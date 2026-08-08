@@ -11,8 +11,14 @@ export const APP_PAGE_SCROLL_HEADER_BAND_VH = 11;
 /** Breadcrumbs + MainCard title row above the scroll body. */
 export const APP_PAGE_SCROLL_TITLE_CHROME_VH = 9;
 
-/** Right-panel section header (e.g. Vetted Biography) below page title. */
+/** Right-panel section header (e.g. Chat with …) below page title. */
 export const APP_PAGE_SCROLL_RIGHT_PANEL_HEADER_VH = 4;
+
+/** Public/Buddies area tab row + sub-tab row under the right-panel header. */
+export const APP_PAGE_SCROLL_RIGHT_PANEL_TAB_BARS_VH = 12;
+
+/** Page toolbar above the two-column layout (e.g. Refresh Posts & Chats). */
+export const APP_PAGE_SCROLL_PAGE_TOOLBAR_VH = 6;
 
 /** Default empty space after the last row so users know they reached the end. */
 export const APP_PAGE_SCROLL_BOTTOM_PADDING_VH = 6;
@@ -22,12 +28,18 @@ export function getAppPageZoomFactor(pageZoom) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed / 100 : 1;
 }
 
-function scrollChromeVhTotal({ rightPanelHeader = false } = {}) {
+function scrollChromeVhTotal({
+  rightPanelHeader = false,
+  rightPanelTabBars = false,
+  pageToolbar = false
+} = {}) {
   return (
     APP_PAGE_SCROLL_HEADER_BAND_VH +
     getAuthFooterHeightVh() +
     APP_PAGE_SCROLL_TITLE_CHROME_VH +
-    (rightPanelHeader ? APP_PAGE_SCROLL_RIGHT_PANEL_HEADER_VH : 0)
+    (rightPanelHeader ? APP_PAGE_SCROLL_RIGHT_PANEL_HEADER_VH : 0) +
+    (rightPanelTabBars ? APP_PAGE_SCROLL_RIGHT_PANEL_TAB_BARS_VH : 0) +
+    (pageToolbar ? APP_PAGE_SCROLL_PAGE_TOOLBAR_VH : 0)
   );
 }
 
@@ -58,7 +70,7 @@ const appPageScrollRegionScrollbarSx = {
 
 /**
  * @param {number} zoomFactor — from getAppPageZoomFactor(pageZoom); pass 1 on mobile scale paths.
- * @param {{ rightPanelHeader?: boolean, bottomPaddingVh?: number }} [options]
+ * @param {{ rightPanelHeader?: boolean, rightPanelTabBars?: boolean, pageToolbar?: boolean, bottomPaddingVh?: number }} [options]
  */
 export function buildAppPageScrollRegionSx(zoomFactor = 1, options = {}) {
   const bottomPaddingVh = options.bottomPaddingVh ?? APP_PAGE_SCROLL_BOTTOM_PADDING_VH;

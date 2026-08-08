@@ -1162,11 +1162,20 @@ export default function VettedFriendsPicksLayout({
   const chatPanelViewportSx = useMemo(() => {
     if (!selectedRightPanelShowsChat) return undefined;
     const zoomFactor = downSM ? 1 : getAppPageZoomFactor(pageZoom);
+    // Remaining viewport after app chrome + page toolbar; right-panel header/tabs live inside this budget.
+    const columnHeight = getAppPageScrollRegionMaxHeightCss(zoomFactor, {
+      pageToolbar: true
+    });
     return {
-      minHeight: getAppPageScrollRegionMaxHeightCss(zoomFactor, { rightPanelHeader: true }),
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
+      columnHeight,
+      contentSx: {
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        boxSizing: 'border-box'
+      }
     };
   }, [downSM, pageZoom, selectedRightPanelShowsChat]);
   useEffect(() => {
@@ -2006,7 +2015,14 @@ export default function VettedFriendsPicksLayout({
           flexDirection: { xs: 'column', sm: 'row' },
           gap: 1.5,
           width: '100%',
-          alignItems: 'flex-start'
+          alignItems: selectedRightPanelShowsChat ? 'stretch' : 'flex-start',
+          ...(selectedRightPanelShowsChat && chatPanelViewportSx?.columnHeight
+            ? {
+                minHeight: 0,
+                height: chatPanelViewportSx.columnHeight,
+                maxHeight: chatPanelViewportSx.columnHeight
+              }
+            : null)
         }}
       >
       <ColorTemplate8PhotoGallery header="Drag a card to rearrange order" selectedGreenBackground selectedAvatarCircular>
@@ -2126,7 +2142,10 @@ export default function VettedFriendsPicksLayout({
           bgcolor: selectedRightPanelShowsChat ? '#ffffff' : 'var(--theme-secondary-color)',
           display: 'flex',
           flexDirection: 'column',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          ...(selectedRightPanelShowsChat
+            ? { minHeight: 0, height: '100%', maxHeight: '100%', overflow: 'hidden' }
+            : null)
         }}
       >
         {selectedIsBlocked ? null : (
@@ -2280,7 +2299,7 @@ export default function VettedFriendsPicksLayout({
           sx={{
             p: selectedRightPanelShowsChat ? 1 : 1.25,
             pb: 0.5,
-            ...(chatPanelViewportSx ?? { display: 'block' })
+            ...(chatPanelViewportSx?.contentSx ?? { display: 'block' })
           }}
         >
           {selectedRightPanelShowsChat && selectedRow ? (
