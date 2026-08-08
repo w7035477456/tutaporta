@@ -22,6 +22,7 @@ import {
   unlockPhotoAlbumsOneDrive
 } from 'api/photoAlbumsFe';
 import {
+  closePhotoAlbumsOneDriveOAuthPopup,
   openPhotoAlbumsOneDriveOAuthPopup,
   PHOTO_ALBUMS_ONEDRIVE_OAUTH_RESULT_KEY
 } from 'utils/photoAlbumsOneDriveOAuth';
@@ -95,6 +96,20 @@ export default function PhotoAlbumsOneDriveGate({
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
   const [, setUnlockGuard] = useState(null);
   const oneDriveGateHandledRef = useRef(false);
+  /** User clicked Skip OneDrive on the busy overlay — abandon in-flight connect. */
+  const oneDriveBusySkipRef = useRef(false);
+
+  const handleSkipOneDriveBusy = useCallback(() => {
+    oneDriveBusySkipRef.current = true;
+    oneDriveGateHandledRef.current = false;
+    closePhotoAlbumsOneDriveOAuthPopup();
+    setOneDriveBusy(false);
+    setOneDriveBusyProgressPercent(null);
+    setOneDriveBusyLabel('Connecting to OneDrive');
+    setOneDriveLoginError('');
+    setOneDriveLoginErrorSecondary('');
+    rvCloudLog('OneDrive', 'FE user skipped OneDrive busy wait');
+  }, []);
 
   useEffect(() => {
     const notice = String(sessionNotice || '').trim();
@@ -307,6 +322,7 @@ export default function PhotoAlbumsOneDriveGate({
       return;
     }
     rvCloudLog('OneDrive', 'FE login-and-use start', { email, oneDriveConnected, normalizedConnected });
+    oneDriveBusySkipRef.current = false;
     setOneDriveBusyLabel('Connecting to OneDrive');
     setOneDriveBusyProgressPercent(null);
     setOneDriveBusy(true);
@@ -320,6 +336,7 @@ export default function PhotoAlbumsOneDriveGate({
       if (oneDriveConnected && normalizedLogin === normalizedConnected) {
         rvCloudLog('OneDrive', 'FE login-and-use same account — skip oauth', { email: normalizedLogin });
         const status = await fetchPhotoAlbumsOneDriveStatus();
+        if (oneDriveBusySkipRef.current) return;
         if (await showInvalidVaultDialogIfNeeded(status)) return;
         oneDriveGateHandledRef.current = true;
         setOneDriveLoggedInEmail(normalizedLogin);
@@ -340,6 +357,7 @@ export default function PhotoAlbumsOneDriveGate({
         });
         setOneDriveLoggedInEmail('');
         await disconnectPhotoAlbumsOneDrive();
+        if (oneDriveBusySkipRef.current) return;
         setOneDriveConnected(false);
         setOneDriveEmail('');
         setOneDriveHasVault(false);
@@ -347,11 +365,14 @@ export default function PhotoAlbumsOneDriveGate({
       }
 
       const oauthEmail = await openPhotoAlbumsOneDriveOAuthPopup(email);
+      if (oneDriveBusySkipRef.current) return;
       rvCloudLog('OneDrive', 'FE login-and-use oauth resolved', { email: oauthEmail });
       setOneDriveEmail(oauthEmail);
       setOneDriveConnected(true);
       await refreshOneDriveStatus();
+      if (oneDriveBusySkipRef.current) return;
       const status = await fetchPhotoAlbumsOneDriveStatus();
+      if (oneDriveBusySkipRef.current) return;
       if (await showInvalidVaultDialogIfNeeded(status)) return;
       oneDriveGateHandledRef.current = true;
       const resolvedEmail = String(oauthEmail || email).trim();
@@ -365,6 +386,7 @@ export default function PhotoAlbumsOneDriveGate({
       }
       rvCloudLog('OneDrive', 'FE login-and-use complete', { email: oauthEmail });
     } catch (err) {
+      if (oneDriveBusySkipRef.current) return;
       oneDriveGateHandledRef.current = false;
       setOneDriveLoggedInEmail('');
       if (isOneDriveOAuthPopupClosedError(err)) {
@@ -387,6 +409,11 @@ export default function PhotoAlbumsOneDriveGate({
       setOneDriveLoginError(message);
       setOneDriveLoginErrorSecondary(String(err?.errorSecondary || data.errorSecondary || '').trim());
     } finally {
+      if (oneDriveBusySkipRef.current) {
+        oneDriveBusySkipRef.current = false;
+        setOneDriveBusy(false);
+        return;
+      }
       setOneDriveBusy(false);
     }
   };
@@ -574,6 +601,14 @@ export default function PhotoAlbumsOneDriveGate({
         progressPercent={oneDriveBusyProgressPercent}
         progressLabel={oneDriveBusyLabel}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+        actionLabel={
+          /connecting to onedrive/i.test(String(oneDriveBusyLabel || '')) ? 'Skip OneDrive' : ''
+        }
+        onAction={
+          /connecting to onedrive/i.test(String(oneDriveBusyLabel || ''))
+            ? handleSkipOneDriveBusy
+            : undefined
+        }
       />
       <PhotoAlbumsViewVaultDialog open={open && viewVaultOpen} onClose={() => setViewVaultOpen(false)} />
       <PhotoAlbumsOneDriveBackupDialog
@@ -636,6 +671,7 @@ export default function PhotoAlbumsOneDriveGate({
               onBackupRestore={handleBackupRestore}
               onFormatMyPhotoAlbumsFolder={() => void handleFormatOneDriveVault()}
               onLogin={(email) => void handleOneDriveLoginAndUse(email)}
+              onSkipOneDrive={handleSkipOneDriveBusy}
               onClearError={() => {
                 setOneDriveLoginError('');
                 setOneDriveLoginErrorSecondary('');
@@ -667,6 +703,7 @@ export default function PhotoAlbumsOneDriveGate({
             onBackupRestore={handleBackupRestore}
             onFormatMyPhotoAlbumsFolder={() => void handleFormatOneDriveVault()}
             onLogin={(email) => void handleOneDriveLoginAndUse(email)}
+            onSkipOneDrive={handleSkipOneDriveBusy}
             onClearError={() => {
               setOneDriveLoginError('');
               setOneDriveLoginErrorSecondary('');

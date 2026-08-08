@@ -277,6 +277,7 @@ export default function PhotoAlbumsOneDriveLoginModal({
   onLogin,
   onClose,
   onClearError,
+  onSkipOneDrive,
   videoTutorialUrl = ''
 }) {
   const [savedEmail, setSavedEmail] = useState('');
@@ -691,6 +692,11 @@ export default function PhotoAlbumsOneDriveLoginModal({
     </>
   );
 
+  const showSkipOneDrive =
+    busy &&
+    typeof onSkipOneDrive === 'function' &&
+    /connecting to onedrive/i.test(String(busyLabel || ''));
+
   return (
     <>
       <BusyHourglassOverlay
@@ -699,6 +705,8 @@ export default function PhotoAlbumsOneDriveLoginModal({
         progressPercent={busyProgressPercent}
         progressLabel={busyLabel}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+        actionLabel={showSkipOneDrive ? 'Skip OneDrive' : ''}
+        onAction={showSkipOneDrive ? onSkipOneDrive : undefined}
       />
       {embedded ? (
         <Box sx={{ width: '100%' }}>{panelBody}</Box>

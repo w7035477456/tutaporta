@@ -71,6 +71,18 @@ function closePopupQuietly(popup) {
   }
 }
 
+/** Close an in-flight OneDrive OAuth popup (e.g. user clicked Skip OneDrive). */
+export function closePhotoAlbumsOneDriveOAuthPopup() {
+  if (typeof window === 'undefined') return;
+  try {
+    const popup = window.open('', 'photoAlbumsOneDriveOAuth');
+    closePopupQuietly(popup);
+  } catch {
+    // ignore
+  }
+  clearOAuthResultLocalStorage();
+}
+
 export function openPhotoAlbumsOneDriveOAuthPopup(loginHint = '') {
   return new Promise((resolve, reject) => {
     const provider = 'OneDrive';
