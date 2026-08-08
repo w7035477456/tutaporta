@@ -17,7 +17,7 @@ import { getAdminImpersonationHeaderState } from 'config/adminImpersonationHeade
 import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeaderCenter';
 import DemoOnlyModeBanner from 'ui-component/DemoOnlyModeBanner';
 import { useAuth } from 'contexts/AuthContext';
-import { isDemoUserCategory } from 'utils/memberCategory';
+import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import HeaderLeft from './Header/HeaderLeft';
 import HeaderRight from './Header/HeaderRight';
 import Sidebar from './Sidebar';
@@ -50,7 +50,7 @@ export default function ApplicationShell({
   const theme = useTheme();
   const { user } = useAuth();
   const adminHeader = getAdminImpersonationHeaderState(user);
-  const showDemoOnlyBanner = !adminHeader && isDemoUserCategory(user?.member_category);
+  const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
   const region7Wide = landingPageWide || landingFrameWide;
   const mainEdgeToEdgeEffective = mainEdgeToEdge || immersiveMain;
 

@@ -107,7 +107,7 @@ const vettedFriendsApprovedRibbonSx = {
   top: '14%',
   left: '-38%',
   width: '100%',
-  py: '0.12rem',
+  py: '0.2rem',
   bgcolor: '#FFEB3B',
   color: '#000000',
   WebkitTextFillColor: '#000000',
@@ -120,7 +120,7 @@ const vettedFriendsApprovedRibbonSx = {
      0.5px  0.5px 0 #000000
   `,
   fontFamily: 'inherit',
-  fontSize: { xs: '0.52rem', sm: '0.58rem' },
+  fontSize: { xs: '1.04rem', sm: '1.16rem' },
   fontWeight: 800,
   letterSpacing: 0.15,
   lineHeight: 1.15,

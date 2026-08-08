@@ -269,6 +269,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
     userSelect: 'none',
     ...(showSelfReportCompletedBadge
       ? {
+          pb: '1.1em !important',
           [`& .${SELF_REPORT_BIO_COMPLETED_BADGE_CLASS}`]: selfReportBioCompletedBadgeSx()
         }
       : null),
@@ -366,7 +367,12 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           <Activity mode={drawerOpen && navChip ? 'visible' : 'hidden'}>{renderNavPendingChip()}</Activity>
         </Box>
         {showSelfReportCompletedBadge ? (
-          <Box component="span" className={SELF_REPORT_BIO_COMPLETED_BADGE_CLASS} aria-hidden>
+          <Box
+            component="span"
+            className={SELF_REPORT_BIO_COMPLETED_BADGE_CLASS}
+            aria-hidden
+            sx={selfReportBioCompletedBadgeSx()}
+          >
             {completedPercent}% completed
           </Box>
         ) : null}

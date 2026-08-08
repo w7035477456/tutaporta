@@ -2,12 +2,12 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { bsizeFontSizeResponsive } from 'config/bsizeEnv';
 import { useAuth } from 'contexts/AuthContext';
-import { isDemoUserCategory } from 'utils/memberCategory';
+import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 
-/** Yellow center-top badge when logged in as DemoUser — shown on all MainLayout pages. */
+/** Yellow center-top badge for demo/demo (or guest/guest) login — not for real DemoUser email logins. */
 export default function DemoOnlyModeBanner() {
   const { user } = useAuth();
-  if (!isDemoUserCategory(user?.member_category)) return null;
+  if (!isGuestDemoLogin(user)) return null;
 
   return (
     <Box

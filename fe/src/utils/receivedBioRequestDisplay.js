@@ -36,6 +36,71 @@ export function isVetBioInfoMatches(vettedValue) {
   return s === 'info_matches' || s === 'info_matched';
 }
 
+/**
+ * Self-Report-Bio % completed — only these 13 UI fields count (yellow digits on Self-Report page).
+ * Other page fields (names, citizenship, POB, Gov Id, misc, etc.) do not count.
+ */
+export const SELF_REPORT_COMPLETION_BRIEF_FIELD_KEYS = Object.freeze([
+  'profileDlPhoto', // 1 Profile&DL photo
+  'profileLivePhoto', // 2 Profile&Live
+  'age', // 3
+  'height', // 4
+  'gender', // 5
+  'current_city' // 6
+]);
+
+export const SELF_REPORT_COMPLETION_FULL_FIELD_KEYS = Object.freeze([
+  'company_domain_name', // 7
+  'current_company', // 8 Employer Name
+  'job_title', // 9
+  'linkedin_url', // 10
+  'college_name', // 11
+  'highest_degree_completed', // 12
+  'degree_graduation_date' // 13
+]);
+
+export const SELF_REPORT_COMPLETION_FIELD_KEYS = Object.freeze([
+  ...SELF_REPORT_COMPLETION_BRIEF_FIELD_KEYS,
+  ...SELF_REPORT_COMPLETION_FULL_FIELD_KEYS
+]);
+
+function isDemoUserMemberCategory(raw) {
+  return String(raw ?? '').trim().toLowerCase() === 'demouser';
+}
+
+function findBioReviewCompletionRow(bioReview, key) {
+  const brief = Array.isArray(bioReview?.briefBio) ? bioReview.briefBio : [];
+  const full = Array.isArray(bioReview?.fullBio) ? bioReview.fullBio : [];
+  return brief.find((row) => row?.key === key) || full.find((row) => row?.key === key) || null;
+}
+
+/**
+ * Matches Self-Report Matching Status display:
+ * DemoUser → Profile&DL / Profile&Live = Not Started; other counted fields = Completed.
+ * Everyone else → verificationStatus info_matches.
+ */
+export function isSelfReportCompletionFieldCompleted(row, { demoUser = false } = {}) {
+  if (!row?.key) return false;
+  if (demoUser) {
+    if (row.key === 'profileDlPhoto' || row.key === 'profileLivePhoto') return false;
+    return true;
+  }
+  return isVetBioInfoMatches(row.verificationStatus);
+}
+
+/** Round to whole % — completed count / fieldKeys.length. */
+export function calcSelfReportCompletionPercent(bioReview, fieldKeys = SELF_REPORT_COMPLETION_FIELD_KEYS) {
+  const keys = Array.isArray(fieldKeys) ? fieldKeys : SELF_REPORT_COMPLETION_FIELD_KEYS;
+  if (!keys.length) return 0;
+  const demoUser = isDemoUserMemberCategory(bioReview?.member?.memberCategory);
+  let matched = 0;
+  for (const key of keys) {
+    const row = findBioReviewCompletionRow(bioReview, key);
+    if (isSelfReportCompletionFieldCompleted(row, { demoUser })) matched += 1;
+  }
+  return Math.round((matched / keys.length) * 100);
+}
+
 /** vet_bio.profilephoto_vetted / age_vetted — Brief/Full Bio Available when info_matches. */
 export function isVetBioAvailable(vettedValue) {
   return isVetBioInfoMatches(vettedValue);
@@ -318,23 +383,19 @@ export function calcFullBioMatchPercent(vetRow) {
 }
 
 export function calcBriefBioMatchPercentFromBioReview(bioReview) {
-  const vetRow = bioReview?.vetBio ?? bioReview;
-  return calcBriefBioMatchPercent(vetRow);
+  return calcSelfReportCompletionPercent(bioReview, SELF_REPORT_COMPLETION_BRIEF_FIELD_KEYS);
 }
 
 export function calcFullBioMatchPercentFromBioReview(bioReview) {
-  const vetRow = bioReview?.vetBio ?? bioReview;
-  return calcFullBioMatchPercent(vetRow);
+  return calcSelfReportCompletionPercent(bioReview, SELF_REPORT_COMPLETION_FULL_FIELD_KEYS);
 }
 
 /**
- * Sidebar "My Self-Report-Bio" badge — average of Brief Bio % and Full Bio % only
- * (excludes Optional Passport / miscellaneous).
+ * Sidebar "My Self-Report-Bio" badge — completed count / 13 Self-Report fields only
+ * (see SELF_REPORT_COMPLETION_FIELD_KEYS).
  */
 export function calcSelfReportBioAverageCompletedPercent(bioReview) {
-  const brief = calcBriefBioMatchPercentFromBioReview(bioReview);
-  const full = calcFullBioMatchPercentFromBioReview(bioReview);
-  return Math.round((brief + full) / 2);
+  return calcSelfReportCompletionPercent(bioReview, SELF_REPORT_COMPLETION_FIELD_KEYS);
 }
 
 const BRIEF_BIO_ROW_VET_FIELD = {

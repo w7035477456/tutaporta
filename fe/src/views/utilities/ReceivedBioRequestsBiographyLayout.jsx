@@ -3,7 +3,7 @@
  * panel only, adapted for Received Bio Requests (/receivedBioRequests).
  * Baseline copy; further behavior changes belong in this file.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
@@ -178,6 +178,7 @@ export default function ReceivedBioRequestsBiographyLayout({
   const isAdmin = isAdminSession(user);
   const API_BASE_URL = getApiBaseUrl();
   const [selectedSinglesId, setSelectedSinglesId] = useState(null);
+  const [touchedApprovalsByRequestId, setTouchedApprovalsByRequestId] = useState({});
 
   const orderStorageKey = user?.singles_id ? `${RECEIVED_BIO_ORDER_LS_PREFIX}${user.singles_id}` : null;
   const orderStorageKeyRef = useRef(orderStorageKey);
@@ -252,6 +253,19 @@ export default function ReceivedBioRequestsBiographyLayout({
     return rowByRequesterId.get(Number(selectedSinglesId)) ?? null;
   }, [rowByRequesterId, selectedSinglesId]);
 
+  const markApprovalTouched = useCallback((requesterSinglesId, bioKind) => {
+    const id = Number(requesterSinglesId);
+    if (!Number.isFinite(id) || id < 1) return;
+    if (bioKind !== 'brief' && bioKind !== 'full') return;
+    setTouchedApprovalsByRequestId((prev) => ({
+      ...prev,
+      [id]: {
+        ...(prev[id] ?? {}),
+        [bioKind]: true
+      }
+    }));
+  }, []);
+
   const requesterPreviewLabel = useMemo(() => {
     if (!selectedRow) return 'this member';
     return formatMemberLabel({
@@ -296,24 +310,22 @@ export default function ReceivedBioRequestsBiographyLayout({
 
   const submitResponseEnabled = useMemo(() => {
     if (!selectedRow || responseDisabled || requestBusyKey) return false;
-    const originalRow = originalRows.find((item) => item.requests_id === selectedRow.requests_id);
-    if (!originalRow) return false;
 
-    const draftBrief = triStateApproval(selectedRow.brief_bio_request_approval);
-    const draftFull = triStateApproval(selectedRow.full_bio_request_approval);
-    const savedBrief = triStateApproval(originalRow.brief_bio_request_approval);
-    const savedFull = triStateApproval(originalRow.full_bio_request_approval);
-
+    const touchKey = Number(selectedRow.singles_id_from);
+    const touched = Number.isFinite(touchKey) ? touchedApprovalsByRequestId[touchKey] ?? {} : {};
     const briefRequested = isBioRequestRequested(selectedRow.brief_bio_request);
     const fullRequested = isBioRequestRequested(selectedRow.full_bio_request);
+    const briefApproval = triStateApproval(selectedRow.brief_bio_request_approval);
+    const fullApproval = triStateApproval(selectedRow.full_bio_request_approval);
 
-    const briefReady = briefRequested && draftBrief !== APPROVAL_STATUS.NO_RESPONSE;
-    const fullReady = fullRequested && draftFull !== APPROVAL_STATUS.NO_RESPONSE;
-    const briefChanged = briefRequested && briefReady && draftBrief !== savedBrief;
-    const fullChanged = fullRequested && fullReady && draftFull !== savedFull;
+    // Approve/Deny: draft leaves noresponse. No Response: requires an explicit radio click (touched).
+    const briefChosen =
+      briefRequested && (Boolean(touched.brief) || briefApproval !== APPROVAL_STATUS.NO_RESPONSE);
+    const fullChosen =
+      fullRequested && (Boolean(touched.full) || fullApproval !== APPROVAL_STATUS.NO_RESPONSE);
 
-    return briefChanged || fullChanged;
-  }, [selectedRow, originalRows, responseDisabled, requestBusyKey]);
+    return briefChosen || fullChosen;
+  }, [selectedRow, responseDisabled, requestBusyKey, touchedApprovalsByRequestId]);
 
   const submitResponseBusy = requestBusyKey === `${selectedRow?.requests_id}:submit`;
 
@@ -436,6 +448,14 @@ export default function ReceivedBioRequestsBiographyLayout({
     const radioLabelSx = responseBoxInteractive ? responseRadioLabelSx : responseRadioLabelDisabledSx;
     const effectiveSavedApproval = responsePanelEnabled ? savedApproval : APPROVAL_STATUS.NO_RESPONSE;
     const effectiveApprovalValue = canRespondToBioRequest ? approvalValue : APPROVAL_STATUS.NO_RESPONSE;
+    const approvalTouched = Boolean(
+      touchedApprovalsByRequestId[Number(row.singles_id_from)]?.[bioKind]
+    );
+    // Pending requests start with no radio selected until the user clicks one.
+    const radioGroupValue =
+      canRespondToBioRequest && !approvalTouched && effectiveSavedApproval === APPROVAL_STATUS.NO_RESPONSE
+        ? ''
+        : effectiveApprovalValue;
     const approveDenyLocked =
       responsePanelEnabled &&
       isApprovalLockedDuringStay(effectiveSavedApproval, approvalDate, approvalStayDurationDays);
@@ -463,6 +483,7 @@ export default function ReceivedBioRequestsBiographyLayout({
 
     const handleRadioChange = (nextValue) => {
       if (!canRespondToBioRequest || approveDenyDisabled) return;
+      markApprovalTouched(row.singles_id_from, bioKind);
       if (typeof onApprovalChange === 'function') {
         onApprovalChange(row, approvalType, nextValue);
       }
@@ -577,7 +598,7 @@ export default function ReceivedBioRequestsBiographyLayout({
               </Typography>
             ) : null}
             <RadioGroup
-              value={effectiveApprovalValue}
+              value={radioGroupValue}
               onChange={(e) => handleRadioChange(e.target.value)}
               sx={{
                 mt: 0,
@@ -899,7 +920,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                           py: { xs: 0.75, sm: 1 }
                         }}
                       >
-                        {`Based on your choices above, here is a preview of what ${requesterPreviewLabel} will see:`}
+                        {`Based on your choices above, here is a preview of what ${requesterPreviewLabel} will see (after you approved):`}
                       </Typography>
                       {requesterPreviewPanel?.empty ? null : requesterPreviewPanel?.bioReview ? (
                         <CheckrBioReviewPanel

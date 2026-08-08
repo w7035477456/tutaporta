@@ -58,7 +58,7 @@ import {
   MY_PHOTO_ALBUMS_BANNER_IMAGE,
   myPhotoAlbumsHeaderBannerSx
 } from 'config/photoAlbumsLayout';
-import { isDemoUserCategory } from 'utils/memberCategory';
+import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 
 // ==============================|| MAIN LAYOUT ||============================== //
 
@@ -118,7 +118,7 @@ export default function MainLayout() {
   const location = useLocation();
   const { user, requiresPasswordUpgrade, upgradeLegacyPassword } = useAuth();
   const adminHeader = getAdminImpersonationHeaderState(user);
-  const showDemoOnlyBanner = !adminHeader && isDemoUserCategory(user?.member_category);
+  const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
   useFlowerShopLightThemeOverride();
 
   const {

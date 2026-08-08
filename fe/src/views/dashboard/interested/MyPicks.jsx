@@ -74,7 +74,7 @@ const MY_PICKS_ORDER_LS_PREFIX = 'myPicksPhotoOrder:';
 const INITIAL_POSTS_LIMIT = COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT;
 const INSTRUCTION_POPUP_TEXT =
   'You are here because you clicked "My Picks" on someone who caught your eye (romance) or shared your hobbies (hobby partners). From here in "Picks & Posts," you can explore their life story and get a glimpse into their world.\n\n' +
-  'After viewing their Public Albums & Postings, you now have two choices: click "Acquaintance Request!" or "Buddy Request!" (or x to remove).\n\n' +
+  'After viewing their Public Albums & Postings, you now have two choices: click "Acquaintance Request!" or "Buddy Request!" (or x to remove).  Full Bio contains Brief Bio informations; so best request only one and wait for response, instead request both.\n\n' +
   'With an Acquaintance Request, you two mutually agree to share a "Brief Bio" (photo validation, age, height, gender, and city).\n\n' +
   'With a Buddy Request, you two mutually agree to share a "Full Bio" (employer domain, LinkedIn URL, job title, education details, and 16 other favorites/infos).\n\n' +
   'Please head over to the "My Self-Report-Bio" menu and complete all reporting there. Other members are much more likely to approve your request if they see your profile is marked "Completed" (your answers remain hidden until both of you mutually agree to swap bios).\n\n' +
@@ -453,12 +453,12 @@ export default function MyPicks() {
     top: '14%',
     left: '-38%',
     width: '100%',
-    py: '0.12rem',
+    py: '0.2rem',
     bgcolor: '#e53935',
     color: '#fff',
     WebkitTextFillColor: '#fff',
     fontFamily: 'inherit',
-    fontSize: { xs: '0.52rem', sm: '0.58rem' },
+    fontSize: { xs: '1.04rem', sm: '1.16rem' },
     fontWeight: 800,
     letterSpacing: 0.15,
     lineHeight: 1.15,

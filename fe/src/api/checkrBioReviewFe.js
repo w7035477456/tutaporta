@@ -50,7 +50,7 @@ export async function resetProfilePhotoVetting() {
   });
 }
 
-/** Sidebar: Brief+Full bio average completion % for My Self-Report-Bio. */
+/** Sidebar: My Self-Report-Bio completion % from the 13 counted Self-Report fields. */
 export function useSelfReportBioCompletedPercent(enabled = true) {
   const url = enabled ? CHECKR_BIO_REVIEW_SWR_KEY : null;
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, {

@@ -15,6 +15,7 @@ export default function GreenButton({ sx, singleLineLabel = true, children, ...r
 
   return (
     <UnSelectedButtonTemplate
+      greenGreyStates
       hoverScale={1}
       fitLabelWidth={false}
       singleLineLabel={singleLineLabel}

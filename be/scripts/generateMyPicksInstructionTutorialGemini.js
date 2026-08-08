@@ -32,7 +32,7 @@ const COPY = {
   step: 'You are on the "Picks & Posts" step',
   body: [
     'You are here because you clicked "My Picks" on someone who caught your eye (romance) or shared your hobbies (hobby partners). From here in "Picks & Posts," you can explore their life story and get a glimpse into their world.',
-    'After viewing their Public Albums & Postings, you now have two choices: click "Acquaintance Request!" or "Buddy Request!" (or x to remove).',
+    'After viewing their Public Albums & Postings, you now have two choices: click "Acquaintance Request!" or "Buddy Request!" (or x to remove).  Full Bio contains Brief Bio informations; so best request only one and wait for response, instead request both.',
     'With an Acquaintance Request, you two mutually agree to share a "Brief Bio" (photo validation, age, height, gender, and city).',
     'With a Buddy Request, you two mutually agree to share a "Full Bio" (employer domain, LinkedIn URL, job title, education details, and 16 other favorites/infos).',
     'Please head over to the "My Self-Report-Bio" menu and complete all reporting there. Other members are much more likely to approve your request if they see your profile is marked "Completed" (your answers remain hidden until both of you mutually agree to swap bios).',
