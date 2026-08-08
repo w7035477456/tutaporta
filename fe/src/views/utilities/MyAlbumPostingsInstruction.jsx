@@ -73,7 +73,7 @@ export function MyAlbumPostingsInstructionBody() {
           </li>
           <li>
             <strong>Choose Your Audience:</strong> Before you click save, don&apos;t forget to set your post&apos;s visibility to Public,
-            Friends, or Myself.
+            Buddies, or MySelf.
           </li>
           <li>
             <strong>Change Your Mind?</strong> No worries at all! If you ever want to delete a post—whether it&apos;s brand new or from your
@@ -91,7 +91,7 @@ export function MyAlbumPostingsInstructionBody() {
           <li>
             <strong>Total Control:</strong> You can update your past photos and captions whenever you like. You also have the power to delete
             comments left by others, edit your own past comments, or change a post&apos;s visibility at any time (choose between Public,
-            Friends, or Just Me).
+            Buddies, or MySelf).
           </li>
         </PageInstructionPopup.BodyText>
       </InstructionSection>

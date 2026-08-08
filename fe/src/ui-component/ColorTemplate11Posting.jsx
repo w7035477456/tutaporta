@@ -251,8 +251,8 @@ function ColorTemplate11PostingPostHeader({
               sx={colorTemplate11PostingVisibilitySelectSx()}
             >
               <MenuItem value="public">Public</MenuItem>
-              <MenuItem value="friends">Friends</MenuItem>
-              <MenuItem value="mySelf">Myself</MenuItem>
+              <MenuItem value="friends">Buddies</MenuItem>
+              <MenuItem value="mySelf">MySelf</MenuItem>
             </Select>
           </Box>
         ) : null}

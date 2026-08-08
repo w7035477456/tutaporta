@@ -1996,8 +1996,8 @@ export default function VettedFriendsPicksLayout({
                     }}
                   />
                   {showApprovedRibbon ? (
-                    <Box component="span" aria-label="Approved" sx={vettedFriendsApprovedRibbonSx}>
-                      Approved!
+                    <Box component="span" aria-label="View Approved" sx={vettedFriendsApprovedRibbonSx}>
+                      View Approved!
                     </Box>
                   ) : null}
                 </Box>

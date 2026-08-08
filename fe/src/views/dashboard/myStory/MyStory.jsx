@@ -1150,6 +1150,8 @@ export default function MyStory() {
   const [postingDraftPhotoIds, setPostingDraftPhotoIds] = useState([]);
   const [postingDraftVideoIds, setPostingDraftVideoIds] = useState([]);
   const [postingDraftVisibility, setPostingDraftVisibility] = useState('public');
+  const [postingVisibilityMenuOpen, setPostingVisibilityMenuOpen] = useState(false);
+  const pendingSaveAfterVisibilityRef = useRef(false);
   const [moreSharingPopupOpen, setMoreSharingPopupOpen] = useState(false);
   const [postingDragOver, setPostingDragOver] = useState(false);
   const [postingSaving, setPostingSaving] = useState(false);
@@ -2309,6 +2311,25 @@ export default function MyStory() {
 
   const postingSaveReady =
     postingDraftPhotoIds.length > 0 || postingDraftVideoIds.length > 0 || postingDraftText.trim().length > 0;
+
+  /** Save → open visibility dropdown; picking Public / Buddies / Myself then creates the post. */
+  const handlePostingSaveClick = useCallback(() => {
+    if (postingSaving || !postingSaveReady) return;
+    pendingSaveAfterVisibilityRef.current = true;
+    setPostingVisibilityMenuOpen(true);
+  }, [postingSaving, postingSaveReady]);
+
+  const handlePostingVisibilityPicked = useCallback(
+    (rawVisibility) => {
+      const visibility = normalizeColorTemplate11PostingVisibility(rawVisibility);
+      setPostingDraftVisibility(visibility);
+      const shouldSave = pendingSaveAfterVisibilityRef.current;
+      pendingSaveAfterVisibilityRef.current = false;
+      setPostingVisibilityMenuOpen(false);
+      if (shouldSave) void handleSavePosting(visibility);
+    },
+    [handleSavePosting]
+  );
 
   useEffect(() => {
     if (!myPicksFeed || Number(myPicksFeed.target_singles_id) !== Number(ownerSinglesId)) {
@@ -4146,15 +4167,32 @@ export default function MyStory() {
           </Typography>
           <Select
             value={postingDraftVisibility}
-            onChange={(e) => setPostingDraftVisibility(normalizeColorTemplate11PostingVisibility(e.target.value))}
+            open={postingVisibilityMenuOpen}
+            onOpen={() => setPostingVisibilityMenuOpen(true)}
+            onClose={() => {
+              setPostingVisibilityMenuOpen(false);
+              pendingSaveAfterVisibilityRef.current = false;
+            }}
+            onChange={(e) => {
+              // Draft-only when user opens the control without clicking Save.
+              if (pendingSaveAfterVisibilityRef.current) return;
+              setPostingDraftVisibility(normalizeColorTemplate11PostingVisibility(e.target.value));
+            }}
             size="small"
             sx={colorTemplate11PostingVisibilitySelectSx()}
             MenuProps={colorTemplate11PostingVisibilityMenuProps({
               PaperProps: { sx: { maxHeight: COLOR_TEMPLATE11_POSTING_VISIBILITY_SELECT_HEIGHT * 6 } }
             })}
           >
-            <MenuItem value="public">Public</MenuItem>
-            <MenuItem value="friends">Friends</MenuItem>
+            <MenuItem value="public" onClick={() => handlePostingVisibilityPicked('public')}>
+              Public
+            </MenuItem>
+            <MenuItem value="friends" onClick={() => handlePostingVisibilityPicked('friends')}>
+              Buddies
+            </MenuItem>
+            <MenuItem value="mySelf" onClick={() => handlePostingVisibilityPicked('mySelf')}>
+              MySelf
+            </MenuItem>
           </Select>
         </Box>
         <Box sx={{ px: 1.5, pt: 1, pb: 0 }}>
@@ -4336,7 +4374,7 @@ export default function MyStory() {
               greenGreyStates={postingSaveReady}
               fitLabelWidth={false}
               disableElevation
-              onClick={() => handleSavePosting(postingDraftVisibility)}
+              onClick={handlePostingSaveClick}
               disabled={postingSaving}
               sx={{
                 minWidth: 120,
