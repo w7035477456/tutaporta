@@ -64,6 +64,7 @@ import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import {
   MY_PICKS_ACQUAINTANCE_REQUEST_TOOLTIP,
   MY_PICKS_FRIEND_REQUEST_TOOLTIP,
+  getMyPicksAvatarSize,
   myPicksBioGreenRequestButtonSx,
   myPicksBioRequestTooltipSlotProps
 } from 'config/myPicksCardEnv';
@@ -72,7 +73,14 @@ import { isSelfIntroVideoPostingUrl, videoThumbnailUrlFromPostingUrl } from 'api
 const MY_PICKS_ORDER_LS_PREFIX = 'myPicksPhotoOrder:';
 const INITIAL_POSTS_LIMIT = COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT;
 const INSTRUCTION_POPUP_TEXT =
-  "So you got here because you click 'My Picks' of someone catches your eye. From there, 'Picks & Posts' you can explore their life stories and get a glimpse into their world.\n\nWant to know a little more? Click 'Bio Request' (green button mean they have completed their vetting with Industry Reputable 3rd-Party) to ask for their brief or full bio. Once they happily reply 'Approve' (usually just a few days!), they'll appear on the Acquaintances & Buddies page.\n\nGo to Acquaintances & Buddies for further instructions";
+  'You are here because you clicked "My Picks" on someone who caught your eye (romance) or shared your hobbies (hobby partners). From here in "Picks & Posts," you can explore their life story and get a glimpse into their world.\n\n' +
+  'After viewing their Public Albums & Postings, you now have two choices: click "Acquaintance Request!" or "Buddy Request!" (or x to remove).\n\n' +
+  'With an Acquaintance Request, you two mutually agree to share a "Brief Bio" (photo validation, age, height, gender, and city).\n\n' +
+  'With a Buddy Request, you two mutually agree to share a "Full Bio" (employer domain, LinkedIn URL, job title, education details, and 16 other favorites/infos).\n\n' +
+  'Please head over to the "My Self-Report-Bio" menu and complete all reporting there. Other members are much more likely to approve your request if they see your profile is marked "Completed" (your answers remain hidden until both of you mutually agree to swap bios).\n\n' +
+  'After sending a request, wait for their approval under the "Acquaintances & Buddies" menu, where their profile will appear once approved. Get the next tutorial step by clicking the orange top-right button on that menu.';
+
+const MY_PICKS_INSTRUCTION_CONTEXT_STEP = 'You are on the "Picks & Posts" step';
 
 const MY_PICKS_INSTRUCTION_AUDIO_BY_VOICE = {
   Sora: typeof audioMyPicksSora === 'string' ? audioMyPicksSora : audioMyPicksSora?.default || '',
@@ -439,6 +447,30 @@ export default function MyPicks() {
 
   const isBioRequestFlagged = (value) => String(value ?? '').trim().toLowerCase() === 'requested';
 
+  const myPicksRequestedRibbonSx = {
+    position: 'absolute',
+    zIndex: 100,
+    top: '14%',
+    left: '-38%',
+    width: '100%',
+    py: '0.12rem',
+    bgcolor: '#e53935',
+    color: '#fff',
+    WebkitTextFillColor: '#fff',
+    fontFamily: 'inherit',
+    fontSize: { xs: '0.52rem', sm: '0.58rem' },
+    fontWeight: 800,
+    letterSpacing: 0.15,
+    lineHeight: 1.15,
+    textAlign: 'center',
+    textTransform: 'none',
+    whiteSpace: 'nowrap',
+    transform: 'rotate(-45deg)',
+    transformOrigin: 'center',
+    pointerEvents: 'none',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.35)'
+  };
+
   const handleSendBioRequest = useCallback(
     async (kind) => {
       const singlesIdTo = Number(selectedSinglesId);
@@ -612,7 +644,7 @@ export default function MyPicks() {
           <PageInstructionAudioTutorial
             active={instructionOpen}
             audioByVoice={MY_PICKS_INSTRUCTION_AUDIO_BY_VOICE}
-            contextStep={"You are In 'Picks and Posts' step."}
+            contextStep={MY_PICKS_INSTRUCTION_CONTEXT_STEP}
           />
           <PageInstructionPopup.BodyText sx={{ whiteSpace: 'pre-line' }}>
             {INSTRUCTION_POPUP_TEXT}
@@ -695,6 +727,9 @@ export default function MyPicks() {
                   );
                   const isDropTarget =
                     draggingSinglesId != null && dropTargetSinglesId === person.singles_id && draggingSinglesId !== person.singles_id;
+                  const showRequestedRibbon =
+                    isBioRequestFlagged(person.brief_bio_request) ||
+                    isBioRequestFlagged(person.full_bio_request);
                   return (
                     <ColorTemplate8PhotoGallery.Item
                       key={person.singles_id}
@@ -747,12 +782,29 @@ export default function MyPicks() {
                           <IconX stroke={3} color="currentColor" />
                         )}
                       </ColorTemplate8PhotoGallery.RemoveButton>
-                      <ColorTemplate8PhotoGallery.Avatar
-                        src={person.profile_image_url || UserRound}
-                        alt={memberLabel}
-                        selected={selected}
-                        onClick={() => setSelectedSinglesId(Number(person.singles_id))}
-                      />
+                      <Box
+                        sx={{
+                          position: 'relative',
+                          zIndex: 100,
+                          width: getMyPicksAvatarSize(),
+                          height: getMyPicksAvatarSize(),
+                          borderRadius: '50%',
+                          overflow: 'visible',
+                          flexShrink: 0
+                        }}
+                      >
+                        <ColorTemplate8PhotoGallery.Avatar
+                          src={person.profile_image_url || UserRound}
+                          alt={memberLabel}
+                          selected={selected}
+                          onClick={() => setSelectedSinglesId(Number(person.singles_id))}
+                        />
+                        {showRequestedRibbon ? (
+                          <Box component="span" aria-label="Requested" sx={myPicksRequestedRibbonSx}>
+                            Requested
+                          </Box>
+                        ) : null}
+                      </Box>
                       <ColorTemplate8PhotoGallery.NameButton onClick={() => setSelectedSinglesId(Number(person.singles_id))}>
                         <ColorTemplate8PhotoGallery.Label
                           primary={memberDisplay.primary}
@@ -793,8 +845,8 @@ export default function MyPicks() {
               <Box sx={myPicksBioPanelGridSx}>
               {(['brief', 'full']).map((kind, sectionIndex) => {
                 const isBrief = kind === 'brief';
-                const kindLabel = isBrief ? 'Acquaintance Request:' : 'Friend Request:';
-                const requestButtonLabel = isBrief ? 'Acquaintance Request' : 'Friend Request';
+                const kindLabel = isBrief ? 'Acquaintance Request:' : 'Buddy Request:';
+                const requestButtonLabel = isBrief ? 'Acquaintance Request' : 'Buddy Request';
                 const requestTooltipText = isBrief
                   ? MY_PICKS_ACQUAINTANCE_REQUEST_TOOLTIP
                   : MY_PICKS_FRIEND_REQUEST_TOOLTIP;

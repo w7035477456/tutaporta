@@ -70,6 +70,8 @@ import {
   ensureMainFontStylesheet,
   findMainFontOptionByStack
 } from 'config/mainFontEnv';
+import { formatLastFirstMiddleName } from 'utils/fullNameFormat';
+import api from 'api/axios';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 
@@ -227,6 +229,7 @@ export default function ProfileSection({ clusterTight = false }) {
     typeof window !== 'undefined' ? profileMenuPanelWidthPx(window.innerWidth) : PROFILE_MENU_PANEL_MIN_PX
   );
   const [profileGreetingLines, setProfileGreetingLines] = useState({ lead: '', nameLine: '' });
+  const [profileMenuIdentity, setProfileMenuIdentity] = useState({ displayName: '', email: '' });
   const [tourActive, setTourActive] = useState(false);
   const [colorFullPalete, setColorFullPaleteState] = useState(() => getColorFullPalete());
   const [aiVoice, setAiVoiceState] = useState(() => getAiVoice());
@@ -507,6 +510,39 @@ export default function ProfileSection({ clusterTight = false }) {
   }, [open, profileMenuMemberKey, user]);
 
   useEffect(() => {
+    if (!open || !user) {
+      setProfileMenuIdentity({ displayName: '', email: '' });
+      return undefined;
+    }
+    let cancelled = false;
+    const emailFallback = String(user.email || '').trim();
+    setProfileMenuIdentity((prev) => ({
+      displayName: prev.displayName,
+      email: prev.email || emailFallback
+    }));
+    (async () => {
+      try {
+        const { data } = await api.get('/api/settings/profile');
+        if (cancelled) return;
+        const displayName = formatLastFirstMiddleName(
+          data?.mailing_lastname || data?.lastname,
+          data?.mailing_firstname || data?.firstname,
+          data?.mailing_middlename
+        );
+        const email = String(data?.email || user.email || '').trim();
+        setProfileMenuIdentity({ displayName, email });
+      } catch {
+        if (!cancelled) {
+          setProfileMenuIdentity({ displayName: '', email: emailFallback });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, profileMenuMemberKey, user]);
+
+  useEffect(() => {
     const applyTourStep = (tourStep) => {
       if (!isVsinglesTourRoute(location.pathname)) return;
       if (tourStep === TOUR_STEP_THEME) {
@@ -748,6 +784,62 @@ export default function ProfileSection({ clusterTight = false }) {
                           </Box>
                         ) : null}
                       </Typography>
+                      {(profileMenuIdentity.displayName || profileMenuIdentity.email) ? (
+                        <Box
+                          sx={{
+                            mt: 1,
+                            mb: 0.5,
+                            display: 'flex',
+                            alignItems: 'baseline',
+                            justifyContent: 'space-between',
+                            gap: 1.5,
+                            width: '100%',
+                            minWidth: 0
+                          }}
+                        >
+                          {profileMenuIdentity.displayName ? (
+                            <Typography
+                              component="div"
+                              sx={{
+                                color: 'var(--theme-primary-color)',
+                                fontWeight: 700,
+                                fontSize: buttonFontSizeResponsive,
+                                lineHeight: 1.25,
+                                textAlign: 'left',
+                                flex: '1 1 auto',
+                                minWidth: 0,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {profileMenuIdentity.displayName}
+                            </Typography>
+                          ) : (
+                            <Box sx={{ flex: '1 1 auto', minWidth: 0 }} />
+                          )}
+                          {profileMenuIdentity.email ? (
+                            <Typography
+                              component="div"
+                              sx={{
+                                color: 'var(--theme-primary-color)',
+                                fontWeight: 600,
+                                fontSize: buttonFontSizeResponsive,
+                                lineHeight: 1.25,
+                                textAlign: 'right',
+                                flex: '0 1 auto',
+                                minWidth: 0,
+                                maxWidth: '55%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {profileMenuIdentity.email}
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      ) : null}
                     </Box>
                     <Box
                       sx={{

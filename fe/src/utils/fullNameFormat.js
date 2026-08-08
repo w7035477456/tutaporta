@@ -36,3 +36,11 @@ export function formatCapitalizedFullNameString(fullName) {
   const { first, middle, last } = parseFullNameParts(fullName);
   return formatCapitalizedFullName(first, middle, last);
 }
+
+/** Display "Lastname, Firstname Middlename" (mailing / legal name lines). */
+export function formatLastFirstMiddleName(last, first, middle) {
+  const lastPart = capitalizeNamePart(last);
+  const given = [first, middle].map(capitalizeNamePart).filter(Boolean).join(' ');
+  if (lastPart && given) return `${lastPart}, ${given}`;
+  return lastPart || given || '';
+}

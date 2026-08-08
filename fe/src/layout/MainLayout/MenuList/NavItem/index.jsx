@@ -36,7 +36,9 @@ import {
   UNSELECTED_BUTTON_TEMPLATE_TEXT
 } from 'config/selectedUnselectedButtonTemplate';
 import { useGetReceivedBioRequestsPendingCount, useGetVettedFriendsBioResponsePendingCount, useGetBioRequestNotifications } from 'api/bioRequestNotificationsFe';
+import { useSelfReportBioCompletedPercent } from 'api/checkrBioReviewFe';
 import { receivedBioPendingBadgeChipSx, receivedBioPendingBadgeTooltipSlotProps } from 'config/receivedBioPendingBadge';
+import { selfReportBioCompletedBadgeSx, SELF_REPORT_BIO_COMPLETED_BADGE_CLASS } from 'config/selfReportBioCompletedBadge';
 import { formatReceivedBioPendingBadgeTooltip } from 'utils/receivedBioPendingTooltip';
 import {
   BELL_NOTIFICATION_REFRESH_EVENT
@@ -56,11 +58,13 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
   const { pathname } = useLocation();
   const isReceivedBioRequestsItem = item?.id === 'util-received-bio-requests';
   const isVettedFriendsItem = item?.id === 'util-requests-sent';
+  const isSelfReportBioItem = item?.id === 'util-self-report-biography';
   const { pendingCount, refetchPendingCount } = useGetReceivedBioRequestsPendingCount(isReceivedBioRequestsItem);
   const { bioRequestNotifications, refetchBioRequestNotifications } =
     useGetBioRequestNotifications(isReceivedBioRequestsItem);
   const { responsePendingCount, refetchBioResponsePendingCount } =
     useGetVettedFriendsBioResponsePendingCount(isVettedFriendsItem);
+  const { completedPercent, refetchCompletedPercent } = useSelfReportBioCompletedPercent(isSelfReportBioItem);
   const {
     state: { borderRadius }
   } = useConfig();
@@ -107,7 +111,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
     return () => window.cancelAnimationFrame(id);
   }, [drawerOpen, item?.title]);
   useEffect(() => {
-    if (!isReceivedBioRequestsItem && !isVettedFriendsItem) return undefined;
+    if (!isReceivedBioRequestsItem && !isVettedFriendsItem && !isSelfReportBioItem) return undefined;
     const onRefresh = (event) => {
       const scope = event?.detail?.scope;
       if (scope === 'bio' || scope === 'all') {
@@ -116,6 +120,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           void refetchBioRequestNotifications();
         }
         if (isVettedFriendsItem) void refetchBioResponsePendingCount();
+        if (isSelfReportBioItem) void refetchCompletedPercent();
       }
     };
     window.addEventListener(BELL_NOTIFICATION_REFRESH_EVENT, onRefresh);
@@ -123,9 +128,11 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
   }, [
     isReceivedBioRequestsItem,
     isVettedFriendsItem,
+    isSelfReportBioItem,
     refetchPendingCount,
     refetchBioRequestNotifications,
-    refetchBioResponsePendingCount
+    refetchBioResponsePendingCount,
+    refetchCompletedPercent
   ]);
 
   useEffect(() => {
@@ -134,13 +141,16 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
       void refetchBioRequestNotifications();
     }
     if (isVettedFriendsItem) void refetchBioResponsePendingCount();
+    if (isSelfReportBioItem) void refetchCompletedPercent();
   }, [
     isReceivedBioRequestsItem,
     isVettedFriendsItem,
+    isSelfReportBioItem,
     pathname,
     refetchPendingCount,
     refetchBioRequestNotifications,
-    refetchBioResponsePendingCount
+    refetchBioResponsePendingCount,
+    refetchCompletedPercent
   ]);
 
   const receivedBioPendingTooltipTitle = formatReceivedBioPendingBadgeTooltip(
@@ -247,11 +257,21 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
   /** Stacking for 2× scale: above sibling rows, main column, and app bar (nav column uses theme.zIndex.modal). */
   const scaledMenuZ = theme.zIndex.tooltip;
 
+  const showSelfReportCompletedBadge =
+    isSelfReportBioItem && drawerOpen && completedPercent !== null && Number.isFinite(completedPercent);
+
   const level1MenuSx = {
     zIndex: 1201,
+    position: 'relative',
+    overflow: 'visible',
     WebkitTouchCallout: 'none',
     WebkitTapHighlightColor: 'transparent',
     userSelect: 'none',
+    ...(showSelfReportCompletedBadge
+      ? {
+          [`& .${SELF_REPORT_BIO_COMPLETED_BADGE_CLASS}`]: selfReportBioCompletedBadgeSx()
+        }
+      : null),
     ...(item.disabled && {
       opacity: 0.42,
       pointerEvents: 'none',
@@ -345,6 +365,11 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           )}
           <Activity mode={drawerOpen && navChip ? 'visible' : 'hidden'}>{renderNavPendingChip()}</Activity>
         </Box>
+        {showSelfReportCompletedBadge ? (
+          <Box component="span" className={SELF_REPORT_BIO_COMPLETED_BADGE_CLASS} aria-hidden>
+            {completedPercent}% completed
+          </Box>
+        ) : null}
       </ColorTemplate10Menu.Item>
     );
   }

@@ -72,8 +72,15 @@ import { isDemoUserCategory } from 'utils/memberCategory';
 import { getBioReviewRowVetColumn } from 'utils/receivedBioRequestDisplay';
 import { themedAlert } from 'utils/themedDialog';
 
-const DEMO_USER_MATCHING_STATUS_LABEL = 'N/A, Demo User Only';
-const DEMO_USER_MATCHING_STATUS_DOT_SX = {
+const DEMO_USER_MATCHING_STATUS_COMPLETED_LINES = ['Completed', '(DemoUser)'];
+const DEMO_USER_MATCHING_STATUS_NOT_STARTED_LINES = ['Not Started', '(DemoUser)'];
+/** Profile&DL / Profile&Live — DemoUser shows Not Started instead of Completed. */
+const DEMO_USER_PROFILE_PHOTO_MATCH_KEYS = new Set(['profileDlPhoto', 'profileLivePhoto']);
+const DEMO_USER_MATCHING_STATUS_COMPLETED_DOT_SX = {
+  bgcolor: '#2e7d32',
+  border: '6px solid #1b5e20'
+};
+const DEMO_USER_MATCHING_STATUS_NOT_STARTED_DOT_SX = {
   bgcolor: '#ffffff',
   border: '6px solid #9e9e9e'
 };
@@ -128,7 +135,7 @@ import { captureElementAsPng } from 'utils/captureConsentDialogImage';
 import { combineImagesSideBySide } from 'utils/combineImagesSideBySide';
 import { sampleDriverLicenseUrl, sampleUSPassportUrl } from 'constants/idVerificationSampleImages';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
-import { saveCheckrBioReviewField } from 'api/checkrBioReviewFe';
+import { saveCheckrBioReviewDraft, saveCheckrBioReviewField } from 'api/checkrBioReviewFe';
 import { hoverEnlargeBaseSx } from 'config/hoverEnlargeEnv';
 import { canPerFieldEditRow, fieldWasVerified, getDraftKeyForBioRow } from 'utils/bioReviewPerFieldEdit';
 import { openLinkedInProfileWindow } from 'utils/linkedinOAuth';
@@ -474,8 +481,24 @@ function VettingStatusPill({
   title = null,
   forcedLabel = null
 }) {
-  const label = saving ? 'Saving…' : forcedLabel != null ? forcedLabel : vettingStatusCompactLabel(status);
-  const dotSx = forcedLabel != null ? DEMO_USER_MATCHING_STATUS_DOT_SX : vettingStatusDotSx(status);
+  const forcedLines = Array.isArray(forcedLabel)
+    ? forcedLabel.map((line) => String(line ?? '').trim()).filter(Boolean)
+    : null;
+  const label = saving
+    ? 'Saving…'
+    : forcedLines
+      ? null
+      : forcedLabel != null
+        ? forcedLabel
+        : vettingStatusCompactLabel(status);
+  const demoForcedNotStarted =
+    forcedLines != null && String(forcedLines[0] ?? '').toLowerCase() === 'not started';
+  const dotSx =
+    forcedLabel != null
+      ? demoForcedNotStarted
+        ? DEMO_USER_MATCHING_STATUS_NOT_STARTED_DOT_SX
+        : DEMO_USER_MATCHING_STATUS_COMPLETED_DOT_SX
+      : vettingStatusDotSx(status);
   const interactive = clickable && !saving && forcedLabel == null;
   const showDataMatchedSuperscript =
     !saving &&
@@ -491,7 +514,7 @@ function VettingStatusPill({
       title={interactive ? title : undefined}
       sx={{
         display: 'inline-flex',
-        alignItems: 'center',
+        alignItems: forcedLines ? 'flex-start' : 'center',
         gap: 0.75,
         border: 'none',
         bgcolor: 'transparent',
@@ -517,22 +540,52 @@ function VettingStatusPill({
           borderRadius: '50%',
           flexShrink: 0,
           boxSizing: 'border-box',
+          ...(forcedLines ? { mt: '0.1em' } : null),
           ...dotSx
         }}
       />
-      <Typography
-        className="vetting-status-label"
-        component="span"
-        sx={{
-          ...tableTextSx,
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-          color: 'inherit'
-        }}
-      >
-        {label}
-        {showDataMatchedSuperscript ? <DataMatchedSuperscript onClick={onDataMatchedDisclaimerClick} /> : null}
-      </Typography>
+      {forcedLines ? (
+        <Box
+          className="vetting-status-label"
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            lineHeight: 1.15,
+            minWidth: 0
+          }}
+        >
+          {forcedLines.map((line) => (
+            <Typography
+              key={line}
+              component="span"
+              sx={{
+                ...tableTextSx,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
+                color: 'inherit',
+                lineHeight: 1.15
+              }}
+            >
+              {line}
+            </Typography>
+          ))}
+        </Box>
+      ) : (
+        <Typography
+          className="vetting-status-label"
+          component="span"
+          sx={{
+            ...tableTextSx,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+            color: 'inherit'
+          }}
+        >
+          {label}
+          {showDataMatchedSuperscript ? <DataMatchedSuperscript onClick={onDataMatchedDisclaimerClick} /> : null}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -1096,7 +1149,13 @@ function VettedBioTable({
         onClick={() => onCycleVettingStatus?.(row, status)}
         onDataMatchedDisclaimerClick={onDataMatchedDisclaimerClick}
         title={clickable ? 'Admin: click to cycle matching status' : undefined}
-        forcedLabel={demoUserMatchingStatus ? DEMO_USER_MATCHING_STATUS_LABEL : null}
+        forcedLabel={
+          demoUserMatchingStatus
+            ? DEMO_USER_PROFILE_PHOTO_MATCH_KEYS.has(row.key)
+              ? DEMO_USER_MATCHING_STATUS_NOT_STARTED_LINES
+              : DEMO_USER_MATCHING_STATUS_COMPLETED_LINES
+            : null
+        }
       />
     );
   };
@@ -1502,7 +1561,7 @@ export default function CheckrBioReviewPanel({
         consentImageToSave = await combineImagesSideBySide(pendingSelfReportImage, consentSignatureImage);
       }
 
-      await api.post('/api/checkr/bio-review/save', { draft: draftValues });
+      await saveCheckrBioReviewDraft(draftValues);
       await postSaveConsentRecord({
         full_name_signed: fullNameSigned,
         viewer_approved: viewerApprovedId,

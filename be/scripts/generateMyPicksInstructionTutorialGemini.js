@@ -29,11 +29,14 @@ dotenv.config({ path: path.join(os.homedir(), '.ssh', 'be', '.env'), override: t
 /** Keep in sync with fe MyPicks INSTRUCTION_POPUP_TEXT + yellow-box context lines. */
 const COPY = {
   title: 'Current Context Tutorial',
-  step: "You are in Picks and Posts step.",
+  step: 'You are on the "Picks & Posts" step',
   body: [
-    "So you got here because you click 'My Picks' of someone catches your eye. From there, 'Picks & Posts' you can explore their life stories and get a glimpse into their world.",
-    "Want to know a little more? Click 'Bio Request' (green button mean they have completed their vetting with Industry Reputable 3rd-Party) to ask for their brief or full bio. Once they happily reply 'Approve' (usually just a few days!), they'll appear on the Acquaintances & Buddies page.",
-    'Go to Acquaintances & Buddies for further instructions.'
+    'You are here because you clicked "My Picks" on someone who caught your eye (romance) or shared your hobbies (hobby partners). From here in "Picks & Posts," you can explore their life story and get a glimpse into their world.',
+    'After viewing their Public Albums & Postings, you now have two choices: click "Acquaintance Request!" or "Buddy Request!" (or x to remove).',
+    'With an Acquaintance Request, you two mutually agree to share a "Brief Bio" (photo validation, age, height, gender, and city).',
+    'With a Buddy Request, you two mutually agree to share a "Full Bio" (employer domain, LinkedIn URL, job title, education details, and 16 other favorites/infos).',
+    'Please head over to the "My Self-Report-Bio" menu and complete all reporting there. Other members are much more likely to approve your request if they see your profile is marked "Completed" (your answers remain hidden until both of you mutually agree to swap bios).',
+    'After sending a request, wait for their approval under the "Acquaintances & Buddies" menu, where their profile will appear once approved. Get the next tutorial step by clicking the orange top-right button on that menu.'
   ].join(' ')
 };
 

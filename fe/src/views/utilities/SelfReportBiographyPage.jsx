@@ -8,6 +8,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MainCard from 'ui-component/cards/MainCard';
 import api from 'api/axios';
+import { seedCheckrBioReviewCache } from 'api/checkrBioReviewFe';
 import { useAuth } from 'contexts/AuthContext';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
 import { getDesktopTextFontSizeVw, getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
@@ -198,6 +199,7 @@ export default function SelfReportBiographyPage() {
     try {
       const { data } = await api.get('/api/checkr/bio-review');
       setBioReview(data || null);
+      void seedCheckrBioReviewCache(data || null);
     } catch (err) {
       console.warn('[SelfReportBiographyPage] bio-review load failed', err?.response?.data?.error || err?.message);
       setBioReview(null);

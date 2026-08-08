@@ -81,6 +81,7 @@ import { useSinglesPreferences } from 'api/singlesPreferencesFe';
 import { getPayPalCheckoutConfig } from 'api/paypalConfigFe';
 import { CONSENT_DESCRIPTION_CHECKR_CHECK } from 'constants/consentRecordVariants';
 import { formatUserDateTime, formatPaymentHistoryDescription } from 'utils/userTimeZone';
+import { formatLastFirstMiddleName } from 'utils/fullNameFormat';
 
 const titleFontSx = {
   color: 'var(--theme-primary-color)',
@@ -318,6 +319,7 @@ export default function ProfilesRecordsPage({
     firstname: '',
     lastname: '',
     mailing_firstname: '',
+    mailing_middlename: '',
     mailing_lastname: '',
     email: '',
     phone: '',
@@ -418,6 +420,7 @@ export default function ProfilesRecordsPage({
         firstname: p.firstname ?? '',
         lastname: p.lastname ?? '',
         mailing_firstname: p.mailing_firstname ?? '',
+        mailing_middlename: p.mailing_middlename ?? '',
         mailing_lastname: p.mailing_lastname ?? '',
         email: p.email ?? '',
         phone: p.phone ?? '',
@@ -498,6 +501,43 @@ export default function ProfilesRecordsPage({
   const latestTokenBalance = Number.isFinite(Number(tokenBalanceFromDb)) ? Number(tokenBalanceFromDb) : 0;
   const adminCanSetTokenBalance = isImpersonationSession(user);
 
+  const profileDisplayName = useMemo(
+    () =>
+      formatLastFirstMiddleName(
+        profileForm.mailing_lastname || profileForm.lastname,
+        profileForm.mailing_firstname || profileForm.firstname,
+        profileForm.mailing_middlename
+      ),
+    [
+      profileForm.mailing_lastname,
+      profileForm.lastname,
+      profileForm.mailing_firstname,
+      profileForm.firstname,
+      profileForm.mailing_middlename
+    ]
+  );
+  const profileDisplayPhone = String(profileForm.phone || user?.phone || '').trim();
+  const profileDisplayEmail = String(profileForm.email || user?.email || '').trim();
+  const profileCurrentValueSx = {
+    ...textFontSx,
+    color: pageTextColor,
+    fontWeight: 700,
+    flex: '0 1 auto',
+    minWidth: 0,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+  };
+
+  const profileActionRowSx = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 1.5,
+    flexWrap: 'nowrap',
+    minWidth: 0,
+    justifySelf: { sm: 'start' }
+  };
+
   useEffect(() => {
     if (!adminCanSetTokenBalance) return;
     setAdminTokenBalanceInput(String(latestTokenBalance));
@@ -575,6 +615,7 @@ export default function ProfilesRecordsPage({
         firstname: data.firstname ?? '',
         lastname: data.lastname ?? '',
         mailing_firstname: data.mailing_firstname ?? '',
+        mailing_middlename: data.mailing_middlename ?? '',
         mailing_lastname: data.mailing_lastname ?? '',
         email: data.email ?? '',
         phone: data.phone ?? '',
@@ -1049,7 +1090,7 @@ export default function ProfilesRecordsPage({
                         rowGap: 1.25,
                         alignItems: 'center',
                         width: '100%',
-                        maxWidth: 720
+                        maxWidth: { xs: '100%', sm: 920 }
                       }}
                     >
                       <Typography sx={{ textAlign: { xs: 'left', sm: 'right' }, whiteSpace: 'nowrap' }}>
@@ -1066,7 +1107,7 @@ export default function ProfilesRecordsPage({
                           <Typography sx={{ textAlign: { xs: 'left', sm: 'right' }, whiteSpace: 'nowrap' }}>
                             Change profile photo:
                           </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', justifySelf: { sm: 'start' } }}>
+                          <Box sx={profileActionRowSx}>
                             <Box
                               component="img"
                               src={profilePhotoUrl || UserRound}
@@ -1075,33 +1116,33 @@ export default function ProfilesRecordsPage({
                                 width: { xs: 56, sm: 64 },
                                 height: { xs: 56, sm: 64 },
                                 objectFit: 'cover',
-                                border: '1px solid rgba(0,0,0,0.35)'
+                                border: '1px solid rgba(0,0,0,0.35)',
+                                flexShrink: 0
                               }}
                             />
-                            <GreenButton onClick={() => void handleProfilePhotoChange()}>
+                            <GreenButton
+                              onClick={() => void handleProfilePhotoChange()}
+                              sx={{ flexShrink: 0 }}
+                            >
                               Click here
                             </GreenButton>
+                            {profileDisplayName ? (
+                              <Typography sx={profileCurrentValueSx}>{profileDisplayName}</Typography>
+                            ) : null}
                           </Box>
                         </>
                       ) : null}
                       <Typography sx={{ textAlign: { xs: 'left', sm: 'right' }, whiteSpace: 'nowrap' }}>
                         Change password:
                       </Typography>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          flexWrap: 'wrap',
-                          justifySelf: { sm: 'start' }
-                        }}
-                      >
+                      <Box sx={profileActionRowSx}>
                         <GreenButton
                           onClick={() =>
                             tryOpenAccountChange(lastPasswordChangeDate, () => setChangePasswordOpen(true), {
                               clearNotice: () => setPasswordChangeNotice('')
                             })
                           }
+                          sx={{ flexShrink: 0 }}
                         >
                           Click here
                         </GreenButton>
@@ -1114,24 +1155,20 @@ export default function ProfilesRecordsPage({
                       <Typography sx={{ textAlign: { xs: 'left', sm: 'right' }, whiteSpace: 'nowrap' }}>
                         Change Phone:
                       </Typography>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          flexWrap: 'wrap',
-                          justifySelf: { sm: 'start' }
-                        }}
-                      >
+                      <Box sx={profileActionRowSx}>
                         <GreenButton
                           onClick={() =>
                             tryOpenAccountChange(lastPhoneChangeDate, () => setChangePhoneOpen(true), {
                               clearNotice: () => setPhoneChangeNotice('')
                             })
                           }
+                          sx={{ flexShrink: 0 }}
                         >
                           Click here
                         </GreenButton>
+                        {profileDisplayPhone ? (
+                          <Typography sx={profileCurrentValueSx}>{profileDisplayPhone}</Typography>
+                        ) : null}
                         {phoneChangeNotice ? (
                           <Typography className="change-success-notice" sx={changeSuccessNoticeSx}>
                             {phoneChangeNotice}
@@ -1141,24 +1178,20 @@ export default function ProfilesRecordsPage({
                       <Typography sx={{ textAlign: { xs: 'left', sm: 'right' }, whiteSpace: 'nowrap' }}>
                         Change Email:
                       </Typography>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          flexWrap: 'wrap',
-                          justifySelf: { sm: 'start' }
-                        }}
-                      >
+                      <Box sx={profileActionRowSx}>
                         <GreenButton
                           onClick={() =>
                             tryOpenAccountChange(lastEmailChangeDate, () => setChangeEmailOpen(true), {
                               clearNotice: () => setEmailChangeNotice('')
                             })
                           }
+                          sx={{ flexShrink: 0 }}
                         >
                           Click here
                         </GreenButton>
+                        {profileDisplayEmail ? (
+                          <Typography sx={profileCurrentValueSx}>{profileDisplayEmail}</Typography>
+                        ) : null}
                         {emailChangeNotice ? (
                           <Typography className="change-success-notice" sx={changeSuccessNoticeSx}>
                             {emailChangeNotice}

@@ -327,6 +327,16 @@ export function calcFullBioMatchPercentFromBioReview(bioReview) {
   return calcFullBioMatchPercent(vetRow);
 }
 
+/**
+ * Sidebar "My Self-Report-Bio" badge — average of Brief Bio % and Full Bio % only
+ * (excludes Optional Passport / miscellaneous).
+ */
+export function calcSelfReportBioAverageCompletedPercent(bioReview) {
+  const brief = calcBriefBioMatchPercentFromBioReview(bioReview);
+  const full = calcFullBioMatchPercentFromBioReview(bioReview);
+  return Math.round((brief + full) / 2);
+}
+
 const BRIEF_BIO_ROW_VET_FIELD = {
   profilePhoto: 'profilephoto_vetted',
   profileDlPhoto: 'profilephoto_vetted',

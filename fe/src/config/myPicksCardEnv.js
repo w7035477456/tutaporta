@@ -83,14 +83,14 @@ export function getMyPicksRemoveButtonInset() {
 /** My Picks bio request / cancel — UnSelectedButtonTemplate with yellow background. */
 export const MY_PICKS_BIO_YELLOW_BUTTON_BG = 'var(--theme-yellow-color)';
 
-/** Green Acquaintance / Friend request buttons on Picks & Posts. */
+/** Green Acquaintance / Buddy request buttons on Picks & Posts. */
 export const MY_PICKS_BIO_GREEN_REQUEST_BUTTON_BG = '#43a047';
 
 export const MY_PICKS_ACQUAINTANCE_REQUEST_TOOLTIP =
   "Instruction: Click to Send 'Acquaintance Request' to mutually share your Basic Bios. Once approved, you'll both have access to each other's Basic Bio. As Acquaintance, go to the 'Acquaint. & Buddies' menu for privilege access/activities there.";
 
 export const MY_PICKS_FRIEND_REQUEST_TOOLTIP =
-  "Instruction: Click to Send 'Friend Request' to mutually share your Full Bios (including Basic Bios). Once they approved your request, you'll both have access to each other's Basic and Full Bio. As mutual Friends, go to the 'Acquaint. & Buddies' menu for privileged access/activities there.";
+  "Instruction: Click to Send 'Buddy Request' to mutually share your Full Bios (including Basic Bios). Once they approved your request, you'll both have access to each other's Basic and Full Bio. As mutual Buddies, go to the 'Acquaint. & Buddies' menu for privileged access/activities there.";
 
 /** Hover tooltip — wide, rounded, orange fill (#F65B0C), red border, black text. */
 export function myPicksBioRequestTooltipSlotProps() {
@@ -127,7 +127,7 @@ export function myPicksBioRequestTooltipSlotProps() {
   };
 }
 
-/** UnSelectedButtonTemplate sx — green bg, black border for Acquaintance / Friend request buttons. */
+/** UnSelectedButtonTemplate sx — green bg, black border for Acquaintance / Buddy request buttons. */
 export function myPicksBioGreenRequestButtonSx({
   transformOrigin = 'center center',
   hoverScale = SELECTED_UNSELECTED_BUTTON_HOVER_SCALE,
