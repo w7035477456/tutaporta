@@ -2,6 +2,7 @@ import useInlineNotificationBell from 'hooks/useInlineNotificationBell';
 import useVettingMobileTopCluster from 'hooks/useVettingMobileTopCluster';
 import Box from '@mui/material/Box';
 import IdleWarningCountdownBadge from 'ui-component/IdleWarningCountdownBadge';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import NotificationSection from './NotificationSection';
 import ProfileSection from './ProfileSection';
 
@@ -16,7 +17,9 @@ export default function HeaderRight({ iconsOnly = false }) {
     <Box sx={{ display: 'inline-flex', alignItems: 'center', overflow: 'visible', position: 'relative', zIndex: 2 }}>
       <IdleWarningCountdownBadge />
       {!inlineNotificationBell ? <NotificationSection /> : null}
-      <ProfileSection />
+      <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }} {...guestDemoAllowProps()}>
+        <ProfileSection />
+      </Box>
     </Box>
   );
 }

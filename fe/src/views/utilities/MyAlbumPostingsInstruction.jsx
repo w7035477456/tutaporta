@@ -110,10 +110,10 @@ export function MyAlbumPostingsInstructionPopup({ open, onClose }) {
   return (
     <PageInstructionPopup open={open} onClose={onClose} closeOnBackdrop bodyTextAlignLeft centeredLeadLines={1}>
       <PageInstructionPopup.Body>
-        <PageInstructionPopup.Title>{MY_ALBUM_POSTINGS_INSTRUCTION_CONTEXT_TITLE}</PageInstructionPopup.Title>
         <PageInstructionAudioTutorial
           active={open}
           audioByVoice={MY_ALBUM_POSTINGS_INSTRUCTION_AUDIO_BY_VOICE}
+          title={MY_ALBUM_POSTINGS_INSTRUCTION_CONTEXT_TITLE}
           contextStep={MY_ALBUM_POSTINGS_INSTRUCTION_CONTEXT_STEP}
         />
         <MyAlbumPostingsInstructionBody />

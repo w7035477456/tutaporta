@@ -50,6 +50,9 @@ import { selfIntroVideoUrl, uploadPublicVaultMediaFile } from 'api/selfIntroVide
 import { resetProfilePhotoVetting } from 'api/checkrBioReviewFe';
 import { resetIdVerification } from 'api/vetBioVerificationServicesFe';
 import { isPilotUserCategory } from 'utils/memberCategory';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { openEmbeddedYoutubePlayer } from 'utils/embeddedYoutubePlayerEvents';
+import { SLIDE_SHOW_MUSIC_SLOT_INDEX } from 'api/userCustomizationFe';
 import {
   evaluateProfilePhotoChangeGate,
   fetchProfilePhotoVettingFromBioReview,
@@ -271,6 +274,13 @@ const ALBUM_TITLES = {
   [ALBUM_TYPES.uploaded]: 'Uploaded',
   [ALBUM_TYPES.public]: 'Public Album: Visible to ALL',
   [ALBUM_TYPES.private]: 'Acquaint & Buddies Album'
+};
+
+/** Embedded Youtube Player Play N (1-based) opened from album title click. */
+const ALBUM_YOUTUBE_PLAY_SLOT_INDEX = {
+  [ALBUM_TYPES.public]: 2, // Play 3
+  [ALBUM_TYPES.private]: 6, // Play 7
+  publicVideo: SLIDE_SHOW_MUSIC_SLOT_INDEX // Play 10
 };
 const ALBUM_MAX = 10;
 const PUBLIC_VIDEO_ALBUM_MAX = 3;
@@ -3099,6 +3109,7 @@ export default function MyStory() {
               hoverScale={isSelected ? 1 : undefined}
               onClick={() => handleStoryTabClick(tab)}
               sx={myStoryTabButtonLayoutSx}
+              {...guestDemoAllowProps()}
             >
               {MY_STORY_TAB_LABEL_BY_KEY[tab]}
             </TabButton>
@@ -3711,6 +3722,7 @@ export default function MyStory() {
                   display: 'flex'
                 }}
                 onClick={(e) => e.stopPropagation()}
+                {...guestDemoAllowProps()}
               >
                 <ProfilePhotoUploadQrPanel
                   variant="inline"
@@ -3747,8 +3759,18 @@ export default function MyStory() {
                         transition: 'background-color 0.2s, border-color 0.2s'
                       }}
                     >
+                      {(() => {
+                        const youtubeSlotIndex = ALBUM_YOUTUBE_PLAY_SLOT_INDEX[albumType];
+                        const opensYoutube = Number.isFinite(youtubeSlotIndex);
+                        return (
                       <UnSelectedButtonTemplate
-                        component="div"
+                        {...(opensYoutube
+                          ? {
+                              type: 'button',
+                              onClick: () => openEmbeddedYoutubePlayer({ slotIndex: youtubeSlotIndex, play: true }),
+                              ...guestDemoAllowProps()
+                            }
+                          : { component: 'div', tabIndex: -1 })}
                         hoverScale={1}
                         fitLabelWidth={false}
                         shrinkLabelToFit
@@ -3758,11 +3780,15 @@ export default function MyStory() {
                             : myStoryAlbumTitleFontSize
                         }
                         fullWidth
-                        tabIndex={-1}
-                        sx={myStoryAlbumPanelTitleButtonSx}
+                        sx={{
+                          ...myStoryAlbumPanelTitleButtonSx,
+                          cursor: opensYoutube ? 'pointer' : 'default'
+                        }}
                       >
                         {ALBUM_TITLES[albumType]} ({albumPhotoCount}/{ALBUM_MAX})
                       </UnSelectedButtonTemplate>
+                        );
+                      })()}
                       {albumPhotoCount === 0 ? (
                         <Typography
                           variant="caption"
@@ -3984,14 +4010,20 @@ export default function MyStory() {
                   }}
                 >
                   <UnSelectedButtonTemplate
-                    component="div"
+                    type="button"
                     hoverScale={1}
                     fitLabelWidth={false}
                     shrinkLabelToFit
                     shrinkLabelMaxFontSize={myStoryAlbumTitleFontSize}
                     fullWidth
-                    tabIndex={-1}
-                    sx={{ ...myStoryAlbumPanelTitleButtonSx, mb: 0.5 }}
+                    {...guestDemoAllowProps()}
+                    onClick={() =>
+                      openEmbeddedYoutubePlayer({
+                        slotIndex: ALBUM_YOUTUBE_PLAY_SLOT_INDEX.publicVideo,
+                        play: true
+                      })
+                    }
+                    sx={{ ...myStoryAlbumPanelTitleButtonSx, mb: 0.5, cursor: 'pointer' }}
                   >
                     {PUBLIC_VIDEO_ALBUM_TITLE} ({publicAlbumVideos.length}/{PUBLIC_VIDEO_ALBUM_MAX})
                   </UnSelectedButtonTemplate>
@@ -4183,6 +4215,7 @@ export default function MyStory() {
             MenuProps={colorTemplate11PostingVisibilityMenuProps({
               PaperProps: { sx: { maxHeight: COLOR_TEMPLATE11_POSTING_VISIBILITY_SELECT_HEIGHT * 6 } }
             })}
+            {...guestDemoAllowProps()}
           >
             <MenuItem value="public" onClick={() => handlePostingVisibilityPicked('public')}>
               Public

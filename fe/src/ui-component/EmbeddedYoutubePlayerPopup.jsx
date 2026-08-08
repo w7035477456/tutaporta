@@ -9,6 +9,7 @@ import {
 import { YOUTUBE_MUSIC_URL_INPUT_MAX_CHARS } from 'config/youtubeMusicUrl';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import {
   COLOR_TEMPLATE10_MENU_UNSELECTED_BG,
   COLOR_TEMPLATE10_MENU_UNSELECTED_BORDER,
@@ -212,7 +213,12 @@ export default function EmbeddedYoutubePlayerPopup({
           loads that slot in the mini YouTube player. Slide Show Music (slot 10) plays during album slideshows.
         </ColorTemplate7PopupLargeDark.BodyText>
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%', pt: 0.25 }}>
-          <GreenButton type="button" disabled={loadDefaultBusy} onClick={() => void onLoadDefault?.()}>
+          <GreenButton
+            type="button"
+            disabled={loadDefaultBusy}
+            onClick={() => void onLoadDefault?.()}
+            {...guestDemoAllowProps()}
+          >
             {loadDefaultBusy ? 'Loading…' : 'Load Default'}
           </GreenButton>
         </Box>

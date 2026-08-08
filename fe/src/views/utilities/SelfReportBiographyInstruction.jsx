@@ -1,8 +1,13 @@
 import PropTypes from 'prop-types';
 
+import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import PageInstructionPopup from 'ui-component/PageInstructionPopup';
 import PageInstructionButton from 'ui-component/PageInstructionButton';
 import PageInstructionAudioTutorial from 'ui-component/PageInstructionAudioTutorial';
+import {
+  PAGE_INSTRUCTION_TOOLTIP_BG,
+  PAGE_INSTRUCTION_TOOLTIP_TEXT
+} from 'config/pageInstructionEnv';
 import audioSelfReportSora from 'assets/sound/self_report_biography_instruction_Sora.m4a';
 import audioSelfReportJessica from 'assets/sound/self_report_biography_instruction_Jessica.m4a';
 import audioSelfReportMichael from 'assets/sound/self_report_biography_instruction_Michael.m4a';
@@ -32,20 +37,6 @@ const RECEIVED_BIO_REQUESTS_INSTRUCTION_AUDIO_BY_VOICE = {
     typeof audioReceivedBioJessica === 'string' ? audioReceivedBioJessica : audioReceivedBioJessica?.default || '',
   Michael:
     typeof audioReceivedBioMichael === 'string' ? audioReceivedBioMichael : audioReceivedBioMichael?.default || ''
-};
-
-function InstructionSection({ title, children }) {
-  return (
-    <>
-      <PageInstructionPopup.SectionLabel>{title}</PageInstructionPopup.SectionLabel>
-      {children}
-    </>
-  );
-}
-
-InstructionSection.propTypes = {
-  title: PropTypes.string.isRequired,
-  children: PropTypes.node.isRequired
 };
 
 function PeerRequestsInstructionSection() {
@@ -81,36 +72,36 @@ export function ReceivedBioRequestsInstructionBody() {
 export function SelfReportBiographyInstructionBody() {
   return (
     <>
-      <PageInstructionPopup.SectionTitle>How it Works: Secure Bio Verification</PageInstructionPopup.SectionTitle>
-      <PageInstructionPopup.BodyText>
-        Welcome to your Bio Verification control panel. To ensure maximum trust and safety while fully protecting your privacy, start with
-        these two secure stages:
-      </PageInstructionPopup.BodyText>
-      <InstructionSection title="Step 1 - Complete Your Profile Bios">
-        <PageInstructionPopup.BodyText>
-          Fill out the three biographical sections below: Brief Bio, Full Bio, and Miscellaneous Optional Bio. You have total control over
-          what details you choose to self-report and reveal on your profile.
-        </PageInstructionPopup.BodyText>
-      </InstructionSection>
-      <InstructionSection title="Step 2 - Off-Site Secure Verification via 3rd-Party">
-        <PageInstructionPopup.BodyText>
-          Click the link to initiate your verification check with 3rd-Party, our reputable, nationwide third-party verification service.
-        </PageInstructionPopup.BodyText>
-        <PageInstructionPopup.BodyText component="ul">
-          <li>
-            <strong>Complete Privacy:</strong> 3rd-Party will contact you directly via email. You will enter your sensitive personal
-            information (such as your SSN and Date of Birth) securely on 3rd-Party&apos;s platform only.
-          </li>
-          <li>
-            <strong>Zero Database Exposure:</strong> Our server never sees, collects, or has access to your sensitive PII.
-          </li>
-          <li>
-            <strong>FCRA Protection:</strong> Once 3rd-Party completes their assessment, they transmit raw verification data to our secure
-            server. Due to strict federal FCRA regulations, we never share or expose this raw data to anyone. We only use it internally to
-            cross-check against the profile information you filled out on this page.
-          </li>
-        </PageInstructionPopup.BodyText>
-      </InstructionSection>
+      <ColorTemplate16PopupCenterWide.BodyText>
+        This page is your toolkit for building a trustworthy, high-performing profile. Our goal is a safe matching environment where you
+        remain in control of your privacy and are protected by FCRA standards.
+      </ColorTemplate16PopupCenterWide.BodyText>
+      <ColorTemplate16PopupCenterWide.SectionLabel>Four steps help you verify who you are:</ColorTemplate16PopupCenterWide.SectionLabel>
+      <ColorTemplate16PopupCenterWide.BodyText component="ul">
+        <li>
+          <strong>Identity:</strong> Upload a photo ID and complete a live facial scan. That sensitive ID data is held only temporarily for
+          the check, then deleted.
+        </li>
+        <li>
+          <strong>Work:</strong> We send a 6-digit code to your work email so we can verify your company domain.
+        </li>
+        <li>
+          <strong>Education:</strong> Order secure transcript services through parchment.com ($11 fee).
+        </li>
+        <li>
+          <strong>LinkedIn:</strong> Link your account to verify your professional experience.
+        </li>
+      </ColorTemplate16PopupCenterWide.BodyText>
+      <ColorTemplate16PopupCenterWide.SectionLabel>Keeping Your Information Secure</ColorTemplate16PopupCenterWide.SectionLabel>
+      <ColorTemplate16PopupCenterWide.BodyText>
+        We follow a Zero Database Exposure protocol: sensitive data such as your SSN is never handled by our main database. We adhere to
+        FCRA rules so raw verification results stay protected and are used only to cross-check what you self-report here.
+      </ColorTemplate16PopupCenterWide.BodyText>
+      <ColorTemplate16PopupCenterWide.SectionLabel>Why a Complete Bio Matters!</ColorTemplate16PopupCenterWide.SectionLabel>
+      <ColorTemplate16PopupCenterWide.BodyText>
+        Watch the completion bar as you fill sections in. A higher completion percentage is an authenticity signal that makes it more likely
+        others will connect with you.
+      </ColorTemplate16PopupCenterWide.BodyText>
     </>
   );
 }
@@ -123,10 +114,10 @@ export function ReceivedBioRequestsInstructionPopup({ open, onClose }) {
   return (
     <PageInstructionPopup open={open} onClose={onClose} closeOnBackdrop bodyTextAlignLeft centeredLeadLines={1}>
       <PageInstructionPopup.Body>
-        <PageInstructionPopup.Title>{RECEIVED_BIO_REQUESTS_INSTRUCTION_CONTEXT_TITLE}</PageInstructionPopup.Title>
         <PageInstructionAudioTutorial
           active={open}
           audioByVoice={RECEIVED_BIO_REQUESTS_INSTRUCTION_AUDIO_BY_VOICE}
+          title={RECEIVED_BIO_REQUESTS_INSTRUCTION_CONTEXT_TITLE}
           contextStep={RECEIVED_BIO_REQUESTS_INSTRUCTION_CONTEXT_STEP}
         />
         <ReceivedBioRequestsInstructionBody />
@@ -137,17 +128,25 @@ export function ReceivedBioRequestsInstructionPopup({ open, onClose }) {
 
 export function SelfReportBiographyInstructionPopup({ open, onClose }) {
   return (
-    <PageInstructionPopup open={open} onClose={onClose} closeOnBackdrop bodyTextAlignLeft centeredLeadLines={1}>
-      <PageInstructionPopup.Body>
-        <PageInstructionPopup.Title>{SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_TITLE}</PageInstructionPopup.Title>
+    <ColorTemplate16PopupCenterWide
+      open={open}
+      onClose={onClose}
+      closeOnBackdrop
+      bodyTextAlignLeft
+      centeredLeadLines={1}
+      panelBg={PAGE_INSTRUCTION_TOOLTIP_BG}
+      textColor={PAGE_INSTRUCTION_TOOLTIP_TEXT}
+    >
+      <ColorTemplate16PopupCenterWide.Body>
         <PageInstructionAudioTutorial
           active={open}
           audioByVoice={SELF_REPORT_BIOGRAPHY_INSTRUCTION_AUDIO_BY_VOICE}
+          title={SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_TITLE}
           contextStep={SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_STEP}
         />
         <SelfReportBiographyInstructionBody />
-      </PageInstructionPopup.Body>
-    </PageInstructionPopup>
+      </ColorTemplate16PopupCenterWide.Body>
+    </ColorTemplate16PopupCenterWide>
   );
 }
 

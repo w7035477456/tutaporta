@@ -7,6 +7,7 @@ import TextField from '@mui/material/TextField';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import GreenButton from 'ui-component/GreenButton';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import {
@@ -163,6 +164,7 @@ export default function ProfilesRecordsReferEmailTab({ accountEmail, pageTextCol
           type="button"
           onClick={handleGenerateAnother}
           disabled={!hasReferralCode || templatesLoading || !template}
+          {...guestDemoAllowProps()}
         >
           Generate another posting text
         </GreenButton>

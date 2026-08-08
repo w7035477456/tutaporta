@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
 import { SELF_INTRO_VIDEO_SLOTS_FULL_MESSAGE } from 'utils/selfIntroVideoSlotHelpers';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 /** Shown when all three self intro video slots are already filled. */
 export default function SelfIntroVideoSlotsFullPopup({ open, onClose }) {
@@ -17,8 +18,8 @@ export default function SelfIntroVideoSlotsFullPopup({ open, onClose }) {
         <ColorTemplate7PopupLargeDark.BodyText sx={{ textAlign: 'center', fontWeight: 700 }}>
           {SELF_INTRO_VIDEO_SLOTS_FULL_MESSAGE}
         </ColorTemplate7PopupLargeDark.BodyText>
-        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 0.5 }}>
-          <GreenButton type="button" onClick={onClose}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 0.5 }} {...guestDemoAllowProps()}>
+          <GreenButton type="button" onClick={onClose} {...guestDemoAllowProps()}>
             OK
           </GreenButton>
         </Box>

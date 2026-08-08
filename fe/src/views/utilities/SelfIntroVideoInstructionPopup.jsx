@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
 import { SELF_INTRO_VIDEO_POPUP_TITLE } from 'constants/selfIntroVideoFavoriteFields';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const selfIntroPopupActionRowSx = {
   display: 'flex',
@@ -45,8 +46,8 @@ export default function SelfIntroVideoInstructionPopup({ open, onClose, onReady 
           your primary video today and swap it out anytime.
         </ColorTemplate7PopupLargeDark.BodyText>
 
-        <Box sx={selfIntroPopupActionRowSx}>
-          <GreenButton type="button" onClick={onReady}>
+        <Box sx={selfIntroPopupActionRowSx} {...guestDemoAllowProps()}>
+          <GreenButton type="button" onClick={onReady} {...guestDemoAllowProps()}>
             I am ready
           </GreenButton>
         </Box>

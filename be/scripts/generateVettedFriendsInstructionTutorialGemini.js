@@ -31,13 +31,26 @@ const COPY = {
   title: 'Current Context Tutorial',
   step: 'You are in Acquaintances and Buddies Menu.',
   body: [
-    'Yay! You took the first step because someone wonderful caught your eye.',
-    'Once they happily say Yes to your bio request (which usually takes just a few days), their photo will appear right here in Vetted Friends.',
-    "From there, you can peek at their Brief or Full Bio to learn more about them. When you're ready to connect, you'll have two magical options:",
-    'SMS Chat to start sharing stories and getting closer.',
-    'Send Flower to send a stunning, real bouquet straight to their door and make them smile from ear to ear!',
-    "Once you two connect, our matchmaking wings have done their job! Your official journey together begins, where you can meet up in the real world and exchange numbers. While that's beyond the scope of Vetted Singles, we'll be cheering you on from the sidelines.",
-    "Of course, if you ever need a helping hand to find another spark, we'll be right here waiting for you!"
+    "Congratulations! You've taken the first step toward someone who caught your eye.",
+    'Once they approve your bio request (which usually takes just a few days), their photo will appear here in the Acquaintances and Buddies section.',
+    'Requesting a Brief Bio makes you mutual Acquaintances upon approval, while a Full Bio makes you mutual Buddies.',
+    'Depending on your connection level, the Acquaintance Area or Buddies tab will appear.',
+    'Both feature a Biography tab with an important Click to View button.',
+    'This is the only feature on our site that requires a fee.',
+    'By purchasing 1 or 2 tokens, you unlock cross-referenced background details from a variety of sources.',
+    "This View Biography option is a high-demand feature that you won't find on any other dating site.",
+    "It saves you time and spares you the awkwardness of asking critical questions you'd rather not ask directly.",
+    'We use a variety of sources to provide you with insights that might otherwise be difficult to find.',
+    'You\'ll receive updates to this information for a full year, and a static snapshot will always be saved under Profile and Record.',
+    'Tip: You can earn free tokens to use here by inviting friends via email or Facebook!',
+    'Both of you will also unlock mutual access to private Acquaintances and Buddies photo albums hidden from the public.',
+    'Upgrading to Buddies unlocks even more features.',
+    'Unlike Acquaintances, Buddies can send instant chats and interact with exclusive Buddies postings.',
+    'You can even send real flowers directly to them through our trusted nationwide partner, florist one dot com.',
+    'Once you connect, our matchmaking wings have done their job!',
+    'Your official journey together begins as you move offline to exchange numbers and meet in the real world.',
+    "While that part is beyond the scope of Tuta, we'll be cheering you on from the sidelines.",
+    "And if you ever need a helping hand to find another spark, we'll be right here waiting for you!"
   ].join(' ')
 };
 

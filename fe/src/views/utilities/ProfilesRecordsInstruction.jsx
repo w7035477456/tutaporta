@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import PageInstructionPopup from 'ui-component/PageInstructionPopup';
 import PageInstructionAudioTutorial from 'ui-component/PageInstructionAudioTutorial';
 import { ALL_SINGLES_INSTRUCTION_POPUP_TEXT } from 'constants/allSinglesInstructionText';
@@ -6,6 +7,10 @@ import {
   PROFILES_RECORDS_INSTRUCTION_CONTEXT_STEP,
   PROFILES_RECORDS_INSTRUCTION_CONTEXT_TITLE
 } from 'constants/profilesRecordsInstructionText';
+import {
+  PAGE_INSTRUCTION_TOOLTIP_BG,
+  PAGE_INSTRUCTION_TOOLTIP_TEXT
+} from 'config/pageInstructionEnv';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesButtonFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import audioProfilesRecordsSora from 'assets/sound/profiles_records_instruction_Sora.m4a';
@@ -30,8 +35,8 @@ const PROFILES_RECORDS_INSTRUCTION_AUDIO_BY_VOICE = {
 function InstructionSection({ title, children }) {
   return (
     <>
-      <PageInstructionPopup.SectionLabel>{title}</PageInstructionPopup.SectionLabel>
-      <PageInstructionPopup.BodyText>{children}</PageInstructionPopup.BodyText>
+      <ColorTemplate16PopupCenterWide.SectionLabel>{title}</ColorTemplate16PopupCenterWide.SectionLabel>
+      <ColorTemplate16PopupCenterWide.BodyText>{children}</ColorTemplate16PopupCenterWide.BodyText>
     </>
   );
 }
@@ -44,23 +49,35 @@ InstructionSection.propTypes = {
 export function ProfilesRecordsInstructionBody() {
   return (
     <>
-      <PageInstructionPopup.SectionTitle leadLine>Welcome to Your Dashboard! ✨</PageInstructionPopup.SectionTitle>
-      <InstructionSection title="Profile Tab:">
-        You can update your alias, email and password, profile, and mailing address. Your safety matters: if a member ID has not been
-        claimed, we recommend only providing first name / alias and general location, not full name / mailing address. However, once a Member
-        ID is claimed, you can complete full name and address for account recovery. We highly recommend using a nickname for anonymity.
+      <ColorTemplate16PopupCenterWide.SectionTitle leadLine>
+        Welcome to Profile &amp; Records
+      </ColorTemplate16PopupCenterWide.SectionTitle>
+      <ColorTemplate16PopupCenterWide.BodyText>
+        This is your main dashboard for managing who you are on the site and how you interact with others.
+      </ColorTemplate16PopupCenterWide.BodyText>
+      <InstructionSection title="Profile:">
+        This is where you maintain your identity. You can change your alias, email, password, and mailing address here. We only need your
+        address for delivering flowers; other members <strong>NEVER</strong> see your real name or your street address (just your city!).
       </InstructionSection>
-      <InstructionSection title="Buy Tokens Tab:">
-        This is where you can reload your token balance anytime. To view another member&apos;s Brief Bio, it costs 1 token. For the Full Bio,
-        it costs 2 tokens. For a 30-day &ldquo;All Access Pass,&rdquo; it costs 2 extra tokens (4 total instead of 2). We recommend using
-        the Full Bio option—it provides a complete picture.
+      <InstructionSection title="Buy Tokens:">
+        Keep your token balance topped up! Tokens allow you to unlock member information. Viewing a Brief Bio costs 1 token, and viewing a
+        Full Bio costs 2 tokens.
       </InstructionSection>
-      <InstructionSection title="Balance History Tab:">
-        This is your go-to spot to review all your past token transactions, balance refills, and referral credits.
+      <InstructionSection title="Balance History:">
+        Your &ldquo;go-to&rdquo; spot to track every token you&apos;ve spent, refills you&apos;ve purchased, and credits you&apos;ve earned
+        through referrals.
       </InstructionSection>
-      <InstructionSection title="Consent Tab:">
-        This is your personal archive where you can view a history of the members you have approved, as well as take a look at the
-        self-reported bio snapshots you&apos;ve submitted in the past.
+      <InstructionSection title="Posting on FB:">
+        Want free tokens? Use this tab to easily generate a Facebook post featuring your unique sharing code. When friends sign up using your
+        code, you get token credits you can use on any Tuta domain (Date, Notes, PhotoAlbum, ProfessionalNetworks, Buynbid, or Classified!).
+      </InstructionSection>
+      <InstructionSection title="Refer Email:">
+        Prefer email? Generate a pre-written invitation to send to friends, including your unique sharing code. You get token credits (valid
+        across all Tuta domains) for every successful sign-up using your code.
+      </InstructionSection>
+      <InstructionSection title="Consent:">
+        Manage your sharing permissions. This tab shows you exactly which members you have approved and allows you to view past snapshots of
+        your submitted self-reported biography.
       </InstructionSection>
     </>
   );
@@ -68,17 +85,25 @@ export function ProfilesRecordsInstructionBody() {
 
 export function ProfilesRecordsInstructionPopup({ open, onClose }) {
   return (
-    <PageInstructionPopup open={open} onClose={onClose} closeOnBackdrop bodyTextAlignLeft centeredLeadLines={2}>
-      <PageInstructionPopup.Body>
-        <PageInstructionPopup.Title>{PROFILES_RECORDS_INSTRUCTION_CONTEXT_TITLE}</PageInstructionPopup.Title>
+    <ColorTemplate16PopupCenterWide
+      open={open}
+      onClose={onClose}
+      closeOnBackdrop
+      bodyTextAlignLeft
+      centeredLeadLines={2}
+      panelBg={PAGE_INSTRUCTION_TOOLTIP_BG}
+      textColor={PAGE_INSTRUCTION_TOOLTIP_TEXT}
+    >
+      <ColorTemplate16PopupCenterWide.Body>
         <PageInstructionAudioTutorial
           active={open}
           audioByVoice={PROFILES_RECORDS_INSTRUCTION_AUDIO_BY_VOICE}
+          title={PROFILES_RECORDS_INSTRUCTION_CONTEXT_TITLE}
           contextStep={PROFILES_RECORDS_INSTRUCTION_CONTEXT_STEP}
         />
         <ProfilesRecordsInstructionBody />
-      </PageInstructionPopup.Body>
-    </PageInstructionPopup>
+      </ColorTemplate16PopupCenterWide.Body>
+    </ColorTemplate16PopupCenterWide>
   );
 }
 

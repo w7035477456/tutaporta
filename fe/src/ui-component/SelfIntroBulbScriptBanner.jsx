@@ -5,6 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
 import bulbFrameImg from 'assets/images/bulbFrame.png';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const SCRIPT_PANEL_BG = '#5B110F';
 /** Taller than live-scan banner (0.25) so script fills bulb frame width + height. */
@@ -261,13 +262,14 @@ export default function SelfIntroBulbScriptBanner({
           </Box>
         </Box>
         {showFontScaleSlider ? (
-          <Box sx={scriptFontScaleBarSx} role="group" aria-label="Teleprompter text size">
+          <Box sx={scriptFontScaleBarSx} role="group" aria-label="Teleprompter text size" {...guestDemoAllowProps()}>
             <IconButton
               type="button"
               aria-label="Decrease teleprompter text size"
               onClick={() => setFontScale(clampedScale - SCRIPT_FONT_SCALE_STEP)}
               disabled={clampedScale <= SCRIPT_FONT_SCALE_MIN}
               sx={scriptFontScaleStepButtonSx}
+              {...guestDemoAllowProps()}
             >
               −
             </IconButton>
@@ -279,6 +281,7 @@ export default function SelfIntroBulbScriptBanner({
               onChange={(_event, value) => setFontScale(Array.isArray(value) ? value[0] : value)}
               aria-label="Teleprompter text size"
               sx={scriptFontScaleSliderSx}
+              {...guestDemoAllowProps()}
             />
             <IconButton
               type="button"
@@ -286,6 +289,7 @@ export default function SelfIntroBulbScriptBanner({
               onClick={() => setFontScale(clampedScale + SCRIPT_FONT_SCALE_STEP)}
               disabled={clampedScale >= SCRIPT_FONT_SCALE_MAX}
               sx={scriptFontScaleStepButtonSx}
+              {...guestDemoAllowProps()}
             >
               +
             </IconButton>

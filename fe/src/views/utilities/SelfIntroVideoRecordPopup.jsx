@@ -24,6 +24,7 @@ import { sanitizeUserFacingTechTerms } from 'utils/sanitizeUserFacingTechTerms';
 import { allSelfIntroVideoSlotsFull } from 'utils/selfIntroVideoSlotHelpers';
 import fancyFrameImg from 'assets/images/fancyframe.png';
 import { applyMicEnabledToStream, blobToDataUrl, pickVideoMimeType } from 'utils/mediaRecorderVideoHelpers';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const SAVED_OVERLAY_MS = 1400;
 const VIDEO_SIZE_SCALE_MIN = 0;
@@ -1286,6 +1287,7 @@ export default function SelfIntroVideoRecordPopup({ open, onClose, scriptText = 
         closeButtonAriaLabel="Close self intro video recorder"
       >
       <ColorTemplate7PopupLargeDark.Body spacing={1.5} sx={recordPopupBodySx}>
+        <Box {...guestDemoAllowProps()} sx={{ display: 'contents' }}>
         <Box sx={{ flexShrink: 0, width: '100%' }}>
           <SelfIntroBulbScriptBanner
             scriptText={scriptText}
@@ -1296,13 +1298,19 @@ export default function SelfIntroVideoRecordPopup({ open, onClose, scriptText = 
           />
         </Box>
 
-        <Box sx={{ ...videoSizeBarLiveSx, flexShrink: 0 }} role="group" aria-label="Video preview size">
+        <Box
+          sx={{ ...videoSizeBarLiveSx, flexShrink: 0 }}
+          role="group"
+          aria-label="Video preview size"
+          {...guestDemoAllowProps()}
+        >
           <IconButton
             type="button"
             aria-label="Decrease video preview size"
             onClick={() => setVideoSizePercent((prev) => applyVideoSizeChange(prev - VIDEO_SIZE_SCALE_STEP))}
             disabled={videoSizePercent <= VIDEO_SIZE_SCALE_MIN}
             sx={videoSizeStepButtonSx}
+            {...guestDemoAllowProps()}
           >
             −
           </IconButton>
@@ -1322,6 +1330,7 @@ export default function SelfIntroVideoRecordPopup({ open, onClose, scriptText = 
             aria-label="Increase video preview size"
             onClick={() => setVideoSizePercent((prev) => applyVideoSizeChange(prev + VIDEO_SIZE_SCALE_STEP))}
             disabled={videoSizePercent >= VIDEO_SIZE_SCALE_MAX}
+            {...guestDemoAllowProps()}
             sx={videoSizeStepButtonSx}
           >
             +
@@ -1427,6 +1436,7 @@ export default function SelfIntroVideoRecordPopup({ open, onClose, scriptText = 
                   aria-pressed={micEnabled}
                   onClick={() => void handleToggleMic()}
                   disabled={recordingActive || savedOverlayVisible || showRecordedPlayback}
+                  {...guestDemoAllowProps()}
                   sx={{
                     ...micToggleButtonSx,
                     bgcolor: micEnabled ? '#43a047' : '#e53935',
@@ -1477,8 +1487,8 @@ export default function SelfIntroVideoRecordPopup({ open, onClose, scriptText = 
             </Box>
           </Box>
 
-          <Box sx={recordControlsDockSx}>
-            <Box sx={recordControlsPanelSx}>
+          <Box sx={recordControlsDockSx} {...guestDemoAllowProps()}>
+            <Box sx={recordControlsPanelSx} {...guestDemoAllowProps()}>
             <Typography sx={timerLabelSx} aria-live="polite">
               Record time left: {secondsLeft} sec of {maxRecordSeconds} sec
             </Typography>
@@ -1507,6 +1517,7 @@ export default function SelfIntroVideoRecordPopup({ open, onClose, scriptText = 
 
         {cameraError ? <ColorTemplate7PopupLargeDark.ErrorBar>{cameraError}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
         {statusText ? <ColorTemplate7PopupLargeDark.ErrorBar>{statusText}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
+        </Box>
       </ColorTemplate7PopupLargeDark.Body>
       </ColorTemplate7PopupLargeDark>
       <SelfIntroVideoSlotsFullPopup open={slotsFullOpen} onClose={() => setSlotsFullOpen(false)} />

@@ -15,6 +15,7 @@ import {
   validateSelfIntroFavoriteForm
 } from 'utils/selfIntroVideoPhraseFill';
 import { buildSelfIntroMiscBioDraft } from 'utils/selfIntroVideoMiscBioSave';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const selfIntroPopupActionRowSx = {
   display: 'flex',
@@ -120,11 +121,11 @@ export default function SelfIntroVideoFavoritesPopup({ open, onClose, initialVal
           </ColorTemplate7PopupLargeDark.BodyText>
         ) : null}
 
-        <Box sx={selfIntroPopupActionRowSx}>
-          <GreenButton type="button" onClick={() => void handleSave()} disabled={saving}>
+        <Box sx={selfIntroPopupActionRowSx} {...guestDemoAllowProps()}>
+          <GreenButton type="button" onClick={() => void handleSave()} disabled={saving} {...guestDemoAllowProps()}>
             {saving ? 'Saving…' : 'Save'}
           </GreenButton>
-          <GreenButton type="button" onClick={handleGenerate} disabled={saving}>
+          <GreenButton type="button" onClick={handleGenerate} disabled={saving} {...guestDemoAllowProps()}>
             Generate self intro text
           </GreenButton>
         </Box>

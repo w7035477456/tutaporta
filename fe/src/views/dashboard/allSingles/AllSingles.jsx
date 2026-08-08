@@ -458,10 +458,10 @@ export default function AllSingles() {
         centeredLeadLines={1}
       >
         <PageInstructionPopup.Body>
-          <PageInstructionPopup.Title>{ALL_SINGLES_INSTRUCTION_CONTEXT_TITLE}</PageInstructionPopup.Title>
           <PageInstructionAudioTutorial
             active={instructionOpen}
             audioByVoice={ALL_SINGLES_INSTRUCTION_AUDIO_BY_VOICE}
+            title={ALL_SINGLES_INSTRUCTION_CONTEXT_TITLE}
             contextStep={ALL_SINGLES_INSTRUCTION_CONTEXT_STEP}
           />
           <PageInstructionPopup.BodyText sx={{ whiteSpace: 'pre-line' }}>

@@ -3,17 +3,24 @@
  * Keep bake script in sync:
  *   be/scripts/generateSelfReportBiographyInstructionTutorialGemini.js
  */
-export const SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_TITLE = 'Current Context Tutorial';
-export const SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_STEP =
-  'You are in My Self-Reporting-Biography page.';
+export const SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_TITLE =
+  'Setting Up Your Self-Reporting Biography';
+export const SELF_REPORT_BIOGRAPHY_INSTRUCTION_CONTEXT_STEP = '';
 
 /** Flat narration text (matches SelfReportBiographyInstructionBody). */
 export const SELF_REPORT_BIOGRAPHY_INSTRUCTION_SPEAK_TEXT = [
-  'How it Works: Secure Bio Verification.',
-  'Welcome to your Bio Verification control panel. To ensure maximum trust and safety while fully protecting your privacy, start with these two secure stages.',
-  'Step 1 - Complete Your Profile Bios. Fill out the three biographical sections below: Brief Bio, Full Bio, and Miscellaneous Optional Bio. You have total control over what details you choose to self-report and reveal on your profile.',
-  'Step 2 - Off-Site Secure Verification via 3rd-Party. Click the link to initiate your verification check with 3rd-Party, our reputable, nationwide third-party verification service.',
-  'Complete Privacy: 3rd-Party will contact you directly via email. You will enter your sensitive personal information, such as your SSN and Date of Birth, securely on 3rd-Party\'s platform only.',
-  'Zero Database Exposure: Our server never sees, collects, or has access to your sensitive PII.',
-  'FCRA Protection: Once 3rd-Party completes their assessment, they transmit raw verification data to our secure server. Due to strict federal FCRA regulations, we never share or expose this raw data to anyone. We only use it internally to cross-check against the profile information you filled out on this page.'
+  'Setting Up Your Self-Reporting Biography.',
+  'This page is your toolkit for building a trustworthy, high-performing profile.',
+  'Our goal is a safe matching environment where you remain in control of your privacy and are protected by FCRA standards.',
+  'Four steps help you verify who you are.',
+  'Identity: upload a photo ID and complete a live facial scan. That sensitive ID data is held only temporarily for the check, then deleted.',
+  'Work: we send a 6-digit code to your work email so we can verify your company domain.',
+  'Education: order secure transcript services through parchment.com for an eleven dollar fee.',
+  'LinkedIn: link your account to verify your professional experience.',
+  'Keeping Your Information Secure.',
+  'We follow a Zero Database Exposure protocol: sensitive data such as your SSN is never handled by our main database.',
+  'We adhere to FCRA rules so raw verification results stay protected and are used only to cross-check what you self-report here.',
+  'Why a Complete Bio Matters!',
+  'Watch the completion bar as you fill sections in.',
+  'A higher completion percentage is an authenticity signal that makes it more likely others will connect with you.'
 ].join(' ');

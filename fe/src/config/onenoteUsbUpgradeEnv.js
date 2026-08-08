@@ -1,6 +1,6 @@
 /**
- * ONENOTE_USB_DISABLE — when true, "Open TutaPhotoAlbums Cloud" and
- * "Open TutaPhotoAlbums USB" stay visible but are not clickable.
+ * ONENOTE_USB_UPGRADE — when true, mall tiles for Tuta Albums / Tuta Notes
+ * show a system-notification popup and do not navigate.
  * Source: fe/.env or ~/.ssh/be/.env (mirrored in vite.config.mjs).
  * Requires vite envPrefix ONENOTE_.
  */
@@ -13,6 +13,6 @@ function parseEnvBool(raw, defaultValue = false) {
 }
 
 /** @returns {boolean} */
-export function isOnenoteUsbDisable() {
-  return parseEnvBool(import.meta.env.ONENOTE_USB_DISABLE, false);
+export function isOnenoteUsbUpgrade() {
+  return parseEnvBool(import.meta.env.ONENOTE_USB_UPGRADE, false);
 }

@@ -11,10 +11,9 @@ import {
   getAiVoice
 } from 'utils/themeConfig';
 import { ENV_MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import { colorTemplate7PopupTitleSx } from 'config/colorTemplate7PopupLargeDark';
 
-const FONT_MIN = 12;
-const FONT_MAX = 28;
-const FONT_STEP = 2;
+const LABEL_FONT_PX = 15;
 const SEEK_SEC = 5;
 const HIGHLIGHT_GREEN = '#60C446';
 
@@ -37,14 +36,16 @@ function imgForVoice(voice) {
 /**
  * Audio readout chrome for page-instruction popups (avatar + transport + voice label).
  * Plays baked m4a for the current Tutorial Voice (Sora / Jessica / Michael).
+ * Photo / buttons / “Click for audio…” sit in a centered bordered box; optional title
+ * and context step render below (left-aligned) so all 7 menu tutorials share one layout.
  */
 export default function PageInstructionAudioTutorial({
   audioByVoice,
+  title = '',
   contextStep = '',
   active = true
 }) {
   const [aiVoice, setAiVoiceState] = useState(() => getAiVoice());
-  const [fontPx, setFontPx] = useState(15);
   const audioRef = useRef(null);
   const [, setTick] = useState(0);
 
@@ -152,25 +153,6 @@ export default function PageInstructionAudioTutorial({
     if (!isPlaying) void startPlay();
   }, [isPaused, isPlaying, resumePlay, startPlay]);
 
-  const bumpFont = (delta) => {
-    setFontPx((prev) => Math.min(FONT_MAX, Math.max(FONT_MIN, prev + delta)));
-  };
-
-  const headerBtnSx = {
-    height: 28,
-    minWidth: 28,
-    border: '2px solid #111',
-    borderRadius: 0.5,
-    bgcolor: '#fff',
-    color: '#111',
-    fontWeight: 900,
-    lineHeight: 1,
-    cursor: 'pointer',
-    p: 0,
-    fontFamily: ENV_MAIN_FONT_FAMILY,
-    flexShrink: 0
-  };
-
   const transportBtns = [
     {
       key: 'rew',
@@ -213,15 +195,18 @@ export default function PageInstructionAudioTutorial({
     }
   ];
 
+  const titleText = String(title || '').trim();
+  const stepText = String(contextStep || '').trim();
+
   return (
     <Box
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-start',
+        alignItems: 'stretch',
         width: '100%',
         mb: 1.5,
-        gap: 0.75,
+        gap: 1,
         fontFamily: ENV_MAIN_FONT_FAMILY,
         color: '#111',
         WebkitTextFillColor: '#111'
@@ -232,166 +217,176 @@ export default function PageInstructionAudioTutorial({
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 1,
+          justifyContent: 'center',
           width: '100%'
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1, minWidth: 0 }}>
-          <Box
-            sx={{
-              width: 72,
-              height: 72,
-              flexShrink: 0,
-              borderRadius: '50%',
-              overflow: 'hidden',
-              border: '2px solid #111',
-              boxSizing: 'border-box',
-              bgcolor: '#222',
-              pointerEvents: 'none'
-            }}
-          >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 0.75,
+            px: 1.25,
+            py: 1,
+            border: '2px solid #111',
+            borderRadius: 0.5,
+            boxSizing: 'border-box',
+            maxWidth: '100%'
+          }}
+        >
+          <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 1 }}>
             <Box
-              component="img"
-              src={imgForVoice(aiVoice)}
-              alt={aiVoice}
-              onError={(event) => {
-                const fb = imgForVoice('Sora');
-                if (fb && event.currentTarget.getAttribute('src') !== fb) {
-                  event.currentTarget.setAttribute('src', fb);
-                }
-              }}
               sx={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: IMG_FRAME.objectPosition,
-                transform: `scale(${IMG_FRAME.scale})`,
-                transformOrigin: 'center center',
-                display: 'block'
+                width: 72,
+                height: 72,
+                flexShrink: 0,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '2px solid #111',
+                boxSizing: 'border-box',
+                bgcolor: '#222',
+                pointerEvents: 'none'
               }}
-            />
+            >
+              <Box
+                component="img"
+                src={imgForVoice(aiVoice)}
+                alt={aiVoice}
+                onError={(event) => {
+                  const fb = imgForVoice('Sora');
+                  if (fb && event.currentTarget.getAttribute('src') !== fb) {
+                    event.currentTarget.setAttribute('src', fb);
+                  }
+                }}
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: IMG_FRAME.objectPosition,
+                  transform: `scale(${IMG_FRAME.scale})`,
+                  transformOrigin: 'center center',
+                  display: 'block'
+                }}
+              />
+            </Box>
+            <Box
+              role="group"
+              aria-label="Tutorial audio controls"
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 32px)',
+                gridTemplateRows: '32px 32px',
+                gap: 0.5,
+                justifyItems: 'center',
+                alignItems: 'center'
+              }}
+            >
+              {transportBtns.map((btn) => (
+                <Box
+                  key={btn.key}
+                  component="button"
+                  type="button"
+                  title={btn.title}
+                  aria-label={btn.title}
+                  onClick={btn.onClick}
+                  sx={{
+                    gridColumn: btn.gridColumn,
+                    gridRow: btn.gridRow || '1',
+                    width: 32,
+                    height: 32,
+                    border: '2px solid #111',
+                    borderRadius: '50%',
+                    bgcolor: btn.play ? HIGHLIGHT_GREEN : btn.stop ? 'var(--theme-error-color, #d32f2f)' : '#fff',
+                    color: btn.stop ? '#fff' : '#111',
+                    fontWeight: 900,
+                    fontSize: btn.play || btn.stop ? '0.8rem' : '0.7rem',
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    p: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontFamily: ENV_MAIN_FONT_FAMILY,
+                    '&:hover': { filter: 'brightness(0.95)' }
+                  }}
+                >
+                  {btn.label}
+                </Box>
+              ))}
+            </Box>
           </Box>
+
           <Box
-            role="group"
-            aria-label="Tutorial audio controls"
+            component="button"
+            type="button"
+            title={clickForAudioLabel}
+            aria-label={clickForAudioLabel}
+            onClick={playOrResume}
             sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 32px)',
-              gridTemplateRows: '32px 32px',
-              gap: 0.5,
-              justifyItems: 'center',
-              alignItems: 'center'
+              display: 'block',
+              border: 0,
+              bgcolor: 'transparent',
+              cursor: 'pointer',
+              p: 0,
+              fontFamily: ENV_MAIN_FONT_FAMILY,
+              color: '#111',
+              WebkitTextFillColor: '#111',
+              textAlign: 'center'
             }}
           >
-            {transportBtns.map((btn) => (
-              <Box
-                key={btn.key}
-                component="button"
-                type="button"
-                title={btn.title}
-                aria-label={btn.title}
-                onClick={btn.onClick}
-                sx={{
-                  gridColumn: btn.gridColumn,
-                  gridRow: btn.gridRow || '1',
-                  width: 32,
-                  height: 32,
-                  border: '2px solid #111',
-                  borderRadius: '50%',
-                  bgcolor: btn.play ? HIGHLIGHT_GREEN : btn.stop ? 'var(--theme-error-color, #d32f2f)' : '#fff',
-                  color: btn.stop ? '#fff' : '#111',
-                  fontWeight: 900,
-                  fontSize: btn.play || btn.stop ? '0.8rem' : '0.7rem',
-                  lineHeight: 1,
-                  cursor: 'pointer',
-                  p: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontFamily: ENV_MAIN_FONT_FAMILY,
-                  '&:hover': { filter: 'brightness(0.95)' }
-                }}
-              >
-                {btn.label}
-              </Box>
-            ))}
-          </Box>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-          <Box
-            component="button"
-            type="button"
-            title="Zoom out font size"
-            aria-label="Zoom out font size"
-            onClick={() => bumpFont(-FONT_STEP)}
-            sx={{ ...headerBtnSx, width: 28, fontSize: '1.1rem' }}
-          >
-            −
-          </Box>
-          <Box
-            component="button"
-            type="button"
-            title="Zoom in font size"
-            aria-label="Zoom in font size"
-            onClick={() => bumpFont(FONT_STEP)}
-            sx={{ ...headerBtnSx, width: 28, fontSize: '1.1rem' }}
-          >
-            +
+            <Typography
+              component="span"
+              sx={{
+                fontWeight: 800,
+                fontSize: `${Math.round(LABEL_FONT_PX * 0.85)}px`,
+                lineHeight: 1.25,
+                fontFamily: ENV_MAIN_FONT_FAMILY,
+                color: '#111',
+                WebkitTextFillColor: '#111'
+              }}
+            >
+              {clickForAudioLabel}
+            </Typography>
           </Box>
         </Box>
       </Box>
 
-      <Box
-        component="button"
-        type="button"
-        title={clickForAudioLabel}
-        aria-label={clickForAudioLabel}
-        onClick={playOrResume}
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          border: 0,
-          bgcolor: 'transparent',
-          cursor: 'pointer',
-          p: 0,
-          fontFamily: ENV_MAIN_FONT_FAMILY,
-          color: '#111',
-          WebkitTextFillColor: '#111',
-          textAlign: 'left'
-        }}
-      >
+      {titleText ? (
         <Typography
-          component="span"
+          variant="inherit"
+          component="h2"
+          className="ct7-popup-title"
+          sx={{
+            ...colorTemplate7PopupTitleSx({
+              textAlign: 'left !important',
+              color: '#111',
+              WebkitTextFillColor: '#111'
+            }),
+            fontFamily: ENV_MAIN_FONT_FAMILY
+          }}
+        >
+          {titleText}
+        </Typography>
+      ) : null}
+
+      {stepText ? (
+        <Typography
+          component="p"
           sx={{
             fontWeight: 800,
-            fontSize: `${Math.round(fontPx * 0.85)}px`,
-            lineHeight: 1.25,
+            fontSize: `${LABEL_FONT_PX}px`,
+            lineHeight: 1.3,
+            m: 0,
+            textAlign: 'left',
             fontFamily: ENV_MAIN_FONT_FAMILY,
             color: '#111',
             WebkitTextFillColor: '#111'
           }}
         >
-          {clickForAudioLabel}
+          {stepText}
         </Typography>
-        {contextStep ? (
-          <Typography
-            component="span"
-            sx={{
-              fontWeight: 800,
-              fontSize: `${fontPx}px`,
-              lineHeight: 1.3,
-              mt: 0.25,
-              fontFamily: ENV_MAIN_FONT_FAMILY,
-              color: '#111',
-              WebkitTextFillColor: '#111'
-            }}
-          >
-            {contextStep}
-          </Typography>
-        ) : null}
-      </Box>
+      ) : null}
     </Box>
   );
 }
@@ -402,6 +397,7 @@ PageInstructionAudioTutorial.propTypes = {
     Jessica: PropTypes.string,
     Michael: PropTypes.string
   }).isRequired,
+  title: PropTypes.string,
   contextStep: PropTypes.string,
   active: PropTypes.bool
 };

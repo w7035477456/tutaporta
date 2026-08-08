@@ -4,6 +4,7 @@ import Stack from '@mui/material/Stack';
 import PageInstructionButton from 'ui-component/PageInstructionButton';
 import EarnTokensButton from 'ui-component/EarnTokensButton';
 import EarnTokensPopup from 'views/utilities/EarnTokensPopup';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 /** Upper-right page header: instruction button with Earn Tokens directly underneath. */
 export default function PageInstructionEarnTokensAction({ onInstructionClick }) {
@@ -11,7 +12,7 @@ export default function PageInstructionEarnTokensAction({ onInstructionClick }) 
 
   return (
     <>
-      <Stack alignItems="flex-end" spacing={0.75} sx={{ flexShrink: 0 }}>
+      <Stack alignItems="flex-end" spacing={0.75} sx={{ flexShrink: 0 }} {...guestDemoAllowProps()}>
         <PageInstructionButton onClick={onInstructionClick} />
         <EarnTokensButton onClick={() => setEarnOpen(true)} />
       </Stack>

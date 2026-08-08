@@ -16,8 +16,12 @@ import tutaDatesImg from 'assets/images/tutaDates.png';
 import tutaNotesImg from 'assets/images/tutaNotes.png';
 import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
+import { isOnenoteUsbUpgrade } from 'config/onenoteUsbUpgradeEnv';
+import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
 
 // ==============================|| LANDING PAGE ||============================== //
+
+const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
 
 const departments = [
   { id: 'vsingles', title: 'Tuta Dates', url: '/vsingles', image: tutaDatesImg },
@@ -77,6 +81,14 @@ export default function Landing() {
   const mallAreaRef = useRef(null);
   const [mallScale, setMallScale] = useState(1);
   const [mallGrid, setMallGrid] = useState(() => getMallStageSize(3, 2));
+  const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
+  const blockOnenoteUsbTiles = isOnenoteUsbUpgrade();
+
+  const openUpgradePopup = useCallback((event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setUpgradePopupOpen(true);
+  }, []);
 
   const visibleDepartments = useMemo(() => {
     const memberKeys = [user?.member_id, user?.member_category]
@@ -240,7 +252,8 @@ export default function Landing() {
             }}
           >
             {rowDepts.map((d) => {
-              const isLink = Boolean(d.url);
+              const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
+              const isLink = Boolean(d.url) && !gateUpgrade;
 
               return (
                 <Box
@@ -249,6 +262,18 @@ export default function Landing() {
                   {...(isLink ? { to: d.url } : {})}
                   data-guest-demo-allow="true"
                   onMouseEnter={handleTileHover}
+                  onClick={gateUpgrade ? openUpgradePopup : undefined}
+                  role={gateUpgrade ? 'button' : undefined}
+                  tabIndex={gateUpgrade ? 0 : undefined}
+                  onKeyDown={
+                    gateUpgrade
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            openUpgradePopup(event);
+                          }
+                        }
+                      : undefined
+                  }
                   sx={{
                     position: 'relative',
                     flex: '0 0 auto',
@@ -261,7 +286,7 @@ export default function Landing() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: isLink ? 'pointer' : 'default',
+                    cursor: isLink || gateUpgrade ? 'pointer' : 'default',
                     textDecoration: 'none',
                     WebkitTouchCallout: 'none',
                     WebkitUserSelect: 'none',
@@ -325,6 +350,7 @@ export default function Landing() {
           </Box>
         ))}
       </Box>
+      <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
     </Box>
   );
 }

@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import makeSelfIntroImg from 'assets/images/makeSelfIntro.png';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 /** Task 1 — marquee image CTA to start self intro video flow. */
 export default function SelfIntroVideoCta({ onClick }) {
@@ -10,6 +11,7 @@ export default function SelfIntroVideoCta({ onClick }) {
       type="button"
       onClick={onClick}
       aria-label="Let's make and post a fun self intro video"
+      {...guestDemoAllowProps()}
       sx={{
         display: 'block',
         p: 0,

@@ -8,9 +8,12 @@ export const PROFILES_RECORDS_INSTRUCTION_CONTEXT_STEP = 'You are in Profile & R
 
 /** Flat narration text (matches ProfilesRecordsInstructionBody). */
 export const PROFILES_RECORDS_INSTRUCTION_SPEAK_TEXT = [
-  'Welcome to Your Dashboard!',
-  'Profile Tab: You can update your alias, email and password, profile, and mailing address. Your safety matters: if a member ID has not been claimed, we recommend only providing first name / alias and general location, not full name / mailing address. However, once a Member ID is claimed, you can complete full name and address for account recovery. We highly recommend using a nickname for anonymity.',
-  'Buy Tokens Tab: This is where you can reload your token balance anytime. To view another member\'s Brief Bio, it costs 1 token. For the Full Bio, it costs 2 tokens. For a 30-day "All Access Pass," it costs 2 extra tokens (4 total instead of 2). We recommend using the Full Bio option—it provides a complete picture.',
-  'Balance History Tab: This is your go-to spot to review all your past token transactions, balance refills, and referral credits.',
-  'Consent Tab: This is your personal archive where you can view a history of the members you have approved, as well as take a look at the self-reported bio snapshots you\'ve submitted in the past.'
+  'Welcome to Profile and Records.',
+  'This is your main dashboard for managing who you are on the site and how you interact with others.',
+  'Profile: This is where you maintain your identity. You can change your alias, email, password, and mailing address here. We only need your address for delivering flowers; other members never see your real name or your street address, just your city.',
+  'Buy Tokens: Keep your token balance topped up! Tokens allow you to unlock member information. Viewing a Brief Bio costs 1 token, and viewing a Full Bio costs 2 tokens.',
+  'Balance History: Your go-to spot to track every token you have spent, refills you have purchased, and credits you have earned through referrals.',
+  'Posting on FB: Want free tokens? Use this tab to easily generate a Facebook post featuring your unique sharing code. When friends sign up using your code, you get token credits you can use on any Tuta domain: Date, Notes, Photo Album, Professional Networks, Buy and Bid, or Classified.',
+  'Refer Email: Prefer email? Generate a pre-written invitation to send to friends, including your unique sharing code. You get token credits, valid across all Tuta domains, for every successful sign-up using your code.',
+  'Consent: Manage your sharing permissions. This tab shows you exactly which members you have approved and allows you to view past snapshots of your submitted self-reported biography.'
 ].join(' ');

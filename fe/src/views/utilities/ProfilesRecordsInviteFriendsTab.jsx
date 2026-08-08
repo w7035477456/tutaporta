@@ -8,6 +8,7 @@ import Alert from '@mui/material/Alert';
 import Link from '@mui/material/Link';
 
 import GreenButton from 'ui-component/GreenButton';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { formatInviteFriendsMessage, formatInviteFriendsPromoFooter } from 'constants/inviteFriendsMessages';
 import { useInviteFriendsMessageTemplates } from 'hooks/useInviteFriendsMessageTemplates';
 import { buildRegisterReferralUrl, normalizeSignupReferralCode } from 'utils/signupReferralCode';
@@ -82,7 +83,12 @@ export default function ProfilesRecordsInviteFriendsTab({ myReferCode, pageTextC
       ) : null}
 
       <Box>
-        <GreenButton type="button" onClick={handleGenerateAnother} disabled={loading || !template}>
+        <GreenButton
+          type="button"
+          onClick={handleGenerateAnother}
+          disabled={loading || !template}
+          {...guestDemoAllowProps()}
+        >
           Generate another posting text
         </GreenButton>
       </Box>

@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Slider from '@mui/material/Slider';
@@ -13,8 +13,10 @@ import { clickableTextHoverMagnifySx, getHoverMagnifyFactor } from 'config/hover
 import { useBackgroundMusic } from 'contexts/BackgroundMusicContext';
 import EmbeddedYoutubePlayerPopup from 'ui-component/EmbeddedYoutubePlayerPopup';
 import { normalizeYoutubeMusicUrl } from 'utils/normalizeYoutubeMusicUrl';
+import { OPEN_EMBEDDED_YOUTUBE_PLAYER_EVENT } from 'utils/embeddedYoutubePlayerEvents';
 import { INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 import { themedAlert } from 'utils/themedDialog';
+import { CUSTOM_MUSIC_URL_SLOT_COUNT } from 'api/userCustomizationFe';
 
 const LABEL_FONT_SIZE = buttonFontSizeResponsive;
 const ICON_BASE_PX = 32;
@@ -125,6 +127,20 @@ export default function BackgroundMusicFooterControls({
   };
 
   const closeYoutubeDialog = () => setYoutubeDialogOpen(false);
+
+  useEffect(() => {
+    const onOpenRequest = (event) => {
+      if (!preferenceLoaded) return;
+      setYoutubeDialogOpen(true);
+      const slotIndex = Number(event?.detail?.slotIndex);
+      if (!Number.isFinite(slotIndex) || slotIndex < 0 || slotIndex >= CUSTOM_MUSIC_URL_SLOT_COUNT) return;
+      if (event?.detail?.play === true) {
+        void playCustomMusicFromSlot(slotIndex);
+      }
+    };
+    window.addEventListener(OPEN_EMBEDDED_YOUTUBE_PLAYER_EVENT, onOpenRequest);
+    return () => window.removeEventListener(OPEN_EMBEDDED_YOUTUBE_PLAYER_EVENT, onOpenRequest);
+  }, [preferenceLoaded, playCustomMusicFromSlot]);
 
   const handleMemorizeSlot = async (slotIndex, rawUrl) => {
     try {

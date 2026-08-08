@@ -50,6 +50,7 @@ import { SELECTED_BUTTON_TEMPLATE_TEXT } from 'config/selectedUnselectedButtonTe
 import { colorTemplate8PhotoGalleryRemoveSpinnerSx } from 'config/colorTemplate8PhotoGallery';
 import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { useAuth } from 'contexts/AuthContext';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import {
   MANUAL_REFRESH_BUTTON_SX,
   MANUAL_REFRESH_POSTS_HINT_LINES
@@ -640,10 +641,10 @@ export default function MyPicks() {
         centeredLeadLines={1}
       >
         <PageInstructionPopup.Body>
-          <PageInstructionPopup.Title>Current Context Tutorial</PageInstructionPopup.Title>
           <PageInstructionAudioTutorial
             active={instructionOpen}
             audioByVoice={MY_PICKS_INSTRUCTION_AUDIO_BY_VOICE}
+            title="Current Context Tutorial"
             contextStep={MY_PICKS_INSTRUCTION_CONTEXT_STEP}
           />
           <PageInstructionPopup.BodyText sx={{ whiteSpace: 'pre-line' }}>
@@ -738,6 +739,7 @@ export default function MyPicks() {
                       isDropTarget={isDropTarget}
                       draggable
                       title="Drag to reorder"
+                      {...guestDemoAllowProps()}
                       onDragStart={(e) => {
                         if (e.target instanceof Element && e.target.closest('[data-clickable-zone="true"]')) {
                           e.preventDefault();
@@ -798,6 +800,7 @@ export default function MyPicks() {
                           alt={memberLabel}
                           selected={selected}
                           onClick={() => setSelectedSinglesId(Number(person.singles_id))}
+                          {...guestDemoAllowProps()}
                         />
                         {showRequestedRibbon ? (
                           <Box component="span" aria-label="Requested" sx={myPicksRequestedRibbonSx}>
@@ -805,7 +808,10 @@ export default function MyPicks() {
                           </Box>
                         ) : null}
                       </Box>
-                      <ColorTemplate8PhotoGallery.NameButton onClick={() => setSelectedSinglesId(Number(person.singles_id))}>
+                      <ColorTemplate8PhotoGallery.NameButton
+                        onClick={() => setSelectedSinglesId(Number(person.singles_id))}
+                        {...guestDemoAllowProps()}
+                      >
                         <ColorTemplate8PhotoGallery.Label
                           primary={memberDisplay.primary}
                           secondary={memberDisplay.secondary}
@@ -961,6 +967,7 @@ export default function MyPicks() {
                   fitLabelWidth={false}
                   onClick={() => handleRightTabClick(tab)}
                   sx={myPicksTabButtonLayoutSx}
+                  {...guestDemoAllowProps()}
                 >
                   {myPicksTabLabelByKey[tab]}
                 </TabButton>
@@ -979,8 +986,8 @@ export default function MyPicks() {
           >
             {activeRightTab === 'publicAlbum' ? (
               <Box
+                {...guestDemoAllowProps()}
                 sx={{
-                  border: '2px dashed #d32f2f',
                   borderRadius: 1,
                   p: 0.75,
                   mb: 1.25,
@@ -1009,6 +1016,7 @@ export default function MyPicks() {
                             event.stopPropagation();
                             openAlbumFullscreenMedia(mediaUrl);
                           }}
+                          {...guestDemoAllowProps()}
                           sx={{
                             p: 0,
                             m: 0,
@@ -1037,6 +1045,7 @@ export default function MyPicks() {
                     mediaUrl={selectedGalleryImageUrl}
                     onOpenFullscreen={openAlbumFullscreenMedia}
                     sx={{ width: '100%', borderRadius: 1, overflow: 'hidden', bgcolor: '#111' }}
+                    {...guestDemoAllowProps()}
                   >
                     {isSelfIntroVideoPostingUrl(selectedGalleryImageUrl) ? (
                       <Box

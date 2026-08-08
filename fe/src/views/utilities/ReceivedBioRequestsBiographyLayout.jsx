@@ -24,6 +24,7 @@ import {
 import GreenButton from 'ui-component/GreenButton';
 import UserRound from 'assets/images/users/profile.jpeg';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { formatMemberLabel, getMemberDisplayLines } from 'utils/memberLabel';
 import {
@@ -694,6 +695,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                   isDropTarget={isDropTarget}
                   draggable
                   title="Drag to reorder"
+                  {...guestDemoAllowProps()}
                   onDragStart={(e) => {
                     if (e.target instanceof Element && e.target.closest('[data-clickable-zone="true"]')) {
                       e.preventDefault();
@@ -738,6 +740,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                       selected={selected}
                       onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
                       sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
+                      {...guestDemoAllowProps()}
                       imgProps={{
                         onError: (e) => {
                           e.currentTarget.onerror = null;
@@ -763,6 +766,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                   <ColorTemplate8PhotoGallery.NameButton
                     onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
                     sx={isBlockedUser ? { pointerEvents: 'none', opacity: 0.55 } : undefined}
+                    {...guestDemoAllowProps()}
                   >
                     <ColorTemplate8PhotoGallery.Label
                       primary={memberDisplay.primary}

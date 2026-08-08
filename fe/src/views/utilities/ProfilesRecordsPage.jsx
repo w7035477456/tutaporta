@@ -26,6 +26,7 @@ import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeD
 import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import GreenButton from 'ui-component/GreenButton';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { PROFILES_RECORDS_OPEN_TABS, PROFILES_RECORDS_TAB_PAY_HISTORY } from 'constants/profilesRecordsRoute';
 import RefereeRewardCongratulationsPopup from './RefereeRewardCongratulationsPopup';
 import { getPricePerTokenFromEnv } from 'config/pricePerTokenEnv';
@@ -1036,6 +1037,7 @@ export default function ProfilesRecordsPage({
                   <Button
                     key={tab.value}
                     onClick={() => setActiveTab(tab.value)}
+                    {...guestDemoAllowProps()}
                     sx={{
                       ...colorTemplate10MenuItemButtonSx({ selected: isSelected, fitLabelWidth: true }),
                       minHeight: 30,
@@ -1617,7 +1619,7 @@ export default function ProfilesRecordsPage({
               ) : null}
               {showReturn ? (
                 <Box sx={{ display: 'flex', justifyContent: 'flex-start', mt: 2 }}>
-                  <GreenButton type="button" onClick={handleReturn}>
+                  <GreenButton type="button" onClick={handleReturn} {...guestDemoAllowProps()}>
                     Return
                   </GreenButton>
                 </Box>

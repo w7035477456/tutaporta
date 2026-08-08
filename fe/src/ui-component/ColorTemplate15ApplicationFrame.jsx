@@ -246,6 +246,7 @@ function ColorTemplate15ApplicationFrameFooterRight({ showMusicControls = true, 
               setSupportOpen(true);
             }}
             {...ORANGE_INSTRUCTION_BUTTON_TEMPLATE_PROPS}
+            {...guestDemoAllowProps()}
             sx={{
               ...orangeUnSelectedInstructionButtonSx({ transformOrigin: 'center center' }),
               minWidth: 0,

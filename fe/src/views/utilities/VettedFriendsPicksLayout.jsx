@@ -74,6 +74,7 @@ import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { useAuth } from 'contexts/AuthContext';
 import { isAdminSession } from 'utils/adminSession';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import {
   buttonHoverMagnifyFontSx,
   buttonHoverMagnifyLabelOnlyFontSx,
@@ -83,10 +84,8 @@ import {
 import VettedFriendsInlineChatPanel from 'views/utilities/VettedFriendsInlineChatPanel';
 import { colorTemplate1WallColorByTheme } from 'config/colorTemplate1';
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
-import useConfig from 'hooks/useConfig';
 import { getMyPicksAvatarSize } from 'config/myPicksCardEnv';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
-import { getAppPageScrollRegionMaxHeightCss, getAppPageZoomFactor } from 'utils/appPageScrollRegionEnv';
 
 /** fe/.env MOBILE_FONT_SIZE_TEXT / DESKTOP_FONT_SIZE_TEXT — Vetted Friends main content copy */
 const outgoingBioBodyTextFontSize = {
@@ -676,16 +675,14 @@ export default function VettedFriendsPicksLayout({
   onPrepareInlineChat,
   onSendFlower,
   initialSelectedSinglesId = null,
-  initialOpenChat = false
+  initialOpenChat = false,
+  onInlineChatOpenChange
 }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
   const vettedFriendsPhoneLayout = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
-  const {
-    state: { pageZoom }
-  } = useConfig();
   const API_BASE_URL = getApiBaseUrl();
   const [selectedSinglesId, setSelectedSinglesId] = useState(null);
   const [activeTabByTargetId, setActiveTabByTargetId] = useState({});
@@ -1161,13 +1158,9 @@ export default function VettedFriendsPicksLayout({
 
   const chatPanelViewportSx = useMemo(() => {
     if (!selectedRightPanelShowsChat) return undefined;
-    const zoomFactor = downSM ? 1 : getAppPageZoomFactor(pageZoom);
-    // Remaining viewport after app chrome + page toolbar; right-panel header/tabs live inside this budget.
-    const columnHeight = getAppPageScrollRegionMaxHeightCss(zoomFactor, {
-      pageToolbar: true
-    });
     return {
-      columnHeight,
+      // Fill parent (page scroll host); parent disables outer scroll while chat is open.
+      columnHeight: '100%',
       contentSx: {
         flex: 1,
         minHeight: 0,
@@ -1177,7 +1170,16 @@ export default function VettedFriendsPicksLayout({
         boxSizing: 'border-box'
       }
     };
-  }, [downSM, pageZoom, selectedRightPanelShowsChat]);
+  }, [selectedRightPanelShowsChat]);
+
+  useEffect(() => {
+    if (typeof onInlineChatOpenChange !== 'function') return undefined;
+    onInlineChatOpenChange(Boolean(selectedRightPanelShowsChat));
+    return () => {
+      onInlineChatOpenChange(false);
+    };
+  }, [selectedRightPanelShowsChat, onInlineChatOpenChange]);
+
   useEffect(() => {
     setApprovedBioViewKinds({ brief: false, full: false });
   }, [selectedSinglesId]);
@@ -1858,8 +1860,8 @@ export default function VettedFriendsPicksLayout({
 
   const renderAlbumPanel = ({ title, urls, selectedImageUrl, setSelectedImageUrl, emptyText }) => (
     <Box
+      {...guestDemoAllowProps()}
       sx={{
-        border: '2px dashed #d32f2f',
         borderRadius: 1,
         p: 0.75,
         mb: 1.25,
@@ -1904,6 +1906,7 @@ export default function VettedFriendsPicksLayout({
                   event.stopPropagation();
                   openAlbumFullscreenMedia(mediaUrl);
                 }}
+                {...guestDemoAllowProps()}
                 sx={{
                   p: 0,
                   m: 0,
@@ -1932,6 +1935,7 @@ export default function VettedFriendsPicksLayout({
           mediaUrl={selectedImageUrl}
           onOpenFullscreen={openAlbumFullscreenMedia}
           sx={{ width: '100%', borderRadius: 1, overflow: 'hidden', bgcolor: '#111' }}
+          {...guestDemoAllowProps()}
         >
           {isSelfIntroVideoPostingUrl(selectedImageUrl) ? (
             <Box
@@ -1991,7 +1995,17 @@ export default function VettedFriendsPicksLayout({
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100%' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        maxWidth: '100%',
+        ...(selectedRightPanelShowsChat
+          ? { flex: 1, minHeight: 0, height: '100%', overflow: 'hidden' }
+          : null)
+      }}
+    >
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1.5, flexShrink: 0 }}>
         <Box
           sx={{
@@ -2002,11 +2016,20 @@ export default function VettedFriendsPicksLayout({
             gap: { xs: 1, sm: 1.5 },
             flexWrap: 'wrap'
           }}
+          {...guestDemoAllowProps()}
         >
-          <Button variant="contained" disabled={refreshChatBusy} onClick={handleRefreshChat} sx={MANUAL_REFRESH_BUTTON_SX}>
+          <Button
+            variant="contained"
+            disabled={refreshChatBusy}
+            onClick={handleRefreshChat}
+            sx={MANUAL_REFRESH_BUTTON_SX}
+            {...guestDemoAllowProps()}
+          >
             Refresh Posts & Chats
           </Button>
-          <NotificationSection placement="inline" />
+          <Box component="span" sx={{ display: 'inline-flex' }} {...guestDemoAllowProps()}>
+            <NotificationSection placement="inline" />
+          </Box>
         </Box>
       </Box>
       <Box
@@ -2016,11 +2039,13 @@ export default function VettedFriendsPicksLayout({
           gap: 1.5,
           width: '100%',
           alignItems: selectedRightPanelShowsChat ? 'stretch' : 'flex-start',
-          ...(selectedRightPanelShowsChat && chatPanelViewportSx?.columnHeight
+          ...(selectedRightPanelShowsChat
             ? {
+                flex: 1,
                 minHeight: 0,
-                height: chatPanelViewportSx.columnHeight,
-                maxHeight: chatPanelViewportSx.columnHeight
+                height: chatPanelViewportSx?.columnHeight ?? '100%',
+                maxHeight: chatPanelViewportSx?.columnHeight ?? '100%',
+                overflow: 'hidden'
               }
             : null)
         }}
@@ -2057,6 +2082,7 @@ export default function VettedFriendsPicksLayout({
                 sx={isBlockedUser ? blockedMemberCardSx : undefined}
                 draggable
                 title="Drag to reorder"
+                {...guestDemoAllowProps()}
                 onDragStart={(e) => {
                   if (e.target instanceof Element && e.target.closest('[data-clickable-zone="true"]')) {
                     e.preventDefault();
@@ -2109,6 +2135,7 @@ export default function VettedFriendsPicksLayout({
                         e.currentTarget.src = UserRound;
                       }
                     }}
+                    {...guestDemoAllowProps()}
                   />
                   {showApprovedRibbon ? (
                     <Box component="span" aria-label="View Approved" sx={vettedFriendsApprovedRibbonSx}>
@@ -2119,6 +2146,7 @@ export default function VettedFriendsPicksLayout({
                 <ColorTemplate8PhotoGallery.NameButton
                   onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
                   sx={isBlockedUser ? { pointerEvents: 'none', opacity: 0.55 } : undefined}
+                  {...guestDemoAllowProps()}
                 >
                   <ColorTemplate8PhotoGallery.Label
                     primary={memberDisplay.primary}
@@ -2254,6 +2282,7 @@ export default function VettedFriendsPicksLayout({
                 fitLabelWidth={false}
                 onClick={() => handleRightAreaClick(selectedRow, area)}
                 sx={areaButtonLayoutSx}
+                {...guestDemoAllowProps()}
               >
                 {label}
               </AreaButton>
@@ -2289,6 +2318,7 @@ export default function VettedFriendsPicksLayout({
               key={tab}
               onClick={() => handleRightTabClick(selectedRow, tab)}
               sx={tabButtonSx(selectedRightPanelActiveTab === tab)}
+              {...guestDemoAllowProps()}
             >
               {vettedFriendsTabLabel(tab, selectedRow)}
             </Button>

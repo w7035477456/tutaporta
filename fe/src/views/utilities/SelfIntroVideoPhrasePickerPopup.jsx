@@ -8,6 +8,7 @@ import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeD
 import GreenButton from 'ui-component/GreenButton';
 import { SELF_INTRO_VIDEO_FAVORITE_EXTRA_KEYS, SELF_INTRO_VIDEO_POPUP_TITLE } from 'constants/selfIntroVideoFavoriteFields';
 import { buildFilledSelfIntroScriptPhrases } from 'utils/selfIntroVideoPhraseFill';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const selfIntroPopupActionRowSx = {
   display: 'flex',
@@ -102,7 +103,7 @@ export default function SelfIntroVideoPhrasePickerPopup({ open, onClose, fallbac
         ) : null}
         {loadError ? <ColorTemplate7PopupLargeDark.ErrorBar>{loadError}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
 
-        <Box sx={phraseListSx}>
+        <Box sx={phraseListSx} {...guestDemoAllowProps()}>
           <RadioGroup value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
             {phrases.map((phrase) => (
               <Box
@@ -133,7 +134,7 @@ export default function SelfIntroVideoPhrasePickerPopup({ open, onClose, fallbac
           </RadioGroup>
         </Box>
 
-        <Box sx={selfIntroPopupActionRowSx}>
+        <Box sx={selfIntroPopupActionRowSx} {...guestDemoAllowProps()}>
           <GreenButton
             type="button"
             disabled={!selectedPhrase || loading}
@@ -141,6 +142,7 @@ export default function SelfIntroVideoPhrasePickerPopup({ open, onClose, fallbac
               if (!selectedPhrase) return;
               onMakeVideo?.(selectedPhrase);
             }}
+            {...guestDemoAllowProps()}
           >
             Selected, Let&apos;s make video now
           </GreenButton>

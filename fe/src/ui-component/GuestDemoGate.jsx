@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from 'contexts/AuthContext';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import { MY_PHOTO_ALBUMS_PATH, MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
+import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
+import { MY_STORY_PATH } from 'utils/profilePhotoSetup';
 import { GUEST_DEMO_ALLOW_ATTR, GUEST_DEMO_LOGIN_MESSAGE, guestDemoAllowProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 
 const INTERACTIVE_SELECTOR = [
@@ -22,14 +24,20 @@ const INTERACTIVE_SELECTOR = [
   '[draggable="true"]'
 ].join(', ');
 
-/** Full /myPhotoAlbums (and fullscreen viewer) — all controls work in Demo mode. */
+/** Pages where every control works in Demo mode (no GuestDemoGate popup). */
 function isGuestDemoUnrestrictedPath(pathname) {
   const path = String(pathname || '');
   return (
     path === MY_PHOTO_ALBUMS_PATH ||
     path.startsWith(`${MY_PHOTO_ALBUMS_PATH}/`) ||
     path === MY_PHOTO_ALBUMS_VIEW_PATH ||
-    path.startsWith(`${MY_PHOTO_ALBUMS_VIEW_PATH}/`)
+    path.startsWith(`${MY_PHOTO_ALBUMS_VIEW_PATH}/`) ||
+    path === MY_STORY_PATH ||
+    path.startsWith(`${MY_STORY_PATH}/`) ||
+    path === '/vsingles/myStory' ||
+    path.startsWith('/vsingles/myStory/') ||
+    path === RECEIVED_BIO_REQUESTS_PATH ||
+    path.startsWith(`${RECEIVED_BIO_REQUESTS_PATH}/`)
   );
 }
 
@@ -56,8 +64,8 @@ function findBlockedInteractive(target) {
 /**
  * Demo mode (demo/demo or guest/guest): allow sidebar, footer legal links, mute/music,
  * top-right theme menu, orange help / tour buttons, TutaNotes Cloud/USB login panels,
- * full /myPhotoAlbums page (path allow — all buttons including Download usbbridge zip);
- * block Support and other interactive clicks and show ColorTemplate16 popup.
+ * full /myPhotoAlbums, /myStory, and /receivedBioRequests (path allow — all page controls);
+ * block Support and other interactive clicks elsewhere and show ColorTemplate16 popup.
  *
  * Mounted outside RouterProvider in App.jsx — do not use useLocation(); read window.location.
  */

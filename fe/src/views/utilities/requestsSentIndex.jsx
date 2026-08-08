@@ -54,6 +54,7 @@ import {
   appPageScrollHostCardSx,
   buildAppPageScrollRegionSx,
   getAppPageScrollRegionBottomPaddingCss,
+  getAppPageScrollRegionMaxHeightCss,
   getAppPageZoomFactor
 } from 'utils/appPageScrollRegionEnv';
 
@@ -122,6 +123,10 @@ export default function RequestsSent() {
   const {
     state: { pageZoom }
   } = useConfig();
+  const [inlineChatOpen, setInlineChatOpen] = useState(false);
+  const handleInlineChatOpenChange = useCallback((open) => {
+    setInlineChatOpen(Boolean(open));
+  }, []);
   const scrollRegionSx = useMemo(() => {
     if (vettedFriendsPhoneLayout) {
       return {
@@ -133,8 +138,21 @@ export default function RequestsSent() {
         pb: getAppPageScrollRegionBottomPaddingCss(1)
       };
     }
+    if (inlineChatOpen) {
+      // Chat pins composer in-panel; outer page scroll only exposed empty space.
+      return {
+        flex: 1,
+        minHeight: 0,
+        maxHeight: getAppPageScrollRegionMaxHeightCss(downSM ? 1 : getAppPageZoomFactor(pageZoom)),
+        overflow: 'hidden',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        pb: 0
+      };
+    }
     return buildAppPageScrollRegionSx(downSM ? 1 : getAppPageZoomFactor(pageZoom));
-  }, [downSM, pageZoom, vettedFriendsPhoneLayout]);
+  }, [downSM, pageZoom, vettedFriendsPhoneLayout, inlineChatOpen]);
   const { user } = useAuth();
   const themeOptions = useMemo(() => getThemeOptionsFromEnv(), []);
   const [themeFamily, setThemeFamily] = useState(() => resolveThemeFamilyFromCss(themeOptions));
@@ -359,7 +377,17 @@ export default function RequestsSent() {
                 backgroundImage: `url(${pageBackgroundImage})`,
                 backgroundSize: 'cover',
                 backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center'
+                backgroundPosition: 'center',
+                ...(inlineChatOpen
+                  ? {
+                      flex: 1,
+                      minHeight: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box'
+                    }
+                  : null)
               }}
             >
               {rows.length === 0 ? (
@@ -377,6 +405,7 @@ export default function RequestsSent() {
                   onSendFlower={openSendFlower}
                   initialSelectedSinglesId={Number.isFinite(focusSinglesId) && focusSinglesId > 0 ? focusSinglesId : null}
                   initialOpenChat={openChatFromNotification || (Number.isFinite(focusSinglesId) && focusSinglesId > 0)}
+                  onInlineChatOpenChange={handleInlineChatOpenChange}
                 />
               ) : (
                 <Typography sx={{ color: 'red', fontWeight: 700, fontSize: '1.5rem' }}>
@@ -396,10 +425,10 @@ export default function RequestsSent() {
         centeredLeadLines={1}
       >
         <PageInstructionPopup.Body>
-          <PageInstructionPopup.Title>{VETTED_FRIENDS_INSTRUCTION_CONTEXT_TITLE}</PageInstructionPopup.Title>
           <PageInstructionAudioTutorial
             active={instructionOpen}
             audioByVoice={VETTED_FRIENDS_INSTRUCTION_AUDIO_BY_VOICE}
+            title={VETTED_FRIENDS_INSTRUCTION_CONTEXT_TITLE}
             contextStep={VETTED_FRIENDS_INSTRUCTION_CONTEXT_STEP}
           />
           <PageInstructionPopup.BodyText sx={{ whiteSpace: 'pre-line' }}>

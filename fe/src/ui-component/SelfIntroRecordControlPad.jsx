@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import buttonsImg from 'assets/images/buttons.png';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 /** Click regions over `buttons.png` (912×1408) — play, pause, skip, stop, save. */
 const BUTTON_HIT_AREAS = {
@@ -20,6 +21,7 @@ function SpriteHitButton({ areaKey, onClick, disabled, ariaLabel }) {
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
+      {...guestDemoAllowProps()}
       sx={{
         position: 'absolute',
         top: area.top,
@@ -68,6 +70,7 @@ export default function SelfIntroRecordControlPad({
 }) {
   return (
     <Box
+      {...guestDemoAllowProps()}
       sx={{
         position: 'relative',
         width: '100%',

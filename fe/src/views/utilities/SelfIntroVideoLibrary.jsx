@@ -11,6 +11,7 @@ import { BUTTON_TEMPLATE_THICK_BLACK_BORDER } from 'config/selectedUnselectedBut
 import { getHoverEnlargeTransform } from 'config/hoverEnlargeEnv';
 import api from 'api/axios';
 import videoIconImg from 'assets/images/videoIcon.png';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const slotButtonFontSize = { xs: getMobileSinglesButtonFontSizeVw(), sm: getDesktopButtonFontSizeVw() };
 
@@ -386,6 +387,7 @@ export function SelfIntroVideoRecorderSlotStrip({
 
   return (
     <Box
+      {...guestDemoAllowProps()}
       sx={{
         display: 'grid',
         gridTemplateColumns: `repeat(3, ${RECORDER_STRIP_SLOT_WIDTH_PX}px)`,
@@ -424,6 +426,7 @@ export function SelfIntroVideoRecorderSlotStrip({
               disabled={disabled}
               aria-label={`Load self intro video ${entry.slot}`}
               aria-pressed={isActive}
+              {...guestDemoAllowProps()}
               sx={{
                 ...recorderSlotThumbButtonSx,
                 cursor: disabled ? 'not-allowed' : 'pointer',
@@ -436,6 +439,7 @@ export function SelfIntroVideoRecorderSlotStrip({
             <ThumbnailDeleteXButton
               aria-label={`Delete self intro video ${entry.slot}`}
               disabled={disabled}
+              {...guestDemoAllowProps()}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
