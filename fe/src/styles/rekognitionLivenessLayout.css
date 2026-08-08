@@ -1,0 +1,77 @@
+/**
+ * Face Liveness: video + oval must share one positioned box (Amplify default styles + layout fixes).
+ * Without @aws-amplify/ui-react-liveness/styles.css the oval renders under the camera feed.
+ */
+
+.rekognition-liveness-root {
+  width: 100%;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  position: relative;
+}
+
+.rekognition-liveness-root .amplify-liveness-detector,
+.rekognition-liveness-root [data-amplify-liveness] {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Amplify start / primary actions — green, ~2× default size */
+.rekognition-liveness-root .amplify-button--primary,
+.rekognition-liveness-root button.amplify-button--primary,
+.rekognition-liveness-root .amplify-liveness-start-screen button.amplify-button {
+  background-color: #43a047 !important;
+  border-color: #2e7d32 !important;
+  color: #ffffff !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  min-height: 80px !important;
+  padding: 1rem 2rem !important;
+}
+
+.rekognition-liveness-root .amplify-button--primary:hover,
+.rekognition-liveness-root button.amplify-button--primary:hover,
+.rekognition-liveness-root .amplify-liveness-start-screen button.amplify-button:hover {
+  background-color: #388e3c !important;
+  border-color: #2e7d32 !important;
+}
+
+.rekognition-liveness-root .amplify-liveness-video-anchor {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+  max-height: min(70vh, 560px);
+  overflow: hidden;
+  background: #000;
+}
+
+.rekognition-liveness-root .amplify-liveness-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Oval / instruction canvas overlays the video (not a separate row below). */
+.rekognition-liveness-root .amplify-liveness-oval-canvas,
+.rekognition-liveness-root .amplify-liveness-instruction-overlay,
+.rekognition-liveness-root .amplify-liveness-overlay {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+}
+
+.rekognition-liveness-root .amplify-liveness-cancel-container,
+.rekognition-liveness-root .amplify-liveness-toast {
+  position: relative;
+  z-index: 2;
+}

@@ -1,0 +1,547 @@
+.rv-editor {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: #111111;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* ---------- Toolbar ---------- */
+.rv-tb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #d8d8d8;
+  background: #f4f5f7;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-right: 1px solid #e0e0e0;
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+
+  &__btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    color: #333;
+    background: #fff;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover:not(:disabled) {
+      background: #eaf0ff;
+      border-color: #9db8ff;
+    }
+
+    &.is-active {
+      background: #2f6fed;
+      border-color: #2f6fed;
+      color: #fff;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  &__select {
+    height: 28px;
+    font-size: 12px;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    background: #fff;
+    color: #333;
+    padding: 0 4px;
+    cursor: pointer;
+  }
+
+  &__color {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    overflow: hidden;
+
+    span {
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .rv-tb__hl {
+      background: #fff176;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    .rv-tb__bg {
+      color: #fff;
+      background: #444;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    input[type='color'] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+  }
+}
+
+/* ---------- Editor body ---------- */
+.rv-editor__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+
+  .ProseMirror {
+    min-height: 100%;
+    padding: 16px 20px;
+    outline: none;
+    line-height: 1.6;
+
+    > * + * {
+      margin-top: 0.6em;
+    }
+
+    h1 { font-size: 1.9em; font-weight: 700; }
+    h2 { font-size: 1.6em; font-weight: 700; }
+    h3 { font-size: 1.3em; font-weight: 700; }
+    h4 { font-size: 1.1em; font-weight: 700; }
+
+    ul,
+    ol {
+      padding-left: 1.4em;
+    }
+
+    blockquote {
+      border-left: 3px solid #cfcfcf;
+      padding-left: 1em;
+      color: #555;
+      font-style: italic;
+    }
+
+    hr {
+      border: none;
+      border-top: 2px solid #e0e0e0;
+      margin: 1em 0;
+    }
+
+    code {
+      background: rgba(97, 97, 97, 0.14);
+      border-radius: 3px;
+      padding: 0.1em 0.3em;
+      font-size: 0.9em;
+      font-family: 'Courier New', monospace;
+    }
+
+    pre {
+      background: #0d1117;
+      color: #c9d1d9;
+      border-radius: 6px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+
+      code {
+        background: none;
+        padding: 0;
+        color: inherit;
+        font-size: 0.85em;
+      }
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+
+      &.ProseMirror-selectednode {
+        outline: 2px solid #2f6fed;
+      }
+    }
+
+    /* Inline vault file (attachment) node view */
+    .rv-attachment-node {
+      display: block;
+      margin: 6px 0;
+
+      &.ProseMirror-selectednode > * {
+        outline: 2px solid #2f6fed;
+        border-radius: 4px;
+      }
+    }
+
+    /* Resizable image node view */
+    .rv-resizable-image {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      line-height: 0;
+
+      img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      &.is-selected img {
+        outline: 2px solid #2f6fed;
+      }
+
+      &__handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: #2f6fed;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        z-index: 2;
+
+        &--tl {
+          top: -6px;
+          left: -6px;
+          cursor: nwse-resize;
+        }
+        &--tr {
+          top: -6px;
+          right: -6px;
+          cursor: nesw-resize;
+        }
+        &--bl {
+          bottom: -6px;
+          left: -6px;
+          cursor: nesw-resize;
+        }
+        &--br {
+          bottom: -6px;
+          right: -6px;
+          cursor: nwse-resize;
+        }
+      }
+    }
+
+    a {
+      color: #2f6fed;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    /* Placeholder */
+    p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      float: left;
+      color: #9aa0a6;
+      pointer-events: none;
+      height: 0;
+    }
+
+    /* Task list */
+    ul[data-type='taskList'] {
+      list-style: none;
+      padding-left: 0.2em;
+
+      li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5em;
+
+        > label {
+          margin-top: 0.2em;
+          user-select: none;
+        }
+        > div {
+          flex: 1;
+        }
+      }
+    }
+
+    /* Tables */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.5em 0;
+      table-layout: fixed;
+      overflow: hidden;
+
+      td,
+      th {
+        border: 1px solid #cfcfcf;
+        padding: 6px 8px;
+        vertical-align: top;
+        position: relative;
+      }
+      th {
+        background: #f1f3f5;
+        font-weight: 700;
+        text-align: left;
+      }
+      .selectedCell::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(47, 111, 237, 0.12);
+        pointer-events: none;
+      }
+      .column-resize-handle {
+        position: absolute;
+        right: -2px;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: #2f6fed;
+        cursor: col-resize;
+      }
+    }
+
+    /* Details / collapsible */
+    details {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 8px 10px;
+
+      summary {
+        font-weight: 600;
+        cursor: pointer;
+      }
+    }
+
+    /* Mention */
+    .rv-mention {
+      background: rgba(47, 111, 237, 0.12);
+      color: #2f6fed;
+      border-radius: 4px;
+      padding: 0.05em 0.3em;
+      font-weight: 600;
+    }
+
+    /* Math (KaTeX) */
+    .tiptap-mathematics-render {
+      padding: 0 0.2em;
+    }
+
+    /* Invisible characters */
+    .tiptap-invisible-character {
+      color: rgba(0, 0, 0, 0.28);
+    }
+  }
+}
+
+/* ---------- Drag/drop position indicator ---------- */
+/* ProseMirror drop cursor — shown while dragging a photo to a new spot. Styled
+   as a bold red dashed bar so the drop target is highly visible. */
+.rv-editor .rv-dropcursor,
+.rv-dropcursor {
+  background-color: rgba(230, 0, 0, 0.12) !important;
+  border: 2px dashed #e60000;
+  border-radius: 4px;
+  box-shadow: 0 0 6px rgba(230, 0, 0, 0.5);
+  /* Give the between-blocks indicator real height so it reads as a drop box. */
+  min-height: 14px;
+  margin-top: -5px;
+}
+
+/* ---------- Search hit highlight ---------- */
+/* Every matched search term in the open note body blinks YELLOW so all hits
+   are easy to spot after opening a found note. */
+.rv-editor .rv-search-hit {
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 700;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  animation: rvSearchHitBlinkYellow 0.9s steps(1, end) infinite;
+}
+
+/* The "current" hit the user stepped to (via the ▲/▼ arrows) blinks RED so the
+   cursor's location is unmistakable among all the yellow-blinking matches. */
+.rv-editor .rv-search-hit--active {
+  font-weight: 900;
+  outline: 2px solid #000;
+  outline-offset: 1px;
+  border-radius: 2px;
+  animation-name: rvSearchHitBlinkRed;
+  animation-duration: 0.5s;
+}
+
+@keyframes rvSearchHitBlinkRed {
+  0% {
+    background-color: #ff2d2d;
+    box-shadow: 0 0 0 3px rgba(255, 45, 45, 0.75), 0 0 12px rgba(255, 45, 45, 0.9);
+  }
+  50% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  100% {
+    background-color: #ff2d2d;
+    box-shadow: 0 0 0 3px rgba(255, 45, 45, 0.75), 0 0 12px rgba(255, 45, 45, 0.9);
+  }
+}
+
+@keyframes rvSearchHitBlinkYellow {
+  0% {
+    background-color: #ffe100;
+    box-shadow: 0 0 0 2px rgba(255, 225, 0, 0.6), 0 0 8px rgba(255, 225, 0, 0.75);
+  }
+  50% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  100% {
+    background-color: #ffe100;
+    box-shadow: 0 0 0 2px rgba(255, 225, 0, 0.6), 0 0 8px rgba(255, 225, 0, 0.75);
+  }
+}
+
+/* ---------- Footer ---------- */
+.rv-editor__footer {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #666;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+/* ---------- Bubble menu ---------- */
+.rv-bubble {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: #1f2430;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+  button {
+    min-width: 26px;
+    height: 26px;
+    color: #fff;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+  }
+}
+
+/* ---------- Suggestion popup (mention / emoji) ---------- */
+.rv-suggestion-portal {
+  .rv-suggestion {
+    min-width: 180px;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    padding: 4px;
+
+    &--empty {
+      padding: 8px 10px;
+      color: #888;
+      font-size: 13px;
+    }
+
+    &__item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 5px 8px;
+      font-size: 13px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+
+      &.is-selected,
+      &:hover {
+        background: #eaf0ff;
+      }
+    }
+  }
+}
+
+/* ---------- Syntax highlighting (lowlight / highlight.js tokens) ---------- */
+.rv-editor__body .ProseMirror pre {
+  .hljs-comment,
+  .hljs-quote {
+    color: #8b949e;
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-type {
+    color: #ff7b72;
+  }
+  .hljs-string,
+  .hljs-attr,
+  .hljs-template-tag,
+  .hljs-addition {
+    color: #a5d6ff;
+  }
+  .hljs-number,
+  .hljs-symbol,
+  .hljs-bullet {
+    color: #d2a8ff;
+  }
+  .hljs-title,
+  .hljs-section,
+  .hljs-function .hljs-title,
+  .hljs-name {
+    color: #d2a8ff;
+  }
+  .hljs-built_in,
+  .hljs-builtin-name {
+    color: #ffa657;
+  }
+  .hljs-attribute {
+    color: #79c0ff;
+  }
+  .hljs-tag {
+    color: #7ee787;
+  }
+  .hljs-meta {
+    color: #79c0ff;
+  }
+  .hljs-deletion {
+    color: #ffdcd7;
+  }
+}

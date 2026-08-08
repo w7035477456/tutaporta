@@ -1,0 +1,1135 @@
+.rv-editor {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Workspace surround (around binder) — theme primary */
+  background: var(--theme-primary-color);
+  color: #111111;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.rv-editor--album-fullscreen {
+  border-radius: 0;
+  overflow: hidden;
+  background: #000000 !important;
+
+  .rv-editor__album-zoom-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Black margins for Prev/Next strips — keep controls off the photos. */
+    padding: 56px 8px !important;
+    background-color: #000000 !important;
+  }
+
+  .rv-editor__album-zoom-scaler {
+    min-height: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  .rv-editor__body--album {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    align-self: center;
+  }
+
+  .rv-editor__page {
+    min-height: 0 !important;
+  }
+
+  .rv-editor__body--album .ProseMirror {
+    min-height: 0 !important;
+  }
+
+  .rv-album-page-resize-e {
+    display: none !important;
+  }
+}
+
+/* ---------- Toolbar ---------- */
+.rv-tb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--theme-daynight-color);
+  background: var(--theme-daynight-color);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 6px;
+    border-right: 1px solid #e0e0e0;
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+
+  &__btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    color: #333;
+    background: #fff;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover:not(:disabled) {
+      background: #eaf0ff;
+      border-color: #9db8ff;
+    }
+
+    &.is-active {
+      background: #2f6fed;
+      border-color: #2f6fed;
+      color: #fff;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  &__select {
+    height: 28px;
+    font-size: 12px;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    background: #fff;
+    color: #333;
+    padding: 0 4px;
+    cursor: pointer;
+  }
+
+  &__color {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #cfcfcf;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    overflow: hidden;
+
+    span {
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .rv-tb__hl {
+      background: #fff176;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    .rv-tb__bg {
+      color: #fff;
+      background: #444;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+    input[type='color'] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+  }
+}
+
+/* ---------- Editor body ---------- */
+.rv-editor__album-zoom-scroll {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  /*
+   * Book pages flip left/right — no vertical stack scroll.
+   * Hide scrollbars; fit zoom keeps the whole page in the black shell.
+   */
+  overflow: hidden !important;
+  scrollbar-gutter: auto;
+  /*
+   * 5–10px theme-primary gutter around the binder/page (AUTO-ZOOM “border”).
+   * Fit zoom subtracts this padding + an extra inset so the page never clips it.
+   */
+  padding: 8px;
+  box-sizing: border-box;
+  background-color: var(--theme-primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  scrollbar-width: none;
+}
+
+/* Staging tray: full filename on hover (yellow on black).
+   Primary path: portaled fixed plate from PhotoAlbumsPhotoStagingTray (z-index max).
+   Absolute rules below are fallback if a non-portaled .rv-album-staging__thumb-name exists. */
+.rv-album-staging__thumb {
+  position: relative;
+
+  .rv-album-staging__thumb-media {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 2px;
+  }
+
+  .rv-album-staging__thumb-name:not(.is-portaled) {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 6px);
+    bottom: auto;
+    transform: translateX(-50%);
+    z-index: 10050;
+    display: none;
+    padding: 6px 18px;
+    background: #000000;
+    color: #ffeb3b;
+    font-size: 2.1rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  }
+
+  &:hover,
+  &:focus-visible {
+    z-index: 10060;
+  }
+
+  &:hover .rv-album-staging__thumb-name:not(.is-portaled),
+  &:focus-visible .rv-album-staging__thumb-name:not(.is-portaled) {
+    display: block;
+  }
+}
+
+/* Photo tray + page filmstrip side-by-side — each pane has its own H-scrollbar. */
+.rv-album-photo-staging__scroll,
+.rv-album-page-filmstrip__scroll {
+  overflow-x: scroll !important;
+  overflow-y: hidden !important;
+  scrollbar-gutter: stable;
+
+  &::-webkit-scrollbar {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+  }
+
+  &::-webkit-scrollbar-corner {
+    background-color: #9e9e9e;
+  }
+
+  &::-webkit-scrollbar-track,
+  &::-webkit-scrollbar-track-piece {
+    background-color: #9e9e9e;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: #000000;
+    border-radius: 0;
+    border: 2px solid #9e9e9e;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: #222222;
+  }
+
+  &::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: #000000 #9e9e9e;
+  }
+}
+
+.rv-editor__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+
+  &--album {
+    /* Open book: left page | binder | right page (flip via translate — not vertical stack scroll). */
+    display: block;
+    position: relative;
+    overflow: hidden;
+  }
+}
+
+/* Outer album zoom scroll centers one page; body must not stretch to viewport height. */
+.rv-editor__album-zoom-scaler > .rv-editor__body--album {
+  overflow: hidden;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+/* Album collage: no PM padding — absolute photos + yellow/red template chrome
+   share the same (0,0) origin. Padding was shifting chrome off the slots. */
+.rv-editor__body--album .ProseMirror {
+  padding: 0;
+  /* Shell clips one spread; JS sets minHeight / width — do not inherit 55vh / 100% stretch. */
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.rv-editor__body--album .rv-editor__page--spread .ProseMirror {
+  /* Spread canvas width is set inline by setAlbumCanvasWidth (2 pages + binder). */
+  max-width: none !important;
+}
+
+.rv-editor__body--album .rv-editor__binder {
+  width: var(--rv-album-binder-width, 7.5%);
+  min-height: 0;
+  height: 100%;
+}
+
+.rv-editor__binder {
+  width: var(--rv-album-binder-width, 7.5%);
+  min-height: 100%;
+  height: 100%;
+  /* Image is painted on the scrolling body; spacer keeps the page offset. */
+  background-color: transparent;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.rv-editor__binder--spread-center {
+  position: absolute;
+  top: 0;
+  left: var(--rv-album-binder-left, 50%);
+  width: var(--rv-album-binder-width, 7.5%);
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% 100%;
+  border-left: none;
+  border-right: none;
+}
+
+.rv-editor__body--album .rv-editor__page--spread {
+  background: var(--theme-daynight-color);
+}
+
+.rv-editor__body--album .rv-editor__page--spread {
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.rv-editor__spread-pane {
+  box-sizing: border-box;
+}
+
+.rv-editor__page {
+  min-width: min(100%, 480px);
+  min-height: 100%;
+  background: var(--theme-daynight-color);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  /* Grow when free-placed photos extend past the viewport */
+  width: max-content;
+  overflow: visible;
+}
+
+.rv-editor__body {
+  .ProseMirror {
+    min-height: 100%;
+    padding: 16px 20px;
+    outline: none;
+    line-height: 1.6;
+
+    > * + * {
+      margin-top: 0.6em;
+    }
+
+    /* Collage: consecutive photo tiles flow side-by-side on the album page */
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 10px 12px;
+    min-height: 55vh;
+    min-width: 100%;
+    /* Expanded by JS when photos are dragged past the right / bottom edge */
+    box-sizing: border-box;
+
+    > *:not(.rv-attachment-photo):not(.rv-text-label) {
+      flex: 1 1 100%;
+      width: 100%;
+    }
+
+    > * + *:not(.rv-attachment-photo):not(.rv-text-label) {
+      margin-top: 0.6em;
+    }
+
+    > .rv-attachment-photo + *:not(.rv-attachment-photo):not(.rv-text-label),
+    > *:not(.rv-attachment-photo):not(.rv-text-label) + .rv-attachment-photo {
+      margin-top: 0.35em;
+    }
+
+    h1 { font-size: 1.9em; font-weight: 700; }
+    h2 { font-size: 1.6em; font-weight: 700; }
+    h3 { font-size: 1.3em; font-weight: 700; }
+    h4 { font-size: 1.1em; font-weight: 700; }
+
+    ul,
+    ol {
+      padding-left: 1.4em;
+    }
+
+    blockquote {
+      border-left: 3px solid #cfcfcf;
+      padding-left: 1em;
+      color: #555;
+      font-style: italic;
+    }
+
+    hr {
+      border: none;
+      border-top: 2px solid #e0e0e0;
+      margin: 1em 0;
+    }
+
+    code {
+      background: rgba(97, 97, 97, 0.14);
+      border-radius: 3px;
+      padding: 0.1em 0.3em;
+      font-size: 0.9em;
+      font-family: 'Courier New', monospace;
+    }
+
+    pre {
+      background: #0d1117;
+      color: #c9d1d9;
+      border-radius: 6px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+
+      code {
+        background: none;
+        padding: 0;
+        color: inherit;
+        font-size: 0.85em;
+      }
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+
+      &.ProseMirror-selectednode {
+        outline: 2px solid #2f6fed;
+      }
+    }
+
+    /* Inline vault file (attachment) node view */
+    .rv-attachment-node {
+      display: block;
+      margin: 6px 0;
+
+      &.ProseMirror-selectednode > * {
+        outline: 2px solid #2f6fed;
+        border-radius: 4px;
+      }
+    }
+
+    .rv-attachment-photo {
+      display: block;
+      margin: 0;
+      flex: 1 1 calc(33.333% - 12px);
+      /* Block native browser drag of page photos (huge translucent ghost). */
+      -webkit-user-drag: none;
+      user-select: none;
+
+      img,
+      .rv-photo-tile,
+      .rv-photo-window {
+        -webkit-user-drag: none !important;
+        user-select: none;
+      }
+      max-width: calc(50% - 6px);
+      min-width: 140px;
+      position: relative;
+
+      /* Filename chip is inline top-right next to return X (photoAlbumsAttachmentNode). */
+      .rv-attachment-photo__name:not(.is-portaled) {
+        display: none;
+      }
+
+      &:hover .rv-attachment-photo__name:not(.is-portaled),
+      &:focus-within .rv-attachment-photo__name:not(.is-portaled),
+      &.is-selected .rv-attachment-photo__name:not(.is-portaled),
+      &.ProseMirror-selectednode .rv-attachment-photo__name:not(.is-portaled) {
+        display: inline;
+      }
+
+      &--size-1 {
+        flex: 1 1 calc(55% - 12px);
+        max-width: calc(66% - 6px);
+        min-width: 200px;
+      }
+
+      &--size-2 {
+        flex: 1 1 calc(40% - 12px);
+        max-width: calc(48% - 6px);
+      }
+
+      &--sized {
+        flex: 0 0 auto;
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      &--placed {
+        position: absolute;
+        flex: none !important;
+        margin: 0 !important;
+        z-index: 2;
+        max-width: none !important;
+      }
+
+      /* Slot window: clips the photo; filename sits top-right next to return X. */
+      &--framed {
+        /* Photo clip is on .rv-photo-window — keep wrapper visible for top chrome. */
+        overflow: visible !important;
+        box-sizing: border-box;
+        /* Stay BELOW template slot overlay (~40) so zoomed photo is clipped/hidden
+           behind the fixed slot window — never raise framed photos above slots. */
+        z-index: 3 !important;
+
+        .rv-photo-window {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          overflow: hidden !important;
+          background: #fff;
+          z-index: 1;
+        }
+
+        .rv-photo-tile {
+          margin: 0;
+          /* Photo pans/zooms underneath the slot clip — lower than window chrome. */
+          z-index: 0;
+        }
+
+        img {
+          max-width: none !important;
+        }
+      }
+
+      &.is-moving {
+        z-index: 90 !important;
+        opacity: 0.96;
+      }
+
+      /*
+       * Free-placed selected photo: stack above chrome so blink is visible.
+       * Framed + selected: also stack above the slot overlay so the full-frame
+       * red↔black border blink is visible for every image format (png/svg/…).
+       * Pan&Zoom uses yellow↔black (.is-pan-zoom).
+       */
+      &.is-selected:not(.rv-attachment-photo--framed),
+      &.ProseMirror-selectednode:not(.rv-attachment-photo--framed) {
+        z-index: 80 !important;
+      }
+
+      /* Framed + selected: clip photo in window only; filename in top-right chrome. */
+      &.is-selected.rv-attachment-photo--framed,
+      &.ProseMirror-selectednode.rv-attachment-photo--framed {
+        overflow: visible !important;
+        /* Above template slot overlay (~40) so the selection border blink shows. */
+        z-index: 50 !important;
+      }
+
+      &.is-selected > .rv-photo-window,
+      &.ProseMirror-selectednode > .rv-photo-window {
+        outline: none;
+        animation: none;
+        overflow: hidden !important;
+      }
+
+      /*
+       * Paint selection OUTSIDE the photo (outline-offset >= 0) so it does not
+       * cover View / Full / Zoom / Download / Remove.
+       * Default (relocate/swap): solid red. Pan&Zoom mode: solid yellow.
+       */
+      &.is-selected::after,
+      &.ProseMirror-selectednode::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1000;
+        box-sizing: border-box;
+        pointer-events: none;
+        outline: 2rem solid #e53935;
+        outline-offset: 0;
+        animation: none;
+        border-radius: 0;
+      }
+
+      &.is-selected.is-pan-zoom::after,
+      &.ProseMirror-selectednode.is-pan-zoom::after {
+        outline-color: #ffeb3b;
+        animation: none;
+      }
+
+      &.is-selected > *:not(.rv-photo-window),
+      &.ProseMirror-selectednode > *:not(.rv-photo-window) {
+        outline: none;
+      }
+
+      &__resize {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        z-index: 5;
+        border-radius: 2px;
+        background:
+          linear-gradient(135deg, transparent 0 42%, #fff 42% 50%, transparent 50% 62%, #fff 62% 70%, transparent 70%),
+          rgba(47, 111, 237, 0.9);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+        opacity: 0.95;
+
+        &:hover {
+          background-color: #2f6fed;
+        }
+
+        &--se {
+          right: 2px;
+          bottom: 2px;
+          cursor: nwse-resize;
+        }
+        &--sw {
+          left: 2px;
+          bottom: 2px;
+          cursor: nesw-resize;
+        }
+        &--ne {
+          right: 2px;
+          top: 2px;
+          cursor: nesw-resize;
+        }
+        &--nw {
+          left: 2px;
+          top: 2px;
+          cursor: nwse-resize;
+        }
+      }
+    }
+
+    /* Free-placed rotatable text labels (above photos). */
+    .rv-text-label {
+      position: absolute !important;
+      display: block;
+      margin: 0 !important;
+      flex: none !important;
+      z-index: 6;
+      max-width: none !important;
+      width: max-content;
+      transform-origin: center center;
+      pointer-events: auto;
+
+      &.is-editing {
+        z-index: 12;
+      }
+
+      &.ProseMirror-selectednode .rv-text-label__body {
+        outline: 2px dashed #2f6fed;
+        outline-offset: 4px;
+      }
+
+      .rv-text-label__resize {
+        pointer-events: auto;
+      }
+    }
+
+    /* Resizable image node view */
+    .rv-resizable-image {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      line-height: 0;
+
+      img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      &.is-selected img {
+        outline: 2px solid #2f6fed;
+      }
+
+      &__handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: #2f6fed;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        z-index: 2;
+
+        &--tl {
+          top: -6px;
+          left: -6px;
+          cursor: nwse-resize;
+        }
+        &--tr {
+          top: -6px;
+          right: -6px;
+          cursor: nesw-resize;
+        }
+        &--bl {
+          bottom: -6px;
+          left: -6px;
+          cursor: nesw-resize;
+        }
+        &--br {
+          bottom: -6px;
+          right: -6px;
+          cursor: nwse-resize;
+        }
+      }
+    }
+
+    a {
+      color: #2f6fed;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    /* Placeholder */
+    p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      float: left;
+      color: #9aa0a6;
+      pointer-events: none;
+      height: 0;
+    }
+
+    /* Task list */
+    ul[data-type='taskList'] {
+      list-style: none;
+      padding-left: 0.2em;
+
+      li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5em;
+
+        > label {
+          margin-top: 0.2em;
+          user-select: none;
+        }
+        > div {
+          flex: 1;
+        }
+      }
+    }
+
+    /* Tables */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.5em 0;
+      table-layout: fixed;
+      overflow: hidden;
+
+      td,
+      th {
+        border: 1px solid #cfcfcf;
+        padding: 6px 8px;
+        vertical-align: top;
+        position: relative;
+      }
+      th {
+        background: #f1f3f5;
+        font-weight: 700;
+        text-align: left;
+      }
+      .selectedCell::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: rgba(47, 111, 237, 0.12);
+        pointer-events: none;
+      }
+      .column-resize-handle {
+        position: absolute;
+        right: -2px;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: #2f6fed;
+        cursor: col-resize;
+      }
+    }
+
+    /* Details / collapsible */
+    details {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 8px 10px;
+
+      summary {
+        font-weight: 600;
+        cursor: pointer;
+      }
+    }
+
+    /* Mention */
+    .rv-mention {
+      background: rgba(47, 111, 237, 0.12);
+      color: #2f6fed;
+      border-radius: 4px;
+      padding: 0.05em 0.3em;
+      font-weight: 600;
+    }
+
+    /* Math (KaTeX) */
+    .tiptap-mathematics-render {
+      padding: 0 0.2em;
+    }
+
+    /* Invisible characters */
+    .tiptap-invisible-character {
+      color: rgba(0, 0, 0, 0.28);
+    }
+  }
+}
+
+/* ---------- Drag/drop position indicator ---------- */
+/* Album photos snap to template slots — hide ProseMirror dropcursor widgets. */
+.rv-editor .rv-dropcursor,
+.rv-dropcursor,
+.ProseMirror-dropcursor,
+.prosemirror-dropcursor-widget {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+/* ---------- Search hit highlight ---------- */
+/* Every matched search term in the open note body blinks YELLOW so all hits
+   are easy to spot after opening a found note. */
+.rv-editor .rv-search-hit {
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 700;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  animation: rvSearchHitBlinkYellow 0.9s steps(1, end) infinite;
+}
+
+/* The "current" hit the user stepped to (via the ▲/▼ arrows) blinks RED so the
+   cursor's location is unmistakable among all the yellow-blinking matches. */
+.rv-editor .rv-search-hit--active {
+  font-weight: 900;
+  outline: 2px solid #000;
+  outline-offset: 1px;
+  border-radius: 2px;
+  animation-name: rvSearchHitBlinkRed;
+  animation-duration: 0.5s;
+}
+
+@keyframes rvSearchHitBlinkRed {
+  0% {
+    background-color: #ff2d2d;
+    box-shadow: 0 0 0 3px rgba(255, 45, 45, 0.75), 0 0 12px rgba(255, 45, 45, 0.9);
+  }
+  50% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  100% {
+    background-color: #ff2d2d;
+    box-shadow: 0 0 0 3px rgba(255, 45, 45, 0.75), 0 0 12px rgba(255, 45, 45, 0.9);
+  }
+}
+
+@keyframes rvSearchHitBlinkYellow {
+  0% {
+    background-color: #ffe100;
+    box-shadow: 0 0 0 2px rgba(255, 225, 0, 0.6), 0 0 8px rgba(255, 225, 0, 0.75);
+  }
+  50% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  100% {
+    background-color: #ffe100;
+    box-shadow: 0 0 0 2px rgba(255, 225, 0, 0.6), 0 0 8px rgba(255, 225, 0, 0.75);
+  }
+}
+
+/* 9-dot handles + bounding outlines — mode-specific rapid blinks. */
+@keyframes rvAlbumHandleBlinkBlueBlack {
+  0%,
+  100% {
+    background-color: #2979ff;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 10px rgba(41, 121, 255, 0.9);
+  }
+  50% {
+    background-color: #000000;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45), 0 0 10px rgba(0, 0, 0, 0.85);
+  }
+}
+
+@keyframes rvAlbumHandleBlinkRedYellow {
+  0%,
+  100% {
+    background-color: #ff1744;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 23, 68, 0.9);
+  }
+  50% {
+    background-color: #ffe600;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 230, 0, 0.9);
+  }
+}
+
+@keyframes rvAlbumOutlineBlinkBlueBlack {
+  0%,
+  100% {
+    outline-color: #2979ff;
+  }
+  50% {
+    outline-color: #000000;
+  }
+}
+
+@keyframes rvAlbumOutlineBlinkRedYellow {
+  0%,
+  100% {
+    outline-color: #ff1744;
+  }
+  50% {
+    outline-color: #ffe600;
+  }
+}
+
+/* Selected photo — 2rem border blinks red ↔ black (relocate / swap mode) */
+@keyframes rvAlbumPhotoSelectBlinkRedBlack {
+  0%,
+  100% {
+    outline-color: #e53935;
+  }
+  50% {
+    outline-color: #000000;
+  }
+}
+
+/* Selected photo in Pan&Zoom — yellow ↔ black */
+@keyframes rvAlbumPhotoSelectBlinkYellowBlack {
+  0%,
+  100% {
+    outline-color: #ffeb3b;
+  }
+  50% {
+    outline-color: #000000;
+  }
+}
+
+/* Legacy alias — prefer RedBlack / YellowBlack */
+@keyframes rvAlbumPhotoSelectBlinkRedBlue {
+  0%,
+  100% {
+    outline-color: #e53935;
+  }
+  50% {
+    outline-color: #000000;
+  }
+}
+
+/* Slot selection — rapid blue ↔ black */
+.rv-album-chrome-outline-blink-slot {
+  animation: rvAlbumOutlineBlinkBlueBlack 0.45s ease-in-out infinite;
+}
+
+/* Occupied slot whose photo is TipTap-selected — solid red frame (slot-sized). */
+.rv-album-chrome-outline-blink-photo-slot {
+  animation: none !important;
+  outline-color: #e53935 !important;
+}
+
+.rv-album-chrome-outline-blink-photo-slot-pan-zoom {
+  animation: none !important;
+  outline-color: #ffeb3b !important;
+}
+
+/* Template selection removed — never blink the template frame. */
+.rv-album-chrome-outline-blink-template,
+.rv-album-chrome-outline-blink,
+.rv-album-template-overlay.is-template-mode {
+  animation: none !important;
+  outline: none !important;
+}
+
+/* ---------- Footer ---------- */
+.rv-editor__footer {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #666;
+  border-top: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+/* ---------- Bubble menu ---------- */
+.rv-bubble {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: #1f2430;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+  button {
+    min-width: 26px;
+    height: 26px;
+    color: #fff;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+  }
+}
+
+/* ---------- Suggestion popup (mention / emoji) ---------- */
+.rv-suggestion-portal {
+  .rv-suggestion {
+    min-width: 180px;
+    max-height: 240px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+    padding: 4px;
+
+    &--empty {
+      padding: 8px 10px;
+      color: #888;
+      font-size: 13px;
+    }
+
+    &__item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 5px 8px;
+      font-size: 13px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+
+      &.is-selected,
+      &:hover {
+        background: #eaf0ff;
+      }
+    }
+  }
+}
+
+/* ---------- Syntax highlighting (lowlight / highlight.js tokens) ---------- */
+.rv-editor__body .ProseMirror pre {
+  .hljs-comment,
+  .hljs-quote {
+    color: #8b949e;
+    font-style: italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-type {
+    color: #ff7b72;
+  }
+  .hljs-string,
+  .hljs-attr,
+  .hljs-template-tag,
+  .hljs-addition {
+    color: #a5d6ff;
+  }
+  .hljs-number,
+  .hljs-symbol,
+  .hljs-bullet {
+    color: #d2a8ff;
+  }
+  .hljs-title,
+  .hljs-section,
+  .hljs-function .hljs-title,
+  .hljs-name {
+    color: #d2a8ff;
+  }
+  .hljs-built_in,
+  .hljs-builtin-name {
+    color: #ffa657;
+  }
+  .hljs-attribute {
+    color: #79c0ff;
+  }
+  .hljs-tag {
+    color: #7ee787;
+  }
+  .hljs-meta {
+    color: #79c0ff;
+  }
+  .hljs-deletion {
+    color: #ffdcd7;
+  }
+}
+
+/* Add Text live preview glyph — fill must beat popup inverse-daynight WebkitTextFillColor. */
+.rv-place-text-pos__glyph {
+  color: var(--rv-place-text-fill, #fbe618) !important;
+  -webkit-text-fill-color: var(--rv-place-text-fill, #fbe618) !important;
+  -webkit-text-stroke: var(--rv-place-text-stroke, 0 transparent);
+  paint-order: stroke fill;
+  text-shadow: var(--rv-place-text-shadow, none);
+}

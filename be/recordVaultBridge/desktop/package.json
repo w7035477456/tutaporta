@@ -1,0 +1,100 @@
+{
+  "name": "record-vault-usb-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-click Record Vault USB bridge for Mac and Windows",
+  "author": "OnlineMall Website",
+  "main": "main.cjs",
+  "scripts": {
+    "prepare-staging": "node scripts/prepare-staging.mjs",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "copy-installers-to-usb": "node scripts/copy-installers-to-usb.mjs",
+    "clean-dist": "rm -rf dist",
+    "pack": "npm run prepare-staging && npm run clean-dist && env -u ELECTRON_RUN_AS_NODE electron-builder --dir",
+    "dist": "npm run prepare-staging && npm run clean-dist && env -u ELECTRON_RUN_AS_NODE electron-builder && npm run copy-installers-to-usb",
+    "dist:mac": "npm run prepare-staging && npm run clean-dist && env -u ELECTRON_RUN_AS_NODE electron-builder --mac && npm run copy-installers-to-usb",
+    "dist:win": "npm run prepare-staging && npm run clean-dist && env -u ELECTRON_RUN_AS_NODE electron-builder --win && npm run copy-installers-to-usb"
+  },
+  "build": {
+    "appId": "website.onlinemall.recordvaultusbbridge",
+    "productName": "usbBridgeV3",
+    "copyright": "Copyright © OnlineMall Website",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.cjs",
+      "status.html",
+      "assets/icon.png",
+      "assets/usbLogo.png"
+    ],
+    "extraResources": [
+      {
+        "from": "staging/be",
+        "to": "be",
+        "filter": [
+          "**/*",
+          "node_modules/**/*"
+        ]
+      },
+      {
+        "from": "staging/be/node_modules",
+        "to": "be/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "staging/fe",
+        "to": "fe",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "assets/icon.png",
+        "to": "assets/icon.png"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "artifactName": "usbBridgeV3.${ext}",
+      "target": [
+        "zip"
+      ],
+      "icon": "assets/icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "afterSign": "scripts/afterSign.mjs",
+    "win": {
+      "artifactName": "usbBridgeV3.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Record Vault USB Bridge",
+      "runAfterFinish": true
+    }
+  },
+  "devDependencies": {
+    "@electron/notarize": "^3.1.1",
+    "electron": "^33.4.11",
+    "electron-builder": "^26.0.12"
+  }
+}

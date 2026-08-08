@@ -1,0 +1,63 @@
+[
+  {
+    "id": 1,
+    "name": "Phoebe",
+    "title": "Dynamic Operations Officer",
+    "description": "Experienced operations professional with a track record of driving efficiency and excellence.",
+    "email": "claudia_kuhn@yahoo.com",
+    "phone": "380-293-0177",
+    "location": "Port Narcos",
+    "avatar": "profile.jpeg"
+  },
+  {
+    "id": 2,
+    "name": "Gaetano",
+    "title": "Investor Division Strategist",
+    "description": "Strategic thinker specializing in investment analysis and portfolio optimization.",
+    "email": "alia_shields25@yahoo.com",
+    "phone": "253-418-5940",
+    "location": "Herminahaven",
+    "avatar": "profile.jpeg"
+  },
+  {
+    "id": 3,
+    "name": "Elisabeth",
+    "title": "Future Markets Associate",
+    "description": "Forward-looking professional focused on emerging market trends and opportunities.",
+    "email": "kieran.mertz87@hotmail.com",
+    "phone": "283-029-1364",
+    "location": "Kihnland",
+    "avatar": "profile.jpeg"
+  },
+  {
+    "id": 4,
+    "name": "Rosalia",
+    "title": "Global Brand Planner",
+    "description": "Creative strategist with expertise in global brand development and market positioning.",
+    "email": "luis.nader30@hotmail.com",
+    "phone": "972-477-5225",
+    "location": "Collinsborough",
+    "avatar": "profile.jpeg"
+  },
+  {
+    "id": 5,
+    "name": "Lizeth",
+    "title": "District Intranet Executive",
+    "description": "Technology leader specializing in internal systems and digital transformation.",
+    "email": "alicia.ohara@company.com",
+    "phone": "474-215-1871",
+    "location": "Alizaville",
+    "avatar": "profile.jpeg"
+  },
+  {
+    "id": 6,
+    "name": "Jessyca",
+    "title": "Future Accountability Liaison",
+    "description": "Dedicated professional ensuring transparency and accountability across organizations.",
+    "email": "titus.kunde76@hotmail.com",
+    "phone": "235-802-6863",
+    "location": "Brandonville",
+    "avatar": "profile.jpeg"
+  }
+]
+

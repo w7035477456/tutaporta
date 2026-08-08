@@ -1,0 +1,8 @@
+-- Backfill member_id using category rules (DemoUser: 1000+singles_id + 2 random digits; Public: random 100000–999999).
+-- Prefer running: node be/scripts/backfillMemberIdsByCategory.js
+-- Example result (2026-06-10 Mac dev):
+--   singles_id=1 DemoUser -> 100164 (M100164)
+--   singles_id=2 DemoUser -> 100236 (M100236)
+--   singles_id=3 DemoUser -> 100357 (M100357)
+--   singles_id=4 Public   -> 225576 (M225576)
+--   singles_id=5 Public   -> 168557 (M168557)

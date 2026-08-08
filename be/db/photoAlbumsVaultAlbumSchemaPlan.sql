@@ -1,0 +1,15 @@
+-- TutaPhotoAlbums vault naming plan (SQLite on USB/OneDrive).
+-- Today the encrypted vault uses notebooks / notes / note_attachments / note_extra_images.
+-- UI labels: Album-Set / Album / attachments / extra images.
+--
+-- Planned rename (NOT applied automatically — would require vault migration):
+--   notebooks        -> album_sets
+--   notes            -> albums
+--   note_keywords    -> album_keywords
+--   note_attachments -> album_attachments
+--   note_extra_images-> album_extra_images
+--   shortcuts target_type notebook|note -> album_set|album
+--
+-- Cross-user sharing uses Postgres (see addPhotoAlbumsInvites.sql):
+--   photo_albums_invites       ~ planning album_invites
+--   photo_albums_shared_albums ~ accepted shares for recipient sidebar

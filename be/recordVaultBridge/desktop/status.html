@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Record Vault USB Bridge</title>
+    <style>
+      :root {
+        --ready: #5ec43a;
+        --notconnected: #f0a000;
+        --nousb: #d32f2f;
+        --needinstall: #ffffff;
+        --ink: #111111;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: 'Comic Neue', 'Comic Sans MS', system-ui, sans-serif;
+        background: #e8e8e8;
+      }
+      body {
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 10px;
+      }
+      .status-card {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px;
+        border: 3px solid #000;
+        border-radius: 6px;
+        background: var(--notconnected);
+        color: var(--ink);
+        box-shadow: none;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+      }
+      body.state-connected .status-card {
+        background: var(--ready);
+        /* outer black + yellow ring + inner black (matches website Ready card) */
+        border: 3px solid #000;
+        box-shadow: inset 0 0 0 3px #f5d547, inset 0 0 0 6px #000;
+      }
+      body.state-notconnected .status-card {
+        background: var(--notconnected);
+      }
+      body.state-nousb .status-card {
+        background: var(--nousb);
+      }
+      body.state-needinstall .status-card {
+        background: var(--needinstall);
+        border-color: #000;
+      }
+      .usb-graphic {
+        width: 72px;
+        height: auto;
+        flex-shrink: 0;
+        display: block;
+        object-fit: contain;
+        user-select: none;
+        -webkit-user-drag: none;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
+      }
+      .copy {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .status-title,
+      .drives,
+      .detail {
+        margin: 0;
+        font-weight: 800;
+        line-height: 1.3;
+        text-align: left;
+        word-break: break-word;
+      }
+      .status-title {
+        font-size: 1.12rem;
+        font-weight: 900;
+      }
+      .drives,
+      .detail {
+        font-size: 0.98rem;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body class="state-notconnected">
+    <section class="status-card" aria-live="polite">
+      <img class="usb-graphic" src="assets/usbLogo.png" alt="" aria-hidden="true" />
+      <div class="copy">
+        <h1 id="title" class="status-title">Status: USB Not Connected</h1>
+        <p id="message" class="sr-only">Starting local USB bridge…</p>
+        <p class="drives" id="drives">USB: (none)</p>
+        <p class="detail" id="detail"></p>
+      </div>
+    </section>
+    <script>
+      window.__setBridgeStatus = function setBridgeStatus(payload) {
+        const raw = String(payload?.state || 'notconnected');
+        const state =
+          raw === 'connected' || raw === 'ok'
+            ? 'connected'
+            : raw === 'nousb'
+              ? 'nousb'
+              : raw === 'needinstall'
+                ? 'needinstall'
+                : 'notconnected';
+
+        const defaults = {
+          connected: 'USB Connected & Ready',
+          nousb: 'USB Not Plugged In',
+          needinstall: 'Need install',
+          notconnected: 'USB Not Connected'
+        };
+        const titleRaw = String(payload?.title || '') || defaults[state];
+        const title = /^Status:/i.test(titleRaw) ? titleRaw : 'Status: ' + titleRaw;
+        const message = String(payload?.message || '');
+        const detail = String(payload?.detail || '');
+        const drives = Array.isArray(payload?.drives) ? payload.drives : [];
+
+        document.body.className = 'state-' + state;
+        document.getElementById('title').textContent = title;
+        document.getElementById('message').textContent = message;
+        document.getElementById('detail').textContent = detail;
+        document.getElementById('drives').textContent = drives.length
+          ? drives.length === 1
+            ? 'USB: ' + drives[0]
+            : 'USB: ' + drives.join(', ')
+          : 'USB: (none)';
+      };
+    </script>
+  </body>
+</html>

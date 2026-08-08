@@ -1,0 +1,5 @@
+Date,Amount $,Amount Token,Balance Token,Description
+01/01/2026,$20.00,4 tokens,4 tokens,Bought 4 tokens
+01/12/2026,$10.00,2 tokens,3 tokens,Used 1 token for basic request
+01/20/2026,$25.00,5 tokens,6 tokens,Bought 5 tokens
+01/22/2026,$0.00,-2 tokens,4 tokens,Used 2 tokens for detail request

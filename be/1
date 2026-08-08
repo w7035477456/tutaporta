@@ -1,0 +1,72 @@
+####### BUILD UBUNTU and MAC ###########################################################################################
+####### BUILD UBUNTU and MAC ###########################################################################################
+####### BUILD UBUNTU and MAC ###########################################################################################
+savedir() {
+    export LAST_CD_INPUT="$PWD"
+    echo "Saved: $LAST_CD_INPUT"
+    echo -n "(2)Press Enter to go here, or type a new folder name: "
+    read input
+    if [ -z "$input" ]; then
+        cd "$LAST_CD_INPUT"
+        pwd
+    else
+        # Save the custom input for later use
+        export LAST_CD_INPUT="$input"
+        echo "Saved: $LAST_CD_INPUT"
+        cd "$LAST_CD_INPUT"
+        pwd
+    fi  
+}       
+            
+cdsavedir() {
+    # Check if the variable is set before trying to cd
+    if [ -z "$LAST_CD_INPUT" ]; then
+        echo "Error: No path has been saved yet. Run cdcurrent first."
+    else
+        cd "$LAST_CD_INPUT"
+    fi  
+}       
+    
+#-------- fe common---------
+alias feclean='cdsavedir;cd ./fe;sudo rm -rf ./node_modules;sudo rm -rfv ./dist;sudo rm -rfv package-lock.json'
+        
+#-------- be common---------
+alias resetpm2='clear;pm2 stop all; pm2 delete all'
+alias beclean='cdsavedir; cd ./be  ; rm -rf node_modules ; rm -rf package-lock.json'
+        
+#========= DEV ============
+alias cleancompilebuildfedev='feclean;cdsavedir && cd ./fe && npm i && npm run builddev'
+alias cleancompileresetrunbedev='beclean;cdsavedir && cd ./be && npm i && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save' 
+
+#========= PROD ============
+alias cleancompilebuildfeprod='feclean;cdsavedir && cd ./fe && npm i && npm run buildprod'
+alias cleancompileresetrunbeprod='beclean;cdsavedir && cd ./be && npm i && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save'
+
+#========= MAC ============
+alias cleancompilebuildfemac='feclean;cdsavedir && cd ./fe && npm i && npm run build'
+alias cleancompileresetrunbemac='beclean;cdsavedir && cd ./be && npm i && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save && openurl'
+
+#----- USE THIS----
+alias testpg='netstat -an | grep LISTEN | grep 50010'
+
+check_pg() {
+    if testpg > /dev/null 2>&1; then
+        echo "✅ Postgres is active. Proceeding..."
+        return 0
+    else
+        echo "❌ Postgres is NOT active. Operation aborted."
+        return 1
+    fi
+}
+
+# Refactored febedev
+alias febedev='check_pg && (savedir; realenv;pm2 flush; cleancompilebuildfedev; cleancompileresetrunbedev)'
+alias bedev='check_pg && (savedir; realenv; pm2 flush; cleancompileresetrunbedev)'
+alias febeprod='check_pg && (savedir; realenv; pm2 flush; cleancompilebuildfeprod;cleancompileresetrunbeprod)'
+alias runprod='check_pg && (savedir; realenv; pm2 flush; pm2 kill && rm -rf ~/.pm2 && pm2 list && cd ./be && npm run pm2:start && pm2 save)'
+
+alias febemac='check_pg && (savedir; realenv; pm2 flush;cleancompilebuildfemac;cleancompileresetrunbemac)'
+
+######## BUILD THE END ###########################################################################################
+######## BUILD THE END ###########################################################################################
+######## BUILD THE END ###########################################################################################

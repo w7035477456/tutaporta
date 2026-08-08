@@ -1,0 +1,64 @@
+{
+  "individual_id": "ind_9f83a2b1-c4d6-4e6f-8a9b-0c1d2e3f4a6b",
+  "datarequest_id": "dr_mock_demo_academic_summary",
+  "academic_record": {
+    "record_type": "M1_ACADEMIC_RECORD",
+    "version": "3.0",
+    "individual_id": "ind_9f83a2b1-c4d6-4e6f-8a9b-0c1d2e3f4a6b",
+    "institution": {
+      "name": "University of Virginia",
+      "opeid": "00374500",
+      "location": {
+        "city": "Charlottesville",
+        "state": "VA",
+        "country": "USA"
+      }
+    },
+    "degrees": [
+      {
+        "status": "AWARDED",
+        "title": "Bachelor of Science",
+        "major": "Computer Science",
+        "confer_date": "2024-05-19",
+        "gpa": {
+          "cumulative_gpa": "3.72"
+        }
+      }
+    ],
+    "academic_history": [
+      {
+        "term": "Fall 2023",
+        "term_gpa": "3.85",
+        "courses": [
+          {
+            "code": "CS 4750",
+            "title": "Database Systems",
+            "grade": "A"
+          },
+          {
+            "code": "CS 4501",
+            "title": "Advanced Web Development",
+            "grade": "A-"
+          }
+        ]
+      }
+    ]
+  },
+  "digest_record": {
+    "record_type": "M1_DIGEST",
+    "individual_id": "ind_9f83a2b1-c4d6-4e6f-8a9b-0c1d2e3f4a6b",
+    "verification_summary": {
+      "is_currently_enrolled": false,
+      "highest_degree_earned": "Bachelor of Science",
+      "primary_major": "Computer Science",
+      "graduation_date": "2024-05-19",
+      "verified_institution_name": "University of Virginia",
+      "cumulative_gpa": "3.72"
+    },
+    "checks": {
+      "identity_match_score": 0.98,
+      "tamper_check_passed": true,
+      "datasource_authenticated": true
+    }
+  }
+}

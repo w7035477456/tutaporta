@@ -1,0 +1,15 @@
+/**
+ * @deprecated Use `config/colorTemplate11Posting.js` — kept for backward-compatible imports.
+ */
+export {
+  COLOR_TEMPLATE11_POSTING_PHOTO_HEIGHTS_STORAGE_KEY as MY_STORY_POSTING_PHOTO_HEIGHTS_STORAGE_KEY,
+  COLOR_TEMPLATE11_POSTING_PHOTO_DEFAULT_VH as MY_STORY_POSTING_PHOTO_DEFAULT_VH,
+  COLOR_TEMPLATE11_POSTING_PHOTO_MIN_VH as MY_STORY_POSTING_PHOTO_MIN_VH,
+  COLOR_TEMPLATE11_POSTING_PHOTO_MAX_VH as MY_STORY_POSTING_PHOTO_MAX_VH,
+  getColorTemplate11PostingPhotoDefaultHeightPx as getMyStoryPostingPhotoDefaultHeightPx,
+  clampColorTemplate11PostingPhotoHeightPx as clampMyStoryPostingPhotoHeightPx,
+  readColorTemplate11PostingPhotoHeightsMap as readMyStoryPostingPhotoHeightsMap,
+  writeColorTemplate11PostingPhotoHeight as writeMyStoryPostingPhotoHeight,
+  colorTemplate11PostingResizeLabelFontSize as myStoryPostingFeedResizeLabelFontSize,
+  colorTemplate11PostingPhotoResizeHandleSx as myStoryPostingFeedPhotoResizeHandleSx
+} from 'config/colorTemplate11Posting';

@@ -1,0 +1,127 @@
+# Live face scan — favorite-bio script phrases (20)
+# Placeholders: [Favorite food], [Favorite movie], [Favorite hobbies], [Favorite music],
+# [Country of Birth], [Favorite desserts], [Favorite Video Game(s)], [Favorite drinks],
+# [Favorite books], [Marriage history], [Children info], [Favorite vacation places],
+# [Favorite memories], [Ethnicity], [Favorite TV Sport(s) and Team(s)], [Religion]
+# Later: random pick one, substitute member favorites, display on screen.
+# Separator between phrases: ---
+
+---
+1. The Cozy Foodie
+
+My ideal Friday night involves a dangerously large plate of [Favorite food] and pretending I'm going to stay awake for more than twenty minutes of [Favorite movie]. When I'm not doing that, you can usually find me practicing [Favorite hobbies] or listening to [Favorite music] on repeat. I was originally born in [Country of Birth], which means I bring a very specific, high-tier snacking standard to this app. If you happen to know the best local spot to grab [Favorite desserts], we are already off to a fantastic start.
+---
+
+---
+2. The Charming Player Two
+
+I'm an unapologetic fan of [Favorite Video Game(s)], though I promise my real-life communication skills are slightly better than my in-game trash talk. To balance out the screen time, I like to unwind with a glass of [Favorite drinks] and get lost in [Favorite books]. To get the big life questions out of the way early: [Marriage history], and when it comes to kids, [Children info]. Swipe right if you're ready to be player two, or at least willing to pretend you care about my random trivia.
+---
+
+---
+3. The Daydreaming Wanderer
+
+If my bank account matched my daydreaming habits, I would permanently reside in [Favorite vacation places]. Until that happens, I settle for exploring local spots, jamming out to [Favorite music], and practicing [Favorite hobbies]. One of my absolute [Favorite memories] involves getting completely lost and finding the best meal of my life, which is why [Favorite food] holds a special place in my heart. I'm a proud [Ethnicity] person looking for someone who doesn't mind taking the scenic route through life.
+---
+
+---
+4. The Passionate Fan
+
+Depending on the season, my overall weekly mood is heavily dictated by how [Favorite TV Sport(s) and Team(s)] performed over the weekend. When I'm not yelling at a television screen, I'm usually out doing [Favorite hobbies] or hunting down the city's best [Favorite drinks]. My background is [Ethnicity], my vibe is laid back, and my [Religion] keeps me grounded whenever my team loses in overtime. Tell me your go-to karaoke song, or better yet, let's just go grab some [Favorite food] and argue about bad referee calls.
+---
+
+---
+5. The Low-Key Homebody
+
+Legend has it that if you say "[Favorite desserts]" three times in front of a mirror, I will magically appear with two spoons. I'm originally from [Country of Birth], though I've fully mastered the local art of staying indoors to re-watch [Favorite movie]. When it comes to my household dynamic, the situation is: [Children info]. I'm looking for someone who understands that "let's hang out" is sometimes just dating-app code for sitting in the same room doing our own separate things.
+---
+
+---
+6. The Practical Romantic
+
+I'm looking for the kind of epic, cinematic romance you see in [Favorite movie], just minus the dramatic rain scenes that ruin your shoes. On a typical Sunday, I'm either lost in [Favorite hobbies], sipping on [Favorite drinks], or re-reading [Favorite books] for the hundredth time. My roots are [Ethnicity], my viewpoint is [Religion], and my [Marriage history] taught me exactly what to appreciate in a real partner. If you can make me laugh hard enough to snort my drink, you win this entire app.
+---
+
+---
+7. The High-Energy Chaos
+
+My brain has roughly forty-seven tabs open at all times, and at least three of them are playing [Favorite music]. I fuel this daily chaos with questionable amounts of [Favorite drinks] and a deep, spiritual devotion to [Favorite food]. When I actually manage to sit still, I'm usually planning my next trip to [Favorite vacation places] or talking about [Favorite memories]. I'm looking for a partner-in-crime to check out new spots with, or at least someone to tell me when to close a few of those open tabs.
+---
+
+---
+8. The Straight-Shooter
+
+For the record, my relationship past is [Marriage history], and regarding kids: [Children info]. With the mandatory paperwork out of the way, I'd much rather skip the small talk and bond over our mutual love for [Favorite food] or debate the ending of [Favorite movie]. I was born in [Country of Birth], guided by [Religion], and spend most of my free time dedicated to [Favorite hobbies]. If you appreciate honest conversation and know your way around a good [Favorite desserts] menu, we'll get along just fine.
+---
+
+---
+9. The Pop-Culture Critic
+
+I judge people almost entirely based on their taste in [Favorite music] and whether they agree that [Favorite movie] is a masterpiece. In the real world, I keep myself busy with [Favorite hobbies] and occasionally escaping reality via [Favorite Video Game(s)]. One of my all-time [Favorite memories] happened right in [Favorite vacation places], which I will gladly tell you about over a round of [Favorite drinks]. Bring your best banter to the chat, because standard "hey what's up" openers are strictly against my personal policy.
+---
+
+---
+10. The Quiet Intellectual
+
+Give me a quiet corner, a hot cup of [Favorite drinks], and a stack of [Favorite books], and I am a genuinely thrilled human being. When I am forced to socialize, I usually try to steer the group toward grabbing [Favorite food] or watching [Favorite TV Sport(s) and Team(s)]. Being of [Ethnicity] descent, family is huge to me, which is why I'm always open about my home life: [Children info]. I'm just looking for someone to share good conversation, comfortable silences, and the occasional slice of [Favorite desserts].
+---
+
+---
+11. The Spontaneous Soul
+
+My passport is my favorite physical possession, mostly because it gets me closer to [Favorite vacation places] whenever humanly possible. When grounded at home, I burn off my extra energy through [Favorite hobbies] and scream-singing to [Favorite music] in my car. Born in [Country of Birth], I grew up learning that the fastest route to anyone's heart is through a plate of [Favorite food]. If you're down for last-minute road trips or a wildly competitive session of [Favorite Video Game(s)], hit my line.
+---
+
+---
+12. The Nostalgic Vibe
+
+I'm a sucker for nostalgia, which is why half of my [Favorite memories] revolve around old playlists of [Favorite music] and classic [Favorite movie] reruns. These days, my life is anchored by my [Religion], my proud [Ethnicity] heritage, and my love for [Favorite hobbies]. I take my morning [Favorite drinks] very seriously, almost as seriously as my ongoing quest to find the city's best [Favorite desserts]. Let's make a deal: you plan the first date, and I promise to bring good conversation and zero awkward pauses.
+---
+
+---
+13. The "Treat Yourself" Advocate
+
+Life is way too short for bad coffee, fake friends, or pretending to enjoy watching sports other than [Favorite TV Sport(s) and Team(s)]. I'm a big believer in treating yourself, which usually manifests as ordering an embarrassing amount of [Favorite food] on a random Tuesday. Just to be transparent up front—relationship status: [Marriage history], and kid situation: [Children info]. I'm looking for someone genuine to laugh with, explore the city with, and debate the plot holes in [Favorite books] with.
+---
+
+---
+14. The Selective Socialite
+
+I possess the social battery of an older smartphone in the dead of winter, but for the right person, I will gladly leave the house. Most of my daily dopamine comes from [Favorite Video Game(s)], getting lost in [Favorite books], and enjoying a quiet glass of [Favorite drinks]. I was born in [Country of Birth], and I'm currently spending my weekends trying to master [Favorite hobbies]. If your ideal first date involves getting [Favorite food] takeout and not wearing formal pants, please propose immediately.
+---
+
+---
+15. The Sunday Morning Person
+
+I am firmly convinced that the absolute peak of human civilization was the invention of [Favorite desserts]. When I'm not testing that theory, I'm usually listening to [Favorite music], catching up on [Favorite TV Sport(s) and Team(s)], or working on [Favorite hobbies]. My [Religion] and my [Ethnicity] roots shaped who I am today, giving me a solid sense of humor and a high standard for hospitality. Send me your absolute worst pun; if it makes me sigh out loud, you've officially earned a first date.
+---
+
+---
+16. The Open Book
+
+If we go out, I will inevitably tell you the story behind my [Favorite memories], likely using way too many intense hand gestures. I'm a native of [Country of Birth], an avid reader of [Favorite books], and a staunch, loyal defender of [Favorite movie]. Putting my cards on the table early: [Marriage history], and as for children, [Children info]. I'm looking for a co-author for the next chapter—someone who likes [Favorite food] and doesn't mind a little spontaneous plot twist.
+---
+
+---
+17. The Friendly Competitor
+
+Fair warning: I become a danger to society when playing [Favorite Video Game(s)] or answering trivia about [Favorite TV Sport(s) and Team(s)]. Outside of the arena, I am a peaceful creature who runs on [Favorite drinks] and spends weekends doing [Favorite hobbies]. My long-term dream is to retire somewhere near [Favorite vacation places], but for now, I'm just trying to find someone to split [Favorite desserts] with. Swipe right if you think you can beat me at Mario Kart, but be prepared to pay for the [Favorite food] when you lose.
+---
+
+---
+18. The City Blend
+
+I'm a mix of traditional [Ethnicity] values and modern city living, fueled mostly by [Favorite drinks] and stubborn optimism. My perfect weekend requires a strict 50/50 balance of getting outdoors for [Favorite hobbies] and staying glued to the couch for [Favorite movie]. One of my favorite [Favorite memories] took place back in [Country of Birth], though that's a story I usually save for date number two. I'm looking for someone who loves talking about [Favorite books], terrible dad jokes, and trying weird new [Favorite food].
+---
+
+---
+19. The Pragmatic Optimist
+
+I've officially reached the age where my back occasionally hurts for no reason, but my taste in [Favorite music] remains elite. I balance out work stress by planning hypothetical trips to [Favorite vacation places] and putting hours into [Favorite hobbies]. To give you the quick life-update: [Marriage history], and on the kid front, [Children info]. I'm looking for a genuine connection with someone who loves [Favorite food]—bonus points if you're the type to share your [Favorite desserts].
+---
+
+---
+20. The Total Package
+
+I come as a fully formed package deal: strong opinions on [Favorite movie], a loud devotion to [Favorite TV Sport(s) and Team(s)], and an obsession with [Favorite food]. On the major life milestones: [Marriage history], and my current household kid status is [Children info]. When I get a rare moment to myself, I recharge with [Favorite Video Game(s)] or a quiet afternoon reading [Favorite books]. If you can handle a little bit of sarcasm, a lot of [Favorite music], and a great conversation over [Favorite drinks], say hello.
+---

@@ -1,0 +1,4 @@
+# Only the desktop app's own deps — not staging/be/node_modules (runtime for packaged bridge).
+/node_modules/
+/staging/
+*.log

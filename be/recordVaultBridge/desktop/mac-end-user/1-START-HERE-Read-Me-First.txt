@@ -1,0 +1,79 @@
+========================================================
+  usbBridgeV3 for Mac — START HERE
+  (After you clicked “Download usbbridge zip” on the website)
+========================================================
+
+You do NOT need Terminal.
+Use only Finder double-clicks and normal Mac buttons.
+
+
+BEFORE THE 4 STEPS — Unzip the download
+---------------------------------------
+  1. Open Finder → Downloads
+  2. Double-click:  usbBridgeV3-mac.zip
+     (This creates a folder named usbBridgeV3-mac)
+  3. Open that folder. You should see:
+       • 1-START-HERE-Read-Me-First.txt   (this file)
+       • 2-Open-Privacy-Settings.webloc
+       • usbBridgeV3.app
+
+  If you still see “Open usbBridgeV3.command” and NOT the
+  two files above, delete the old folder and download again
+  from the website (you have an old zip).
+
+
+Why Mac shows a warning
+-----------------------
+This app is not yet signed with an Apple certificate.
+macOS blocks it the first time. That is normal.
+The steps below are Apple’s way to allow it.
+
+
+STEP 1 — Try to open the app
+----------------------------
+  • Double-click:  usbBridgeV3.app
+
+  • A warning appears (Apple could not verify … malware).
+  • Click the button:  Done
+    (Do NOT click “Move to Trash”.)
+
+
+STEP 2 — Open Privacy settings
+------------------------------
+  • Double-click this file in the same folder:
+
+      2-Open-Privacy-Settings.webloc
+
+  • System Settings opens to Privacy & Security.
+
+
+STEP 3 — Allow the app
+----------------------
+  • Scroll to the BOTTOM of that settings page.
+  • You should see a message that usbBridgeV3 was blocked.
+  • Click:  Open Anyway
+  • If Mac asks for your password or Touch ID, approve it.
+  • If it asks again to open, click:  Open
+
+
+STEP 4 — Open the app again
+---------------------------
+  • Double-click:  usbBridgeV3.app  again
+
+  • Look for a small icon in the menu bar (top of screen).
+
+  • Go back to the website (Photo Albums or Notes → USB).
+    Status should turn green: “USB Connected & Ready”.
+
+
+Next time
+---------
+Just double-click usbBridgeV3.app. You should not need
+Steps 1–3 again.
+
+Need help?
+----------
+If Step 3 does not show “Open Anyway”, complete Step 1
+first (double-click the app and click Done), then try
+Step 2 again within a few minutes.
+========================================================

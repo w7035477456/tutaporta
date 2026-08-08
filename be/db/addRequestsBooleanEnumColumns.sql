@@ -1,0 +1,1 @@
+-- Deprecated: use be/db/migrateAllBooleanEnumColumns.sql (all boolean columns -> boolean_enum).

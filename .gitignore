@@ -1,0 +1,38 @@
+fe/yarn.lock
+
+# Sensitive/local session data
+cookies.txt
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+
+# Root-level env files (if you use any)
+.env
+.env.*
+!.env.example
+
+# Logs/temp at repo root
+*.log
+tmp/
+.temp/
+
+# Deploy integrity manifests (written at febeprod / work2)
+ARTIFACT.json
+ARTIFACT.sha256
+
+# Local server inventory
+scripts/deploy-hosts.txt
+
+# USB bridge installer binaries (served by BE download API)
+be/usb/
+
+# USB bridge desktop — installers live in repo-root usb/ after build
+be/recordVaultBridge/desktop/dist/
+be/recordVaultBridge/desktop/staging/
+be/recordVaultBridge/desktop/node_modules/
+
+# Record Vault / OMNotes local vault data (encrypted *.enc + meta) — never commit
+**/.recordvault/
+**/OMNotes/
+

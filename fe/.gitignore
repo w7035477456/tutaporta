@@ -1,0 +1,37 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+yarn.lock
+
+be/logs/*.log
+
+# dependencies
+node_modules/
+**/node_modules/
+# Keep package-lock.json in git so Mac + Ubuntu npm ci use the same versions.
+dist/
+**/dist/
+logs/
+**/logs/
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+
+# Generated when Vite finishes start/build (UI + showbuild)
+/public/build-info.json
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/kendo-ui-license**
+
+npm-debug.log*
+
+# License
+kendo-ui-license.txt

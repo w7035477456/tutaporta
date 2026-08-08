@@ -1,0 +1,9 @@
+# Keep package-lock.json in git so Mac + Ubuntu npm ci use the same versions.
+node_modules/
+# App loads env from ~/.ssh/be/.env; ignore any local .env in be/
+*.log
+
+# Local Record Vault / OMNotes trees (USB/dev copies) — never commit
+.recordvault/
+OMNotes/
+

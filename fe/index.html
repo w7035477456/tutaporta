@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>OnlineMall.Website</title>
+    <!-- PNG first for Android (Chrome often fails to show .ico); ICO fallback for older desktop -->
+    <link rel="icon" type="image/png" href="/onlineMallNeon.png" />
+    <link rel="icon" type="image/x-icon" href="/onlineMallNeon.ico" />
+    <link rel="apple-touch-icon" href="/onlineMallNeon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <!-- Primary webfont for MAIN_FONT in fe/.env (first-postfix Google family name if you change MAIN_FONT) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
+    <!-- Meta Tags-->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="var(--theme-primary-color)" />
+    <meta name="title" content="OnlineMall.Website" />
+    <meta
+      name="description"
+      content="OnlineMall.Website has everything under one roof. Dating, Jobs, Rentals, Homes, Services, and more."
+    />
+    <meta
+      name="keywords"
+      content="Dating, Jobs, Rentals, Homes, Services, and more."
+    />
+    <meta name="author" content="https://OnlineMall.Website" />
+    <script defer src="https://OnlineMall.Website" ></script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+          This HTML file is a template.
+          If you open it directly in the browser, you will see an empty page.
+
+          You can add webfonts, meta tags, or analytics to this file.
+          The build step will place the bundled scripts into the <body> tag.
+
+          To begin the development, run `npm start`.
+          To create a production bundle, use `npm run build`.
+        -->
+    <script type="module" src="/src/index.jsx"></script>
+  </body>
+</html>
