@@ -7,10 +7,14 @@ cookies.txt
 .DS_Store
 Thumbs.db
 
-# Root-level env files (if you use any)
+# Env files — never commit secrets (be uses ~/.ssh/be/.env, not repo).
+# fe/.env is UI/build knobs only (font sizes, API_PORT, etc.) and MUST be
+# checked in so Ubuntu work2/febeprod Vite builds bake DESKTOP_/MOBILE_/MAIN_FONT.
+# Without it, production buttons look blank (missing vw sizes / font stack).
 .env
 .env.*
 !.env.example
+!fe/.env
 
 # Logs/temp at repo root
 *.log
