@@ -3,19 +3,22 @@ import { booleanEnumCast, toBooleanEnumLabel } from '../../utils/booleanEnum.js'
 
 /**
  * Next requests_id for schemas where the column is NOT NULL without a working serial default.
+ * @param {string} requestSchema
+ * @param {string} quotedSchema
+ * @param {import('pg').Pool | import('pg').PoolClient} [db]
  */
-export async function allocateRequestsId(requestSchema, quotedSchema) {
-  const seqResult = await pool.query(`SELECT pg_get_serial_sequence($1, 'requests_id') AS seq_name`, [
+export async function allocateRequestsId(requestSchema, quotedSchema, db = pool) {
+  const seqResult = await db.query(`SELECT pg_get_serial_sequence($1, 'requests_id') AS seq_name`, [
     `${requestSchema}.requests`
   ]);
   const seqName = seqResult.rows[0]?.seq_name;
   if (seqName) {
-    const next = await pool.query(`SELECT nextval($1::regclass) AS next_id`, [seqName]);
+    const next = await db.query(`SELECT nextval($1::regclass) AS next_id`, [seqName]);
     const id = Number(next.rows[0]?.next_id);
     if (Number.isFinite(id) && id >= 1) return id;
   }
 
-  const maxResult = await pool.query(
+  const maxResult = await db.query(
     `SELECT COALESCE(MAX(requests_id), 0) + 1 AS next_id FROM ${quotedSchema}.requests`
   );
   const id = Number(maxResult.rows[0]?.next_id);
