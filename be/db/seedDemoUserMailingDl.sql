@@ -6,8 +6,9 @@ BEGIN;
 
 UPDATE helloworldjunktest.singles
 SET
+  mailing_middlename = CHR(65 + ((singles_id * 7 + 3) % 26)::int),
   dl_firstname = NULLIF(BTRIM(mailing_firstname), ''),
-  dl_middlename = NULLIF(BTRIM(mailing_middlename), ''),
+  dl_middlename = CHR(65 + ((singles_id * 7 + 3) % 26)::int),
   dl_lastname = NULLIF(BTRIM(mailing_lastname), ''),
   updated_at = CURRENT_TIMESTAMP
 WHERE member_category = 'DemoUser';

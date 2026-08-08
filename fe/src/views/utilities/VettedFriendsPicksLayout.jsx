@@ -83,6 +83,7 @@ import VettedFriendsInlineChatPanel from 'views/utilities/VettedFriendsInlineCha
 import { colorTemplate1WallColorByTheme } from 'config/colorTemplate1';
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
 import useConfig from 'hooks/useConfig';
+import { getMyPicksAvatarSize } from 'config/myPicksCardEnv';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
 import { getAppPageScrollRegionMaxHeightCss, getAppPageZoomFactor } from 'utils/appPageScrollRegionEnv';
 
@@ -97,6 +98,41 @@ const OUTGOING_BIO_APPROVED_FAT_FONT_SCALE = 1.3;
 const outgoingBioApprovedStatusFontSize = {
   xs: `calc(${getMobileSinglesTextFontSizeVw()} * ${OUTGOING_BIO_APPROVED_FAT_FONT_SCALE})`,
   sm: `calc(${getDesktopTextFontSizeVw()} * ${OUTGOING_BIO_APPROVED_FAT_FONT_SCALE})`
+};
+
+/** Yellow sash + black outlined text — avatar when brief/full bio approval is approve. */
+const vettedFriendsApprovedRibbonSx = {
+  position: 'absolute',
+  zIndex: 100,
+  top: '14%',
+  left: '-38%',
+  width: '100%',
+  py: '0.12rem',
+  bgcolor: '#FFEB3B',
+  color: '#000000',
+  WebkitTextFillColor: '#000000',
+  WebkitTextStroke: '0.45px #000000',
+  paintOrder: 'stroke fill',
+  textShadow: `
+    -0.5px -0.5px 0 #000000,
+     0.5px -0.5px 0 #000000,
+    -0.5px  0.5px 0 #000000,
+     0.5px  0.5px 0 #000000
+  `,
+  fontFamily: 'inherit',
+  fontSize: { xs: '0.52rem', sm: '0.58rem' },
+  fontWeight: 800,
+  letterSpacing: 0.15,
+  lineHeight: 1.15,
+  textAlign: 'center',
+  textTransform: 'none',
+  whiteSpace: 'nowrap',
+  transform: 'rotate(-45deg)',
+  transformOrigin: 'center',
+  pointerEvents: 'none',
+  boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
+  border: '1.5px solid #000000',
+  boxSizing: 'border-box'
 };
 
 const vettedFriendsPanelTextSx = {
@@ -167,6 +203,13 @@ function isTruthyPaidFlag(value) {
 function getBioRequestApprovalState(row, kind) {
   const value = kind === 'brief' ? row?.brief_bio_request_approval : row?.full_bio_request_approval;
   return triStateApproval(value);
+}
+
+function hasApprovedBioRequestRibbon(row) {
+  return (
+    getBioRequestApprovalState(row, 'brief') === APPROVAL_STATUS.APPROVE ||
+    getBioRequestApprovalState(row, 'full') === APPROVAL_STATUS.APPROVE
+  );
 }
 
 /** Outgoing request can be canceled only while still awaiting a response. */
@@ -1888,6 +1931,7 @@ export default function VettedFriendsPicksLayout({
               row.profile_image_url || buildProfilePhotoUrl(row.singles_id_to, row.profile_image_fk);
             const isDropTarget = draggingSinglesId != null && dropTargetSinglesId === singlesId && draggingSinglesId !== singlesId;
             const isBlockedUser = effectiveBlockUser(row);
+            const showApprovedRibbon = hasApprovedBioRequestRibbon(row);
 
             return (
               <ColorTemplate8PhotoGallery.Item
@@ -1927,19 +1971,36 @@ export default function VettedFriendsPicksLayout({
                   setDropTargetSinglesId(null);
                 }}
               >
-                <ColorTemplate8PhotoGallery.Avatar
-                  src={profileUrl}
-                  alt={memberLabel}
-                  selected={selected}
-                  onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
-                  sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
-                  imgProps={{
-                    onError: (e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = UserRound;
-                    }
+                <Box
+                  sx={{
+                    position: 'relative',
+                    zIndex: 100,
+                    width: getMyPicksAvatarSize(),
+                    height: getMyPicksAvatarSize(),
+                    borderRadius: '50%',
+                    overflow: 'visible',
+                    flexShrink: 0
                   }}
-                />
+                >
+                  <ColorTemplate8PhotoGallery.Avatar
+                    src={profileUrl}
+                    alt={memberLabel}
+                    selected={selected}
+                    onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
+                    sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
+                    imgProps={{
+                      onError: (e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = UserRound;
+                      }
+                    }}
+                  />
+                  {showApprovedRibbon ? (
+                    <Box component="span" aria-label="Approved" sx={vettedFriendsApprovedRibbonSx}>
+                      Approved!
+                    </Box>
+                  ) : null}
+                </Box>
                 <ColorTemplate8PhotoGallery.NameButton
                   onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
                   sx={isBlockedUser ? { pointerEvents: 'none', opacity: 0.55 } : undefined}
