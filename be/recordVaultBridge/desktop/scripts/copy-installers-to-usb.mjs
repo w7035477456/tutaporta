@@ -12,15 +12,16 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-function loadUsbDmgExeFromHomeEnv() {
-  if (String(process.env.USB_DMG_EXE || '').trim()) return;
+function loadEnvKeyFromHomeEnv(key) {
+  if (String(process.env[key] || '').trim()) return;
   const homeEnvPath = path.join(os.homedir(), '.ssh', 'be', '.env');
   if (!fs.existsSync(homeEnvPath)) return;
   const text = fs.readFileSync(homeEnvPath, 'utf8');
+  const re = new RegExp('^' + key + '\\s*=\\s*(.*)$');
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
-    const m = /^USB_DMG_EXE\s*=\s*(.*)$/.exec(trimmed);
+    const m = re.exec(trimmed);
     if (!m) continue;
     let val = m[1].trim();
     if (
@@ -29,21 +30,42 @@ function loadUsbDmgExeFromHomeEnv() {
     ) {
       val = val.slice(1, -1);
     }
-    // strip inline comment
     const hash = val.indexOf(' #');
     if (hash >= 0) val = val.slice(0, hash).trim();
-    if (val) process.env.USB_DMG_EXE = val;
+    if (val) process.env[key] = val;
     break;
   }
 }
 
+function loadUsbDmgExeFromHomeEnv() {
+  loadEnvKeyFromHomeEnv('STORAGE_FOLDER');
+  loadEnvKeyFromHomeEnv('USB_DMG_EXE');
+}
+
 loadUsbDmgExeFromHomeEnv();
+
+/** Expand ${STORAGE_FOLDER} / $STORAGE_FOLDER inside USB_DMG_EXE. */
+function expandUsbDmgExeEnv() {
+  const storage = String(process.env.STORAGE_FOLDER || '')
+    .trim()
+    .replace(/\/+$/, '');
+  let usb = String(process.env.USB_DMG_EXE || '').trim();
+  if (!usb) return;
+  if (storage) {
+    usb = usb.replace(/\$\{STORAGE_FOLDER\}/g, storage).replace(/\$STORAGE_FOLDER/g, storage);
+  }
+  process.env.USB_DMG_EXE = usb.replace(/\/+$/, '');
+}
+
+expandUsbDmgExeEnv();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopDir = path.resolve(__dirname, '..');
 const beRoot = path.resolve(desktopDir, '..', '..');
+const repoRoot = path.resolve(beRoot, '..');
 const distDir = path.join(desktopDir, 'dist');
 const legacyUsbDir = path.join(beRoot, 'usb');
+const repoUsbzipDir = path.join(repoRoot, 'usbzip');
 
 function resolveDestDir() {
   const fromEnv = String(process.env.USB_DMG_EXE || '')
@@ -59,6 +81,15 @@ function ensureDir(dir) {
 function copyFile(src, dest) {
   fs.copyFileSync(src, dest);
   console.log(`[copy-installers-to-usb] ${src} -> ${dest}`);
+}
+
+/** Also stage into repo usbzip/ for git commit + Ubuntu work2 publish. */
+function mirrorToRepoUsbzip(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return;
+  ensureDir(repoUsbzipDir);
+  const dest = path.join(repoUsbzipDir, path.basename(filePath));
+  fs.copyFileSync(filePath, dest);
+  console.log(`[copy-installers-to-usb] mirrored -> ${dest} (commit this for Ubuntu work2)`);
 }
 
 /** electron-builder Mac zip → usbBridgeV3-mac.zip (+ Open .command for Gatekeeper). */
@@ -114,6 +145,7 @@ function publishMacZip(destDir) {
     console.log(
       `[copy-installers-to-usb] ${src} -> ${dest} (with ${startHereName} + ${privacyOpenName})`
     );
+    mirrorToRepoUsbzip(dest);
     return true;
   } catch (err) {
     console.error(
@@ -146,6 +178,7 @@ function publishWinZip(destDir) {
     return false;
   }
   copyFile(stagingZip, destZip);
+  mirrorToRepoUsbzip(destZip);
   return true;
 }
 

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Sync USB Bridge installers from Mac USB_DMG_EXE → Ubuntu USB_DMG_EXE.
+# OPTIONAL emergency sync: Mac USB_DMG_EXE → Ubuntu USB_DMG_EXE over SSH.
 #
-# Why: git checkout of usbzip/*.zip is often a Git LFS pointer (~134 bytes), not the
-# real ~111MB zip. Downloads must come from STORAGE_FOLDER/USB_DMG_EXE on each app server.
+# Preferred path (no manual SCP):
+#   Mac:    usball → commit usbzip/*.zip → push
+#   Ubuntu: work2 / febeprod → git lfs pull → scripts/publish-usbzip-to-storage.sh
 #
-# Usage (Mac, after usball / copy-installers-to-usb):
+# Why this script still exists: if Git LFS pull fails on Ubuntu, push real zips over SSH.
+#
+# Usage (Mac, after usball):
 #   scripts/sync-usb-bridge-installers.sh
 #   scripts/sync-usb-bridge-installers.sh lawsen0@192.168.222.202
 #
