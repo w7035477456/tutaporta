@@ -234,8 +234,8 @@ async function canViewPrivatePhoto(viewerSinglesId, ownerSinglesId) {
     [viewerSinglesId, ownerSinglesId]
   );
   const row = result.rows[0];
-  // Buddies Photo Album: Full Bio approved only (brief does not qualify).
-  return isApprovedValue(row?.detail_approval);
+  // Acquaint (brief) or Buddies (full) private album access.
+  return isApprovedValue(row?.basic_approval) || isApprovedValue(row?.detail_approval);
 }
 
 async function isProfilePhoto(photoId, ownerSinglesId) {

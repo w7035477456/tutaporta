@@ -185,26 +185,58 @@ function getFullBioRequestApproval(row) {
 }
 
 const VETTED_FRIENDS_AREA_PUBLIC = 'public';
+const VETTED_FRIENDS_AREA_ACQUAINT = 'acquaint';
 const VETTED_FRIENDS_AREA_BUDDIES = 'buddies';
 const VETTED_FRIENDS_PUBLIC_TAB_KEYS = ['publicPostings', 'publicAlbum', 'publicVideoAlbum'];
+const VETTED_FRIENDS_ACQUAINT_TAB_KEYS = ['bio', 'friendAlbum'];
 const VETTED_FRIENDS_BUDDIES_TAB_KEYS = ['bio', 'chat', 'buddiesPostings', 'friendAlbum'];
 const VETTED_FRIENDS_DEFAULT_TAB = 'publicPostings';
 const VETTED_FRIENDS_TAB_LABEL_BY_KEY = {
   publicPostings: 'Public Postings',
   publicAlbum: 'Public Photo Album',
   publicVideoAlbum: 'Public Video Album',
-  bio: 'Buddies Biography',
   chat: 'Buddies Chat',
-  buddiesPostings: 'Buddies Postings',
-  friendAlbum: 'Buddies Photo Album'
+  buddiesPostings: 'Buddies Postings'
 };
 
-function areaForVettedFriendsTab(tab) {
-  return VETTED_FRIENDS_BUDDIES_TAB_KEYS.includes(tab) ? VETTED_FRIENDS_AREA_BUDDIES : VETTED_FRIENDS_AREA_PUBLIC;
+function isBuddyRelationship(row) {
+  return getFullBioRequestApproval(row) === APPROVAL_STATUS.APPROVE;
+}
+
+function isAcquaintOrBuddyRelationship(row) {
+  return (
+    triStateApproval(row?.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE ||
+    isBuddyRelationship(row)
+  );
+}
+
+function privateAreaForRelationship(row) {
+  return isBuddyRelationship(row) ? VETTED_FRIENDS_AREA_BUDDIES : VETTED_FRIENDS_AREA_ACQUAINT;
+}
+
+function areaForVettedFriendsTab(tab, row) {
+  if (VETTED_FRIENDS_PUBLIC_TAB_KEYS.includes(tab)) return VETTED_FRIENDS_AREA_PUBLIC;
+  return privateAreaForRelationship(row);
 }
 
 function defaultTabForVettedFriendsArea(area) {
-  return area === VETTED_FRIENDS_AREA_BUDDIES ? 'bio' : VETTED_FRIENDS_DEFAULT_TAB;
+  return area === VETTED_FRIENDS_AREA_PUBLIC ? VETTED_FRIENDS_DEFAULT_TAB : 'bio';
+}
+
+function tabKeysForVettedFriendsArea(area) {
+  if (area === VETTED_FRIENDS_AREA_BUDDIES) return VETTED_FRIENDS_BUDDIES_TAB_KEYS;
+  if (area === VETTED_FRIENDS_AREA_ACQUAINT) return VETTED_FRIENDS_ACQUAINT_TAB_KEYS;
+  return VETTED_FRIENDS_PUBLIC_TAB_KEYS;
+}
+
+function vettedFriendsTabLabel(tab, row) {
+  if (tab === 'bio') {
+    return isBuddyRelationship(row) ? 'Buddies Biography' : 'Acquaint Biography';
+  }
+  if (tab === 'friendAlbum') {
+    return isBuddyRelationship(row) ? 'Buddies Photo Album' : 'Acquaint Photo Album';
+  }
+  return VETTED_FRIENDS_TAB_LABEL_BY_KEY[tab] ?? tab;
 }
 
 function isPostingsTab(tab) {
@@ -948,7 +980,7 @@ export default function VettedFriendsPicksLayout({
   );
   const selectedRowFriendMediaUrls = useMemo(() => {
     if (!selectedRow) return [];
-    if (getFullBioRequestApproval(selectedRow) !== APPROVAL_STATUS.APPROVE) return [];
+    if (!isAcquaintOrBuddyRelationship(selectedRow)) return [];
     return Array.isArray(selectedRow.friend_gallery_image_urls)
       ? selectedRow.friend_gallery_image_urls.map((url) => String(url ?? '').trim()).filter(Boolean)
       : [];
@@ -1108,12 +1140,25 @@ export default function VettedFriendsPicksLayout({
     Number.isFinite(selectedTargetId) && selectedTargetId > 0
       ? activeTabByTargetId[selectedTargetId] ?? VETTED_FRIENDS_DEFAULT_TAB
       : VETTED_FRIENDS_DEFAULT_TAB;
-  const selectedRightPanelActiveArea = areaForVettedFriendsTab(selectedRightPanelActiveTab);
+  const selectedBriefBioApproved = triStateApproval(selectedRow?.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE;
+  const selectedFullBioApproved = triStateApproval(selectedRow?.full_bio_request_approval) === APPROVAL_STATUS.APPROVE;
+  const selectedIsBuddy = selectedFullBioApproved;
+  const selectedCanViewPrivateAlbum = selectedBriefBioApproved || selectedFullBioApproved;
+  const selectedPrivateArea = privateAreaForRelationship(selectedRow);
+  const selectedRightPanelActiveArea = areaForVettedFriendsTab(selectedRightPanelActiveTab, selectedRow);
   const selectedRightPanelShowsChat = selectedRightPanelActiveTab === 'chat';
-  const selectedRightPanelTabKeys =
-    selectedRightPanelActiveArea === VETTED_FRIENDS_AREA_BUDDIES
-      ? VETTED_FRIENDS_BUDDIES_TAB_KEYS
-      : VETTED_FRIENDS_PUBLIC_TAB_KEYS;
+  const selectedRightPanelTabKeys = tabKeysForVettedFriendsArea(selectedRightPanelActiveArea);
+
+  useEffect(() => {
+    const targetId = Number(selectedSinglesId);
+    if (!Number.isFinite(targetId) || targetId < 1 || selectedIsBuddy) return;
+    setActiveTabByTargetId((prev) => {
+      const tab = prev[targetId];
+      if (tab !== 'chat' && tab !== 'buddiesPostings') return prev;
+      return { ...prev, [targetId]: 'bio' };
+    });
+  }, [selectedSinglesId, selectedIsBuddy]);
+
   const chatPanelViewportSx = useMemo(() => {
     if (!selectedRightPanelShowsChat) return undefined;
     const zoomFactor = downSM ? 1 : getAppPageZoomFactor(pageZoom);
@@ -1128,8 +1173,6 @@ export default function VettedFriendsPicksLayout({
     setApprovedBioViewKinds({ brief: false, full: false });
   }, [selectedSinglesId]);
 
-  const selectedBriefBioApproved = triStateApproval(selectedRow?.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE;
-  const selectedFullBioApproved = triStateApproval(selectedRow?.full_bio_request_approval) === APPROVAL_STATUS.APPROVE;
   const showApprovedBriefBio = selectedBriefBioApproved && approvedBioViewKinds.brief;
   const showApprovedFullBio = selectedFullBioApproved && approvedBioViewKinds.full;
   const hasApprovedBioViewOpen = showApprovedBriefBio || showApprovedFullBio;
@@ -2140,7 +2183,9 @@ export default function VettedFriendsPicksLayout({
           ) : selectedRightPanelActiveTab === 'publicAlbum' ? (
             <Typography sx={rightPanelHeaderTitleSx}>Public Photo Album</Typography>
           ) : selectedRightPanelActiveTab === 'friendAlbum' ? (
-            <Typography sx={rightPanelHeaderTitleSx}>Buddies Photo Album</Typography>
+            <Typography sx={rightPanelHeaderTitleSx}>
+              {selectedIsBuddy ? 'Buddies Photo Album' : 'Acquaint Photo Album'}
+            </Typography>
           ) : selectedRightPanelActiveTab === 'publicVideoAlbum' ? (
             <Typography sx={rightPanelHeaderTitleSx}>Public Video Album</Typography>
           ) : selectedRightPanelActiveTab === 'buddiesPostings' ? (
@@ -2176,7 +2221,10 @@ export default function VettedFriendsPicksLayout({
         >
           {[
             { area: VETTED_FRIENDS_AREA_PUBLIC, label: 'Public area' },
-            { area: VETTED_FRIENDS_AREA_BUDDIES, label: 'Buddies area' }
+            {
+              area: selectedPrivateArea,
+              label: selectedIsBuddy ? 'Buddies area' : 'Acquaint area'
+            }
           ].map(({ area, label }) => {
             const isSelected = selectedRightPanelActiveArea === area;
             const AreaButton = isSelected ? SelectedButtonTemplate : UnSelectedButtonTemplate;
@@ -2223,7 +2271,7 @@ export default function VettedFriendsPicksLayout({
               onClick={() => handleRightTabClick(selectedRow, tab)}
               sx={tabButtonSx(selectedRightPanelActiveTab === tab)}
             >
-              {VETTED_FRIENDS_TAB_LABEL_BY_KEY[tab]}
+              {vettedFriendsTabLabel(tab, selectedRow)}
             </Button>
           ))}
         </Box>
@@ -2254,17 +2302,21 @@ export default function VettedFriendsPicksLayout({
               })
             : null}
           {selectedRightPanelActiveTab === 'friendAlbum'
-            ? selectedFullBioApproved
+            ? selectedCanViewPrivateAlbum
               ? renderAlbumPanel({
-                  title: 'Buddies Photo Album',
+                  title: selectedIsBuddy ? 'Buddies Photo Album' : 'Acquaint Photo Album',
                   urls: selectedRowPrivatePhotoGalleryUrls,
                   selectedImageUrl: selectedFriendGalleryImageUrl,
                   setSelectedImageUrl: setSelectedFriendGalleryImageUrl,
-                  emptyText: 'No buddies photo album photos.'
+                  emptyText: selectedIsBuddy
+                    ? 'No buddies photo album photos.'
+                    : 'No acquaint photo album photos.'
                 })
               : (
                 <Typography sx={{ color: 'var(--theme-primary-color)', ...vettedFriendsPanelTextSx }}>
-                  Buddies Photo Album is available after Full Bio is approved.
+                  {selectedIsBuddy
+                    ? 'Buddies Photo Album is available after Full Bio is approved.'
+                    : 'Acquaint Photo Album is available after Brief Bio is approved.'}
                 </Typography>
               )
             : null}

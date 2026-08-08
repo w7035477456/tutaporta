@@ -270,7 +270,7 @@ const ALBUM_TYPES = {
 const ALBUM_TITLES = {
   [ALBUM_TYPES.uploaded]: 'Uploaded',
   [ALBUM_TYPES.public]: 'Public Album: Visible to ALL',
-  [ALBUM_TYPES.private]: 'Buddies Album: Visible to Acq & Buddies'
+  [ALBUM_TYPES.private]: 'Acquaint & Buddies Album'
 };
 const ALBUM_MAX = 10;
 const PUBLIC_VIDEO_ALBUM_MAX = 3;

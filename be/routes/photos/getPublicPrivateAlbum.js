@@ -123,8 +123,8 @@ export async function getPublicPrivateAlbum(req, res) {
           [me, targetSinglesId]
         );
         const latest = approvalResult.rows[0];
-        // Buddies Photo Album: Full Bio approved only (brief does not qualify).
-        canViewPrivateAlbum = isApprovedValue(latest?.detail_approval);
+        // Acquaint (brief) or Buddies (full) private album access.
+        canViewPrivateAlbum = isApprovedValue(latest?.basic_approval) || isApprovedValue(latest?.detail_approval);
       }
     }
 
