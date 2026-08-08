@@ -893,6 +893,15 @@ export default function ReceivedBioRequestsBiographyLayout({
                           void onSubmitResponse(selectedRow);
                         }
                       }}
+                      sx={{
+                        // Fixed green — Minimal remaps --theme-action-green-color away from green.
+                        bgcolor: '#60C446 !important',
+                        '@media (hover: hover)': {
+                          '&:hover:not(.Mui-disabled)': {
+                            bgcolor: '#60C446 !important'
+                          }
+                        }
+                      }}
                     >
                       {submitResponseBusy ? 'Submitting…' : 'Submit Response'}
                     </GreenButton>

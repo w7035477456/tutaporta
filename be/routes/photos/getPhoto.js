@@ -5,7 +5,6 @@ import { extToContentType } from '../../utils/albumUploadFormats.js';
 import { getPhotoFolder, resolvePhotoFilePath } from '../../utils/photoFilePath.js';
 import { resolvePhotoThumbnailPath } from '../../utils/photoThumbnail.js';
 import { resolveRequestsAppSchema } from '../singles/resolveRequestsAppSchema.js';
-import { sqlInterestedIsTrue } from '../singles/interestedSql.js';
 import { logMyStoryPhotos, logMyStoryPhotosAlways, myStoryPhotoDebugEnabled } from '../../utils/myStoryPhotoDebug.js';
 import { recordPhotoCacheResult } from '../../utils/photoCacheStats.js';
 import { sqlBooleanEnumIsTrue } from '../../utils/booleanEnum.js';
@@ -133,6 +132,7 @@ async function canViewTargetFullBio(requestSchema, viewerSinglesId, ownerSingles
   return Number(result.rows[0]?.has_full ?? 0) > 0;
 }
 
+/** Buddy access: Full Bio approved (brief-only does not qualify). */
 async function canViewTargetFriendsPosts(requestSchema, viewerSinglesId, ownerSinglesId) {
   if (Number(viewerSinglesId) === Number(ownerSinglesId)) return true;
   const result = await pool.query(
@@ -142,7 +142,7 @@ async function canViewTargetFriendsPosts(requestSchema, viewerSinglesId, ownerSi
        (r.singles_id_from = $1 AND r.singles_id_to = $2)
        OR (r.singles_id_from = $2 AND r.singles_id_to = $1)
      )
-       AND ${sqlInterestedIsTrue('r')}
+       AND LOWER(COALESCE(r.full_bio_request_approval::text, '')) IN ('approve','approved','true','1','t','yes','y')
      LIMIT 1`,
     [viewerSinglesId, ownerSinglesId]
   );
@@ -234,7 +234,8 @@ async function canViewPrivatePhoto(viewerSinglesId, ownerSinglesId) {
     [viewerSinglesId, ownerSinglesId]
   );
   const row = result.rows[0];
-  return isApprovedValue(row?.basic_approval) || isApprovedValue(row?.detail_approval);
+  // Buddies Photo Album: Full Bio approved only (brief does not qualify).
+  return isApprovedValue(row?.detail_approval);
 }
 
 async function isProfilePhoto(photoId, ownerSinglesId) {

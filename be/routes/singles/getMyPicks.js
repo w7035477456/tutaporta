@@ -369,8 +369,11 @@ export async function canViewTargetFullBio(requestSchema, me, targetSinglesId) {
   return Number(result.rows[0]?.has_approved ?? 0) > 0;
 }
 
+/** Buddy access: Full Bio approved (brief-only does not qualify). */
 export async function canViewTargetFriendsPosts(requestSchema, me, targetSinglesId) {
   if (Number(me) === Number(targetSinglesId)) return true;
+  const cols = await requestColumns(requestSchema);
+  if (!cols.has('full_bio_request_approval')) return false;
   const result = await pool.query(
     `SELECT 1
      FROM ${requestSchema}.requests r
@@ -378,7 +381,7 @@ export async function canViewTargetFriendsPosts(requestSchema, me, targetSingles
        (r.singles_id_from = $1 AND r.singles_id_to = $2)
        OR (r.singles_id_from = $2 AND r.singles_id_to = $1)
      )
-       AND ${sqlInterestedIsTrue('r')}
+       AND LOWER(COALESCE(r.full_bio_request_approval::text, '')) IN ('approve','approved','true','1','t','yes','y')
      LIMIT 1`,
     [me, targetSinglesId]
   );
@@ -850,8 +853,8 @@ export async function getMyPicksFeed(req, res) {
         ? canViewPrivatePosts
           ? ''
           : canViewFriendsPosts
-            ? 'Friends Posts and Public Posts are visible. Myself-only posts remain hidden.'
-            : 'Only public posts are visible until you are connected as friends or your bio request is approved.'
+            ? 'Buddies Posts and Public Posts are visible. Myself-only posts remain hidden.'
+            : 'Only public posts are visible until Full Bio is approved (Buddies).'
         : '';
 
     const feedClient = await pool.connect();
@@ -925,7 +928,7 @@ export async function getMyPicksPostNotifications(req, res) {
         (r_fr.singles_id_from = $1 AND r_fr.singles_id_to = p.singles_id)
         OR (r_fr.singles_id_from = p.singles_id AND r_fr.singles_id_to = $1)
       )
-      AND ${sqlInterestedIsTrue('r_fr')}
+      AND LOWER(COALESCE(r_fr.full_bio_request_approval::text, '')) IN ('approve','approved','true','1','t','yes','y')
     )`;
 
     const rows = await pool.query(

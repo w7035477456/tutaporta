@@ -57,6 +57,7 @@ import { TOUR_STEP_VETTED_FRIENDS_SMS } from 'utils/vsinglesTour';
 import { TOUR_LISA_MEMBER_NUMBER } from 'utils/vsinglesTourActions';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
+import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import ColorTemplate11Posting from 'ui-component/ColorTemplate11Posting';
 import { isSelfIntroVideoPostingUrl, videoThumbnailUrlFromPostingUrl } from 'api/selfIntroVideoFe';
@@ -181,6 +182,33 @@ function triStateApproval(value) {
 
 function getFullBioRequestApproval(row) {
   return triStateApproval(row?.full_bio_request_approval);
+}
+
+const VETTED_FRIENDS_AREA_PUBLIC = 'public';
+const VETTED_FRIENDS_AREA_BUDDIES = 'buddies';
+const VETTED_FRIENDS_PUBLIC_TAB_KEYS = ['publicPostings', 'publicAlbum', 'publicVideoAlbum'];
+const VETTED_FRIENDS_BUDDIES_TAB_KEYS = ['bio', 'chat', 'buddiesPostings', 'friendAlbum'];
+const VETTED_FRIENDS_DEFAULT_TAB = 'publicPostings';
+const VETTED_FRIENDS_TAB_LABEL_BY_KEY = {
+  publicPostings: 'Public Postings',
+  publicAlbum: 'Public Photo Album',
+  publicVideoAlbum: 'Public Video Album',
+  bio: 'Buddies Biography',
+  chat: 'Buddies Chat',
+  buddiesPostings: 'Buddies Postings',
+  friendAlbum: 'Buddies Photo Album'
+};
+
+function areaForVettedFriendsTab(tab) {
+  return VETTED_FRIENDS_BUDDIES_TAB_KEYS.includes(tab) ? VETTED_FRIENDS_AREA_BUDDIES : VETTED_FRIENDS_AREA_PUBLIC;
+}
+
+function defaultTabForVettedFriendsArea(area) {
+  return area === VETTED_FRIENDS_AREA_BUDDIES ? 'bio' : VETTED_FRIENDS_DEFAULT_TAB;
+}
+
+function isPostingsTab(tab) {
+  return tab === 'publicPostings' || tab === 'buddiesPostings';
 }
 
 function isBioRequestFlagged(value) {
@@ -631,9 +659,14 @@ export default function VettedFriendsPicksLayout({
   const [activeTabByTargetId, setActiveTabByTargetId] = useState({});
   /** Bumped when user opens SMS Chat so the inline composer can steal focus after mount. */
   const [composerFocusNonce, setComposerFocusNonce] = useState(0);
+  const selectedTabForFeed =
+    Number.isFinite(Number(selectedSinglesId)) && Number(selectedSinglesId) > 0
+      ? activeTabByTargetId[Number(selectedSinglesId)] ?? VETTED_FRIENDS_DEFAULT_TAB
+      : VETTED_FRIENDS_DEFAULT_TAB;
+  const feedVisibility = selectedTabForFeed === 'buddiesPostings' ? 'friends' : 'public';
   const { myPicksFeed, myPicksFeedLoading, myPicksFeedError, refetchMyPicksFeed } = useGetMyPicksFeed(selectedSinglesId, {
     limit: INITIAL_POSTS_LIMIT,
-    visibilityFeed: 'friends'
+    visibilityFeed: feedVisibility
   });
   const { canDeletePosts, deleteBusy, handleDeletePosting, handleDeletePostingPhoto, deleteConfirmDialog } =
     usePostingFeedDelete(selectedSinglesId, { refetchFeed: refetchMyPicksFeed });
@@ -856,7 +889,7 @@ export default function VettedFriendsPicksLayout({
           limit,
           beforeCreatedAt: feedCursor.created_at,
           beforePostId: feedCursor.post_id,
-          visibilityFeed: 'friends'
+          visibilityFeed: feedVisibility
         });
         const nextPosts = Array.isArray(page?.posts) ? page.posts : [];
         setFeedPosts((prev) => {
@@ -886,7 +919,7 @@ export default function VettedFriendsPicksLayout({
         setLoadMoreBusy(false);
       }
     },
-    [selectedSinglesId, loadMoreBusy, feedHasMore, feedCursor]
+    [selectedSinglesId, loadMoreBusy, feedHasMore, feedCursor, feedVisibility]
   );
 
   const selectedRow = useMemo(() => {
@@ -915,6 +948,7 @@ export default function VettedFriendsPicksLayout({
   );
   const selectedRowFriendMediaUrls = useMemo(() => {
     if (!selectedRow) return [];
+    if (getFullBioRequestApproval(selectedRow) !== APPROVAL_STATUS.APPROVE) return [];
     return Array.isArray(selectedRow.friend_gallery_image_urls)
       ? selectedRow.friend_gallery_image_urls.map((url) => String(url ?? '').trim()).filter(Boolean)
       : [];
@@ -1071,8 +1105,15 @@ export default function VettedFriendsPicksLayout({
 
   const selectedTargetId = Number(selectedRow?.singles_id_to);
   const selectedRightPanelActiveTab =
-    Number.isFinite(selectedTargetId) && selectedTargetId > 0 ? activeTabByTargetId[selectedTargetId] ?? 'postings' : 'postings';
+    Number.isFinite(selectedTargetId) && selectedTargetId > 0
+      ? activeTabByTargetId[selectedTargetId] ?? VETTED_FRIENDS_DEFAULT_TAB
+      : VETTED_FRIENDS_DEFAULT_TAB;
+  const selectedRightPanelActiveArea = areaForVettedFriendsTab(selectedRightPanelActiveTab);
   const selectedRightPanelShowsChat = selectedRightPanelActiveTab === 'chat';
+  const selectedRightPanelTabKeys =
+    selectedRightPanelActiveArea === VETTED_FRIENDS_AREA_BUDDIES
+      ? VETTED_FRIENDS_BUDDIES_TAB_KEYS
+      : VETTED_FRIENDS_PUBLIC_TAB_KEYS;
   const chatPanelViewportSx = useMemo(() => {
     if (!selectedRightPanelShowsChat) return undefined;
     const zoomFactor = downSM ? 1 : getAppPageZoomFactor(pageZoom);
@@ -1615,12 +1656,18 @@ export default function VettedFriendsPicksLayout({
 
   const refreshRightPanelTabData = useCallback(
     async (tab) => {
-      if (tab === 'postings' && Number.isFinite(Number(selectedSinglesId)) && Number(selectedSinglesId) > 0) {
+      if (isPostingsTab(tab) && Number.isFinite(Number(selectedSinglesId)) && Number(selectedSinglesId) > 0) {
         await Promise.all([refetchMyPicksFeed(), invalidateMyPicksFeedCache()]);
       } else if (tab === 'chat') {
         setChatRefreshNonce((n) => n + 1);
       }
-      if (tab === 'bio' || tab === 'publicAlbum' || tab === 'friendAlbum' || tab === 'publicVideoAlbum' || tab === 'chat') {
+      if (
+        tab === 'bio' ||
+        tab === 'publicAlbum' ||
+        tab === 'friendAlbum' ||
+        tab === 'publicVideoAlbum' ||
+        tab === 'chat'
+      ) {
         if (typeof onBioRequestUpdated === 'function') {
           await onBioRequestUpdated();
         }
@@ -1639,6 +1686,14 @@ export default function VettedFriendsPicksLayout({
       void refreshRightPanelTabData(tab);
     },
     [openTabForRow, refreshRightPanelTabData]
+  );
+
+  const handleRightAreaClick = useCallback(
+    (row, area) => {
+      if (!row) return;
+      handleRightTabClick(row, defaultTabForVettedFriendsArea(area));
+    },
+    [handleRightTabClick]
   );
 
   useEffect(() => {
@@ -1721,16 +1776,6 @@ export default function VettedFriendsPicksLayout({
     return renderSendFlowerButton(row);
   };
 
-  const tabKeys = ['bio', 'chat', 'postings', 'publicAlbum', 'friendAlbum', 'publicVideoAlbum'];
-  const tabLabelByKey = {
-    bio: 'Biography',
-    chat: 'Chat',
-    postings: 'Postings',
-    publicAlbum: 'Public Photo Album',
-    friendAlbum: 'Private Photo Album',
-    publicVideoAlbum: 'Public Video Album'
-  };
-
   const tabButtonSx = (selected) => ({
     ...colorTemplate10MenuItemButtonSx({ selected, fitLabelWidth: true }),
     textTransform: 'none',
@@ -1745,6 +1790,17 @@ export default function VettedFriendsPicksLayout({
     lineHeight: 1.15,
     fontSize: outgoingBioBodyTextFontSize
   });
+  const areaButtonLayoutSx = {
+    textTransform: 'none',
+    borderRadius: 1,
+    minWidth: 0,
+    width: '100%',
+    px: 0.6,
+    py: 0.7,
+    fontWeight: 700,
+    lineHeight: 1.15,
+    fontSize: outgoingBioBodyTextFontSize
+  };
   const visiblePosts = useMemo(() => feedPosts, [feedPosts]);
   const rightPanelHeaderTitleSx = { color: 'var(--theme-primary-color)', fontWeight: 700, ...vettedFriendsPanelTextSx };
 
@@ -2054,7 +2110,7 @@ export default function VettedFriendsPicksLayout({
                     prefix: selectedRow.prefix,
                     memberId: selectedRow.member_id
                   })}`
-                : 'Chat'}
+                : 'Buddies Chat'}
             </Typography>
           ) : selectedRightPanelActiveTab === 'bio' ? (
             <Typography sx={rightPanelHeaderTitleSx}>
@@ -2084,11 +2140,13 @@ export default function VettedFriendsPicksLayout({
           ) : selectedRightPanelActiveTab === 'publicAlbum' ? (
             <Typography sx={rightPanelHeaderTitleSx}>Public Photo Album</Typography>
           ) : selectedRightPanelActiveTab === 'friendAlbum' ? (
-            <Typography sx={rightPanelHeaderTitleSx}>Private Photo Album</Typography>
+            <Typography sx={rightPanelHeaderTitleSx}>Buddies Photo Album</Typography>
           ) : selectedRightPanelActiveTab === 'publicVideoAlbum' ? (
             <Typography sx={rightPanelHeaderTitleSx}>Public Video Album</Typography>
+          ) : selectedRightPanelActiveTab === 'buddiesPostings' ? (
+            <Typography sx={rightPanelHeaderTitleSx}>Buddies Postings</Typography>
           ) : (
-            <Typography sx={rightPanelHeaderTitleSx}>Postings</Typography>
+            <Typography sx={rightPanelHeaderTitleSx}>Public Postings</Typography>
           )}
           {selectedRow && !effectiveBlockUser(selectedRow) ? (
             <UnSelectedButtonTemplate
@@ -2110,6 +2168,38 @@ export default function VettedFriendsPicksLayout({
             px: 0.75,
             py: 0.7,
             borderBottom: '1px solid var(--theme-primary-color)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 0.6,
+            bgcolor: (theme) => colorTemplate1WallColorByTheme(theme)
+          }}
+        >
+          {[
+            { area: VETTED_FRIENDS_AREA_PUBLIC, label: 'Public area' },
+            { area: VETTED_FRIENDS_AREA_BUDDIES, label: 'Buddies area' }
+          ].map(({ area, label }) => {
+            const isSelected = selectedRightPanelActiveArea === area;
+            const AreaButton = isSelected ? SelectedButtonTemplate : UnSelectedButtonTemplate;
+            return (
+              <AreaButton
+                key={area}
+                fullWidth
+                fitLabelWidth={false}
+                onClick={() => handleRightAreaClick(selectedRow, area)}
+                sx={areaButtonLayoutSx}
+              >
+                {label}
+              </AreaButton>
+            );
+          })}
+        </Box>
+        <Box
+          sx={{
+            flexShrink: 0,
+            width: '100%',
+            px: 0.75,
+            py: 0.7,
+            borderBottom: '1px solid var(--theme-primary-color)',
             ...(vettedFriendsPhoneLayout
               ? {
                   display: 'flex',
@@ -2122,18 +2212,18 @@ export default function VettedFriendsPicksLayout({
                 }
               : {
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${tabKeys.length}, minmax(0, 1fr))`,
+                  gridTemplateColumns: `repeat(${selectedRightPanelTabKeys.length}, minmax(0, 1fr))`,
                   gap: 0.6
                 })
           }}
         >
-          {tabKeys.map((tab) => (
+          {selectedRightPanelTabKeys.map((tab) => (
             <Button
               key={tab}
               onClick={() => handleRightTabClick(selectedRow, tab)}
               sx={tabButtonSx(selectedRightPanelActiveTab === tab)}
             >
-              {tabLabelByKey[tab]}
+              {VETTED_FRIENDS_TAB_LABEL_BY_KEY[tab]}
             </Button>
           ))}
         </Box>
@@ -2164,13 +2254,19 @@ export default function VettedFriendsPicksLayout({
               })
             : null}
           {selectedRightPanelActiveTab === 'friendAlbum'
-            ? renderAlbumPanel({
-                title: 'Private Photo Album',
-                urls: selectedRowPrivatePhotoGalleryUrls,
-                selectedImageUrl: selectedFriendGalleryImageUrl,
-                setSelectedImageUrl: setSelectedFriendGalleryImageUrl,
-                emptyText: 'No private photo album photos.'
-              })
+            ? selectedFullBioApproved
+              ? renderAlbumPanel({
+                  title: 'Buddies Photo Album',
+                  urls: selectedRowPrivatePhotoGalleryUrls,
+                  selectedImageUrl: selectedFriendGalleryImageUrl,
+                  setSelectedImageUrl: setSelectedFriendGalleryImageUrl,
+                  emptyText: 'No buddies photo album photos.'
+                })
+              : (
+                <Typography sx={{ color: 'var(--theme-primary-color)', ...vettedFriendsPanelTextSx }}>
+                  Buddies Photo Album is available after Full Bio is approved.
+                </Typography>
+              )
             : null}
           {selectedRightPanelActiveTab === 'publicVideoAlbum'
             ? renderAlbumPanel({
@@ -2261,12 +2357,21 @@ export default function VettedFriendsPicksLayout({
               )}
             </Box>
           ) : null}
-          {selectedRightPanelActiveTab === 'postings' && selectedSinglesId == null ? (
+          {isPostingsTab(selectedRightPanelActiveTab) && selectedSinglesId == null ? (
             <Typography sx={{ color: 'var(--theme-primary-color)', ...vettedFriendsPanelTextSx }}>
               Select a photo on the left.
             </Typography>
           ) : null}
-          {selectedRightPanelActiveTab === 'postings' && selectedSinglesId != null ? (
+          {selectedRightPanelActiveTab === 'buddiesPostings' &&
+          selectedSinglesId != null &&
+          !selectedFullBioApproved ? (
+            <Typography sx={{ color: 'var(--theme-primary-color)', ...vettedFriendsPanelTextSx }}>
+              Buddies Postings are available after Full Bio is approved.
+            </Typography>
+          ) : null}
+          {isPostingsTab(selectedRightPanelActiveTab) &&
+          selectedSinglesId != null &&
+          (selectedRightPanelActiveTab === 'publicPostings' || selectedFullBioApproved) ? (
             <ColorTemplate11Posting.Feed
               title="Posts and Comments"
               posts={visiblePosts}
