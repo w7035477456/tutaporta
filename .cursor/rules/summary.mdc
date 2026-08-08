@@ -1,0 +1,126 @@
+---
+description: Project summary — DB, deployment, cluster architecture, dev workflow, UI templates
+alwaysApply: true
+---
+
+# Project summary
+
+## 1) Agent — AI autonomy
+
+**AI Autonomy Rule:** Never stop to present multiple-choice questions or ask for permission on routine implementation steps. Always automatically select the recommended path (Choice A) and execute directly unless a critical, blocking ambiguity arises.
+
+Do not ask clarifying multiple-choice questions when intent is clear.
+
+
+## 2) Postgres schema — no `public`
+
+- **Do not use schema `public`.**
+- Only schema: **`helloworldjunktest`**
+- DB user: **`test_user1`** (superuser on Mac dev)
+- Qualify tables in SQL and migrations: `helloworldjunktest.singles`, etc.
+
+## 3) FE + BE on same web server (CORS)
+
+**Frontend and backend always run on the same web server** — intentional same-origin model to avoid CORS issues.
+
+- Production: FE + BE behind one HAProxy hostname.
+- Mac dev: Vite `:3000` proxies `/api` to local BE (`API_PORT` / `DEV_ALLOWED_ORIGINS`).
+- Do not hardcode cross-origin API URLs in production builds.
+
+## 4) No session memory — Postgres only
+
+**All mutable state must persist in PostgreSQL** (or cluster-wide Redis where already standardized).
+
+- Requests are **round-robin load balanced** across a cluster — **no session pinning**.
+- Do **not** use in-process `Map`, module-level session caches, or `express-session` in-memory stores for data that must be consistent across servers.
+- Load user/profile state from DB on each request; write through Primary.
+
+See `multi-server-stateless.mdc`.
+
+## 5) Redis — centralized cache
+
+Redis exists for **centralized cache** of a few shared, read-heavy items (rate limits when enabled, health, photo cache stats, etc.).
+
+- Use **`REDIS_URL`** — not per-process memory — when cross-server fairness matters.
+- Always TTL; fall back to DB if Redis is down.
+
+See `cluster-architecture-redis.mdc`.
+
+## 6) Postgres Primary + Replica
+
+| Operation | Target |
+|-----------|--------|
+| **Writes** (`INSERT`, `UPDATE`, `DELETE`, DDL) | **Primary only** |
+| **Reads** (`SELECT`, listings, profile loads) | **Local replica** on each app server (prod) |
+
+After a write in the same request, use Primary or tolerate replication lag for read-your-writes.
+
+See `postgres-primary-replica.mdc`.
+
+## 7) Deployment topology (current vs future)
+
+**Current (single box):** one server hosts HAProxy, Postgres Primary, Postgres Replica, and one web server (FE + BE).
+
+**Future (multi-server):** ~5 servers splitting HAProxy, Primary, replicas, and web servers. Andrew will say when to target multi-server deploy — **until then, code must still follow cluster rules above** (stateless app servers, Primary writes, replica reads, Redis when shared).
+
+See `cross-environment-deploy.mdc`.
+
+## 8) Mac dev workflow
+
+Bash init: **`source ~/b`** (repo copy: **`myscript/mac/b`**)
+
+| Alias | Purpose |
+|-------|---------|
+| **`feall`** | Frontend with hot reload (Vite) |
+| **`beall`** | Backend with hot reload |
+| **`deployall2`** | Mac → Ubuntu remote deploy (VPN + SSH) |
+| **`showbuild`** | Print FE build stamp / checksum |
+
+Env: `~/.ssh/be/.env` (BE), `fe/.env` (FE). Restart after env changes.
+
+## 9) Ubuntu production workflow
+
+Bash init: **`source ~/b`** (repo copy: **`myscript/ubuntu/b`**)
+
+| Alias | Purpose |
+|-------|---------|
+| **`work2`** | Interactive PM2 build + deploy |
+| **`work2_deploy`** | Non-interactive work2 (SSH / deploy-all) |
+| **`febeprod`** | PM2 build + deploy (alternate) |
+| **`deployall`** | Deploy branch to all hosts in deploy-hosts.txt |
+| **`showbuild`** / **`showartifact`** | Build stamp / deploy artifact checksum |
+
+After BE env changes: `pm2 restart onlinemallwebsite`.
+
+## 10) Preferred UI components / templates
+
+Reuse these **ColorTemplate** and button templates instead of one-off styling:
+
+| Component / export | Path |
+|--------------------|------|
+| `ColorTemplate15ApplicationFrame` | `fe/src/ui-component/ColorTemplate15ApplicationFrame.jsx` |
+| `ColorTemplate14LandingFrame` | `fe/src/ui-component/ColorTemplate14LandingFrame.jsx` |
+| `ColorTemplate13DisableGreenButton` | `fe/src/ui-component/ColorTemplate13DisableGreenButton.jsx` |
+| `SelectedButtonTemplate` / `UnSelectedButtonTemplate` | `fe/src/config/selectedUnselectedButtonTemplate.js` |
+| `ColorTemplate12Underline` | `fe/src/ui-component/ColorTemplate12Underline.jsx` |
+| `ColorTemplate11Posting` | `fe/src/ui-component/ColorTemplate11Posting.jsx` |
+| `ColorTemplate10Menu` | `fe/src/ui-component/ColorTemplate10Menu.jsx` |
+| `ColorTemplate9TableData` | `fe/src/ui-component/ColorTemplate9TableData.jsx` |
+| `ColorTemplate8PhotoGallery` | `fe/src/ui-component/ColorTemplate8PhotoGallery.jsx` |
+| `ColorTemplate7PopupLargeDark` | `fe/src/ui-component/ColorTemplate7PopupLargeDark.jsx` |
+| `ColorTemplate6CloseX` | `fe/src/ui-component/ColorTemplate6CloseX.jsx` |
+
+Prefer importing and extending these over new ad-hoc MUI `sx` blocks for the same patterns.
+
+
+## 11) Mac dev — `vi` and `psql`
+
+Andrew uses **`vi`** at the command line.
+
+Quick singles query (Mac tunnel):
+
+```bash
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -c "SELECT * FROM helloworldjunktest.singles;"
+```
+
+See also `mac-psql-local.mdc` for migrations and one-liners.

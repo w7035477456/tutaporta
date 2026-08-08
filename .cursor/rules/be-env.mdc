@@ -1,0 +1,480 @@
+---
+description: Backend environment reference (~/.ssh/be/.env) — Mac dev snapshot and variable behavior
+alwaysApply: true
+---
+
+## Agent — AI autonomy
+
+**AI Autonomy Rule:** Never stop to present multiple-choice questions or ask for permission on routine implementation steps. Always automatically select the recommended path (Choice A) and execute directly unless a critical, blocking ambiguity arises.
+
+Do not ask clarifying multiple-choice questions when intent is clear.
+
+# Backend environment (`~/.ssh/be/.env`)
+
+Runtime config for the Node backend is loaded from **`~/.ssh/be/.env`** (not committed to git). After changes, restart PM2: `pm2 restart onlinemallwebsite`.
+
+Relevant loader: `be/loadEnv.js` (imported first in `be/server_be.js`).
+
+Mac dev snapshot below. **Secrets are redacted in this doc** — keep real values only in `~/.ssh/be/.env`.
+
+## Hosts
+
+| Name | Address | Notes |
+|------|---------|-------|
+| **YOUR_UBUNTU_HOST** | `192.168.222.202` | Primary Ubuntu app server (SSH / `scp` / deploy target). Example: `scp … lawsen0@192.168.222.202:~/code/main/be/usb/` |
+
+## New account signup
+
+```bash
+NEW_ACCOUNT_SIGNUP=true
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `NEW_ACCOUNT_SIGNUP` | `true` | Exposed via server config API; controls whether new account signup is allowed (`be/server_be.js`, `fe/src/views/pages/authentication/Login.jsx`). |
+
+## LinkedIn OAuth
+
+```bash
+
+LINKEDIN_REDIRECT_URI=http://localhost:3000/api/auth/linkedin/callback
+LINKEDIN_PARTNER_POSITIONS=true
+```
+
+| Variable | Notes |
+|----------|-------|
+| `ClientId` | Alias for `LINKEDIN_CLIENT_ID` (`be/routes/singles/linkedinOAuth.js`). |
+| `PrimaryClientSecret` | Alias for `LINKEDIN_CLIENT_SECRET`. |
+| `LINKEDIN_REDIRECT_URI` | OAuth callback; Mac dev uses Vite `:3000` proxy path. |
+| `LINKEDIN_PARTNER_POSITIONS` | `true` → request positions scope for job/company auto-verify (requires LinkedIn Partner Program approval). |
+
+## Live face scan
+
+```bash
+SKIP_LIVE_FACE_SCAN=false
+LIVE_SCAN_COOLDOWN=1
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `SKIP_LIVE_FACE_SCAN` | `false` | When `true`, skips Rekognition liveness (`be/lib/rekognitionClient.js`). |
+| `LIVE_SCAN_COOLDOWN` | `1` | Minutes before user can retry after failed liveness scan. |
+
+## Lockout / access control
+
+```bash
+PUBLIC_LOCKOUT=false
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `PUBLIC_LOCKOUT` | `false` | Intended: when `true`, lock out `member_type=PUBLIC`. **Runtime login lockout today uses `LOCK_OUT`** (checks `member_category` PilotUser/Admin only) in `be/routes/singles/beVerifyLoginPassword.js`. Align env name with code before enabling. |
+
+## Critical production config
+
+```bash
+BY_PASS_SMS_PHONE_VERIFICATION=false
+DUPLICATE_PHONE_ALLOW=true
+ENABLE_LOGIN_BYPASS=false
+BLOCK_MOBILE=false
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `BY_PASS_SMS_PHONE_VERIFICATION` | `false` | When `true`, skips SMS phone verification on signup (`be/utils/bypassSmsPhoneVerification.js`). |
+| `DUPLICATE_PHONE_ALLOW` | `true` | `true` → skip duplicate-phone check (Mac/staging Twilio test mode; `be/utils/duplicatePhonePolicy.js`). |
+| `ENABLE_LOGIN_BYPASS` | `false` | `true` → passwordless login as `SPECIAL_ID` (`be/routes/singles/beLoginBypass.js`). **Keep `false` on real production.** |
+| `BLOCK_MOBILE` | `false` | When `true` (default), login blocks compact/mobile viewports (`be/utils/blockMobileConfig.js`). |
+
+## Member visibility (listings)
+
+```bash
+SHOW_MEMBER_CATEGORY=PILOTUSER,DemoUser,PUBLIC
+```
+
+Filters All Singles–style listings to active users whose `member_category` is in this comma list (`be/routes/singles/memberVisibility.js`). Case-insensitive match.
+
+## Dev login shortcut
+
+```bash
+SPECIAL_LINK=/bamboom62895
+SPECIAL_ID=a2@b.com
+SPECIAL_P=****
+```
+
+| Variable | Notes |
+|----------|-------|
+| `SPECIAL_LINK` | FE opens login with prefilled id/password (`fe/src/config/specialLoginEnv.js`, `LoginBypass.jsx`). |
+| `SPECIAL_ID` / `SPECIAL_P` | BE bypass credentials (`be/routes/singles/beLoginBypass.js`). **Never commit real passwords.** |
+
+## Security — Mac dev (keep as-is)
+
+```bash
+NODE_ENV=development
+AUTH_COOKIE_SAMESITE=strict
+AUTH_COOKIE_SECURE=false
+PUBLIC_APP_URL=http://localhost:3000
+DEV_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:40000
+
+JWT_PRIVATE_KEY_PATH=/Users/a/.ssh/be/private_key.pem
+JWT_PUBLIC_KEY_PATH=/Users/a/.ssh/be/public_key.pem
+```
+
+| Variable | Notes |
+|----------|-------|
+| `NODE_ENV` | `development` on Mac; `production` behind HTTPS in prod. |
+| `AUTH_COOKIE_SAMESITE` | `strict` when FE+BE same site; `none` only if cross-site cookies required (+ Secure). |
+| `AUTH_COOKIE_SECURE` | `false` on Mac HTTP; `true` behind HAProxy HTTPS in prod. |
+| `PUBLIC_APP_URL` | Mac: `http://localhost:3000`. Prod: HAProxy public hostname. |
+| `DEV_ALLOWED_ORIGINS` | **Mac dev only** — comma-separated CORS origins (`be/server_be.js`). Do not use in production. |
+| `JWT_*_KEY_PATH` | RS256 key pair paths; not in repo. |
+
+## Photos
+
+```bash
+VSINGLES_PHOTO_FOLDER=/Users/a/onlinemallwebsite_storage/photos/
+MAX_SIZE_UPLOAD_MB=9
+JSON_LIMIT_MB=400
+```
+
+| Variable | Notes |
+|----------|-------|
+| `VSINGLES_PHOTO_FOLDER` | On-disk photo root; must exist on each app server (or shared mount). |
+| `MAX_SIZE_UPLOAD_MB` | Upload cap per photo (`be/routes/photos/uploadPhoto.js`). |
+| `JSON_LIMIT_MB` | Express JSON body limit (base64 uploads). Align nginx `client_max_body_size` if used. |
+
+## ASN / VPN block list
+
+```bash
+BLOCK_VPN_ASN=true
+BLOCKED_ASN_GITHUB_URL=https://raw.githubusercontent.com/X4BNet/lists_vpn/main/input/vpn/ASN.txt
+REFRESH_ASN_VPN_AT=24
+```
+
+| Variable | Notes |
+|----------|-------|
+| `BLOCK_VPN_ASN` | Enable VPN ASN blocking (admin sync + request filtering). |
+| `BLOCKED_ASN_GITHUB_URL` | Source list for ASN sync (`be/utils/blockedAsnConfig.js`). |
+| `REFRESH_ASN_VPN_AT` | Daily refresh hour; `24` or `0` = midnight local (`be/utils/blockedAsnRefresh.js`). |
+
+## Partition retention
+
+```bash
+KEEP_USER_ACTIVITIES_SESSION=3
+KEEP_CHAT_LOG=3
+```
+
+Months of user-activities / chat partitions to keep; drop older partitions (see `be/db/migratePostingsMonthlyPartitions.sql` and related chat partition work).
+
+## Album limits
+
+```bash
+MAX_PHOTO_PER_ALBUM=10
+```
+
+Maximum photos per album.
+
+## Auto logout (idle warning)
+
+```bash
+LOGOUT_AUTO_SEC=30
+LOGOUT_WARN_SEC=10
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `LOGOUT_AUTO_SEC` | `30` | After per-user idle minutes (`custom_logout_duration`), header countdown length in seconds (`IdleWarningCountdownBadge.jsx`). |
+| `LOGOUT_WARN_SEC` | `10` | Within that final countdown, seconds remaining when the modal popup appears (`SessionTimeoutWarning.jsx`). Must be ≤ `LOGOUT_AUTO_SEC`. At 0 with no activity → logout. |
+
+Per-user idle minutes: Profiles dashboard → `custom_logout_duration` (default 60 min).
+
+## Cloudflare WAF ASN sync
+
+```bash
+CLOUDFLARE_ASN_SYNC=true
+CLOUDFLARE_API_TOKEN=cfut_################################dbd9
+CLOUDFLARE_ZONE_ID=e7a44d07f94d2d583fb5c65dbeed0e7b
+CLOUDFLARE_ASN_RULE_NAME=RULE2
+CLOUDFLARE_RULESET_ID=a548139ba21e4b5797940e4c5a78f58b
+CLOUDFLARE_RULE_ID=6238ceedcbae416182f53680578fbc19
+CLOUDFLARE_ASN_BLOCK_NON_NA=true
+```
+
+Sync VPN ASN list to Cloudflare custom WAF rule via API (`be/utils/cloudflareAsnRuleSync.js`). `CLOUDFLARE_ASN_BLOCK_NON_NA=true` keeps the “non–North America” block in the rule.
+
+## Keep me logged in / session age
+
+```bash
+KEEP_ME_LOGIN=7
+AUTH_SESSION_MAX_AGE_MS=86400000
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `KEEP_ME_LOGIN` | `7` | Days for “Keep me logged in” checkbox (`be/utils/authCookie.js`). |
+| `AUTH_SESSION_MAX_AGE_MS` | `86400000` (1 day) | JWT + auth cookie max age when checkbox unchecked. `604800000` = 7 days; `2592000000` = 30 days. |
+
+## Barcode / phone upload QR
+
+```bash
+BARCODE_RENEW_MINUTES=30
+SCAN_FOR_PHONE_UPLOAD_SEC=10
+```
+
+| Variable | Notes |
+|----------|-------|
+| `BARCODE_RENEW_MINUTES` | Phone QR session lifetime (`be/utils/mobilePhotoUploadSession.js`). |
+| `SCAN_FOR_PHONE_UPLOAD_SEC` | Desktop poll interval for phone upload status — also set in **`fe/.env`** (`fe/src/config/phoneUploadScanEnv.js`). |
+
+## Bio approved viewing
+
+```bash
+BIO_APPROVED_VIEW_DURATION=12
+```
+
+Minimum approved bio viewing period in months (`be/utils/approvedViewingDurationConfig.js`).
+
+## Postgres logging
+
+```bash
+DB_DISPLAY_PERFORMANCE=delay
+PG_QUERY_LOG=true
+PG_CONNECT_LOG=true
+SHOW_PG_PERFORMANCE_LOG=true
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `DB_DISPLAY_PERFORMANCE` | `delay` | PM2 SQL lines show `[p N milsec]`; `percentage` shows busy estimate. |
+| `PG_QUERY_LOG` / `PG_CONNECT_LOG` | `true` | Extra Postgres pool/checkout logging. |
+| `SHOW_PG_PERFORMANCE_LOG` | `true` | Master switch for pool/query logging (`be/db/connection.js`). |
+
+## Amazon Rekognition
+
+```bash
+REKOGNITION_ENABLED=true
+REKOGNITION_FACE_MATCH_THRESHOLD=80
+REKOGNITION_LIVENESS_MIN_CONFIDENCE=80
+REKOGNITION_REQUIRE_LIVENESS=true
+REKOGNITION_COGNITO_IDENTITY_POOL_ID=us-east-1:dbdcac5b-ff58-42f2-9436-09d0315725f8
+```
+
+| Variable | Notes |
+|----------|-------|
+| `REKOGNITION_REQUIRE_LIVENESS` | `true` in prod; Mac/local dev often `false` to skip liveness. |
+| `REKOGNITION_*` | See `be/README.md` for debug UI and Cognito pool. |
+
+## AWS (driver license / Rekognition)
+
+```bash
+AWS_ACCESS_KEY_ID=AKIA##############WHW4
+AWS_SECRET_ACCESS_KEY=********************************
+AWS_REGION=us-east-1
+```
+
+**Secrets only in `~/.ssh/be/.env`**, never in git or rules.
+
+## MeasureOne (education verification)
+
+```bash
+MEASUREONE_MOCK=true
+M1_PLATFORM=api-stg.measureone.com
+MEASUREONE_CLIENT_ID=your_client_id
+MEASUREONE_CLIENT_SECRET=your_client_secret
+MEASUREONE_API_URL=https://api-stg.measureone.com
+MEASUREONE_HOST_NAME=api-stg.measureone.com
+MEASUREONE_LINK_SCRIPT_URL=https://api-stg.measureone.com/v3/js/m1-link-2021042000.js
+```
+
+`MEASUREONE_MOCK=true` → mock flow without live API (`be/routes/singles/measureoneEducation.js`).
+
+## Twilio (SMS / Verify)
+
+```bash
+TWILIO_ACCOUNT_SID=AC5327ca################41d0f7517
+TWILIO_AUTH_TOKEN=********************************
+TWILIO_ServiceSID=VA81a163569##################e3f60
+TWILIO_PHONE_NUMBER=+18888378479
+```
+
+Code accepts `TWILIO_ServiceSID` or `TWILIO_SERVICE_SID` (`be/lib/twilioVerifySms.js`).
+
+## Production checklist
+
+```bash
+MAIN_FONT=Comic Sans MS
+
+PHOTO_BROWSER_CACHE_FOREVER=true
+PHOTO_BROWSER_CACHE_MAX_AGE_SEC=300
+
+DEBUG_PHOTO_INFO=false
+
+AUTO_UI_CHAT_UPDATE=false
+AUTO_UI_POST_UPDATE=false
+
+NOTIFICATION_CHAT=false
+NOTIFICATION_POST=false
+```
+
+| Variable | Notes |
+|----------|-------|
+| `MAIN_FONT` | Site font — also set in **`fe/.env`** (`fe/src/config/mainFontEnv.js`). |
+| `PHOTO_BROWSER_CACHE_*` | Cache-Control for `GET /api/photo/:id`. |
+| `DEBUG_PHOTO_INFO` | Extra upload/debug UI when `true`. |
+| `AUTO_UI_CHAT_UPDATE` / `AUTO_UI_POST_UPDATE` | Default `true` if unset; `false` disables background auto-sync. **Env key is `AUTO_UI_POST_UPDATE`** (not `AUTO_UI_POST_UPDATET`). |
+| `NOTIFICATION_CHAT` / `NOTIFICATION_POST` | Notification feature flags. |
+
+## Rate limiting (optional)
+
+```bash
+#BACKEND_RATE_LIMIT_ENABLE=false
+#BACKEND_RATE_LIMIT_MAX=150
+#BACKEND_RATE_LIMIT_WINDOW_MINUTES=1
+REDIS_URL=redis://localhost:6379
+```
+
+Express rate-limit middleware is currently **removed** (`server_be.js` — `/api/rateLimitStatus` is a stub). When re-enabled, prefer **`REDIS_URL`** so all PM2 workers / web servers share one counter.
+
+## Browser API rate limit (FE bundle)
+
+Mirrored from here into the Vite client bundle (`fe/vite.config.mjs` → `fe/src/config/clientApiRateLimitEnv.js`). **Not in `fe/.env`.**
+
+```bash
+FE_RATE_LIMIT_ENABLE=true
+FE_RATE_CLIENT_API_ACCESS_LIMIT=100
+FE_RATE_CLIENT_API_TIMESLICE_SECONDS=60
+FE_RATE_CLIENT_API_COOLDOWN_SECONDS=30
+FE_RATE_CLIENT_API_COOLDOWN_ENABLED=true
+FE_RATE_CLIENT_API_CONSOLE_LOG=false
+```
+
+| Variable | Behavior |
+|----------|----------|
+| `FE_RATE_LIMIT_ENABLE` | Master switch; `false` = no per-tab browser API cooldown. |
+| `FE_RATE_CLIENT_API_ACCESS_LIMIT` | Max API calls per rolling window per tab. |
+| `FE_RATE_CLIENT_API_TIMESLICE_SECONDS` | Window length (seconds). |
+| `FE_RATE_CLIENT_API_COOLDOWN_SECONDS` | Cooldown after limit hit. |
+| `FE_RATE_CLIENT_API_COOLDOWN_ENABLED` | Sub-switch; `false` = same as master off for gating. |
+| `FE_RATE_CLIENT_API_CONSOLE_LOG` | DevTools logging when master enabled. |
+
+After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod so the bundle picks up new values.
+
+## Self intro video recorder (FE bundle)
+
+Mirrored from here into the Vite client bundle (`fe/vite.config.mjs` → `fe/src/config/selfIntroVideoMaxLengthEnv.js`). **Not in `fe/.env`.**
+
+```bash
+SELF_INTRO_VIDEO_MAX_LENGTH=30
+```
+
+| Variable | Behavior |
+|----------|----------|
+| `SELF_INTRO_VIDEO_MAX_LENGTH` | Max self intro recording duration in seconds (`SelfIntroVideoRecordPopup` countdown). Default `30` if unset or invalid. |
+
+After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod.
+
+## Menu visibility by member category
+
+```bash
+Admin=show_all
+DemoUser=show_all
+PilotUser=show_all
+Public=show_vsingles, show_eMarketPlace
+```
+
+Loaded by `be/mallDepartmentMode.js` → `mallDepartmentMode` on user. Keys must match DB **`singles.member_category`**.
+
+## API port and logging
+
+```bash
+API_PORT=40000
+PM2_LOG_LEVEL=DEBUG
+```
+
+| Variable | Notes |
+|----------|-------|
+| `API_PORT` | Also set in **`fe/.env`** — `be/loadEnv.js` copies to `PORT`; Vite proxy uses same port. |
+| `PM2_LOG_LEVEL` | `TRACE` … `FATAL` — filters `be/logger.js` app logs. |
+
+## Database (Mac dev)
+
+**Database name:** `onlinemallwebsite` (formerly `vsingles`). Use `-d onlinemallwebsite` in `psql`; env key remains `DB_NAME`.
+
+```bash
+DB_HOST=localhost
+DB_PORT=50010
+DB_NAME=onlinemallwebsite
+DB_USER=test_user1
+DB_PASSWORD=****
+DB_SCHEMA=helloworldjunktest
+VSINGLES_SCHEMA=helloworldjunktest
+PORT=3005
+```
+
+Mac `psql`: see `mac-psql-local.mdc`. **Writes** go to Primary; reads use local replica in production (`postgres-primary-replica.mdc`).
+
+## SMTP
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=support@onlinemall.website
+SMTP_PASS=****
+```
+
+Used by referral invites, password upgrade, support messages, live-scan support email, etc.
+
+## Dialog layout (FE — also in `fe/.env`)
+
+```bash
+DIALOG_ZOOM=100%
+DIALOG_HEIGHT_OFFSET=0%
+DIALOG_WIDGHT_OFFSET=0%
+```
+
+Auth dialog tuning; standard width/margins use `DIALOG_WIDTH_*` and `DIALOG_MARGIN_*` in **`fe/.env`** (`fe/src/config/standardAuthDialogEnv.js`).
+
+## RentCast / Google Maps
+
+```bash
+VITE_RENTCAST_API_KEY=********************************
+RENTCAST_API_KEY=********************************
+VITE_GOOGLE_MAPS_API_KEY=********************************
+```
+
+`VITE_GOOGLE_MAPS_API_KEY` is exposed to FE via server config (`be/server_be.js` → `fe/src/api/googleMapsKeyFe.js`). RentCast keys used by eHomes test views.
+
+## PayPal
+
+```bash
+PAYPAL_CLIENT_ID=********************************
+PAYPAL_CLIENT_SECRET=********************************
+PAYPAL_ENV=live
+PRICE_PER_TOKEN=10
+```
+
+`PAYPAL_ENV=live` or `sandbox` (`be/routes/singles/settingsProfile.js`).
+
+## FloristOne
+
+```bash
+FLORISTONE_API_Key=292711
+FLORISTONE_PASSWORD=****
+```
+
+Send-flowers integration (`be/routes/singles/sendFlower.js`). Accepts aliases `FLORISTONE_API_KEY`, `FLORISTONE_APIKEY`, etc.
+
+## When changing these
+
+1. Edit `~/.ssh/be/.env` on the target machine (Mac vs server copy may differ).
+2. `pm2 restart onlinemallwebsite` on servers.
+3. Mac local BE: restart Node process after env change.
+4. Restart Vite if you change keys mirrored in **`fe/.env`**.
+
+## Agent — end of each task
+
+When a task (or a clear unit of requested work) is finished, end the reply with this exact line so completion is obvious at a glance:
+
+```
+############### DONE ##################
+```
