@@ -1,28 +1,25 @@
 # usbzip/
 
-Checked-in USB Bridge installers for deploy.
+Local staging only — **zips are not checked into git** (GitHub hard limit 100MB;
+Git LFS is unreliable here because Ubuntu often has no `git-lfs`).
 
 | Path | Role |
 |------|------|
-| `usbzip/usbBridgeV3-mac.zip` (this folder) | Built on **Mac** (`usball`), committed (Git LFS). |
-| `$USB_DMG_EXE` = `$STORAGE_FOLDER/USB_DMG_EXE` | **Customer download** target. Ubuntu `work2` copies here. |
+| Mac `$USB_DMG_EXE` | Built by `usball` (local downloads) |
+| `usbzip/*.zip` | Local copy next to the repo (gitignored) |
+| Ubuntu `$STORAGE_FOLDER/USB_DMG_EXE` | Customer downloads on onlinemall.website |
 
-## Mac
-
-```bash
-usball                                          # electron build → USB_DMG_EXE + usbzip/
-git add usbzip/usbBridgeV3-*.zip && git commit   # push so Ubuntu can pull
-# optional local refresh without rebuild:
-scripts/publish-usbzip-to-storage.sh
-```
-
-`beall` / `feall` / `work1` call `publish-usbzip-to-storage.sh` (copy only; no Electron rebuild).
-
-## Ubuntu (`work2` / `febeprod`)
+## Workflow
 
 ```bash
-git lfs pull --include="usbzip/**"   # real bytes, not 134-byte LFS pointer
-scripts/publish-usbzip-to-storage.sh # → /mnt/pgdata16/.../USB_DMG_EXE/
+# Mac — build (requires macOS for the .app zip; cannot build Mac zip on Ubuntu)
+usball
+
+# Mac — push zips to Ubuntu storage over SSH (no git)
+scripts/sync-usb-bridge-installers.sh
+
+# Ubuntu — normal deploy (code only; zips already in USB_DMG_EXE)
+work2   # or febeprod
 ```
 
-API serves only real ZIP files (`PK` magic); Git LFS pointer stubs are rejected.
+`work1` / `usball` call the sync script when possible so you do not SCP by hand.
