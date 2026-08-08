@@ -1,0 +1,8 @@
+
+
+Change the URL to use new URL: https://[URL]/entertoken here and 
+On right:
+
+http://[URL]/entertoken?token=339824
+
+Which is clone of http://localhost:3000/pages/register?

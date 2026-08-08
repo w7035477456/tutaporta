@@ -1,0 +1,14 @@
+# One host per line (user@host supported)
+# Copy to scripts/deploy-hosts.txt and edit:
+#
+#   cp scripts/deploy-hosts.example.txt scripts/deploy-hosts.txt
+#
+# --- Mac controller → remote Ubuntu solo ---
+# lawsen0@192.168.222.202
+#
+# --- On Ubuntu solo (deploy on same box, no SSH) ---
+# localhost
+#
+# --- Multi-server production later ---
+# lawsen0@10.0.1.11
+# lawsen0@10.0.1.12
