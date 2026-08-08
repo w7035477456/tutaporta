@@ -26,6 +26,7 @@ import {
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 import { TUTAPHOTOALBUMS_CLOUD_LOGO, TUTAPHOTOALBUMS_CLOUD_LOGIN_TITLE } from './tutaPhotoAlbumsBranding';
 import PopupBlockedAllowHelp, { isPopupBlockedErrorMessage } from 'ui-component/PopupBlockedAllowHelp';
+import { isOnenoteUsbDisable } from 'config/onenoteUsbDisableEnv';
 
 const ONEDRIVE_SIGNUP_URL =
   'https://www.microsoft.com/en-us/microsoft-365/onedrive/onedrive-plans-and-pricing';
@@ -311,8 +312,9 @@ export default function PhotoAlbumsOneDriveLoginModal({
   /** Valid TutaPhotoAlbums cloud vault only — Open/View/Backup. Missing/broken → Format only. */
   const cloudVaultBroken = Boolean(needsReformat);
   const canFormatCloud = sessionActive && !busy;
-  const canOpenCloud = canFormatCloud && Boolean(hasVault) && !cloudVaultBroken;
-  const canViewOrBackupCloud = canOpenCloud;
+  const canOpenCloud =
+    canFormatCloud && Boolean(hasVault) && !cloudVaultBroken && !isOnenoteUsbDisable();
+  const canViewOrBackupCloud = canFormatCloud && Boolean(hasVault) && !cloudVaultBroken;
 
   const visibleSuccess = sessionActive ? String(success || '').trim() : '';
   const showRememberedEmailsSection = emailsLoading || emailOptions.length > 0;

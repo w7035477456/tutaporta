@@ -3,8 +3,8 @@
   (After you clicked “Download usbbridge zip” on the website)
 ========================================================
 
-You do NOT need Terminal.
-Use only Finder double-clicks and normal Mac buttons.
+You do NOT need Terminal commands typed by hand.
+Use Finder clicks and normal Mac buttons.
 
 
 BEFORE THE 4 STEPS — Unzip the download
@@ -14,45 +14,57 @@ BEFORE THE 4 STEPS — Unzip the download
      (This creates a folder named usbBridgeV3-mac)
   3. Open that folder. You should see:
        • 1-START-HERE-Read-Me-First.txt   (this file)
-       • 2-Open-Privacy-Settings.webloc
+       • 2-Open-Privacy-Settings.command
        • usbBridgeV3.app
 
-  If you still see “Open usbBridgeV3.command” and NOT the
-  two files above, delete the old folder and download again
-  from the website (you have an old zip).
+  If you still see “2-Open-Privacy-Settings.webloc” (old zip),
+  delete that folder and download again from the website.
 
 
 Why Mac shows a warning
 -----------------------
 This app is not yet signed with an Apple certificate.
 macOS blocks it the first time. That is normal.
-The steps below are Apple’s way to allow it.
 
 
-STEP 1 — Try to open the app
-----------------------------
+EASIEST PATH (try this first on newer macOS)
+--------------------------------------------
+  1. Control-click (right-click) usbBridgeV3.app
+  2. Choose:  Open
+  3. In the dialog, click:  Open
+  4. Look for a small icon in the menu bar (top of screen)
+
+  If that worked, you are done — skip Steps 1–4 below.
+
+
+STEP 1 — Try to open the app (registers the block with macOS)
+-------------------------------------------------------------
   • Double-click:  usbBridgeV3.app
 
   • A warning appears (Apple could not verify … malware).
-  • Click the button:  Done
+  • Click:  Done
     (Do NOT click “Move to Trash”.)
 
 
-STEP 2 — Open Privacy settings
-------------------------------
-  • Double-click this file in the same folder:
+STEP 2 — Open Privacy & Security settings
+-----------------------------------------
+  • Double-click:
 
-      2-Open-Privacy-Settings.webloc
+      2-Open-Privacy-Settings.command
 
-  • System Settings opens to Privacy & Security.
+  • If Mac asks whether to open Terminal / allow the script, click Open / Allow.
+  • System Settings should open to Privacy & Security.
+
+  • If nothing useful opens, do this manually:
+      Apple menu → System Settings → Privacy & Security
 
 
 STEP 3 — Allow the app
 ----------------------
-  • Scroll to the BOTTOM of that settings page.
-  • You should see a message that usbBridgeV3 was blocked.
+  • Scroll to the BOTTOM of Privacy & Security.
+  • You should see that usbBridgeV3 was blocked.
   • Click:  Open Anyway
-  • If Mac asks for your password or Touch ID, approve it.
+  • Approve password / Touch ID if asked.
   • If it asks again to open, click:  Open
 
 
@@ -69,11 +81,12 @@ STEP 4 — Open the app again
 Next time
 ---------
 Just double-click usbBridgeV3.app. You should not need
-Steps 1–3 again.
+the allow steps again.
 
 Need help?
 ----------
-If Step 3 does not show “Open Anyway”, complete Step 1
-first (double-click the app and click Done), then try
-Step 2 again within a few minutes.
+• “webloc / document not readable” → you have an old zip. Download again.
+• No “Open Anyway” → finish Step 1 first (Done, not Trash), wait a few
+  seconds, then open Privacy & Security again.
+• Still blocked → use the EASIEST PATH (Control-click → Open).
 ========================================================

@@ -10,10 +10,11 @@ The website backend cannot see USB drives on your laptop. This bridge listens on
 
 1. Download **usbBridgeV3-mac.zip**
 2. Double-click the zip to unzip
-3. Open **`1-START-HERE-Read-Me-First.txt`** and follow the 4 steps (double-click only; no Terminal)
+3. Open **`1-START-HERE-Read-Me-First.txt`** and follow the steps (prefer Control-click → Open on the app; or use `2-Open-Privacy-Settings.command`)
 4. On onlinemall.website → Record Vault / Photo Albums → USB — the strip turns green when the bridge is up
 
-Zip contents for end users: `1-START-HERE-Read-Me-First.txt`, `2-Open-Privacy-Settings.webloc`, `usbBridgeV3.app`.
+Zip contents for end users: `1-START-HERE-Read-Me-First.txt`, `2-Open-Privacy-Settings.command`, `usbBridgeV3.app`.
+(Do not ship `.webloc` — `x-apple.systempreferences:` weblocs fail on many macOS versions with “document not readable”.)
 
 The app starts at login by default. Leave it running while you use USB vault features. Tray → **Show status window** anytime.
 

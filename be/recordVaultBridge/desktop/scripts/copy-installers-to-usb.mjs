@@ -83,35 +83,36 @@ function publishMacZip(destDir) {
       return false;
     }
 
-    // End-user Mac zip: clear numbered instructions + Privacy Settings webloc.
-    // Sequoia blocks unsigned apps on first open; Open Anyway is required (no Terminal).
+    // End-user Mac zip: instructions + .command opener (webloc x-apple.* URLs fail on Sequoia).
     const macEndUserDir = path.join(__dirname, '..', 'mac-end-user');
     const startHereName = '1-START-HERE-Read-Me-First.txt';
-    const weblocName = '2-Open-Privacy-Settings.webloc';
+    const privacyOpenName = '2-Open-Privacy-Settings.command';
     const startHereSrc = path.join(macEndUserDir, startHereName);
-    const weblocSrc = path.join(macEndUserDir, weblocName);
-    if (!fs.existsSync(startHereSrc) || !fs.existsSync(weblocSrc)) {
+    const privacyOpenSrc = path.join(macEndUserDir, privacyOpenName);
+    if (!fs.existsSync(startHereSrc) || !fs.existsSync(privacyOpenSrc)) {
       console.error(
         '[copy-installers-to-usb] missing mac-end-user instructions:',
         startHereSrc,
-        weblocSrc
+        privacyOpenSrc
       );
       return false;
     }
     fs.copyFileSync(startHereSrc, path.join(stagingRoot, startHereName));
-    fs.copyFileSync(weblocSrc, path.join(stagingRoot, weblocName));
+    const privacyOpenDest = path.join(stagingRoot, privacyOpenName);
+    fs.copyFileSync(privacyOpenSrc, privacyOpenDest);
+    fs.chmodSync(privacyOpenDest, 0o755);
 
     if (fs.existsSync(dest)) fs.unlinkSync(dest);
     execFileSync(
       'zip',
-      ['-r', '-q', '-y', dest, 'usbBridgeV3.app', startHereName, weblocName],
+      ['-r', '-q', '-y', dest, 'usbBridgeV3.app', startHereName, privacyOpenName],
       {
         cwd: stagingRoot,
         stdio: 'inherit'
       }
     );
     console.log(
-      `[copy-installers-to-usb] ${src} -> ${dest} (with ${startHereName} + ${weblocName})`
+      `[copy-installers-to-usb] ${src} -> ${dest} (with ${startHereName} + ${privacyOpenName})`
     );
     return true;
   } catch (err) {

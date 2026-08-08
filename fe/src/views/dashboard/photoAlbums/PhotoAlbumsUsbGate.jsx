@@ -40,6 +40,7 @@ import {
   fetchPhotoAlbumsStorageConfig
 } from 'api/photoAlbumsFe';
 import { normalizeUsbBridgeInstallerUrl } from 'utils/usbBridgeInstallerDownloadUrl';
+import { isOnenoteUsbDisable } from 'config/onenoteUsbDisableEnv';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { useAuth } from 'contexts/AuthContext';
 import {
@@ -856,7 +857,7 @@ export default function PhotoAlbumsUsbGate({
     Boolean(selectedPrimary?.legacyPinVault) || Boolean(selectedPrimary?.partial);
   const usbVaultReady = usbSelected && Boolean(selectedPrimary?.hasVault) && !usbVaultBroken;
   const canFormatUsb = usbSelected;
-  const canOpenUsb = usbVaultReady;
+  const canOpenUsb = usbVaultReady && !isOnenoteUsbDisable();
   const canViewOrBackupUsb = usbVaultReady;
   const combinedStorageChoice = Boolean(!usbOnly && oneDriveVisible && localUsbVisible);
 

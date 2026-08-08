@@ -42,7 +42,8 @@ const BE_ENV_KEYS_FROM_HOME_FILE = [
   'FE_RATE_CLIENT_API_CONSOLE_LOG',
   'SELF_INTRO_VIDEO_MAX_LENGTH',
   'NOTES_DEFAULT_BUTTON_FONT_SIZE_REM',
-  'PHOTOALBUMS_DEFAULT_BUTTON_FONT_SIZE_REM'
+  'PHOTOALBUMS_DEFAULT_BUTTON_FONT_SIZE_REM',
+  'ONENOTE_USB_DISABLE'
 ];
 
 function loadBeEnvKeysFromHomeFile() {
@@ -123,6 +124,7 @@ export default defineConfig(({ mode }) => {
       'YELLOW_',
       'NOTES_',
       'PHOTOALBUMS_',
+      'ONENOTE_',
       'ALBUM_',
       'BSIZE'
     ],
