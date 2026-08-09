@@ -67,6 +67,11 @@ import { usePostingAlbumMediaFullscreen } from 'hooks/usePostingAlbumMediaFullsc
 import PostingAlbumMediaFullscreen from 'ui-component/PostingAlbumMediaFullscreen';
 import AlbumMediaDoubleClickSurface from 'ui-component/AlbumMediaDoubleClickSurface';
 import { MANUAL_REFRESH_BUTTON_SX } from 'config/manualRefreshButtonEnv';
+import {
+  YELLOW_BUTTON_TEMPLATE_BG,
+  YELLOW_BUTTON_TEMPLATE_TEXT,
+  yellowButtonTemplateSx
+} from 'config/yellowButtonTemplate';
 import { dispatchBellNotificationRefresh } from 'utils/notificationBellStore';
 import { themedAlert } from 'utils/themedDialog';
 import NotificationSection from 'layout/MainLayout/Header/NotificationSection';
@@ -74,7 +79,7 @@ import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { useAuth } from 'contexts/AuthContext';
 import { isAdminSession } from 'utils/adminSession';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { guestDemoAllowProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import {
   buttonHoverMagnifyFontSx,
   buttonHoverMagnifyLabelOnlyFontSx,
@@ -441,35 +446,40 @@ const OUTGOING_BIO_CLICK_TO_VIEW_BUTTON_SX = outgoingBioGreenActionButtonSx({
   border: OUTGOING_BIO_CLICK_TO_VIEW_BORDER
 });
 
-/** Request to View — yellow bg, black text (matches View Approved ribbon / refresh CTAs). */
-const OUTGOING_BIO_REQUEST_TO_VIEW_BORDER = '3px solid #000000';
+/**
+ * Request to View — always yellow + black (hardcoded; do not use --theme-yellow-color).
+ * In Minimal palette that CSS var tracks secondary (blue), so resting looked non-yellow
+ * and only the hover #fff176 looked yellow.
+ */
 const OUTGOING_BIO_REQUEST_TO_VIEW_BUTTON_SX = {
+  ...yellowButtonTemplateSx({
+    bg: YELLOW_BUTTON_TEMPLATE_BG,
+    text: YELLOW_BUTTON_TEMPLATE_TEXT,
+    border: '3px solid #000000',
+    hoverScale: 1
+  }),
   flexShrink: 0,
-  textTransform: 'none',
   lineHeight: 1.25,
   py: 0.75,
   px: 1.25,
   minWidth: 0,
   minHeight: 'unset',
-  bgcolor: 'var(--theme-yellow-color, #FFEB3B) !important',
-  border: `${OUTGOING_BIO_REQUEST_TO_VIEW_BORDER} !important`,
-  color: '#000000 !important',
-  WebkitTextFillColor: '#000000 !important',
   boxShadow: 'none',
   transform: 'none !important',
-  ...buttonHoverMagnifyTransitionSx,
+  fontSize: outgoingBioBodyTextFontSize,
   '@media (hover: hover)': {
     '&:hover:not(.Mui-disabled)': {
-      bgcolor: '#fff176 !important',
-      border: `${OUTGOING_BIO_REQUEST_TO_VIEW_BORDER} !important`,
-      color: '#000000 !important',
-      WebkitTextFillColor: '#000000 !important',
+      bgcolor: `${YELLOW_BUTTON_TEMPLATE_BG} !important`,
+      color: `${YELLOW_BUTTON_TEMPLATE_TEXT} !important`,
+      WebkitTextFillColor: `${YELLOW_BUTTON_TEMPLATE_TEXT} !important`,
+      border: '3px solid #000000 !important',
       transform: 'none !important',
+      filter: 'brightness(0.96)',
       ...buttonHoverMagnifyLabelOnlyFontSx({ baseFontSize: outgoingBioBodyTextFontSize })
     }
   },
   '&.Mui-disabled': {
-    bgcolor: 'rgba(255, 235, 59, 0.45) !important',
+    bgcolor: 'rgba(251, 223, 27, 0.45) !important',
     color: 'rgba(0,0,0,0.45) !important',
     WebkitTextFillColor: 'rgba(0,0,0,0.45) !important',
     border: '3px solid rgba(0,0,0,0.35) !important'
@@ -562,6 +572,7 @@ function OutgoingBioRequestSentenceLine({
             disableElevation
             onClick={() => void onApprovedClick?.(bioKind)}
             sx={OUTGOING_BIO_CLICK_TO_VIEW_BUTTON_SX}
+            {...guestDemoAllowProps()}
           >
             <Box component="span" className="hover-magnify-label" sx={OUTGOING_BIO_GREEN_ACTION_LABEL_SX}>
               {approval.actionText}
@@ -1240,51 +1251,54 @@ export default function VettedFriendsPicksLayout({
     async (bioKind) => {
       if (!selectedRow) return;
       setViewUnlockError('');
+      const guestDemo = isGuestDemoLogin(user);
       const isBrief = bioKind === 'brief';
       if (isBrief) {
         if (!selectedBriefBioApproved) {
           setViewUnlockError('Brief Bio is not approved yet.');
           return;
         }
-        if (!isTruthyPaidFlag(selectedRow.brief_paid)) {
-          if (typeof onApprovedViewClick === 'function') {
-            try {
-              await onApprovedViewClick(selectedRow, 'basic');
-            } catch (err) {
-              setViewUnlockError(err?.message || 'Could not start Brief Bio unlock.');
-            }
-          } else {
-            setViewUnlockError('Bio unlock is not available on this page.');
-          }
+        // Demo login: allow Click to view without token debit / GuestDemoGate block.
+        if (guestDemo || isTruthyPaidFlag(selectedRow.brief_paid)) {
+          openApprovedInlineBioView('brief');
           return;
         }
-        openApprovedInlineBioView('brief');
-        return;
-      }
-      if (!selectedFullBioApproved) {
-        setViewUnlockError('Full Bio is not approved yet.');
-        return;
-      }
-      if (!isTruthyPaidFlag(selectedRow.full_paid)) {
         if (typeof onApprovedViewClick === 'function') {
           try {
-            await onApprovedViewClick(selectedRow, 'detail');
+            await onApprovedViewClick(selectedRow, 'basic');
           } catch (err) {
-            setViewUnlockError(err?.message || 'Could not start Full Bio unlock.');
+            setViewUnlockError(err?.message || 'Could not start Brief Bio unlock.');
           }
         } else {
           setViewUnlockError('Bio unlock is not available on this page.');
         }
         return;
       }
-      openApprovedInlineBioView('full');
+      if (!selectedFullBioApproved) {
+        setViewUnlockError('Full Bio is not approved yet.');
+        return;
+      }
+      if (guestDemo || isTruthyPaidFlag(selectedRow.full_paid)) {
+        openApprovedInlineBioView('full');
+        return;
+      }
+      if (typeof onApprovedViewClick === 'function') {
+        try {
+          await onApprovedViewClick(selectedRow, 'detail');
+        } catch (err) {
+          setViewUnlockError(err?.message || 'Could not start Full Bio unlock.');
+        }
+      } else {
+        setViewUnlockError('Bio unlock is not available on this page.');
+      }
     },
     [
       selectedRow,
       selectedBriefBioApproved,
       selectedFullBioApproved,
       onApprovedViewClick,
-      openApprovedInlineBioView
+      openApprovedInlineBioView,
+      user
     ]
   );
 

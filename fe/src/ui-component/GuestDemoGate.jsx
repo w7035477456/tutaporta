@@ -65,6 +65,7 @@ function findBlockedInteractive(target) {
  * Demo mode (demo/demo or guest/guest): allow sidebar, footer legal links, mute/music,
  * top-right theme menu, orange help / tour buttons, TutaNotes Cloud/USB login panels,
  * full /myPhotoAlbums, /myStory, and /receivedBioRequests (path allow — all page controls);
+ * plus marked controls (data-guest-demo-allow), e.g. vetted-friends "Click to view";
  * block Support and other interactive clicks elsewhere and show ColorTemplate16 popup.
  *
  * Mounted outside RouterProvider in App.jsx — do not use useLocation(); read window.location.
