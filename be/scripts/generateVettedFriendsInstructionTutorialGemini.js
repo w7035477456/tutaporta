@@ -34,7 +34,7 @@ const COPY = {
     "Congratulations! You've taken the first step toward someone who caught your eye.",
     'Once they approve your bio request (which usually takes just a few days), their photo will appear here in the Acquaintances and Buddies section.',
     'Requesting a Brief Bio makes you mutual Acquaintances upon approval, while a Full Bio makes you mutual Buddies.',
-    'Depending on your connection level, the Acquaintance Area or Buddies tab will appear.',
+    'Depending on your connection level, the Acquaintance Area Tab or Buddies Area tab will appear.',
     'Both feature a Biography tab with an important Click to View button.',
     'This is the only feature on our site that requires a fee.',
     'By purchasing 1 or 2 tokens, you unlock cross-referenced background details from a variety of sources.',
