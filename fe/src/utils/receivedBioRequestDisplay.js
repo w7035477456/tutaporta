@@ -320,7 +320,7 @@ export function formatOutgoingBioRequestActionMainDetailText(row, bioKind) {
   return `${friendLabel} ${bioLabel}`;
 }
 
-/** Vetted Friends — plain text after the green "Request to View" button. */
+/** Vetted Friends — plain text after the yellow "Request to View" button. */
 export function formatOutgoingBioRequestActionDetailText(row, bioKind) {
   return `${formatOutgoingBioRequestActionMainDetailText(row, bioKind)} ${formatOutgoingBioRequestIncludesPhrase(bioKind)}`;
 }

@@ -440,11 +440,41 @@ function outgoingBioGreenActionButtonSx({ py = 0.5, px = 1, border = '1px solid 
 const OUTGOING_BIO_CLICK_TO_VIEW_BUTTON_SX = outgoingBioGreenActionButtonSx({
   border: OUTGOING_BIO_CLICK_TO_VIEW_BORDER
 });
-const OUTGOING_BIO_REQUEST_TO_VIEW_BUTTON_SX = outgoingBioGreenActionButtonSx({
+
+/** Request to View — yellow bg, black text (matches View Approved ribbon / refresh CTAs). */
+const OUTGOING_BIO_REQUEST_TO_VIEW_BORDER = '3px solid #000000';
+const OUTGOING_BIO_REQUEST_TO_VIEW_BUTTON_SX = {
+  flexShrink: 0,
+  textTransform: 'none',
+  lineHeight: 1.25,
   py: 0.75,
   px: 1.25,
-  border: OUTGOING_BIO_CLICK_TO_VIEW_BORDER
-});
+  minWidth: 0,
+  minHeight: 'unset',
+  bgcolor: 'var(--theme-yellow-color, #FFEB3B) !important',
+  border: `${OUTGOING_BIO_REQUEST_TO_VIEW_BORDER} !important`,
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  boxShadow: 'none',
+  transform: 'none !important',
+  ...buttonHoverMagnifyTransitionSx,
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled)': {
+      bgcolor: '#fff176 !important',
+      border: `${OUTGOING_BIO_REQUEST_TO_VIEW_BORDER} !important`,
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important',
+      transform: 'none !important',
+      ...buttonHoverMagnifyLabelOnlyFontSx({ baseFontSize: outgoingBioBodyTextFontSize })
+    }
+  },
+  '&.Mui-disabled': {
+    bgcolor: 'rgba(255, 235, 59, 0.45) !important',
+    color: 'rgba(0,0,0,0.45) !important',
+    WebkitTextFillColor: 'rgba(0,0,0,0.45) !important',
+    border: '3px solid rgba(0,0,0,0.35) !important'
+  }
+};
 
 function BioRequestNumberedLine({ lineNumber, children }) {
   return (
