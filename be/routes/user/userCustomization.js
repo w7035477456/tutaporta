@@ -25,16 +25,6 @@ const DEFAULT_NEW_USER_VOLUME = 0;
 const DEFAULT_NEW_USER_LYRIC_VOLUME = 1;
 const DEFAULT_NEW_USER_SOUND_PREFERENCE = 'mute';
 
-/** Preloaded Track slots 1–3 for new users (Embedded Youtube Player). */
-const DEFAULT_NEW_USER_CUSTOM_MUSIC_RAW = [
-  'https://www.youtube.com/watch?v=c7u5tTO7bdE&list=RDc7u5tTO7bdE&start_radio=1',
-  'https://www.youtube.com/watch?v=g8J0GPXOA4U&list=RDg8J0GPXOA4U&start_radio=1',
-  'https://www.youtube.com/watch?v=TNZceXN8FWA&list=RDTNZceXN8FWA&start_radio=1&t=27s'
-];
-
-/** Slot 10 (0-based index 9) — Slide Show Music from canonical defaults. */
-const SLIDE_SHOW_MUSIC_SLOT_INDEX = 9;
-
 function toSinglesId(value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
@@ -73,14 +63,15 @@ function emptyCustomMusicUrlSlots() {
 
 function defaultCustomMusicUrlSlots() {
   const slots = emptyCustomMusicUrlSlots();
-  for (let i = 0; i < DEFAULT_NEW_USER_CUSTOM_MUSIC_RAW.length && i < CUSTOM_MUSIC_URL_SLOT_COUNT; i++) {
-    slots[i] = normalizeYoutubeMusicUrl(DEFAULT_NEW_USER_CUSTOM_MUSIC_RAW[i]);
-  }
-  const slideShow = DEFAULT_GLOBAL_MUSIC_URLS[SLIDE_SHOW_MUSIC_SLOT_INDEX];
-  if (slideShow) {
-    slots[SLIDE_SHOW_MUSIC_SLOT_INDEX] = normalizeYoutubeMusicUrl(slideShow);
+  for (let i = 0; i < DEFAULT_GLOBAL_MUSIC_URLS.length && i < CUSTOM_MUSIC_URL_SLOT_COUNT; i++) {
+    slots[i] = normalizeYoutubeMusicUrl(DEFAULT_GLOBAL_MUSIC_URLS[i]);
   }
   return slots;
+}
+
+function parseLoadDefaultFlag(row) {
+  if (!row || !Object.prototype.hasOwnProperty.call(row, 'load_default')) return true;
+  return row.load_default === true || row.load_default === 'true';
 }
 
 function normalizeCustomMusicUrlSlots(value) {
@@ -133,6 +124,7 @@ function rowToPayload(row) {
       lyricVolume: DEFAULT_NEW_USER_LYRIC_VOLUME,
       volume: DEFAULT_NEW_USER_VOLUME,
       customMusicUrls: defaultCustomMusicUrlSlots(),
+      loadDefault: true,
       ...mynotePrefsFromDbRow(null)
     };
   }
@@ -167,6 +159,7 @@ function rowToPayload(row) {
     vsinglesLyric,
     lyricMute,
     lyricVolume,
+    loadDefault: parseLoadDefaultFlag(row),
     volume,
     customMusicUrls: normalizeCustomMusicUrlSlots(row.custom_music_url),
     ...mynotePrefsFromDbRow(row)
@@ -270,6 +263,15 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS mynote_note_scroll_top integer NULL,
       ADD COLUMN IF NOT EXISTS mynote_editor_caret_pos integer NULL,
       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW()
+  `);
+  // Existing rows keep true (no one-time overwrite); new inserts default false until first Track Load Default.
+  await pool.query(`
+    ALTER TABLE helloworldjunktest.user_customization
+      ADD COLUMN IF NOT EXISTS load_default boolean NOT NULL DEFAULT true
+  `);
+  await pool.query(`
+    ALTER TABLE helloworldjunktest.user_customization
+      ALTER COLUMN load_default SET DEFAULT false
   `);
   await pool.query(`
     ALTER TABLE helloworldjunktest.user_customization
@@ -458,7 +460,7 @@ async function selectCustomizationRow(me) {
   try {
     const { rows } = await pool.query(
       `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
-             , custom_music_url
+             , custom_music_url, load_default
              , mynote_last_notebook_id, mynote_last_note_id
              , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
              , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
@@ -468,6 +470,19 @@ async function selectCustomizationRow(me) {
     );
     return rows[0] ?? null;
   } catch (err) {
+    if (isMissingColumn(err, 'load_default')) {
+      const { rows } = await pool.query(
+        `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
+               , custom_music_url
+               , mynote_last_notebook_id, mynote_last_note_id
+               , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
+               , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
+         FROM helloworldjunktest.user_customization
+         WHERE singles_id = $1`,
+        [me]
+      );
+      return rows[0] ?? null;
+    }
     if (isMissingColumn(err, 'mynote_last_notebook_id')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url
@@ -845,6 +860,7 @@ export async function putUserCustomization(req, res) {
       lyric_volume: nextLyricVolume,
       volume: nextVolume,
       custom_music_url: customMusicUrlSlotsToDb(nextCustomMusicUrls),
+      load_default: parseLoadDefaultFlag(prev),
       ...nextMynoteDb
     }));
   } catch (err) {
@@ -878,6 +894,17 @@ export async function postLoadDefaultMusicUrls(req, res) {
     };
 
     await upsertCustomizationRow(me, nextRow);
+    try {
+      await pool.query(
+        `UPDATE helloworldjunktest.user_customization
+         SET load_default = true, updated_at = NOW()
+         WHERE singles_id = $1`,
+        [me]
+      );
+      nextRow.load_default = true;
+    } catch (flagErr) {
+      if (!isMissingColumn(flagErr, 'load_default')) throw flagErr;
+    }
     return res.status(200).json(rowToPayload(nextRow));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {

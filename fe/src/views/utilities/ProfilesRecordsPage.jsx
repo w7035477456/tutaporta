@@ -26,7 +26,7 @@ import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeD
 import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import GreenButton from 'ui-component/GreenButton';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { guestDemoAllowProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { PROFILES_RECORDS_OPEN_TABS, PROFILES_RECORDS_TAB_PAY_HISTORY } from 'constants/profilesRecordsRoute';
 import RefereeRewardCongratulationsPopup from './RefereeRewardCongratulationsPopup';
 import { getPricePerTokenFromEnv } from 'config/pricePerTokenEnv';
@@ -289,6 +289,7 @@ export default function ProfilesRecordsPage({
 }) {
   const MAX_ACCOUNT_TOKEN_BALANCE = 20;
   const { user } = useAuth();
+  const guestDemo = isGuestDemoLogin(user);
   const { preferences } = useSinglesPreferences();
   const location = useLocation();
   const navigate = useNavigate();
@@ -684,7 +685,7 @@ export default function ProfilesRecordsPage({
   const totalPrice = tokensBuyingNum * pricePerToken;
 
   useEffect(() => {
-    if (activeTab !== 'buyTokens' || !paypalClientId) return undefined;
+    if (guestDemo || activeTab !== 'buyTokens' || !paypalClientId) return undefined;
     let cancelled = false;
 
     const scriptId = 'paypal-js-sdk-script';
@@ -721,10 +722,10 @@ export default function ProfilesRecordsPage({
     return () => {
       cancelled = true;
     };
-  }, [activeTab, paypalClientId]);
+  }, [activeTab, paypalClientId, guestDemo]);
 
   useEffect(() => {
-    if (activeTab !== 'buyTokens') return undefined;
+    if (guestDemo || activeTab !== 'buyTokens') return undefined;
     if (!paypalSdkReady || !window.paypal?.Buttons || !paypalButtonContainerRef.current) return undefined;
 
     paypalButtonsRef.current?.close?.();
@@ -799,7 +800,7 @@ export default function ProfilesRecordsPage({
     return () => {
       paypalButtonsRef.current?.close?.();
     };
-  }, [activeTab, paypalSdkReady, paymentForm.tokensBuying, tokensBuyingNum, latestTokenBalance]);
+  }, [activeTab, paypalSdkReady, paymentForm.tokensBuying, tokensBuyingNum, latestTokenBalance, guestDemo]);
 
   const profilesRecordsHeaderTitle = (
     <Box
@@ -1424,18 +1425,49 @@ export default function ProfilesRecordsPage({
                         label={paypalEnv === 'live' ? 'Live Mode' : 'Sandbox Mode'}
                       />
                     </Box>
-                    {paypalConfigLoading ? <Typography>Loading checkout...</Typography> : null}
-                    {!paypalConfigLoading && !paypalClientId ? (
+                    {paypalConfigLoading && !guestDemo ? <Typography>Loading checkout...</Typography> : null}
+                    {!guestDemo && !paypalConfigLoading && !paypalClientId ? (
                       <Alert severity="error">PayPal is not configured yet. Please contact support to set PAYPAL_CLIENT_ID.</Alert>
                     ) : null}
-                    <Box
-                      ref={paypalButtonContainerRef}
-                      sx={{
-                        minHeight: 42,
-                        opacity: paymentSaving ? 0.7 : 1,
-                        pointerEvents: paymentSaving ? 'none' : 'auto'
-                      }}
-                    />
+                    {guestDemo ? (
+                      <Stack spacing={1} sx={{ width: '100%' }} aria-label="Checkout unavailable in demo mode">
+                        {[
+                          { label: 'PayPal', bgcolor: '#ffc439', color: '#111' },
+                          { label: 'Pay Later', bgcolor: '#ffc439', color: '#111' },
+                          { label: 'Debit or Credit Card', bgcolor: '#111', color: '#fff' }
+                        ].map((btn) => (
+                          <Box
+                            key={btn.label}
+                            component="button"
+                            type="button"
+                            aria-label={`${btn.label} unavailable in demo mode`}
+                            sx={{
+                              width: '100%',
+                              minHeight: 45,
+                              border: 'none',
+                              borderRadius: 1,
+                              bgcolor: btn.bgcolor,
+                              color: btn.color,
+                              fontWeight: 700,
+                              fontSize: '1rem',
+                              cursor: 'pointer',
+                              fontFamily: 'inherit'
+                            }}
+                          >
+                            {btn.label}
+                          </Box>
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Box
+                        ref={paypalButtonContainerRef}
+                        sx={{
+                          minHeight: 42,
+                          opacity: paymentSaving ? 0.7 : 1,
+                          pointerEvents: paymentSaving ? 'none' : 'auto'
+                        }}
+                      />
+                    )}
                   </Box>
                   {paymentMessage ? <Alert severity={paymentMessage === 'Payment completed.' ? 'success' : 'error'}>{paymentMessage}</Alert> : null}
                 </Stack>

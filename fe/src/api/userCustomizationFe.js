@@ -123,6 +123,12 @@ const MYNOTE_EDITOR_PREF_KEYS = [
   'mynoteEditorCaretPos'
 ];
 
+function parseLoadDefault(data) {
+  // Missing field → treat as already applied (do not auto-overwrite).
+  if (data == null || !Object.prototype.hasOwnProperty.call(data, 'loadDefault')) return true;
+  return data.loadDefault === true || data.loadDefault === 'true';
+}
+
 function mapCustomizationResponse(data) {
   return {
     chatFontSize: parseChatFontSize(data),
@@ -133,6 +139,7 @@ function mapCustomizationResponse(data) {
     lyricVolume: parseLyricVolume(data),
     volume: parseVolume(data),
     customMusicUrls: parseCustomMusicUrls(data),
+    loadDefault: parseLoadDefault(data),
     ...parseMynoteEditorPrefs(data)
   };
 }

@@ -354,6 +354,8 @@ export function BackgroundMusicProvider({ children }) {
   const [lyricVolume, setLyricVolume] = useState(0);
   const [volume, setVolume] = useState(0);
   const [customMusicUrls, setCustomMusicUrls] = useState(emptyCustomMusicUrlSlots);
+  /** false → first Track open should auto Load Default once. */
+  const [loadDefault, setLoadDefault] = useState(true);
   const [customMusicUrl, setCustomMusicUrl] = useState(null);
   const [customMusicLoop, setCustomMusicLoop] = useState(true);
   const [customMusicStartMuted, setCustomMusicStartMuted] = useState(false);
@@ -385,6 +387,7 @@ export function BackgroundMusicProvider({ children }) {
     setLyricVolume(saved.lyricVolume ?? 1);
     setVolume(demoVolume ?? saved.volume);
     setCustomMusicUrls(saved.customMusicUrls ?? emptyCustomMusicUrlSlots());
+    setLoadDefault(saved.loadDefault !== false);
   }, []);
 
   useEffect(() => {
@@ -709,6 +712,7 @@ export function BackgroundMusicProvider({ children }) {
     }
     const saved = await fetchDefaultCustomMusicUrlsApi();
     setCustomMusicUrls(saved.customMusicUrls ?? emptyCustomMusicUrlSlots());
+    setLoadDefault(saved.loadDefault !== false);
     return saved.customMusicUrls ?? emptyCustomMusicUrlSlots();
   }, [user]);
 
@@ -806,6 +810,7 @@ export function BackgroundMusicProvider({ children }) {
       setVsinglesMediaPaused,
       customMusicUrl,
       customMusicUrls,
+      loadDefault,
       playCustomMusicFromSlot,
       stopCustomMusicPlayback,
       saveCustomMusicUrlSlot,
@@ -839,6 +844,7 @@ export function BackgroundMusicProvider({ children }) {
       vsinglesMediaPaused,
       customMusicUrl,
       customMusicUrls,
+      loadDefault,
       playCustomMusicFromSlot,
       stopCustomMusicPlayback,
       saveCustomMusicUrlSlot,

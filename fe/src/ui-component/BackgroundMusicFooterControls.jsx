@@ -92,6 +92,7 @@ export default function BackgroundMusicFooterControls({
     preferenceLoaded,
     isFooterMuted,
     customMusicUrls,
+    loadDefault,
     saveCustomMusicUrlSlot,
     loadDefaultCustomMusicUrls,
     playCustomMusicFromSlot,
@@ -102,6 +103,7 @@ export default function BackgroundMusicFooterControls({
 
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false);
   const [loadDefaultBusy, setLoadDefaultBusy] = useState(false);
+  const [autoLoadDefaultTried, setAutoLoadDefaultTried] = useState(false);
   const isFixed = variant === 'fixed';
   const isSidebar = variant === 'sidebar';
   const isFooterBar = variant === 'footer';
@@ -119,6 +121,18 @@ export default function BackgroundMusicFooterControls({
   const handleSliderCommitted = (_e, value) => {
     const v = Array.isArray(value) ? value[0] : value;
     void setVolume(v, { flush: true });
+  };
+
+  const handleLoadDefault = async () => {
+    if (loadDefaultBusy) return;
+    setLoadDefaultBusy(true);
+    try {
+      await loadDefaultCustomMusicUrls();
+    } catch (err) {
+      await themedAlert(err?.response?.data?.error || err?.message || 'Could not load default music URLs.');
+    } finally {
+      setLoadDefaultBusy(false);
+    }
   };
 
   const openYoutubeDialog = () => {
@@ -141,6 +155,15 @@ export default function BackgroundMusicFooterControls({
     window.addEventListener(OPEN_EMBEDDED_YOUTUBE_PLAYER_EVENT, onOpenRequest);
     return () => window.removeEventListener(OPEN_EMBEDDED_YOUTUBE_PLAYER_EVENT, onOpenRequest);
   }, [preferenceLoaded, playCustomMusicFromSlot]);
+
+  // First Track open: if load_default=false, apply global defaults once.
+  useEffect(() => {
+    if (!youtubeDialogOpen || !preferenceLoaded) return;
+    if (autoLoadDefaultTried || loadDefault !== false || loadDefaultBusy) return;
+    setAutoLoadDefaultTried(true);
+    void handleLoadDefault();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot when dialog opens
+  }, [youtubeDialogOpen, preferenceLoaded, loadDefault, loadDefaultBusy, autoLoadDefaultTried]);
 
   const handleMemorizeSlot = async (slotIndex, rawUrl) => {
     try {
@@ -185,18 +208,6 @@ export default function BackgroundMusicFooterControls({
         console.warn('[BackgroundMusicFooterControls] memorize after play failed', err);
         await themedAlert(message);
       }
-    }
-  };
-
-  const handleLoadDefault = async () => {
-    if (loadDefaultBusy) return;
-    setLoadDefaultBusy(true);
-    try {
-      await loadDefaultCustomMusicUrls();
-    } catch (err) {
-      await themedAlert(err?.response?.data?.error || err?.message || 'Could not load default music URLs.');
-    } finally {
-      setLoadDefaultBusy(false);
     }
   };
 
