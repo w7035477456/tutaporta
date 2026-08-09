@@ -430,16 +430,36 @@ export function BackgroundMusicProvider({ children }) {
       setLyricVolume(0);
       setVolume(0);
       setCustomMusicUrls(emptyCustomMusicUrlSlots());
+      setLoadDefault(true);
       setCustomMusicUrl(null);
       setVsinglesMediaPaused(false);
       return undefined;
     }
 
+    const LEGACY_PARTIAL_IDS = ['c7u5tTO7bdE', 'g8J0GPXOA4U', 'TNZceXN8FWA'];
+    const looksLikeLegacyPartial = (urls) => {
+      const list = Array.isArray(urls) ? urls : [];
+      const blob = list.map((u) => String(u || '')).join(' ');
+      if (LEGACY_PARTIAL_IDS.some((id) => blob.includes(id))) return true;
+      const filled = list.filter((u) => u && String(u).trim()).length;
+      const midEmpty = [3, 4, 5, 6, 7, 8].every((i) => !list[i]);
+      return filled > 0 && filled < CUSTOM_MUSIC_URL_SLOT_COUNT && midEmpty && Boolean(list[9]);
+    };
+
     let cancelled = false;
     setPreferenceLoaded(false);
     (async () => {
       try {
-        const data = await fetchUserCustomization();
+        let data = await fetchUserCustomization();
+        if (cancelled) return;
+        // Belt-and-suspenders if BE hasn't healed yet: replace garbage/partial on login.
+        if (data?.loadDefault === false || looksLikeLegacyPartial(data?.customMusicUrls)) {
+          try {
+            data = await fetchDefaultCustomMusicUrlsApi();
+          } catch (healErr) {
+            console.warn('[BackgroundMusic] auto Load Default on login failed', healErr);
+          }
+        }
         if (cancelled) return;
         applySavedCustomization(data);
       } catch (err) {
@@ -592,16 +612,10 @@ export function BackgroundMusicProvider({ children }) {
       setVolume(v);
       if (localOnly || !user) return v;
       if (!flush) return v;
-      // Custom YouTube is already playing with soundPreference 'mute' so site MP3 stays off.
-      // Volume slider must only change volume — never auto-launch piano/mp3.
-      const nextSoundPreference =
-        v > 0 && soundPreference === 'mute' && !customMusicUrl ? 'piano' : null;
-      if (nextSoundPreference) {
-        setSoundPreference(nextSoundPreference);
-      }
-      return persistVolume(v, nextSoundPreference);
+      // Local MP3 beds removed — volume slider never auto-launches a site bed.
+      return persistVolume(v, null);
     },
-    [user, persistVolume, soundPreference, customMusicUrl]
+    [user, persistVolume]
   );
 
   const playCustomMusicUrl = useCallback(
@@ -752,29 +766,16 @@ export function BackgroundMusicProvider({ children }) {
       setLyricMute(false);
       return setLyricVolumeAndSave(100, { flush: true });
     }
-    // While a custom YouTube track is up, only bump volume — do not start piano MP3.
-    const nextPref = customMusicUrl
-      ? soundPreference
-      : soundPreference === 'mute'
-        ? 'piano'
-        : soundPreference;
-    setSoundPreference(nextPref);
+    // Local MP3 beds removed — max volume only; Track/YouTube supplies music.
     setVolume(100);
     if (!user) return;
     try {
-      const saved = await saveUserCustomization({ soundPreference: nextPref, volume: 100 });
+      const saved = await saveUserCustomization({ volume: 100 });
       applySavedCustomization(saved);
     } catch (err) {
       console.warn('[BackgroundMusic] failed to save max volume', err);
     }
-  }, [
-    useVsinglesLyricAudio,
-    soundPreference,
-    customMusicUrl,
-    user,
-    applySavedCustomization,
-    setLyricVolumeAndSave
-  ]);
+  }, [useVsinglesLyricAudio, user, applySavedCustomization, setLyricVolumeAndSave]);
 
   const isFooterMuted = useVsinglesLyricAudio ? lyricMute : soundPreference === 'mute';
   const footerVolume = useVsinglesLyricAudio ? lyricVolume : volume;

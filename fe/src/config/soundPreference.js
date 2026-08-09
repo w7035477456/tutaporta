@@ -1,15 +1,7 @@
 import vsinglesLyric1 from 'assets/sound/vsinglesLyric1.mp3';
-import jazzBackground from 'assets/sound/jazzBackground.mp3';
-import musicTranceBackground from 'assets/sound/musicTranceBackground.mp3';
-import pianoBackground from 'assets/sound/pianoBackground.mp3';
 import rainBackground from 'assets/sound/rainBackground.mp4';
-import harpBirdsBackground from 'assets/sound/harpBirdsBackground.mp3';
-import spaSaunaBackground from 'assets/sound/spaSaunaBackground.mp3';
-import stormBackground from 'assets/sound/stormBackground.mp3';
-import wavesSeagullsBackground from 'assets/sound/wavesSeagullsBackground.mp3';
-import violinBackground from 'assets/sound/violinBackground.mp3';
 
-/** DB `sound_preference_enum` — site-wide beds (not /vsingles lyric). */
+/** DB `sound_preference_enum` — site-wide beds (not /vsingles lyric). Local MP3 beds removed; prefer Track/YouTube. */
 export const SOUND_PREFERENCES = ['piano', 'harpbirds', 'spasauna', 'musictrance', 'storm', 'wavesseagulls', 'rain', 'violin', 'jazz', 'mute'];
 
 export const SOUND_PREFERENCE_LABELS = {
@@ -21,7 +13,8 @@ export const SOUND_PREFERENCE_LABELS = {
   harpbirds: 'Harp/Birds Background',
   spasauna: 'Spa/Sauna Background',
   wavesseagulls: 'Waves/Seagulls Background',
-  storm: 'Storm Background'
+  storm: 'Storm Background',
+  rain: 'Rain Background'
 };
 
 /** DB `vsingles_lyric_enum` — /vsingles splash vocal only. */
@@ -32,15 +25,8 @@ export const VSINGLES_LYRIC_LABELS = {
   mute: 'Mute lyric'
 };
 
+/** Only prefs with a bundled asset play via GlobalBackgroundPlayer. Others are silent (use Track). */
 export const BACKGROUND_TRACK_SRC = {
-  piano: pianoBackground,
-  violin: violinBackground,
-  jazz: jazzBackground,
-  musictrance: musicTranceBackground,
-  storm: stormBackground,
-  wavesseagulls: wavesSeagullsBackground,
-  harpbirds: harpBirdsBackground,
-  spasauna: spaSaunaBackground,
   rain: rainBackground
 };
 
@@ -61,9 +47,9 @@ export const LYRIC_CAPTION_CUES = [
 ];
 
 const LEGACY_SOUND_MAP = {
-  lyric: 'piano',
-  flute: 'spasauna',
-  vocaltrance: 'spasauna'
+  lyric: 'mute',
+  flute: 'mute',
+  vocaltrance: 'mute'
 };
 
 export function normalizeSoundPreference(value) {
@@ -72,7 +58,7 @@ export function normalizeSoundPreference(value) {
     .toLowerCase();
   if (SOUND_PREFERENCES.includes(key)) return key;
   if (LEGACY_SOUND_MAP[key]) return LEGACY_SOUND_MAP[key];
-  return 'piano';
+  return 'mute';
 }
 
 export function normalizeVsinglesLyric(value) {

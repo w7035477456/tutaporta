@@ -74,6 +74,56 @@ function parseLoadDefaultFlag(row) {
   return row.load_default === true || row.load_default === 'true';
 }
 
+/** Legacy new-user seed (Play 1–3 + slideshow only) — never show these again. */
+const LEGACY_PARTIAL_MUSIC_VIDEO_IDS = ['c7u5tTO7bdE', 'g8J0GPXOA4U', 'TNZceXN8FWA'];
+
+function isLegacyPartialCustomMusic(slotsOrDb) {
+  const slots = normalizeCustomMusicUrlSlots(slotsOrDb);
+  const blob = slots.map((s) => s || '').join(' ');
+  if (LEGACY_PARTIAL_MUSIC_VIDEO_IDS.some((id) => blob.includes(id))) return true;
+  const filled = slots.filter(Boolean).length;
+  const midEmpty = [3, 4, 5, 6, 7, 8].every((i) => !slots[i]);
+  // Old seed: a few early slots + slot 10, middle blank.
+  return filled > 0 && filled < CUSTOM_MUSIC_URL_SLOT_COUNT && midEmpty && Boolean(slots[9]);
+}
+
+function needsAutoLoadDefaultMusic(row) {
+  if (!row) return true;
+  if (row.load_default === false || row.load_default === 'false') return true;
+  return isLegacyPartialCustomMusic(row.custom_music_url);
+}
+
+async function applyGlobalDefaultMusicToUser(me, prev) {
+  await persistGlobalDefaultMusicUrls();
+  const defaultSlots = await loadGlobalDefaultMusicUrls();
+  const base = prev ?? defaultCustomizationDbRow();
+  const nextRow = {
+    chat_font_size: base.chat_font_size ?? null,
+    mynote_font_size: base.mynote_font_size ?? null,
+    sound_preference: normalizeSoundPreference(base.sound_preference),
+    vsingles_lyric: normalizeVsinglesLyric(base.vsingles_lyric),
+    lyric_mute: base.lyric_mute != null ? parseLyricMute(base.lyric_mute) : false,
+    lyric_volume: parseLevel0to100(base.lyric_volume, DEFAULT_NEW_USER_LYRIC_VOLUME),
+    volume: parseLevel0to100(base.volume, DEFAULT_NEW_USER_VOLUME),
+    custom_music_url: customMusicUrlSlotsToDb(defaultSlots),
+    ...mynotePrefsToDbRow(mynotePrefsFromDbRow(base))
+  };
+  await upsertCustomizationRow(me, nextRow);
+  try {
+    await pool.query(
+      `UPDATE helloworldjunktest.user_customization
+       SET load_default = true, updated_at = NOW()
+       WHERE singles_id = $1`,
+      [me]
+    );
+    nextRow.load_default = true;
+  } catch (flagErr) {
+    if (!isMissingColumn(flagErr, 'load_default')) throw flagErr;
+    nextRow.load_default = true;
+  }
+  return nextRow;
+}
+
 function normalizeCustomMusicUrlSlots(value) {
   if (value == null) return emptyCustomMusicUrlSlots();
   if (typeof value === 'string') {
@@ -677,6 +727,10 @@ export async function getUserCustomization(req, res) {
       await upsertCustomizationRow(me, defaultCustomizationDbRow());
       row = await selectCustomizationRow(me);
     }
+    // Replace legacy partial / never-loaded defaults before the client ever sees them.
+    if (needsAutoLoadDefaultMusic(row)) {
+      row = await applyGlobalDefaultMusicToUser(me, row);
+    }
     return res.status(200).json(rowToPayload(row));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {
@@ -879,32 +933,8 @@ export async function postLoadDefaultMusicUrls(req, res) {
 
   try {
     await ensureCustomizationSchema();
-    await persistGlobalDefaultMusicUrls();
-    const defaultSlots = await loadGlobalDefaultMusicUrls();
     const prev = (await selectCustomizationRow(me)) ?? defaultCustomizationDbRow();
-    const nextRow = {
-      chat_font_size: prev.chat_font_size ?? null,
-      mynote_font_size: prev.mynote_font_size ?? null,
-      sound_preference: normalizeSoundPreference(prev.sound_preference),
-      vsingles_lyric: normalizeVsinglesLyric(prev.vsingles_lyric),
-      lyric_mute: prev.lyric_mute != null ? parseLyricMute(prev.lyric_mute) : false,
-      lyric_volume: parseLevel0to100(prev.lyric_volume, DEFAULT_NEW_USER_LYRIC_VOLUME),
-      volume: parseLevel0to100(prev.volume, DEFAULT_NEW_USER_VOLUME),
-      custom_music_url: customMusicUrlSlotsToDb(defaultSlots)
-    };
-
-    await upsertCustomizationRow(me, nextRow);
-    try {
-      await pool.query(
-        `UPDATE helloworldjunktest.user_customization
-         SET load_default = true, updated_at = NOW()
-         WHERE singles_id = $1`,
-        [me]
-      );
-      nextRow.load_default = true;
-    } catch (flagErr) {
-      if (!isMissingColumn(flagErr, 'load_default')) throw flagErr;
-    }
+    const nextRow = await applyGlobalDefaultMusicToUser(me, prev);
     return res.status(200).json(rowToPayload(nextRow));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {
