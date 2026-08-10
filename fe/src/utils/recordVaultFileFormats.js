@@ -323,7 +323,7 @@ export function canViewRecordVaultAttachment(ext) {
 
 /**
  * Extensions shown inline on the note (not only View/Download/Remove).
- * PDF + common raster images + browser-friendly video (first-frame thumb).
+ * PDF + common raster images + browser-friendly video (first-frame thumb) + text.
  */
 const RECORD_VAULT_INLINE_PREVIEW_EXTENSIONS = new Set([
   'pdf',
@@ -333,11 +333,35 @@ const RECORD_VAULT_INLINE_PREVIEW_EXTENSIONS = new Set([
   'bmp',
   'png',
   'mp4',
-  'mov'
+  'mov',
+  'txt',
+  'sql',
+  'json',
+  'csv',
+  'js',
+  'jsx',
+  'c',
+  'java',
+  'html',
+  'htm'
 ]);
 
 /** .mp4 / .mov — show first frame on the note (not only View/Download/Remove). */
 const RECORD_VAULT_INLINE_VIDEO_PREVIEW_EXTENSIONS = new Set(['mp4', 'mov']);
+
+/** Plain-text-ish files shown as readable body on the note. */
+const RECORD_VAULT_INLINE_TEXT_PREVIEW_EXTENSIONS = new Set([
+  'txt',
+  'sql',
+  'json',
+  'csv',
+  'js',
+  'jsx',
+  'c',
+  'java',
+  'html',
+  'htm'
+]);
 
 export function canInlinePreviewRecordVaultAttachment(ext) {
   const normalized = String(ext || '')
@@ -353,6 +377,14 @@ export function canInlineVideoPreviewRecordVaultAttachment(ext) {
     .toLowerCase()
     .replace(/^\./, '');
   return RECORD_VAULT_INLINE_VIDEO_PREVIEW_EXTENSIONS.has(normalized);
+}
+
+export function canInlineTextPreviewRecordVaultAttachment(ext) {
+  const normalized = String(ext || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  return RECORD_VAULT_INLINE_TEXT_PREVIEW_EXTENSIONS.has(normalized);
 }
 
 /** Word/Excel/PowerPoint files that can open in the Mac default desktop app via backend `open`. */

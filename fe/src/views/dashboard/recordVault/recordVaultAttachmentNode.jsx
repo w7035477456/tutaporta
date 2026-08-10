@@ -9,11 +9,13 @@ import {
   canViewRecordVaultAttachment,
   canInlinePreviewRecordVaultAttachment,
   canInlineVideoPreviewRecordVaultAttachment,
+  canInlineTextPreviewRecordVaultAttachment,
   canNativeOpenRecordVaultAttachment,
   extensionFromRecordVaultAttachment,
   formatRecordVaultFileSize,
   getRecordVaultAttachmentViewKind
 } from 'utils/recordVaultFileFormats';
+import { captureVideoPreviewFrame } from 'utils/captureVideoPreviewFrame';
 import {
   downloadRecordVaultNoteAttachment,
   fetchRecordVaultNoteAttachmentBlob,
@@ -32,6 +34,8 @@ const LAUNCH_BUSY_HOLD_MS = 5000;
 const INLINE_PREVIEW_NOTE_ID_RETRIES = 40;
 const INLINE_PREVIEW_NOTE_ID_RETRY_MS = 100;
 const INLINE_PDF_HEIGHT = { xs: '55vh', sm: '70vh' };
+/** Cap huge text files so the note stays responsive. */
+const INLINE_TEXT_PREVIEW_MAX_CHARS = 200_000;
 
 const IMAGE_MIME_BY_EXT = {
   jpg: 'image/jpeg',
@@ -45,18 +49,6 @@ const VIDEO_MIME_BY_EXT = {
   mp4: 'video/mp4',
   mov: 'video/quicktime'
 };
-
-/** Seek slightly past 0 so browsers paint the first decoded frame as a still. */
-function seekVideoToFirstFrame(videoEl) {
-  if (!videoEl) return;
-  try {
-    const duration = Number(videoEl.duration);
-    const t = Number.isFinite(duration) && duration > 0 ? Math.min(0.001, duration / 2) : 0.001;
-    if (videoEl.currentTime < t) videoEl.currentTime = t;
-  } catch {
-    // Ignore seek errors (e.g. not yet seekable).
-  }
-}
 
 const wrapperSx = {
   display: 'flex',
@@ -116,9 +108,9 @@ function blobWithMime(blob, mime) {
 
 /**
  * React node view for an inline vault file. PDF / jpg / jpeg / gif / bmp / png /
- * mp4 / mov render on the note page (videos show the first frame); other types
- * keep the yellow bar with Launch/View + Download + Remove. Runtime context is
- * read from editor storage.
+ * mp4 / mov / txt (and other text types) render on the note page (videos show a
+ * visible frame); other types keep the yellow bar with Launch/View + Download +
+ * Remove. Runtime context is read from editor storage.
  */
 function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const attachmentId = Number(node?.attrs?.attachmentId);
@@ -135,6 +127,8 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
+  const [videoFrameUrl, setVideoFrameUrl] = useState('');
+  const [previewText, setPreviewText] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
 
@@ -146,6 +140,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const viewKind = getRecordVaultAttachmentViewKind(ext);
   const showInlinePreview = canInlinePreviewRecordVaultAttachment(ext);
   const showInlineVideoFrame = canInlineVideoPreviewRecordVaultAttachment(ext);
+  const showInlineText = canInlineTextPreviewRecordVaultAttachment(ext);
   const canView = canViewRecordVaultAttachment(ext);
   const launchesNative = canNativeOpenRecordVaultAttachment(ext);
   const actionLabel = launchesNative ? 'Launch' : 'View';
@@ -155,6 +150,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
     if (!showInlinePreview) return undefined;
     let cancelled = false;
     let ownedObjectUrl = null;
+    let ownedFrameUrl = null;
     let attempts = 0;
     let retryTimer = null;
 
@@ -190,6 +186,8 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
       if (!cancelled) {
         setPreviewLoading(true);
         setPreviewError('');
+        setVideoFrameUrl('');
+        setPreviewText(null);
       }
 
       try {
@@ -200,7 +198,22 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
         if (cancelled) return;
         if (!blob) {
           setPreviewUrl('');
+          setVideoFrameUrl('');
+          setPreviewText(null);
           setPreviewError('Attachment returned no data');
+          return;
+        }
+
+        if (showInlineText) {
+          let text = await blob.text();
+          if (cancelled) return;
+          if (text.length > INLINE_TEXT_PREVIEW_MAX_CHARS) {
+            text = `${text.slice(0, INLINE_TEXT_PREVIEW_MAX_CHARS)}\n\n… [truncated — open View for full file]`;
+          }
+          setPreviewUrl('');
+          setVideoFrameUrl('');
+          setPreviewText(text);
+          setPreviewError('');
           return;
         }
 
@@ -221,13 +234,45 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
 
         if (ownedObjectUrl) URL.revokeObjectURL(ownedObjectUrl);
         ownedObjectUrl = URL.createObjectURL(previewBlob);
+
+        if (showInlineVideoFrame) {
+          const frameUrl = await captureVideoPreviewFrame(ownedObjectUrl);
+          // Frame JPEG is enough for the still — drop the full video blob from memory.
+          if (ownedObjectUrl) {
+            URL.revokeObjectURL(ownedObjectUrl);
+            ownedObjectUrl = null;
+          }
+          if (cancelled) {
+            if (frameUrl) URL.revokeObjectURL(frameUrl);
+            return;
+          }
+          if (ownedFrameUrl) URL.revokeObjectURL(ownedFrameUrl);
+          ownedFrameUrl = frameUrl;
+          if (!frameUrl) {
+            setPreviewUrl('');
+            setVideoFrameUrl('');
+            setPreviewText(null);
+            setPreviewError('Could not find a visible video frame — use View');
+            return;
+          }
+          setPreviewUrl('');
+          setVideoFrameUrl(frameUrl);
+          setPreviewText(null);
+          setPreviewError('');
+          return;
+        }
+
         if (!cancelled) {
           setPreviewUrl(ownedObjectUrl);
+          setVideoFrameUrl('');
+          setPreviewText(null);
           setPreviewError('');
         }
       } catch (err) {
         if (!cancelled) {
           setPreviewUrl('');
+          setVideoFrameUrl('');
+          setPreviewText(null);
           setPreviewError(readRecordVaultApiError(err, 'Could not load preview'));
         }
       } finally {
@@ -242,8 +287,9 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
       cancelled = true;
       clearRetry();
       if (ownedObjectUrl) URL.revokeObjectURL(ownedObjectUrl);
+      if (ownedFrameUrl) URL.revokeObjectURL(ownedFrameUrl);
     };
-  }, [showInlinePreview, showInlineVideoFrame, attachmentId, editor, readContext, viewKind, ext]);
+  }, [showInlinePreview, showInlineVideoFrame, showInlineText, attachmentId, editor, readContext, viewKind, ext]);
 
   const handleView = useCallback(async () => {
     const ctx = readContext();
@@ -411,20 +457,21 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
             sx={{
               width: '100%',
               borderRadius: 1,
-              overflow: 'hidden',
-              bgcolor: '#111',
+              overflow: showInlineText ? 'auto' : 'hidden',
+              bgcolor: showInlineText ? '#fff' : '#111',
               border: '1px solid var(--theme-primary-color)',
               minHeight: viewKind === 'pdf' ? INLINE_PDF_HEIGHT : '8rem',
+              maxHeight: showInlineText ? { xs: '40vh', sm: '50vh' } : undefined,
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              alignItems: showInlineText ? 'stretch' : 'center',
+              justifyContent: showInlineText ? 'flex-start' : 'center'
             }}
           >
-            {previewLoading && !previewUrl ? (
+            {previewLoading && !previewUrl && !videoFrameUrl && previewText == null ? (
               <BusyHourglass fontSize={{ xs: '1.5rem', sm: '1.75rem' }} sx={{ filter: 'none', WebkitFilter: 'none' }} />
             ) : null}
-            {!previewLoading && previewError && !previewUrl ? (
-              <Typography sx={{ color: '#fff', p: 2, textAlign: 'center', fontSize: '0.9em' }}>
+            {!previewLoading && previewError && !previewUrl && !videoFrameUrl && previewText == null ? (
+              <Typography sx={{ color: showInlineText ? '#000' : '#fff', p: 2, textAlign: 'center', fontSize: '0.9em' }}>
                 Preview unavailable — use View or Download
               </Typography>
             ) : null}
@@ -457,27 +504,42 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
                 }}
               />
             ) : null}
-            {previewUrl && showInlineVideoFrame ? (
+            {showInlineVideoFrame && videoFrameUrl ? (
               <Box
-                component="video"
-                src={previewUrl}
-                muted
-                playsInline
-                preload="metadata"
-                controls={false}
-                aria-label={`${label} first frame`}
-                onLoadedMetadata={(event) => seekVideoToFirstFrame(event.currentTarget)}
-                onLoadedData={(event) => seekVideoToFirstFrame(event.currentTarget)}
+                component="img"
+                src={videoFrameUrl}
+                alt={`${label} preview frame`}
                 sx={{
                   width: '100%',
                   maxHeight: { xs: '40vh', sm: '50vh' },
                   objectFit: 'contain',
                   objectPosition: 'center',
                   display: 'block',
-                  bgcolor: '#000',
-                  pointerEvents: 'none'
+                  bgcolor: '#000'
                 }}
               />
+            ) : null}
+            {showInlineText && previewText != null ? (
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  p: 1.5,
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  overflow: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  fontSize: '0.9em',
+                  lineHeight: 1.45,
+                  color: '#111',
+                  bgcolor: '#fff'
+                }}
+              >
+                {previewText === '' ? ' ' : previewText}
+              </Box>
             ) : null}
           </Box>
         </Box>
