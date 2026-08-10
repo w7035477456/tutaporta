@@ -35,6 +35,7 @@ import {
   TUTANOTES_USB_LOGO,
   TUTANOTES_USB_PANE_TOOLTIP,
   TUTANOTES_USB_STRIP_COLOR,
+  TUTANOTES_USB_TAB_LABEL_COLOR,
   TUTANOTES_USB_WORKSPACE_TITLE
 } from './tutaNotesBranding';
 import { clearTutaNotesTutorialChrome } from './tutaNotesTutorialChrome';
@@ -46,6 +47,7 @@ const myNoteLoadingBackdropSx = {
 /** Tab + frame colors from TutaNotes dual-login mockup. */
 const ONEDRIVE_TAB_COLOR = TUTANOTES_ONEDRIVE_STRIP_COLOR;
 const USB_TAB_COLOR = TUTANOTES_USB_STRIP_COLOR;
+const USB_TAB_LABEL_COLOR = TUTANOTES_USB_TAB_LABEL_COLOR;
 const ACTIVE_PANE_BORDER_WIDTH = 16;
 
 const TAB_LABEL_ONEDRIVE = TUTANOTES_ONEDRIVE_WORKSPACE_TITLE;
@@ -184,7 +186,7 @@ const storageTabBarSx = {
 };
 
 /** Task 3: large yellow label with black outline on colored tab. */
-function storageTabSx(color, selected) {
+function storageTabSx(color, selected, labelColor = 'var(--theme-yellow-color)') {
   return {
     flex: 1,
     minWidth: 0,
@@ -198,8 +200,8 @@ function storageTabSx(color, selected) {
     borderRight: '1px solid rgba(0,0,0,0.35)',
     borderBottom: selected ? '4px solid #000' : '4px solid transparent',
     bgcolor: color,
-    color: 'var(--theme-yellow-color)',
-    WebkitTextFillColor: 'var(--theme-yellow-color)',
+    color: labelColor,
+    WebkitTextFillColor: labelColor,
     WebkitTextStroke: '1.15px #000',
     paintOrder: 'stroke fill',
     fontFamily: MAIN_FONT_FAMILY,
@@ -221,7 +223,8 @@ function storageTabSx(color, selected) {
   };
 }
 
-function PaneHeader({ title, logoSrc, titleTooltip, stripColor }) {
+function PaneHeader({ title, logoSrc, titleTooltip, stripColor, titleColor }) {
+  const stripTitleColor = titleColor || 'var(--theme-yellow-color)';
   return (
     <Box
       sx={{
@@ -250,8 +253,8 @@ function PaneHeader({ title, logoSrc, titleTooltip, stripColor }) {
               ...paneTitleSx,
               ...(stripColor
                 ? {
-                    color: 'var(--theme-yellow-color)',
-                    WebkitTextFillColor: 'var(--theme-yellow-color)',
+                    color: stripTitleColor,
+                    WebkitTextFillColor: stripTitleColor,
                     WebkitTextStroke: '1.15px #000',
                     paintOrder: 'stroke fill'
                   }
@@ -730,7 +733,7 @@ export default function MyRecordVault() {
                       : 'Expand TutaNotes on USB to the full window'
                 }
                 onClick={selectUsbTab}
-                sx={storageTabSx(USB_TAB_COLOR, paneFocus === 'usb')}
+                sx={storageTabSx(USB_TAB_COLOR, paneFocus === 'usb', USB_TAB_LABEL_COLOR)}
               >
                 {TAB_LABEL_USB}
               </Box>
@@ -789,6 +792,7 @@ export default function MyRecordVault() {
                     logoSrc={TUTANOTES_USB_LOGO}
                     titleTooltip={TUTANOTES_USB_PANE_TOOLTIP}
                     stripColor={showCompare ? USB_TAB_COLOR : undefined}
+                    titleColor={showCompare ? USB_TAB_LABEL_COLOR : undefined}
                   />
                 ) : null}
                 <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

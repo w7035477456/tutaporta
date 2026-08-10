@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import Box from '@mui/material/Box';
@@ -7,6 +7,8 @@ import SliderControlButton from 'ui-component/SliderControlButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import {
   canViewRecordVaultAttachment,
+  canInlinePreviewRecordVaultAttachment,
+  canInlineVideoPreviewRecordVaultAttachment,
   canNativeOpenRecordVaultAttachment,
   extensionFromRecordVaultAttachment,
   formatRecordVaultFileSize,
@@ -14,10 +16,12 @@ import {
 } from 'utils/recordVaultFileFormats';
 import {
   downloadRecordVaultNoteAttachment,
+  fetchRecordVaultNoteAttachmentBlob,
   openRecordVaultNoteAttachmentNative,
   isRecordVaultNativeOpenUnsupportedError,
   readRecordVaultApiError
 } from 'api/recordVaultFe';
+import { trimSolidImageBorder } from 'utils/trimSolidImageBorder';
 import { openRecordVaultAttachmentInNewWindow } from './openRecordVaultAttachmentWindow';
 
 export const RECORD_VAULT_ATTACHMENT_NODE_NAME = 'recordVaultAttachment';
@@ -25,6 +29,34 @@ export const RECORD_VAULT_ATTACHMENT_NODE_NAME = 'recordVaultAttachment';
 const VIEW_BUTTON_HOURGLASS_SIZE = { xs: '1.1rem', sm: '1.25rem' };
 /** Keep launch hourglass visible after the desktop app opens. */
 const LAUNCH_BUSY_HOLD_MS = 5000;
+const INLINE_PREVIEW_NOTE_ID_RETRIES = 40;
+const INLINE_PREVIEW_NOTE_ID_RETRY_MS = 100;
+const INLINE_PDF_HEIGHT = { xs: '55vh', sm: '70vh' };
+
+const IMAGE_MIME_BY_EXT = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  bmp: 'image/bmp',
+  png: 'image/png'
+};
+
+const VIDEO_MIME_BY_EXT = {
+  mp4: 'video/mp4',
+  mov: 'video/quicktime'
+};
+
+/** Seek slightly past 0 so browsers paint the first decoded frame as a still. */
+function seekVideoToFirstFrame(videoEl) {
+  if (!videoEl) return;
+  try {
+    const duration = Number(videoEl.duration);
+    const t = Number.isFinite(duration) && duration > 0 ? Math.min(0.001, duration / 2) : 0.001;
+    if (videoEl.currentTime < t) videoEl.currentTime = t;
+  } catch {
+    // Ignore seek errors (e.g. not yet seekable).
+  }
+}
 
 const wrapperSx = {
   display: 'flex',
@@ -43,12 +75,50 @@ const wrapperSx = {
   }
 };
 
+const inlineShellSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.75,
+  my: 0.5,
+  p: 0.75,
+  borderRadius: 1,
+  bgcolor: 'var(--theme-yellow-color)',
+  color: '#000',
+  border: '1px solid var(--theme-primary-color)',
+  '& .MuiTypography-root': {
+    color: '#000',
+    WebkitTextFillColor: '#000'
+  }
+};
+
+const toolbarSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1,
+  flexWrap: 'wrap'
+};
+
+const actionBtnSx = {
+  minWidth: 0,
+  px: 1,
+  py: 0.35,
+  fontSize: '0.85em !important',
+  minHeight: '1.75rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+function blobWithMime(blob, mime) {
+  if (!mime || blob?.type === mime) return blob;
+  return new Blob([blob], { type: mime });
+}
+
 /**
- * React node view for an inline vault file. Renders the file name / size and the
- * Launch/View + Download + Remove controls. Runtime context (which note the file
- * belongs to, the storage type, the busy flag, and the server-delete handler) is
- * read from the editor's `recordVaultAttachment` storage, which the workspace pane
- * keeps in sync with the open note.
+ * React node view for an inline vault file. PDF / jpg / jpeg / gif / bmp / png /
+ * mp4 / mov render on the note page (videos show the first frame); other types
+ * keep the yellow bar with Launch/View + Download + Remove. Runtime context is
+ * read from editor storage.
  */
 function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const attachmentId = Number(node?.attrs?.attachmentId);
@@ -64,16 +134,116 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const [downloading, setDownloading] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
 
   const readContext = useCallback(() => editor?.storage?.[RECORD_VAULT_ATTACHMENT_NODE_NAME] || {}, [editor]);
 
   const label = String(attachment.file_name || `file.${attachment.file_extension || 'bin'}`);
   const sizeLabel = formatRecordVaultFileSize(attachment.file_size_bytes);
   const ext = extensionFromRecordVaultAttachment(attachment);
+  const viewKind = getRecordVaultAttachmentViewKind(ext);
+  const showInlinePreview = canInlinePreviewRecordVaultAttachment(ext);
+  const showInlineVideoFrame = canInlineVideoPreviewRecordVaultAttachment(ext);
   const canView = canViewRecordVaultAttachment(ext);
   const launchesNative = canNativeOpenRecordVaultAttachment(ext);
   const actionLabel = launchesNative ? 'Launch' : 'View';
   const editable = Boolean(editor?.isEditable);
+
+  useEffect(() => {
+    if (!showInlinePreview) return undefined;
+    let cancelled = false;
+    let ownedObjectUrl = null;
+    let attempts = 0;
+    let retryTimer = null;
+
+    const clearRetry = () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    };
+
+    const load = async () => {
+      const ctx = readContext();
+      const noteId = Number(ctx.noteId);
+      if (!Number.isFinite(noteId) || noteId < 1) {
+        if (attempts++ < INLINE_PREVIEW_NOTE_ID_RETRIES) {
+          retryTimer = setTimeout(() => {
+            void load();
+          }, INLINE_PREVIEW_NOTE_ID_RETRY_MS);
+        } else if (!cancelled) {
+          setPreviewLoading(false);
+          setPreviewError('Note was not ready — cannot load preview');
+        }
+        return;
+      }
+      if (!Number.isFinite(attachmentId) || attachmentId < 1) {
+        if (!cancelled) {
+          setPreviewLoading(false);
+          setPreviewError('Invalid attachment id');
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setPreviewLoading(true);
+        setPreviewError('');
+      }
+
+      try {
+        const blob = await fetchRecordVaultNoteAttachmentBlob(noteId, attachmentId, {
+          inline: true,
+          storageType: ctx.storageType
+        });
+        if (cancelled) return;
+        if (!blob) {
+          setPreviewUrl('');
+          setPreviewError('Attachment returned no data');
+          return;
+        }
+
+        let previewBlob = blob;
+        if (viewKind === 'pdf') {
+          previewBlob = blobWithMime(blob, 'application/pdf');
+        } else if (viewKind === 'image') {
+          const mime = IMAGE_MIME_BY_EXT[ext] || blob.type || 'image/*';
+          const typed = blobWithMime(blob, mime);
+          try {
+            previewBlob = blobWithMime(await trimSolidImageBorder(typed), mime);
+          } catch {
+            previewBlob = typed;
+          }
+        } else if (showInlineVideoFrame) {
+          previewBlob = blobWithMime(blob, VIDEO_MIME_BY_EXT[ext] || blob.type || 'video/mp4');
+        }
+
+        if (ownedObjectUrl) URL.revokeObjectURL(ownedObjectUrl);
+        ownedObjectUrl = URL.createObjectURL(previewBlob);
+        if (!cancelled) {
+          setPreviewUrl(ownedObjectUrl);
+          setPreviewError('');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPreviewUrl('');
+          setPreviewError(readRecordVaultApiError(err, 'Could not load preview'));
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    };
+
+    setPreviewLoading(true);
+    void load();
+
+    return () => {
+      cancelled = true;
+      clearRetry();
+      if (ownedObjectUrl) URL.revokeObjectURL(ownedObjectUrl);
+    };
+  }, [showInlinePreview, showInlineVideoFrame, attachmentId, editor, readContext, viewKind, ext]);
 
   const handleView = useCallback(async () => {
     const ctx = readContext();
@@ -81,8 +251,6 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
     if (!Number.isFinite(noteId) || noteId < 1) return;
     if (!Number.isFinite(attachmentId) || attachmentId < 1 || ctx.busy || viewingId != null) return;
     setError('');
-
-    const viewKind = getRecordVaultAttachmentViewKind(ext);
 
     // Open the preview window synchronously on click (before any await) so blockers allow it.
     let previewWin = null;
@@ -133,7 +301,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
       setViewerLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readContext, attachmentId, viewingId, launchesNative, ext]);
+  }, [readContext, attachmentId, viewingId, launchesNative, ext, viewKind]);
 
   const handleDownload = useCallback(async () => {
     const ctx = readContext();
@@ -176,66 +344,151 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
 
   const isViewing = viewingId === attachmentId && viewerLoading;
 
-  return (
-    <NodeViewWrapper as="div" className="rv-attachment-node" data-drag-handle={editable ? '' : undefined}>
-      <Box sx={wrapperSx} contentEditable={false}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: 'inherit', wordBreak: 'break-word' }}>{label}</Typography>
-          {sizeLabel ? <Typography sx={{ fontSize: '0.85em', opacity: 0.8 }}>{sizeLabel}</Typography> : null}
-          {error ? (
-            <Typography sx={{ color: 'var(--theme-error-color)', fontWeight: 600, fontSize: '0.85em' }}>{error}</Typography>
-          ) : null}
-        </Box>
-        {canView ? (
-          <SliderControlButton
-            type="button"
-            disabled={isViewing || (viewingId != null && viewingId !== attachmentId)}
-            onClick={() => void handleView()}
-            aria-label={isViewing ? (launchesNative ? `Launching ${label}` : `Opening ${label}`) : `${actionLabel} ${label}`}
+  const toolbar = (
+    <Box sx={showInlinePreview ? toolbarSx : { display: 'contents' }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 'inherit', wordBreak: 'break-word' }}>{label}</Typography>
+        {sizeLabel ? <Typography sx={{ fontSize: '0.85em', opacity: 0.8 }}>{sizeLabel}</Typography> : null}
+        {error ? (
+          <Typography sx={{ color: 'var(--theme-error-color)', fontWeight: 600, fontSize: '0.85em' }}>{error}</Typography>
+        ) : null}
+        {showInlinePreview && previewError ? (
+          <Typography sx={{ color: 'var(--theme-error-color)', fontWeight: 600, fontSize: '0.85em' }}>
+            {previewError}
+          </Typography>
+        ) : null}
+      </Box>
+      {canView ? (
+        <SliderControlButton
+          type="button"
+          disabled={isViewing || (viewingId != null && viewingId !== attachmentId)}
+          onClick={() => void handleView()}
+          aria-label={isViewing ? (launchesNative ? `Launching ${label}` : `Opening ${label}`) : `${actionLabel} ${label}`}
+          sx={actionBtnSx}
+        >
+          {isViewing ? (
+            <BusyHourglass fontSize={VIEW_BUTTON_HOURGLASS_SIZE} sx={{ filter: 'none', WebkitFilter: 'none' }} />
+          ) : (
+            actionLabel
+          )}
+        </SliderControlButton>
+      ) : null}
+      <SliderControlButton
+        type="button"
+        disabled={downloading}
+        onClick={() => void handleDownload()}
+        sx={{ minWidth: 0, px: 1, py: 0.35, fontSize: '0.85em !important' }}
+      >
+        {downloading ? 'Downloading…' : 'Download'}
+      </SliderControlButton>
+      {editable ? (
+        <SliderControlButton
+          type="button"
+          disabled={removing}
+          onClick={() => void handleRemove()}
+          sx={{
+            minWidth: 0,
+            px: 1,
+            py: 0.35,
+            fontSize: '0.85em !important',
+            bgcolor: 'var(--theme-error-color) !important',
+            color: '#fff !important',
+            WebkitTextFillColor: '#fff !important'
+          }}
+        >
+          {removing ? 'Removing…' : 'Remove'}
+        </SliderControlButton>
+      ) : null}
+    </Box>
+  );
+
+  if (showInlinePreview) {
+    return (
+      <NodeViewWrapper as="div" className="rv-attachment-node" data-drag-handle={editable ? '' : undefined}>
+        <Box sx={inlineShellSx} contentEditable={false}>
+          {toolbar}
+          <Box
             sx={{
-              minWidth: 0,
-              px: 1,
-              py: 0.35,
-              fontSize: '0.85em !important',
-              minHeight: '1.75rem',
-              display: 'inline-flex',
+              width: '100%',
+              borderRadius: 1,
+              overflow: 'hidden',
+              bgcolor: '#111',
+              border: '1px solid var(--theme-primary-color)',
+              minHeight: viewKind === 'pdf' ? INLINE_PDF_HEIGHT : '8rem',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
             }}
           >
-            {isViewing ? (
-              <BusyHourglass fontSize={VIEW_BUTTON_HOURGLASS_SIZE} sx={{ filter: 'none', WebkitFilter: 'none' }} />
-            ) : (
-              actionLabel
-            )}
-          </SliderControlButton>
-        ) : null}
-        <SliderControlButton
-          type="button"
-          disabled={downloading}
-          onClick={() => void handleDownload()}
-          sx={{ minWidth: 0, px: 1, py: 0.35, fontSize: '0.85em !important' }}
-        >
-          {downloading ? 'Downloading…' : 'Download'}
-        </SliderControlButton>
-        {editable ? (
-          <SliderControlButton
-            type="button"
-            disabled={removing}
-            onClick={() => void handleRemove()}
-            sx={{
-              minWidth: 0,
-              px: 1,
-              py: 0.35,
-              fontSize: '0.85em !important',
-              bgcolor: 'var(--theme-error-color) !important',
-              color: '#fff !important',
-              WebkitTextFillColor: '#fff !important'
-            }}
-          >
-            {removing ? 'Removing…' : 'Remove'}
-          </SliderControlButton>
-        ) : null}
+            {previewLoading && !previewUrl ? (
+              <BusyHourglass fontSize={{ xs: '1.5rem', sm: '1.75rem' }} sx={{ filter: 'none', WebkitFilter: 'none' }} />
+            ) : null}
+            {!previewLoading && previewError && !previewUrl ? (
+              <Typography sx={{ color: '#fff', p: 2, textAlign: 'center', fontSize: '0.9em' }}>
+                Preview unavailable — use View or Download
+              </Typography>
+            ) : null}
+            {previewUrl && viewKind === 'pdf' ? (
+              <Box
+                component="iframe"
+                title={label}
+                src={previewUrl}
+                sx={{
+                  width: '100%',
+                  height: INLINE_PDF_HEIGHT,
+                  border: 0,
+                  display: 'block',
+                  bgcolor: '#fff'
+                }}
+              />
+            ) : null}
+            {previewUrl && viewKind === 'image' ? (
+              <Box
+                component="img"
+                src={previewUrl}
+                alt={label}
+                sx={{
+                  width: '100%',
+                  maxHeight: { xs: '55vh', sm: '70vh' },
+                  objectFit: 'contain',
+                  objectPosition: 'center',
+                  display: 'block',
+                  bgcolor: '#111'
+                }}
+              />
+            ) : null}
+            {previewUrl && showInlineVideoFrame ? (
+              <Box
+                component="video"
+                src={previewUrl}
+                muted
+                playsInline
+                preload="metadata"
+                controls={false}
+                aria-label={`${label} first frame`}
+                onLoadedMetadata={(event) => seekVideoToFirstFrame(event.currentTarget)}
+                onLoadedData={(event) => seekVideoToFirstFrame(event.currentTarget)}
+                sx={{
+                  width: '100%',
+                  maxHeight: { xs: '40vh', sm: '50vh' },
+                  objectFit: 'contain',
+                  objectPosition: 'center',
+                  display: 'block',
+                  bgcolor: '#000',
+                  pointerEvents: 'none'
+                }}
+              />
+            ) : null}
+          </Box>
+        </Box>
+      </NodeViewWrapper>
+    );
+  }
+
+  return (
+    <NodeViewWrapper as="div" className="rv-attachment-node" data-drag-handle={editable ? '' : undefined}>
+      <Box sx={wrapperSx} contentEditable={false}>
+        {toolbar}
       </Box>
     </NodeViewWrapper>
   );

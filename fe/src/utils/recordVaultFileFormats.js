@@ -321,6 +321,40 @@ export function canViewRecordVaultAttachment(ext) {
   return getRecordVaultAttachmentViewKind(ext) != null;
 }
 
+/**
+ * Extensions shown inline on the note (not only View/Download/Remove).
+ * PDF + common raster images + browser-friendly video (first-frame thumb).
+ */
+const RECORD_VAULT_INLINE_PREVIEW_EXTENSIONS = new Set([
+  'pdf',
+  'jpg',
+  'jpeg',
+  'gif',
+  'bmp',
+  'png',
+  'mp4',
+  'mov'
+]);
+
+/** .mp4 / .mov — show first frame on the note (not only View/Download/Remove). */
+const RECORD_VAULT_INLINE_VIDEO_PREVIEW_EXTENSIONS = new Set(['mp4', 'mov']);
+
+export function canInlinePreviewRecordVaultAttachment(ext) {
+  const normalized = String(ext || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  return RECORD_VAULT_INLINE_PREVIEW_EXTENSIONS.has(normalized);
+}
+
+export function canInlineVideoPreviewRecordVaultAttachment(ext) {
+  const normalized = String(ext || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  return RECORD_VAULT_INLINE_VIDEO_PREVIEW_EXTENSIONS.has(normalized);
+}
+
 /** Word/Excel/PowerPoint files that can open in the Mac default desktop app via backend `open`. */
 export function canNativeOpenRecordVaultAttachment(ext) {
   const normalized = String(ext || '')

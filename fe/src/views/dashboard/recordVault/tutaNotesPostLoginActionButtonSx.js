@@ -1,6 +1,7 @@
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { bsizeInputHeightResponsive } from 'config/bsizeEnv';
 import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
+import { GREEN_BUTTON_DISABLED_BG, GREEN_BUTTON_TEXT } from 'config/greenButton';
 import { recordVaultOneDriveBackupRestoreButtonSx } from './recordVaultOneDriveBackupRestoreButtonSx';
 
 function scaleResponsiveSize(responsive, factor) {
@@ -12,6 +13,9 @@ function scaleResponsiveSize(responsive, factor) {
 
 const actionButtonHeight = scaleResponsiveSize(bsizeInputHeightResponsive, 1.25);
 
+/** Fixed green — must stay green when clickable (Minimal remaps --theme-action-green-color). */
+const OPEN_ACTION_GREEN_BG = '#60C446';
+
 export const tutaNotesPostLoginButtonRowSx = {
   display: 'grid',
   gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
@@ -19,6 +23,7 @@ export const tutaNotesPostLoginButtonRowSx = {
   width: '100%'
 };
 
+/** Open TutaNotes Cloud / USB — green when enabled, grey when disabled. */
 export const tutaNotesPostLoginActionButtonSx = {
   width: '100%',
   minWidth: 0,
@@ -32,6 +37,25 @@ export const tutaNotesPostLoginActionButtonSx = {
   fontSize: buttonFontSizeResponsive.xs,
   '@media (min-width: 600px)': {
     fontSize: buttonFontSizeResponsive.sm
+  },
+  bgcolor: `${OPEN_ACTION_GREEN_BG} !important`,
+  color: `${GREEN_BUTTON_TEXT} !important`,
+  WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+  border: '1px solid #000000 !important',
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled)': {
+      bgcolor: `${OPEN_ACTION_GREEN_BG} !important`,
+      color: `${GREEN_BUTTON_TEXT} !important`,
+      WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+      border: '1px solid #000000 !important'
+    }
+  },
+  '&.Mui-disabled': {
+    bgcolor: `${GREEN_BUTTON_DISABLED_BG} !important`,
+    color: `${GREEN_BUTTON_TEXT} !important`,
+    WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+    border: '1px solid #000000 !important',
+    opacity: '1 !important'
   }
 };
 

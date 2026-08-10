@@ -59,10 +59,6 @@ const downloadBridgeButtonSx = {
   alignSelf: 'stretch',
   width: '100%',
   maxWidth: '100%',
-  bgcolor: 'var(--theme-action-green-color, #60C447) !important',
-  color: '#000 !important',
-  WebkitTextFillColor: '#000 !important',
-  border: '1px solid #000 !important',
   fontWeight: 800
 };
 

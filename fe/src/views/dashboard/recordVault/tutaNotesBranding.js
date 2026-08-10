@@ -15,6 +15,8 @@ export const TUTANOTES_USB_DECRYPT_TITLE = 'Icon Decrypt USB TutaNotes';
 /** Tab + expanded workspace chrome (matches MyRecordVault dual-login tabs). */
 export const TUTANOTES_ONEDRIVE_STRIP_COLOR = '#9B3DBA';
 export const TUTANOTES_USB_STRIP_COLOR = '#6EB5E0';
+/** “TutaNotes on USB” tab / pane title text on the light-blue strip. */
+export const TUTANOTES_USB_TAB_LABEL_COLOR = '#9B3DBA';
 
 export function tutaNotesStorageStripColor(storageType) {
   return storageType === 'onedrive' ? TUTANOTES_ONEDRIVE_STRIP_COLOR : TUTANOTES_USB_STRIP_COLOR;
