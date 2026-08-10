@@ -107,10 +107,13 @@ export default function RecordVaultUsbBackupDialog({
   const [success, setSuccess] = useState('');
   const [successTone, setSuccessTone] = useState('');
   const [treeRefreshToken, setTreeRefreshToken] = useState(0);
+  /** After restore/format the vault must be unlocked again — don't fetch the tree (avoids "USB not unlocked"). */
+  const [vaultNeedsRelock, setVaultNeedsRelock] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     needsRelockRef.current = false;
+    setVaultNeedsRelock(false);
     setTreeRefreshToken((value) => value + 1);
   }, [open]);
 
@@ -187,11 +190,13 @@ export default function RecordVaultUsbBackupDialog({
       const count = Number(result?.restoredFiles) || 0;
       const label = String(result?.label || folderLabel || 'USB').trim() || 'USB';
       needsRelockRef.current = true;
+      setVaultNeedsRelock(true);
       setSuccess(
         `Restored ${count} file${count === 1 ? '' : 's'} to USB (${label}). Open TutaNotes again with your Encrypt Password to load the restored notes.`
       );
       setSuccessTone('general');
-      refreshVaultTree();
+      // Skip vault-tree refresh: restore leaves the vault locked, and a refresh would
+      // surface a conflicting "Record Vault USB not unlocked" error under the success text.
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Restore failed');
     } finally {
@@ -213,9 +218,10 @@ export default function RecordVaultUsbBackupDialog({
       const result = await formatRecordVaultUsb();
       const resultLabel = String(result?.label || label).trim() || label;
       needsRelockRef.current = true;
+      setVaultNeedsRelock(true);
       setSuccess(`Formatted TutaNotes USB on ${resultLabel}. The folder is now blank and ready for a fresh vault.`);
       setSuccessTone('general');
-      refreshVaultTree();
+      // Same as restore: vault needs unlock again — don't refresh tree into an unlock error.
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Format failed');
     } finally {
@@ -293,7 +299,7 @@ export default function RecordVaultUsbBackupDialog({
 
           <Box sx={vaultTreeSectionSx}>
             <RecordVaultOneDriveVaultTreePanel
-              active={open}
+              active={open && !vaultNeedsRelock}
               storageType="usb"
               refreshToken={treeRefreshToken}
               maxHeight="22vh"

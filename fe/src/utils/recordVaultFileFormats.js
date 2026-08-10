@@ -27,6 +27,8 @@ export const RECORD_VAULT_ALLOWED_FILE_EXTENSIONS = new Set([
   'zip',
   'msi',
   'pkg',
+  'exe',
+  'dmg',
   'mp4',
   'mp3',
   'avi',
@@ -108,7 +110,10 @@ const RECORD_VAULT_MIME_TO_EXTENSION = {
   'application/zip': 'zip',
   'application/x-zip-compressed': 'zip',
   'application/x-msi': 'msi',
-  'application/x-msdownload': 'msi',
+  'application/x-msdownload': 'exe',
+  'application/x-msdos-program': 'exe',
+  'application/vnd.microsoft.portable-executable': 'exe',
+  'application/x-apple-diskimage': 'dmg',
   'application/x-apple-aspen-config': 'pkg',
   'application/vnd.apple.installer+xml': 'pkg',
   'application/x-xar': 'pkg',
@@ -126,7 +131,7 @@ const RECORD_VAULT_MIME_TO_EXTENSION = {
 };
 
 export const RECORD_VAULT_ACCEPTED_FILE_EXTENSIONS_UI =
-  '*.doc, *.docx, *.xls, *.xlsx, *.ppt, *.pptx, *.pdf, *.sql, *.json, *.csv, *.txt, *.html, *.js, *.css, *.xml, *.yaml, *.tar, *.gz, *.xz, *.zip, *.msi, *.pkg, *.mp4, *.mp3, *.avi, *.mov, *.wmv, *.jpg, *.jpeg, *.png, *.gif, *.svg, *.webp, *.avif, *.tif, *.bmp, *.heic, *.raw, *.psd, *.ai, *.eps, *.ico';
+  '*.doc, *.docx, *.xls, *.xlsx, *.ppt, *.pptx, *.pdf, *.sql, *.json, *.csv, *.txt, *.html, *.js, *.css, *.xml, *.yaml, *.tar, *.gz, *.xz, *.zip, *.msi, *.pkg, *.exe, *.dmg, *.mp4, *.mp3, *.avi, *.mov, *.wmv, *.jpg, *.jpeg, *.png, *.gif, *.svg, *.webp, *.avif, *.tif, *.bmp, *.heic, *.raw, *.psd, *.ai, *.eps, *.ico';
 
 export const RECORD_VAULT_FILE_INPUT_ACCEPT = [
   ...RECORD_VAULT_ALLOWED_FILE_EXTENSIONS,
@@ -178,6 +183,10 @@ export function resolveRecordVaultFileExtension(file) {
   if (mime.includes('csv')) return 'csv';
   if (mime.includes('javascript')) return 'js';
   if (mime.includes('zip')) return 'zip';
+  if (mime.includes('msdownload') || mime.includes('msdos-program') || mime.includes('portable-executable')) {
+    return 'exe';
+  }
+  if (mime.includes('apple-diskimage') || mime.endsWith('/dmg')) return 'dmg';
   if (mime.includes('mpeg')) return 'mp3';
   if (mime.includes('mp4') || mime.includes('m4v')) return 'mp4';
   if (mime.includes('quicktime')) return 'mov';
@@ -283,7 +292,7 @@ export function getRecordVaultAttachmentViewKind(ext) {
     .replace(/^\./, '');
   if (!normalized) return null;
   if (normalized === 'pdf') return 'pdf';
-  if (['txt', 'sql', 'json', 'csv', 'js', 'jsx', 'c', 'java', 'html', 'htm'].includes(normalized)) return 'text';
+  if (['txt', 'sql', 'json', 'csv', 'js', 'jsx', 'c', 'java', 'html', 'htm', 'css', 'xml'].includes(normalized)) return 'text';
   if (['mp4', 'avi', 'mov', 'wmv'].includes(normalized)) return 'video';
   if (normalized === 'mp3') return 'audio';
   if (
@@ -343,7 +352,10 @@ const RECORD_VAULT_INLINE_PREVIEW_EXTENSIONS = new Set([
   'c',
   'java',
   'html',
-  'htm'
+  'htm',
+  'css',
+  'xml',
+  'docx'
 ]);
 
 /** .mp4 / .mov — show first frame on the note (not only View/Download/Remove). */
@@ -360,8 +372,13 @@ const RECORD_VAULT_INLINE_TEXT_PREVIEW_EXTENSIONS = new Set([
   'c',
   'java',
   'html',
-  'htm'
+  'htm',
+  'css',
+  'xml'
 ]);
+
+/** .docx — convert with mammoth and embed HTML on the note. */
+const RECORD_VAULT_INLINE_DOCX_PREVIEW_EXTENSIONS = new Set(['docx']);
 
 export function canInlinePreviewRecordVaultAttachment(ext) {
   const normalized = String(ext || '')
@@ -385,6 +402,14 @@ export function canInlineTextPreviewRecordVaultAttachment(ext) {
     .toLowerCase()
     .replace(/^\./, '');
   return RECORD_VAULT_INLINE_TEXT_PREVIEW_EXTENSIONS.has(normalized);
+}
+
+export function canInlineDocxPreviewRecordVaultAttachment(ext) {
+  const normalized = String(ext || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  return RECORD_VAULT_INLINE_DOCX_PREVIEW_EXTENSIONS.has(normalized);
 }
 
 /** Word/Excel/PowerPoint files that can open in the Mac default desktop app via backend `open`. */

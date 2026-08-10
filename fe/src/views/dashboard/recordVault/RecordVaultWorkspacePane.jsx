@@ -1297,6 +1297,8 @@ export default function RecordVaultWorkspacePane({
   const [loading, setLoading] = useState(true);
   const [vaultUiReady, setVaultUiReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** When set with busy, shows site BusyHourglassOverlay (e.g. notebook/note delete). */
+  const [busyLabel, setBusyLabel] = useState('');
   const [batchUploadProgress] = useState(null);
   const [vaultLeaving, setVaultLeaving] = useState(false);
   /** Honest 0–100% while Log off Cloud syncs dirty vault files to OneDrive. */
@@ -5574,6 +5576,7 @@ export default function RecordVaultWorkspacePane({
     if (busy || !notebookId) return;
     const label = String(notebookName ?? 'this notebook').trim() || 'this notebook';
     if (!(await themedConfirm(`Delete "${label}" and all its notes? You can restore within 7 days (undelete coming later).`))) return;
+    setBusyLabel('Deleting notebook');
     setBusy(true);
     setError('');
     try {
@@ -5583,6 +5586,7 @@ export default function RecordVaultWorkspacePane({
       setError(readRecordVaultApiError(err, 'Failed to delete notebook'));
     } finally {
       setBusy(false);
+      setBusyLabel('');
     }
   };
 
@@ -5598,6 +5602,7 @@ export default function RecordVaultWorkspacePane({
       ? await themedConfirm('Are you sure you want to delete this file (encrypted)?')
       : await themedConfirm(`Delete "${label}"? You can restore within 7 days (undelete coming later).`);
     if (!confirmed) return;
+    setBusyLabel('Deleting note');
     setBusy(true);
     setError('');
     try {
@@ -5626,6 +5631,7 @@ export default function RecordVaultWorkspacePane({
       setError(readRecordVaultApiError(err, 'Failed to delete note'));
     } finally {
       setBusy(false);
+      setBusyLabel('');
     }
   };
 
@@ -5633,6 +5639,7 @@ export default function RecordVaultWorkspacePane({
     if (busy || !shortcutId) return;
     const label = String(shortcutLabel ?? 'this shortcut').trim() || 'this shortcut';
     if (!(await themedConfirm(`Remove "${label}" from shortcuts?`))) return;
+    setBusyLabel('Removing shortcut');
     setBusy(true);
     setError('');
     try {
@@ -5642,6 +5649,7 @@ export default function RecordVaultWorkspacePane({
       setError(readRecordVaultApiError(err, 'Failed to remove shortcut'));
     } finally {
       setBusy(false);
+      setBusyLabel('');
     }
   };
 
@@ -5876,6 +5884,12 @@ export default function RecordVaultWorkspacePane({
       <BusyHourglassOverlay
         open={Boolean(batchUploadProgress)}
         label={batchUploadProgress?.label || 'Uploading files'}
+        backdropSx={vaultLeavingBackdropSx}
+        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+      />
+      <BusyHourglassOverlay
+        open={Boolean(busy && busyLabel)}
+        label={busyLabel || 'Working'}
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />

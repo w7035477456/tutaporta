@@ -10,6 +10,7 @@ import {
   canInlinePreviewRecordVaultAttachment,
   canInlineVideoPreviewRecordVaultAttachment,
   canInlineTextPreviewRecordVaultAttachment,
+  canInlineDocxPreviewRecordVaultAttachment,
   canNativeOpenRecordVaultAttachment,
   extensionFromRecordVaultAttachment,
   formatRecordVaultFileSize,
@@ -34,6 +35,7 @@ const LAUNCH_BUSY_HOLD_MS = 5000;
 const INLINE_PREVIEW_NOTE_ID_RETRIES = 40;
 const INLINE_PREVIEW_NOTE_ID_RETRY_MS = 100;
 const INLINE_PDF_HEIGHT = { xs: '55vh', sm: '70vh' };
+const INLINE_DOCX_HEIGHT = { xs: '40vh', sm: '55vh' };
 /** Cap huge text files so the note stays responsive. */
 const INLINE_TEXT_PREVIEW_MAX_CHARS = 200_000;
 
@@ -108,9 +110,9 @@ function blobWithMime(blob, mime) {
 
 /**
  * React node view for an inline vault file. PDF / jpg / jpeg / gif / bmp / png /
- * mp4 / mov / txt (and other text types) render on the note page (videos show a
- * visible frame); other types keep the yellow bar with Launch/View + Download +
- * Remove. Runtime context is read from editor storage.
+ * mp4 / mov / txt / css / xml / docx (and other text types) render on the note
+ * page; other types keep the yellow bar with Launch/View + Download + Remove.
+ * Runtime context is read from editor storage.
  */
 function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const attachmentId = Number(node?.attrs?.attachmentId);
@@ -129,6 +131,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [videoFrameUrl, setVideoFrameUrl] = useState('');
   const [previewText, setPreviewText] = useState(null);
+  const [previewHtml, setPreviewHtml] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState('');
 
@@ -141,10 +144,14 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
   const showInlinePreview = canInlinePreviewRecordVaultAttachment(ext);
   const showInlineVideoFrame = canInlineVideoPreviewRecordVaultAttachment(ext);
   const showInlineText = canInlineTextPreviewRecordVaultAttachment(ext);
+  const showInlineDocx = canInlineDocxPreviewRecordVaultAttachment(ext);
   const canView = canViewRecordVaultAttachment(ext);
   const launchesNative = canNativeOpenRecordVaultAttachment(ext);
   const actionLabel = launchesNative ? 'Launch' : 'View';
   const editable = Boolean(editor?.isEditable);
+  const showDocumentBody = showInlineText || showInlineDocx;
+  const hasInlineBody =
+    Boolean(previewUrl) || Boolean(videoFrameUrl) || previewText != null || previewHtml != null;
 
   useEffect(() => {
     if (!showInlinePreview) return undefined;
@@ -188,6 +195,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
         setPreviewError('');
         setVideoFrameUrl('');
         setPreviewText(null);
+        setPreviewHtml(null);
       }
 
       try {
@@ -200,6 +208,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
           setPreviewUrl('');
           setVideoFrameUrl('');
           setPreviewText(null);
+          setPreviewHtml(null);
           setPreviewError('Attachment returned no data');
           return;
         }
@@ -213,6 +222,21 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
           setPreviewUrl('');
           setVideoFrameUrl('');
           setPreviewText(text);
+          setPreviewHtml(null);
+          setPreviewError('');
+          return;
+        }
+
+        if (showInlineDocx) {
+          const mammoth = await import('mammoth');
+          const arrayBuffer = await blob.arrayBuffer();
+          if (cancelled) return;
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          if (cancelled) return;
+          setPreviewUrl('');
+          setVideoFrameUrl('');
+          setPreviewText(null);
+          setPreviewHtml(String(result?.value || '') || '<p>(Empty document)</p>');
           setPreviewError('');
           return;
         }
@@ -252,12 +276,14 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
             setPreviewUrl('');
             setVideoFrameUrl('');
             setPreviewText(null);
+            setPreviewHtml(null);
             setPreviewError('Could not find a visible video frame — use View');
             return;
           }
           setPreviewUrl('');
           setVideoFrameUrl(frameUrl);
           setPreviewText(null);
+          setPreviewHtml(null);
           setPreviewError('');
           return;
         }
@@ -266,6 +292,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
           setPreviewUrl(ownedObjectUrl);
           setVideoFrameUrl('');
           setPreviewText(null);
+          setPreviewHtml(null);
           setPreviewError('');
         }
       } catch (err) {
@@ -273,6 +300,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
           setPreviewUrl('');
           setVideoFrameUrl('');
           setPreviewText(null);
+          setPreviewHtml(null);
           setPreviewError(readRecordVaultApiError(err, 'Could not load preview'));
         }
       } finally {
@@ -289,7 +317,17 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
       if (ownedObjectUrl) URL.revokeObjectURL(ownedObjectUrl);
       if (ownedFrameUrl) URL.revokeObjectURL(ownedFrameUrl);
     };
-  }, [showInlinePreview, showInlineVideoFrame, showInlineText, attachmentId, editor, readContext, viewKind, ext]);
+  }, [
+    showInlinePreview,
+    showInlineVideoFrame,
+    showInlineText,
+    showInlineDocx,
+    attachmentId,
+    editor,
+    readContext,
+    viewKind,
+    ext
+  ]);
 
   const handleView = useCallback(async () => {
     const ctx = readContext();
@@ -457,22 +495,28 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
             sx={{
               width: '100%',
               borderRadius: 1,
-              overflow: showInlineText ? 'auto' : 'hidden',
-              bgcolor: showInlineText ? '#fff' : '#111',
+              overflow: showDocumentBody ? 'auto' : 'hidden',
+              bgcolor: showDocumentBody ? '#fff' : '#111',
               border: '1px solid var(--theme-primary-color)',
               minHeight: viewKind === 'pdf' ? INLINE_PDF_HEIGHT : '8rem',
-              maxHeight: showInlineText ? { xs: '40vh', sm: '50vh' } : undefined,
+              maxHeight: showInlineText
+                ? { xs: '40vh', sm: '50vh' }
+                : showInlineDocx
+                  ? INLINE_DOCX_HEIGHT
+                  : undefined,
               display: 'flex',
-              alignItems: showInlineText ? 'stretch' : 'center',
-              justifyContent: showInlineText ? 'flex-start' : 'center'
+              alignItems: showDocumentBody ? 'stretch' : 'center',
+              justifyContent: showDocumentBody ? 'flex-start' : 'center'
             }}
           >
-            {previewLoading && !previewUrl && !videoFrameUrl && previewText == null ? (
+            {previewLoading && !hasInlineBody ? (
               <BusyHourglass fontSize={{ xs: '1.5rem', sm: '1.75rem' }} sx={{ filter: 'none', WebkitFilter: 'none' }} />
             ) : null}
-            {!previewLoading && previewError && !previewUrl && !videoFrameUrl && previewText == null ? (
-              <Typography sx={{ color: showInlineText ? '#000' : '#fff', p: 2, textAlign: 'center', fontSize: '0.9em' }}>
-                Preview unavailable — use View or Download
+            {!previewLoading && previewError && !hasInlineBody ? (
+              <Typography
+                sx={{ color: showDocumentBody ? '#000' : '#fff', p: 2, textAlign: 'center', fontSize: '0.9em' }}
+              >
+                Preview unavailable — use {actionLabel} or Download
               </Typography>
             ) : null}
             {previewUrl && viewKind === 'pdf' ? (
@@ -540,6 +584,27 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
               >
                 {previewText === '' ? ' ' : previewText}
               </Box>
+            ) : null}
+            {showInlineDocx && previewHtml != null ? (
+              <Box
+                sx={{
+                  m: 0,
+                  p: 2,
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  overflow: 'auto',
+                  color: '#111',
+                  bgcolor: '#fff',
+                  fontSize: '0.95em',
+                  lineHeight: 1.45,
+                  '& p': { mt: 0, mb: 1 },
+                  '& img': { maxWidth: '100%', height: 'auto' },
+                  '& table': { borderCollapse: 'collapse', maxWidth: '100%' },
+                  '& td, & th': { border: '1px solid #ccc', px: 0.75, py: 0.35 }
+                }}
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              />
             ) : null}
           </Box>
         </Box>
