@@ -208,7 +208,7 @@ export default function RecordVaultUsbBackupDialog({
     if (busy) return;
     const label = String(folderLabel || 'USB').trim() || 'USB';
     const ok = await themedConfirm(
-      `Format TutaNotes USB on ${label}?\n\nThis deletes the existing USB TutaNotes folder and leaves a blank vault area. Other files on the USB are not touched.\n\nBack up first if you want to keep your current notes.`
+      `Format TutaNotes USB on ${label}?\n\nThis deletes the existing USB TutaNotes folder and creates a fresh vault with sample Notebook 1 / NOTE 1. Other files on the USB are not touched.\n\nBack up first if you want to keep your current notes.`
     );
     if (!ok) return;
 
@@ -219,7 +219,7 @@ export default function RecordVaultUsbBackupDialog({
       const resultLabel = String(result?.label || label).trim() || label;
       needsRelockRef.current = true;
       setVaultNeedsRelock(true);
-      setSuccess(`Formatted TutaNotes USB on ${resultLabel}. The folder is now blank and ready for a fresh vault.`);
+      setSuccess(`Formatted TutaNotes USB on ${resultLabel}. Open TutaNotes again to see sample Notebook 1 / NOTE 1.`);
       setSuccessTone('general');
       // Same as restore: vault needs unlock again — don't refresh tree into an unlock error.
     } catch (err) {

@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import SliderControlButton from 'ui-component/SliderControlButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import {
   canViewRecordVaultAttachment,
   canInlinePreviewRecordVaultAttachment,
@@ -449,6 +450,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
           onClick={() => void handleView()}
           aria-label={isViewing ? (launchesNative ? `Launching ${label}` : `Opening ${label}`) : `${actionLabel} ${label}`}
           sx={actionBtnSx}
+          {...guestDemoAllowProps()}
         >
           {isViewing ? (
             <BusyHourglass fontSize={VIEW_BUTTON_HOURGLASS_SIZE} sx={{ filter: 'none', WebkitFilter: 'none' }} />
@@ -462,6 +464,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
         disabled={downloading}
         onClick={() => void handleDownload()}
         sx={{ minWidth: 0, px: 1, py: 0.35, fontSize: '0.85em !important' }}
+        {...guestDemoAllowProps()}
       >
         {downloading ? 'Downloading…' : 'Download'}
       </SliderControlButton>

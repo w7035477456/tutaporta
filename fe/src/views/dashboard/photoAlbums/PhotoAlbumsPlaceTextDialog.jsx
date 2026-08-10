@@ -14,6 +14,9 @@ import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCente
 import { colorTemplate7PopupSliderSx } from 'config/colorTemplate7PopupLargeDark';
 import PhotoAlbumsFillOutlineColorPicker from './PhotoAlbumsFillOutlineColorPicker';
 import PhotoAlbumsPlaceTextMediaPreview from './PhotoAlbumsPlaceTextMediaPreview';
+import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
+import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
+import { newLabelId } from './photoAlbumsTextLabelNode';
 
 export const PLACE_TEXT_FONT_FAMILIES = [
   { label: 'Comic Sans MS', value: 'Comic Sans MS, Comic Neue, cursive' },
@@ -115,6 +118,8 @@ const PLACE_TEXT_PREVIEW_SPLIT_MAX = 0.82;
 const PLACE_TEXT_SPLIT_HANDLE_PX = 10;
 
 const SELECT_MENU_Z = COLOR_TEMPLATE16_POPUP_Z_INDEX + 200;
+const EMOJI_PICKER_Z = COLOR_TEMPLATE16_POPUP_Z_INDEX + 300;
+const PLACE_TEXT_EMOJI_FONT = 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif';
 
 const labelSx = {
   color: 'var(--theme-yellow-color) !important',
@@ -246,6 +251,7 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [existingPick, setExistingPick] = useState('');
   const [labels, setLabels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
+  const [emojiPickerAnchor, setEmojiPickerAnchor] = useState(null);
   const skipStyleSyncRef = useRef(false);
   const splitContainerRef = useRef(null);
   const [previewSplitRatio, setPreviewSplitRatio] = useState(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
@@ -301,7 +307,10 @@ export default function PhotoAlbumsPlaceTextDialog({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setEmojiPickerAnchor(null);
+      return;
+    }
     if (hasMedia) setPreviewSplitRatio(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
     const seeded = String(initialText || '').trim();
@@ -362,25 +371,48 @@ export default function PhotoAlbumsPlaceTextDialog({
     [hasMedia, activeKey]
   );
 
+  const activeLabelIsEmoji = useMemo(() => {
+    const active = labels.find((l) => l.clientKey === activeKey);
+    return Boolean(
+      active &&
+        (active.isEmoji || /Emoji/i.test(String(active.fontFamily || '')))
+    );
+  }, [labels, activeKey]);
+
   /** Keep preview labels in sync without RAF skip races from applyStyleFields. */
   const handleFillChange = useCallback(
     (next) => {
       setColor(next);
-      patchActiveLabel({ color: next });
+      if (!activeLabelIsEmoji) patchActiveLabel({ color: next });
     },
-    [patchActiveLabel]
+    [patchActiveLabel, activeLabelIsEmoji]
   );
 
   const handleOutlineChange = useCallback(
     (next) => {
       setOutlineColor(next);
-      patchActiveLabel({ outlineColor: next });
+      if (!activeLabelIsEmoji) patchActiveLabel({ outlineColor: next });
     },
-    [patchActiveLabel]
+    [patchActiveLabel, activeLabelIsEmoji]
   );
 
   useEffect(() => {
     if (!hasMedia || !activeKey || skipStyleSyncRef.current) return;
+    if (activeLabelIsEmoji) {
+      // Stickers: only size from the font-size slider (box tracks glyph size).
+      const fs = Math.max(
+        10,
+        Math.round(Number(fontSize) || PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX)
+      );
+      const pw = Math.max(1, mediaSession?.photoRect?.width || 1);
+      const ph = Math.max(1, mediaSession?.photoRect?.height || 1);
+      patchActiveLabel({
+        fontSize: fs,
+        relW: Math.max(0.06, (fs + 12) / pw),
+        relH: Math.max(0.06, (fs + 12) / ph)
+      });
+      return;
+    }
     patchActiveLabel(
       stylePatchFromControls({
         text,
@@ -396,6 +428,7 @@ export default function PhotoAlbumsPlaceTextDialog({
   }, [
     hasMedia,
     activeKey,
+    activeLabelIsEmoji,
     text,
     color,
     outlineColor,
@@ -404,6 +437,7 @@ export default function PhotoAlbumsPlaceTextDialog({
     fontSize,
     outlineWidth,
     selectedPreset,
+    mediaSession,
     patchActiveLabel
   ]);
 
@@ -412,7 +446,24 @@ export default function PhotoAlbumsPlaceTextDialog({
       if (!key) return;
       setActiveKey(key);
       const l = labels.find((item) => item.clientKey === key);
-      if (l) applyStyleFields(l, l.text);
+      if (!l) return;
+      const isEmoji =
+        Boolean(l.isEmoji) || /Emoji/i.test(String(l.fontFamily || ''));
+      if (isEmoji) {
+        // Stickers: update size slider only — never replace caption Text / style samples.
+        skipStyleSyncRef.current = true;
+        setFontSize(
+          Math.max(
+            10,
+            Math.round(Number(l.fontSize) || PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX)
+          )
+        );
+        requestAnimationFrame(() => {
+          skipStyleSyncRef.current = false;
+        });
+        return;
+      }
+      applyStyleFields(l, l.text);
     },
     [labels, applyStyleFields]
   );
@@ -426,6 +477,7 @@ export default function PhotoAlbumsPlaceTextDialog({
     setFontWeight(preset.fontWeight);
     setFontSize(preset.fontSize);
     setOutlineWidth(preset.outlineWidth);
+    if (activeLabelIsEmoji) return;
     // Sync immediately — do not wait on the style-sync effect (skipStyleSync races).
     patchActiveLabel({
       color: preset.color,
@@ -477,6 +529,22 @@ export default function PhotoAlbumsPlaceTextDialog({
       }
     },
     [activeKey]
+  );
+
+  const handleLabelDelete = useCallback(
+    (clientKey) => {
+      if (!clientKey) return;
+      setLabels((prev) => {
+        const next = prev.filter((l) => l.clientKey !== clientKey);
+        if (clientKey === activeKey) {
+          const fallback = next[next.length - 1] || null;
+          setActiveKey(fallback?.clientKey || '');
+          if (fallback) applyStyleFields(fallback, fallback.text);
+        }
+        return next;
+      });
+    },
+    [activeKey, applyStyleFields]
   );
 
   const startPreviewSplitDrag = useCallback(
@@ -531,9 +599,13 @@ export default function PhotoAlbumsPlaceTextDialog({
 
     let finalLabels = labels;
     if (hasMedia && activeKey) {
-      finalLabels = labels.map((l) =>
-        l.clientKey === activeKey ? { ...l, ...style } : l
-      );
+      const active = labels.find((l) => l.clientKey === activeKey);
+      // Don't overwrite emoji stickers with the text-style form fields.
+      if (active && !active.isEmoji && !/Emoji/i.test(String(active.fontFamily || ''))) {
+        finalLabels = labels.map((l) =>
+          l.clientKey === activeKey ? { ...l, ...style } : l
+        );
+      }
     }
 
     onConfirm?.({
@@ -554,6 +626,45 @@ export default function PhotoAlbumsPlaceTextDialog({
         : null)
     });
   };
+
+  const handlePlaceEmoji = useCallback(
+    (em) => {
+      const emoji = String(em || '').trim();
+      if (!emoji || !hasMedia || !mediaSession?.photoRect) return;
+      const pw = Math.max(1, mediaSession.photoRect.width);
+      const ph = Math.max(1, mediaSession.photoRect.height);
+      const size = PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX;
+      const clientKey = `emoji_${Date.now()}`;
+      const next = {
+        clientKey,
+        isNew: true,
+        isEmoji: true,
+        docPos: null,
+        labelId: newLabelId(),
+        text: emoji,
+        color: '#000000',
+        outlineColor: '#000000',
+        outlineWidth: 0,
+        fontSize: size,
+        fontFamily: PLACE_TEXT_EMOJI_FONT,
+        fontWeight: 400,
+        rotationDeg: 0,
+        relX: 0.38,
+        relY: 0.38,
+        relW: Math.max(0.06, (size + 12) / pw),
+        relH: Math.max(0.06, (size + 12) / ph)
+      };
+      setLabels((prev) => [...prev, next]);
+      // Select sticker for drag/resize, but do not overwrite Text / style-preset samples.
+      skipStyleSyncRef.current = true;
+      setActiveKey(clientKey);
+      requestAnimationFrame(() => {
+        skipStyleSyncRef.current = false;
+      });
+      setEmojiPickerAnchor(null);
+    },
+    [hasMedia, mediaSession]
+  );
 
   const stylePresetButtons = (compact = false) => (
     <Stack spacing={compact ? 0.35 : 0.5} sx={{ mb: compact ? 0.5 : 1 }}>
@@ -869,8 +980,22 @@ export default function PhotoAlbumsPlaceTextDialog({
                 direction="row"
                 spacing={1}
                 justifyContent="flex-end"
+                alignItems="center"
                 sx={{ mt: 'auto', pt: 1, flexShrink: 0 }}
               >
+                <GreenButton
+                  type="button"
+                  aria-haspopup="dialog"
+                  aria-expanded={emojiPickerAnchor ? 'true' : undefined}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const el = e.currentTarget;
+                    setEmojiPickerAnchor((prev) => (prev ? null : el));
+                  }}
+                  sx={{ minWidth: 80, fontWeight: 800 }}
+                >
+                  Emoji
+                </GreenButton>
                 <GreenButton type="button" onClick={onClose} sx={{ minWidth: 80, fontWeight: 800 }}>
                   Cancel
                 </GreenButton>
@@ -878,6 +1003,13 @@ export default function PhotoAlbumsPlaceTextDialog({
                   OK
                 </GreenButton>
               </Stack>
+              <PhotoAlbumsEmojiPickerPopover
+                open={Boolean(emojiPickerAnchor)}
+                anchorEl={emojiPickerAnchor}
+                onClose={() => setEmojiPickerAnchor(null)}
+                onPick={(em) => handlePlaceEmoji(em)}
+                zIndex={EMOJI_PICKER_Z}
+              />
             </Box>
           </Stack>
         ) : (
@@ -996,7 +1128,7 @@ export default function PhotoAlbumsPlaceTextDialog({
           sx={hasMedia ? { flexShrink: 0, mb: 0, lineHeight: 1.3, fontSize: '0.88rem' } : undefined}
         >
           {hasMedia
-            ? 'Type below — text updates live on the photo. Drag corners to scale text; drag sides to stretch the box. Drag the yellow bar to resize preview vs controls.'
+            ? 'Type below — text updates live on the photo. Use Emoji to place stickers. Drag corners to scale; drag sides to stretch the box. Drag the yellow bar to resize preview vs controls.'
             : 'Style your text, then OK to place it on the page (drag & rotate like a photo).'}
         </ColorTemplate16PopupCenterWide.SectionDescription>
 
@@ -1020,6 +1152,7 @@ export default function PhotoAlbumsPlaceTextDialog({
                 storageType={storageType}
                 onActivate={activateLabel}
                 onLabelChange={handleLabelChange}
+                onLabelDelete={handleLabelDelete}
                 onDoubleClickLabel={activateLabel}
               />
             </Box>

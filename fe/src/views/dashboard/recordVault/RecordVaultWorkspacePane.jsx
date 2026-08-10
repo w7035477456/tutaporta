@@ -26,6 +26,7 @@ import {
 } from 'api/recordVaultFe';
 import { useAuth } from 'contexts/AuthContext';
 import { themedConfirm } from 'utils/themedDialog';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { fetchUploadLimits } from 'api/myPhotosFe';
 import {
   isAllowedRecordVaultFile,
@@ -6292,6 +6293,7 @@ export default function RecordVaultWorkspacePane({
             }}
           >
             <Box
+              {...guestDemoAllowProps()}
               sx={{
                 flex: '0 0 auto',
                 display: 'flex',
@@ -6760,6 +6762,7 @@ export default function RecordVaultWorkspacePane({
           {leftMenuOpen ? (
             <>
               <Box
+                {...guestDemoAllowProps()}
                 sx={{
                   flex: compareMode ? '1 1 0' : '0 0 auto',
                   width: compareMode
@@ -7325,6 +7328,7 @@ export default function RecordVaultWorkspacePane({
               />
               ) : null}
               <Box
+                {...guestDemoAllowProps()}
                 sx={{
                   flex: compareMode ? '1 1 0' : '0 0 auto',
                   width: compareMode

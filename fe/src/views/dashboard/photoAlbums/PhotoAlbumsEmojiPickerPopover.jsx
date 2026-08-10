@@ -2,20 +2,32 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Popover from '@mui/material/Popover';
 import { PHOTO_ALBUMS_EMOJI_PALETTE } from './photoAlbumsEmojiPalette';
+import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCenterWide';
+
+const DEFAULT_EMOJI_PICKER_Z = COLOR_TEMPLATE16_POPUP_Z_INDEX + 300;
 
 /**
  * Click-open emoji grid. Choosing an emoji calls onPick and the parent closes.
  */
-export default function PhotoAlbumsEmojiPickerPopover({ open, anchorEl, onClose, onPick }) {
+export default function PhotoAlbumsEmojiPickerPopover({
+  open,
+  anchorEl,
+  onClose,
+  onPick,
+  zIndex = DEFAULT_EMOJI_PICKER_Z
+}) {
   return (
     <Popover
       open={Boolean(open && anchorEl)}
       anchorEl={anchorEl}
       onClose={onClose}
       disableRestoreFocus
+      disableScrollLock
       anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      sx={{ zIndex }}
       slotProps={{
+        root: { sx: { zIndex } },
         paper: {
           sx: {
             p: 1.25,
@@ -25,7 +37,8 @@ export default function PhotoAlbumsEmojiPickerPopover({ open, anchorEl, onClose,
             border: '3px solid #000',
             borderRadius: 1,
             bgcolor: '#fff',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.35)'
+            boxShadow: '0 8px 28px rgba(0,0,0,0.35)',
+            zIndex
           }
         }
       }}
@@ -89,5 +102,6 @@ PhotoAlbumsEmojiPickerPopover.propTypes = {
   open: PropTypes.bool,
   anchorEl: PropTypes.any,
   onClose: PropTypes.func,
-  onPick: PropTypes.func
+  onPick: PropTypes.func,
+  zIndex: PropTypes.number
 };

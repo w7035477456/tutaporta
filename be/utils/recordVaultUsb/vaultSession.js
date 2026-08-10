@@ -51,6 +51,8 @@ import {
 import {
   DEFAULT_BODY_TEXT,
   DEFAULT_NOTEBOOKS,
+  DEFAULT_SAMPLE_NOTE_NAME,
+  DEFAULT_SAMPLE_NOTE_BODY_HTML,
   NOTE_EXTRA_IMAGES_MIGRATION_SQL,
   VAULT_SCHEMA_SQL
 } from './vaultSchema.js';
@@ -79,7 +81,6 @@ function ensureNoteInnerEncryptColumns(db) {
   }
   return changed;
 }
-import { formatDefaultRecordVaultNoteTitle } from '../recordVaultDefaultTitle.js';
 import {
   expandRecordVaultBodyTextForSearch,
   normalizeRecordVaultKeyword,
@@ -474,14 +475,19 @@ function seedEmptyVault(db) {
       nbIdx
     ]);
     const nbId = queryOne(db, `SELECT last_insert_rowid() AS id`).id;
-    for (let noteIdx = 0; noteIdx < 3; noteIdx += 1) {
-      const title = formatDefaultRecordVaultNoteTitle(nbIdx + 1, noteIdx + 1);
-      db.run(
-        `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
-         VALUES (?, ?, ?, ?, ?)`,
-        [nbId, title, DEFAULT_BODY_TEXT, noteIdx, `${title} ${DEFAULT_BODY_TEXT}`.toLowerCase()]
-      );
-    }
+    // Format OneDrive / USB: one starter note with onboarding copy (not empty NB n, Note n stubs).
+    const title = DEFAULT_SAMPLE_NOTE_NAME;
+    const bodyHtml = DEFAULT_SAMPLE_NOTE_BODY_HTML;
+    const bodyForSearch = expandRecordVaultBodyTextForSearch(bodyHtml);
+    const searchText = `${title} ${bodyForSearch}`
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+    db.run(
+      `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
+       VALUES (?, ?, ?, ?, ?)`,
+      [nbId, title, bodyHtml, 0, searchText]
+    );
   }
 }
 

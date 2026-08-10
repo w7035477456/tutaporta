@@ -64,8 +64,10 @@ function findBlockedInteractive(target) {
 /**
  * Demo mode (demo/demo or guest/guest): allow sidebar, footer legal links, mute/music,
  * top-right theme menu, orange help / tour buttons, TutaNotes Cloud/USB login panels,
+ * TutaNotes notebook/note/shortcut chrome + View/Download on attachments,
  * full /myPhotoAlbums, /myStory, and /receivedBioRequests (path allow — all page controls);
  * plus marked controls (data-guest-demo-allow), e.g. vetted-friends "Click to view";
+ * always block OS file drag/drop into the page (even over allowlisted regions);
  * block Support and other interactive clicks elsewhere and show ColorTemplate16 popup.
  *
  * Mounted outside RouterProvider in App.jsx — do not use useLocation(); read window.location.
@@ -102,6 +104,20 @@ export default function GuestDemoGate() {
 
     const blockDragDrop = (event) => {
       if (isGuestDemoUnrestrictedPath(currentPathname())) return;
+      // OS file drops (attach / import into notes) stay blocked even over allowlisted chrome.
+      const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
+      const isOsFileTransfer =
+        types.includes('Files') ||
+        (event.type === 'drop' && Boolean(event.dataTransfer?.files?.length));
+      if (isOsFileTransfer) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') {
+          event.stopImmediatePropagation();
+        }
+        setOpen(true);
+        return;
+      }
       if (isAllowedGuestDemoTarget(event.target)) return;
       event.preventDefault();
       event.stopPropagation();

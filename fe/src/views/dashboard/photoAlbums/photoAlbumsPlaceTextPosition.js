@@ -37,9 +37,7 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
   const pw = Math.max(1, photoRect.width);
   const ph = Math.max(1, photoRect.height);
 
-  const near = listTextAndEmojiNearPhoto(editor.state, photoRect).filter(
-    (item) => !isEmojiStickerLabel(item.attrs?.text, item.attrs?.fontFamily)
-  );
+  const near = listTextAndEmojiNearPhoto(editor.state, photoRect);
 
   const labels = near.map((item) => ({
     clientKey: String(item.attrs?.labelId || item.pos),
@@ -57,7 +55,8 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     relX: item.relX,
     relY: item.relY,
     relW: item.relBoxW,
-    relH: item.relBoxH
+    relH: item.relBoxH,
+    isEmoji: isEmojiStickerLabel(item.attrs?.text, item.attrs?.fontFamily)
   }));
 
   const applyStyle = (base) => ({
@@ -120,8 +119,16 @@ function labelToPageAttrs(label, photoRect) {
   const pw = Math.max(1, photoRect.width);
   const ph = Math.max(1, photoRect.height);
   const fs = Math.max(10, Math.round(Number(label.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
-  const boxW = Math.max(48, Math.round((Number(label.relW) || 0.35) * pw));
-  const boxH = Math.max(28, Math.round((Number(label.relH) || 0.12) * ph));
+  const emoji =
+    Boolean(label.isEmoji) || isEmojiStickerLabel(label.text, label.fontFamily);
+  const boxW = Math.max(
+    emoji ? 24 : 48,
+    Math.round((Number(label.relW) || (emoji ? (fs + 12) / pw : 0.35)) * pw)
+  );
+  const boxH = Math.max(
+    emoji ? 24 : 28,
+    Math.round((Number(label.relH) || (emoji ? (fs + 12) / ph : 0.12)) * ph)
+  );
   return {
     labelId: String(label.labelId || newLabelId()),
     text: String(label.text || '').trim() || 'Text',
@@ -134,7 +141,9 @@ function labelToPageAttrs(label, photoRect) {
     fontWeight: label.fontWeight || PLACE_TEXT_DEFAULTS.fontWeight,
     rotationDeg: Number.isFinite(Number(label.rotationDeg))
       ? Math.round(Number(label.rotationDeg))
-      : -12,
+      : emoji
+        ? 0
+        : -12,
     posLeft: Math.round(photoRect.left + (Number(label.relX) || 0) * pw),
     posTop: Math.round(photoRect.top + (Number(label.relY) || 0) * ph),
     boxWidth: boxW,
@@ -147,15 +156,44 @@ export function commitPlaceTextPositionSession(editor, session) {
   if (!editor || !session?.photoRect || !Array.isArray(session.labels)) return false;
   const { photoRect, labels } = session;
 
+  const keptIds = new Set(
+    labels.map((l) => String(l.labelId || '').trim()).filter(Boolean)
+  );
+
+  // Remove stickers/text deleted in Add Text before position updates shift doc positions.
+  const near = listTextAndEmojiNearPhoto(editor.state, photoRect);
+  const toDelete = near
+    .filter((item) => {
+      const id = String(item.attrs?.labelId || '').trim();
+      return id && !keptIds.has(id);
+    })
+    .sort((a, b) => b.pos - a.pos);
+
+  let tr = editor.state.tr;
+  for (const item of toDelete) {
+    const current = tr.doc.nodeAt(item.pos);
+    if (!current || current.type.name !== PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) continue;
+    tr = tr.delete(item.pos, item.pos + current.nodeSize);
+  }
+  if (tr.docChanged) {
+    editor.view.dispatch(tr);
+  }
+
   const existing = labels
     .filter((l) => !l.isNew && Number.isFinite(l.docPos))
     .sort((a, b) => b.docPos - a.docPos);
 
-  let tr = editor.state.tr;
+  tr = editor.state.tr;
   for (const label of existing) {
-    const current = tr.doc.nodeAt(label.docPos);
+    // Re-resolve by labelId after deletions may have shifted positions.
+    let pos = label.docPos;
+    const byId = listTextAndEmojiNearPhoto(editor.state, photoRect).find(
+      (item) => String(item.attrs?.labelId || '') === String(label.labelId || '')
+    );
+    if (byId) pos = byId.pos;
+    const current = editor.state.doc.nodeAt(pos);
     if (!current || current.type.name !== PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) continue;
-    tr = tr.setNodeMarkup(label.docPos, undefined, {
+    tr = tr.setNodeMarkup(pos, undefined, {
       ...current.attrs,
       ...labelToPageAttrs(label, photoRect)
     });

@@ -30,6 +30,7 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
   storageType = null,
   onActivate,
   onLabelChange,
+  onLabelDelete,
   onDoubleClickLabel
 }) {
   const stageRef = useRef(null);
@@ -208,6 +209,7 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
               active={label.clientKey === activeKey}
               onActivate={onActivate}
               onChange={onLabelChange}
+              onDelete={onLabelDelete}
               onDoubleClickEdit={onDoubleClickLabel}
             />
           ))}
@@ -225,5 +227,6 @@ PhotoAlbumsPlaceTextMediaPreview.propTypes = {
   storageType: PropTypes.string,
   onActivate: PropTypes.func,
   onLabelChange: PropTypes.func,
+  onLabelDelete: PropTypes.func,
   onDoubleClickLabel: PropTypes.func
 };

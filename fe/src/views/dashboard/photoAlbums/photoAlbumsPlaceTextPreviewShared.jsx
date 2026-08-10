@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
+import ThumbnailDeleteXButton from 'ui-component/ThumbnailDeleteXButton';
 import { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
 
 export const PLACE_TEXT_PREVIEW_MIN_REL_W = 0.06;
@@ -79,6 +80,7 @@ export function PlaceTextPositionLabel({
   active,
   onActivate,
   onChange,
+  onDelete,
   onDoubleClickEdit
 }) {
   const rootRef = useRef(null);
@@ -112,6 +114,7 @@ export function PlaceTextPositionLabel({
     (event) => {
       if (event.button !== 0) return;
       if (event.target?.closest?.('.rv-place-text-pos__handle')) return;
+      if (event.target?.closest?.('.rv-place-text-pos__delete')) return;
       event.preventDefault();
       event.stopPropagation();
       onActivate?.(label.clientKey);
@@ -279,10 +282,12 @@ export function PlaceTextPositionLabel({
       ref={rootRef}
       className={`rv-place-text-pos__label${active ? ' is-active' : ''}`}
       onMouseDown={(e) => {
+        if (e.target?.closest?.('.rv-place-text-pos__delete')) return;
         onActivate?.(label.clientKey);
         startMove(e);
       }}
       onDoubleClick={(e) => {
+        if (e.target?.closest?.('.rv-place-text-pos__delete')) return;
         e.preventDefault();
         e.stopPropagation();
         onActivate?.(label.clientKey);
@@ -307,6 +312,29 @@ export function PlaceTextPositionLabel({
         overflow: 'visible'
       }}
     >
+      {typeof onDelete === 'function' ? (
+        <ThumbnailDeleteXButton
+          className="rv-place-text-pos__delete"
+          aria-label="Delete text or emoji"
+          title="Delete"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete(label.clientKey);
+          }}
+          sx={{
+            top: -10,
+            right: -10,
+            width: 22,
+            height: 22,
+            zIndex: 8
+          }}
+        />
+      ) : null}
       <Box
         sx={{
           width: '100%',
@@ -409,5 +437,6 @@ PlaceTextPositionLabel.propTypes = {
   active: PropTypes.bool,
   onActivate: PropTypes.func,
   onChange: PropTypes.func,
+  onDelete: PropTypes.func,
   onDoubleClickEdit: PropTypes.func
 };

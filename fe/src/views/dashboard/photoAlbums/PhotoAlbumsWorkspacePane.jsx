@@ -43,7 +43,7 @@ import {
 import PhotoAlbumsSearchBar from './PhotoAlbumsSearchBar';
 import PhotoAlbumsInviteBar from './PhotoAlbumsInviteBar';
 import PhotoAlbumsInviteReviewDialog from './PhotoAlbumsInviteReviewDialog';
-import { fetchPhotoAlbumsSharedAlbums, fetchPhotoAlbumsSharedAlbumContent, readPhotoAlbumsInviteError } from 'api/photoAlbumsInviteFe';
+import { fetchPhotoAlbumsSharedAlbums, fetchPhotoAlbumsSharedAlbumContent, removePhotoAlbumsSharedAlbum, readPhotoAlbumsInviteError } from 'api/photoAlbumsInviteFe';
 import {
   PHOTO_ALBUMS_MENU_BUTTON_FONT_REM_VAR,
   photoAlbumsMenuButtonFontRemFromTenths
@@ -3767,6 +3767,39 @@ export default function PhotoAlbumsWorkspacePane({
       setSharedAlbumLoading(false);
     }
   }, []);
+
+  /** Hide from Shared Album list (recipient copy only — owner's album is untouched). */
+  const handleRemoveSharedAlbum = useCallback(
+    async (sharedAlbumId, displayLabel) => {
+      const id = Number(sharedAlbumId);
+      if (!Number.isFinite(id) || id < 1 || busy) return;
+      const label = String(displayLabel || 'this shared album').trim() || 'this shared album';
+      if (
+        !(await themedConfirm(
+          `Remove “${label}” from Shared Album?\n\nThis only hides it from your list. The owner’s album is not deleted.`
+        ))
+      ) {
+        return;
+      }
+      setBusy(true);
+      setError('');
+      try {
+        await removePhotoAlbumsSharedAlbum(id);
+        setSharedAlbums((prev) =>
+          (Array.isArray(prev) ? prev : []).filter((row) => Number(row.sharedAlbumId) !== id)
+        );
+        if (Number(selectedSharedAlbumId) === id) {
+          setSelectedSharedAlbumId(null);
+          setSharedAlbumView(null);
+        }
+      } catch (err) {
+        setError(readPhotoAlbumsInviteError(err, 'Failed to remove shared album'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, selectedSharedAlbumId]
+  );
 
   const activeAlbumSetName =
     selectedNotebook && !sharedAlbumView
@@ -8810,31 +8843,37 @@ export default function PhotoAlbumsWorkspacePane({
                           const label = item.displayLabel || `${item.albumSetName} / ${item.albumName}`;
                           const selected = Number(selectedSharedAlbumId) === Number(item.sharedAlbumId);
                           return (
-                            <SliderControlButton
+                            <MenuRowWithDelete
                               key={item.sharedAlbumId}
-                              type="button"
-                              fullWidth
-                              variant={selected ? 'green' : 'yellow'}
-                              hoverScale={1.15}
-                              onClick={() => void openSharedAlbum(item.sharedAlbumId)}
-                              title={
-                                item.ownerEmail
-                                  ? `Shared by ${item.ownerEmail} — view album`
-                                  : label
-                              }
-                              sx={{
-                                justifyContent: 'flex-start',
-                                textAlign: 'left',
-                                mb: 0.5,
-                                px: 1,
-                                py: 0.75,
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}
+                              deleteLabel={`Remove ${label} from Shared Album`}
+                              disabled={busy}
+                              onDelete={() => void handleRemoveSharedAlbum(item.sharedAlbumId, label)}
                             >
-                              {label}
-                            </SliderControlButton>
+                              <SliderControlButton
+                                type="button"
+                                fullWidth
+                                variant={selected ? 'green' : 'yellow'}
+                                hoverScale={1.15}
+                                onClick={() => void openSharedAlbum(item.sharedAlbumId)}
+                                title={
+                                  item.ownerEmail
+                                    ? `Shared by ${item.ownerEmail} — view album`
+                                    : label
+                                }
+                                sx={{
+                                  justifyContent: 'flex-start',
+                                  textAlign: 'left',
+                                  mb: 0,
+                                  px: 1,
+                                  py: 0.75,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                              >
+                                {label}
+                              </SliderControlButton>
+                            </MenuRowWithDelete>
                           );
                         })}
                         {!sharedAlbums.length ? (

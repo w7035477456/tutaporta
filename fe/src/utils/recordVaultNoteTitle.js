@@ -22,7 +22,8 @@ export function isDefaultStyleRecordVaultNoteTitle(name) {
 }
 
 export function isLegacyShortRecordVaultNoteName(name) {
-  return /^(new note|note \d+)$/i.test(plainNoteName(name));
+  // Only upgrade blank placeholder "New Note" — keep seeded "NOTE 1" / "Note 1" as-is.
+  return /^(new note)$/i.test(plainNoteName(name));
 }
 
 export function notebookNumberFromList(notebooks, notebookId) {

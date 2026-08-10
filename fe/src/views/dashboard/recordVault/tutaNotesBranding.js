@@ -26,11 +26,11 @@ export function tutaNotesStorageStripColor(storageType) {
 export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = 'TutaNotes on OneDrive';
 export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
-export const TUTANOTES_VIDEO_TUTORIAL_LABEL = 'Click here for video tutorial on TutaNotes';
-export const TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL = 'Click here for video tutorial on OneDrive';
-export const TUTANOTES_USB_VIDEO_TUTORIAL_LABEL = 'Click here for video tutorial on USB Bridge';
+export const TUTANOTES_VIDEO_TUTORIAL_LABEL = 'Click here for Tutorial';
+export const TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL = 'Click here for Tutorial';
+export const TUTANOTES_USB_VIDEO_TUTORIAL_LABEL = 'Click here for Tutorial';
 /** Fixed short header button text — full detail stays in title/aria for USB + OneDrive. */
-export const TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL = 'Click here for...';
+export const TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL = 'Click here for Tutorial';
 
 /** Login + icon-decrypt popups: each 1/3 viewport width (alone or side-by-side = 2/3 vw). */
 export const TUTANOTES_HALF_PANEL_WIDTH = '33.333vw';

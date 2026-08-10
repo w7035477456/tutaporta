@@ -188,7 +188,7 @@ export default function RecordVaultOneDriveBackupDialog({
   const handleFormat = async () => {
     if (busy) return;
     const ok = await themedConfirm(
-      `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh blank vault. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
+      `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with sample Notebook 1 / NOTE 1. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
     );
     if (!ok) return;
 
@@ -196,8 +196,9 @@ export default function RecordVaultOneDriveBackupDialog({
     setBusy(true);
     try {
       await formatRecordVaultOneDrive();
-      setSuccess(`Formatted ${folderName} on OneDrive. The folder is now blank and ready for a fresh vault.`);
-      setSuccessTone('general');
+      setSuccess(
+        `Formatted ${folderName} on OneDrive. Open TutaNotes again to see sample Notebook 1 / NOTE 1.`
+      );      setSuccessTone('general');
       refreshVaultTree();
       onFormatted?.();
     } catch (err) {

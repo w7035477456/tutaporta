@@ -34,7 +34,6 @@ import {
   usePhotoAlbumsAlbumLayout
 } from './photoAlbumsAlbumLayoutContext';
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
-import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
 import { findFramedPhotoInFrame } from './photoAlbumsSlotOccupancy';
 
@@ -897,7 +896,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const [viewerLoading, setViewerLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const [emojiPickerAnchor, setEmojiPickerAnchor] = useState(null);
   /** /myStory-style pan mode — drag moves photo inside the slot; 4-way arrows show. */
   const [panEnabled, setPanEnabled] = useState(false);
   const [error, setError] = useState('');
@@ -2602,24 +2600,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           </SliderControlButton>
         </>
       ) : null}
-      {isPhoto && editable ? (
-        <SliderControlButton
-          type="button"
-          title="Click to open emoji stickers — pick one to place at the mouse"
-          aria-label="Place emoji sticker"
-          aria-haspopup="dialog"
-          aria-expanded={emojiPickerAnchor ? 'true' : undefined}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const el = e.currentTarget;
-            setEmojiPickerAnchor((prev) => (prev ? null : el));
-          }}
-          sx={photoSlotActionBtnSx}
-        >
-          Emoji
-        </SliderControlButton>
-      ) : null}
       {isPhoto && editable ? placeTextActionBtn : null}
       {canView && !isAlbumSlotMedia ? (
         <SliderControlButton
@@ -2653,19 +2633,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           {downloading ? 'Downloading…' : 'Download'}
         </SliderControlButton>
       ) : null}
-      <PhotoAlbumsEmojiPickerPopover
-        open={Boolean(emojiPickerAnchor)}
-        anchorEl={emojiPickerAnchor}
-        onClose={() => setEmojiPickerAnchor(null)}
-        onPick={(em, e) => {
-          setEmojiPickerAnchor(null);
-          const place =
-            editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.openPlaceEmoji;
-          if (typeof place === 'function') {
-            place(em, e?.clientX, e?.clientY);
-          }
-        }}
-      />
     </>
   );
 

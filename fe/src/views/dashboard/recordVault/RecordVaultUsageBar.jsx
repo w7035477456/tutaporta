@@ -9,10 +9,13 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
 import {
   TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL,
-  TUTANOTES_USB_VIDEO_TUTORIAL_LABEL
+  TUTANOTES_USB_VIDEO_TUTORIAL_LABEL,
+  TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL
 } from './tutaNotesBranding';
 import RecordVaultDataPlanDialog from './RecordVaultDataPlanDialog';
+import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
 import { reportRecordVaultOverageThrottleDepleted } from 'utils/recordVaultOverageThrottleUi';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/VaultOverageThrottleNotice';
 import AdminEditableUsageDataAmount, {
   formatUsageDataAmount
@@ -33,7 +36,7 @@ const usageBarActionBtnSx = {
   lineHeight: 1.15,
   px: { xs: 0.85, sm: 1.1 },
   py: 0.4,
-  minWidth: { xs: '11rem', sm: '14rem', md: '16.5rem' },
+  minWidth: { xs: '9rem', sm: '11rem', md: '12.5rem' },
   bgcolor: ORANGE_BUTTON_ENABLED_BG,
   color: '#000',
   WebkitTextFillColor: '#000',
@@ -167,15 +170,16 @@ export default function RecordVaultUsageBar({
   onGetMoreTokens
 }) {
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const transfer = usage?.transfer;
   const sessionFileCounts = usage?.sessionFileCounts || {};
   const usbTxRx = Number(sessionFileCounts.usbTxRx) || 0;
   const uiTxRx = Number(sessionFileCounts.uiTxRx) || 0;
   const isOneDrive = storageType === 'onedrive';
-  const tutorialUrl = String(videoTutorialUrl || '').trim();
   const tutorialDetail = isOneDrive
     ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL
     : TUTANOTES_USB_VIDEO_TUTORIAL_LABEL;
+  const tutorialButtonLabel = TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL;
 
   useEffect(() => {
     if (!transfer) {
@@ -193,18 +197,17 @@ export default function RecordVaultUsageBar({
       <Box
         component="button"
         type="button"
-        disabled={!tutorialUrl}
         title={tutorialDetail}
         aria-label={tutorialDetail}
+        {...guestDemoAllowProps()}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (!tutorialUrl) return;
-          window.open(tutorialUrl, '_blank', 'noopener,noreferrer');
+          setTutorialOpen(true);
         }}
         sx={usageBarActionBtnSx}
       >
-        {tutorialDetail}
+        {tutorialButtonLabel}
       </Box>
     </>
   );
@@ -212,36 +215,44 @@ export default function RecordVaultUsageBar({
   if (!transfer && !isOneDrive) {
     // USB often has no transfer quota — still show USB Bridge promo line + actions.
     return (
-      <UsageBarShell actions={actions}>
-        <Typography
-          component="div"
-          sx={{
-            ...usageBarFontSx,
-            color: 'var(--theme-primary-color)',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          2M+ users trust local USB vaults —{' '}
-          <Link
-            component={RouterLink}
-            to={PROFILES_RECORDS_PATH}
-            state={{ openTab: 'buyTokens' }}
-            underline="always"
+      <>
+        <UsageBarShell actions={actions}>
+          <Typography
+            component="div"
             sx={{
               ...usageBarFontSx,
               color: 'var(--theme-primary-color)',
-              textDecorationColor: 'currentColor'
+              whiteSpace: 'nowrap'
             }}
           >
-            USB Bridge
-          </Link>
-        </Typography>
-      </UsageBarShell>
+            2M+ users trust local USB vaults —{' '}
+            <Link
+              component={RouterLink}
+              to={PROFILES_RECORDS_PATH}
+              state={{ openTab: 'buyTokens' }}
+              underline="always"
+              sx={{
+                ...usageBarFontSx,
+                color: 'var(--theme-primary-color)',
+                textDecorationColor: 'currentColor'
+              }}
+            >
+              USB Bridge
+            </Link>
+          </Typography>
+        </UsageBarShell>
+        <TutaNotesWelcomeTutorialPopup open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
+      </>
     );
   }
 
   if (!transfer) {
-    return <UsageBarShell actions={actions}>{null}</UsageBarShell>;
+    return (
+      <>
+        <UsageBarShell actions={actions}>{null}</UsageBarShell>
+        <TutaNotesWelcomeTutorialPopup open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
+      </>
+    );
   }
 
   const refillRemainMb =
@@ -311,6 +322,7 @@ export default function RecordVaultUsageBar({
         onPurchased={onPurchased}
         onGetMoreTokens={onGetMoreTokens}
       />
+      <TutaNotesWelcomeTutorialPopup open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
     </>
   );
 }
