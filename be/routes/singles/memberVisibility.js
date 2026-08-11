@@ -6,10 +6,16 @@ function parseAllowedMemberCategories() {
     .filter(Boolean);
 }
 
-/** SQL fragment: singles.status must be active (helloworldjunktest.singles_status enum). */
+/**
+ * SQL fragment: singles.status must be active (helloworldjunktest.singles_status enum).
+ * Inactive / blank / suspend / etc. must not appear on /allSingles, /myPicks, /vettedFriends.
+ */
 export function buildSinglesActiveStatusWhereSql(alias = 's') {
   return `LOWER(COALESCE(TRIM(${alias}.status::text), 'blank')) = 'active'`;
 }
+
+/** Categories always eligible when status=active (CreateNewMember.sh). */
+const ALWAYS_VISIBLE_MEMBER_CATEGORIES = ['regularmember', 'anymember'];
 
 export function buildSinglesVisibilityWhereSql(alias = 's', paramIndex = 1) {
   const activeStatusSql = buildSinglesActiveStatusWhereSql(alias);
@@ -20,9 +26,10 @@ export function buildSinglesVisibilityWhereSql(alias = 's', paramIndex = 1) {
       params: []
     };
   }
+  const merged = [...new Set([...allowedCategories, ...ALWAYS_VISIBLE_MEMBER_CATEGORIES])];
   return {
     whereSql: `${activeStatusSql} AND LOWER(COALESCE(TRIM(${alias}.member_category::text), '')) = ANY($${paramIndex}::text[])`,
-    params: [allowedCategories]
+    params: [merged]
   };
 }
 
