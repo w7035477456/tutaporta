@@ -49,6 +49,30 @@ export async function postMyPosting(payload) {
   return response.json();
 }
 
+export async function addMyPostingPhotos(postId, photoUrls) {
+  const id = Number(postId);
+  const response = await fetch(`${API_BASE_URL}/api/myPicks/posting/${id}/photos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ photo_urls: Array.isArray(photoUrls) ? photoUrls : [] })
+  });
+  if (!response.ok) {
+    notifyRateLimit429(response.status);
+    let message = `Failed to attach photos (${response.status})`;
+    try {
+      const data = await response.json();
+      if (data?.error) message = data.error;
+    } catch {
+      // ignore parse error
+    }
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+  return response.json();
+}
+
 export async function patchMyPostingVisibility(postId, postingVisibility) {
   const response = await fetch(`${API_BASE_URL}/api/myPicks/posting/${postId}/visibility`, {
     method: 'PATCH',

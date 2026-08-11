@@ -7,7 +7,8 @@
 import {
   SELECTED_UNSELECTED_BUTTON_HOVER_SCALE,
   baseButtonSx,
-  buttonTemplateSelectedLabelScaleSx
+  buttonTemplateSelectedLabelScaleSx,
+  buttonTemplateSelectedLabelTextBoxSx
 } from 'config/selectedUnselectedButtonTemplate';
 import { getSidebarMenuIconSlotSx, SIDEBAR_MENU_ICON_LABEL_GAP_VW } from 'config/menuNavFontEnv';
 import {
@@ -54,6 +55,20 @@ export function colorTemplate10MenuItemButtonSx({
   return {
     ...baseButtonSx(bg, text, border, hoverScale, { fitLabelWidth, transformOrigin }),
     ...(selected ? buttonTemplateSelectedLabelScaleSx() : null),
+    ...(selected
+      ? {
+          // Black box around label text only (sidebar + tab selected state).
+          '& .MuiTypography-root': {
+            color: `${text} !important`,
+            WebkitTextFillColor: `${text} !important`,
+            ...buttonTemplateSelectedLabelTextBoxSx({
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              verticalAlign: 'middle'
+            })
+          }
+        }
+      : null),
     ...(zIndexSx || {})
   };
 }

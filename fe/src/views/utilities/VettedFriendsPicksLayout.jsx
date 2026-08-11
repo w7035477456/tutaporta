@@ -57,7 +57,7 @@ import { TOUR_STEP_VETTED_FRIENDS_SMS } from 'utils/vsinglesTour';
 import { TOUR_LISA_MEMBER_NUMBER } from 'utils/vsinglesTourActions';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
-import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
+import SelectedButtonTemplate, { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import ColorTemplate11Posting from 'ui-component/ColorTemplate11Posting';
 import { isSelfIntroVideoPostingUrl, videoThumbnailUrlFromPostingUrl } from 'api/selfIntroVideoFe';
@@ -2364,7 +2364,9 @@ export default function VettedFriendsPicksLayout({
               sx={tabButtonSx(selectedRightPanelActiveTab === tab)}
               {...guestDemoAllowProps()}
             >
-              {vettedFriendsTabLabel(tab, selectedRow)}
+              <SelectedButtonLabelTextBox enabled={selectedRightPanelActiveTab === tab}>
+                {vettedFriendsTabLabel(tab, selectedRow)}
+              </SelectedButtonLabelTextBox>
             </Button>
           ))}
         </Box>

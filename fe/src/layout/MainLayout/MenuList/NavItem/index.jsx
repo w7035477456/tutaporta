@@ -361,7 +361,16 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           </Box>
           {(drawerOpen || level !== 1) && (
             <Tooltip title={item.title} disableHoverListener={!hoverStatus}>
-              <Box sx={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden' }}>{menuLabel}</Box>
+              <Box
+                sx={{
+                  flex: '1 1 auto',
+                  minWidth: 0,
+                  // Visible when selected so the black label text-box border is not clipped.
+                  overflow: isSelected || tourHighlightNav ? 'visible' : 'hidden'
+                }}
+              >
+                {menuLabel}
+              </Box>
             </Tooltip>
           )}
           <Activity mode={drawerOpen && navChip ? 'visible' : 'hidden'}>{renderNavPendingChip()}</Activity>

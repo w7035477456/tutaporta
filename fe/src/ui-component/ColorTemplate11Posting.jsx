@@ -26,6 +26,7 @@ import {
   colorTemplate11PostingBodyTextSx,
   colorTemplate11PostingCardSx,
   colorTemplate11PostingDeleteButtonSx,
+  colorTemplate11PostingPhotoDeleteButtonSx,
   colorTemplate11PostingFeedScrollAreaSx,
   colorTemplate11PostingFeedShellSx,
   colorTemplate11PostingHeaderDateSx,
@@ -330,7 +331,7 @@ function ColorTemplate11PostingPhotoMedia({
       </Box>
       {showPhotoDelete ? (
         <PostingFeedPhotoDeleteButton
-          sx={colorTemplate11PostingDeleteButtonSx()}
+          sx={colorTemplate11PostingPhotoDeleteButtonSx()}
           onClick={() => onDeletePhoto?.(photo.photo_id, photo.photo_url)}
         />
       ) : null}
@@ -494,6 +495,8 @@ function ColorTemplate11PostingPost({
   deleteBusy,
   onDeletePost,
   onDeletePhoto,
+  attachBusy = false,
+  onAttachMedia,
   visibilityBusyPostId,
   onVisibilityChange,
   contentBusyPostId,
@@ -509,12 +512,14 @@ function ColorTemplate11PostingPost({
   photoFullscreenOverlayLines,
   sx
 }) {
+  const [attachDragOver, setAttachDragOver] = useState(false);
   const hasPhotos = Array.isArray(post?.photos) && post.photos.length > 0;
   const viewerId = Number(viewerSinglesId);
   const ownerId = Number(feedOwnerSinglesId);
   const postOwnerId = Number(post?.post_owner_id ?? feedOwnerSinglesId);
   const isOwnPost = Number.isFinite(viewerId) && viewerId > 0 && postOwnerId === viewerId;
   const canEditContent = isOwnPost && typeof onSaveContent === 'function';
+  const canAttachMedia = isOwnPost && typeof onAttachMedia === 'function';
   const showShareRepost =
     typeof onShare === 'function' &&
     Number.isFinite(viewerId) &&
@@ -523,11 +528,51 @@ function ColorTemplate11PostingPost({
     ownerId > 0 &&
     viewerId !== ownerId;
 
+  const handleAttachDragOver = (e) => {
+    if (!canAttachMedia || attachBusy) return;
+    const types = e.dataTransfer?.types;
+    const hasFiles = types?.includes?.('Files') || (types && [...types].includes('Files'));
+    if (!hasFiles && !types?.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    setAttachDragOver(true);
+  };
+
+  const handleAttachDragLeave = (e) => {
+    const rel = e.relatedTarget;
+    if (rel && e.currentTarget.contains(rel)) return;
+    setAttachDragOver(false);
+  };
+
+  const handleAttachDrop = (e) => {
+    if (!canAttachMedia || attachBusy) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setAttachDragOver(false);
+    onAttachMedia?.(post, e);
+  };
+
   return (
-    <Card sx={{ ...colorTemplate11PostingCardSx(), ...(sx || {}) }}>
+    <Card
+      onDragOver={canAttachMedia ? handleAttachDragOver : undefined}
+      onDragLeave={canAttachMedia ? handleAttachDragLeave : undefined}
+      onDrop={canAttachMedia ? handleAttachDrop : undefined}
+      sx={{
+        ...colorTemplate11PostingCardSx(),
+        ...(attachDragOver
+          ? {
+              outline: '3px dashed var(--theme-primary-color)',
+              outlineOffset: 2,
+              bgcolor: 'var(--theme-daynight-color)'
+            }
+          : null),
+        ...(sx || {})
+      }}
+    >
       {showDeletePost ? (
         <PostingFeedPostDeleteButton
-          disabled={deleteBusy}
+          disabled={deleteBusy || attachBusy}
           sx={colorTemplate11PostingDeleteButtonSx()}
           onClick={() => onDeletePost?.(post.post_id)}
         />
@@ -549,6 +594,24 @@ function ColorTemplate11PostingPost({
           showPhotoDelete={showDeletePost}
           photoFullscreenOverlayLines={photoFullscreenOverlayLines}
         />
+      ) : null}
+      {canAttachMedia && !hasPhotos ? (
+        <Box
+          sx={{
+            mx: 1.25,
+            mb: 1,
+            px: 1.25,
+            py: 1.5,
+            border: '2px dashed var(--theme-primary-color)',
+            borderRadius: 1,
+            textAlign: 'center',
+            opacity: attachBusy ? 0.6 : 1
+          }}
+        >
+          <Typography sx={{ ...colorTemplate11PostingPanelTextSx(), color: 'var(--theme-primary-color)', fontWeight: 600 }}>
+            {attachBusy ? 'Attaching…' : 'Drag & drop a photo here to attach'}
+          </Typography>
+        </Box>
       ) : null}
       <ColorTemplate11PostingEditableBody
         content={post?.content}
@@ -616,6 +679,8 @@ function ColorTemplate11PostingFeed({
   deleteBusy = false,
   onDeletePost,
   onDeletePhoto,
+  attachBusyPostId = null,
+  onAttachMedia,
   visibilityBusyPostId,
   onVisibilityChange,
   contentBusyPostId,
@@ -693,6 +758,8 @@ function ColorTemplate11PostingFeed({
                 deleteBusy={deleteBusy}
                 onDeletePost={onDeletePost}
                 onDeletePhoto={onDeletePhoto}
+                attachBusy={Number(attachBusyPostId) === Number(post.post_id)}
+                onAttachMedia={onAttachMedia}
                 visibilityBusyPostId={visibilityBusyPostId}
                 onVisibilityChange={onVisibilityChange}
                 contentBusyPostId={contentBusyPostId}
@@ -757,6 +824,8 @@ ColorTemplate11PostingFeed.propTypes = {
   deleteBusy: PropTypes.bool,
   onDeletePost: PropTypes.func,
   onDeletePhoto: PropTypes.func,
+  attachBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onAttachMedia: PropTypes.func,
   visibilityBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onVisibilityChange: PropTypes.func,
   contentBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -793,6 +862,8 @@ ColorTemplate11PostingPost.propTypes = {
   deleteBusy: PropTypes.bool,
   onDeletePost: PropTypes.func,
   onDeletePhoto: PropTypes.func,
+  attachBusy: PropTypes.bool,
+  onAttachMedia: PropTypes.func,
   visibilityBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onVisibilityChange: PropTypes.func,
   contentBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

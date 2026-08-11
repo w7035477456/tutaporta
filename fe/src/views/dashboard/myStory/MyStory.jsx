@@ -80,6 +80,7 @@ import { useMyAlbumVideos, updateMyVideoType, deleteMyVideo } from 'api/myAlbumV
 import { bumpPhotosAlbumCacheBust } from 'api/photoCacheBust';
 import {
   invalidateMyPicksFeedCache,
+  addMyPostingPhotos,
   patchMyPostingContent,
   patchMyPostingVisibility,
   postMyPosting,
@@ -1116,6 +1117,7 @@ export default function MyStory() {
   const [likeBusyPostId, setLikeBusyPostId] = useState(null);
   const [visibilityBusyPostId, setVisibilityBusyPostId] = useState(null);
   const [contentBusyPostId, setContentBusyPostId] = useState(null);
+  const [attachBusyPostId, setAttachBusyPostId] = useState(null);
   const [likesPostId, setLikesPostId] = useState(null);
   const [likesList, setLikesList] = useState([]);
   const [likesLoading, setLikesLoading] = useState(false);
@@ -2598,6 +2600,100 @@ export default function MyStory() {
     [photosWithType, handlePostingDraftPhotoFiles, refetchMyPhotos]
   );
 
+  const handleAttachMediaToExistingPost = useCallback(
+    async (post, dropEvent) => {
+      const postId = Number(post?.post_id);
+      if (!Number.isFinite(postId) || postId < 1 || attachBusyPostId != null) return;
+
+      const videoIds = resolveDroppedVideoIds(dropEvent);
+      const sourceIds = resolveDroppedPhotoIds(dropEvent, draggingPhotoIdsRef);
+      const externalFiles = fileListToArray(dropEvent?.dataTransfer?.files);
+      draggingPhotoIdsRef.current = [];
+      setDraggingPhotoId(null);
+
+      if (videoIds.length === 0 && sourceIds.length === 0 && externalFiles.length === 0) return;
+
+      setAttachBusyPostId(postId);
+      setUploadError('');
+      try {
+        const photoUrls = [];
+
+        for (const videoId of videoIds) {
+          const url = selfIntroVideoUrl(videoId);
+          if (url) photoUrls.push(url);
+        }
+
+        for (const sourceId of sourceIds) {
+          const sourcePhoto = photosWithType.find((p) => Number(p.photos_id) === Number(sourceId));
+          if (!sourcePhoto) continue;
+          const sourceAlbumType = normalizeAlbumType(sourcePhoto.type);
+          if (sourceAlbumType !== ALBUM_TYPES.public) {
+            await updateMyPhotoType(sourceId, ALBUM_TYPES.public);
+          }
+          const url = myPhotoUrl(sourceId);
+          if (url) photoUrls.push(url);
+        }
+
+        for (const file of externalFiles) {
+          if (!file) continue;
+          if (!isAllowedAlbumPhotoFile(file)) {
+            setWrongFormatAttemptFile(file.name);
+            setWrongFormatDialogOpen(true);
+            continue;
+          }
+          const photoMaxBytes = maxUploadMb * 1024 * 1024;
+          if (!adminImpersonationUploadBypass && file.size > photoMaxBytes) {
+            setFileTooLargeActualMb((file.size / (1024 * 1024)).toFixed(2));
+            setFileTooLargeMaxMb(String(maxUploadMb));
+            setFileTooLargeDialogOpen(true);
+            continue;
+          }
+          const result = await uploadMyPhoto(file);
+          const photoId = Number(result?.photos_id);
+          if (!Number.isFinite(photoId) || photoId < 1) {
+            throw new Error('Upload completed but photo id is missing');
+          }
+          bumpPhotoVersion(photoId);
+          if (result?.replacedDuplicate) {
+            setDuplicateUploadDialogOpen(true);
+          }
+          const url = myPhotoUrl(photoId);
+          if (url) photoUrls.push(url);
+        }
+
+        if (photoUrls.length === 0) return;
+
+        const attachResult = await addMyPostingPhotos(postId, photoUrls);
+        const attached = Array.isArray(attachResult?.photos) ? attachResult.photos : [];
+        if (attached.length > 0) {
+          setFeedPosts((prev) =>
+            prev.map((row) => {
+              if (Number(row.post_id) !== postId) return row;
+              const existing = Array.isArray(row.photos) ? row.photos : [];
+              return { ...row, photos: [...existing, ...attached] };
+            })
+          );
+        }
+        bumpAlbumPhotoCache();
+        await Promise.all([refetchMyPhotos(), refetchMyPicksFeed(), invalidateMyPicksFeedCache()]);
+      } catch (err) {
+        setUploadError(err?.response?.data?.error || err?.message || 'Failed to attach photo to posting');
+      } finally {
+        setAttachBusyPostId(null);
+      }
+    },
+    [
+      attachBusyPostId,
+      photosWithType,
+      adminImpersonationUploadBypass,
+      maxUploadMb,
+      bumpPhotoVersion,
+      bumpAlbumPhotoCache,
+      refetchMyPhotos,
+      refetchMyPicksFeed
+    ]
+  );
+
   const removeDraftPostingPhoto = useCallback((photoId) => {
     setPostingDraftPhotoIds((prev) => prev.filter((id) => Number(id) !== Number(photoId)));
   }, []);
@@ -3211,6 +3307,8 @@ export default function MyStory() {
                   deleteBusy={deleteBusy}
                   onDeletePost={handleDeletePosting}
                   onDeletePhoto={handleDeletePostingPhoto}
+                  attachBusyPostId={attachBusyPostId}
+                  onAttachMedia={handleAttachMediaToExistingPost}
                   visibilityBusyPostId={visibilityBusyPostId}
                   onVisibilityChange={handlePostingVisibilityChange}
                   contentBusyPostId={contentBusyPostId}

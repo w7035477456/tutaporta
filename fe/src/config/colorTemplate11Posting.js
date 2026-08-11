@@ -29,6 +29,9 @@ export const colorTemplate11PostingDeleteXFontSize = {
 
 export const COLOR_TEMPLATE11_POSTING_DELETE_X_COLOR = `var(${YELLOW_VAR})`;
 export const COLOR_TEMPLATE11_POSTING_DELETE_X_STROKE = '2px var(--theme-primary-color)';
+/** Per-photo remove X — red as requested for attached posting photos. */
+export const COLOR_TEMPLATE11_POSTING_PHOTO_DELETE_X_COLOR = `var(${ERROR_VAR})`;
+export const COLOR_TEMPLATE11_POSTING_PHOTO_DELETE_X_STROKE = '2px var(--theme-primary-color)';
 
 const colorTemplate11PostingRemoveInset = getMyPicksRemoveButtonInset();
 
@@ -469,7 +472,7 @@ export function colorTemplate11PostingHeaderPaddingSx(showDeleteButton = false) 
   return showDeleteButton ? { pr: { xs: 4.5, sm: 5 } } : {};
 }
 
-/** Yellow outlined delete “X” — top-right of post card or photo. */
+/** Yellow outlined delete “X” — top-right of post card. */
 export function colorTemplate11PostingDeleteButtonSx(overrides = {}) {
   return {
     position: 'absolute',
@@ -504,20 +507,28 @@ export function colorTemplate11PostingDeleteButtonSx(overrides = {}) {
       '&:hover:not(:disabled)': {
         bgcolor: 'transparent',
         boxShadow: 'none',
-        ...buttonHoverMagnifyFontSx({ baseFontSize: colorTemplate11PostingDeleteXFontSize })
+        fontSize: {
+          xs: `calc(${colorTemplate11PostingDeleteXFontSize.xs} * var(--hover-magnify-factor, 1.3))`,
+          sm: `calc(${colorTemplate11PostingDeleteXFontSize.sm} * var(--hover-magnify-factor, 1.3))`
+        }
       }
     },
-    '&:active:not(:disabled)': {
-      boxShadow: 'none'
-    },
     '&:disabled': {
-      bgcolor: 'transparent',
-      cursor: 'not-allowed',
       opacity: 0.3,
-      boxShadow: 'none'
+      cursor: 'not-allowed'
     },
     ...overrides
   };
+}
+
+/** Red outlined delete “X” — top-right of each attached posting photo. */
+export function colorTemplate11PostingPhotoDeleteButtonSx(overrides = {}) {
+  return colorTemplate11PostingDeleteButtonSx({
+    color: COLOR_TEMPLATE11_POSTING_PHOTO_DELETE_X_COLOR,
+    WebkitTextFillColor: COLOR_TEMPLATE11_POSTING_PHOTO_DELETE_X_COLOR,
+    WebkitTextStroke: COLOR_TEMPLATE11_POSTING_PHOTO_DELETE_X_STROKE,
+    ...overrides
+  });
 }
 
 export const colorTemplate11PostingResizeLabelFontSize = {

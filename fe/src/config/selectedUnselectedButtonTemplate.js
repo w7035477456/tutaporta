@@ -48,6 +48,25 @@ export const SELECTED_UNSELECTED_BUTTON_SELECTED_LABEL_SCALE = null;
 /** Button label — MOBILE_FONT_SIZE_BUTTON / DESKTOP_FONT_SIZE_BUTTON (fe/.env). */
 export const SELECTED_UNSELECTED_BUTTON_FONT_SIZE = buttonFontSizeResponsive;
 
+/** Selected — thin black box tightly around the label text (in addition to button bg). */
+export const SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER = '1px solid #000000';
+
+export function buttonTemplateSelectedLabelTextBoxSx(overrides = {}) {
+  return {
+    border: SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER,
+    borderRadius: 0,
+    boxSizing: 'border-box',
+    px: '0.25em',
+    py: '0.05em',
+    lineHeight: 1.25,
+    display: 'inline-block',
+    maxWidth: '100%',
+    boxDecorationBreak: 'clone',
+    WebkitBoxDecorationBreak: 'clone',
+    ...overrides
+  };
+}
+
 /** Selected tab/menu — label stays magnified until deselected (button box unchanged). */
 export function buttonTemplateSelectedLabelScaleSx(selectedLabelScale = SELECTED_UNSELECTED_BUTTON_SELECTED_LABEL_SCALE) {
   const magnify = buttonSelectedMagnifyFontSx({

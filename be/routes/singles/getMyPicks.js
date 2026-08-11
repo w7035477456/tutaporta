@@ -1307,6 +1307,110 @@ export async function deleteMyPostingPhoto(req, res) {
   }
 }
 
+/**
+ * POST /api/myPicks/posting/:postId/photos
+ * Body: { photo_urls: string[] }
+ * Attach more photos/videos to an existing posting owned by the caller.
+ */
+export async function addMyPostingPhotos(req, res) {
+  const me = Number(req.auth?.singles_id);
+  const postId = Number(req.params.postId);
+  if (!Number.isFinite(me) || me < 1) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (!Number.isFinite(postId) || postId < 1) {
+    return res.status(400).json({ error: 'Invalid post id' });
+  }
+
+  try {
+    const postingsSchema = await resolvePostingsSchema();
+    const photoUrlsRaw = Array.isArray(req.body?.photo_urls) ? req.body.photo_urls : [];
+    const photoUrls = photoUrlsRaw
+      .map((url) => normalizePostingPhotoUrlForStorage(url))
+      .filter(Boolean)
+      .slice(0, 20);
+
+    if (photoUrls.length === 0) {
+      return res.status(400).json({ error: 'Please add at least one photo or video' });
+    }
+
+    const owner = await pool.query(
+      `SELECT p.post_id, p.created_at
+       FROM ${postingsSchema}.postings p
+       WHERE p.post_id = $1
+         AND p.singles_id = $2
+       LIMIT 1`,
+      [postId, me]
+    );
+    if (!owner.rows.length) {
+      return res.status(404).json({ error: 'Posting not found' });
+    }
+
+    const existingCountResult = await pool.query(
+      `SELECT COUNT(*)::int AS n
+       FROM ${postingsSchema}.posting_photos
+       WHERE post_id = $1`,
+      [postId]
+    );
+    const existingCount = Number(existingCountResult.rows[0]?.n ?? 0);
+    const remainingSlots = Math.max(0, 20 - (Number.isFinite(existingCount) ? existingCount : 0));
+    if (remainingSlots < 1) {
+      return res.status(400).json({ error: 'This posting already has the maximum number of photos.' });
+    }
+
+    const correctedPhotoUrls = [];
+    for (const url of photoUrls.slice(0, remainingSlots)) {
+      correctedPhotoUrls.push(await correctPostingMediaUrlForOwner(pool, me, url));
+    }
+
+    const sortBaseResult = await pool.query(
+      `SELECT COALESCE(MAX(sort_order), -1)::int AS max_sort
+       FROM ${postingsSchema}.posting_photos
+       WHERE post_id = $1`,
+      [postId]
+    );
+    let nextSort = Number(sortBaseResult.rows[0]?.max_sort ?? -1) + 1;
+    if (!Number.isFinite(nextSort) || nextSort < 0) nextSort = 0;
+
+    const inserted = [];
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const url of correctedPhotoUrls) {
+        const result = await client.query(
+          `INSERT INTO ${postingsSchema}.posting_photos (post_id, post_created_at, photo_url, sort_order)
+           VALUES ($1, $2, $3, $4)
+           RETURNING photo_id, photo_url, sort_order`,
+          [postId, owner.rows[0].created_at, url, nextSort]
+        );
+        nextSort += 1;
+        if (result.rows[0]) {
+          inserted.push({
+            photo_id: Number(result.rows[0].photo_id),
+            photo_url: result.rows[0].photo_url,
+            sort_order: Number(result.rows[0].sort_order)
+          });
+        }
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    return res.status(201).json({ ok: true, post_id: postId, photos: inserted });
+  } catch (error) {
+    console.error('addMyPostingPhotos error:', error);
+    return res.status(500).json({ error: 'Failed to attach photos to posting' });
+  }
+}
+
 export async function updateMyPostingVisibility(req, res) {
   const me = Number(req.auth?.singles_id);
   const postId = Number(req.params.postId);

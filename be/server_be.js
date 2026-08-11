@@ -29,6 +29,7 @@ import {
   dismissMyPicksPostNotification,
   dismissAllMyPicksPostNotifications,
   createMyPosting,
+  addMyPostingPhotos,
   updateMyPostingVisibility,
   updateMyPostingContent,
   deleteMyPosting,
@@ -1230,6 +1231,7 @@ app.get('/api/bioResponses/pendingCount', requireAuth, getVettedFriendsBioRespon
 app.post('/api/bioResponses/notifications/dismiss', requireAuth, dismissBioResponseNotification);
 app.post('/api/bioResponses/notifications/dismissAll', requireAuth, dismissAllBioResponseNotifications);
 app.post('/api/myPicks/posting', requireAuth, createMyPosting);
+app.post('/api/myPicks/posting/:postId/photos', requireAuth, addMyPostingPhotos);
 app.patch('/api/myPicks/posting/:postId/visibility', requireAuth, updateMyPostingVisibility);
 app.patch('/api/myPicks/posting/:postId/content', requireAuth, updateMyPostingContent);
 app.delete('/api/myPicks/posting/:postId', requireAuth, deleteMyPosting);

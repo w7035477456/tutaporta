@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
+import { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate';
 import { INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 import {
   COLOR_TEMPLATE9_TABLE_PANEL_DIVIDER,
@@ -176,7 +177,7 @@ function ColorTemplate9TableDataTabButton({ selected = false, sx, children, ...r
       }}
       {...rest}
     >
-      {children}
+      <SelectedButtonLabelTextBox enabled={selected}>{children}</SelectedButtonLabelTextBox>
     </Button>
   );
 }

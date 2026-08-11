@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import {
   buttonTemplateContrastFlipTextColor,
@@ -6,6 +7,7 @@ import {
   buttonTemplateIconSizeResponsive,
   buttonTemplateIconSx,
   buttonTemplateSelectedLabelScaleSx,
+  buttonTemplateSelectedLabelTextBoxSx,
   buttonTemplateSingleLineLabelSx,
   SELECTED_BUTTON_TEMPLATE_BG,
   SELECTED_BUTTON_TEMPLATE_BORDER,
@@ -49,6 +51,8 @@ export default function SelectedButtonTemplate({
   shrinkLabelMaxFontSize,
   selectedLabelScale,
   thickBlackBorder = false,
+  /** Black box around label text — selected indicator (Desire). Opt out for plain CTAs. */
+  labelTextBox = true,
   fullWidth = false,
   sx,
   children,
@@ -79,7 +83,13 @@ export default function SelectedButtonTemplate({
 
   return (
     <Button fullWidth={effectiveFullWidth} {...rest} ref={fitLabelRef} sx={mergedSx}>
-      {children}
+      {labelTextBox ? (
+        <Box component="span" sx={buttonTemplateSelectedLabelTextBoxSx({ whiteSpace: 'inherit' })}>
+          {children}
+        </Box>
+      ) : (
+        children
+      )}
     </Button>
   );
 }
@@ -94,6 +104,7 @@ SelectedButtonTemplate.propTypes = {
   shrinkLabelMaxFontSize: PropTypes.object,
   selectedLabelScale: PropTypes.number,
   thickBlackBorder: PropTypes.bool,
+  labelTextBox: PropTypes.bool,
   fullWidth: PropTypes.bool,
   sx: PropTypes.oneOfType([PropTypes.object, PropTypes.func]),
   children: PropTypes.node
@@ -105,3 +116,20 @@ SelectedButtonTemplate.contrastFlipTextColor = buttonTemplateContrastFlipTextCol
 SelectedButtonTemplate.Icon = ButtonTemplateIcon;
 SelectedButtonTemplate.iconSize = buttonTemplateIconSizeResponsive;
 SelectedButtonTemplate.iconSx = buttonTemplateIconSx;
+SelectedButtonTemplate.LabelTextBox = SelectedButtonLabelTextBox;
+
+/** Black box around selected label text — use with raw Buttons that apply colorTemplate10MenuItemButtonSx. */
+export function SelectedButtonLabelTextBox({ enabled = true, sx, children }) {
+  if (!enabled) return children;
+  return (
+    <Box component="span" sx={{ ...buttonTemplateSelectedLabelTextBoxSx(), whiteSpace: 'inherit', ...(sx || {}) }}>
+      {children}
+    </Box>
+  );
+}
+
+SelectedButtonLabelTextBox.propTypes = {
+  enabled: PropTypes.bool,
+  sx: PropTypes.object,
+  children: PropTypes.node
+};

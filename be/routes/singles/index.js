@@ -33,6 +33,7 @@ export {
   dismissMyPicksPostNotification,
   dismissAllMyPicksPostNotifications,
   createMyPosting,
+  addMyPostingPhotos,
   updateMyPostingVisibility,
   updateMyPostingContent,
   deleteMyPosting,

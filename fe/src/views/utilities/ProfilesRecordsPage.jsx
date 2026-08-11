@@ -22,6 +22,7 @@ import Link from '@mui/material/Link';
 import MainCard from 'ui-component/cards/MainCard';
 import Button from '@mui/material/Button';
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
+import { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import GreenButton from 'ui-component/GreenButton';
@@ -1051,7 +1052,7 @@ export default function ProfilesRecordsPage({
                       ...textFontSx
                     }}
                   >
-                    {tab.label}
+                    <SelectedButtonLabelTextBox enabled={isSelected}>{tab.label}</SelectedButtonLabelTextBox>
                   </Button>
                 );
               })}

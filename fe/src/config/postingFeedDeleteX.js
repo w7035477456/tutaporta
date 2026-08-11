@@ -5,13 +5,15 @@
 import { hoverMagnifyCalcFontSize } from 'config/hoverMagnifyEnv';
 import { getMyPicksRemoveButtonInset, getMyPicksRemoveIconSize } from 'config/myPicksCardEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
-import { YELLOW_VAR } from 'utils/themeConfig';
+import { ERROR_VAR, YELLOW_VAR } from 'utils/themeConfig';
 
 const removeIconSize = getMyPicksRemoveIconSize();
 const removeInset = getMyPicksRemoveButtonInset();
 
 export const POSTING_FEED_DELETE_X_COLOR = `var(${YELLOW_VAR})`;
 export const POSTING_FEED_DELETE_X_STROKE = '4px var(--theme-primary-color)';
+export const POSTING_FEED_PHOTO_DELETE_X_COLOR = `var(${ERROR_VAR})`;
+export const POSTING_FEED_PHOTO_DELETE_X_STROKE = '4px var(--theme-primary-color)';
 export const POSTING_FEED_DELETE_X_SIZE_MULTIPLIER = 4;
 function postingFeedDeleteButtonBaseSx(overrides = {}) {
   const sizeMul = POSTING_FEED_DELETE_X_SIZE_MULTIPLIER;
@@ -65,9 +67,14 @@ function postingFeedDeleteButtonBaseSx(overrides = {}) {
   };
 }
 
-/** Top-right of each posting photo. */
+/** Top-right of each posting photo — red X. */
 export function postingFeedPhotoDeleteButtonSx(overrides = {}) {
-  return postingFeedDeleteButtonBaseSx(overrides);
+  return postingFeedDeleteButtonBaseSx({
+    color: POSTING_FEED_PHOTO_DELETE_X_COLOR,
+    WebkitTextFillColor: POSTING_FEED_PHOTO_DELETE_X_COLOR,
+    WebkitTextStroke: POSTING_FEED_PHOTO_DELETE_X_STROKE,
+    ...overrides
+  });
 }
 
 /** Top-right of entire posting card. */
