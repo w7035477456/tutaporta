@@ -1126,61 +1126,71 @@ export async function createMyPosting(req, res) {
       correctedPhotoUrls.push(await correctPostingMediaUrlForOwner(pool, me, url));
     }
 
-    await pool.query('BEGIN');
-    const insertColumns = ['singles_id', 'content'];
-    const insertValues = [me, content || null];
-    const placeholders = ['$1', '$2'];
-    if (postingVisibilityColumn) {
-      insertColumns.push(postingVisibilityColumn);
-      if (postingVisibilityColumn === 'is_private') {
-        insertValues.push(postingVisibility !== 'public');
-      } else if (postingVisibilityColumn === 'is_public') {
-        insertValues.push(postingVisibility === 'public');
-      } else {
-        insertValues.push(postingVisibilityForDb(postingVisibility));
+    // Must use one pooled client for BEGIN/INSERT/COMMIT — pool.query('BEGIN') does not bind a session.
+    const client = await pool.connect();
+    let postId = null;
+    try {
+      await client.query('BEGIN');
+      const insertColumns = ['singles_id', 'content'];
+      const insertValues = [me, content || null];
+      const placeholders = ['$1', '$2'];
+      if (postingVisibilityColumn) {
+        insertColumns.push(postingVisibilityColumn);
+        if (postingVisibilityColumn === 'is_private') {
+          insertValues.push(postingVisibility !== 'public');
+        } else if (postingVisibilityColumn === 'is_public') {
+          insertValues.push(postingVisibility === 'public');
+        } else {
+          insertValues.push(postingVisibilityForDb(postingVisibility));
+        }
+        placeholders.push(`$${insertValues.length}`);
       }
-      placeholders.push(`$${insertValues.length}`);
-    }
-    if (repostedFromSinglesId != null && postingRepostColumns.repostedFromSinglesId) {
-      insertColumns.push(postingRepostColumns.repostedFromSinglesId);
-      insertValues.push(repostedFromSinglesId);
-      placeholders.push(`$${insertValues.length}`);
-    }
-    if (repostedFromPostId != null && postingRepostColumns.repostedFromPostId) {
-      insertColumns.push(postingRepostColumns.repostedFromPostId);
-      insertValues.push(repostedFromPostId);
-      placeholders.push(`$${insertValues.length}`);
-    }
-    const postResult = await pool.query(
-      `INSERT INTO ${postingsSchema}.postings (${insertColumns.join(', ')})
-       VALUES (${placeholders.join(', ')})
-       RETURNING post_id`,
-      insertValues
-    );
-    const postId = Number(postResult.rows[0]?.post_id);
-
-    if (!Number.isFinite(postId) || postId < 1) {
-      throw new Error('Failed to create posting');
-    }
-
-    for (let i = 0; i < correctedPhotoUrls.length; i += 1) {
-      await pool.query(
-        `INSERT INTO ${postingsSchema}.posting_photos (post_id, post_created_at, photo_url, sort_order)
-         SELECT $1, p.created_at, $2, $3
-         FROM ${postingsSchema}.postings p
-         WHERE p.post_id = $1`,
-        [postId, correctedPhotoUrls[i], i]
+      if (repostedFromSinglesId != null && postingRepostColumns.repostedFromSinglesId) {
+        insertColumns.push(postingRepostColumns.repostedFromSinglesId);
+        insertValues.push(repostedFromSinglesId);
+        placeholders.push(`$${insertValues.length}`);
+      }
+      if (repostedFromPostId != null && postingRepostColumns.repostedFromPostId) {
+        insertColumns.push(postingRepostColumns.repostedFromPostId);
+        insertValues.push(repostedFromPostId);
+        placeholders.push(`$${insertValues.length}`);
+      }
+      const postResult = await client.query(
+        `INSERT INTO ${postingsSchema}.postings (${insertColumns.join(', ')})
+         VALUES (${placeholders.join(', ')})
+         RETURNING post_id`,
+        insertValues
       );
-    }
+      postId = Number(postResult.rows[0]?.post_id);
 
-    await pool.query('COMMIT');
+      if (!Number.isFinite(postId) || postId < 1) {
+        throw new Error('Failed to create posting');
+      }
+
+      for (let i = 0; i < correctedPhotoUrls.length; i += 1) {
+        await client.query(
+          `INSERT INTO ${postingsSchema}.posting_photos (post_id, post_created_at, photo_url, sort_order)
+           SELECT $1, p.created_at, $2, $3
+           FROM ${postingsSchema}.postings p
+           WHERE p.post_id = $1`,
+          [postId, correctedPhotoUrls[i], i]
+        );
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore rollback errors
+      }
+      console.error('createMyPosting error:', error);
+      return res.status(500).json({ error: 'Failed to create posting' });
+    } finally {
+      client.release();
+    }
     return res.status(201).json({ ok: true, post_id: postId });
   } catch (error) {
-    try {
-      await pool.query('ROLLBACK');
-    } catch {
-      // ignore rollback errors
-    }
     console.error('createMyPosting error:', error);
     return res.status(500).json({ error: 'Failed to create posting' });
   }
@@ -1216,23 +1226,34 @@ export async function deleteMyPosting(req, res) {
       return res.status(404).json({ error: 'Posting not found' });
     }
 
-    await pool.query('BEGIN');
-    const photosDelete = await pool.query(`DELETE FROM ${postingsSchema}.posting_photos WHERE post_id = $1`, [postId]);
-    const postDelete = await pool.query(`DELETE FROM ${postingsSchema}.postings WHERE post_id = $1`, [postId]);
-    await pool.query('COMMIT');
+    const client = await pool.connect();
+    let photosDeleted = 0;
+    let postsDeleted = 0;
+    try {
+      await client.query('BEGIN');
+      const photosDelete = await client.query(`DELETE FROM ${postingsSchema}.posting_photos WHERE post_id = $1`, [postId]);
+      const postDelete = await client.query(`DELETE FROM ${postingsSchema}.postings WHERE post_id = $1`, [postId]);
+      await client.query('COMMIT');
+      photosDeleted = photosDelete.rowCount;
+      postsDeleted = postDelete.rowCount;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore rollback errors
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
     console.info('[be][deleteMyPosting] delete:success', {
       me,
       postId,
-      photosDeleted: photosDelete.rowCount,
-      postsDeleted: postDelete.rowCount
+      photosDeleted,
+      postsDeleted
     });
     return res.json({ ok: true });
   } catch (error) {
-    try {
-      await pool.query('ROLLBACK');
-    } catch {
-      // ignore rollback errors
-    }
     console.error('[be][deleteMyPosting] delete:error', {
       me,
       postId,
