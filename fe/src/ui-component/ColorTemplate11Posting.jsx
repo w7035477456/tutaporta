@@ -501,6 +501,7 @@ function ColorTemplate11PostingPost({
   onVisibilityChange,
   contentBusyPostId,
   onSaveContent,
+  onPostDoubleClick,
   showActions,
   likeBusyPostId,
   shareBusyPostId,
@@ -518,7 +519,9 @@ function ColorTemplate11PostingPost({
   const ownerId = Number(feedOwnerSinglesId);
   const postOwnerId = Number(post?.post_owner_id ?? feedOwnerSinglesId);
   const isOwnPost = Number.isFinite(viewerId) && viewerId > 0 && postOwnerId === viewerId;
-  const canEditContent = isOwnPost && typeof onSaveContent === 'function';
+  const canOpenInComposer = isOwnPost && typeof onPostDoubleClick === 'function';
+  // Prefer composer edit (My Story) over inline text edit when both are wired.
+  const canEditContent = isOwnPost && typeof onSaveContent === 'function' && !canOpenInComposer;
   const canAttachMedia = isOwnPost && typeof onAttachMedia === 'function';
   const showShareRepost =
     typeof onShare === 'function' &&
@@ -553,13 +556,27 @@ function ColorTemplate11PostingPost({
     onAttachMedia?.(post, e);
   };
 
+  const handleCardDoubleClick = (e) => {
+    if (!canOpenInComposer) return;
+    const interactive = e.target?.closest?.(
+      'button, a, input, textarea, select, [role="button"], [role="menuitem"], label'
+    );
+    if (interactive) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onPostDoubleClick(post);
+  };
+
   return (
     <Card
+      onDoubleClick={canOpenInComposer ? handleCardDoubleClick : undefined}
+      title={canOpenInComposer ? 'Double-click to edit in Add New Posting' : undefined}
       onDragOver={canAttachMedia ? handleAttachDragOver : undefined}
       onDragLeave={canAttachMedia ? handleAttachDragLeave : undefined}
       onDrop={canAttachMedia ? handleAttachDrop : undefined}
       sx={{
         ...colorTemplate11PostingCardSx(),
+        ...(canOpenInComposer ? { cursor: 'pointer' } : null),
         ...(attachDragOver
           ? {
               outline: '3px dashed var(--theme-primary-color)',
@@ -685,6 +702,7 @@ function ColorTemplate11PostingFeed({
   onVisibilityChange,
   contentBusyPostId,
   onSaveContent,
+  onPostDoubleClick,
   showActions = false,
   likeBusyPostId,
   shareBusyPostId,
@@ -764,6 +782,7 @@ function ColorTemplate11PostingFeed({
                 onVisibilityChange={onVisibilityChange}
                 contentBusyPostId={contentBusyPostId}
                 onSaveContent={onSaveContent}
+                onPostDoubleClick={onPostDoubleClick}
                 showActions={showActions}
                 likeBusyPostId={likeBusyPostId}
                 shareBusyPostId={shareBusyPostId}
@@ -830,6 +849,7 @@ ColorTemplate11PostingFeed.propTypes = {
   onVisibilityChange: PropTypes.func,
   contentBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onSaveContent: PropTypes.func,
+  onPostDoubleClick: PropTypes.func,
   showActions: PropTypes.bool,
   likeBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   shareBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -868,6 +888,7 @@ ColorTemplate11PostingPost.propTypes = {
   onVisibilityChange: PropTypes.func,
   contentBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onSaveContent: PropTypes.func,
+  onPostDoubleClick: PropTypes.func,
   showActions: PropTypes.bool,
   likeBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   shareBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

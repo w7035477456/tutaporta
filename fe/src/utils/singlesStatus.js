@@ -7,7 +7,8 @@ export const SINGLES_STATUS_VALUES = Object.freeze([
   'abandon',
   'unknown',
   'other',
-  'blank'
+  'blank',
+  'inactive'
 ]);
 
 /**

@@ -1,4 +1,4 @@
-/** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank'} SinglesStatus */
+/** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive'} SinglesStatus */
 
 /** Cycle order matches helloworldjunktest.singles_status enum sort order. */
 export const SINGLES_STATUS_VALUES = Object.freeze([
@@ -9,7 +9,8 @@ export const SINGLES_STATUS_VALUES = Object.freeze([
   'abandon',
   'unknown',
   'other',
-  'blank'
+  'blank',
+  'inactive'
 ]);
 
 /**

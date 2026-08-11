@@ -359,7 +359,7 @@ allocate_member_id() {
 allocate_member_id
 
 # ---------------------------------------------------------------------------
-# 4–5) password_hash + status
+# 4–5) password_hash + status + initial_setup_done
 # ---------------------------------------------------------------------------
 if [[ "$MEMBER_CATEGORY" == "DemoUser" || "$MEMBER_CATEGORY" == "RegularMember" ]]; then
   PASSWORD_HASH=$(psql_q -Atc "SELECT password_hash FROM ${SCHEMA}.singles WHERE lower(email)=lower('${DM1_EMAIL}') LIMIT 1;")
@@ -368,6 +368,7 @@ if [[ "$MEMBER_CATEGORY" == "DemoUser" || "$MEMBER_CATEGORY" == "RegularMember" 
     exit 1
   fi
   STATUS="inactive"
+  INITIAL_SETUP_DONE="true"
 else
   PASSWORD_HASH=$(psql_q -Atc "SELECT password_hash FROM ${SCHEMA}.singles WHERE lower(email)=lower('${DM1_EMAIL}') LIMIT 1;")
   if [[ -z "$PASSWORD_HASH" ]]; then
@@ -375,6 +376,7 @@ else
     exit 1
   fi
   STATUS="active"
+  INITIAL_SETUP_DONE="false"
 fi
 
 # ---------------------------------------------------------------------------
@@ -463,6 +465,7 @@ printf "%-22s %s\n" "member_category:" "$MEMBER_CATEGORY"
 printf "%-22s %s\n" "email:" "$EMAIL"
 printf "%-22s %s\n" "member_id:" "$MEMBER_ID"
 printf "%-22s %s\n" "status:" "$STATUS"
+printf "%-22s %s\n" "initial_setup_done:" "$INITIAL_SETUP_DONE"
 printf "%-22s %s\n" "password_hash:" "(cloned from ${DM1_EMAIL})"
 printf "%-22s %s\n" "dl_sex:" "$DL_SEX"
 printf "%-22s %s\n" "ethnicity:" "$ETHNIC_LABEL"
@@ -557,7 +560,7 @@ WITH new_row AS (
     '$(sql_escape "$CITIZENSHIP")',
     '$(sql_escape "$BIRTH_COUNTRY")',
     '$(sql_escape "$MY_REFER_CODE")',
-    false,
+    ${INITIAL_SETUP_DONE},
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
   )

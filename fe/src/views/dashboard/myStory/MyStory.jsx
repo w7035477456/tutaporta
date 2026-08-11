@@ -46,7 +46,7 @@ import SelfIntroVideoPlaybackPopup, {
   SELF_INTRO_VIDEO_ID_MIME,
   SelfIntroVideoFrameThumbnail
 } from 'views/utilities/SelfIntroVideoLibrary';
-import { selfIntroVideoUrl, uploadPublicVaultMediaFile } from 'api/selfIntroVideoFe';
+import { selfIntroVideoUrl, uploadPublicVaultMediaFile, isSelfIntroVideoPostingUrl } from 'api/selfIntroVideoFe';
 import { resetProfilePhotoVetting } from 'api/checkrBioReviewFe';
 import { resetIdVerification } from 'api/vetBioVerificationServicesFe';
 import { isPilotUserCategory } from 'utils/memberCategory';
@@ -81,6 +81,7 @@ import { bumpPhotosAlbumCacheBust } from 'api/photoCacheBust';
 import {
   invalidateMyPicksFeedCache,
   addMyPostingPhotos,
+  deleteMyPostingPhoto,
   patchMyPostingContent,
   patchMyPostingVisibility,
   postMyPosting,
@@ -1164,8 +1165,13 @@ export default function MyStory() {
   const [postingDraftPhotoIds, setPostingDraftPhotoIds] = useState([]);
   const [postingDraftVideoIds, setPostingDraftVideoIds] = useState([]);
   const [postingDraftVisibility, setPostingDraftVisibility] = useState('public');
+  /** When set, Save updates this post instead of creating a new one (double-click from Review). */
+  const [editingPostId, setEditingPostId] = useState(null);
+  /** Original posting_photos rows loaded into the composer: { postingPhotoId, mediaId, kind }. */
+  const [editingPostOriginalMedia, setEditingPostOriginalMedia] = useState([]);
   const [postingVisibilityMenuOpen, setPostingVisibilityMenuOpen] = useState(false);
   const pendingSaveAfterVisibilityRef = useRef(false);
+  const addNewPostingSectionRef = useRef(null);
   const [moreSharingPopupOpen, setMoreSharingPopupOpen] = useState(false);
   const [postingDragOver, setPostingDragOver] = useState(false);
   const [postingSaving, setPostingSaving] = useState(false);
@@ -2269,6 +2275,68 @@ export default function MyStory() {
     [handlePostingDraftPhotoFiles]
   );
 
+  const clearPostingComposer = useCallback(() => {
+    setPostingDraftText('');
+    setPostingDraftPhotoIds([]);
+    setPostingDraftVideoIds([]);
+    setEditingPostId(null);
+    setEditingPostOriginalMedia([]);
+  }, []);
+
+  const handleOpenPostingInComposer = useCallback(
+    (post) => {
+      const postId = Number(post?.post_id);
+      if (!Number.isFinite(postId) || postId < 1) return;
+
+      const photoIds = [];
+      const videoIds = [];
+      const originalMedia = [];
+      for (const row of Array.isArray(post?.photos) ? post.photos : []) {
+        const url = String(row?.photo_url ?? '').trim();
+        const postingPhotoId = Number(row?.photo_id);
+        if (!url) continue;
+        if (isSelfIntroVideoPostingUrl(url)) {
+          const match = url.match(/\/api\/video\/(\d+)/i);
+          const mediaId = match ? Number(match[1]) : NaN;
+          if (!Number.isFinite(mediaId) || mediaId < 1) continue;
+          if (!videoIds.includes(mediaId)) videoIds.push(mediaId);
+          if (Number.isFinite(postingPhotoId) && postingPhotoId > 0) {
+            originalMedia.push({ postingPhotoId, mediaId, kind: 'video' });
+          }
+          continue;
+        }
+        const match = url.match(/\/api\/photo\/(\d+)/i);
+        const mediaId = match ? Number(match[1]) : Number(row?.photos_id ?? row?.photo_id);
+        if (!Number.isFinite(mediaId) || mediaId < 1) continue;
+        // Prefer album photos_id from URL; posting photo_id is for delete API only.
+        const albumId = match ? Number(match[1]) : mediaId;
+        if (!photoIds.includes(albumId)) photoIds.push(albumId);
+        if (Number.isFinite(postingPhotoId) && postingPhotoId > 0) {
+          originalMedia.push({ postingPhotoId, mediaId: albumId, kind: 'photo' });
+        }
+      }
+
+      setEditingPostId(postId);
+      setEditingPostOriginalMedia(originalMedia);
+      setPostingDraftText(String(post?.content ?? ''));
+      setPostingDraftPhotoIds(photoIds);
+      setPostingDraftVideoIds(videoIds);
+      setPostingDraftVisibility(normalizeColorTemplate11PostingVisibility(post?.posting_visibility ?? 'public'));
+      setUploadError('');
+      setActiveStoryTab('albumsCreate');
+      // Scroll composer into view after tab paints.
+      window.setTimeout(() => {
+        addNewPostingSectionRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+      }, 80);
+    },
+    []
+  );
+
+  const handleCancelPostingEdit = useCallback(() => {
+    clearPostingComposer();
+    setUploadError('');
+  }, [clearPostingComposer]);
+
   const handleSavePosting = useCallback(async (postingVisibility = 'public') => {
     if (postingSaving) return;
     const trimmedText = postingDraftText.trim();
@@ -2281,14 +2349,60 @@ export default function MyStory() {
     try {
       setPostingSaving(true);
       setUploadError('');
+
+      const editingId = Number(editingPostId);
+      if (Number.isFinite(editingId) && editingId > 0) {
+        await patchMyPostingContent(editingId, trimmedText);
+        const currentVisibility = normalizeColorTemplate11PostingVisibility(postingVisibility);
+        await patchMyPostingVisibility(editingId, currentVisibility);
+
+        const keptMediaKeys = new Set([
+          ...postingDraftPhotoIds.map((id) => `photo:${Number(id)}`),
+          ...postingDraftVideoIds.map((id) => `video:${Number(id)}`)
+        ]);
+        const toDelete = editingPostOriginalMedia.filter(
+          (row) => !keptMediaKeys.has(`${row.kind}:${Number(row.mediaId)}`)
+        );
+        for (const row of toDelete) {
+          const postingPhotoId = Number(row.postingPhotoId);
+          if (Number.isFinite(postingPhotoId) && postingPhotoId > 0) {
+            await deleteMyPostingPhoto(postingPhotoId);
+          }
+        }
+
+        const originalKeys = new Set(
+          editingPostOriginalMedia.map((row) => `${row.kind}:${Number(row.mediaId)}`)
+        );
+        const newUrls = [];
+        for (const id of postingDraftPhotoIds) {
+          if (!originalKeys.has(`photo:${Number(id)}`)) {
+            const url = myPhotoUrl(id);
+            if (url) newUrls.push(url);
+          }
+        }
+        for (const id of postingDraftVideoIds) {
+          if (!originalKeys.has(`video:${Number(id)}`)) {
+            const url = selfIntroVideoUrl(id);
+            if (url) newUrls.push(url);
+          }
+        }
+        if (newUrls.length > 0) {
+          await addMyPostingPhotos(editingId, newUrls);
+        }
+
+        clearPostingComposer();
+        scrollReviewFeedToTopRef.current = true;
+        setActiveStoryTab('reviewPostings');
+        await Promise.all([refetchMyPicksFeed(), invalidateMyPicksFeedCache()]);
+        return;
+      }
+
       const createResult = await postMyPosting({
         content: trimmedText,
         photo_urls: [...photoUrls, ...videoUrls],
         posting_visibility: postingVisibility
       });
-      setPostingDraftText('');
-      setPostingDraftPhotoIds([]);
-      setPostingDraftVideoIds([]);
+      clearPostingComposer();
 
       const newPostId = Number(createResult?.post_id);
       if (Number.isFinite(newPostId) && newPostId > 0) {
@@ -2321,7 +2435,17 @@ export default function MyStory() {
     } finally {
       setPostingSaving(false);
     }
-  }, [ownerSinglesId, postingDraftPhotoIds, postingDraftVideoIds, postingDraftText, postingSaving, refetchMyPicksFeed]);
+  }, [
+    clearPostingComposer,
+    editingPostId,
+    editingPostOriginalMedia,
+    ownerSinglesId,
+    postingDraftPhotoIds,
+    postingDraftVideoIds,
+    postingDraftText,
+    postingSaving,
+    refetchMyPicksFeed
+  ]);
 
   const postingSaveReady =
     postingDraftPhotoIds.length > 0 || postingDraftVideoIds.length > 0 || postingDraftText.trim().length > 0;
@@ -3313,6 +3437,7 @@ export default function MyStory() {
                   onVisibilityChange={handlePostingVisibilityChange}
                   contentBusyPostId={contentBusyPostId}
                   onSaveContent={handlePostingContentSave}
+                  onPostDoubleClick={handleOpenPostingInComposer}
                   showActions
                   likeBusyPostId={likeBusyPostId}
                   onToggleLike={handleTogglePostingLike}
@@ -4296,6 +4421,7 @@ export default function MyStory() {
       )}
 
       <Box
+        ref={addNewPostingSectionRef}
         sx={{
           mt: 2,
           border: ADD_NEW_POSTING_BORDER,
@@ -4322,7 +4448,7 @@ export default function MyStory() {
               fontWeight: 700
             }}
           >
-            Add New Posting here
+            {editingPostId != null ? 'Edit Posting here' : 'Add New Posting here'}
           </Typography>
           <Select
             value={postingDraftVisibility}
@@ -4530,6 +4656,22 @@ export default function MyStory() {
             }}
           />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexWrap: 'wrap' }}>
+            {editingPostId != null ? (
+              <UnSelectedButtonTemplate
+                fitLabelWidth={false}
+                disableElevation
+                onClick={handleCancelPostingEdit}
+                disabled={postingSaving}
+                sx={{
+                  minWidth: 120,
+                  fontWeight: 600,
+                  fontSize: myStoryButtonFontSize,
+                  transformOrigin: 'center center'
+                }}
+              >
+                Cancel
+              </UnSelectedButtonTemplate>
+            ) : null}
             <UnSelectedButtonTemplate
               greenGreyStates={postingSaveReady}
               fitLabelWidth={false}
