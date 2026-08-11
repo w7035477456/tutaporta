@@ -11,6 +11,7 @@ import { withSchemaCache } from '../../utils/dbSchemaMetadataCache.js';
 import { buildSinglesActiveStatusWhereSql } from './memberVisibility.js';
 import { sqlBooleanEnumIsTrue } from '../../utils/booleanEnum.js';
 import { ensurePostingQuarterlyPartitionsBeforeWrite } from '../../utils/ensureQuarterlyPartitions.js';
+import { resolveRegularMemberActivityTimestamp, loadLatestPostingCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 import { normalizeApprovalStatus } from '../../utils/approvalStatusEnum.js';
 import { sqlGalleryVideoIdsSubquery } from '../../utils/galleryMediaSql.js';
 import { isToolsOnlyAdminAuth } from '../../utils/adminAuth.js';
@@ -1126,6 +1127,14 @@ export async function createMyPosting(req, res) {
       correctedPhotoUrls.push(await correctPostingMediaUrlForOwner(pool, me, url));
     }
 
+    // RegularMember backdated created_at: resolve timestamp + ensure partitions BEFORE BEGIN.
+    // Doing DDL inside an open postings transaction deadlocks (ACCESS EXCLUSIVE vs RowShare).
+    const previousAt = await loadLatestPostingCreatedAt(pool, postingsSchema, me);
+    const activityAt = await resolveRegularMemberActivityTimestamp(pool, me, { previousAt });
+    if (activityAt) {
+      await ensurePostingQuarterlyPartitionsBeforeWrite(activityAt);
+    }
+
     // Must use one pooled client for BEGIN/INSERT/COMMIT — pool.query('BEGIN') does not bind a session.
     const client = await pool.connect();
     let postId = null;
@@ -1134,6 +1143,11 @@ export async function createMyPosting(req, res) {
       const insertColumns = ['singles_id', 'content'];
       const insertValues = [me, content || null];
       const placeholders = ['$1', '$2'];
+      if (activityAt) {
+        insertColumns.push('created_at');
+        insertValues.push(activityAt.toISOString());
+        placeholders.push(`$${insertValues.length}`);
+      }
       if (postingVisibilityColumn) {
         insertColumns.push(postingVisibilityColumn);
         if (postingVisibilityColumn === 'is_private') {

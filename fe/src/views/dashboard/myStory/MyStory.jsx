@@ -296,6 +296,10 @@ const MY_STORY_DELETE_CONFIRM = {
     message: 'Do you want to permanently delete this photo?',
     enterConfirms: false
   },
+  permanentPhotosBulk: {
+    message: 'Do you want to permanently delete the selected photos?',
+    enterConfirms: false
+  },
   permanentVideo: {
     message: 'Do you want to permanently delete this video?',
     enterConfirms: false
@@ -1895,32 +1899,49 @@ export default function MyStory() {
     [videoCountByType, refetchMyAlbumVideos]
   );
 
-  const executePermanentDelete = useCallback(
-    async (photo) => {
-      if (!photo || deletingId) return;
-      const deletedId = Number(photo.photos_id);
-      setDeletingId(deletedId);
+  const executePermanentDeleteIds = useCallback(
+    async (rawIds) => {
+      const ids = [...new Set((Array.isArray(rawIds) ? rawIds : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
+      if (!ids.length || deletingId) return;
+      setDeletingId(ids[0]);
+      const deletedSet = new Set();
       try {
-        await deleteMyPhoto(deletedId);
-        if (selectedPhotoId === deletedId) setSelectedPhotoId(null);
-        if (profilePhotoId != null && Number(profilePhotoId) === deletedId) {
+        for (const deletedId of ids) {
+          await deleteMyPhoto(deletedId);
+          deletedSet.add(deletedId);
+        }
+        if (selectedPhotoId != null && deletedSet.has(Number(selectedPhotoId))) setSelectedPhotoId(null);
+        if (profilePhotoId != null && deletedSet.has(Number(profilePhotoId))) {
           updateSessionProfilePhoto(null);
           bumpProfilePhotoCache();
         }
         setPhotoVersion((v) => {
           const next = { ...v };
-          delete next[deletedId];
+          deletedSet.forEach((id) => {
+            delete next[id];
+          });
           return next;
         });
+        setBulkSelectedPhotoIds((prev) => prev.filter((id) => !deletedSet.has(Number(id))));
         bumpAlbumPhotoCache();
         await refetchMyPhotos(
           (current) =>
-            Array.isArray(current) ? current.filter((p) => Number(p.photos_id) !== deletedId) : current,
+            Array.isArray(current) ? current.filter((p) => !deletedSet.has(Number(p.photos_id))) : current,
           { revalidate: true }
         );
         await refetchMyPicksFeed();
       } catch (err) {
         setUploadError(err.response?.data?.error || err.message || 'Delete failed');
+        if (deletedSet.size) {
+          setBulkSelectedPhotoIds((prev) => prev.filter((id) => !deletedSet.has(Number(id))));
+          bumpAlbumPhotoCache();
+          await refetchMyPhotos(
+            (current) =>
+              Array.isArray(current) ? current.filter((p) => !deletedSet.has(Number(p.photos_id))) : current,
+            { revalidate: true }
+          );
+          await refetchMyPicksFeed();
+        }
       } finally {
         setDeletingId(null);
       }
@@ -1935,6 +1956,14 @@ export default function MyStory() {
       bumpProfilePhotoCache,
       refetchMyPicksFeed
     ]
+  );
+
+  const executePermanentDelete = useCallback(
+    async (photo) => {
+      if (!photo) return;
+      await executePermanentDeleteIds([photo.photos_id]);
+    },
+    [executePermanentDeleteIds]
   );
 
   const executePermanentDeleteVideo = useCallback(
@@ -1974,15 +2003,53 @@ export default function MyStory() {
     setDeleteConfirm(null);
   }, []);
 
-  const openPermanentDeleteConfirm = useCallback((photo) => {
-    if (!photo) return;
-    setDeleteConfirm({ type: 'permanentPhoto', photo });
-  }, []);
+  const openPermanentDeleteConfirm = useCallback(
+    (photo) => {
+      if (!photo) return;
+      const photoId = Number(photo.photos_id);
+      const bulkIds =
+        Number.isFinite(photoId) &&
+        bulkSelectedPhotoIds.includes(photoId) &&
+        bulkSelectedPhotoIds.length > 1
+          ? bulkSelectedPhotoIds
+          : null;
+      if (bulkIds) {
+        setDeleteConfirm({ type: 'permanentPhotosBulk', photoIds: bulkIds });
+        return;
+      }
+      setDeleteConfirm({ type: 'permanentPhoto', photo });
+    },
+    [bulkSelectedPhotoIds]
+  );
 
   const openPermanentDeleteVideoConfirm = useCallback((video) => {
     if (!video) return;
     setDeleteConfirm({ type: 'permanentVideo', video });
   }, []);
+
+  const openBulkPhotosDeleteConfirm = useCallback(
+    (albumPhotoIds) => {
+      const scope =
+        Array.isArray(albumPhotoIds) && albumPhotoIds.length
+          ? new Set(albumPhotoIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))
+          : null;
+      const ids = bulkSelectedPhotoIds.filter((id) => {
+        const n = Number(id);
+        if (!Number.isFinite(n) || n < 1) return false;
+        return scope ? scope.has(n) : true;
+      });
+      if (!ids.length) return;
+      if (ids.length === 1) {
+        const photo = photos.find((p) => Number(p.photos_id) === Number(ids[0]));
+        if (photo) {
+          setDeleteConfirm({ type: 'permanentPhoto', photo });
+          return;
+        }
+      }
+      setDeleteConfirm({ type: 'permanentPhotosBulk', photoIds: ids });
+    },
+    [bulkSelectedPhotoIds, photos]
+  );
 
   const confirmDeleteFromDialog = useCallback(async () => {
     const pending = deleteConfirm;
@@ -1992,10 +2059,14 @@ export default function MyStory() {
       await executePermanentDelete(pending.photo);
       return;
     }
+    if (pending.type === 'permanentPhotosBulk') {
+      await executePermanentDeleteIds(pending.photoIds);
+      return;
+    }
     if (pending.type === 'permanentVideo') {
       await executePermanentDeleteVideo(pending.video);
     }
-  }, [deleteConfirm, closeDeleteConfirm, executePermanentDelete, executePermanentDeleteVideo]);
+  }, [deleteConfirm, closeDeleteConfirm, executePermanentDelete, executePermanentDeleteIds, executePermanentDeleteVideo]);
 
   useEffect(() => {
     if (!deleteConfirm) return undefined;
@@ -2052,9 +2123,16 @@ export default function MyStory() {
   }, []);
 
   const handleAlbumPhotoClick = useCallback(
-    (photoId) => {
+    (photoId, event) => {
       handleSelectPhoto(photoId);
-      toggleBulkPhotoSelection(photoId);
+      // Green check = multi-select for drag-into-posting (modifier click only).
+      // Plain click only previews in the editor so it does not look "locked".
+      const multiSelect = Boolean(event?.metaKey || event?.ctrlKey || event?.shiftKey);
+      if (multiSelect) {
+        toggleBulkPhotoSelection(photoId);
+        return;
+      }
+      setBulkSelectedPhotoIds([]);
     },
     [handleSelectPhoto, toggleBulkPhotoSelection]
   );
@@ -2906,7 +2984,11 @@ export default function MyStory() {
     >
       <ColorTemplate7PopupLargeDark.Body spacing={2}>
         <ColorTemplate7PopupLargeDark.BodyText>
-          {deleteConfirm ? MY_STORY_DELETE_CONFIRM[deleteConfirm.type]?.message : ''}
+          {deleteConfirm?.type === 'permanentPhotosBulk'
+            ? `Do you want to permanently delete these ${Array.isArray(deleteConfirm.photoIds) ? deleteConfirm.photoIds.length : 0} photos?`
+            : deleteConfirm
+              ? MY_STORY_DELETE_CONFIRM[deleteConfirm.type]?.message
+              : ''}
         </ColorTemplate7PopupLargeDark.BodyText>
         <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
           <GreenButton type="button" onClick={closeDeleteConfirm}>
@@ -4014,7 +4096,11 @@ export default function MyStory() {
                       {(() => {
                         const youtubeSlotIndex = ALBUM_YOUTUBE_PLAY_SLOT_INDEX[albumType];
                         const opensYoutube = Number.isFinite(youtubeSlotIndex);
+                        const albumBulkCount = albumPhotos.filter((p) =>
+                          bulkSelectedPhotoIds.includes(Number(p.photos_id))
+                        ).length;
                         return (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', mb: 0.5 }}>
                       <UnSelectedButtonTemplate
                         {...(opensYoutube
                           ? {
@@ -4034,11 +4120,26 @@ export default function MyStory() {
                         fullWidth
                         sx={{
                           ...myStoryAlbumPanelTitleButtonSx,
-                          cursor: opensYoutube ? 'pointer' : 'default'
+                          cursor: opensYoutube ? 'pointer' : 'default',
+                          flex: 1
                         }}
                       >
                         {ALBUM_TITLES[albumType]} ({albumPhotoCount}/{ALBUM_MAX})
                       </UnSelectedButtonTemplate>
+                      {albumBulkCount > 0 ? (
+                        <UnSelectedButtonTemplate
+                          type="button"
+                          size="small"
+                          disabled={Boolean(deletingId)}
+                          onClick={() =>
+                            openBulkPhotosDeleteConfirm(albumPhotos.map((p) => Number(p.photos_id)))
+                          }
+                          sx={{ minWidth: 0, flexShrink: 0, whiteSpace: 'nowrap', boxShadow: 'none' }}
+                        >
+                          Delete selected ({albumBulkCount})
+                        </UnSelectedButtonTemplate>
+                      ) : null}
+                      </Box>
                         );
                       })()}
                       {albumPhotoCount === 0 ? (
@@ -4073,7 +4174,7 @@ export default function MyStory() {
                               draggable
                               onDragStart={(e) => handleTileDragStart(e, p)}
                               onDragEnd={handleTileDragEnd}
-                              onClick={() => handleAlbumPhotoClick(p.photos_id)}
+                              onClick={(e) => handleAlbumPhotoClick(p.photos_id, e)}
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -4084,8 +4185,13 @@ export default function MyStory() {
                                 width: '100%',
                                 aspectRatio: '1 / 1',
                                 borderRadius: 1,
-                                border: selectedPhotoId === p.photos_id ? '2px solid' : '2px solid transparent',
-                                borderColor: selectedPhotoId === p.photos_id ? 'primary.main' : 'transparent',
+                                border: selectedPhotoId === p.photos_id || isBulkSelected ? '2px solid' : '2px solid transparent',
+                                borderColor:
+                                  selectedPhotoId === p.photos_id
+                                    ? 'primary.main'
+                                    : isBulkSelected
+                                      ? '#00e676'
+                                      : 'transparent',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -4185,29 +4291,21 @@ export default function MyStory() {
                                   sx={{
                                     position: 'absolute',
                                     zIndex: 3,
-                                    inset: 0,
+                                    left: 4,
+                                    bottom: 4,
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: '50%',
+                                    bgcolor: '#00e676',
+                                    border: '2px solid #fff',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    bgcolor: 'rgba(0, 230, 118, 0.42)',
+                                    boxShadow: '0 1px 6px rgba(0,0,0,0.45)',
                                     pointerEvents: 'none'
                                   }}
                                 >
-                                  <Box
-                                    sx={{
-                                      width: '44%',
-                                      height: '44%',
-                                      borderRadius: '50%',
-                                      bgcolor: '#00e676',
-                                      border: '3px solid #fff',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 2px 10px rgba(0,0,0,0.55)'
-                                    }}
-                                  >
-                                    <IconCheck size={22} color="#fff" stroke={3.2} />
-                                  </Box>
+                                  <IconCheck size={14} color="#fff" stroke={3.2} />
                                 </Box>
                               ) : null}
 

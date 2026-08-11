@@ -1,5 +1,12 @@
 /** Cycle order matches helloworldjunktest.member_category_enum sort order. */
-export const MEMBER_CATEGORY_VALUES = Object.freeze(['Public', 'Admin', 'DemoUser', 'PilotUser']);
+export const MEMBER_CATEGORY_VALUES = Object.freeze([
+  'Public',
+  'Admin',
+  'DemoUser',
+  'PilotUser',
+  'RegularMember',
+  'AnyMember'
+]);
 
 /**
  * @param {unknown} raw
@@ -40,4 +47,13 @@ export function isPilotUserCategory(raw) {
 
 export function isDemoUserCategory(raw) {
   return normalizeMemberCategory(raw) === 'DemoUser';
+}
+
+export function isRegularMemberCategory(raw) {
+  return normalizeMemberCategory(raw) === 'RegularMember';
+}
+
+/** DemoUser / RegularMember: full menus; skip mandatory profile-photo setup gate. */
+export function isInitialSetupBypassMemberCategory(raw) {
+  return isDemoUserCategory(raw) || isRegularMemberCategory(raw);
 }

@@ -18,6 +18,7 @@ import { isLegacySixDigitPassword } from '../../utils/passwordRequirements.js';
 import { isSinglesStatusLoginAllowed } from '../../utils/singlesStatus.js';
 import { getRequestClientIp, isAdminIpAllowed } from '../../utils/adminIpConfig.js';
 import { resolveDemoGuestLoginAlias } from '../../utils/demoGuestLoginAlias.js';
+import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status
          FROM helloworldjunktest.singles s`;
@@ -45,7 +46,7 @@ async function findUserByLoginIdentifier(identifier) {
 
   const emailResult = await pool.query(
     `${USER_SELECT}
-         WHERE s.email = $1
+         WHERE LOWER(s.email) = $1
          ORDER BY COALESCE(s.updated_at, s.created_at) DESC
          LIMIT 1`,
     [normalized.value]
@@ -105,6 +106,12 @@ async function checkLoginPassword(storedHash, plainPassword) {
 async function issueLoginSuccess(res, user, log, rememberMe = false, options = {}) {
   const { requiresPasswordUpgrade = false, guestDemoLogin = false } = options;
   const { password_hash, ...userWithoutPassword } = user;
+
+  try {
+    await ensureDemoRegularInitialSetupDone(pool, user.singles_id, user.member_category);
+  } catch (err) {
+    console.error('[beVerifyLoginPassword] ensureDemoRegularInitialSetupDone:', err?.message ?? err);
+  }
 
   const logoutMins = await resolveCustomLogoutMinutes(user.singles_id);
   const tokenPayload = {
@@ -193,7 +200,7 @@ export async function beVerifyLoginPassword(req, res) {
         });
         return res.status(401).json({ error: 'Login or Password fail' });
       }
-      if (!isSinglesStatusLoginAllowed(aliasUser.status)) {
+      if (!isSinglesStatusLoginAllowed(aliasUser.status, aliasUser.member_category)) {
         return res.status(403).json({
           error: 'Your account is not active. Please contact support.'
         });
@@ -344,10 +351,11 @@ export async function beVerifyLoginPassword(req, res) {
       client.release();
     }
 
-    if (!isSinglesStatusLoginAllowed(user.status)) {
+    if (!isSinglesStatusLoginAllowed(user.status, user.member_category)) {
       log('[beVerifyLoginPassword.js] reject: singles status not login-eligible', {
         singles_id: user.singles_id,
-        status: user.status
+        status: user.status,
+        member_category: user.member_category
       });
       return res.status(403).json({
         error: 'Your account is not active. Please contact support.'

@@ -7,6 +7,7 @@ import {
 } from './fullNameFormat.js';
 import { formatBriefBioGovIdDisplay, formatPassportGovIdDisplay, readCitizenshipDisplayValue, readPlaceOfBirthDisplayValue } from '../../utils/govIdDocumentLabels.js';
 import { normalizeApprovalStatus, APPROVAL_STATUS_APPROVE } from '../../utils/approvalStatusEnum.js';
+import { isRegularMemberCategory } from '../../utils/memberCategory.js';
 
 function readVettedGroup(row, prefix) {
   const responseKey = prefix;
@@ -283,9 +284,21 @@ function readPlaceOfBirthVettedGroup(singlesRow, vetRow) {
 
 function buildBriefBioRows(singlesRow, vetRow) {
   const mergedVetRow = buildMergedVetRowForNames(vetRow, singlesRow);
-  const profileDlVetted = readProfileDlVettedGroup(singlesRow, vetRow);
-  const profileLiveVetted = readProfileLiveVettedGroup(singlesRow, vetRow);
-  const profilePpVetted = readProfilePpVettedGroup(singlesRow, vetRow);
+  const forceRegularPhotoMatch = isRegularMemberCategory(singlesRow?.member_category);
+  const regularMatchedVetted = {
+    verificationStatus: 'info_matches',
+    vettedDate: null,
+    vettedNote: null
+  };
+  const profileDlVetted = forceRegularPhotoMatch
+    ? { ...regularMatchedVetted, vettedNote: 'DL 100%' }
+    : readProfileDlVettedGroup(singlesRow, vetRow);
+  const profileLiveVetted = forceRegularPhotoMatch
+    ? { ...regularMatchedVetted, vettedNote: 'LIVE 100%' }
+    : readProfileLiveVettedGroup(singlesRow, vetRow);
+  const profilePpVetted = forceRegularPhotoMatch
+    ? { ...regularMatchedVetted, vettedNote: 'PP 100%' }
+    : readProfilePpVettedGroup(singlesRow, vetRow);
   const ageVetted = readVettedGroup(vetRow, 'age');
   const heightVetted = readVettedGroup(vetRow, 'height');
   const genderVetted = readVettedGroup(vetRow, 'official_gender');
@@ -298,7 +311,7 @@ function buildBriefBioRows(singlesRow, vetRow) {
       label: 'Profile&DL photo',
       matchKind: 'dl',
       matchLabel: 'DL',
-      matchPercent: readMatchPercent(singlesRow?.dl_profile_percent_match),
+      matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.dl_profile_percent_match),
       comparisonImageKind: 'driver_license',
       comparisonImagePhotosId: singlesRow?.dl_face_reference_photos_id ?? null,
       vetted: profileDlVetted
@@ -308,7 +321,7 @@ function buildBriefBioRows(singlesRow, vetRow) {
       label: 'Profile&Live',
       matchKind: 'live',
       matchLabel: 'LIVE',
-      matchPercent: readMatchPercent(singlesRow?.live_scan_percent_match),
+      matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.live_scan_percent_match),
       comparisonImageKind: 'profile',
       primaryImagePhotosId: singlesRow?.live_scan_reference_photos_id ?? null,
       comparisonImagePhotosId: singlesRow?.profile_image_fk ?? null,
@@ -316,14 +329,14 @@ function buildBriefBioRows(singlesRow, vetRow) {
     })
   ];
 
-  if (memberHasPassportProfileMatch(singlesRow)) {
+  if (forceRegularPhotoMatch || memberHasPassportProfileMatch(singlesRow)) {
     rows.push(
       buildProfileMatchPairRow(singlesRow, {
         key: 'profilePpPhoto',
         label: 'Profile&PP',
         matchKind: 'pp',
         matchLabel: 'PP',
-        matchPercent: readMatchPercent(singlesRow?.pp_profile_percent_match),
+        matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.pp_profile_percent_match),
         comparisonImageKind: 'passport',
         comparisonImagePhotosId: singlesRow?.pp_face_reference_photos_id ?? null,
         vetted: profilePpVetted

@@ -1,7 +1,8 @@
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
-import { isToolsOnlyAdminSession } from 'utils/adminSession';
+import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
+import { isInitialSetupBypassMemberCategory } from 'utils/memberCategory';
 
 export const MY_STORY_PATH = '/myStory';
 export const MY_STORE_PATH = '/vsingles/myStore';
@@ -9,7 +10,9 @@ export const PROFILE_PHOTO_MENU_ID = 'myStory';
 
 /** True when the member has not set a profile photo yet. */
 export function needsProfilePhotoSetup(user) {
-  if (isToolsOnlyAdminSession(user)) return false;
+  if (isToolsOnlyAdminSession(user) || isImpersonationSession(user)) return false;
+  // DemoUser / RegularMember: never lock the sidebar behind profile photo.
+  if (isInitialSetupBypassMemberCategory(user?.member_category)) return false;
   const id = Number(user?.profile_image_fk);
   return !Number.isFinite(id) || id < 1;
 }
@@ -18,12 +21,14 @@ export function needsProfilePhotoSetup(user) {
 export function isPathRequiringProfilePhoto(pathname) {
   const p = String(pathname ?? '');
   if (p === MY_STORY_PATH || p === MY_STORE_PATH) return false;
+  // Self-Report must stay reachable during mandatory IDV (no photo ↔ IDV redirect fight).
+  if (p === SELF_REPORT_BIOGRAPHY_PATH) return false;
   if (p.startsWith('/vsingles')) return true;
   if (p === '/allSingles' || p === '/myPicks' || p === '/interestedSingles') return true;
   if (p === RECEIVED_BIO_REQUESTS_PATH || p === PROFILES_RECORDS_PATH) return true;
   if (p === '/vettedFriends' || p === '/request-ive-sent' || p === '/send-flower') return true;
   if (p.startsWith('/vettedFriends/') || p.startsWith('/request-ive-sent/')) return true;
-  if (p === '/verifyself' || p === SELF_REPORT_BIOGRAPHY_PATH) return true;
+  if (p === '/verifyself') return true;
   if (p.startsWith('/request-')) return true;
   return false;
 }

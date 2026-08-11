@@ -1,8 +1,8 @@
 // material-ui
 import { useTheme, useColorScheme } from '@mui/material/styles';
 
-import logo from 'assets/images/vettedSingleLogoText.png';
-import logoDark from 'assets/images/vettedSingleLogoText.png'; // optional
+import logo from 'assets/images/vettedSingleLogoText.jpeg';
+import logoDark from 'assets/images/vettedSingleLogoText.jpeg'; // optional
 import welcomeMall from 'assets/images/welcomeMall.png';
 
 // ==============================|| LOGO SVG ||============================== //

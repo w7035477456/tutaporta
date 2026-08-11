@@ -51,7 +51,7 @@ async function findUserByLoginIdentifier(identifier) {
 
   const emailResult = await pool.query(
     `${USER_SELECT}
-         WHERE s.email = $1
+         WHERE LOWER(s.email) = $1
          ORDER BY COALESCE(s.updated_at, s.created_at) DESC
          LIMIT 1`,
     [normalized.value]

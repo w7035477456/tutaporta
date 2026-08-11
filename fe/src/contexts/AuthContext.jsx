@@ -5,9 +5,15 @@ import { clearSessionEndNotices } from '../utils/sessionEndNotice';
 import { applyThemeByName, DEFAULT_NEW_USER_THEME_NAME } from '../utils/themeConfig';
 import { syncClientApiRateLimitBypass } from '../utils/adminSession';
 import { clearClientApiCooldownState } from '../utils/clientApiCooldown';
+import { clearSignupIdentificationVerificationRequired } from '../utils/signupIdentificationVerification';
 
 function clearSwrCacheForNewSession() {
   void mutateSwrCache(() => true, undefined, { revalidate: false });
+}
+
+/** Drop tab-local onboarding locks when switching accounts (login / impersonate / logout). */
+function clearSessionLocalOnboardingLocks() {
+  clearSignupIdentificationVerificationRequired();
 }
 const AuthContext = createContext(null);
 
@@ -197,6 +203,7 @@ export const AuthProvider = ({ children }) => {
       }
       setUser(nextUser);
       setRequiresPasswordUpgrade(Boolean(response.data.requiresPasswordUpgrade));
+      clearSessionLocalOnboardingLocks();
       clearSwrCacheForNewSession();
       cancelPendingSessionEndRedirect();
       clearSessionEndNotices();
@@ -239,6 +246,7 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(nextUser);
     setRequiresPasswordUpgrade(false);
+    clearSessionLocalOnboardingLocks();
     clearSwrCacheForNewSession();
     cancelPendingSessionEndRedirect();
     clearSessionEndNotices();
@@ -258,6 +266,7 @@ export const AuthProvider = ({ children }) => {
     const nextUser = mergeAuthUser(response.user, response);
     setUser(nextUser);
     setRequiresPasswordUpgrade(false);
+    clearSessionLocalOnboardingLocks();
     clearSwrCacheForNewSession();
     cancelPendingSessionEndRedirect();
     clearSessionEndNotices();
@@ -291,6 +300,7 @@ export const AuthProvider = ({ children }) => {
     }
     setUser(null);
     setRequiresPasswordUpgrade(false);
+    clearSessionLocalOnboardingLocks();
     clearSwrCacheForNewSession();
   };
 

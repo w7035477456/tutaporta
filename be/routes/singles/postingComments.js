@@ -17,6 +17,7 @@ import {
   toBooleanEnumLabel
 } from '../../utils/booleanEnum.js';
 import { ensurePostingQuarterlyPartitionsBeforeWrite } from '../../utils/ensureQuarterlyPartitions.js';
+import { resolveRegularMemberActivityTimestamp, loadLatestCommentCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 
 const POSTING_COMMENT_BOOLEAN_ENUM_COLS = new Set(['is_liked', 'is_shared']);
 
@@ -351,7 +352,15 @@ export async function createPostingComment(req, res) {
       insertColumns.push('alias');
       insertValues.push(alias || null);
     }
-    await ensurePostingQuarterlyPartitionsBeforeWrite();
+    const previousAt = await loadLatestCommentCreatedAt(pool, postingsSchema, me, { photoId });
+    const activityAt = await resolveRegularMemberActivityTimestamp(pool, me, { previousAt });
+    if (activityAt && commentColumns.has('created_at')) {
+      insertColumns.push('created_at');
+      insertValues.push(activityAt.toISOString());
+      await ensurePostingQuarterlyPartitionsBeforeWrite(activityAt);
+    } else {
+      await ensurePostingQuarterlyPartitionsBeforeWrite();
+    }
     const insertQuery = buildPostingCommentInsertQuery(
       postingsSchema,
       commentColumns,

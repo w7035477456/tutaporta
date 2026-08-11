@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { useAuth } from 'contexts/AuthContext';
-import { isToolsOnlyAdminSession } from 'utils/adminSession';
+import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 import {
   isIdentificationVerificationLockActive,
   isPathAllowedDuringIdentificationVerificationLock,
@@ -25,7 +25,7 @@ export default function IdentificationVerificationSetupRedirect() {
 
   useEffect(() => {
     if (loading) return;
-    if (isToolsOnlyAdminSession(user)) return;
+    if (isToolsOnlyAdminSession(user) || isImpersonationSession(user)) return;
     if (!isIdentificationVerificationLockActive(user)) return;
     if (isPathAllowedDuringIdentificationVerificationLock(pathname)) return;
     navigate(SELF_REPORT_BIOGRAPHY_PATH, {

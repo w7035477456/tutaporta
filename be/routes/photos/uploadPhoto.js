@@ -16,6 +16,7 @@ import {
   normalizePhotoExtension
 } from '../../utils/albumUploadFormats.js';
 import { isAdminImpersonationSession } from '../../utils/adminAuth.js';
+import { resolveRegularMemberActivityTimestamp, loadLatestPhotoCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 
 // Max upload size from ~/.ssh/be/.env (NOTES_MAX_SIZE_UPLOAD_MB), default 2 MiB — read at request time so PM2 restarts pick up changes
 export function getMaxUploadMb() {
@@ -455,6 +456,12 @@ export async function uploadPhoto(req, res) {
       if (checksumColumn) {
         optionalColumns.push('checksum');
         optionalValues.push(uploadedChecksum);
+      }
+      const previousAt = await loadLatestPhotoCreatedAt(client, singlesId);
+      const activityAt = await resolveRegularMemberActivityTimestamp(client, singlesId, { previousAt });
+      if (activityAt) {
+        optionalColumns.push('created_at');
+        optionalValues.push(activityAt.toISOString());
       }
       ({ optionalColumns, optionalValues } = await appendPhotoThumbnailToInsert(client, {
         optionalColumns,

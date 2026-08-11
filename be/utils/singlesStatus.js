@@ -1,3 +1,5 @@
+import { isRegularMemberCategory } from './memberCategory.js';
+
 /** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive'} SinglesStatus */
 
 /** Cycle order matches helloworldjunktest.singles_status enum sort order. */
@@ -22,6 +24,8 @@ export function normalizeSinglesStatus(raw) {
     .trim()
     .toLowerCase();
   if (value === 'cencel') return 'cancel';
+  // Accept "notactive" / "not_active" as inactive.
+  if (value === 'notactive' || value === 'not_active' || value === 'not-active') return 'inactive';
   return SINGLES_STATUS_VALUES.includes(value) ? value : null;
 }
 
@@ -61,10 +65,12 @@ export function formatSinglesStatusLabel(raw) {
 export const SINGLES_LOGIN_ALLOWED_STATUSES = Object.freeze(['active', 'pause']);
 
 /**
- * @param {unknown} raw
+ * @param {unknown} rawStatus
+ * @param {unknown} [memberCategory] RegularMember may log in even when status is inactive / not active
  * @returns {boolean}
  */
-export function isSinglesStatusLoginAllowed(raw) {
-  const normalized = normalizeSinglesStatus(raw);
+export function isSinglesStatusLoginAllowed(rawStatus, memberCategory) {
+  if (isRegularMemberCategory(memberCategory)) return true;
+  const normalized = normalizeSinglesStatus(rawStatus);
   return normalized != null && SINGLES_LOGIN_ALLOWED_STATUSES.includes(normalized);
 }

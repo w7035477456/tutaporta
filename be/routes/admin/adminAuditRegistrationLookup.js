@@ -25,6 +25,7 @@ import {
 } from '../../utils/adminLookupWildcard.js';
 import { loadVideosBySinglesIds, mapSinglesLookupVideos } from '../../utils/loadVideosBySinglesIds.js';
 import { RECORD4SUPPORT_FILE_PREFIX } from '../../utils/saveRecord4SupportVideo.js';
+import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
 
 const SINGLES_LOOKUP_WILDCARD_LIMIT = 500;
 
@@ -405,6 +406,7 @@ export async function postAdminSetSinglesMemberCategory(req, res) {
         [nextCategory, singlesId]
       );
     }
+    await ensureDemoRegularInitialSetupDone(client, singlesId, nextCategory);
 
     await client.query('COMMIT');
 

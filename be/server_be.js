@@ -400,6 +400,7 @@ import { photoAlbumsTransferMeterStack } from './middleware/photoAlbumsTransferM
 import { getPublicKey } from './jwtKeys.js';
 import { clearAuthCookie, getAuthTokenFromCookies, getKeepMeLoginDays } from './utils/authCookie.js';
 import { getMallDepartmentMode } from './mallDepartmentMode.js';
+import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
 import appLog from './logger.js';
 import { respondSessionInvalid } from './utils/sessionInvalidResponse.js';
 import { buildSessionConfigResponse } from './utils/sessionTimeoutConfig.js';
@@ -994,6 +995,11 @@ app.get('/api/me', async (req, res) => {
     }
 
     const row = result.rows[0];
+    try {
+      await ensureDemoRegularInitialSetupDone(pool, row.singles_id, row.member_category);
+    } catch (err) {
+      console.error('[/api/me] ensureDemoRegularInitialSetupDone:', err?.message ?? err);
+    }
     const user = {
       singles_id: row.singles_id,
       prefix: row.prefix,

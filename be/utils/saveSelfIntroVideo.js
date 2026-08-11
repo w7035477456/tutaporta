@@ -14,6 +14,7 @@ import { purgeOrphanSelfIntroVideosInTx } from './hardDeleteMemberSelfIntroVideo
 import { generateAndSaveVideoThumbnail } from './generateVideoThumbnail.js';
 import { PUBLIC_VIDEO_ALBUM_MAX, countAlbumVideosInType } from './albumMediaCapacity.js';
 import { duplicateVaultVideoError, findSameUserVaultVideoWithByteSize } from './duplicateVaultVideoPolicy.js';
+import { resolveRegularMemberActivityTimestamp, loadLatestVideoCreatedAt } from './regularMemberActivityTimestamp.js';
 
 export const SELF_INTRO_VIDEO_FILE_PREFIX = 'selfintro_';
 export const SELF_INTRO_VIDEO_KEEP_COUNT = 3;
@@ -113,11 +114,18 @@ export async function saveSelfIntroVideo(
     outputDir: filePathDir
   });
 
+  const previousAt = await loadLatestVideoCreatedAt(client, singlesId);
+  const activityAt = await resolveRegularMemberActivityTimestamp(client, singlesId, { previousAt });
+
   await client.query(
     `INSERT INTO helloworldjunktest.videos
-       (video_id, singles_id, file_path, file_extension, type, video_file_name, checksum, video_thumbnail)
-     VALUES ($1, $2, $3, $4, ${sqlPhotoTypeParam('$5')}, $6, $7, $8)`,
-    [videoId, singlesId, videoFolder, ext, 'public', videoFileName, uploadedChecksum, videoThumbnail]
+       (video_id, singles_id, file_path, file_extension, type, video_file_name, checksum, video_thumbnail${
+         activityAt ? ', created_at' : ''
+       })
+     VALUES ($1, $2, $3, $4, ${sqlPhotoTypeParam('$5')}, $6, $7, $8${activityAt ? ', $9' : ''})`,
+    activityAt
+      ? [videoId, singlesId, videoFolder, ext, 'public', videoFileName, uploadedChecksum, videoThumbnail, activityAt.toISOString()]
+      : [videoId, singlesId, videoFolder, ext, 'public', videoFileName, uploadedChecksum, videoThumbnail]
   );
 
   const assigned = await assignSelfIntroVideoToFirstEmptySlot(client, singlesId, videoId);
