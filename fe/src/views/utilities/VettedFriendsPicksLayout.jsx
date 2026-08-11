@@ -285,7 +285,8 @@ function canCancelOutgoingBioRequest(row, kind) {
 
 function formatOutgoingBioPanelTitle(row, kind) {
   const friendLabel = formatOutgoingBioFriendLabel(row);
-  const bioLabel = kind === 'brief' ? 'Brief Bio' : 'Full Bio';
+  const bioLabel =
+    kind === 'brief' ? 'Acquaintance Bio (Brief Bio)' : 'Buddies Bio (Full Bio)';
   return `View ${bioLabel} of ${friendLabel}`;
 }
 
@@ -590,8 +591,8 @@ function OutgoingBioRequestSentenceLine({
                 lineHeight: 1.35
               }}
             >
-              Tap Click to view to unlock with {bioKind === 'full' ? '2 tokens' : '1 token'}. The bio table appears below
-              after unlock.
+              Tap {bioKind === 'full' ? 'View Buddies Bio (Full Bio)' : 'View Acquaintance Bio (Brief Bio)'} to unlock
+              with {bioKind === 'full' ? '2 tokens' : '1 token'}. The bio table appears below after unlock.
             </Typography>
           ) : null}
         </>
@@ -1238,10 +1239,8 @@ export default function VettedFriendsPicksLayout({
       }
       if (bioKind === 'full') {
         if (!selectedFullBioApproved) return;
-        setApprovedBioViewKinds({
-          brief: selectedBriefBioApproved,
-          full: true
-        });
+        // Full Bio includes Brief Bio content even when Brief was never requested/approved.
+        setApprovedBioViewKinds({ brief: true, full: true });
       }
     },
     [selectedBriefBioApproved, selectedFullBioApproved]
@@ -1349,8 +1348,9 @@ export default function VettedFriendsPicksLayout({
       loading: approvedBioReviewLoading,
       viewerMaskPending: false,
       viewerMaskMiscOnly: false,
+      // Full Bio (Buddies) is a superset — always include Brief Bio fields (photo, age, height, …).
       visibleSections: {
-        brief: showApprovedBriefBio,
+        brief: showApprovedBriefBio || showApprovedFullBio,
         full: showApprovedFullBio,
         misc: showApprovedFullBio
       }
@@ -2438,7 +2438,7 @@ export default function VettedFriendsPicksLayout({
                       ...vettedFriendsPanelTextSx
                     }}
                   >
-                    {`Want to view ${selectedBioMemberLabel}'s vetted profile? Click Request Brief Bio or Request Full Bio button. As soon as ${selectedBioMemberLabel} responds with 'Approved !', you will have a green button 'Click to View'.`}
+                    {`Want to view ${selectedBioMemberLabel}'s vetted profile? Click Request Brief Bio or Request Full Bio button. As soon as ${selectedBioMemberLabel} responds with 'Approved !', you will have a green button 'View Acquaintance Bio (Brief Bio)' or 'View Buddies Bio (Full Bio)'.`}
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, width: '100%' }}>
                     {renderOutgoingBioKindPanel(selectedRow, 'brief')}

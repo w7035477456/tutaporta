@@ -265,7 +265,7 @@ export function formatOutgoingBioFriendLabel(row) {
 }
 
 /** Approval suffix for outgoing bio request sentences on Vetted Friends. */
-export function formatBioRequestApprovalDisplay(approvalValue, { requestFlag } = {}) {
+export function formatBioRequestApprovalDisplay(approvalValue, { requestFlag, bioKind } = {}) {
   if (!isBioRequestRequested(requestFlag)) {
     return { text: '', clickable: false, showViewAction: false, tone: 'neutral' };
   }
@@ -273,7 +273,10 @@ export function formatBioRequestApprovalDisplay(approvalValue, { requestFlag } =
   if (state === APPROVAL_STATUS.APPROVE) {
     return {
       text: 'Approved !',
-      actionText: 'Click to view',
+      actionText:
+        bioKind === 'brief'
+          ? 'View Acquaintance Bio (Brief Bio)'
+          : 'View Buddies Bio (Full Bio)',
       clickable: true,
       showViewAction: true,
       tone: 'approve'
@@ -287,7 +290,7 @@ export function formatBioRequestApprovalDisplay(approvalValue, { requestFlag } =
 
 /**
  * Outgoing bio request status sentence (Vetted Friends Biography tab).
- * e.g. "Status: Requested to view WackyWill Brief Bio Response: Approved | Click to view"
+ * e.g. "Status: Requested to view WackyWill Brief Bio Response: Approved | Buddies Bio (Full Bio)"
  */
 export function formatOutgoingBioRequestSentence(row, bioKind) {
   const friendLabel = formatOutgoingBioFriendLabel(row);
@@ -299,7 +302,7 @@ export function formatOutgoingBioRequestSentence(row, bioKind) {
     requestText,
     friendLabel,
     bioPhrase,
-    approval: formatBioRequestApprovalDisplay(approvalValue, { requestFlag })
+    approval: formatBioRequestApprovalDisplay(approvalValue, { requestFlag, bioKind })
   };
 }
 

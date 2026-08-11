@@ -649,12 +649,20 @@ export async function getApprovedCheckrBioReview(req, res) {
       return res.status(404).json({ error: 'Member not found' });
     }
 
+    // Full Bio (Buddies) is a superset of Brief Bio (Acquaintance) — include brief rows with full.
+    const includeBrief = Boolean(access.brief || access.full);
+    const includeFull = Boolean(access.full);
+
     return res.json({
       ...bioReview,
-      access,
-      briefBio: access.brief ? bioReview.briefBio : [],
-      fullBio: access.full ? bioReview.fullBio : [],
-      miscBio: access.full ? bioReview.miscBio : []
+      access: {
+        ...access,
+        brief: includeBrief,
+        full: includeFull
+      },
+      briefBio: includeBrief ? bioReview.briefBio : [],
+      fullBio: includeFull ? bioReview.fullBio : [],
+      miscBio: includeFull ? bioReview.miscBio : []
     });
   } catch (error) {
     console.error('[checkr:getApprovedBioReview]', error?.message || error);

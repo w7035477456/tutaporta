@@ -120,7 +120,9 @@ export default function VettedFriendsBioViewTokenPopup({
 }) {
   const navigate = useNavigate();
   const isFullBio = bioKind === 'full';
-  const unlockLabel = isFullBio ? 'Full Bio' : 'Brief Bio';
+  const unlockLabel = isFullBio
+    ? 'View Buddies Bio (Full Bio)'
+    : 'View Acquaintance Bio (Brief Bio)';
   const balance = Math.max(0, Number(tokenBalance) || 0);
   const cost = resolveUnlockTokenCost(bioKind, requiredTokens);
   const balanceAfterUnlock = balance - cost;
@@ -146,7 +148,7 @@ export default function VettedFriendsBioViewTokenPopup({
         <ColorTemplate7PopupLargeDark.Title>Token Debit confirmation</ColorTemplate7PopupLargeDark.Title>
         <ColorTemplate7PopupLargeDark.BodyText sx={leftBodyTextSx}>
           Great news! <strong>{memberLabel}</strong> approved your request to view their{' '}
-          {isFullBio ? 'Full Bio' : 'Brief Bio'}. To open it now, a small token fee unlocks this profile view on your
+          {unlockLabel}. To open it now, a small token fee unlocks this profile view on your
           account.
         </ColorTemplate7PopupLargeDark.BodyText>
         <ColorTemplate7PopupLargeDark.BodyText sx={leftBodyTextSx}>
@@ -206,7 +208,7 @@ export default function VettedFriendsBioViewTokenPopup({
         {mode === 'insufficient' ? (
           <ColorTemplate7PopupLargeDark.ErrorBar sx={tokenBalanceErrorBarSx}>
             Your current balance is {tokenCountLabel(balance)}. You need {tokenCountLabel(cost)} to unlock {unlockLabel}.
-            Please buy more tokens, then tap <strong>Click to view</strong> again.
+            Please buy more tokens, then tap <strong>{unlockLabel}</strong> again.
           </ColorTemplate7PopupLargeDark.ErrorBar>
         ) : null}
 
