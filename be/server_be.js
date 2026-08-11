@@ -30,6 +30,7 @@ import {
   dismissAllMyPicksPostNotifications,
   createMyPosting,
   updateMyPostingVisibility,
+  updateMyPostingContent,
   deleteMyPosting,
   deleteMyPostingPhoto,
   getPostingComments,
@@ -1230,6 +1231,7 @@ app.post('/api/bioResponses/notifications/dismiss', requireAuth, dismissBioRespo
 app.post('/api/bioResponses/notifications/dismissAll', requireAuth, dismissAllBioResponseNotifications);
 app.post('/api/myPicks/posting', requireAuth, createMyPosting);
 app.patch('/api/myPicks/posting/:postId/visibility', requireAuth, updateMyPostingVisibility);
+app.patch('/api/myPicks/posting/:postId/content', requireAuth, updateMyPostingContent);
 app.delete('/api/myPicks/posting/:postId', requireAuth, deleteMyPosting);
 app.delete('/api/myPicks/postingPhoto/:photoId', requireAuth, deleteMyPostingPhoto);
 app.get('/api/myPicks/posting/:postId/comments', requireAuth, getPostingComments);

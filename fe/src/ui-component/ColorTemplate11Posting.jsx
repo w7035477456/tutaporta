@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Divider from '@mui/material/Divider';
@@ -49,6 +49,183 @@ import {
 import { useUserTimeZoneProfile } from 'hooks/useUserTimeZoneProfile';
 import { usePhotoDoubleClickOpen } from 'utils/photoDoubleClickOpen';
 
+function ColorTemplate11PostingEditableBody({ content, canEdit, saving, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState('');
+  const inputRef = useRef(null);
+  const skipBlurCancelRef = useRef(false);
+  const text = String(content ?? '');
+
+  useEffect(() => {
+    if (!editing) return undefined;
+    const t = window.setTimeout(() => {
+      inputRef.current?.focus?.();
+      const el = inputRef.current;
+      if (el && typeof el.setSelectionRange === 'function') {
+        const len = el.value?.length ?? 0;
+        el.setSelectionRange(len, len);
+      }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [editing]);
+
+  const beginEdit = (event) => {
+    if (!canEdit || saving) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setError('');
+    setDraft(text);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setDraft('');
+    setError('');
+  };
+
+  const saveEdit = async () => {
+    if (saving) return;
+    const next = String(draft ?? '');
+    if (next.trim() === text.trim()) {
+      cancelEdit();
+      return;
+    }
+    setError('');
+    try {
+      skipBlurCancelRef.current = true;
+      await onSave?.(next);
+      setEditing(false);
+      setDraft('');
+    } catch (err) {
+      skipBlurCancelRef.current = false;
+      setError(err?.message || 'Save failed');
+    }
+  };
+
+  if (editing) {
+    return (
+      <Box sx={{ px: 1.25, py: 1 }}>
+        <Box
+          component="textarea"
+          ref={inputRef}
+          value={draft}
+          disabled={saving}
+          aria-label="Edit posting text"
+          title="Ctrl/Cmd+Enter to save · Esc to cancel"
+          onChange={(event) => setDraft(event.target.value)}
+          onClick={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              skipBlurCancelRef.current = true;
+              cancelEdit();
+              return;
+            }
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              void saveEdit();
+            }
+          }}
+          onBlur={() => {
+            if (skipBlurCancelRef.current) {
+              skipBlurCancelRef.current = false;
+              return;
+            }
+            if (!saving) cancelEdit();
+          }}
+          sx={{
+            ...colorTemplate11PostingBodyTextSx(),
+            display: 'block',
+            width: '100%',
+            minHeight: '5.5rem',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+            m: 0,
+            px: 1,
+            py: 0.75,
+            border: '1px solid var(--theme-primary-color)',
+            borderRadius: 1,
+            bgcolor: 'var(--theme-card-bg-color, #fff)',
+            color: 'inherit',
+            font: 'inherit',
+            lineHeight: 1.45,
+            outline: 'none'
+          }}
+        />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={saving}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              skipBlurCancelRef.current = true;
+            }}
+            onClick={() => void saveEdit()}
+            sx={{ textTransform: 'none', fontWeight: 700 }}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          <Button
+            size="small"
+            variant="text"
+            disabled={saving}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              skipBlurCancelRef.current = true;
+            }}
+            onClick={cancelEdit}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          {error ? (
+            <Typography color="error" sx={{ fontSize: '0.85em', fontWeight: 700 }}>
+              {error}
+            </Typography>
+          ) : (
+            <Typography sx={{ fontSize: '0.8em', opacity: 0.75 }}>Ctrl/Cmd+Enter to save · Esc to cancel</Typography>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!text && !canEdit) return null;
+
+  return (
+    <Box sx={{ px: 1.25, py: 1 }}>
+      <Typography
+        onDoubleClick={canEdit ? beginEdit : undefined}
+        title={canEdit ? 'Double-click to edit · Ctrl/Cmd+Enter to save' : undefined}
+        sx={{
+          ...colorTemplate11PostingBodyTextSx(),
+          ...(canEdit
+            ? {
+                cursor: 'text',
+                borderRadius: 0.5,
+                outline: '1px dashed transparent',
+                '&:hover': { outlineColor: 'rgba(0,0,0,0.25)' }
+              }
+            : null),
+          ...(!text && canEdit
+            ? {
+                fontStyle: 'italic',
+                opacity: 0.65,
+                minHeight: '1.5em'
+              }
+            : null)
+        }}
+      >
+        {text || (canEdit ? 'Double-click to add posting text' : '')}
+      </Typography>
+    </Box>
+  );
+}
 function ColorTemplate11PostingFeedShell({ title, scrollable, maxScrollHeight, pinFooter, footer, scrollContainerRef, sx, children }) {
   const usePinnedLayout = Boolean(pinFooter);
   const useFillHeight = usePinnedLayout && !scrollable && maxScrollHeight == null;
@@ -319,6 +496,8 @@ function ColorTemplate11PostingPost({
   onDeletePhoto,
   visibilityBusyPostId,
   onVisibilityChange,
+  contentBusyPostId,
+  onSaveContent,
   showActions,
   likeBusyPostId,
   shareBusyPostId,
@@ -333,6 +512,9 @@ function ColorTemplate11PostingPost({
   const hasPhotos = Array.isArray(post?.photos) && post.photos.length > 0;
   const viewerId = Number(viewerSinglesId);
   const ownerId = Number(feedOwnerSinglesId);
+  const postOwnerId = Number(post?.post_owner_id ?? feedOwnerSinglesId);
+  const isOwnPost = Number.isFinite(viewerId) && viewerId > 0 && postOwnerId === viewerId;
+  const canEditContent = isOwnPost && typeof onSaveContent === 'function';
   const showShareRepost =
     typeof onShare === 'function' &&
     Number.isFinite(viewerId) &&
@@ -368,11 +550,12 @@ function ColorTemplate11PostingPost({
           photoFullscreenOverlayLines={photoFullscreenOverlayLines}
         />
       ) : null}
-      {post?.content ? (
-        <Box sx={{ px: 1.25, py: hasPhotos ? 1 : 0, pt: hasPhotos ? 1 : 0 }}>
-          <Typography sx={colorTemplate11PostingBodyTextSx()}>{post.content}</Typography>
-        </Box>
-      ) : null}
+      <ColorTemplate11PostingEditableBody
+        content={post?.content}
+        canEdit={canEditContent}
+        saving={contentBusyPostId === post?.post_id}
+        onSave={(nextContent) => onSaveContent?.(post, nextContent)}
+      />
       {showActions ? (
         <>
           <Divider />
@@ -435,6 +618,8 @@ function ColorTemplate11PostingFeed({
   onDeletePhoto,
   visibilityBusyPostId,
   onVisibilityChange,
+  contentBusyPostId,
+  onSaveContent,
   showActions = false,
   likeBusyPostId,
   shareBusyPostId,
@@ -510,6 +695,8 @@ function ColorTemplate11PostingFeed({
                 onDeletePhoto={onDeletePhoto}
                 visibilityBusyPostId={visibilityBusyPostId}
                 onVisibilityChange={onVisibilityChange}
+                contentBusyPostId={contentBusyPostId}
+                onSaveContent={onSaveContent}
                 showActions={showActions}
                 likeBusyPostId={likeBusyPostId}
                 shareBusyPostId={shareBusyPostId}
@@ -572,6 +759,8 @@ ColorTemplate11PostingFeed.propTypes = {
   onDeletePhoto: PropTypes.func,
   visibilityBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onVisibilityChange: PropTypes.func,
+  contentBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onSaveContent: PropTypes.func,
   showActions: PropTypes.bool,
   likeBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   shareBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -606,6 +795,8 @@ ColorTemplate11PostingPost.propTypes = {
   onDeletePhoto: PropTypes.func,
   visibilityBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onVisibilityChange: PropTypes.func,
+  contentBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onSaveContent: PropTypes.func,
   showActions: PropTypes.bool,
   likeBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   shareBusyPostId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

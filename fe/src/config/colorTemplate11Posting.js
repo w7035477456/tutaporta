@@ -184,7 +184,7 @@ export function colorTemplate11PostingPhotoHeightPxToVh(heightPx, viewportHeight
 }
 
 export const COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT =
-  '(Double click on photos/videos to view full screen)';
+  '(Double click on photos/videos to view full screen · double-click post text to edit)';
 
 export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
   return {

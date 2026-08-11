@@ -80,6 +80,7 @@ import { useMyAlbumVideos, updateMyVideoType, deleteMyVideo } from 'api/myAlbumV
 import { bumpPhotosAlbumCacheBust } from 'api/photoCacheBust';
 import {
   invalidateMyPicksFeedCache,
+  patchMyPostingContent,
   patchMyPostingVisibility,
   postMyPosting,
   useGetMyPicksFeed,
@@ -1114,6 +1115,7 @@ export default function MyStory() {
   const [commentsDialog, setCommentsDialog] = useState(null);
   const [likeBusyPostId, setLikeBusyPostId] = useState(null);
   const [visibilityBusyPostId, setVisibilityBusyPostId] = useState(null);
+  const [contentBusyPostId, setContentBusyPostId] = useState(null);
   const [likesPostId, setLikesPostId] = useState(null);
   const [likesList, setLikesList] = useState([]);
   const [likesLoading, setLikesLoading] = useState(false);
@@ -2458,6 +2460,31 @@ export default function MyStory() {
     [visibilityBusyPostId, refetchMyPicksFeed]
   );
 
+  const handlePostingContentSave = useCallback(
+    async (post, nextContent) => {
+      const postId = Number(post?.post_id);
+      if (!Number.isFinite(postId) || postId < 1 || contentBusyPostId != null) {
+        throw new Error('Unable to save posting right now');
+      }
+      setContentBusyPostId(postId);
+      try {
+        const result = await patchMyPostingContent(postId, nextContent);
+        const savedContent = result?.content ?? String(nextContent ?? '');
+        setFeedPosts((prev) =>
+          prev.map((row) => (Number(row.post_id) === postId ? { ...row, content: savedContent } : row))
+        );
+        await Promise.all([refetchMyPicksFeed(), invalidateMyPicksFeedCache()]);
+      } catch (err) {
+        const message = err?.message || 'Failed to update posting';
+        await themedAlert(message);
+        throw err instanceof Error ? err : new Error(message);
+      } finally {
+        setContentBusyPostId(null);
+      }
+    },
+    [contentBusyPostId, refetchMyPicksFeed]
+  );
+
   const handleShowPostingLikes = useCallback(async (_event, postId) => {
     const numericPostId = Number(postId);
     if (!Number.isFinite(numericPostId) || numericPostId < 1) return;
@@ -3186,6 +3213,8 @@ export default function MyStory() {
                   onDeletePhoto={handleDeletePostingPhoto}
                   visibilityBusyPostId={visibilityBusyPostId}
                   onVisibilityChange={handlePostingVisibilityChange}
+                  contentBusyPostId={contentBusyPostId}
+                  onSaveContent={handlePostingContentSave}
                   showActions
                   likeBusyPostId={likeBusyPostId}
                   onToggleLike={handleTogglePostingLike}

@@ -159,7 +159,14 @@ function addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, 
     candidates.add(path.join(photoFolder, `${fileBase}.${tryExt}`));
   }
 
-  if (Number.isFinite(pid) && pid > 0) {
+  // Only unlink bare `{photosId}.{ext}` for legacy rows named by photos_id.
+  // Always deleting those when photo_file_name is already `memberId_…` can wipe
+  // another member's legacy file that happens to be named `{thisRow.photos_id}.jpg`.
+  const usesLegacyPhotosIdFileName =
+    Number.isFinite(pid) &&
+    pid > 0 &&
+    (!rawName || fileBase === String(pid) || rawName === String(pid) || rawName === `${pid}.${ext}`);
+  if (usesLegacyPhotosIdFileName) {
     for (const tryExt of IMAGE_EXTS) {
       candidates.add(path.join(photoFolder, `${pid}.${tryExt}`));
     }

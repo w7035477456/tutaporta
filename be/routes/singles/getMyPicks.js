@@ -1346,3 +1346,49 @@ export async function updateMyPostingVisibility(req, res) {
     return res.status(500).json({ error: 'Failed to update posting visibility' });
   }
 }
+
+export async function updateMyPostingContent(req, res) {
+  const me = Number(req.auth?.singles_id);
+  const postId = Number(req.params.postId);
+  if (!Number.isFinite(me) || me < 1) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (!Number.isFinite(postId) || postId < 1) {
+    return res.status(400).json({ error: 'Invalid post id' });
+  }
+
+  try {
+    const postingsSchema = await resolvePostingsSchema();
+    const content = String(req.body?.content ?? '').trim();
+    const owner = await pool.query(
+      `SELECT p.post_id,
+              (SELECT COUNT(*)::int
+               FROM ${postingsSchema}.posting_photos pp
+               WHERE pp.post_id = p.post_id) AS photo_count
+       FROM ${postingsSchema}.postings p
+       WHERE p.post_id = $1
+         AND p.singles_id = $2
+       LIMIT 1`,
+      [postId, me]
+    );
+    if (!owner.rows.length) {
+      return res.status(404).json({ error: 'Posting not found' });
+    }
+    const photoCount = Number(owner.rows[0]?.photo_count) || 0;
+    if (!content && photoCount === 0) {
+      return res.status(400).json({ error: 'Please add a message or keep at least one photo or video' });
+    }
+
+    await pool.query(
+      `UPDATE ${postingsSchema}.postings
+       SET content = $1
+       WHERE post_id = $2
+         AND singles_id = $3`,
+      [content || null, postId, me]
+    );
+    return res.json({ ok: true, content: content || '' });
+  } catch (error) {
+    console.error('updateMyPostingContent error:', error);
+    return res.status(500).json({ error: 'Failed to update posting content' });
+  }
+}

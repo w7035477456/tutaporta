@@ -72,6 +72,29 @@ export async function patchMyPostingVisibility(postId, postingVisibility) {
   return response.json();
 }
 
+export async function patchMyPostingContent(postId, content) {
+  const response = await fetch(`${API_BASE_URL}/api/myPicks/posting/${postId}/content`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ content: content ?? '' })
+  });
+  if (!response.ok) {
+    notifyRateLimit429(response.status);
+    let message = `Failed to update posting (${response.status})`;
+    try {
+      const data = await response.json();
+      if (data?.error) message = data.error;
+    } catch {
+      // ignore parse error
+    }
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+  return response.json();
+}
+
 async function deleteJson(path) {
   console.info('[myPicksFe][deleteJson] request:start', { path });
   const response = await fetch(`${API_BASE_URL}${path}`, {
