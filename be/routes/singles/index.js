@@ -34,6 +34,7 @@ export {
   dismissAllMyPicksPostNotifications,
   createMyPosting,
   updateMyPostingVisibility,
+  updateMyPostingContent,
   deleteMyPosting,
   deleteMyPostingPhoto
 } from './getMyPicks.js';
