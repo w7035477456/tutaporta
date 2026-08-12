@@ -124,6 +124,9 @@ async function issueLoginSuccess(res, user, log, rememberMe = false, options = {
   }
   if (requiresPasswordUpgrade) {
     tokenPayload.requiresPasswordUpgrade = true;
+  } else if (guestDemoLogin) {
+    // Exception to single-account single-login: concurrent demo/guest alias sessions.
+    // Do not write Redis session_id (would kick other demo/demo or real dm4 sessions).
   } else {
     const sessionId = await startSingleLoginSession(user.singles_id, logoutMins);
     if (sessionId) {

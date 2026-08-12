@@ -48,6 +48,19 @@ LINKEDIN_PARTNER_POSITIONS=true
 | `LINKEDIN_REDIRECT_URI` | OAuth callback; Mac dev uses Vite `:3000` proxy path. |
 | `LINKEDIN_PARTNER_POSITIONS` | `true` → request positions scope for job/company auto-verify (requires LinkedIn Partner Program approval). |
 
+## Google signup OAuth
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=….apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=****
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/signup/callback
+```
+
+| Variable | Notes |
+|----------|-------|
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Web OAuth client (`be/routes/auth/googleSignupOAuth.js`). Same pair can power Record Vault Drive. |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Must **exactly** match an Authorized redirect URI in Google Cloud Console → Credentials → that OAuth client. Mac: Vite `:3000` proxy path. Prod: `https://onlinemall.website/api/auth/google/signup/callback` (add both URIs on the same client). Missing match → `Error 400: redirect_uri_mismatch`. |
+
 ## Live face scan
 
 ```bash

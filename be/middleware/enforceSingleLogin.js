@@ -7,6 +7,8 @@ function shouldSkipSingleLogin(auth, decoded) {
   if (auth.tools_only === true) return true;
   if (isToolsOnlyAdminJwt(decoded)) return true;
   if (isAdminImpersonationSession(auth, decoded)) return true;
+  // demo/demo and guest/guest share one singles row — allow concurrent sessions.
+  if (decoded?.guest_demo_login === true) return true;
   const id = Number(auth.singles_id);
   return !Number.isFinite(id) || id < 1;
 }
@@ -25,7 +27,8 @@ function sessionErrorBody(result) {
   };
 }
 
-/** After JWT auth: ensure JWT session_id matches Redis (one device per account). */
+/** After JWT auth: ensure JWT session_id matches Redis (one device per account).
+ * Skips guest_demo_login (demo/demo, guest/guest) so multiple demos can stay signed in. */
 export async function enforceSingleLoginSession(req, res, decoded) {
   if (shouldSkipSingleLogin(req.auth, decoded)) {
     return { ok: true };

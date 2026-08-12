@@ -256,6 +256,19 @@ export function googleSignupStart(req, res) {
     prompt: 'select_account'
   });
 
+  console.log(
+    '[googleSignupOAuth] authorize — copy redirect_uri into Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client → Authorized redirect URIs:'
+  );
+  console.log('[googleSignupOAuth]   redirect_uri:', config.redirectUri);
+  console.log('[googleSignupOAuth]   client_id:', config.clientId);
+  if (String(process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim()) {
+    console.log('[googleSignupOAuth]   redirect source: GOOGLE_OAUTH_REDIRECT_URI env');
+  } else if (String(process.env.PUBLIC_APP_URL || '').trim()) {
+    console.log('[googleSignupOAuth]   redirect source: PUBLIC_APP_URL =', String(process.env.PUBLIC_APP_URL).trim());
+  } else {
+    console.log('[googleSignupOAuth]   redirect source: getPublicAppUrl() default');
+  }
+
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 }
 
