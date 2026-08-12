@@ -22,4 +22,6 @@ scripts/sync-usb-bridge-installers.sh
 work2   # or febeprod
 ```
 
+USB Bridge zips are **optional**. `febeprod` / `publish-usbzip-to-storage.sh` warn and continue when zips are missing (set `REQUIRE_USBZIP=1` to hard-fail). Skip the step with `SKIP_USBZIP_PUBLISH=1`.
+
 `work1` / `usball` call the sync script when possible so you do not SCP by hand.

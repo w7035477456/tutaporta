@@ -48,13 +48,15 @@ export const SELECTED_UNSELECTED_BUTTON_SELECTED_LABEL_SCALE = null;
 /** Button label — MOBILE_FONT_SIZE_BUTTON / DESKTOP_FONT_SIZE_BUTTON (fe/.env). */
 export const SELECTED_UNSELECTED_BUTTON_FONT_SIZE = buttonFontSizeResponsive;
 
-/** Selected — thin black box tightly around the label text (in addition to button bg). */
-export const SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER = '1px solid #000000';
+/** Selected — black box tightly around the label text (in addition to button bg). */
+export const SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER = '2px solid #000000';
+/** Rounded corners on the selected label text box (was square). */
+export const SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER_RADIUS = '8px';
 
 export function buttonTemplateSelectedLabelTextBoxSx(overrides = {}) {
   return {
     border: SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER,
-    borderRadius: 0,
+    borderRadius: SELECTED_BUTTON_LABEL_TEXT_BOX_BORDER_RADIUS,
     boxSizing: 'border-box',
     px: '0.25em',
     py: '0.05em',

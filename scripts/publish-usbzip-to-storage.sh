@@ -2,8 +2,13 @@
 # Copy repo usbzip/*.zip → $USB_DMG_EXE (STORAGE_FOLDER/USB_DMG_EXE).
 #
 # Customer downloads are served from USB_DMG_EXE, NOT from the git working tree.
-# Refuses Git LFS pointer stubs (~134 bytes). Copies every real zip found (does
-# not abort the whole run if one platform file is still a pointer).
+# Refuses Git LFS pointer stubs (~134 bytes). Copies every real zip found.
+#
+# USB Bridge installers are OPTIONAL for FE/BE deploy. Missing zips → WARN + exit 0
+# (does not abort febeprod / work2). Force hard fail: REQUIRE_USBZIP=1
+#
+# Skip entirely:
+#   SKIP_USBZIP_PUBLISH=1 scripts/publish-usbzip-to-storage.sh
 #
 # Mac (after usball):
 #   scripts/publish-usbzip-to-storage.sh
@@ -12,6 +17,11 @@
 #   scripts/publish-usbzip-to-storage.sh
 #
 set -euo pipefail
+
+if [[ "${SKIP_USBZIP_PUBLISH:-}" == "1" || "${SKIP_USBZIP_PUBLISH:-}" == "true" ]]; then
+  echo "publish-usbzip-to-storage: SKIP (SKIP_USBZIP_PUBLISH=${SKIP_USBZIP_PUBLISH})"
+  exit 0
+fi
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USBZIP_DIR="${USBZIP_DIR:-$ROOT/usbzip}"
@@ -148,11 +158,21 @@ for f in usbBridgeV3-mac.zip usbBridgeV3-win.zip; do
     continue
   fi
 
-  cp -f "$src" "$dest"
+  if ! cp -f "$src" "$dest" 2>/dev/null; then
+    echo "publish-usbzip-to-storage: WARN copy failed (dest not writable?): $dest" >&2
+    if is_real_zip "$dest"; then
+      echo "publish-usbzip-to-storage: keep existing real $dest" >&2
+      kept=$((kept + 1))
+    else
+      failed=$((failed + 1))
+      failed_names+=("$f")
+    fi
+    continue
+  fi
   # verify dest after copy
   if ! is_real_zip "$dest"; then
     echo "publish-usbzip-to-storage: ERROR copy failed validation: $dest" >&2
-    rm -f "$dest"
+    rm -f "$dest" 2>/dev/null || true
     failed=$((failed + 1))
     failed_names+=("$f")
     continue
@@ -164,15 +184,29 @@ done
 echo "publish-usbzip-to-storage: summary copied=$copied kept=$kept failed=$failed dest=$DEST"
 ls -lh "$DEST"/usbBridgeV3-*.zip 2>/dev/null || echo "publish-usbzip-to-storage: (no usbBridgeV3-*.zip in dest yet)"
 
+require_usbzip=false
+if [[ "${REQUIRE_USBZIP:-}" == "1" || "${REQUIRE_USBZIP:-}" == "true" ]]; then
+  require_usbzip=true
+fi
+
 if [[ "$copied" -eq 0 && "$kept" -eq 0 ]]; then
-  echo "publish-usbzip-to-storage: ERROR no real installer zip published to $DEST" >&2
-  exit 1
+  echo "publish-usbzip-to-storage: WARN no USB Bridge installer zips (optional — FE/BE deploy OK)." >&2
+  echo "  To publish later: Mac usball → scripts/sync-usb-bridge-installers.sh" >&2
+  if $require_usbzip; then
+    echo "publish-usbzip-to-storage: ERROR REQUIRE_USBZIP=1 and nothing published to $DEST" >&2
+    exit 1
+  fi
+  exit 0
 fi
 
 if [[ "$failed" -gt 0 ]]; then
-  echo "publish-usbzip-to-storage: ERROR incomplete publish: ${failed_names[*]}" >&2
-  echo "  Dest still missing real zip(s). Fix usbzip/ then re-run this script." >&2
-  exit 1
+  echo "publish-usbzip-to-storage: WARN incomplete publish: ${failed_names[*]} (optional)." >&2
+  echo "  Dest may still be missing some platform zip(s)." >&2
+  if $require_usbzip; then
+    echo "publish-usbzip-to-storage: ERROR REQUIRE_USBZIP=1 incomplete: ${failed_names[*]}" >&2
+    exit 1
+  fi
+  exit 0
 fi
 
 echo "publish-usbzip-to-storage: OK"
