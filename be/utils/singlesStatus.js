@@ -65,6 +65,15 @@ export function formatSinglesStatusLabel(raw) {
 export const SINGLES_LOGIN_ALLOWED_STATUSES = Object.freeze(['active', 'pause']);
 
 /**
+ * Listing surfaces (All Singles / Picks & Posts / Acquaint. & Buddies) only show active members.
+ * @param {unknown} rawStatus
+ * @returns {boolean}
+ */
+export function isSinglesStatusActive(rawStatus) {
+  return normalizeSinglesStatus(rawStatus) === 'active';
+}
+
+/**
  * @param {unknown} rawStatus
  * @param {unknown} [memberCategory] RegularMember may log in even when status is inactive / not active
  * @returns {boolean}

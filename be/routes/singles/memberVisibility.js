@@ -8,7 +8,8 @@ function parseAllowedMemberCategories() {
 
 /**
  * SQL fragment: singles.status must be active (helloworldjunktest.singles_status enum).
- * Inactive / blank / suspend / etc. must not appear on /allSingles, /myPicks, /vettedFriends.
+ * Inactive / blank / suspend / pause / etc. must not appear on
+ * All Singles, Picks & Posts, or Acquaint. & Buddies listings.
  */
 export function buildSinglesActiveStatusWhereSql(alias = 's') {
   return `LOWER(COALESCE(TRIM(${alias}.status::text), 'blank')) = 'active'`;

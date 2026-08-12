@@ -475,6 +475,7 @@ export async function getMyPicksList(req, res) {
          s.prefix,
          s.member_id,
          s.alias,
+         s.status,
          s.profile_image_fk,
          ${firstNameExpr} AS first_name,
          ${lastNameExpr} AS last_name,
@@ -556,6 +557,7 @@ export async function getMyPicksList(req, res) {
         prefix: row.prefix ?? null,
         member_id: row.member_id ?? null,
         alias: row.alias ?? null,
+        status: String(row.status ?? '').trim().toLowerCase() || null,
         profile_image_fk: row.profile_image_fk ?? null,
         first_name: row.first_name ?? null,
         last_name: row.last_name ?? null,
@@ -950,6 +952,7 @@ export async function getMyPicksPostNotifications(req, res) {
            AND r_pick.singles_id_to = p.singles_id
            AND ${interestedExpr}
        )
+         AND ${buildSinglesActiveStatusWhereSql('s')}
          AND p.singles_id <> $1
          AND p.created_at > COALESCE(
            (SELECT rs.last_read_at FROM helloworldjunktest.user_post_notification_read_state rs WHERE rs.singles_id = $1),

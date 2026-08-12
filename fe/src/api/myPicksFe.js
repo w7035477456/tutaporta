@@ -249,13 +249,18 @@ function normalizeRequestState(value) {
 
 export function useGetMyPicksList() {
   const { data, error, isLoading, mutate } = useSWR(MY_PICKS_LIST_URL, fetcher, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true
   });
 
   const myPicksList = useMemo(() => {
     if (!Array.isArray(data)) return [];
-    return data.map((row) => {
+    return data
+      .filter((row) => {
+        if (row?.status == null || row?.status === '') return true;
+        return String(row.status).trim().toLowerCase() === 'active';
+      })
+      .map((row) => {
       const profileVersion = Number(row?.profile_image_fk);
       const profileVersionQuery = Number.isFinite(profileVersion) && profileVersion > 0 ? `?v=${profileVersion}` : '';
       const profilePhotoUrl = row?.singles_id ? `${API_BASE_URL}/api/profile-photo/${row.singles_id}${profileVersionQuery}` : '';
@@ -268,6 +273,7 @@ export function useGetMyPicksList() {
         prefix: row.prefix ?? null,
         member_id: row.member_id ?? null,
         alias: row.alias ?? null,
+        status: String(row.status ?? 'active').trim().toLowerCase() || 'active',
         brief_bio_request: normalizeRequestState(row.brief_bio_request),
         full_bio_request: normalizeRequestState(row.full_bio_request),
         brief_bio_request_approval: parseApprovalValue(row.brief_bio_request_approval),

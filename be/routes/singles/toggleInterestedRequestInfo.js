@@ -12,6 +12,7 @@ import { sqlApprovalStatusParam } from '../../utils/pgEnumTypes.js';
 import { normalizeApprovalStatus } from '../../utils/approvalStatusEnum.js';
 import { clearBioRequestNotificationDismissed } from './bioRequestNotifications.js';
 import { sendBioRequestNotificationEmailFireAndForget } from '../../lib/bioRequestNotificationEmail.js';
+import { isSinglesStatusActive } from '../../utils/singlesStatus.js';
 
 async function resolveAppSchema() {
   const result = await pool.query(
@@ -95,9 +96,13 @@ export async function toggleInterestedRequestInfo(req, res) {
   try {
     const schemaName = await resolveAppSchema();
     const quotedSchema = quoteSchema(schemaName);
-    const target = await pool.query(`SELECT 1 FROM ${quotedSchema}.singles WHERE singles_id = $1`, [to]);
+    const target = await pool.query(`SELECT status FROM ${quotedSchema}.singles WHERE singles_id = $1 LIMIT 1`, [to]);
     if (target.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found' });
+    }
+    // Sending new bio requests only allowed to Active members (approvals may still update existing rows).
+    if ((hasBasicPayload || hasDetailsPayload) && !isSinglesStatusActive(target.rows[0]?.status)) {
+      return res.status(404).json({ error: 'Member is not available' });
     }
 
     const requestColumns = await getRequestColumns(schemaName);

@@ -17,6 +17,9 @@ import {
   cascadeDeleteAdminTableRow,
   fetchAdminVideoObjectUrl
 } from 'api/adminToolsFe';
+import { invalidateAllSinglesCache } from 'api/allSinglesFe';
+import { invalidateMyPicksFeedCache, invalidateMyPicksListCache } from 'api/myPicksFe';
+import { invalidateRequestedSinglesCache } from 'api/requestsSentFe';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { useAuth } from 'contexts/AuthContext';
@@ -736,6 +739,12 @@ export default function AdminToolsLookupTab({ onError }) {
         }
       }
       await (lastLookupWasAll ? runLookupAll() : runLookup());
+      await Promise.all([
+        invalidateAllSinglesCache(),
+        invalidateMyPicksListCache(),
+        invalidateMyPicksFeedCache(),
+        invalidateRequestedSinglesCache()
+      ]);
       setSaveResultPopup({ kind: 'success', message: 'Save Success' });
     } catch (err) {
       const message = err?.response?.data?.error || err?.message || 'Failed to save singles changes';

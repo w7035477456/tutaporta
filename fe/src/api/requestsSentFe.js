@@ -1,3 +1,4 @@
+import { mutate as globalMutate } from 'swr';
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
@@ -9,6 +10,12 @@ import { normalizeApprovalStatus } from 'utils/approvalStatusEnum';
 import { galleryMediaUrlsFromRow, privateGalleryMediaUrlsFromRow, publicGalleryMediaUrlsFromRow } from 'utils/galleryMediaUrls';
 
 const API_BASE_URL = getApiBaseUrl();
+const REQUESTED_SINGLES_URL = `${API_BASE_URL}/api/requestedSingles`;
+
+/** Refetch Acquaint. & Buddies list after admin status changes, etc. */
+export function invalidateRequestedSinglesCache() {
+  return globalMutate(REQUESTED_SINGLES_URL);
+}
 
 const fetcher = async (url) => {
   const response = await fetch(url, { credentials: 'include' });
@@ -68,9 +75,9 @@ function normalizeRequestState(value) {
 }
 
 export function useGetRequestsSent() {
-  const url = `${API_BASE_URL}/api/requestedSingles`;
+  const url = REQUESTED_SINGLES_URL;
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
     revalidateOnReconnect: true
   });
 

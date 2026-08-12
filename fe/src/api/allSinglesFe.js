@@ -104,7 +104,7 @@ export async function postMarkInterested(singlesIdTo) {
 export function useGetAllSingles() {
   const url = `${API_BASE_URL}${endpoints.list}`;
   const { data, error, isLoading, mutate } = useSWR(url, fetcher, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
     revalidateOnReconnect: true
   });
 

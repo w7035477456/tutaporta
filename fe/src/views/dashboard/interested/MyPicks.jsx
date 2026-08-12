@@ -232,6 +232,14 @@ export default function MyPicks() {
     });
   }, [myPicksList, orderStorageKey]);
 
+  /** Drop selection when the pick leaves the list (e.g. target Suspend / not Active). */
+  useEffect(() => {
+    if (selectedSinglesId == null || myPicksListLoading) return;
+    const stillListed = myPicksList.some((p) => Number(p.singles_id) === Number(selectedSinglesId));
+    if (stillListed) return;
+    setSelectedSinglesId(orderedIds[0] ?? null);
+  }, [myPicksList, myPicksListLoading, orderedIds, selectedSinglesId]);
+
   useEffect(() => {
     if (selectedSinglesId != null) return;
     if (!orderedIds.length) return;
@@ -242,10 +250,10 @@ export default function MyPicks() {
     const qp = new URLSearchParams(location.search);
     const targetSinglesId = Number(qp.get('focusAuthor') ?? location.state?.targetSinglesId);
     if (!Number.isFinite(targetSinglesId) || targetSinglesId < 1) return;
-
-    setSelectedSinglesId(targetSinglesId);
+    const inList = myPicksList.some((p) => Number(p.singles_id) === targetSinglesId);
+    if (inList) setSelectedSinglesId(targetSinglesId);
     navigate({ pathname: location.pathname, search: '' }, { replace: true, state: null });
-  }, [location.pathname, location.search, location.state, navigate]);
+  }, [location.pathname, location.search, location.state, navigate, myPicksList]);
 
   const handleReorderDrop = (fromId, toId) => {
     const a = Number(fromId);

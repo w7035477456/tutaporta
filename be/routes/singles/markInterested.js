@@ -3,6 +3,7 @@ import { resolveRequestsAppSchema } from './resolveRequestsAppSchema.js';
 import { upsertMarkInterested } from './requestsUpsert.js';
 import { parseBooleanEnumRaw, sqlBooleanEnumColumnAsBool } from '../../utils/booleanEnum.js';
 import { isToolsOnlyAdminAuth } from '../../utils/adminAuth.js';
+import { isSinglesStatusActive } from '../../utils/singlesStatus.js';
 
 /**
  * POST /api/markInterested — authenticated user marks another single as interested.
@@ -30,9 +31,18 @@ export async function markInterested(req, res) {
     const requestSchema = await resolveRequestsAppSchema();
     const quotedSchema = `"${String(requestSchema).replace(/"/g, '""')}"`;
 
-    const target = await pool.query(`SELECT 1 FROM ${quotedSchema}.singles WHERE singles_id = $1`, [to]);
-    if (target.rows.length === 0) {
+    const target = await pool.query(
+      `SELECT s.status
+       FROM ${quotedSchema}.singles s
+       WHERE s.singles_id = $1
+       LIMIT 1`,
+      [to]
+    );
+    if (!target.rows.length) {
       return res.status(404).json({ error: 'Member not found' });
+    }
+    if (!isSinglesStatusActive(target.rows[0]?.status)) {
+      return res.status(404).json({ error: 'Member is not available' });
     }
 
     await upsertMarkInterested(requestSchema, from, to);
