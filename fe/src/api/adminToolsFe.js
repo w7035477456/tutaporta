@@ -183,6 +183,23 @@ export async function fetchAdminAuditRegistrationLookup({ singlesId, email, alia
   return data;
 }
 
+/** Admin Tools → Login Log tab */
+export async function fetchAdminLoginLogLookup({ type, singlesId, email, phone, ip }) {
+  const { data } = await api.post('/api/admin/login-log/lookup', {
+    type,
+    singlesId,
+    email,
+    phone,
+    ip
+  });
+  return data;
+}
+
+export async function fetchAdminLoginLogLookupAll() {
+  const { data } = await api.post('/api/admin/login-log/lookup-all');
+  return data;
+}
+
 export async function cycleAdminSinglesStatus({ singlesId }) {
   const { data } = await api.post('/api/admin/singles/cycle-status', { singlesId });
   return data;

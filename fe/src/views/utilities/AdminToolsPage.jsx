@@ -23,9 +23,11 @@ import AdminToolsLookupTab from './AdminToolsLookupTab';
 import AdminToolsAsnTab from './AdminToolsAsnTab';
 import AdminToolsTablesTab from './AdminToolsTablesTab';
 import AdminToolsWipeByIdTab from './AdminToolsWipeByIdTab';
+import AdminToolsLoginLogTab from './AdminToolsLoginLogTab';
 
 const ADMIN_TOOLS_TABS = [
   { value: 'lookup', label: 'LookupByID' },
+  { value: 'login-log', label: 'Login Log' },
   { value: 'password-check', label: 'Password Check' },
   { value: 'statistic', label: 'Statistic' },
   { value: 'test', label: 'Test' },
@@ -358,6 +360,7 @@ export default function AdminToolsPage() {
             <AdminToolsPasswordCheckTab onError={handleToolsError} />
           ) : null}
           {!loading && activeTab === 'lookup' ? <AdminToolsLookupTab onError={handleToolsError} /> : null}
+          {!loading && activeTab === 'login-log' ? <AdminToolsLoginLogTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'asn' ? <AdminToolsAsnTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'tables' ? <AdminToolsTablesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'wipe-by-id' ? <AdminToolsWipeByIdTab onError={handleToolsError} /> : null}

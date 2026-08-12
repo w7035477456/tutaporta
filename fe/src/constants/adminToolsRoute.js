@@ -1,6 +1,7 @@
 export const ADMIN_TOOLS_PATH = '/adminTools';
 export const ADMIN_TOOLS_TEST_TAB = 'test';
 export const ADMIN_TOOLS_LOOKUP_TAB = 'lookup';
+export const ADMIN_TOOLS_LOGIN_LOG_TAB = 'login-log';
 
 export function adminToolsPathWithTab(tab) {
   const value = String(tab ?? '').trim();

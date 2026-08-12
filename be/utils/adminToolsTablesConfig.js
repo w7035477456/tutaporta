@@ -31,7 +31,8 @@ export const ADMIN_TOOLS_TABLES = [
     idColumn: 'token',
     idType: 'text'
   },
-  { key: 'audit_registrations', table: 'audit_registrations', label: 'audit_registrations', idColumn: 'audit_registration_id', idType: 'bigint' }
+  { key: 'audit_registrations', table: 'audit_registrations', label: 'audit_registrations', idColumn: 'audit_registration_id', idType: 'bigint' },
+  { key: 'login_log', table: 'login_log', label: 'login_log', idColumn: 'login_log_id', idType: 'bigint' }
 ];
 
 const TABLE_BY_KEY = new Map(ADMIN_TOOLS_TABLES.map((def) => [def.key, def]));

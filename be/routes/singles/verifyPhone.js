@@ -9,6 +9,7 @@ import { formatPhoneForDuplicateCheck, respondIfDuplicatePhone } from '../../uti
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
+import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
 
 async function cleanupVerificationRowsByEmail(emailNorm) {
   const result = await pool.query(`DELETE FROM helloworldjunktest.verifications WHERE email = $1`, [emailNorm]);
@@ -187,6 +188,11 @@ export async function verifyPhone(req, res) {
           newMemberEmail: emailNorm,
           referByCode: account.referByCode,
           isNewAccount: true
+        });
+        await attachOrInsertSignupLoginLog(req, {
+          singlesId: account.singlesId,
+          email: emailNorm,
+          phone: formattedPhone
         });
       }
 

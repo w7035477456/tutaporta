@@ -13,6 +13,7 @@ import { processReferralSignupReward } from '../../utils/referralSignupReward.js
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { hashPassword } from '../../utils/passwordHash.js';
+import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
 
 const LOG_PREFIX = '[createPassword]';
 
@@ -80,7 +81,7 @@ export async function createPassword(req, res) {
         [emailNorm, formattedPhoneEarly]
       );
       if (pendingPhone.rows[0]) {
-        return finishRegistrationAfterPhoneVerified(res, {
+        return finishRegistrationAfterPhoneVerified(req, res, {
           code,
           emailNorm,
           password,
@@ -167,6 +168,7 @@ export async function createPassword(req, res) {
 }
 
 async function finishRegistrationAfterPhoneVerified(
+  req,
   res,
   { code, emailNorm, password, formattedPhone, pendingRowId, referByCode }
 ) {
@@ -238,6 +240,11 @@ async function finishRegistrationAfterPhoneVerified(
         newMemberEmail: emailNorm,
         referByCode: account.referByCode,
         isNewAccount: true
+      });
+      await attachOrInsertSignupLoginLog(req, {
+        singlesId: account.singlesId,
+        email: emailNorm,
+        phone: formattedPhone
       });
     }
 

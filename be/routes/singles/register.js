@@ -14,6 +14,7 @@ import { normalizeReferralCodeQuery } from './validateReferralCode.js';
 import { isDefaultReferByCode } from '../../utils/referByCode.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { getUsSignupPhoneValidationMessage, validateUsSignupPhone } from '../../utils/usPhoneValidation.js';
+import { insertSignupLoginLog } from '../../utils/loginLog.js';
 
 const EMAIL_EXISTS_ERROR = 'This email already exist in out system. Please double check your email.';
 const CODE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -204,6 +205,14 @@ export async function registerUser(req, res) {
       return res.status(500).json({
         error: 'Email service not configured. Cannot send registration email.',
         details: detailsMsg
+      });
+    }
+
+    const phoneForLog = formattedPhoneForCheck || String(phoneRaw ?? '').trim();
+    if (phoneForLog) {
+      await insertSignupLoginLog(req, {
+        email: emailTrimmed,
+        phone: phoneForLog
       });
     }
 

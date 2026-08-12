@@ -9,6 +9,7 @@ import { DEFAULT_NEW_USER_THEME } from '../lib/defaultNewUserPreferences.js';
 import { insertNewSinglesAccount } from '../utils/newSinglesAccount.js';
 import { normalizeEmailForDb } from '../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../utils/insertAuditRegistration.js';
+import { attachOrInsertSignupLoginLog } from '../utils/loginLog.js';
 import { referCodeFromMemberId } from '../utils/referCodeFromMemberId.js';
 import { resolveReferByCode } from '../utils/referByCode.js';
 import { verifyPassword } from '../utils/passwordHash.js';
@@ -423,11 +424,16 @@ export const verifyPhone_HHHHHHHH = async (req, res) => {
           phone: formattedPhone
         });
       } else {
-        await insertNewSinglesAccount(pool, {
+        const account = await insertNewSinglesAccount(pool, {
           emailNorm: normalizeEmailForDb(email),
           passwordHash: storedData.password,
           formattedPhone,
           referByCode: resolvedReferByCode
+        });
+        await attachOrInsertSignupLoginLog(req, {
+          singlesId: account.singlesId,
+          email: normalizeEmailForDb(email),
+          phone: formattedPhone
         });
       }
 

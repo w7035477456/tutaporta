@@ -19,6 +19,7 @@ import { isSinglesStatusLoginAllowed } from '../../utils/singlesStatus.js';
 import { getRequestClientIp, isAdminIpAllowed } from '../../utils/adminIpConfig.js';
 import { resolveDemoGuestLoginAlias } from '../../utils/demoGuestLoginAlias.js';
 import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
+import { createLoginLogSessionToken, insertDemoLoginLog } from '../../utils/loginLog.js';
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status
          FROM helloworldjunktest.singles s`;
@@ -104,7 +105,8 @@ async function checkLoginPassword(storedHash, plainPassword) {
 }
 
 async function issueLoginSuccess(res, user, log, rememberMe = false, options = {}) {
-  const { requiresPasswordUpgrade = false, guestDemoLogin = false } = options;
+  const { requiresPasswordUpgrade = false, guestDemoLogin = false, req = null, loginLogSessionToken = null } =
+    options;
   const { password_hash, ...userWithoutPassword } = user;
 
   try {
@@ -121,6 +123,9 @@ async function issueLoginSuccess(res, user, log, rememberMe = false, options = {
   };
   if (guestDemoLogin) {
     tokenPayload.guest_demo_login = true;
+    if (loginLogSessionToken) {
+      tokenPayload.login_log_session = loginLogSessionToken;
+    }
   }
   if (requiresPasswordUpgrade) {
     tokenPayload.requiresPasswordUpgrade = true;
@@ -132,6 +137,14 @@ async function issueLoginSuccess(res, user, log, rememberMe = false, options = {
     if (sessionId) {
       tokenPayload.session_id = sessionId;
     }
+  }
+
+  if (guestDemoLogin && req) {
+    await insertDemoLoginLog(req, {
+      singlesId: user.singles_id,
+      email: user.email,
+      sessionToken: loginLogSessionToken
+    });
   }
 
   const token = jwt.sign(tokenPayload, getPrivateKey(), {
@@ -208,8 +221,11 @@ export async function beVerifyLoginPassword(req, res) {
           error: 'Your account is not active. Please contact support.'
         });
       }
+      const loginLogSessionToken = createLoginLogSessionToken();
       return issueLoginSuccess(res, aliasUser, log, rememberMe, {
-        guestDemoLogin: demoGuestAlias.guestDemoLogin
+        guestDemoLogin: demoGuestAlias.guestDemoLogin,
+        req,
+        loginLogSessionToken
       });
     }
 

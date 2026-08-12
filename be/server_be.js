@@ -401,6 +401,7 @@ import { getPublicKey } from './jwtKeys.js';
 import { clearAuthCookie, getAuthTokenFromCookies, getKeepMeLoginDays } from './utils/authCookie.js';
 import { getMallDepartmentMode } from './mallDepartmentMode.js';
 import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
+import { closeLoginLogSession } from './utils/loginLog.js';
 import appLog from './logger.js';
 import { respondSessionInvalid } from './utils/sessionInvalidResponse.js';
 import { buildSessionConfigResponse } from './utils/sessionTimeoutConfig.js';
@@ -464,6 +465,10 @@ import {
   postAdminSetSinglesStatus,
   postAdminSinglesLookupAll
 } from './routes/admin/adminAuditRegistrationLookup.js';
+import {
+  postAdminLoginLogLookup,
+  postAdminLoginLogLookupAll
+} from './routes/admin/adminLoginLogLookup.js';
 import {
   deleteAdminBlockedAsnVpn,
   getAdminBlockedAsnVpn,
@@ -1078,6 +1083,22 @@ app.post('/api/logout', async (req, res) => {
           console.error('[logout] clearPhotoAlbumsCacheIcon', err?.message || err);
         }
       }
+      try {
+        const logoutReason =
+          String(req.body?.reason ?? req.body?.logoutReason ?? '')
+            .trim()
+            .toLowerCase() === 'auto_logout'
+            ? 'auto_logout'
+            : 'user_logout';
+        const loginLogSession = String(decoded?.login_log_session ?? '').trim();
+        if (loginLogSession) {
+          await closeLoginLogSession({ sessionToken: loginLogSession, reason: logoutReason });
+        } else if (decoded?.guest_demo_login === true && Number.isFinite(singlesId) && singlesId > 0) {
+          await closeLoginLogSession({ singlesId, reason: logoutReason, onlyDemo: true });
+        }
+      } catch (err) {
+        console.error('[logout] closeLoginLogSession', err?.message || err);
+      }
     }
   } catch (err) {
     console.error('[logout] token decode', err?.message || err);
@@ -1140,6 +1161,8 @@ app.post('/api/admin/password-check/singles', requireAuth, requireAdminRole, pos
 app.post('/api/admin/password-check/member-category', requireAuth, requireAdminRole, postAdminPasswordCheckSetMemberCategory);
 app.post('/api/admin/password-check/global', requireAuth, requireAdminRole, postAdminPasswordCheckSetGlobal);
 app.post('/api/admin/audit-registrations/lookup', requireAuth, requireAdminRole, postAdminAuditRegistrationLookup);
+app.post('/api/admin/login-log/lookup', requireAuth, requireAdminRole, postAdminLoginLogLookup);
+app.post('/api/admin/login-log/lookup-all', requireAuth, requireAdminRole, postAdminLoginLogLookupAll);
 app.post('/api/admin/singles/lookup-all', requireAuth, requireAdminRole, postAdminSinglesLookupAll);
 app.post('/api/admin/singles/cycle-status', requireAuth, requireAdminRole, postAdminCycleSinglesStatus);
 app.post('/api/admin/singles/set-status', requireAuth, requireAdminRole, postAdminSetSinglesStatus);
