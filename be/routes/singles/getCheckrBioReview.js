@@ -239,6 +239,7 @@ function buildProfileMatchPairRow(singlesRow, config) {
     primaryImagePhotosId: primaryImagePhotosId ?? singlesRow?.profile_image_fk ?? null,
     comparisonImagePhotosId: comparisonImagePhotosId ?? null,
     singlesId: Number(singlesRow?.singles_id),
+    memberCategory: singlesRow?.member_category ?? null,
     verificationStatus: vetted?.verificationStatus ?? null,
     vettedDate: vetted?.vettedDate ?? null,
     vettedNote: vetted?.vettedNote ?? null

@@ -68,7 +68,7 @@ import {
   cycleVettingStatus,
   normalizeVettingStatusKey
 } from 'utils/vettingStatusDisplay';
-import { isDemoUserCategory } from 'utils/memberCategory';
+import { isDemoUserCategory, isRegularMemberCategory } from 'utils/memberCategory';
 import { getBioReviewRowVetColumn } from 'utils/receivedBioRequestDisplay';
 import { themedAlert } from 'utils/themedDialog';
 
@@ -712,6 +712,10 @@ function ProfileMatchPairResponse({ row }) {
     row?.comparisonImagePhotosId ??
     (comparisonImageKind === 'profile' ? row?.response : null);
   const useStoredComparisonPhoto = Number(comparisonPhotosId) > 0;
+  const regularMemberLabels = isRegularMemberCategory(row?.memberCategory ?? user?.member_category);
+  const missingDlLabel = regularMemberLabels ? 'Driver License' : 'No driver license face photo';
+  const missingPpLabel = regularMemberLabels ? 'Passport' : 'No passport face photo';
+  const missingComparisonLabel = comparisonImageKind === 'passport' ? missingPpLabel : missingDlLabel;
 
   const {
     dataUrl: leftPhotoDataUrl,
@@ -783,13 +787,9 @@ function ProfileMatchPairResponse({ row }) {
       {rightPhotoSrc ? (
         <Box component="img" src={rightPhotoSrc} alt={rightAlt} sx={profileMatchThumbSx} />
       ) : useStoredComparisonPhoto && rightLoadFailed ? (
-        <Typography sx={{ ...tableTextSx }}>
-          {comparisonImageKind === 'passport' ? 'No passport face photo' : 'No driver license face photo'}
-        </Typography>
+        <Typography sx={{ ...tableTextSx }}>{missingComparisonLabel}</Typography>
       ) : !showSampleComparison && !rightPhotoSrc ? (
-        <Typography sx={{ ...tableTextSx }}>
-          {comparisonImageKind === 'passport' ? 'No passport face photo' : 'No driver license face photo'}
-        </Typography>
+        <Typography sx={{ ...tableTextSx }}>{missingComparisonLabel}</Typography>
       ) : comparisonImageKind === 'profile' && rightLoadFailed ? (
         <Typography sx={{ ...tableTextSx }}>No profile photo</Typography>
       ) : null}
