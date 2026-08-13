@@ -101,6 +101,18 @@ clear_sms_state() {
   rm -f "$STATE_FILE"
 }
 
+clear_logs_after_recovery() {
+  : >"$MONITOR_LOG"
+  : >"$SMS_LOG"
+}
+
+reset_after_recovery() {
+  clear_sms_state
+  clear_logs_after_recovery
+  DOWN=0
+  log_monitor "RECOVERED site is up — logs cleared, SMS schedule reset (3x10min then 3x1h then daily)"
+}
+
 # Seconds to wait after SMS number `sent_count` before sending the next one.
 # 0 sent → send immediately; next 2 at 10 min; next 3 hourly; then daily.
 next_sms_wait_sec() {
@@ -248,10 +260,10 @@ while true; do
     DOWN=1
   else
     if [[ "$DOWN" -eq 1 ]]; then
-      log_monitor "RECOVERED all curls succeeded"
-      DOWN=0
+      reset_after_recovery
+    else
+      clear_sms_state
     fi
-    clear_sms_state
   fi
   sleep "$INTERVAL_SEC"
 done
