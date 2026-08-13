@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Install 24x7 website curl+SMS monitor as a systemd service (not PM2).
+#
+#   sudo bash scripts/install-site-uptime-monitor.sh
+#
+# Then: sudo systemctl status site-uptime-monitor
+# Logs:  ~/logs/site-uptime-monitor/sms-sent.log
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MONITOR_SRC="${SCRIPT_DIR}/site-uptime-monitor.sh"
+UNIT_SRC="${SCRIPT_DIR}/site-uptime-monitor.service"
+
+if [[ "$(id -u)" -ne 0 ]]; then
+  echo "Run with sudo: sudo bash scripts/install-site-uptime-monitor.sh" >&2
+  exit 1
+fi
+
+RUN_USER="${SUDO_USER:-lawsen0}"
+if ! id "$RUN_USER" >/dev/null 2>&1; then
+  echo "User ${RUN_USER} not found." >&2
+  exit 1
+fi
+RUN_GROUP="$(id -gn "$RUN_USER")"
+HOME_DIR="$(getent passwd "$RUN_USER" | cut -d: -f6)"
+INSTALL_DIR="${HOME_DIR}/bin"
+SCRIPT_PATH="${INSTALL_DIR}/site-uptime-monitor.sh"
+LOG_DIR="${HOME_DIR}/logs/site-uptime-monitor"
+UNIT_PATH="/etc/systemd/system/site-uptime-monitor.service"
+
+[[ -f "$MONITOR_SRC" ]] || { echo "Missing $MONITOR_SRC" >&2; exit 1; }
+[[ -f "$UNIT_SRC" ]] || { echo "Missing $UNIT_SRC" >&2; exit 1; }
+
+install -d -o "$RUN_USER" -g "$RUN_GROUP" -m 0755 "$INSTALL_DIR"
+install -d -o "$RUN_USER" -g "$RUN_GROUP" -m 0755 "$LOG_DIR"
+install -o "$RUN_USER" -g "$RUN_GROUP" -m 0755 "$MONITOR_SRC" "$SCRIPT_PATH"
+
+sed \
+  -e "s|__RUN_USER__|${RUN_USER}|g" \
+  -e "s|__RUN_GROUP__|${RUN_GROUP}|g" \
+  -e "s|__HOME_DIR__|${HOME_DIR}|g" \
+  -e "s|__SCRIPT_PATH__|${SCRIPT_PATH}|g" \
+  "$UNIT_SRC" >"$UNIT_PATH"
+chmod 0644 "$UNIT_PATH"
+
+systemctl daemon-reload
+systemctl enable --now site-uptime-monitor.service
+
+echo
+echo "Installed site-uptime-monitor (systemd, independent of PM2)."
+echo "  service: site-uptime-monitor"
+echo "  script:  ${SCRIPT_PATH}"
+echo "  sms log: ${LOG_DIR}/sms-sent.log"
+echo "  run log: ${LOG_DIR}/monitor.log"
+echo
+systemctl --no-pager --full status site-uptime-monitor.service || true
+echo
+echo "Useful commands:"
+echo "  sudo systemctl status site-uptime-monitor"
+echo "  sudo journalctl -u site-uptime-monitor -f"
+echo "  tail -f ${LOG_DIR}/sms-sent.log"
+echo "  sudo systemctl restart site-uptime-monitor"
