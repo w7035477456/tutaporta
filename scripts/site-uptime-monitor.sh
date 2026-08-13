@@ -181,6 +181,7 @@ send_sms() {
       --user "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
       --data-urlencode "To=${SMS_TO}" \
       --data-urlencode "Channel=sms" \
+      --data-urlencode "CustomFriendlyName=OnlineMall-DOWN" \
       || true
   )"
   local sid status err_msg err_code snippet
