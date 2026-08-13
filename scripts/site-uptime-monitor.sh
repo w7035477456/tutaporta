@@ -50,9 +50,9 @@ read_env_value() {
 
 TWILIO_ACCOUNT_SID="$(read_env_value TWILIO_ACCOUNT_SID "$ENV_FILE")"
 TWILIO_AUTH_TOKEN="$(read_env_value TWILIO_AUTH_TOKEN "$ENV_FILE")"
-TWILIO_FROM="$(read_env_value TWILIO_PHONE_NUMBER "$ENV_FILE")"
-if [[ -z "$TWILIO_FROM" ]]; then
-  TWILIO_FROM="$(read_env_value TWILIO_FROM "$ENV_FILE")"
+TWILIO_SERVICE_SID="$(read_env_value TWILIO_SERVICE_SID "$ENV_FILE")"
+if [[ -z "$TWILIO_SERVICE_SID" ]]; then
+  TWILIO_SERVICE_SID="$(read_env_value TWILIO_ServiceSID "$ENV_FILE")"
 fi
 SMS_TO="${SITE_UPTIME_SMS_TO:-$(read_env_value SITE_UPTIME_SMS_TO "$ENV_FILE")}"
 if [[ -z "$SMS_TO" ]]; then
@@ -167,20 +167,20 @@ json_field() {
 
 send_sms() {
   local body="$1"
-  if [[ -z "$TWILIO_ACCOUNT_SID" || -z "$TWILIO_AUTH_TOKEN" || -z "$TWILIO_FROM" ]]; then
-    log_sms "SMS NOT SENT (Twilio env missing in ${ENV_FILE}) sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} from='${TWILIO_FROM}' to=${SMS_TO} body=${body}"
+  if [[ -z "$TWILIO_ACCOUNT_SID" || -z "$TWILIO_AUTH_TOKEN" || -z "$TWILIO_SERVICE_SID" ]]; then
+    log_sms "SMS NOT SENT (Twilio Verify env missing in ${ENV_FILE}) sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} verify_sid_len=${#TWILIO_SERVICE_SID} to=${SMS_TO} body=${body}"
     return 1
   fi
   local resp http
   resp="$(mktemp)"
+  # Same Twilio Verify path as new-account registration SMS (not Messages API).
   http="$(
     curl -sS -o "$resp" -w '%{http_code}' \
       --max-time 20 \
-      -X POST "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json" \
+      -X POST "https://verify.twilio.com/v2/Services/${TWILIO_SERVICE_SID}/Verifications" \
       --user "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
       --data-urlencode "To=${SMS_TO}" \
-      --data-urlencode "From=${TWILIO_FROM}" \
-      --data-urlencode "Body=${body}" \
+      --data-urlencode "Channel=sms" \
       || true
   )"
   local sid status err_msg err_code snippet
@@ -190,11 +190,11 @@ send_sms() {
   err_code="$(json_field code "$resp")"
   snippet="$(tr '\n' ' ' <"$resp" | sed 's/[[:space:]]\+/ /g' | cut -c1-400)"
   rm -f "$resp"
-  if [[ "$http" =~ ^2[0-9][0-9]$ && "$sid" =~ ^(SM|MM) ]]; then
-    log_sms "SMS SENT to=${SMS_TO} from=${TWILIO_FROM} twilio_http=${http} status=${status:-?} sid=${sid} body=${body}"
+  if [[ "$http" =~ ^2[0-9][0-9]$ && "$sid" =~ ^VE ]]; then
+    log_sms "SMS SENT (Twilio Verify / signup-style) to=${SMS_TO} twilio_http=${http} status=${status:-?} sid=${sid} note=${body}"
     return 0
   fi
-  log_sms "SMS FAILED to=${SMS_TO} from=${TWILIO_FROM} twilio_http=${http:-000} status=${status:-?} code=${err_code:-?} error=${err_msg:-unknown} body=${body} raw=${snippet}"
+  log_sms "SMS FAILED (Twilio Verify) to=${SMS_TO} twilio_http=${http:-000} status=${status:-?} code=${err_code:-?} error=${err_msg:-unknown} note=${body} raw=${snippet}"
   return 1
 }
 
@@ -223,12 +223,12 @@ maybe_send_failure_sms() {
 
 if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   clear_sms_state
-  log_monitor "TEST-SMS env=${ENV_FILE} from=${TWILIO_FROM:-missing} to=${SMS_TO} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN}"
+  log_monitor "TEST-SMS (Twilio Verify) env=${ENV_FILE} to=${SMS_TO} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} verify_sid_len=${#TWILIO_SERVICE_SID}"
   send_sms "OnlineMall uptime monitor test at $(ts)"
   exit $?
 fi
 
-log_monitor "START interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} from=${TWILIO_FROM:-missing} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily"
+log_monitor "START interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily"
 
 DOWN=0
 while true; do
