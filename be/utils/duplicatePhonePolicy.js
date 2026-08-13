@@ -1,10 +1,24 @@
 import pool from '../db/connection.js';
+import { isAnyMemberCategory, normalizeMemberCategoryEnum } from './memberCategory.js';
 
 const DUPLICATE_PHONE_ERROR =
   'This phone number is already associated with an account. Please use a different number or sign in.';
 
-export function isDuplicatePhoneAllowed() {
+/** Raw env: DUPLICATE_PHONE_ALLOW=true|false (only consulted for AnyMember). */
+export function isDuplicatePhoneEnvEnabled() {
   return String(process.env.DUPLICATE_PHONE_ALLOW || '').trim().toLowerCase() === 'true';
+}
+
+/**
+ * Whether duplicate phones are allowed for this member_category.
+ * - Not AnyMember → always allowed
+ * - AnyMember (or omitted/unknown → treat as AnyMember for public signup) → DUPLICATE_PHONE_ALLOW
+ * @param {unknown} [memberCategory]
+ */
+export function isDuplicatePhoneAllowed(memberCategory) {
+  const normalized = normalizeMemberCategoryEnum(memberCategory);
+  if (normalized != null && !isAnyMemberCategory(normalized)) return true;
+  return isDuplicatePhoneEnvEnabled();
 }
 
 /** @param {string} phoneRaw */
@@ -15,11 +29,13 @@ export function formatPhoneForDuplicateCheck(phoneRaw) {
 }
 
 /**
- * When DUPLICATE_PHONE_ALLOW is not true, returns an error message if phone is already on a singles row.
+ * When duplicates are not allowed for this category, returns an error if phone is already on a singles row.
+ * @param {string|null} formattedPhone
+ * @param {unknown} [memberCategory]
  * @returns {Promise<string|null>}
  */
-export async function findDuplicatePhoneRegistrationError(formattedPhone) {
-  if (!formattedPhone || isDuplicatePhoneAllowed()) return null;
+export async function findDuplicatePhoneRegistrationError(formattedPhone, memberCategory) {
+  if (!formattedPhone || isDuplicatePhoneAllowed(memberCategory)) return null;
   const existing = await pool.query('SELECT singles_id FROM helloworldjunktest.singles WHERE phone = $1 LIMIT 1', [
     formattedPhone
   ]);
@@ -28,14 +44,16 @@ export async function findDuplicatePhoneRegistrationError(formattedPhone) {
 }
 
 /**
- * When DUPLICATE_PHONE_ALLOW=true, singles.phone UNIQUE still applies — pick a nearby unused E.164 value.
- * Mac/staging Twilio test-cell signups only; production keeps one account per phone.
+ * When duplicates are allowed for this category, singles.phone UNIQUE still applies —
+ * pick a nearby unused E.164 value. Production AnyMember with DUPLICATE_PHONE_ALLOW=false keeps one account per phone.
  * @param {import('pg').PoolClient} client
+ * @param {string} formattedPhone
+ * @param {unknown} [memberCategory]
  * @returns {Promise<string>}
  */
-export async function resolvePhoneForNewSinglesAccount(client, formattedPhone) {
+export async function resolvePhoneForNewSinglesAccount(client, formattedPhone, memberCategory) {
   if (!formattedPhone) return formattedPhone;
-  if (!isDuplicatePhoneAllowed()) return formattedPhone;
+  if (!isDuplicatePhoneAllowed(memberCategory)) return formattedPhone;
 
   const taken = await client.query('SELECT 1 FROM helloworldjunktest.singles WHERE phone = $1 LIMIT 1', [
     formattedPhone
@@ -58,10 +76,12 @@ export async function resolvePhoneForNewSinglesAccount(client, formattedPhone) {
 
 /**
  * @param {import('express').Response} res
+ * @param {string|null} formattedPhone
+ * @param {unknown} [memberCategory]
  * @returns {Promise<boolean>} true if response was sent (duplicate blocked)
  */
-export async function respondIfDuplicatePhone(res, formattedPhone) {
-  const message = await findDuplicatePhoneRegistrationError(formattedPhone);
+export async function respondIfDuplicatePhone(res, formattedPhone, memberCategory) {
+  const message = await findDuplicatePhoneRegistrationError(formattedPhone, memberCategory);
   if (!message) return false;
   res.status(400).json({ error: message });
   return true;

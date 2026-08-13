@@ -5,6 +5,7 @@ import { getPrivateKey } from '../../jwtKeys.js';
 import { getAuthJwtExpiresInSeconds, setAuthCookie } from '../../utils/authCookie.js';
 import { startSingleLoginSession } from '../../utils/singleLoginSession.js';
 import { resolveCustomLogoutMinutes } from '../../utils/customLogoutDuration.js';
+import { ensureSeededDemoBuddiesOnLogin } from '../../utils/ensureSeededDemoBuddiesOnLogin.js';
 
 function getSpecialLoginEmail() {
   return String(process.env.SPECIAL_ID ?? '').trim();
@@ -33,6 +34,11 @@ export async function beLoginBypass(req, res) {
         return res.status(404).json({ error: `Bypass user not found: ${bypassEmail}` });
       }
       const user = result.rows[0];
+      try {
+        await ensureSeededDemoBuddiesOnLogin(pool, user.singles_id);
+      } catch (seedErr) {
+        console.error('[beLoginBypass] ensureSeededDemoBuddiesOnLogin:', seedErr?.message ?? seedErr);
+      }
       const logoutMins = await resolveCustomLogoutMinutes(user.singles_id);
       const sessionId = await startSingleLoginSession(user.singles_id, logoutMins);
       const tokenPayload = {

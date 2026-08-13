@@ -38,12 +38,12 @@ SET
   dl_sex = CASE
     WHEN lower(COALESCE(t.firstname, '')) IN (
       'michelle', 'donna', 'marie', 'deborah', 'ming', 'kiran'
-    ) THEN 'Female'
+    ) THEN 'F'
     WHEN lower(COALESCE(t.firstname, '')) IN (
       'steven', 'andrew', 'gary', 'kevin'
-    ) THEN 'Male'
-    WHEN (t.rn % 2) = 0 THEN 'Female'
-    ELSE 'Male'
+    ) THEN 'M'
+    WHEN (t.rn % 2) = 0 THEN 'F'
+    ELSE 'M'
   END,
   pp_nationality = 'United States of America',
   pp_place_of_birth = CASE (t.rn % 5)

@@ -20,8 +20,10 @@ import { getRequestClientIp, isAdminIpAllowed } from '../../utils/adminIpConfig.
 import { resolveDemoGuestLoginAlias } from '../../utils/demoGuestLoginAlias.js';
 import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
 import { createLoginLogSessionToken, insertDemoLoginLog } from '../../utils/loginLog.js';
+import { ensureSeededDemoBuddiesOnLogin } from '../../utils/ensureSeededDemoBuddiesOnLogin.js';
 
-const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status
+const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
+                seeded_demo_buddies_boolean, gender_self_report
          FROM helloworldjunktest.singles s`;
 
 function parseRememberMe(raw) {
@@ -115,6 +117,27 @@ async function issueLoginSuccess(res, user, log, rememberMe = false, options = {
     console.error('[beVerifyLoginPassword] ensureDemoRegularInitialSetupDone:', err?.message ?? err);
   }
 
+  try {
+    await ensureSeededDemoBuddiesOnLogin(pool, user.singles_id);
+  } catch (err) {
+    console.error('[beVerifyLoginPassword] ensureSeededDemoBuddiesOnLogin:', err?.message ?? err);
+  }
+
+  try {
+    const flagsRes = await pool.query(
+      `SELECT seeded_demo_buddies_boolean, gender_self_report
+       FROM helloworldjunktest.singles
+       WHERE singles_id = $1`,
+      [user.singles_id]
+    );
+    if (flagsRes.rows[0]) {
+      user.seeded_demo_buddies_boolean = flagsRes.rows[0].seeded_demo_buddies_boolean;
+      user.gender_self_report = flagsRes.rows[0].gender_self_report;
+    }
+  } catch (err) {
+    console.error('[beVerifyLoginPassword] refresh seed flags:', err?.message ?? err);
+  }
+
   const logoutMins = await resolveCustomLogoutMinutes(user.singles_id);
   const tokenPayload = {
     singles_id: user.singles_id,
@@ -161,13 +184,22 @@ async function issueLoginSuccess(res, user, log, rememberMe = false, options = {
     guestDemoLogin: Boolean(guestDemoLogin)
   });
   const mallDepartmentMode = getMallDepartmentMode(userWithoutPassword.member_category);
+  const seededDemoBuddies =
+    String(userWithoutPassword.seeded_demo_buddies_boolean ?? '').trim().toLowerCase() === 'true' ||
+    userWithoutPassword.seeded_demo_buddies_boolean === true;
+  const genderRaw = String(userWithoutPassword.gender_self_report ?? '')
+    .trim()
+    .toUpperCase();
+  const genderSelfReport = genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null;
   return res.json({
     success: true,
     role: 'user',
     user: {
       ...userWithoutPassword,
       mallDepartmentMode,
-      guest_demo_login: Boolean(guestDemoLogin)
+      guest_demo_login: Boolean(guestDemoLogin),
+      seeded_demo_buddies_boolean: seededDemoBuddies,
+      gender_self_report: genderSelfReport
     },
     requiresPasswordUpgrade: Boolean(requiresPasswordUpgrade)
   });

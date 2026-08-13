@@ -1653,11 +1653,11 @@ export function formatPpPlaceOfBirthCapture(placeText) {
   return normalized || 'not found';
 }
 
-/** Value for singles.dl_sex — M/F from OCR or literal not found. */
+/** Value for singles.dl_sex — 'M' | 'F' | null (CHAR(1); never full words). */
 export function formatDlSexCapture(sexText) {
   const sex = normalizeSex(sexText);
   if (sex === 'M' || sex === 'F') return sex;
-  return 'not found';
+  return null;
 }
 
 /** Value for singles.pp_sex — passport sex from OCR or literal not found. */

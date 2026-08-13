@@ -65,7 +65,7 @@ export async function verifyPasswordWithAttemptTracking(
   options = {}
 ) {
   const userResult = await client.query(
-    `SELECT password_hash, password_attempt_count, password_attempt_datetime, email, phone
+    `SELECT password_hash, password_attempt_count, password_attempt_datetime, email, phone, member_category
      FROM helloworldjunktest.singles
      WHERE singles_id = $1
      LIMIT 1

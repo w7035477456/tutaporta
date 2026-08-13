@@ -383,7 +383,7 @@ import { getUploadLimits } from './routes/photos/getUploadLimits.js';
 import { getMyPhotos } from './routes/photos/getMyPhotos.js';
 import { deletePhoto } from './routes/photos/deletePhoto.js';
 import { setProfileImage } from './routes/photos/setProfileImage.js';
-import { postSeedMaleDemoFriends } from './routes/singles/seedMaleDemoFriendsRoute.js';
+import { postGenderSelfReport, postSeedDemoBuddies } from './routes/singles/genderSelfReportRoute.js';
 import { updateMyPhotoType } from './routes/photos/updateMyPhotoType.js';
 import { getPublicPrivateAlbum } from './routes/photos/getPublicPrivateAlbum.js';
 import { requireAuth } from './middleware/requireAuth.js';
@@ -402,6 +402,7 @@ import { getPublicKey } from './jwtKeys.js';
 import { clearAuthCookie, getAuthTokenFromCookies, getKeepMeLoginDays } from './utils/authCookie.js';
 import { getMallDepartmentMode } from './mallDepartmentMode.js';
 import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
+import { ensureSeededDemoBuddiesOnLogin } from './utils/ensureSeededDemoBuddiesOnLogin.js';
 import { closeLoginLogSession } from './utils/loginLog.js';
 import appLog from './logger.js';
 import { respondSessionInvalid } from './utils/sessionInvalidResponse.js';
@@ -940,7 +941,7 @@ app.get('/api/publicConfig', (_req, res) => {
     oneDriveVaultEnabled: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()).enabled,
     linkedInEnabled: isLinkedInOAuthConfigured(),
     blockMobile: isBlockMobileEnabled(),
-    duplicatePhoneAllow: isDuplicatePhoneAllowed()
+    duplicatePhoneAllow: isDuplicatePhoneAllowed('AnyMember')
   });
 });
 
@@ -990,7 +991,9 @@ app.get('/api/me', async (req, res) => {
         mailing_zip,
         profile_image_fk,
         alias,
-        member_category
+        member_category,
+        seeded_demo_buddies_boolean,
+        gender_self_report
        FROM helloworldjunktest.singles 
        WHERE singles_id = $1`,
       [decoded.singles_id]
@@ -1006,6 +1009,22 @@ app.get('/api/me', async (req, res) => {
     } catch (err) {
       console.error('[/api/me] ensureDemoRegularInitialSetupDone:', err?.message ?? err);
     }
+    try {
+      await ensureSeededDemoBuddiesOnLogin(pool, row.singles_id);
+    } catch (err) {
+      console.error('[/api/me] ensureSeededDemoBuddiesOnLogin:', err?.message ?? err);
+    }
+    // Re-read flags after possible seed on /api/me
+    const flagsRes = await pool.query(
+      `SELECT seeded_demo_buddies_boolean, gender_self_report
+       FROM helloworldjunktest.singles
+       WHERE singles_id = $1`,
+      [row.singles_id]
+    );
+    const flags = flagsRes.rows[0] ?? row;
+    const genderRaw = String(flags.gender_self_report ?? '')
+      .trim()
+      .toUpperCase();
     const user = {
       singles_id: row.singles_id,
       prefix: row.prefix,
@@ -1016,6 +1035,10 @@ app.get('/api/me', async (req, res) => {
       profile_image_fk: row.profile_image_fk,
       alias: row.alias,
       member_category: row.member_category,
+      seeded_demo_buddies_boolean:
+        String(flags.seeded_demo_buddies_boolean ?? '').trim().toLowerCase() === 'true' ||
+        flags.seeded_demo_buddies_boolean === true,
+      gender_self_report: genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null,
       guest_demo_login: decoded.guest_demo_login === true
     };
     const mallDepartmentMode = getMallDepartmentMode(user.member_category);
@@ -1475,7 +1498,8 @@ app.patch('/api/myPhotos/:id/type', requireAuth, updateMyPhotoType);
 app.post('/api/myPhotos/:id/resetOriginal', requireAuth, resetMyPhotoFromOrig);
 app.delete('/api/myPhotos/:id', requireAuth, deletePhoto);
 app.post('/api/profilePhoto', requireAuth, setProfileImage);
-app.post('/api/singles/seed-male-demo-friends', requireAuth, postSeedMaleDemoFriends);
+app.post('/api/singles/gender-self-report', requireAuth, postGenderSelfReport);
+app.post('/api/singles/seed-demo-buddies', requireAuth, postSeedDemoBuddies);
 app.get('/api/singlesPreferences', requireAuth, getSinglesPreferences_IIIIIIII);
 app.post('/api/singlesPreferences', requireAuth, updateSinglesPreferences_JJJJJJJJ);
 app.get('/api/verifyself/photo', requireAuth, getVerifySelfPhotoValue);

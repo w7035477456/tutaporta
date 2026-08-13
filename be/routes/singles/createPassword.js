@@ -14,6 +14,7 @@ import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { hashPassword } from '../../utils/passwordHash.js';
 import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
+import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
 const LOG_PREFIX = '[createPassword]';
 
@@ -100,9 +101,10 @@ export async function createPassword(req, res) {
       console.log(LOG_PREFIX, 'reject: phone not 10 digits');
       return res.status(400).json({ error: 'Phone number must be 10 digits' });
     }
-    if (isDuplicatePhoneAllowed()) {
-      console.log(LOG_PREFIX, 'DUPLICATE_PHONE_ALLOW=true: skipping duplicate phone check');
-    } else if (await respondIfDuplicatePhone(res, formattedPhone)) {
+    const signupCategory = resolveSignupMemberCategory(emailNorm);
+    if (isDuplicatePhoneAllowed(signupCategory)) {
+      console.log(LOG_PREFIX, 'duplicate phone allowed for', signupCategory);
+    } else if (await respondIfDuplicatePhone(res, formattedPhone, signupCategory)) {
       console.log(LOG_PREFIX, 'reject: phone already in use');
       return;
     }
@@ -199,7 +201,7 @@ async function finishRegistrationAfterPhoneVerified(
     return res.status(400).json({ error: 'Email does not match the registration. Please use the email that received the code.' });
   }
 
-  if (await respondIfDuplicatePhone(res, formattedPhone)) return;
+  if (await respondIfDuplicatePhone(res, formattedPhone, resolveSignupMemberCategory(emailNorm))) return;
 
   const passwordHash = await hashPassword(password);
 

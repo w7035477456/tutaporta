@@ -10,6 +10,7 @@ import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
 import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
+import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
 async function cleanupVerificationRowsByEmail(emailNorm) {
   const result = await pool.query(`DELETE FROM helloworldjunktest.verifications WHERE email = $1`, [emailNorm]);
@@ -126,7 +127,7 @@ export async function verifyPhone(req, res) {
       });
     }
 
-    if (await respondIfDuplicatePhone(res, formattedPhone)) return;
+    if (await respondIfDuplicatePhone(res, formattedPhone, resolveSignupMemberCategory(emailNorm))) return;
 
     if (!storedRow_AAAAA.password_hash) {
       if (phoneSessionTable === 'verifications') {

@@ -49,6 +49,10 @@ export function isRegularMemberCategory(raw) {
   return normalizeMemberCategoryEnum(raw) === 'RegularMember';
 }
 
+export function isAnyMemberCategory(raw) {
+  return normalizeMemberCategoryEnum(raw) === 'AnyMember';
+}
+
 /** DemoUser / RegularMember: skip mandatory setup / IDV nav locks. */
 export function isInitialSetupBypassMemberCategory(raw) {
   return isDemoUserCategory(raw) || isRegularMemberCategory(raw);

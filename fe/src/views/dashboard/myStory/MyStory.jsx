@@ -34,7 +34,6 @@ import { isAdminImpersonationBypassSession, isAdminSession, isImpersonationSessi
 import NicknamePickerDialog from './NicknamePickerDialog';
 import SecurityIconPickerDialog from './SecurityIconPickerDialog';
 import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
-import { seedMaleDemoFriendsForCurrentUser } from 'api/seedMaleDemoFriendsFe';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { markSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import {
@@ -1107,7 +1106,7 @@ export default function MyStory() {
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
   const myStoryPhoneLayout = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const isMobileUpload = useMediaQuery(MOBILE_UPLOAD_MAX_CSS);
-  const { user, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname } = useAuth();
+  const { user, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname, updateSessionDemoBuddyFlags } = useAuth();
   const { photos, myPhotosLoading, refetchMyPhotos } = useMyPhotos(user?.singles_id);
   const { albumVideos, refetchMyAlbumVideos } = useMyAlbumVideos(user?.singles_id);
   const ownerSinglesId = user?.singles_id ?? null;
@@ -1735,10 +1734,15 @@ export default function MyStory() {
         didInitSelectionRef.current = true;
         pendingAutoMakePhotoIdRef.current = null;
         if (wasFirstProfileSetup) {
+          // Demo buddies seed on login / gender popup; retry after first profile photo exists.
           try {
-            await seedMaleDemoFriendsForCurrentUser();
+            const { default: api } = await import('api/axios');
+            const { data } = await api.post('/api/singles/seed-demo-buddies');
+            updateSessionDemoBuddyFlags({
+              seeded_demo_buddies_boolean: Boolean(data?.seeded_demo_buddies_boolean)
+            });
           } catch (seedErr) {
-            console.warn('[MyStory] seed male demo friends failed', seedErr?.response?.data?.error || seedErr?.message || seedErr);
+            console.warn('[MyStory] seed-demo-buddies retry failed', seedErr?.response?.data?.error || seedErr?.message || seedErr);
           }
           pendingRefereeAfterSeedBuddiesRef.current = shouldShowRefereeRewardUxAfterProfileSetup();
           setShowSeedBuddiesPostingPopup(true);
@@ -1759,7 +1763,8 @@ export default function MyStory() {
       refreshAuthProfilePhoto,
       bumpProfilePhotoCache,
       profileBasics.alias,
-      user?.alias
+      user?.alias,
+      updateSessionDemoBuddyFlags
     ]
   );
 

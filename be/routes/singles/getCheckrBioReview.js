@@ -92,8 +92,7 @@ function formatDlSexDisplay(raw) {
   const upper = text.toUpperCase();
   if (upper === 'M' || upper === 'MALE') return 'Male';
   if (upper === 'F' || upper === 'FEMALE') return 'Female';
-  if (text.toLowerCase() === 'not found') return 'not found';
-  return text;
+  return null;
 }
 
 function readGenderDisplayValue(singlesRow, vetRow) {

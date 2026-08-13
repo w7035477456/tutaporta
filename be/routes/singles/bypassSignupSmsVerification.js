@@ -5,6 +5,7 @@ import {
   respondIfDuplicatePhone
 } from '../../utils/duplicatePhonePolicy.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
+import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
 const LOG_PREFIX = '[bypassSignupSmsVerification]';
 
@@ -61,7 +62,7 @@ export async function bypassSignupSmsVerification(req, res) {
       });
     }
 
-    if (await respondIfDuplicatePhone(res, formattedPhone)) return;
+    if (await respondIfDuplicatePhone(res, formattedPhone, resolveSignupMemberCategory(emailNorm))) return;
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await pool.query(

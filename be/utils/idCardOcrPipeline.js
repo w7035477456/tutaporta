@@ -144,7 +144,7 @@ export function logSexOcrTrace(trace, { rekognitionLines = [], tesseractLines = 
     );
   }
   if (trace.allFailed) {
-    console.log('[rekognition:sex-ocr] ALL STEPS FAILED — singles.dl_sex saved as "not found"');
+    console.log('[rekognition:sex-ocr] ALL STEPS FAILED — singles.dl_sex saved as NULL');
     if (rekognitionLines.length) {
       console.log('[rekognition:sex-ocr] Rekognition LINE sample:', rekognitionLines.slice(0, 25));
     }

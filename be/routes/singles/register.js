@@ -15,6 +15,7 @@ import { isDefaultReferByCode } from '../../utils/referByCode.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { getUsSignupPhoneValidationMessage, validateUsSignupPhone } from '../../utils/usPhoneValidation.js';
 import { insertSignupLoginLog } from '../../utils/loginLog.js';
+import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
 const EMAIL_EXISTS_ERROR = 'This email already exist in out system. Please double check your email.';
 const CODE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -92,10 +93,11 @@ export async function registerUser(req, res) {
 
     const formattedPhoneForCheck = formatPhoneForDuplicateCheck(phoneRaw);
     if (formattedPhoneForCheck) {
-      if (isDuplicatePhoneAllowed()) {
-        console.log('[register] DUPLICATE_PHONE_ALLOW=true: skipping duplicate phone check');
+      const signupCategory = resolveSignupMemberCategory(emailTrimmed);
+      if (isDuplicatePhoneAllowed(signupCategory)) {
+        console.log('[register] duplicate phone allowed for', signupCategory);
       } else {
-        const duplicatePhoneError = await findDuplicatePhoneRegistrationError(formattedPhoneForCheck);
+        const duplicatePhoneError = await findDuplicatePhoneRegistrationError(formattedPhoneForCheck, signupCategory);
         if (duplicatePhoneError) {
           return res.status(409).json({ error: duplicatePhoneError });
         }

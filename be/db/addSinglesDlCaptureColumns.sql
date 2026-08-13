@@ -7,7 +7,7 @@ ALTER TABLE helloworldjunktest.singles
   ADD COLUMN IF NOT EXISTS dl_middlename text,
   ADD COLUMN IF NOT EXISTS dl_lastname text,
   ADD COLUMN IF NOT EXISTS dl_dob text,
-  ADD COLUMN IF NOT EXISTS dl_sex text,
+  ADD COLUMN IF NOT EXISTS dl_sex char(1),
   ADD COLUMN IF NOT EXISTS dl_height text,
   ADD COLUMN IF NOT EXISTS dl_city text,
   ADD COLUMN IF NOT EXISTS pp_nationality text;
@@ -25,7 +25,7 @@ COMMENT ON COLUMN helloworldjunktest.singles.dl_dob IS
   'Date of birth from driver license OCR (MM/DD/YYYY next to DOB label), or None Found.';
 
 COMMENT ON COLUMN helloworldjunktest.singles.dl_sex IS
-  'Sex (M or F) from driver license OCR next to Sex label, or "not found".';
+  'Sex from driver license OCR: M or F (CHAR(1)); NULL when unknown.';
 
 COMMENT ON COLUMN helloworldjunktest.singles.dl_height IS
   'Height read from driver license OCR during Identification Verification step 3.';

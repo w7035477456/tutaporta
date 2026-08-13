@@ -9,7 +9,7 @@ import {
   upsertBioRow
 } from './checkrBioReviewDb.js';
 import { parseGovIdArrayFromEdit } from '../../utils/govIdDocumentLabels.js';
-import { normalizePassportPlaceOfBirthDisplay } from '../../utils/idCardOcrParse.js';
+import { formatDlSexCapture, normalizePassportPlaceOfBirthDisplay } from '../../utils/idCardOcrParse.js';
 import { isAdminAuth, isAdminImpersonationSession } from '../../utils/adminAuth.js';
 
 function asNullableVarchar(raw) {
@@ -193,7 +193,7 @@ export async function saveCheckrBioReviewField(req, res) {
     if (isGenderEdit && singlesColumns.has('dl_sex')) {
       await pool.query(
         `UPDATE ${schema}.singles SET dl_sex = $1, updated_at = CURRENT_TIMESTAMP WHERE singles_id = $2`,
-        [asNullableVarchar(rawValue), singlesId]
+        [formatDlSexCapture(rawValue), singlesId]
       );
     }
 

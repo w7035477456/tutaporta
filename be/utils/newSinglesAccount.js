@@ -22,7 +22,7 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
   const memberId = await allocateMemberIdForCategory(client, { memberCategory: resolvedCategory, singlesId: newSinglesId });
   const myReferCode = referCodeFromMemberId(memberId);
   const resolvedReferByCode = resolveReferByCode(referByCode);
-  const phoneForInsert = await resolvePhoneForNewSinglesAccount(client, formattedPhone);
+  const phoneForInsert = await resolvePhoneForNewSinglesAccount(client, formattedPhone, resolvedCategory);
 
   await client.query('BEGIN');
   try {

@@ -41,6 +41,7 @@ import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeade
 import DemoOnlyModeBanner from 'ui-component/DemoOnlyModeBanner';
 import { getAdminImpersonationHeaderState, adminImpersonationHeaderCenterWrapSx } from 'config/adminImpersonationHeader';
 import LegacyPasswordUpgradeDialog from 'views/auth-forms/LegacyPasswordUpgradeDialog';
+import GenderSelfReportPopup from 'ui-component/GenderSelfReportPopup';
 import RecordVaultLeaveBusyOverlay from 'ui-component/RecordVaultLeaveBusyOverlay';
 import PhotoAlbumsLeaveBusyOverlay from 'ui-component/PhotoAlbumsLeaveBusyOverlay';
 import { useAuth } from 'contexts/AuthContext';
@@ -116,9 +117,15 @@ export default function MainLayout() {
   const downLG = useMediaQuery(theme.breakpoints.down('lg'));
   const mobileEdgeToEdge = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const location = useLocation();
-  const { user, requiresPasswordUpgrade, upgradeLegacyPassword } = useAuth();
+  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, updateSessionDemoBuddyFlags } = useAuth();
   const adminHeader = getAdminImpersonationHeaderState(user);
   const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
+  const needsGenderSelfReport =
+    Boolean(user) &&
+    !user.tools_only &&
+    !isGuestDemoLogin(user) &&
+    !user.seeded_demo_buddies_boolean &&
+    (user.gender_self_report !== 'M' && user.gender_self_report !== 'F');
   useFlowerShopLightThemeOverride();
 
   const {
@@ -495,6 +502,15 @@ export default function MainLayout() {
       <LegacyPasswordUpgradeDialog
         open={Boolean(user) && requiresPasswordUpgrade}
         onSubmit={upgradeLegacyPassword}
+      />
+      <GenderSelfReportPopup
+        open={needsGenderSelfReport && !requiresPasswordUpgrade}
+        onCompleted={(flags) => {
+          updateSessionDemoBuddyFlags({
+            gender_self_report: flags?.gender_self_report,
+            seeded_demo_buddies_boolean: flags?.seeded_demo_buddies_boolean
+          });
+        }}
       />
       <RecordVaultLeaveBusyOverlay />
       <PhotoAlbumsLeaveBusyOverlay />

@@ -83,6 +83,17 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
+  const updateSessionDemoBuddyFlags = useCallback(({ gender_self_report, seeded_demo_buddies_boolean } = {}) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      return normalizeUserShape({
+        ...prev,
+        ...(gender_self_report !== undefined ? { gender_self_report } : {}),
+        ...(seeded_demo_buddies_boolean !== undefined ? { seeded_demo_buddies_boolean } : {})
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (!user) {
       applyThemeByName(DEFAULT_NEW_USER_THEME_NAME);
@@ -320,7 +331,8 @@ export const AuthProvider = ({ children }) => {
         bumpProfilePhotoCache,
         updateSessionProfilePhoto,
         refreshAuthProfilePhoto,
-        updateSessionNickname
+        updateSessionNickname,
+        updateSessionDemoBuddyFlags
       }}
     >
       {children}

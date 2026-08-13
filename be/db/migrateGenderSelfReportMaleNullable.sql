@@ -1,0 +1,2 @@
+-- Superseded by migrateGenderSelfReportChar.sql (boolean → CHAR(1) gender_self_report).
+-- Kept for history only; do not re-run on DBs that already have gender_self_report.

@@ -5,6 +5,7 @@ import {
   respondIfDuplicatePhone
 } from '../../utils/duplicatePhonePolicy.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
+import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
 const LOG_PREFIX = '[sendRegistrationSms]';
 
@@ -53,7 +54,7 @@ export async function sendRegistrationSms(req, res) {
     if (!formattedPhone) {
       return res.status(400).json({ error: 'Phone number must be 10 digits' });
     }
-    if (await respondIfDuplicatePhone(res, formattedPhone)) return;
+    if (await respondIfDuplicatePhone(res, formattedPhone, resolveSignupMemberCategory(emailNorm))) return;
 
     if (!isTwilioVerifyConfigured()) {
       return res.status(500).json({

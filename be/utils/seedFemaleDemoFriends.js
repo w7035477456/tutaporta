@@ -9,13 +9,15 @@
  *
  * Idempotent upserts for requests; upgrades legacy hiking seed post / attaches missing photo.
  *
- * Library (for later first-login wiring):
+ * Library (called on login via ensureSeededDemoBuddiesOnLogin):
  *   import { seedFemaleDemoFriendsForSinglesId } from '../utils/seedFemaleDemoFriends.js';
  *
  * CLI:
  *   node be/scripts/seedFemaleDemoFriends.js --email=regularmember2@gmail.com
  *   node be/scripts/seedFemaleDemoFriends.js --singles-id=36
  *   node be/scripts/seedFemaleDemoFriends.js --email=… --dry-run
+ *
+ * On success sets singles.seeded_demo_buddies_boolean = true.
  */
 import { allocateRequestsId } from '../routes/singles/requestsUpsert.js';
 import { booleanEnumCast, toBooleanEnumLabel } from './booleanEnum.js';
@@ -461,6 +463,14 @@ export async function seedFemaleDemoFriendsForSinglesId(db, femaleSinglesId, opt
     const posting = await ensureSamplePosting(client, femaleId, { forcePost, createdAt: postCreatedAt });
 
     if (ownsClient) await client.query('COMMIT');
+
+    await db.query(
+      `UPDATE ${Q}.singles
+       SET seeded_demo_buddies_boolean = '${TRUE}'::${CAST},
+           updated_at = CURRENT_TIMESTAMP
+       WHERE singles_id = $1`,
+      [femaleId]
+    );
 
     return { dryRun: false, ...plan, requests, posting };
   } catch (err) {

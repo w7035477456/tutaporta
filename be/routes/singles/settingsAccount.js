@@ -1431,7 +1431,7 @@ export async function submitSettingsChangePhone(req, res) {
       return res.status(400).json({ error: 'That is already your current phone number.' });
     }
 
-    if (!isDuplicatePhoneAllowed()) {
+    if (!isDuplicatePhoneAllowed(gate.row.member_category)) {
       const taken = await client.query(
         `SELECT singles_id FROM helloworldjunktest.singles WHERE phone = $1 AND singles_id <> $2 LIMIT 1`,
         [newPhoneStored, singlesId]
