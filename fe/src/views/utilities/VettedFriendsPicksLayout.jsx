@@ -567,18 +567,20 @@ function OutgoingBioRequestSentenceLine({
             })}
           >
             {approval.text}
-          </Box>{' '}
-          <Button
-            type="button"
-            disableElevation
-            onClick={() => void onApprovedClick?.(bioKind)}
-            sx={OUTGOING_BIO_CLICK_TO_VIEW_BUTTON_SX}
-            {...guestDemoAllowProps()}
-          >
-            <Box component="span" className="hover-magnify-label" sx={OUTGOING_BIO_GREEN_ACTION_LABEL_SX}>
-              {approval.actionText}
-            </Box>
-          </Button>
+          </Box>
+          <Box sx={{ display: 'block', mt: 0.75 }}>
+            <Button
+              type="button"
+              disableElevation
+              onClick={() => void onApprovedClick?.(bioKind)}
+              sx={OUTGOING_BIO_CLICK_TO_VIEW_BUTTON_SX}
+              {...guestDemoAllowProps()}
+            >
+              <Box component="span" className="hover-magnify-label" sx={OUTGOING_BIO_GREEN_ACTION_LABEL_SX}>
+                {approval.actionText}
+              </Box>
+            </Button>
+          </Box>
           {needsTokenUnlock ? (
             <Typography
               component="span"

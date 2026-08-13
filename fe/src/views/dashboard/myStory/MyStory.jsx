@@ -2508,13 +2508,19 @@ export default function MyStory() {
         for (const id of postingDraftPhotoIds) {
           if (!originalKeys.has(`photo:${Number(id)}`)) {
             const url = myPhotoUrl(id);
-            if (url) newUrls.push(url);
+            if (!url) {
+              throw new Error('Could not attach one or more photos. Try dropping them again.');
+            }
+            newUrls.push(url);
           }
         }
         for (const id of postingDraftVideoIds) {
           if (!originalKeys.has(`video:${Number(id)}`)) {
             const url = selfIntroVideoUrl(id);
-            if (url) newUrls.push(url);
+            if (!url) {
+              throw new Error('Could not attach one or more videos. Try dropping them again.');
+            }
+            newUrls.push(url);
           }
         }
         if (newUrls.length > 0) {
@@ -2581,12 +2587,11 @@ export default function MyStory() {
   const postingSaveReady =
     postingDraftPhotoIds.length > 0 || postingDraftVideoIds.length > 0 || postingDraftText.trim().length > 0;
 
-  /** Save → open visibility dropdown; picking Public / Buddies / Myself then creates the post. */
+  /** Save with the visibility already shown in the composer (do not re-open the dropdown). */
   const handlePostingSaveClick = useCallback(() => {
     if (postingSaving || !postingSaveReady) return;
-    pendingSaveAfterVisibilityRef.current = true;
-    setPostingVisibilityMenuOpen(true);
-  }, [postingSaving, postingSaveReady]);
+    void handleSavePosting(postingDraftVisibility);
+  }, [handleSavePosting, postingDraftVisibility, postingSaving, postingSaveReady]);
 
   const handlePostingVisibilityPicked = useCallback(
     (rawVisibility) => {

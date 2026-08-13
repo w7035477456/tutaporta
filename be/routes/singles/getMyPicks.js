@@ -1363,6 +1363,9 @@ export async function addMyPostingPhotos(req, res) {
       return res.status(404).json({ error: 'Posting not found' });
     }
 
+    // Old posts may sit in a past quarter; posting_photos is RANGE(post_created_at).
+    await ensurePostingQuarterlyPartitionsBeforeWrite(owner.rows[0].created_at);
+
     const existingCountResult = await pool.query(
       `SELECT COUNT(*)::int AS n
        FROM ${postingsSchema}.posting_photos
@@ -1394,11 +1397,16 @@ export async function addMyPostingPhotos(req, res) {
     try {
       await client.query('BEGIN');
       for (const url of correctedPhotoUrls) {
+        // Copy postings.created_at in SQL — JS Date can lose microseconds and
+        // miss posting_photos_post_fkey (post_id, post_created_at).
         const result = await client.query(
           `INSERT INTO ${postingsSchema}.posting_photos (post_id, post_created_at, photo_url, sort_order)
-           VALUES ($1, $2, $3, $4)
+           SELECT $1, p.created_at, $2, $3
+           FROM ${postingsSchema}.postings p
+           WHERE p.post_id = $1
+             AND p.singles_id = $4
            RETURNING photo_id, photo_url, sort_order`,
-          [postId, owner.rows[0].created_at, url, nextSort]
+          [postId, url, nextSort, me]
         );
         nextSort += 1;
         if (result.rows[0]) {

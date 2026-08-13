@@ -8,6 +8,10 @@ import { postSupportMessage } from 'api/supportMessageFe';
 import { useAuth } from 'contexts/AuthContext';
 import { formatAliasWithMemberCode } from 'utils/memberLabel';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
+import {
+  PAGE_INSTRUCTION_TOOLTIP_BG,
+  PAGE_INSTRUCTION_TOOLTIP_TEXT
+} from 'config/pageInstructionEnv';
 
 const MAX_FILES = 2;
 const MAX_FILE_BYTES = 7 * 1024 * 1024;
@@ -150,6 +154,8 @@ export default function SupportMessageDialog({ open, onClose }) {
       closeOnBackdrop={!sending}
       showCloseButton={!sending}
       closeButtonAriaLabel="Close support message"
+      panelBg={PAGE_INSTRUCTION_TOOLTIP_BG}
+      textColor={PAGE_INSTRUCTION_TOOLTIP_TEXT}
     >
       <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
         <ColorTemplate7PopupLargeDark.Title id="support-message-dialog-title">
@@ -182,7 +188,7 @@ export default function SupportMessageDialog({ open, onClose }) {
         <Box sx={{ width: '100%' }}>
           <Typography
             variant="body2"
-            sx={{ fontWeight: 700, color: 'var(--theme-primary-color)', mb: 0.75 }}
+            sx={{ fontWeight: 700, mb: 0.75 }}
           >
             How can we help you?
           </Typography>

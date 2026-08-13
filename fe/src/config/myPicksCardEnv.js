@@ -92,7 +92,7 @@ export const MY_PICKS_ACQUAINTANCE_REQUEST_TOOLTIP =
 export const MY_PICKS_FRIEND_REQUEST_TOOLTIP =
   "Instruction: Click to Send 'Buddy Request' to mutually share your Full Bios (including Basic Bios). Once they approved your request, you'll both have access to each other's Basic and Full Bio. As mutual Buddies, go to the 'Acquaint. & Buddies' menu for privileged access/activities there.";
 
-/** Hover tooltip — wide, rounded, orange fill (#F65B0C), red border, black text. */
+/** Hover tooltip — wide, rounded, orange fill (#F75B0B), red border, black text. */
 export function myPicksBioRequestTooltipSlotProps() {
   return {
     popper: {
