@@ -4,10 +4,21 @@ import { getRequestClientIp } from './adminIpConfig.js';
 
 const SCHEMA = 'helloworldjunktest';
 
+/** Never write login_log for these client IPs (local / home). */
+const LOGIN_LOG_SKIP_IPS = new Set(['127.0.0.1', '72.83.247.73']);
+
 function normalizeInet(raw) {
-  const ip = String(raw ?? '').trim();
+  let ip = String(raw ?? '').trim();
   if (!ip || ip === 'unknown') return null;
+  if (ip.startsWith('::ffff:')) ip = ip.slice('::ffff:'.length);
   return ip;
+}
+
+/** True when this IP must not be recorded in login_log at all. */
+export function shouldSkipLoginLogIp(rawIp) {
+  const ip = normalizeInet(rawIp);
+  if (!ip) return false;
+  return LOGIN_LOG_SKIP_IPS.has(ip);
 }
 
 function userAgentFromReq(req) {
@@ -42,6 +53,7 @@ export async function insertDemoLoginLog(req, fields = {}) {
     const phone = String(fields.phone ?? '').trim() || null;
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
     const clientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (shouldSkipLoginLogIp(clientIp)) return null;
     const userAgent = userAgentFromReq(req);
 
     const { rows } = await pool.query(
@@ -79,6 +91,7 @@ export async function insertSignupLoginLog(req, fields = {}) {
     }
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
     const clientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (shouldSkipLoginLogIp(clientIp)) return null;
     const userAgent = userAgentFromReq(req);
 
     const { rows } = await pool.query(

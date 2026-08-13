@@ -33,6 +33,8 @@ import { useAuth } from 'contexts/AuthContext';
 import { isAdminImpersonationBypassSession, isAdminSession, isImpersonationSession } from 'utils/adminSession';
 import NicknamePickerDialog from './NicknamePickerDialog';
 import SecurityIconPickerDialog from './SecurityIconPickerDialog';
+import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
+import { seedMaleDemoFriendsForCurrentUser } from 'api/seedMaleDemoFriendsFe';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { markSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import {
@@ -1144,6 +1146,8 @@ export default function MyStory() {
   const userClearedAliasRef = useRef(false);
   const userDismissedSecurityIconRef = useRef(false);
   const [showFirstPhotoDialog, setShowFirstPhotoDialog] = useState(false);
+  const [showSeedBuddiesPostingPopup, setShowSeedBuddiesPostingPopup] = useState(false);
+  const pendingRefereeAfterSeedBuddiesRef = useRef(false);
   const [showNicknameDialog, setShowNicknameDialog] = useState(false);
   const [showSecurityIconDialog, setShowSecurityIconDialog] = useState(false);
   const [hasSecretIcon, setHasSecretIcon] = useState(false);
@@ -1730,11 +1734,14 @@ export default function MyStory() {
         userPickedPhotoIdRef.current = id;
         didInitSelectionRef.current = true;
         pendingAutoMakePhotoIdRef.current = null;
-        if (wasFirstProfileSetup && shouldShowRefereeRewardUxAfterProfileSetup()) {
-          clearRefereeRewardUxAfterProfileSetup();
-          navigate(PROFILES_RECORDS_PATH, {
-            state: { openTab: PROFILES_RECORDS_TAB_PAY_HISTORY, showRefereeRewardPopup: true }
-          });
+        if (wasFirstProfileSetup) {
+          try {
+            await seedMaleDemoFriendsForCurrentUser();
+          } catch (seedErr) {
+            console.warn('[MyStory] seed male demo friends failed', seedErr?.response?.data?.error || seedErr?.message || seedErr);
+          }
+          pendingRefereeAfterSeedBuddiesRef.current = shouldShowRefereeRewardUxAfterProfileSetup();
+          setShowSeedBuddiesPostingPopup(true);
           return;
         }
         if (!String(profileBasics.alias || user?.alias || '').trim()) {
@@ -1752,8 +1759,7 @@ export default function MyStory() {
       refreshAuthProfilePhoto,
       bumpProfilePhotoCache,
       profileBasics.alias,
-      user?.alias,
-      navigate
+      user?.alias
     ]
   );
 
@@ -1796,13 +1802,44 @@ export default function MyStory() {
 
   useEffect(() => {
     if (userClearedAliasRef.current) return;
-    if (myPhotosLoading || pendingAutoMakeProfile || showFirstPhotoDialog) return;
+    if (myPhotosLoading || pendingAutoMakeProfile || showFirstPhotoDialog || showSeedBuddiesPostingPopup) return;
     if (!profilePhotoId || hasNickname) {
       if (hasNickname) setShowNicknameDialog(false);
       return;
     }
     setShowNicknameDialog(true);
-  }, [myPhotosLoading, profilePhotoId, hasNickname, pendingAutoMakeProfile, showFirstPhotoDialog]);
+  }, [
+    myPhotosLoading,
+    profilePhotoId,
+    hasNickname,
+    pendingAutoMakeProfile,
+    showFirstPhotoDialog,
+    showSeedBuddiesPostingPopup
+  ]);
+
+  const handleSeedBuddiesPostingContinue = useCallback(() => {
+    setShowSeedBuddiesPostingPopup(false);
+    if (pendingRefereeAfterSeedBuddiesRef.current) {
+      pendingRefereeAfterSeedBuddiesRef.current = false;
+      clearRefereeRewardUxAfterProfileSetup();
+      navigate(PROFILES_RECORDS_PATH, {
+        state: { openTab: PROFILES_RECORDS_TAB_PAY_HISTORY, showRefereeRewardPopup: true }
+      });
+      return;
+    }
+    if (!String(profileBasics.alias || user?.alias || '').trim()) {
+      setShowNicknameDialog(true);
+      return;
+    }
+    if (!hasSecretIcon) {
+      setShowSecurityIconDialog(true);
+      return;
+    }
+    markSignupIdentificationVerificationRequired();
+    navigate(SELF_REPORT_BIOGRAPHY_PATH, {
+      state: { openIdentificationVerification: true }
+    });
+  }, [navigate, profileBasics.alias, user?.alias, hasSecretIcon]);
 
   const handleNicknameSaved = useCallback(
     (nickname) => {
@@ -1841,10 +1878,26 @@ export default function MyStory() {
 
   useEffect(() => {
     if (userDismissedSecurityIconRef.current) return;
-    if (profileBasicsLoading || showNicknameDialog || suggestListOpen || showSecurityIconDialog) return;
+    if (
+      profileBasicsLoading ||
+      showNicknameDialog ||
+      suggestListOpen ||
+      showSecurityIconDialog ||
+      showSeedBuddiesPostingPopup
+    ) {
+      return;
+    }
     if (!hasNickname || hasSecretIcon) return;
     setShowSecurityIconDialog(true);
-  }, [profileBasicsLoading, hasNickname, hasSecretIcon, showNicknameDialog, suggestListOpen, showSecurityIconDialog]);
+  }, [
+    profileBasicsLoading,
+    hasNickname,
+    hasSecretIcon,
+    showNicknameDialog,
+    suggestListOpen,
+    showSecurityIconDialog,
+    showSeedBuddiesPostingPopup
+  ]);
 
   const openNicknameEditor = useCallback(() => {
     setProfileBasicsMessage('');
@@ -3140,6 +3193,7 @@ export default function MyStory() {
         cancelLabel="No"
         confirmLabel="Yes"
       />
+      <SeedBuddiesPostingPopup open={showSeedBuddiesPostingPopup} onContinue={handleSeedBuddiesPostingContinue} />
       <NicknamePickerDialog
         open={showNicknameDialog || suggestListOpen}
         initialNickname={profileBasics.alias || user?.alias || ''}
