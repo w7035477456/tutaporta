@@ -34,6 +34,9 @@ UNIT_PATH="/etc/systemd/system/site-uptime-monitor.service"
 install -d -o "$RUN_USER" -g "$RUN_GROUP" -m 0755 "$INSTALL_DIR"
 install -d -o "$RUN_USER" -g "$RUN_GROUP" -m 0755 "$LOG_DIR"
 install -o "$RUN_USER" -g "$RUN_GROUP" -m 0755 "$MONITOR_SRC" "$SCRIPT_PATH"
+touch "${LOG_DIR}/monitor.log" "${LOG_DIR}/sms-sent.log"
+chown -R "$RUN_USER:$RUN_GROUP" "$LOG_DIR"
+chmod 0644 "${LOG_DIR}/monitor.log" "${LOG_DIR}/sms-sent.log"
 
 sed \
   -e "s|__RUN_USER__|${RUN_USER}|g" \
@@ -59,4 +62,8 @@ echo "Useful commands:"
 echo "  sudo systemctl status site-uptime-monitor"
 echo "  sudo journalctl -u site-uptime-monitor -f"
 echo "  tail -f ${LOG_DIR}/sms-sent.log"
-echo "  sudo systemctl restart site-uptime-monitor"
+echo
+echo "Send a test text (site can stay up):"
+echo "  rm -f ${LOG_DIR}/sms-state"
+echo "  sudo -u ${RUN_USER} ${SCRIPT_PATH} --test-sms"
+echo "  tail -5 ${LOG_DIR}/sms-sent.log"

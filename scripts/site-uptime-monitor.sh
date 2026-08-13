@@ -8,15 +8,19 @@ set -u
 
 ENV_FILE="${SITE_UPTIME_ENV_FILE:-${HOME}/.ssh/be/.env}"
 LOG_DIR="${SITE_UPTIME_LOG_DIR:-${HOME}/logs/site-uptime-monitor}"
-SMS_TO="${SITE_UPTIME_SMS_TO:-+17035477456}"
 INTERVAL_SEC="${SITE_UPTIME_INTERVAL_SEC:-30}"
 CURL_MAX_TIME="${SITE_UPTIME_CURL_MAX_TIME:-15}"
-SMS_COOLDOWN_SEC="${SITE_UPTIME_SMS_COOLDOWN_SEC:-900}"
+# SMS while still down: 3 texts every 10 min, then 3 hourly, then once a day.
+FAST_SMS_SEC="${SITE_UPTIME_FAST_SMS_SEC:-600}"
+FAST_SMS_COUNT="${SITE_UPTIME_FAST_SMS_COUNT:-3}"
+HOURLY_SMS_SEC="${SITE_UPTIME_HOURLY_SMS_SEC:-3600}"
+HOURLY_SMS_COUNT="${SITE_UPTIME_HOURLY_SMS_COUNT:-3}"
+DAILY_SMS_SEC="${SITE_UPTIME_DAILY_SMS_SEC:-86400}"
 BASE_URL="${SITE_UPTIME_BASE_URL:-https://onlinemall.website}"
 
 MONITOR_LOG="${LOG_DIR}/monitor.log"
 SMS_LOG="${LOG_DIR}/sms-sent.log"
-STATE_FILE="${LOG_DIR}/last-sms-epoch"
+STATE_FILE="${LOG_DIR}/sms-state"
 
 URLS=(
   "${BASE_URL}/"
@@ -31,10 +35,11 @@ read_env_value() {
   local file="$2"
   local line raw
   [[ -f "$file" ]] || return 0
-  line="$(grep -E "^[[:space:]]*${key}=" "$file" | tail -n 1 || true)"
+  line="$(grep -E "^[[:space:]]*(export[[:space:]]+)?${key}=" "$file" | tail -n 1 || true)"
   [[ -n "$line" ]] || return 0
   raw="${line#*=}"
   raw="${raw%$'\r'}"
+  raw="${raw#"${raw%%[![:space:]]*}"}"
   if [[ "$raw" == \"*\" && "$raw" == *\" ]]; then
     raw="${raw:1:${#raw}-2}"
   elif [[ "$raw" == \'*\' && "$raw" == *\' ]]; then
@@ -49,33 +54,81 @@ TWILIO_FROM="$(read_env_value TWILIO_PHONE_NUMBER "$ENV_FILE")"
 if [[ -z "$TWILIO_FROM" ]]; then
   TWILIO_FROM="$(read_env_value TWILIO_FROM "$ENV_FILE")"
 fi
+SMS_TO="${SITE_UPTIME_SMS_TO:-$(read_env_value SITE_UPTIME_SMS_TO "$ENV_FILE")}"
+if [[ -z "$SMS_TO" ]]; then
+  SMS_TO="+17035477456"
+fi
 
 ts() {
   date '+%Y-%m-%d %H:%M:%S %Z'
 }
 
 log_monitor() {
-  echo "$(ts) $*" | tee -a "$MONITOR_LOG"
+  echo "$(ts) $*" | tee -a "$MONITOR_LOG" >/dev/null
+  echo "$(ts) $*"
 }
 
 log_sms() {
-  echo "$(ts) $*" | tee -a "$SMS_LOG"
+  if ! echo "$(ts) $*" >>"$SMS_LOG" 2>/dev/null; then
+    echo "$(ts) SMS_LOG_WRITE_FAILED file=${SMS_LOG} $*" >&2
+  fi
+  echo "$(ts) $*"
 }
 
 now_epoch() {
   date +%s
 }
 
-last_sms_epoch() {
+# sms-state: "sent_count last_epoch"
+read_sms_state() {
+  SMS_SENT_COUNT=0
+  SMS_LAST_EPOCH=0
   if [[ -f "$STATE_FILE" ]]; then
-    cat "$STATE_FILE" 2>/dev/null || echo 0
-  else
-    echo 0
+    local line
+    line="$(tr -d '\r' <"$STATE_FILE" | head -n 1)"
+    SMS_SENT_COUNT="${line%% *}"
+    SMS_LAST_EPOCH="${line#* }"
+    [[ "$SMS_SENT_COUNT" =~ ^[0-9]+$ ]] || SMS_SENT_COUNT=0
+    [[ "$SMS_LAST_EPOCH" =~ ^[0-9]+$ ]] || SMS_LAST_EPOCH=0
   fi
 }
 
-mark_sms_sent() {
-  now_epoch >"$STATE_FILE"
+write_sms_state() {
+  echo "$1 $2" >"$STATE_FILE"
+}
+
+clear_sms_state() {
+  rm -f "$STATE_FILE"
+}
+
+# Seconds to wait after SMS number `sent_count` before sending the next one.
+# 0 sent → send immediately; next 2 at 10 min; next 3 hourly; then daily.
+next_sms_wait_sec() {
+  local sent="$1"
+  if [[ "$sent" -lt "$FAST_SMS_COUNT" ]]; then
+    if [[ "$sent" -eq 0 ]]; then
+      echo 0
+    else
+      echo "$FAST_SMS_SEC"
+    fi
+    return
+  fi
+  if [[ "$sent" -lt $((FAST_SMS_COUNT + HOURLY_SMS_COUNT)) ]]; then
+    echo "$HOURLY_SMS_SEC"
+    return
+  fi
+  echo "$DAILY_SMS_SEC"
+}
+
+sms_phase_label() {
+  local next_n=$(( ${1} + 1 ))
+  if [[ "$next_n" -le "$FAST_SMS_COUNT" ]]; then
+    echo "10min ${next_n}/${FAST_SMS_COUNT}"
+  elif [[ "$next_n" -le $((FAST_SMS_COUNT + HOURLY_SMS_COUNT)) ]]; then
+    echo "hourly $((next_n - FAST_SMS_COUNT))/${HOURLY_SMS_COUNT}"
+  else
+    echo "daily $((next_n - FAST_SMS_COUNT - HOURLY_SMS_COUNT))"
+  fi
 }
 
 check_url() {
@@ -106,10 +159,16 @@ check_url() {
   return 1
 }
 
+json_field() {
+  local key="$1"
+  local file="$2"
+  grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*\"[^\"]+\"" "$file" 2>/dev/null | head -1 | sed "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"//;s/\"$//"
+}
+
 send_sms() {
   local body="$1"
   if [[ -z "$TWILIO_ACCOUNT_SID" || -z "$TWILIO_AUTH_TOKEN" || -z "$TWILIO_FROM" ]]; then
-    log_sms "SMS NOT SENT (Twilio env missing in ${ENV_FILE}) to=${SMS_TO} body=${body}"
+    log_sms "SMS NOT SENT (Twilio env missing in ${ENV_FILE}) sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} from='${TWILIO_FROM}' to=${SMS_TO} body=${body}"
     return 1
   fi
   local resp http
@@ -118,47 +177,58 @@ send_sms() {
     curl -sS -o "$resp" -w '%{http_code}' \
       --max-time 20 \
       -X POST "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json" \
-      -u "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
+      --user "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
       --data-urlencode "To=${SMS_TO}" \
       --data-urlencode "From=${TWILIO_FROM}" \
       --data-urlencode "Body=${body}" \
       || true
   )"
-  local sid
-  sid="$(grep -oE '"sid"[[:space:]]*:[[:space:]]*"[^"]+"' "$resp" | head -1 | sed 's/.*"sid"[[:space:]]*:[[:space:]]*"//;s/"$//')"
-  local err_msg
-  err_msg="$(grep -oE '"message"[[:space:]]*:[[:space:]]*"[^"]+"' "$resp" | head -1 | sed 's/.*"message"[[:space:]]*:[[:space:]]*"//;s/"$//')"
+  local sid status err_msg err_code snippet
+  sid="$(json_field sid "$resp")"
+  status="$(json_field status "$resp")"
+  err_msg="$(json_field message "$resp")"
+  err_code="$(json_field code "$resp")"
+  snippet="$(tr '\n' ' ' <"$resp" | sed 's/[[:space:]]\+/ /g' | cut -c1-400)"
   rm -f "$resp"
-  if [[ "$http" =~ ^2[0-9][0-9]$ ]]; then
-    log_sms "SMS SENT to=${SMS_TO} twilio_http=${http} sid=${sid:-?} body=${body}"
-    mark_sms_sent
+  if [[ "$http" =~ ^2[0-9][0-9]$ && "$sid" =~ ^(SM|MM) ]]; then
+    log_sms "SMS SENT to=${SMS_TO} from=${TWILIO_FROM} twilio_http=${http} status=${status:-?} sid=${sid} body=${body}"
     return 0
   fi
-  log_sms "SMS FAILED to=${SMS_TO} twilio_http=${http:-000} error=${err_msg:-unknown} body=${body}"
+  log_sms "SMS FAILED to=${SMS_TO} from=${TWILIO_FROM} twilio_http=${http:-000} status=${status:-?} code=${err_code:-?} error=${err_msg:-unknown} body=${body} raw=${snippet}"
   return 1
 }
 
 maybe_send_failure_sms() {
   local fail_at="$1"
   local detail="$2"
-  local last now elapsed
-  last="$(last_sms_epoch)"
+  local now wait elapsed phase
+  read_sms_state
   now="$(now_epoch)"
-  elapsed=$((now - last))
-  if [[ "$last" != "0" && "$elapsed" -lt "$SMS_COOLDOWN_SEC" ]]; then
-    log_monitor "FAIL ${detail} sms=skipped cooldown_remaining=$((SMS_COOLDOWN_SEC - elapsed))s"
+  wait="$(next_sms_wait_sec "$SMS_SENT_COUNT")"
+  elapsed=$((now - SMS_LAST_EPOCH))
+  if [[ "$SMS_SENT_COUNT" -gt 0 && "$elapsed" -lt "$wait" ]]; then
+    log_monitor "FAIL ${detail} sms=skipped next_in=$((wait - elapsed))s phase=$(sms_phase_label "$SMS_SENT_COUNT")"
     return 0
   fi
+  phase="$(sms_phase_label "$SMS_SENT_COUNT")"
   local msg
-  msg="OnlineMall DOWN at ${fail_at}: ${detail}"
+  msg="OnlineMall DOWN at ${fail_at} [${phase}]: ${detail}"
   if send_sms "$msg"; then
-    log_monitor "FAIL ${detail} sms=sent"
+    write_sms_state $((SMS_SENT_COUNT + 1)) "$(now_epoch)"
+    log_monitor "FAIL ${detail} sms=sent phase=${phase} count=$((SMS_SENT_COUNT + 1))"
   else
-    log_monitor "FAIL ${detail} sms=failed"
+    log_monitor "FAIL ${detail} sms=failed phase=${phase}"
   fi
 }
 
-log_monitor "START interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} cooldown=${SMS_COOLDOWN_SEC}s"
+if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
+  clear_sms_state
+  log_monitor "TEST-SMS env=${ENV_FILE} from=${TWILIO_FROM:-missing} to=${SMS_TO} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN}"
+  send_sms "OnlineMall uptime monitor test at $(ts)"
+  exit $?
+fi
+
+log_monitor "START interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} from=${TWILIO_FROM:-missing} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily"
 
 DOWN=0
 while true; do
@@ -180,6 +250,7 @@ while true; do
       log_monitor "RECOVERED all curls succeeded"
       DOWN=0
     fi
+    clear_sms_state
   fi
   sleep "$INTERVAL_SEC"
 done
