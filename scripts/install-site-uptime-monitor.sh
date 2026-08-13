@@ -47,7 +47,12 @@ sed \
 chmod 0644 "$UNIT_PATH"
 
 systemctl daemon-reload
-systemctl enable --now site-uptime-monitor.service
+systemctl enable site-uptime-monitor.service
+systemctl restart site-uptime-monitor.service
+
+if ! grep -q 'immediate_on_new_outage=1' "$SCRIPT_PATH"; then
+  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v3). Copy ~/code/main first." >&2
+fi
 
 echo
 echo "Installed site-uptime-monitor (systemd, independent of PM2)."

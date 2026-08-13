@@ -98,7 +98,7 @@ write_sms_state() {
 }
 
 clear_sms_state() {
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "${LOG_DIR}/last-sms-epoch"
 }
 
 clear_logs_after_recovery() {
@@ -241,7 +241,7 @@ if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   exit $?
 fi
 
-log_monitor "START interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily"
+log_monitor "START v3 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily immediate_on_new_outage=1"
 
 DOWN=0
 while true; do
@@ -255,6 +255,10 @@ while true; do
   done
 
   if [[ "$ALL_OK" -eq 0 ]]; then
+    if [[ "$DOWN" -eq 0 ]]; then
+      clear_sms_state
+      log_monitor "NEW OUTAGE — SMS schedule reset, first text now"
+    fi
     fail_at="$(ts)"
     maybe_send_failure_sms "$fail_at" "$FAIL_DETAIL"
     DOWN=1
