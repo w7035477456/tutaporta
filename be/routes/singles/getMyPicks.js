@@ -1130,7 +1130,8 @@ export async function createMyPosting(req, res) {
       correctedPhotoUrls.push(await correctPostingMediaUrlForOwner(pool, me, url));
     }
 
-    // RegularMember backdated created_at: resolve timestamp + ensure partitions BEFORE BEGIN.
+    // RegularMember: random created_at a few weeks after this member's previous post
+    // (first post: random in the last 3 years). Never "now".
     // Doing DDL inside an open postings transaction deadlocks (ACCESS EXCLUSIVE vs RowShare).
     const previousAt = await loadLatestPostingCreatedAt(pool, postingsSchema, me);
     const activityAt = await resolveRegularMemberActivityTimestamp(pool, me, { previousAt });

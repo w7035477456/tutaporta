@@ -58,6 +58,7 @@ Creates / upserts:
   • Mutual Acquaint with GiddyGail (approved brief bio) + brief_paid=true (no token popup)
   • Pending Buddy request to SillySue (noresponse)
   • One public welcome posting with profile photo attached (requires profile_image_fk)
+    created_at is a few weeks after this member's previous post (first post: random in last 3 years)
   • Skips duplicate welcome content; upgrades legacy hiking seed post if present
 
 Does NOT create a new singles row — target male must already exist.
@@ -97,6 +98,7 @@ async function main() {
     if (result.posting) {
       console.log(
         `  posting: post_id=${result.posting.postId ?? '—'} ` +
+          `created_at=${result.posting.createdAt ? new Date(result.posting.createdAt).toISOString() : '—'} ` +
           `photo=${result.posting.photoUrl ?? '—'} ` +
           `(${
             result.posting.dryRun

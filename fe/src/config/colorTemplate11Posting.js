@@ -199,7 +199,7 @@ export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
     gap: { xs: 0.75, sm: 1 },
     px: { xs: 1, sm: 1.5 },
     py: { xs: 0.75, sm: 1 },
-    bgcolor: YELLOW_BUTTON_TEMPLATE_BG,
+    bgcolor: 'var(--theme-secondary-color)',
     borderBottom: '2px solid var(--theme-primary-color)',
     flexShrink: 0,
     flexWrap: 'wrap',
@@ -207,7 +207,7 @@ export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
   };
 }
 
-/** Zoom −/+ icons, slider, and Nvh readout on the yellow photo-size bar. */
+/** Zoom −/+ icons, slider, and Nvh readout on the posting photo-size bar. */
 export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT = `var(${ERROR_VAR})`;
 
 export function colorTemplate11PostingPhotoZoomIconButtonSx(overrides = {}) {

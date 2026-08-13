@@ -83,6 +83,16 @@ export async function ensurePostingQuarterlyPartitionsBeforeWrite(at = new Date(
   await ensureQuarterlyPartitionsBeforeWrite('posting_comments', at);
 }
 
+/** Create posting partitions for every UTC quarter from `fromDate` through `toDate` (inclusive) plus the next quarter. */
+export async function ensurePostingQuarterlyPartitionsForRange(fromDate, toDate = new Date()) {
+  let q = quarterStartUtc(fromDate);
+  const last = addQuartersUtc(quarterStartUtc(toDate), 1);
+  while (q.getTime() <= last.getTime()) {
+    await ensurePostingQuarterlyPartitionsBeforeWrite(q);
+    q = addQuartersUtc(q, 1);
+  }
+}
+
 export async function ensureChatLogQuarterlyPartitionsBeforeWrite(at = new Date()) {
   await ensureQuarterlyPartitionsBeforeWrite('chat_log', at);
 }

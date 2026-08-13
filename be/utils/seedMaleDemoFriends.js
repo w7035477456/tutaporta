@@ -5,6 +5,7 @@
  *   - GiddyGail: mutual approved Acquaint (brief bio) + brief_paid (skip token debit popup)
  *   - SillySue: outgoing Buddy request with noresponse (she never answers)
  *   - 1 public welcome posting with profile photo attached (`posting_photos.photo_url=/api/photo/{profile_image_fk}`)
+ *     and created_at a few weeks after this member's previous post (first post: random in last 3 years)
  *
  * Idempotent upserts for requests; upgrades legacy hiking seed post / attaches missing photo.
  *
@@ -18,6 +19,13 @@
  */
 import { allocateRequestsId } from '../routes/singles/requestsUpsert.js';
 import { booleanEnumCast, toBooleanEnumLabel } from './booleanEnum.js';
+import { ensurePostingQuarterlyPartitionsBeforeWrite } from './ensureQuarterlyPartitions.js';
+import {
+  DEFAULT_LOOKBACK_YEARS,
+  loadLatestPostingCreatedAt,
+  randomTimestampAfterPrevious,
+  randomTimestampWithinLastYears
+} from './regularMemberActivityTimestamp.js';
 
 export const SCHEMA = 'helloworldjunktest';
 
@@ -272,7 +280,7 @@ async function ensurePostingHasProfilePhoto(client, postId, photoUrl) {
  * Create/upgrade the public welcome posting with the member's profile photo attached
  * (same shape as createMyPosting: postings row + posting_photos.photo_url=/api/photo/:id).
  */
-async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost = false } = {}) {
+async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost = false, createdAt = null } = {}) {
   const content = MALE_DEMO_SAMPLE_POST_CONTENT;
   const photoFk = await resolveOwnedProfilePhotoId(client, maleId);
   const photoUrl = `/api/photo/${photoFk}`;
@@ -289,7 +297,7 @@ async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost =
   }
 
   const existing = await client.query(
-    `SELECT post_id, BTRIM(COALESCE(content, '')) AS content
+    `SELECT post_id, created_at, BTRIM(COALESCE(content, '')) AS content
      FROM ${Q}.postings
      WHERE singles_id = $1
        AND parent_post_id IS NULL
@@ -304,6 +312,7 @@ async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost =
   let postId = existing.rows[0] ? Number(existing.rows[0].post_id) : null;
   let inserted = false;
   let upgraded = false;
+  let resolvedCreatedAt = existing.rows[0]?.created_at ?? null;
 
   if (postId && !forcePost) {
     const priorContent = String(existing.rows[0].content ?? '');
@@ -318,14 +327,17 @@ async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost =
       upgraded = true;
     }
   } else {
+    const postCreatedAt =
+      createdAt instanceof Date ? createdAt : randomTimestampWithinLastYears(DEFAULT_LOOKBACK_YEARS);
     const { rows } = await client.query(
-      `INSERT INTO ${Q}.postings (singles_id, content, posting_visibility)
-       VALUES ($1, $2, 'public')
+      `INSERT INTO ${Q}.postings (singles_id, content, posting_visibility, created_at)
+       VALUES ($1, $2, 'public', $3::timestamptz)
        RETURNING post_id, created_at`,
-      [maleId, content]
+      [maleId, content, postCreatedAt.toISOString()]
     );
     postId = Number(rows[0].post_id);
     inserted = true;
+    resolvedCreatedAt = rows[0].created_at ?? postCreatedAt;
   }
 
   if (!Number.isFinite(postId) || postId < 1) {
@@ -336,7 +348,7 @@ async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost =
 
   return {
     postId,
-    createdAt: undefined,
+    createdAt: resolvedCreatedAt,
     photoUrl,
     profileImageFk: photoFk,
     photoId: photo.photoId,
@@ -400,6 +412,15 @@ export async function seedMaleDemoFriendsForSinglesId(db, maleSinglesId, opts = 
   if (dryRun) {
     return { dryRun: true, ...plan, requests: [], posting: { dryRun: true } };
   }
+
+  // Backdated created_at: a few weeks after this member's previous post (first post:
+  // random in last 3 years). Ensure the target quarter exists BEFORE BEGIN.
+  // DDL inside an open postings transaction deadlocks (ACCESS EXCLUSIVE vs RowShare).
+  const previousAt = await loadLatestPostingCreatedAt(db, SCHEMA, maleId);
+  const postCreatedAt = previousAt
+    ? randomTimestampAfterPrevious(previousAt)
+    : randomTimestampWithinLastYears(DEFAULT_LOOKBACK_YEARS);
+  await ensurePostingQuarterlyPartitionsBeforeWrite(postCreatedAt);
 
   const ownsClient = typeof db.connect === 'function';
   const client = ownsClient ? await db.connect() : db;
@@ -476,7 +497,7 @@ export async function seedMaleDemoFriendsForSinglesId(db, maleSinglesId, opts = 
       }))
     });
 
-    const posting = await ensureSamplePosting(client, maleId, { forcePost });
+    const posting = await ensureSamplePosting(client, maleId, { forcePost, createdAt: postCreatedAt });
 
     if (ownsClient) await client.query('COMMIT');
 

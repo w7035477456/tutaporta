@@ -2,17 +2,23 @@
  * RegularMember demo/test accounts: stamp activity rows with a random time
  * instead of CURRENT_TIMESTAMP.
  *
- * - First activity: random date/time within the last 5 years.
- * - Later activity: random time a few days / few weeks after the previous stamp
- *   (never in the future).
+ * - First activity: random date/time within the last 3 years (never today).
+ * - Later activity: random time a few weeks after the previous stamp
+ *   (never in the future, never the current date, always after the previous post).
  * - Non–RegularMember: callers get null and keep normal “now” defaults.
  */
 
 const REGULAR_MEMBER_CATEGORY = 'regularmember';
-const DEFAULT_LOOKBACK_YEARS = 5;
-/** Prefer a few days … a few weeks after the previous RegularMember stamp. */
-const AFTER_PREVIOUS_MIN_DAYS = 2;
-const AFTER_PREVIOUS_MAX_DAYS = 21;
+export const DEFAULT_LOOKBACK_YEARS = 3;
+/** Do not stamp RegularMember activity on the current calendar day. */
+const EXCLUDE_RECENT_MS = 24 * 60 * 60 * 1000;
+/** Prefer a few weeks after the previous RegularMember stamp. */
+const AFTER_PREVIOUS_MIN_DAYS = 14;
+const AFTER_PREVIOUS_MAX_DAYS = 28;
+
+function maxAllowedStampMs() {
+  return Date.now() - EXCLUDE_RECENT_MS;
+}
 
 /**
  * @param {unknown} raw
@@ -23,29 +29,30 @@ export function isRegularMemberCategory(raw) {
 }
 
 /**
- * Random Date within the last `years` years (inclusive of now → years ago).
- * Includes a random time-of-day.
+ * Random Date within the last `years` years, excluding the last 24 hours
+ * so RegularMember posts never show today's date/time.
  * @param {number} [years]
  * @returns {Date}
  */
 export function randomTimestampWithinLastYears(years = DEFAULT_LOOKBACK_YEARS) {
   const lookback = Number(years);
   const safeYears = Number.isFinite(lookback) && lookback > 0 ? lookback : DEFAULT_LOOKBACK_YEARS;
-  const nowMs = Date.now();
-  const spanMs = Math.floor(safeYears * 365.25 * 24 * 60 * 60 * 1000);
+  const maxMs = maxAllowedStampMs();
+  const spanMs = Math.max(1, Math.floor(safeYears * 365.25 * 24 * 60 * 60 * 1000) - EXCLUDE_RECENT_MS);
   const offsetMs = Math.floor(Math.random() * (spanMs + 1));
-  return new Date(nowMs - offsetMs);
+  return new Date(maxMs - offsetMs);
 }
 
 /**
- * Random timestamp after `previousAt`, typically +2..21 days with a random clock time.
- * Clamped to now (never future).
+ * Random timestamp after `previousAt`, typically +2..4 weeks with a random clock time.
+ * Always strictly after `previousAt`. Prefer not today / not the future; if there is
+ * no room before that cap, still stay after the previous stamp.
  * @param {Date | string | number} previousAt
  * @returns {Date}
  */
 export function randomTimestampAfterPrevious(previousAt) {
   const prevMs = new Date(previousAt).getTime();
-  const nowMs = Date.now();
+  const maxMs = maxAllowedStampMs();
   if (!Number.isFinite(prevMs)) {
     return randomTimestampWithinLastYears(DEFAULT_LOOKBACK_YEARS);
   }
@@ -58,19 +65,44 @@ export function randomTimestampAfterPrevious(previousAt) {
   const randomTimeOfDayMs = Math.floor(Math.random() * dayMs);
   let nextMs = prevMs + daysAhead * dayMs + randomTimeOfDayMs;
 
-  // If that lands after now, pick a random time between previous and now (when possible).
-  if (nextMs > nowMs) {
-    const room = nowMs - prevMs;
-    if (room <= 60_000) {
-      // Previous is already ~now — stay at now.
-      return new Date(nowMs);
+  if (nextMs > maxMs) {
+    const room = maxMs - prevMs;
+    if (room <= 1000) {
+      return new Date(prevMs + 1000);
     }
-    // Prefer still “a bit later”: at least ~1 hour when there is room, else any gap.
     const minGap = Math.min(60 * 60 * 1000, Math.floor(room / 4));
-    nextMs = prevMs + minGap + Math.floor(Math.random() * (room - minGap));
+    nextMs = prevMs + minGap + Math.floor(Math.random() * Math.max(1, room - minGap));
+    if (nextMs > maxMs) nextMs = maxMs;
+    if (nextMs <= prevMs) nextMs = prevMs + 1000;
   }
 
   return new Date(nextMs);
+}
+
+/**
+ * Sequential RegularMember posting stamps: first in the last 3 years, each later
+ * post a few weeks after the previous. Used by Save and by the backfill script.
+ * @param {number} count
+ * @returns {Date[]}
+ */
+export function planRegularMemberPostingTimestamps(count) {
+  const n = Math.max(0, Math.trunc(Number(count) || 0));
+  if (n < 1) return [];
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const maxMs = maxAllowedStampMs();
+  const lookbackMs = Math.floor(DEFAULT_LOOKBACK_YEARS * 365.25 * dayMs);
+  const minGapMs = AFTER_PREVIOUS_MIN_DAYS * dayMs;
+  const reservedMs = (n - 1) * minGapMs;
+  const firstLo = maxMs - lookbackMs;
+  const firstHi = Math.max(firstLo, maxMs - reservedMs);
+  const firstMs = firstLo + Math.floor(Math.random() * (firstHi - firstLo + 1));
+
+  const stamps = [new Date(firstMs)];
+  for (let i = 1; i < n; i += 1) {
+    stamps.push(randomTimestampAfterPrevious(stamps[i - 1]));
+  }
+  return stamps;
 }
 
 /**
@@ -104,8 +136,8 @@ export async function loadMemberCategoryForSinglesId(db, singlesId) {
 
 /**
  * For RegularMember:
- * - if `previousAt` is set → random few days/weeks after that
- * - else → random within last 5 years
+ * - if `previousAt` is set → random few weeks after that (never today, always later)
+ * - else → random within last 3 years (never today)
  * For everyone else: null (caller keeps DB default / now).
  *
  * @param {import('pg').Pool | import('pg').PoolClient} db
