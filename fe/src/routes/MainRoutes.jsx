@@ -16,7 +16,6 @@ import MyStory from '../views/dashboard/myStory/MyStory';
 import MyPicks from '../views/dashboard/interested/MyPicks';
 import UnderConstruction from '../views/dashboard/underConstruction/UnderConstruction';
 import Landing from '../views/dashboard/landing/Landing';
-import EMarketPlaceLanding from '../views/dashboard/eMarketPlace/EMarketPlaceLanding';
 import VsinglesLanding from '../views/dashboard/vsingles/VsinglesLanding';
 
 // dashboard routing
@@ -63,7 +62,7 @@ const MainRoutes = {
       children: [
         {
           index: true,
-          element: <EMarketPlaceLanding />
+          element: <UnderConstruction />
         },
         {
           path: 'flowerShop',

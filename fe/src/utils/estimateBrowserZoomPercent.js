@@ -1,17 +1,31 @@
 /**
  * Best-effort browser page-zoom % (Ctrl/Cmd +/-).
  *
- * Window resize is NOT page zoom. Resizing often changes `innerWidth` alone
- * (scrollbar gutter, chrome) while `outerWidth` stays fixed — that must not
- * trigger a zoom warning.
+ * Native Retina `devicePixelRatio` is often 2 at 100% zoom. Treating DPR as
+ * zoom (or as a ratio against a stored baseline) false-triggers ~200% until
+ * a window resize re-baselines — Cmd-0 then does nothing.
  *
- * We only treat `devicePixelRatio` changes as page zoom. Viewport width/height
- * changes re-baseline and stay at 100%.
+ * Chrome/Safari/Firefox page zoom shrinks CSS `innerWidth` relative to
+ * `outerWidth`. At 100% that ratio stays ~1 even on Retina. Window resize
+ * changes both together, so the ratio stays ~1 and must not warn.
  */
 
-const BASELINE_STORAGE_KEY = 'vsingles.browserZoomBaseline.v3';
 export const BROWSER_ZOOM_TOLERANCE_PCT = 2;
 const DEFAULT_ZOOM_TOLERANCE_PCT = BROWSER_ZOOM_TOLERANCE_PCT;
+
+/** Snap to 100% when outer/inner is closer than Chrome's 90%/110% zoom steps. */
+const LAYOUT_ZOOM_SNAP_PCT = 8;
+
+/** Tab bar + bookmarks + download shelf — used to tell page zoom from a side dock. */
+const BROWSER_CHROME_HEIGHT_MAX_PX = 320;
+
+const STALE_BASELINE_STORAGE_KEY = 'vsingles.browserZoomBaseline.v3';
+
+try {
+  sessionStorage.removeItem(STALE_BASELINE_STORAGE_KEY);
+} catch {
+  // ignore
+}
 
 function roundZoomPercent(value) {
   const n = Number(value);
@@ -19,57 +33,9 @@ function roundZoomPercent(value) {
   return Math.max(25, Math.min(500, Math.round(n)));
 }
 
-function readStoredBaseline() {
-  try {
-    const raw = sessionStorage.getItem(BASELINE_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.dpr === 'number' && parsed.dpr > 0) {
-      return parsed;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function writeStoredBaseline(dpr, outerWidth, innerWidth, outerHeight, innerHeight, lastZoomPct = 100) {
-  try {
-    sessionStorage.setItem(
-      BASELINE_STORAGE_KEY,
-      JSON.stringify({
-        dpr,
-        outerWidth: Number.isFinite(outerWidth) ? outerWidth : null,
-        innerWidth: Number.isFinite(innerWidth) ? innerWidth : null,
-        outerHeight: Number.isFinite(outerHeight) ? outerHeight : null,
-        innerHeight: Number.isFinite(innerHeight) ? innerHeight : null,
-        lastZoomPct: roundZoomPercent(lastZoomPct) ?? 100,
-        capturedAt: Date.now()
-      })
-    );
-  } catch {
-    // ignore
-  }
-}
-
-function readViewportMetrics() {
-  if (typeof window === 'undefined') return null;
-  return {
-    dpr: window.devicePixelRatio,
-    outerWidth: window.outerWidth,
-    innerWidth: window.innerWidth,
-    outerHeight: window.outerHeight,
-    innerHeight: window.innerHeight
-  };
-}
-
-function viewportMetricsChanged(baseline, metrics) {
-  return (
-    baseline.outerWidth !== metrics.outerWidth ||
-    baseline.innerWidth !== metrics.innerWidth ||
-    baseline.outerHeight !== metrics.outerHeight ||
-    baseline.innerHeight !== metrics.innerHeight
-  );
+function isLikelyMobile() {
+  if (typeof navigator === 'undefined') return false;
+  return /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
 
 function isChromiumDesktop() {
@@ -78,89 +44,61 @@ function isChromiumDesktop() {
   return /Chrome|Chromium|Edg\//.test(ua) && !/Mobile|Android/i.test(ua);
 }
 
-/** Pinch zoom on mobile (not window resize). */
-function readPinchZoomPercent() {
-  const scale = window.visualViewport?.scale;
-  if (!Number.isFinite(scale) || scale <= 0 || scale === 1) return null;
-  return roundZoomPercent(scale * 100);
+function heightAgreesWithWidthZoom(outerWidth, outerHeight, innerWidth, innerHeight, zoomW) {
+  if (!(zoomW > 0) || innerHeight <= 0) return false;
+  const expectedNoChrome = outerHeight / zoomW;
+  const expectedMaxChrome = (outerHeight - BROWSER_CHROME_HEIGHT_MAX_PX) / zoomW;
+  const lo = Math.min(expectedNoChrome, expectedMaxChrome) * 0.92;
+  const hi = Math.max(expectedNoChrome, expectedMaxChrome) * 1.08;
+  return innerHeight >= lo && innerHeight <= hi;
 }
 
 /**
- * @param {ReturnType<typeof readStoredBaseline>} baseline
- * @param {ReturnType<typeof readViewportMetrics>} metrics
- * @returns {number | null}
+ * Cmd/Ctrl +/- zoom: outerWidth stays with the window, innerWidth is CSS px.
+ * Side docks (DevTools) only shrink width — height will not match the same zoom.
  */
-function estimatePageZoomFromBaseline(baseline, metrics) {
-  if (!Number.isFinite(metrics.dpr) || metrics.dpr <= 0) return null;
+function estimateLayoutPageZoomPercent(metrics) {
+  const { innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh } = metrics;
+  if (![iw, ih, ow, oh].every((n) => Number.isFinite(n) && n > 0)) return null;
 
-  const lastZoom = roundZoomPercent(baseline.lastZoomPct) ?? 100;
-  const pinchPct = readPinchZoomPercent();
-  if (pinchPct != null) {
-    writeStoredBaseline(
-      metrics.dpr,
-      metrics.outerWidth,
-      metrics.innerWidth,
-      metrics.outerHeight,
-      metrics.innerHeight,
-      pinchPct
-    );
-    return pinchPct;
-  }
+  const zoomW = ow / iw;
+  const widthPct = zoomW * 100;
+  if (Math.abs(widthPct - 100) <= LAYOUT_ZOOM_SNAP_PCT) return 100;
 
-  if (viewportMetricsChanged(baseline, metrics)) {
-    // Any window geometry change while DPR is stable = resize/layout, not Cmd+/Cmd-.
-    writeStoredBaseline(
-      metrics.dpr,
-      metrics.outerWidth,
-      metrics.innerWidth,
-      metrics.outerHeight,
-      metrics.innerHeight,
-      100
-    );
-    return 100;
-  }
+  if (!heightAgreesWithWidthZoom(ow, oh, iw, ih, zoomW)) return 100;
 
-  if (Math.abs(metrics.dpr - baseline.dpr) > 0.01) {
-    const pct = roundZoomPercent((metrics.dpr / baseline.dpr) * lastZoom);
-    writeStoredBaseline(
-      metrics.dpr,
-      metrics.outerWidth,
-      metrics.innerWidth,
-      metrics.outerHeight,
-      metrics.innerHeight,
-      pct ?? 100
-    );
-    return pct;
-  }
-
-  return lastZoom;
+  return roundZoomPercent(widthPct);
 }
 
-function ensureBaseline(metrics) {
-  let baseline = readStoredBaseline();
-  if (!baseline) {
-    writeStoredBaseline(
-      metrics.dpr,
-      metrics.outerWidth,
-      metrics.innerWidth,
-      metrics.outerHeight,
-      metrics.innerHeight,
-      100
-    );
-    baseline = readStoredBaseline();
-  }
-  return baseline;
+/** Pinch zoom on mobile (not desktop page zoom, not window resize). */
+function readPinchZoomPercent() {
+  if (!isLikelyMobile()) return null;
+  const scale = window.visualViewport?.scale;
+  if (!Number.isFinite(scale) || scale <= 0) return null;
+  const pct = roundZoomPercent(scale * 100);
+  if (pct == null || Math.abs(pct - 100) <= LAYOUT_ZOOM_SNAP_PCT) return null;
+  return pct;
+}
+
+function readViewportMetrics() {
+  if (typeof window === 'undefined') return null;
+  return {
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    outerWidth: window.outerWidth,
+    outerHeight: window.outerHeight
+  };
 }
 
 /** @returns {number | null} e.g. 75, 100, 125 — null when unknown */
 export function estimateBrowserZoomPercent() {
+  const pinchPct = typeof window !== 'undefined' ? readPinchZoomPercent() : null;
+  if (pinchPct != null) return pinchPct;
+
   const metrics = readViewportMetrics();
   if (!metrics) return null;
 
-  const baseline = ensureBaseline(metrics);
-  if (!baseline) return null;
-
-  return estimatePageZoomFromBaseline(baseline, metrics);
+  return estimateLayoutPageZoomPercent(metrics);
 }
 
 export function isBrowserZoomLikelyDefault(tolerancePct = DEFAULT_ZOOM_TOLERANCE_PCT) {
@@ -183,7 +121,11 @@ export function getBrowserZoomResetShortcut() {
 export function isBrowserZoomDetectionSupported() {
   if (typeof window === 'undefined') return false;
   if (isChromiumDesktop()) return true;
-  if (Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0) return true;
-  const pinchScale = window.visualViewport?.scale;
-  return Number.isFinite(pinchScale) && pinchScale > 0;
+  if (isLikelyMobile() && Number.isFinite(window.visualViewport?.scale)) return true;
+  return (
+    Number.isFinite(window.outerWidth) &&
+    Number.isFinite(window.innerWidth) &&
+    window.outerWidth > 0 &&
+    window.innerWidth > 0
+  );
 }

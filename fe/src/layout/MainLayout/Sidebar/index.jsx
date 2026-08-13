@@ -37,9 +37,10 @@ function Sidebar() {
 
   const { pathname } = useLocation();
 
-  const isEMarketPlaceSection = pathname === '/eMarketPlace' || pathname.startsWith('/eMarketPlace/');
+  const isEMarketPlaceSection = pathname.startsWith('/eMarketPlace/');
 
   const isUnderConstructionMallSection =
+    pathname === '/eMarketPlace' ||
     pathname === '/onlineProfessionals' ||
     pathname === '/eClassifieds' ||
     pathname === '/eServices';

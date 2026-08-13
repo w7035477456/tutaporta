@@ -15,6 +15,7 @@ export default function LogoSection() {
   const { pathname } = useLocation();
 
   const isUnderConstructionMallSection =
+    pathname === '/eMarketPlace' ||
     pathname === '/onlineProfessionals' ||
     pathname === '/eClassifieds' ||
     pathname === '/eServices';
