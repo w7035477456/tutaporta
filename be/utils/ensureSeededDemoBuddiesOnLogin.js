@@ -1,6 +1,8 @@
 /**
  * Seed demo buddies when singles.seeded_demo_buddies_boolean is false and
- * singles.gender_self_report is set ('M' = male pack, 'F' = female pack).
+ * singles.gender_self_report is set (opposite-gender packs):
+ *   'F' = male friends (JazzyJeff, BrainyBobby, LuckyLuke)
+ *   'M' = female friends (RapidRuth, GiddyGail, SillySue)
  *
  * Gender is self-reported via FE popup (not DL / vet_bio).
  * If gender_self_report IS NULL → skip (FE shows "What Gender are you?").
@@ -72,9 +74,10 @@ export async function saveGenderSelfReportMale(db, singlesId, isMale) {
 /**
  * @param {import('pg').Pool | import('pg').PoolClient} db
  * @param {number} singlesId
+ * @param {{ force?: boolean }} [opts]
  * @returns {Promise<{ skipped?: boolean, reason?: string, gender?: string, seeded?: boolean, pack?: string, result?: object, error?: string }>}
  */
-export async function ensureSeededDemoBuddiesOnLogin(db, singlesId) {
+export async function ensureSeededDemoBuddiesOnLogin(db, singlesId, opts = {}) {
   const id = Math.trunc(Number(singlesId));
   if (!Number.isFinite(id) || id < 1) {
     return { skipped: true, reason: 'invalid_singles_id' };
@@ -95,7 +98,7 @@ export async function ensureSeededDemoBuddiesOnLogin(db, singlesId) {
     return { skipped: true, reason: 'singles_not_found' };
   }
 
-  if (parseBooleanEnumRaw(row.seeded_demo_buddies_boolean)) {
+  if (!opts.force && parseBooleanEnumRaw(row.seeded_demo_buddies_boolean)) {
     return { skipped: true, reason: 'already_seeded' };
   }
 

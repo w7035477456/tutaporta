@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * ONE-TIME backfill for existing singles rows:
- *   WHERE seeded_demo_buddies_boolean is false
+ *   WHERE seeded_demo_buddies_boolean is false (or --force)
  *     AND gender_self_report IN ('M','F')
- *   → M: seedMaleDemoFriends
- *   → F: seedFemaleDemoFriends
+ *   → F: seedFemaleDemoFriends (JazzyJeff, BrainyBobby, LuckyLuke)
+ *   → M: seedMaleDemoFriends (RapidRuth, GiddyGail, SillySue)
  *   (sets seeded_demo_buddies_boolean = true on success)
  *
  * Does NOT change the new-login gender popup flow.
@@ -12,6 +12,8 @@
  * Usage (from repo root, with BE env loaded):
  *   node be/scripts/backfillExistingDemoBuddies.js --dry-run
  *   node be/scripts/backfillExistingDemoBuddies.js
+ *   node be/scripts/backfillExistingDemoBuddies.js --email=regularmember4@gmail.com
+ *   node be/scripts/backfillExistingDemoBuddies.js --force
  */
 import '../loadEnv.js';
 import pool from '../db/connection.js';
@@ -25,11 +27,18 @@ import { parseBooleanEnumRaw } from '../utils/booleanEnum.js';
 const Q = `"${SCHEMA}"`;
 
 function parseArgs(argv) {
-  const out = { dryRun: false, help: false };
-  for (const raw of argv) {
-    const arg = String(raw ?? '').trim();
+  const out = { dryRun: false, help: false, force: false, email: null };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = String(argv[i] ?? '').trim();
+    const next = String(argv[i + 1] ?? '').trim();
     if (arg === '--help' || arg === '-h') out.help = true;
     else if (arg === '--dry-run') out.dryRun = true;
+    else if (arg === '--force') out.force = true;
+    else if (arg.startsWith('--email=')) out.email = arg.slice('--email='.length).trim().toLowerCase();
+    else if (arg === '--email' && next && !next.startsWith('-')) {
+      out.email = next.trim().toLowerCase();
+      i += 1;
+    }
   }
   return out;
 }
@@ -40,8 +49,12 @@ function printHelp() {
 Usage:
   node be/scripts/backfillExistingDemoBuddies.js --dry-run
   node be/scripts/backfillExistingDemoBuddies.js
+  node be/scripts/backfillExistingDemoBuddies.js --email=regularmember4@gmail.com
+  node be/scripts/backfillExistingDemoBuddies.js --force
 
-Selects rows where seeded_demo_buddies_boolean is false and gender_self_report is M or F.
+gender_self_report F → JazzyJeff, BrainyBobby, LuckyLuke (guys)
+gender_self_report M → RapidRuth, GiddyGail, SillySue (girls)
+Wrong-gender leftover demo pack is removed.
 Skips NULL / unknown gender (those use the new-login popup later).
 Requires profile photo for welcome posting (same as seed utils).`);
 }
@@ -54,16 +67,31 @@ async function main() {
     return;
   }
 
+  const params = [];
+  const where = [
+    `UPPER(BTRIM(COALESCE(gender_self_report::text, ''))) IN ('M', 'F')`
+  ];
+  if (!args.force) {
+    where.push(
+      `LOWER(BTRIM(COALESCE(seeded_demo_buddies_boolean::text, 'false'))) <> 'true'`
+    );
+  }
+  if (args.email) {
+    params.push(args.email);
+    where.push(`LOWER(TRIM(email)) = $${params.length}`);
+  }
+
   const { rows } = await pool.query(
     `SELECT singles_id, email, alias, gender_self_report, seeded_demo_buddies_boolean
      FROM ${Q}.singles
-     WHERE LOWER(BTRIM(COALESCE(seeded_demo_buddies_boolean::text, 'false'))) <> 'true'
-       AND UPPER(BTRIM(COALESCE(gender_self_report::text, ''))) IN ('M', 'F')
-     ORDER BY singles_id`
+     WHERE ${where.join('\n       AND ')}
+     ORDER BY singles_id`,
+    params
   );
 
   console.log(
-    `[backfillExistingDemoBuddies] candidates=${rows.length} dryRun=${args.dryRun}`
+    `[backfillExistingDemoBuddies] candidates=${rows.length} dryRun=${args.dryRun} force=${args.force}` +
+      (args.email ? ` email=${args.email}` : '')
   );
 
   let ok = 0;
@@ -82,14 +110,14 @@ async function main() {
       continue;
     }
 
-    if (parseBooleanEnumRaw(row.seeded_demo_buddies_boolean)) {
+    if (!args.force && parseBooleanEnumRaw(row.seeded_demo_buddies_boolean)) {
       console.log(`[skip] already seeded ${label}`);
       skipped += 1;
       continue;
     }
 
     try {
-      const result = await ensureSeededDemoBuddiesOnLogin(pool, id);
+      const result = await ensureSeededDemoBuddiesOnLogin(pool, id, { force: args.force });
       if (result.seeded) {
         console.log(`[ok] seeded ${label}`);
         ok += 1;

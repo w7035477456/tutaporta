@@ -44,10 +44,10 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Seed male demo friends (Gary / JazzyJeff pack)
+  console.log(`Seed male demo friends (RapidRuth / GiddyGail / SillySue for gender_self_report=M)
 
 Usage:
-  node be/scripts/seedMaleDemoFriends.js --email=<male@email>
+  node be/scripts/seedMaleDemoFriends.js --email=<member@email>
   node be/scripts/seedMaleDemoFriends.js --singles-id=<id>
   node be/scripts/seedMaleDemoFriends.js --email=… --dry-run
   node be/scripts/seedMaleDemoFriends.js --email=… --force-post
@@ -59,10 +59,10 @@ Creates / upserts:
   • Pending Buddy request to SillySue (noresponse)
   • One public welcome posting with profile photo attached (requires profile_image_fk)
     created_at is a few weeks after this member's previous post (first post: random in last 3 years)
+  • Removes leftover wrong pack (JazzyJeff / BrainyBobby / LuckyLuke) if present
   • Skips duplicate welcome content; upgrades legacy hiking seed post if present
 
-Does NOT create a new singles row — target male must already exist.
-Does NOT wire first-login yet (library export is ready).`);
+Does NOT create a new singles row — target member must already exist.`);
 }
 
 async function main() {

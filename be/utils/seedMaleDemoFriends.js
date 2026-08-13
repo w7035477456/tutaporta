@@ -1,5 +1,5 @@
 /**
- * Seed a male member with the same demo-social starter pack as Gary (JazzyJeff / dm4@gmail.com):
+ * Seed opposite-gender demo friends onto a male member (gender_self_report = 'M'):
  *   - 3 My Picks: RapidRuth, GiddyGail, SillySue (interested)
  *   - RapidRuth: mutual approved Buddy (full bio) + full_paid (skip token debit popup)
  *   - GiddyGail: mutual approved Acquaint (brief bio) + brief_paid (skip token debit popup)
@@ -31,15 +31,22 @@ import {
 
 export const SCHEMA = 'helloworldjunktest';
 
-/** Template male (Gary / JazzyJeff). */
+/** Template male (Gary / JazzyJeff) — do not seed this pack onto himself. */
 export const MALE_DEMO_TEMPLATE_EMAIL = 'dm4@gmail.com';
 
-/** Fixed demo women (aliases must match helloworldjunktest.singles.alias). */
+/** Fixed demo women for male members (aliases must match helloworldjunktest.singles.alias). */
 export const MALE_DEMO_FRIENDS = Object.freeze({
   buddy: { alias: 'RapidRuth', email: 'dm8@gmail.com', role: 'buddy' },
   acquaint: { alias: 'GiddyGail', email: 'dm9@gmail.com', role: 'acquaint' },
   pending: { alias: 'SillySue', email: 'dm10@gmail.com', role: 'pending_buddy_request' }
 });
+
+/** Wrong-pack emails (guys) — removed when seeding girls onto a male so mixed packs cannot linger. */
+export const WRONG_PACK_MALE_DEMO_FRIEND_EMAILS = Object.freeze([
+  'dm4@gmail.com',
+  'dm1@gmail.com',
+  'dm3@gmail.com'
+]);
 
 /** Public welcome posting (Review Postings) + profile photo attachment. */
 export const MALE_DEMO_SAMPLE_POST_CONTENT =
@@ -89,6 +96,29 @@ export async function findSinglesById(db, singlesId) {
     [id]
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Delete request rows between `singlesId` and the given friend emails (both directions).
+ * @param {import('pg').Pool | import('pg').PoolClient} db
+ * @param {number} singlesId
+ * @param {readonly string[]} emails
+ */
+export async function deleteRequestsWithFriendEmails(db, singlesId, emails) {
+  const id = Math.trunc(Number(singlesId));
+  const list = (emails ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean);
+  if (!Number.isFinite(id) || id < 1 || !list.length) return 0;
+  const { rowCount } = await db.query(
+    `DELETE FROM ${Q}.requests r
+     USING ${Q}.singles other
+     WHERE (
+            (r.singles_id_from = $1 AND r.singles_id_to = other.singles_id)
+         OR (r.singles_id_to = $1 AND r.singles_id_from = other.singles_id)
+          )
+       AND LOWER(TRIM(other.email)) = ANY($2::text[])`,
+    [id, list]
+  );
+  return rowCount ?? 0;
 }
 
 /**
@@ -362,7 +392,7 @@ async function ensureSamplePosting(client, maleId, { dryRun = false, forcePost =
 }
 
 /**
- * Apply Gary-style demo friends + one sample posting to an existing male singles row.
+ * Apply opposite-gender demo friends (RapidRuth / GiddyGail / SillySue) for a male member.
  *
  * @param {import('pg').Pool | import('pg').PoolClient} db
  * @param {number} maleSinglesId
@@ -430,6 +460,8 @@ export async function seedMaleDemoFriendsForSinglesId(db, maleSinglesId, opts = 
 
   try {
     if (ownsClient) await client.query('BEGIN');
+
+    await deleteRequestsWithFriendEmails(client, maleId, WRONG_PACK_MALE_DEMO_FRIEND_EMAILS);
 
     // 1) RapidRuth — mutual buddy (viewer already paid for full bio = 2 tokens)
     requests.push({

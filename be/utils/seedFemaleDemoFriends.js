@@ -1,5 +1,5 @@
 /**
- * Seed a female member with the RapidRuth-style demo-social starter pack:
+ * Seed opposite-gender demo friends onto a female member (gender_self_report = 'F'):
  *   - 3 My Picks: JazzyJeff, BrainyBobby, LuckyLuke (interested)
  *   - JazzyJeff: mutual approved Buddy (full bio) + full_paid (skip token debit popup)
  *   - BrainyBobby: mutual approved Acquaint (brief bio) + brief_paid (skip token debit popup)
@@ -28,19 +28,31 @@ import {
   randomTimestampAfterPrevious,
   randomTimestampWithinLastYears
 } from './regularMemberActivityTimestamp.js';
-import { findSinglesByEmail, findSinglesById, SCHEMA } from './seedMaleDemoFriends.js';
+import {
+  deleteRequestsWithFriendEmails,
+  findSinglesByEmail,
+  findSinglesById,
+  SCHEMA
+} from './seedMaleDemoFriends.js';
 
 export { SCHEMA, findSinglesByEmail, findSinglesById };
 
-/** Template female (RapidRuth). */
+/** Template female (RapidRuth) — do not seed this pack onto herself. */
 export const FEMALE_DEMO_TEMPLATE_EMAIL = 'dm8@gmail.com';
 
-/** Fixed demo men (aliases must match helloworldjunktest.singles.alias). */
+/** Fixed demo men for female members (aliases must match helloworldjunktest.singles.alias). */
 export const FEMALE_DEMO_FRIENDS = Object.freeze({
   buddy: { alias: 'JazzyJeff', email: 'dm4@gmail.com', role: 'buddy' },
   acquaint: { alias: 'BrainyBobby', email: 'dm1@gmail.com', role: 'acquaint' },
   pending: { alias: 'LuckyLuke', email: 'dm3@gmail.com', role: 'pending_buddy_request' }
 });
+
+/** Wrong-pack emails (girls) — removed when seeding guys onto a female so mixed packs cannot linger. */
+export const WRONG_PACK_FEMALE_DEMO_FRIEND_EMAILS = Object.freeze([
+  'dm8@gmail.com',
+  'dm9@gmail.com',
+  'dm10@gmail.com'
+]);
 
 /** Public welcome posting (Review Postings) + profile photo attachment. */
 export const FEMALE_DEMO_SAMPLE_POST_CONTENT =
@@ -326,7 +338,7 @@ async function ensureSamplePosting(client, femaleId, { dryRun = false, forcePost
 }
 
 /**
- * Apply RapidRuth-style demo friends + one sample posting to an existing female singles row.
+ * Apply opposite-gender demo friends (JazzyJeff / BrainyBobby / LuckyLuke) for a female member.
  *
  * @param {import('pg').Pool | import('pg').PoolClient} db
  * @param {number} femaleSinglesId
@@ -391,6 +403,8 @@ export async function seedFemaleDemoFriendsForSinglesId(db, femaleSinglesId, opt
 
   try {
     if (ownsClient) await client.query('BEGIN');
+
+    await deleteRequestsWithFriendEmails(client, femaleId, WRONG_PACK_FEMALE_DEMO_FRIEND_EMAILS);
 
     // 1) JazzyJeff — mutual buddy (viewer already paid for full bio = 2 tokens)
     requests.push({
