@@ -50,8 +50,8 @@ systemctl daemon-reload
 systemctl enable site-uptime-monitor.service
 systemctl restart site-uptime-monitor.service
 
-if ! grep -q 'immediate_on_new_outage=1' "$SCRIPT_PATH"; then
-  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v3). Copy ~/code/main first." >&2
+if ! grep -q 'no_custom_friendly_name=1' "$SCRIPT_PATH"; then
+  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v4). Copy ~/code/main first." >&2
 fi
 
 echo

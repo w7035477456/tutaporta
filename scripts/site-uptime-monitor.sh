@@ -185,7 +185,8 @@ send_sms() {
   fi
   local resp http
   resp="$(mktemp)"
-  # Same Twilio Verify path as new-account registration SMS (not Messages API).
+  # Same Twilio Verify path as signup SMS (To + Channel only).
+  # Do NOT send CustomFriendlyName — Twilio error 60204 unless Sales enables it.
   http="$(
     curl -sS -o "$resp" -w '%{http_code}' \
       --max-time 20 \
@@ -193,7 +194,6 @@ send_sms() {
       --user "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
       --data-urlencode "To=${SMS_TO}" \
       --data-urlencode "Channel=sms" \
-      --data-urlencode "CustomFriendlyName=OnlineMall-DOWN" \
       || true
   )"
   local sid status err_msg err_code snippet
@@ -241,7 +241,7 @@ if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   exit $?
 fi
 
-log_monitor "START v3 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily immediate_on_new_outage=1"
+log_monitor "START v4 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily immediate_on_new_outage=1 no_custom_friendly_name=1"
 
 DOWN=0
 while true; do
