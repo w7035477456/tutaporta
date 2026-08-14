@@ -691,6 +691,7 @@ function ColorTemplate11PostingFeed({
   feedOwnerSinglesId,
   scrollable = false,
   maxScrollHeight,
+  nestedScroll,
   scrollContainerRef,
   showDeletePosts = false,
   deleteBusy = false,
@@ -724,7 +725,10 @@ function ColorTemplate11PostingFeed({
     () => postList.some((post) => Array.isArray(post.photos) && post.photos.length > 0),
     [postList]
   );
-  const usePinnedLoadMore = showLoadMore;
+  // Page-scroll hosts (Acquaint. & Buddies, My Picks) must not nest overflow:auto +
+  // overscroll-behavior:contain — that scrollport swallows the wheel even when it
+  // cannot scroll, so only the parent padding/scrollbar gutter still moves the page.
+  const usePinnedLoadMore = Boolean(showLoadMore) && nestedScroll !== false;
   const loadMoreBar = showLoadMore ? (
     <ColorTemplate11PostingLoadMoreBar
       feedHasMore={feedHasMore}
@@ -740,7 +744,7 @@ function ColorTemplate11PostingFeed({
       title={title}
       scrollable={scrollable}
       maxScrollHeight={maxScrollHeight}
-      pinFooter={Boolean(showLoadMore)}
+      pinFooter={usePinnedLoadMore}
       footer={loadMoreBar}
       scrollContainerRef={scrollContainerRef}
       sx={sx}
@@ -838,6 +842,7 @@ ColorTemplate11PostingFeed.propTypes = {
   feedOwnerSinglesId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   scrollable: PropTypes.bool,
   maxScrollHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.object]),
+  nestedScroll: PropTypes.bool,
   scrollContainerRef: PropTypes.oneOfType([PropTypes.func, PropTypes.shape({ current: PropTypes.any })]),
   showDeletePosts: PropTypes.bool,
   deleteBusy: PropTypes.bool,
