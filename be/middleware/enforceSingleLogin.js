@@ -7,7 +7,7 @@ function shouldSkipSingleLogin(auth, decoded) {
   if (auth.tools_only === true) return true;
   if (isToolsOnlyAdminJwt(decoded)) return true;
   if (isAdminImpersonationSession(auth, decoded)) return true;
-  // demo/demo and guest/guest share one singles row — allow concurrent sessions.
+  // demo/demo and guest/guest alias logins — allow concurrent sessions.
   if (decoded?.guest_demo_login === true) return true;
   const id = Number(auth.singles_id);
   return !Number.isFinite(id) || id < 1;

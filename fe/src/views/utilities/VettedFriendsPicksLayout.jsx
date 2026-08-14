@@ -14,6 +14,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Link from '@mui/material/Link';
 import ButtonBase from '@mui/material/ButtonBase';
 import Button from '@mui/material/Button';
+import { IconX } from '@tabler/icons-react';
 import UserRound from 'assets/images/users/profile.jpeg';
 import sendFlowerGreenIcon from 'assets/images/sendFlower_green.png';
 import {
@@ -26,7 +27,7 @@ import {
   useGetMyPicksFeed
 } from 'api/myPicksFe';
 import { postInterestedRequestInfo } from 'api/interestedSinglesFe';
-import { postRequestSentBlock } from 'api/requestsSentFe';
+import { postRemoveRequestedFriend, postRequestSentBlock } from 'api/requestsSentFe';
 import PostingCommentsDialog from 'views/dashboard/interested/PostingCommentsDialog';
 import PostingLikesDialog from 'views/dashboard/interested/PostingLikesDialog';
 import CheckrBioReviewPanel from 'views/utilities/CheckrBioReviewPanel';
@@ -57,6 +58,7 @@ import { TOUR_STEP_VETTED_FRIENDS_SMS } from 'utils/vsinglesTour';
 import { TOUR_LISA_MEMBER_NUMBER } from 'utils/vsinglesTourActions';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
+import { colorTemplate8PhotoGalleryRemoveSpinnerSx } from 'config/colorTemplate8PhotoGallery';
 import SelectedButtonTemplate, { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import ColorTemplate11Posting from 'ui-component/ColorTemplate11Posting';
@@ -73,7 +75,7 @@ import {
   yellowButtonTemplateSx
 } from 'config/yellowButtonTemplate';
 import { dispatchBellNotificationRefresh } from 'utils/notificationBellStore';
-import { themedAlert } from 'utils/themedDialog';
+import { themedAlert, themedConfirm } from 'utils/themedDialog';
 import NotificationSection from 'layout/MainLayout/Header/NotificationSection';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
@@ -759,6 +761,7 @@ export default function VettedFriendsPicksLayout({
   const [chatRefreshNonce, setChatRefreshNonce] = useState(0);
   const [refreshChatBusy, setRefreshChatBusy] = useState(false);
   const [bioRequestBusyKey, setBioRequestBusyKey] = useState('');
+  const [removeFriendBusyId, setRemoveFriendBusyId] = useState(null);
   const [blockBusyKey, setBlockBusyKey] = useState('');
   const [blockUserOverrideByTargetId, setBlockUserOverrideByTargetId] = useState({});
   const [approvedBioReview, setApprovedBioReview] = useState(null);
@@ -896,6 +899,42 @@ export default function VettedFriendsPicksLayout({
       return next;
     });
   };
+
+  const handleRemoveFriend = useCallback(
+    async (row) => {
+      const id = Number(row?.singles_id_to);
+      if (!Number.isFinite(id) || id < 1 || removeFriendBusyId != null) return;
+      const friendLabel = formatOutgoingBioFriendLabel(row);
+      const role = isBuddyRelationship(row)
+        ? 'Buddy'
+        : triStateApproval(row?.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE
+          ? 'Acquaintance'
+          : null;
+      const confirmed = await themedConfirm(
+        role
+          ? `Remove ${friendLabel} as a ${role}? You will no longer share bios, private albums, or buddy chat.`
+          : `Remove ${friendLabel} from Acquaintances & Buddies?`,
+        { title: 'Remove from list', okLabel: 'Remove', cancelLabel: 'Cancel' }
+      );
+      if (!confirmed) return;
+      setRemoveFriendBusyId(id);
+      try {
+        await postRemoveRequestedFriend(id);
+        if (Number(selectedSinglesId) === id) {
+          const nextSelected = orderedIds.find((pickId) => Number(pickId) !== id);
+          setSelectedSinglesId(nextSelected ?? null);
+        }
+        if (typeof onBioRequestUpdated === 'function') {
+          await onBioRequestUpdated();
+        }
+      } catch (err) {
+        await themedAlert(err?.message || 'Failed to remove acquaintance or buddy');
+      } finally {
+        setRemoveFriendBusyId(null);
+      }
+    },
+    [onBioRequestUpdated, orderedIds, removeFriendBusyId, selectedSinglesId]
+  );
 
   const handleTogglePostingLike = async (postId) => {
     const numericPostId = Number(postId);
@@ -2158,6 +2197,20 @@ export default function VettedFriendsPicksLayout({
                   setDropTargetSinglesId(null);
                 }}
               >
+                <ColorTemplate8PhotoGallery.RemoveButton
+                  aria-label="Remove from Acquaintances & Buddies"
+                  disabled={Number(removeFriendBusyId) === Number(singlesId)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleRemoveFriend(row);
+                  }}
+                >
+                  {Number(removeFriendBusyId) === Number(singlesId) ? (
+                    <CircularProgress sx={colorTemplate8PhotoGalleryRemoveSpinnerSx()} />
+                  ) : (
+                    <IconX stroke={3} color="currentColor" />
+                  )}
+                </ColorTemplate8PhotoGallery.RemoveButton>
                 <Box
                   sx={{
                     position: 'relative',

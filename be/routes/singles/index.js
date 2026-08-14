@@ -53,6 +53,7 @@ export {
 } from './toggleRequestsAboutMeRequestFlag.js';
 export { toggleRequestBlockAboutMe, toggleRequestBlockAboutMe as toggleRequestBlockAboutMe_SSSSSSSS } from './toggleRequestBlockAboutMe.js';
 export { toggleRequestBlockSent, toggleRequestBlockSent as toggleRequestBlockSent_UUUUUUUU } from './toggleRequestBlockSent.js';
+export { removeRequestedFriend } from './removeRequestedFriend.js';
 export { createPassword, createPassword as createPassword_GGGGGGGG } from './createPassword.js';
 export {
   verifyPhone,

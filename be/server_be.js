@@ -43,6 +43,7 @@ import {
   toggleRequestsAboutMeRequestFlag_WWWWWWWW,
   toggleRequestBlockAboutMe_SSSSSSSS,
   toggleRequestBlockSent_UUUUUUUU,
+  removeRequestedFriend,
   createPassword_GGGGGGGG,
   verifyRegistrationLink_KKKKKKKK,
   verifyRegistrationCode_VVVVVVVV,
@@ -1299,6 +1300,7 @@ app.get('/api/requestsAboutMe/settings', requireAuth, getRequestsAboutMeSettings
 app.get('/api/requestedSingles', requireAuth, getRequestedSingles_TTTTTTTT);
 app.get('/api/requestedSingles/poem', requireAuth, getRequestedSinglesPoem);
 app.post('/api/requestedSingles/block', requireAuth, toggleRequestBlockSent_UUUUUUUU);
+app.post('/api/requestedSingles/remove', requireAuth, removeRequestedFriend);
 app.post('/api/requestsAboutMe/approval', requireAuth, toggleRequestApprovalAboutMe_QQQQQQQQ);
 app.post('/api/requestsAboutMe/requestFlag', requireAuth, toggleRequestsAboutMeRequestFlag_WWWWWWWW);
 app.post('/api/requestsAboutMe/block', requireAuth, toggleRequestBlockAboutMe_SSSSSSSS);

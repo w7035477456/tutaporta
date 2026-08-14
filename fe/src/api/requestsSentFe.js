@@ -203,6 +203,29 @@ export function useGetRequestsSent() {
   );
 }
 
+export async function postRemoveRequestedFriend(singlesIdTo) {
+  const response = await fetch(`${API_BASE_URL}/api/requestedSingles/remove`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ singles_id_to: Number(singlesIdTo) })
+  });
+  if (!response.ok) {
+    notifyRateLimit429(response.status);
+    let msg = `Failed to remove acquaintance or buddy (${response.status})`;
+    try {
+      const j = await response.json();
+      if (j?.error) msg = j.error;
+    } catch {
+      /* ignore */
+    }
+    const err = new Error(msg);
+    err.status = response.status;
+    throw err;
+  }
+  return response.json();
+}
+
 export async function postRequestSentBlock(singles_id_to, block) {
   const response = await fetch(`${API_BASE_URL}/api/requestedSingles/block`, {
     method: 'POST',

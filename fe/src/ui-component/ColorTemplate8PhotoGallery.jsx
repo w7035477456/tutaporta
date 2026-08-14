@@ -408,7 +408,13 @@ function ColorTemplate8PhotoGalleryLabel({ primary, secondary, selected = false,
 
 function ColorTemplate8PhotoGalleryRemoveButton({ sx, children, ...rest }) {
   return (
-    <Box component="button" sx={{ ...colorTemplate8PhotoGalleryRemoveButtonSx(), ...(sx || {}) }} {...rest}>
+    <Box
+      component="button"
+      {...rest}
+      type="button"
+      data-clickable-zone="true"
+      sx={{ ...colorTemplate8PhotoGalleryRemoveButtonSx(), ...(sx || {}) }}
+    >
       {children}
     </Box>
   );
