@@ -96,3 +96,7 @@ export async function ensurePostingQuarterlyPartitionsForRange(fromDate, toDate 
 export async function ensureChatLogQuarterlyPartitionsBeforeWrite(at = new Date()) {
   await ensureQuarterlyPartitionsBeforeWrite('chat_log', at);
 }
+
+export async function ensureGroupChatLogQuarterlyPartitionsBeforeWrite(at = new Date()) {
+  await ensureQuarterlyPartitionsBeforeWrite('group_chat_log', at);
+}
