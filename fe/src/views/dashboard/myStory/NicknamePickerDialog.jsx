@@ -4,7 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 
 import { saveOnlineNickname, ALIAS_ALNUM_ONLY_MESSAGE } from 'api/saveOnlineNicknameFe';
-import { isValidAliasFormat, sanitizeAliasForSave, appendAliasSuggestionClick } from 'utils/aliasValidation';
+import {
+  isValidAliasFormat,
+  isDoubledWordAlias,
+  sanitizeAliasForSave,
+  appendAliasSuggestionClick,
+  ALIAS_DOUBLED_WORD_MESSAGE
+} from 'utils/aliasValidation';
 import { NICKNAME_ADJECTIVE_GROUPS } from 'config/nicknameSuggestions';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 
@@ -117,6 +123,11 @@ export default function NicknamePickerDialog({
 
     if (!isValidAliasFormat(aliasToSave)) {
       setError(ALIAS_ALNUM_ONLY_MESSAGE);
+      return;
+    }
+
+    if (isDoubledWordAlias(aliasToSave)) {
+      setError(ALIAS_DOUBLED_WORD_MESSAGE);
       return;
     }
 

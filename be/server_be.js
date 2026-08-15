@@ -500,6 +500,19 @@ import {
   markChatVisitedHandler,
   sendChatMessage
 } from './routes/chat/chatWithFriends.js';
+import {
+  getGroupChatInviteCandidates,
+  getGroupChatMessages,
+  getGroupChatOverview,
+  getMyGroupChat,
+  getMyGroupChatMemberships,
+  getPendingGroupChatInvites,
+  postAcceptGroupChatInvite,
+  postDeclineGroupChatInvite,
+  postGroupChatInvite,
+  postGroupChatMarkVisited,
+  postGroupChatMessage
+} from './routes/chat/groupChat.js';
 import { uploadChatInlineImage, getChatInlineImage } from './routes/chat/chatImage.js';
 import {
   feBeTrafficLogMiddleware,
@@ -1608,6 +1621,18 @@ app.put('/api/user/customization', requireAuth, putUserCustomization);
 app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoadDefaultMusicUrls);
 app.post('/api/chat/uploadImage', requireAuth, uploadChatInlineImage);
 app.get('/api/chat/image/:filename', requireAuth, getChatInlineImage);
+
+app.get('/api/group-chat/mine', requireAuth, getMyGroupChat);
+app.get('/api/group-chat/memberships', requireAuth, getMyGroupChatMemberships);
+app.get('/api/group-chat/invite-candidates', requireAuth, getGroupChatInviteCandidates);
+app.post('/api/group-chat/invite', requireAuth, postGroupChatInvite);
+app.get('/api/group-chat/invites/pending', requireAuth, getPendingGroupChatInvites);
+app.post('/api/group-chat/invite/:inviteId/accept', requireAuth, postAcceptGroupChatInvite);
+app.post('/api/group-chat/invite/:inviteId/decline', requireAuth, postDeclineGroupChatInvite);
+app.get('/api/group-chat/:groupId/messages', requireAuth, getGroupChatMessages);
+app.get('/api/group-chat/:groupId/overview', requireAuth, getGroupChatOverview);
+app.post('/api/group-chat/:groupId/send', requireAuth, postGroupChatMessage);
+app.post('/api/group-chat/:groupId/markVisited', requireAuth, postGroupChatMarkVisited);
 
 // Serve built frontend (fe/dist). Production (NODE_ENV=production, e.g. pm2 --env production) requires a prior fe build.
 // Local dev (npm run dev, NODE_ENV unset): skip if fe/dist missing — use Vite on :3000 for the UI.

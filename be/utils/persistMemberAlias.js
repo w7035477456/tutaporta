@@ -1,6 +1,8 @@
 import {
   ALIAS_ALNUM_ONLY_MESSAGE,
+  ALIAS_DOUBLED_WORD_MESSAGE,
   cleanAlias,
+  isDoubledWordAlias,
   isValidAliasFormat,
   normalizeAliasKey,
   formatAliasTakenMessage
@@ -55,6 +57,10 @@ export async function persistMemberAlias(client, singlesId, rawAlias) {
 
   if (!isValidAliasFormat(nickname)) {
     return { ok: false, status: 400, error: ALIAS_ALNUM_ONLY_MESSAGE };
+  }
+
+  if (isDoubledWordAlias(nickname)) {
+    return { ok: false, status: 400, error: ALIAS_DOUBLED_WORD_MESSAGE };
   }
 
   const currentNickname = cleanAlias(currentResult.rows[0]?.alias);

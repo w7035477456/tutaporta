@@ -1,6 +1,17 @@
 export const ALIAS_ALNUM_ONLY_MESSAGE =
   'Nick name may only contain letters and numbers (no spaces or symbols).';
 
+export const ALIAS_DOUBLED_WORD_MESSAGE =
+  'Nickname cannot use the same word twice (e.g. SillySilly). Pick an adjective plus a different name.';
+
+/** True when alias is WordWord with identical halves (SillySilly / QuirkyQuirky). */
+export function isDoubledWordAlias(value) {
+  const s = String(value ?? '').replace(/[^A-Za-z0-9]/g, '');
+  if (s.length < 4 || s.length % 2 !== 0) return false;
+  const half = s.length / 2;
+  return s.slice(0, half).toLowerCase() === s.slice(half).toLowerCase();
+}
+
 /** Case-insensitive key for singles.alias uniqueness lookups. */
 export function normalizeAliasKey(alias) {
   return String(alias ?? '').trim().toLowerCase();

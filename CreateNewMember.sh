@@ -199,96 +199,44 @@ MIDDLE_NAME="$(title_case "$MIDDLE_NAME")"
 LAST_NAME="$(title_case "$LAST_NAME")"
 
 # ---------------------------------------------------------------------------
-# 8) Alias — adjective + rhyming first-name style (BubblyBob)
+# 8) Alias — adjective (from nicknameSuggestions.js) + real first name
+#     Never repeat the same word (no SillySilly / QuirkyQuirky).
 # ---------------------------------------------------------------------------
-load_nickname_words() {
-  # Extract adjective words and gender name lists from nicknameSuggestions.js
+load_nickname_adjectives() {
+  # Extract adjective words from nicknameSuggestions.js (Alias/Nickname module).
   ADJECTIVES=(Bubbly Sunny Clever Goofy Flash Turbo Merry Witty Cheeky Cosmic Neon Echo Rogue Frosty Alpha)
-  MALE_NICK=(Bob Champ Ace Jax Leo Max Nash Rex Troy Zane Buddy Chip Duke Gus Hank Jack Luke Nick Sam Tex)
-  FEMALE_NICK=(Coco Luna Nova Ruby Stella Aria Bella Jade Ivy Zara Alice Daisy Joy Lily Pearl Rosie Sunny Violet)
   if [[ ! -f "$NICKNAME_JS" ]]; then
     return
   fi
-  local adj_line names_line
+  local adj_line
   adj_line="$(grep -E "word: '" "$NICKNAME_JS" | sed -E "s/.*word: '([^']+)'.*/\1/" | sort -u | tr '\n' ' ')"
   if [[ -n "$adj_line" ]]; then
     # shellcheck disable=SC2206
     ADJECTIVES=($adj_line)
   fi
-  names_line="$(python3 - "$NICKNAME_JS" <<'PY' 2>/dev/null || true
-import re, sys
-path = sys.argv[1]
-text = open(path).read()
-female = []
-male = []
-for block in re.finditer(r"female:\s*\[(.*?)\]", text, re.S):
-    female += re.findall(r"'([^']+)'", block.group(1))
-for block in re.finditer(r"male:\s*\[(.*?)\]", text, re.S):
-    male += re.findall(r"'([^']+)'", block.group(1))
-print("FEMALE|" + " ".join(dict.fromkeys(female)))
-print("MALE|" + " ".join(dict.fromkeys(male)))
-PY
-)"
-  local line
-  while IFS= read -r line; do
-    case "$line" in
-      FEMALE\|*)
-        # shellcheck disable=SC2206
-        FEMALE_NICK=(${line#FEMALE|})
-        ;;
-      MALE\|*)
-        # shellcheck disable=SC2206
-        MALE_NICK=(${line#MALE|})
-        ;;
-    esac
-  done <<EOF
-$names_line
-EOF
   [[ ${#ADJECTIVES[@]} -gt 0 ]] || ADJECTIVES=(Bubbly Sunny Clever Goofy Flash Turbo Merry Witty Cheeky Cosmic)
-  [[ ${#FEMALE_NICK[@]} -gt 0 ]] || FEMALE_NICK=(Coco Luna Nova Ruby Stella Aria Bella Jade Ivy Zara)
-  [[ ${#MALE_NICK[@]} -gt 0 ]] || MALE_NICK=(Bob Champ Ace Jax Leo Max Nash Rex Troy Zane)
-}
-
-rhyme_tail() {
-  local w
-  w="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z')"
-  local n=${#w}
-  if [[ "$n" -ge 3 ]]; then
-    echo "${w:$((n - 3))}"
-  elif [[ "$n" -ge 2 ]]; then
-    echo "${w:$((n - 2))}"
-  else
-    echo "$w"
-  fi
 }
 
 generate_alias() {
-  load_nickname_words
-  local -a nick_pool
-  if [[ "$GENDER_KEY" == "female" ]]; then
-    nick_pool=("${FEMALE_NICK[@]}")
-  else
-    nick_pool=("${MALE_NICK[@]}")
+  load_nickname_adjectives
+  local first_clean first_l attempt adj adj_l
+  first_clean="$(printf '%s' "$FIRST_NAME" | tr -cd 'A-Za-z0-9')"
+  first_l="$(printf '%s' "$first_clean" | tr '[:upper:]' '[:lower:]')"
+  if [[ -z "$first_clean" ]]; then
+    echo "ERROR: first name is empty; cannot build alias"
+    exit 1
   fi
-  local attempt adj nick adj_l nick_l tail rhymes=()
-  for attempt in $(seq 1 40); do
+
+  for attempt in $(seq 1 60); do
     adj="$(pick_from "${ADJECTIVES[@]}")"
-    adj_l="$(printf '%s' "$adj" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z')"
-    tail="$(rhyme_tail "$adj_l")"
-    rhymes=()
-    for nick in "${nick_pool[@]}"; do
-      nick_l="$(printf '%s' "$nick" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z')"
-      if [[ "$nick_l" == *"$tail" ]]; then
-        rhymes+=("$nick")
-      fi
-    done
-    if [[ ${#rhymes[@]} -gt 0 ]]; then
-      nick="$(pick_from "${rhymes[@]}")"
-    else
-      nick="$(pick_from "${nick_pool[@]}")"
+    adj="$(printf '%s' "$adj" | tr -cd 'A-Za-z0-9')"
+    adj_l="$(printf '%s' "$adj" | tr '[:upper:]' '[:lower:]')"
+    # Same word twice is not allowed (Silly + Silly → SillySilly).
+    if [[ -z "$adj_l" || "$adj_l" == "$first_l" ]]; then
+      continue
     fi
-    # Bubbly + Bob -> BubblyBob
-    ALIAS="$(title_case "$adj")$(title_case "$nick")"
+    # Adjective + real first name (gender/ethnicity already chose FIRST_NAME).
+    ALIAS="$(title_case "$adj")$(title_case "$first_clean")"
     ALIAS="$(printf '%s' "$ALIAS" | tr -cd 'A-Za-z0-9' | cut -c1-80)"
     local taken
     taken=$(psql_q -Atc "SELECT 1 FROM ${SCHEMA}.singles WHERE lower(alias)=lower('$(sql_escape "$ALIAS")') LIMIT 1;")
@@ -296,7 +244,14 @@ generate_alias() {
       return 0
     fi
   done
-  ALIAS="Alias$(rand_int 1000 9999)"
+  # Fallback: adjective + first name + digits (still never doubled word).
+  adj="$(pick_from "${ADJECTIVES[@]}")"
+  adj_l="$(printf '%s' "$adj" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z')"
+  if [[ "$adj_l" == "$first_l" ]]; then
+    adj="Sunny"
+  fi
+  ALIAS="$(title_case "$adj")$(title_case "$first_clean")$(rand_int 10 99)"
+  ALIAS="$(printf '%s' "$ALIAS" | tr -cd 'A-Za-z0-9' | cut -c1-80)"
 }
 
 generate_alias

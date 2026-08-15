@@ -23,13 +23,28 @@ export function appendAliasSuggestionClick(currentValue, word) {
   return (String(currentValue ?? '') + titleCaseWord(piece)).slice(0, 80);
 }
 
-/** Combine two suggestion clicks: "bubbly" + "bob" -> "BubblyBob". */
+/** Combine two suggestion clicks: "bubbly" + "bob" -> "BubblyBob". Rejects same word twice. */
 export function formatAliasFromClickPair(word1, word2) {
   const w1 = String(word1 ?? '').replace(/[^A-Za-z0-9]/g, '');
   const w2 = String(word2 ?? '').replace(/[^A-Za-z0-9]/g, '');
   if (!w1 || !w2) return titleCaseWord(w1 || w2);
+  if (w1.toLowerCase() === w2.toLowerCase()) {
+    return titleCaseWord(w1).slice(0, 80);
+  }
   return (titleCaseWord(w1) + titleCaseWord(w2)).slice(0, 80);
 }
+
+/** True when alias is WordWord with identical halves (SillySilly / QuirkyQuirky). */
+export function isDoubledWordAlias(value) {
+  const s = String(value ?? '').replace(/[^A-Za-z0-9]/g, '');
+  if (s.length < 4 || s.length % 2 !== 0) return false;
+  const half = s.length / 2;
+  return s.slice(0, half).toLowerCase() === s.slice(half).toLowerCase();
+}
+
+export const ALIAS_DOUBLED_WORD_MESSAGE =
+  'Nickname cannot use the same word twice (e.g. SillySilly). Pick an adjective plus a different name.';
+
 
 /** Format nickname built from suggestion clicks (one or two words). */
 export function formatAliasFromClicks(value) {

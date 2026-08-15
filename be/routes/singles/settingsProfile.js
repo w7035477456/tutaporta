@@ -3,7 +3,13 @@ import { respondSessionInvalid } from '../../utils/sessionInvalidResponse.js';
 import { formatMemberDisplayCode, formatMemberIdDigits } from '../../utils/memberDisplayCode.js';
 import { referCodeFromMemberId } from '../../utils/referCodeFromMemberId.js';
 import { resolveRequestsAppSchema } from './resolveRequestsAppSchema.js';
-import { cleanAlias, isValidAliasFormat, ALIAS_ALNUM_ONLY_MESSAGE } from '../../utils/aliasValidation.js';
+import {
+  cleanAlias,
+  isValidAliasFormat,
+  isDoubledWordAlias,
+  ALIAS_ALNUM_ONLY_MESSAGE,
+  ALIAS_DOUBLED_WORD_MESSAGE
+} from '../../utils/aliasValidation.js';
 import nodemailer from 'nodemailer';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
 import { enrichMailOptions, wrapEmailHtml } from '../../lib/emailHtml.js';
@@ -2014,6 +2020,8 @@ export async function updateSettingsProfile(req, res) {
           nextValue = null;
         } else if (!isValidAliasFormat(nextValue)) {
           return res.status(400).json({ error: ALIAS_ALNUM_ONLY_MESSAGE });
+        } else if (isDoubledWordAlias(nextValue)) {
+          return res.status(400).json({ error: ALIAS_DOUBLED_WORD_MESSAGE });
         }
       }
       values.push(nextValue);

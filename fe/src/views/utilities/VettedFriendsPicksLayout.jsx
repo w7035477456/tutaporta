@@ -104,6 +104,7 @@ import {
   clickableTextHoverMagnifySx
 } from 'config/hoverMagnifyEnv';
 import VettedFriendsInlineChatPanel from 'views/utilities/VettedFriendsInlineChatPanel';
+import VettedFriendsGroupChatPanel from 'views/utilities/VettedFriendsGroupChatPanel';
 import { colorTemplate1WallColorByTheme } from 'config/colorTemplate1';
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
 import { getMyPicksAvatarSize } from 'config/myPicksCardEnv';
@@ -210,13 +211,14 @@ const VETTED_FRIENDS_AREA_ACQUAINT = 'acquaint';
 const VETTED_FRIENDS_AREA_BUDDIES = 'buddies';
 const VETTED_FRIENDS_PUBLIC_TAB_KEYS = ['publicPostings', 'publicAlbum', 'publicVideoAlbum'];
 const VETTED_FRIENDS_ACQUAINT_TAB_KEYS = ['bio', 'friendAlbum'];
-const VETTED_FRIENDS_BUDDIES_TAB_KEYS = ['bio', 'chat', 'buddiesPostings', 'friendAlbum'];
+const VETTED_FRIENDS_BUDDIES_TAB_KEYS = ['bio', 'chat', 'groupChat', 'buddiesPostings', 'friendAlbum'];
 const VETTED_FRIENDS_DEFAULT_TAB = 'publicPostings';
 const VETTED_FRIENDS_TAB_LABEL_BY_KEY = {
   publicPostings: 'Public Postings',
   publicAlbum: 'Public Photo Album',
   publicVideoAlbum: 'Public Video Album',
   chat: 'Buddies Chat',
+  groupChat: 'Group Chat',
   buddiesPostings: 'Buddies Postings'
 };
 
@@ -1337,6 +1339,7 @@ export default function VettedFriendsPicksLayout({
   const selectedPrivateArea = privateAreaForRelationship(selectedRow);
   const selectedRightPanelActiveArea = areaForVettedFriendsTab(selectedRightPanelActiveTab, selectedRow);
   const selectedRightPanelShowsChat = selectedRightPanelActiveTab === 'chat';
+  const selectedRightPanelShowsGroupChat = selectedRightPanelActiveTab === 'groupChat';
   const selectedRightPanelTabKeys = tabKeysForVettedFriendsArea(selectedRightPanelActiveArea);
 
   useEffect(() => {
@@ -2665,6 +2668,8 @@ export default function VettedFriendsPicksLayout({
             <Typography sx={rightPanelHeaderTitleSx}>Public Video Album</Typography>
           ) : selectedRightPanelActiveTab === 'buddiesPostings' ? (
             <Typography sx={rightPanelHeaderTitleSx}>Buddies Postings</Typography>
+          ) : selectedRightPanelActiveTab === 'groupChat' ? (
+            <Typography sx={rightPanelHeaderTitleSx}>Group Chat</Typography>
           ) : (
             <Typography sx={rightPanelHeaderTitleSx}>Public Postings</Typography>
           )}
@@ -2769,6 +2774,11 @@ export default function VettedFriendsPicksLayout({
                 focusComposerNonce={composerFocusNonce}
                 refreshNonce={chatRefreshNonce}
               />
+            </Box>
+          ) : null}
+          {selectedRightPanelShowsGroupChat ? (
+            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+              <VettedFriendsGroupChatPanel refreshNonce={chatRefreshNonce} />
             </Box>
           ) : null}
           {selectedRightPanelActiveTab === 'publicAlbum'
