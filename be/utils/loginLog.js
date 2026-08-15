@@ -7,11 +7,42 @@ const SCHEMA = 'helloworldjunktest';
 /** Never write login_log for these client IPs (local / home). */
 const LOGIN_LOG_SKIP_IPS = new Set(['127.0.0.1', '72.83.247.73']);
 
+/** Stored/displayed form: x.x.x.# where # is a single decimal digit. */
+const MASKED_LOGIN_LOG_IP_RE = /^x\.x\.x\.[0-9]$/;
+
 function normalizeInet(raw) {
   let ip = String(raw ?? '').trim();
   if (!ip || ip === 'unknown') return null;
   if (ip.startsWith('::ffff:')) ip = ip.slice('::ffff:'.length);
+  const slash = ip.indexOf('/');
+  if (slash > 0) ip = ip.slice(0, slash);
   return ip;
+}
+
+/** Last decimal digit of an IP (IPv4 last octet, or last digit in the string). */
+export function lastDigitOfIp(raw) {
+  const ip = normalizeInet(raw);
+  if (!ip) return null;
+  if (MASKED_LOGIN_LOG_IP_RE.test(ip)) return ip.slice(-1);
+  const lastOctet = ip.includes('.') ? ip.split('.').pop() : ip;
+  const digits = String(lastOctet ?? '').replace(/\D/g, '');
+  if (!digits) return null;
+  return digits.slice(-1);
+}
+
+/**
+ * Privacy mask for Postgres inet: only the final digit, as 0.0.0.N
+ * (Admin Tools shows this as x.x.x.N). Never a full client address.
+ */
+export function privacyMaskLoginLogIpForStorage(raw) {
+  const digit = lastDigitOfIp(raw);
+  return digit ? `0.0.0.${digit}` : null;
+}
+
+/** Admin Tools display: always x.x.x.#, including leftover full-IP rows. */
+export function formatLoginLogIpForDisplay(raw) {
+  const digit = lastDigitOfIp(raw);
+  return digit ? `x.x.x.${digit}` : '';
 }
 
 /** True when this IP must not be recorded in login_log at all. */
@@ -52,8 +83,9 @@ export async function insertDemoLoginLog(req, fields = {}) {
     const email = String(fields.email ?? '').trim() || null;
     const phone = String(fields.phone ?? '').trim() || null;
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
-    const clientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
-    if (shouldSkipLoginLogIp(clientIp)) return null;
+    const rawClientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (shouldSkipLoginLogIp(rawClientIp)) return null;
+    const clientIp = privacyMaskLoginLogIpForStorage(rawClientIp);
     const userAgent = userAgentFromReq(req);
 
     const { rows } = await pool.query(
@@ -90,8 +122,9 @@ export async function insertSignupLoginLog(req, fields = {}) {
       return null;
     }
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
-    const clientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
-    if (shouldSkipLoginLogIp(clientIp)) return null;
+    const rawClientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (shouldSkipLoginLogIp(rawClientIp)) return null;
+    const clientIp = privacyMaskLoginLogIpForStorage(rawClientIp);
     const userAgent = userAgentFromReq(req);
 
     const { rows } = await pool.query(

@@ -1,4 +1,4 @@
--- helloworldjunktest.login_log — demo logins + new-account signups, with IP and online duration.
+-- helloworldjunktest.login_log — demo logins + new-account signups, with last-digit IP and online duration.
 -- Run on Primary only. Safe to re-run.
 --
 -- Mac:
@@ -7,8 +7,11 @@
 -- Tracks:
 --   1) demo/demo (and guest/guest) logins  → event_type = 'demo_login', is_demo = true
 --   2) new account signup                 → event_type = 'signup', email + phone
---   For either: client_ip, login_at, logout_at, online_seconds, logout_reason
+--   For either: client_ip (privacy: only last digit, stored as 0.0.0.N, shown as x.x.x.N),
+--     login_at, logout_at, online_seconds, logout_reason
 --     (explicit logout, idle/system auto-logout, or browser close / session end)
+--
+-- Existing DBs: also run be/db/maskLoginLogClientIpLastDigit.sql so old full IPs are scrubbed.
 
 DO $$
 BEGIN
@@ -69,7 +72,7 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.login_log (
   email text,
   phone text,
 
-  -- client / session
+  -- client / session — privacy: only last IP digit as inet 0.0.0.N (Tools shows x.x.x.N)
   client_ip inet,
   user_agent text,
   -- correlates JWT/Redis session_id when present (logout close-out)
@@ -131,7 +134,9 @@ CREATE INDEX IF NOT EXISTS login_log_open_sessions_idx
   WHERE logout_at IS NULL;
 
 COMMENT ON TABLE helloworldjunktest.login_log IS
-  'Demo logins and new signups: IP + online duration until logout / auto-logout / browser close.';
+  'Demo logins and new signups: last-digit IP (shown as x.x.x.#) + online duration until logout / auto-logout / browser close.';
+COMMENT ON COLUMN helloworldjunktest.login_log.client_ip IS
+  'Privacy: only the final IP digit, stored as 0.0.0.N (e.g. 0.0.0.5) and shown in Tools as x.x.x.N. Never a full client address.';
 COMMENT ON COLUMN helloworldjunktest.login_log.is_demo IS
   'True when login used demo/demo or guest/guest alias (guest_demo_login).';
 COMMENT ON COLUMN helloworldjunktest.login_log.online_seconds IS

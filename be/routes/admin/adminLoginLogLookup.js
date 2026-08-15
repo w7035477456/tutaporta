@@ -8,6 +8,7 @@ import {
   parseSinglesIdLookup,
   wildcardToLikePattern
 } from '../../utils/adminLookupWildcard.js';
+import { formatLoginLogIpForDisplay, lastDigitOfIp } from '../../utils/loginLog.js';
 
 const LOGIN_LOG_LIMIT = 2000;
 const LIKE_ESCAPE = ` ESCAPE '\\'`;
@@ -71,7 +72,7 @@ function mapLoginLogRow(row) {
     memberId: row.member_id != null && Number.isFinite(Number(row.member_id)) ? Number(row.member_id) : null,
     email: String(row.email ?? ''),
     phone: String(row.phone ?? ''),
-    clientIp: row.client_ip != null ? String(row.client_ip) : '',
+    clientIp: formatLoginLogIpForDisplay(row.client_ip),
     loginAt: row.login_at,
     logoutAt: row.logout_at,
     onlineSeconds:
@@ -127,11 +128,18 @@ function buildLoginLogWhere(body, { requireInput }) {
   paramIndex = appendPhoneCondition(conditions, params, phoneLookup, paramIndex, 'll.phone');
 
   if (ipLookup?.mode === 'exact') {
-    conditions.push(`host(ll.client_ip) = $${paramIndex}`);
-    params.push(ipLookup.value);
-    paramIndex += 1;
+    const digit = lastDigitOfIp(ipLookup.value);
+    if (digit) {
+      conditions.push(`right(regexp_replace(ll.client_ip::text, '[^0-9]', '', 'g'), 1) = $${paramIndex}`);
+      params.push(digit);
+      paramIndex += 1;
+    } else {
+      conditions.push(`ll.client_ip::text = $${paramIndex}`);
+      params.push(ipLookup.value);
+      paramIndex += 1;
+    }
   } else if (ipLookup?.mode === 'like') {
-    conditions.push(`host(ll.client_ip) LIKE $${paramIndex}${LIKE_ESCAPE}`);
+    conditions.push(`ll.client_ip::text LIKE $${paramIndex}${LIKE_ESCAPE}`);
     params.push(ipLookup.pattern);
     paramIndex += 1;
   }

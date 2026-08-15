@@ -92,6 +92,17 @@ function formatLoginAt(value) {
   }
 }
 
+/** Privacy: show only last IP digit as x.x.x.# (e.g. x.x.x.5). */
+function formatLoginLogIp(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (/^x\.x\.x\.[0-9]$/i.test(text)) return text.toLowerCase();
+  const lastOctet = text.includes('.') ? text.split('.').pop() : text;
+  const digits = String(lastOctet ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  return `x.x.x.${digits.slice(-1)}`;
+}
+
 function hasLoginLogInput({ typeInput, singlesIdInput, emailInput, phoneInput, ipInput }) {
   return Boolean(
     String(typeInput ?? '').trim() ||
@@ -126,7 +137,7 @@ function buildLoginLogColumnTexts(rows) {
     ['singles_id', ...rows.map((row) => truncateLookupDisplay(row.singlesId ?? '—'))],
     ['member_id', ...rows.map((row) => truncateLookupDisplay(row.memberId ?? '—'))],
     ['Email', ...rows.map((row) => truncateLookupDisplay(row.email || '—'))],
-    ['IP', ...rows.map((row) => truncateLookupDisplay(row.clientIp || '—'))]
+    ['IP (x.x.x.#)', ...rows.map((row) => truncateLookupDisplay(formatLoginLogIp(row.clientIp) || '—'))]
   ];
 }
 
@@ -297,7 +308,7 @@ export default function AdminToolsLoginLogTab({ onError }) {
                     Email
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                    IP
+                    IP (x.x.x.#)
                   </ColorTemplate9TableData.HeaderCell>
                 </ColorTemplate9TableData.HeaderRow>
                 {rows.map((row, index) => (
@@ -313,7 +324,7 @@ export default function AdminToolsLoginLogTab({ onError }) {
                       <ColorTemplate9TableData.BodyText
                         sx={{ display: { xs: 'block', sm: 'none' }, opacity: 0.85, mt: 0.25 }}
                       >
-                        {formatLoginAt(row.loginAt)} · {row.email || '—'} · {row.clientIp || '—'}
+                        {formatLoginAt(row.loginAt)} · {row.email || '—'} · {formatLoginLogIp(row.clientIp) || '—'}
                       </ColorTemplate9TableData.BodyText>
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell sx={lookupCenterColumnCellSx}>
@@ -338,7 +349,7 @@ export default function AdminToolsLoginLogTab({ onError }) {
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell sx={lookupCenterColumnCellSx}>
                       <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
-                        {truncateLookupDisplay(row.clientIp || '—')}
+                        {truncateLookupDisplay(formatLoginLogIp(row.clientIp) || '—')}
                       </ColorTemplate9TableData.BodyText>
                     </ColorTemplate9TableData.BodyCell>
                   </ColorTemplate9TableData.BodyRow>
