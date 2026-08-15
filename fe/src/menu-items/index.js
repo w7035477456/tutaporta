@@ -35,7 +35,7 @@ const singlesOutgoingGroup = {
   type: 'group',
   title: '',
   children: [
-    ...pickChildren(dashboardKids, ['allSingles', 'myPicks']),
+    ...pickChildren(dashboardKids, ['allSingles', 'speedDating', 'myPicks']),
     ...pickChildren(pagesKids, ['util-requests-sent'])
   ]
 };

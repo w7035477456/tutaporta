@@ -31,6 +31,7 @@ const EMarketPlaceFlowerShopPage = Loadable(lazy(() => import('views/utilities/E
 const InterestedAlbumPage = Loadable(lazy(() => import('views/utilities/InterestedAlbumPage')));
 const SelfReportBiographyPage = Loadable(lazy(() => import('views/utilities/SelfReportBiographyPage')));
 const AdminToolsPage = Loadable(lazy(() => import('views/utilities/AdminToolsPage')));
+const SpeedDatePage = Loadable(lazy(() => import('../views/dashboard/speedDate/SpeedDatePage')));
 const MeasureOneLaunchPage = Loadable(lazy(() => import('views/utilities/MeasureOneLaunchPage')));
 const MyRecordVault = Loadable(lazy(() => import('../views/dashboard/recordVault/MyRecordVault')));
 const MyPhotoAlbums = Loadable(lazy(() => import('../views/dashboard/photoAlbums/MyPhotoAlbums')));
@@ -134,6 +135,10 @@ const MainRoutes = {
     {
       path: 'myPicks',
       element: <MyPicks />
+    },
+    {
+      path: 'speedDating',
+      element: <SpeedDatePage />
     },
     {
       path: 'interestedSingles',

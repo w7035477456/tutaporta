@@ -29,6 +29,23 @@ Mac dev snapshot below. **Secrets are redacted in this doc** — keep real value
 |------|---------|-------|
 | **YOUR_UBUNTU_HOST** | `192.168.222.202` | Primary Ubuntu app server (SSH / `scp` / deploy target). Example: `scp … lawsen0@192.168.222.202:~/code/main/be/usb/` |
 
+## Speed dating (1:1 WebRTC)
+
+Video goes **browser-to-browser**, not through the R630 web servers. App servers only persist pairing + SDP/ICE in Postgres.
+
+```bash
+# SPEED_DATE_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+# SPEED_DATE_TURN_URLS=turn:192.168.222.202:3478?transport=udp
+# SPEED_DATE_TURN_USERNAME=speeddate
+# SPEED_DATE_TURN_CREDENTIAL=****
+```
+
+| Variable | Notes |
+|----------|-------|
+| `SPEED_DATE_STUN_URLS` | Comma-separated STUN URLs. Default is Google public STUN. |
+| `SPEED_DATE_TURN_URLS` | Optional coturn relay on one R630 for guests behind strict NAT. Leave unset until coturn is running. |
+| `SPEED_DATE_TURN_USERNAME` / `SPEED_DATE_TURN_CREDENTIAL` | Required with TURN URLs. Do not commit secrets. |
+
 ## New account signup
 
 ```bash

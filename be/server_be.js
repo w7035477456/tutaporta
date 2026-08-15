@@ -515,6 +515,19 @@ import {
 } from './routes/chat/groupChat.js';
 import { uploadChatInlineImage, getChatInlineImage } from './routes/chat/chatImage.js';
 import {
+  createSpeedDateEvent,
+  endSpeedDateEvent,
+  getSpeedDateSession,
+  getSpeedDateSignals,
+  heartbeatSpeedDate,
+  listSpeedDateEvents,
+  nextSpeedDateRound,
+  postSpeedDateInterest,
+  postSpeedDateSignal,
+  rsvpSpeedDateEvent,
+  startSpeedDateEvent
+} from './routes/speedDate/speedDateRoutes.js';
+import {
   feBeTrafficLogMiddleware,
   isFeBeTrafficLogEnabled,
   logFeBeTrafficLogStartupStatus
@@ -1609,6 +1622,18 @@ app.get('/api/vet-bio/verification-services', requireAuth, getVetBioVerification
 app.patch('/api/vet-bio/verification-services', requireAuth, requireAdminRole, patchVetBioVerificationServices);
 app.post('/api/vet-bio/id-verification-date-on-close', requireAuth, postIdVerificationDateOnClose);
 app.post('/api/vet-bio/reset-id-verification', requireAuth, postResetIdVerification);
+app.get('/api/speed-date/events', requireAuth, listSpeedDateEvents);
+app.post('/api/speed-date/events', requireAuth, requireAdminRole, createSpeedDateEvent);
+app.post('/api/speed-date/events/:eventId/rsvp', requireAuth, rsvpSpeedDateEvent);
+app.post('/api/speed-date/events/:eventId/heartbeat', requireAuth, heartbeatSpeedDate);
+app.get('/api/speed-date/session', requireAuth, getSpeedDateSession);
+app.post('/api/speed-date/events/:eventId/start', requireAuth, requireAdminRole, startSpeedDateEvent);
+app.post('/api/speed-date/events/:eventId/next-round', requireAuth, requireAdminRole, nextSpeedDateRound);
+app.post('/api/speed-date/events/:eventId/end', requireAuth, requireAdminRole, endSpeedDateEvent);
+app.post('/api/speed-date/signal', requireAuth, postSpeedDateSignal);
+app.get('/api/speed-date/signals', requireAuth, getSpeedDateSignals);
+app.post('/api/speed-date/pairs/:pairId/interest', requireAuth, postSpeedDateInterest);
+
 app.post('/api/chat/send', requireAuth, sendChatMessage);
 app.get('/api/chat/history/:targetUserId', requireAuth, getChatHistory);
 app.post('/api/chat/historyBatch', requireAuth, getChatHistoryBatch);

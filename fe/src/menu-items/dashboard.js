@@ -5,6 +5,7 @@ import {
   pickPostIcon
 } from 'config/menuIcons';
 import { PRIMARY_COLOR_CSS } from 'utils/themeConfig';
+import { SPEED_DATING_PATH } from 'constants/speedDateRoute';
 
 const SECONDARY_COLOR_CSS = 'var(--theme-secondary-color)';
 
@@ -34,6 +35,19 @@ const dashboard = {
       type: 'item',
       url: '/allSingles',
       iconSrc: allSinglesIcon,
+      breadcrumbs: false,
+      customStyle: {
+        fontFamily: MAIN_FONT_FAMILY,
+        color: PRIMARY_COLOR_CSS,
+        fontWeight: 600
+      }
+    },
+    {
+      id: 'speedDating',
+      title: 'Speed Dating',
+      type: 'item',
+      url: SPEED_DATING_PATH,
+      iconSrc: pickPostIcon,
       breadcrumbs: false,
       customStyle: {
         fontFamily: MAIN_FONT_FAMILY,
