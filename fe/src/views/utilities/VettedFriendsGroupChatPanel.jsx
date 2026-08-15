@@ -8,6 +8,11 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Avatar from '@mui/material/Avatar';
 import GreenButton from 'ui-component/GreenButton';
 import { GREEN_BUTTON_ENABLED_BG, GREEN_BUTTON_TEXT } from 'config/greenButton';
+import {
+  COLOR_TEMPLATE1_BG_SELECTED,
+  COLOR_TEMPLATE1_TEXT_SELECTED,
+  COLOR_TEMPLATE1_TEXT_UNSELECTED
+} from 'config/colorTemplate1';
 import { buildProfilePhotoUrl } from 'utils/profilePhotoUrl';
 import { formatMemberLabel } from 'utils/memberLabel';
 import { themedAlert } from 'utils/themedDialog';
@@ -40,6 +45,15 @@ const invitePanelSx = {
   maxHeight: 320,
   overflowY: 'auto'
 };
+
+/** Distinct incoming blues so each other member is easy to tell apart. */
+const GROUP_INCOMING_SHADE_MIXES = ['#90caf9', '#64b5f6', '#4fc3f7', '#29b6f6', '#81d4fa', '#42a5f5'];
+
+function incomingBubbleShadeForSender(senderId) {
+  const id = Math.abs(Number(senderId) || 0);
+  const mix = GROUP_INCOMING_SHADE_MIXES[id % GROUP_INCOMING_SHADE_MIXES.length];
+  return `color-mix(in srgb, var(--theme-secondary-color) 72%, ${mix} 28%)`;
+}
 
 /**
  * Buddies-area Group Chat panel.
@@ -557,19 +571,88 @@ export default function VettedFriendsGroupChatPanel({ refreshNonce = 0 }) {
           </Typography>
         ) : (
           messages.map((m) => {
-            const who =
-              m.sender === 'me'
-                ? 'You'
-                : formatMemberLabel({
-                    alias: m.alias,
-                    singlesId: m.senderId,
-                    prefix: m.prefix,
-                    memberId: m.memberId
-                  });
+            const isMine = m.sender === 'me';
+            const who = isMine
+              ? 'You'
+              : formatMemberLabel({
+                  alias: m.alias,
+                  singlesId: m.senderId,
+                  prefix: m.prefix,
+                  memberId: m.memberId
+                });
+            const bubbleBg = isMine ? COLOR_TEMPLATE1_BG_SELECTED : incomingBubbleShadeForSender(m.senderId);
+            const bubbleTextColor = isMine ? COLOR_TEMPLATE1_TEXT_SELECTED : COLOR_TEMPLATE1_TEXT_UNSELECTED;
+            const avatarSrc = isMine
+              ? buildProfilePhotoUrl(mySinglesId, user?.profile_image_fk)
+              : buildProfilePhotoUrl(m.senderId, m.profileImageFk);
             return (
-              <Box key={m.id} sx={{ mb: 1 }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.8rem' }}>{who}</Typography>
-                <Typography sx={{ fontSize: '0.95rem', whiteSpace: 'pre-wrap' }}>{m.text}</Typography>
+              <Box
+                key={m.id}
+                sx={{
+                  display: 'flex',
+                  justifyContent: isMine ? 'flex-end' : 'flex-start',
+                  alignItems: 'flex-end',
+                  gap: 0.75,
+                  mb: 1.25
+                }}
+              >
+                {!isMine ? (
+                  <Avatar src={avatarSrc || undefined} alt={who} sx={{ width: 32, height: 32, flexShrink: 0, mb: 0.25 }} />
+                ) : null}
+                <Box sx={{ maxWidth: '75%', display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
+                  {!isMine ? (
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.75rem', mb: 0.25, color: COLOR_TEMPLATE1_TEXT_UNSELECTED }}>
+                      {who}
+                    </Typography>
+                  ) : null}
+                  <Box
+                    sx={{
+                      px: 1.2,
+                      py: 0.8,
+                      borderRadius: '20px',
+                      maxWidth: '100%',
+                      mr: isMine ? '18px' : 0,
+                      ml: isMine ? 0 : '18px',
+                      bgcolor: bubbleBg,
+                      border: '1px solid var(--theme-primary-color)',
+                      color: bubbleTextColor,
+                      position: 'relative',
+                      zIndex: 1,
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        bottom: 6,
+                        width: 22,
+                        height: 22,
+                        backgroundColor: bubbleBg,
+                        zIndex: isMine ? 1 : 3,
+                        ...(isMine
+                          ? { right: -11, borderRadius: '0 0 8px 20px', transform: 'rotate(-45deg)' }
+                          : {
+                              left: -11,
+                              borderRadius: '0 0 20px 8px',
+                              transform: 'rotate(45deg)',
+                              borderLeft: '1px solid var(--theme-primary-color)',
+                              borderBottom: '1px solid var(--theme-primary-color)'
+                            })
+                      }
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: '0.95rem',
+                        color: `${bubbleTextColor} !important`,
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {m.text}
+                    </Typography>
+                  </Box>
+                </Box>
+                {isMine ? (
+                  <Avatar src={avatarSrc || undefined} alt="You" sx={{ width: 32, height: 32, flexShrink: 0, mb: 0.25 }} />
+                ) : null}
               </Box>
             );
           })
