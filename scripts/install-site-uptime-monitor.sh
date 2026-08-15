@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install 24x7 website curl+SMS monitor as a systemd service (not PM2).
+# Install 24x7 website curl+SMS+USB-speaker monitor as a systemd service (not PM2).
 #
 #   sudo bash scripts/install-site-uptime-monitor.sh
 #
@@ -22,11 +22,20 @@ if ! id "$RUN_USER" >/dev/null 2>&1; then
   exit 1
 fi
 RUN_GROUP="$(id -gn "$RUN_USER")"
+RUN_UID="$(id -u "$RUN_USER")"
 HOME_DIR="$(getent passwd "$RUN_USER" | cut -d: -f6)"
 INSTALL_DIR="${HOME_DIR}/bin"
 SCRIPT_PATH="${INSTALL_DIR}/site-uptime-monitor.sh"
 LOG_DIR="${HOME_DIR}/logs/site-uptime-monitor"
 UNIT_PATH="/etc/systemd/system/site-uptime-monitor.service"
+
+if getent group audio >/dev/null 2>&1; then
+  usermod -aG audio "$RUN_USER" || true
+fi
+if ! command -v speaker-test >/dev/null 2>&1 || ! command -v aplay >/dev/null 2>&1; then
+  echo "Installing alsa-utils (speaker-test / aplay) for USB speaker alarm..."
+  apt-get install -y alsa-utils
+fi
 
 [[ -f "$MONITOR_SRC" ]] || { echo "Missing $MONITOR_SRC" >&2; exit 1; }
 [[ -f "$UNIT_SRC" ]] || { echo "Missing $UNIT_SRC" >&2; exit 1; }
@@ -41,6 +50,7 @@ chmod 0644 "${LOG_DIR}/monitor.log" "${LOG_DIR}/sms-sent.log"
 sed \
   -e "s|__RUN_USER__|${RUN_USER}|g" \
   -e "s|__RUN_GROUP__|${RUN_GROUP}|g" \
+  -e "s|__RUN_UID__|${RUN_UID}|g" \
   -e "s|__HOME_DIR__|${HOME_DIR}|g" \
   -e "s|__SCRIPT_PATH__|${SCRIPT_PATH}|g" \
   "$UNIT_SRC" >"$UNIT_PATH"
@@ -50,8 +60,8 @@ systemctl daemon-reload
 systemctl enable site-uptime-monitor.service
 systemctl restart site-uptime-monitor.service
 
-if ! grep -q 'no_custom_friendly_name=1' "$SCRIPT_PATH"; then
-  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v4). Copy ~/code/main first." >&2
+if ! grep -q 'START v5' "$SCRIPT_PATH"; then
+  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v5 USB alarm). Copy ~/code/main first." >&2
 fi
 
 echo
@@ -72,3 +82,7 @@ echo "Send a test text (site can stay up):"
 echo "  rm -f ${LOG_DIR}/sms-state"
 echo "  sudo -u ${RUN_USER} ${SCRIPT_PATH} --test-sms"
 echo "  tail -5 ${LOG_DIR}/sms-sent.log"
+echo
+echo "USB speaker alarm (plays until you Ctrl-C, or 8s for --test-alarm):"
+echo "  sudo -u ${RUN_USER} ${SCRIPT_PATH} --list-audio"
+echo "  sudo -u ${RUN_USER} ${SCRIPT_PATH} --test-alarm"

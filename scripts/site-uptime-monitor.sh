@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 24x7 website uptime monitor — independent of PM2 (onlinemallwebsite).
-# Curls a few public URLs; on failure, SMS +17035477456 and log the send.
+# Curls a few public URLs; on failure, SMS +17035477456 and a USB-speaker
+# tone that runs until the site is healthy again.
 #
 # Install (Ubuntu): sudo scripts/install-site-uptime-monitor.sh
 # Logs: ~/logs/site-uptime-monitor/monitor.log  and  sms-sent.log
@@ -17,10 +18,15 @@ HOURLY_SMS_SEC="${SITE_UPTIME_HOURLY_SMS_SEC:-3600}"
 HOURLY_SMS_COUNT="${SITE_UPTIME_HOURLY_SMS_COUNT:-3}"
 DAILY_SMS_SEC="${SITE_UPTIME_DAILY_SMS_SEC:-86400}"
 BASE_URL="${SITE_UPTIME_BASE_URL:-https://onlinemall.website}"
+ALARM_ENABLE="${SITE_UPTIME_ALARM:-1}"
+ALARM_DEVICE="${SITE_UPTIME_ALARM_DEVICE:-auto}"
+ALARM_HZ="${SITE_UPTIME_ALARM_HZ:-880}"
+ALARM_CHANNELS="${SITE_UPTIME_ALARM_CHANNELS:-2}"
 
 MONITOR_LOG="${LOG_DIR}/monitor.log"
 SMS_LOG="${LOG_DIR}/sms-sent.log"
 STATE_FILE="${LOG_DIR}/sms-state"
+ALARM_PID_FILE="${LOG_DIR}/alarm.pid"
 
 URLS=(
   "${BASE_URL}/"
@@ -106,11 +112,156 @@ clear_logs_after_recovery() {
   : >"$SMS_LOG"
 }
 
+alarm_pid_alive() {
+  local pid="${1:-}"
+  [[ -n "$pid" && "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+read_alarm_pid() {
+  ALARM_PID=""
+  if [[ -f "$ALARM_PID_FILE" ]]; then
+    ALARM_PID="$(tr -d ' \t\r\n' <"$ALARM_PID_FILE")"
+  fi
+}
+
+alarm_is_running() {
+  read_alarm_pid
+  alarm_pid_alive "$ALARM_PID"
+}
+
+stop_alarm() {
+  read_alarm_pid
+  if alarm_pid_alive "$ALARM_PID"; then
+    kill "$ALARM_PID" 2>/dev/null || true
+    local i
+    for i in 1 2 3 4 5 6 7 8; do
+      alarm_pid_alive "$ALARM_PID" || break
+      sleep 0.25
+    done
+    if alarm_pid_alive "$ALARM_PID"; then
+      kill -9 "$ALARM_PID" 2>/dev/null || true
+    fi
+    log_monitor "ALARM stop pid=${ALARM_PID}"
+  fi
+  rm -f "$ALARM_PID_FILE"
+  ALARM_PID=""
+}
+
+# Prefer a USB playback card; skip HDMI / DisplayPort / onboard NVS.
+pick_alsa_playback_device() {
+  if [[ -n "$ALARM_DEVICE" && "$ALARM_DEVICE" != "auto" ]]; then
+    printf '%s' "$ALARM_DEVICE"
+    return 0
+  fi
+  command -v aplay >/dev/null 2>&1 || return 1
+  local listing card device rest lower chosen="" fallback="" skip_re usb_re
+  listing="$(aplay -l 2>/dev/null || true)"
+  [[ -n "$listing" ]] || return 1
+  while IFS= read -r line; do
+    [[ "$line" == card\ * ]] || continue
+    card="${line#card }"
+    card="${card%%:*}"
+    rest="${line#*, device }"
+    device="${rest%%:*}"
+    device="${device%% *}"
+    [[ "$card" =~ ^[0-9]+$ && "$device" =~ ^[0-9]+$ ]] || continue
+    lower="$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')"
+    skip_re='hdmi|displayport|nvs|nvidia'
+    usb_re='usb|c-media|audio device|speaker|headset'
+    if [[ "$lower" =~ $skip_re ]]; then
+      continue
+    fi
+    if [[ -z "$fallback" ]]; then
+      fallback="plughw:${card},${device}"
+    fi
+    if [[ "$lower" =~ $usb_re ]]; then
+      chosen="plughw:${card},${device}"
+      break
+    fi
+  done <<<"$listing"
+  if [[ -n "$chosen" ]]; then
+    printf '%s' "$chosen"
+    return 0
+  fi
+  if [[ -n "$fallback" ]]; then
+    printf '%s' "$fallback"
+    return 0
+  fi
+  printf '%s' "default"
+}
+
+unmute_alarm_device() {
+  local spec="$1"
+  command -v amixer >/dev/null 2>&1 || return 0
+  local card=""
+  if [[ "$spec" =~ plughw:([0-9]+) ]]; then
+    card="${BASH_REMATCH[1]}"
+  elif [[ "$spec" =~ hw:([0-9]+) ]]; then
+    card="${BASH_REMATCH[1]}"
+  fi
+  [[ -n "$card" ]] || return 0
+  amixer -c "$card" -q set Master 100% unmute 2>/dev/null || true
+  amixer -c "$card" -q set PCM 100% unmute 2>/dev/null || true
+  amixer -c "$card" -q set Speaker 100% unmute 2>/dev/null || true
+  amixer -c "$card" -q set Headphone 100% unmute 2>/dev/null || true
+}
+
+start_alarm() {
+  if [[ "$ALARM_ENABLE" != "1" ]]; then
+    return 0
+  fi
+  if alarm_is_running; then
+    return 0
+  fi
+  rm -f "$ALARM_PID_FILE"
+  local spec
+  spec="$(pick_alsa_playback_device || true)"
+  if [[ -z "$spec" ]]; then
+    log_monitor "ALARM start failed: no ALSA playback device (plug in USB speaker, aplay -l)"
+    return 1
+  fi
+  unmute_alarm_device "$spec"
+  if ! command -v speaker-test >/dev/null 2>&1; then
+    log_monitor "ALARM start failed: speaker-test missing (sudo apt-get install -y alsa-utils)"
+    return 1
+  fi
+  # Infinite sine until stop_alarm. Direct ALSA so systemd (no desktop session) still plays.
+  speaker-test -D "$spec" -c "$ALARM_CHANNELS" -t sine -f "$ALARM_HZ" >/dev/null 2>&1 &
+  local pid=$!
+  sleep 0.3
+  if ! alarm_pid_alive "$pid"; then
+    # Mono USB dongles often reject -c 2
+    speaker-test -D "$spec" -c 1 -t sine -f "$ALARM_HZ" >/dev/null 2>&1 &
+    pid=$!
+    sleep 0.3
+  fi
+  if ! alarm_pid_alive "$pid"; then
+    log_monitor "ALARM start failed device=${spec} hz=${ALARM_HZ} (check USB speaker, aplay -l)"
+    return 1
+  fi
+  echo "$pid" >"$ALARM_PID_FILE"
+  ALARM_PID="$pid"
+  log_monitor "ALARM start pid=${pid} device=${spec} hz=${ALARM_HZ}"
+}
+
+list_audio() {
+  echo "ALARM_ENABLE=${ALARM_ENABLE} ALARM_DEVICE=${ALARM_DEVICE} ALARM_HZ=${ALARM_HZ}"
+  echo "picked=$(pick_alsa_playback_device || echo none)"
+  echo
+  if command -v aplay >/dev/null 2>&1; then
+    aplay -l || true
+  else
+    echo "aplay not found — sudo apt-get install -y alsa-utils"
+  fi
+}
+
 reset_after_recovery() {
+  stop_alarm
   clear_sms_state
   clear_logs_after_recovery
   DOWN=0
-  log_monitor "RECOVERED site is up — logs cleared, SMS schedule reset (3x10min then 3x1h then daily)"
+  log_monitor "RECOVERED site is up — alarm stopped, logs cleared, SMS schedule reset (3x10min then 3x1h then daily)"
 }
 
 # Seconds to wait after SMS number `sent_count` before sending the next one.
@@ -234,6 +385,22 @@ maybe_send_failure_sms() {
   fi
 }
 
+if [[ "${1:-}" == "--list-audio" || "${1:-}" == "list-audio" ]]; then
+  list_audio
+  exit 0
+fi
+
+if [[ "${1:-}" == "--test-alarm" || "${1:-}" == "test-alarm" ]]; then
+  log_monitor "TEST-ALARM 8s USB speaker (Ctrl-C to stop early)"
+  trap stop_alarm EXIT INT TERM
+  start_alarm || exit 1
+  sleep 8
+  stop_alarm
+  trap - EXIT INT TERM
+  log_monitor "TEST-ALARM done"
+  exit 0
+fi
+
 if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   clear_sms_state
   log_monitor "TEST-SMS (Twilio Verify) env=${ENV_FILE} to=${SMS_TO} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} verify_sid_len=${#TWILIO_SERVICE_SID}"
@@ -241,7 +408,12 @@ if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   exit $?
 fi
 
-log_monitor "START v4 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily immediate_on_new_outage=1 no_custom_friendly_name=1"
+cleanup_on_exit() {
+  stop_alarm
+}
+trap cleanup_on_exit EXIT INT TERM
+
+log_monitor "START v5 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily immediate_on_new_outage=1 no_custom_friendly_name=1 alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ}"
 
 DOWN=0
 while true; do
@@ -257,8 +429,9 @@ while true; do
   if [[ "$ALL_OK" -eq 0 ]]; then
     if [[ "$DOWN" -eq 0 ]]; then
       clear_sms_state
-      log_monitor "NEW OUTAGE — SMS schedule reset, first text now"
+      log_monitor "NEW OUTAGE — SMS schedule reset, first text now, USB alarm on"
     fi
+    start_alarm
     fail_at="$(ts)"
     maybe_send_failure_sms "$fail_at" "$FAIL_DETAIL"
     DOWN=1
