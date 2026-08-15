@@ -21,6 +21,7 @@ import Box from '@mui/material/Box';
 import Transitions from 'ui-component/extended/Transitions';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
+import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { buttonHoverMagnifyFontSx, buttonHoverMagnifyTransitionSx } from 'config/hoverMagnifyEnv';
@@ -765,6 +766,17 @@ export default function ProfileSection({ clusterTight = false }) {
                         ...PROFILE_MENU_PANEL_FILL_SX
                       }}
                     >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          width: '100%',
+                          mb: 1
+                        }}
+                      >
+                        <PageVideoTutorialsButton pageKey="topRight" />
+                      </Box>
                       <Typography
                         variant="h4"
                         component="div"

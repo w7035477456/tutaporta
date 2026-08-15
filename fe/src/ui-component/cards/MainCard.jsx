@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 
 // material-ui
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
@@ -25,6 +26,8 @@ export default function MainCard({
   headerSX = {},
   darkTitle,
   secondary,
+  /** Optional node absolutely centered in the card header (e.g. Video Tutorials). */
+  center,
   shadow,
   sx = {},
   title,
@@ -33,6 +36,7 @@ export default function MainCard({
 }) {
   const defaultShadow = '0 2px 14px 0 rgb(32 40 45 / 8%)';
   const debugBorder = getDebugDottedBorders();
+  const showHeader = Boolean(title || darkTitle || secondary || center);
 
   return (
     <Card
@@ -58,13 +62,41 @@ export default function MainCard({
       })}
     >
       {/* card header and action */}
-      {!darkTitle && title && <CardHeader sx={{ ...headerStyle, ...headerSX }} title={title} action={secondary} />}
-      {darkTitle && title && (
-        <CardHeader sx={{ ...headerStyle, ...headerSX }} title={<Typography variant="h3">{title}</Typography>} action={secondary} />
-      )}
+      {showHeader ? (
+        <Box sx={{ position: 'relative' }}>
+          {!darkTitle && (title || secondary) ? (
+            <CardHeader sx={{ ...headerStyle, ...headerSX }} title={title} action={secondary} />
+          ) : null}
+          {darkTitle && (title || secondary) ? (
+            <CardHeader
+              sx={{ ...headerStyle, ...headerSX }}
+              title={title ? <Typography variant="h3">{title}</Typography> : undefined}
+              action={secondary}
+            />
+          ) : null}
+          {center ? (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 2,
+                maxWidth: { xs: '46%', sm: '40%' },
+                display: 'flex',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+                '& > *': { pointerEvents: 'auto' }
+              }}
+            >
+              {center}
+            </Box>
+          ) : null}
+        </Box>
+      ) : null}
 
       {/* content & header divider */}
-      {title && <Divider />}
+      {showHeader && (title || darkTitle || secondary) ? <Divider /> : null}
 
       {/* card content */}
       {content && (
@@ -87,6 +119,7 @@ MainCard.propTypes = {
   headerSX: PropTypes.object,
   darkTitle: PropTypes.bool,
   secondary: PropTypes.any,
+  center: PropTypes.node,
   shadow: PropTypes.string,
   sx: PropTypes.object,
   title: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),

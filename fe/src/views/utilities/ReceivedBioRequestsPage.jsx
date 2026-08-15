@@ -36,6 +36,7 @@ import {
 } from './SelfReportBiographyInstruction';
 import EarnTokensPageTitle from 'ui-component/EarnTokensPageTitle';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
+import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
 import { formatMemberLabel } from 'utils/memberLabel';
 import { formatCapitalizedFullName } from 'utils/fullNameFormat';
 
@@ -452,6 +453,7 @@ export default function ReceivedBioRequestsPage() {
           </Typography>
         </EarnTokensPageTitle>
       }
+      center={<PageVideoTutorialsButton pageKey="receivedBioRequest" />}
       secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
     >
       <ReceivedBioRequestsInstructionPopup open={instructionOpen} onClose={() => setInstructionOpen(false)} />

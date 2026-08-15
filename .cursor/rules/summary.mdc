@@ -11,6 +11,7 @@ alwaysApply: true
 
 Do not ask clarifying multiple-choice questions when intent is clear.
 
+**Cursor model — Auto only:** Use **Auto** mode only. Do not use Grok, Composer, or any other named model. Grok, Composer, and all other models are disabled — do not select, request, switch to, or launch them. When spawning subagents, use model `inherit` only (Auto). Never pass `composer-2.5-fast`, Grok, or any other model slug.
 
 ## 2) Postgres schema — no `public`
 

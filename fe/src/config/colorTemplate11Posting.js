@@ -208,7 +208,7 @@ export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
 }
 
 /** Zoom −/+ icons, slider, and Nvh readout on the posting photo-size bar. */
-export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT = `var(${ERROR_VAR})`;
+export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT = `var(${YELLOW_VAR})`;
 
 export function colorTemplate11PostingPhotoZoomIconButtonSx(overrides = {}) {
   return {
@@ -260,8 +260,8 @@ export function colorTemplate11PostingPhotoFullscreenHintSx(overrides = {}) {
     flex: { xs: '1 1 100%', sm: '0 1 auto' },
     textAlign: { xs: 'center', sm: 'right' },
     fontWeight: 700,
-    color: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT,
-    WebkitTextFillColor: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT,
+    color: '#ffffff',
+    WebkitTextFillColor: '#ffffff',
     fontSize: colorTemplate11PostingTextFontSize,
     lineHeight: 1.2,
     ...overrides

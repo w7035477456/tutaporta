@@ -9,6 +9,12 @@ alwaysApply: true
 
 Do not ask clarifying multiple-choice questions when intent is clear.
 
+## Agent — Cursor model (Auto only)
+
+- Use **Auto** mode only. Do not use Grok, Composer, or any other named model.
+- Grok, Composer, and all other models are disabled. Do not select, request, switch to, or launch them.
+- When spawning subagents, use model `inherit` only (Auto). Never pass `composer-2.5-fast`, Grok, or any other model slug.
+
 # Backend environment (`~/.ssh/be/.env`)
 
 Runtime config for the Node backend is loaded from **`~/.ssh/be/.env`** (not committed to git). After changes, restart PM2: `pm2 restart onlinemallwebsite`.
@@ -371,6 +377,35 @@ FE_RATE_CLIENT_API_CONSOLE_LOG=false
 | `FE_RATE_CLIENT_API_CONSOLE_LOG` | DevTools logging when master enabled. |
 
 After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod so the bundle picks up new values.
+
+## Menu page Video Tutorials (FE bundle)
+
+Mirrored from here into the Vite client bundle (`fe/vite.config.mjs` → `fe/src/config/pageVideoTutorialEnv.js`). **Not in `fe/.env`.**
+
+```bash
+#-----Video Tutorial-----
+TOPRIGHT_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+ALL_SINGLES_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+PICKS_POSTS_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+ACQUAINTS_BUDDIES_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+MYALBUM_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+MYSELFREPORTBIO_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+PROFILE_RECORDS_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
+```
+
+| Variable | Menu page |
+|----------|-----------|
+| `TOPRIGHT_VIDEO_TUTORIAL` | Header profile/settings menu (top-right account chip) |
+| `ALL_SINGLES_VIDEO_TUTORIAL` | All Singles |
+| `PICKS_POSTS_VIDEO_TUTORIAL` | Picks & Posts |
+| `ACQUAINTS_BUDDIES_VIDEO_TUTORIAL` | Acquaint. & Buddies (alias `ACQUAINT_BUDDIES_VIDEO_TUTORIAL` also accepted) |
+| `MYALBUM_VIDEO_TUTORIAL` | My Album&Posts |
+| `MYSELFREPORTBIO_VIDEO_TUTORIAL` | My Self-Report-Bio |
+| `RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL` | Received Bio Req |
+| `PROFILE_RECORDS_VIDEO_TUTORIAL` | Profile & Records |
+
+Centered **VIDEO TUTORIALS** header control (`PageVideoTutorialsButton`) opens the URL in a new tab. After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod.
 
 ## Self intro video recorder (FE bundle)
 

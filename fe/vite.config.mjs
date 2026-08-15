@@ -43,7 +43,16 @@ const BE_ENV_KEYS_FROM_HOME_FILE = [
   'SELF_INTRO_VIDEO_MAX_LENGTH',
   'NOTES_DEFAULT_BUTTON_FONT_SIZE_REM',
   'PHOTOALBUMS_DEFAULT_BUTTON_FONT_SIZE_REM',
-  'ONENOTE_USB_UPGRADE'
+  'ONENOTE_USB_UPGRADE',
+  'ALL_SINGLES_VIDEO_TUTORIAL',
+  'PICKS_POSTS_VIDEO_TUTORIAL',
+  'ACQUAINTS_BUDDIES_VIDEO_TUTORIAL',
+  'ACQUAINT_BUDDIES_VIDEO_TUTORIAL',
+  'MYALBUM_VIDEO_TUTORIAL',
+  'MYSELFREPORTBIO_VIDEO_TUTORIAL',
+  'RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL',
+  'PROFILE_RECORDS_VIDEO_TUTORIAL',
+  'TOPRIGHT_VIDEO_TUTORIAL'
 ];
 
 function loadBeEnvKeysFromHomeFile() {
@@ -90,6 +99,7 @@ export default defineConfig(({ mode }) => {
       // FE_ — e.g. FE_DEBUG; FE_RATE_* mirrored from ~/.ssh/be/.env (clientApiRateLimitEnv.js)
       // DEFAULT_ — e.g. DEFAULT_THEME (see config/defaultThemeEnv.js)
       // ALBUM_ — e.g. ALBUM_BINDER_WIDTH_PCT (see config/albumBinderWidthEnv.js)
+      // ALL_SINGLES_ / PICKS_ / ACQUAINT*_ / MYALBUM_ / … — page Video Tutorials URLs (pageVideoTutorialEnv.js)
       envPrefix: [
       'VITE_',
       'FE_',
@@ -126,6 +136,15 @@ export default defineConfig(({ mode }) => {
       'PHOTOALBUMS_',
       'ONENOTE_',
       'ALBUM_',
+      'ALL_SINGLES_',
+      'PICKS_',
+      'ACQUAINTS_',
+      'ACQUAINT_',
+      'MYALBUM_',
+      'MYSELFREPORTBIO_',
+      'RECEIVED_',
+      'PROFILE_',
+      'TOPRIGHT_',
       'BSIZE'
     ],
     server: {

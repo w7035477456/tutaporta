@@ -62,7 +62,22 @@ import { colorTemplate8PhotoGalleryRemoveSpinnerSx } from 'config/colorTemplate8
 import SelectedButtonTemplate, { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import ColorTemplate11Posting from 'ui-component/ColorTemplate11Posting';
-import { isSelfIntroVideoPostingUrl, videoThumbnailUrlFromPostingUrl } from 'api/selfIntroVideoFe';
+import {
+  isSelfIntroVideoPostingUrl,
+  parseSelfIntroVideoIdFromUrl,
+  uploadPublicVaultMediaFile,
+  videoThumbnailUrlFromPostingUrl
+} from 'api/selfIntroVideoFe';
+import {
+  isAllowedPublicVaultMediaFile,
+  PUBLIC_VAULT_MEDIA_ACCEPT,
+  PUBLIC_VAULT_UPLOAD_MAX_BYTES,
+  PUBLIC_VAULT_UPLOAD_MAX_MB
+} from 'utils/publicVaultMediaUpload';
+import { SELF_INTRO_VIDEO_SLOT_MAX } from 'constants/selfIntroVideoLimits';
+import { SelfIntroVideoFrameThumbnail } from 'views/utilities/SelfIntroVideoLibrary';
+import SelfIntroVideoSlotsFullPopup from 'views/utilities/SelfIntroVideoSlotsFullPopup';
+import filmBackground from 'assets/images/filmBackground.png';
 import { COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT } from 'config/colorTemplate11Posting';
 import usePostingFeedDelete from 'hooks/usePostingFeedDelete';
 import { usePostingAlbumMediaFullscreen } from 'hooks/usePostingAlbumMediaFullscreen';
@@ -758,6 +773,10 @@ export default function VettedFriendsPicksLayout({
   const [selectedPublicGalleryImageUrl, setSelectedPublicGalleryImageUrl] = useState('');
   const [selectedFriendGalleryImageUrl, setSelectedFriendGalleryImageUrl] = useState('');
   const [selectedPublicVideoGalleryImageUrl, setSelectedPublicVideoGalleryImageUrl] = useState('');
+  const [publicVideoAlbumDragOver, setPublicVideoAlbumDragOver] = useState(false);
+  const [publicVideoAlbumUploadBusy, setPublicVideoAlbumUploadBusy] = useState(false);
+  const [publicVideoAlbumSlotsFullOpen, setPublicVideoAlbumSlotsFullOpen] = useState(false);
+  const publicVideoAlbumFileInputRef = useRef(null);
   const [chatRefreshNonce, setChatRefreshNonce] = useState(0);
   const [refreshChatBusy, setRefreshChatBusy] = useState(false);
   const [bioRequestBusyKey, setBioRequestBusyKey] = useState('');
@@ -1068,6 +1087,97 @@ export default function VettedFriendsPicksLayout({
   const selectedRowPrivatePhotoGalleryUrls = useMemo(
     () => selectedRowFriendMediaUrls.filter((url) => !isSelfIntroVideoPostingUrl(url)),
     [selectedRowFriendMediaUrls]
+  );
+
+  const canUploadOwnPublicVideoAlbum = useMemo(() => {
+    if (isGuestDemoLogin(user)) return false;
+    const me = Number(user?.singles_id);
+    const target = Number(selectedSinglesId);
+    return Number.isFinite(me) && me > 0 && Number.isFinite(target) && target > 0 && me === target;
+  }, [user, selectedSinglesId]);
+
+  const handlePublicVideoAlbumFiles = useCallback(
+    async (files) => {
+      if (!canUploadOwnPublicVideoAlbum || publicVideoAlbumUploadBusy) return;
+      const fileArray = Array.from(files || []).filter(Boolean);
+      if (!fileArray.length) return;
+
+      const slotsLeft = SELF_INTRO_VIDEO_SLOT_MAX - selectedRowPublicVideoGalleryUrls.length;
+      if (slotsLeft < 1) {
+        setPublicVideoAlbumSlotsFullOpen(true);
+        return;
+      }
+
+      const maxUploadCount = Math.min(fileArray.length, slotsLeft);
+      setPublicVideoAlbumUploadBusy(true);
+      try {
+        for (let i = 0; i < maxUploadCount; i += 1) {
+          const file = fileArray[i];
+          if (!isAllowedPublicVaultMediaFile(file)) {
+            await themedAlert(`Unsupported file type: ${file?.name || 'unknown'}. Use .mp3/.mp4/.webm/.mov/.avi/.wmv.`);
+            continue;
+          }
+          if (file.size > PUBLIC_VAULT_UPLOAD_MAX_BYTES) {
+            await themedAlert(
+              `${file.name} is ${(file.size / (1024 * 1024)).toFixed(2)} MB. Public Video Vault uploads are limited to ${PUBLIC_VAULT_UPLOAD_MAX_MB} MB.`
+            );
+            continue;
+          }
+          try {
+            await uploadPublicVaultMediaFile(file);
+          } catch (uploadErr) {
+            const data = uploadErr?.response?.data;
+            const msg = data?.error || uploadErr?.message || 'Upload failed';
+            if (String(msg).toLowerCase().includes('full')) {
+              setPublicVideoAlbumSlotsFullOpen(true);
+              break;
+            }
+            await themedAlert(msg);
+          }
+        }
+        if (typeof onBioRequestUpdated === 'function') {
+          await onBioRequestUpdated();
+        }
+      } finally {
+        setPublicVideoAlbumUploadBusy(false);
+      }
+    },
+    [
+      canUploadOwnPublicVideoAlbum,
+      publicVideoAlbumUploadBusy,
+      selectedRowPublicVideoGalleryUrls.length,
+      onBioRequestUpdated
+    ]
+  );
+
+  const handlePublicVideoAlbumDragOver = useCallback(
+    (event) => {
+      if (!canUploadOwnPublicVideoAlbum) return;
+      const hasFiles = event.dataTransfer?.types?.includes?.('Files');
+      if (!hasFiles) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = 'copy';
+      setPublicVideoAlbumDragOver(true);
+    },
+    [canUploadOwnPublicVideoAlbum]
+  );
+
+  const handlePublicVideoAlbumDragLeave = useCallback((event) => {
+    const related = event.relatedTarget;
+    if (related && event.currentTarget.contains(related)) return;
+    setPublicVideoAlbumDragOver(false);
+  }, []);
+
+  const handlePublicVideoAlbumDrop = useCallback(
+    (event) => {
+      if (!canUploadOwnPublicVideoAlbum) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPublicVideoAlbumDragOver(false);
+      void handlePublicVideoAlbumFiles(event.dataTransfer?.files);
+    },
+    [canUploadOwnPublicVideoAlbum, handlePublicVideoAlbumFiles]
   );
 
   const handleSendBioRequest = useCallback(
@@ -2071,6 +2181,225 @@ export default function VettedFriendsPicksLayout({
     </Box>
   );
 
+  const renderPublicVideoAlbumPanel = () => {
+    const urls = selectedRowPublicVideoGalleryUrls;
+    const selectedImageUrl = selectedPublicVideoGalleryImageUrl;
+    const title = `Public Video Album (${urls.length}/${SELF_INTRO_VIDEO_SLOT_MAX})`;
+    return (
+      <Box
+        {...guestDemoAllowProps()}
+        onDragOver={handlePublicVideoAlbumDragOver}
+        onDragLeave={handlePublicVideoAlbumDragLeave}
+        onDrop={handlePublicVideoAlbumDrop}
+        sx={{
+          borderRadius: 1,
+          p: 0.75,
+          mb: 1.25,
+          bgcolor: publicVideoAlbumDragOver ? 'var(--theme-daynight-color, #fff)' : 'var(--theme-daynight-color, #fff)',
+          outline: publicVideoAlbumDragOver ? '2px dashed var(--theme-primary-color)' : 'none',
+          outlineOffset: 2,
+          transition: 'outline 0.15s ease, background-color 0.15s ease'
+        }}
+      >
+        <Box
+          sx={{
+            mb: 0.75,
+            px: 1,
+            py: 1.05,
+            bgcolor: (theme) => colorTemplate1WallColorByTheme(theme),
+            color: (theme) => (theme.palette.mode === 'dark' ? '#fff' : 'var(--theme-primary-color)'),
+            border: '1px solid var(--theme-primary-color)',
+            borderRadius: 0.6,
+            textAlign: 'center',
+            fontWeight: 700,
+            lineHeight: 1.15
+          }}
+        >
+          <Typography sx={{ color: 'inherit', fontWeight: 700, ...vettedFriendsPanelTextSx }}>{title}</Typography>
+        </Box>
+        {selectedSinglesId == null ? (
+          <Typography sx={{ color: 'var(--theme-primary-color)', ...vettedFriendsPanelTextSx }}>
+            Select a photo on the left.
+          </Typography>
+        ) : (
+          <>
+            {canUploadOwnPublicVideoAlbum ? (
+              <Typography
+                sx={{
+                  color: 'var(--theme-primary-color)',
+                  opacity: 0.85,
+                  mb: 1,
+                  ...vettedFriendsPanelTextSx
+                }}
+              >
+                Drag and drop a video or audio file into an Empty slot (up to {PUBLIC_VAULT_UPLOAD_MAX_MB} MB). Others can click a
+                filled slot to watch.
+              </Typography>
+            ) : null}
+            <input
+              ref={publicVideoAlbumFileInputRef}
+              type="file"
+              accept={PUBLIC_VAULT_MEDIA_ACCEPT}
+              multiple
+              hidden
+              onChange={(event) => {
+                const files = event.target.files;
+                event.target.value = '';
+                void handlePublicVideoAlbumFiles(files);
+              }}
+            />
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: { xs: 0.75, sm: 1 },
+                width: '100%',
+                mb: selectedImageUrl ? 1 : 0
+              }}
+            >
+              {Array.from({ length: SELF_INTRO_VIDEO_SLOT_MAX }, (_, slotIndex) => {
+                const mediaUrl = urls[slotIndex];
+                if (!mediaUrl) {
+                  return (
+                    <Box
+                      key={`public-video-album-empty-${slotIndex}`}
+                      component={canUploadOwnPublicVideoAlbum ? 'button' : 'div'}
+                      type={canUploadOwnPublicVideoAlbum ? 'button' : undefined}
+                      disabled={canUploadOwnPublicVideoAlbum ? publicVideoAlbumUploadBusy : undefined}
+                      onClick={
+                        canUploadOwnPublicVideoAlbum
+                          ? () => publicVideoAlbumFileInputRef.current?.click()
+                          : undefined
+                      }
+                      {...(canUploadOwnPublicVideoAlbum ? guestDemoAllowProps() : {})}
+                      sx={{
+                        border: '2px dashed var(--theme-primary-color)',
+                        borderRadius: 1,
+                        aspectRatio: '1 / 1',
+                        minHeight: { xs: 44, sm: 48 },
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--theme-primary-color)',
+                        opacity: publicVideoAlbumUploadBusy ? 0.55 : 0.65,
+                        fontWeight: 700,
+                        fontSize: outgoingBioBodyTextFontSize,
+                        bgcolor: 'transparent',
+                        cursor: canUploadOwnPublicVideoAlbum ? 'pointer' : 'default',
+                        p: 0,
+                        m: 0
+                      }}
+                      aria-label={`Public video album slot ${slotIndex + 1} empty`}
+                    >
+                      {publicVideoAlbumUploadBusy ? '…' : 'Empty'}
+                    </Box>
+                  );
+                }
+                const videoId = parseSelfIntroVideoIdFromUrl(mediaUrl);
+                const isSelected = selectedImageUrl === mediaUrl;
+                return (
+                  <Box
+                    key={mediaUrl}
+                    component="button"
+                    type="button"
+                    onClick={() => setSelectedPublicVideoGalleryImageUrl(mediaUrl)}
+                    onDoubleClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openAlbumFullscreenMedia(mediaUrl);
+                    }}
+                    {...guestDemoAllowProps()}
+                    sx={{
+                      p: 0,
+                      m: 0,
+                      border: isSelected ? '2px solid var(--theme-primary-color)' : '2px solid transparent',
+                      borderRadius: 1,
+                      overflow: 'hidden',
+                      width: '100%',
+                      aspectRatio: '1 / 1',
+                      bgcolor: '#111',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    aria-label={`Play public video ${slotIndex + 1}`}
+                  >
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        zIndex: 0,
+                        width: '79%',
+                        height: '79%',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {videoId ? (
+                        <SelfIntroVideoFrameThumbnail videoId={videoId} sx={{ width: '100%', height: '100%' }} />
+                      ) : (
+                        <Box
+                          component="img"
+                          src={videoThumbnailUrlFromPostingUrl(mediaUrl)}
+                          alt=""
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      )}
+                    </Box>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        zIndex: 1,
+                        backgroundImage: `url(${filmBackground})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        pointerEvents: 'none'
+                      }}
+                      aria-hidden
+                    />
+                  </Box>
+                );
+              })}
+            </Box>
+            {selectedImageUrl ? (
+              <AlbumMediaDoubleClickSurface
+                mediaUrl={selectedImageUrl}
+                onOpenFullscreen={openAlbumFullscreenMedia}
+                sx={{ width: '100%', borderRadius: 1, overflow: 'hidden', bgcolor: '#111' }}
+                {...guestDemoAllowProps()}
+              >
+                <Box
+                  component="video"
+                  src={selectedImageUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openAlbumFullscreenMedia(selectedImageUrl);
+                  }}
+                  sx={{
+                    display: 'block',
+                    width: '100%',
+                    height: 'auto',
+                    maxHeight: 'none',
+                    objectFit: 'contain',
+                    borderRadius: 1,
+                    border: '1px solid rgba(0,0,0,0.22)',
+                    bgcolor: '#000',
+                    cursor: 'zoom-in'
+                  }}
+                />
+              </AlbumMediaDoubleClickSurface>
+            ) : null}
+          </>
+        )}
+      </Box>
+    );
+  };
+
   if (!rows.length) {
     return (
       <Typography sx={{ color: 'var(--theme-primary-color)', ...vettedFriendsPanelTextSx }}>
@@ -2470,15 +2799,7 @@ export default function VettedFriendsPicksLayout({
                 </Typography>
               )
             : null}
-          {selectedRightPanelActiveTab === 'publicVideoAlbum'
-            ? renderAlbumPanel({
-                title: 'Public Video Album',
-                urls: selectedRowPublicVideoGalleryUrls,
-                selectedImageUrl: selectedPublicVideoGalleryImageUrl,
-                setSelectedImageUrl: setSelectedPublicVideoGalleryImageUrl,
-                emptyText: 'No public videos.'
-              })
-            : null}
+          {selectedRightPanelActiveTab === 'publicVideoAlbum' ? renderPublicVideoAlbumPanel() : null}
           {selectedRightPanelActiveTab === 'bio' ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {selectedRow == null ? (
@@ -2628,6 +2949,10 @@ export default function VettedFriendsPicksLayout({
         mediaUrl={fullscreenMediaUrl}
         overlayLines={fullscreenOverlayLines}
         onClose={closeFullscreenMedia}
+      />
+      <SelfIntroVideoSlotsFullPopup
+        open={publicVideoAlbumSlotsFullOpen}
+        onClose={() => setPublicVideoAlbumSlotsFullOpen(false)}
       />
     </Box>
   );

@@ -43,6 +43,7 @@ import PostingAlbumMediaFullscreen from 'ui-component/PostingAlbumMediaFullscree
 import AlbumMediaDoubleClickSurface from 'ui-component/AlbumMediaDoubleClickSurface';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
+import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
 import EarnTokensPageTitle from 'ui-component/EarnTokensPageTitle';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
@@ -639,6 +640,7 @@ export default function MyPicks() {
           </Typography>
         </EarnTokensPageTitle>
       }
+      center={<PageVideoTutorialsButton pageKey="picksPosts" />}
       secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
     >
       <PageInstructionPopup

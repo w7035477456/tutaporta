@@ -16,6 +16,18 @@ const VAULT_MEDIA_MIME_TYPES = new Set([
 const PHOTO_ACCEPT_ATTR = [...ALBUM_PHOTO_EXTENSIONS].map((ext) => `.${ext}`).join(',');
 const VAULT_ACCEPT_ATTR = [...VAULT_MEDIA_EXTENSIONS].map((ext) => `.${ext}`).join(',');
 
+/** File picker / drop accept for Public Video Vault only. */
+export const PUBLIC_VAULT_MEDIA_ACCEPT = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/x-ms-wmv',
+  'audio/mpeg',
+  'audio/mp3',
+  VAULT_ACCEPT_ATTR
+].join(',');
+
 /** Combined accept for MyStory drag-drop / file picker (photos + Public Video Vault media). */
 export const MY_STORY_UPLOAD_ACCEPT = [
   'image/jpeg',

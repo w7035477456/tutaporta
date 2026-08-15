@@ -127,6 +127,7 @@ import {
   hoverMagnifyFontSizeSx
 } from 'config/hoverMagnifyEnv';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
+import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
 import { PROFILES_RECORDS_PATH, PROFILES_RECORDS_TAB_PAY_HISTORY } from 'constants/profilesRecordsRoute';
 import {
   clearRefereeRewardUxAfterProfileSetup,
@@ -290,7 +291,7 @@ const ALBUM_MAX = 10;
 const PUBLIC_VIDEO_ALBUM_MAX = 3;
 const PUBLIC_VIDEO_ALBUM_TITLE = 'Public Video Vault';
 const PUBLIC_VIDEO_ALBUM_HINT =
-  'New videos and audio save here automatically (3 max, uploads up to 10 MB). Delete one to add more. Drag to Posting below to share with comments.';
+  'Drag and drop a video or audio onto an Empty slot (or use UPLOAD above). 3 max, uploads up to 10 MB. Others see these under Public Video Album. Drag a filled tile to Posting to share with comments.';
 const SECTION_FULL_ERROR = 'Full error message';
 const MY_STORY_DELETE_CONFIRM = {
   permanentPhoto: {
@@ -3454,6 +3455,7 @@ export default function MyStory() {
                 gap: { xs: 1.15, sm: 1.35 }
               }}
             >
+              <PageVideoTutorialsButton pageKey="myAlbum" />
               <Typography
                 component="h1"
                 sx={{
@@ -4415,12 +4417,40 @@ export default function MyStory() {
               })}
               <Box>
                 <Box
+                  {...guestDemoAllowProps()}
+                  onDragOver={(e) => {
+                    const hasFiles = e.dataTransfer?.types?.includes?.('Files');
+                    if (!hasFiles) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                    setDragOverAlbumType('publicVideo');
+                  }}
+                  onDragLeave={(e) => {
+                    const rel = e.relatedTarget;
+                    if (rel && e.currentTarget.contains(rel)) return;
+                    setDragOverAlbumType((prev) => (prev === 'publicVideo' ? null : prev));
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOverAlbumType(null);
+                    const vaultFiles = fileListToArray(e.dataTransfer?.files).filter(isAllowedPublicVaultMediaFile);
+                    if (!vaultFiles.length) {
+                      const anyFiles = fileListToArray(e.dataTransfer?.files);
+                      if (anyFiles.length) setWrongFormatAttemptFile(anyFiles[0]?.name || '');
+                      if (anyFiles.length) setWrongFormatDialogOpen(true);
+                      return;
+                    }
+                    void handleVaultMediaFiles(vaultFiles);
+                  }}
                   sx={{
                     border: MY_STORY_ALBUM_PANEL_BORDER,
                     borderRadius: 1,
                     p: 1,
                     minHeight: 88,
-                    bgcolor: 'var(--theme-secondary-color)'
+                    bgcolor: dragOverAlbumType === 'publicVideo' ? 'var(--theme-daynight-color)' : 'var(--theme-secondary-color)',
+                    transition: 'background-color 0.2s, border-color 0.2s'
                   }}
                 >
                   <UnSelectedButtonTemplate
@@ -4467,6 +4497,10 @@ export default function MyStory() {
                         return (
                           <Box
                             key={`public-video-empty-${slotIndex}`}
+                            component="button"
+                            type="button"
+                            {...guestDemoAllowProps()}
+                            onClick={() => triggerFilePicker(fileInputRef)}
                             sx={{
                               border: '2px dashed var(--theme-primary-color)',
                               borderRadius: 1,
@@ -4478,9 +4512,13 @@ export default function MyStory() {
                               color: 'var(--theme-primary-color)',
                               opacity: 0.65,
                               fontWeight: 700,
-                              fontSize: myStoryAlbumDropHintFontSize
+                              fontSize: myStoryAlbumDropHintFontSize,
+                              bgcolor: 'transparent',
+                              cursor: 'pointer',
+                              p: 0,
+                              m: 0
                             }}
-                            aria-label={`Public video album slot ${slotIndex + 1} empty`}
+                            aria-label={`Public video album slot ${slotIndex + 1} empty — drop or click to upload`}
                           >
                             Empty
                           </Box>

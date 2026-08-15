@@ -36,6 +36,7 @@ import { ProfilesRecordsInstructionPopup } from './ProfilesRecordsInstruction';
 import ProfilesRecordsInviteFriendsTab from './ProfilesRecordsInviteFriendsTab';
 import ProfilesRecordsReferEmailTab from './ProfilesRecordsReferEmailTab';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
+import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
 import { ChangeEmailPopup, ChangePasswordPopup, ChangePhonePopup } from './ProfilesRecordsAccountPopups';
 import ProfilesRecordsAutoLogout from './ProfilesRecordsAutoLogout';
 import {
@@ -840,15 +841,24 @@ export default function ProfilesRecordsPage({
         <Box
           sx={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: 1,
+            gap: 0.75,
             justifySelf: 'center',
             gridColumn: { xs: '1', sm: '2' },
-            gridRow: { xs: 2, sm: 'auto' },
-            flexWrap: 'wrap',
-            justifyContent: 'center'
+            gridRow: { xs: 2, sm: 'auto' }
           }}
         >
+          <PageVideoTutorialsButton pageKey="profileRecords" />
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: 'wrap',
+              justifyContent: 'center'
+            }}
+          >
           <Typography sx={{ ...textFontSx, fontWeight: 600, color: pageTextColor, whiteSpace: 'nowrap' }}>
             Token balance:
           </Typography>
@@ -907,6 +917,7 @@ export default function ProfilesRecordsPage({
             alt="payment icon"
             sx={{ width: { xs: 30, sm: 36 }, height: { xs: 30, sm: 36 }, objectFit: 'contain', flexShrink: 0 }}
           />
+          </Box>
         </Box>
         {adminCanSetTokenBalance && adminTokenBalanceMessage ? (
           <Typography

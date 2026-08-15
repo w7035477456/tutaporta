@@ -9,13 +9,19 @@ alwaysApply: true
 
 Do not ask clarifying multiple-choice questions when intent is clear.
 
+## Agent — Cursor model (Auto only)
+
+- Use **Auto** mode only. Do not use Grok, Composer, or any other named model.
+- Grok, Composer, and all other models are disabled. Do not select, request, switch to, or launch them.
+- When spawning subagents, use model `inherit` only (Auto). Never pass `composer-2.5-fast`, Grok, or any other model slug.
+
 # Frontend environment (`fe/.env`)
 
 Vite loads **`fe/.env`** at build/dev time. Client-visible keys use `import.meta.env` via `fe/vite.config.mjs` **`envPrefix`** (`VITE_`, `FE_`, `API_`, `MOBILE_`, `DESKTOP_`, `DIALOG_`, `HOVER_`, `RECORD_`, `YELLOW_`, etc.).
 
 After changes: **restart Vite** (`feall` or stop/start dev server). No PM2 on Mac FE.
 
-Some keys are **mirrored from `~/.ssh/be/.env`** at Vite startup (`SPECIAL_*`, `PRICE_PER_TOKEN`, `FE_RATE_*`, `SELF_INTRO_VIDEO_MAX_LENGTH` via `fe/vite.config.mjs`). Backend-only keys stay in **`~/.ssh/be/.env`** — see `be-env.mdc`.
+Some keys are **mirrored from `~/.ssh/be/.env`** at Vite startup (`SPECIAL_*`, `PRICE_PER_TOKEN`, `FE_RATE_*`, `SELF_INTRO_VIDEO_MAX_LENGTH`, `*_VIDEO_TUTORIAL` via `fe/vite.config.mjs`). Backend-only keys stay in **`~/.ssh/be/.env`** — see `be-env.mdc`.
 
 Mac dev snapshot below from committed `fe/.env`.
 
@@ -235,6 +241,7 @@ Set on the backend env file; some are injected into the Vite bundle or exposed v
 | `PRICE_PER_TOKEN` | Token pricing display (`pricePerTokenEnv.js`). |
 | `FE_RATE_*` | Browser API rate limit (`clientApiRateLimitEnv.js`). |
 | `SELF_INTRO_VIDEO_MAX_LENGTH` | Self intro recorder max seconds (`selfIntroVideoMaxLengthEnv.js`). |
+| `ALL_SINGLES_VIDEO_TUTORIAL` / `PICKS_POSTS_VIDEO_TUTORIAL` / `ACQUAINTS_BUDDIES_VIDEO_TUTORIAL` / `MYALBUM_VIDEO_TUTORIAL` / `MYSELFREPORTBIO_VIDEO_TUTORIAL` / `RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL` / `PROFILE_RECORDS_VIDEO_TUTORIAL` / `TOPRIGHT_VIDEO_TUTORIAL` | Per-menu **VIDEO TUTORIALS** header button (`pageVideoTutorialEnv.js`). |
 | `SCAN_FOR_PHONE_UPLOAD_SEC` | Also set in **`fe/.env`** when tuning desktop QR poll — `phoneUploadScanEnv.js`. |
 | `DIALOG_ZOOM`, `DIALOG_*_OFFSET` | Auth dialog tuning — prefer **`fe/.env`** `DIALOG_*` for width/margins. |
 | Rekognition / IDV | `SKIP_DL_PASSPORT_CHECK`, `SKIP_LIVE_FACE_SCAN`, etc. — BE only (`be-env.mdc`). |
