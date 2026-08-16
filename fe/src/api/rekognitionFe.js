@@ -65,7 +65,7 @@ export async function captureDriverLicenseFromIdImage({ idImage, documentType })
   return data;
 }
 
-/** Notify support@onlinemall.website for manual ID verification review (one email per dialog session). */
+/** Notify support@tutamall.com for manual ID verification review (one email per dialog session). */
 export async function postIdVerificationManualSupportEmail(payload) {
   const { data } = await api.post('/api/rekognition/manual-support-email', payload, { timeout: 120000 });
   return data;

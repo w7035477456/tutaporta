@@ -135,7 +135,7 @@ export default function PrivacyPolicy() {
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>8. Contact and Disputes</Typography>
                 <Typography variant="body1" paragraph>
-                  For privacy concerns or to exercise data rights, you can contact <strong>OnlineMall.Website</strong> at <strong>privacy@OnlineMall.Website</strong>.
+                  For privacy concerns or to exercise data rights, you can contact <strong>OnlineMall.Website</strong> at <strong>privacy@tutamall.com</strong>.
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>

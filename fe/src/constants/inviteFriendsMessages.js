@@ -1,6 +1,6 @@
 /** Post FB + Refer Email — body templates loaded from global.promotional_array; promo footer stays in code. */
 export const INVITE_FRIENDS_MESSAGE_PROMO_FOOTER =
-  "Get a free token to spend at the site, worth $10, when you sign up! (Learn how to earn more tokens on the site.) This promotion ends soon, so claim yours here: [Link]\n\nAlternatively, if you don't feel safe with links, then go directly to https://OnlineMall.Website/entertoken and enter code [Code].";
+  "Get a free token to spend at the site, worth $10, when you sign up! (Learn how to earn more tokens on the site.) This promotion ends soon, so claim yours here: [Link]\n\nAlternatively, if you don't feel safe with links, then go directly to https://tutamall.com/entertoken and enter code [Code].";
 
 export function formatInviteFriendsPromoFooter(referralUrl, referCode) {
   const code = String(referCode ?? '').trim();

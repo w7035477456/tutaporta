@@ -32,7 +32,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 // ===============================|| JWT - LOGIN ||=============================== //
 
 const MOBILE_LOGIN_NOTICE =
-  'We are smoothing final fixes to Mobile UI for Android and Iphone, so this application will be availble soon.  Mean while, please use dekstop browser for this website at URL https://OnlineMall.Website. Thank you for your patient';
+  'We are smoothing final fixes to Mobile UI for Android and Iphone, so this application will be availble soon.  Mean while, please use dekstop browser for this website at URL https://tutamall.com. Thank you for your patient';
 
 /** Avoid a bare max-height rule: mobile browsers change the layout viewport when the URL bar hides,
  *  which can flip (max-height: 667px) off and re-enable Sign In after the dialog closes.

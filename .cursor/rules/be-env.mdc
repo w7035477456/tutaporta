@@ -82,7 +82,7 @@ GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/signup/callback
 | Variable | Notes |
 |----------|-------|
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Web OAuth client (`be/routes/auth/googleSignupOAuth.js`). Same pair can power Record Vault Drive. |
-| `GOOGLE_OAUTH_REDIRECT_URI` | Must **exactly** match an Authorized redirect URI in Google Cloud Console → Credentials → that OAuth client. Mac: Vite `:3000` proxy path. Prod: `https://onlinemall.website/api/auth/google/signup/callback` (add both URIs on the same client). Missing match → `Error 400: redirect_uri_mismatch`. |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Must **exactly** match an Authorized redirect URI in Google Cloud Console → Credentials → that OAuth client. Mac: Vite `:3000` proxy path. Prod: `https://tutamall.com/api/auth/google/signup/callback` (add both URIs on the same client). Missing match → `Error 400: redirect_uri_mismatch`. |
 
 ## Live face scan
 
@@ -161,7 +161,7 @@ JWT_PUBLIC_KEY_PATH=/Users/a/.ssh/be/public_key.pem
 | `NODE_ENV` | `development` on Mac; `production` behind HTTPS in prod. |
 | `AUTH_COOKIE_SAMESITE` | `strict` when FE+BE same site; `none` only if cross-site cookies required (+ Secure). |
 | `AUTH_COOKIE_SECURE` | `false` on Mac HTTP; `true` behind HAProxy HTTPS in prod. |
-| `PUBLIC_APP_URL` | Mac: `http://localhost:3000`. Prod: HAProxy public hostname. |
+| `PUBLIC_APP_URL` | Mac: `http://localhost:3000`. Prod: `https://tutamall.com`. |
 | `DEV_ALLOWED_ORIGINS` | **Mac dev only** — comma-separated CORS origins (`be/server_be.js`). Do not use in production. |
 | `JWT_*_KEY_PATH` | RS256 key pair paths; not in repo. |
 
@@ -483,7 +483,7 @@ Mac `psql`: see `mac-psql-local.mdc`. **Writes** go to Primary; reads use local 
 ```bash
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=support@onlinemall.website
+SMTP_USER=support@tutamall.com
 SMTP_PASS=****
 ```
 

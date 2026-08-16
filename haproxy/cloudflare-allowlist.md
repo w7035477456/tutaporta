@@ -119,7 +119,7 @@ Express middleware is weaker than firewall; prefer firewall or HAProxy.
 
 If a phone scan shows **“Sorry, you have been blocked”** (Cloudflare page with a Ray ID), the request never reached your app. Desktop `/myStory` works; cellular browsers are often flagged by **Bot Fight Mode**, **OWASP**, or **rate limits**.
 
-**Fix in Cloudflare dashboard (zone onlinemall.website):**
+**Fix in Cloudflare dashboard (zone tutamall.com; also copy the same skip on onlinemall.website while the old name still redirects):**
 
 1. **Security → Events** — find the block; note the **Ray ID** and **rule**.
 2. **Security → WAF → Custom rules** — add a skip (or log-only) rule, e.g.:
@@ -127,6 +127,6 @@ If a phone scan shows **“Sorry, you have been blocked”** (Cloudflare page wi
    - **Action:** Skip all remaining custom rules (or skip Bot Fight Mode for that path).
 3. Or lower **Security Level** / disable **Bot Fight Mode** for verified mobile upload paths.
 
-**App-side (repo):** QR links use path tokens `https://onlinemall.website/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
+**App-side (repo):** QR links use path tokens `https://tutamall.com/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
 
-**Verify origin works (bypasses Cloudflare):** from a server on the LAN, `curl -I https://onlinemall.website/mobilePhotoUpload` should return `200` HTML. If only phones fail, it is Cloudflare—not Ubuntu/HAProxy.
+**Verify origin works (bypasses Cloudflare):** from a server on the LAN, `curl -I https://tutamall.com/mobilePhotoUpload` should return `200` HTML. If only phones fail, it is Cloudflare—not Ubuntu/HAProxy.

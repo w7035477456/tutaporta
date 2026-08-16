@@ -32,7 +32,7 @@ function defaultForwardedMessage({ referralUrl, referCode }) {
   return `Hey! I've been using this great dating website to meet real, verified people.
 If you sign up using my personal link below, we both each get a token to spend.
 ${referralUrl}
-(If you don't trust link then go to this website https://OnlineMall.Website/entertoken and enter this referee code ${referCode})`;
+(If you don't trust link then go to this website https://tutamall.com/entertoken and enter this referee code ${referCode})`;
 }
 
 function resolveForwardedMessage({ forwardedMessage, referralUrl, referCode }) {

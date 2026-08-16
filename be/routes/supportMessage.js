@@ -73,7 +73,7 @@ function normalizeAttachments(raw) {
 
 /**
  * POST /api/supportMessage — body: { name, email, message, attachments? }
- * Sends to support@onlinemall.website and CCs the submitter.
+ * Sends to support@tutamall.com and CCs the submitter.
  */
 export async function postSupportMessage(req, res) {
   try {

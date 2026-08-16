@@ -66,14 +66,14 @@ const customHtml = `
      style="width: 100%; max-width: 400px; border-radius: 8px;">
 
 <h1 style="color: var(--theme-primary-color);">We're Fine-Tuning Things</h1>
-        <h2>https://OnlineMall.Website</h1>
+        <h2>https://tutamall.com</h1>
         <p style="color: var(--theme-error-color);">We are currently performing some essential updates to improve your shopping experience at OnlineMall. We know this is inconvenient, and we sincerely apologize for the interruption.</p>
         <p>Our team is working hard to get everything back to normal as quickly as possible. We truly appreciate your patience and your support.</p>
         
         <div class="support-box">
             <p>Have urgent questions regarding your orders or account?</p>
             <p>Please reach out to us at: <br> 
-            <strong><a href="mailto:support@OnlineMall.Website">support@OnlineMall.Website</a></strong></p>
+            <strong><a href="mailto:support@tutamall.com">support@tutamall.com</a></strong></p>
         </div>
         <p><small>Thank you for being part of the OnlineMall.Website community.</small></p>
     </div>

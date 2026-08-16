@@ -1675,7 +1675,7 @@ if (!feBuilt) {
   );
 }
 if (feBuilt) {
-  // On Ubuntu: ensure both OnlineMall.Website and www.OnlineMall.Website route to this app so /assets/* (e.g. Login-*.js) are served.
+  // On Ubuntu: ensure both tutamall.com and www.tutamall.com route to this app so /assets/* (e.g. Login-*.js) are served.
   app.use(express.static(feDistPath, { index: false }));
 
   // SPA: all other GET routes serve index.html (no-cache so registration/auth get fresh code)

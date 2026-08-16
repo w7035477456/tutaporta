@@ -25043,7 +25043,7 @@ function getPublicAppUrl() {
     return String(override).trim().replace(/\/$/, "");
   }
   if (process.env.NODE_ENV === "production") {
-    return "https://OnlineMall.Website";
+    return "https://tutamall.com";
   }
   return "http://localhost:3000";
 }
@@ -64520,7 +64520,12 @@ function isAllowedOrigin(origin, allowedOrigins) {
   if (allowedOrigins.includes(origin)) return true;
   try {
     const host = new URL(origin).hostname.toLowerCase();
-    return host === "onlinemall.website" || host.endsWith(".onlinemall.website");
+    return (
+      host === "tutamall.com" ||
+      host.endsWith(".tutamall.com") ||
+      host === "onlinemall.website" ||
+      host.endsWith(".onlinemall.website")
+    );
   } catch {
     return false;
   }
@@ -64626,6 +64631,8 @@ var init_agentServer = __esm({
     init_recordVaultRoutes();
     DEFAULT_PORT = Number(process.env.RECORD_VAULT_BRIDGE_PORT || 49201);
     DEFAULT_ORIGINS = [
+      "https://tutamall.com",
+      "https://www.tutamall.com",
       "https://onlinemall.website",
       "https://www.onlinemall.website",
       "http://localhost:3000",

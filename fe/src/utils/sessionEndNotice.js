@@ -16,7 +16,7 @@ export function buildIdleLogoutMessage(minutes) {
 }
 
 export function buildSessionSupersededMessage() {
-  return 'Your account was signed in on another device. Please sign in again. If this wasn\'t you, protect your account by contacting Support at support@onlinemall.website.';
+  return 'Your account was signed in on another device. Please sign in again. If this wasn\'t you, protect your account by contacting Support at support@tutamall.com.';
 }
 
 export function buildSessionInvalidMessage() {

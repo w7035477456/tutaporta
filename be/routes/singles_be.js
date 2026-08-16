@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import pool from '../db/connection.js';
 import nodemailer from 'nodemailer';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../lib/emailFrom.js';
+import { getPublicAppUrl } from '../utils/publicAppUrl.js';
 import { enrichMailOptions, wrapEmailHtml } from '../lib/emailHtml.js';
 import { isAwsSmsConfigured, sendTransactionalSms } from '../lib/awsPinpointSms.js';
 import { generateSixDigitOtp, safeEqualOtp } from '../lib/smsOtp.js';
@@ -63,7 +64,7 @@ export const registerUser_FFFFFFFF = async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = Date.now() + TOKEN_EXPIRY_MS;
       await storeCreatePasswordToken(token, email, expiresAt);
-      const createPasswordLink = `https://OnlineMall.Website/pages/createPassword?token=${token}&email=${encodeURIComponent(email)}`;
+      const createPasswordLink = `${getPublicAppUrl()}/pages/createPassword?token=${token}&email=${encodeURIComponent(email)}`;
       const mailOptions = enrichMailOptions({
         from: OUTBOUND_EMAIL_FROM_HEADER,
         to: email,

@@ -104,7 +104,7 @@ export default function TermsAndConditions() {
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>8. Statutory Cancellation Rights</Typography>
                 <Typography variant="body1" paragraph>
-                  Residents of AZ, CA, CO, CT, IL, IA, MN, NY, NC, OH, RI, WI may have additional cancellation rights. Cancel via email: <strong>subscriptions@OnlineMall.Website</strong>.
+                  Residents of AZ, CA, CO, CT, IL, IA, MN, NY, NC, OH, RI, WI may have additional cancellation rights. Cancel via email: <strong>subscriptions@tutamall.com</strong>.
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>9. Mobile Messaging Terms</Typography>
                 <Typography variant="body1" paragraph>
@@ -125,7 +125,7 @@ export default function TermsAndConditions() {
                   </Typography>
                   <Typography component="li" variant="body1" sx={{ mb: 1 }}>
                     <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>
-                      <strong>Support:</strong> For assistance, reply &quot;<strong>HELP</strong>&quot; to any message or contact support at <strong>privacy@OnlineMall.Website</strong>.
+                      <strong>Support:</strong> For assistance, reply &quot;<strong>HELP</strong>&quot; to any message or contact support at <strong>privacy@tutamall.com</strong>.
                     </Box>
                   </Typography>
                   <Typography component="li" variant="body1" sx={{ mb: 1 }}>

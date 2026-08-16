@@ -7,7 +7,7 @@ Git LFS is unreliable here because Ubuntu often has no `git-lfs`).
 |------|------|
 | Mac `$USB_DMG_EXE` | Built by `usball` (local downloads) |
 | `usbzip/*.zip` | Local copy next to the repo (gitignored) |
-| Ubuntu `$STORAGE_FOLDER/USB_DMG_EXE` | Customer downloads on onlinemall.website |
+| Ubuntu `$STORAGE_FOLDER/USB_DMG_EXE` | Customer downloads on tutamall.com |
 
 ## Workflow
 
