@@ -3,6 +3,10 @@
 # Curls a few public URLs; on failure, SMS +17035477456 and a USB-speaker
 # tone that runs until the site is healthy again.
 #
+# SERVERDOWN_TEXT in ~/.ssh/be/.env (or SITE_UPTIME_SERVERDOWN_TEXT):
+#   ALL — 3 texts every 10 min, then 3 hourly, then once a day (default)
+#   1   — one text on outage, then silence until the site recovers
+#
 # Install (Ubuntu): sudo scripts/install-site-uptime-monitor.sh
 # Logs: ~/logs/site-uptime-monitor/monitor.log  and  sms-sent.log
 set -u
@@ -11,7 +15,7 @@ ENV_FILE="${SITE_UPTIME_ENV_FILE:-${HOME}/.ssh/be/.env}"
 LOG_DIR="${SITE_UPTIME_LOG_DIR:-${HOME}/logs/site-uptime-monitor}"
 INTERVAL_SEC="${SITE_UPTIME_INTERVAL_SEC:-30}"
 CURL_MAX_TIME="${SITE_UPTIME_CURL_MAX_TIME:-15}"
-# SMS while still down: 3 texts every 10 min, then 3 hourly, then once a day.
+# SMS while still down (SERVERDOWN_TEXT=ALL): 3 texts every 10 min, then 3 hourly, then once a day.
 FAST_SMS_SEC="${SITE_UPTIME_FAST_SMS_SEC:-600}"
 FAST_SMS_COUNT="${SITE_UPTIME_FAST_SMS_COUNT:-3}"
 HOURLY_SMS_SEC="${SITE_UPTIME_HOURLY_SMS_SEC:-3600}"
@@ -63,6 +67,11 @@ fi
 SMS_TO="${SITE_UPTIME_SMS_TO:-$(read_env_value SITE_UPTIME_SMS_TO "$ENV_FILE")}"
 if [[ -z "$SMS_TO" ]]; then
   SMS_TO="+17035477456"
+fi
+SERVERDOWN_TEXT="${SITE_UPTIME_SERVERDOWN_TEXT:-$(read_env_value SERVERDOWN_TEXT "$ENV_FILE")}"
+SERVERDOWN_TEXT="$(printf '%s' "$SERVERDOWN_TEXT" | tr '[:lower:]' '[:upper:]')"
+if [[ "$SERVERDOWN_TEXT" != "1" ]]; then
+  SERVERDOWN_TEXT="ALL"
 fi
 
 ts() {
@@ -261,13 +270,30 @@ reset_after_recovery() {
   clear_sms_state
   clear_logs_after_recovery
   DOWN=0
-  log_monitor "RECOVERED site is up — alarm stopped, logs cleared, SMS schedule reset (3x10min then 3x1h then daily)"
+  log_monitor "RECOVERED site is up — alarm stopped, logs cleared, SMS schedule reset (SERVERDOWN_TEXT=${SERVERDOWN_TEXT})"
+}
+
+sms_schedule_label() {
+  if [[ "$SERVERDOWN_TEXT" == "1" ]]; then
+    echo "1 text on outage"
+  else
+    echo "3x10min then 3x1h then daily"
+  fi
 }
 
 # Seconds to wait after SMS number `sent_count` before sending the next one.
-# 0 sent → send immediately; next 2 at 10 min; next 3 hourly; then daily.
+# ALL: 0 sent → send immediately; next 2 at 10 min; next 3 hourly; then daily.
+# 1: first text immediately; no further texts until recovery.
 next_sms_wait_sec() {
   local sent="$1"
+  if [[ "$SERVERDOWN_TEXT" == "1" ]]; then
+    if [[ "$sent" -eq 0 ]]; then
+      echo 0
+    else
+      echo 999999999
+    fi
+    return
+  fi
   if [[ "$sent" -lt "$FAST_SMS_COUNT" ]]; then
     if [[ "$sent" -eq 0 ]]; then
       echo 0
@@ -285,6 +311,10 @@ next_sms_wait_sec() {
 
 sms_phase_label() {
   local next_n=$(( ${1} + 1 ))
+  if [[ "$SERVERDOWN_TEXT" == "1" ]]; then
+    echo "once ${next_n}/1"
+    return
+  fi
   if [[ "$next_n" -le "$FAST_SMS_COUNT" ]]; then
     echo "10min ${next_n}/${FAST_SMS_COUNT}"
   elif [[ "$next_n" -le $((FAST_SMS_COUNT + HOURLY_SMS_COUNT)) ]]; then
@@ -368,6 +398,10 @@ maybe_send_failure_sms() {
   local now wait elapsed phase
   read_sms_state
   now="$(now_epoch)"
+  if [[ "$SERVERDOWN_TEXT" == "1" && "$SMS_SENT_COUNT" -ge 1 ]]; then
+    log_monitor "FAIL ${detail} sms=skipped SERVERDOWN_TEXT=1 already_sent=1"
+    return 0
+  fi
   wait="$(next_sms_wait_sec "$SMS_SENT_COUNT")"
   elapsed=$((now - SMS_LAST_EPOCH))
   if [[ "$SMS_SENT_COUNT" -gt 0 && "$elapsed" -lt "$wait" ]]; then
@@ -413,7 +447,7 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT INT TERM
 
-log_monitor "START v5 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} schedule=3x10min then 3x1h then daily immediate_on_new_outage=1 no_custom_friendly_name=1 alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ}"
+log_monitor "START v6 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} SERVERDOWN_TEXT=${SERVERDOWN_TEXT} schedule=$(sms_schedule_label) immediate_on_new_outage=1 no_custom_friendly_name=1 alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ}"
 
 DOWN=0
 while true; do

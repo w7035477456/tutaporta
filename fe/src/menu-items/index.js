@@ -4,6 +4,7 @@ import other from './other';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 import { PRIMARY_COLOR_CSS } from 'utils/themeConfig';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import { isSpeedDatingEnabled } from 'config/speedDatingEnv';
 import { settingsIcon } from 'config/menuIcons';
 
 // ==============================|| MENU ITEMS ||============================== //
@@ -35,7 +36,7 @@ const singlesOutgoingGroup = {
   type: 'group',
   title: '',
   children: [
-    ...pickChildren(dashboardKids, ['allSingles', 'speedDating', 'myPicks']),
+    ...pickChildren(dashboardKids, ['allSingles', ...(isSpeedDatingEnabled() ? ['speedDating'] : []), 'myPicks']),
     ...pickChildren(pagesKids, ['util-requests-sent'])
   ]
 };

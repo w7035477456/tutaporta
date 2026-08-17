@@ -241,6 +241,7 @@ Set on the backend env file; some are injected into the Vite bundle or exposed v
 | `PRICE_PER_TOKEN` | Token pricing display (`pricePerTokenEnv.js`). |
 | `FE_RATE_*` | Browser API rate limit (`clientApiRateLimitEnv.js`). |
 | `SELF_INTRO_VIDEO_MAX_LENGTH` | Self intro recorder max seconds (`selfIntroVideoMaxLengthEnv.js`). |
+| `SPEEDDATING` | `true` → show Speed Dating in the sidebar (`speedDatingEnv.js`). Else hide. |
 | `ALL_SINGLES_VIDEO_TUTORIAL` / `PICKS_POSTS_VIDEO_TUTORIAL` / `ACQUAINTS_BUDDIES_VIDEO_TUTORIAL` / `MYALBUM_VIDEO_TUTORIAL` / `MYSELFREPORTBIO_VIDEO_TUTORIAL` / `RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL` / `PROFILE_RECORDS_VIDEO_TUTORIAL` / `TOPRIGHT_VIDEO_TUTORIAL` | Per-menu **VIDEO TUTORIALS** header button (`pageVideoTutorialEnv.js`). |
 | `SCAN_FOR_PHONE_UPLOAD_SEC` | Also set in **`fe/.env`** when tuning desktop QR poll — `phoneUploadScanEnv.js`. |
 | `DIALOG_ZOOM`, `DIALOG_*_OFFSET` | Auth dialog tuning — prefer **`fe/.env`** `DIALOG_*` for width/margins. |

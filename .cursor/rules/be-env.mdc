@@ -34,6 +34,7 @@ Mac dev snapshot below. **Secrets are redacted in this doc** — keep real value
 Video goes **browser-to-browser**, not through the R630 web servers. App servers only persist pairing + SDP/ICE in Postgres.
 
 ```bash
+SPEEDDATING=false
 # SPEED_DATE_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
 # SPEED_DATE_TURN_URLS=turn:192.168.222.202:3478?transport=udp
 # SPEED_DATE_TURN_USERNAME=speeddate
@@ -42,6 +43,7 @@ Video goes **browser-to-browser**, not through the R630 web servers. App servers
 
 | Variable | Notes |
 |----------|-------|
+| `SPEEDDATING` | `true` → show the Speed Dating sidebar item (`fe/src/config/speedDatingEnv.js`). Any other value (or unset) hides it. Mirrored into the Vite FE bundle. Restart Vite / re-run FE build after changing. |
 | `SPEED_DATE_STUN_URLS` | Comma-separated STUN URLs. Default is Google public STUN. |
 | `SPEED_DATE_TURN_URLS` | Optional coturn relay on one R630 for guests behind strict NAT. Leave unset until coturn is running. |
 | `SPEED_DATE_TURN_USERNAME` / `SPEED_DATE_TURN_CREDENTIAL` | Required with TURN URLs. Do not commit secrets. |
@@ -529,12 +531,26 @@ FLORISTONE_PASSWORD=****
 
 Send-flowers integration (`be/routes/singles/sendFlower.js`). Accepts aliases `FLORISTONE_API_KEY`, `FLORISTONE_APIKEY`, etc.
 
+## Site uptime monitor (curl + SMS)
+
+Read by `scripts/site-uptime-monitor.sh` from **`~/.ssh/be/.env`** (not PM2). After changing, restart systemd: `sudo systemctl restart site-uptime-monitor`.
+
+```bash
+SERVERDOWN_TEXT=ALL
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `SERVERDOWN_TEXT` | `ALL` (default if unset) | While curl is down: 3 texts every 10 min, then 3 hourly, then once a day. |
+| `SERVERDOWN_TEXT` | `1` | Send **one** text on outage; no further SMS until the site recovers. |
+
 ## When changing these
 
 1. Edit `~/.ssh/be/.env` on the target machine (Mac vs server copy may differ).
 2. `pm2 restart onlinemallwebsite` on servers.
 3. Mac local BE: restart Node process after env change.
 4. Restart Vite if you change keys mirrored in **`fe/.env`**.
+5. After changing **`SERVERDOWN_TEXT`**: `sudo systemctl restart site-uptime-monitor` on the Ubuntu monitor host (not PM2).
 
 ## Agent — end of each task
 

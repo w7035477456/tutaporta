@@ -27,7 +27,8 @@ function parseSimpleEnvFile(raw) {
 }
 
 /** Keys mirrored from ~/.ssh/be/.env into process.env before Vite bundles the FE (see config/*.js).
- *  MAIN_FONT wins over fe/.env when set in ~/.ssh/be/.env (dotenv does not override process.env). */
+ *  MAIN_FONT wins over fe/.env when set in ~/.ssh/be/.env (dotenv does not override process.env).
+ *  SPEEDDATING — sidebar Speed Dating item (speedDatingEnv.js). */
 const BE_ENV_KEYS_FROM_HOME_FILE = [
   'SPECIAL_LINK',
   'SPECIAL_ID',
@@ -52,7 +53,8 @@ const BE_ENV_KEYS_FROM_HOME_FILE = [
   'MYSELFREPORTBIO_VIDEO_TUTORIAL',
   'RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL',
   'PROFILE_RECORDS_VIDEO_TUTORIAL',
-  'TOPRIGHT_VIDEO_TUTORIAL'
+  'TOPRIGHT_VIDEO_TUTORIAL',
+  'SPEEDDATING'
 ];
 
 function loadBeEnvKeysFromHomeFile() {
@@ -100,6 +102,7 @@ export default defineConfig(({ mode }) => {
       // DEFAULT_ — e.g. DEFAULT_THEME (see config/defaultThemeEnv.js)
       // ALBUM_ — e.g. ALBUM_BINDER_WIDTH_PCT (see config/albumBinderWidthEnv.js)
       // ALL_SINGLES_ / PICKS_ / ACQUAINT*_ / MYALBUM_ / … — page Video Tutorials URLs (pageVideoTutorialEnv.js)
+      // SPEEDDATING — sidebar Speed Dating item (speedDatingEnv.js); mirrored from ~/.ssh/be/.env
       envPrefix: [
       'VITE_',
       'FE_',
@@ -145,6 +148,7 @@ export default defineConfig(({ mode }) => {
       'RECEIVED_',
       'PROFILE_',
       'TOPRIGHT_',
+      'SPEEDDATING',
       'BSIZE'
     ],
     server: {
