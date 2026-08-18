@@ -159,7 +159,8 @@ function defaultCustomizationDbRow() {
     lyric_mute: false,
     lyric_volume: DEFAULT_NEW_USER_LYRIC_VOLUME,
     volume: DEFAULT_NEW_USER_VOLUME,
-    custom_music_url: customMusicUrlSlotsToDb(defaultCustomMusicUrlSlots())
+    custom_music_url: customMusicUrlSlotsToDb(defaultCustomMusicUrlSlots()),
+    all_singles_welcome_expanded: true
   };
 }
 
@@ -175,6 +176,7 @@ function rowToPayload(row) {
       volume: DEFAULT_NEW_USER_VOLUME,
       customMusicUrls: defaultCustomMusicUrlSlots(),
       loadDefault: true,
+      allSinglesWelcomeExpanded: true,
       ...mynotePrefsFromDbRow(null)
     };
   }
@@ -212,6 +214,8 @@ function rowToPayload(row) {
     loadDefault: parseLoadDefaultFlag(row),
     volume,
     customMusicUrls: normalizeCustomMusicUrlSlots(row.custom_music_url),
+    allSinglesWelcomeExpanded:
+      row.all_singles_welcome_expanded != null ? parseBooleanEnumRaw(row.all_singles_welcome_expanded) : true,
     ...mynotePrefsFromDbRow(row)
   };
 }
@@ -312,6 +316,7 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS mynote_editor_font_size_pt smallint NULL DEFAULT 20,
       ADD COLUMN IF NOT EXISTS mynote_note_scroll_top integer NULL,
       ADD COLUMN IF NOT EXISTS mynote_editor_caret_pos integer NULL,
+      ADD COLUMN IF NOT EXISTS all_singles_welcome_expanded helloworldjunktest.boolean_enum NOT NULL DEFAULT 'true'::helloworldjunktest.boolean_enum,
       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW()
   `);
   // Existing rows keep true (no one-time overwrite); new inserts default false until first Track Load Default.
@@ -514,12 +519,26 @@ async function selectCustomizationRow(me) {
              , mynote_last_notebook_id, mynote_last_note_id
              , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
              , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
+             , all_singles_welcome_expanded
        FROM helloworldjunktest.user_customization
        WHERE singles_id = $1`,
       [me]
     );
     return rows[0] ?? null;
   } catch (err) {
+    if (isMissingColumn(err, 'all_singles_welcome_expanded')) {
+      const { rows } = await pool.query(
+        `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
+               , custom_music_url, load_default
+               , mynote_last_notebook_id, mynote_last_note_id
+               , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
+               , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
+         FROM helloworldjunktest.user_customization
+         WHERE singles_id = $1`,
+        [me]
+      );
+      return rows[0] ?? null;
+    }
     if (isMissingColumn(err, 'load_default')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
@@ -592,18 +611,20 @@ async function upsertCustomizationRow(me, row) {
     mynoteDb.mynote_text_highlight_index ?? MYNOTE_DEFAULT_TEXT_HIGHLIGHT_INDEX,
     mynoteDb.mynote_editor_font_size ?? MYNOTE_DEFAULT_EDITOR_FONT_SIZE_PT,
     mynoteDb.mynote_note_scroll_top,
-    mynoteDb.mynote_editor_caret_pos
+    mynoteDb.mynote_editor_caret_pos,
+    toBooleanEnumLabel(row.all_singles_welcome_expanded !== false)
   ];
   const lyricMuteParam = sqlBooleanEnumParam('$6', 'helloworldjunktest');
+  const welcomeExpandedParam = sqlBooleanEnumParam('$18', 'helloworldjunktest');
   try {
     await pool.query(
       `
       INSERT INTO helloworldjunktest.user_customization (
         singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url,
         mynote_last_notebook_id, mynote_last_note_id, mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index,
-        mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, updated_at
+        mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, all_singles_welcome_expanded, updated_at
       )
-      VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+      VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, ${welcomeExpandedParam}, NOW())
       ON CONFLICT (singles_id) DO UPDATE SET
         chat_font_size = EXCLUDED.chat_font_size,
         mynote_font_size = EXCLUDED.mynote_font_size,
@@ -621,11 +642,45 @@ async function upsertCustomizationRow(me, row) {
         mynote_editor_font_size = EXCLUDED.mynote_editor_font_size,
         mynote_note_scroll_top = EXCLUDED.mynote_note_scroll_top,
         mynote_editor_caret_pos = EXCLUDED.mynote_editor_caret_pos,
+        all_singles_welcome_expanded = EXCLUDED.all_singles_welcome_expanded,
         updated_at = NOW()
       `,
       params
     );
   } catch (err) {
+    if (isMissingColumn(err, 'all_singles_welcome_expanded')) {
+      params.pop();
+      await pool.query(
+        `
+        INSERT INTO helloworldjunktest.user_customization (
+          singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url,
+          mynote_last_notebook_id, mynote_last_note_id, mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index,
+          mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, updated_at
+        )
+        VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+        ON CONFLICT (singles_id) DO UPDATE SET
+          chat_font_size = EXCLUDED.chat_font_size,
+          mynote_font_size = EXCLUDED.mynote_font_size,
+          sound_preference = EXCLUDED.sound_preference,
+          vsingles_lyric = EXCLUDED.vsingles_lyric,
+          lyric_mute = EXCLUDED.lyric_mute,
+          lyric_volume = EXCLUDED.lyric_volume,
+          volume = EXCLUDED.volume,
+          custom_music_url = EXCLUDED.custom_music_url,
+          mynote_last_notebook_id = EXCLUDED.mynote_last_notebook_id,
+          mynote_last_note_id = EXCLUDED.mynote_last_note_id,
+          mynote_content_bg_index = EXCLUDED.mynote_content_bg_index,
+          mynote_font_color_index = EXCLUDED.mynote_font_color_index,
+          mynote_text_highlight_index = EXCLUDED.mynote_text_highlight_index,
+          mynote_editor_font_size = EXCLUDED.mynote_editor_font_size,
+          mynote_note_scroll_top = EXCLUDED.mynote_note_scroll_top,
+          mynote_editor_caret_pos = EXCLUDED.mynote_editor_caret_pos,
+          updated_at = NOW()
+        `,
+        params
+      );
+      return;
+    }
     if (isMissingColumn(err, 'mynote_last_notebook_id')) {
       const legacyParams = [
         me,
@@ -754,6 +809,7 @@ export async function putUserCustomization(req, res) {
   const hasVolume = Object.prototype.hasOwnProperty.call(body, 'volume');
   const hasCustomMusicUrls = Object.prototype.hasOwnProperty.call(body, 'customMusicUrls');
   const hasMynoteFontSize = Object.prototype.hasOwnProperty.call(body, 'mynoteFontSize');
+  const hasAllSinglesWelcomeExpanded = Object.prototype.hasOwnProperty.call(body, 'allSinglesWelcomeExpanded');
   const hasAnyMynotePref = MYNOTE_PREFS_API_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
 
   if (
@@ -765,7 +821,8 @@ export async function putUserCustomization(req, res) {
     !hasLyricMute &&
     !hasLyricVolume &&
     !hasVolume &&
-    !hasCustomMusicUrls
+    !hasCustomMusicUrls &&
+    !hasAllSinglesWelcomeExpanded
   ) {
     return res.status(400).json({ error: 'No customization fields provided' });
   }
@@ -853,6 +910,11 @@ export async function putUserCustomization(req, res) {
     }
   }
 
+  let allSinglesWelcomeExpanded = null;
+  if (hasAllSinglesWelcomeExpanded) {
+    allSinglesWelcomeExpanded = parseBooleanEnumRaw(body.allSinglesWelcomeExpanded);
+  }
+
   try {
     await ensureCustomizationSchema();
     const prev = await selectCustomizationRow(me);
@@ -874,6 +936,11 @@ export async function putUserCustomization(req, res) {
     const nextCustomMusicUrls = hasCustomMusicUrls
       ? customMusicUrls
       : normalizeCustomMusicUrlSlots(prev?.custom_music_url);
+    const nextAllSinglesWelcomeExpanded = hasAllSinglesWelcomeExpanded
+      ? allSinglesWelcomeExpanded
+      : prev?.all_singles_welcome_expanded != null
+        ? parseBooleanEnumRaw(prev.all_singles_welcome_expanded)
+        : true;
 
     const nextMynotePrefs = hasAnyMynotePref
       ? { ...mynotePrefsFromDbRow(prev), ...mynotePatchResult.patch }
@@ -903,6 +970,7 @@ export async function putUserCustomization(req, res) {
       lyric_volume: nextLyricVolume,
       volume: nextVolume,
       custom_music_url: customMusicUrlSlotsToDb(nextCustomMusicUrls),
+      all_singles_welcome_expanded: nextAllSinglesWelcomeExpanded,
       ...nextMynoteDb
     });
     return res.status(200).json(rowToPayload({
@@ -914,6 +982,7 @@ export async function putUserCustomization(req, res) {
       lyric_volume: nextLyricVolume,
       volume: nextVolume,
       custom_music_url: customMusicUrlSlotsToDb(nextCustomMusicUrls),
+      all_singles_welcome_expanded: nextAllSinglesWelcomeExpanded,
       load_default: parseLoadDefaultFlag(prev),
       ...nextMynoteDb
     }));

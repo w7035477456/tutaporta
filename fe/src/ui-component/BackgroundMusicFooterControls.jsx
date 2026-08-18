@@ -123,7 +123,7 @@ export default function BackgroundMusicFooterControls({
     loadDefaultCustomMusicUrls,
     playCustomMusicFromSlot,
     setVolume,
-    muteFromFooter,
+    toggleMuteFromFooter,
     maxFromFooter
   } = useBackgroundMusic();
 
@@ -139,6 +139,13 @@ export default function BackgroundMusicFooterControls({
   const muteIconSize = speakerIconSizePx(isFooterMuted);
   const maxIconSize = speakerIconSizePx(!isFooterMuted);
   const muteSpeaker = muteSpeakerVisual(isFooterMuted);
+  const muteToggleLabel = isFooterMuted ? 'Unmute' : 'Mute';
+  const muteToggleAria = isFooterMuted ? 'Unmute music' : 'Mute music';
+
+  const handleMuteToggle = () => {
+    if (!preferenceLoaded) return;
+    void toggleMuteFromFooter();
+  };
 
   const handleSliderChange = (_e, value) => {
     const v = Array.isArray(value) ? value[0] : value;
@@ -296,19 +303,16 @@ export default function BackgroundMusicFooterControls({
             underline
             disabled={!preferenceLoaded}
             color={VSINGLES_TOOLBAR_RED}
-            onClick={() => {
-              if (!preferenceLoaded) return;
-              void muteFromFooter();
-            }}
+            onClick={handleMuteToggle}
           >
-            Mute
+            {muteToggleLabel}
           </VolumeControlLabel>
           <IconButton
             type="button"
             size="small"
-            onClick={() => void muteFromFooter()}
+            onClick={handleMuteToggle}
             disabled={!preferenceLoaded}
-            aria-label="Mute music"
+            aria-label={muteToggleAria}
             sx={muteSpeakerButtonSx(isFooterMuted, muteIconSize)}
           >
             <Box
@@ -379,19 +383,16 @@ export default function BackgroundMusicFooterControls({
           <VolumeControlLabel
             underline
             disabled={!preferenceLoaded}
-            onClick={() => {
-              if (!preferenceLoaded) return;
-              void muteFromFooter();
-            }}
+            onClick={handleMuteToggle}
           >
-            Mute
+            {muteToggleLabel}
           </VolumeControlLabel>
           <IconButton
             type="button"
             size="small"
-            onClick={() => void muteFromFooter()}
+            onClick={handleMuteToggle}
             disabled={!preferenceLoaded}
-            aria-label="Mute music"
+            aria-label={muteToggleAria}
             sx={muteSpeakerButtonSx(isFooterMuted, muteIconSize, { compact: true })}
           >
             <Box
@@ -467,12 +468,9 @@ export default function BackgroundMusicFooterControls({
           <VolumeControlLabel
             underline
             disabled={!preferenceLoaded}
-            onClick={() => {
-              if (!preferenceLoaded) return;
-              void muteFromFooter();
-            }}
+            onClick={handleMuteToggle}
           >
-            Mute
+            {muteToggleLabel}
           </VolumeControlLabel>
           {trackVisible ? (
             <VolumeControlLabel
@@ -512,9 +510,9 @@ export default function BackgroundMusicFooterControls({
             <IconButton
               type="button"
               size="small"
-              onClick={() => void muteFromFooter()}
+              onClick={handleMuteToggle}
               disabled={!preferenceLoaded}
-              aria-label="Mute music"
+              aria-label={muteToggleAria}
               sx={{
                 ...muteSpeakerButtonSx(isFooterMuted, muteIconSize),
                 transition: 'width 0.15s ease, height 0.15s ease'

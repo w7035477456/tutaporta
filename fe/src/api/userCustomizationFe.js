@@ -129,6 +129,12 @@ function parseLoadDefault(data) {
   return data.loadDefault === true || data.loadDefault === 'true';
 }
 
+function parseAllSinglesWelcomeExpanded(data) {
+  if (data?.allSinglesWelcomeExpanded === true || data?.allSinglesWelcomeExpanded === 'true') return true;
+  if (data?.allSinglesWelcomeExpanded === false || data?.allSinglesWelcomeExpanded === 'false') return false;
+  return true;
+}
+
 function mapCustomizationResponse(data) {
   return {
     chatFontSize: parseChatFontSize(data),
@@ -140,6 +146,7 @@ function mapCustomizationResponse(data) {
     volume: parseVolume(data),
     customMusicUrls: parseCustomMusicUrls(data),
     loadDefault: parseLoadDefault(data),
+    allSinglesWelcomeExpanded: parseAllSinglesWelcomeExpanded(data),
     ...parseMynoteEditorPrefs(data)
   };
 }
@@ -174,6 +181,9 @@ export async function saveUserCustomization(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'customMusicUrls')) {
     body.customMusicUrls = patch.customMusicUrls;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'allSinglesWelcomeExpanded')) {
+    body.allSinglesWelcomeExpanded = Boolean(patch.allSinglesWelcomeExpanded);
   }
   for (const key of MYNOTE_EDITOR_PREF_KEYS) {
     if (Object.prototype.hasOwnProperty.call(patch, key)) {

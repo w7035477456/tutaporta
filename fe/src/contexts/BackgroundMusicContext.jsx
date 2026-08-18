@@ -742,7 +742,7 @@ export function BackgroundMusicProvider({ children }) {
     }
   }, [user, applySavedCustomization]);
 
-  /** Left speaker: on /vsingles → lyric_volume 0; elsewhere force-close YouTube mini and mute. */
+  /** Left speaker: mute or toggle unmute. */
   const muteFromFooter = useCallback(async () => {
     if (useVsinglesLyricAudio) {
       return setLyricMuteAndSave(true);
@@ -759,6 +759,52 @@ export function BackgroundMusicProvider({ children }) {
       console.warn('[BackgroundMusic] failed to save mute preference', err);
     }
   }, [useVsinglesLyricAudio, setLyricMuteAndSave, customMusicUrl, closeCustomMusicAndMute, user, applySavedCustomization]);
+
+  const unmuteFromFooter = useCallback(async () => {
+    if (useVsinglesLyricAudio) {
+      if (lyricVolume <= 0) {
+        return setLyricVolumeAndSave(100, { flush: true });
+      }
+      return setLyricMuteAndSave(false);
+    }
+    const nextPref = 'piano';
+    setSoundPreference(nextPref);
+    const nextVolume = volume <= 0 ? 55 : volume;
+    if (volume <= 0) {
+      setVolume(nextVolume);
+    }
+    if (!user) return;
+    try {
+      const payload = volume <= 0 ? { soundPreference: nextPref, volume: nextVolume } : { soundPreference: nextPref };
+      const saved = await saveUserCustomization(payload);
+      applySavedCustomization(saved);
+    } catch (err) {
+      console.warn('[BackgroundMusic] failed to save unmute preference', err);
+    }
+  }, [
+    useVsinglesLyricAudio,
+    lyricVolume,
+    setLyricVolumeAndSave,
+    setLyricMuteAndSave,
+    volume,
+    user,
+    applySavedCustomization
+  ]);
+
+  const toggleMuteFromFooter = useCallback(async () => {
+    const mutedNow = useVsinglesLyricAudio ? lyricMute : customMusicUrl ? false : soundPreference === 'mute';
+    if (mutedNow) {
+      return unmuteFromFooter();
+    }
+    return muteFromFooter();
+  }, [
+    useVsinglesLyricAudio,
+    lyricMute,
+    customMusicUrl,
+    soundPreference,
+    unmuteFromFooter,
+    muteFromFooter
+  ]);
 
   /** Right speaker: max volume; on /vsingles sets lyric_volume 100. */
   const maxFromFooter = useCallback(async () => {
@@ -777,7 +823,7 @@ export function BackgroundMusicProvider({ children }) {
     }
   }, [useVsinglesLyricAudio, user, applySavedCustomization, setLyricVolumeAndSave]);
 
-  const isFooterMuted = useVsinglesLyricAudio ? lyricMute : soundPreference === 'mute';
+  const isFooterMuted = useVsinglesLyricAudio ? lyricMute : customMusicUrl ? false : soundPreference === 'mute';
   const footerVolume = useVsinglesLyricAudio ? lyricVolume : volume;
   const setFooterVolume = useVsinglesLyricAudio ? setLyricVolumeAndSave : setVolumeAndSave;
 
@@ -823,6 +869,8 @@ export function BackgroundMusicProvider({ children }) {
       toggleLyricMute,
       setVolume: setFooterVolume,
       muteFromFooter,
+      unmuteFromFooter,
+      toggleMuteFromFooter,
       maxFromFooter,
       registerSlideshowMusicUi,
       resetSlideshowMusicAutoStart,
@@ -857,6 +905,8 @@ export function BackgroundMusicProvider({ children }) {
       toggleLyricMute,
       setFooterVolume,
       muteFromFooter,
+      unmuteFromFooter,
+      toggleMuteFromFooter,
       maxFromFooter,
       registerSlideshowMusicUi,
       resetSlideshowMusicAutoStart,

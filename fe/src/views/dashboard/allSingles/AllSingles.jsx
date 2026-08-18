@@ -39,6 +39,7 @@ import {
 
 //import { useGetAllSingles } from 'api/allSinglesFe';
 import { useGetAllSingles, postMarkInterested } from '../../../api/allSinglesFe';
+import { fetchUserCustomization, saveUserCustomization } from '../../../api/userCustomizationFe';
 import { useSinglesPreferences } from '../../../api/singlesPreferencesFe';
 import { useAuth } from 'contexts/AuthContext';
 import ServiceNoticeModal from 'ui-component/ServiceNoticeModal';
@@ -249,7 +250,32 @@ export default function AllSingles() {
   const [instructionOpen, setInstructionOpen] = useState(false);
   const [welcomeExpanded, setWelcomeExpanded] = useState(true);
   const toggleWelcomeExpanded = useCallback(() => {
-    setWelcomeExpanded((open) => !open);
+    setWelcomeExpanded((open) => {
+      const next = !open;
+      void saveUserCustomization({ allSinglesWelcomeExpanded: next }).catch((err) => {
+        console.warn('[AllSingles] save welcome panel preference failed', err?.message ?? err);
+      });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const prefs = await fetchUserCustomization();
+        if (!cancelled) {
+          setWelcomeExpanded(prefs.allSinglesWelcomeExpanded !== false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[AllSingles] load welcome panel preference failed', err?.message ?? err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
