@@ -1750,6 +1750,7 @@ export default function PhotoAlbumsWorkspacePane({
   const noteEditorApiRef = useRef(null);
   const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
   const [inviteReviewOpen, setInviteReviewOpen] = useState(false);
+  const [inviteReviewSendResult, setInviteReviewSendResult] = useState(null);
   const [sharedAlbums, setSharedAlbums] = useState([]);
   const [selectedSharedAlbumId, setSelectedSharedAlbumId] = useState(null);
   const [sharedAlbumView, setSharedAlbumView] = useState(null);
@@ -7257,9 +7258,13 @@ export default function PhotoAlbumsWorkspacePane({
 
       <PhotoAlbumsInviteReviewDialog
         open={inviteReviewOpen}
-        onClose={() => setInviteReviewOpen(false)}
+        onClose={() => {
+          setInviteReviewOpen(false);
+          setInviteReviewSendResult(null);
+        }}
         noteId={selectedNote ? Number(selectedNote.note_id) : null}
         storageType={paneStorageType}
+        sendResult={inviteReviewSendResult}
       />
 
       <PhotoAlbumsOrderAlbumDialog
@@ -8032,7 +8037,8 @@ export default function PhotoAlbumsWorkspacePane({
                     albumSetName={activeAlbumSetName}
                     albumName={activeAlbumName}
                     onInvited={() => void refreshSharedAlbums()}
-                    onOpenReview={() => {
+                    onOpenReview={(sendResult) => {
+                      setInviteReviewSendResult(sendResult || null);
                       setInviteReviewOpen(true);
                     }}
                   />

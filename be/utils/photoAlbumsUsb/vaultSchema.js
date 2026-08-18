@@ -129,4 +129,7 @@ ALTER TABLE notes ADD COLUMN inner_unlock_locked_until TEXT;
 `;
 
 export const DEFAULT_BODY_TEXT = '';
-export const DEFAULT_NOTEBOOKS = ['Set 1', 'Set 2', 'Set 3'];
+/** Fresh vault / after format: one album-set. */
+export const DEFAULT_NOTEBOOKS = ['Set 1'];
+/** Albums created in each default set. */
+export const DEFAULT_NOTES_PER_NOTEBOOK = 2;

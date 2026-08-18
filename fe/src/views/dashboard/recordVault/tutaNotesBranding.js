@@ -26,6 +26,22 @@ export function tutaNotesStorageStripColor(storageType) {
 export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = 'TutaNotes on OneDrive';
 export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
+/** Volume name only — radio rows append " (vault, 61.9 GB, EXFAT)". */
+export function shortUsbVolumeName(label) {
+  const raw = String(label || '').trim();
+  if (!raw) return '';
+  const paren = raw.indexOf(' (');
+  if (paren > 0) return raw.slice(0, paren).trim();
+  return raw;
+}
+
+/** Tab / pane title: `TutaNotes on USB: (TutaUSB-1)` when a drive is selected. */
+export function formatUsbWorkspaceTitle(label) {
+  const name = shortUsbVolumeName(label);
+  if (!name) return TUTANOTES_USB_WORKSPACE_TITLE;
+  return `${TUTANOTES_USB_WORKSPACE_TITLE}: (${name})`;
+}
+
 export const TUTANOTES_VIDEO_TUTORIAL_LABEL = 'Click here for Tutorial';
 export const TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL = 'Click here for Tutorial';
 export const TUTANOTES_USB_VIDEO_TUTORIAL_LABEL = 'Click here for Tutorial';

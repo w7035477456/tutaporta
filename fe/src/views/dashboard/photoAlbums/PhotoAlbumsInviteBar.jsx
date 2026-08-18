@@ -55,14 +55,22 @@ export default function PhotoAlbumsInviteBar({
 
   const canInvite = Boolean(noteId && notebookId && storageType && !disabled);
 
+  const openReview = (sendResult) => {
+    onOpenReview?.(sendResult || null);
+  };
+
   const handleInvite = async () => {
     const trimmed = String(email || '').trim();
     if (!trimmed) {
-      setError('Enter an email address to invite.');
+      const message = 'Enter an email address to invite.';
+      setError(message);
+      openReview({ ok: false, email: '', message });
       return;
     }
     if (!canInvite) {
-      setError('Open an album before sending an invite.');
+      const message = 'Open an album before sending an invite.';
+      setError(message);
+      openReview({ ok: false, email: trimmed, message });
       return;
     }
     setBusy(true);
@@ -77,11 +85,15 @@ export default function PhotoAlbumsInviteBar({
         albumSetName,
         albumName
       });
-      setMessage(`Invitation sent to ${trimmed}`);
+      const message = `Invitation sent successfully to ${trimmed}.`;
+      setMessage(message);
       setEmail('');
       onInvited?.();
+      openReview({ ok: true, email: trimmed, message });
     } catch (err) {
-      setError(readPhotoAlbumsInviteError(err, 'Failed to send invitation'));
+      const message = readPhotoAlbumsInviteError(err, `Failed to send invitation to ${trimmed}.`);
+      setError(message);
+      openReview({ ok: false, email: trimmed, message });
     } finally {
       setBusy(false);
     }
@@ -117,7 +129,7 @@ export default function PhotoAlbumsInviteBar({
             variant="yellow"
             hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
             disabled={!canInvite}
-            onClick={() => onOpenReview?.()}
+            onClick={() => openReview(null)}
             aria-label="Review album invites"
             sx={inviteActionSx}
           >

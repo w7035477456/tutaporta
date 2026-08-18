@@ -53,6 +53,7 @@ import {
 import {
   DEFAULT_BODY_TEXT,
   DEFAULT_NOTEBOOKS,
+  DEFAULT_NOTES_PER_NOTEBOOK,
   NOTE_EXTRA_IMAGES_MIGRATION_SQL,
   VAULT_SCHEMA_SQL
 } from './vaultSchema.js';
@@ -476,12 +477,21 @@ function seedEmptyVault(db) {
       nbIdx
     ]);
     const nbId = queryOne(db, `SELECT last_insert_rowid() AS id`).id;
-    for (let noteIdx = 0; noteIdx < 3; noteIdx += 1) {
+    let firstNoteId = null;
+    for (let noteIdx = 0; noteIdx < DEFAULT_NOTES_PER_NOTEBOOK; noteIdx += 1) {
       const title = formatDefaultPhotoAlbumsNoteTitle(nbIdx + 1, noteIdx + 1);
       db.run(
         `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
          VALUES (?, ?, ?, ?, ?)`,
         [nbId, title, DEFAULT_BODY_TEXT, noteIdx, `${title} ${DEFAULT_BODY_TEXT}`.toLowerCase()]
+      );
+      const noteId = queryOne(db, `SELECT last_insert_rowid() AS id`).id;
+      if (noteIdx === 0) firstNoteId = noteId;
+    }
+    if (nbIdx === 0 && firstNoteId) {
+      db.run(
+        `INSERT INTO shortcuts (target_type, notebook_id, note_id, display_order) VALUES (?, ?, ?, ?)`,
+        ['note', nbId, firstNoteId, 0]
       );
     }
   }

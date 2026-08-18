@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
-import { greenButtonSx } from 'config/greenButton';
+import { greenButtonSx, GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
 
 /**
  * Green action button — UnSelectedButtonTemplate + BSIZE label, black border/text,
@@ -16,7 +16,7 @@ export default function GreenButton({ sx, singleLineLabel = true, children, ...r
   return (
     <UnSelectedButtonTemplate
       greenGreyStates
-      hoverScale={1}
+      hoverScale={GREEN_BUTTON_HOVER_SCALE}
       fitLabelWidth={false}
       singleLineLabel={singleLineLabel}
       transformOrigin="center center"

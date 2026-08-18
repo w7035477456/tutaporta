@@ -72,6 +72,15 @@ function youtubeEmbedVideoId(src) {
   }
 }
 
+function postYoutubeCommand(iframeWindow, func, args = []) {
+  if (!iframeWindow) return;
+  try {
+    iframeWindow.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  } catch {
+    // Ignore postMessage failures for non-YouTube iframes.
+  }
+}
+
 /** Site-wide piano / flute / rain — never on /vsingles (lyric is separate). */
 function GlobalBackgroundPlayer({ soundPreference, volume, vsinglesMediaPaused, pathname, customMusicUrl }) {
   const audioRef = useRef(null);
@@ -140,6 +149,7 @@ function GlobalCustomMusicPlayer({
   pathname,
   customMusicLoop,
   volume,
+  paused = false,
   onToggleLoop,
   onClose,
   slideshowMusicUiElevated = false,
@@ -208,28 +218,22 @@ function GlobalCustomMusicPlayer({
     const iframeWindow = iframeRef.current?.contentWindow;
     if (!iframeWindow) return undefined;
     const nextVolume = Math.min(100, Math.max(0, Math.trunc(Number(volume))));
-    try {
-      iframeWindow.postMessage(
-        JSON.stringify({
-          event: 'command',
-          func: 'setVolume',
-          args: [nextVolume]
-        }),
-        '*'
-      );
-      iframeWindow.postMessage(
-        JSON.stringify({
-          event: 'command',
-          func: nextVolume <= 0 ? 'mute' : 'unMute',
-          args: []
-        }),
-        '*'
-      );
-    } catch {
-      // Ignore postMessage failures for non-YouTube iframes.
+    postYoutubeCommand(iframeWindow, 'setVolume', [nextVolume]);
+    if (paused || nextVolume <= 0) {
+      postYoutubeCommand(iframeWindow, 'mute');
+    } else {
+      postYoutubeCommand(iframeWindow, 'unMute');
     }
     return undefined;
-  }, [iframeReady, volume, customMusicUrl, customMusicLoop, customMusicStartMuted]);
+  }, [iframeReady, volume, paused, customMusicUrl, customMusicLoop, customMusicStartMuted]);
+
+  useEffect(() => {
+    if (!iframeReady) return undefined;
+    const iframeWindow = iframeRef.current?.contentWindow;
+    if (!iframeWindow) return undefined;
+    postYoutubeCommand(iframeWindow, paused ? 'pauseVideo' : 'playVideo');
+    return undefined;
+  }, [iframeReady, paused, customMusicUrl]);
 
   if (!customMusicUrl || useVsinglesLyricAudio) return null;
   return (
@@ -338,6 +342,7 @@ GlobalCustomMusicPlayer.propTypes = {
   customMusicLoop: PropTypes.bool.isRequired,
   customMusicStartMuted: PropTypes.bool,
   volume: PropTypes.number.isRequired,
+  paused: PropTypes.bool,
   onToggleLoop: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
   slideshowMusicUiElevated: PropTypes.bool,
@@ -357,6 +362,7 @@ export function BackgroundMusicProvider({ children }) {
   /** false → first Track open should auto Load Default once. */
   const [loadDefault, setLoadDefault] = useState(true);
   const [customMusicUrl, setCustomMusicUrl] = useState(null);
+  const [customMusicPaused, setCustomMusicPaused] = useState(false);
   const [customMusicLoop, setCustomMusicLoop] = useState(true);
   const [customMusicStartMuted, setCustomMusicStartMuted] = useState(false);
   const [vsinglesMediaPaused, setVsinglesMediaPaused] = useState(false);
@@ -432,6 +438,7 @@ export function BackgroundMusicProvider({ children }) {
       setCustomMusicUrls(emptyCustomMusicUrlSlots());
       setLoadDefault(true);
       setCustomMusicUrl(null);
+      setCustomMusicPaused(false);
       setVsinglesMediaPaused(false);
       return undefined;
     }
@@ -628,6 +635,7 @@ export function BackgroundMusicProvider({ children }) {
       }
       setCustomMusicStartMuted(Boolean(startMuted) && !userInitiated);
       setCustomMusicUrl(normalized);
+      setCustomMusicPaused(false);
       setSoundPreference('mute');
       if (!user) return true;
       try {
@@ -659,6 +667,7 @@ export function BackgroundMusicProvider({ children }) {
 
   const stopCustomMusicPlayback = useCallback(() => {
     setCustomMusicUrl(null);
+    setCustomMusicPaused(false);
     setCustomMusicStartMuted(false);
   }, []);
 
@@ -732,6 +741,7 @@ export function BackgroundMusicProvider({ children }) {
 
   const closeCustomMusicAndMute = useCallback(async () => {
     setCustomMusicUrl(null);
+    setCustomMusicPaused(false);
     setSoundPreference('mute');
     if (!user) return;
     try {
@@ -742,13 +752,14 @@ export function BackgroundMusicProvider({ children }) {
     }
   }, [user, applySavedCustomization]);
 
-  /** Left speaker: mute or toggle unmute. */
+  /** Left speaker: mute or toggle unmute. Keep the YouTube mini-player; pause/resume in place. */
   const muteFromFooter = useCallback(async () => {
     if (useVsinglesLyricAudio) {
       return setLyricMuteAndSave(true);
     }
     if (customMusicUrl) {
-      return closeCustomMusicAndMute();
+      setCustomMusicPaused(true);
+      return;
     }
     setSoundPreference('mute');
     if (!user) return;
@@ -758,7 +769,7 @@ export function BackgroundMusicProvider({ children }) {
     } catch (err) {
       console.warn('[BackgroundMusic] failed to save mute preference', err);
     }
-  }, [useVsinglesLyricAudio, setLyricMuteAndSave, customMusicUrl, closeCustomMusicAndMute, user, applySavedCustomization]);
+  }, [useVsinglesLyricAudio, setLyricMuteAndSave, customMusicUrl, user, applySavedCustomization]);
 
   const unmuteFromFooter = useCallback(async () => {
     if (useVsinglesLyricAudio) {
@@ -766,6 +777,10 @@ export function BackgroundMusicProvider({ children }) {
         return setLyricVolumeAndSave(100, { flush: true });
       }
       return setLyricMuteAndSave(false);
+    }
+    if (customMusicUrl) {
+      setCustomMusicPaused(false);
+      return;
     }
     const nextPref = 'piano';
     setSoundPreference(nextPref);
@@ -786,13 +801,18 @@ export function BackgroundMusicProvider({ children }) {
     lyricVolume,
     setLyricVolumeAndSave,
     setLyricMuteAndSave,
+    customMusicUrl,
     volume,
     user,
     applySavedCustomization
   ]);
 
   const toggleMuteFromFooter = useCallback(async () => {
-    const mutedNow = useVsinglesLyricAudio ? lyricMute : customMusicUrl ? false : soundPreference === 'mute';
+    const mutedNow = useVsinglesLyricAudio
+      ? lyricMute
+      : customMusicUrl
+        ? customMusicPaused
+        : soundPreference === 'mute';
     if (mutedNow) {
       return unmuteFromFooter();
     }
@@ -801,6 +821,7 @@ export function BackgroundMusicProvider({ children }) {
     useVsinglesLyricAudio,
     lyricMute,
     customMusicUrl,
+    customMusicPaused,
     soundPreference,
     unmuteFromFooter,
     muteFromFooter
@@ -823,7 +844,11 @@ export function BackgroundMusicProvider({ children }) {
     }
   }, [useVsinglesLyricAudio, user, applySavedCustomization, setLyricVolumeAndSave]);
 
-  const isFooterMuted = useVsinglesLyricAudio ? lyricMute : customMusicUrl ? false : soundPreference === 'mute';
+  const isFooterMuted = useVsinglesLyricAudio
+    ? lyricMute
+    : customMusicUrl
+      ? customMusicPaused
+      : soundPreference === 'mute';
   const footerVolume = useVsinglesLyricAudio ? lyricVolume : volume;
   const setFooterVolume = useVsinglesLyricAudio ? setLyricVolumeAndSave : setVolumeAndSave;
 
@@ -933,6 +958,7 @@ export function BackgroundMusicProvider({ children }) {
           customMusicLoop={customMusicLoop}
           customMusicStartMuted={customMusicStartMuted}
           volume={volume}
+          paused={customMusicPaused}
           onToggleLoop={() => setCustomMusicLoop((prev) => !prev)}
           onClose={() => {
             void closeCustomMusicAndMute();

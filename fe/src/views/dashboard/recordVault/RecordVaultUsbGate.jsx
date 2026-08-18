@@ -86,6 +86,8 @@ export default function RecordVaultUsbGate({
   onUnlocked,
   onSkip,
   onOpenClicked,
+  /** Selected USB volume name (radio) — updates the USB tab / pane title immediately. */
+  onUsbLocationChange,
   proceedOpenToken = 0,
   /** Bumped when Access Gate formats USB after 5 wrong vault passwords. */
   accessFormatRefreshToken = 0,
@@ -421,6 +423,12 @@ export default function RecordVaultUsbGate({
     setUnlockGuard(null);
   }, []);
 
+  useEffect(() => {
+    const label = String(selectedPrimary?.label || '').trim();
+    if (!label) return;
+    onUsbLocationChange?.(label);
+  }, [onUsbLocationChange, selectedPrimary?.label, selectedPrimary?.mountPath]);
+
   const handleSelectBackup = useCallback((location) => {
     if (selectedPrimary?.mountPath === location?.mountPath) return;
     setSelectedBackup(location);
@@ -545,7 +553,8 @@ export default function RecordVaultUsbGate({
     setError('');
     setDragOverRole('');
     setPickerRefreshToken((value) => value + 1);
-  }, []);
+    onUsbLocationChange?.('');
+  }, [onUsbLocationChange]);
 
   const finishUsbUnlockSuccess = useCallback(() => {
     const pending = pendingAfterUnlockRef.current || 'open';
