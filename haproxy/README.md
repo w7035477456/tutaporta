@@ -2,6 +2,8 @@
 
 Config for HAProxy on **xbox2** (192.168.222.202). Backend: local webserver (127.0.0.1:40000) plus optional xbox3–xbox7 on port 40000.
 
+**Canonical host:** `https://onlinemall.website`. HAProxy 301s `www.onlinemall.website` to that apex (keep the Cloudflare `www` A record proxied so the name still resolves). Do not run www as a second live site — the production FE bundle calls `https://onlinemall.website/api/*`, so a www origin fails CORS/`/api/health` (Service Notice E3), and `__Host-` auth cookies cannot be shared across hosts. Faster equivalent at Cloudflare: **Rules → Redirect Rules** if hostname equals `www.onlinemall.website` → `https://onlinemall.website${uri}` 301.
+
 ## Deploy
 
 Copy config and Cloudflare IP lists to the server, then reload:

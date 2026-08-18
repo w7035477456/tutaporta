@@ -569,6 +569,19 @@ if (isProduction) {
   app.set('trust proxy', 1);
 }
 
+// Canonical host is the apex (https://onlinemall.website). Serving the SPA on www looks up
+// VITE_API_BASE_URL=https://onlinemall.website, which is a different origin — CORS then
+// fails /api/health and the UI shows Service Notice (E3). Redirect www → apex instead
+// of running two live hostnames (auth cookies are __Host- and cannot be shared).
+app.use((req, res, next) => {
+  const host = String(req.hostname || req.get('host') || '')
+    .split(':')[0]
+    .trim()
+    .toLowerCase();
+  if (host !== 'www.onlinemall.website') return next();
+  res.redirect(301, `https://onlinemall.website${req.originalUrl || '/'}`);
+});
+
 function normalizeOrigin(urlLike) {
   try {
     return new URL(String(urlLike || '').trim()).origin;

@@ -63,7 +63,7 @@ export function createLoginLogSessionToken() {
 }
 
 /**
- * Record demo/guest alias login (demo/demo, guest/guest).
+ * Record demo/guest alias login (demo, guest/guest).
  * Never throws to callers — login must succeed even if logging fails.
  *
  * @param {import('express').Request | null | undefined} req

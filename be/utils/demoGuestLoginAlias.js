@@ -1,6 +1,6 @@
 /**
  * Magic login aliases from the login form (not real singles emails).
- * - demo / demo  → dm2@gmail.com with guest_demo_login (UI restricted: menus/footer/tutorials + TutaNotes login panels)
+ * - demo  → dm2@gmail.com with guest_demo_login (password optional / ignored)
  * - guest / guest → dm4@gmail.com with guest_demo_login (same UI restriction)
  * Concurrent sessions are allowed for these aliases (exception to single-login Redis).
  */
@@ -20,9 +20,9 @@ export function resolveDemoGuestLoginAlias(loginId, password) {
   const pw = String(password ?? '')
     .trim()
     .toLowerCase();
-  if (!id || !pw) return null;
+  if (!id) return null;
 
-  if (id === 'demo' && pw === 'demo') {
+  if (id === 'demo') {
     return { email: DEMO_LOGIN_TARGET_EMAIL, guestDemoLogin: true };
   }
   if (id === 'guest' && pw === 'guest') {

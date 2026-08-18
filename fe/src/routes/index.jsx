@@ -1,4 +1,3 @@
-import { lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 
 // routes
@@ -6,8 +5,9 @@ import AppMusicLayout from 'layout/AppMusicLayout';
 import AuthenticationRoutes from './AuthenticationRoutes';
 import MainRoutes from './MainRoutes';
 import TooManyRequests from 'views/pages/tooManyRequests/TooManyRequests';
-import Loadable from 'ui-component/Loadable';
+import Loadable, { lazy } from 'ui-component/Loadable';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
+import ErrorBoundary from './ErrorBoundary';
 import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 
 const PhotoAlbumsFullscreenView = Loadable(lazy(() => import('views/dashboard/photoAlbums/PhotoAlbumsFullscreenView')));
@@ -20,6 +20,7 @@ const router = createBrowserRouter(
   [
     {
       element: <AppMusicLayout />,
+      errorElement: <ErrorBoundary />,
       children: [
         {
           path: '/tooManyRequests',

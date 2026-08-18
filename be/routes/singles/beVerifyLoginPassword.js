@@ -214,9 +214,9 @@ export async function beVerifyLoginPassword(req, res) {
     const loginId = typeof rawLoginId === 'string' ? rawLoginId.trim() : '';
     const rememberMe = parseRememberMe(rawRememberMe);
 
-    if (!loginId || !password) {
-      log('[beVerifyLoginPassword.js] reject: missing login identifier or password');
-      return res.status(400).json({ error: 'Email or phone and password are required' });
+    if (!loginId) {
+      log('[beVerifyLoginPassword.js] reject: missing login identifier');
+      return res.status(400).json({ error: 'Email or phone is required' });
     }
 
     const providedPassword = (password && typeof password === 'string') ? password.trim() : '';
@@ -259,6 +259,11 @@ export async function beVerifyLoginPassword(req, res) {
         req,
         loginLogSessionToken
       });
+    }
+
+    if (!providedPassword) {
+      log('[beVerifyLoginPassword.js] reject: missing password');
+      return res.status(400).json({ error: 'Email or phone and password are required' });
     }
 
     if (loginId.trim().toLowerCase() === TOOLS_ONLY_ADMIN_LOGIN_ID) {

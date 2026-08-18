@@ -1,4 +1,3 @@
-import { lazy } from 'react';
 import { Navigate } from 'react-router-dom';
 import RedirectPreservingLocation, { RedirectLegacyVettedFriendsMember } from './RedirectPreservingLocation';
 import { VETTED_FRIENDS_PATH } from './vettedFriendsPaths';
@@ -10,7 +9,7 @@ import { isSpeedDatingEnabled } from 'config/speedDatingEnv';
 
 // project imports
 import MainLayout from 'layout/MainLayout';
-import Loadable from 'ui-component/Loadable';
+import Loadable, { lazy } from 'ui-component/Loadable';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
 import AllSingles from '../views/dashboard/allSingles/AllSingles';
 import MyStory from '../views/dashboard/myStory/MyStory';

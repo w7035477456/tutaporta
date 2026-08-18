@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -85,6 +86,37 @@ const allSinglesVerifiedSealSx = {
   filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))'
 };
 
+const WELCOME_BANNER_BORDER = '#e53935';
+const WELCOME_COLLAPSED_LINE_CLAMP = 2;
+
+function WelcomeBannerChevron({ expanded, onToggle }) {
+  const Icon = expanded ? IconChevronUp : IconChevronDown;
+  return (
+    <Box
+      component="button"
+      type="button"
+      aria-label={expanded ? 'Collapse welcome text' : 'Expand welcome text'}
+      onClick={onToggle}
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        p: 0.15,
+        m: 0,
+        lineHeight: 0,
+        border: 'none',
+        borderRadius: '50%',
+        bgcolor: 'transparent',
+        color: WELCOME_BANNER_BORDER,
+        cursor: 'pointer',
+        '&:hover': { bgcolor: 'transparent', color: WELCOME_BANNER_BORDER }
+      }}
+    >
+      <Icon size={18} stroke={2.75} color="currentColor" />
+    </Box>
+  );
+}
+
 const FILTER_AGE_MIN = 18;
 const FILTER_AGE_MAX = 99;
 const FILTER_DISTANCE_MIN = 0;
@@ -165,6 +197,10 @@ export default function AllSingles() {
   const { preferences, preferencesLoading } = useSinglesPreferences();
 
   const [instructionOpen, setInstructionOpen] = useState(false);
+  const [welcomeExpanded, setWelcomeExpanded] = useState(true);
+  const toggleWelcomeExpanded = useCallback(() => {
+    setWelcomeExpanded((open) => !open);
+  }, []);
 
   useEffect(() => {
     if (!preferences || preferencesLoading) return;
@@ -367,20 +403,44 @@ export default function AllSingles() {
       center={<PageVideoTutorialsButton pageKey="allSingles" />}
         secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
     >
-      <Typography
-        component="div"
+      <Box
         sx={{
-          color: 'var(--theme-primary-color)',
-          fontSize: { xs: getMobileSinglesTextFontSizeVw(), sm: getDesktopTextFontSizeVw() },
-          lineHeight: 1.45,
-          whiteSpace: 'pre-line',
-          mb: downSM ? 1.5 : 2,
+          position: 'relative',
           flexShrink: 0,
-          px: { xs: 0.5, sm: 0 }
+          mb: downSM ? 1.5 : 2,
+          mx: { xs: 0.5, sm: 0 },
+          px: { xs: 1.25, sm: 1.75 },
+          pt: 0.25,
+          pb: 1.25,
+          border: `2px dashed ${WELCOME_BANNER_BORDER}`,
+          borderRadius: 1
         }}
       >
-        {ALL_SINGLES_WELCOME_BANNER_TEXT}
-      </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
+          <WelcomeBannerChevron expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} />
+          <WelcomeBannerChevron expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} />
+        </Box>
+        <Typography
+          component="div"
+          aria-expanded={welcomeExpanded}
+          sx={{
+            color: 'var(--theme-primary-color)',
+            fontSize: { xs: getMobileSinglesTextFontSizeVw(), sm: getDesktopTextFontSizeVw() },
+            lineHeight: 1.45,
+            whiteSpace: welcomeExpanded ? 'pre-line' : 'normal',
+            ...(welcomeExpanded
+              ? {}
+              : {
+                  display: '-webkit-box',
+                  WebkitLineClamp: WELCOME_COLLAPSED_LINE_CLAMP,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                })
+          }}
+        >
+          {ALL_SINGLES_WELCOME_BANNER_TEXT}
+        </Typography>
+      </Box>
       <Box
         data-suppress-touch-contextmenu="true"
         sx={{

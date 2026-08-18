@@ -1,7 +1,5 @@
-import { lazy } from 'react';
-
 // project imports
-import Loadable from 'ui-component/Loadable';
+import Loadable, { lazy } from 'ui-component/Loadable';
 import MinimalLayout from 'layout/MinimalLayout';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
 import { LIVE_FACE_SCAN_POPUP_PATH } from 'constants/liveFaceScanPopupRoute';

@@ -1,7 +1,22 @@
-import { Suspense } from 'react';
+import { lazy as reactLazy, Suspense } from 'react';
 
 // project imports
 import Loader from './Loader';
+import { tryHardReloadOnFailedDynamicImport } from 'utils/hardReloadOnStaleModule';
+
+/** Same as React.lazy, but Shift-Cmd-R-equivalent reload once on stale Vite chunks. */
+export function lazy(importer) {
+  return reactLazy(() =>
+    Promise.resolve()
+      .then(importer)
+      .catch((error) => {
+        if (tryHardReloadOnFailedDynamicImport(error)) {
+          return new Promise(() => {});
+        }
+        throw error;
+      })
+  );
+}
 
 export default function Loadable(Component) {
   if (!Component) {

@@ -1,12 +1,31 @@
+import { useEffect, useState } from 'react';
 import { isRouteErrorResponse, useRouteError } from 'react-router-dom';
 
 // material-ui
 import Alert from '@mui/material/Alert';
+import { isFailedDynamicImportError, tryHardReloadOnFailedDynamicImport } from 'utils/hardReloadOnStaleModule';
 
 // ==============================|| ELEMENT ERROR - COMMON ||============================== //
 
 export default function ErrorBoundary() {
   const error = useRouteError();
+  const staleModule = isFailedDynamicImportError(error);
+  const [reloadSkipped, setReloadSkipped] = useState(false);
+
+  useEffect(() => {
+    if (!staleModule) return undefined;
+    const started = tryHardReloadOnFailedDynamicImport(error);
+    if (!started) setReloadSkipped(true);
+    return undefined;
+  }, [error, staleModule]);
+
+  if (staleModule && !reloadSkipped) {
+    return null;
+  }
+
+  if (staleModule) {
+    return <Alert severity="error">This page failed to load. Hard-refresh (Shift-Cmd-R) and try again.</Alert>;
+  }
 
   if (isRouteErrorResponse(error)) {
     if (error.status === 404) {

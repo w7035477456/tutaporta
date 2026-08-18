@@ -10,8 +10,8 @@ const LoginDemoModeContext = createContext({
 });
 
 /**
- * Login page: restrict non–Sign In actions only when credentials are exactly
- * demo/demo or guest/guest. Otherwise Email, Password, Sign In, and signup stay allowed.
+ * Login page: restrict non–Sign In actions only when credentials are demo alias
+ * (login id "demo", any password) or guest/guest.
  */
 export function LoginDemoModeProvider({ children }) {
   const [credentials, setCredentials] = useState({ loginId: '', password: '' });

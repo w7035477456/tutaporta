@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from 'contexts/AuthContext';
 import { useLoginDemoMode } from 'contexts/LoginDemoModeContext';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { DEMO_LOGIN_PASSWORD_HINT, guestDemoAllowProps, isDemoLoginAliasId } from 'utils/guestDemoLogin';
 
 // material-ui
 import Button from '@mui/material/Button';
@@ -131,9 +131,12 @@ export default function AuthLogin() {
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
   const [mobileNoticeDismissed, setMobileNoticeDismissed] = useState(false);
   const [blockMobile, setBlockMobile] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const isMobileViewport = useCompactLoginViewport();
   const mobileLoginBlocked = blockMobile && isMobileViewport;
-  const isFormValid = email.trim().length > 0 && password.trim().length > 0;
+  const isDemoAliasLogin = isDemoLoginAliasId(email);
+  const passwordVisible = showPassword || isDemoAliasLogin;
+  const isFormValid = email.trim().length > 0 && (isDemoAliasLogin || password.trim().length > 0);
   const signInDisabled = mobileLoginBlocked || isLoading || !isFormValid || maxAttemptsReached;
 
   useEffect(() => {
@@ -174,9 +177,25 @@ export default function AuthLogin() {
 
   const dismissMobileNotice = useCallback(() => setMobileNoticeDismissed(true), []);
 
-  const [showPassword, setShowPassword] = useState(false);
+  const handleEmailChange = (event) => {
+    const next = event.target.value;
+    const nextIsDemo = isDemoLoginAliasId(next);
+    const prevIsDemo = isDemoLoginAliasId(email);
+    setEmail(next);
+    if (nextIsDemo && !prevIsDemo) {
+      setShowPassword(true);
+      setPassword(DEMO_LOGIN_PASSWORD_HINT);
+      return;
+    }
+    if (!nextIsDemo && prevIsDemo) {
+      setShowPassword(false);
+      setPassword((prev) => (prev === DEMO_LOGIN_PASSWORD_HINT ? '' : prev));
+    }
+  };
+
   const handleClickShowPassword = (event) => {
     if (blockDemoAction(event)) return;
+    if (isDemoAliasLogin) return;
     setShowPassword(!showPassword);
   };
 
@@ -278,7 +297,7 @@ export default function AuthLogin() {
             label="Email or Phone"
             type="text"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={handleEmailChange}
             name="email"
             autoComplete="username"
             required
@@ -301,11 +320,11 @@ export default function AuthLogin() {
           <ColorTemplate16InputTemplate
             id="outlined-adornment-password-login"
             label="Password"
-            type={showPassword ? 'text' : 'password'}
+            type={passwordVisible ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             name="password"
-            required
+            required={!isDemoAliasLogin}
             inputProps={{ onKeyDown: handleCredentialKeyDown }}
             endAdornment={
               <InputAdornment position="end">
@@ -316,7 +335,7 @@ export default function AuthLogin() {
                   edge="end"
                   sx={loginVisibilityIconButtonSx}
                 >
-                  {showPassword ? <Visibility /> : <VisibilityOff />}
+                  {passwordVisible ? <Visibility /> : <VisibilityOff />}
                 </IconButton>
               </InputAdornment>
             }
