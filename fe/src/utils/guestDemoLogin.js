@@ -11,6 +11,9 @@ export const DEMO_LOGIN_PASSWORD_HINT = '(not required for demo)';
 /** DOM marker for sidebar / footer / theme menu / orange help / TutaNotes login panels — clicks allowed in demo mode. */
 export const GUEST_DEMO_ALLOW_ATTR = 'data-guest-demo-allow';
 
+/** DOM marker for mutating actions that stay blocked even on otherwise-unrestricted demo pages. */
+export const GUEST_DEMO_BLOCK_ATTR = 'data-guest-demo-block';
+
 export function isGuestDemoLogin(user) {
   return Boolean(user?.guest_demo_login);
 }
@@ -45,4 +48,8 @@ export function isDemoGuestLoginAliasCredentials(loginId, password) {
 
 export function guestDemoAllowProps() {
   return { [GUEST_DEMO_ALLOW_ATTR]: 'true' };
+}
+
+export function guestDemoBlockProps() {
+  return { [GUEST_DEMO_BLOCK_ATTR]: 'true' };
 }

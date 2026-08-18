@@ -51,7 +51,7 @@ import { selfIntroVideoUrl, uploadPublicVaultMediaFile, isSelfIntroVideoPostingU
 import { resetProfilePhotoVetting } from 'api/checkrBioReviewFe';
 import { resetIdVerification } from 'api/vetBioVerificationServicesFe';
 import { isPilotUserCategory } from 'utils/memberCategory';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { openEmbeddedYoutubePlayer } from 'utils/embeddedYoutubePlayerEvents';
 import { SLIDE_SHOW_MUSIC_SLOT_INDEX } from 'api/userCustomizationFe';
 import {
@@ -3728,6 +3728,7 @@ export default function MyStory() {
           <UnSelectedButtonTemplate
             type="submit"
             disabled={!selectedPhotoId || makeProfileBusy}
+            {...guestDemoBlockProps()}
             sx={{
               position: 'relative',
               left: '50%',

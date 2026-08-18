@@ -24,7 +24,7 @@ import {
 import GreenButton from 'ui-component/GreenButton';
 import UserRound from 'assets/images/users/profile.jpeg';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { formatMemberLabel, getMemberDisplayLines } from 'utils/memberLabel';
 import {
@@ -876,6 +876,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                     <GreenButton
                       type="button"
                       disabled={!submitResponseEnabled || submitResponseBusy}
+                      {...guestDemoBlockProps()}
                       onClick={() => {
                         if (typeof onSubmitResponse === 'function' && selectedRow) {
                           void onSubmitResponse(selectedRow);
