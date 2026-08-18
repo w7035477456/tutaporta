@@ -675,9 +675,9 @@ function ColorTemplate11PostingLoadMoreBar({ feedHasMore, loadMoreBusy, feedLoad
   );
 }
 
-function ColorTemplate11PostingFeedPhotoZoomBar() {
+function ColorTemplate11PostingFeedPhotoZoomBar({ variant = 'full' }) {
   const { heightPx, setHeightPx } = useColorTemplate11PostingPhotoHeight();
-  return <ColorTemplate11PostingPhotoZoomBar heightPx={heightPx} onChangeHeight={setHeightPx} />;
+  return <ColorTemplate11PostingPhotoZoomBar heightPx={heightPx} onChangeHeight={setHeightPx} variant={variant} />;
 }
 
 function ColorTemplate11PostingFeed({
@@ -717,6 +717,7 @@ function ColorTemplate11PostingFeed({
   onLoadMore,
   renderPostExtra,
   photoFullscreenOverlayLines,
+  photoZoomBarVariant = 'full',
   sx
 }) {
   const postList = Array.isArray(posts) ? posts : [];
@@ -750,7 +751,9 @@ function ColorTemplate11PostingFeed({
       sx={sx}
     >
       <ColorTemplate11PostingPhotoHeightProvider postIds={postIds}>
-        {!loading && !error && hasPostingPhotos ? <ColorTemplate11PostingFeedPhotoZoomBar /> : null}
+        {!loading && !error && hasPostingPhotos && photoZoomBarVariant !== 'hidden' ? (
+          <ColorTemplate11PostingFeedPhotoZoomBar variant={photoZoomBarVariant === 'hint' ? 'hint' : 'full'} />
+        ) : null}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
             <CircularProgress size={24} />
@@ -868,6 +871,7 @@ ColorTemplate11PostingFeed.propTypes = {
   onLoadMore: PropTypes.func,
   renderPostExtra: PropTypes.func,
   photoFullscreenOverlayLines: PropTypes.arrayOf(PropTypes.string),
+  photoZoomBarVariant: PropTypes.oneOf(['full', 'hint', 'hidden']),
   sx: PropTypes.object
 };
 

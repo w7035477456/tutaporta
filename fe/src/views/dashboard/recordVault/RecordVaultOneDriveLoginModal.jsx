@@ -18,6 +18,7 @@ import TutaNotesRadioMark, {
 } from './TutaNotesRadioMark';
 import {
   tutaNotesFormatPostLoginButtonSx,
+  tutaNotesMoreChoicesButtonSx,
   tutaNotesOrangePostLoginButtonSx,
   tutaNotesPostLoginActionButtonSx,
   tutaNotesPostLoginButtonRowSx,
@@ -279,6 +280,8 @@ export default function RecordVaultOneDriveLoginModal({
   const [savedEmail, setSavedEmail] = useState('');
   const [typedEmail, setTypedEmail] = useState('');
   const [emailLoadElapsedSec, setEmailLoadElapsedSec] = useState(0);
+  /** Compact: Open + More Choices. Expanded: full 2×2 grid + signup footer. */
+  const [showMoreChoices, setShowMoreChoices] = useState(false);
   const savedEmailInitializedRef = useRef(false);
 
   const emailOptions = useMemo(() => dedupeEmails(savedEmails), [savedEmails]);
@@ -312,6 +315,7 @@ export default function RecordVaultOneDriveLoginModal({
   useEffect(() => {
     if (!open) {
       savedEmailInitializedRef.current = false;
+      setShowMoreChoices(false);
       return;
     }
     setTypedEmail('');
@@ -494,46 +498,69 @@ export default function RecordVaultOneDriveLoginModal({
                 </GreenButton>
 
                 <Box sx={tutaNotesPostLoginButtonRowSx}>
-                  <GreenButton
-                    type="button"
-                    singleLineLabel={false}
-                    disabled={!canOpenCloud}
-                    onClick={() => onOpenMyNote?.()}
-                    sx={tutaNotesPostLoginActionButtonSx}
-                  >
-                    {busy && sessionActive ? 'Opening…' : 'Open TutaNotes Cloud'}
-                  </GreenButton>
-                  <GreenButton
-                    type="button"
-                    singleLineLabel={false}
-                    disabled={!canViewOrBackupCloud}
-                    onClick={() => onViewOneDrive?.()}
-                    sx={tutaNotesYellowPostLoginButtonSx}
-                  >
-                    View OneDrive Cloud
-                  </GreenButton>
-                  <GreenButton
-                    type="button"
-                    singleLineLabel={false}
-                    disabled={!canViewOrBackupCloud}
-                    onClick={() => onBackupRestore?.()}
-                    sx={tutaNotesOrangePostLoginButtonSx}
-                  >
-                    Backup &amp; Restore Cloud
-                  </GreenButton>
-                  <GreenButton
-                    type="button"
-                    singleLineLabel={false}
-                    disabled={!canFormatCloud}
-                    onClick={() => onFormatMyNoteFolder?.()}
-                    sx={tutaNotesFormatPostLoginButtonSx}
-                  >
-                    Format TutaNotes Cloud
-                  </GreenButton>
+                  {showMoreChoices ? (
+                    <>
+                      <GreenButton
+                        type="button"
+                        singleLineLabel={false}
+                        onClick={() => setShowMoreChoices(false)}
+                        sx={tutaNotesPostLoginActionButtonSx}
+                      >
+                        Less Choices
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        singleLineLabel={false}
+                        disabled={!canViewOrBackupCloud}
+                        onClick={() => onViewOneDrive?.()}
+                        sx={tutaNotesYellowPostLoginButtonSx}
+                      >
+                        View OneDrive Cloud
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        singleLineLabel={false}
+                        disabled={!canViewOrBackupCloud}
+                        onClick={() => onBackupRestore?.()}
+                        sx={tutaNotesOrangePostLoginButtonSx}
+                      >
+                        Backup &amp; Restore Cloud
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        singleLineLabel={false}
+                        disabled={!canFormatCloud}
+                        onClick={() => onFormatMyNoteFolder?.()}
+                        sx={tutaNotesFormatPostLoginButtonSx}
+                      >
+                        Format TutaNotes Cloud
+                      </GreenButton>
+                    </>
+                  ) : (
+                    <>
+                      <GreenButton
+                        type="button"
+                        singleLineLabel={false}
+                        disabled={!canOpenCloud}
+                        onClick={() => onOpenMyNote?.()}
+                        sx={tutaNotesPostLoginActionButtonSx}
+                      >
+                        {busy && sessionActive ? 'Opening…' : 'Open TutaNotes Cloud'}
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        singleLineLabel={false}
+                        onClick={() => setShowMoreChoices(true)}
+                        sx={tutaNotesMoreChoicesButtonSx}
+                      >
+                        More Choices
+                      </GreenButton>
+                    </>
+                  )}
                 </Box>
               </Box>
 
-              {sessionActive && (!hasVault || needsReformat) ? (
+              {showMoreChoices && sessionActive && (!hasVault || needsReformat) ? (
                 <ColorTemplate16PopupCenterWide.SectionDescription
                   sx={{ color: 'var(--theme-yellow-color)', fontWeight: 700, mb: 0 }}
                 >
@@ -543,24 +570,28 @@ export default function RecordVaultOneDriveLoginModal({
                 </ColorTemplate16PopupCenterWide.SectionDescription>
               ) : null}
 
-              <Box sx={{ width: '100%' }}>
-                <ColorTemplate16PopupCenterWide.BodyText sx={{ mt: 0, mb: 0, width: '100%', textAlign: 'left', fontSize: '0.92rem' }}>
-                  Microsoft offer extremely cheap rate storage:
-                </ColorTemplate16PopupCenterWide.BodyText>
-                <ColorTemplate16PopupCenterWide.BodyText sx={{ mt: 0.25, mb: 0, width: '100%', textAlign: 'left', fontSize: '0.92rem' }}>
-                  * Free 5g Cloud Storage
-                </ColorTemplate16PopupCenterWide.BodyText>
-                <ColorTemplate16PopupCenterWide.BodyText sx={{ mt: 0.25, mb: 0, width: '100%', textAlign: 'left', fontSize: '0.92rem' }}>
-                  * Upgrade: $1.99/m or only $19.9/year for 100gb Cloud Storage
-                </ColorTemplate16PopupCenterWide.BodyText>
-              </Box>
+              {showMoreChoices ? (
+                <Box sx={{ width: '100%' }}>
+                  <ColorTemplate16PopupCenterWide.BodyText sx={{ mt: 0, mb: 0, width: '100%', textAlign: 'left', fontSize: '0.92rem' }}>
+                    Microsoft offer extremely cheap rate storage:
+                  </ColorTemplate16PopupCenterWide.BodyText>
+                  <ColorTemplate16PopupCenterWide.BodyText sx={{ mt: 0.25, mb: 0, width: '100%', textAlign: 'left', fontSize: '0.92rem' }}>
+                    * Free 5g Cloud Storage
+                  </ColorTemplate16PopupCenterWide.BodyText>
+                  <ColorTemplate16PopupCenterWide.BodyText sx={{ mt: 0.25, mb: 0, width: '100%', textAlign: 'left', fontSize: '0.92rem' }}>
+                    * Upgrade: $1.99/m or only $19.9/year for 100gb Cloud Storage
+                  </ColorTemplate16PopupCenterWide.BodyText>
+                </Box>
+              ) : null}
             </Box>
 
-            <Box sx={signupFooterSx}>
-              <OrangeButton type="button" onClick={handleOpenOneDriveSignup}>
-                Register new OneDrive
-              </OrangeButton>
-            </Box>
+            {showMoreChoices ? (
+              <Box sx={signupFooterSx}>
+                <OrangeButton type="button" onClick={handleOpenOneDriveSignup}>
+                  Register new OneDrive
+                </OrangeButton>
+              </Box>
+            ) : null}
 
             {!embedded ? (
               <Box sx={privacyGuaranteeBoxSx}>

@@ -16,6 +16,7 @@ import {
   tutaNotesOrangePostLoginButtonSx,
   tutaNotesPostLoginActionButtonSx,
   tutaNotesPostLoginButtonRowSx,
+  tutaNotesUsbMoreChoicesButtonSx,
   tutaNotesYellowPostLoginButtonSx
 } from './tutaNotesPostLoginActionButtonSx';
 import {
@@ -132,8 +133,14 @@ export default function RecordVaultUsbGate({
   const [privacyStorageLabel, setPrivacyStorageLabel] = useState('your chosen storage');
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
+  /** Compact: Open + More Choices. Expanded: full 2×2 post-login grid. Independent of Cloud. */
+  const [showMoreUsbChoices, setShowMoreUsbChoices] = useState(false);
   /** After unlock: 'open' → workspace, 'view' → View USB dialog, 'backup' → Backup dialog. */
   const pendingAfterUnlockRef = useRef('open');
+
+  useEffect(() => {
+    if (!open) setShowMoreUsbChoices(false);
+  }, [open]);
 
   useEffect(() => {
     setRecordVaultBridgeSinglesId(user?.singles_id ?? null);
@@ -796,54 +803,77 @@ export default function RecordVaultUsbGate({
 
   const usbPostLoginActions = (
     <Box sx={tutaNotesPostLoginButtonRowSx}>
-      <GreenButton
-        type="button"
-        singleLineLabel={false}
-        disabled={!canOpenUsb}
-        onClick={() => {
-          if (
-            onOpenClicked?.({ mountPath: selectedPrimary?.mountPath || '' }) === true
-          ) {
-            return;
-          }
-          void openUsbVault('open');
-        }}
-        {...guestDemoAllowProps()}
-        sx={tutaNotesPostLoginActionButtonSx}
-      >
-        Open TutaNotes USB
-      </GreenButton>
-      <GreenButton
-        type="button"
-        singleLineLabel={false}
-        disabled={!canViewOrBackupUsb}
-        onClick={() => {
-          void openUsbVault('view');
-        }}
-        sx={tutaNotesYellowPostLoginButtonSx}
-      >
-        View USB
-      </GreenButton>
-      <GreenButton
-        type="button"
-        singleLineLabel={false}
-        disabled={!canViewOrBackupUsb}
-        onClick={() => {
-          void openUsbVault('backup');
-        }}
-        sx={tutaNotesOrangePostLoginButtonSx}
-      >
-        Backup &amp; Restore USB
-      </GreenButton>
-      <GreenButton
-        type="button"
-        singleLineLabel={false}
-        disabled={!canFormatUsb}
-        onClick={() => void handleFormatUsb('primary')}
-        sx={tutaNotesFormatPostLoginButtonSx}
-      >
-        Format TutaNotes USB
-      </GreenButton>
+      {showMoreUsbChoices ? (
+        <>
+          <GreenButton
+            type="button"
+            singleLineLabel={false}
+            onClick={() => setShowMoreUsbChoices(false)}
+            sx={tutaNotesPostLoginActionButtonSx}
+          >
+            Less Choices
+          </GreenButton>
+          <GreenButton
+            type="button"
+            singleLineLabel={false}
+            disabled={!canViewOrBackupUsb}
+            onClick={() => {
+              void openUsbVault('view');
+            }}
+            sx={tutaNotesYellowPostLoginButtonSx}
+          >
+            View USB
+          </GreenButton>
+          <GreenButton
+            type="button"
+            singleLineLabel={false}
+            disabled={!canViewOrBackupUsb}
+            onClick={() => {
+              void openUsbVault('backup');
+            }}
+            sx={tutaNotesOrangePostLoginButtonSx}
+          >
+            Backup &amp; Restore USB
+          </GreenButton>
+          <GreenButton
+            type="button"
+            singleLineLabel={false}
+            disabled={!canFormatUsb}
+            onClick={() => void handleFormatUsb('primary')}
+            sx={tutaNotesFormatPostLoginButtonSx}
+          >
+            Format TutaNotes USB
+          </GreenButton>
+        </>
+      ) : (
+        <>
+          <GreenButton
+            type="button"
+            singleLineLabel={false}
+            disabled={!canOpenUsb}
+            onClick={() => {
+              if (
+                onOpenClicked?.({ mountPath: selectedPrimary?.mountPath || '' }) === true
+              ) {
+                return;
+              }
+              void openUsbVault('open');
+            }}
+            {...guestDemoAllowProps()}
+            sx={tutaNotesPostLoginActionButtonSx}
+          >
+            Open TutaNotes USB
+          </GreenButton>
+          <GreenButton
+            type="button"
+            singleLineLabel={false}
+            onClick={() => setShowMoreUsbChoices(true)}
+            sx={tutaNotesUsbMoreChoicesButtonSx}
+          >
+            More Choices
+          </GreenButton>
+        </>
+      )}
     </Box>
   );
 
@@ -997,13 +1027,13 @@ export default function RecordVaultUsbGate({
 
   const usbOnlyHints = (
     <Stack spacing={1.5} sx={{ mt: embedded ? 1 : 0 }}>
-      {localUsbVisible && storageBackend === 'usb' && !selectedPrimary ? (
+      {showMoreUsbChoices && localUsbVisible && storageBackend === 'usb' && !selectedPrimary ? (
         <ColorTemplate7PopupLargeDark.SectionDescription sx={{ color: 'var(--theme-yellow-color)', fontWeight: 700 }}>
           Choose a USB drive below for primary.
         </ColorTemplate7PopupLargeDark.SectionDescription>
       ) : null}
 
-      {localUsbVisible && storageBackend === 'usb' && selectedPrimary && !legacyPinVault ? (
+      {showMoreUsbChoices && localUsbVisible && storageBackend === 'usb' && selectedPrimary && !legacyPinVault ? (
         <ColorTemplate7PopupLargeDark.SectionDescription sx={{ color: 'var(--theme-yellow-color)', fontWeight: 700 }}>
           {selectedPrimary?.hasVault && !selectedPrimary?.partial
             ? 'Primary USB assigned. Use Open TutaNotes USB to continue.'
@@ -1011,7 +1041,7 @@ export default function RecordVaultUsbGate({
         </ColorTemplate7PopupLargeDark.SectionDescription>
       ) : null}
 
-      {legacyPinVault ? (
+      {showMoreUsbChoices && legacyPinVault ? (
         <ColorTemplate7PopupLargeDark.SectionDescription sx={{ color: 'var(--theme-yellow-color)', fontWeight: 700 }}>
           This folder has an older 6-digit PIN vault. Create a new vault in a different folder to use
           Encrypt Password vault protection.

@@ -268,6 +268,23 @@ export function colorTemplate11PostingPhotoFullscreenHintSx(overrides = {}) {
   };
 }
 
+/** Hint-only zoom bar (My Album&Posts) — no slider; message centered. */
+export function colorTemplate11PostingPhotoHintOnlyBarSx(overrides = {}) {
+  return colorTemplate11PostingPhotoZoomBarSx({
+    justifyContent: 'center',
+    ...overrides
+  });
+}
+
+export function colorTemplate11PostingPhotoHintOnlyTextSx(overrides = {}) {
+  return colorTemplate11PostingPhotoFullscreenHintSx({
+    ml: 0,
+    flex: '1 1 auto',
+    textAlign: 'center',
+    ...overrides
+  });
+}
+
 export function colorTemplate11PostingVisibilitySelectSx(overrides = {}) {
   return {
     ...yellowButtonVisibilitySelectSx({

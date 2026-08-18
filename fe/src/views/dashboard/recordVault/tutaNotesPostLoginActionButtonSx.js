@@ -106,3 +106,41 @@ export const tutaNotesFormatPostLoginButtonSx = {
     border: '3px solid rgba(0, 0, 0, 0.35) !important'
   }
 };
+
+/** Neutral gray — More Choices (Cloud login compact row). */
+export const tutaNotesMoreChoicesButtonSx = {
+  ...tutaNotesPostLoginActionButtonSx,
+  bgcolor: '#9e9e9e !important',
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  border: '1px solid #000000 !important',
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled)': {
+      bgcolor: '#8e8e8e !important',
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important',
+      border: '1px solid #000000 !important'
+    }
+  },
+  '&.Mui-disabled': {
+    bgcolor: '#bdbdbd !important',
+    color: 'rgba(0, 0, 0, 0.45) !important',
+    WebkitTextFillColor: 'rgba(0, 0, 0, 0.45) !important',
+    border: '1px solid rgba(0, 0, 0, 0.35) !important',
+    opacity: '1 !important'
+  }
+};
+
+/** Light blue — More Choices (USB login compact row). */
+export const tutaNotesUsbMoreChoicesButtonSx = {
+  ...tutaNotesMoreChoicesButtonSx,
+  bgcolor: '#90caf9 !important',
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled)': {
+      bgcolor: '#64b5f6 !important',
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important',
+      border: '1px solid #000000 !important'
+    }
+  }
+};

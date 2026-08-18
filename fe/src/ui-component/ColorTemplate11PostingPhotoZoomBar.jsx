@@ -10,6 +10,8 @@ import {
   COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT,
   colorTemplate11PostingPhotoFullscreenHintSx,
   colorTemplate11PostingPhotoHeightPxToVh,
+  colorTemplate11PostingPhotoHintOnlyBarSx,
+  colorTemplate11PostingPhotoHintOnlyTextSx,
   colorTemplate11PostingPhotoZoomBarSx,
   colorTemplate11PostingPhotoZoomIconButtonSx,
   colorTemplate11PostingPhotoZoomSliderSx,
@@ -17,7 +19,7 @@ import {
   getColorTemplate11PostingPhotoHeightBoundsPx
 } from 'config/colorTemplate11Posting';
 
-export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeHeight }) {
+export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeHeight, variant = 'full' }) {
   const { minPx, maxPx, stepPx } = useMemo(() => getColorTemplate11PostingPhotoHeightBoundsPx(), [heightPx]);
   const heightVh = colorTemplate11PostingPhotoHeightPxToVh(heightPx);
 
@@ -32,6 +34,16 @@ export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeH
   const handleZoomIn = () => {
     onChangeHeight?.(Math.min(maxPx, heightPx + stepPx));
   };
+
+  if (variant === 'hint') {
+    return (
+      <Box sx={colorTemplate11PostingPhotoHintOnlyBarSx()} role="note">
+        <Typography sx={colorTemplate11PostingPhotoHintOnlyTextSx()}>
+          {COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT}
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={colorTemplate11PostingPhotoZoomBarSx()} role="group" aria-label="Posting photo size">
@@ -73,5 +85,6 @@ export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeH
 
 ColorTemplate11PostingPhotoZoomBar.propTypes = {
   heightPx: PropTypes.number.isRequired,
-  onChangeHeight: PropTypes.func.isRequired
+  onChangeHeight: PropTypes.func.isRequired,
+  variant: PropTypes.oneOf(['full', 'hint'])
 };

@@ -3570,6 +3570,7 @@ export default function MyStory() {
                   scrollContainerRef={myStoryReviewFeedScrollRef}
                   loading={myPicksFeedLoading}
                   error={myPicksFeedError}
+                  photoZoomBarVariant="hint"
                   privacyMessage={
                     myPicksFeed && !myPicksFeed.can_view_private_posts && myPicksFeed.message ? myPicksFeed.message : undefined
                   }
