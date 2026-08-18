@@ -233,7 +233,7 @@ export default function ReceivedBioRequestsPage() {
     const captureNode = previewCaptureRef.current;
     if (!captureNode) {
       await themedAlert(
-        'Request preview is not visible. Select Approve for Brief Bio so the yellow preview box appears, then try again.'
+        'Request preview is not visible. Select Approve so the yellow preview box appears, then try again.'
       );
       clearSubmitResponseBusy(submitBusyKey);
       return;

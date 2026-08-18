@@ -31,9 +31,9 @@ import {
   calcBriefBioMatchPercent,
   calcFullBioMatchPercent,
   countIncomingBioRequestsPending,
-  formatIncomingBioApprovalStatusMessage,
   formatIncomingBioNotRequestedResponseMessage,
   formatIncomingBioRequestMessageParts,
+  formatIncomingBioYourResponseHeading,
   isApprovedViewingExpired,
   isApprovalLockedDuringStay,
   isBioRequestRequested,
@@ -294,7 +294,9 @@ export default function ReceivedBioRequestsBiographyLayout({
   const requesterPreviewPanel = useMemo(() => {
     if (!showRequesterPreview) return null;
 
-    if (!briefBioApproved) {
+    // Full Bio is a superset of Brief Bio (same as Vetted Friends). Approving Full
+    // must preview Brief + Full even when Brief was not separately requested.
+    if (!briefBioApproved && !fullBioApproved) {
       return { bioReview: null, empty: true, visibleSections: { brief: false, full: false, misc: false } };
     }
 
@@ -302,7 +304,7 @@ export default function ReceivedBioRequestsBiographyLayout({
       bioReview,
       empty: false,
       visibleSections: {
-        brief: true,
+        brief: briefBioApproved || fullBioApproved,
         full: fullBioApproved,
         misc: fullBioApproved
       }
@@ -465,22 +467,10 @@ export default function ReceivedBioRequestsBiographyLayout({
       : responsePanelEnabled
         ? radiosBusy || approveDenyLocked
         : radiosBusy;
-    const approvalStatusMessage = responsePanelEnabled
-      ? formatIncomingBioApprovalStatusMessage({
-          bioKind,
-          requestFlag,
-          savedApproval: effectiveSavedApproval,
-          approvalDate,
-          viewingDurationMonths: approvedViewingDurationMonths
-        })
-      : '';
     const notRequestedResponseMessage = showExpiredResetPanel
       ? formatIncomingBioNotRequestedResponseMessage(bioKind)
       : '';
-    const approveRadioLabel =
-      bioKind === 'brief'
-        ? 'Approve (Includes view-only access to Friends-only Album)'
-        : 'Approve (Includes 2-way chat, likes, repost, and comments)';
+    const approveRadioLabel = 'Approve';
 
     const handleRadioChange = (nextValue) => {
       if (!canRespondToBioRequest || approveDenyDisabled) return;
@@ -565,7 +555,9 @@ export default function ReceivedBioRequestsBiographyLayout({
               color: 'inherit'
             }}
           >
-            Your Response:
+            {responseBoxEnabled
+              ? formatIncomingBioYourResponseHeading(row, bioKind)
+              : 'Your Response:'}
           </Typography>
           <Box sx={{ position: 'relative' }}>
             {busy && responsePanelEnabled ? (
@@ -584,18 +576,6 @@ export default function ReceivedBioRequestsBiographyLayout({
                 }}
               >
                 {notRequestedResponseMessage}
-              </Typography>
-            ) : null}
-            {approvalStatusMessage ? (
-              <Typography
-                sx={{
-                  mb: 0.5,
-                  fontWeight: 700,
-                  lineHeight: 1.35,
-                  color: 'inherit'
-                }}
-              >
-                {approvalStatusMessage}
               </Typography>
             ) : null}
             <RadioGroup
@@ -807,7 +787,8 @@ export default function ReceivedBioRequestsBiographyLayout({
                 <Typography sx={{ color: 'var(--theme-primary-color)' }}>Select a member on the left.</Typography>
               ) : (
                 <>
-                  {(function renderBriefBioSection() {
+                  {briefBioRequested
+                    ? (function renderBriefBioSection() {
                     const briefMatchPercent = calcBriefBioMatchPercent(selectedRow);
                     return (
                       <Box
@@ -841,8 +822,10 @@ export default function ReceivedBioRequestsBiographyLayout({
                         </Box>
                       </Box>
                     );
-                  })()}
-                  {(function renderFullBioSection() {
+                  })()
+                    : null}
+                  {fullBioRequested
+                    ? (function renderFullBioSection() {
                     const fullMatchPercent = calcFullBioMatchPercent(selectedRow);
                     return (
                       <Box
@@ -876,7 +859,8 @@ export default function ReceivedBioRequestsBiographyLayout({
                         </Box>
                       </Box>
                     );
-                  })()}
+                  })()
+                    : null}
                   <Box
                     sx={{
                       display: 'flex',

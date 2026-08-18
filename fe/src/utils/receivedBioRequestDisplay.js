@@ -368,6 +368,23 @@ export function formatIncomingBioRequestMessage(row, bioKind) {
   return `${requesterLabel} ${statusPhrase}${trailingText}`.trim();
 }
 
+/** Heading inside the Your Response box when a request exists. */
+export function formatIncomingBioYourResponseHeading(row, bioKind) {
+  const alias = String(row?.alias || '').trim();
+  const requester =
+    alias ||
+    formatAliasWithMemberCode({
+      alias: row?.alias,
+      prefix: row?.prefix,
+      memberId: row?.member_id
+    }) ||
+    'this member';
+  if (bioKind === 'brief') {
+    return `Your response to ${requester} Request to 'view your Brief Bio':`;
+  }
+  return `Your response to ${requester} Request to 'view your Full Bio':`;
+}
+
 function countInfoMatches(vetRow, fieldNames) {
   if (!vetRow || !fieldNames.length) return 0;
   return fieldNames.reduce((count, field) => (isVetBioInfoMatches(vetRow[field]) ? count + 1 : count), 0);
