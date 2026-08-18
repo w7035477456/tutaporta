@@ -22,6 +22,8 @@ const LABEL_FONT_SIZE = buttonFontSizeResponsive;
 const ICON_BASE_PX = 32;
 const VSINGLES_TOOLBAR_RED = '#d32f2f';
 const VSINGLES_SLIDER_RAIL = 'rgba(255, 255, 255, 0.45)';
+const SPEAKER_PLAY_GREEN = '#43a047';
+const SPEAKER_MUTE_RED = '#e53935';
 
 function volumeAccent(v) {
   if (v <= 0) return '#9e9e9e';
@@ -39,6 +41,30 @@ function volumeLabelHoverSx() {
 function speakerIconSizePx(magnified) {
   const factor = getHoverMagnifyFactor();
   return magnified ? ICON_BASE_PX * factor : ICON_BASE_PX;
+}
+
+/** Left speaker: green + audioOn when playing; red + audioOff when muted. */
+function muteSpeakerVisual(isMuted) {
+  return {
+    src: isMuted ? audioOffImg : audioOnImg,
+    borderColor: isMuted ? SPEAKER_MUTE_RED : SPEAKER_PLAY_GREEN
+  };
+}
+
+function muteSpeakerButtonSx(isMuted, iconSize, { compact = false } = {}) {
+  const { borderColor } = muteSpeakerVisual(isMuted);
+  const pad = compact ? 0.25 : 0.5;
+  const extra = compact ? 4 : 8;
+  return {
+    flexShrink: 0,
+    p: pad,
+    width: iconSize + extra,
+    height: iconSize + extra,
+    border: `2px solid ${borderColor}`,
+    borderRadius: 1,
+    bgcolor: borderColor,
+    '&:hover': { bgcolor: borderColor }
+  };
 }
 
 function VolumeControlLabel({ children, onClick, disabled, align = 'left', underline = false, color }) {
@@ -112,6 +138,7 @@ export default function BackgroundMusicFooterControls({
   const trackVisible = showTrackLink;
   const muteIconSize = speakerIconSizePx(isFooterMuted);
   const maxIconSize = speakerIconSizePx(!isFooterMuted);
+  const muteSpeaker = muteSpeakerVisual(isFooterMuted);
 
   const handleSliderChange = (_e, value) => {
     const v = Array.isArray(value) ? value[0] : value;
@@ -282,18 +309,11 @@ export default function BackgroundMusicFooterControls({
             onClick={() => void muteFromFooter()}
             disabled={!preferenceLoaded}
             aria-label="Mute music"
-            sx={{
-              flexShrink: 0,
-              p: 0.5,
-              width: muteIconSize + 8,
-              height: muteIconSize + 8,
-              border: isFooterMuted ? `2px solid ${VSINGLES_TOOLBAR_RED}` : '2px solid transparent',
-              borderRadius: 1
-            }}
+            sx={muteSpeakerButtonSx(isFooterMuted, muteIconSize)}
           >
             <Box
               component="img"
-              src={audioOffImg}
+              src={muteSpeaker.src}
               alt=""
               sx={{ width: muteIconSize, height: muteIconSize, display: 'block', objectFit: 'contain' }}
             />
@@ -372,18 +392,11 @@ export default function BackgroundMusicFooterControls({
             onClick={() => void muteFromFooter()}
             disabled={!preferenceLoaded}
             aria-label="Mute music"
-            sx={{
-              flexShrink: 0,
-              p: 0.25,
-              width: muteIconSize + 4,
-              height: muteIconSize + 4,
-              border: isFooterMuted ? '2px solid var(--theme-error-color)' : '2px solid transparent',
-              borderRadius: 1
-            }}
+            sx={muteSpeakerButtonSx(isFooterMuted, muteIconSize, { compact: true })}
           >
             <Box
               component="img"
-              src={audioOffImg}
+              src={muteSpeaker.src}
               alt=""
               sx={{ width: muteIconSize, height: muteIconSize, display: 'block', objectFit: 'contain' }}
             />
@@ -503,18 +516,13 @@ export default function BackgroundMusicFooterControls({
               disabled={!preferenceLoaded}
               aria-label="Mute music"
               sx={{
-                flexShrink: 0,
-                p: 0.5,
-                width: muteIconSize + 8,
-                height: muteIconSize + 8,
-                border: isFooterMuted ? '2px solid var(--theme-error-color)' : '2px solid transparent',
-                borderRadius: 1,
+                ...muteSpeakerButtonSx(isFooterMuted, muteIconSize),
                 transition: 'width 0.15s ease, height 0.15s ease'
               }}
             >
               <Box
                 component="img"
-                src={audioOffImg}
+                src={muteSpeaker.src}
                 alt=""
                 sx={{
                   width: muteIconSize,

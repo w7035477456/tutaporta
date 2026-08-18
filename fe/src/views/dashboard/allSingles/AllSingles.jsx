@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -8,6 +8,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import Collapse from '@mui/material/Collapse';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Link from '@mui/material/Link';
@@ -51,6 +52,7 @@ import {
 } from 'config/singlesMemberCardFontEnv';
 import { isApiInfrastructureError } from 'utils/apiInfrastructureError';
 import { isToolsOnlyAdminSession } from 'utils/adminSession';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { formatMemberLabel, formatMemberNumber, getMemberDisplayLines } from 'utils/memberLabel';
 import {
   ALL_SINGLES_INSTRUCTION_CONTEXT_STEP,
@@ -86,33 +88,81 @@ const allSinglesVerifiedSealSx = {
   filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))'
 };
 
-const WELCOME_BANNER_BORDER = '#e53935';
-const WELCOME_COLLAPSED_LINE_CLAMP = 2;
+const WELCOME_PANEL_HEADER_BG = 'grey.300';
+const WELCOME_PANEL_CHEVRON_SIZE = 32;
+const WELCOME_PANEL_CHEVRON_STROKE = 4.5;
 
-function WelcomeBannerChevron({ expanded, onToggle }) {
-  const Icon = expanded ? IconChevronUp : IconChevronDown;
+function WelcomePanelChevron({ expanded, onToggle }) {
+  const ToggleIcon = expanded ? IconChevronDown : IconChevronRight;
   return (
     <Box
       component="button"
       type="button"
       aria-label={expanded ? 'Collapse welcome text' : 'Expand welcome text'}
       onClick={onToggle}
+      {...guestDemoAllowProps()}
       sx={{
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: 0.15,
+        p: 0,
         m: 0,
         lineHeight: 0,
         border: 'none',
-        borderRadius: '50%',
         bgcolor: 'transparent',
-        color: WELCOME_BANNER_BORDER,
+        color: 'var(--theme-primary-color)',
         cursor: 'pointer',
-        '&:hover': { bgcolor: 'transparent', color: WELCOME_BANNER_BORDER }
+        flexShrink: 0
       }}
     >
-      <Icon size={18} stroke={2.75} color="currentColor" />
+      <ToggleIcon size={WELCOME_PANEL_CHEVRON_SIZE} stroke={WELCOME_PANEL_CHEVRON_STROKE} />
+    </Box>
+  );
+}
+
+function AllSinglesWelcomePanel({ expanded, onToggle, downSM, children }) {
+  return (
+    <Box
+      sx={{
+        flexShrink: 0,
+        mb: downSM ? 1.5 : 2,
+        mx: { xs: 0.5, sm: 0 },
+        border: '1px solid',
+        borderColor: 'var(--theme-primary-color)',
+        borderRadius: 1,
+        overflow: 'hidden'
+      }}
+    >
+      <Box
+        aria-expanded={expanded}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          minHeight: 36,
+          px: 0.75,
+          py: 0.25,
+          border: 'none',
+          borderBottom: expanded ? '1px solid' : 'none',
+          borderColor: 'var(--theme-primary-color)',
+          bgcolor: WELCOME_PANEL_HEADER_BG
+        }}
+      >
+        <WelcomePanelChevron expanded={expanded} onToggle={onToggle} />
+        <WelcomePanelChevron expanded={expanded} onToggle={onToggle} />
+      </Box>
+      <Collapse in={expanded} timeout="auto">
+        <Box
+          sx={{
+            px: { xs: 1.25, sm: 1.75 },
+            py: 1.25,
+            bgcolor: 'var(--theme-secondary-color)'
+          }}
+        >
+          {children}
+        </Box>
+      </Collapse>
     </Box>
   );
 }
@@ -403,44 +453,19 @@ export default function AllSingles() {
       center={<PageVideoTutorialsButton pageKey="allSingles" />}
         secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
     >
-      <Box
-        sx={{
-          position: 'relative',
-          flexShrink: 0,
-          mb: downSM ? 1.5 : 2,
-          mx: { xs: 0.5, sm: 0 },
-          px: { xs: 1.25, sm: 1.75 },
-          pt: 0.25,
-          pb: 1.25,
-          border: `2px dashed ${WELCOME_BANNER_BORDER}`,
-          borderRadius: 1
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
-          <WelcomeBannerChevron expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} />
-          <WelcomeBannerChevron expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} />
-        </Box>
+      <AllSinglesWelcomePanel expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} downSM={downSM}>
         <Typography
           component="div"
-          aria-expanded={welcomeExpanded}
           sx={{
             color: 'var(--theme-primary-color)',
             fontSize: { xs: getMobileSinglesTextFontSizeVw(), sm: getDesktopTextFontSizeVw() },
             lineHeight: 1.45,
-            whiteSpace: welcomeExpanded ? 'pre-line' : 'normal',
-            ...(welcomeExpanded
-              ? {}
-              : {
-                  display: '-webkit-box',
-                  WebkitLineClamp: WELCOME_COLLAPSED_LINE_CLAMP,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
-                })
+            whiteSpace: 'pre-line'
           }}
         >
           {ALL_SINGLES_WELCOME_BANNER_TEXT}
         </Typography>
-      </Box>
+      </AllSinglesWelcomePanel>
       <Box
         data-suppress-touch-contextmenu="true"
         sx={{
