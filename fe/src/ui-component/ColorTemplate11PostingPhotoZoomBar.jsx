@@ -19,7 +19,7 @@ import {
   getColorTemplate11PostingPhotoHeightBoundsPx
 } from 'config/colorTemplate11Posting';
 
-export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeHeight, variant = 'full' }) {
+export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeHeight, variant = 'hint' }) {
   const { minPx, maxPx, stepPx } = useMemo(() => getColorTemplate11PostingPhotoHeightBoundsPx(), [heightPx]);
   const heightVh = colorTemplate11PostingPhotoHeightPxToVh(heightPx);
 

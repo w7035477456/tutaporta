@@ -1,4 +1,5 @@
-import pool from '../../db/connection.js';
+import pool, { getPostgresBusyPercent } from '../../db/connection.js';
+import appLog from '../../logger.js';
 import { resolveRequestsAppSchema } from './resolveRequestsAppSchema.js';
 import { sqlInterestedIsTrue } from './interestedSql.js';
 import {
@@ -44,6 +45,45 @@ async function ensureNotificationDismissSchemaReady() {
     throw err;
   });
   return notificationDismissSchemaPromise;
+}
+
+function picksFeedPoolSnapshot() {
+  try {
+    return {
+      pgBusyPct: getPostgresBusyPercent(pool),
+      total: pool?.totalCount ?? null,
+      idle: pool?.idleCount ?? null,
+      waiting: pool?.waitingCount ?? null
+    };
+  } catch {
+    return {};
+  }
+}
+
+function logPicksFeed(level, reqId, step, extra = {}) {
+  const payload = { reqId, step, pool: picksFeedPoolSnapshot(), ...extra };
+  if (level === 'error') appLog.error('[getMyPicksFeed]', payload);
+  else if (level === 'warn') appLog.warn('[getMyPicksFeed]', payload);
+  else appLog.info('[getMyPicksFeed]', payload);
+}
+
+async function timedPicksFeed(reqId, step, fn) {
+  const t0 = Date.now();
+  logPicksFeed('info', reqId, `${step}:start`);
+  try {
+    const result = await fn();
+    const ms = Date.now() - t0;
+    logPicksFeed(ms >= 1500 ? 'warn' : 'info', reqId, `${step}:done`, { ms });
+    return result;
+  } catch (err) {
+    logPicksFeed('error', reqId, `${step}:failed`, {
+      ms: Date.now() - t0,
+      message: err?.message,
+      code: err?.code,
+      stack: err?.stack
+    });
+    throw err;
+  }
 }
 
 function normalizeBool(value) {
@@ -648,20 +688,40 @@ export async function getMyPicksFeed(req, res) {
   const beforePostId = Number.isFinite(beforePostIdRaw) && beforePostIdRaw > 0 ? Math.trunc(beforePostIdRaw) : null;
   const visibilityFeedRaw = String(req.query?.visibilityFeed ?? '').trim().toLowerCase();
   const visibilityFeed = visibilityFeedRaw === 'friends' ? 'friends' : visibilityFeedRaw === 'public' ? 'public' : null;
+  const reqId = `picksFeed:${me}->${targetSinglesId}:${Date.now()}`;
+  const tStart = Date.now();
+  const heartbeat = setInterval(() => {
+    logPicksFeed('warn', reqId, 'still-running', {
+      ms: Date.now() - tStart,
+      url: req.originalUrl
+    });
+  }, 5000);
 
   try {
+    logPicksFeed('info', reqId, 'request', {
+      me,
+      targetSinglesId,
+      queryLimit,
+      visibilityFeed,
+      beforeCreatedAtIso,
+      beforePostId,
+      url: req.originalUrl
+    });
     logMyStoryPhotos('[getMyPicksFeed] request', { me, targetSinglesId });
     const isSelfFeed = me === targetSinglesId;
     if (!isSelfFeed) {
-      const activeCheck = await pool.query(
-        `SELECT 1
-         FROM helloworldjunktest.singles s
-         WHERE s.singles_id = $1
-           AND ${buildSinglesActiveStatusWhereSql('s')}
-         LIMIT 1`,
-        [targetSinglesId]
+      const activeCheck = await timedPicksFeed(reqId, 'activeCheck', () =>
+        pool.query(
+          `SELECT 1
+           FROM helloworldjunktest.singles s
+           WHERE s.singles_id = $1
+             AND ${buildSinglesActiveStatusWhereSql('s')}
+           LIMIT 1`,
+          [targetSinglesId]
+        )
       );
       if (!activeCheck.rows.length) {
+        logPicksFeed('info', reqId, 'empty-inactive-target', { ms: Date.now() - tStart });
         return res.json({
           target_singles_id: targetSinglesId,
           can_view_full_bio: false,
@@ -673,15 +733,20 @@ export async function getMyPicksFeed(req, res) {
         });
       }
     }
-    const requestSchema = await resolveRequestsAppSchema();
-    const postingsSchema = await resolvePostingsSchema();
+    const requestSchema = await timedPicksFeed(reqId, 'resolveRequestsAppSchema', () => resolveRequestsAppSchema());
+    const postingsSchema = await timedPicksFeed(reqId, 'resolvePostingsSchema', () => resolvePostingsSchema());
     logMyStoryPhotos('[getMyPicksFeed] schemas', { requestSchema, postingsSchema });
-    const [canViewPrivatePosts, canViewFriendsPosts, postingVisibilityColumn, postingRepostColumns] = await Promise.all([
-      canViewTargetFullBio(requestSchema, me, targetSinglesId),
-      canViewTargetFriendsPosts(requestSchema, me, targetSinglesId),
-      resolvePostingVisibilityColumn(postingsSchema),
-      resolvePostingRepostColumns(postingsSchema)
-    ]);
+    const [canViewPrivatePosts, canViewFriendsPosts, postingVisibilityColumn, postingRepostColumns] = await timedPicksFeed(
+      reqId,
+      'visibilityAndColumns',
+      () =>
+        Promise.all([
+          canViewTargetFullBio(requestSchema, me, targetSinglesId),
+          canViewTargetFriendsPosts(requestSchema, me, targetSinglesId),
+          resolvePostingVisibilityColumn(postingsSchema),
+          resolvePostingRepostColumns(postingsSchema)
+        ])
+    );
     const visibilityExpr = postingVisibilityExpr(postingVisibilityColumn, 'p');
     let privateVisibilityFilter = '';
     if (!isSelfFeed) {
@@ -700,7 +765,9 @@ export async function getMyPicksFeed(req, res) {
       }
     }
 
-    const hasPostingComments = await relationExists(postingsSchema, 'posting_comments');
+    const hasPostingComments = await timedPicksFeed(reqId, 'relationExists posting_comments', () =>
+      relationExists(postingsSchema, 'posting_comments')
+    );
     const ownerColumn = hasPostingComments ? await resolvePostingsOwnerColumn(postingsSchema) : null;
     const postingCommentCountExpr = hasPostingComments
       ? `COALESCE((
@@ -765,7 +832,8 @@ export async function getMyPicksFeed(req, res) {
          ON repost_src.singles_id = p.${postingRepostColumns.repostedFromSinglesId}`
       : '';
 
-    const posts = await pool.query(
+    const posts = await timedPicksFeed(reqId, 'postsQuery', () =>
+      pool.query(
       `SELECT
          p.post_id,
          p.content,
@@ -814,10 +882,16 @@ export async function getMyPicksFeed(req, res) {
        ORDER BY p.created_at DESC, p.post_id DESC
        LIMIT COALESCE($5::int, 1000000)`,
       [targetSinglesId, me, beforeCreatedAtIso, beforePostId, queryLimit ? queryLimit + 1 : null]
+      )
     );
 
     const hasMore = queryLimit != null ? posts.rows.length > queryLimit : false;
     const visibleRows = queryLimit != null ? posts.rows.slice(0, queryLimit) : posts.rows;
+    logPicksFeed('info', reqId, 'postsQuery:rows', {
+      rawRows: posts.rows.length,
+      visibleRows: visibleRows.length,
+      hasMore
+    });
     const lastRow = visibleRows.length ? visibleRows[visibleRows.length - 1] : null;
     const nextCursor = hasMore && lastRow
       ? {
@@ -860,16 +934,29 @@ export async function getMyPicksFeed(req, res) {
             : 'Only public posts are visible until Full Bio is approved (Buddies).'
         : '';
 
-    const feedClient = await pool.connect();
+    const feedClient = await timedPicksFeed(reqId, 'pool.connect media', () => pool.connect());
     let mediaUrlCorrections = new Map();
     try {
       const allPostingUrls = visibleRows.flatMap((row) =>
         (Array.isArray(row.photos) ? row.photos : []).map((photo) => photo?.photo_url)
       );
-      mediaUrlCorrections = await buildPostingMediaUrlCorrections(feedClient, targetSinglesId, allPostingUrls);
+      mediaUrlCorrections = await timedPicksFeed(reqId, 'buildPostingMediaUrlCorrections', () =>
+        buildPostingMediaUrlCorrections(feedClient, targetSinglesId, allPostingUrls)
+      );
     } finally {
       feedClient.release();
     }
+
+    const totalMs = Date.now() - tStart;
+    logPicksFeed(totalMs >= 1500 ? 'warn' : 'info', reqId, 'success', {
+      ms: totalMs,
+      postCount: visibleRows.length,
+      hasMore,
+      canViewPrivatePosts,
+      canViewFriendsPosts
+    });
+    res.setHeader('X-Picks-Feed-Ms', String(totalMs));
+    res.setHeader('X-Picks-Feed-Req-Id', reqId);
 
     return res.json({
       target_singles_id: targetSinglesId,
@@ -901,8 +988,16 @@ export async function getMyPicksFeed(req, res) {
       }))
     });
   } catch (error) {
+    logPicksFeed('error', reqId, 'unhandled', {
+      ms: Date.now() - tStart,
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack
+    });
     console.error('getMyPicksFeed error:', error);
     return res.status(500).json({ error: 'Failed to load My Picks feed' });
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 

@@ -162,11 +162,25 @@ export default function MyPicks() {
     usePostingFeedDelete(selectedSinglesId, { refetchFeed: refetchMyPicksFeed });
 
   const refreshPosts = useCallback(async () => {
+    console.info('[picks-posts-feed]', {
+      event: 'refreshPosts:start',
+      selectedSinglesId,
+      t: new Date().toISOString()
+    });
     setRefreshPostsBusy(true);
     try {
       await refetchMyPicksList();
       if (selectedSinglesId != null) await refetchMyPicksFeed();
       dispatchBellNotificationRefresh('posts');
+      console.info('[picks-posts-feed]', { event: 'refreshPosts:done', selectedSinglesId });
+    } catch (err) {
+      console.error('[picks-posts-feed]', {
+        event: 'refreshPosts:error',
+        selectedSinglesId,
+        message: err?.message,
+        status: err?.status
+      });
+      throw err;
     } finally {
       setRefreshPostsBusy(false);
     }
@@ -174,15 +188,30 @@ export default function MyPicks() {
 
   useEffect(() => {
     if (!myPicksFeed || Number(myPicksFeed.target_singles_id) !== Number(selectedSinglesId)) {
+      console.info('[picks-posts-feed]', {
+        event: 'page:feed-mismatch-clear',
+        selectedSinglesId,
+        feedTarget: myPicksFeed?.target_singles_id ?? null,
+        loading: myPicksFeedLoading,
+        error: myPicksFeedError?.message || null
+      });
       setFeedPosts([]);
       setFeedCursor(null);
       setFeedHasMore(false);
       return;
     }
-    setFeedPosts(Array.isArray(myPicksFeed.posts) ? myPicksFeed.posts : []);
+    const posts = Array.isArray(myPicksFeed.posts) ? myPicksFeed.posts : [];
+    console.info('[picks-posts-feed]', {
+      event: 'page:feed-applied',
+      selectedSinglesId,
+      postCount: posts.length,
+      hasMore: Boolean(myPicksFeed.has_more),
+      loading: myPicksFeedLoading
+    });
+    setFeedPosts(posts);
     setFeedCursor(myPicksFeed.next_cursor ?? null);
     setFeedHasMore(Boolean(myPicksFeed.has_more));
-  }, [myPicksFeed, selectedSinglesId]);
+  }, [myPicksFeed, selectedSinglesId, myPicksFeedLoading, myPicksFeedError]);
 
   /** Legacy: on each visit, same as Refresh Posts (duplicates SWR mount fetches). Off when VITE_MY_PICKS_LEGACY_REFRESH is not true. */
   useEffect(() => {
@@ -359,6 +388,12 @@ export default function MyPicks() {
       if (!Number.isFinite(limit) || limit < 1) return;
       if (loadMoreBusy || !feedHasMore || !feedCursor?.created_at || !feedCursor?.post_id) return;
       setLoadMoreBusy(true);
+      console.info('[picks-posts-feed]', {
+        event: 'load-more:start',
+        targetId,
+        limit,
+        beforePostId: feedCursor.post_id
+      });
       try {
         const page = await fetchMyPicksFeedPage(targetId, {
           limit,
@@ -367,6 +402,12 @@ export default function MyPicks() {
           visibilityFeed: 'public'
         });
         const nextPosts = Array.isArray(page?.posts) ? page.posts : [];
+        console.info('[picks-posts-feed]', {
+          event: 'load-more:ok',
+          targetId,
+          nextCount: nextPosts.length,
+          hasMore: page?.has_more
+        });
         setFeedPosts((prev) => {
           const seen = new Set(prev.map((post) => Number(post.post_id)));
           const merged = [...prev];
@@ -389,6 +430,12 @@ export default function MyPicks() {
         );
         setFeedHasMore(page?.has_more === true || page?.has_more === 1);
       } catch (err) {
+        console.error('[picks-posts-feed]', {
+          event: 'load-more:error',
+          targetId,
+          message: err?.message,
+          status: err?.status
+        });
         await themedAlert(err?.message || 'Failed to load older posts');
       } finally {
         setLoadMoreBusy(false);
@@ -1113,6 +1160,7 @@ export default function MyPicks() {
                 loading={myPicksFeedLoading}
                 error={myPicksFeedError}
                 nestedScroll={false}
+                photoZoomBarVariant="hint"
                 photoFullscreenOverlayLines={photoFullscreenOverlayLines}
                 privacyMessage={
                   myPicksFeed && !myPicksFeed.can_view_private_posts && myPicksFeed.message ? myPicksFeed.message : undefined

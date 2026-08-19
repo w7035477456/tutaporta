@@ -50,6 +50,8 @@ function buildEmbeddedYoutubeSrc(src, loopEnabled, { startMuted = false } = {}) 
     }
     if (typeof window !== 'undefined' && window.location?.origin) {
       embed.searchParams.set('origin', window.location.origin);
+      // YouTube Error 153 when the embed request has no Referer / origin identity.
+      embed.searchParams.set('widget_referrer', window.location.origin);
     }
     if (loopEnabled) {
       embed.searchParams.set('loop', '1');
@@ -326,6 +328,7 @@ function GlobalCustomMusicPlayer({
           startMuted: customMusicStartMuted
         })}
         title="Embedded Youtube Player"
+        referrerPolicy="strict-origin-when-cross-origin"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         onLoad={() => setIframeReady(true)}

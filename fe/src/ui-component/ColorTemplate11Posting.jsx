@@ -675,7 +675,7 @@ function ColorTemplate11PostingLoadMoreBar({ feedHasMore, loadMoreBusy, feedLoad
   );
 }
 
-function ColorTemplate11PostingFeedPhotoZoomBar({ variant = 'full' }) {
+function ColorTemplate11PostingFeedPhotoZoomBar({ variant = 'hint' }) {
   const { heightPx, setHeightPx } = useColorTemplate11PostingPhotoHeight();
   return <ColorTemplate11PostingPhotoZoomBar heightPx={heightPx} onChangeHeight={setHeightPx} variant={variant} />;
 }
@@ -717,11 +717,23 @@ function ColorTemplate11PostingFeed({
   onLoadMore,
   renderPostExtra,
   photoFullscreenOverlayLines,
-  photoZoomBarVariant = 'full',
+  photoZoomBarVariant = 'hint',
   sx
 }) {
   const postList = Array.isArray(posts) ? posts : [];
   const postIds = useMemo(() => postList.map((post) => post.post_id), [postList]);
+  useEffect(() => {
+    console.info('[picks-posts-feed]', {
+      event: 'ui:feed-render',
+      title,
+      loading: Boolean(loading),
+      error: error?.message || null,
+      errorStatus: error?.status || null,
+      postCount: postList.length,
+      loadMoreBusy: Boolean(loadMoreBusy),
+      feedHasMore: Boolean(feedHasMore)
+    });
+  }, [title, loading, error, postList.length, loadMoreBusy, feedHasMore]);
   const hasPostingPhotos = useMemo(
     () => postList.some((post) => Array.isArray(post.photos) && post.photos.length > 0),
     [postList]
@@ -752,7 +764,7 @@ function ColorTemplate11PostingFeed({
     >
       <ColorTemplate11PostingPhotoHeightProvider postIds={postIds}>
         {!loading && !error && hasPostingPhotos && photoZoomBarVariant !== 'hidden' ? (
-          <ColorTemplate11PostingFeedPhotoZoomBar variant={photoZoomBarVariant === 'hint' ? 'hint' : 'full'} />
+          <ColorTemplate11PostingFeedPhotoZoomBar variant={photoZoomBarVariant === 'full' ? 'full' : 'hint'} />
         ) : null}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>

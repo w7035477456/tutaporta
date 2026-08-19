@@ -7,6 +7,21 @@ import { normalizeApprovalStatus } from 'utils/approvalStatusEnum';
 import { galleryMediaUrlsFromRow } from 'utils/galleryMediaUrls';
 
 const API_BASE_URL = getApiBaseUrl();
+const PICKS_FEED_LOG = '[picks-posts-feed]';
+let picksFeedFetchSeq = 0;
+
+function picksFeedLog(level, event, extra = {}) {
+  const payload = {
+    t: new Date().toISOString(),
+    event,
+    path: typeof window !== 'undefined' ? window.location?.pathname : '',
+    online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+    ...extra
+  };
+  if (level === 'error') console.error(PICKS_FEED_LOG, payload);
+  else if (level === 'warn') console.warn(PICKS_FEED_LOG, payload);
+  else console.info(PICKS_FEED_LOG, payload);
+}
 
 function normalizePostingVisibility(value) {
   const raw = String(value ?? '').trim().toLowerCase();
@@ -25,6 +40,69 @@ const fetcher = async (url) => {
   }
   return response.json();
 };
+
+async function myPicksFeedFetcher(url) {
+  const reqId = `fe-${++picksFeedFetchSeq}-${Date.now()}`;
+  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const msNow = () => Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
+  picksFeedLog('info', 'fetch:start', { reqId, url });
+  try {
+    const response = await fetch(url, { credentials: 'include' });
+    const elapsed = msNow();
+    picksFeedLog(response.ok ? 'info' : 'error', 'fetch:response', {
+      reqId,
+      url,
+      status: response.status,
+      ok: response.ok,
+      ms: elapsed,
+      contentType: response.headers.get('content-type'),
+      serverMs: response.headers.get('x-picks-feed-ms'),
+      serverReqId: response.headers.get('x-picks-feed-req-id')
+    });
+    if (!response.ok) {
+      notifyRateLimit429(response.status);
+      let bodyPreview = '';
+      try {
+        bodyPreview = String(await response.text() || '').slice(0, 400);
+      } catch {
+        bodyPreview = '(unreadable body)';
+      }
+      picksFeedLog('error', 'fetch:http-error', {
+        reqId,
+        url,
+        status: response.status,
+        ms: elapsed,
+        bodyPreview
+      });
+      const httpErr = new Error(`Failed to fetch My Picks (${response.status})`);
+      httpErr.status = response.status;
+      httpErr.reqId = reqId;
+      httpErr.bodyPreview = bodyPreview;
+      throw httpErr;
+    }
+    const json = await response.json();
+    const postCount = Array.isArray(json?.posts) ? json.posts.length : null;
+    picksFeedLog('info', 'fetch:ok', {
+      reqId,
+      url,
+      ms: msNow(),
+      postCount,
+      hasMore: json?.has_more,
+      target: json?.target_singles_id
+    });
+    return json;
+  } catch (err) {
+    picksFeedLog('error', 'fetch:exception', {
+      reqId,
+      url,
+      ms: msNow(),
+      name: err?.name,
+      message: err?.message,
+      status: err?.status
+    });
+    throw err;
+  }
+}
 
 export async function postMyPosting(payload) {
   const response = await fetch(`${API_BASE_URL}/api/myPicks/posting`, {
@@ -443,7 +521,10 @@ export function fetchMyPicksFeedPage(targetSinglesId, options = {}) {
     params.set('visibilityFeed', visibilityFeed);
   }
   const suffix = params.toString() ? `?${params.toString()}` : '';
-  return fetcher(`${API_BASE_URL}/api/myPicks/feed/${targetId}${suffix}`).then((payload) => normalizeMyPicksFeedPayload(payload));
+  picksFeedLog('info', 'load-more:request', { targetId, options });
+  return myPicksFeedFetcher(`${API_BASE_URL}/api/myPicks/feed/${targetId}${suffix}`).then((payload) =>
+    normalizeMyPicksFeedPayload(payload)
+  );
 }
 
 function normalizePhotoUrl(value, photoId) {
@@ -543,10 +624,42 @@ export function useGetMyPicksFeed(targetSinglesId, options = {}) {
   }
   const queryString = params.toString();
   const url = canQuery ? `${API_BASE_URL}/api/myPicks/feed/${targetId}${queryString ? `?${queryString}` : ''}` : null;
-  const { data, error, isLoading, mutate } = useSWR(url, fetcher, {
+  const { data, error, isLoading, isValidating, mutate } = useSWR(url, myPicksFeedFetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: true
   });
+
+  useEffect(() => {
+    picksFeedLog('info', 'swr:state', {
+      url,
+      targetId: canQuery ? targetId : null,
+      isLoading,
+      isValidating,
+      hasData: Boolean(data),
+      postCount: Array.isArray(data?.posts) ? data.posts.length : null,
+      error: error?.message || null,
+      errorStatus: error?.status || null
+    });
+  }, [url, canQuery, targetId, isLoading, isValidating, data, error]);
+
+  useEffect(() => {
+    if (!url || (!isLoading && !isValidating)) return undefined;
+    const startedAt = Date.now();
+    const timers = [8000, 15000, 30000, 60000].map((ms) =>
+      setTimeout(() => {
+        picksFeedLog('warn', 'swr:still-loading', {
+          url,
+          waitedMs: Date.now() - startedAt,
+          thresholdMs: ms,
+          isLoading,
+          isValidating,
+          hasData: Boolean(data),
+          error: error?.message || null
+        });
+      }, ms)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [url, isLoading, isValidating, data, error]);
 
   const myPicksFeed = useMemo(() => normalizeMyPicksFeedPayload(data), [data, photosCacheBust]);
 
