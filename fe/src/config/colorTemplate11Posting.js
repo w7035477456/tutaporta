@@ -195,26 +195,48 @@ export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
     top: 0,
     zIndex: 4,
     display: 'flex',
-    alignItems: 'center',
-    gap: { xs: 0.75, sm: 1 },
-    px: { xs: 1, sm: 1.5 },
-    py: { xs: 0.75, sm: 1 },
-    bgcolor: 'var(--theme-secondary-color)',
-    borderBottom: '2px solid var(--theme-primary-color)',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 0.35,
     flexShrink: 0,
-    flexWrap: 'wrap',
     ...overrides
   };
 }
 
-/** Zoom −/+ icons, slider, and Nvh readout on the posting photo-size bar. */
-export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT = `var(${YELLOW_VAR})`;
+/** Yellow chrome row: red speaker + red thumb on a black track. */
+export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_BAR_BG = YELLOW_BUTTON_TEMPLATE_BG;
+export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER = `var(${ERROR_VAR})`;
+export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_TRACK = '#000000';
+export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT = COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER;
 
-export function colorTemplate11PostingPhotoZoomIconButtonSx(overrides = {}) {
+export function colorTemplate11PostingPhotoZoomChromeSx(overrides = {}) {
   return {
-    color: `${COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT} !important`,
+    display: 'flex',
+    alignItems: 'center',
+    gap: { xs: 0.75, sm: 1 },
+    px: { xs: 1, sm: 1.25 },
+    py: { xs: 0.45, sm: 0.55 },
+    bgcolor: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_BAR_BG,
+    border: '1px solid #000',
+    borderRadius: 0.5,
+    boxSizing: 'border-box',
     ...overrides
   };
+}
+
+export function colorTemplate11PostingPhotoZoomSpeakerSx(overrides = {}) {
+  return {
+    color: `${COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER} !important`,
+    flexShrink: 0,
+    p: 0.25,
+    fontSize: { xs: '1.05rem', sm: '1.2rem' },
+    lineHeight: 1,
+    ...overrides
+  };
+}
+
+export function colorTemplate11PostingPhotoZoomIconButtonSx(overrides = {}) {
+  return colorTemplate11PostingPhotoZoomSpeakerSx(overrides);
 }
 
 export function colorTemplate11PostingPhotoZoomVhLabelSx(overrides = {}) {
@@ -222,8 +244,8 @@ export function colorTemplate11PostingPhotoZoomVhLabelSx(overrides = {}) {
     minWidth: { xs: 34, sm: 40 },
     textAlign: 'right',
     fontWeight: 700,
-    color: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT,
-    WebkitTextFillColor: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT,
+    color: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER,
+    WebkitTextFillColor: COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER,
     fontSize: { xs: '0.8rem', sm: '0.9rem' },
     flexShrink: 0,
     ...overrides
@@ -231,39 +253,67 @@ export function colorTemplate11PostingPhotoZoomVhLabelSx(overrides = {}) {
 }
 
 export function colorTemplate11PostingPhotoZoomSliderSx(overrides = {}) {
-  const accent = COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_ACCENT;
+  const thumb = COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER;
+  const track = COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_TRACK;
   return {
-    color: accent,
+    color: thumb,
     flex: 1,
-    mx: 0.5,
+    mx: 0.25,
+    py: 0.75,
     '& .MuiSlider-thumb': {
-      width: 18,
-      height: 18,
-      bgcolor: `${accent} !important`,
+      width: 16,
+      height: 16,
+      bgcolor: `${thumb} !important`,
       border: '2px solid #000'
     },
     '& .MuiSlider-track': {
-      bgcolor: `${accent} !important`,
+      height: 4,
+      bgcolor: `${track} !important`,
       border: 'none'
     },
     '& .MuiSlider-rail': {
-      opacity: 0.45,
-      bgcolor: `${accent} !important`
+      height: 4,
+      opacity: 1,
+      bgcolor: `${track} !important`
+    },
+    '& .MuiSlider-mark': {
+      width: 2,
+      height: 8,
+      borderRadius: 0,
+      bgcolor: `${track} !important`,
+      opacity: 1
+    },
+    '& .MuiSlider-markActive': {
+      bgcolor: `${thumb} !important`
     },
     ...overrides
   };
 }
 
+export function colorTemplate11PostingPhotoZoomMarks(minPx, maxPx, stepPx) {
+  const min = Number(minPx);
+  const max = Number(maxPx);
+  const step = Math.max(1, Number(stepPx) || 1);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return [];
+  const span = max - min;
+  const markStep = Math.max(step, Math.round(span / 12 / step) * step);
+  const marks = [];
+  for (let value = min; value <= max; value += markStep) {
+    marks.push({ value });
+  }
+  if (marks[marks.length - 1]?.value !== max) marks.push({ value: max });
+  return marks;
+}
+
 export function colorTemplate11PostingPhotoFullscreenHintSx(overrides = {}) {
   return {
-    ml: { xs: 0, sm: 'auto' },
-    flex: { xs: '1 1 100%', sm: '0 1 auto' },
-    textAlign: { xs: 'center', sm: 'right' },
+    textAlign: 'center',
     fontWeight: 700,
-    color: '#ffffff',
-    WebkitTextFillColor: '#ffffff',
+    color: 'var(--theme-primary-color)',
+    WebkitTextFillColor: 'var(--theme-primary-color)',
     fontSize: colorTemplate11PostingTextFontSize,
     lineHeight: 1.2,
+    px: 0.5,
     ...overrides
   };
 }

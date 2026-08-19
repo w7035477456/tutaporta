@@ -1,11 +1,10 @@
 import PropTypes from 'prop-types';
 import { useMemo } from 'react';
 import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMagnifyingGlassMinus, faMagnifyingGlassPlus } from '@fortawesome/free-solid-svg-icons';
+import { faVolumeHigh } from '@fortawesome/free-solid-svg-icons';
 import {
   COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT,
   colorTemplate11PostingPhotoFullscreenHintSx,
@@ -13,9 +12,10 @@ import {
   colorTemplate11PostingPhotoHintOnlyBarSx,
   colorTemplate11PostingPhotoHintOnlyTextSx,
   colorTemplate11PostingPhotoZoomBarSx,
-  colorTemplate11PostingPhotoZoomIconButtonSx,
+  colorTemplate11PostingPhotoZoomChromeSx,
+  colorTemplate11PostingPhotoZoomMarks,
   colorTemplate11PostingPhotoZoomSliderSx,
-  colorTemplate11PostingPhotoZoomVhLabelSx,
+  colorTemplate11PostingPhotoZoomSpeakerSx,
   getColorTemplate11PostingPhotoHeightBoundsPx
 } from 'config/colorTemplate11Posting';
 
@@ -27,13 +27,7 @@ export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeH
     onChangeHeight?.(newValue);
   };
 
-  const handleZoomOut = () => {
-    onChangeHeight?.(Math.max(minPx, heightPx - stepPx));
-  };
-
-  const handleZoomIn = () => {
-    onChangeHeight?.(Math.min(maxPx, heightPx + stepPx));
-  };
+  const marks = useMemo(() => colorTemplate11PostingPhotoZoomMarks(minPx, maxPx, stepPx), [minPx, maxPx, stepPx]);
 
   if (variant === 'hint') {
     return (
@@ -47,38 +41,27 @@ export default function ColorTemplate11PostingPhotoZoomBar({ heightPx, onChangeH
 
   return (
     <Box sx={colorTemplate11PostingPhotoZoomBarSx()} role="group" aria-label="Posting photo size">
-      <IconButton
-        size="small"
-        onClick={handleZoomOut}
-        disabled={heightPx <= minPx}
-        aria-label="Smaller posting photos"
-        sx={colorTemplate11PostingPhotoZoomIconButtonSx()}
-      >
-        <FontAwesomeIcon icon={faMagnifyingGlassMinus} />
-      </IconButton>
-      <Slider
-        value={heightPx}
-        onChange={handleSliderChange}
-        min={minPx}
-        max={maxPx}
-        step={stepPx}
-        size="small"
-        sx={colorTemplate11PostingPhotoZoomSliderSx()}
-        valueLabelDisplay="auto"
-        valueLabelFormat={() => `${heightVh}vh`}
-        aria-label="Posting photo height"
-      />
-      <IconButton
-        size="small"
-        onClick={handleZoomIn}
-        disabled={heightPx >= maxPx}
-        aria-label="Larger posting photos"
-        sx={colorTemplate11PostingPhotoZoomIconButtonSx()}
-      >
-        <FontAwesomeIcon icon={faMagnifyingGlassPlus} />
-      </IconButton>
-      <Typography sx={colorTemplate11PostingPhotoZoomVhLabelSx()}>{heightVh}vh</Typography>
-      <Typography sx={colorTemplate11PostingPhotoFullscreenHintSx()}>{COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT}</Typography>
+      <Box sx={colorTemplate11PostingPhotoZoomChromeSx()}>
+        <Box sx={colorTemplate11PostingPhotoZoomSpeakerSx()} aria-hidden>
+          <FontAwesomeIcon icon={faVolumeHigh} />
+        </Box>
+        <Slider
+          value={heightPx}
+          onChange={handleSliderChange}
+          min={minPx}
+          max={maxPx}
+          step={stepPx}
+          marks={marks}
+          size="small"
+          sx={colorTemplate11PostingPhotoZoomSliderSx()}
+          valueLabelDisplay="auto"
+          valueLabelFormat={() => `${heightVh}vh`}
+          aria-label="Posting photo height"
+        />
+      </Box>
+      <Typography sx={colorTemplate11PostingPhotoFullscreenHintSx()}>
+        {COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT}
+      </Typography>
     </Box>
   );
 }

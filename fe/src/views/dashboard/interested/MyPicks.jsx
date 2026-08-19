@@ -1160,7 +1160,7 @@ export default function MyPicks() {
                 loading={myPicksFeedLoading}
                 error={myPicksFeedError}
                 nestedScroll={false}
-                photoZoomBarVariant="hint"
+                photoZoomBarVariant="full"
                 photoFullscreenOverlayLines={photoFullscreenOverlayLines}
                 privacyMessage={
                   myPicksFeed && !myPicksFeed.can_view_private_posts && myPicksFeed.message ? myPicksFeed.message : undefined

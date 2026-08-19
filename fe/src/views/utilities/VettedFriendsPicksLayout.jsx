@@ -2911,7 +2911,7 @@ export default function VettedFriendsPicksLayout({
               loading={myPicksFeedLoading}
               error={myPicksFeedError}
               nestedScroll={false}
-              photoZoomBarVariant="hidden"
+              photoZoomBarVariant="full"
               photoFullscreenOverlayLines={photoFullscreenOverlayLines}
               privacyMessage={
                 myPicksFeed && !myPicksFeed.can_view_private_posts && myPicksFeed.message ? myPicksFeed.message : undefined

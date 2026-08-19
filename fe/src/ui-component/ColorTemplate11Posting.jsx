@@ -227,9 +227,28 @@ function ColorTemplate11PostingEditableBody({ content, canEdit, saving, onSave }
     </Box>
   );
 }
-function ColorTemplate11PostingFeedShell({ title, scrollable, maxScrollHeight, pinFooter, footer, scrollContainerRef, sx, children }) {
+function ColorTemplate11PostingFeedShell({
+  title,
+  header,
+  scrollable,
+  maxScrollHeight,
+  pinFooter,
+  footer,
+  scrollContainerRef,
+  sx,
+  children
+}) {
   const usePinnedLayout = Boolean(pinFooter);
   const useFillHeight = usePinnedLayout && !scrollable && maxScrollHeight == null;
+  const headerBlock =
+    title || header ? (
+      <Box sx={{ flexShrink: 0, gridRow: 1, minWidth: 0 }}>
+        {title ? (
+          <Typography sx={{ ...colorTemplate11PostingTitleSx(), mb: header ? 0.5 : 1 }}>{title}</Typography>
+        ) : null}
+        {header}
+      </Box>
+    ) : null;
 
   return (
     <Box
@@ -243,9 +262,7 @@ function ColorTemplate11PostingFeedShell({ title, scrollable, maxScrollHeight, p
         ...(sx || {})
       }}
     >
-      {title ? (
-        <Typography sx={{ ...colorTemplate11PostingTitleSx(), flexShrink: 0, gridRow: 1 }}>{title}</Typography>
-      ) : null}
+      {headerBlock}
       {usePinnedLayout ? (
         <>
           <Box
@@ -734,10 +751,7 @@ function ColorTemplate11PostingFeed({
       feedHasMore: Boolean(feedHasMore)
     });
   }, [title, loading, error, postList.length, loadMoreBusy, feedHasMore]);
-  const hasPostingPhotos = useMemo(
-    () => postList.some((post) => Array.isArray(post.photos) && post.photos.length > 0),
-    [postList]
-  );
+  const zoomBarVariant = photoZoomBarVariant === 'full' ? 'full' : photoZoomBarVariant === 'hidden' ? null : 'hint';
   // Page-scroll hosts (Acquaint. & Buddies, My Picks) must not nest overflow:auto +
   // overscroll-behavior:contain — that scrollport swallows the wheel even when it
   // cannot scroll, so only the parent padding/scrollbar gutter still moves the page.
@@ -751,10 +765,14 @@ function ColorTemplate11PostingFeed({
       pinned={usePinnedLoadMore}
     />
   ) : null;
+  const zoomHeader =
+    zoomBarVariant ? <ColorTemplate11PostingFeedPhotoZoomBar variant={zoomBarVariant} /> : null;
 
   return (
+    <ColorTemplate11PostingPhotoHeightProvider postIds={postIds}>
     <ColorTemplate11PostingFeedShell
       title={title}
+      header={zoomHeader}
       scrollable={scrollable}
       maxScrollHeight={maxScrollHeight}
       pinFooter={usePinnedLoadMore}
@@ -762,10 +780,6 @@ function ColorTemplate11PostingFeed({
       scrollContainerRef={scrollContainerRef}
       sx={sx}
     >
-      <ColorTemplate11PostingPhotoHeightProvider postIds={postIds}>
-        {!loading && !error && hasPostingPhotos && photoZoomBarVariant !== 'hidden' ? (
-          <ColorTemplate11PostingFeedPhotoZoomBar variant={photoZoomBarVariant === 'full' ? 'full' : 'hint'} />
-        ) : null}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
             <CircularProgress size={24} />
@@ -814,8 +828,8 @@ function ColorTemplate11PostingFeed({
             />
             ))
           : null}
-      </ColorTemplate11PostingPhotoHeightProvider>
     </ColorTemplate11PostingFeedShell>
+    </ColorTemplate11PostingPhotoHeightProvider>
   );
 }
 
