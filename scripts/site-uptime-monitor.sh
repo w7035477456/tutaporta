@@ -7,6 +7,9 @@
 #   ALL — 3 texts every 10 min, then 3 hourly, then once a day (default)
 #   1   — one text on outage, then silence until the site recovers
 #
+# ALARM_USB_VOL in ~/.ssh/be/.env (or SITE_UPTIME_ALARM_USB_VOL):
+#   0–100 percent of USB speaker volume (50 = 50%). Default 100. Not a 1–10 scale.
+#
 # Install (Ubuntu): sudo scripts/install-site-uptime-monitor.sh
 # Logs: ~/logs/site-uptime-monitor/monitor.log  and  sms-sent.log
 set -u
@@ -72,6 +75,11 @@ SERVERDOWN_TEXT="${SITE_UPTIME_SERVERDOWN_TEXT:-$(read_env_value SERVERDOWN_TEXT
 SERVERDOWN_TEXT="$(printf '%s' "$SERVERDOWN_TEXT" | tr '[:lower:]' '[:upper:]')"
 if [[ "$SERVERDOWN_TEXT" != "1" ]]; then
   SERVERDOWN_TEXT="ALL"
+fi
+ALARM_USB_VOL="${SITE_UPTIME_ALARM_USB_VOL:-$(read_env_value ALARM_USB_VOL "$ENV_FILE")}"
+ALARM_USB_VOL="$(printf '%s' "$ALARM_USB_VOL" | tr -d ' %')"
+if [[ ! "$ALARM_USB_VOL" =~ ^[0-9]+$ ]] || [[ "$ALARM_USB_VOL" -gt 100 ]]; then
+  ALARM_USB_VOL=100
 fi
 
 ts() {
@@ -210,10 +218,11 @@ unmute_alarm_device() {
     card="${BASH_REMATCH[1]}"
   fi
   [[ -n "$card" ]] || return 0
-  amixer -c "$card" -q set Master 100% unmute 2>/dev/null || true
-  amixer -c "$card" -q set PCM 100% unmute 2>/dev/null || true
-  amixer -c "$card" -q set Speaker 100% unmute 2>/dev/null || true
-  amixer -c "$card" -q set Headphone 100% unmute 2>/dev/null || true
+  local vol="${ALARM_USB_VOL}%"
+  amixer -c "$card" -q set Master "$vol" unmute 2>/dev/null || true
+  amixer -c "$card" -q set PCM "$vol" unmute 2>/dev/null || true
+  amixer -c "$card" -q set Speaker "$vol" unmute 2>/dev/null || true
+  amixer -c "$card" -q set Headphone "$vol" unmute 2>/dev/null || true
 }
 
 start_alarm() {
@@ -251,11 +260,11 @@ start_alarm() {
   fi
   echo "$pid" >"$ALARM_PID_FILE"
   ALARM_PID="$pid"
-  log_monitor "ALARM start pid=${pid} device=${spec} hz=${ALARM_HZ}"
+  log_monitor "ALARM start pid=${pid} device=${spec} hz=${ALARM_HZ} vol=${ALARM_USB_VOL}%"
 }
 
 list_audio() {
-  echo "ALARM_ENABLE=${ALARM_ENABLE} ALARM_DEVICE=${ALARM_DEVICE} ALARM_HZ=${ALARM_HZ}"
+  echo "ALARM_ENABLE=${ALARM_ENABLE} ALARM_DEVICE=${ALARM_DEVICE} ALARM_HZ=${ALARM_HZ} ALARM_USB_VOL=${ALARM_USB_VOL}%"
   echo "picked=$(pick_alsa_playback_device || echo none)"
   echo
   if command -v aplay >/dev/null 2>&1; then
@@ -447,7 +456,7 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT INT TERM
 
-log_monitor "START v6 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} SERVERDOWN_TEXT=${SERVERDOWN_TEXT} schedule=$(sms_schedule_label) immediate_on_new_outage=1 no_custom_friendly_name=1 alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ}"
+log_monitor "START v7 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} SERVERDOWN_TEXT=${SERVERDOWN_TEXT} schedule=$(sms_schedule_label) immediate_on_new_outage=1 no_custom_friendly_name=1 alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ} alarm_usb_vol=${ALARM_USB_VOL}%"
 
 DOWN=0
 while true; do

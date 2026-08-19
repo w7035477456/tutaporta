@@ -60,8 +60,8 @@ systemctl daemon-reload
 systemctl enable site-uptime-monitor.service
 systemctl restart site-uptime-monitor.service
 
-if ! grep -q 'START v6' "$SCRIPT_PATH"; then
-  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v6 SERVERDOWN_TEXT). Copy ~/code/main first." >&2
+if ! grep -q 'START v7' "$SCRIPT_PATH"; then
+  echo "WARNING: installed script at ${SCRIPT_PATH} is not the latest (missing v7 ALARM_USB_VOL). Copy ~/code/main first." >&2
 fi
 
 echo

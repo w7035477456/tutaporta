@@ -537,12 +537,14 @@ Read by `scripts/site-uptime-monitor.sh` from **`~/.ssh/be/.env`** (not PM2). Af
 
 ```bash
 SERVERDOWN_TEXT=ALL
+ALARM_USB_VOL=100
 ```
 
 | Variable | Value | Behavior |
 |----------|-------|----------|
 | `SERVERDOWN_TEXT` | `ALL` (default if unset) | While curl is down: 3 texts every 10 min, then 3 hourly, then once a day. |
 | `SERVERDOWN_TEXT` | `1` | Send **one** text on outage; no further SMS until the site recovers. |
+| `ALARM_USB_VOL` | `0`–`100` (default `100`) | USB speaker volume **percent** when curl is down (`50` = 50%). Not a 1–10 scale. |
 
 ## When changing these
 
@@ -550,7 +552,7 @@ SERVERDOWN_TEXT=ALL
 2. `pm2 restart onlinemallwebsite` on servers.
 3. Mac local BE: restart Node process after env change.
 4. Restart Vite if you change keys mirrored in **`fe/.env`**.
-5. After changing **`SERVERDOWN_TEXT`**: `sudo systemctl restart site-uptime-monitor` on the Ubuntu monitor host (not PM2).
+5. After changing **`SERVERDOWN_TEXT`** or **`ALARM_USB_VOL`**: `sudo systemctl restart site-uptime-monitor` on the Ubuntu monitor host (not PM2). Re-copy/install the monitor script if the Ubuntu host does not yet have `ALARM_USB_VOL` support.
 
 ## Agent — end of each task
 
