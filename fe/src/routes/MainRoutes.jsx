@@ -35,6 +35,11 @@ const SpeedDatePage = Loadable(lazy(() => import('../views/dashboard/speedDate/S
 const MeasureOneLaunchPage = Loadable(lazy(() => import('views/utilities/MeasureOneLaunchPage')));
 const MyRecordVault = Loadable(lazy(() => import('../views/dashboard/recordVault/MyRecordVault')));
 const MyPhotoAlbums = Loadable(lazy(() => import('../views/dashboard/photoAlbums/MyPhotoAlbums')));
+const EClassifiedsStorybookLayout = Loadable(lazy(() => import('../views/dashboard/eClassifieds/EClassifiedsStorybookLayout')));
+const BpmDemoStory = Loadable(lazy(() => import('../views/dashboard/eClassifieds/BpmDemoStory')));
+const MyListingsStory = Loadable(lazy(() => import('../views/dashboard/eClassifieds/MyListingsStory')));
+const PendingApprovalsStory = Loadable(lazy(() => import('../views/dashboard/eClassifieds/PendingApprovalsStory')));
+const ProcessHistoryStory = Loadable(lazy(() => import('../views/dashboard/eClassifieds/ProcessHistoryStory')));
 
 // ==============================|| MAIN ROUTING ||============================== //
 
@@ -77,7 +82,29 @@ const MainRoutes = {
     },
     {
       path: 'eClassifieds',
-      element: <UnderConstruction />
+      element: <EClassifiedsStorybookLayout />,
+      children: [
+        {
+          index: true,
+          element: <Navigate to="/eClassifieds/bpm-demo" replace />
+        },
+        {
+          path: 'bpm-demo',
+          element: <BpmDemoStory />
+        },
+        {
+          path: 'my-listings',
+          element: <MyListingsStory />
+        },
+        {
+          path: 'pending',
+          element: <PendingApprovalsStory />
+        },
+        {
+          path: 'history',
+          element: <ProcessHistoryStory />
+        }
+      ]
     },
     {
       path: 'eServices',

@@ -492,6 +492,16 @@ import {
 } from './middleware/requireTrustedOrigin.js';
 import { getUserCustomization, putUserCustomization, postLoadDefaultMusicUrls } from './routes/user/userCustomization.js';
 import {
+  getBpmDiagram,
+  getBpmListings,
+  getBpmInstances,
+  getBpmPending,
+  getBpmInstance,
+  postBpmStart,
+  postBpmComplete,
+  postBpmResetAll
+} from './routes/eClassifieds/bpmDemo.js';
+import {
   getChatFriends,
   getChatHistory,
   getChatHistoryBatch,
@@ -1657,6 +1667,15 @@ app.post('/api/chat/markVisited/:targetUserId', requireAuth, markChatVisitedHand
 app.get('/api/user/customization', requireAuth, getUserCustomization);
 app.put('/api/user/customization', requireAuth, putUserCustomization);
 app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoadDefaultMusicUrls);
+
+app.get('/api/eClassifieds/bpm/diagram', requireAuth, getBpmDiagram);
+app.get('/api/eClassifieds/bpm/listings', requireAuth, getBpmListings);
+app.get('/api/eClassifieds/bpm/instances', requireAuth, getBpmInstances);
+app.get('/api/eClassifieds/bpm/pending', requireAuth, getBpmPending);
+app.get('/api/eClassifieds/bpm/instances/:instanceId', requireAuth, getBpmInstance);
+app.post('/api/eClassifieds/bpm/instances', requireAuth, postBpmStart);
+app.post('/api/eClassifieds/bpm/instances/:instanceId/complete', requireAuth, postBpmComplete);
+app.post('/api/eClassifieds/bpm/reset', requireAuth, postBpmResetAll);
 app.post('/api/chat/uploadImage', requireAuth, uploadChatInlineImage);
 app.get('/api/chat/image/:filename', requireAuth, getChatInlineImage);
 

@@ -38,14 +38,12 @@ function Sidebar() {
   const { pathname } = useLocation();
 
   const isEMarketPlaceSection = pathname.startsWith('/eMarketPlace/');
+  const isEClassifiedsSection = pathname === '/eClassifieds' || pathname.startsWith('/eClassifieds/');
 
   const isUnderConstructionMallSection =
-    pathname === '/eMarketPlace' ||
-    pathname === '/onlineProfessionals' ||
-    pathname === '/eClassifieds' ||
-    pathname === '/eServices';
+    pathname === '/eMarketPlace' || pathname === '/onlineProfessionals' || pathname === '/eServices';
 
-  const mallCompactCloseMenuLayout = isUnderConstructionMallSection || isEMarketPlaceSection;
+  const mallCompactCloseMenuLayout = isUnderConstructionMallSection || isEMarketPlaceSection || isEClassifiedsSection;
 
   const isVsinglesSection =
     pathname.startsWith('/vsingles') ||

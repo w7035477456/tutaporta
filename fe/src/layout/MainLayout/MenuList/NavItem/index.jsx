@@ -72,7 +72,8 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
 
   const { menuMaster } = useGetMenuMaster();
   const drawerOpen = navigationDrawerOpenState(menuMaster?.isDashboardDrawerOpened);
-  const fitLabelRef = useFitTextToWidth(Boolean(drawerOpen && level === 1), String(item?.title ?? ''));
+  const menuTitleFull = item?.titleSuffix ? `${item.title} ${item.titleSuffix}` : String(item?.title ?? '');
+  const fitLabelRef = useFitTextToWidth(Boolean(drawerOpen && level === 1), menuTitleFull);
   const { open: tourOpen, step: tourStep } = useVsinglesTour();
   const tourHighlightNav =
     tourOpen &&
@@ -109,7 +110,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
   useEffect(() => {
     const id = window.requestAnimationFrame(compareSize);
     return () => window.cancelAnimationFrame(id);
-  }, [drawerOpen, item?.title]);
+  }, [drawerOpen, item?.title, item?.titleSuffix]);
   useEffect(() => {
     if (!isReceivedBioRequestsItem && !isVettedFriendsItem && !isSelfReportBioItem) return undefined;
     const onRefresh = (event) => {
@@ -326,6 +327,20 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
       }}
     >
       {item.title}
+      {item.titleSuffix ? (
+        <Box
+          component="span"
+          sx={{
+            fontSize: '50%',
+            fontWeight: 600,
+            marginLeft: '0.35em',
+            opacity: 0.9,
+            verticalAlign: 'baseline'
+          }}
+        >
+          {item.titleSuffix}
+        </Box>
+      ) : null}
     </Typography>
   );
 
@@ -360,7 +375,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
             {itemIcon}
           </Box>
           {(drawerOpen || level !== 1) && (
-            <Tooltip title={item.title} disableHoverListener={!hoverStatus}>
+            <Tooltip title={menuTitleFull} disableHoverListener={!hoverStatus}>
               <Box
                 sx={{
                   flex: '1 1 auto',
@@ -441,7 +456,7 @@ export default function NavItem({ item, level, isParents = false, setSelectedID 
           </ListItemIcon>
         </ButtonBase>
 
-        <Tooltip title={item.title} disableHoverListener={!hoverStatus}>
+        <Tooltip title={menuTitleFull} disableHoverListener={!hoverStatus}>
           <ListItemText
               sx={
                 drawerOpen

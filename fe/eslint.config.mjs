@@ -1,3 +1,6 @@
+// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
+import storybook from "eslint-plugin-storybook";
+
 import { fixupConfigRules } from '@eslint/compat';
 import prettier from 'eslint-plugin-prettier';
 import react from 'eslint-plugin-react';
@@ -16,74 +19,69 @@ const compat = new FlatCompat({
   allConfig: js.configs.all
 });
 
-export default [
-  ...fixupConfigRules(compat.extends('prettier')),
+export default [...fixupConfigRules(compat.extends('prettier')), {
+  plugins: {
+    prettier,
+    react,
+    'react-hooks': reactHooks,
+    'jsx-a11y': jsxA11y
+  },
 
-  {
-    plugins: {
-      prettier,
-      react,
-      'react-hooks': reactHooks,
-      'jsx-a11y': jsxA11y
-    },
-
-    languageOptions: {
-      ecmaVersion: 2020,
-      sourceType: 'module',
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true
-        }
+  languageOptions: {
+    ecmaVersion: 2020,
+    sourceType: 'module',
+    parserOptions: {
+      ecmaFeatures: {
+        jsx: true
       }
-    },
-
-    settings: {
-      react: {
-        version: 'detect'
-      }
-    },
-
-    rules: {
-      'react/jsx-filename-extension': 'off',
-      'no-param-reassign': 'off',
-      'react/prop-types': 'off',
-      'react/require-default-props': 'off',
-      'react/no-array-index-key': 'off',
-      'react/react-in-jsx-scope': 'off',
-      'react/jsx-props-no-spreading': 'off',
-      'import/order': 'off',
-      'no-console': 'off',
-      'no-shadow': 'off',
-      'import/no-cycle': 'off',
-      'import/no-extraneous-dependencies': 'off',
-      'jsx-a11y/label-has-associated-control': 'off',
-      'jsx-a11y/no-autofocus': 'off',
-      'react/jsx-uses-react': 'off',
-      'react/jsx-uses-vars': 'error',
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-      'no-unused-vars': 'off',
-
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: ['@mui/*/*/*', '!@mui/material/test-utils/*']
-        }
-      ],
-
-      'no-unused-vars': [
-        'error',
-        {
-          vars: 'all',
-          args: 'none'
-        }
-      ],
-
-      'prettier/prettier': 'warn',
     }
   },
-  {
-    ignores: ['node_modules/**'],
-    files: ['src/**/*.{js,jsx}']
+
+  settings: {
+    react: {
+      version: 'detect'
+    }
+  },
+
+  rules: {
+    'react/jsx-filename-extension': 'off',
+    'no-param-reassign': 'off',
+    'react/prop-types': 'off',
+    'react/require-default-props': 'off',
+    'react/no-array-index-key': 'off',
+    'react/react-in-jsx-scope': 'off',
+    'react/jsx-props-no-spreading': 'off',
+    'import/order': 'off',
+    'no-console': 'off',
+    'no-shadow': 'off',
+    'import/no-cycle': 'off',
+    'import/no-extraneous-dependencies': 'off',
+    'jsx-a11y/label-has-associated-control': 'off',
+    'jsx-a11y/no-autofocus': 'off',
+    'react/jsx-uses-react': 'off',
+    'react/jsx-uses-vars': 'error',
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'warn',
+    'no-unused-vars': 'off',
+
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: ['@mui/*/*/*', '!@mui/material/test-utils/*']
+      }
+    ],
+
+    'no-unused-vars': [
+      'error',
+      {
+        vars: 'all',
+        args: 'none'
+      }
+    ],
+
+    'prettier/prettier': 'warn',
   }
-];
+}, {
+  ignores: ['node_modules/**'],
+  files: ['src/**/*.{js,jsx}']
+}, ...storybook.configs["flat/recommended"]];

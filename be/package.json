@@ -31,6 +31,7 @@
     "archiver": "^8.0.0",
     "argon2": "^0.44.0",
     "bcrypt": "^6.0.0",
+    "bpmn-engine": "^25.0.1",
     "bull": "^4.16.5",
     "busboy": "^1.6.0",
     "cookie-parser": "^1.4.7",

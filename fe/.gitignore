@@ -35,3 +35,6 @@ npm-debug.log*
 
 # License
 kendo-ui-license.txt
+
+*storybook.log
+storybook-static

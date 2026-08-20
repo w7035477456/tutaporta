@@ -1,0 +1,231 @@
+/* Storybook-inspired chrome for eClassifieds BPM demo (scoped — no global Tailwind). */
+.ecsb-root {
+  --ecsb-bg: #f6f9fc;
+  --ecsb-panel: #ffffff;
+  --ecsb-border: #e3e6eb;
+  --ecsb-text: #2e3438;
+  --ecsb-muted: #73828c;
+  --ecsb-accent: #029cfd;
+  --ecsb-accent-soft: #e8f5ff;
+  --ecsb-pink: #ff4785;
+  --ecsb-sidebar: #f3f3f3;
+  --ecsb-font: 'Nunito Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 520px;
+  background: var(--ecsb-bg);
+  color: var(--ecsb-text);
+  font-family: var(--ecsb-font);
+  border: 1px solid var(--ecsb-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ecsb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--ecsb-panel);
+  border-bottom: 1px solid var(--ecsb-border);
+}
+
+.ecsb-brand {
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ecsb-pink);
+}
+
+.ecsb-toolbar-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--ecsb-text);
+}
+
+.ecsb-toolbar-meta {
+  margin-left: auto;
+  font-size: 24px;
+  color: var(--ecsb-muted);
+}
+
+.ecsb-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.ecsb-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--ecsb-bg);
+}
+
+.ecsb-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.ecsb-canvas-card {
+  background: var(--ecsb-panel);
+  border: 1px solid var(--ecsb-border);
+  border-radius: 6px;
+  min-height: 280px;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ecsb-bpmn-host {
+  width: 100%;
+  height: 360px;
+  background: #fafbfc;
+  border: 1px dashed var(--ecsb-border);
+  border-radius: 4px;
+}
+
+.ecsb-bpmn-host .djs-element.highlight-current .djs-visual > :nth-child(1) {
+  stroke: #029cfd !important;
+  stroke-width: 3px !important;
+}
+
+.ecsb-bpmn-host .djs-element.highlight-done .djs-visual > :nth-child(1) {
+  stroke: #66bf3c !important;
+  stroke-width: 2px !important;
+}
+
+.ecsb-addon {
+  border-top: 1px solid var(--ecsb-border);
+  background: var(--ecsb-panel);
+  padding: 12px 16px 16px;
+  max-height: 42%;
+  overflow: auto;
+}
+
+.ecsb-addon-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ecsb-muted);
+  margin-bottom: 10px;
+}
+
+.ecsb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ecsb-btn {
+  appearance: none;
+  border: 1px solid var(--ecsb-border);
+  background: #fff;
+  color: var(--ecsb-text);
+  font: inherit;
+  font-size: 26px;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ecsb-btn:hover {
+  border-color: var(--ecsb-accent);
+  color: #015c99;
+}
+
+.ecsb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ecsb-btn-primary {
+  background: var(--ecsb-accent);
+  border-color: var(--ecsb-accent);
+  color: #fff;
+}
+
+.ecsb-btn-primary:hover {
+  filter: brightness(0.95);
+  color: #fff;
+}
+
+.ecsb-btn-danger {
+  background: #fff;
+  border-color: #f44336;
+  color: #c62828;
+}
+
+.ecsb-btn-success {
+  background: #66bf3c;
+  border-color: #66bf3c;
+  color: #fff;
+}
+
+.ecsb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 26px;
+}
+
+.ecsb-table th,
+.ecsb-table td {
+  border-bottom: 1px solid var(--ecsb-border);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.ecsb-table th {
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ecsb-muted);
+}
+
+.ecsb-badge {
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ecsb-accent-soft);
+  color: #015c99;
+}
+
+.ecsb-badge-wait {
+  background: #fff3e0;
+  color: #ef6c00;
+}
+
+.ecsb-badge-done {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.ecsb-muted {
+  color: var(--ecsb-muted);
+  font-size: 26px;
+}
+
+.ecsb-error {
+  color: #c62828;
+  font-size: 26px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.ecsb-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 24px;
+  background: #f3f3f3;
+  padding: 2px 6px;
+  border-radius: 3px;
+}

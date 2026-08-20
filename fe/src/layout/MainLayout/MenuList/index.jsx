@@ -66,7 +66,6 @@ const underConstructionMenuItems = {
       children: [
         { id: 'uc-2', title: 'Under Construction', type: 'item', url: '/eMarketPlace' },
         { id: 'uc-3', title: 'Under Construction', type: 'item', url: '/onlineProfessionals' },
-        { id: 'uc-4', title: 'Under Construction', type: 'item', url: '/eClassifieds' },
         { id: 'uc-5', title: 'Under Construction', type: 'item', url: '/eServices' }
       ]
     }
@@ -80,6 +79,40 @@ const eMarketPlaceMenuItems = {
       title: 'Flower Shop',
       type: 'group',
       children: [{ id: 'flower-shop-nav', title: 'Flower Shop', type: 'item', url: '/eMarketPlace/flowerShop' }]
+    }
+  ]
+};
+
+const eClassifiedsMenuItems = {
+  items: [
+    {
+      id: 'e-classifieds-bpm',
+      title: 'eClassifieds',
+      type: 'group',
+      children: [
+        { id: 'ec-bpm-demo', title: 'BPM Demo', type: 'item', url: '/eClassifieds/bpm-demo' },
+        {
+          id: 'ec-my-listings',
+          title: 'My Listings',
+          titleSuffix: '(role=seller)',
+          type: 'item',
+          url: '/eClassifieds/my-listings'
+        },
+        {
+          id: 'ec-pending',
+          title: 'Pending Approvals',
+          titleSuffix: '(role=manager)',
+          type: 'item',
+          url: '/eClassifieds/pending'
+        },
+        {
+          id: 'ec-history',
+          title: 'Process History',
+          titleSuffix: '(Role=auditor)',
+          type: 'item',
+          url: '/eClassifieds/history'
+        }
+      ]
     }
   ]
 };
@@ -156,26 +189,27 @@ function MenuList() {
   }, [user, identificationVerificationLockTick]);
 
   const isEMarketPlaceSection = pathname.startsWith('/eMarketPlace/');
+  const isEClassifiedsSection = pathname === '/eClassifieds' || pathname.startsWith('/eClassifieds/');
 
   const isUnderConstructionMallSection =
-    pathname === '/eMarketPlace' ||
-    pathname === '/onlineProfessionals' ||
-    pathname === '/eClassifieds' ||
-    pathname === '/eServices';
+    pathname === '/eMarketPlace' || pathname === '/onlineProfessionals' || pathname === '/eServices';
 
   const activeMenuItems = useMemo(() => {
     if (toolsOnlyMenu) {
       return toolsOnlyMenuItems;
     }
-    const base = isEMarketPlaceSection
-      ? eMarketPlaceMenuItems
-      : isUnderConstructionMallSection
-        ? underConstructionMenuItems
-        : menuItems;
+    const base = isEClassifiedsSection
+      ? eClassifiedsMenuItems
+      : isEMarketPlaceSection
+        ? eMarketPlaceMenuItems
+        : isUnderConstructionMallSection
+          ? underConstructionMenuItems
+          : menuItems;
     const withTools = filterToolsMenuItem(base, showToolsMenu);
     const withProfilePhoto = applyProfilePhotoMenuDisabled(withTools, profilePhotoSetupRequired);
     return applyIdentificationVerificationMenuDisabled(withProfilePhoto, identificationVerificationLockActive);
   }, [
+    isEClassifiedsSection,
     isEMarketPlaceSection,
     isUnderConstructionMallSection,
     profilePhotoSetupRequired,

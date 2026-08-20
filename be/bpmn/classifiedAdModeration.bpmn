@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions
+  xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+  id="OnlineMallClassifiedDefs"
+  targetNamespace="http://onlinemall.website/bpmn/classified"
+>
+  <process id="ClassifiedAdModeration" name="Classified Ad Moderation" isExecutable="true">
+    <startEvent id="Start" name="Seller submits"/>
+    <sequenceFlow id="flow_start_submit" sourceRef="Start" targetRef="SubmitAd"/>
+
+    <serviceTask id="SubmitAd" name="Record listing" implementation="${environment.services.noop}"/>
+    <sequenceFlow id="flow_submit_check" sourceRef="SubmitAd" targetRef="AutoCheck"/>
+
+    <serviceTask id="AutoCheck" name="Auto checks&#10;(price / category)" implementation="${environment.services.noop}"/>
+    <sequenceFlow id="flow_check_review" sourceRef="AutoCheck" targetRef="ManualReview"/>
+
+    <userTask id="ManualReview" name="Moderator review"/>
+    <sequenceFlow id="flow_review_gateway" sourceRef="ManualReview" targetRef="DecisionGateway"/>
+
+    <exclusiveGateway id="DecisionGateway" name="Approve?" default="flow_reject"/>
+    <sequenceFlow id="flow_approve" name="Yes" sourceRef="DecisionGateway" targetRef="NotifyApproved">
+      <conditionExpression xsi:type="tFormalExpression" language="javascript"><![CDATA[next(null, environment.variables.decision === 'approve');]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_reject" name="No" sourceRef="DecisionGateway" targetRef="NotifyRejected"/>
+
+    <serviceTask id="NotifyApproved" name="Notify seller&#10;(approved)" implementation="${environment.services.noop}"/>
+    <sequenceFlow id="flow_approved_end" sourceRef="NotifyApproved" targetRef="EndApproved"/>
+    <endEvent id="EndApproved" name="Published"/>
+
+    <serviceTask id="NotifyRejected" name="Notify seller&#10;(rejected)" implementation="${environment.services.noop}"/>
+    <sequenceFlow id="flow_rejected_end" sourceRef="NotifyRejected" targetRef="EndRejected"/>
+    <endEvent id="EndRejected" name="Rejected"/>
+  </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="ClassifiedAdModeration">
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start">
+        <omgdc:Bounds x="152" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="130" y="145" width="80" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubmitAd_di" bpmnElement="SubmitAd">
+        <omgdc:Bounds x="240" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AutoCheck_di" bpmnElement="AutoCheck">
+        <omgdc:Bounds x="390" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ManualReview_di" bpmnElement="ManualReview">
+        <omgdc:Bounds x="540" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DecisionGateway_di" bpmnElement="DecisionGateway" isMarkerVisible="true">
+        <omgdc:Bounds x="695" y="95" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="693" y="152" width="54" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="NotifyApproved_di" bpmnElement="NotifyApproved">
+        <omgdc:Bounds x="800" y="30" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="NotifyRejected_di" bpmnElement="NotifyRejected">
+        <omgdc:Bounds x="800" y="150" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndApproved_di" bpmnElement="EndApproved">
+        <omgdc:Bounds x="952" y="52" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="942" y="95" width="56" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndRejected_di" bpmnElement="EndRejected">
+        <omgdc:Bounds x="952" y="172" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="944" y="215" width="52" height="14"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flow_start_submit_di" bpmnElement="flow_start_submit">
+        <omgdi:waypoint x="188" y="120"/>
+        <omgdi:waypoint x="240" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_submit_check_di" bpmnElement="flow_submit_check">
+        <omgdi:waypoint x="340" y="120"/>
+        <omgdi:waypoint x="390" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_check_review_di" bpmnElement="flow_check_review">
+        <omgdi:waypoint x="490" y="120"/>
+        <omgdi:waypoint x="540" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_review_gateway_di" bpmnElement="flow_review_gateway">
+        <omgdi:waypoint x="640" y="120"/>
+        <omgdi:waypoint x="695" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_approve_di" bpmnElement="flow_approve">
+        <omgdi:waypoint x="720" y="95"/>
+        <omgdi:waypoint x="720" y="70"/>
+        <omgdi:waypoint x="800" y="70"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_reject_di" bpmnElement="flow_reject">
+        <omgdi:waypoint x="720" y="145"/>
+        <omgdi:waypoint x="720" y="190"/>
+        <omgdi:waypoint x="800" y="190"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_approved_end_di" bpmnElement="flow_approved_end">
+        <omgdi:waypoint x="900" y="70"/>
+        <omgdi:waypoint x="952" y="70"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow_rejected_end_di" bpmnElement="flow_rejected_end">
+        <omgdi:waypoint x="900" y="190"/>
+        <omgdi:waypoint x="952" y="190"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

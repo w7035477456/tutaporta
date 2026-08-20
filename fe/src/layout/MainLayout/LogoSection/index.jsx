@@ -14,13 +14,24 @@ import Logo from 'ui-component/Logo';
 export default function LogoSection() {
   const { pathname } = useLocation();
 
+  const isEClassifiedsSection = pathname === '/eClassifieds' || pathname.startsWith('/eClassifieds/');
+
   const isUnderConstructionMallSection =
-    pathname === '/eMarketPlace' ||
-    pathname === '/onlineProfessionals' ||
-    pathname === '/eClassifieds' ||
-    pathname === '/eServices';
+    pathname === '/eMarketPlace' || pathname === '/onlineProfessionals' || pathname === '/eServices';
 
   const isMallLanding = pathname === '/' || pathname === '/landing' || pathname === '/mall';
+
+  if (isEClassifiedsSection) {
+    return (
+      <Link component={RouterLink} to="/eClassifieds/bpm-demo" aria-label="eclassifieds-logo" underline="none">
+        <Box sx={{ px: 1, py: 0.5 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: 'secondary.main', whiteSpace: 'nowrap' }}>
+            eClassifieds
+          </Typography>
+        </Box>
+      </Link>
+    );
+  }
 
   if (isUnderConstructionMallSection) {
     return (
