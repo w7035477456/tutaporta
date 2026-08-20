@@ -16,7 +16,8 @@ import Logo from 'ui-component/Logo';
 import Footer from 'layout/MainLayout/Footer';
 import AuthLogin from '../auth-forms/AuthLogin';
 import SessionEndNoticeDialog from 'ui-component/SessionEndNoticeDialog';
-import { LoginDemoModeProvider, useLoginDemoMode } from 'contexts/LoginDemoModeContext';
+import { LoginDemoModeProvider } from 'contexts/LoginDemoModeContext';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { consumeSessionEndNotice } from 'utils/sessionEndNotice';
 import { authShellStackSx, authFixedFooterContentPaddingBottom } from './authPageLayoutSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
@@ -26,17 +27,13 @@ import { getApiBaseUrl } from 'config/apiBaseUrl';
 // ================================|| AUTH3 - LOGIN ||================================ //
 
 function LoginSignupPrompt({ signupEnabled, signupPromptSx }) {
-  const { blockDemoAction } = useLoginDemoMode();
-
   if (signupEnabled) {
     return (
       <Typography
         component={Link}
         to="/register"
         variant="subtitle1"
-        onClick={(event) => {
-          if (blockDemoAction(event)) return;
-        }}
+        {...guestDemoAllowProps()}
         sx={signupPromptSx}
       >
         Don&apos;t have an account?
@@ -48,9 +45,6 @@ function LoginSignupPrompt({ signupEnabled, signupPromptSx }) {
     <Typography
       variant="subtitle1"
       aria-disabled="true"
-      onClick={(event) => {
-        blockDemoAction(event);
-      }}
       sx={{ ...signupPromptSx, cursor: 'default', userSelect: 'none' }}
     >
       Don&apos;t have an account?

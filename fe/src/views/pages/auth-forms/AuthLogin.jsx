@@ -357,9 +357,7 @@ export default function AuthLogin() {
           variant="subtitle1"
           component={Link}
           to="/pages/forgotPassword"
-          onClick={(event) => {
-            if (blockDemoAction(event)) return;
-          }}
+          {...guestDemoAllowProps()}
           sx={{ textDecoration: 'underline', color: 'var(--theme-primary-color)' }}
         >
           Forgot Password?
