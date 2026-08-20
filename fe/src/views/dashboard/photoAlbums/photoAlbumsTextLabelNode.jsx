@@ -111,7 +111,7 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
   const outlineWidth = Math.max(0, Number(node?.attrs?.outlineWidth));
   const strokeW = Number.isFinite(outlineWidth) ? outlineWidth : 1.25;
   const fontSize = Math.max(10, Math.round(Number(node?.attrs?.fontSize) || DEFAULT_FONT_SIZE));
-  const fontFamily = String(node?.attrs?.fontFamily || 'Comic Sans MS, Comic Neue, cursive');
+  const fontFamily = String(node?.attrs?.fontFamily || 'Algerian, fantasy');
   const fontWeight = Number(node?.attrs?.fontWeight) || 700;
   const rotationDeg = Number(node?.attrs?.rotationDeg);
   const rot = Number.isFinite(rotationDeg) ? rotationDeg : DEFAULT_ROTATION;
@@ -781,8 +781,8 @@ export const PhotoAlbumsTextLabelNode = Node.create({
         renderHTML: (attrs) => attrToData(attrs.fontSize, 'data-font-size')
       },
       fontFamily: {
-        default: 'Comic Sans MS, Comic Neue, cursive',
-        parseHTML: (el) => el.getAttribute('data-font-family') || 'Comic Sans MS, Comic Neue, cursive',
+        default: 'Algerian, fantasy',
+        parseHTML: (el) => el.getAttribute('data-font-family') || 'Algerian, fantasy',
         renderHTML: (attrs) => attrToData(attrs.fontFamily, 'data-font-family')
       },
       fontWeight: {
@@ -862,7 +862,7 @@ export const PhotoAlbumsTextLabelNode = Node.create({
                   ? Number(attrs.outlineWidth)
                   : 1.25,
               fontSize: attrs.fontSize || DEFAULT_FONT_SIZE,
-              fontFamily: attrs.fontFamily || 'Comic Sans MS, Comic Neue, cursive',
+              fontFamily: attrs.fontFamily || 'Algerian, fantasy',
               fontWeight: attrs.fontWeight || 700,
               rotationDeg:
                 attrs.rotationDeg != null && Number.isFinite(Number(attrs.rotationDeg))

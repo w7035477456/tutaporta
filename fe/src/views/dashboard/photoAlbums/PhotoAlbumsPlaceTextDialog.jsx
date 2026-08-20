@@ -19,7 +19,7 @@ import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
 import { newLabelId } from './photoAlbumsTextLabelNode';
 
 export const PLACE_TEXT_FONT_FAMILIES = [
-  { label: 'Comic Sans MS', value: 'Comic Sans MS, Comic Neue, cursive' },
+  { label: 'Algerian', value: 'Algerian, fantasy' },
   { label: 'Herculanum', value: 'Herculanum, Papyrus, fantasy' },
   { label: 'Brush Script MT', value: '"Brush Script MT", "Segoe Script", cursive' },
   { label: 'Courier New', value: '"Courier New", Courier, monospace' },
@@ -43,11 +43,11 @@ export const PLACE_TEXT_FONT_WEIGHTS = [
 /** Five pre-styled place-text buttons (font / fill / outline / size). */
 export const PLACE_TEXT_STYLE_PRESETS = [
   {
-    id: 'comic-yellow',
-    label: 'Comic Sans MS · yellow',
+    id: 'algerian-yellow',
+    label: 'Algerian · yellow',
     color: '#FBE618',
     outlineColor: '#000000',
-    fontFamily: 'Comic Sans MS, Comic Neue, cursive',
+    fontFamily: 'Algerian, fantasy',
     fontWeight: 700,
     fontSize: 45,
     outlineWidth: 5,

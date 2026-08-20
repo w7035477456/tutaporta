@@ -4,6 +4,8 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 
 import { useAuth } from 'contexts/AuthContext';
+import useConfig from 'hooks/useConfig';
+import { ensureMainFontStylesheet, findMainFontOptionByStack } from 'config/mainFontEnv';
 import { fetchUserCustomization, saveUserCustomization, loadDefaultCustomMusicUrls as fetchDefaultCustomMusicUrlsApi, emptyCustomMusicUrlSlots, CUSTOM_MUSIC_URL_SLOT_COUNT } from 'api/userCustomizationFe';
 import {
   BACKGROUND_TRACK_SRC,
@@ -354,6 +356,7 @@ GlobalCustomMusicPlayer.propTypes = {
 
 export function BackgroundMusicProvider({ children }) {
   const { user, loading: authLoading } = useAuth();
+  const { setField } = useConfig();
   const { pathname } = useLocation();
 
   const [soundPreference, setSoundPreference] = useState('mute');
@@ -397,7 +400,12 @@ export function BackgroundMusicProvider({ children }) {
     setVolume(demoVolume ?? saved.volume);
     setCustomMusicUrls(saved.customMusicUrls ?? emptyCustomMusicUrlSlots());
     setLoadDefault(saved.loadDefault !== false);
-  }, []);
+    if (saved?.mainFont) {
+      const option = findMainFontOptionByStack(saved.mainFont);
+      ensureMainFontStylesheet(option);
+      setField('fontFamily', option.stack);
+    }
+  }, [setField]);
 
   useEffect(() => {
     if (!useVsinglesLyricAudio) {

@@ -500,7 +500,7 @@ export function buildPhotoAlbumsContextTutorialPopoutHtml(initialMode = 'idle', 
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   const fontKey = 'pa-context-tutorial-font-px';
-  const fontFamily = String(assets.mainFontFamily || '"Comic Neue", "Comic Sans MS", cursive').replace(/"/g, "'");
+  const fontFamily = String(assets.mainFontFamily || 'Algerian, fantasy').replace(/"/g, "'");
   const googleFontsHref = String(assets.googleFontsHref || '').trim();
   const fontLink = googleFontsHref
     ? `<link rel="preconnect" href="https://fonts.googleapis.com"/>

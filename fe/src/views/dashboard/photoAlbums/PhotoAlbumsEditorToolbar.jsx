@@ -7,7 +7,7 @@ const FONT_FAMILIES = [
   { label: 'Sans', value: 'Arial, Helvetica, sans-serif' },
   { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
   { label: 'Mono', value: '"Courier New", monospace' },
-  { label: 'Comic', value: '"Comic Sans MS", "Comic Neue", cursive' }
+  { label: 'Algerian', value: 'Algerian, fantasy' }
 ];
 
 const FONT_SIZES = ['', '12px', '14px', '16px', '18px', '24px', '32px', '48px'];

@@ -24,6 +24,8 @@ const CUSTOM_MUSIC_URL_SLOT_COUNT = 10;
 const DEFAULT_NEW_USER_VOLUME = 0;
 const DEFAULT_NEW_USER_LYRIC_VOLUME = 1;
 const DEFAULT_NEW_USER_SOUND_PREFERENCE = 'mute';
+const DEFAULT_MAIN_FONT = 'Algerian, fantasy';
+const MAIN_FONT_MAX_LEN = 200;
 
 function toSinglesId(value) {
   const n = Number(value);
@@ -55,6 +57,12 @@ function parseLevel0to100(value, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(100, Math.max(0, Math.trunc(n)));
+}
+
+function normalizeMainFont(value) {
+  const s = String(value ?? '').trim();
+  if (!s || s.length > MAIN_FONT_MAX_LEN) return DEFAULT_MAIN_FONT;
+  return s;
 }
 
 function emptyCustomMusicUrlSlots() {
@@ -160,7 +168,8 @@ function defaultCustomizationDbRow() {
     lyric_volume: DEFAULT_NEW_USER_LYRIC_VOLUME,
     volume: DEFAULT_NEW_USER_VOLUME,
     custom_music_url: customMusicUrlSlotsToDb(defaultCustomMusicUrlSlots()),
-    all_singles_welcome_expanded: true
+    all_singles_welcome_expanded: true,
+    main_font: DEFAULT_MAIN_FONT
   };
 }
 
@@ -177,6 +186,7 @@ function rowToPayload(row) {
       customMusicUrls: defaultCustomMusicUrlSlots(),
       loadDefault: true,
       allSinglesWelcomeExpanded: true,
+      mainFont: DEFAULT_MAIN_FONT,
       ...mynotePrefsFromDbRow(null)
     };
   }
@@ -216,6 +226,7 @@ function rowToPayload(row) {
     customMusicUrls: normalizeCustomMusicUrlSlots(row.custom_music_url),
     allSinglesWelcomeExpanded:
       row.all_singles_welcome_expanded != null ? parseBooleanEnumRaw(row.all_singles_welcome_expanded) : true,
+    mainFont: normalizeMainFont(row.main_font),
     ...mynotePrefsFromDbRow(row)
   };
 }
@@ -317,12 +328,20 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS mynote_note_scroll_top integer NULL,
       ADD COLUMN IF NOT EXISTS mynote_editor_caret_pos integer NULL,
       ADD COLUMN IF NOT EXISTS all_singles_welcome_expanded helloworldjunktest.boolean_enum NOT NULL DEFAULT 'true'::helloworldjunktest.boolean_enum,
+      ADD COLUMN IF NOT EXISTS main_font text NOT NULL DEFAULT 'Algerian, fantasy',
       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW()
   `);
   // Existing rows keep true (no one-time overwrite); new inserts default false until first Track Load Default.
   await pool.query(`
     ALTER TABLE helloworldjunktest.user_customization
       ADD COLUMN IF NOT EXISTS load_default boolean NOT NULL DEFAULT true
+  `);
+  await pool.query(`
+    UPDATE helloworldjunktest.user_customization
+    SET main_font = 'Algerian, fantasy'
+    WHERE main_font IS NULL
+       OR btrim(main_font) = ''
+       OR lower(replace(replace(main_font, '"', ''), '''', '')) LIKE 'comic neue%'
   `);
   await pool.query(`
     ALTER TABLE helloworldjunktest.user_customization
@@ -519,13 +538,27 @@ async function selectCustomizationRow(me) {
              , mynote_last_notebook_id, mynote_last_note_id
              , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
              , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
-             , all_singles_welcome_expanded
+             , all_singles_welcome_expanded, main_font
        FROM helloworldjunktest.user_customization
        WHERE singles_id = $1`,
       [me]
     );
     return rows[0] ?? null;
   } catch (err) {
+    if (isMissingColumn(err, 'main_font')) {
+      const { rows } = await pool.query(
+        `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
+               , custom_music_url, load_default
+               , mynote_last_notebook_id, mynote_last_note_id
+               , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
+               , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
+               , all_singles_welcome_expanded
+         FROM helloworldjunktest.user_customization
+         WHERE singles_id = $1`,
+        [me]
+      );
+      return rows[0] ?? null;
+    }
     if (isMissingColumn(err, 'all_singles_welcome_expanded')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
@@ -810,6 +843,7 @@ export async function putUserCustomization(req, res) {
   const hasCustomMusicUrls = Object.prototype.hasOwnProperty.call(body, 'customMusicUrls');
   const hasMynoteFontSize = Object.prototype.hasOwnProperty.call(body, 'mynoteFontSize');
   const hasAllSinglesWelcomeExpanded = Object.prototype.hasOwnProperty.call(body, 'allSinglesWelcomeExpanded');
+  const hasMainFont = Object.prototype.hasOwnProperty.call(body, 'mainFont');
   const hasAnyMynotePref = MYNOTE_PREFS_API_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
 
   if (
@@ -822,7 +856,8 @@ export async function putUserCustomization(req, res) {
     !hasLyricVolume &&
     !hasVolume &&
     !hasCustomMusicUrls &&
-    !hasAllSinglesWelcomeExpanded
+    !hasAllSinglesWelcomeExpanded &&
+    !hasMainFont
   ) {
     return res.status(400).json({ error: 'No customization fields provided' });
   }
@@ -915,6 +950,11 @@ export async function putUserCustomization(req, res) {
     allSinglesWelcomeExpanded = parseBooleanEnumRaw(body.allSinglesWelcomeExpanded);
   }
 
+  let mainFont = null;
+  if (hasMainFont) {
+    mainFont = normalizeMainFont(body.mainFont);
+  }
+
   try {
     await ensureCustomizationSchema();
     const prev = await selectCustomizationRow(me);
@@ -941,6 +981,7 @@ export async function putUserCustomization(req, res) {
       : prev?.all_singles_welcome_expanded != null
         ? parseBooleanEnumRaw(prev.all_singles_welcome_expanded)
         : true;
+    const nextMainFont = hasMainFont ? mainFont : normalizeMainFont(prev?.main_font);
 
     const nextMynotePrefs = hasAnyMynotePref
       ? { ...mynotePrefsFromDbRow(prev), ...mynotePatchResult.patch }
@@ -973,6 +1014,18 @@ export async function putUserCustomization(req, res) {
       all_singles_welcome_expanded: nextAllSinglesWelcomeExpanded,
       ...nextMynoteDb
     });
+    if (hasMainFont || nextMainFont) {
+      try {
+        await pool.query(
+          `UPDATE helloworldjunktest.user_customization
+           SET main_font = $1, updated_at = NOW()
+           WHERE singles_id = $2`,
+          [nextMainFont, me]
+        );
+      } catch (fontErr) {
+        if (!isMissingColumn(fontErr, 'main_font')) throw fontErr;
+      }
+    }
     return res.status(200).json(rowToPayload({
       chat_font_size: nextChatFontSize,
       mynote_font_size: nextMynoteFontSize,
@@ -984,6 +1037,7 @@ export async function putUserCustomization(req, res) {
       custom_music_url: customMusicUrlSlotsToDb(nextCustomMusicUrls),
       all_singles_welcome_expanded: nextAllSinglesWelcomeExpanded,
       load_default: parseLoadDefaultFlag(prev),
+      main_font: nextMainFont,
       ...nextMynoteDb
     }));
   } catch (err) {

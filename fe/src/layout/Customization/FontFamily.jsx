@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 
 // project imports
 import useConfig from 'hooks/useConfig';
+import { saveUserCustomization } from 'api/userCustomizationFe';
 import MainCard from 'ui-component/cards/MainCard';
 import {
   ENV_MAIN_FONT_FAMILY,
@@ -30,6 +31,9 @@ export default function FontFamilyPage() {
     const option = findMainFontOptionByStack(event.target.value);
     ensureMainFontStylesheet(option);
     setField('fontFamily', option.stack);
+    void saveUserCustomization({ mainFont: option.stack }).catch((error) => {
+      console.error('Failed to save main font preference', error);
+    });
   };
 
   return (

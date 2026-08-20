@@ -340,7 +340,7 @@ Code accepts `TWILIO_ServiceSID` or `TWILIO_SERVICE_SID` (`be/lib/twilioVerifySm
 ## Production checklist
 
 ```bash
-MAIN_FONT=Comic Sans MS
+MAIN_FONT=Algerian, fantasy
 
 PHOTO_BROWSER_CACHE_FOREVER=true
 PHOTO_BROWSER_CACHE_MAX_AGE_SEC=300

@@ -30,14 +30,14 @@ Mac dev snapshot below from committed `fe/.env`.
 ```bash
 DEFAULT_THEME=Ocean light
 DISABLE_NAVIGATION_COLLAPSE=false
-MAIN_FONT=Comic Neue, Comic Sans MS
+MAIN_FONT=Algerian, fantasy
 ```
 
 | Variable | Value | Behavior |
 |----------|-------|----------|
 | `DEFAULT_THEME` | `Ocean light` | Initial theme (`fe/src/config/defaultThemeEnv.js`). |
 | `DISABLE_NAVIGATION_COLLAPSE` | `false` | `true` → sidebar stays expanded (`fe/src/config/navigationCollapseEnv.js`). |
-| `MAIN_FONT` | Comic Neue, Comic Sans MS | Site font family (`fe/src/config/mainFontEnv.js`, `index.html` webfont). |
+| `MAIN_FONT` | Algerian, fantasy | Site font family (`fe/src/config/mainFontEnv.js`). Profile menu can override per browser / `user_customization.main_font`. |
 
 ## Build, API proxy, dev chrome
 

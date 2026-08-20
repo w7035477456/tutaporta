@@ -80,7 +80,7 @@ function FullHdAdjustDialog({ open, onClose, widthPx, heightPx }) {
             bgcolor: 'var(--theme-error-color)',
             color: '#000000',
             WebkitTextFillColor: '#000000',
-            fontFamily: '"Comic Sans MS", "Comic Sans", cursive',
+            fontFamily: 'Algerian, fantasy',
             fontWeight: 800,
             fontSize: buttonFontSizeResponsive,
             lineHeight: 1,

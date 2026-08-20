@@ -61,6 +61,7 @@ import {
   VSINGLES_TOUR_STEP_EVENT,
   isVsinglesTourRoute
 } from 'utils/vsinglesTour';
+import { saveUserCustomization } from 'api/userCustomizationFe';
 import { fetchBuildLabel } from 'config/buildInfoEnv';
 import { siteFooterTextFontSize } from 'config/footerFontEnv';
 import {
@@ -326,6 +327,9 @@ export default function ProfileSection({ clusterTight = false }) {
     window.setTimeout(() => {
       try {
         setField('fontFamily', option.stack);
+        void saveUserCustomization({ mainFont: option.stack }).catch((error) => {
+          console.error('Failed to save main font preference', error);
+        });
       } finally {
         const clearBusy = () => setMainFontBusy(false);
         const fontsReady =
@@ -347,7 +351,7 @@ export default function ProfileSection({ clusterTight = false }) {
     }, 50);
   };
 
-  /** Reset to Ocean light + recommended Comic Neue. */
+  /** Reset to Ocean light + recommended Algerian. */
   const resetThemeAndFont = () => {
     if (tourActive || mainFontBusy) return;
     closeProfileMenu();

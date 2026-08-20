@@ -147,6 +147,7 @@ function mapCustomizationResponse(data) {
     customMusicUrls: parseCustomMusicUrls(data),
     loadDefault: parseLoadDefault(data),
     allSinglesWelcomeExpanded: parseAllSinglesWelcomeExpanded(data),
+    mainFont: String(data?.mainFont || '').trim() || 'Algerian, fantasy',
     ...parseMynoteEditorPrefs(data)
   };
 }
@@ -184,6 +185,9 @@ export async function saveUserCustomization(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'allSinglesWelcomeExpanded')) {
     body.allSinglesWelcomeExpanded = Boolean(patch.allSinglesWelcomeExpanded);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'mainFont')) {
+    body.mainFont = patch.mainFont;
   }
   for (const key of MYNOTE_EDITOR_PREF_KEYS) {
     if (Object.prototype.hasOwnProperty.call(patch, key)) {

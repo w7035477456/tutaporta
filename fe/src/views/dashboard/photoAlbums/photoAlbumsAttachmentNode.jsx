@@ -595,7 +595,7 @@ const panModeInstructionBannerSx = {
   userSelect: 'none',
   textAlign: 'center',
   fontWeight: 800,
-  fontFamily: 'Comic Sans MS, Comic Neue, cursive',
+  fontFamily: 'Algerian, fantasy',
   fontSize: { xs: '0.68rem', sm: '0.78rem' },
   lineHeight: 1.25
 };
@@ -667,7 +667,7 @@ const slotZoomPctLabelSx = (active) => ({
   flexShrink: 0,
   fontSize: '0.78rem',
   lineHeight: 1.2,
-  fontFamily: 'Comic Sans MS, Comic Neue, cursive'
+  fontFamily: 'Algerian, fantasy'
 });
 
 /** Map framed photo width vs cover → 0…100% (0 = cover fill, 100 = max zoom). */
@@ -3180,7 +3180,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               <Typography
                 component="div"
                 sx={{
-                  fontFamily: 'Comic Sans MS, Comic Neue, cursive',
+                  fontFamily: 'Algerian, fantasy',
                   fontWeight: 900,
                   fontSize: { xs: '1.05rem', sm: '1.35rem' },
                   lineHeight: 1.15,

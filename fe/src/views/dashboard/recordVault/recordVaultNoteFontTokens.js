@@ -123,7 +123,7 @@ export function recordVaultThemeDaynightShellSx(bgColorIndex) {
 }
 
 export const RECORD_VAULT_FONT_FAMILY_OPTIONS = [
-  'Comic Neue, Comic Sans MS, cursive',
+  'Algerian, fantasy',
   'Inter, sans-serif',
   'Georgia, serif',
   'Courier New, monospace'
