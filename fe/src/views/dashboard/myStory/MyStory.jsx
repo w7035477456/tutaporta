@@ -3208,6 +3208,7 @@ export default function MyStory() {
       <NicknamePickerDialog
         open={showNicknameDialog || suggestListOpen}
         initialNickname={profileBasics.alias || user?.alias || ''}
+        excludeFirstName={user?.firstname || user?.first_name || user?.mailing_firstname || ''}
         onSaved={handleNicknameSaved}
         dismissible={suggestListOpen}
         onClose={() => {

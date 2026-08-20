@@ -1,8 +1,22 @@
+import {
+  isValidRhymingNickname,
+  listNicknameAdjectives,
+  listNicknameFirstNames,
+  NICKNAME_ADJECTIVE_GROUPS,
+  buildRhymingNickname,
+  nicknameFirstLetterKey,
+  titleCaseNicknameWord,
+  parseNicknameParts
+} from '../../fe/src/config/nicknameSuggestions.js';
+
 export const ALIAS_ALNUM_ONLY_MESSAGE =
   'Nick name may only contain letters and numbers (no spaces or symbols).';
 
 export const ALIAS_DOUBLED_WORD_MESSAGE =
   'Nickname cannot use the same word twice (e.g. SillySilly). Pick an adjective plus a different name.';
+
+export const ALIAS_RHYME_NAME_MESSAGE =
+  'Nickname must be an adjective plus a real first name that start with the same letter (e.g. BrainyBobby).';
 
 /** True when alias is WordWord with identical halves (SillySilly / QuirkyQuirky). */
 export function isDoubledWordAlias(value) {
@@ -18,9 +32,7 @@ export function normalizeAliasKey(alias) {
 }
 
 function titleCaseWord(word) {
-  const w = String(word ?? '').trim();
-  if (!w) return '';
-  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  return titleCaseNicknameWord(word);
 }
 
 /**
@@ -59,3 +71,22 @@ export function formatAliasTakenMessage(alias) {
   const name = cleanAlias(alias) || String(alias ?? '').trim();
   return `The alias ${name} is taken. Please add a number or choose different combinations`;
 }
+
+export function isValidRhymingAliasFormat(value, excludeFirstName = '') {
+  return isValidRhymingNickname(value, {
+    adjectives: listNicknameAdjectives(),
+    firstNames: listNicknameFirstNames(),
+    excludeFirstName
+  });
+}
+
+export {
+  isValidRhymingNickname,
+  listNicknameAdjectives,
+  listNicknameFirstNames,
+  NICKNAME_ADJECTIVE_GROUPS,
+  buildRhymingNickname,
+  nicknameFirstLetterKey,
+  parseNicknameParts,
+  titleCaseNicknameWord
+};

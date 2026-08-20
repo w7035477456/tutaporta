@@ -1,9 +1,11 @@
 import {
   ALIAS_ALNUM_ONLY_MESSAGE,
   ALIAS_DOUBLED_WORD_MESSAGE,
+  ALIAS_RHYME_NAME_MESSAGE,
   cleanAlias,
   isDoubledWordAlias,
   isValidAliasFormat,
+  isValidRhymingAliasFormat,
   normalizeAliasKey,
   formatAliasTakenMessage
 } from './aliasValidation.js';
@@ -23,6 +25,22 @@ async function isSinglesAliasTakenByOther(client, alias, excludeSinglesId) {
     [trimmed, excludeSinglesId]
   );
   return rows.length > 0;
+}
+
+async function loadLegalFirstName(client, singlesId) {
+  const { rows } = await client.query(
+    `SELECT COALESCE(
+       NULLIF(BTRIM(s.mailing_firstname), ''),
+       NULLIF(BTRIM(s.dl_firstname), ''),
+       NULLIF(BTRIM(v.firstname), '')
+     ) AS first_name
+     FROM helloworldjunktest.singles s
+     LEFT JOIN helloworldjunktest.vet_bio v ON v.singles_id = s.singles_id
+     WHERE s.singles_id = $1
+     LIMIT 1`,
+    [singlesId]
+  );
+  return String(rows[0]?.first_name ?? '').trim();
 }
 
 /**
@@ -61,6 +79,11 @@ export async function persistMemberAlias(client, singlesId, rawAlias) {
 
   if (isDoubledWordAlias(nickname)) {
     return { ok: false, status: 400, error: ALIAS_DOUBLED_WORD_MESSAGE };
+  }
+
+  const legalFirst = await loadLegalFirstName(client, singlesId);
+  if (!isValidRhymingAliasFormat(nickname, legalFirst)) {
+    return { ok: false, status: 400, error: ALIAS_RHYME_NAME_MESSAGE };
   }
 
   const currentNickname = cleanAlias(currentResult.rows[0]?.alias);

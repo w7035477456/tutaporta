@@ -1,10 +1,22 @@
+import {
+  isValidRhymingNickname,
+  listNicknameAdjectives,
+  listNicknameFirstNames,
+  wordsShareFirstLetter,
+  titleCaseNicknameWord
+} from 'config/nicknameSuggestions';
+
 export const ALIAS_ALNUM_ONLY_MESSAGE =
   'Nick name may only contain letters and numbers (no spaces or symbols).';
 
+export const ALIAS_DOUBLED_WORD_MESSAGE =
+  'Nickname cannot use the same word twice (e.g. SillySilly). Pick an adjective plus a different name.';
+
+export const ALIAS_RHYME_NAME_MESSAGE =
+  'Nickname must be an adjective plus a real first name that start with the same letter (e.g. BrainyBobby).';
+
 function titleCaseWord(word) {
-  const w = String(word ?? '').trim();
-  if (!w) return '';
-  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  return titleCaseNicknameWord(word);
 }
 
 export const titleCaseWordForAlias = titleCaseWord;
@@ -23,15 +35,30 @@ export function appendAliasSuggestionClick(currentValue, word) {
   return (String(currentValue ?? '') + titleCaseWord(piece)).slice(0, 80);
 }
 
-/** Combine two suggestion clicks: "bubbly" + "bob" -> "BubblyBob". Rejects same word twice. */
+/**
+ * Combine adjective + first name. Requires same first letter (“rhyme”).
+ * Returns '' when the pair is invalid so the UI can show an error.
+ */
 export function formatAliasFromClickPair(word1, word2) {
   const w1 = String(word1 ?? '').replace(/[^A-Za-z0-9]/g, '');
   const w2 = String(word2 ?? '').replace(/[^A-Za-z0-9]/g, '');
   if (!w1 || !w2) return titleCaseWord(w1 || w2);
   if (w1.toLowerCase() === w2.toLowerCase()) {
-    return titleCaseWord(w1).slice(0, 80);
+    return '';
+  }
+  if (!wordsShareFirstLetter(w1, w2)) {
+    return '';
   }
   return (titleCaseWord(w1) + titleCaseWord(w2)).slice(0, 80);
+}
+
+/** True when alias follows Adj + real first name + same first letter. */
+export function isValidRhymingAliasFormat(value, excludeFirstName = '') {
+  return isValidRhymingNickname(value, {
+    adjectives: listNicknameAdjectives(),
+    firstNames: listNicknameFirstNames(),
+    excludeFirstName
+  });
 }
 
 /** True when alias is WordWord with identical halves (SillySilly / QuirkyQuirky). */
@@ -41,10 +68,6 @@ export function isDoubledWordAlias(value) {
   const half = s.length / 2;
   return s.slice(0, half).toLowerCase() === s.slice(half).toLowerCase();
 }
-
-export const ALIAS_DOUBLED_WORD_MESSAGE =
-  'Nickname cannot use the same word twice (e.g. SillySilly). Pick an adjective plus a different name.';
-
 
 /** Format nickname built from suggestion clicks (one or two words). */
 export function formatAliasFromClicks(value) {

@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 
@@ -7,17 +7,36 @@ import { saveOnlineNickname, ALIAS_ALNUM_ONLY_MESSAGE } from 'api/saveOnlineNick
 import {
   isValidAliasFormat,
   isDoubledWordAlias,
+  isValidRhymingAliasFormat,
   sanitizeAliasForSave,
-  appendAliasSuggestionClick,
-  ALIAS_DOUBLED_WORD_MESSAGE
+  ALIAS_DOUBLED_WORD_MESSAGE,
+  ALIAS_RHYME_NAME_MESSAGE
 } from 'utils/aliasValidation';
-import { NICKNAME_ADJECTIVE_GROUPS } from 'config/nicknameSuggestions';
+import {
+  NICKNAME_ADJECTIVE_GROUPS,
+  listNicknameAdjectives,
+  nicknameFirstLetterKey,
+  titleCaseNicknameWord
+} from 'config/nicknameSuggestions';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 
-function AdjectiveChips({ items, onPick }) {
+function AdjectiveChips({ items, letterFilter, onPick }) {
+  const filtered = letterFilter
+    ? items.filter((item) => {
+        const word = typeof item === 'string' ? item : item.word;
+        return nicknameFirstLetterKey(word) === letterFilter;
+      })
+    : items;
+  if (!filtered.length) {
+    return (
+      <ColorTemplate7PopupLargeDark.SectionDescription>
+        No adjectives start with “{String(letterFilter).toUpperCase()}”. Clear the name or pick a matching letter.
+      </ColorTemplate7PopupLargeDark.SectionDescription>
+    );
+  }
   return (
     <Box sx={{ lineHeight: 1.55 }}>
-      {items.map((item) => {
+      {filtered.map((item) => {
         const word = typeof item === 'string' ? item : item.word;
         const example = typeof item === 'string' ? null : item.example;
         return (
@@ -36,7 +55,7 @@ function AdjectiveChips({ items, onPick }) {
   );
 }
 
-function AdjectivesSection({ onPick }) {
+function AdjectivesSection({ letterFilter, onPick }) {
   return (
     <Box sx={{ width: '100%' }}>
       <ColorTemplate7PopupLargeDark.SectionTitle>Adjectives</ColorTemplate7PopupLargeDark.SectionTitle>
@@ -44,17 +63,27 @@ function AdjectivesSection({ onPick }) {
         <Box key={`adj-${group.key}`} sx={{ mb: 2 }}>
           <ColorTemplate7PopupLargeDark.SectionLabel>{group.label}</ColorTemplate7PopupLargeDark.SectionLabel>
           <ColorTemplate7PopupLargeDark.SectionDescription>{group.description}</ColorTemplate7PopupLargeDark.SectionDescription>
-          <AdjectiveChips items={group.adjectives ?? []} onPick={onPick} />
+          <AdjectiveChips items={group.adjectives ?? []} letterFilter={letterFilter} onPick={onPick} />
         </Box>
       ))}
     </Box>
   );
 }
 
-function NameChips({ names, onPick }) {
+function NameChips({ names, letterFilter, onPick }) {
+  const filtered = letterFilter
+    ? names.filter((name) => nicknameFirstLetterKey(name) === letterFilter)
+    : names;
+  if (!filtered.length) {
+    return (
+      <ColorTemplate7PopupLargeDark.SectionDescription>
+        No first names start with “{String(letterFilter).toUpperCase()}”. Pick a different adjective letter.
+      </ColorTemplate7PopupLargeDark.SectionDescription>
+    );
+  }
   return (
     <Box sx={{ lineHeight: 1.55 }}>
-      {names.map((name) => (
+      {filtered.map((name) => (
         <ColorTemplate7PopupLargeDark.Link key={name} onClick={() => onPick(name)}>
           {name}
         </ColorTemplate7PopupLargeDark.Link>
@@ -63,7 +92,7 @@ function NameChips({ names, onPick }) {
   );
 }
 
-function GenderColumn({ title, nameKey, onPick }) {
+function GenderColumn({ title, nameKey, letterFilter, onPick }) {
   return (
     <Box sx={{ flex: 1, minWidth: 0 }}>
       <ColorTemplate7PopupLargeDark.SectionTitle>{title}</ColorTemplate7PopupLargeDark.SectionTitle>
@@ -71,7 +100,7 @@ function GenderColumn({ title, nameKey, onPick }) {
         <Box key={`${nameKey}-${group.key}`} sx={{ mb: 2 }}>
           <ColorTemplate7PopupLargeDark.SectionLabel>{group.label}</ColorTemplate7PopupLargeDark.SectionLabel>
           <ColorTemplate7PopupLargeDark.SectionDescription>{group.description}</ColorTemplate7PopupLargeDark.SectionDescription>
-          <NameChips names={group[nameKey]} onPick={onPick} />
+          <NameChips names={group[nameKey]} letterFilter={letterFilter} onPick={onPick} />
         </Box>
       ))}
     </Box>
@@ -83,22 +112,61 @@ export default function NicknamePickerDialog({
   initialNickname = '',
   onSaved,
   onClose,
-  dismissible = false
+  dismissible = false,
+  excludeFirstName = ''
 }) {
   const [nickname, setNickname] = useState(initialNickname);
+  const [pendingAdjective, setPendingAdjective] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const adjectiveSet = useMemo(
+    () => new Set(listNicknameAdjectives().map((w) => w.toLowerCase())),
+    []
+  );
 
   useEffect(() => {
     if (!open) return;
     setNickname(initialNickname);
+    setPendingAdjective('');
     setError('');
   }, [open, initialNickname]);
 
-  const handlePickWord = useCallback((word) => {
-    setError('');
-    setNickname((prev) => appendAliasSuggestionClick(prev, word));
-  }, []);
+  const letterFilter = nicknameFirstLetterKey(pendingAdjective) || null;
+
+  const handlePickWord = useCallback(
+    (word) => {
+      setError('');
+      const clean = titleCaseNicknameWord(word);
+      const isAdjective = adjectiveSet.has(clean.toLowerCase());
+
+      if (!pendingAdjective && isAdjective) {
+        setPendingAdjective(clean);
+        setNickname(clean);
+        return;
+      }
+
+      if (pendingAdjective) {
+        if (!nicknameFirstLetterKey(pendingAdjective) || nicknameFirstLetterKey(pendingAdjective) !== nicknameFirstLetterKey(clean)) {
+          setError(ALIAS_RHYME_NAME_MESSAGE);
+          return;
+        }
+        if (pendingAdjective.toLowerCase() === clean.toLowerCase()) {
+          setError(ALIAS_DOUBLED_WORD_MESSAGE);
+          return;
+        }
+        setNickname(`${pendingAdjective}${clean}`);
+        setPendingAdjective('');
+        return;
+      }
+
+      // Name clicked first → require matching adjective next.
+      setPendingAdjective('');
+      setNickname(clean);
+      setError('Pick an adjective that starts with the same letter as this first name.');
+    },
+    [adjectiveSet, pendingAdjective]
+  );
 
   const handleSave = useCallback(async () => {
     const aliasToSave = sanitizeAliasForSave(nickname);
@@ -131,6 +199,11 @@ export default function NicknamePickerDialog({
       return;
     }
 
+    if (!isValidRhymingAliasFormat(aliasToSave, excludeFirstName)) {
+      setError(ALIAS_RHYME_NAME_MESSAGE);
+      return;
+    }
+
     setNickname(aliasToSave);
     setSaving(true);
     setError('');
@@ -142,7 +215,7 @@ export default function NicknamePickerDialog({
     } finally {
       setSaving(false);
     }
-  }, [nickname, onSaved, dismissible]);
+  }, [nickname, onSaved, dismissible, excludeFirstName]);
 
   const hasCloseHandler = typeof onClose === 'function';
 
@@ -156,8 +229,14 @@ export default function NicknamePickerDialog({
       <ColorTemplate7PopupLargeDark.Body>
         <ColorTemplate7PopupLargeDark.Title>Please choose a nickname for this site.</ColorTemplate7PopupLargeDark.Title>
         <ColorTemplate7PopupLargeDark.BodyText>
-          You can &ldquo;click&rdquo; any two words from the group of adjectives and nouns below, or type in, to set your
-          Nickname/Alias (example: BubblyBob, or BubblyBob99)
+          Click one adjective, then a real first name that starts with the same letter (example: BrainyBobby). The second
+          word must be a first name — not your legal first name.
+          {pendingAdjective ? (
+            <>
+              {' '}
+              Selected adjective: <strong>{pendingAdjective}</strong> — now pick a matching first name.
+            </>
+          ) : null}
         </ColorTemplate7PopupLargeDark.BodyText>
 
         <Box
@@ -177,6 +256,7 @@ export default function NicknamePickerDialog({
             value={nickname}
             onChange={(e) => {
               setNickname(e.target.value);
+              setPendingAdjective('');
               setError('');
             }}
             disabled={saving}
@@ -188,7 +268,7 @@ export default function NicknamePickerDialog({
 
         {error ? <ColorTemplate7PopupLargeDark.ErrorBar>{error}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
 
-        <AdjectivesSection onPick={handlePickWord} />
+        <AdjectivesSection letterFilter={null} onPick={handlePickWord} />
 
         <Box
           sx={{
@@ -198,8 +278,18 @@ export default function NicknamePickerDialog({
             width: '100%'
           }}
         >
-          <GenderColumn title="50 Female Nicknames" nameKey="female" onPick={handlePickWord} />
-          <GenderColumn title="50 Male Nicknames" nameKey="male" onPick={handlePickWord} />
+          <GenderColumn
+            title="Female first names"
+            nameKey="female"
+            letterFilter={letterFilter}
+            onPick={handlePickWord}
+          />
+          <GenderColumn
+            title="Male first names"
+            nameKey="male"
+            letterFilter={letterFilter}
+            onPick={handlePickWord}
+          />
         </Box>
       </ColorTemplate7PopupLargeDark.Body>
     </ColorTemplate7PopupLargeDark>
@@ -211,5 +301,6 @@ NicknamePickerDialog.propTypes = {
   initialNickname: PropTypes.string,
   onSaved: PropTypes.func,
   onClose: PropTypes.func,
-  dismissible: PropTypes.bool
+  dismissible: PropTypes.bool,
+  excludeFirstName: PropTypes.string
 };
