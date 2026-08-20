@@ -42,7 +42,13 @@ import { formatCapitalizedFullName } from 'utils/fullNameFormat';
 
 const IDENTIFICATION_SEARCH_NAME_REQUIRED_MSG =
   'You must complete "Identifcation Search" on "MY self-report-bio menu" first for verified name before signing off approval for your own bio requests.';
-import { hasIncomingBioRequest, isBioRequestRequested } from 'utils/receivedBioRequestDisplay';
+import { useGetRequestsSent } from 'api/requestsSentFe';
+import {
+  isBioRequestRequested,
+  isOutgoingBioRequestApproved,
+  mirroredIncomingApprovalFromOutgoing,
+  shouldShowOnReceivedBioRequestsPage
+} from 'utils/receivedBioRequestDisplay';
 import ReceivedBioRequestsBiographyLayout from './ReceivedBioRequestsBiographyLayout';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
 import { dispatchBellNotificationRefresh } from 'utils/notificationBellStore';
@@ -53,6 +59,39 @@ import { appPageScrollHostCardSx, buildAppPageScrollRegionSx, getAppPageZoomFact
 
 function isRequestedState(value) {
   return String(value ?? '').trim().toLowerCase() === 'requested';
+}
+
+function buildReciprocalIncomingRow(outgoingRow, viewerSinglesId) {
+  const mirrored = mirroredIncomingApprovalFromOutgoing(outgoingRow);
+  return {
+    requests_id: `reciprocal-${outgoingRow.requests_id}`,
+    singles_id_from: Number(outgoingRow.singles_id_to),
+    singles_id_to: viewerSinglesId,
+    prefix: outgoingRow.prefix ?? null,
+    member_id: outgoingRow.member_id ?? null,
+    alias: outgoingRow.alias ?? null,
+    profile_image_url: outgoingRow.profile_image_url ?? null,
+    gallery_image_urls: outgoingRow.gallery_image_urls ?? [],
+    vetted_status: Boolean(outgoingRow.vetted_status),
+    brief_bio_request: 'notrequested',
+    full_bio_request: 'notrequested',
+    brief_bio_request_approval: mirrored?.brief_bio_request_approval ?? APPROVAL_STATUS.NO_RESPONSE,
+    full_bio_request_approval: mirrored?.full_bio_request_approval ?? APPROVAL_STATUS.NO_RESPONSE,
+    brief_approval_date: null,
+    full_approval_date: null,
+    block_user: Boolean(outgoingRow.block_user),
+    reciprocal_from_outgoing: true
+  };
+}
+
+function applyMirroredIncomingApproval(row, outgoingRow) {
+  const mirrored = mirroredIncomingApprovalFromOutgoing(outgoingRow);
+  if (!mirrored) return row;
+  return {
+    ...row,
+    brief_bio_request_approval: mirrored.brief_bio_request_approval,
+    full_bio_request_approval: mirrored.full_bio_request_approval
+  };
 }
 
 // ==============================|| RECEIVED BIO REQUESTS PAGE ||============================== //
@@ -71,6 +110,7 @@ export default function ReceivedBioRequestsPage() {
   );
   const { user } = useAuth();
   const { requestsAboutMe, requestsAboutMeLoading, requestsAboutMeError, refetch } = useGetRequestsAboutMe();
+  const { requestsSent, requestsSentLoading, requestsSentError } = useGetRequestsSent();
   const { approvalStayDurationDays, approvedViewingDurationMonths } = useGetRequestsAboutMeSettings();
   const [requestBusyKey, setRequestBusyKey] = useState('');
   const [approvalStateByRequestId, setApprovalStateByRequestId] = useState({});
@@ -87,9 +127,9 @@ export default function ReceivedBioRequestsPage() {
   }, []);
 
   useLayoutEffect(() => {
-    if (requestsAboutMeLoading || requestsAboutMeError) return;
+    if (requestsAboutMeLoading || requestsSentLoading || requestsAboutMeError || requestsSentError) return;
     focusMainScrollColumn();
-  }, [requestsAboutMeLoading, requestsAboutMeError]);
+  }, [requestsAboutMeLoading, requestsSentLoading, requestsAboutMeError, requestsSentError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,15 +146,41 @@ export default function ReceivedBioRequestsPage() {
     };
   }, []);
 
+  const outgoingByRequesterId = useMemo(() => {
+    const myId = user?.singles_id != null ? Number(user.singles_id) : null;
+    const myIdOk = Number.isFinite(myId);
+    const map = new Map();
+    for (const row of requestsSent) {
+      if (!Number.isFinite(row?.singles_id_to) || !Number.isFinite(row?.singles_id_from)) continue;
+      if (myIdOk && Number(row.singles_id_from) !== myId) continue;
+      map.set(Number(row.singles_id_to), row);
+    }
+    return map;
+  }, [requestsSent, user?.singles_id]);
+
   const rows = useMemo(() => {
     const currentSinglesId = Number(user?.singles_id);
     const shouldFilterByTarget = Number.isFinite(currentSinglesId);
-    return requestsAboutMe
+    const incomingRows = requestsAboutMe
       .filter((x) => Number.isFinite(x?.singles_id_from))
-      .filter((x) => (shouldFilterByTarget ? Number(x?.singles_id_to) === currentSinglesId : true))
-      .filter(hasIncomingBioRequest)
-      .sort((a, b) => a.singles_id_from - b.singles_id_from);
-  }, [requestsAboutMe, user?.singles_id]);
+      .filter((x) => (shouldFilterByTarget ? Number(x?.singles_id_to) === currentSinglesId : true));
+
+    const mergedByRequester = new Map();
+    for (const row of incomingRows) {
+      const requesterId = Number(row.singles_id_from);
+      const outgoingRow = outgoingByRequesterId.get(requesterId);
+      if (!shouldShowOnReceivedBioRequestsPage(row, outgoingRow)) continue;
+      mergedByRequester.set(requesterId, applyMirroredIncomingApproval(row, outgoingRow));
+    }
+
+    for (const [requesterId, outgoingRow] of outgoingByRequesterId.entries()) {
+      if (mergedByRequester.has(requesterId)) continue;
+      if (!isOutgoingBioRequestApproved(outgoingRow)) continue;
+      mergedByRequester.set(requesterId, buildReciprocalIncomingRow(outgoingRow, currentSinglesId));
+    }
+
+    return [...mergedByRequester.values()].sort((a, b) => a.singles_id_from - b.singles_id_from);
+  }, [requestsAboutMe, outgoingByRequesterId, user?.singles_id]);
 
   const effectiveRowApproval = (row, key) => {
     const override = approvalStateByRequestId?.[row.requests_id];
@@ -134,14 +200,26 @@ export default function ReceivedBioRequestsPage() {
           override && Object.prototype.hasOwnProperty.call(override, 'full_bio_request_approval');
         const briefRequested = isBioRequestRequested(row.brief_bio_request);
         const fullRequested = isBioRequestRequested(row.full_bio_request);
+        const outgoingRow = outgoingByRequesterId.get(Number(row.singles_id_from));
+        const mirrored = mirroredIncomingApprovalFromOutgoing(outgoingRow);
         let briefApproval = briefOverride
           ? effectiveRowApproval(row, 'brief_bio_request_approval')
           : normalizeRequestApproval(row.brief_bio_request_approval);
         let fullApproval = fullOverride
           ? effectiveRowApproval(row, 'full_bio_request_approval')
           : normalizeRequestApproval(row.full_bio_request_approval);
-        if (!briefRequested) briefApproval = APPROVAL_STATUS.NO_RESPONSE;
-        if (!fullRequested) fullApproval = APPROVAL_STATUS.NO_RESPONSE;
+
+        if (mirrored && !briefOverride && !fullOverride) {
+          briefApproval = normalizeRequestApproval(mirrored.brief_bio_request_approval);
+          fullApproval = normalizeRequestApproval(mirrored.full_bio_request_approval);
+        }
+
+        if (!briefRequested && briefApproval !== APPROVAL_STATUS.APPROVE) {
+          briefApproval = APPROVAL_STATUS.NO_RESPONSE;
+        }
+        if (!fullRequested && fullApproval !== APPROVAL_STATUS.APPROVE) {
+          fullApproval = APPROVAL_STATUS.NO_RESPONSE;
+        }
 
         return {
           ...row,
@@ -149,7 +227,7 @@ export default function ReceivedBioRequestsPage() {
           full_bio_request_approval: fullApproval
         };
       }),
-    [rows, approvalStateByRequestId]
+    [rows, approvalStateByRequestId, outgoingByRequesterId]
   );
 
   const expectedFullName = useMemo(() => {
@@ -467,20 +545,20 @@ export default function ReceivedBioRequestsPage() {
         onConfirm={handleConsentConfirm}
         onCancel={handleConsentCancel}
       />
-      {requestsAboutMeLoading ? (
+      {requestsAboutMeLoading || requestsSentLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
           <CircularProgress />
         </Box>
       ) : null}
-      {requestsAboutMeError ? (
+      {requestsAboutMeError || requestsSentError ? (
         <Alert severity="error">
           Failed to load requests.
           <Box component="pre" sx={{ mt: 1, fontSize: '0.75rem', overflow: 'auto', maxHeight: 120 }}>
-            {requestsAboutMeError?.message ?? String(requestsAboutMeError)}
+            {requestsAboutMeError?.message ?? requestsSentError?.message ?? String(requestsAboutMeError ?? requestsSentError)}
           </Box>
         </Alert>
       ) : null}
-      {!requestsAboutMeLoading && !requestsAboutMeError ? (
+      {!requestsAboutMeLoading && !requestsSentLoading && !requestsAboutMeError && !requestsSentError ? (
         <Box sx={scrollRegionSx}>
           <ReceivedBioRequestsBiographyLayout
             rows={rowsWithEffectiveApproval}

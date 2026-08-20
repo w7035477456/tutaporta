@@ -189,6 +189,10 @@ export function colorTemplate11PostingPhotoHeightPxToVh(heightPx, viewportHeight
 export const COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT =
   '(Double click on photos/videos to view full screen · double-click post text to edit)';
 
+/** Picks & Posts / Acquaint. & Buddies: photo zoom only (no in-place post edit). */
+export const COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT_VIEW_ONLY =
+  '(Double click on photos/videos to view full screen)';
+
 export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
   return {
     position: 'sticky',

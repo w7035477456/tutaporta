@@ -27,7 +27,7 @@ import {
 import MainCard from 'ui-component/cards/MainCard';
 import { useGetRequestsSent } from 'api/requestsSentFe';
 import { dismissAllBioResponseNotifications } from 'api/bioRequestNotificationsFe';
-import { triStateBioRequestApproval } from 'utils/receivedBioRequestDisplay';
+import { triStateBioRequestApproval, isOutgoingBioRequestApproved } from 'utils/receivedBioRequestDisplay';
 import { dispatchBellNotificationRefresh } from 'utils/notificationBellStore';
 import api from 'api/axios';
 import { useAuth } from 'contexts/AuthContext';
@@ -211,16 +211,8 @@ export default function RequestsSent() {
     })();
   }, []);
 
-  /** Photo stack: outgoing requests where brief or full bio was requested. */
-  const photoStackRows = useMemo(
-    () =>
-      rows.filter((row) => {
-        const briefRequested = String(row.brief_bio_request ?? '').trim().toLowerCase() === 'requested';
-        const fullRequested = String(row.full_bio_request ?? '').trim().toLowerCase() === 'requested';
-        return briefRequested || fullRequested;
-      }),
-    [rows]
-  );
+  /** Left-rail cards: outgoing requests where recipient approved Brief or Full bio. */
+  const photoStackRows = useMemo(() => rows.filter(isOutgoingBioRequestApproved), [rows]);
 
   const closeViewChargeDialog = useCallback(() => {
     setViewChargeDialogState((prev) => ({ ...prev, open: false, row: null }));

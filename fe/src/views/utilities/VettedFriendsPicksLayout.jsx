@@ -59,6 +59,13 @@ import { TOUR_LISA_MEMBER_NUMBER } from 'utils/vsinglesTourActions';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
 import { colorTemplate8PhotoGalleryRemoveSpinnerSx } from 'config/colorTemplate8PhotoGallery';
+import {
+  MEMBER_PHOTO_STACK_SX,
+  MEMBER_INCOMING_APPROVED_SASH_SX,
+  MEMBER_RELATIONSHIP_TAG_SX,
+  memberRelationshipRibbonKind,
+  memberRelationshipRibbonLabel
+} from 'config/memberRelationshipRibbon';
 import SelectedButtonTemplate, { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import ColorTemplate11Posting from 'ui-component/ColorTemplate11Posting';
@@ -78,7 +85,10 @@ import { SELF_INTRO_VIDEO_SLOT_MAX } from 'constants/selfIntroVideoLimits';
 import { SelfIntroVideoFrameThumbnail } from 'views/utilities/SelfIntroVideoLibrary';
 import SelfIntroVideoSlotsFullPopup from 'views/utilities/SelfIntroVideoSlotsFullPopup';
 import filmBackground from 'assets/images/filmBackground.png';
-import { COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT } from 'config/colorTemplate11Posting';
+import {
+  COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT,
+  COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT_VIEW_ONLY
+} from 'config/colorTemplate11Posting';
 import usePostingFeedDelete from 'hooks/usePostingFeedDelete';
 import { usePostingAlbumMediaFullscreen } from 'hooks/usePostingAlbumMediaFullscreen';
 import PostingAlbumMediaFullscreen from 'ui-component/PostingAlbumMediaFullscreen';
@@ -124,40 +134,6 @@ const outgoingBioApprovedStatusFontSize = {
 };
 
 /** Yellow sash + black outlined text — avatar when brief/full bio approval is approve. */
-const vettedFriendsApprovedRibbonSx = {
-  position: 'absolute',
-  zIndex: 100,
-  top: '14%',
-  left: '-38%',
-  width: '100%',
-  py: '0.2rem',
-  bgcolor: '#FFEB3B',
-  color: '#000000',
-  WebkitTextFillColor: '#000000',
-  WebkitTextStroke: '0.45px #000000',
-  paintOrder: 'stroke fill',
-  textShadow: `
-    -0.5px -0.5px 0 #000000,
-     0.5px -0.5px 0 #000000,
-    -0.5px  0.5px 0 #000000,
-     0.5px  0.5px 0 #000000
-  `,
-  fontFamily: 'inherit',
-  fontSize: { xs: '1.04rem', sm: '1.16rem' },
-  fontWeight: 800,
-  letterSpacing: 0.15,
-  lineHeight: 1.15,
-  textAlign: 'center',
-  textTransform: 'none',
-  whiteSpace: 'nowrap',
-  transform: 'rotate(-45deg)',
-  transformOrigin: 'center',
-  pointerEvents: 'none',
-  boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
-  border: '1.5px solid #000000',
-  boxSizing: 'border-box'
-};
-
 const vettedFriendsPanelTextSx = {
   fontSize: outgoingBioBodyTextFontSize,
   lineHeight: 1.35
@@ -286,13 +262,6 @@ function isTruthyPaidFlag(value) {
 function getBioRequestApprovalState(row, kind) {
   const value = kind === 'brief' ? row?.brief_bio_request_approval : row?.full_bio_request_approval;
   return triStateApproval(value);
-}
-
-function hasApprovedBioRequestRibbon(row) {
-  return (
-    getBioRequestApprovalState(row, 'brief') === APPROVAL_STATUS.APPROVE ||
-    getBioRequestApprovalState(row, 'full') === APPROVAL_STATUS.APPROVE
-  );
 }
 
 /** Outgoing request can be canceled only while still awaiting a response. */
@@ -2488,7 +2457,10 @@ export default function VettedFriendsPicksLayout({
               row.profile_image_url || buildProfilePhotoUrl(row.singles_id_to, row.profile_image_fk);
             const isDropTarget = draggingSinglesId != null && dropTargetSinglesId === singlesId && draggingSinglesId !== singlesId;
             const isBlockedUser = effectiveBlockUser(row);
-            const showApprovedRibbon = hasApprovedBioRequestRibbon(row);
+            const relationshipKind =
+              memberRelationshipRibbonKind(row) ||
+              (isBuddyRelationship(row) ? 'buddies' : isAcquaintOrBuddyRelationship(row) ? 'acquaintance' : null);
+            const relationshipLabel = memberRelationshipRibbonLabel(relationshipKind);
 
             return (
               <ColorTemplate8PhotoGallery.Item
@@ -2543,34 +2515,41 @@ export default function VettedFriendsPicksLayout({
                     <IconX stroke={3} color="currentColor" />
                   )}
                 </ColorTemplate8PhotoGallery.RemoveButton>
-                <Box
-                  sx={{
-                    position: 'relative',
-                    zIndex: 100,
-                    width: getMyPicksAvatarSize(),
-                    height: getMyPicksAvatarSize(),
-                    borderRadius: '50%',
-                    overflow: 'visible',
-                    flexShrink: 0
-                  }}
-                >
-                  <ColorTemplate8PhotoGallery.Avatar
-                    src={profileUrl}
-                    alt={memberLabel}
-                    selected={selected}
-                    onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
-                    sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
-                    imgProps={{
-                      onError: (e) => {
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src = UserRound;
-                      }
+                <Box sx={MEMBER_PHOTO_STACK_SX}>
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      zIndex: 100,
+                      width: getMyPicksAvatarSize(),
+                      height: getMyPicksAvatarSize(),
+                      borderRadius: '50%',
+                      overflow: 'visible',
+                      flexShrink: 0
                     }}
-                    {...guestDemoAllowProps()}
-                  />
-                  {showApprovedRibbon ? (
-                    <Box component="span" aria-label="View Approved" sx={vettedFriendsApprovedRibbonSx}>
-                      View Approved!
+                  >
+                    <ColorTemplate8PhotoGallery.Avatar
+                      src={profileUrl}
+                      alt={memberLabel}
+                      selected={selected}
+                      onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
+                      sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
+                      imgProps={{
+                        onError: (e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = UserRound;
+                        }
+                      }}
+                      {...guestDemoAllowProps()}
+                    />
+                    {relationshipKind ? (
+                      <Box component="span" aria-label="Approved" sx={MEMBER_INCOMING_APPROVED_SASH_SX}>
+                        Approved
+                      </Box>
+                    ) : null}
+                  </Box>
+                  {relationshipKind ? (
+                    <Box component="span" aria-label={relationshipLabel} sx={MEMBER_RELATIONSHIP_TAG_SX}>
+                      {relationshipLabel}
                     </Box>
                   ) : null}
                 </Box>
@@ -2912,6 +2891,7 @@ export default function VettedFriendsPicksLayout({
               error={myPicksFeedError}
               nestedScroll={false}
               photoZoomBarVariant="full"
+              photoZoomBarHint={COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT_VIEW_ONLY}
               photoFullscreenOverlayLines={photoFullscreenOverlayLines}
               privacyMessage={
                 myPicksFeed && !myPicksFeed.can_view_private_posts && myPicksFeed.message ? myPicksFeed.message : undefined

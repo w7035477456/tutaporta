@@ -36,7 +36,10 @@ import { postInterestedRequestInfo, postNotInterested } from 'api/interestedSing
 import { formatMemberLabel, formatMemberNumber, getMemberDisplayLines } from 'utils/memberLabel';
 import { TOUR_DEMO_MEMBER_NUMBERS } from 'utils/vsinglesTourActions';
 import { getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
-import { COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT } from 'config/colorTemplate11Posting';
+import {
+  COLOR_TEMPLATE11_POSTING_INITIAL_LIMIT,
+  COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT_VIEW_ONLY
+} from 'config/colorTemplate11Posting';
 import usePostingFeedDelete from 'hooks/usePostingFeedDelete';
 import { usePostingAlbumMediaFullscreen } from 'hooks/usePostingAlbumMediaFullscreen';
 import PostingAlbumMediaFullscreen from 'ui-component/PostingAlbumMediaFullscreen';
@@ -49,6 +52,13 @@ import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import { SELECTED_BUTTON_TEMPLATE_TEXT } from 'config/selectedUnselectedButtonTemplate';
 import { colorTemplate8PhotoGalleryRemoveSpinnerSx } from 'config/colorTemplate8PhotoGallery';
+import {
+  MEMBER_PHOTO_STACK_SX,
+  MEMBER_INCOMING_APPROVED_SASH_SX,
+  MEMBER_RELATIONSHIP_TAG_SX,
+  memberRelationshipRibbonKind,
+  memberRelationshipRibbonLabel
+} from 'config/memberRelationshipRibbon';
 import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { useAuth } from 'contexts/AuthContext';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
@@ -785,9 +795,12 @@ export default function MyPicks() {
                   );
                   const isDropTarget =
                     draggingSinglesId != null && dropTargetSinglesId === person.singles_id && draggingSinglesId !== person.singles_id;
+                  const relationshipKind = memberRelationshipRibbonKind(person);
+                  const relationshipLabel = memberRelationshipRibbonLabel(relationshipKind);
                   const showRequestedRibbon =
-                    isBioRequestFlagged(person.brief_bio_request) ||
-                    isBioRequestFlagged(person.full_bio_request);
+                    !relationshipKind &&
+                    (isBioRequestFlagged(person.brief_bio_request) ||
+                      isBioRequestFlagged(person.full_bio_request));
                   return (
                     <ColorTemplate8PhotoGallery.Item
                       key={person.singles_id}
@@ -841,27 +854,38 @@ export default function MyPicks() {
                           <IconX stroke={3} color="currentColor" />
                         )}
                       </ColorTemplate8PhotoGallery.RemoveButton>
-                      <Box
-                        sx={{
-                          position: 'relative',
-                          zIndex: 100,
-                          width: getMyPicksAvatarSize(),
-                          height: getMyPicksAvatarSize(),
-                          borderRadius: '50%',
-                          overflow: 'visible',
-                          flexShrink: 0
-                        }}
-                      >
-                        <ColorTemplate8PhotoGallery.Avatar
-                          src={person.profile_image_url || UserRound}
-                          alt={memberLabel}
-                          selected={selected}
-                          onClick={() => setSelectedSinglesId(Number(person.singles_id))}
-                          {...guestDemoAllowProps()}
-                        />
-                        {showRequestedRibbon ? (
-                          <Box component="span" aria-label="Requested" sx={myPicksRequestedRibbonSx}>
-                            Requested
+                      <Box sx={MEMBER_PHOTO_STACK_SX}>
+                        <Box
+                          sx={{
+                            position: 'relative',
+                            zIndex: 100,
+                            width: getMyPicksAvatarSize(),
+                            height: getMyPicksAvatarSize(),
+                            borderRadius: '50%',
+                            overflow: 'visible',
+                            flexShrink: 0
+                          }}
+                        >
+                          <ColorTemplate8PhotoGallery.Avatar
+                            src={person.profile_image_url || UserRound}
+                            alt={memberLabel}
+                            selected={selected}
+                            onClick={() => setSelectedSinglesId(Number(person.singles_id))}
+                            {...guestDemoAllowProps()}
+                          />
+                          {relationshipKind ? (
+                            <Box component="span" aria-label="Approved" sx={MEMBER_INCOMING_APPROVED_SASH_SX}>
+                              Approved
+                            </Box>
+                          ) : showRequestedRibbon ? (
+                            <Box component="span" aria-label="Requested" sx={myPicksRequestedRibbonSx}>
+                              Requested
+                            </Box>
+                          ) : null}
+                        </Box>
+                        {relationshipKind ? (
+                          <Box component="span" aria-label={relationshipLabel} sx={MEMBER_RELATIONSHIP_TAG_SX}>
+                            {relationshipLabel}
                           </Box>
                         ) : null}
                       </Box>
@@ -1161,6 +1185,7 @@ export default function MyPicks() {
                 error={myPicksFeedError}
                 nestedScroll={false}
                 photoZoomBarVariant="full"
+                photoZoomBarHint={COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT_VIEW_ONLY}
                 photoFullscreenOverlayLines={photoFullscreenOverlayLines}
                 privacyMessage={
                   myPicksFeed && !myPicksFeed.can_view_private_posts && myPicksFeed.message ? myPicksFeed.message : undefined

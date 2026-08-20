@@ -692,9 +692,16 @@ function ColorTemplate11PostingLoadMoreBar({ feedHasMore, loadMoreBusy, feedLoad
   );
 }
 
-function ColorTemplate11PostingFeedPhotoZoomBar({ variant = 'hint' }) {
+function ColorTemplate11PostingFeedPhotoZoomBar({ variant = 'hint', hintText }) {
   const { heightPx, setHeightPx } = useColorTemplate11PostingPhotoHeight();
-  return <ColorTemplate11PostingPhotoZoomBar heightPx={heightPx} onChangeHeight={setHeightPx} variant={variant} />;
+  return (
+    <ColorTemplate11PostingPhotoZoomBar
+      heightPx={heightPx}
+      onChangeHeight={setHeightPx}
+      variant={variant}
+      hintText={hintText}
+    />
+  );
 }
 
 function ColorTemplate11PostingFeed({
@@ -735,6 +742,7 @@ function ColorTemplate11PostingFeed({
   renderPostExtra,
   photoFullscreenOverlayLines,
   photoZoomBarVariant = 'hint',
+  photoZoomBarHint,
   sx
 }) {
   const postList = Array.isArray(posts) ? posts : [];
@@ -765,8 +773,9 @@ function ColorTemplate11PostingFeed({
       pinned={usePinnedLoadMore}
     />
   ) : null;
-  const zoomHeader =
-    zoomBarVariant ? <ColorTemplate11PostingFeedPhotoZoomBar variant={zoomBarVariant} /> : null;
+  const zoomHeader = zoomBarVariant ? (
+    <ColorTemplate11PostingFeedPhotoZoomBar variant={zoomBarVariant} hintText={photoZoomBarHint} />
+  ) : null;
 
   return (
     <ColorTemplate11PostingPhotoHeightProvider postIds={postIds}>
@@ -898,6 +907,7 @@ ColorTemplate11PostingFeed.propTypes = {
   renderPostExtra: PropTypes.func,
   photoFullscreenOverlayLines: PropTypes.arrayOf(PropTypes.string),
   photoZoomBarVariant: PropTypes.oneOf(['full', 'hint', 'hidden']),
+  photoZoomBarHint: PropTypes.string,
   sx: PropTypes.object
 };
 

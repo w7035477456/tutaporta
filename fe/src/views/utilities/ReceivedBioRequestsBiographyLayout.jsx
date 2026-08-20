@@ -24,6 +24,16 @@ import {
 import GreenButton from 'ui-component/GreenButton';
 import UserRound from 'assets/images/users/profile.jpeg';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
+import { getMyPicksAvatarSize } from 'config/myPicksCardEnv';
+import {
+  MEMBER_INCOMING_APPROVED_SASH_SX,
+  MEMBER_INCOMING_REQUESTED_SASH_SX,
+  MEMBER_PHOTO_STACK_SX,
+  MEMBER_RELATIONSHIP_TAG_SX,
+  incomingBioPhotoSashKind,
+  memberRelationshipRibbonKind,
+  memberRelationshipRibbonLabel
+} from 'config/memberRelationshipRibbon';
 import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { formatMemberLabel, getMemberDisplayLines } from 'utils/memberLabel';
@@ -456,9 +466,9 @@ export default function ReceivedBioRequestsBiographyLayout({
     );
     // Pending requests start with no radio selected until the user clicks one.
     const radioGroupValue =
-      canRespondToBioRequest && !approvalTouched && effectiveSavedApproval === APPROVAL_STATUS.NO_RESPONSE
+      canRespondToBioRequest && !approvalTouched && approvalValue === APPROVAL_STATUS.NO_RESPONSE
         ? ''
-        : effectiveApprovalValue;
+        : approvalValue;
     const approveDenyLocked =
       responsePanelEnabled &&
       isApprovalLockedDuringStay(effectiveSavedApproval, approvalDate, approvalStayDurationDays);
@@ -664,8 +674,10 @@ export default function ReceivedBioRequestsBiographyLayout({
                   : `${API_BASE_URL}/api/profile-photo/${row.singles_id_from}`;
               const isDropTarget = draggingSinglesId != null && dropTargetSinglesId === singlesId && draggingSinglesId !== singlesId;
               const isBlockedUser = Boolean(row.block_user);
-              const savedRow = originalRows.find((item) => item.requests_id === row.requests_id) ?? row;
-              const pendingBadgeCount = countIncomingBioRequestsPending(savedRow);
+              const pendingBadgeCount = countIncomingBioRequestsPending(row);
+              const photoSashKind = incomingBioPhotoSashKind(row);
+              const relationshipKind = memberRelationshipRibbonKind(row);
+              const relationshipLabel = memberRelationshipRibbonLabel(relationshipKind);
 
               return (
                 <ColorTemplate8PhotoGallery.Item
@@ -706,28 +718,47 @@ export default function ReceivedBioRequestsBiographyLayout({
                     setDropTargetSinglesId(null);
                   }}
                 >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      width: '100%'
-                    }}
-                  >
-                    <ColorTemplate8PhotoGallery.Avatar
-                      src={profileUrl}
-                      alt={memberLabel}
-                      selected={selected}
-                      onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
-                      sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
-                      {...guestDemoAllowProps()}
-                      imgProps={{
-                        onError: (e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = UserRound;
-                        }
+                  <Box sx={MEMBER_PHOTO_STACK_SX}>
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        zIndex: 100,
+                        width: getMyPicksAvatarSize(),
+                        height: getMyPicksAvatarSize(),
+                        borderRadius: '50%',
+                        overflow: 'visible',
+                        flexShrink: 0
                       }}
-                    />
+                    >
+                      <ColorTemplate8PhotoGallery.Avatar
+                        src={profileUrl}
+                        alt={memberLabel}
+                        selected={selected}
+                        onClick={isBlockedUser ? undefined : () => setSelectedSinglesId(Number(singlesId))}
+                        sx={isBlockedUser ? blockedMemberAvatarSx : undefined}
+                        {...guestDemoAllowProps()}
+                        imgProps={{
+                          onError: (e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = UserRound;
+                          }
+                        }}
+                      />
+                      {photoSashKind === 'approved' ? (
+                        <Box component="span" aria-label="Approved" sx={MEMBER_INCOMING_APPROVED_SASH_SX}>
+                          Approved
+                        </Box>
+                      ) : photoSashKind === 'requested' ? (
+                        <Box component="span" aria-label="Requested" sx={MEMBER_INCOMING_REQUESTED_SASH_SX}>
+                          Requested
+                        </Box>
+                      ) : null}
+                    </Box>
+                    {relationshipKind ? (
+                      <Box component="span" aria-label={relationshipLabel} sx={MEMBER_RELATIONSHIP_TAG_SX}>
+                        {relationshipLabel}
+                      </Box>
+                    ) : null}
                     {pendingBadgeCount > 0 ? (
                       <Box
                         component="span"

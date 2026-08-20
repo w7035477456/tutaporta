@@ -254,6 +254,46 @@ export function triStateBioRequestApproval(value) {
   return normalizeApprovalStatus(value);
 }
 
+/** Outgoing request row — recipient approved Brief or Full bio (Acquaint. & Buddies list). */
+export function isOutgoingBioRequestApproved(row) {
+  return (
+    triStateBioRequestApproval(row?.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE ||
+    triStateBioRequestApproval(row?.full_bio_request_approval) === APPROVAL_STATUS.APPROVE
+  );
+}
+
+/**
+ * When they approved my outgoing bio request, mirror that level as my incoming approval
+ * (Brief → Acquaintance, Full → Buddies) even if they never requested my bio.
+ * @returns {{ brief_bio_request_approval: string, full_bio_request_approval: string } | null}
+ */
+export function mirroredIncomingApprovalFromOutgoing(outgoingRow) {
+  if (!outgoingRow) return null;
+  const fullApproved =
+    triStateBioRequestApproval(outgoingRow.full_bio_request_approval) === APPROVAL_STATUS.APPROVE;
+  const briefApproved =
+    triStateBioRequestApproval(outgoingRow.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE;
+  if (fullApproved) {
+    return {
+      brief_bio_request_approval: APPROVAL_STATUS.APPROVE,
+      full_bio_request_approval: APPROVAL_STATUS.APPROVE
+    };
+  }
+  if (briefApproved) {
+    return {
+      brief_bio_request_approval: APPROVAL_STATUS.APPROVE,
+      full_bio_request_approval: APPROVAL_STATUS.NO_RESPONSE
+    };
+  }
+  return null;
+}
+
+/** Received Bio Req left rail — incoming request and/or reciprocal buddy/acquaintance. */
+export function shouldShowOnReceivedBioRequestsPage(incomingRow, outgoingRow) {
+  if (hasIncomingBioRequest(incomingRow)) return true;
+  return isOutgoingBioRequestApproved(outgoingRow);
+}
+
 /** Outgoing request row — display name for singles_id_to (friend being viewed). */
 export function formatOutgoingBioFriendLabel(row) {
   return formatAliasWithMemberCode({

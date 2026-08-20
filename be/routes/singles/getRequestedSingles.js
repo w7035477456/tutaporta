@@ -58,6 +58,11 @@ function requestFlagIsTrue(expr) {
   return `LOWER(BTRIM(COALESCE((${expr})::text, 'notrequested'))) = 'requested'`;
 }
 
+/** True when approval_status_enum is approve (Brief or Full bio response). */
+function approvalIsApprove(expr) {
+  return `LOWER(BTRIM(COALESCE((${expr})::text, 'noresponse'))) IN ('approve', 'approved', 'true', 'yes', '1')`;
+}
+
 /**
  * Outgoing info requests: rows where JWT user is `singles_id_from` (sender).
  * Recipient profile (`s_to`) is the member card shown (e.g. singles_id_to 31, 2, 3).
@@ -232,6 +237,10 @@ export async function getRequestedSingles(req, res) {
         AND (
           ${requestFlagIsTrue(basicRequestExpr)}
           OR ${requestFlagIsTrue(fullBioRequestExpr)}
+        )
+        AND (
+          ${approvalIsApprove(basicApprovalExpr)}
+          OR ${approvalIsApprove(fullBioApprovalExpr)}
         )
         ${
           has.has('block_user')
