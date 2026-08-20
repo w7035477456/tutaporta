@@ -1,16 +1,10 @@
-/** Signup emails ending with this suffix get member_category PilotUser. */
-export const PILOT_USER_EMAIL_SUFFIX = '7035477456@gmail.com';
-
 /**
  * Resolve member_category for a new self-service signup (e.g. Login →
- * "Don't have an account?" → /register). Default is AnyMember.
- * @param {unknown} emailNorm — lowercase email (see normalizeEmailForDb)
- * @returns {'AnyMember' | 'PilotUser'}
+ * "Don't have an account?" → /register, or Sign up with Google).
+ * Always AnyMember — never PilotUser from public signup.
+ * @param {unknown} [_emailNorm] — unused; kept for call-site compatibility
+ * @returns {'AnyMember'}
  */
-export function resolveSignupMemberCategory(emailNorm) {
-  const email = String(emailNorm ?? '').trim().toLowerCase();
-  if (email.endsWith(PILOT_USER_EMAIL_SUFFIX)) {
-    return 'PilotUser';
-  }
+export function resolveSignupMemberCategory(_emailNorm) {
   return 'AnyMember';
 }
