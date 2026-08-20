@@ -22,16 +22,27 @@ const REFRESH_MS = 10 * 1000;
 const STANDALONE = isRecordVaultBridgeStandalone();
 
 let cache = null;
-let homeEnvBytes = null;
-let feEnvBytes = null;
+/** @type {{ size: number, mtimeMs: number } | null} */
+let homeEnvStamp = null;
+/** @type {{ size: number, mtimeMs: number } | null} */
+let feEnvStamp = null;
 
-function getFileByteLength(filePath) {
+function getFileStamp(filePath) {
   try {
     const stats = fs.statSync(filePath);
-    return Number.isFinite(stats.size) ? stats.size : -1;
+    return {
+      size: Number.isFinite(stats.size) ? stats.size : -1,
+      // Same-length secret edits (e.g. SMTP_PASS) must still reload — size-only is not enough.
+      mtimeMs: Number.isFinite(stats.mtimeMs) ? stats.mtimeMs : -1
+    };
   } catch {
-    return -1;
+    return { size: -1, mtimeMs: -1 };
   }
+}
+
+function stampsEqual(a, b) {
+  if (!a || !b) return false;
+  return a.size === b.size && a.mtimeMs === b.mtimeMs;
 }
 
 function warnDuplicateAwsEnvKeys(filePath) {
@@ -93,23 +104,25 @@ function reloadFeEnvFile() {
 }
 
 function initializeEnvFiles() {
-  homeEnvBytes = getFileByteLength(homeEnvPath);
-  feEnvBytes = getFileByteLength(feEnvPath);
+  homeEnvStamp = getFileStamp(homeEnvPath);
+  feEnvStamp = getFileStamp(feEnvPath);
   reloadHomeEnvFile();
   reloadFeEnvFile();
 }
 
 function reloadChangedEnvFiles() {
-  const nextHomeBytes = getFileByteLength(homeEnvPath);
-  const nextFeBytes = getFileByteLength(feEnvPath);
+  const nextHomeStamp = getFileStamp(homeEnvPath);
+  const nextFeStamp = getFileStamp(feEnvPath);
 
-  if (nextHomeBytes !== homeEnvBytes) {
-    homeEnvBytes = nextHomeBytes;
+  if (!stampsEqual(nextHomeStamp, homeEnvStamp)) {
+    homeEnvStamp = nextHomeStamp;
     reloadHomeEnvFile();
+    console.log('[envConfig] Reloaded ~/.ssh/be/.env (size/mtime changed)');
   }
-  if (nextFeBytes !== feEnvBytes) {
-    feEnvBytes = nextFeBytes;
+  if (!stampsEqual(nextFeStamp, feEnvStamp)) {
+    feEnvStamp = nextFeStamp;
     reloadFeEnvFile();
+    console.log('[envConfig] Reloaded fe/.env (size/mtime changed)');
   }
 }
 
