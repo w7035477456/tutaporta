@@ -1,6 +1,7 @@
 // ==============================|| OVERRIDES - CSS BASELINE ||============================== //
 
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
+import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { DARK_SURFACE_CLASS, LIGHT_SURFACE_CLASS, TEXT_ON_LIGHT_BG_CSS } from 'utils/themeContrast';
 
 /** When day/night background is black — copy and titles render white via CssBaseline (light themes unchanged). */
@@ -40,10 +41,11 @@ export default function CssBaseline(theme) {
     MuiCssBaseline: {
       styleOverrides: {
         html: {
-          backgroundColor: 'var(--theme-daynight-color)'
+          backgroundColor: 'var(--theme-daynight-color)',
+          fontFamily: MAIN_FONT_FAMILY
         },
         body: {
-          fontFamily: theme.typography.fontFamily,
+          fontFamily: MAIN_FONT_FAMILY,
           backgroundColor: 'var(--theme-daynight-color)',
           [theme.breakpoints.up('sm')]: {
             fontSize: dText

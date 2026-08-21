@@ -98,6 +98,13 @@ export async function fetchMobilePhotoUploadSessionPublic(token) {
   throw lastErr ?? new Error('Upload link is not valid');
 }
 
+function fileExtensionFromName(fileName) {
+  const name = String(fileName ?? '');
+  const i = name.lastIndexOf('.');
+  if (i <= 0 || i === name.length - 1) return '';
+  return name.slice(i + 1).toLowerCase();
+}
+
 /** POST /api/mobilePhotoUpload/photo?token= — phone upload (no login cookie required) */
 export async function uploadPhotoViaMobileSession(token, file) {
   const trimmed = String(token ?? '').trim().replace(/\s+/g, '');
@@ -108,6 +115,11 @@ export async function uploadPhotoViaMobileSession(token, file) {
     reader.readAsDataURL(file);
   });
 
+  const fileExtension = fileExtensionFromName(file?.name);
+  const body = { image: dataUrl };
+  if (fileExtension) body.file_extension = fileExtension;
+  if (file?.name) body.originalFileName = String(file.name);
+
   const url = `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(trimmed)}`;
   let res;
   try {
@@ -116,7 +128,7 @@ export async function uploadPhotoViaMobileSession(token, file) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       credentials: 'omit',
       cache: 'no-store',
-      body: JSON.stringify({ image: dataUrl })
+      body: JSON.stringify(body)
     });
   } catch (networkErr) {
     const err = new Error('Could not reach the server. Check your connection and try again.');

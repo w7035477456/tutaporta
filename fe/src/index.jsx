@@ -29,6 +29,9 @@ console.error = (...args) => {
 import api from 'api/axios';
 import { installFeBeTrafficLog, syncFeBeTrafficLogFromPublicConfig } from 'utils/feBeTrafficLog';
 import { installClientApiCooldownFetchGuard } from 'utils/clientApiCooldown';
+// Algerian @font-face + --main-font-family default (before React paint).
+import 'config/algerianWebFont';
+import 'config/mainFontEnv';
 import App from 'App';
 
 installClientApiCooldownFetchGuard();

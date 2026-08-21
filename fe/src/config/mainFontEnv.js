@@ -9,7 +9,12 @@
  * Runtime override: set CSS var --main-font-family (profile menu / config).
  * Components use MAIN_FONT_FAMILY so they follow the override.
  * Use ENV_MAIN_FONT_FAMILY when a surface must always match env MAIN_FONT.
+ *
+ * Mac note: system Algerian is usually missing; ensureAlgerianWebFont() loads
+ * a decorative webfont under the family name Algerian (see algerianWebFont.js).
  */
+
+import { ensureAlgerianWebFont } from 'config/algerianWebFont';
 
 const DEFAULT_MAIN_FONT = 'Algerian, fantasy';
 const DEFAULT_TERTIARY_FALLBACK = 'cursive';
@@ -69,6 +74,9 @@ export const MAIN_FONT_FAMILY = `var(${MAIN_FONT_CSS_VAR}, ${ENV_MAIN_FONT_FAMIL
 export function applyMainFontFamily(fontFamilyStack) {
   if (typeof document === 'undefined') return;
   const stack = String(fontFamilyStack || '').trim() || ENV_MAIN_FONT_FAMILY;
+  if (stackNeedsAlgerianWebFont(stack)) {
+    ensureAlgerianWebFont();
+  }
   document.documentElement.style.setProperty(MAIN_FONT_CSS_VAR, stack);
 }
 
@@ -116,17 +124,31 @@ export const MAIN_FONT_OPTIONS = [
 
 const loadedGoogleFonts = new Set();
 
+function stackNeedsAlgerianWebFont(stack) {
+  return normalizeFontStackKey(stack).includes('algerian');
+}
+
 /** Ensure a Google Fonts stylesheet is present for options that need one. */
 export function ensureMainFontStylesheet(optionOrStack) {
   if (typeof document === 'undefined') return;
+
+  let stack = '';
   let google = null;
   if (optionOrStack && typeof optionOrStack === 'object') {
     google = optionOrStack.google || null;
+    stack = optionOrStack.stack || '';
+    if (optionOrStack.id === 'recommend-algerian' || stackNeedsAlgerianWebFont(stack)) {
+      ensureAlgerianWebFont();
+    }
   } else {
-    const stack = String(optionOrStack || '');
+    stack = String(optionOrStack || '');
+    if (stackNeedsAlgerianWebFont(stack) || !stack) {
+      ensureAlgerianWebFont();
+    }
     const match = MAIN_FONT_OPTIONS.find((o) => o.stack === stack);
     google = match?.google || null;
   }
+
   if (!google || loadedGoogleFonts.has(google)) return;
   loadedGoogleFonts.add(google);
   const id = `main-font-google-${google.replace(/[^a-zA-Z0-9]+/g, '-')}`;
@@ -161,6 +183,7 @@ export function resolveStoredMainFontStack(parsedConfig) {
 
 /** Apply persisted override as early as this module loads (avoids MAIN_FONT flash). */
 if (typeof document !== 'undefined') {
+  ensureAlgerianWebFont();
   try {
     const raw = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
@@ -174,6 +197,7 @@ if (typeof document !== 'undefined') {
       window.localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(parsed));
     }
   } catch {
+    ensureAlgerianWebFont();
     applyMainFontFamily(ENV_MAIN_FONT_FAMILY);
   }
 }

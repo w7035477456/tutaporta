@@ -1,0 +1,40 @@
+/**
+ * Cross-platform Algerian — bundled webfont for Mac/Linux (Windows uses local() first).
+ * OFL Cinzel Decorative files, registered under font-family "Algerian".
+ */
+@font-face {
+  font-family: 'Algerian';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    local('Algerian'),
+    local('Algerian Regular'),
+    url('./algerian-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Algerian';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src:
+    local('Algerian'),
+    local('Algerian Bold'),
+    local('Algerian Regular'),
+    url('./algerian-700.woff2') format('woff2');
+}
+
+:root {
+  --main-font-family: Algerian, fantasy, cursive;
+}
+
+html,
+body,
+#root,
+button,
+input,
+textarea,
+select {
+  font-family: var(--main-font-family, Algerian, fantasy, cursive);
+}

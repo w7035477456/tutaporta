@@ -6,6 +6,7 @@ import config from 'config';
 import {
   ALGERIAN_DEFAULT_MIGRATION_FLAG,
   ENV_MAIN_FONT_FAMILY,
+  RECOMMENDED_MAIN_FONT_STACK,
   applyMainFontFamily,
   ensureMainFontStylesheet,
   findMainFontOptionByStack,
@@ -42,7 +43,7 @@ export function ConfigProvider({ children }) {
   useEffect(() => {
     const option = findMainFontOptionByStack(fontFamily);
     ensureMainFontStylesheet(option);
-    applyMainFontFamily(fontFamily);
+    applyMainFontFamily(fontFamily || RECOMMENDED_MAIN_FONT_STACK);
   }, [fontFamily]);
 
   const stateWithFont = useMemo(() => ({ ...state, fontFamily }), [state, fontFamily]);

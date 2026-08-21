@@ -1,14 +1,16 @@
 import { getDesktopButtonFontSizeVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesButtonFontSizeVw, getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 
-export default function Typography(fontFamily) {
+import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+
+export default function Typography() {
   const dText = getDesktopTextFontSizeVw();
   const mText = getMobileSinglesTextFontSizeVw();
   const dBtn = getDesktopButtonFontSizeVw();
   const mBtn = getMobileSinglesButtonFontSizeVw();
 
   return {
-    fontFamily,
+    fontFamily: MAIN_FONT_FAMILY,
     h6: {
       fontWeight: 500,
       fontSize: { xs: mText, sm: dText }

@@ -17,12 +17,12 @@ import componentsOverrides from './overrides';
 
 export default function ThemeCustomization({ children }) {
   const {
-    state: { borderRadius, fontFamily, outlinedFilled, presetColor }
+    state: { borderRadius, outlinedFilled, presetColor }
   } = useConfig();
 
   const palette = useMemo(() => buildPalette(presetColor), [presetColor]);
 
-  const themeTypography = useMemo(() => Typography(fontFamily), [fontFamily]);
+  const themeTypography = useMemo(() => Typography(), []);
 
   const themeOptions = useMemo(
     () => ({

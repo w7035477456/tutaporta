@@ -11,6 +11,7 @@ import { unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
 import {
   ALBUM_PHOTO_EXTENSIONS_ERROR,
   contentTypeToExt as albumContentTypeToExt,
+  extToContentType,
   isAllowedAlbumPhotoContentType,
   isPassthroughAlbumPhotoExtension,
   normalizePhotoExtension
@@ -309,15 +310,25 @@ export async function uploadPhoto(req, res) {
       return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER is not set in .env' });
     }
 
-    const { image: dataUrl, file_extension: fileExtensionHint } = req.body || {};
+    const { image: dataUrl, file_extension: fileExtensionHint, originalFileName } = req.body || {};
     if (!dataUrl || typeof dataUrl !== 'string') {
       return res.status(400).json({ error: 'Missing image (data URL or base64)' });
     }
 
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    const contentType = match ? match[1].trim().toLowerCase() : 'image/jpeg';
+    const match = dataUrl.match(/^data:([^;]*);base64,(.+)$/);
+    let contentType = match ? match[1].trim().toLowerCase() : 'image/jpeg';
     const base64 = match ? match[2] : dataUrl;
-    const fileExtension = normalizePhotoExtension(fileExtensionHint);
+    let fileExtension = normalizePhotoExtension(fileExtensionHint);
+    if (!fileExtension && originalFileName) {
+      const name = String(originalFileName);
+      const dot = name.lastIndexOf('.');
+      if (dot > 0) fileExtension = normalizePhotoExtension(name.slice(dot + 1));
+    }
+
+    // Android often sends blank MIME or application/octet-stream — use filename extension.
+    if (!contentType || contentType === 'application/octet-stream') {
+      contentType = fileExtension ? extToContentType(fileExtension) : 'image/jpeg';
+    }
 
     if (!isAllowedAlbumPhotoContentType(contentType, fileExtension)) {
       const base = contentType.split(';')[0].trim().toLowerCase();
@@ -506,7 +517,20 @@ export async function uploadPhoto(req, res) {
           photosId
         });
       }
-      await req._afterPhotoUpload(photosId);
+      try {
+        await req._afterPhotoUpload(photosId);
+      } catch (afterErr) {
+        // Photo is already on disk + in DB — do not fail the phone upload for session bookkeeping.
+        console.error('[uploadPhoto] afterPhotoUpload hook failed (photo saved):', afterErr?.message ?? afterErr);
+        if (req._mobilePhotoUploadToken) {
+          debugMobilePhotoUpload('afterPhotoUpload hook FAIL (photo saved)', {
+            token: maskMobileUploadToken(req._mobilePhotoUploadToken),
+            singlesId: req.auth?.singles_id,
+            photosId,
+            message: afterErr?.message ?? String(afterErr)
+          });
+        }
+      }
     }
     res.status(201).json({
       photos_id: photosId,
@@ -520,6 +544,16 @@ export async function uploadPhoto(req, res) {
         error: 'Database schema outdated. Run: psql -U <user> -d vsingles -f sql/migration_vsingles_photos_to_photos.sql',
       });
     }
-    res.status(500).json({ error: 'Failed to upload photo' });
+    const detail = String(err?.message || '').trim();
+    const safeDetail =
+      detail &&
+      detail.length <= 180 &&
+      !/password|secret|token|ECONN|SASL|pg_/i.test(detail) &&
+      !/\/Users\/|\/home\/|\\\\/i.test(detail)
+        ? detail
+        : '';
+    res.status(500).json({
+      error: safeDetail ? `Failed to upload photo: ${safeDetail}` : 'Failed to upload photo'
+    });
   }
 }

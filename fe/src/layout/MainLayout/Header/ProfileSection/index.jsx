@@ -69,6 +69,7 @@ import {
   MAIN_FONT_FAMILY,
   MAIN_FONT_OPTIONS,
   RECOMMENDED_MAIN_FONT_STACK,
+  applyMainFontFamily,
   ensureMainFontStylesheet,
   findMainFontOptionByStack
 } from 'config/mainFontEnv';
@@ -326,6 +327,7 @@ export default function ProfileSection({ clusterTight = false }) {
     // Paint hourglass first, then apply font (can block main thread for seconds).
     window.setTimeout(() => {
       try {
+        applyMainFontFamily(option.stack);
         setField('fontFamily', option.stack);
         void saveUserCustomization({ mainFont: option.stack }).catch((error) => {
           console.error('Failed to save main font preference', error);

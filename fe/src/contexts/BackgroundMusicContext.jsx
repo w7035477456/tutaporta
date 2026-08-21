@@ -5,7 +5,12 @@ import Box from '@mui/material/Box';
 
 import { useAuth } from 'contexts/AuthContext';
 import useConfig from 'hooks/useConfig';
-import { ensureMainFontStylesheet, findMainFontOptionByStack } from 'config/mainFontEnv';
+import {
+  RECOMMENDED_MAIN_FONT_STACK,
+  applyMainFontFamily,
+  ensureMainFontStylesheet,
+  findMainFontOptionByStack
+} from 'config/mainFontEnv';
 import { fetchUserCustomization, saveUserCustomization, loadDefaultCustomMusicUrls as fetchDefaultCustomMusicUrlsApi, emptyCustomMusicUrlSlots, CUSTOM_MUSIC_URL_SLOT_COUNT } from 'api/userCustomizationFe';
 import {
   BACKGROUND_TRACK_SRC,
@@ -403,7 +408,11 @@ export function BackgroundMusicProvider({ children }) {
     if (saved?.mainFont) {
       const option = findMainFontOptionByStack(saved.mainFont);
       ensureMainFontStylesheet(option);
+      applyMainFontFamily(option.stack);
       setField('fontFamily', option.stack);
+    } else {
+      ensureMainFontStylesheet(RECOMMENDED_MAIN_FONT_STACK);
+      applyMainFontFamily(RECOMMENDED_MAIN_FONT_STACK);
     }
   }, [setField]);
 

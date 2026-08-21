@@ -45,6 +45,10 @@ export function parseMobilePhotoMultipart(req) {
       req.body.image = `data:${mimeType};base64,${base64}`;
       if (originalFileName) {
         req.body.originalFileName = originalFileName;
+        const dot = originalFileName.lastIndexOf('.');
+        if (dot > 0 && dot < originalFileName.length - 1) {
+          req.body.file_extension = originalFileName.slice(dot + 1).toLowerCase();
+        }
       }
       resolve(true);
     });

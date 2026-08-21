@@ -120,21 +120,36 @@ function Login() {
                     <Logo authBranding />
                   </Link>
                 </Box>
-                <Typography
-                  component="h1"
-                  variant="h5"
-                  sx={(theme) => ({
-                    textAlign: 'center',
-                    fontWeight: 700,
-                    color: 'var(--theme-primary-color)',
-                    lineHeight: 1.2,
-                    maxWidth: '100%',
-                    wordBreak: 'break-word',
-                    fontSize: `calc(${theme.typography.h5.fontSize} * 2)`
-                  })}
-                >
-                  Login OnlineMall.website
-                </Typography>
+                <Stack sx={{ alignItems: 'center', gap: 0.5, width: '100%' }}>
+                  <Typography
+                    component="h1"
+                    variant="h5"
+                    sx={(theme) => ({
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      color: 'var(--theme-primary-color)',
+                      lineHeight: 1.2,
+                      maxWidth: '100%',
+                      fontSize: `calc(${theme.typography.h5.fontSize} * 2)`
+                    })}
+                  >
+                    Login TutaMall.com
+                  </Typography>
+                  <Typography
+                    component="p"
+                    sx={(theme) => ({
+                      m: 0,
+                      textAlign: 'center',
+                      fontWeight: 700,
+                      color: 'var(--theme-primary-color)',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                      fontSize: `calc(${theme.typography.h5.fontSize} * 2 * 0.5)`
+                    })}
+                  >
+                    (formerly OnlineMall.website)
+                  </Typography>
+                </Stack>
                 <Typography
                   variant="caption"
                   sx={{ fontSize: '16px', textAlign: 'center', color: 'var(--theme-primary-color)' }}
