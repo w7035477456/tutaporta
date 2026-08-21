@@ -254,6 +254,13 @@ async function handleMobilePhotoUploadPost(req, res, token) {
   }
 
   const hasImage = Boolean(req.body?.image && typeof req.body.image === 'string');
+  if (hasImage && !req.body?.file_extension) {
+    const originalName = req.body?.originalFileName || req.body?.file_name || req.body?.filename || '';
+    const extMatch = String(originalName).match(/\.([^.]+)$/);
+    if (extMatch) {
+      req.body.file_extension = extMatch[1].toLowerCase();
+    }
+  }
   const imageChars = hasImage ? String(req.body.image).length : 0;
   debugMobilePhotoUpload('POST photo START', {
     token: maskMobileUploadToken(token),

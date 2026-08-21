@@ -1,4 +1,17 @@
 import Busboy from 'busboy';
+import path from 'path';
+
+import {
+  extToContentType,
+  normalizePhotoExtension
+} from './albumUploadFormats.js';
+
+function extensionOf(fileName) {
+  const base = path.basename(String(fileName || ''));
+  const dot = base.lastIndexOf('.');
+  if (dot < 0) return '';
+  return normalizePhotoExtension(base.slice(dot + 1));
+}
 
 /**
  * Parse multipart field "photo" into req.body.image (data URL) for uploadPhoto().
@@ -40,11 +53,23 @@ export function parseMobilePhotoMultipart(req) {
         reject(new Error('Missing photo file'));
         return;
       }
+      const ext = extensionOf(originalFileName);
+      let resolvedMime = mimeType;
+      if (ext) {
+        const fromExt = extToContentType(ext);
+        const genericMime = !resolvedMime || resolvedMime === 'application/octet-stream' || resolvedMime === 'image/jpeg';
+        if (genericMime && fromExt && fromExt !== 'application/octet-stream') {
+          resolvedMime = fromExt;
+        }
+      }
       const base64 = fileBuffer.toString('base64');
       req.body = req.body || {};
-      req.body.image = `data:${mimeType};base64,${base64}`;
+      req.body.image = `data:${resolvedMime};base64,${base64}`;
       if (originalFileName) {
         req.body.originalFileName = originalFileName;
+        if (ext) {
+          req.body.file_extension = ext;
+        }
       }
       resolve(true);
     });

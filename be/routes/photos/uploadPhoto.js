@@ -18,11 +18,16 @@ import {
 import { isAdminImpersonationSession } from '../../utils/adminAuth.js';
 import { resolveRegularMemberActivityTimestamp, loadLatestPhotoCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 
-// Max upload size from ~/.ssh/be/.env (NOTES_MAX_SIZE_UPLOAD_MB), default 2 MiB — read at request time so PM2 restarts pick up changes
+// Max upload size from ~/.ssh/be/.env — NOTES_MAX_SIZE_UPLOAD_MB, else MAX_SIZE_UPLOAD_MB, default 2 MiB
 export function getMaxUploadMb() {
-  const raw = process.env.NOTES_MAX_SIZE_UPLOAD_MB;
-  const n = Number(raw);
-  return Math.max(0.5, Math.min(999, Number.isFinite(n) && n > 0 ? n : 2));
+  const notesRaw = process.env.NOTES_MAX_SIZE_UPLOAD_MB;
+  const notesN = Number(notesRaw);
+  if (Number.isFinite(notesN) && notesN > 0) {
+    return Math.max(0.5, Math.min(999, notesN));
+  }
+  const maxRaw = process.env.MAX_SIZE_UPLOAD_MB;
+  const maxN = Number(maxRaw);
+  return Math.max(0.5, Math.min(999, Number.isFinite(maxN) && maxN > 0 ? maxN : 2));
 }
 export function getMaxUploadBytes() {
   return getMaxUploadMb() * 1024 * 1024;
@@ -506,7 +511,11 @@ export async function uploadPhoto(req, res) {
           photosId
         });
       }
-      await req._afterPhotoUpload(photosId);
+      try {
+        await req._afterPhotoUpload(photosId);
+      } catch (hookErr) {
+        console.error('[uploadPhoto] afterPhotoUpload hook failed (photo saved):', hookErr?.message ?? hookErr);
+      }
     }
     res.status(201).json({
       photos_id: photosId,
@@ -520,6 +529,12 @@ export async function uploadPhoto(req, res) {
         error: 'Database schema outdated. Run: psql -U <user> -d vsingles -f sql/migration_vsingles_photos_to_photos.sql',
       });
     }
-    res.status(500).json({ error: 'Failed to upload photo' });
+    const detail = String(err?.message ?? '').trim();
+    const safeDetail =
+      detail && detail.length <= 200 && !/ENOENT|EACCES|password|secret|\.env/i.test(detail) ? detail : '';
+    res.status(500).json({
+      error: safeDetail || 'Failed to upload photo',
+      code: err?.code || undefined
+    });
   }
 }

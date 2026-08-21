@@ -101,6 +101,9 @@ export async function fetchMobilePhotoUploadSessionPublic(token) {
 /** POST /api/mobilePhotoUpload/photo?token= — phone upload (no login cookie required) */
 export async function uploadPhotoViaMobileSession(token, file) {
   const trimmed = String(token ?? '').trim().replace(/\s+/g, '');
+  const fileName = String(file?.name ?? '').trim();
+  const extMatch = fileName.match(/\.([^.]+)$/);
+  const fileExtension = extMatch ? extMatch[1].toLowerCase() : '';
   const dataUrl = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result);
@@ -109,6 +112,9 @@ export async function uploadPhotoViaMobileSession(token, file) {
   });
 
   const url = `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(trimmed)}`;
+  const body = { image: dataUrl };
+  if (fileExtension) body.file_extension = fileExtension;
+  if (fileName) body.originalFileName = fileName;
   let res;
   try {
     res = await fetch(url, {
@@ -116,7 +122,7 @@ export async function uploadPhotoViaMobileSession(token, file) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       credentials: 'omit',
       cache: 'no-store',
-      body: JSON.stringify({ image: dataUrl })
+      body: JSON.stringify(body)
     });
   } catch (networkErr) {
     const err = new Error('Could not reach the server. Check your connection and try again.');
