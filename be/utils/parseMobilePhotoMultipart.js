@@ -57,10 +57,18 @@ export function parseMobilePhotoMultipart(req) {
   });
 }
 
+/** fetch() with Accept: application/json expects a JSON body, not a 303 back to the upload page. */
+export function wantsMobilePhotoUploadJsonResponse(req) {
+  return String(req.headers?.accept || '')
+    .toLowerCase()
+    .includes('application/json');
+}
+
 /** Redirect back to phone upload page after native form POST (avoids JSON on screen). */
 export function installMobilePhotoFormRedirect(req, res, token) {
   const ct = String(req.headers['content-type'] || '');
   if (!ct.includes('multipart/form-data')) return;
+  if (wantsMobilePhotoUploadJsonResponse(req)) return;
 
   const tokenQ = encodeURIComponent(String(token ?? '').trim());
   const go = (suffix) => {

@@ -19,11 +19,11 @@ import {
 import { isAdminImpersonationSession } from '../../utils/adminAuth.js';
 import { resolveRegularMemberActivityTimestamp, loadLatestPhotoCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 
-// Max upload size from ~/.ssh/be/.env (NOTES_MAX_SIZE_UPLOAD_MB), default 2 MiB — read at request time so PM2 restarts pick up changes
+// Max upload size from ~/.ssh/be/.env MAX_SIZE_UPLOAD_MB (legacy alias NOTES_MAX_SIZE_UPLOAD_MB), default 9 MiB.
 export function getMaxUploadMb() {
-  const raw = process.env.NOTES_MAX_SIZE_UPLOAD_MB;
+  const raw = process.env.MAX_SIZE_UPLOAD_MB ?? process.env.NOTES_MAX_SIZE_UPLOAD_MB;
   const n = Number(raw);
-  return Math.max(0.5, Math.min(999, Number.isFinite(n) && n > 0 ? n : 2));
+  return Math.max(0.5, Math.min(999, Number.isFinite(n) && n > 0 ? n : 9));
 }
 export function getMaxUploadBytes() {
   return getMaxUploadMb() * 1024 * 1024;
@@ -361,8 +361,8 @@ export async function uploadPhoto(req, res) {
       '| max allowed',
       maxBytes,
       `(${formatBytes(maxBytes)})`,
-      '| process.env.NOTES_MAX_SIZE_UPLOAD_MB raw=',
-      JSON.stringify(process.env.NOTES_MAX_SIZE_UPLOAD_MB),
+      '| process.env.MAX_SIZE_UPLOAD_MB raw=',
+      JSON.stringify(process.env.MAX_SIZE_UPLOAD_MB),
       '| skipUploadSizeLimit=',
       skipUploadSizeLimit
     );
@@ -384,8 +384,8 @@ export async function uploadPhoto(req, res) {
         maxBytes,
         'bytes (',
         maxMb,
-        'MiB). process.env.NOTES_MAX_SIZE_UPLOAD_MB=',
-        JSON.stringify(process.env.NOTES_MAX_SIZE_UPLOAD_MB),
+        'MiB). process.env.MAX_SIZE_UPLOAD_MB=',
+        JSON.stringify(process.env.MAX_SIZE_UPLOAD_MB),
         'singles_id=',
         singlesId
       );

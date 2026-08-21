@@ -1,4 +1,8 @@
 import api from './axios';
+import { normalizeVerificationImageFile } from 'utils/normalizeVerificationImage';
+
+/** Max width before phone QR upload — keeps multipart payloads small and converts HEIC → JPEG. */
+const MOBILE_UPLOAD_MAX_WIDTH_PX = 2048;
 
 /** POST /api/mobilePhotoUpload/session — desktop creates phone upload link */
 export async function createMobilePhotoUploadSession({ purpose } = {}) {
@@ -98,37 +102,45 @@ export async function fetchMobilePhotoUploadSessionPublic(token) {
   throw lastErr ?? new Error('Upload link is not valid');
 }
 
-function fileExtensionFromName(fileName) {
-  const name = String(fileName ?? '');
-  const i = name.lastIndexOf('.');
-  if (i <= 0 || i === name.length - 1) return '';
-  return name.slice(i + 1).toLowerCase();
+function dataUrlToUploadBlob(dataUrl, fileName = 'photo.jpg') {
+  const match = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
+  const mime = match?.[1]?.trim() || 'image/jpeg';
+  const base64 = match?.[2] || '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new File([bytes], fileName, { type: mime });
+}
+
+/** Resize HEIC/large gallery picks to JPEG before upload (avoids passthrough size limits). */
+async function prepareMobileUploadFile(file) {
+  try {
+    const dataUrl = await normalizeVerificationImageFile(file, MOBILE_UPLOAD_MAX_WIDTH_PX);
+    return dataUrlToUploadBlob(dataUrl, 'photo.jpg');
+  } catch {
+    return file;
+  }
 }
 
 /** POST /api/mobilePhotoUpload/photo?token= — phone upload (no login cookie required) */
 export async function uploadPhotoViaMobileSession(token, file) {
   const trimmed = String(token ?? '').trim().replace(/\s+/g, '');
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('Could not read image file'));
-    reader.readAsDataURL(file);
-  });
+  const uploadFile = await prepareMobileUploadFile(file);
 
-  const fileExtension = fileExtensionFromName(file?.name);
-  const body = { image: dataUrl };
-  if (fileExtension) body.file_extension = fileExtension;
-  if (file?.name) body.originalFileName = String(file.name);
+  const formData = new FormData();
+  formData.append('photo', uploadFile, uploadFile.name || 'photo.jpg');
 
   const url = `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(trimmed)}`;
   let res;
   try {
     res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { Accept: 'application/json' },
       credentials: 'omit',
       cache: 'no-store',
-      body: JSON.stringify(body)
+      body: formData
     });
   } catch (networkErr) {
     const err = new Error('Could not reach the server. Check your connection and try again.');
@@ -137,6 +149,15 @@ export async function uploadPhotoViaMobileSession(token, file) {
   }
   const data = await parseApiResponse(res);
   if (!res.ok) {
+    if (res.status === 413 || data?.code === 'REQUEST_BODY_TOO_LARGE') {
+      throw new Error(
+        data?.error ||
+          'Photo is too large for the server. Try taking a new photo with the camera button instead of gallery.'
+      );
+    }
+    if (data?.code === 'FILE_TOO_LARGE') {
+      throw new Error(data.error || 'Photo is too large. Try the camera button or a smaller image.');
+    }
     throw mobileUploadFetchError(res, data, 'Upload failed');
   }
   return data;

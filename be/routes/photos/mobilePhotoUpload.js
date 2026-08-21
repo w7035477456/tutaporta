@@ -18,7 +18,8 @@ import { uploadPhoto } from './uploadPhoto.js';
 import pool from '../../db/connection.js';
 import {
   installMobilePhotoFormRedirect,
-  parseMobilePhotoMultipart
+  parseMobilePhotoMultipart,
+  wantsMobilePhotoUploadJsonResponse
 } from '../../utils/parseMobilePhotoMultipart.js';
 import { writeMobileUploadFile } from '../../utils/mobileUploadFolder.js';
 
@@ -241,12 +242,15 @@ async function handleMobilePhotoUploadPost(req, res, token) {
   let isMultipart = false;
   try {
     isMultipart = await parseMobilePhotoMultipart(req);
-    if (isMultipart) {
+    if (isMultipart && !wantsMobilePhotoUploadJsonResponse(req)) {
       installMobilePhotoFormRedirect(req, res, token);
     }
   } catch (parseErr) {
     appLog.error('[mobilePhotoUpload] POST photo multipart parse FAIL', parseErr?.message ?? parseErr);
-    if (String(req.headers['content-type'] || '').includes('multipart/form-data')) {
+    if (
+      String(req.headers['content-type'] || '').includes('multipart/form-data') &&
+      !wantsMobilePhotoUploadJsonResponse(req)
+    ) {
       installMobilePhotoFormRedirect(req, res, token);
       return res.status(400).json({ error: parseErr?.message || 'Missing photo file' });
     }
