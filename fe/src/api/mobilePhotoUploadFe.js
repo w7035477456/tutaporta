@@ -23,8 +23,12 @@ async function parseApiResponse(res) {
     return JSON.parse(text);
   } catch {
     if (/^\s*</.test(text)) {
+      const sizeHint =
+        res.status === 413 || res.status >= 500
+          ? ' Photo may be too large for the server — try a smaller image or scan a fresh QR code.'
+          : '';
       return {
-        error: `Server returned HTML instead of JSON (HTTP ${res.status}). Rebuild/deploy the backend with mobile upload routes, or scan a fresh QR code.`
+        error: `Upload failed (HTTP ${res.status}).${sizeHint} Scan a fresh QR code from your computer and try again.`
       };
     }
     return { error: text.slice(0, 200) };
@@ -101,34 +105,41 @@ export async function fetchMobilePhotoUploadSessionPublic(token) {
 /** POST /api/mobilePhotoUpload/photo?token= — phone upload (no login cookie required) */
 export async function uploadPhotoViaMobileSession(token, file) {
   const trimmed = String(token ?? '').trim().replace(/\s+/g, '');
-  const fileName = String(file?.name ?? '').trim();
-  const extMatch = fileName.match(/\.([^.]+)$/);
-  const fileExtension = extMatch ? extMatch[1].toLowerCase() : '';
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error('Could not read image file'));
-    reader.readAsDataURL(file);
-  });
+  const fileName = String(file?.name ?? '').trim() || 'photo.jpg';
+  const form = new FormData();
+  form.append('photo', file, fileName);
 
   const url = `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(trimmed)}`;
-  const body = { image: dataUrl };
-  if (fileExtension) body.file_extension = fileExtension;
-  if (fileName) body.originalFileName = fileName;
   let res;
   try {
+    // Multipart (binary) — same wire format as the original HTML form POST.
     res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: { Accept: 'application/json' },
       credentials: 'omit',
       cache: 'no-store',
-      body: JSON.stringify(body)
+      body: form,
+      redirect: 'manual'
     });
   } catch (networkErr) {
     const err = new Error('Could not reach the server. Check your connection and try again.');
     err.cause = networkErr;
     throw err;
   }
+
+  // Legacy BE: multipart upload redirects back to /mobilePhotoUpload?…&uploaded=1
+  if (res.status >= 300 && res.status < 400) {
+    const location = String(res.headers.get('Location') || '');
+    if (location.includes('uploaded=1')) {
+      return { success: true };
+    }
+    const errMatch = location.match(/[?&]error=([^&]+)/);
+    if (errMatch) {
+      throw new Error(decodeURIComponent(errMatch[1]));
+    }
+    throw new Error('Upload failed. Scan a fresh QR code from your computer and try again.');
+  }
+
   const data = await parseApiResponse(res);
   if (!res.ok) {
     throw mobileUploadFetchError(res, data, 'Upload failed');
