@@ -47,6 +47,9 @@ import RecordVaultOneDriveBackupDialog from './RecordVaultOneDriveBackupDialog';
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import RecordVaultStorageFilesPanel from './RecordVaultStorageFilesPanel';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
+import RecordVaultNoteContentZoomBar, {
+  NOTE_CONTENT_ZOOM_DEFAULT
+} from './RecordVaultNoteContentZoomBar';
 import RecordVaultFileMenu, {
   prepareImportedHtml,
   stripYamlFrontMatter,
@@ -1412,6 +1415,7 @@ export default function RecordVaultWorkspacePane({
   const multiSelectedNoteIdsRef = useRef([]);
   const noteMultiSelectAnchorIdRef = useRef(null);
   const [openNoteTitlePlain, setOpenNoteTitlePlain] = useState('');
+  const [noteContentZoom, setNoteContentZoom] = useState(NOTE_CONTENT_ZOOM_DEFAULT);
   // While searching, the title shows blinking highlights (read-only) until the
   // user clicks it to edit; flips back to highlight view on blur / note swap.
   const [titleEditing, setTitleEditing] = useState(false);
@@ -7150,6 +7154,7 @@ export default function RecordVaultWorkspacePane({
                       ref={noteEditorApiRef}
                       onReady={handleEditorReady}
                       onChange={scheduleSave}
+                      contentZoom={noteContentZoom}
                       header={
                         selectedNote && !lockedNow ? (
                           <Box
@@ -7242,6 +7247,8 @@ export default function RecordVaultWorkspacePane({
                                 InputProps={{ disableUnderline: true }}
                                 inputProps={{ 'aria-label': 'Note title', maxLength: 200 }}
                                 sx={{
+                                  flex: 1,
+                                  minWidth: 0,
                                   '& .MuiInputBase-input': {
                                     fontSize: '1.15rem',
                                     fontWeight: 600,
@@ -7251,6 +7258,10 @@ export default function RecordVaultWorkspacePane({
                                 }}
                               />
                             )}
+                            <RecordVaultNoteContentZoomBar
+                              value={noteContentZoom}
+                              onChange={setNoteContentZoom}
+                            />
                           </Box>
                         ) : null
                       }

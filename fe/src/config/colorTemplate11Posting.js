@@ -207,7 +207,7 @@ export function colorTemplate11PostingPhotoZoomBarSx(overrides = {}) {
   };
 }
 
-/** Yellow chrome row: red speaker + red thumb on a black track. */
+/** Yellow chrome row: − / + ends, percent label, red thumb on a black track. */
 export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_BAR_BG = YELLOW_BUTTON_TEMPLATE_BG;
 export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_SPEAKER = `var(${ERROR_VAR})`;
 export const COLOR_TEMPLATE11_POSTING_PHOTO_ZOOM_TRACK = '#000000';

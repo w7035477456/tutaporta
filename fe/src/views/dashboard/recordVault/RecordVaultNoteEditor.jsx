@@ -42,10 +42,12 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
     onChange,
     onReady,
     onContentHeightChange,
-    header = null
+    header = null,
+    contentZoom = 100
   },
   ref
 ) {
+  const zoomScale = Math.max(0.25, (Number(contentZoom) || 100) / 100);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onReadyRef = useRef(onReady);
@@ -320,7 +322,15 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
       {header}
 
       <Box className="rv-editor__body">
-        <EditorContent editor={editor} />
+        <Box
+          className="rv-editor__body-zoom"
+          sx={{
+            // CSS zoom scales text + images together and keeps pointer hit-testing aligned.
+            zoom: zoomScale
+          }}
+        >
+          <EditorContent editor={editor} />
+        </Box>
       </Box>
 
       <Box className="rv-editor__footer">
@@ -337,7 +347,8 @@ RecordVaultNoteEditor.propTypes = {
   onChange: PropTypes.func,
   onReady: PropTypes.func,
   onContentHeightChange: PropTypes.func,
-  header: PropTypes.node
+  header: PropTypes.node,
+  contentZoom: PropTypes.number
 };
 
 export default RecordVaultNoteEditor;
