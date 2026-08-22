@@ -95,6 +95,7 @@ import innerEncryptOnImg from 'assets/images/innerEncryptON.png';
 import redLockImg from 'assets/images/redlock.png';
 import greenUnlockImg from 'assets/images/unlockIcon.png';
 import RecordVaultNoteInnerEncryptDialog from './RecordVaultNoteInnerEncryptDialog';
+import RecordVaultCreateItemDialog from './RecordVaultCreateItemDialog';
 import { LOCK_GIF_CYCLE_MS } from './RecordVaultEncryptDecryptVideoOverlay';
 import {
   decryptRecordVaultNoteInnerBody,
@@ -1327,6 +1328,8 @@ export default function RecordVaultWorkspacePane({
   const [crossPaneDuplicateError, setCrossPaneDuplicateError] = useState('');
   const [duplicateNamePopup, setDuplicateNamePopup] = useState('');
   const [renameSavedPopup, setRenameSavedPopup] = useState('');
+  /** 'notebook' | 'note' — name prompt before creating a new item. */
+  const [createItemDialog, setCreateItemDialog] = useState(null);
   /** Auto-dismiss success toasts after notes-list import/export (queued; work continues in parallel). */
   const [importSuccessPopup, setImportSuccessPopup] = useState('');
   /** After multi-note drag to Finder: offer folder picker to write separate .html files. */
@@ -5501,13 +5504,25 @@ export default function RecordVaultWorkspacePane({
     }
   };
 
-  const handleAddNotebook = async () => {
+  const handleAddNotebook = () => {
     if (busy) return;
-    const desiredName = 'NEW NOTEBOOK';
+    setCreateItemDialog('notebook');
+  };
+
+  const handleAddNote = () => {
+    if (busy || !selectedNotebookId || notebookGateLocked) return;
+    setCreateItemDialog('note');
+  };
+
+  const confirmCreateNotebook = async (rawName) => {
+    const desiredName = String(rawName || '').trim().toUpperCase();
+    if (!desiredName) return;
     if (vaultNameExists(desiredName)) {
+      setCreateItemDialog(null);
       setDuplicateNamePopup(DUPLICATE_NAME_MESSAGE);
       return;
     }
+    setCreateItemDialog(null);
     setBusy(true);
     setError('');
     try {
@@ -5520,27 +5535,24 @@ export default function RecordVaultWorkspacePane({
     }
   };
 
-  const handleAddNote = async () => {
-    if (busy || !selectedNotebookId) return;
-    const targetNotebook = notebooks.find(
-      (nb) => Number(nb.notebook_id) === Number(selectedNotebookId)
-    );
-    const siblingNotes = targetNotebook?.notes || [];
-    const desiredName = formatDefaultRecordVaultNoteTitle(
-      notebookNumberFromList(notebooks, selectedNotebookId),
-      siblingNotes.length + 1
-    ).toUpperCase();
+  const confirmCreateNote = async (rawName) => {
+    if (!selectedNotebookId) return;
+    const desiredName = String(rawName || '').trim().toUpperCase();
+    if (!desiredName) return;
     if (vaultNameExists(desiredName)) {
+      setCreateItemDialog(null);
       setDuplicateNamePopup(DUPLICATE_NAME_MESSAGE);
       return;
     }
+    setCreateItemDialog(null);
     setBusy(true);
     setError('');
     try {
-      const created = await vaultApi.createRecordVaultNote(selectedNotebookId, {});
+      const created = await vaultApi.createRecordVaultNote(selectedNotebookId, { note_name: desiredName });
       if (!created?.note_id) throw new Error('Failed to create note');
       const createdRow = {
         ...created,
+        note_name: created.note_name || desiredName,
         notebook_id: Number(created.notebook_id ?? selectedNotebookId),
         content_loaded: created.body_text != null
       };
@@ -6152,6 +6164,18 @@ export default function RecordVaultWorkspacePane({
         folderLabel={usbVaultFolderLabel}
         onOpenMyNote={() => setUsbBackupOpen(false)}
         onRestored={() => handleUsbVaultRestoredOrFormatted()}
+      />
+      <RecordVaultCreateItemDialog
+        open={Boolean(createItemDialog)}
+        mode={createItemDialog}
+        busy={busy}
+        noteNamePlaceholder={formatDefaultRecordVaultNoteTitle(
+          notebookNumberFromList(notebooks, selectedNotebookId),
+          (selectedNotebook?.notes || []).length + 1
+        ).toUpperCase()}
+        onClose={() => setCreateItemDialog(null)}
+        onConfirmNotebook={(name) => void confirmCreateNotebook(name)}
+        onConfirmNote={(name) => void confirmCreateNote(name)}
       />
       <ColorTemplate16PopupCenterWide
         open={vaultFileTooLargeOpen}
@@ -6811,7 +6835,7 @@ export default function RecordVaultWorkspacePane({
                       <SliderControlButton
                         type="button"
                         fullWidth
-                        onClick={() => void handleAddNotebook()}
+                        onClick={handleAddNotebook}
                         disabled={busy}
                         hoverScale={1.25}
                         singleLineLabel
@@ -6932,7 +6956,7 @@ export default function RecordVaultWorkspacePane({
                       <SliderControlButton
                         type="button"
                         fullWidth
-                        onClick={() => void handleAddNote()}
+                        onClick={handleAddNote}
                         disabled={busy || !selectedNotebookId || notebookGateLocked}
                         hoverScale={1.25}
                         singleLineLabel
