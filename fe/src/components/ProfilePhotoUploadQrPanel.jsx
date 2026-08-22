@@ -9,6 +9,7 @@ import {
   createMobilePhotoUploadSession,
   fetchMobilePhotoUploadSessionStatus
 } from 'api/mobilePhotoUploadFe';
+import { mobilePhotoUploadDebugLog } from 'utils/mobilePhotoUploadDebug';
 import { getScanForPhoneUploadMs } from 'config/phoneUploadScanEnv';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
@@ -78,15 +79,24 @@ export default function ProfilePhotoUploadQrPanel({
       const data = await createMobilePhotoUploadSession(
         isPhotoAlbumsPurpose ? { purpose: 'photo_albums' } : {}
       );
+      mobilePhotoUploadDebugLog('desktop QR session created', {
+        purpose: data?.purpose,
+        expiresAt: data?.expiresAt,
+        mobileUrl: data?.mobileUrl
+      });
       setSession(data);
     } catch (err) {
       setSession(null);
-      setError(
+      const errMsg =
         err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          err?.message ||
-          'Could not create phone upload link.'
-      );
+        err?.response?.data?.error ||
+        err?.message ||
+        'Could not create phone upload link.';
+      mobilePhotoUploadDebugLog('desktop QR session FAIL', {
+        message: errMsg,
+        status: err?.response?.status
+      });
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
@@ -189,8 +199,16 @@ export default function ProfilePhotoUploadQrPanel({
     if (!session?.token) return 'idle';
     try {
       const status = await fetchMobilePhotoUploadSessionStatus(session.token);
+      if (status?.completed) {
+        mobilePhotoUploadDebugLog('desktop poll completed', {
+          photosId: status?.photosId,
+          fileName: status?.fileName,
+          purpose: status?.purpose
+        });
+      }
       return await applyUploadStatus(status);
-    } catch {
+    } catch (pollErr) {
+      mobilePhotoUploadDebugLog('desktop poll error', { message: pollErr?.message });
       return 'error';
     }
   }, [applyUploadStatus, session?.token]);

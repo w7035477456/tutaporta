@@ -546,6 +546,7 @@ import { initPhotoCacheStats } from './utils/photoCacheStats.js';
 import { initUserActivityStatsSchema } from './utils/userActivityStats.js';
 import { initUserCustomizationSchema } from './routes/user/userCustomization.js';
 import { initMobilePhotoUploadSchema, setMobilePhotoUploadRedis } from './utils/mobilePhotoUploadSession.js';
+import { mobilePhotoUploadTraceMiddleware } from './middleware/mobilePhotoUploadTrace.js';
 import { setSingleLoginRedis, endSingleLoginSessionIfMatches } from './utils/singleLoginSession.js';
 import { saveOnlineNickname } from './routes/singles/saveOnlineNickname.js';
 import { saveSecretIcon, verifySecretIcon } from './routes/singles/saveSecretIcon.js';
@@ -762,6 +763,18 @@ app.use((req, res, next) => {
       note: 'If logs stop here, body failed before route (JSON limit, nginx client_max_body_size, or disconnect)'
     });
   }
+  if (req.path.startsWith('/api/mobilePhotoUpload')) {
+    const cl = req.get('content-length');
+    const n = cl ? parseInt(cl, 10) : NaN;
+    uploadTrace('mobile-barcode-incoming', {
+      method: req.method,
+      path: req.originalUrl || req.path,
+      contentLength: cl || '(no header)',
+      approxRequestMiB: Number.isFinite(n) ? (n / (1024 * 1024)).toFixed(2) : '?',
+      contentType: String(req.get('content-type') || '').slice(0, 80) || '(none)',
+      note: 'Phone QR upload — if logs stop here, body never reached route (proxy limit or disconnect)'
+    });
+  }
   next();
 });
 
@@ -783,6 +796,7 @@ app.use((req, res, next) => {
 
 app.use(cookieParser());
 app.use(requireTrustedOriginFactory(allowedOriginPatterns));
+app.use(mobilePhotoUploadTraceMiddleware());
 app.use(feBeTrafficLogMiddleware());
 
 const PHOTO_CACHE_WINDOW_MINUTES = 15;
@@ -991,7 +1005,10 @@ app.get('/api/publicConfig', (_req, res) => {
     oneDriveVaultEnabled: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()).enabled,
     linkedInEnabled: isLinkedInOAuthConfigured(),
     blockMobile: isBlockMobileEnabled(),
-    duplicatePhoneAllow: isDuplicatePhoneAllowed('AnyMember')
+    duplicatePhoneAllow: isDuplicatePhoneAllowed('AnyMember'),
+    onenoteUsbUpgrade: ['true', '1', 'yes', 'on'].includes(
+      String(process.env.ONENOTE_USB_UPGRADE ?? '').trim().toLowerCase()
+    )
   });
 });
 
@@ -1750,7 +1767,10 @@ app.use((err, req, res, next) => {
   if (tooLarge) {
     const limit = err?.limit ?? jsonLimitBytes;
     const length = err?.length ?? err?.expected;
-    console.error('[upload trace] FAIL body-parser / raw-body — REQUEST TOO LARGE', {
+    const isMobileUpload = String(req.path || '').startsWith('/api/mobilePhotoUpload');
+    console.error(
+      isMobileUpload ? '[mobilePhotoUpload] FAIL body-parser — REQUEST TOO LARGE' : '[upload trace] FAIL body-parser / raw-body — REQUEST TOO LARGE',
+      {
       path: req.path,
       method: req.method,
       limitBytes: limit,
@@ -1759,7 +1779,9 @@ app.use((err, req, res, next) => {
       receivedMiB: length ? (length / (1024 * 1024)).toFixed(2) : '?',
       errName: err?.name,
       errType: err?.type,
-      hint: 'Increase JSON_LIMIT_MB in ~/.ssh/be/.env; check nginx client_max_body_size if request never reaches Node'
+      hint: isMobileUpload
+        ? 'Multipart phone upload may be blocked by nginx client_max_body_size or HAProxy — not JSON_LIMIT_MB'
+        : 'Increase JSON_LIMIT_MB in ~/.ssh/be/.env; check nginx client_max_body_size if request never reaches Node'
     });
     console.error('[upload trace] Full error stack:', err?.stack || err);
     if (res.headersSent) return next(err);
@@ -1770,6 +1792,15 @@ app.use((err, req, res, next) => {
   }
 
   console.error('[server_be] Unhandled error:', err?.message, req.method, req.path);
+  if (String(req.path || '').startsWith('/api/mobilePhotoUpload')) {
+    console.error('[mobilePhotoUpload] Unhandled error detail:', {
+      path: req.originalUrl || req.path,
+      method: req.method,
+      message: err?.message,
+      code: err?.code,
+      stack: err?.stack
+    });
+  }
   console.error(err?.stack || err);
   if (res.headersSent) return next(err);
   res.status(500).json({ error: 'Internal server error' });

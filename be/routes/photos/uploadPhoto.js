@@ -6,7 +6,12 @@ import crypto from 'crypto';
 import pool from '../../db/connection.js';
 import { sqlPhotoTypeParam } from '../../utils/pgEnumTypes.js';
 import { appendPhotoThumbnailToInsert } from '../../utils/photoThumbnail.js';
-import { debugMobilePhotoUpload, maskMobileUploadToken } from '../../utils/mobilePhotoUploadLog.js';
+import {
+  debugMobilePhotoUpload,
+  formatMobileUploadBytes,
+  maskMobileUploadToken,
+  traceMobilePhotoUpload
+} from '../../utils/mobilePhotoUploadLog.js';
 import { unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
 import {
   ALBUM_PHOTO_EXTENSIONS_ERROR,
@@ -311,12 +316,21 @@ export async function resizeToFit(buffer, contentType, targetBytes) {
  * photos_id is the PK (nextval sequence); file_path + photos_id + '.' + file_extension is the on-disk path.
  */
 export async function uploadPhoto(req, res) {
+  const mobileToken = req._mobilePhotoUploadToken;
+  const mobileCtx = mobileToken
+    ? { token: maskMobileUploadToken(mobileToken), singlesId: req.auth?.singles_id }
+    : null;
   try {
+    if (mobileCtx) {
+      traceMobilePhotoUpload('uploadPhoto ENTER (phone QR)', mobileCtx);
+    }
     console.log('[upload trace] 4-uploadPhoto-handler-ENTER');
     console.log('[uploadPhoto] START', {
       singlesId: req.auth?.singles_id,
       hasBody: !!req.body,
-      hasImageField: !!req.body?.image
+      hasImageField: !!req.body?.image,
+      mobileUpload: Boolean(mobileToken),
+      hasMobileBuffer: Buffer.isBuffer(req._mobilePhotoBuffer) && req._mobilePhotoBuffer.length > 0
     });
 
     const singlesId = req.auth?.singles_id;
@@ -348,6 +362,15 @@ export async function uploadPhoto(req, res) {
       contentType = String(req._mobilePhotoContentType || 'image/jpeg').trim().toLowerCase();
       fileExtension = normalizePhotoExtension(fileExtensionHint);
       buffer = mobileBuffer;
+      if (mobileCtx) {
+        traceMobilePhotoUpload('uploadPhoto mobile buffer', {
+          ...mobileCtx,
+          contentType,
+          fileExtension: fileExtension || null,
+          bytes: buffer.length,
+          sizeLabel: formatMobileUploadBytes(buffer.length)
+        });
+      }
     } else {
       const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
       contentType = match ? match[1].trim().toLowerCase() : 'image/jpeg';
@@ -361,6 +384,15 @@ export async function uploadPhoto(req, res) {
     }
 
     ({ buffer, contentType, fileExtension } = await normalizeUploadedImageBuffer(buffer, contentType, fileExtension));
+    if (mobileCtx) {
+      traceMobilePhotoUpload('uploadPhoto after normalize', {
+        ...mobileCtx,
+        contentType,
+        fileExtension: fileExtension || null,
+        bytes: buffer.length,
+        sizeLabel: formatMobileUploadBytes(buffer.length)
+      });
+    }
 
     if (!isAllowedAlbumPhotoContentType(contentType, fileExtension)) {
       const base = contentType.split(';')[0].trim().toLowerCase();
@@ -560,6 +592,15 @@ export async function uploadPhoto(req, res) {
     });
   } catch (err) {
     console.error('Upload photo error:', err);
+    if (mobileToken) {
+      traceMobilePhotoUpload('uploadPhoto FAIL (phone QR)', {
+        token: maskMobileUploadToken(mobileToken),
+        singlesId: req.auth?.singles_id,
+        message: err?.message,
+        code: err?.code,
+        stack: String(err?.stack || '').split('\n').slice(0, 4).join(' | ')
+      });
+    }
     // PostgreSQL undefined column (e.g. file_extension missing) → run migration
     if (err?.code === '42703') {
       return res.status(500).json({

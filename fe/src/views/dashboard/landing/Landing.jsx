@@ -17,6 +17,7 @@ import tutaNotesImg from 'assets/images/tutaNotes.png';
 import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
 import { isOnenoteUsbUpgrade } from 'config/onenoteUsbUpgradeEnv';
+import { fetchOnenoteUsbUpgradeBlocked } from 'api/onenoteUsbUpgradeFe';
 import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
 
 // ==============================|| LANDING PAGE ||============================== //
@@ -82,7 +83,17 @@ export default function Landing() {
   const [mallScale, setMallScale] = useState(1);
   const [mallGrid, setMallGrid] = useState(() => getMallStageSize(3, 2));
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
-  const blockOnenoteUsbTiles = isOnenoteUsbUpgrade();
+  const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchOnenoteUsbUpgradeBlocked().then((blocked) => {
+      if (!cancelled) setBlockOnenoteUsbTiles(blocked);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openUpgradePopup = useCallback((event) => {
     event?.preventDefault?.();

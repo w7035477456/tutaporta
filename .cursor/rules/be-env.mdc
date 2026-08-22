@@ -337,6 +337,19 @@ TWILIO_PHONE_NUMBER=+18888378479
 
 Code accepts `TWILIO_ServiceSID` or `TWILIO_SERVICE_SID` (`be/lib/twilioVerifySms.js`).
 
+## Mall — Tuta Albums / Tuta Notes upgrade gate
+
+```bash
+ONENOTE_USB_UPGRADE=false
+```
+
+| Variable | Value | Behavior |
+|----------|-------|----------|
+| `ONENOTE_USB_UPGRADE` | `false` | Mall tiles **TutaPhotoAlbums** and **TutaNotes** navigate normally. |
+| `ONENOTE_USB_UPGRADE` | `true` | Those tiles show the system-notification popup (no navigate). |
+
+Exposed at runtime via `GET /api/publicConfig` → `onenoteUsbUpgrade` (`Landing.jsx`). Also mirrored into the Vite bundle (`fe/vite.config.mjs`, `fe/.env`). After changing on prod: **`pm2 restart onlinemallwebsite`**; redeploy FE once so `/mall` reads runtime config (not build-time only).
+
 ## Production checklist
 
 ```bash

@@ -5,6 +5,12 @@ import {
   extToContentType,
   normalizePhotoExtension
 } from './albumUploadFormats.js';
+import {
+  debugMobilePhotoUpload,
+  formatMobileUploadBytes,
+  traceMobilePhotoUpload,
+  warnMobilePhotoUpload
+} from './mobilePhotoUploadLog.js';
 
 function extensionOf(fileName) {
   const base = path.basename(String(fileName || ''));
@@ -20,36 +26,68 @@ function extensionOf(fileName) {
 export function parseMobilePhotoMultipart(req) {
   const ct = String(req.headers['content-type'] || '');
   if (!ct.includes('multipart/form-data')) {
+    debugMobilePhotoUpload('multipart parse SKIP (not multipart)', { contentType: ct || null });
     return Promise.resolve(false);
   }
+
+  const cl = req.headers['content-length'];
+  traceMobilePhotoUpload('multipart parse START', {
+    contentType: ct.slice(0, 120),
+    contentLength: cl || null,
+    contentLengthLabel: cl ? formatMobileUploadBytes(Number(cl)) : null
+  });
 
   return new Promise((resolve, reject) => {
     const busboy = Busboy({ headers: req.headers });
     let fileBuffer = null;
     let mimeType = 'image/jpeg';
     let seenFile = false;
+    let skippedFields = [];
 
     let originalFileName = '';
 
     busboy.on('file', (fieldname, stream, info) => {
       if (fieldname !== 'photo') {
+        skippedFields.push(fieldname);
         stream.resume();
         return;
       }
       seenFile = true;
       mimeType = info.mimeType || mimeType;
       originalFileName = String(info.filename || '').trim();
+      traceMobilePhotoUpload('multipart file field', {
+        fieldname,
+        mimeType,
+        originalFileName: originalFileName || '(none)',
+        encoding: info.encoding
+      });
       const chunks = [];
       stream.on('data', (chunk) => chunks.push(chunk));
       stream.on('end', () => {
         fileBuffer = Buffer.concat(chunks);
+        traceMobilePhotoUpload('multipart file end', {
+          bytes: fileBuffer.length,
+          sizeLabel: formatMobileUploadBytes(fileBuffer.length)
+        });
       });
     });
 
-    busboy.on('error', reject);
+    busboy.on('error', (err) => {
+      warnMobilePhotoUpload('multipart busboy error', {
+        message: err?.message ?? err,
+        seenFile,
+        skippedFields
+      });
+      reject(err);
+    });
 
     busboy.on('finish', () => {
       if (!seenFile || !fileBuffer?.length) {
+        warnMobilePhotoUpload('multipart parse FAIL missing file', {
+          seenFile,
+          bufferBytes: fileBuffer?.length ?? 0,
+          skippedFields
+        });
         reject(new Error('Missing photo file'));
         return;
       }
@@ -71,9 +109,19 @@ export function parseMobilePhotoMultipart(req) {
           req.body.file_extension = ext;
         }
       }
+      traceMobilePhotoUpload('multipart parse OK', {
+        bytes: fileBuffer.length,
+        sizeLabel: formatMobileUploadBytes(fileBuffer.length),
+        resolvedMime,
+        ext: ext || null,
+        originalFileName: originalFileName || null
+      });
       resolve(true);
     });
 
+    req.on('error', (err) => {
+      warnMobilePhotoUpload('multipart req stream error', { message: err?.message ?? err });
+    });
     req.pipe(busboy);
   });
 }
@@ -89,11 +137,21 @@ export function wantsMobilePhotoJsonResponse(req) {
 export function installMobilePhotoFormRedirect(req, res, token) {
   const ct = String(req.headers['content-type'] || '');
   if (!ct.includes('multipart/form-data')) return;
-  if (wantsMobilePhotoJsonResponse(req)) return;
+  if (wantsMobilePhotoJsonResponse(req)) {
+    traceMobilePhotoUpload('form redirect SKIP (client wants JSON)', {
+      accept: String(req.headers?.accept ?? '').slice(0, 80)
+    });
+    return;
+  }
+  traceMobilePhotoUpload('form redirect installed (HTML form POST)', {
+    token: String(token ?? '').slice(0, 10)
+  });
 
   const tokenQ = encodeURIComponent(String(token ?? '').trim());
   const go = (suffix) => {
-    res.redirect(303, `/mobilePhotoUpload?token=${tokenQ}${suffix}`);
+    const target = `/mobilePhotoUpload?token=${tokenQ}${suffix}`;
+    traceMobilePhotoUpload('form redirect GO', { target: target.slice(0, 120), suffix });
+    res.redirect(303, target);
   };
 
   const origStatus = res.status.bind(res);

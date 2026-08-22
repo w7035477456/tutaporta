@@ -1,7 +1,8 @@
 /**
  * ONENOTE_USB_UPGRADE — when true, mall tiles for Tuta Albums / Tuta Notes
  * show a system-notification popup and do not navigate.
- * Source: fe/.env or ~/.ssh/be/.env (mirrored in vite.config.mjs).
+ * Runtime (authoritative on /mall): GET /api/publicConfig.onenoteUsbUpgrade from ~/.ssh/be/.env.
+ * Build-time fallback: fe/.env or ~/.ssh/be/.env mirrored in vite.config.mjs.
  * Requires vite envPrefix ONENOTE_.
  */
 function parseEnvBool(raw, defaultValue = false) {

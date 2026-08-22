@@ -1,4 +1,3 @@
-import appLog from '../../logger.js';
 import {
   createMobilePhotoUploadSession,
   getMobilePhotoUploadSession,
@@ -10,7 +9,11 @@ import {
 import { setProfileImageForSingles } from '../../utils/setProfileImageForSingles.js';
 import {
   debugMobilePhotoUpload,
+  errorMobilePhotoUpload,
+  formatMobileUploadBytes,
   maskMobileUploadToken,
+  mobileUploadRequestContext,
+  traceMobilePhotoUpload,
   warnMobilePhotoUpload,
   infoMobilePhotoUpload
 } from '../../utils/mobilePhotoUploadLog.js';
@@ -99,7 +102,7 @@ async function respondPublicMobilePhotoUploadSession(req, res, token) {
     });
     return res.json(payload);
   } catch (err) {
-    appLog.error('[mobilePhotoUpload] validate FAIL', err?.message ?? err);
+    errorMobilePhotoUpload('validate FAIL', err, mobileUploadRequestContext(req));
     return res.status(500).json({ error: 'Failed to read upload session' });
   }
 }
@@ -129,13 +132,13 @@ export async function postMobilePhotoUploadSession(req, res) {
     return res.json(session);
   } catch (err) {
     if (err?.code === '42P01') {
-      appLog.error('[mobilePhotoUpload] POST /session table missing — run addMobilePhotoUploadSessions.sql');
+      errorMobilePhotoUpload('POST /session table missing — run addMobilePhotoUploadSessions.sql', err, { singlesId });
       return res.status(503).json({
         error: 'mobile_upload_not_configured',
         message: 'Run be/db/addMobilePhotoUploadSessions.sql on Primary.'
       });
     }
-    appLog.error('[mobilePhotoUpload] POST /session FAIL', err?.message ?? err);
+    errorMobilePhotoUpload('POST /session FAIL', err, { singlesId, purpose, ...mobileUploadRequestContext(req) });
     return res.status(500).json({ error: 'Failed to create mobile upload session' });
   }
 }
@@ -170,13 +173,14 @@ export async function getMobilePhotoUploadSessionStatus(req, res) {
     });
     return res.json(payload);
   } catch (err) {
-    appLog.error('[mobilePhotoUpload] GET /session/:token/status FAIL', err?.message ?? err);
+    errorMobilePhotoUpload('GET /session/:token/status FAIL', err, mobileUploadRequestContext(req));
     return res.status(500).json({ error: 'Failed to read upload session' });
   }
 }
 
 /** GET /api/mobilePhotoUpload/ping — public health for phone upload API (no auth). */
 export function getMobilePhotoUploadPing(req, res) {
+  traceMobilePhotoUpload('ping', mobileUploadRequestContext(req));
   return res.json({ ok: true, apiVersion: 2 });
 }
 
@@ -235,22 +239,36 @@ async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
     });
   } catch (err) {
     if (/UPLOAD_FOLDER is not set/i.test(String(err?.message || ''))) {
+      errorMobilePhotoUpload('albums write FAIL — UPLOAD_FOLDER missing', err, { singlesId });
       return res.status(500).json({ error: 'UPLOAD_FOLDER is not set in .env' });
     }
-    appLog.error('[mobilePhotoUpload] albums write FAIL', err?.message ?? err);
+    errorMobilePhotoUpload('albums write FAIL', err, {
+      token: maskMobileUploadToken(token),
+      singlesId,
+      bufferBytes: buffer?.length,
+      bufferSize: formatMobileUploadBytes(buffer?.length)
+    });
     return res.status(400).json({ error: err?.message || 'Failed to save phone upload' });
   }
 }
 
 async function handleMobilePhotoUploadPost(req, res, token) {
+  traceMobilePhotoUpload('POST photo handler ENTER', {
+    ...mobileUploadRequestContext(req),
+    token: maskMobileUploadToken(token)
+  });
   let isMultipart = false;
   try {
     isMultipart = await parseMobilePhotoMultipart(req);
+    traceMobilePhotoUpload('POST photo multipart result', { isMultipart });
     if (isMultipart) {
       installMobilePhotoFormRedirect(req, res, token);
     }
   } catch (parseErr) {
-    appLog.error('[mobilePhotoUpload] POST photo multipart parse FAIL', parseErr?.message ?? parseErr);
+    errorMobilePhotoUpload('POST photo multipart parse FAIL', parseErr, {
+      ...mobileUploadRequestContext(req),
+      token: maskMobileUploadToken(token)
+    });
     if (String(req.headers['content-type'] || '').includes('multipart/form-data')) {
       installMobilePhotoFormRedirect(req, res, token);
       return res.status(400).json({ error: parseErr?.message || 'Missing photo file' });
@@ -269,11 +287,16 @@ async function handleMobilePhotoUploadPost(req, res, token) {
     }
   }
   const imageChars = hasImage ? String(req.body.image).length : 0;
-  debugMobilePhotoUpload('POST photo START', {
+  const mobileBytes = Buffer.isBuffer(req._mobilePhotoBuffer) ? req._mobilePhotoBuffer.length : 0;
+  traceMobilePhotoUpload('POST photo payload', {
     token: maskMobileUploadToken(token),
     ip: clientIp(req),
     hasImage,
     imagePayloadChars: imageChars,
+    mobileBufferBytes: mobileBytes,
+    mobileBufferSize: mobileBytes ? formatMobileUploadBytes(mobileBytes) : null,
+    originalFileName: req.body?.originalFileName || null,
+    fileExtension: req.body?.file_extension || null,
     userAgent: String(req.headers?.['user-agent'] ?? '').slice(0, 120)
   });
   try {
@@ -337,11 +360,15 @@ async function handleMobilePhotoUploadPost(req, res, token) {
 
     debugMobilePhotoUpload('POST photo delegating to uploadPhoto', {
       token: maskMobileUploadToken(token),
-      singlesId
+      singlesId,
+      purpose
     });
     return uploadPhoto(req, res);
   } catch (err) {
-    appLog.error('[mobilePhotoUpload] POST photo FAIL', err?.message ?? err);
+    errorMobilePhotoUpload('POST photo FAIL', err, {
+      ...mobileUploadRequestContext(req),
+      token: maskMobileUploadToken(token)
+    });
     return res.status(500).json({ error: 'Failed to upload photo from phone' });
   }
 }
