@@ -355,10 +355,10 @@ const laneContainedButtonSx = {
 };
 
 /**
- * Narrow notebook/note columns — always two text rows thick (Add / Notebook, Add / Note).
+ * Narrow notebook/note columns — single-line Add Notebook / Add Note.
  * Hover scale (+25%) comes from SliderControlButton default (do not pass disableHoverScale).
  */
-const laneContainedButtonTwoLineSx = {
+const laneContainedButtonOneLineSx = {
   width: '100% !important',
   maxWidth: '100% !important',
   minWidth: '0 !important',
@@ -366,17 +366,17 @@ const laneContainedButtonTwoLineSx = {
   boxSizing: 'border-box',
   flexShrink: 0,
   flexGrow: 0,
-  whiteSpace: 'normal !important',
+  whiteSpace: 'nowrap !important',
   overflow: 'hidden',
+  textOverflow: 'ellipsis',
   textAlign: 'center',
   justifyContent: 'center',
   alignItems: 'center',
   px: { xs: 0.25, sm: 0.35 },
   py: { xs: 0.35, sm: 0.4 },
-  // Fixed two-line height so the pill stays “two rows thick” at every font size.
-  height: { xs: 52, sm: 58 },
-  minHeight: { xs: 52, sm: 58 },
-  maxHeight: { xs: 52, sm: 58 },
+  height: { xs: 36, sm: 40 },
+  minHeight: { xs: 36, sm: 40 },
+  maxHeight: { xs: 36, sm: 40 },
   lineHeight: '1.15 !important',
   transformOrigin: 'center center'
 };
@@ -6427,46 +6427,8 @@ export default function RecordVaultWorkspacePane({
                     )}
                   </SliderControlButton>
                 </Box>
-                {!compareMode ? (
-                  <Box
-                    sx={{
-                      ...menuRailButtonCellSx,
-                      flex: menuLabelsCompact ? '0 0 auto' : '1 1 0',
-                      width: 'auto',
-                      minWidth: 0,
-                      maxWidth: menuLabelsCompact ? 'none' : '34%',
-                      overflow: 'visible'
-                    }}
-                  >
-                    <SliderControlButton
-                      type="button"
-                      variant="yellow"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      fullWidth={!menuLabelsCompact}
-                      data-guest-demo-allow="true"
-                      onClick={() => setMobileUploadOpen(true)}
-                      disabled={
-                        busy ||
-                        innerEncryptBusy ||
-                        notebookGateLocked ||
-                        !selectedNote ||
-                        (selectedNote &&
-                          noteHasInnerEncryption(selectedNote) &&
-                          !isInnerNoteUnlocked(selectedNote.note_id))
-                      }
-                      aria-label="Mobile Upload"
-                      title="Mobile Upload"
-                      sx={menuLabelsCompact ? headerToggleButtonSx : headerFullWidthButtonSx}
-                    >
-                      {menuLabelsCompact ? 'M' : 'Mobile Upload'}
-                    </SliderControlButton>
-                  </Box>
-                ) : null}
               </Box>
-              {(!compareMode &&
-                ((paneStorageType === 'onedrive' && oneDriveOffered) ||
-                  paneStorageType === 'usb' ||
-                  canEnterCompare)) ? (
+              {!compareMode ? (
                 <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
                   {paneStorageType === 'onedrive' && oneDriveOffered ? (
                     <Box
@@ -6475,7 +6437,7 @@ export default function RecordVaultWorkspacePane({
                         flex: '1 1 0',
                         width: 'auto',
                         minWidth: 0,
-                        maxWidth: canEnterCompare ? '50%' : '100%',
+                        maxWidth: canEnterCompare ? '33%' : '50%',
                         overflow: 'visible'
                       }}
                     >
@@ -6500,7 +6462,7 @@ export default function RecordVaultWorkspacePane({
                         flex: '1 1 0',
                         width: 'auto',
                         minWidth: 0,
-                        maxWidth: canEnterCompare ? '50%' : '100%',
+                        maxWidth: canEnterCompare ? '33%' : '50%',
                         overflow: 'visible'
                       }}
                     >
@@ -6511,13 +6473,51 @@ export default function RecordVaultWorkspacePane({
                         fullWidth
                         onClick={() => setUsbBackupOpen(true)}
                         disabled={busy}
-                        aria-label="Backup/Restore USB"
+                        aria-label="Backup/Restore"
+                        title="Backup / Restore USB"
                         sx={headerFullWidthButtonSx}
                       >
-                        Backup/Restore USB
+                        Backup/Restore
                       </SliderControlButton>
                     </Box>
                   ) : null}
+                  <Box
+                    sx={{
+                      ...menuRailButtonCellSx,
+                      flex: '1 1 0',
+                      width: 'auto',
+                      minWidth: 0,
+                      maxWidth: canEnterCompare
+                        ? '33%'
+                        : paneStorageType === 'usb' || (paneStorageType === 'onedrive' && oneDriveOffered)
+                          ? '50%'
+                          : '100%',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <SliderControlButton
+                      type="button"
+                      variant="yellow"
+                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                      fullWidth
+                      data-guest-demo-allow="true"
+                      onClick={() => setMobileUploadOpen(true)}
+                      disabled={
+                        busy ||
+                        innerEncryptBusy ||
+                        notebookGateLocked ||
+                        !selectedNote ||
+                        (selectedNote &&
+                          noteHasInnerEncryption(selectedNote) &&
+                          !isInnerNoteUnlocked(selectedNote.note_id))
+                      }
+                      aria-label="Mobile Upload"
+                      title="Mobile Upload"
+                      sx={headerFullWidthButtonSx}
+                    >
+                      {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
+                    </SliderControlButton>
+                  </Box>
                   {canEnterCompare ? (
                     <Box
                       sx={{
@@ -6525,7 +6525,7 @@ export default function RecordVaultWorkspacePane({
                         flex: '1 1 0',
                         width: 'auto',
                         minWidth: 0,
-                        maxWidth: '50%',
+                        maxWidth: '33%',
                         overflow: 'visible'
                       }}
                     >
@@ -6814,11 +6814,10 @@ export default function RecordVaultWorkspacePane({
                         onClick={() => void handleAddNotebook()}
                         disabled={busy}
                         hoverScale={1.25}
-                        sx={laneContainedButtonTwoLineSx}
+                        singleLineLabel
+                        sx={laneContainedButtonOneLineSx}
                       >
-                        Add
-                        <br />
-                        Notebook
+                        Add Notebook
                       </SliderControlButton>
                     </Box>
                     <Box sx={recordVaultMenuListScrollSx}>
@@ -6936,11 +6935,10 @@ export default function RecordVaultWorkspacePane({
                         onClick={() => void handleAddNote()}
                         disabled={busy || !selectedNotebookId || notebookGateLocked}
                         hoverScale={1.25}
-                        sx={laneContainedButtonTwoLineSx}
+                        singleLineLabel
+                        sx={laneContainedButtonOneLineSx}
                       >
-                        Add
-                        <br />
-                        Note
+                        Add Note
                       </SliderControlButton>
                     </Box>
                     <Box sx={recordVaultMenuListScrollSx}>
