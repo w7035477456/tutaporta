@@ -360,7 +360,7 @@ import { logoffVaultUsb as logoffPhotoAlbumsUsbSession } from './utils/photoAlbu
 import { updateMyVideoType } from './routes/videos/updateMyVideoType.js';
 import { clearRecordVaultCacheIcon, RECORD_VAULT_CACHE_ICON_KEY_PREFIX } from './utils/recordVaultCacheIcon.js';
 import { logoffVaultUsb } from './utils/recordVaultUsb/vaultSession.js';
-import { validateSharedMediaStorageForCluster, isMultiServerClusterMode } from './utils/sharedMediaStorage.js';
+import { validateMediaStorage } from './utils/sharedMediaStorage.js';
 import { getOneDriveStagingRootStatus } from './utils/recordVaultOneDriveStagingRoot.js';
 import { deleteMyVideo } from './routes/videos/deleteMyVideo.js';
 import { getAdminPhoto } from './routes/photos/getAdminPhoto.js';
@@ -866,15 +866,18 @@ console.log(
     }
   }
 }
-if (isMultiServerClusterMode()) {
-  const mediaCheck = validateSharedMediaStorageForCluster();
+{
+  const mediaCheck = validateMediaStorage();
   if (mediaCheck.ok) {
-    console.log('[startup] CLUSTER_MULTI_SERVER: shared media storage OK', {
+    console.log('[startup] media storage OK', {
       photoDir: mediaCheck.photoDir,
       videoDir: mediaCheck.videoDir
     });
   } else {
-    console.error('[startup] CLUSTER_MULTI_SERVER: shared media storage issues:', mediaCheck.issues);
+    console.error(
+      '[startup] MEDIA STORAGE NOT USABLE — uploads will fail until this is fixed:',
+      mediaCheck.issues
+    );
   }
 }
 console.log(

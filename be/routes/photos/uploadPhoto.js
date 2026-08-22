@@ -226,14 +226,28 @@ function formatBytes(bytes) {
 
 /**
  * Phone uploads only ever showed "Failed to upload photo", which hid the cause.
- * Report the real reason, with filesystem paths reduced to their basename.
+ * Storage faults name the offending path and syscall so the operator can fix it
+ * without reading server logs; everything else is scrubbed to a basename.
  */
 function describeUploadFailure(err) {
   const code = String(err?.code ?? '').trim();
-  if (code === 'ENOENT') return 'Server photo folder is missing (VSINGLES_PHOTO_FOLDER). Ask support to create it.';
-  if (code === 'EACCES' || code === 'EPERM') return 'Server cannot write to the photo folder (permissions). Ask support to fix it.';
-  if (code === 'ENOSPC') return 'Server disk is full. Ask support to free space.';
-  if (code === 'ECONNREFUSED' || code === '57P01' || code === '08006') return 'Database is unreachable. Try again in a minute.';
+  const FS_FAULTS = {
+    ENOENT: 'Folder does not exist',
+    EACCES: 'Node process lacks write permission',
+    EPERM: 'Node process lacks write permission',
+    ENOSPC: 'Disk is full',
+    EROFS: 'Filesystem is mounted read-only',
+    EMFILE: 'Server ran out of file handles'
+  };
+  if (FS_FAULTS[code]) {
+    const target = String(err?.path ?? '').trim();
+    const where = target ? ` at ${path.dirname(target) || target}` : '';
+    const call = err?.syscall ? ` [${err.syscall}]` : '';
+    return `Server storage error${where}: ${FS_FAULTS[code]} (${code})${call}`;
+  }
+  if (code === 'ECONNREFUSED' || code === '57P01' || code === '08006') {
+    return 'Database is unreachable. Try again in a minute.';
+  }
 
   const raw = String(err?.message ?? '').trim();
   if (!raw) return 'Failed to upload photo (unknown server error)';

@@ -29,10 +29,14 @@ function isLikelyLocalOnlyPath(dirPath) {
 }
 
 /**
- * When CLUSTER_MULTI_SERVER=true, photo/video roots must be on shared storage (NFS, SAN, object-mount).
- * Set VSINGLES_PHOTO_FOLDER (and optional VSINGLES_VIDEO_FOLDER) to a path all web hosts can read/write.
+ * Checks the photo/video roots exist and are readable/writable by this process.
+ * Runs on every startup: a folder owned by another user silently breaks every
+ * upload at write time, which is otherwise only visible as a request failure.
+ *
+ * When CLUSTER_MULTI_SERVER=true, additionally requires shared storage (NFS, SAN,
+ * object-mount) so all web hosts see the same files.
  */
-export function validateSharedMediaStorageForCluster() {
+export function validateMediaStorage() {
   const issues = [];
   const photoDir = getPhotoFolder().replace(/\/+$/, '');
   const videoDir = getVideoFolder().replace(/\/+$/, '');
