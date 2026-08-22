@@ -59,6 +59,13 @@ async function parseApiResponse(res) {
     return JSON.parse(text);
   } catch {
     if (summary.isHtml) {
+      if (res.status === 403) {
+        return {
+          error:
+            'Upload blocked (HTTP 403). Cloudflare or the firewall may be blocking phone photo POSTs. Add a WAF skip rule for /api/mobilePhotoUpload (see haproxy/cloudflare-allowlist.md), deploy, then scan a fresh QR code.',
+          _debug: summary
+        };
+      }
       const sizeHint =
         res.status === 413 || res.status >= 500
           ? ' Photo may be too large for the server — try a smaller image or scan a fresh QR code.'

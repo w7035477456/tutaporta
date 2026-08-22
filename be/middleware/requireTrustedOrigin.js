@@ -3,6 +3,12 @@ import { getAuthTokenFromCookies } from '../utils/authCookie.js';
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Pre-auth flows must work even when a stale session cookie is still present. */
+function isTrustedOriginExemptApiPath(path) {
+  const p = String(path || '');
+  if (p.startsWith('/api/mobilePhotoUpload/')) return true;
+  return TRUSTED_ORIGIN_EXEMPT_API_PATHS.has(p);
+}
+
 const TRUSTED_ORIGIN_EXEMPT_API_PATHS = new Set([
   '/api/verifyPassword',
   '/api/register',
@@ -69,7 +75,7 @@ export function requireTrustedOriginFactory(allowedOriginPatterns) {
   return function requireTrustedOrigin(req, res, next) {
     if (!MUTATING_METHODS.has(req.method)) return next();
     if (!req.path.startsWith('/api/')) return next();
-    if (TRUSTED_ORIGIN_EXEMPT_API_PATHS.has(req.path)) return next();
+    if (isTrustedOriginExemptApiPath(req.path)) return next();
 
     const hasSessionCookie = Boolean(getAuthTokenFromCookies(req.cookies));
     if (!hasSessionCookie) return next();

@@ -117,7 +117,7 @@ Express middleware is weaker than firewall; prefer firewall or HAProxy.
 
 ## Cloudflare WAF: phone QR upload (`/mobilePhotoUpload`)
 
-If a phone scan shows **“Sorry, you have been blocked”** (Cloudflare page with a Ray ID), the request never reached your app. Desktop `/myStory` works; cellular browsers are often flagged by **Bot Fight Mode**, **OWASP**, or **rate limits**.
+If a phone scan shows **“Sorry, you have been blocked”** (Cloudflare page with a Ray ID), or the phone page shows **HTTP 403** / **“Server returned HTML instead of JSON”** on upload (while desktop QR status polls show `RESPONSE OK` in PM2 logs), the **POST never reached Node**. Cellular browsers are often flagged by **Bot Fight Mode**, **OWASP**, or **rate limits** on `POST /api/mobilePhotoUpload/photo` even when `GET` validate/status works.
 
 **Fix in Cloudflare dashboard (zone onlinemall.website):**
 

@@ -10,8 +10,7 @@ import Logo from 'ui-component/Logo';
 import {
   fetchMobilePhotoUploadSessionPublic,
   getMobilePhotoUploadDebugLines,
-  isMobilePhotoUploadDebugEnabled,
-  uploadPhotoViaMobileSession
+  isMobilePhotoUploadDebugEnabled
 } from 'api/mobilePhotoUploadFe';
 import { mobilePhotoUploadDebugLog } from 'utils/mobilePhotoUploadDebug';
 
@@ -22,18 +21,33 @@ export default function MobilePhotoUploadPage() {
   const { token: pathToken } = useParams();
   const [searchParams] = useSearchParams();
   const token = String(pathToken ?? searchParams.get('token') ?? '').trim();
-  const cameraInputRef = useRef(null);
-  const galleryInputRef = useRef(null);
+  const cameraFormRef = useRef(null);
+  const galleryFormRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [validating, setValidating] = useState(false);
   const [sessionOk, setSessionOk] = useState(null);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [debugLines, setDebugLines] = useState([]);
   const missingToken = !token;
   const uploaded = searchParams.get('uploaded') === '1';
   const errorFromRedirect = String(searchParams.get('error') ?? '').trim();
   const showDebug = isMobilePhotoUploadDebugEnabled();
+
+  const uploadAction = token
+    ? `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(token)}`
+    : '';
+
+  const handleFileChange = (formRef) => (e) => {
+    if (!e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    mobilePhotoUploadDebugLog('file selected — native form POST', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+    setSubmitting(true);
+    e.currentTarget.form?.requestSubmit();
+  };
 
   const refreshDebugLines = useCallback(() => {
     setDebugLines(getMobilePhotoUploadDebugLines());
@@ -85,41 +99,14 @@ export default function MobilePhotoUploadPage() {
     };
   }, [missingToken, refreshDebugLines, token]);
 
-  const handleFileSelected = async (file) => {
-    if (!file || !token) return;
-    setSubmitting(true);
-    setError('');
-    setSuccess(false);
-    mobilePhotoUploadDebugLog('file selected', {
-      name: file.name,
-      size: file.size,
-      type: file.type
-    });
-    try {
-      await uploadPhotoViaMobileSession(token, file);
-      setSuccess(true);
-      mobilePhotoUploadDebugLog('upload complete');
-    } catch (err) {
-      const msg = err?.message || 'Failed to upload photo';
-      setError(msg);
-      mobilePhotoUploadDebugLog('upload error shown to user', { message: msg, debug: err?.debug });
-    } finally {
-      setSubmitting(false);
-      refreshDebugLines();
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
-      if (galleryInputRef.current) galleryInputRef.current.value = '';
+  useEffect(() => {
+    if (uploaded) {
+      mobilePhotoUploadDebugLog('upload complete (redirect)');
     }
-  };
-
-  const onCameraChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) void handleFileSelected(file);
-  };
-
-  const onGalleryChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) void handleFileSelected(file);
-  };
+    if (errorFromRedirect) {
+      mobilePhotoUploadDebugLog('upload error from redirect', { error: errorFromRedirect });
+    }
+  }, [errorFromRedirect, uploaded]);
 
   return (
     <Box
@@ -157,7 +144,7 @@ export default function MobilePhotoUploadPage() {
           </Alert>
         ) : null}
 
-        {!missingToken && (uploaded || success) ? (
+        {!missingToken && (uploaded) ? (
           <Alert severity="success">
             Photo uploaded. Your album on your computer will update automatically. You can upload another photo below
             using the same QR link.
@@ -183,34 +170,49 @@ export default function MobilePhotoUploadPage() {
               </Stack>
             ) : null}
 
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept={ACCEPT}
-              capture="user"
-              onChange={onCameraChange}
+            <form
+              ref={cameraFormRef}
+              method="POST"
+              action={uploadAction}
+              encType="multipart/form-data"
               style={{ display: 'none' }}
-            />
-            <input
-              ref={galleryInputRef}
-              type="file"
-              accept="image/*"
-              onChange={onGalleryChange}
+            >
+              <input
+                type="file"
+                name="photo"
+                accept={ACCEPT}
+                capture="user"
+                onChange={handleFileChange(cameraFormRef)}
+              />
+            </form>
+
+            <form
+              ref={galleryFormRef}
+              method="POST"
+              action={uploadAction}
+              encType="multipart/form-data"
               style={{ display: 'none' }}
-            />
+            >
+              <input
+                type="file"
+                name="photo"
+                accept="image/*"
+                onChange={handleFileChange(galleryFormRef)}
+              />
+            </form>
 
             <Stack spacing={1.5}>
               <SelectedButtonTemplate
                 fullWidth
                 disabled={submitting || validating}
-                onClick={() => cameraInputRef.current?.click()}
+                onClick={() => cameraFormRef.current?.querySelector('input[type="file"]')?.click()}
               >
                 Take photo
               </SelectedButtonTemplate>
               <SelectedButtonTemplate
                 fullWidth
                 disabled={submitting || validating}
-                onClick={() => galleryInputRef.current?.click()}
+                onClick={() => galleryFormRef.current?.querySelector('input[type="file"]')?.click()}
               >
                 Choose from gallery
               </SelectedButtonTemplate>
