@@ -21,6 +21,12 @@ import {
   normalizePhotoExtension
 } from '../../utils/albumUploadFormats.js';
 import { isAdminImpersonationSession } from '../../utils/adminAuth.js';
+import {
+  isStoragePermissionError,
+  logStoragePermissionFailure,
+  STORAGE_PERMISSION_CODE,
+  STORAGE_PERMISSION_USER_MESSAGE
+} from '../../utils/storagePermissionError.js';
 import { resolveRegularMemberActivityTimestamp, loadLatestPhotoCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 
 // Max upload size from ~/.ssh/be/.env — NOTES_MAX_SIZE_UPLOAD_MB, else MAX_SIZE_UPLOAD_MB, default 2 MiB
@@ -626,6 +632,14 @@ export async function uploadPhoto(req, res) {
     });
   } catch (err) {
     console.error('[UPLOAD_FAIL] Upload photo error:', err?.code || '', err?.message || err, err?.stack || '');
+    const storageMessage = handleStorageFault(err, {
+      route: 'uploadPhoto',
+      singlesId: req.auth?.singles_id,
+      viaPhoneQr: mobileToken ? 'yes' : 'no'
+    });
+    if (storageMessage) {
+      return res.status(500).json({ error: storageMessage, code: err?.code });
+    }
     if (mobileToken) {
       traceMobilePhotoUpload('uploadPhoto FAIL (phone QR)', {
         token: maskMobileUploadToken(mobileToken),
@@ -633,6 +647,18 @@ export async function uploadPhoto(req, res) {
         message: err?.message,
         code: err?.code,
         stack: String(err?.stack || '').split('\n').slice(0, 4).join(' | ')
+      });
+    }
+    if (isStoragePermissionError(err)) {
+      logStoragePermissionFailure(err, {
+        route: mobileToken ? 'uploadPhoto (phone QR)' : 'uploadPhoto',
+        envKey: 'VSINGLES_PHOTO_FOLDER',
+        folder: process.env.VSINGLES_PHOTO_FOLDER,
+        singlesId: req.auth?.singles_id
+      });
+      return res.status(500).json({
+        code: STORAGE_PERMISSION_CODE,
+        error: STORAGE_PERMISSION_USER_MESSAGE
       });
     }
     // PostgreSQL undefined column (e.g. file_extension missing) → run migration

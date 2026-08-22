@@ -154,6 +154,16 @@ export function installMobilePhotoFormRedirect(req, res, token) {
     res.redirect(303, target);
   };
 
+  // Native form POST cannot read the JSON body, so the machine-readable code has
+  // to ride along in the query string for the page to branch on (e.g. permission
+  // faults get their own popup instead of a generic inline error).
+  const failureSuffix = (body) => {
+    const msg = encodeURIComponent(String(body?.error || body?.message || 'Upload failed').slice(0, 200));
+    const code = String(body?.code ?? '').trim();
+    const codeQ = code ? `&code=${encodeURIComponent(code.slice(0, 40))}` : '';
+    return `&error=${msg}${codeQ}`;
+  };
+
   const origStatus = res.status.bind(res);
   res.status = function status(code) {
     res.statusCode = code;
@@ -163,8 +173,7 @@ export function installMobilePhotoFormRedirect(req, res, token) {
           go('&uploaded=1');
           return res;
         }
-        const msg = encodeURIComponent(String(body?.error || body?.message || 'Upload failed').slice(0, 200));
-        go(`&error=${msg}`);
+        go(failureSuffix(body));
         return res;
       }
     };
@@ -177,8 +186,7 @@ export function installMobilePhotoFormRedirect(req, res, token) {
       go('&uploaded=1');
       return res;
     }
-    const msg = encodeURIComponent(String(body?.error || 'Upload failed').slice(0, 200));
-    go(`&error=${msg}`);
+    go(failureSuffix(body));
     return res;
   };
 }

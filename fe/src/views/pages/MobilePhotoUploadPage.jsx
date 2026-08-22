@@ -5,6 +5,10 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import Logo from 'ui-component/Logo';
 import {
@@ -17,6 +21,9 @@ import { mobilePhotoUploadDebugLog } from 'utils/mobilePhotoUploadDebug';
 const ACCEPT =
   'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff';
 
+/** Matches STORAGE_PERMISSION_CODE in be/utils/storagePermissionError.js. */
+const STORAGE_PERMISSION_CODE = 'STORAGE_PERMISSION';
+
 export default function MobilePhotoUploadPage() {
   const { token: pathToken } = useParams();
   const [searchParams] = useSearchParams();
@@ -28,9 +35,12 @@ export default function MobilePhotoUploadPage() {
   const [sessionOk, setSessionOk] = useState(null);
   const [error, setError] = useState('');
   const [debugLines, setDebugLines] = useState([]);
+  const [permissionPopupOpen, setPermissionPopupOpen] = useState(false);
   const missingToken = !token;
   const uploaded = searchParams.get('uploaded') === '1';
   const errorFromRedirect = String(searchParams.get('error') ?? '').trim();
+  const errorCode = String(searchParams.get('code') ?? '').trim();
+  const isPermissionError = errorCode === STORAGE_PERMISSION_CODE;
   const showDebug = isMobilePhotoUploadDebugEnabled();
 
   const uploadAction = token
@@ -104,9 +114,15 @@ export default function MobilePhotoUploadPage() {
       mobilePhotoUploadDebugLog('upload complete (redirect)');
     }
     if (errorFromRedirect) {
-      mobilePhotoUploadDebugLog('upload error from redirect', { error: errorFromRedirect });
+      mobilePhotoUploadDebugLog('upload error from redirect', {
+        error: errorFromRedirect,
+        code: errorCode || null
+      });
     }
-  }, [errorFromRedirect, uploaded]);
+    if (isPermissionError) {
+      setPermissionPopupOpen(true);
+    }
+  }, [errorCode, errorFromRedirect, isPermissionError, uploaded]);
 
   return (
     <Box
@@ -258,6 +274,32 @@ export default function MobilePhotoUploadPage() {
           </>
         ) : null}
       </Stack>
+
+      <Dialog
+        open={permissionPopupOpen}
+        onClose={() => setPermissionPopupOpen(false)}
+        aria-labelledby="upload-permission-error-title"
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle id="upload-permission-error-title" sx={{ fontWeight: 700, color: 'error.main' }}>
+          Upload failed
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 1.5 }}>
+            Permission error on the server. Your photo was received but could not be saved.
+          </Typography>
+          <Typography variant="body2" sx={{ opacity: 0.85 }}>
+            This is a server configuration problem, not a problem with your photo or your phone. Please contact
+            admin — retrying will not help until it is fixed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <SelectedButtonTemplate fullWidth onClick={() => setPermissionPopupOpen(false)}>
+            Close
+          </SelectedButtonTemplate>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

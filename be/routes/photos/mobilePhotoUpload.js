@@ -24,6 +24,12 @@ import {
   parseMobilePhotoMultipart
 } from '../../utils/parseMobilePhotoMultipart.js';
 import { writeMobileUploadFile } from '../../utils/mobileUploadFolder.js';
+import {
+  isStoragePermissionError,
+  logStoragePermissionFailure,
+  STORAGE_PERMISSION_CODE,
+  STORAGE_PERMISSION_USER_MESSAGE
+} from '../../utils/storagePermissionError.js';
 
 function sessionStatusPayload(row) {
   const expired = sessionExpired(row);
@@ -241,6 +247,18 @@ async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
     if (/UPLOAD_FOLDER is not set/i.test(String(err?.message || ''))) {
       errorMobilePhotoUpload('albums write FAIL — UPLOAD_FOLDER missing', err, { singlesId });
       return res.status(500).json({ error: 'UPLOAD_FOLDER is not set in .env' });
+    }
+    if (isStoragePermissionError(err)) {
+      logStoragePermissionFailure(err, {
+        route: 'mobilePhotoUpload (photo albums QR)',
+        envKey: 'UPLOAD_FOLDER',
+        folder: process.env.UPLOAD_FOLDER,
+        singlesId
+      });
+      return res.status(500).json({
+        code: STORAGE_PERMISSION_CODE,
+        error: STORAGE_PERMISSION_USER_MESSAGE
+      });
     }
     errorMobilePhotoUpload('albums write FAIL', err, {
       token: maskMobileUploadToken(token),

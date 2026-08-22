@@ -10,7 +10,10 @@
 # Ubuntu ~/b:  alias checkstorage='$HOME/code/main/scripts/verify-media-storage.sh'
 set -uo pipefail
 
-ENV_FILE="${BE_ENV_FILE:-$HOME/.ssh/be/.env}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/media-storage-env.sh
+. "${SCRIPT_DIR}/lib/media-storage-env.sh"
+
 ME="$(id -un)"
 FAILED=0
 
@@ -25,33 +28,6 @@ else
   stat_user()  { stat -f '%Su' "$1"; }
 fi
 
-if [[ ! -r "$ENV_FILE" ]]; then
-  echo "FAIL  cannot read env file: $ENV_FILE" >&2
-  exit 1
-fi
-
-# Last assignment wins, strip inline comments / quotes / trailing space.
-read_env() {
-  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV_FILE" \
-    | tail -n1 \
-    | sed -e 's/[[:space:]]*#.*$//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//'
-}
-
-STORAGE_FOLDER="$(read_env STORAGE_FOLDER)"
-ROOT_FOLDER="$(read_env ROOT_FOLDER)"
-
-# Mirror be/loadEnv.js ${VAR} expansion for the few vars paths actually use.
-expand_path() {
-  local v="$1"
-  v="${v//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-  v="${v//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
-  v="${v//\$\{ROOT_FOLDER\}/$ROOT_FOLDER}"
-  v="${v//\$\{HOME\}/$HOME}"
-  v="${v//\$HOME/$HOME}"
-  [[ "$v" == "~/"* ]] && v="$HOME/${v:2}"
-  echo "${v%/}"
-}
-
 check_dir() {
   local key="$1" required="$2"
   local raw dir owner mode probe foreign
@@ -59,7 +35,7 @@ check_dir() {
 
   if [[ -z "$raw" ]]; then
     if [[ "$required" == "required" ]]; then
-      echo "FAIL  $key is not set in $ENV_FILE"
+      echo "FAIL  $key is not set in $MEDIA_ENV_FILE"
       FAILED=1
     else
       echo "skip  $key not set (optional)"
@@ -69,11 +45,24 @@ check_dir() {
 
   dir="$(expand_path "$raw")"
 
+  # uploadPhoto() and ensureMobileUploadFolder() both mkdir -p on first use, so a
+  # missing folder is only fatal when the nearest existing parent is unwritable.
   if [[ ! -d "$dir" ]]; then
-    echo "FAIL  $key -> $dir"
-    echo "      directory does not exist"
-    echo "      fix: sudo mkdir -p '$dir' && sudo chown $ME:$ME '$dir'"
-    FAILED=1
+    local ancestor="$dir"
+    while [[ ! -d "$ancestor" && "$ancestor" != "/" ]]; do
+      ancestor="$(dirname "$ancestor")"
+    done
+    probe="$ancestor/.storage_write_test.$$"
+    if touch "$probe" 2>/dev/null; then
+      rm -f "$probe"
+      echo "OK    $key -> $dir"
+      echo "      not created yet — backend will mkdir -p on first use ($ancestor is writable)"
+    else
+      echo "FAIL  $key -> $dir"
+      echo "      missing AND cannot be created: $ancestor is not writable by $ME"
+      echo "      fix: sudo mkdir -p '$dir' && sudo chown -R $ME:$ME '$dir'"
+      FAILED=1
+    fi
     return
   fi
 
@@ -109,13 +98,13 @@ check_dir() {
   echo "OK    $key -> $dir  (owner $owner, mode $mode, writable by $ME)"
 }
 
-echo "media storage check — user $ME on $(hostname), env $ENV_FILE"
+echo "media storage check — user $ME on $(hostname), env $MEDIA_ENV_FILE"
 echo
 
-check_dir VSINGLES_PHOTO_FOLDER required
-check_dir UPLOAD_FOLDER required
-check_dir VSINGLES_VIDEO_FOLDER optional
-check_dir RECORD_NOTES_ONEDRIVE_STAGING_ROOT optional
+for entry in "${MEDIA_FOLDER_KEYS[@]}"; do
+  # shellcheck disable=SC2086
+  check_dir $entry
+done
 
 echo
 if [[ -n "$STORAGE_FOLDER" && -d "$STORAGE_FOLDER" ]]; then
