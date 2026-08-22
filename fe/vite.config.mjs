@@ -184,8 +184,7 @@ export default defineConfig(({ mode }) => {
         // {
         //   find: 'assets',
         //   replacement: path.join(process.cwd(), 'src/assets')
-        // },
-        '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs'
+        // }
       }
     },
     base: '/',
