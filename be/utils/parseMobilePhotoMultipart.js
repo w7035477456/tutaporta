@@ -14,7 +14,7 @@ function extensionOf(fileName) {
 }
 
 /**
- * Parse multipart field "photo" into req.body.image (data URL) for uploadPhoto().
+ * Parse multipart field "photo" into req._mobilePhotoBuffer for uploadPhoto().
  * No-op when Content-Type is not multipart/form-data.
  */
 export function parseMobilePhotoMultipart(req) {
@@ -62,9 +62,9 @@ export function parseMobilePhotoMultipart(req) {
           resolvedMime = fromExt;
         }
       }
-      const base64 = fileBuffer.toString('base64');
       req.body = req.body || {};
-      req.body.image = `data:${resolvedMime};base64,${base64}`;
+      req._mobilePhotoBuffer = fileBuffer;
+      req._mobilePhotoContentType = resolvedMime;
       if (originalFileName) {
         req.body.originalFileName = originalFileName;
         if (ext) {

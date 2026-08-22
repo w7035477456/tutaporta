@@ -199,13 +199,18 @@ export async function getMobilePhotoUploadSessionPublic(req, res) {
 }
 
 async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
-  const dataUrl = req.body?.image;
   let buffer;
   let contentType;
-  try {
-    ({ buffer, contentType } = decodeImageDataUrl(dataUrl));
-  } catch (decodeErr) {
-    return res.status(400).json({ error: decodeErr?.message || 'Missing image (data URL or base64)' });
+  if (Buffer.isBuffer(req._mobilePhotoBuffer) && req._mobilePhotoBuffer.length) {
+    buffer = req._mobilePhotoBuffer;
+    contentType = String(req._mobilePhotoContentType || 'image/jpeg');
+  } else {
+    const dataUrl = req.body?.image;
+    try {
+      ({ buffer, contentType } = decodeImageDataUrl(dataUrl));
+    } catch (decodeErr) {
+      return res.status(400).json({ error: decodeErr?.message || 'Missing image (data URL or base64)' });
+    }
   }
   const originalName =
     req.body?.originalFileName || req.body?.file_name || req.body?.filename || 'photo';
@@ -253,7 +258,9 @@ async function handleMobilePhotoUploadPost(req, res, token) {
     return res.status(400).json({ error: parseErr?.message || 'Missing photo file' });
   }
 
-  const hasImage = Boolean(req.body?.image && typeof req.body.image === 'string');
+  const hasImage =
+    Boolean(req.body?.image && typeof req.body.image === 'string') ||
+    (Buffer.isBuffer(req._mobilePhotoBuffer) && req._mobilePhotoBuffer.length > 0);
   if (hasImage && !req.body?.file_extension) {
     const originalName = req.body?.originalFileName || req.body?.file_name || req.body?.filename || '';
     const extMatch = String(originalName).match(/\.([^.]+)$/);

@@ -219,6 +219,23 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
 }
 
+/** iPhone gallery often sends HEIC — convert to JPEG so Sharp/storage always work. */
+async function normalizeUploadedImageBuffer(buffer, contentType, fileExtension) {
+  const ext = normalizePhotoExtension(fileExtension);
+  const ct = String(contentType || '').toLowerCase();
+  const isHeic = ct.includes('heic') || ct.includes('heif') || ext === 'heic' || ext === 'heif';
+  if (!isHeic) {
+    return { buffer, contentType: ct || 'image/jpeg', fileExtension: ext };
+  }
+  try {
+    const converted = await sharp(buffer).rotate().jpeg({ quality: 90 }).toBuffer();
+    return { buffer: converted, contentType: 'image/jpeg', fileExtension: 'jpeg' };
+  } catch (err) {
+    console.error('[uploadPhoto] HEIC/HEIF convert failed:', err?.message ?? err);
+    return { buffer, contentType: ct, fileExtension: ext };
+  }
+}
+
 /**
  * Resize image buffer to fit under targetBytes while keeping aspect ratio.
  * Chooses an output format that usually yields smaller files:
@@ -315,14 +332,35 @@ export async function uploadPhoto(req, res) {
     }
 
     const { image: dataUrl, file_extension: fileExtensionHint } = req.body || {};
-    if (!dataUrl || typeof dataUrl !== 'string') {
+    const mobileBuffer = req._mobilePhotoBuffer;
+    const hasMobileBuffer = Buffer.isBuffer(mobileBuffer) && mobileBuffer.length > 0;
+    const hasDataUrl = Boolean(dataUrl && typeof dataUrl === 'string');
+
+    if (!hasMobileBuffer && !hasDataUrl) {
       return res.status(400).json({ error: 'Missing image (data URL or base64)' });
     }
 
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    const contentType = match ? match[1].trim().toLowerCase() : 'image/jpeg';
-    const base64 = match ? match[2] : dataUrl;
-    const fileExtension = normalizePhotoExtension(fileExtensionHint);
+    let contentType;
+    let fileExtension;
+    let buffer;
+
+    if (hasMobileBuffer) {
+      contentType = String(req._mobilePhotoContentType || 'image/jpeg').trim().toLowerCase();
+      fileExtension = normalizePhotoExtension(fileExtensionHint);
+      buffer = mobileBuffer;
+    } else {
+      const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      contentType = match ? match[1].trim().toLowerCase() : 'image/jpeg';
+      const base64 = match ? match[2] : dataUrl;
+      fileExtension = normalizePhotoExtension(fileExtensionHint);
+      buffer = Buffer.from(base64, 'base64');
+    }
+
+    if (!buffer.length) {
+      return res.status(400).json({ error: 'Empty image payload' });
+    }
+
+    ({ buffer, contentType, fileExtension } = await normalizeUploadedImageBuffer(buffer, contentType, fileExtension));
 
     if (!isAllowedAlbumPhotoContentType(contentType, fileExtension)) {
       const base = contentType.split(';')[0].trim().toLowerCase();
@@ -338,7 +376,6 @@ export async function uploadPhoto(req, res) {
       });
     }
 
-    let buffer = Buffer.from(base64, 'base64');
     let finalContentType = contentType;
     const sizeBefore = buffer.length;
     const skipUploadSizeLimit = isAdminImpersonationSession(req.auth);
