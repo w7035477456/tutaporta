@@ -21,7 +21,6 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import TextAlign from '@tiptap/extension-text-align';
 import Typography from '@tiptap/extension-typography';
 import InvisibleCharacters from '@tiptap/extension-invisible-characters';
-import FileHandler from '@tiptap/extension-file-handler';
 import { Mathematics } from '@tiptap/extension-mathematics';
 import { Markdown } from 'tiptap-markdown';
 import { common, createLowlight } from 'lowlight';
@@ -42,25 +41,6 @@ export const RECORD_VAULT_MENTION_ITEMS = [
   { id: 'team', label: 'Team' },
   { id: 'everyone', label: 'Everyone' }
 ];
-
-function insertImageFiles(currentEditor, files, pos) {
-  files
-    .filter((file) => file.type.startsWith('image/'))
-    .forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        currentEditor
-          .chain()
-          .insertContentAt(pos ?? currentEditor.state.selection.anchor, {
-            type: 'image',
-            attrs: { src: reader.result }
-          })
-          .focus()
-          .run();
-      };
-      reader.readAsDataURL(file);
-    });
-}
 
 /** All FREE TipTap extensions wired for the Record Vault note editor. */
 export function buildRecordVaultEditorExtensions() {
@@ -151,7 +131,10 @@ export function buildRecordVaultEditorExtensions() {
       bulletListMarker: '-',
       linkify: false,
       breaks: false,
-      transformPastedText: true,
+      // External paste (Apple Notes, Word, etc.) is handled by
+      // recordVaultPasteFromClipboard — do not run pasted plain text through
+      // the Markdown parser (that mangled multi-line Notes dumps).
+      transformPastedText: false,
       transformCopiedText: false
     }),
 
@@ -162,13 +145,9 @@ export function buildRecordVaultEditorExtensions() {
     CharacterCount,
     RecordVaultSearchHighlight,
     Focus.configure({ className: 'has-focus', mode: 'all' }),
-    Placeholder.configure({ placeholder: 'Start writing your note…' }),
-    FileHandler.configure({
-      allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
-      // OS file drops onto the content pane are handled by the workspace as
-      // vault attachments (html/pdf/docx/mp4/png/jpg/…). Paste still inserts
-      // inline images here.
-      onPaste: (currentEditor, files) => insertImageFiles(currentEditor, files)
-    })
+    Placeholder.configure({ placeholder: 'Start writing your note…' })
+    // Clipboard paste (Apple Notes / Word / images) is handled in
+    // RecordVaultNoteEditor via recordVaultPasteFromClipboard — not FileHandler.
+    // OS file drops onto the pane are handled by the workspace as vault attachments.
   ];
 }

@@ -7,6 +7,12 @@ import 'katex/dist/katex.min.css';
 
 import { buildRecordVaultEditorExtensions } from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
+import {
+  buildRecordVaultPasteHtml,
+  plainTextToHtml,
+  recordVaultPasteSignature,
+  shouldHandleRecordVaultPaste
+} from './recordVaultPasteFromClipboard';
 import RecordVaultEditorToolbar from './RecordVaultEditorToolbar';
 import './recordVaultEditor.scss';
 
@@ -46,16 +52,89 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
   onReadyRef.current = onReady;
   const onContentHeightRef = useRef(onContentHeightChange);
   onContentHeightRef.current = onContentHeightChange;
+  const editorRef = useRef(null);
+  /** Blocks TipTap default + duplicate paste events from inserting the same clipboard twice. */
+  const pasteInFlightRef = useRef(false);
+  const lastPasteAtRef = useRef(0);
+  const lastPasteSigRef = useRef('');
+  const lastInsertedSigRef = useRef('');
 
   const editor = useEditor({
     extensions: buildRecordVaultEditorExtensions(),
     content: initialContent || EMPTY_DOC,
     editable,
     immediatelyRender: false,
+    editorProps: {
+      /**
+       * Apple Notes / Word / LibreOffice / browser Select-All → Copy → Paste.
+       * Same path on Mac and Ubuntu. Takes over when the clipboard has HTML,
+       * multi-line plain text, or image files; otherwise TipTap's default runs.
+       *
+       * Must return true synchronously and never let ProseMirror's default slice
+       * insert — otherwise we get double paste (PM slice + our insertContent).
+       */
+      handlePaste: (_view, event) => {
+        const cd = event?.clipboardData;
+        const current = editorRef.current;
+        if (!cd || !current || !current.isEditable) return false;
+        if (!shouldHandleRecordVaultPaste(cd)) return false;
+
+        // One Ctrl-V can fire paste twice on Mac Safari/Chrome; ignore repeats of the same payload.
+        const now = Date.now();
+        const sig = recordVaultPasteSignature(cd);
+        if (
+          pasteInFlightRef.current ||
+          (now - lastPasteAtRef.current < 2500 && lastPasteSigRef.current === sig)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          return true;
+        }
+
+        pasteInFlightRef.current = true;
+        lastPasteAtRef.current = now;
+        lastPasteSigRef.current = sig;
+        event.preventDefault();
+        event.stopPropagation();
+
+        void buildRecordVaultPasteHtml(cd)
+          .then((html) => {
+            const ed = editorRef.current;
+            if (!ed) return;
+            if (lastInsertedSigRef.current === sig) return;
+            if (html) {
+              lastInsertedSigRef.current = sig;
+              ed.chain().focus().insertContent(html).run();
+              return;
+            }
+            const plain = String(cd.getData('text/plain') || '');
+            if (plain) {
+              lastInsertedSigRef.current = sig;
+              ed.chain().focus().insertContent(plainTextToHtml(plain)).run();
+            }
+          })
+          .catch((err) => {
+            console.error('[RecordVault paste] failed:', err?.message || err);
+            const ed = editorRef.current;
+            const plain = String(cd.getData('text/plain') || '');
+            if (plain && ed && lastInsertedSigRef.current !== sig) {
+              lastInsertedSigRef.current = sig;
+              ed.chain().focus().insertContent(plainTextToHtml(plain)).run();
+            }
+          })
+          .finally(() => {
+            pasteInFlightRef.current = false;
+            lastPasteAtRef.current = Date.now();
+          });
+        return true;
+      }
+    },
     onUpdate: ({ editor: e }) => {
       onChangeRef.current?.(e.getHTML());
     }
   });
+
+  editorRef.current = editor;
 
   useEffect(() => {
     if (editor && editor.isEditable !== editable) editor.setEditable(editable);
