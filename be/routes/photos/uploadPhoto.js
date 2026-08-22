@@ -224,6 +224,26 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MiB`;
 }
 
+/**
+ * Phone uploads only ever showed "Failed to upload photo", which hid the cause.
+ * Report the real reason, with filesystem paths reduced to their basename.
+ */
+function describeUploadFailure(err) {
+  const code = String(err?.code ?? '').trim();
+  if (code === 'ENOENT') return 'Server photo folder is missing (VSINGLES_PHOTO_FOLDER). Ask support to create it.';
+  if (code === 'EACCES' || code === 'EPERM') return 'Server cannot write to the photo folder (permissions). Ask support to fix it.';
+  if (code === 'ENOSPC') return 'Server disk is full. Ask support to free space.';
+  if (code === 'ECONNREFUSED' || code === '57P01' || code === '08006') return 'Database is unreachable. Try again in a minute.';
+
+  const raw = String(err?.message ?? '').trim();
+  if (!raw) return 'Failed to upload photo (unknown server error)';
+  const scrubbed = raw
+    .replace(/(?:\/[\w.@-]+)+\/([\w.@-]+)/g, '$1')
+    .replace(/(password|secret|token)\s*[:=]\s*\S+/gi, '$1=***')
+    .slice(0, 200);
+  return code ? `${scrubbed} (${code})` : scrubbed;
+}
+
 /** iPhone gallery often sends HEIC — convert to JPEG so Sharp/storage always work. */
 async function normalizeUploadedImageBuffer(buffer, contentType, fileExtension) {
   const ext = normalizePhotoExtension(fileExtension);
@@ -591,7 +611,7 @@ export async function uploadPhoto(req, res) {
       ...(req._replacedDuplicate ? { replacedDuplicate: true } : {})
     });
   } catch (err) {
-    console.error('Upload photo error:', err);
+    console.error('[UPLOAD_FAIL] Upload photo error:', err?.code || '', err?.message || err, err?.stack || '');
     if (mobileToken) {
       traceMobilePhotoUpload('uploadPhoto FAIL (phone QR)', {
         token: maskMobileUploadToken(mobileToken),
@@ -607,11 +627,8 @@ export async function uploadPhoto(req, res) {
         error: 'Database schema outdated. Run: psql -U <user> -d vsingles -f sql/migration_vsingles_photos_to_photos.sql',
       });
     }
-    const detail = String(err?.message ?? '').trim();
-    const safeDetail =
-      detail && detail.length <= 200 && !/ENOENT|EACCES|password|secret|\.env/i.test(detail) ? detail : '';
     res.status(500).json({
-      error: safeDetail || 'Failed to upload photo',
+      error: describeUploadFailure(err),
       code: err?.code || undefined
     });
   }
