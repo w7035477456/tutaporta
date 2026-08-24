@@ -64,6 +64,8 @@ import {
 import TutaNotesBrandTitle from './TutaNotesBrandTitle';
 import TutaNotesVideoTutorialLink from './TutaNotesVideoTutorialLink';
 import RecordVaultUsbBridgeStatusPanel from './RecordVaultUsbBridgeStatusPanel';
+import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
+import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 
 const ASSIGNED_USB_STATS_REFRESH_MS = 2500;
 
@@ -1077,6 +1079,11 @@ export default function RecordVaultUsbGate({
     if (!open) return null;
     return (
       <Box sx={{ width: '100%' }}>
+        <BusyHourglassOverlay
+          open={Boolean(open) && busy}
+          label="Opening TutaNotes USB…"
+          fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+        />
         <RecordVaultViewVaultDialog
           open={open && viewVaultOpen}
           onClose={() => setViewVaultOpen(false)}
@@ -1164,6 +1171,11 @@ export default function RecordVaultUsbGate({
 
   return (
     <>
+      <BusyHourglassOverlay
+        open={Boolean(open) && busy}
+        label="Opening TutaNotes USB…"
+        fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+      />
       <ColorTemplate7PopupLargeDark
         open={open}
         onClose={handleCloseGate}

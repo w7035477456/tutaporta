@@ -727,6 +727,7 @@ export default function MyPhotoAlbums() {
             aria-selected={paneFocus === 'usb'}
             title="Open or reload TutaPhotoAlbums notes on USB"
             onClick={selectUsbTab}
+            {...guestDemoAllowProps()}
             sx={usbTitleButtonSx}
           >
             {usbTabLabel}
@@ -766,6 +767,7 @@ export default function MyPhotoAlbums() {
                 aria-selected={paneFocus === 'usb'}
                 title="Expand TutaPhotoAlbums on USB to the full window"
                 onClick={selectUsbTab}
+                {...guestDemoAllowProps()}
                 sx={usbTitleButtonSx}
               >
                 {usbTabLabel}

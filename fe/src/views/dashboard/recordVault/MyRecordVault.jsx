@@ -677,6 +677,7 @@ export default function MyRecordVault() {
             aria-selected={paneFocus === 'usb'}
             title="Open or reload TutaNotes notes on USB"
             onClick={selectUsbTab}
+            {...guestDemoAllowProps()}
             sx={usbTitleButtonSx}
           >
             {usbTabLabel}
@@ -716,6 +717,7 @@ export default function MyRecordVault() {
                 aria-selected={paneFocus === 'usb'}
                 title="Expand TutaNotes on USB to the full window"
                 onClick={selectUsbTab}
+                {...guestDemoAllowProps()}
                 sx={usbTitleButtonSx}
               >
                 {usbTabLabel}

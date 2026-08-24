@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
+import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
+import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import {
   clearRecordVaultAccessFail,
   fetchRecordVaultAccessFailStatus,
@@ -185,7 +188,12 @@ export default function RecordVaultAccessGate({
   );
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) {
+      // Next open must show hourglass immediately (checking starts true again).
+      setChecking(true);
+      setBusy(false);
+      return undefined;
+    }
     closeErrorPopup();
     let cancelled = false;
     setCurrentPassword('');
@@ -198,8 +206,8 @@ export default function RecordVaultAccessGate({
     setCooldownSeconds(0);
     setCooldownUntilMs(0);
     setFailedAttempts(0);
+    setChecking(true);
     void (async () => {
-      setChecking(true);
       try {
         const [e2e, accessStatus, failStatus] = await Promise.all([
           fetchRecordVaultE2eKeys(),
@@ -299,8 +307,11 @@ export default function RecordVaultAccessGate({
       setError('Vault key material missing — set a Encrypt Password first');
       return;
     }
-    setBusy(true);
-    setError('');
+    // Paint hourglass before Argon2 KDF blocks the main thread.
+    flushSync(() => {
+      setBusy(true);
+      setError('');
+    });
     try {
       // Password stays in the browser — never POSTed to the server.
       const { dek, dekRaw } = await unlockVaultWithPassword(vaultRow, value);
@@ -368,8 +379,11 @@ export default function RecordVaultAccessGate({
       setError('Vault key material missing — set a Encrypt Password first');
       return;
     }
-    setBusy(true);
-    setError('');
+    // Paint hourglass before Argon2 KDF blocks the main thread.
+    flushSync(() => {
+      setBusy(true);
+      setError('');
+    });
     try {
       // Unlock with current password from the change box (not the top verify field).
       const { dekRaw } = await unlockVaultWithPassword(vaultRow, priorPassword);
@@ -414,8 +428,11 @@ export default function RecordVaultAccessGate({
       );
       return;
     }
-    setBusy(true);
-    setError('');
+    // Paint hourglass before Argon2 KDF blocks the main thread.
+    flushSync(() => {
+      setBusy(true);
+      setError('');
+    });
     try {
       // Client: password → KEK → wrap DEK. Server gets salt + wrapped DEK only.
       const { dek, dekRaw, createPayload } = await createVaultKeyMaterial(value);
@@ -603,20 +620,34 @@ export default function RecordVaultAccessGate({
   );
 
   return (
-    <ColorTemplate16PopupCenterWide
-      open={open}
-      onClose={handleClose}
-      closeOnBackdrop={false}
-      closeButtonDisabled={verifyLocked}
-    >
-      <ColorTemplate16PopupCenterWide.Title>Full Disk Encryption</ColorTemplate16PopupCenterWide.Title>
-      <ColorTemplate16PopupCenterWide.Body>
-        <Stack spacing={2}>
-          <RecordVaultZeroKnowledgeNotice />
+    <>
+      <BusyHourglassOverlay
+        open={Boolean(open) && (checking || busy)}
+        label={
+          checking
+            ? 'Checking vault access…'
+            : changePasswordOpen
+              ? 'Updating Encrypt Password…'
+              : configured
+                ? 'Verifying Encrypt Password…'
+                : 'Setting Encrypt Password…'
+        }
+        fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+      />
+      <ColorTemplate16PopupCenterWide
+        open={open}
+        onClose={handleClose}
+        closeOnBackdrop={false}
+        closeButtonDisabled={verifyLocked}
+      >
+        <ColorTemplate16PopupCenterWide.Title>Full Disk Encryption</ColorTemplate16PopupCenterWide.Title>
+        <ColorTemplate16PopupCenterWide.Body>
+          <Stack spacing={2}>
+            <RecordVaultZeroKnowledgeNotice />
 
-          {checking ? (
-            <Typography>Checking vault access…</Typography>
-          ) : configured ? (
+            {checking ? (
+              <Typography>Checking vault access…</Typography>
+            ) : configured ? (
             <Stack spacing={1.5}>
               <Typography sx={{ lineHeight: 1.5, fontWeight: 700 }}>
                 Enter your current password and verify to continue.
@@ -697,5 +728,6 @@ export default function RecordVaultAccessGate({
         </Stack>
       </ColorTemplate16PopupCenterWide.Body>
     </ColorTemplate16PopupCenterWide>
+    </>
   );
 }

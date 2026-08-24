@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
+import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
+import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import {
   clearPhotoAlbumsAccessFail,
   fetchPhotoAlbumsAccessStatus,
@@ -118,7 +121,11 @@ export default function PhotoAlbumsAccessGate({
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) {
+      setChecking(true);
+      setBusy(false);
+      return undefined;
+    }
     closeErrorPopup();
     let cancelled = false;
     setCurrentPassword('');
@@ -129,8 +136,8 @@ export default function PhotoAlbumsAccessGate({
     setNewHint('');
     setChangePasswordOpen(false);
     setError('');
+    setChecking(true);
     void (async () => {
-      setChecking(true);
       try {
         const [e2e, accessStatus] = await Promise.all([
           fetchPhotoAlbumsE2eKeys(),
@@ -172,8 +179,11 @@ export default function PhotoAlbumsAccessGate({
       setError('Vault key material missing — set a Encrypt Password first');
       return;
     }
-    setBusy(true);
-    setError('');
+    // Paint hourglass before Argon2 KDF blocks the main thread.
+    flushSync(() => {
+      setBusy(true);
+      setError('');
+    });
     try {
       // Password stays in the browser — never POSTed to the server.
       const { dek, dekRaw } = await unlockVaultWithPassword(vaultRow, value);
@@ -222,8 +232,11 @@ export default function PhotoAlbumsAccessGate({
       setError('Vault key material missing — set a Encrypt Password first');
       return;
     }
-    setBusy(true);
-    setError('');
+    // Paint hourglass before Argon2 KDF blocks the main thread.
+    flushSync(() => {
+      setBusy(true);
+      setError('');
+    });
     try {
       // Unlock with current password from the change box (not the top verify field).
       const { dekRaw } = await unlockVaultWithPassword(vaultRow, priorPassword);
@@ -268,8 +281,11 @@ export default function PhotoAlbumsAccessGate({
       );
       return;
     }
-    setBusy(true);
-    setError('');
+    // Paint hourglass before Argon2 KDF blocks the main thread.
+    flushSync(() => {
+      setBusy(true);
+      setError('');
+    });
     try {
       // Client: password → KEK → wrap DEK. Server gets salt + wrapped DEK only.
       const { dek, dekRaw, createPayload } = await createVaultKeyMaterial(value);
@@ -455,7 +471,21 @@ export default function PhotoAlbumsAccessGate({
   );
 
   return (
-    <ColorTemplate16PopupCenterWide
+    <>
+      <BusyHourglassOverlay
+        open={Boolean(open) && (checking || busy)}
+        label={
+          checking
+            ? 'Checking vault access…'
+            : changePasswordOpen
+              ? 'Updating Encrypt Password…'
+              : configured
+                ? 'Verifying Encrypt Password…'
+                : 'Setting Encrypt Password…'
+        }
+        fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+      />
+      <ColorTemplate16PopupCenterWide
       open={open}
       onClose={handleClose}
       closeOnBackdrop={false}
@@ -537,5 +567,6 @@ export default function PhotoAlbumsAccessGate({
         </Stack>
       </ColorTemplate16PopupCenterWide.Body>
     </ColorTemplate16PopupCenterWide>
+    </>
   );
 }

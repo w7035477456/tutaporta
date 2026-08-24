@@ -12,8 +12,8 @@ export const BUSY_HOURGLASS_SIZE = {
   sm: '8rem'
 };
 
-/** Above ColorTemplate7/16 popups (1400) and MUI modal (1300). */
-export const BUSY_HOURGLASS_OVERLAY_Z_INDEX = 1500;
+/** Above ColorTemplate7 (1400) and ColorTemplate16 (1500) Full Disk Encryption. */
+export const BUSY_HOURGLASS_OVERLAY_Z_INDEX = 1600;
 
 /** Centered on modal / gate busy states (Connecting…, Working…). */
 export const BUSY_HOURGLASS_MODAL_SIZE = {

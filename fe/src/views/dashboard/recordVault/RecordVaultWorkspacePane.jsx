@@ -122,7 +122,6 @@ import {
   stripRecordVaultHtml,
 } from 'utils/recordVaultRichText';
 import ThumbnailDeleteXButton from 'ui-component/ThumbnailDeleteXButton';
-import threeDashesImg from 'assets/images/threeDashes.png';
 import {
   recordVaultNoteSidebarLabel,
   recordVaultNoteMenuLabel,
@@ -393,15 +392,6 @@ const laneAddButtonWrapSx = {
   mb: 1,
   overflow: 'visible',
   width: '100%'
-};
-
-const menuToggleIconSx = {
-  display: 'block',
-  height: { xs: 28, md: 32 },
-  width: 'auto',
-  objectFit: 'contain',
-  pointerEvents: 'none',
-  userSelect: 'none'
 };
 
 const menuButtonSx = {
@@ -5816,7 +5806,8 @@ export default function RecordVaultWorkspacePane({
   const menusOpen = leftMenuOpen || rightMenuOpen;
   const menuLabelsCompact = menusOpen && !menuLabelsExpanded;
 
-  /** Open menus from the hamburger, or collapse left+right so the page goes full width. */
+  /** Open left+right notebook menus, or collapse them so the editor goes full width.
+   *  Top action bar stays put — only the sidebar columns toggle. */
   const handleMenuLabelsToggle = useCallback(() => {
     if (!menusOpen) {
       setLeftMenuOpen(true);
@@ -6327,9 +6318,11 @@ export default function RecordVaultWorkspacePane({
                 display: 'flex',
                 flexDirection: 'column',
                 bgcolor: 'transparent',
+                // Keep this rail width stable when menus close so File / Search / Backup
+                // stay put; only the notebook sidebar below collapses.
                 minWidth: {
                   xs: menuLabelsCompact ? 0 : 148,
-                  md: compareMode ? 220 : menuLabelsCompact ? 0 : menusOpen ? sidebarWidth : 220
+                  md: compareMode ? 220 : menuLabelsCompact ? 0 : sidebarWidth
                 },
                 maxWidth: {
                   xs: '100%',
@@ -6337,9 +6330,7 @@ export default function RecordVaultWorkspacePane({
                     ? 280
                     : menuLabelsCompact
                       ? 'fit-content'
-                      : menusOpen
-                        ? sidebarWidth
-                        : 220
+                      : sidebarWidth
                 },
                 width: menuLabelsCompact ? 'auto' : undefined,
                 overflow: 'visible',
@@ -6381,10 +6372,9 @@ export default function RecordVaultWorkspacePane({
                 <Box
                   sx={{
                     ...menuRailButtonCellSx,
-                    flex: menusOpen || compareMode ? '0 0 auto' : '1 1 0',
+                    flex: '0 0 auto',
                     width: 'auto',
                     minWidth: 0,
-                    maxWidth: menusOpen || compareMode ? 'none' : '34%',
                     overflow: 'visible'
                   }}
                 >
@@ -6405,15 +6395,11 @@ export default function RecordVaultWorkspacePane({
                       variant="yellow"
                       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                       aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
-                      title={!menusOpen ? 'Open menus' : 'Close left and right menus'}
+                      title={!menusOpen ? 'Open left and right menus' : 'Close left and right menus'}
                       onClick={handleMenuLabelsToggle}
-                      sx={menusOpen ? headerToggleButtonSx : { ...headerFullWidthButtonSx, width: '100%' }}
+                      sx={headerToggleButtonSx}
                     >
-                      {menusOpen ? (
-                        '< Close Menu'
-                      ) : (
-                        <Box component="img" src={threeDashesImg} alt="" aria-hidden sx={menuToggleIconSx} />
-                      )}
+                      {menusOpen ? '< Close Menu' : 'Open Menu >'}
                     </SliderControlButton>
                   )}
                 </Box>
