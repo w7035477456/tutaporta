@@ -3,6 +3,7 @@ import { isDuplicatePhoneAllowed } from './utils/duplicatePhonePolicy.js';
 import { isBlockMobileEnabled } from './utils/blockMobileConfig.js';
 import { isBypassSmsPhoneVerificationEnabled } from './utils/bypassSmsPhoneVerification.js';
 import { startBlockedAsnDailyRefresh } from './utils/blockedAsnRefresh.js';
+import { startBillOverdueEmailDaily } from './utils/billOverdueEmail.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -537,6 +538,8 @@ import {
   rsvpSpeedDateEvent,
   startSpeedDateEvent
 } from './routes/speedDate/speedDateRoutes.js';
+import { getMonthlyBill, putMonthlyBill } from './routes/recordVault/monthlyBillRoutes.js';
+import { getYearlyBill, putYearlyBill } from './routes/recordVault/yearlyBillRoutes.js';
 import {
   feBeTrafficLogMiddleware,
   isFeBeTrafficLogEnabled,
@@ -1677,6 +1680,11 @@ app.post('/api/speed-date/signal', requireAuth, postSpeedDateSignal);
 app.get('/api/speed-date/signals', requireAuth, getSpeedDateSignals);
 app.post('/api/speed-date/pairs/:pairId/interest', requireAuth, postSpeedDateInterest);
 
+app.get('/api/monthlyBill', requireAuth, getMonthlyBill);
+app.put('/api/monthlyBill', requireAuth, putMonthlyBill);
+app.get('/api/yearlyBill', requireAuth, getYearlyBill);
+app.put('/api/yearlyBill', requireAuth, putYearlyBill);
+
 app.post('/api/chat/send', requireAuth, sendChatMessage);
 app.get('/api/chat/history/:targetUserId', requireAuth, getChatHistory);
 app.post('/api/chat/historyBatch', requireAuth, getChatHistoryBatch);
@@ -1826,5 +1834,10 @@ httpServer.listen(PORT, () => {
   startBlockedAsnDailyRefresh().catch((err) =>
     console.error('[startup] blocked-asn init failed:', err?.message ?? err)
   );
+  try {
+    startBillOverdueEmailDaily();
+  } catch (err) {
+    console.error('[startup] bill overdue email schedule failed:', err?.message ?? err);
+  }
 });
 

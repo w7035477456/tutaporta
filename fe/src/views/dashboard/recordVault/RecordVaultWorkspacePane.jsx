@@ -47,6 +47,16 @@ import RecordVaultOneDriveBackupDialog from './RecordVaultOneDriveBackupDialog';
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import RecordVaultStorageFilesPanel from './RecordVaultStorageFilesPanel';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
+import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
+import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
+import {
+  buildBillScheduleNotebook,
+  isBillMonthlyNoteId,
+  isBillScheduleNotebookId,
+  isBillScheduleSystemId,
+  isBillYearlyNoteId,
+  isSelectableNoteId
+} from './billScheduleConstants';
 import RecordVaultNoteContentZoomBar, {
   NOTE_CONTENT_ZOOM_DEFAULT
 } from './RecordVaultNoteContentZoomBar';
@@ -1547,15 +1557,23 @@ export default function RecordVaultWorkspacePane({
   /** Late-bound folder→notebook import (defined after vaultNameExists). */
   const importFoldersAsNotebooksRef = useRef(null);
 
-  const selectedNotebook = useMemo(
-    () => notebooks.find((nb) => Number(nb.notebook_id) === Number(selectedNotebookId)) ?? null,
-    [notebooks, selectedNotebookId]
-  );
+  // Append undeletable Bill Schedule last; list UI also flushes it to the column bottom (mt: auto).
+  const displayNotebooks = useMemo(() => [...notebooks, buildBillScheduleNotebook()], [notebooks]);
+
+  const selectedNotebook = useMemo(() => {
+    return (
+      displayNotebooks.find((nb) => Number(nb.notebook_id) === Number(selectedNotebookId)) ?? null
+    );
+  }, [displayNotebooks, selectedNotebookId]);
 
   const selectedNote = useMemo(() => {
     if (!selectedNotebook) return null;
     return (selectedNotebook.notes || []).find((n) => Number(n.note_id) === Number(selectedNoteId)) ?? null;
   }, [selectedNotebook, selectedNoteId]);
+
+  const isBillScheduleView = isBillScheduleNotebookId(selectedNotebookId);
+  const isBillMonthlyView = isBillMonthlyNoteId(selectedNoteId);
+  const isBillYearlyView = isBillYearlyNoteId(selectedNoteId);
 
   useEffect(() => {
     selectedNotebookIdRef.current = selectedNotebookId;
@@ -1672,11 +1690,12 @@ export default function RecordVaultWorkspacePane({
   // the left. A match is shown purely by selection styling — the containing
   // notebook goes white (selected) and the matched note goes blue (selectedBlue) —
   // so the user keeps their full notebook list while jumping between hits.
-  const displayNotebooks = notebooks;
+  // (displayNotebooks includes Bill Schedule — defined above with selectedNotebook.)
 
   const loadNoteContent = useCallback(async (noteId) => {
     const id = Number(noteId);
     if (!Number.isFinite(id) || id < 1) return;
+    if (isBillScheduleSystemId(id)) return;
     const note = await vaultApi.fetchRecordVaultNote(id);
     if (!note) throw new Error('Note not found');
     setNotebooks((prev) =>
@@ -2290,12 +2309,43 @@ export default function RecordVaultWorkspacePane({
 
   const selectNoteId = useCallback((noteId, { fromNotebook = false } = {}) => {
     const next = Number(noteId);
-    if (!Number.isFinite(next) || next < 1) return;
+    if (!isSelectableNoteId(next)) return;
     replaceMultiSelectedNoteIds([]);
     noteMultiSelectAnchorIdRef.current = next;
     if (Number(selectedNoteIdRef.current) === next) {
       if (!fromNotebook) setInnerEncryptUiScope('note');
       setNoteContentLoading(false);
+      return;
+    }
+    // Bill Schedule notes are local panels — no vault body fetch.
+    if (isBillScheduleSystemId(next)) {
+      void (async () => {
+        const prevNoteId = selectedNoteIdRef.current;
+        if (prevNoteId && !isBillScheduleSystemId(prevNoteId)) {
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+          }
+          try {
+            skipSaveRef.current = false;
+            await persistNoteRef.current?.();
+          } catch {
+            // allow switch even if save failed
+          }
+        }
+        loadedNoteIdRef.current = next;
+        loadedDraftKeyRef.current = '';
+        loadedTitleKeyRef.current = '';
+        hydratedDraftKeyRef.current = '';
+        setEditingNoteId(null);
+        setEditingNotebookId(null);
+        setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
+        setRenameUiSurface(null);
+        setOpenNoteTitlePlain('');
+        draftRef.current = { openNoteTitlePlain: '' };
+        setNoteContentLoading(false);
+        setSelectedNoteId(next);
+      })();
       return;
     }
     // OneDrive/USB note body fetch can take seconds — show hourglass on click, not after await.
@@ -2758,6 +2808,11 @@ export default function RecordVaultWorkspacePane({
       return undefined;
     }
     const id = Number(selectedNoteId);
+    if (isBillScheduleSystemId(id)) {
+      setNoteContentLoading(false);
+      loadedNoteIdRef.current = id;
+      return undefined;
+    }
     if (selectedNote?.content_loaded && selectedNote.body_text != null) {
       loadedNoteIdRef.current = id;
       setNoteContentLoading(false);
@@ -5505,6 +5560,7 @@ export default function RecordVaultWorkspacePane({
 
   const handleAddNote = () => {
     if (busy || !selectedNotebookId || notebookGateLocked) return;
+    if (isBillScheduleNotebookId(selectedNotebookId)) return;
     setCreateItemDialog('note');
   };
 
@@ -5580,6 +5636,7 @@ export default function RecordVaultWorkspacePane({
 
 
   const handleDeleteNotebook = async (notebookId, notebookName) => {
+    if (isBillScheduleNotebookId(notebookId)) return;
     if (busy || !notebookId) return;
     const label = String(notebookName ?? 'this notebook').trim() || 'this notebook';
     if (!(await themedConfirm(`Delete "${label}" and all its notes? You can restore within 7 days (undelete coming later).`))) return;
@@ -5598,6 +5655,7 @@ export default function RecordVaultWorkspacePane({
   };
 
   const handleDeleteNote = async (noteId, noteLabel) => {
+    if (isBillScheduleSystemId(noteId)) return;
     if (busy || innerEncryptBusy || !noteId) return;
     const label = String(noteLabel ?? 'this note').trim() || 'this note';
     const note =
@@ -5706,13 +5764,13 @@ export default function RecordVaultWorkspacePane({
 
 
   const notes = useMemo(() => {
-    const source = searchActive ? displayNotebooks : notebooks;
+    const source = displayNotebooks;
     const nb =
       source.find((item) => Number(item.notebook_id) === Number(selectedNotebookId)) ??
       source[0] ??
       selectedNotebook;
     return nb?.notes || [];
-  }, [searchActive, displayNotebooks, notebooks, selectedNotebookId, selectedNotebook]);
+  }, [displayNotebooks, selectedNotebookId, selectedNotebook]);
 
   const searchResultTabs = useMemo(() => {
     if (!searchActive || !Array.isArray(searchResults)) return [];
@@ -6834,20 +6892,35 @@ export default function RecordVaultWorkspacePane({
                         Add Notebook
                       </SliderControlButton>
                     </Box>
-                    <Box sx={recordVaultMenuListScrollSx}>
+                    <Box
+                      sx={{
+                        ...recordVaultMenuListScrollSx,
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}
+                    >
                       {displayNotebooks.map((nb) => {
                         void innerUnlockVersion;
+                        const isSystemNb = Boolean(nb.is_system || isBillScheduleNotebookId(nb.notebook_id));
                         const notebookNotes = nb.notes || [];
-                        const notebookHasInner = notebookNotes.some((n) => noteHasInnerEncryption(n));
-                        const notebookInnerLocked = notebookInnerLockedForDisplay(notebookNotes);
+                        const notebookHasInner = !isSystemNb && notebookNotes.some((n) => noteHasInnerEncryption(n));
+                        const notebookInnerLocked = !isSystemNb && notebookInnerLockedForDisplay(notebookNotes);
                         const notebookLockingUp =
+                          !isSystemNb &&
                           !notebookInnerLocked &&
                           innerEncryptUiScope === 'notebook' &&
                           (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
                           Number(nb.notebook_id) === Number(selectedNotebookId);
                         return (
-                        <RenamableDraggableMenuRow
+                        <Box
                           key={nb.notebook_id}
+                          sx={{
+                            width: '100%',
+                            flexShrink: 0,
+                            ...(isSystemNb ? { mt: 'auto' } : null)
+                          }}
+                        >
+                        <RenamableDraggableMenuRow
                           id={nb.notebook_id}
                           domId={`record-vault-notebook-${nb.notebook_id}`}
                           label={
@@ -6859,7 +6932,9 @@ export default function RecordVaultWorkspacePane({
                                 : nb.notebook_name
                           }
                           buttonTitle={
-                            notebookInnerLocked
+                            isSystemNb
+                              ? 'Bill Schedule (system — cannot delete or rename)'
+                              : notebookInnerLocked
                               ? 'Locked notebook — enter PIN to unlock'
                               : notebookLockingUp
                                 ? 'Locking notebook — enter PIN'
@@ -6870,6 +6945,7 @@ export default function RecordVaultWorkspacePane({
                           selected={Number(nb.notebook_id) === Number(selectedNotebookId)}
                           locked={notebookInnerLocked}
                           editing={
+                            !isSystemNb &&
                             Number(editingNotebookId) === Number(nb.notebook_id) &&
                             renameUiSurface === 'menu' &&
                             !notebookInnerLocked
@@ -6881,10 +6957,11 @@ export default function RecordVaultWorkspacePane({
                             notebookScopePendingRef.current = true;
                             setInnerEncryptUiScope('notebook');
                             // Immediate feedback — note body may still be loading from OneDrive.
-                            setNoteContentLoading(true);
+                            setNoteContentLoading(!isSystemNb);
                             setSelectedNotebookId(nb.notebook_id);
                           }}
                           onStartEdit={() => {
+                            if (isSystemNb) return;
                             setEditingNoteId(null);
                             setRenameUiSurface('menu');
                             setEditingNotebookId(nb.notebook_id);
@@ -6892,32 +6969,49 @@ export default function RecordVaultWorkspacePane({
                           }}
                           onCommitEdit={() => void commitNotebookRename()}
                           onCancelEdit={clearRenameState}
-                          dragMime={DRAG_NOTEBOOK}
+                          dragMime={isSystemNb ? undefined : DRAG_NOTEBOOK}
                           draggingId={draggingNotebookId}
                           alternateDraggingId={draggingNoteId}
                           dropTargetId={dropTargetNotebookId}
                           dragTitle={
-                            crossPaneDropActive
+                            isSystemNb
+                              ? 'Bill Schedule (fixed)'
+                              : crossPaneDropActive
                               ? 'Drop here to copy or move from the other vault'
                               : draggingNoteId != null
                                 ? 'Drop note here to move into this notebook'
                                 : 'Drag to reorder; drag to Finder to export notebook folder + HTML notes'
                           }
-                          onDragStart={handleDragStart}
+                          onDragStart={
+                            isSystemNb
+                              ? (e) => {
+                                  e.preventDefault();
+                                }
+                              : handleDragStart
+                          }
                           onDragEnd={handleDragEnd}
-                          onDragOver={setDropTargetNotebookId}
-                          onDrop={(e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)}
-                          onDelete={() => void handleDeleteNotebook(nb.notebook_id, nb.notebook_name)}
+                          onDragOver={isSystemNb ? () => {} : setDropTargetNotebookId}
+                          onDrop={
+                            isSystemNb
+                              ? () => {}
+                              : (e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)
+                          }
+                          onDelete={
+                            isSystemNb
+                              ? undefined
+                              : () => void handleDeleteNotebook(nb.notebook_id, nb.notebook_name)
+                          }
                           deleteLabel={`Delete notebook ${nb.notebook_name}`}
-                          onToggleLock={() => handleToggleNotebookLock(nb)}
+                          onToggleLock={isSystemNb ? undefined : () => handleToggleNotebookLock(nb)}
                           lockTitle={
                             notebookInnerLocked
                               ? 'Unlock notebook (enter 6-digit PIN)'
                               : 'Lock notebook with a 6-digit PIN'
                           }
                           disabled={busy || crossPaneBusy}
-                          acceptForeignDrop={crossPaneDropActive}
+                          acceptForeignDrop={!isSystemNb && crossPaneDropActive}
                         />
+                        </Box>
                         );
                       })}
                     </Box>
@@ -6947,7 +7041,12 @@ export default function RecordVaultWorkspacePane({
                         type="button"
                         fullWidth
                         onClick={handleAddNote}
-                        disabled={busy || !selectedNotebookId || notebookGateLocked}
+                        disabled={
+                          busy ||
+                          !selectedNotebookId ||
+                          notebookGateLocked ||
+                          isBillScheduleNotebookId(selectedNotebookId)
+                        }
                         hoverScale={1.25}
                         singleLineLabel
                         sx={laneContainedButtonOneLineSx}
@@ -6955,39 +7054,64 @@ export default function RecordVaultWorkspacePane({
                         Add Note
                       </SliderControlButton>
                     </Box>
-                    <Box sx={recordVaultMenuListScrollSx}>
+                    <Box
+                      sx={{
+                        ...recordVaultMenuListScrollSx,
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}
+                    >
                       {/* Encrypted notebook: do not reveal any note names until unlocked. */}
                       {(notebookGateLocked ? [] : notes).map((note) => {
+                        const isSystemNote = Boolean(note.is_system || isBillScheduleSystemId(note.note_id));
                         const noteInnerLocked =
+                          !isSystemNote &&
                           noteRequiresInnerPinToView(note) &&
                           !isInnerNoteUnlockedForDisplay(note.note_id, note);
                         const noteLockingUp =
+                          !isSystemNote &&
                           !noteInnerLocked &&
                           (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
                           Number(note.note_id) === Number(selectedNoteId);
                         // innerUnlockVersion lives in unlock refs — read so rows re-paint after PIN unlock.
                         void innerUnlockVersion;
-                        const noteMenuLabel = noteInnerLocked
+                        const noteMenuLabel = isSystemNote
+                          ? note.note_name
+                          : noteInnerLocked
                           ? RECORD_VAULT_INNER_LOCKED_LABEL
                           : recordVaultNoteMenuLabel(note, notes, {
                               selectedNoteId,
                               openNoteTitlePlain,
                               notebooks
                             });
-                        const noteRealLabel = recordVaultNoteMenuLabel(note, notes, {
-                          selectedNoteId,
-                          openNoteTitlePlain,
-                          notebooks
-                        });
+                        const noteRealLabel = isSystemNote
+                          ? note.note_name
+                          : recordVaultNoteMenuLabel(note, notes, {
+                              selectedNoteId,
+                              openNoteTitlePlain,
+                              notebooks
+                            });
                         const menuEditingThisNote =
+                          !isSystemNote &&
                           Number(editingNoteId) === Number(note.note_id) &&
                           renameUiSurface === 'menu';
                         const headerEditingThisNote =
+                          !isSystemNote &&
                           Number(editingNoteId) === Number(note.note_id) &&
                           renameUiSurface === 'header';
+                        // Pin the first Bill Schedule note (Monthly) — Yearly rides below it.
+                        const flushSystemToBottom =
+                          isSystemNote && isBillMonthlyNoteId(note.note_id);
                         return (
-                        <RenamableDraggableMenuRow
+                        <Box
                           key={note.note_id}
+                          sx={{
+                            width: '100%',
+                            flexShrink: 0,
+                            ...(flushSystemToBottom ? { mt: 'auto' } : null)
+                          }}
+                        >
+                        <RenamableDraggableMenuRow
                           id={note.note_id}
                           domId={`record-vault-note-${note.note_id}`}
                           label={
@@ -7001,7 +7125,9 @@ export default function RecordVaultWorkspacePane({
                                   : noteMenuLabel
                           }
                           buttonTitle={
-                            noteInnerLocked
+                            isSystemNote
+                              ? `${note.note_name} (system — cannot delete or rename)`
+                              : noteInnerLocked
                               ? 'Locked — enter PIN to view'
                               : noteLockingUp
                                 ? 'Locking up — enter PIN'
@@ -7009,22 +7135,25 @@ export default function RecordVaultWorkspacePane({
                           }
                           selected={Number(note.note_id) === Number(selectedNoteId)}
                           selectedBlue={searchActive}
-                          multiSelected={multiSelectedNoteIds.some(
-                            (id) => Number(id) === Number(note.note_id)
-                          )}
+                          multiSelected={
+                            !isSystemNote &&
+                            multiSelectedNoteIds.some(
+                              (id) => Number(id) === Number(note.note_id)
+                            )
+                          }
                           locked={noteInnerLocked}
                           editing={menuEditingThisNote && !noteInnerLocked}
                           editValue={editNameDraft}
                           onEditValueChange={handleNoteListTitleEditChange}
                           onSelect={(e) => {
-                            if (e?.shiftKey) {
+                            if (!isSystemNote && e?.shiftKey) {
                               handleNoteShiftSelect(note.note_id);
                               return;
                             }
                             selectNoteId(note.note_id);
                           }}
                           onStartEdit={() => {
-                            if (noteInnerLocked) return;
+                            if (isSystemNote || noteInnerLocked) return;
                             replaceMultiSelectedNoteIds([]);
                             noteMultiSelectAnchorIdRef.current = note.note_id;
                             setEditingNotebookId(null);
@@ -7039,38 +7168,52 @@ export default function RecordVaultWorkspacePane({
                           }}
                           onCommitEdit={() => void commitNoteRename()}
                           onCancelEdit={clearRenameState}
-                          dragMime={DRAG_NOTE}
+                          dragMime={isSystemNote ? undefined : DRAG_NOTE}
                           dragNotebookId={selectedNotebookId}
                           draggingId={draggingNoteId}
                           dropTargetId={dropTargetNoteId}
-                          acceptForeignDrop={crossPaneDropActive}
+                          acceptForeignDrop={!isSystemNote && crossPaneDropActive}
                           dragTitle={
-                            crossPaneDropActive
+                            isSystemNote
+                              ? 'Bill Schedule note (fixed)'
+                              : crossPaneDropActive
                               ? 'Drop here to copy or move from the other vault'
                               : multiSelectedNoteIds.length > 1
                                 ? `Shift-selected: ${multiSelectedNoteIds.length} notes — drag to Finder, then Choose folder for separate HTML files`
                                 : 'Shift+click to multi-select; drag to Finder to export HTML; drop on a notebook to move'
                           }
-                          onDragStart={handleDragStart}
+                          onDragStart={
+                            isSystemNote
+                              ? (e) => {
+                                  e.preventDefault();
+                                }
+                              : handleDragStart
+                          }
                           onDragEnd={handleDragEnd}
-                          onPrefetchDrag={prefetchNoteHtmlExport}
-                          onDragOver={setDropTargetNoteId}
-                          onDrop={(e, toId, mime) => {
-                            void handleDropReorder(
-                              e,
-                              toId,
-                              mime,
-                              notes,
-                              'note_id',
-                              (ids) => vaultApi.reorderRecordVaultNotes(selectedNotebookId, ids)
-                            );
-                          }}
-                          onFileDrop={(e) => void handleNoteListFileDrop(e)}
-                          onDelete={() =>
-                            void handleDeleteNote(note.note_id, noteRealLabel)
+                          onPrefetchDrag={isSystemNote ? undefined : prefetchNoteHtmlExport}
+                          onDragOver={isSystemNote ? () => {} : setDropTargetNoteId}
+                          onDrop={
+                            isSystemNote
+                              ? () => {}
+                              : (e, toId, mime) => {
+                                  void handleDropReorder(
+                                    e,
+                                    toId,
+                                    mime,
+                                    notes,
+                                    'note_id',
+                                    (ids) => vaultApi.reorderRecordVaultNotes(selectedNotebookId, ids)
+                                  );
+                                }
+                          }
+                          onFileDrop={isSystemNote ? undefined : (e) => void handleNoteListFileDrop(e)}
+                          onDelete={
+                            isSystemNote
+                              ? undefined
+                              : () => void handleDeleteNote(note.note_id, noteRealLabel)
                           }
                           deleteLabel={`Delete note ${noteRealLabel}`}
-                          onToggleLock={() => handleToggleNoteLock(note)}
+                          onToggleLock={isSystemNote ? undefined : () => handleToggleNoteLock(note)}
                           lockTitle={
                             noteInnerLocked
                               ? 'Unlock note (enter 6-digit PIN)'
@@ -7078,6 +7221,7 @@ export default function RecordVaultWorkspacePane({
                           }
                           disabled={busy || crossPaneBusy || !selectedNotebookId}
                         />
+                        </Box>
                         );
                       })}
                     </Box>
@@ -7114,6 +7258,12 @@ export default function RecordVaultWorkspacePane({
             }}
           >
             {(() => {
+              if (isBillMonthlyView) {
+                return <BillScheduleMonthlyPanel />;
+              }
+              if (isBillYearlyView) {
+                return <BillScheduleYearlyPanel />;
+              }
               const notebookNotesForLock = selectedNotebook?.notes || [];
               const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);
               const openNoteLocked = Boolean(
