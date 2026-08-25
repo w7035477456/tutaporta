@@ -6,6 +6,8 @@ import { applyThemeByName, DEFAULT_NEW_USER_THEME_NAME } from '../utils/themeCon
 import { syncClientApiRateLimitBypass } from '../utils/adminSession';
 import { clearClientApiCooldownState } from '../utils/clientApiCooldown';
 import { clearSignupIdentificationVerificationRequired } from '../utils/signupIdentificationVerification';
+import { resetMainFontToEnvDefault } from '../config/mainFontEnv';
+import useConfig from '../hooks/useConfig';
 
 function clearSwrCacheForNewSession() {
   void mutateSwrCache(() => true, undefined, { revalidate: false });
@@ -47,6 +49,7 @@ function normalizeUserShape(rawUser, authMeta = {}) {
 }
 
 export const AuthProvider = ({ children }) => {
+  const { setField } = useConfig();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [requiresPasswordUpgrade, setRequiresPasswordUpgrade] = useState(false);
@@ -139,6 +142,9 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setRequiresPasswordUpgrade(false);
         clearSwrCacheForNewSession();
+        // Logged out → env MAIN_FONT (Algerian) until user_customization loads after login.
+        const stack = resetMainFontToEnvDefault();
+        setField('fontFamily', stack);
         return;
       }
       let nextUser = mergeAuthUser(response.data.user, response.data);
@@ -173,6 +179,8 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setRequiresPasswordUpgrade(false);
         clearSwrCacheForNewSession();
+        const stack = resetMainFontToEnvDefault();
+        setField('fontFamily', stack);
       }
     } finally {
       setLoading(false);
@@ -313,6 +321,9 @@ export const AuthProvider = ({ children }) => {
     setRequiresPasswordUpgrade(false);
     clearSessionLocalOnboardingLocks();
     clearSwrCacheForNewSession();
+    // Algerian (MAIN_FONT) until the next login loads user_customization.main_font.
+    const stack = resetMainFontToEnvDefault();
+    setField('fontFamily', stack);
   };
 
   return (

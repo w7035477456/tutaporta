@@ -6,7 +6,10 @@
  * fe/.env MAIN_FONT is the fallback when be is unset.
  * Requires vite envPrefix MAIN_ (see vite.config.mjs).
  *
- * Runtime override: set CSS var --main-font-family (profile menu / config).
+ * Default: env MAIN_FONT (Algerian). Runtime override: profile “Main Font” →
+ * user_customization.main_font (and CSS var --main-font-family). Logged-out /
+ * login surfaces reset to the env default until customization loads after login.
+ *
  * Components use MAIN_FONT_FAMILY so they follow the override.
  * Use ENV_MAIN_FONT_FAMILY when a surface must always match env MAIN_FONT.
  */
@@ -22,9 +25,21 @@ function quoteFontName(name) {
   return /\s/.test(trimmed) ? `"${trimmed}"` : trimmed;
 }
 
+/**
+ * Normalize env MAIN_FONT. Bare `Algerian` (common in ~/.ssh/be/.env) becomes
+ * `Algerian, fantasy` so fallbacks match Recommend / user_customization default.
+ * @param {string | undefined} raw
+ */
+export function normalizeMainFontEnvRaw(raw) {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return DEFAULT_MAIN_FONT;
+  if (/^algerian$/i.test(trimmed)) return DEFAULT_MAIN_FONT;
+  return trimmed;
+}
+
 /** @param {string | undefined} raw */
 export function buildMainFontFamily(raw, tertiaryFallback = DEFAULT_TERTIARY_FALLBACK) {
-  const parts = String(raw ?? DEFAULT_MAIN_FONT)
+  const parts = String(normalizeMainFontEnvRaw(raw ?? DEFAULT_MAIN_FONT))
     .split(',')
     .map((part) => quoteFontName(part))
     .filter(Boolean);
@@ -52,7 +67,7 @@ export function isLegacyDefaultMainFontStack(fontFamilyStack) {
   return key.startsWith('comic neue');
 }
 
-/** Concrete stack from fe/.env MAIN_FONT (no CSS var). */
+/** Concrete stack from MAIN_FONT env (no CSS var). */
 export const ENV_MAIN_FONT_FAMILY = buildMainFontFamily(import.meta.env.MAIN_FONT);
 
 export function getMainFontFamily() {
@@ -72,12 +87,32 @@ export function applyMainFontFamily(fontFamilyStack) {
   document.documentElement.style.setProperty(MAIN_FONT_CSS_VAR, stack);
 }
 
-/**
- * Curated website fonts for the profile “Main Font for website” picker.
- * System names use platform fallbacks; google: loads that family when selected.
- */
-/** Recommended / reset target — Algerian (matches fe/.env MAIN_FONT default). */
-export const RECOMMENDED_MAIN_FONT_STACK = buildMainFontFamily('Algerian, fantasy');
+const loadedGoogleFonts = new Set();
+
+/** Ensure a Google Fonts stylesheet is present for options that need one. */
+export function ensureMainFontStylesheet(optionOrStack) {
+  if (typeof document === 'undefined') return;
+  let google = null;
+  if (optionOrStack && typeof optionOrStack === 'object') {
+    google = optionOrStack.google || null;
+  } else {
+    const stack = String(optionOrStack || '');
+    const match = MAIN_FONT_OPTIONS.find((o) => o.stack === stack);
+    google = match?.google || null;
+  }
+  if (!google || loadedGoogleFonts.has(google)) return;
+  loadedGoogleFonts.add(google);
+  const id = `main-font-google-${google.replace(/[^a-zA-Z0-9]+/g, '-')}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement('link');
+  link.id = id;
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${google}&display=swap`;
+  document.head.appendChild(link);
+}
+
+/** Recommended / reset target — same stack as env MAIN_FONT (Algerian by default). */
+export const RECOMMENDED_MAIN_FONT_STACK = ENV_MAIN_FONT_FAMILY;
 
 export const MAIN_FONT_OPTIONS = [
   {
@@ -114,30 +149,6 @@ export const MAIN_FONT_OPTIONS = [
   { id: 'roboto', label: 'Roboto', stack: '"Roboto", Helvetica, Arial, sans-serif', google: 'Roboto:wght@400;500;700' }
 ];
 
-const loadedGoogleFonts = new Set();
-
-/** Ensure a Google Fonts stylesheet is present for options that need one. */
-export function ensureMainFontStylesheet(optionOrStack) {
-  if (typeof document === 'undefined') return;
-  let google = null;
-  if (optionOrStack && typeof optionOrStack === 'object') {
-    google = optionOrStack.google || null;
-  } else {
-    const stack = String(optionOrStack || '');
-    const match = MAIN_FONT_OPTIONS.find((o) => o.stack === stack);
-    google = match?.google || null;
-  }
-  if (!google || loadedGoogleFonts.has(google)) return;
-  loadedGoogleFonts.add(google);
-  const id = `main-font-google-${google.replace(/[^a-zA-Z0-9]+/g, '-')}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${google}&display=swap`;
-  document.head.appendChild(link);
-}
-
 export function findMainFontOptionByStack(fontFamilyStack) {
   const stack = String(fontFamilyStack || '').trim();
   if (!stack) return MAIN_FONT_OPTIONS[0];
@@ -148,6 +159,28 @@ export function findMainFontOptionByStack(fontFamilyStack) {
   if (byKey) return byKey;
   if (key.startsWith('algerian')) return MAIN_FONT_OPTIONS[0];
   return MAIN_FONT_OPTIONS[0];
+}
+
+/**
+ * Env MAIN_FONT default (Algerian). Use on login / logout so the site does not keep
+ * another account’s user_customization.main_font until the next login loads it.
+ */
+export function resetMainFontToEnvDefault() {
+  const option = findMainFontOptionByStack(ENV_MAIN_FONT_FAMILY);
+  ensureMainFontStylesheet(option);
+  applyMainFontFamily(option.stack);
+  if (typeof window === 'undefined') return option.stack;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_STORAGE_CONFIG_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object') return option.stack;
+    parsed.fontFamily = option.stack;
+    parsed[ALGERIAN_DEFAULT_MIGRATION_FLAG] = true;
+    window.localStorage.setItem(LOCAL_STORAGE_CONFIG_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore storage errors
+  }
+  return option.stack;
 }
 
 /** One-shot: old Comic Neue site default → Algerian. Later Comic Neue picks are kept. */

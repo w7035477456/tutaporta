@@ -23,6 +23,8 @@ import { authShellStackSx, authFixedFooterContentPaddingBottom } from './authPag
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
+import useConfig from 'hooks/useConfig';
+import { MAIN_FONT_FAMILY, resetMainFontToEnvDefault } from 'config/mainFontEnv';
 
 // ================================|| AUTH3 - LOGIN ||================================ //
 
@@ -59,6 +61,7 @@ LoginSignupPrompt.propTypes = {
 
 function Login() {
   const navigate = useNavigate();
+  const { setField } = useConfig();
   const defaultSignupEnabled = ['true', '1', 'yes', 'on'].includes(
     String(import.meta.env.NEW_ACCOUNT_SIGNUP ?? import.meta.env.VITE_NEW_ACCOUNT_SIGNUP ?? '')
       .trim()
@@ -71,6 +74,12 @@ function Login() {
     const message = consumeSessionEndNotice();
     if (message) setIdleLogoutNotice(message);
   }, []);
+
+  // MAIN_FONT (Algerian) until login loads user_customization.main_font.
+  useEffect(() => {
+    const stack = resetMainFontToEnvDefault();
+    setField('fontFamily', stack);
+  }, [setField]);
 
   useEffect(() => {
     if (sessionStorage.getItem('logoutBlockBack') !== '1') return;
@@ -126,6 +135,7 @@ function Login() {
                   sx={(theme) => ({
                     textAlign: 'center',
                     fontWeight: 700,
+                    fontFamily: MAIN_FONT_FAMILY,
                     color: 'var(--theme-primary-color)',
                     lineHeight: 1.2,
                     maxWidth: '100%',
