@@ -267,12 +267,6 @@ export default function BillScheduleMonthlyPanel() {
         <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
       ) : null}
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-start', flexShrink: 0 }}>
-        <ColorTemplate13DisableGreenButton type="button" onClick={handleAdd} disabled={loading || saving}>
-          Add
-        </ColorTemplate13DisableGreenButton>
-      </Box>
-
       <Box
         component="table"
         sx={{
@@ -401,7 +395,18 @@ export default function BillScheduleMonthlyPanel() {
         </tbody>
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
+          gap: 1
+        }}
+      >
+        <ColorTemplate13DisableGreenButton type="button" onClick={handleAdd} disabled={loading || saving}>
+          Add
+        </ColorTemplate13DisableGreenButton>
         <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleSave()} disabled={loading || saving}>
           {saving ? 'Saving…' : 'SAVE'}
         </ColorTemplate13DisableGreenButton>
