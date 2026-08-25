@@ -144,9 +144,16 @@ export async function deriveVaultKeyFromIconSecret(secret, options = {}) {
 
 export function getRecordVaultEnvSecret(storageType) {
   const normalizedType = String(storageType || '').trim().toLowerCase();
-  const envName = normalizedType === 'onedrive' ? 'TEMPKEY_ONEDRIVE' : normalizedType === 'usb' ? 'TEMPKEY_USB' : '';
+  // TutaDrive replaces OneDrive on the left panel — reuse TEMPKEY_ONEDRIVE (or TEMPKEY_TUTADRIVE).
+  let envName = '';
+  if (normalizedType === 'onedrive' || normalizedType === 'tutadrive') {
+    const tuta = String(process.env.TEMPKEY_TUTADRIVE ?? '').trim();
+    envName = tuta ? 'TEMPKEY_TUTADRIVE' : 'TEMPKEY_ONEDRIVE';
+  } else if (normalizedType === 'usb') {
+    envName = 'TEMPKEY_USB';
+  }
   if (!envName) {
-    throw new Error('Record Vault storage type must be onedrive or usb');
+    throw new Error('Record Vault storage type must be onedrive, tutadrive, or usb');
   }
   const secret = String(process.env[envName] ?? '').trim();
   if (!secret) {

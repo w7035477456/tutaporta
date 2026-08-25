@@ -1,4 +1,5 @@
 import pool from '../../db/connection.js';
+import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
 
 function toInt(value) {
   const n = Number(value);
@@ -121,26 +122,28 @@ function mapRow(row, year, month) {
   };
 }
 
-async function countMonthRows(client, singlesId, year, month) {
+async function countMonthRows(client, singlesId, year, month, storageBackend) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
        FROM helloworldjunktest.monthly_bill
-      WHERE singles_id = $1 AND bill_year = $2 AND bill_month = $3`,
-    [singlesId, year, month]
+      WHERE singles_id = $1 AND storage_backend = $2
+        AND bill_year = $3 AND bill_month = $4`,
+    [singlesId, storageBackend, year, month]
   );
   return Number(rows[0]?.c) || 0;
 }
 
-async function findPriorMonthWithRows(client, singlesId, year, month) {
+async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend) {
   const { rows } = await client.query(
     `SELECT bill_year, bill_month
        FROM helloworldjunktest.monthly_bill
       WHERE singles_id = $1
-        AND (bill_year < $2 OR (bill_year = $2 AND bill_month < $3))
+        AND storage_backend = $2
+        AND (bill_year < $3 OR (bill_year = $3 AND bill_month < $4))
       GROUP BY bill_year, bill_month
       ORDER BY bill_year DESC, bill_month DESC
       LIMIT 1`,
-    [singlesId, year, month]
+    [singlesId, storageBackend, year, month]
   );
   if (!rows[0]) return null;
   return { year: Number(rows[0].bill_year), month: Number(rows[0].bill_month) };
@@ -150,57 +153,70 @@ async function findPriorMonthWithRows(client, singlesId, year, month) {
  * If target month has no rows, clone template fields from latest prior month
  * (action + paid_record_id left NULL).
  */
-async function ensureMonthCloned(client, singlesId, year, month) {
-  const existing = await countMonthRows(client, singlesId, year, month);
+async function ensureMonthCloned(client, singlesId, year, month, storageBackend) {
+  const existing = await countMonthRows(client, singlesId, year, month, storageBackend);
   if (existing > 0) return { cloned: false, from: null };
 
-  const prior = await findPriorMonthWithRows(client, singlesId, year, month);
+  const prior = await findPriorMonthWithRows(client, singlesId, year, month, storageBackend);
   if (!prior) return { cloned: false, from: null };
 
   await client.query(
     `INSERT INTO helloworldjunktest.monthly_bill (
-       singles_id, bill_year, bill_month, row_index,
+       singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type,
        action, paid_record_id
      )
      SELECT
-       singles_id, $2, $3, row_index,
+       singles_id, storage_backend, $3, $4, row_index,
        bill_description, due_day, amount, bill_type,
        NULL, NULL
        FROM helloworldjunktest.monthly_bill
-      WHERE singles_id = $1 AND bill_year = $4 AND bill_month = $5
+      WHERE singles_id = $1 AND storage_backend = $2
+        AND bill_year = $5 AND bill_month = $6
       ORDER BY row_index ASC`,
-    [singlesId, year, month, prior.year, prior.month]
+    [singlesId, storageBackend, year, month, prior.year, prior.month]
   );
   return { cloned: true, from: prior };
 }
 
-async function listMonthRows(client, singlesId, year, month) {
+async function listMonthRows(client, singlesId, year, month, storageBackend) {
   const { rows } = await client.query(
     `SELECT *
        FROM helloworldjunktest.monthly_bill
-      WHERE singles_id = $1 AND bill_year = $2 AND bill_month = $3
+      WHERE singles_id = $1 AND storage_backend = $2
+        AND bill_year = $3 AND bill_month = $4
       ORDER BY row_index ASC, monthly_bill_id ASC`,
-    [singlesId, year, month]
+    [singlesId, storageBackend, year, month]
   );
   return rows.map((r) => mapRow(r, year, month));
 }
 
-/** GET /api/monthlyBill?year=&month= — list (+ clone-on-first-open). */
+/** GET /api/monthlyBill?year=&month=&storageType=onedrive|usb — list (+ clone-on-first-open). */
 export async function getMonthlyBill(req, res) {
   try {
     const singlesId = requireSinglesId(req);
     const { year, month } = parseYearMonth(req.query);
+    const storageBackend = readBillStorageBackend(req);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const cloneInfo = await ensureMonthCloned(client, singlesId, year, month);
-      const rows = await listMonthRows(client, singlesId, year, month);
+      const cloneInfo = await ensureMonthCloned(client, singlesId, year, month, storageBackend);
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      const peer = storageBackend === 'usb' ? 'onedrive' : 'usb';
+      const { rows: peerCountRows } = await client.query(
+        `SELECT COUNT(*)::int AS c
+           FROM helloworldjunktest.monthly_bill
+          WHERE singles_id = $1 AND storage_backend = $2`,
+        [singlesId, peer]
+      );
       await client.query('COMMIT');
       return res.json({
         bill_year: year,
         bill_month: month,
         bill_month_key: billMonthKey(year, month),
+        storage_backend: storageBackend,
+        peer_storage_backend: peer,
+        peer_has_rows: (Number(peerCountRows[0]?.c) || 0) > 0,
         cloned: cloneInfo.cloned,
         cloned_from: cloneInfo.from,
         rows
@@ -229,6 +245,7 @@ export async function putMonthlyBill(req, res) {
   try {
     const singlesId = requireSinglesId(req);
     const { year, month } = parseYearMonth(req.body || {});
+    const storageBackend = readBillStorageBackend(req);
     const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
     if (!incoming) throw httpError(400, 'rows array required');
     if (incoming.length > 500) throw httpError(400, 'Too many rows (max 500)');
@@ -265,18 +282,20 @@ export async function putMonthlyBill(req, res) {
       await client.query('BEGIN');
       await client.query(
         `DELETE FROM helloworldjunktest.monthly_bill
-          WHERE singles_id = $1 AND bill_year = $2 AND bill_month = $3`,
-        [singlesId, year, month]
+          WHERE singles_id = $1 AND storage_backend = $2
+            AND bill_year = $3 AND bill_month = $4`,
+        [singlesId, storageBackend, year, month]
       );
       for (const r of normalized) {
         await client.query(
           `INSERT INTO helloworldjunktest.monthly_bill (
-             singles_id, bill_year, bill_month, row_index,
+             singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
              action, paid_record_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [
             singlesId,
+            storageBackend,
             year,
             month,
             r.row_index,
@@ -289,13 +308,14 @@ export async function putMonthlyBill(req, res) {
           ]
         );
       }
-      const rows = await listMonthRows(client, singlesId, year, month);
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
       await client.query('COMMIT');
       return res.json({
         ok: true,
         bill_year: year,
         bill_month: month,
         bill_month_key: billMonthKey(year, month),
+        storage_backend: storageBackend,
         rows
       });
     } catch (err) {

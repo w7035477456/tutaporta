@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.monthly_bill (
   monthly_bill_id bigserial PRIMARY KEY,
   singles_id bigint NOT NULL
     REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+  storage_backend text NOT NULL DEFAULT 'onedrive'
+    CHECK (storage_backend IN ('onedrive', 'usb')),
   bill_year integer NOT NULL
     CHECK (bill_year >= 2000 AND bill_year <= 2100),
   bill_month integer NOT NULL
@@ -30,12 +32,12 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.monthly_bill (
   paid_record_id bigint NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT monthly_bill_singles_ym_row_uniq
-    UNIQUE (singles_id, bill_year, bill_month, row_index)
+  CONSTRAINT monthly_bill_singles_storage_ym_row_uniq
+    UNIQUE (singles_id, storage_backend, bill_year, bill_month, row_index)
 );
 
-CREATE INDEX IF NOT EXISTS idx_monthly_bill_singles_ym
-  ON helloworldjunktest.monthly_bill (singles_id, bill_year DESC, bill_month DESC);
+CREATE INDEX IF NOT EXISTS idx_monthly_bill_singles_storage_ym
+  ON helloworldjunktest.monthly_bill (singles_id, storage_backend, bill_year DESC, bill_month DESC);
 
 COMMENT ON TABLE helloworldjunktest.monthly_bill IS
   'TutaNotes Bill Schedule Monthly rows; one forever slice per (singles_id, year, month).';

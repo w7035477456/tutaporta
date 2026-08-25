@@ -7,6 +7,11 @@
 import pool from '../db/connection.js';
 import { getDBSchema } from '../config/envConfig.js';
 import { wipeOneDriveVaultFolder, cleanupOneDriveStaging } from './recordVaultOneDrive/oneDriveVaultSync.js';
+import {
+  isLeftSideTutaDrive,
+  loadMemberIdForSingles,
+  wipeTutaDriveMemberVault
+} from './tutaDriveMemberPaths.js';
 import { clearRecordVaultCacheIcon } from './recordVaultCacheIcon.js';
 import { formatCountdown } from './recordVaultUsb/unlockGuard.js';
 
@@ -90,6 +95,12 @@ export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedr
 }
 
 async function formatOneDriveFailSide(singlesId) {
+  if (isLeftSideTutaDrive()) {
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (memberId) wipeTutaDriveMemberVault(memberId);
+    await clearRecordVaultCacheIcon(singlesId, 'onedrive');
+    return { vaultFormatted: true, storageType: 'onedrive', tutaDrive: true };
+  }
   await wipeOneDriveVaultFolder(singlesId);
   cleanupOneDriveStaging(singlesId);
   await clearRecordVaultCacheIcon(singlesId, 'onedrive');

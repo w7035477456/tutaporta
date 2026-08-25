@@ -24,8 +24,12 @@ export function tutaNotesStorageStripColor(storageType) {
 
 /** Expanded workspace yellow header — matches storage tab labels. */
 export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = 'TutaNotes on OneDrive';
+export const TUTANOTES_TUTADRIVE_WORKSPACE_TITLE = 'TutaNotes on TutaDrive';
 export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
+export const TUTANOTES_TUTADRIVE_LOGIN_TITLE = 'TutaNotes';
+export const TUTANOTES_TUTADRIVE_OPEN_LABEL = 'Open TutaDrive Cloud';
+export const TUTANOTES_TUTADRIVE_STRIP_COLOR = '#4A90D9';
 /** Volume name only — radio rows append " (vault, 61.9 GB, EXFAT)". */
 export function shortUsbVolumeName(label) {
   const raw = String(label || '').trim();

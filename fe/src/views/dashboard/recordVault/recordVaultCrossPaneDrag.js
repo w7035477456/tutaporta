@@ -40,16 +40,22 @@ export function serializeCrossPaneDrag(payload) {
   }
 }
 
+const BILL_KINDS = new Set(['bill_schedule', 'bill_monthly', 'bill_yearly']);
+
 export function parseCrossPaneDrag(raw) {
   if (!raw) return null;
   try {
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (!data || typeof data !== 'object') return null;
     const storageType = String(data.storageType || '').toLowerCase() === 'onedrive' ? 'onedrive' : 'usb';
-    const kind = data.kind === 'notebook' ? 'notebook' : data.kind === 'note' ? 'note' : null;
+    let kind = null;
+    if (data.kind === 'notebook') kind = 'notebook';
+    else if (data.kind === 'note') kind = 'note';
+    else if (BILL_KINDS.has(String(data.kind || ''))) kind = String(data.kind);
     if (!kind) return null;
     const id = Number(data.id);
-    if (!Number.isFinite(id) || id < 1) return null;
+    if (!Number.isFinite(id)) return null;
+    if ((kind === 'notebook' || kind === 'note') && id < 1) return null;
     return {
       kind,
       id,

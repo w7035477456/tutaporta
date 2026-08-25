@@ -227,6 +227,14 @@ import {
   testWriteRecordVaultOneDrive,
   unlockRecordVaultOneDrive
 } from './routes/recordVault/recordVaultOneDriveRoutes.js';
+import {
+  formatRecordVaultTutaDrive,
+  getRecordVaultTutaDriveStatus,
+  initRecordVaultTutaDrive,
+  logoffRecordVaultTutaDrive,
+  unlockRecordVaultTutaDrive
+} from './routes/recordVault/recordVaultTutaDriveRoutes.js';
+import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
 import { getRecordVaultStorageConfig, logoffRecordVaultStorage } from './routes/recordVault/recordVaultStorageRoutes.js';
 import { downloadRecordVaultBridgeInstaller } from './routes/recordVault/recordVaultBridgeInstaller.js';
 import {
@@ -540,6 +548,7 @@ import {
 } from './routes/speedDate/speedDateRoutes.js';
 import { getMonthlyBill, putMonthlyBill } from './routes/recordVault/monthlyBillRoutes.js';
 import { getYearlyBill, putYearlyBill } from './routes/recordVault/yearlyBillRoutes.js';
+import { transferBillSchedule } from './routes/recordVault/billScheduleTransferRoutes.js';
 import {
   feBeTrafficLogMiddleware,
   isFeBeTrafficLogEnabled,
@@ -1014,7 +1023,10 @@ app.get('/api/publicConfig', (_req, res) => {
     duplicatePhoneAllow: isDuplicatePhoneAllowed('AnyMember'),
     onenoteUsbUpgrade: ['true', '1', 'yes', 'on'].includes(
       String(process.env.ONENOTE_USB_UPGRADE ?? '').trim().toLowerCase()
-    )
+    ),
+    // TutaNotes left panel: OneDrive | TutaDrive (LEFT_SIDE in ~/.ssh/be/.env)
+    leftSide: getLeftSideMode(),
+    tutaDrive: isLeftSideTutaDrive()
   });
 });
 
@@ -1466,6 +1478,12 @@ app.post('/api/recordVault/onedrive/format', requireAuth, formatRecordVaultOneDr
 app.post('/api/recordVault/onedrive/test-write', requireAuth, testWriteRecordVaultOneDrive);
 app.post('/api/recordVault/onedrive/restore-zip', requireAuth, restoreRecordVaultOneDriveBackupZip);
 
+app.get('/api/recordVault/tutadrive/status', requireAuth, getRecordVaultTutaDriveStatus);
+app.post('/api/recordVault/tutadrive/unlock', requireAuth, unlockRecordVaultTutaDrive);
+app.post('/api/recordVault/tutadrive/init', requireAuth, initRecordVaultTutaDrive);
+app.post('/api/recordVault/tutadrive/format', requireAuth, formatRecordVaultTutaDrive);
+app.post('/api/recordVault/tutadrive/logoff', requireAuth, logoffRecordVaultTutaDrive);
+
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----
 app.use('/api/photoAlbums', ...photoAlbumsTransferMeterStack);
 app.get('/api/photoAlbums', requireAuth, getPhotoAlbumsTree);
@@ -1684,6 +1702,7 @@ app.get('/api/monthlyBill', requireAuth, getMonthlyBill);
 app.put('/api/monthlyBill', requireAuth, putMonthlyBill);
 app.get('/api/yearlyBill', requireAuth, getYearlyBill);
 app.put('/api/yearlyBill', requireAuth, putYearlyBill);
+app.post('/api/billSchedule/transfer', requireAuth, transferBillSchedule);
 
 app.post('/api/chat/send', requireAuth, sendChatMessage);
 app.get('/api/chat/history/:targetUserId', requireAuth, getChatHistory);

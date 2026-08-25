@@ -24,6 +24,7 @@ import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { readRecordVaultLastUsbLocation } from 'utils/recordVaultUsbPreference';
 import RecordVaultAccessGate from './RecordVaultAccessGate';
 import RecordVaultOneDriveGate from './RecordVaultOneDriveGate';
+import RecordVaultTutaDriveGate from './RecordVaultTutaDriveGate';
 import RecordVaultUsbGate from './RecordVaultUsbGate';
 import RecordVaultWorkspacePane from './RecordVaultWorkspacePane';
 import RecordVaultSessionFileCountsBar from './RecordVaultSessionFileCountsBar';
@@ -34,11 +35,15 @@ import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import TutaNotesBrandTitle from './TutaNotesBrandTitle';
 import GreenButton from 'ui-component/GreenButton';
 import { GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
+import { isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
+import { getApiBaseUrl } from 'config/apiBaseUrl';
 import {
   TUTANOTES_CLOUD_LOGO,
   TUTANOTES_CLOUD_PANE_TOOLTIP,
   TUTANOTES_ONEDRIVE_STRIP_COLOR,
   TUTANOTES_ONEDRIVE_WORKSPACE_TITLE,
+  TUTANOTES_TUTADRIVE_STRIP_COLOR,
+  TUTANOTES_TUTADRIVE_WORKSPACE_TITLE,
   TUTANOTES_HALF_PANEL_WIDTH,
   TUTANOTES_USB_LOGO,
   TUTANOTES_USB_PANE_TOOLTIP,
@@ -54,12 +59,14 @@ const myNoteLoadingBackdropSx = {
 
 /** Tab + frame colors from TutaNotes dual-login mockup. */
 const ONEDRIVE_TAB_COLOR = TUTANOTES_ONEDRIVE_STRIP_COLOR;
+const TUTADRIVE_TAB_COLOR = TUTANOTES_TUTADRIVE_STRIP_COLOR;
 const USB_TAB_COLOR = TUTANOTES_USB_STRIP_COLOR;
 const USB_TAB_LABEL_COLOR = TUTANOTES_USB_TAB_LABEL_COLOR;
 const USB_TITLE_BUTTON_BG = '#9C3CBB';
 const ACTIVE_PANE_BORDER_WIDTH = 16;
 
 const TAB_LABEL_ONEDRIVE = TUTANOTES_ONEDRIVE_WORKSPACE_TITLE;
+const TAB_LABEL_TUTADRIVE = TUTANOTES_TUTADRIVE_WORKSPACE_TITLE;
 
 const storageTabButtonSx = {
   width: 'max-content',
@@ -287,6 +294,7 @@ export default function MyRecordVault() {
   const { user } = useAuth();
   const [storageConfigLoaded, setStorageConfigLoaded] = useState(false);
   const [oneDriveOffered, setOneDriveOffered] = useState(false);
+  const [tutaDriveMode, setTutaDriveMode] = useState(() => isLeftSideTutaDriveFromVite());
   const [localUsbOffered, setLocalUsbOffered] = useState(false);
   const [oneDriveUnlocked, setOneDriveUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
@@ -358,15 +366,36 @@ export default function MyRecordVault() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      const applyLeftSide = (cfg) => {
+        if (cfg && (cfg.leftSide != null || cfg.tutaDrive != null)) {
+          setTutaDriveMode(
+            Boolean(cfg.tutaDrive) || parseLeftSideMode(cfg.leftSide) === 'TutaDrive'
+          );
+          return;
+        }
+        setTutaDriveMode(isLeftSideTutaDriveFromVite());
+      };
+      try {
+        // Runtime BE env (authoritative after pm2/be restart) — no auth required.
+        const pubRes = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
+        if (pubRes.ok) {
+          const pub = await pubRes.json();
+          if (!cancelled) applyLeftSide(pub);
+        }
+      } catch {
+        // keep Vite / prior value
+      }
       try {
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
-        setOneDriveOffered(Boolean(cfg.oneDrive.visible));
-        setLocalUsbOffered(Boolean(cfg.localUsb.visible));
+        setOneDriveOffered(Boolean(cfg.oneDrive?.visible));
+        applyLeftSide(cfg);
+        setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
       } catch {
         if (!cancelled) {
           setOneDriveOffered(true);
           setLocalUsbOffered(true);
+          setTutaDriveMode(isLeftSideTutaDriveFromVite());
         }
       } finally {
         if (!cancelled) setStorageConfigLoaded(true);
@@ -514,11 +543,11 @@ export default function MyRecordVault() {
       await logoffRecordVaultStorage({ storageType: 'onedrive' });
       handleOneDriveSessionEnded();
     } catch (err) {
-      setError(readRecordVaultApiError(err, 'Log off OneDrive failed'));
+      setError(readRecordVaultApiError(err, tutaDriveMode ? 'Log off TutaDrive failed' : 'Log off OneDrive failed'));
     } finally {
       setOneDriveDualLogoffBusy(false);
     }
-  }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded]);
+  }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded, tutaDriveMode]);
 
   const handleUsbLocationChange = useCallback((label) => {
     setUsbVolumeLabel(String(label || '').trim());
@@ -574,6 +603,10 @@ export default function MyRecordVault() {
   const showDual = showTabBar && paneFocus === 'both';
   const showCompare = showTabBar && paneFocus === 'compare';
   const canEnterCompare = Boolean(oneDriveUnlocked && usbUnlocked && showTabBar);
+  const cloudTabLabel = tutaDriveMode ? TAB_LABEL_TUTADRIVE : TAB_LABEL_ONEDRIVE;
+  const cloudTabColor = tutaDriveMode ? TUTADRIVE_TAB_COLOR : ONEDRIVE_TAB_COLOR;
+  const cloudLogOffLabel = tutaDriveMode ? 'Log off TutaDrive' : 'Log off OneDrive';
+  const CloudGate = tutaDriveMode ? RecordVaultTutaDriveGate : RecordVaultOneDriveGate;
 
   // Tutorial lives on the usage bar (USB + OneDrive) — never in the site header.
   useEffect(() => {
@@ -596,14 +629,18 @@ export default function MyRecordVault() {
             type="button"
             role="tab"
             aria-selected={paneFocus === 'onedrive'}
-            title="Open or reload TutaNotes notes on OneDrive"
+            title={
+              tutaDriveMode
+                ? 'Open or reload TutaNotes notes on TutaDrive'
+                : 'Open or reload TutaNotes notes on OneDrive'
+            }
             onClick={selectOneDriveTab}
             sx={storageTabButtonSx}
           >
-            {TAB_LABEL_ONEDRIVE}
+            {cloudTabLabel}
           </GreenButton>
           <DualLogOffButton
-            label="Log off OneDrive"
+            label={cloudLogOffLabel}
             onClick={() => void handleDualPaneLogOffOneDrive()}
             disabled={oneDriveDualLogoffBusy}
           />
@@ -618,7 +655,7 @@ export default function MyRecordVault() {
             unlocked
             compact
             compareMode={showCompare}
-            paneLabel="OneDrive"
+            paneLabel={tutaDriveMode ? 'TutaDrive' : 'OneDrive'}
             canEnterCompare={canEnterCompare}
             onEnterCompare={enterCompareMode}
             onReturnFromCompare={returnFromCompareMode}
@@ -636,13 +673,17 @@ export default function MyRecordVault() {
                 type="button"
                 role="tab"
                 aria-selected={paneFocus === 'onedrive'}
-                title="Expand TutaNotes on OneDrive to the full window"
+                title={
+                  tutaDriveMode
+                    ? 'Expand TutaNotes on TutaDrive to the full window'
+                    : 'Expand TutaNotes on OneDrive to the full window'
+                }
                 onClick={selectOneDriveTab}
                 sx={storageTabButtonSx}
               >
-                {TAB_LABEL_ONEDRIVE}
+                {cloudTabLabel}
               </GreenButton>
-              <RecordVaultOneDriveGate
+              <CloudGate
                 embedded
                 open
                 onUnlocked={handleOneDriveUnlocked}
@@ -652,7 +693,7 @@ export default function MyRecordVault() {
               />
             </Box>
           ) : (
-            <RecordVaultOneDriveGate
+            <CloudGate
               embedded
               open
               onUnlocked={handleOneDriveUnlocked}
@@ -799,7 +840,7 @@ export default function MyRecordVault() {
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {showTabBar && !showCompare && !showDual ? (
             <Box role="tablist" aria-label="TutaNotes storage" {...guestDemoAllowProps()} sx={storageTabBarSx}>
-              <Box sx={storageTabStripSx(ONEDRIVE_TAB_COLOR)}>
+              <Box sx={storageTabStripSx(cloudTabColor)}>
                 <GreenButton
                   type="button"
                   role="tab"
@@ -807,16 +848,18 @@ export default function MyRecordVault() {
                   title={
                     paneFocus === 'onedrive'
                       ? oneDriveOffered && localUsbOffered
-                        ? 'Click again to show OneDrive and USB side by side'
-                        : 'TutaNotes Cloud is open'
+                        ? `Click again to show ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} and USB side by side`
+                        : tutaDriveMode
+                          ? 'TutaDrive Cloud is open'
+                          : 'TutaNotes Cloud is open'
                       : oneDriveUnlocked
-                        ? 'Open or reload TutaNotes notes on OneDrive'
-                        : 'Expand TutaNotes on OneDrive to the full window'
+                        ? `Open or reload TutaNotes notes on ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'}`
+                        : `Expand TutaNotes on ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} to the full window`
                   }
                   onClick={selectOneDriveTab}
                   sx={storageTabButtonSx}
                 >
-                  {TAB_LABEL_ONEDRIVE}
+                  {cloudTabLabel}
                 </GreenButton>
               </Box>
               <Box sx={storageTabStripSx(USB_TAB_COLOR)}>
@@ -856,19 +899,19 @@ export default function MyRecordVault() {
                 sx={{
                   ...loginColumnSx(),
                   display: oneDriveVisible ? 'flex' : 'none',
-                  borderColor: ONEDRIVE_TAB_COLOR,
+                  borderColor: cloudTabColor,
                   overflow: showDual ? 'visible' : 'hidden',
                   bgcolor:
-                    showDual || !oneDriveUnlocked ? ONEDRIVE_TAB_COLOR : 'var(--theme-daynight-color)'
+                    showDual || !oneDriveUnlocked ? cloudTabColor : 'var(--theme-daynight-color)'
                 }}
               >
                 {/* Yellow title row when only one storage mode is offered, or per-pane titles in compare. */}
                 {!showTabBar || showCompare ? (
                   <PaneHeader
-                    title={TUTANOTES_ONEDRIVE_WORKSPACE_TITLE}
+                    title={cloudTabLabel}
                     logoSrc={TUTANOTES_CLOUD_LOGO}
                     titleTooltip={TUTANOTES_CLOUD_PANE_TOOLTIP}
-                    stripColor={showCompare ? ONEDRIVE_TAB_COLOR : undefined}
+                    stripColor={showCompare ? cloudTabColor : undefined}
                   />
                 ) : null}
                 <Box

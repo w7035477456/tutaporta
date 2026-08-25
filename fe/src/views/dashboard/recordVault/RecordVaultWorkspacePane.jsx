@@ -50,8 +50,11 @@ import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
 import {
+  BILL_SCHEDULE_NOTEBOOK_ID,
+  billScheduleCrossPaneKind,
   buildBillScheduleNotebook,
   isBillMonthlyNoteId,
+  isBillScheduleCrossPaneKind,
   isBillScheduleNotebookId,
   isBillScheduleSystemId,
   isBillYearlyNoteId,
@@ -75,6 +78,7 @@ import api from 'api/axios';
 import {
   clearActiveCrossPaneDrag,
   DRAG_CROSS_PANE,
+  getActiveCrossPaneDrag,
   isForeignCrossPaneDrag,
   markCrossPaneDropConsumed,
   notifyRecordVaultTreeReload,
@@ -4540,23 +4544,30 @@ export default function RecordVaultWorkspacePane({
       pendingNotebookExportRef.current = null;
       if (mime === DRAG_NOTEBOOK) {
         setDraggingNotebookId(id);
-        const nb = notebooks.find((row) => Number(row.notebook_id) === Number(id));
-        const noteCount = Array.isArray(nb?.notes) ? nb.notes.length : 0;
-        pendingNotebookExportRef.current = {
-          notebookId: Number(id),
-          notebookName: String(nb?.notebook_name || '').trim() || 'Notebook',
-          noteCount
-        };
-        // Prefetch note bodies so Choose-folder export is fast.
-        (nb?.notes || []).forEach((n) => {
-          try {
-            prefetchNoteHtmlExport(n.note_id);
-          } catch {
-            // ignore
-          }
-        });
+        if (!billScheduleCrossPaneKind(id)) {
+          const nb = notebooks.find((row) => Number(row.notebook_id) === Number(id));
+          const noteCount = Array.isArray(nb?.notes) ? nb.notes.length : 0;
+          pendingNotebookExportRef.current = {
+            notebookId: Number(id),
+            notebookName: String(nb?.notebook_name || '').trim() || 'Notebook',
+            noteCount
+          };
+          // Prefetch note bodies so Choose-folder export is fast.
+          (nb?.notes || []).forEach((n) => {
+            try {
+              prefetchNoteHtmlExport(n.note_id);
+            } catch {
+              // ignore
+            }
+          });
+        } else {
+          pendingNotebookExportRef.current = null;
+        }
       } else if (mime === DRAG_NOTE) {
         setDraggingNoteId(id);
+        if (billScheduleCrossPaneKind(id)) {
+          pendingHtmlExportRef.current = null;
+        } else {
         if (notebookIdForNote != null) {
           event.dataTransfer.setData(DRAG_NOTEBOOK, String(notebookIdForNote));
         }
@@ -4571,12 +4582,23 @@ export default function RecordVaultWorkspacePane({
         if (payloads.length) attachHtmlExportToDataTransfer(event, payloads);
         // Multi export is completed via a "Choose folder" dialog on dragend
         // (needs a real click gesture). Do not put File/text payloads on the drag.
+        }
       } else if (mime === DRAG_SHORTCUT) setDraggingShortcutId(id);
 
       if (mime === DRAG_NOTEBOOK || mime === DRAG_NOTE) {
         let name = '';
         let notebookId = notebookIdForNote != null ? Number(notebookIdForNote) : null;
-        if (mime === DRAG_NOTEBOOK) {
+        const billKind = billScheduleCrossPaneKind(id);
+        if (billKind === 'bill_schedule') {
+          name = 'Bill Schedule';
+          notebookId = BILL_SCHEDULE_NOTEBOOK_ID;
+        } else if (billKind === 'bill_monthly') {
+          name = 'Monthly';
+          notebookId = BILL_SCHEDULE_NOTEBOOK_ID;
+        } else if (billKind === 'bill_yearly') {
+          name = 'Yearly';
+          notebookId = BILL_SCHEDULE_NOTEBOOK_ID;
+        } else if (mime === DRAG_NOTEBOOK) {
           const nb = notebooks.find((row) => Number(row.notebook_id) === Number(id));
           name = String(nb?.notebook_name || '').trim();
         } else {
@@ -4592,13 +4614,18 @@ export default function RecordVaultWorkspacePane({
           }
         }
         const payload = {
-          kind: mime === DRAG_NOTEBOOK ? 'notebook' : 'note',
+          kind: billKind || (mime === DRAG_NOTEBOOK ? 'notebook' : 'note'),
           id: Number(id),
           storageType: paneStorageType === 'onedrive' ? 'onedrive' : 'usb',
           name,
           notebookId: Number.isFinite(notebookId) ? notebookId : null,
           noteIds: mime === DRAG_NOTE && draggedNoteIds.length > 1 ? draggedNoteIds : undefined
         };
+        // Bill Schedule: no Finder HTML export
+        if (isBillScheduleCrossPaneKind(payload.kind)) {
+          pendingNotebookExportRef.current = null;
+          pendingHtmlExportRef.current = null;
+        }
         setActiveCrossPaneDrag(payload);
         try {
           event.dataTransfer.setData(DRAG_CROSS_PANE, serializeCrossPaneDrag(payload));
@@ -4795,6 +4822,10 @@ export default function RecordVaultWorkspacePane({
       // Source pane dragend must skip Finder HTML export — do not clear this here.
       markCrossPaneDropConsumed();
       setCrossPaneDropActive(false);
+      if (isBillScheduleCrossPaneKind(foreign.kind)) {
+        openCrossPaneTransfer(foreign, BILL_SCHEDULE_NOTEBOOK_ID);
+        return true;
+      }
       if (foreign.kind === 'note') {
         const destId = targetNotebookId != null ? Number(targetNotebookId) : Number(selectedNotebookId);
         if (!Number.isFinite(destId) || destId < 1) {
@@ -6933,7 +6964,7 @@ export default function RecordVaultWorkspacePane({
                           }
                           buttonTitle={
                             isSystemNb
-                              ? 'Bill Schedule (system — cannot delete or rename)'
+                              ? 'Bill Schedule — drag to the other vault (Cloud↔USB) to copy or move'
                               : notebookInnerLocked
                               ? 'Locked notebook — enter PIN to unlock'
                               : notebookLockingUp
@@ -6969,31 +7000,29 @@ export default function RecordVaultWorkspacePane({
                           }}
                           onCommitEdit={() => void commitNotebookRename()}
                           onCancelEdit={clearRenameState}
-                          dragMime={isSystemNb ? undefined : DRAG_NOTEBOOK}
+                          dragMime={DRAG_NOTEBOOK}
                           draggingId={draggingNotebookId}
                           alternateDraggingId={draggingNoteId}
                           dropTargetId={dropTargetNotebookId}
                           dragTitle={
                             isSystemNb
-                              ? 'Bill Schedule (fixed)'
+                              ? 'Drag Bill Schedule to the other vault to copy or move Monthly + Yearly data'
                               : crossPaneDropActive
                               ? 'Drop here to copy or move from the other vault'
                               : draggingNoteId != null
                                 ? 'Drop note here to move into this notebook'
                                 : 'Drag to reorder; drag to Finder to export notebook folder + HTML notes'
                           }
-                          onDragStart={
-                            isSystemNb
-                              ? (e) => {
-                                  e.preventDefault();
-                                }
-                              : handleDragStart
-                          }
+                          onDragStart={handleDragStart}
                           onDragEnd={handleDragEnd}
                           onDragOver={isSystemNb ? () => {} : setDropTargetNotebookId}
                           onDrop={
                             isSystemNb
-                              ? () => {}
+                              ? (e) => {
+                                  if (tryHandleForeignCrossPaneDrop(e, { targetNotebookId: nb.notebook_id })) {
+                                    return;
+                                  }
+                                }
                               : (e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)
                           }
                           onDelete={
@@ -7009,7 +7038,12 @@ export default function RecordVaultWorkspacePane({
                               : 'Lock notebook with a 6-digit PIN'
                           }
                           disabled={busy || crossPaneBusy}
-                          acceptForeignDrop={!isSystemNb && crossPaneDropActive}
+                          acceptForeignDrop={
+                            crossPaneDropActive &&
+                            (isSystemNb
+                              ? isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)
+                              : true)
+                          }
                         />
                         </Box>
                         );
@@ -7126,7 +7160,7 @@ export default function RecordVaultWorkspacePane({
                           }
                           buttonTitle={
                             isSystemNote
-                              ? `${note.note_name} (system — cannot delete or rename)`
+                              ? `${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`
                               : noteInnerLocked
                               ? 'Locked — enter PIN to view'
                               : noteLockingUp
@@ -7168,33 +7202,40 @@ export default function RecordVaultWorkspacePane({
                           }}
                           onCommitEdit={() => void commitNoteRename()}
                           onCancelEdit={clearRenameState}
-                          dragMime={isSystemNote ? undefined : DRAG_NOTE}
+                          dragMime={DRAG_NOTE}
                           dragNotebookId={selectedNotebookId}
                           draggingId={draggingNoteId}
                           dropTargetId={dropTargetNoteId}
-                          acceptForeignDrop={!isSystemNote && crossPaneDropActive}
+                          acceptForeignDrop={
+                            crossPaneDropActive &&
+                            (isSystemNote
+                              ? isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)
+                              : true)
+                          }
                           dragTitle={
                             isSystemNote
-                              ? 'Bill Schedule note (fixed)'
+                              ? `Drag ${note.note_name} to the other vault to copy or move`
                               : crossPaneDropActive
                               ? 'Drop here to copy or move from the other vault'
                               : multiSelectedNoteIds.length > 1
                                 ? `Shift-selected: ${multiSelectedNoteIds.length} notes — drag to Finder, then Choose folder for separate HTML files`
                                 : 'Shift+click to multi-select; drag to Finder to export HTML; drop on a notebook to move'
                           }
-                          onDragStart={
-                            isSystemNote
-                              ? (e) => {
-                                  e.preventDefault();
-                                }
-                              : handleDragStart
-                          }
+                          onDragStart={handleDragStart}
                           onDragEnd={handleDragEnd}
                           onPrefetchDrag={isSystemNote ? undefined : prefetchNoteHtmlExport}
                           onDragOver={isSystemNote ? () => {} : setDropTargetNoteId}
                           onDrop={
                             isSystemNote
-                              ? () => {}
+                              ? (e) => {
+                                  if (
+                                    tryHandleForeignCrossPaneDrop(e, {
+                                      targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
+                                    })
+                                  ) {
+                                    return;
+                                  }
+                                }
                               : (e, toId, mime) => {
                                   void handleDropReorder(
                                     e,
@@ -7259,10 +7300,10 @@ export default function RecordVaultWorkspacePane({
           >
             {(() => {
               if (isBillMonthlyView) {
-                return <BillScheduleMonthlyPanel />;
+                return <BillScheduleMonthlyPanel storageType={paneStorageType} />;
               }
               if (isBillYearlyView) {
-                return <BillScheduleYearlyPanel />;
+                return <BillScheduleYearlyPanel storageType={paneStorageType} />;
               }
               const notebookNotesForLock = selectedNotebook?.notes || [];
               const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);

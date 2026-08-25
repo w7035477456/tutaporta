@@ -820,6 +820,31 @@ export async function unlockRecordVaultOneDrive({ onProgress } = {}) {
   }
 }
 
+export async function fetchRecordVaultTutaDriveStatus() {
+  const { data } = await api.get('/api/recordVault/tutadrive/status');
+  return data;
+}
+
+export async function unlockRecordVaultTutaDrive() {
+  const { data } = await api.post('/api/recordVault/tutadrive/unlock');
+  return data;
+}
+
+export async function formatRecordVaultTutaDrive() {
+  const { data } = await api.post('/api/recordVault/tutadrive/format');
+  return data;
+}
+
+export async function initRecordVaultTutaDrive() {
+  const { data } = await api.post('/api/recordVault/tutadrive/init');
+  return data;
+}
+
+export async function logoffRecordVaultTutaDrive() {
+  const { data } = await api.post('/api/recordVault/tutadrive/logoff');
+  return data;
+}
+
 export async function initRecordVaultOneDrive() {
   const { data } = await api.post('/api/recordVault/onedrive/init');
   return data;

@@ -1,4 +1,5 @@
 import pool from '../../db/connection.js';
+import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
 
 function toInt(value) {
   const n = Number(value);
@@ -121,79 +122,90 @@ function mapRow(row, year) {
   };
 }
 
-async function countYearRows(client, singlesId, year) {
+async function countYearRows(client, singlesId, year, storageBackend) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
        FROM helloworldjunktest.yearly_bill
-      WHERE singles_id = $1 AND bill_year = $2`,
-    [singlesId, year]
+      WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3`,
+    [singlesId, storageBackend, year]
   );
   return Number(rows[0]?.c) || 0;
 }
 
-async function findPriorYearWithRows(client, singlesId, year) {
+async function findPriorYearWithRows(client, singlesId, year, storageBackend) {
   const { rows } = await client.query(
     `SELECT bill_year
        FROM helloworldjunktest.yearly_bill
-      WHERE singles_id = $1 AND bill_year < $2
+      WHERE singles_id = $1 AND storage_backend = $2 AND bill_year < $3
       GROUP BY bill_year
       ORDER BY bill_year DESC
       LIMIT 1`,
-    [singlesId, year]
+    [singlesId, storageBackend, year]
   );
   if (!rows[0]) return null;
   return Number(rows[0].bill_year);
 }
 
-async function ensureYearCloned(client, singlesId, year) {
-  const existing = await countYearRows(client, singlesId, year);
+async function ensureYearCloned(client, singlesId, year, storageBackend) {
+  const existing = await countYearRows(client, singlesId, year, storageBackend);
   if (existing > 0) return { cloned: false, from: null };
 
-  const priorYear = await findPriorYearWithRows(client, singlesId, year);
+  const priorYear = await findPriorYearWithRows(client, singlesId, year, storageBackend);
   if (!priorYear) return { cloned: false, from: null };
 
   await client.query(
     `INSERT INTO helloworldjunktest.yearly_bill (
-       singles_id, bill_year, bill_month, row_index,
+       singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_month_day, amount, bill_type,
        action, paid_record_id
      )
      SELECT
-       singles_id, $2, bill_month, row_index,
+       singles_id, storage_backend, $3, bill_month, row_index,
        bill_description, due_month_day, amount, bill_type,
        NULL, NULL
        FROM helloworldjunktest.yearly_bill
-      WHERE singles_id = $1 AND bill_year = $3
+      WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $4
       ORDER BY row_index ASC`,
-    [singlesId, year, priorYear]
+    [singlesId, storageBackend, year, priorYear]
   );
   return { cloned: true, from: priorYear };
 }
 
-async function listYearRows(client, singlesId, year) {
+async function listYearRows(client, singlesId, year, storageBackend) {
   const { rows } = await client.query(
     `SELECT *
        FROM helloworldjunktest.yearly_bill
-      WHERE singles_id = $1 AND bill_year = $2
+      WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3
       ORDER BY row_index ASC, yearly_bill_id ASC`,
-    [singlesId, year]
+    [singlesId, storageBackend, year]
   );
   return rows.map((r) => mapRow(r, year));
 }
 
-/** GET /api/yearlyBill?year= — list (+ clone-on-first-open). */
+/** GET /api/yearlyBill?year=&storageType=onedrive|usb — list (+ clone-on-first-open). */
 export async function getYearlyBill(req, res) {
   try {
     const singlesId = requireSinglesId(req);
     const year = parseYear(req.query);
+    const storageBackend = readBillStorageBackend(req);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const cloneInfo = await ensureYearCloned(client, singlesId, year);
-      const rows = await listYearRows(client, singlesId, year);
+      const cloneInfo = await ensureYearCloned(client, singlesId, year, storageBackend);
+      const rows = await listYearRows(client, singlesId, year, storageBackend);
+      const peer = storageBackend === 'usb' ? 'onedrive' : 'usb';
+      const { rows: peerCountRows } = await client.query(
+        `SELECT COUNT(*)::int AS c
+           FROM helloworldjunktest.yearly_bill
+          WHERE singles_id = $1 AND storage_backend = $2`,
+        [singlesId, peer]
+      );
       await client.query('COMMIT');
       return res.json({
         bill_year: year,
+        storage_backend: storageBackend,
+        peer_storage_backend: peer,
+        peer_has_rows: (Number(peerCountRows[0]?.c) || 0) > 0,
         cloned: cloneInfo.cloned,
         cloned_from: cloneInfo.from,
         rows
@@ -215,12 +227,13 @@ export async function getYearlyBill(req, res) {
 
 /**
  * PUT /api/yearlyBill
- * Body: { year, rows: [{ row_index, bill_description, bill_month, due_month_day, amount, bill_type, action, paid_record_id? }] }
+ * Body: { year, storageType?, rows: [...] }
  */
 export async function putYearlyBill(req, res) {
   try {
     const singlesId = requireSinglesId(req);
     const year = parseYear(req.body || {});
+    const storageBackend = readBillStorageBackend(req);
     const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
     if (!incoming) throw httpError(400, 'rows array required');
     if (incoming.length > 500) throw httpError(400, 'Too many rows (max 500)');
@@ -257,18 +270,19 @@ export async function putYearlyBill(req, res) {
       await client.query('BEGIN');
       await client.query(
         `DELETE FROM helloworldjunktest.yearly_bill
-          WHERE singles_id = $1 AND bill_year = $2`,
-        [singlesId, year]
+          WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3`,
+        [singlesId, storageBackend, year]
       );
       for (const r of normalized) {
         await client.query(
           `INSERT INTO helloworldjunktest.yearly_bill (
-             singles_id, bill_year, bill_month, row_index,
+             singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_month_day, amount, bill_type,
              action, paid_record_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [
             singlesId,
+            storageBackend,
             year,
             r.bill_month,
             r.row_index,
@@ -281,11 +295,12 @@ export async function putYearlyBill(req, res) {
           ]
         );
       }
-      const rows = await listYearRows(client, singlesId, year);
+      const rows = await listYearRows(client, singlesId, year, storageBackend);
       await client.query('COMMIT');
       return res.json({
         ok: true,
         bill_year: year,
+        storage_backend: storageBackend,
         rows
       });
     } catch (err) {

@@ -5,8 +5,11 @@ import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import { fetchMonthlyBill, saveMonthlyBill } from 'api/monthlyBillFe';
+import { fetchMonthlyBill, saveMonthlyBill, transferBillSchedule } from 'api/monthlyBillFe';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import PropTypes from 'prop-types';
+import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
+import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -101,7 +104,8 @@ const navBtnSx = {
   lineHeight: 1
 };
 
-export default function BillScheduleMonthlyPanel() {
+export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp }) {
+  const paneStorageType = useRecordVaultPaneStorageType();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -111,25 +115,63 @@ export default function BillScheduleMonthlyPanel() {
   const [error, setError] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
   const [paidStubOpen, setPaidStubOpen] = useState(false);
+  const [peerHasRows, setPeerHasRows] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const storageKey =
+    String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
+  const peerKey = storageKey === 'usb' ? 'onedrive' : 'usb';
+  const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
+  const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
 
   const load = useCallback(async (y, m) => {
     setLoading(true);
     setError('');
     setSavedMsg('');
     try {
-      const data = await fetchMonthlyBill(y, m);
+      const data = await fetchMonthlyBill(y, m, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], y, m));
+      setPeerHasRows(Boolean(data?.peer_has_rows));
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to load monthly bills');
       setRows([]);
+      setPeerHasRows(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     void load(year, month);
   }, [year, month, load]);
+
+  useEffect(() => {
+    const onReload = () => {
+      void load(year, month);
+    };
+    window.addEventListener('record-vault-tree-reload', onReload);
+    return () => window.removeEventListener('record-vault-tree-reload', onReload);
+  }, [year, month, load]);
+
+  const copyFromPeer = async () => {
+    if (copyBusy) return;
+    setCopyBusy(true);
+    setError('');
+    try {
+      await transferBillSchedule({
+        mode: 'copy',
+        kind: 'bill_monthly',
+        sourceStorageType: peerKey,
+        targetStorageType: storageKey
+      });
+      notifyRecordVaultTreeReload(null);
+      await load(year, month);
+      setSavedMsg(`Copied Monthly from ${peerLabel}`);
+    } catch (err) {
+      setError(err?.message || err?.response?.data?.error || 'Copy failed');
+    } finally {
+      setCopyBusy(false);
+    }
+  };
 
   const updateRow = (index, patch) => {
     setRows((prev) =>
@@ -168,7 +210,7 @@ export default function BillScheduleMonthlyPanel() {
         action: r.bill_type === 'Auto' ? null : r.action,
         paid_record_id: r.paid_record_id
       }));
-      const data = await saveMonthlyBill(year, month, payload);
+      const data = await saveMonthlyBill(year, month, payload, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], year, month));
       setSavedMsg('Saved');
     } catch (err) {
@@ -245,6 +287,9 @@ export default function BillScheduleMonthlyPanel() {
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
         <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>Title: Monthly</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#555' }}>
+          ({sideLabel})
+        </Typography>
         <Box sx={{ flex: 1 }} />
         <Box component="button" type="button" aria-label="Previous month" onClick={() => shiftMonth(-1)} sx={navBtnSx}>
           ‹
@@ -256,6 +301,33 @@ export default function BillScheduleMonthlyPanel() {
           ›
         </Box>
       </Box>
+
+      {!loading && rows.length === 0 && peerHasRows ? (
+        <Box
+          sx={{
+            flexShrink: 0,
+            bgcolor: YELLOW,
+            border: '2px solid #000',
+            borderRadius: 1,
+            p: 1.25,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1
+          }}
+        >
+          <Typography sx={{ fontWeight: 700, flex: '1 1 200px' }}>
+            No Monthly rows on {sideLabel} yet. Your Bill Schedule data is on {peerLabel}.
+          </Typography>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            disabled={copyBusy}
+            onClick={() => void copyFromPeer()}
+          >
+            {copyBusy ? 'Copying…' : `Copy Monthly from ${peerLabel}`}
+          </ColorTemplate13DisableGreenButton>
+        </Box>
+      ) : null}
 
       {error ? (
         <Typography sx={{ color: RED, fontWeight: 700, flexShrink: 0 }}>{error}</Typography>
@@ -514,3 +586,7 @@ export default function BillScheduleMonthlyPanel() {
     </Box>
   );
 }
+
+BillScheduleMonthlyPanel.propTypes = {
+  storageType: PropTypes.oneOf(['onedrive', 'usb'])
+};

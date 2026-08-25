@@ -181,6 +181,20 @@ JSON_LIMIT_MB=400
 | `MAX_SIZE_UPLOAD_MB` | Upload cap per photo (`be/routes/photos/uploadPhoto.js`). |
 | `JSON_LIMIT_MB` | Express JSON body limit (base64 uploads). Align nginx `client_max_body_size` if used. |
 
+## TutaDrive / large cheap storage
+
+```bash
+LEFT_SIDE=TutaDrive
+STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
+LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
+```
+
+| Variable | Notes |
+|----------|-------|
+| `LEFT_SIDE` | `OneDrive` (default) = left panel Microsoft OneDrive. `TutaDrive` = simplified left panel; vault under `LARGE_CHEAP_STORAGE_FOLDER`. |
+| `STORAGE_FOLDER` | General app storage (photos installers, etc.). |
+| `LARGE_CHEAP_STORAGE_FOLDER` | TutaDrive member data: `{root}/users/M{member_id}/notes` and `…/photos`. Same as `STORAGE_FOLDER` for now; later point at large/slow USB RAID. Falls back to `STORAGE_FOLDER` if unset. |
+
 ## ASN / VPN block list
 
 ```bash

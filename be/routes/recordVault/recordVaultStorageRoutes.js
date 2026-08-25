@@ -4,6 +4,7 @@ import {
   isVaultLocalUsbOffered,
   isVaultOneDriveOffered
 } from '../../utils/recordVaultStorageFlags.js';
+import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
 import { isVaultE2eYellow } from '../../utils/vaultE2eYellowConfig.js';
 import { isOneDriveVaultOAuthConfigured } from '../../utils/recordVaultOneDrive/oneDriveApi.js';
 import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
@@ -42,9 +43,16 @@ export async function getRecordVaultStorageConfig(req, res) {
 
   const videoTutorialTutanotes = await loadGlobalVideoTutorialTutanotes();
   const usbBridgeInstallers = getRecordVaultBridgeInstallerUrls();
+  const leftSide = getLeftSideMode();
+  const tutaDrive = isLeftSideTutaDrive();
+  const oneDrive = tutaDrive
+    ? { visible: true, oauthConfigured: true, enabled: true, tutaDrive: true }
+    : buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured());
 
   return res.json({
-    oneDrive: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()),
+    leftSide,
+    tutaDrive,
+    oneDrive,
     localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
     backupUsbEnabled: isVaultBackupUsbEnabled(),
     iconEncryptionRequired: isRecordVaultIconEncryptionEnabled(),

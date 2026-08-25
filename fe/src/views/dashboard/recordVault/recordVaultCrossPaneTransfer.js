@@ -4,8 +4,10 @@ import {
   fetchRecordVaultNoteExtraImageBlob,
   fetchRecordVaultNoteImageBlob
 } from 'api/recordVaultFe';
+import { transferBillSchedule } from 'api/monthlyBillFe';
 import { isRecordVaultInnerEncryptedBody } from 'utils/recordVaultNoteInnerCrypto';
 import { namesEqualIgnoreCase } from './recordVaultCrossPaneDrag';
+import { isBillScheduleCrossPaneKind } from './billScheduleConstants';
 
 function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -219,6 +221,18 @@ export async function transferRecordVaultItem({
   const sourceApi = createRecordVaultPaneApi(sourceType);
   const targetApi = createRecordVaultPaneApi(targetType);
   const copyBandEnd = mode === 'move' ? 92 : 98;
+
+  if (isBillScheduleCrossPaneKind(item.kind)) {
+    await reportTransferProgress(onProgress, 5, 'Transferring Bill Schedule…');
+    await transferBillSchedule({
+      mode,
+      kind: item.kind,
+      sourceStorageType: sourceType,
+      targetStorageType: targetType
+    });
+    await reportTransferProgress(onProgress, 100, 'Done');
+    return { billSchedule: true, kind: item.kind };
+  }
 
   if (item.kind === 'notebook') {
     await reportTransferProgress(onProgress, 1, 'Loading source notebook…');

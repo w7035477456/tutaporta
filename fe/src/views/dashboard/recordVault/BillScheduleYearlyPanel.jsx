@@ -5,8 +5,11 @@ import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import { fetchYearlyBill, saveYearlyBill } from 'api/monthlyBillFe';
+import { fetchYearlyBill, saveYearlyBill, transferBillSchedule } from 'api/monthlyBillFe';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import PropTypes from 'prop-types';
+import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
+import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -168,7 +171,8 @@ function MiniMonthCalendar({ year, month, marks, today }) {
   );
 }
 
-export default function BillScheduleYearlyPanel() {
+export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }) {
+  const paneStorageType = useRecordVaultPaneStorageType();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [rows, setRows] = useState([]);
@@ -177,25 +181,63 @@ export default function BillScheduleYearlyPanel() {
   const [error, setError] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
   const [paidStubOpen, setPaidStubOpen] = useState(false);
+  const [peerHasRows, setPeerHasRows] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const storageKey =
+    String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
+  const peerKey = storageKey === 'usb' ? 'onedrive' : 'usb';
+  const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
+  const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
 
   const load = useCallback(async (y) => {
     setLoading(true);
     setError('');
     setSavedMsg('');
     try {
-      const data = await fetchYearlyBill(y);
+      const data = await fetchYearlyBill(y, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], y));
+      setPeerHasRows(Boolean(data?.peer_has_rows));
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to load yearly bills');
       setRows([]);
+      setPeerHasRows(false);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     void load(year);
   }, [year, load]);
+
+  useEffect(() => {
+    const onReload = () => {
+      void load(year);
+    };
+    window.addEventListener('record-vault-tree-reload', onReload);
+    return () => window.removeEventListener('record-vault-tree-reload', onReload);
+  }, [year, load]);
+
+  const copyFromPeer = async () => {
+    if (copyBusy) return;
+    setCopyBusy(true);
+    setError('');
+    try {
+      await transferBillSchedule({
+        mode: 'copy',
+        kind: 'bill_yearly',
+        sourceStorageType: peerKey,
+        targetStorageType: storageKey
+      });
+      notifyRecordVaultTreeReload(null);
+      await load(year);
+      setSavedMsg(`Copied Yearly from ${peerLabel}`);
+    } catch (err) {
+      setError(err?.message || err?.response?.data?.error || 'Copy failed');
+    } finally {
+      setCopyBusy(false);
+    }
+  };
 
   const updateRow = (index, patch) => {
     setRows((prev) =>
@@ -236,7 +278,7 @@ export default function BillScheduleYearlyPanel() {
         action: r.bill_type === 'Auto' ? null : r.action,
         paid_record_id: r.paid_record_id
       }));
-      const data = await saveYearlyBill(year, payload);
+      const data = await saveYearlyBill(year, payload, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], year));
       setSavedMsg('Saved');
     } catch (err) {
@@ -298,6 +340,9 @@ export default function BillScheduleYearlyPanel() {
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
         <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>Title: Yearly</Typography>
+        <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#555' }}>
+          ({sideLabel})
+        </Typography>
         <Box sx={{ flex: 1 }} />
         <Box
           component="button"
@@ -319,6 +364,33 @@ export default function BillScheduleYearlyPanel() {
           ›
         </Box>
       </Box>
+
+      {!loading && rows.length === 0 && peerHasRows ? (
+        <Box
+          sx={{
+            flexShrink: 0,
+            bgcolor: YELLOW,
+            border: '2px solid #000',
+            borderRadius: 1,
+            p: 1.25,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1
+          }}
+        >
+          <Typography sx={{ fontWeight: 700, flex: '1 1 200px' }}>
+            No Yearly rows on {sideLabel} yet. Your Bill Schedule data is on {peerLabel}.
+          </Typography>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            disabled={copyBusy}
+            onClick={() => void copyFromPeer()}
+          >
+            {copyBusy ? 'Copying…' : `Copy Yearly from ${peerLabel}`}
+          </ColorTemplate13DisableGreenButton>
+        </Box>
+      ) : null}
 
       {error ? (
         <Typography sx={{ color: RED, fontWeight: 700, flexShrink: 0 }}>{error}</Typography>
@@ -572,3 +644,7 @@ export default function BillScheduleYearlyPanel() {
     </Box>
   );
 }
+
+BillScheduleYearlyPanel.propTypes = {
+  storageType: PropTypes.oneOf(['onedrive', 'usb'])
+};

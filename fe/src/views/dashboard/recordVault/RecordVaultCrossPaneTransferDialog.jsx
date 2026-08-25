@@ -61,16 +61,24 @@ export default function RecordVaultCrossPaneTransferDialog({
 
   if (!item) return null;
 
-  const kindLabel = item.kind === 'notebook' ? 'notebook' : 'note';
+  const isBill =
+    item.kind === 'bill_schedule' || item.kind === 'bill_monthly' || item.kind === 'bill_yearly';
+  const kindLabel = isBill
+    ? 'Bill Schedule'
+    : item.kind === 'notebook'
+      ? 'notebook'
+      : 'note';
   const name = String(item.name || '').trim() || (item.kind === 'notebook' ? 'Notebook' : 'Note');
   const fromLabel = storageLabel(item.storageType);
   const toLabel = storageLabel(targetStorageType);
   const noteDestHint =
-    item.kind === 'note' && targetNotebookName
+    !isBill && item.kind === 'note' && targetNotebookName
       ? ` into notebook “${targetNotebookName}”`
-      : item.kind === 'note'
+      : !isBill && item.kind === 'note'
         ? ' into the selected notebook'
-        : '';
+        : isBill
+          ? ' (Bill Schedule data for this vault side)'
+          : '';
 
   return (
     <ColorTemplate16PopupCenterWide
@@ -115,7 +123,7 @@ export default function RecordVaultCrossPaneTransferDialog({
 RecordVaultCrossPaneTransferDialog.propTypes = {
   open: PropTypes.bool,
   item: PropTypes.shape({
-    kind: PropTypes.oneOf(['notebook', 'note']),
+    kind: PropTypes.oneOf(['notebook', 'note', 'bill_schedule', 'bill_monthly', 'bill_yearly']),
     id: PropTypes.number,
     storageType: PropTypes.oneOf(['onedrive', 'usb']),
     name: PropTypes.string,
