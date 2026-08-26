@@ -4,6 +4,7 @@ import {
   isVaultLocalUsbOffered,
   isVaultOneDriveOffered
 } from '../../utils/photoAlbumsStorageFlags.js';
+import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
 import { isVaultE2eYellow } from '../../utils/photoAlbumsE2eYellowConfig.js';
 import { isOneDriveVaultOAuthConfigured } from '../../utils/photoAlbumsOneDrive/oneDriveApi.js';
 import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
@@ -42,9 +43,22 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
 
   const videoTutorialTutaphotoalbums = await loadGlobalVideoTutorialPhotoAlbums();
   const usbBridgeInstallers = getPhotoAlbumsBridgeInstallerUrls();
+  const leftSide = getLeftSideMode();
+  const tutaDrive = isLeftSideTutaDrive();
+  let oneDrive;
+  if (leftSide === 'None') {
+    oneDrive = { visible: false, oauthConfigured: false, enabled: false, tutaDrive: false };
+  } else if (tutaDrive) {
+    oneDrive = { visible: true, oauthConfigured: true, enabled: true, tutaDrive: true };
+  } else {
+    oneDrive = buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured());
+  }
 
   return res.json({
-    oneDrive: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()),
+    leftSide,
+    tutaDrive,
+    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
+    oneDrive,
     localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
     backupUsbEnabled: isVaultBackupUsbEnabled(),
     iconEncryptionRequired: isPhotoAlbumsIconEncryptionEnabled(),

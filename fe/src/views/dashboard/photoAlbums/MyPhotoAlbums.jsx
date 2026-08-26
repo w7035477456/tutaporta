@@ -11,6 +11,7 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   fetchPhotoAlbumsOneDriveStatus,
   fetchPhotoAlbumsStorageConfig,
+  fetchPhotoAlbumsTutaDriveStatus,
   fetchPhotoAlbumsUsbStatus,
   logoffPhotoAlbumsStorage,
   readPhotoAlbumsApiError,
@@ -22,8 +23,12 @@ import { useAuth } from 'contexts/AuthContext';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { clearPhotoAlbumsE2eSession } from 'utils/photoAlbumsClientSession';
 import { readPhotoAlbumsLastUsbLocation } from 'utils/photoAlbumsUsbPreference';
+import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
+import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
+import { getApiBaseUrl } from 'config/apiBaseUrl';
 import PhotoAlbumsAccessGate from './PhotoAlbumsAccessGate';
 import PhotoAlbumsOneDriveGate from './PhotoAlbumsOneDriveGate';
+import PhotoAlbumsTutaDriveGate from './PhotoAlbumsTutaDriveGate';
 import PhotoAlbumsUsbGate from './PhotoAlbumsUsbGate';
 import PhotoAlbumsWorkspacePane from './PhotoAlbumsWorkspacePane';
 import PhotoAlbumsSessionFileCountsBar from './PhotoAlbumsSessionFileCountsBar';
@@ -40,6 +45,8 @@ import {
   TUTAPHOTOALBUMS_ONEDRIVE_STRIP_COLOR,
   TUTAPHOTOALBUMS_ONEDRIVE_WORKSPACE_TITLE,
   TUTAPHOTOALBUMS_HALF_PANEL_WIDTH,
+  TUTAPHOTOALBUMS_TUTADRIVE_STRIP_COLOR,
+  TUTAPHOTOALBUMS_TUTADRIVE_WORKSPACE_TITLE,
   TUTAPHOTOALBUMS_USB_LOGO,
   TUTAPHOTOALBUMS_USB_PANE_TOOLTIP,
   TUTAPHOTOALBUMS_USB_STRIP_COLOR,
@@ -57,12 +64,14 @@ const myPhotoAlbumsLoadingBackdropSx = {
 
 /** Tab + frame colors from TutaPhotoAlbums dual-login mockup. */
 const ONEDRIVE_TAB_COLOR = TUTAPHOTOALBUMS_ONEDRIVE_STRIP_COLOR;
+const TUTADRIVE_TAB_COLOR = TUTAPHOTOALBUMS_TUTADRIVE_STRIP_COLOR;
 const USB_TAB_COLOR = TUTAPHOTOALBUMS_USB_STRIP_COLOR;
 const USB_TAB_LABEL_COLOR = TUTAPHOTOALBUMS_USB_TAB_LABEL_COLOR;
 const USB_TITLE_BUTTON_BG = '#9C3CBB';
 const ACTIVE_PANE_BORDER_WIDTH = 16;
 
 const TAB_LABEL_ONEDRIVE = TUTAPHOTOALBUMS_ONEDRIVE_WORKSPACE_TITLE;
+const TAB_LABEL_TUTADRIVE = TUTAPHOTOALBUMS_TUTADRIVE_WORKSPACE_TITLE;
 
 const storageTabButtonSx = {
   width: 'max-content',
@@ -299,8 +308,9 @@ function LoginScrollArea({ children }) {
 export default function MyPhotoAlbums() {
   const { user } = useAuth();
   const [storageConfigLoaded, setStorageConfigLoaded] = useState(false);
-  const [oneDriveOffered, setOneDriveOffered] = useState(false);
-  const [localUsbOffered, setLocalUsbOffered] = useState(false);
+  const [oneDriveOffered, setOneDriveOffered] = useState(() => isLeftSideOfferedFromVite());
+  const [tutaDriveMode, setTutaDriveMode] = useState(() => isLeftSideTutaDriveFromVite());
+  const [localUsbOffered, setLocalUsbOffered] = useState(() => isRightSideUsbFromVite());
   const [oneDriveUnlocked, setOneDriveUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
   /** Volume name from USB radio / last mount — shown as `TutaPhotoAlbums on USB: (TutaUSB-1)`. */
@@ -362,11 +372,16 @@ export default function MyPhotoAlbums() {
     setSessionChecking(true);
     setError('');
     try {
-      const [oneDriveStatus, usbStatus] = await Promise.all([
-        oneDriveOffered ? fetchPhotoAlbumsOneDriveStatus().catch(() => null) : Promise.resolve(null),
+      const [cloudStatus, usbStatus] = await Promise.all([
+        oneDriveOffered
+          ? (tutaDriveMode
+              ? fetchPhotoAlbumsTutaDriveStatus()
+              : fetchPhotoAlbumsOneDriveStatus()
+            ).catch(() => null)
+          : Promise.resolve(null),
         localUsbOffered ? fetchPhotoAlbumsUsbStatus().catch(() => null) : Promise.resolve(null)
       ]);
-      setOneDriveUnlocked(Boolean(oneDriveStatus?.session?.unlocked));
+      setOneDriveUnlocked(Boolean(cloudStatus?.session?.unlocked));
       setUsbUnlocked(Boolean(usbStatus?.session?.unlocked));
       const sessionUsbLabel = String(usbStatus?.session?.label || '').trim();
       if (usbStatus?.session?.unlocked && sessionUsbLabel && sessionUsbLabel !== 'OneDrive') {
@@ -379,20 +394,55 @@ export default function MyPhotoAlbums() {
     } finally {
       setSessionChecking(false);
     }
-  }, [oneDriveOffered, localUsbOffered]);
+  }, [oneDriveOffered, localUsbOffered, tutaDriveMode]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      const applyPanelSides = (cfg) => {
+        if (!cfg) {
+          setTutaDriveMode(isLeftSideTutaDriveFromVite());
+          setOneDriveOffered(isLeftSideOfferedFromVite());
+          setLocalUsbOffered(isRightSideUsbFromVite());
+          return;
+        }
+        if (cfg.leftSide != null || cfg.tutaDrive != null) {
+          const leftMode = parseLeftSideMode(cfg.leftSide);
+          setTutaDriveMode(Boolean(cfg.tutaDrive) || leftMode === 'TutaDrive');
+          if (cfg.oneDrive?.visible != null) {
+            setOneDriveOffered(Boolean(cfg.oneDrive.visible));
+          } else {
+            setOneDriveOffered(leftMode !== 'None');
+          }
+        }
+        if (cfg.rightSide != null || cfg.localUsb?.visible != null) {
+          if (cfg.localUsb?.visible != null) {
+            setLocalUsbOffered(Boolean(cfg.localUsb.visible));
+          } else {
+            setLocalUsbOffered(parseRightSideMode(cfg.rightSide) === 'USB');
+          }
+        }
+      };
+      try {
+        const pubRes = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
+        if (pubRes.ok) {
+          const pub = await pubRes.json();
+          if (!cancelled) applyPanelSides(pub);
+        }
+      } catch {
+        // keep Vite / prior value
+      }
       try {
         const cfg = await fetchPhotoAlbumsStorageConfig();
         if (cancelled) return;
-        setOneDriveOffered(Boolean(cfg.oneDrive.visible));
-        setLocalUsbOffered(Boolean(cfg.localUsb.visible));
+        applyPanelSides(cfg);
+        setOneDriveOffered(Boolean(cfg.oneDrive?.visible));
+        setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
       } catch {
         if (!cancelled) {
-          setOneDriveOffered(true);
-          setLocalUsbOffered(true);
+          setOneDriveOffered(isLeftSideOfferedFromVite());
+          setLocalUsbOffered(isRightSideUsbFromVite());
+          setTutaDriveMode(isLeftSideTutaDriveFromVite());
         }
       } finally {
         if (!cancelled) setStorageConfigLoaded(true);
@@ -561,11 +611,11 @@ export default function MyPhotoAlbums() {
       await logoffPhotoAlbumsStorage({ storageType: 'onedrive' });
       handleOneDriveSessionEnded();
     } catch (err) {
-      setError(readPhotoAlbumsApiError(err, 'Log off OneDrive failed'));
+      setError(readPhotoAlbumsApiError(err, tutaDriveMode ? 'Log off TutaDrive failed' : 'Log off OneDrive failed'));
     } finally {
       setOneDriveDualLogoffBusy(false);
     }
-  }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded]);
+  }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded, tutaDriveMode]);
 
   // Open TutaPhotoAlbums Cloud / USB share one vault-password popup (Step 1), then resume icon unlock.
   const handleOneDriveOpenClicked = useCallback(() => {
@@ -621,6 +671,10 @@ export default function MyPhotoAlbums() {
   const showDual = showTabBar && paneFocus === 'both';
   const showCompare = showTabBar && paneFocus === 'compare';
   const canEnterCompare = Boolean(oneDriveUnlocked && usbUnlocked && showTabBar);
+  const cloudTabLabel = tutaDriveMode ? TAB_LABEL_TUTADRIVE : TAB_LABEL_ONEDRIVE;
+  const cloudTabColor = tutaDriveMode ? TUTADRIVE_TAB_COLOR : ONEDRIVE_TAB_COLOR;
+  const cloudLogOffLabel = tutaDriveMode ? 'Log off TutaDrive' : 'Log off OneDrive';
+  const CloudGate = tutaDriveMode ? PhotoAlbumsTutaDriveGate : PhotoAlbumsOneDriveGate;
 
   // Tutorial lives on the usage bar (USB + OneDrive) — never in the site header.
   useEffect(() => {
@@ -644,14 +698,18 @@ export default function MyPhotoAlbums() {
             type="button"
             role="tab"
             aria-selected={paneFocus === 'onedrive'}
-            title="Open or reload TutaPhotoAlbums notes on OneDrive"
+            title={
+              tutaDriveMode
+                ? 'Open or reload TutaPhotoAlbums notes on TutaDrive'
+                : 'Open or reload TutaPhotoAlbums notes on OneDrive'
+            }
             onClick={selectOneDriveTab}
             sx={storageTabButtonSx}
           >
-            {TAB_LABEL_ONEDRIVE}
+            {cloudTabLabel}
           </GreenButton>
           <DualLogOffButton
-            label="Log off OneDrive"
+            label={cloudLogOffLabel}
             onClick={() => void handleDualPaneLogOffOneDrive()}
             disabled={oneDriveDualLogoffBusy}
           />
@@ -666,7 +724,7 @@ export default function MyPhotoAlbums() {
             unlocked
             compact
             compareMode={showCompare}
-            paneLabel="OneDrive"
+            paneLabel={tutaDriveMode ? 'TutaDrive' : 'OneDrive'}
             canEnterCompare={canEnterCompare}
             onEnterCompare={enterCompareMode}
             onReturnFromCompare={returnFromCompareMode}
@@ -684,31 +742,35 @@ export default function MyPhotoAlbums() {
                 type="button"
                 role="tab"
                 aria-selected={paneFocus === 'onedrive'}
-                title="Expand TutaPhotoAlbums on OneDrive to the full window"
+                title={
+                  tutaDriveMode
+                    ? 'Expand TutaPhotoAlbums on TutaDrive to the full window'
+                    : 'Expand TutaPhotoAlbums on OneDrive to the full window'
+                }
                 onClick={selectOneDriveTab}
                 sx={storageTabButtonSx}
               >
-                {TAB_LABEL_ONEDRIVE}
+                {cloudTabLabel}
               </GreenButton>
-              <PhotoAlbumsOneDriveGate
+              <CloudGate
                 embedded
                 open
                 onUnlocked={handleOneDriveUnlocked}
                 onOpenClicked={handleOneDriveOpenClicked}
                 proceedOpenToken={oneDriveProceedOpenToken}
                 accessFormatRefreshToken={oneDriveGateRefreshToken}
-                sessionNotice={oneDriveSessionNotice}
+                {...(tutaDriveMode ? {} : { sessionNotice: oneDriveSessionNotice })}
               />
             </Box>
           ) : (
-            <PhotoAlbumsOneDriveGate
+            <CloudGate
               embedded
               open
               onUnlocked={handleOneDriveUnlocked}
               onOpenClicked={handleOneDriveOpenClicked}
               proceedOpenToken={oneDriveProceedOpenToken}
               accessFormatRefreshToken={oneDriveGateRefreshToken}
-              sessionNotice={oneDriveSessionNotice}
+              {...(tutaDriveMode ? {} : { sessionNotice: oneDriveSessionNotice })}
             />
           )}
         </LoginScrollArea>
@@ -838,7 +900,13 @@ export default function MyPhotoAlbums() {
       />
       <BusyHourglassOverlay
         open={usbDualLogoffBusy || oneDriveDualLogoffBusy}
-        label={oneDriveDualLogoffBusy ? 'Logging off OneDrive' : 'Logging off USB'}
+        label={
+          oneDriveDualLogoffBusy
+            ? tutaDriveMode
+              ? 'Logging off TutaDrive'
+              : 'Logging off OneDrive'
+            : 'Logging off USB'
+        }
         backdropSx={myPhotoAlbumsLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
@@ -852,7 +920,7 @@ export default function MyPhotoAlbums() {
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {showTabBar && !showCompare && !showDual ? (
             <Box role="tablist" aria-label="TutaPhotoAlbums storage" sx={storageTabBarSx}>
-              <Box sx={storageTabStripSx(ONEDRIVE_TAB_COLOR)}>
+              <Box sx={storageTabStripSx(cloudTabColor)}>
                 <GreenButton
                   type="button"
                   role="tab"
@@ -860,16 +928,18 @@ export default function MyPhotoAlbums() {
                   title={
                     paneFocus === 'onedrive'
                       ? oneDriveOffered && localUsbOffered
-                        ? 'Click again to show OneDrive and USB side by side'
-                        : 'TutaPhotoAlbums Cloud is open'
+                        ? `Click again to show ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} and USB side by side`
+                        : tutaDriveMode
+                          ? 'TutaPhotoAlbums Cloud is open'
+                          : 'TutaPhotoAlbums Cloud is open'
                       : oneDriveUnlocked
-                        ? 'Open or reload TutaPhotoAlbums notes on OneDrive'
-                        : 'Expand TutaPhotoAlbums on OneDrive to the full window'
+                        ? `Open or reload TutaPhotoAlbums notes on ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'}`
+                        : `Expand TutaPhotoAlbums on ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} to the full window`
                   }
                   onClick={selectOneDriveTab}
                   sx={storageTabButtonSx}
                 >
-                  {TAB_LABEL_ONEDRIVE}
+                  {cloudTabLabel}
                 </GreenButton>
               </Box>
               <Box sx={storageTabStripSx(USB_TAB_COLOR)}>
@@ -880,7 +950,7 @@ export default function MyPhotoAlbums() {
                   title={
                     paneFocus === 'usb'
                       ? oneDriveOffered && localUsbOffered
-                        ? 'Click again to show OneDrive and USB side by side'
+                        ? `Click again to show ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} and USB side by side`
                         : 'TutaPhotoAlbums USB is open'
                       : usbUnlocked
                         ? 'Open or reload TutaPhotoAlbums notes on USB'
@@ -909,19 +979,19 @@ export default function MyPhotoAlbums() {
                 sx={{
                   ...loginColumnSx(),
                   display: oneDriveVisible ? 'flex' : 'none',
-                  borderColor: ONEDRIVE_TAB_COLOR,
+                  borderColor: cloudTabColor,
                   overflow: showDual ? 'visible' : 'hidden',
                   bgcolor:
-                    showDual || !oneDriveUnlocked ? ONEDRIVE_TAB_COLOR : 'var(--theme-daynight-color)'
+                    showDual || !oneDriveUnlocked ? cloudTabColor : 'var(--theme-daynight-color)'
                 }}
               >
                 {/* Yellow title row when only one storage mode is offered, or per-pane titles in compare. */}
                 {!showTabBar || showCompare ? (
                   <PaneHeader
-                    title={TUTAPHOTOALBUMS_ONEDRIVE_WORKSPACE_TITLE}
+                    title={cloudTabLabel}
                     logoSrc={TUTAPHOTOALBUMS_CLOUD_LOGO}
                     titleTooltip={TUTAPHOTOALBUMS_CLOUD_PANE_TOOLTIP}
-                    stripColor={showCompare ? ONEDRIVE_TAB_COLOR : undefined}
+                    stripColor={showCompare ? cloudTabColor : undefined}
                   />
                 ) : null}
                 <Box

@@ -1,4 +1,6 @@
-/** Env toggles for Record Vault Step 2 storage choices (~/.ssh/be/.env). */
+/** Env toggles for TutaPhotoAlbums storage choices (~/.ssh/be/.env). */
+
+import { isRightSideUsb } from './tutaDriveMemberPaths.js';
 
 function parseEnvBool(raw, defaultValue = true) {
   const value = String(raw ?? '').trim().toLowerCase();
@@ -12,8 +14,13 @@ export function isVaultOneDriveOffered() {
   return parseEnvBool(process.env.PHOTOALBUMS_ONE_DRIVE, true);
 }
 
-/** Local USB bridge — disabled by default; set PHOTOALBUMS_LOCAL_USB=true to offer in Step 2 UI. */
+/**
+ * Local USB bridge /myPhotoAlbums right panel.
+ * Prefer RIGHT_SIDE=USB | None when set; else PHOTOALBUMS_LOCAL_USB (default false).
+ */
 export function isVaultLocalUsbOffered() {
+  const rightSideUsb = isRightSideUsb();
+  if (rightSideUsb != null) return rightSideUsb;
   return parseEnvBool(process.env.PHOTOALBUMS_LOCAL_USB, false);
 }
 

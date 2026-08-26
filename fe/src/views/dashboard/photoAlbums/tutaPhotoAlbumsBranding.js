@@ -26,6 +26,12 @@ export function tutaPhotoAlbumsStorageStripColor(storageType) {
 export const TUTAPHOTOALBUMS_ONEDRIVE_WORKSPACE_TITLE = 'TutaPhotoAlbums on OneDrive';
 export const TUTAPHOTOALBUMS_USB_WORKSPACE_TITLE = 'TutaPhotoAlbums on USB';
 
+/** LEFT_SIDE=TutaDrive — centered cloud gate (matches TutaNotes). */
+export const TUTAPHOTOALBUMS_TUTADRIVE_WORKSPACE_TITLE = 'TutaPhotoAlbums on TutaDrive';
+export const TUTAPHOTOALBUMS_TUTADRIVE_LOGIN_TITLE = 'TutaPhotoAlbums';
+export const TUTAPHOTOALBUMS_TUTADRIVE_OPEN_LABEL = 'Open TutaDrive Cloud';
+export const TUTAPHOTOALBUMS_TUTADRIVE_STRIP_COLOR = '#4A90D9';
+
 /** Volume name only — radio rows append " (vault, 61.9 GB, EXFAT)". */
 export function shortUsbVolumeName(label) {
   const raw = String(label || '').trim();

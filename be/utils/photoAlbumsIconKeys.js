@@ -144,9 +144,16 @@ export async function deriveVaultKeyFromIconSecret(secret, options = {}) {
 
 export function getPhotoAlbumsEnvSecret(storageType) {
   const normalizedType = String(storageType || '').trim().toLowerCase();
-  const envName = normalizedType === 'onedrive' ? 'TEMPKEY_ONEDRIVE' : normalizedType === 'usb' ? 'TEMPKEY_USB' : '';
+  // TutaDrive reuses OneDrive env key slot (or TEMPKEY_TUTADRIVE when set).
+  let envName = '';
+  if (normalizedType === 'onedrive' || normalizedType === 'tutadrive') {
+    const tuta = String(process.env.TEMPKEY_TUTADRIVE ?? '').trim();
+    envName = tuta ? 'TEMPKEY_TUTADRIVE' : 'TEMPKEY_ONEDRIVE';
+  } else if (normalizedType === 'usb') {
+    envName = 'TEMPKEY_USB';
+  }
   if (!envName) {
-    throw new Error('Record Vault storage type must be onedrive or usb');
+    throw new Error('Photo Albums storage type must be onedrive, tutadrive, or usb');
   }
   const secret = String(process.env[envName] ?? '').trim();
   if (!secret) {

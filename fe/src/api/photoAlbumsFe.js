@@ -766,9 +766,13 @@ export async function fetchPhotoAlbumsStorageConfig() {
   const mapChoice = (choice) => ({
     visible: choice?.visible === true,
     oauthConfigured: Boolean(choice?.oauthConfigured),
-    enabled: Boolean(choice?.enabled)
+    enabled: Boolean(choice?.enabled),
+    tutaDrive: Boolean(choice?.tutaDrive)
   });
   return {
+    leftSide: data?.leftSide != null ? String(data.leftSide) : undefined,
+    tutaDrive: Boolean(data?.tutaDrive),
+    rightSide: data?.rightSide != null ? String(data.rightSide) : undefined,
     oneDrive: mapChoice(data?.oneDrive),
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
@@ -782,6 +786,31 @@ export async function fetchPhotoAlbumsStorageConfig() {
       win: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.win, 'win')
     }
   };
+}
+
+export async function fetchPhotoAlbumsTutaDriveStatus() {
+  const { data } = await api.get('/api/photoAlbums/tutadrive/status');
+  return data;
+}
+
+export async function unlockPhotoAlbumsTutaDrive() {
+  const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
+  return data;
+}
+
+export async function formatPhotoAlbumsTutaDrive() {
+  const { data } = await api.post('/api/photoAlbums/tutadrive/format');
+  return data;
+}
+
+export async function initPhotoAlbumsTutaDrive() {
+  const { data } = await api.post('/api/photoAlbums/tutadrive/init');
+  return data;
+}
+
+export async function logoffPhotoAlbumsTutaDrive() {
+  const { data } = await api.post('/api/photoAlbums/tutadrive/logoff');
+  return data;
 }
 
 /** Download USB Bridge installer via API (reads USB_DMG_EXE on server). */

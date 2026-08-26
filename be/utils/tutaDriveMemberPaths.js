@@ -9,6 +9,12 @@ import {
   vaultRootOnMount
 } from './recordVaultUsb/vaultPaths.js';
 import { oneDriveStagingMountPath } from './recordVaultOneDriveStagingRoot.js';
+import { oneDriveStagingMountPath as photoAlbumsOneDriveStagingMountPath } from './photoAlbumsOneDriveStagingRoot.js';
+import {
+  ensureVaultLayoutDirs as ensurePhotoAlbumsVaultLayoutDirs,
+  vaultHasDbFile as photoAlbumsVaultHasDbFile,
+  vaultRootOnMount as photoAlbumsVaultRootOnMount
+} from './photoAlbumsUsb/vaultPaths.js';
 import { ensurePathWritableOrThrow } from './appStorageFolderPerms.js';
 
 /** LEFT_SIDE=OneDrive (default) | TutaDrive | None */
@@ -218,4 +224,82 @@ export function wipeTutaDriveMemberVault(memberId) {
   }
   // Recreate empty layout (notes + photos dirs stay)
   ensureTutaDriveMemberLayout(memberId);
+}
+
+/** Vault mount = ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/photoalbums */
+export function tutaDrivePhotoAlbumsMountPath(memberId) {
+  return path.join(tutaDriveMemberRoot(memberId), 'photoalbums');
+}
+
+/**
+ * One-time: copy leftover Photo Albums OneDrive staging → TutaDrive photoalbums vault.
+ */
+export function migrateLegacyPhotoAlbumsStagingToTutaDrive(singlesId, memberId) {
+  const albumsMount = tutaDrivePhotoAlbumsMountPath(memberId);
+  if (photoAlbumsVaultHasDbFile(albumsMount)) {
+    return { migrated: false, reason: 'dest_has_vault' };
+  }
+
+  const stagingMount = photoAlbumsOneDriveStagingMountPath(singlesId);
+  const stagingVault = photoAlbumsVaultRootOnMount(stagingMount);
+  if (
+    !photoAlbumsVaultHasDbFile(stagingMount) &&
+    !fs.existsSync(path.join(stagingVault, 'vault.meta.json'))
+  ) {
+    return { migrated: false, reason: 'no_staging_vault' };
+  }
+  if (!fs.existsSync(stagingVault)) {
+    return { migrated: false, reason: 'no_staging_vault' };
+  }
+
+  const destVault = photoAlbumsVaultRootOnMount(albumsMount);
+  fs.mkdirSync(destVault, { recursive: true });
+  fs.cpSync(stagingVault, destVault, { recursive: true, force: true });
+  console.info(
+    `[tutaDrive/photoAlbums] migrated OneDrive staging singles_id=${singlesId} → ${destVault}`
+  );
+  return { migrated: true, from: stagingVault, to: destVault };
+}
+
+/**
+ * Ensure per-member Photo Albums TutaDrive tree:
+ *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/photoalbums/TutaPhotoAlbums/…
+ */
+export function ensureTutaDrivePhotoAlbumsLayout(memberId, options = {}) {
+  const singlesId = options?.singlesId != null ? Number(options.singlesId) : null;
+  const albumsMount = tutaDrivePhotoAlbumsMountPath(memberId);
+  const memberRoot = tutaDriveMemberRoot(memberId);
+
+  ensurePathWritableOrThrow(memberRoot, {
+    route: 'ensureTutaDrivePhotoAlbumsLayout',
+    singlesId: Number.isFinite(singlesId) ? singlesId : undefined
+  });
+  fs.mkdirSync(albumsMount, { recursive: true });
+  ensurePhotoAlbumsVaultLayoutDirs(albumsMount);
+  ensurePathWritableOrThrow(albumsMount, { route: 'ensureTutaDrivePhotoAlbumsLayout:mount' });
+
+  if (Number.isFinite(singlesId) && singlesId >= 1) {
+    try {
+      migrateLegacyPhotoAlbumsStagingToTutaDrive(singlesId, memberId);
+      ensurePhotoAlbumsVaultLayoutDirs(albumsMount);
+    } catch (err) {
+      console.warn('[tutaDrive/photoAlbums] staging migrate skipped:', err?.message || err);
+    }
+  }
+
+  return {
+    albumsMount,
+    vaultRoot: photoAlbumsVaultRootOnMount(albumsMount),
+    memberRoot,
+    memberFolder: memberFolderName(memberId)
+  };
+}
+
+export function wipeTutaDrivePhotoAlbumsVault(memberId) {
+  const albumsMount = tutaDrivePhotoAlbumsMountPath(memberId);
+  const vaultRoot = photoAlbumsVaultRootOnMount(albumsMount);
+  if (fs.existsSync(vaultRoot)) {
+    fs.rmSync(vaultRoot, { recursive: true, force: true });
+  }
+  ensureTutaDrivePhotoAlbumsLayout(memberId);
 }

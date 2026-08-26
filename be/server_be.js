@@ -334,6 +334,13 @@ import {
 } from './routes/photoAlbums/photoAlbumsOneDriveRoutes.js';
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
+  formatPhotoAlbumsTutaDrive,
+  getPhotoAlbumsTutaDriveStatus,
+  initPhotoAlbumsTutaDrive,
+  logoffPhotoAlbumsTutaDrive,
+  unlockPhotoAlbumsTutaDrive
+} from './routes/photoAlbums/photoAlbumsTutaDriveRoutes.js';
+import {
   deletePhotoAlbumsMobileUploadFile,
   getPhotoAlbumsMobileUploadFile,
   listPhotoAlbumsMobileUploadFiles
@@ -1545,6 +1552,11 @@ app.post('/api/photoAlbums/usb/logoff', requireAuth, logoffPhotoAlbumsUsb);
 app.post('/api/photoAlbums/usb/init', requireAuth, initPhotoAlbumsUsb);
 app.post('/api/photoAlbums/usb/format', requireAuth, formatPhotoAlbumsUsb);
 app.get('/api/photoAlbums/storage/config', requireAuth, getPhotoAlbumsStorageConfig);
+app.get('/api/photoAlbums/tutadrive/status', requireAuth, getPhotoAlbumsTutaDriveStatus);
+app.post('/api/photoAlbums/tutadrive/unlock', requireAuth, unlockPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/init', requireAuth, initPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/format', requireAuth, formatPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/logoff', requireAuth, logoffPhotoAlbumsTutaDrive);
 app.get('/api/photoAlbums/mobile-upload/files', requireAuth, listPhotoAlbumsMobileUploadFiles);
 app.get('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, getPhotoAlbumsMobileUploadFile);
 app.delete('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, deletePhotoAlbumsMobileUploadFile);
