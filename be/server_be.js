@@ -228,10 +228,15 @@ import {
   unlockRecordVaultOneDrive
 } from './routes/recordVault/recordVaultOneDriveRoutes.js';
 import {
+  downloadRecordVaultTutaDriveBackupZip,
+  downloadRecordVaultTutaDriveStoredBackup,
   formatRecordVaultTutaDrive,
+  getRecordVaultTutaDriveBackupStatus,
   getRecordVaultTutaDriveStatus,
   initRecordVaultTutaDrive,
   logoffRecordVaultTutaDrive,
+  restoreRecordVaultTutaDriveBackupZip,
+  storeRecordVaultTutaDriveBackup,
   unlockRecordVaultTutaDrive
 } from './routes/recordVault/recordVaultTutaDriveRoutes.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
@@ -1492,6 +1497,11 @@ app.post('/api/recordVault/tutadrive/unlock', requireAuth, unlockRecordVaultTuta
 app.post('/api/recordVault/tutadrive/init', requireAuth, initRecordVaultTutaDrive);
 app.post('/api/recordVault/tutadrive/format', requireAuth, formatRecordVaultTutaDrive);
 app.post('/api/recordVault/tutadrive/logoff', requireAuth, logoffRecordVaultTutaDrive);
+app.get('/api/recordVault/tutadrive/backup-zip', requireAuth, downloadRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutadrive/backup', requireAuth, storeRecordVaultTutaDriveBackup);
+app.get('/api/recordVault/tutadrive/backup', requireAuth, downloadRecordVaultTutaDriveStoredBackup);
+app.get('/api/recordVault/tutadrive/backup/status', requireAuth, getRecordVaultTutaDriveBackupStatus);
+app.post('/api/recordVault/tutadrive/restore-zip', requireAuth, restoreRecordVaultTutaDriveBackupZip);
 
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----
 app.use('/api/photoAlbums', ...photoAlbumsTransferMeterStack);

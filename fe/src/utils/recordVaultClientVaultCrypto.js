@@ -118,6 +118,58 @@ export async function decryptBytesWithKey(payloadB64, key) {
   return aesGcmDecryptBytes(payloadB64, key);
 }
 
+/** Magic for TutaDrive member backups sealed with Encrypt Password (DEK). */
+export const TUTADRIVE_BACKUP_MAGIC = new TextEncoder().encode('TNBAK1');
+
+/**
+ * Seal a vault zip with the in-tab Encrypt Password DEK (zero-knowledge — password never leaves browser).
+ * Output: TNBAK1 | version(1) | iv(12) | ciphertext+tag
+ */
+export async function sealTutaDriveBackupZipWithDek(plainZipBytes, dek) {
+  if (!dek) throw new Error('Encrypt Password session required to seal backup');
+  const bytes = plainZipBytes instanceof Uint8Array ? plainZipBytes : new Uint8Array(plainZipBytes);
+  const iv = randomBytes(IV_LEN);
+  const cipherBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8 },
+    dek,
+    bytes
+  );
+  const cipher = new Uint8Array(cipherBuf);
+  const out = new Uint8Array(TUTADRIVE_BACKUP_MAGIC.length + 1 + IV_LEN + cipher.length);
+  out.set(TUTADRIVE_BACKUP_MAGIC, 0);
+  out[TUTADRIVE_BACKUP_MAGIC.length] = VAULT_E2E_CRYPTO_VERSION;
+  out.set(iv, TUTADRIVE_BACKUP_MAGIC.length + 1);
+  out.set(cipher, TUTADRIVE_BACKUP_MAGIC.length + 1 + IV_LEN);
+  return out;
+}
+
+/** Unseal TNBAK1 backup with Encrypt Password DEK → plaintext zip bytes. */
+export async function unsealTutaDriveBackupZipWithDek(sealedBytes, dek) {
+  if (!dek) throw new Error('Encrypt Password session required to open backup');
+  const bytes = sealedBytes instanceof Uint8Array ? sealedBytes : new Uint8Array(sealedBytes);
+  const magicLen = TUTADRIVE_BACKUP_MAGIC.length;
+  if (bytes.length < magicLen + 1 + IV_LEN + TAG_LEN) {
+    throw new Error('Backup file is corrupt or not an Encrypt Password sealed backup');
+  }
+  for (let i = 0; i < magicLen; i += 1) {
+    if (bytes[i] !== TUTADRIVE_BACKUP_MAGIC[i]) {
+      throw new Error('Backup file is not sealed with Encrypt Password (missing TNBAK1 header)');
+    }
+  }
+  const iv = bytes.subarray(magicLen + 1, magicLen + 1 + IV_LEN);
+  const data = bytes.subarray(magicLen + 1 + IV_LEN);
+  try {
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8 },
+      dek,
+      data
+    );
+    return new Uint8Array(plainBuf);
+  } catch {
+    throw new Error('Unable to decrypt backup — wrong Encrypt Password or corrupt file');
+  }
+}
+
 /** Generate random DEK (extractable so we can wrap it with KEK). */
 export async function generateDek() {
   const raw = randomBytes(DEK_LEN);

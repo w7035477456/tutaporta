@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
+import PropTypes from 'prop-types';
 import Stack from '@mui/material/Stack';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import GreenButton from 'ui-component/GreenButton';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import {
+  createRecordVaultTutaDriveEncryptedBackup,
   downloadRecordVaultOneDriveBackupZip,
+  fetchRecordVaultTutaDriveBackupStatus,
   formatRecordVaultOneDrive,
-  restoreRecordVaultOneDriveBackupZip
+  formatRecordVaultTutaDrive,
+  restoreRecordVaultOneDriveBackupZip,
+  restoreRecordVaultTutaDriveEncryptedBackup
 } from 'api/recordVaultFe';
 import RecordVaultOneDriveVaultTreePanel from './RecordVaultOneDriveVaultTreePanel';
 import {
@@ -104,6 +109,7 @@ export default function RecordVaultOneDriveBackupDialog({
   open,
   onClose,
   folderName = 'onlinemallwebsitevault',
+  tutaDrive = false,
   onFormatted,
   onRestored,
   onOpenMyNote
@@ -114,11 +120,38 @@ export default function RecordVaultOneDriveBackupDialog({
   const [success, setSuccess] = useState('');
   const [successTone, setSuccessTone] = useState('');
   const [treeRefreshToken, setTreeRefreshToken] = useState(0);
+  const [storedBackupLabel, setStoredBackupLabel] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setTreeRefreshToken((value) => value + 1);
-  }, [open]);
+    if (!tutaDrive) {
+      setStoredBackupLabel('');
+      return undefined;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await fetchRecordVaultTutaDriveBackupStatus();
+        const current = status?.backups?.[0];
+        if (cancelled) return;
+        if (current?.fileName) {
+          const mb =
+            Number(current.sizeBytes) > 0
+              ? (Number(current.sizeBytes) / (1024 * 1024)).toFixed(1)
+              : '';
+          setStoredBackupLabel(mb ? `${current.fileName} (${mb}mb)` : String(current.fileName));
+        } else {
+          setStoredBackupLabel('');
+        }
+      } catch {
+        if (!cancelled) setStoredBackupLabel('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tutaDrive]);
 
   const resetMessages = () => {
     setError('');
@@ -140,14 +173,27 @@ export default function RecordVaultOneDriveBackupDialog({
     resetMessages();
     setBusy(true);
     try {
-      const result = await downloadRecordVaultOneDriveBackupZip();
-      const fileName = result?.fileName || 'onlinemallwebsitevault-backup.zip';
-      const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
-      const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
-      setSuccess(
-        `Backup to zip completed. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
-      );
-      setSuccessTone('backup');
+      if (tutaDrive) {
+        const result = await createRecordVaultTutaDriveEncryptedBackup();
+        const fileName = result?.fileName || 'backup.zip';
+        const rel = result?.relativePath || fileName;
+        const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
+        const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
+        setStoredBackupLabel(fileName + (sizeLabel ? ` (${sizeLabel})` : ''));
+        setSuccess(
+          `Backup sealed with your Encrypt Password and saved as ${rel}${sizeText}. Only one backup is kept — this replaced any previous backup_*.zip.`
+        );
+        setSuccessTone('backup');
+      } else {
+        const result = await downloadRecordVaultOneDriveBackupZip();
+        const fileName = result?.fileName || 'onlinemallwebsitevault-backup.zip';
+        const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
+        const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
+        setSuccess(
+          `Backup to zip completed. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
+        );
+        setSuccessTone('backup');
+      }
       refreshVaultTree();
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Backup failed');
@@ -156,24 +202,18 @@ export default function RecordVaultOneDriveBackupDialog({
     }
   };
 
-  const handleRestoreClick = () => {
-    if (busy) return;
-    resetMessages();
-    fileInputRef.current?.click();
-  };
-
-  const handleRestoreFile = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
+  const handleTutaDriveRestoreFromStored = async () => {
+    const ok = await themedConfirm(
+      'Restore the Encrypt Password sealed backup from your member folder?\n\nThis replaces your current TutaDrive vault. You will need to open TutaNotes again afterward.'
+    );
+    if (!ok) return;
     resetMessages();
     setBusy(true);
     try {
-      const result = await restoreRecordVaultOneDriveBackupZip(file);
+      const result = await restoreRecordVaultTutaDriveEncryptedBackup();
       const count = Number(result?.restoredFiles) || 0;
       setSuccess(
-        `Restored ${count} file${count === 1 ? '' : 's'} to OneDrive (${folderName}). Open MyNote again with your Encrypt Password to load the restored notes.`
+        `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
       );
       setSuccessTone('general');
       refreshVaultTree();
@@ -185,20 +225,72 @@ export default function RecordVaultOneDriveBackupDialog({
     }
   };
 
+  const handleRestoreClick = () => {
+    if (busy) return;
+    resetMessages();
+    if (tutaDrive) {
+      void handleTutaDriveRestoreFromStored();
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleRestoreFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    resetMessages();
+    setBusy(true);
+    try {
+      if (tutaDrive) {
+        const result = await restoreRecordVaultTutaDriveEncryptedBackup(file);
+        const count = Number(result?.restoredFiles) || 0;
+        setSuccess(
+          `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
+        );
+        setSuccessTone('general');
+        refreshVaultTree();
+        await onRestored?.(result);
+      } else {
+        const result = await restoreRecordVaultOneDriveBackupZip(file);
+        const count = Number(result?.restoredFiles) || 0;
+        setSuccess(
+          `Restored ${count} file${count === 1 ? '' : 's'} to OneDrive (${folderName}). Open MyNote again with your Encrypt Password to load the restored notes.`
+        );
+        setSuccessTone('general');
+        refreshVaultTree();
+        await onRestored?.(result);
+      }
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Restore failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleFormat = async () => {
     if (busy) return;
     const ok = await themedConfirm(
-      `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with sample Notebook 1 / NOTE 1. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
+      tutaDrive
+        ? `Format TutaDrive vault?\n\nThis deletes notes under your member notes/TutaNotes folder. Photos folder is kept.\n\nBack up first if you want to keep your current notes.`
+        : `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with sample Notebook 1 / NOTE 1. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
     );
     if (!ok) return;
 
     resetMessages();
     setBusy(true);
     try {
-      await formatRecordVaultOneDrive();
-      setSuccess(
-        `Formatted ${folderName} on OneDrive. Open TutaNotes again to see sample Notebook 1 / NOTE 1.`
-      );      setSuccessTone('general');
+      if (tutaDrive) {
+        await formatRecordVaultTutaDrive();
+        setSuccess('Formatted TutaDrive vault. Open TutaNotes again to create a fresh vault.');
+      } else {
+        await formatRecordVaultOneDrive();
+        setSuccess(
+          `Formatted ${folderName} on OneDrive. Open TutaNotes again to see sample Notebook 1 / NOTE 1.`
+        );
+      }
+      setSuccessTone('general');
       refreshVaultTree();
       onFormatted?.();
     } catch (err) {
@@ -210,34 +302,40 @@ export default function RecordVaultOneDriveBackupDialog({
 
   return (
     <>
-      <BusyHourglassOverlay open={open && busy} label="Working on OneDrive backup" fontSize={BUSY_HOURGLASS_MODAL_SIZE} />
+      <BusyHourglassOverlay
+        open={open && busy}
+        label={tutaDrive ? 'Working on TutaDrive backup' : 'Working on OneDrive backup'}
+        fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+      />
       <input
         ref={fileInputRef}
         type="file"
-        accept=".zip,application/zip"
+        accept={tutaDrive ? '.zip,application/octet-stream,application/zip' : '.zip,application/zip'}
         hidden
         onChange={(event) => void handleRestoreFile(event)}
       />
-      <ColorTemplate16PopupCenterWide
-        open={open}
-        onClose={handleClose}
-        closeOnBackdrop={!busy}
-      >
+      <ColorTemplate16PopupCenterWide open={open} onClose={handleClose} closeOnBackdrop={!busy}>
         <ColorTemplate16PopupCenterWide.Title>
           Backup &amp; Restore TutaNotes Cloud
         </ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
-            You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You
-            can also Restore from it back to OneDrive (overwrite OneDrive).
+            {tutaDrive
+              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/backup_YYYY-MM-DD.zip. Each new backup replaces the previous one.'
+              : 'You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You can also Restore from it back to OneDrive (overwrite OneDrive).'}
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
-            If you do not want to store your data on OneDrive, before you select the &quot;Format TutaNotes Cloud&quot;
-            button below, backup all your data first to a zip file on your storage. Click Backup TutaNotes Cloud. Once you
-            have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to
-            restore your backup to OneDrive, choose Restore TutaNotes Cloud below.
+            {tutaDrive
+              ? 'Sealing uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Only one backup_*.zip is kept. Before Format, run Backup first if you need to keep your notes.'
+              : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup TutaNotes Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore TutaNotes Cloud below.'}
           </Box>
+
+          {tutaDrive && storedBackupLabel ? (
+            <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
+              Current backup on TutaDrive: {storedBackupLabel}
+            </ColorTemplate16PopupCenterWide.SectionDescription>
+          ) : null}
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
 
@@ -288,15 +386,27 @@ export default function RecordVaultOneDriveBackupDialog({
             )
           ) : null}
 
-          <Box sx={vaultTreeSectionSx}>
-            <RecordVaultOneDriveVaultTreePanel
-              active={open}
-              refreshToken={treeRefreshToken}
-              maxHeight="22vh"
-            />
-          </Box>
+          {!tutaDrive ? (
+            <Box sx={vaultTreeSectionSx}>
+              <RecordVaultOneDriveVaultTreePanel
+                active={open}
+                refreshToken={treeRefreshToken}
+                maxHeight="22vh"
+              />
+            </Box>
+          ) : null}
         </ColorTemplate16PopupCenterWide.Body>
       </ColorTemplate16PopupCenterWide>
     </>
   );
 }
+
+RecordVaultOneDriveBackupDialog.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  folderName: PropTypes.string,
+  tutaDrive: PropTypes.bool,
+  onFormatted: PropTypes.func,
+  onRestored: PropTypes.func,
+  onOpenMyNote: PropTypes.func
+};

@@ -7684,18 +7684,27 @@ export default function PhotoAlbumsWorkspacePane({
               boxSizing: 'border-box'
             }}
           >
-            {/* Section 1 — File / menus / backup / mobile */}
+            {/* Section 1 — File / menus (row 1) + Backup/Restore / Mobile Upload (row 2) */}
             <Box
               sx={{
                 flex: '1 1 0',
                 minWidth: 0,
                 display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: 0.5,
+                flexDirection: 'column',
+                alignItems: 'stretch',
+                gap: 0.35,
                 py: 0.25
               }}
             >
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  minWidth: 0
+                }}
+              >
               {!compareMode ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <PhotoAlbumsFileMenu
@@ -7789,7 +7798,19 @@ export default function PhotoAlbumsWorkspacePane({
                   )}
                 </SliderControlButton>
               </Box>
-              {!compareMode && paneStorageType === 'onedrive' && oneDriveOffered ? (
+              </Box>
+
+              {!compareMode ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  minWidth: 0
+                }}
+              >
+              {paneStorageType === 'onedrive' && oneDriveOffered ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
                     type="button"
@@ -7799,15 +7820,15 @@ export default function PhotoAlbumsWorkspacePane({
                       setOneDriveBackupOpen(true);
                     }}
                     disabled={busy}
-                    aria-label="Back/Rest OneDrive"
-                    title="Backup / Restore OneDrive"
+                    aria-label="Backup/Restore"
+                    title="Backup / Restore"
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
-                    {menuLabelsCompact ? 'BR' : 'Back/Rest OneDrive'}
+                    {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
                   </SliderControlButton>
                 </Box>
               ) : null}
-              {!compareMode && paneStorageType === 'usb' ? (
+              {paneStorageType === 'usb' ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
                     type="button"
@@ -7817,15 +7838,15 @@ export default function PhotoAlbumsWorkspacePane({
                       setUsbBackupOpen(true);
                     }}
                     disabled={busy}
-                    aria-label="Backup/Restore USB"
-                    title="Backup / Restore USB"
+                    aria-label="Backup/Restore"
+                    title="Backup / Restore"
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
-                    {menuLabelsCompact ? 'BR' : 'Backup/Restore USB'}
+                    {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
                   </SliderControlButton>
                 </Box>
               ) : null}
-              {!compareMode && row2ShowsMobileUpload ? (
+              {row2ShowsMobileUpload ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
                     type="button"
@@ -7844,7 +7865,7 @@ export default function PhotoAlbumsWorkspacePane({
                   </SliderControlButton>
                 </Box>
               ) : null}
-              {!compareMode && canEnterCompare ? (
+              {canEnterCompare ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
                     type="button"
@@ -7861,6 +7882,8 @@ export default function PhotoAlbumsWorkspacePane({
                     {menuLabelsCompact ? '<=>' : 'OneDrive↔USB'}
                   </SliderControlButton>
                 </Box>
+              ) : null}
+              </Box>
               ) : null}
             </Box>
 

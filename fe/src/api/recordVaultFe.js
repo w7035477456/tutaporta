@@ -986,6 +986,65 @@ export async function downloadRecordVaultOneDriveBackupZip() {
   }
 }
 
+/**
+ * TutaDrive backup: zip vault → seal with Encrypt Password DEK in-browser →
+ * store as users/M{id}/backup_YYYY-MM-DD.zip (replaces any prior backup_*).
+ */
+export async function createRecordVaultTutaDriveEncryptedBackup() {
+  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+  const { sealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  if (!isRecordVaultE2eUnlocked()) {
+    throw new Error('Unlock with your Encrypt Password first, then run Backup again');
+  }
+  const dek = getRecordVaultE2eDek();
+  const zipResponse = await api.get('/api/recordVault/tutadrive/backup-zip', { responseType: 'blob' });
+  const zipBuf = new Uint8Array(await zipResponse.data.arrayBuffer());
+  const sealed = await sealTutaDriveBackupZipWithDek(zipBuf, dek);
+  const formData = new FormData();
+  formData.append(
+    'backup',
+    new Blob([sealed], { type: 'application/octet-stream' }),
+    'backup.zip'
+  );
+  const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return data;
+}
+
+export async function fetchRecordVaultTutaDriveBackupStatus() {
+  const { data } = await api.get('/api/recordVault/tutadrive/backup/status');
+  return data;
+}
+
+/** Download sealed backup, unseal with Encrypt Password DEK, restore vault on server. */
+export async function restoreRecordVaultTutaDriveEncryptedBackup(file) {
+  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+  const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  if (!isRecordVaultE2eUnlocked()) {
+    throw new Error('Unlock with your Encrypt Password first, then run Restore again');
+  }
+  const dek = getRecordVaultE2eDek();
+  let sealedBytes;
+  if (file) {
+    sealedBytes = new Uint8Array(await file.arrayBuffer());
+  } else {
+    const response = await api.get('/api/recordVault/tutadrive/backup', { responseType: 'blob' });
+    sealedBytes = new Uint8Array(await response.data.arrayBuffer());
+  }
+  const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek);
+  const formData = new FormData();
+  formData.append(
+    'backup',
+    new Blob([plainZip], { type: 'application/zip' }),
+    'TutaNotes-restore.zip'
+  );
+  const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return data;
+}
+
 /** Zip the unlocked USB `.recordvault` folder and save to the browser download folder. */
 export async function downloadRecordVaultUsbBackupZip() {
   try {

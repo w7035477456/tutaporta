@@ -6239,6 +6239,7 @@ export default function RecordVaultWorkspacePane({
         open={oneDriveBackupOpen}
         onClose={() => setOneDriveBackupOpen(false)}
         folderName={oneDriveVaultFolderName}
+        tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
         onOpenMyNote={() => setOneDriveBackupOpen(false)}
         onRestored={() => void handleOneDriveVaultRestored()}
       />
@@ -6551,10 +6552,11 @@ export default function RecordVaultWorkspacePane({
                         fullWidth
                         onClick={() => setOneDriveBackupOpen(true)}
                         disabled={busy}
-                        aria-label="Back/Rest OneDrive"
+                        aria-label="Backup/Restore"
+                        title="Backup / Restore"
                         sx={headerFullWidthButtonSx}
                       >
-                        Back/Rest OneDrive
+                        Backup/Restore
                       </SliderControlButton>
                     </Box>
                   ) : null}

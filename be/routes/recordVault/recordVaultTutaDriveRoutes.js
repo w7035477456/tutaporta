@@ -29,6 +29,14 @@ import {
   loadMemberIdForSingles,
   wipeTutaDriveMemberVault
 } from '../../utils/tutaDriveMemberPaths.js';
+import {
+  listTutaDriveBackups,
+  readTutaDriveEncryptedBackup,
+  restoreTutaDriveVaultFromZipFile,
+  storeTutaDriveEncryptedBackup,
+  streamTutaDriveVaultBackupZip
+} from '../../utils/recordVaultTutaDriveBackup.js';
+import { parseOneDriveBackupZipUpload } from '../../utils/recordVaultOneDrive/parseOneDriveBackupZipUpload.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
 
@@ -292,5 +300,162 @@ export async function logoffRecordVaultTutaDrive(req, res) {
   } catch (err) {
     console.error('[logoffRecordVaultTutaDrive]', err?.message || err);
     return res.status(400).json({ error: err?.message || 'Logoff failed' });
+  }
+}
+
+/** GET /api/recordVault/tutadrive/backup-zip — plain vault zip for client Encrypt-Password seal. */
+export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    await streamTutaDriveVaultBackupZip(singlesId, res);
+  } catch (err) {
+    console.error('[downloadRecordVaultTutaDriveBackupZip]', err?.message || err);
+    if (!res.headersSent) {
+      return sendRecordVaultError(res, err, 'Unable to build TutaDrive backup zip', {
+        route: 'downloadRecordVaultTutaDriveBackupZip',
+        singlesId,
+        status: isStoragePermissionError(err) ? 500 : 400
+      });
+    }
+  }
+}
+
+/**
+ * POST /api/recordVault/tutadrive/backup
+ * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
+ * Stores as users/M{id}/backup_YYYY-MM-DD.zip and deletes any prior backup_*.zip.
+ */
+export async function storeRecordVaultTutaDriveBackup(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  let upload = null;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.status(400).json({ error: 'Your member number is not set; cannot store backup.' });
+    }
+    upload = await parseOneDriveBackupZipUpload(req);
+    const encrypted = fs.readFileSync(upload.zipPath);
+    const stored = storeTutaDriveEncryptedBackup(memberId, encrypted);
+    return res.json({
+      success: true,
+      ...stored,
+      message: `Backup saved (Encrypt Password sealed). Only one backup is kept; previous backup was replaced.`
+    });
+  } catch (err) {
+    console.error('[storeRecordVaultTutaDriveBackup]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to store TutaDrive backup', {
+      route: 'storeRecordVaultTutaDriveBackup',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  } finally {
+    if (upload?.tmpDir) {
+      try {
+        fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+/** GET /api/recordVault/tutadrive/backup — download the sealed backup file (if any). */
+export async function downloadRecordVaultTutaDriveStoredBackup(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.status(400).json({ error: 'Your member number is not set' });
+    }
+    const current = readTutaDriveEncryptedBackup(memberId);
+    if (!current) {
+      return res.status(404).json({ error: 'No TutaDrive backup found' });
+    }
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${current.fileName}"`);
+    res.setHeader('Content-Length', String(current.data.length));
+    return res.end(current.data);
+  } catch (err) {
+    console.error('[downloadRecordVaultTutaDriveStoredBackup]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to read TutaDrive backup', {
+      route: 'downloadRecordVaultTutaDriveStoredBackup',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  }
+}
+
+/** GET /api/recordVault/tutadrive/backup/status — list current single backup. */
+export async function getRecordVaultTutaDriveBackupStatus(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.json({ enabled: false, backups: [] });
+    }
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.json({ enabled: true, backups: [], memberId: null });
+    }
+    ensureTutaDriveMemberLayout(memberId, { singlesId });
+    const backups = listTutaDriveBackups(memberId).map(({ fileName, sizeBytes, mtimeMs, absPath }) => ({
+      fileName,
+      sizeBytes,
+      mtimeMs,
+      absPath
+    }));
+    return res.json({ enabled: true, memberId, backups });
+  } catch (err) {
+    console.error('[getRecordVaultTutaDriveBackupStatus]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to read backup status', {
+      route: 'getRecordVaultTutaDriveBackupStatus',
+      singlesId,
+      status: 400
+    });
+  }
+}
+
+/**
+ * POST /api/recordVault/tutadrive/restore-zip
+ * Multipart field `backup` = plaintext vault zip (client already decrypted with Encrypt Password).
+ */
+export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  let upload = null;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    upload = await parseOneDriveBackupZipUpload(req);
+    const result = await restoreTutaDriveVaultFromZipFile(singlesId, upload.zipPath);
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[restoreRecordVaultTutaDriveBackupZip]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to restore TutaDrive backup', {
+      route: 'restoreRecordVaultTutaDriveBackupZip',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  } finally {
+    if (upload?.tmpDir) {
+      try {
+        fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
   }
 }
