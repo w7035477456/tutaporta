@@ -244,6 +244,7 @@ import {
 } from './routes/recordVault/recordVaultUsageRoutes.js';
 import {
   buildVaultStorageChoice,
+  isVaultLocalUsbOffered,
   isVaultOneDriveOffered
 } from './utils/recordVaultStorageFlags.js';
 import {
@@ -1024,9 +1025,10 @@ app.get('/api/publicConfig', (_req, res) => {
     onenoteUsbUpgrade: ['true', '1', 'yes', 'on'].includes(
       String(process.env.ONENOTE_USB_UPGRADE ?? '').trim().toLowerCase()
     ),
-    // TutaNotes left panel: OneDrive | TutaDrive (LEFT_SIDE in ~/.ssh/be/.env)
+    // TutaNotes panels: LEFT_SIDE=OneDrive|TutaDrive|None, RIGHT_SIDE=USB|None (~/.ssh/be/.env)
     leftSide: getLeftSideMode(),
-    tutaDrive: isLeftSideTutaDrive()
+    tutaDrive: isLeftSideTutaDrive(),
+    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None'
   });
 });
 

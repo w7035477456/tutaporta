@@ -23,6 +23,7 @@ import { readVaultMeta, validateVaultOnMount } from '../../utils/recordVaultUsb/
 import { vaultHasDbFile, vaultMetaPath } from '../../utils/recordVaultUsb/vaultPaths.js';
 import {
   ensureTutaDriveMemberLayout,
+  getLeftSideMode,
   isLeftSideTutaDrive,
   loadMemberIdForSingles,
   wipeTutaDriveMemberVault
@@ -121,7 +122,7 @@ export async function getRecordVaultTutaDriveStatus(req, res) {
   try {
     if (!isLeftSideTutaDrive()) {
       return res.json({
-        leftSide: 'OneDrive',
+        leftSide: getLeftSideMode(),
         tutadrive: { enabled: false },
         session: { unlocked: false }
       });

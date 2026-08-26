@@ -55,7 +55,8 @@ const BE_ENV_KEYS_FROM_HOME_FILE = [
   'PROFILE_RECORDS_VIDEO_TUTORIAL',
   'TOPRIGHT_VIDEO_TUTORIAL',
   'SPEEDDATING',
-  'LEFT_SIDE'
+  'LEFT_SIDE',
+  'RIGHT_SIDE'
 ];
 
 function loadBeEnvKeysFromHomeFile() {
@@ -104,7 +105,7 @@ export default defineConfig(({ mode }) => {
       // ALBUM_ — e.g. ALBUM_BINDER_WIDTH_PCT (see config/albumBinderWidthEnv.js)
       // ALL_SINGLES_ / PICKS_ / ACQUAINT*_ / MYALBUM_ / … — page Video Tutorials URLs (pageVideoTutorialEnv.js)
       // SPEEDDATING — sidebar Speed Dating item (speedDatingEnv.js); mirrored from ~/.ssh/be/.env
-      // LEFT_SIDE — TutaNotes left panel OneDrive | TutaDrive (leftSideEnv.js); mirrored from ~/.ssh/be/.env
+      // LEFT_SIDE / RIGHT_SIDE — TutaNotes panels (leftSideEnv.js, rightSideEnv.js); from ~/.ssh/be/.env
       envPrefix: [
       'VITE_',
       'FE_',

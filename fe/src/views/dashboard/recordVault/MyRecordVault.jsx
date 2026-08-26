@@ -35,7 +35,8 @@ import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import TutaNotesBrandTitle from './TutaNotesBrandTitle';
 import GreenButton from 'ui-component/GreenButton';
 import { GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
-import { isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
+import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
+import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import {
   TUTANOTES_CLOUD_LOGO,
@@ -293,9 +294,9 @@ function LoginScrollArea({ children }) {
 export default function MyRecordVault() {
   const { user } = useAuth();
   const [storageConfigLoaded, setStorageConfigLoaded] = useState(false);
-  const [oneDriveOffered, setOneDriveOffered] = useState(false);
+  const [oneDriveOffered, setOneDriveOffered] = useState(() => isLeftSideOfferedFromVite());
   const [tutaDriveMode, setTutaDriveMode] = useState(() => isLeftSideTutaDriveFromVite());
-  const [localUsbOffered, setLocalUsbOffered] = useState(false);
+  const [localUsbOffered, setLocalUsbOffered] = useState(() => isRightSideUsbFromVite());
   const [oneDriveUnlocked, setOneDriveUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
   const [usbVolumeLabel, setUsbVolumeLabel] = useState(
@@ -366,21 +367,36 @@ export default function MyRecordVault() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const applyLeftSide = (cfg) => {
-        if (cfg && (cfg.leftSide != null || cfg.tutaDrive != null)) {
-          setTutaDriveMode(
-            Boolean(cfg.tutaDrive) || parseLeftSideMode(cfg.leftSide) === 'TutaDrive'
-          );
+      const applyPanelSides = (cfg) => {
+        if (!cfg) {
+          setTutaDriveMode(isLeftSideTutaDriveFromVite());
+          setOneDriveOffered(isLeftSideOfferedFromVite());
+          setLocalUsbOffered(isRightSideUsbFromVite());
           return;
         }
-        setTutaDriveMode(isLeftSideTutaDriveFromVite());
+        if (cfg.leftSide != null || cfg.tutaDrive != null) {
+          const leftMode = parseLeftSideMode(cfg.leftSide);
+          setTutaDriveMode(Boolean(cfg.tutaDrive) || leftMode === 'TutaDrive');
+          if (cfg.oneDrive?.visible != null) {
+            setOneDriveOffered(Boolean(cfg.oneDrive.visible));
+          } else {
+            setOneDriveOffered(leftMode !== 'None');
+          }
+        }
+        if (cfg.rightSide != null || cfg.localUsb?.visible != null) {
+          if (cfg.localUsb?.visible != null) {
+            setLocalUsbOffered(Boolean(cfg.localUsb.visible));
+          } else {
+            setLocalUsbOffered(parseRightSideMode(cfg.rightSide) === 'USB');
+          }
+        }
       };
       try {
         // Runtime BE env (authoritative after pm2/be restart) — no auth required.
         const pubRes = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
         if (pubRes.ok) {
           const pub = await pubRes.json();
-          if (!cancelled) applyLeftSide(pub);
+          if (!cancelled) applyPanelSides(pub);
         }
       } catch {
         // keep Vite / prior value
@@ -388,13 +404,13 @@ export default function MyRecordVault() {
       try {
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
+        applyPanelSides(cfg);
         setOneDriveOffered(Boolean(cfg.oneDrive?.visible));
-        applyLeftSide(cfg);
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
       } catch {
         if (!cancelled) {
-          setOneDriveOffered(true);
-          setLocalUsbOffered(true);
+          setOneDriveOffered(isLeftSideOfferedFromVite());
+          setLocalUsbOffered(isRightSideUsbFromVite());
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
         }
       } finally {

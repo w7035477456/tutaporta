@@ -45,13 +45,19 @@ export async function getRecordVaultStorageConfig(req, res) {
   const usbBridgeInstallers = getRecordVaultBridgeInstallerUrls();
   const leftSide = getLeftSideMode();
   const tutaDrive = isLeftSideTutaDrive();
-  const oneDrive = tutaDrive
-    ? { visible: true, oauthConfigured: true, enabled: true, tutaDrive: true }
-    : buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured());
+  let oneDrive;
+  if (leftSide === 'None') {
+    oneDrive = { visible: false, oauthConfigured: false, enabled: false, tutaDrive: false };
+  } else if (tutaDrive) {
+    oneDrive = { visible: true, oauthConfigured: true, enabled: true, tutaDrive: true };
+  } else {
+    oneDrive = buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured());
+  }
 
   return res.json({
     leftSide,
     tutaDrive,
+    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
     oneDrive,
     localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
     backupUsbEnabled: isVaultBackupUsbEnabled(),

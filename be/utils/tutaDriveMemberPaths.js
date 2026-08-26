@@ -7,15 +7,42 @@ import {
   vaultRootOnMount
 } from './recordVaultUsb/vaultPaths.js';
 
-/** LEFT_SIDE=OneDrive (default) | TutaDrive */
+/** LEFT_SIDE=OneDrive (default) | TutaDrive | None */
 export function getLeftSideMode() {
   const raw = String(process.env.LEFT_SIDE ?? 'OneDrive').trim().toLowerCase();
+  if (raw === 'none' || raw === 'off' || raw === '0' || raw === 'false' || raw === 'hide') {
+    return 'None';
+  }
   if (raw === 'tutadrive' || raw === 'tuta_drive' || raw === 'tuta-drive') return 'TutaDrive';
   return 'OneDrive';
 }
 
 export function isLeftSideTutaDrive() {
   return getLeftSideMode() === 'TutaDrive';
+}
+
+export function isLeftSideOffered() {
+  return getLeftSideMode() !== 'None';
+}
+
+/**
+ * RIGHT_SIDE=USB | None — /myNote right panel.
+ * When unset, callers fall back to NOTES_LOCAL_USB (see recordVaultStorageFlags).
+ */
+export function getRightSideMode() {
+  const raw = String(process.env.RIGHT_SIDE ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  if (raw === 'none' || raw === 'off' || raw === '0' || raw === 'false' || raw === 'hide') {
+    return 'None';
+  }
+  if (raw === 'usb') return 'USB';
+  return 'USB';
+}
+
+export function isRightSideUsb() {
+  const mode = getRightSideMode();
+  if (mode == null) return null;
+  return mode === 'USB';
 }
 
 /**

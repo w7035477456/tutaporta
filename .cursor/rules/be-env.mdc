@@ -185,13 +185,15 @@ JSON_LIMIT_MB=400
 
 ```bash
 LEFT_SIDE=TutaDrive
+RIGHT_SIDE=USB
 STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
 LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
 ```
 
 | Variable | Notes |
 |----------|-------|
-| `LEFT_SIDE` | `OneDrive` (default) = left panel Microsoft OneDrive. `TutaDrive` = simplified left panel; vault under `LARGE_CHEAP_STORAGE_FOLDER`. |
+| `LEFT_SIDE` | Left panel on `/myNote`: `OneDrive` (default Microsoft OneDrive) \| `TutaDrive` (vault under `LARGE_CHEAP_STORAGE_FOLDER`) \| `None` (hide left panel). |
+| `RIGHT_SIDE` | Right panel on `/myNote`: `USB` (show USB bridge) \| `None` (hide USB). When unset, falls back to `NOTES_LOCAL_USB`. |
 | `STORAGE_FOLDER` | General app storage (photos installers, etc.). |
 | `LARGE_CHEAP_STORAGE_FOLDER` | TutaDrive member data: `{root}/users/M{member_id}/notes` and `…/photos`. Same as `STORAGE_FOLDER` for now; later point at large/slow USB RAID. Falls back to `STORAGE_FOLDER` if unset. |
 

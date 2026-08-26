@@ -1,5 +1,7 @@
 /** Env toggles for Record Vault Step 2 storage choices (~/.ssh/be/.env). */
 
+import { isRightSideUsb } from './tutaDriveMemberPaths.js';
+
 function parseEnvBool(raw, defaultValue = true) {
   const value = String(raw ?? '').trim().toLowerCase();
   if (!value) return defaultValue;
@@ -12,8 +14,13 @@ export function isVaultOneDriveOffered() {
   return parseEnvBool(process.env.NOTES_ONE_DRIVE, true);
 }
 
-/** Local USB bridge — disabled by default; set NOTES_LOCAL_USB=true to offer in Step 2 UI. */
+/**
+ * Local USB bridge /myNote right panel.
+ * Prefer RIGHT_SIDE=USB | None when set; else NOTES_LOCAL_USB (default false).
+ */
 export function isVaultLocalUsbOffered() {
+  const rightSideUsb = isRightSideUsb();
+  if (rightSideUsb != null) return rightSideUsb;
   return parseEnvBool(process.env.NOTES_LOCAL_USB, false);
 }
 
