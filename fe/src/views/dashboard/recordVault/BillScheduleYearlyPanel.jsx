@@ -330,6 +330,17 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
     '& .MuiSelect-select': { py: 0.5, px: 0.75 }
   };
 
+  // Allow ~3 years back and ~1 year ahead from today; hide arrows at the ends.
+  const nowYear = now.getFullYear();
+  const canGoPrevYear = year > nowYear - 3;
+  const canGoNextYear = year < nowYear + 1;
+
+  const shiftYear = (delta) => {
+    if (delta < 0 && !canGoPrevYear) return;
+    if (delta > 0 && !canGoNextYear) return;
+    setYear((y) => y + delta);
+  };
+
   return (
     <Box
       sx={{
@@ -351,25 +362,33 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
           ({sideLabel})
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <Box
-          component="button"
-          type="button"
-          aria-label="Previous year"
-          onClick={() => setYear((y) => y - 1)}
-          sx={navBtnSx}
-        >
-          ‹
-        </Box>
+        {canGoPrevYear ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Previous year"
+            onClick={() => shiftYear(-1)}
+            sx={navBtnSx}
+          >
+            ‹
+          </Box>
+        ) : (
+          <Box sx={{ width: 36 }} aria-hidden />
+        )}
         <Typography sx={{ fontWeight: 700, minWidth: 80, textAlign: 'center' }}>{year}</Typography>
-        <Box
-          component="button"
-          type="button"
-          aria-label="Next year"
-          onClick={() => setYear((y) => y + 1)}
-          sx={navBtnSx}
-        >
-          ›
-        </Box>
+        {canGoNextYear ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Next year"
+            onClick={() => shiftYear(1)}
+            sx={navBtnSx}
+          >
+            ›
+          </Box>
+        ) : (
+          <Box sx={{ width: 36 }} aria-hidden />
+        )}
       </Box>
 
       {!loading && rows.length === 0 && peerHasRows ? (
@@ -584,30 +603,75 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
           border: '2px solid #000',
           borderRadius: 1,
           p: 1.5,
-          flexShrink: 0
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'stretch',
+          gap: 1
         }}
       >
-        <Typography sx={{ fontWeight: 800, mb: 1, textAlign: 'center' }}>{year}</Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' },
-            gap: 1
-          }}
-        >
-          {Array.from({ length: 12 }).map((_, i) => {
-            const m = i + 1;
-            return (
-              <MiniMonthCalendar
-                key={`cal-${year}-${m}`}
-                year={year}
-                month={m}
-                marks={marksByMonth.get(m) || new Map()}
-                today={now}
-              />
-            );
-          })}
+        {canGoPrevYear ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Previous year"
+            onClick={() => shiftYear(-1)}
+            sx={{
+              ...navBtnSx,
+              alignSelf: 'center',
+              fontSize: '2rem',
+              px: 1.25,
+              py: 2,
+              flexShrink: 0
+            }}
+          >
+            ‹
+          </Box>
+        ) : (
+          <Box sx={{ width: 44, flexShrink: 0 }} aria-hidden />
+        )}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, mb: 1, textAlign: 'center' }}>{year}</Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' },
+              gap: 1
+            }}
+          >
+            {Array.from({ length: 12 }).map((_, i) => {
+              const m = i + 1;
+              return (
+                <MiniMonthCalendar
+                  key={`cal-${year}-${m}`}
+                  year={year}
+                  month={m}
+                  marks={marksByMonth.get(m) || new Map()}
+                  today={now}
+                />
+              );
+            })}
+          </Box>
         </Box>
+        {canGoNextYear ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Next year"
+            onClick={() => shiftYear(1)}
+            sx={{
+              ...navBtnSx,
+              alignSelf: 'center',
+              fontSize: '2rem',
+              px: 1.25,
+              py: 2,
+              flexShrink: 0
+            }}
+          >
+            ›
+          </Box>
+        ) : (
+          <Box sx={{ width: 44, flexShrink: 0 }} aria-hidden />
+        )}
       </Box>
 
       {paidStubOpen ? (

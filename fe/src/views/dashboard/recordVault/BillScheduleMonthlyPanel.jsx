@@ -220,21 +220,6 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
     }
   };
 
-  const shiftMonth = (delta) => {
-    let y = year;
-    let m = month + delta;
-    while (m < 1) {
-      m += 12;
-      y -= 1;
-    }
-    while (m > 12) {
-      m -= 12;
-      y += 1;
-    }
-    setYear(y);
-    setMonth(m);
-  };
-
   const calendarMarks = useMemo(() => {
     const map = new Map();
     for (const r of rows) {
@@ -252,6 +237,29 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
   const startWd = firstWeekday(year, month);
   const today = now;
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+
+  // Allow ~3 years back and ~1 year ahead from today; hide arrows at the ends.
+  const viewMonthIndex = year * 12 + (month - 1);
+  const nowMonthIndex = today.getFullYear() * 12 + today.getMonth();
+  const canGoPrevMonth = viewMonthIndex > nowMonthIndex - 36;
+  const canGoNextMonth = viewMonthIndex < nowMonthIndex + 12;
+
+  const shiftMonth = (delta) => {
+    if (delta < 0 && !canGoPrevMonth) return;
+    if (delta > 0 && !canGoNextMonth) return;
+    let y = year;
+    let m = month + delta;
+    while (m < 1) {
+      m += 12;
+      y -= 1;
+    }
+    while (m > 12) {
+      m -= 12;
+      y += 1;
+    }
+    setYear(y);
+    setMonth(m);
+  };
 
   const inputSx = {
     '& .MuiInputBase-input': {
@@ -291,15 +299,35 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
           ({sideLabel})
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <Box component="button" type="button" aria-label="Previous month" onClick={() => shiftMonth(-1)} sx={navBtnSx}>
-          ‹
-        </Box>
+        {canGoPrevMonth ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Previous month"
+            onClick={() => shiftMonth(-1)}
+            sx={navBtnSx}
+          >
+            ‹
+          </Box>
+        ) : (
+          <Box sx={{ width: 36 }} aria-hidden />
+        )}
         <Typography sx={{ fontWeight: 700, minWidth: 140, textAlign: 'center' }}>
           {MONTH_NAMES[month - 1]} {year}
         </Typography>
-        <Box component="button" type="button" aria-label="Next month" onClick={() => shiftMonth(1)} sx={navBtnSx}>
-          ›
-        </Box>
+        {canGoNextMonth ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Next month"
+            onClick={() => shiftMonth(1)}
+            sx={navBtnSx}
+          >
+            ›
+          </Box>
+        ) : (
+          <Box sx={{ width: 36 }} aria-hidden />
+        )}
       </Box>
 
       {!loading && rows.length === 0 && peerHasRows ? (
@@ -496,9 +524,45 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
           boxSizing: 'border-box'
         }}
       >
-        <Typography sx={{ fontWeight: 800, mb: 1.5, textAlign: 'center', fontSize: '1.5rem' }}>
-          {MONTH_NAMES[month - 1]} {year}
-        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1.5,
+            mb: 1.5
+          }}
+        >
+          {canGoPrevMonth ? (
+            <Box
+              component="button"
+              type="button"
+              aria-label="Previous month"
+              onClick={() => shiftMonth(-1)}
+              sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+            >
+              ‹
+            </Box>
+          ) : (
+            <Box sx={{ width: 44 }} aria-hidden />
+          )}
+          <Typography sx={{ fontWeight: 800, textAlign: 'center', fontSize: '1.5rem', minWidth: 200 }}>
+            {MONTH_NAMES[month - 1]} {year}
+          </Typography>
+          {canGoNextMonth ? (
+            <Box
+              component="button"
+              type="button"
+              aria-label="Next month"
+              onClick={() => shiftMonth(1)}
+              sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+            >
+              ›
+            </Box>
+          ) : (
+            <Box sx={{ width: 44 }} aria-hidden />
+          )}
+        </Box>
         <Box
           sx={{
             display: 'grid',
