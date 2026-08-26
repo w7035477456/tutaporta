@@ -10,6 +10,8 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PropTypes from 'prop-types';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
+import BillColumnButton from './BillColumnButton';
+import BillReceiptsPopup from './BillReceiptsPopup';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -41,6 +43,7 @@ function blankRow(rowIndex) {
     bill_type: 'Manual',
     action: null,
     paid_record_id: null,
+    has_bill_content: false,
     status: '',
     status_tone: 'none'
   };
@@ -114,7 +117,8 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
-  const [paidStubOpen, setPaidStubOpen] = useState(false);
+  const [billPopupOpen, setBillPopupOpen] = useState(false);
+  const [billEnsurePayload, setBillEnsurePayload] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const storageKey =
@@ -186,6 +190,44 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
       })
     );
     setSavedMsg('');
+  };
+
+  const openBillForRow = (row) => {
+    setBillEnsurePayload({
+      kind: 'monthly',
+      year,
+      month,
+      row_index: Number(row.row_index) || 1,
+      monthly_bill_id: row.monthly_bill_id || undefined,
+      bill_description: row.bill_description,
+      due_day: row.due_day === '' ? null : row.due_day,
+      amount: row.amount,
+      bill_type: row.bill_type,
+      action: row.action
+    });
+    setBillPopupOpen(true);
+  };
+
+  const handleBillChanged = (data) => {
+    if (!data?.paidRecordId) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (
+          (data.monthlyBillId && Number(r.monthly_bill_id) === Number(data.monthlyBillId)) ||
+          (Number(r.paid_record_id) === Number(data.paidRecordId)) ||
+          (Number(r.row_index) === Number(billEnsurePayload?.row_index) &&
+            !r.monthly_bill_id)
+        ) {
+          return {
+            ...r,
+            paid_record_id: data.paidRecordId,
+            monthly_bill_id: data.monthlyBillId || r.monthly_bill_id,
+            has_bill_content: Boolean(data.hasBillContent)
+          };
+        }
+        return r;
+      })
+    );
   };
 
   const handleAdd = () => {
@@ -389,6 +431,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
             <th>Bill Description</th>
             <th style={{ width: 88 }}>Due Date</th>
             <th style={{ width: 120 }}>Amount</th>
+            <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
             <th style={{ width: 110 }}>Type</th>
             <th style={{ width: 120 }}>Action</th>
             <th style={{ width: 110 }}>Status</th>
@@ -444,6 +487,13 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                     sx={inputSx}
                   />
                 </td>
+                <td style={{ textAlign: 'center' }}>
+                  <BillColumnButton
+                    hasContent={Boolean(row.has_bill_content)}
+                    disabled={loading || saving}
+                    onClick={() => openBillForRow(row)}
+                  />
+                </td>
                 <td style={{ background: typeActionStatusBg }}>
                   <Select
                     fullWidth
@@ -466,7 +516,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                       onChange={(e) => {
                         const next = e.target.value || null;
                         updateRow(index, { action: next });
-                        if (next === 'Paid') setPaidStubOpen(true);
+                        if (next === 'Paid') openBillForRow(row);
                       }}
                       sx={selectSx}
                       renderValue={(v) => {
@@ -514,138 +564,230 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
 
       <Box
         sx={{
-          border: '2px solid #000',
-          borderRadius: 1,
-          p: 2.5,
           flexShrink: 0,
           width: '100%',
-          maxWidth: 840,
+          maxWidth: 920,
           mx: 'auto',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'flex-start' },
+          gap: 2
         }}
       >
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1.5,
-            mb: 1.5
-          }}
-        >
-          {canGoPrevMonth ? (
-            <Box
-              component="button"
-              type="button"
-              aria-label="Previous month"
-              onClick={() => shiftMonth(-1)}
-              sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
-            >
-              ‹
-            </Box>
-          ) : (
-            <Box sx={{ width: 44 }} aria-hidden />
-          )}
-          <Typography sx={{ fontWeight: 800, textAlign: 'center', fontSize: '1.5rem', minWidth: 200 }}>
-            {MONTH_NAMES[month - 1]} {year}
-          </Typography>
-          {canGoNextMonth ? (
-            <Box
-              component="button"
-              type="button"
-              aria-label="Next month"
-              onClick={() => shiftMonth(1)}
-              sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
-            >
-              ›
-            </Box>
-          ) : (
-            <Box sx={{ width: 44 }} aria-hidden />
-          )}
-        </Box>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            gap: 1,
-            textAlign: 'center'
-          }}
-        >
-          {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-            <Typography key={d} sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-              {d}
-            </Typography>
-          ))}
-          {Array.from({ length: startWd }).map((_, i) => (
-            <Box key={`pad-${i}`} />
-          ))}
-          {Array.from({ length: dim }).map((_, i) => {
-            const day = i + 1;
-            const tone = calendarMarks.get(day);
-            const isToday = isCurrentMonth && today.getDate() === day;
-            const upcoming = tone === 'upcoming';
-            return (
-              <Box
-                key={`day-${day}`}
-                sx={{
-                  py: 1.5,
-                  borderRadius: upcoming ? '50%' : 1,
-                  fontWeight: 700,
-                  fontSize: '1.25rem',
-                  bgcolor: tone && !upcoming ? cellToneBg(tone) : 'transparent',
-                  color: tone === 'overdue' ? '#fff' : '#000',
-                  outline: upcoming
-                    ? '3px solid #000'
-                    : isToday
-                      ? `2px solid ${RED}`
-                      : 'none',
-                  outlineOffset: 1
-                }}
-              >
-                {day}
-              </Box>
-            );
-          })}
-        </Box>
-      </Box>
-
-      {paidStubOpen ? (
-        <Box
-          role="dialog"
-          aria-label="Paid record"
-          onClick={() => setPaidStubOpen(false)}
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(0,0,0,0.45)',
-            zIndex: 1400,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 2
+            flex: '1 1 auto',
+            minWidth: 0,
+            maxWidth: { sm: 520 },
+            border: '2px solid #000',
+            borderRadius: 1,
+            bgcolor: '#fff',
+            p: 2.5,
+            boxSizing: 'border-box'
           }}
         >
           <Box
-            onClick={(e) => e.stopPropagation()}
             sx={{
-              bgcolor: '#fff',
-              color: '#000',
-              border: '3px solid #000',
-              borderRadius: 1,
-              p: 2,
-              maxWidth: 420,
-              width: '100%'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              mb: 1.5
             }}
           >
-            <Typography sx={{ fontWeight: 800, mb: 1 }}>Paid record</Typography>
-            <Typography sx={{ mb: 2 }}>
-              Paid will open a popup linked to table <strong>paid_record</strong> (to be built later).
+            {canGoPrevMonth ? (
+              <Box
+                component="button"
+                type="button"
+                aria-label="Previous month"
+                onClick={() => shiftMonth(-1)}
+                sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+              >
+                ‹
+              </Box>
+            ) : (
+              <Box sx={{ width: 44 }} aria-hidden />
+            )}
+            <Typography sx={{ fontWeight: 800, textAlign: 'center', fontSize: '1.5rem', minWidth: 200 }}>
+              {MONTH_NAMES[month - 1]} {year}
             </Typography>
-            <ColorTemplate13DisableGreenButton type="button" onClick={() => setPaidStubOpen(false)}>
-              Close
-            </ColorTemplate13DisableGreenButton>
+            {canGoNextMonth ? (
+              <Box
+                component="button"
+                type="button"
+                aria-label="Next month"
+                onClick={() => shiftMonth(1)}
+                sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+              >
+                ›
+              </Box>
+            ) : (
+              <Box sx={{ width: 44 }} aria-hidden />
+            )}
+          </Box>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: 1,
+              textAlign: 'center'
+            }}
+          >
+            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+              <Typography key={d} sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                {d}
+              </Typography>
+            ))}
+            {Array.from({ length: startWd }).map((_, i) => (
+              <Box key={`pad-${i}`} />
+            ))}
+            {Array.from({ length: dim }).map((_, i) => {
+              const day = i + 1;
+              const tone = calendarMarks.get(day);
+              const isToday = isCurrentMonth && today.getDate() === day;
+              const upcoming = tone === 'upcoming';
+              return (
+                <Box
+                  key={`day-${day}`}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: upcoming ? '50%' : 1,
+                    fontWeight: 700,
+                    fontSize: '1.25rem',
+                    bgcolor: tone && !upcoming ? cellToneBg(tone) : 'transparent',
+                    color: tone === 'overdue' ? '#fff' : '#000',
+                    outline: upcoming
+                      ? '3px solid #000'
+                      : isToday
+                        ? `2px solid ${RED}`
+                        : 'none',
+                    outlineOffset: 1
+                  }}
+                >
+                  {day}
+                </Box>
+              );
+            })}
           </Box>
         </Box>
+
+        <Box
+          component="aside"
+          aria-label="Calendar legend"
+          sx={{
+            flex: '0 0 auto',
+            alignSelf: { xs: 'stretch', sm: 'flex-start' },
+            border: '2px solid #000',
+            borderRadius: 1,
+            bgcolor: '#fff',
+            px: 1.75,
+            py: 1.5,
+            minWidth: { sm: 260 },
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.25,
+            boxSizing: 'border-box'
+          }}
+        >
+          {[
+            {
+              key: 'today',
+              label: 'Today Date',
+              sample: 26,
+              sx: {
+                borderRadius: 1,
+                bgcolor: 'transparent',
+                outline: `2px solid ${RED}`,
+                outlineOffset: 0
+              }
+            },
+            {
+              key: 'upcoming',
+              label: 'Manual Pay Note Due yet',
+              sample: 29,
+              sx: {
+                borderRadius: '50%',
+                bgcolor: 'transparent',
+                outline: '3px solid #000',
+                outlineOffset: 0
+              }
+            },
+            {
+              key: 'auto',
+              label: 'Auto pay',
+              sample: 15,
+              sx: {
+                borderRadius: 1,
+                bgcolor: YELLOW,
+                color: '#000'
+              }
+            },
+            {
+              key: 'paid',
+              label: 'Manual Paid',
+              sample: 1,
+              sx: {
+                borderRadius: 1,
+                bgcolor: GREEN,
+                color: '#000'
+              }
+            },
+            {
+              key: 'overdue',
+              label: 'Manual NotPaid Overdue/Late',
+              sample: 25,
+              sx: {
+                borderRadius: 1,
+                bgcolor: RED,
+                color: '#fff'
+              }
+            }
+          ].map((item) => (
+            <Box
+              key={item.key}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25
+              }}
+            >
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  boxSizing: 'border-box',
+                  ...item.sx
+                }}
+              >
+                {item.sample}
+              </Box>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+                {item.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      {billPopupOpen ? (
+        <BillReceiptsPopup
+          open={billPopupOpen}
+          storageType={storageKey}
+          ensurePayload={billEnsurePayload}
+          onClose={() => {
+            setBillPopupOpen(false);
+            setBillEnsurePayload(null);
+            void load(year, month);
+          }}
+          onChanged={handleBillChanged}
+        />
       ) : null}
     </Box>
   );

@@ -563,6 +563,15 @@ import { getMonthlyBill, putMonthlyBill } from './routes/recordVault/monthlyBill
 import { getYearlyBill, putYearlyBill } from './routes/recordVault/yearlyBillRoutes.js';
 import { transferBillSchedule } from './routes/recordVault/billScheduleTransferRoutes.js';
 import {
+  postPaidRecordEnsure,
+  getPaidRecord,
+  putPaidRecordNotes,
+  postPaidRecordAttachment,
+  getPaidRecordAttachment,
+  downloadPaidRecordAttachment,
+  deletePaidRecordAttachment
+} from './routes/recordVault/paidRecordRoutes.js';
+import {
   feBeTrafficLogMiddleware,
   isFeBeTrafficLogEnabled,
   logFeBeTrafficLogStartupStatus
@@ -1727,6 +1736,18 @@ app.put('/api/monthlyBill', requireAuth, putMonthlyBill);
 app.get('/api/yearlyBill', requireAuth, getYearlyBill);
 app.put('/api/yearlyBill', requireAuth, putYearlyBill);
 app.post('/api/billSchedule/transfer', requireAuth, transferBillSchedule);
+
+app.post('/api/paidRecord/ensure', requireAuth, postPaidRecordEnsure);
+app.get('/api/paidRecord/:id', requireAuth, getPaidRecord);
+app.put('/api/paidRecord/:id/notes', requireAuth, putPaidRecordNotes);
+app.post('/api/paidRecord/:id/attachments', requireAuth, postPaidRecordAttachment);
+app.get('/api/paidRecord/:id/attachments/:attachmentId', requireAuth, getPaidRecordAttachment);
+app.get(
+  '/api/paidRecord/:id/attachments/:attachmentId/download',
+  requireAuth,
+  downloadPaidRecordAttachment
+);
+app.delete('/api/paidRecord/:id/attachments/:attachmentId', requireAuth, deletePaidRecordAttachment);
 
 app.post('/api/chat/send', requireAuth, sendChatMessage);
 app.get('/api/chat/history/:targetUserId', requireAuth, getChatHistory);

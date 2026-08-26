@@ -3259,6 +3259,10 @@ export default function RecordVaultWorkspacePane({
     async (file, coords) => {
       if (!selectedNote || !file || busy) return;
       const noteId = Number(selectedNote.note_id);
+      // Bill Schedule Monthly/Yearly use synthetic negative ids — not vault notes.
+      if (!Number.isFinite(noteId) || noteId < 1 || isBillScheduleSystemId(noteId)) {
+        return;
+      }
       if (!isAllowedRecordVaultFile(file)) {
         setError(`Unsupported vault file type: ${file.name || 'file'}`);
         return;
@@ -3349,6 +3353,10 @@ export default function RecordVaultWorkspacePane({
   );
 
   const handleContentDragOver = useCallback((event) => {
+    // Bill Schedule Monthly/Yearly — file drops belong to Bills/Receipts popup, not vault note attach.
+    if (isBillMonthlyNoteId(selectedNoteId) || isBillYearlyNoteId(selectedNoteId)) {
+      return;
+    }
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
     // Outgoing note HTML export also carries Files — do not treat as OS import.
     if (
@@ -3363,7 +3371,7 @@ export default function RecordVaultWorkspacePane({
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
     }
-  }, []);
+  }, [selectedNoteId]);
 
   /** Phone QR upload → fetch album photo → insert into open note body. */
   const handleMobilePhoneUploadComplete = useCallback(
@@ -3758,6 +3766,10 @@ export default function RecordVaultWorkspacePane({
   const handleContentFileDrop = useCallback(
     async (event) => {
       if (!selectedNote) return;
+      // Bill Schedule panels own their own uploads (Bills/Receipts) — never treat as vault note attach.
+      if (isBillScheduleSystemId(selectedNote.note_id)) {
+        return;
+      }
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
       if (
         types.includes(DRAG_NOTE) ||
@@ -7285,11 +7297,11 @@ export default function RecordVaultWorkspacePane({
           <Box
             data-record-vault-note-content
             ref={noteContentPaneRef}
-            draggable={Boolean(selectedNoteId)}
+            draggable={Boolean(selectedNoteId) && !isBillMonthlyView && !isBillYearlyView}
             onDragStart={handleContentPaneHtmlExportDragStart}
             onDragEnd={handleDragEnd}
-            onDragOver={handleContentDragOver}
-            onDrop={handleContentFileDrop}
+            onDragOver={isBillMonthlyView || isBillYearlyView ? undefined : handleContentDragOver}
+            onDrop={isBillMonthlyView || isBillYearlyView ? undefined : handleContentFileDrop}
             sx={{
               flex: 1,
               minWidth: 0,

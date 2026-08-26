@@ -1367,6 +1367,18 @@ export async function fetchPhotoAlbumsUsage({ storageType } = {}) {
     storageType: data?.storageType ? String(data.storageType) : null,
     onedriveEmail: data?.onedriveEmail ? String(data.onedriveEmail) : null,
     vaultFolderMb: Number(data?.vaultFolderMb) || 0,
+    tutaDrive: Boolean(data?.tutaDrive),
+    tutaDriveStorage: data?.tutaDriveStorage
+      ? {
+          memberFolder: data.tutaDriveStorage.memberFolder
+            ? String(data.tutaDriveStorage.memberFolder)
+            : null,
+          notesBytes: Number(data.tutaDriveStorage.notesBytes) || 0,
+          photosBytes: Number(data.tutaDriveStorage.photosBytes) || 0,
+          totalBytes: Number(data.tutaDriveStorage.totalBytes) || 0,
+          usedGb: Number(data.tutaDriveStorage.usedGb) || 0
+        }
+      : null,
     subscriptionTier: data?.subscriptionTier ? String(data.subscriptionTier) : 'FREE',
     transfer: data?.transfer
       ? {

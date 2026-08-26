@@ -8,6 +8,10 @@ import {
   snapshotVaultSessionFileCountsToLast
 } from '../../utils/photoAlbumsSessionFileCounts.js';
 import { readRequestedVaultStorageType, vaultUsbStatus } from '../../utils/photoAlbumsUsb/vaultSession.js';
+import {
+  isLeftSideTutaDrive,
+  loadTutaDriveMemberNotesPhotosSizeForSingles
+} from '../../utils/tutaDriveMemberPaths.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -46,7 +50,7 @@ export async function getPhotoAlbumsUsage(req, res) {
     if (!session?.unlocked) {
       const sessionFileCounts = await getVaultSessionFileCounts(singlesId);
       const lastSessionFileCounts = await resolveLoginGateFileCounts(singlesId);
-      return res.json({
+      const payload = {
         storageType: requestedType || null,
         transfer,
         sessionFileCounts: {
@@ -60,8 +64,25 @@ export async function getPhotoAlbumsUsage(req, res) {
         subscriptionTier: 'FREE',
         onedriveEmail: null,
         vaultFolderMb: 0,
-        onedriveStorage: null
-      });
+        onedriveStorage: null,
+        tutaDrive: false,
+        tutaDriveStorage: null
+      };
+      if (isLeftSideTutaDrive() && (requestedType == null || requestedType === 'onedrive')) {
+        const disk = await loadTutaDriveMemberNotesPhotosSizeForSingles(singlesId);
+        if (disk) {
+          payload.tutaDrive = true;
+          payload.tutaDriveStorage = {
+            memberFolder: disk.memberFolder,
+            notesBytes: disk.notesBytes,
+            photosBytes: disk.photosBytes,
+            totalBytes: disk.totalBytes,
+            usedGb: disk.usedGb
+          };
+          payload.vaultFolderMb = disk.totalMb;
+        }
+      }
+      return res.json(payload);
     }
     const usage = await buildPhotoAlbumsUsageStats(singlesId, session.storageType);
     return res.json(usage);

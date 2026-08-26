@@ -8,6 +8,7 @@ import {
   vaultPhotosRoot,
   vaultRootOnMount
 } from './recordVaultUsb/vaultPaths.js';
+import { computeDirectorySizeBytes, parseGbFromBytes } from './recordVaultUsb/vaultFolderSize.js';
 import { oneDriveStagingMountPath } from './recordVaultOneDriveStagingRoot.js';
 import { oneDriveStagingMountPath as photoAlbumsOneDriveStagingMountPath } from './photoAlbumsOneDriveStagingRoot.js';
 import {
@@ -109,6 +110,45 @@ export function tutaDriveNotesMountPath(memberId) {
 
 export function tutaDrivePhotosPath(memberId) {
   return path.join(tutaDriveMemberRoot(memberId), 'photos');
+}
+
+/**
+ * On-disk usage for TutaDrive Total GB: only
+ *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/notes
+ *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/photos
+ * Symlinks are skipped (so notes→photos link is not double-counted).
+ * Does not include photoalbums/, backup_*.zip, or other siblings.
+ */
+export function computeTutaDriveMemberNotesPhotosSize(memberId) {
+  const notesPath = tutaDriveNotesMountPath(memberId);
+  const photosPath = tutaDrivePhotosPath(memberId);
+  const notesBytes = computeDirectorySizeBytes(notesPath);
+  const photosBytes = computeDirectorySizeBytes(photosPath);
+  const totalBytes = notesBytes + photosBytes;
+  const totalMb = totalBytes > 0 ? totalBytes / (1024 * 1024) : 0;
+  return {
+    notesPath,
+    photosPath,
+    notesBytes,
+    photosBytes,
+    totalBytes,
+    totalMb,
+    usedGb: parseGbFromBytes(totalBytes) ?? 0
+  };
+}
+
+/**
+ * Resolve current member and return notes+photos size, or null if unavailable.
+ */
+export async function loadTutaDriveMemberNotesPhotosSizeForSingles(singlesId) {
+  if (!isLeftSideTutaDrive()) return null;
+  const memberId = await loadMemberIdForSingles(singlesId);
+  if (!memberId) return null;
+  return {
+    memberId,
+    memberFolder: memberFolderName(memberId),
+    ...computeTutaDriveMemberNotesPhotosSize(memberId)
+  };
 }
 
 /**

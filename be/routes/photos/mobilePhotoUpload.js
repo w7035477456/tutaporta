@@ -30,6 +30,7 @@ import {
   STORAGE_PERMISSION_CODE,
   STORAGE_PERMISSION_USER_MESSAGE
 } from '../../utils/storagePermissionError.js';
+import { attachBufferToPaidRecord } from '../recordVault/paidRecordRoutes.js';
 
 function sessionStatusPayload(row) {
   const expired = sessionExpired(row);
@@ -42,7 +43,8 @@ function sessionStatusPayload(row) {
     expiresAt: row?.expires_at ?? null,
     replacedDuplicate: Boolean(row?.replaced_duplicate),
     purpose,
-    fileName: row?.stored_file_name ?? null
+    fileName: row?.stored_file_name ?? null,
+    paidRecordId: row?.paid_record_id != null ? Number(row.paid_record_id) : null
   };
 }
 
@@ -123,15 +125,21 @@ export async function postMobilePhotoUploadSession(req, res) {
       debugMobilePhotoUpload('POST /session REJECT auth', { singlesId });
       return res.status(401).json({ error: 'Authentication required' });
     }
-    const session = await createMobilePhotoUploadSession(singlesId, { purpose });
+    const paidRecordId = Number(req.body?.paid_record_id ?? req.body?.paidRecordId);
+    const session = await createMobilePhotoUploadSession(singlesId, {
+      purpose,
+      paidRecordId: Number.isFinite(paidRecordId) ? paidRecordId : null
+    });
     infoMobilePhotoUpload('POST /session OK', {
       singlesId,
       purpose: session.purpose,
+      paidRecordId: session.paidRecordId,
       token: maskMobileUploadToken(session.token)
     });
     debugMobilePhotoUpload('POST /session OK detail', {
       singlesId,
       purpose: session.purpose,
+      paidRecordId: session.paidRecordId,
       token: maskMobileUploadToken(session.token),
       expiresAt: session.expiresAt
     });
@@ -206,6 +214,54 @@ export async function getMobilePhotoUploadSessionPublic(req, res) {
     return res.status(400).json({ error: 'Missing upload token. Scan the QR code again from your computer.' });
   }
   return respondPublicMobilePhotoUploadSession(req, res, token);
+}
+
+async function handleBillReceiptMobileUpload(req, res, token, singlesId, paidRecordId) {
+  let buffer;
+  let contentType;
+  if (Buffer.isBuffer(req._mobilePhotoBuffer) && req._mobilePhotoBuffer.length) {
+    buffer = req._mobilePhotoBuffer;
+    contentType = String(req._mobilePhotoContentType || 'image/jpeg');
+  } else {
+    const dataUrl = req.body?.image;
+    try {
+      ({ buffer, contentType } = decodeImageDataUrl(dataUrl));
+    } catch (decodeErr) {
+      return res.status(400).json({ error: decodeErr?.message || 'Missing image (data URL or base64)' });
+    }
+  }
+  const originalName =
+    req.body?.originalFileName || req.body?.file_name || req.body?.filename || 'receipt.jpg';
+  try {
+    const result = await attachBufferToPaidRecord(singlesId, paidRecordId, {
+      buffer,
+      originalName,
+      mimeType: contentType
+    });
+    await markMobilePhotoUploadCompleted(token, null, { storedFileName: result.fileName });
+    infoMobilePhotoUpload('POST bill_receipt OK', {
+      token: maskMobileUploadToken(token),
+      singlesId,
+      paidRecordId,
+      fileName: result.fileName,
+      size: result.size
+    });
+    return res.status(200).json({
+      success: true,
+      fileName: result.fileName,
+      purpose: 'bill_receipt',
+      paidRecordId,
+      attachmentId: result.attachmentId,
+      size: result.size
+    });
+  } catch (err) {
+    errorMobilePhotoUpload('bill_receipt write FAIL', err, {
+      token: maskMobileUploadToken(token),
+      singlesId,
+      paidRecordId
+    });
+    return res.status(400).json({ error: err?.message || 'Failed to save bill receipt upload' });
+  }
 }
 
 async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
@@ -341,6 +397,19 @@ async function handleMobilePhotoUploadPost(req, res, token) {
         singlesId
       });
       return handlePhotoAlbumsMobileUpload(req, res, token, singlesId);
+    }
+
+    if (purpose === 'bill_receipt') {
+      const paidRecordId = Number(row.paid_record_id);
+      if (!Number.isFinite(paidRecordId) || paidRecordId < 1) {
+        return res.status(400).json({ error: 'Upload link is missing paid_record_id' });
+      }
+      debugMobilePhotoUpload('POST bill_receipt path', {
+        token: maskMobileUploadToken(token),
+        singlesId,
+        paidRecordId
+      });
+      return handleBillReceiptMobileUpload(req, res, token, singlesId, paidRecordId);
     }
 
     req.auth = { singles_id: singlesId };

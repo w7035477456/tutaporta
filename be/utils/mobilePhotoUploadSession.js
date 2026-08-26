@@ -15,6 +15,7 @@ export const MOBILE_PHOTO_UPLOAD_PATH = '/mobilePhotoUpload';
 
 const PURPOSE_PROFILE = 'profile';
 const PURPOSE_PHOTO_ALBUMS = 'photo_albums';
+const PURPOSE_BILL_RECEIPT = 'bill_receipt';
 
 export function normalizeMobilePhotoUploadPurpose(raw) {
   const p = String(raw ?? '')
@@ -23,7 +24,14 @@ export function normalizeMobilePhotoUploadPurpose(raw) {
   if (p === PURPOSE_PHOTO_ALBUMS || p === 'photoalbums' || p === 'albums') {
     return PURPOSE_PHOTO_ALBUMS;
   }
+  if (p === PURPOSE_BILL_RECEIPT || p === 'bill' || p === 'bill_receipts' || p === 'receipt') {
+    return PURPOSE_BILL_RECEIPT;
+  }
   return PURPOSE_PROFILE;
+}
+
+export function isBillReceiptUploadPurpose(purpose) {
+  return normalizeMobilePhotoUploadPurpose(purpose) === PURPOSE_BILL_RECEIPT;
 }
 
 let redisClient = null;
@@ -106,24 +114,35 @@ export function buildMobilePhotoUploadPageUrl(token) {
   return `${base}${MOBILE_PHOTO_UPLOAD_PATH}/u/${encodeURIComponent(token)}`;
 }
 
-export async function createMobilePhotoUploadSession(singlesId, { purpose: purposeRaw } = {}) {
+export async function createMobilePhotoUploadSession(
+  singlesId,
+  { purpose: purposeRaw, paidRecordId: paidRecordIdRaw } = {}
+) {
   await ensureMobilePhotoUploadSchema();
   const purpose = normalizeMobilePhotoUploadPurpose(purposeRaw);
+  const paidRecordId =
+    purpose === PURPOSE_BILL_RECEIPT ? Number(paidRecordIdRaw) : null;
+  if (purpose === PURPOSE_BILL_RECEIPT) {
+    if (!Number.isFinite(paidRecordId) || paidRecordId < 1) {
+      throw new Error('paid_record_id is required for bill_receipt uploads');
+    }
+  }
   const token = crypto.randomBytes(24).toString('hex');
   const renewMinutes = getBarcodeRenewMinutes();
   const expiresAt = new Date(Date.now() + renewMinutes * 60 * 1000);
   debugMobilePhotoUpload('create session START', {
     singlesId,
     purpose,
+    paidRecordId,
     token: maskMobileUploadToken(token),
     expiresAt: expiresAt.toISOString(),
     renewMinutes,
     publicAppUrl: getPublicAppUrl()
   });
   await pool.query(
-    `INSERT INTO ${sessionsTable()} (token, singles_id, expires_at, purpose)
-     VALUES ($1, $2, $3, $4)`,
-    [token, singlesId, expiresAt, purpose]
+    `INSERT INTO ${sessionsTable()} (token, singles_id, expires_at, purpose, paid_record_id)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [token, singlesId, expiresAt, purpose, Number.isFinite(paidRecordId) ? paidRecordId : null]
   );
   const insertedRow = {
     token,
@@ -134,7 +153,8 @@ export async function createMobilePhotoUploadSession(singlesId, { purpose: purpo
     completed_at: null,
     replaced_duplicate: false,
     purpose,
-    stored_file_name: null
+    stored_file_name: null,
+    paid_record_id: Number.isFinite(paidRecordId) ? paidRecordId : null
   };
   await saveSessionToRedis(insertedRow);
   const verify = await getMobilePhotoUploadSession(token);
@@ -163,7 +183,8 @@ export async function createMobilePhotoUploadSession(singlesId, { purpose: purpo
     expiresAt: expiresAt.toISOString(),
     renewMinutes,
     mobileUrl,
-    purpose
+    purpose,
+    paidRecordId: Number.isFinite(paidRecordId) ? paidRecordId : null
   };
 }
 
@@ -180,7 +201,7 @@ export async function getMobilePhotoUploadSession(token) {
   }
   const { rows } = await pool.query(
     `SELECT token, singles_id, created_at, expires_at, photos_id, completed_at, replaced_duplicate,
-            purpose, stored_file_name
+            purpose, stored_file_name, paid_record_id
      FROM ${sessionsTable()}
      WHERE token = $1
      LIMIT 1`,
@@ -274,6 +295,10 @@ export async function initMobilePhotoUploadSchema() {
     await pool.query(`
       ALTER TABLE "${schema}"."mobile_photo_upload_sessions"
         ADD COLUMN IF NOT EXISTS stored_file_name text
+    `);
+    await pool.query(`
+      ALTER TABLE "${schema}"."mobile_photo_upload_sessions"
+        ADD COLUMN IF NOT EXISTS paid_record_id bigint NULL
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS mobile_photo_upload_sessions_expires_idx

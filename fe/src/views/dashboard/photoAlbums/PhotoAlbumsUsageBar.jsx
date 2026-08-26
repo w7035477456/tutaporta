@@ -128,6 +128,33 @@ SessionFileCountLabel.propTypes = {
   uiTxRx: PropTypes.number
 };
 
+/** TutaDrive Total GB from notes+photos folders only (always shown in gb). */
+function formatTutaDriveTotalGb(usage) {
+  const bytes = Number(usage?.tutaDriveStorage?.totalBytes);
+  if (Number.isFinite(bytes) && bytes >= 0) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(3)}gb`;
+  }
+  const mb = Number(usage?.vaultFolderMb) || 0;
+  return `${Math.max(0, mb / 1024).toFixed(3)}gb`;
+}
+
+function TutaDriveTotalLabel({ usage }) {
+  if (!usage?.tutaDrive) return null;
+  const label = formatTutaDriveTotalGb(usage);
+  const notesMb = (Number(usage?.tutaDriveStorage?.notesBytes) || 0) / (1024 * 1024);
+  const photosMb = (Number(usage?.tutaDriveStorage?.photosBytes) || 0) / (1024 * 1024);
+  const title = `Disk Total = notes (${formatUsageDataAmount(notesMb)}) + photos (${formatUsageDataAmount(photosMb)}) under users/M####/`;
+  return (
+    <Typography component="span" sx={yellowTextSx} title={title}>
+      Total {label}.{' '}
+    </Typography>
+  );
+}
+
+TutaDriveTotalLabel.propTypes = {
+  usage: PropTypes.object
+};
+
 export default function PhotoAlbumsUsageBar({
   usage,
   storageType = 'usb',
@@ -192,7 +219,13 @@ export default function PhotoAlbumsUsageBar({
   if (!transfer) {
     return (
       <>
-        <UsageBarShell actions={actions}>{null}</UsageBarShell>
+        <UsageBarShell actions={actions}>
+          {usage?.tutaDrive ? (
+            <Typography component="div" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
+              <TutaDriveTotalLabel usage={usage} />
+            </Typography>
+          ) : null}
+        </UsageBarShell>
         {dataPlanDialog}
       </>
     );
@@ -217,6 +250,7 @@ export default function PhotoAlbumsUsageBar({
             whiteSpace: 'nowrap'
           }}
         >
+          <TutaDriveTotalLabel usage={usage} />
           {depleted ? (
             <>
               Data Depleted:{' '}

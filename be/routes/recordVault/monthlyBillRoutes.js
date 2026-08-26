@@ -134,6 +134,7 @@ function mapRow(row, year, month) {
     bill_type: row.bill_type === 'Auto' ? 'Auto' : 'Manual',
     action: row.action ?? null,
     paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
+    has_bill_content: Boolean(row.has_bill_content),
     created_at: row.created_at,
     updated_at: row.updated_at,
     ...derived
@@ -199,11 +200,21 @@ async function ensureMonthCloned(client, singlesId, year, month, storageBackend)
 
 async function listMonthRows(client, singlesId, year, month, storageBackend) {
   const { rows } = await client.query(
-    `SELECT *
-       FROM helloworldjunktest.monthly_bill
-      WHERE singles_id = $1 AND storage_backend = $2
-        AND bill_year = $3 AND bill_month = $4
-      ORDER BY row_index ASC, monthly_bill_id ASC`,
+    `SELECT mb.*,
+            (
+              COALESCE(LENGTH(TRIM(pr.notes_text)), 0) > 0
+              OR EXISTS (
+                SELECT 1
+                  FROM helloworldjunktest.paid_record_attachment a
+                 WHERE a.paid_record_id = pr.paid_record_id
+              )
+            ) AS has_bill_content
+       FROM helloworldjunktest.monthly_bill mb
+       LEFT JOIN helloworldjunktest.paid_record pr
+         ON pr.paid_record_id = mb.paid_record_id
+      WHERE mb.singles_id = $1 AND mb.storage_backend = $2
+        AND mb.bill_year = $3 AND mb.bill_month = $4
+      ORDER BY mb.row_index ASC, mb.monthly_bill_id ASC`,
     [singlesId, storageBackend, year, month]
   );
   return rows.map((r) => mapRow(r, year, month));
@@ -281,10 +292,7 @@ export async function putMonthlyBill(req, res) {
         amount: normalizeAmount(row?.amount),
         bill_type: billType,
         action,
-        paid_record_id:
-          billType === 'Manual' && action === 'Paid' && paidRecordId && paidRecordId > 0
-            ? paidRecordId
-            : null
+        paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null
       };
     });
 
@@ -305,12 +313,13 @@ export async function putMonthlyBill(req, res) {
         [singlesId, storageBackend, year, month]
       );
       for (const r of normalized) {
-        await client.query(
+        const { rows: inserted } = await client.query(
           `INSERT INTO helloworldjunktest.monthly_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
              action, paid_record_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           RETURNING monthly_bill_id`,
           [
             singlesId,
             storageBackend,
@@ -325,6 +334,15 @@ export async function putMonthlyBill(req, res) {
             r.paid_record_id
           ]
         );
+        const newBillId = Number(inserted[0]?.monthly_bill_id);
+        if (r.paid_record_id && newBillId) {
+          await client.query(
+            `UPDATE helloworldjunktest.paid_record
+                SET monthly_bill_id = $1, updated_at = now()
+              WHERE paid_record_id = $2 AND singles_id = $3`,
+            [newBillId, r.paid_record_id, singlesId]
+          );
+        }
       }
       const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
       await client.query('COMMIT');

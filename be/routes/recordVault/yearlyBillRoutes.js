@@ -134,6 +134,7 @@ function mapRow(row, year) {
     bill_type: row.bill_type === 'Auto' ? 'Auto' : 'Manual',
     action: row.action ?? null,
     paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
+    has_bill_content: Boolean(row.has_bill_content),
     created_at: row.created_at,
     updated_at: row.updated_at,
     ...derived
@@ -191,10 +192,20 @@ async function ensureYearCloned(client, singlesId, year, storageBackend) {
 
 async function listYearRows(client, singlesId, year, storageBackend) {
   const { rows } = await client.query(
-    `SELECT *
-       FROM helloworldjunktest.yearly_bill
-      WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3
-      ORDER BY row_index ASC, yearly_bill_id ASC`,
+    `SELECT yb.*,
+            (
+              COALESCE(LENGTH(TRIM(pr.notes_text)), 0) > 0
+              OR EXISTS (
+                SELECT 1
+                  FROM helloworldjunktest.paid_record_attachment a
+                 WHERE a.paid_record_id = pr.paid_record_id
+              )
+            ) AS has_bill_content
+       FROM helloworldjunktest.yearly_bill yb
+       LEFT JOIN helloworldjunktest.paid_record pr
+         ON pr.paid_record_id = yb.paid_record_id
+      WHERE yb.singles_id = $1 AND yb.storage_backend = $2 AND yb.bill_year = $3
+      ORDER BY yb.row_index ASC, yb.yearly_bill_id ASC`,
     [singlesId, storageBackend, year]
   );
   return rows.map((r) => mapRow(r, year));
@@ -270,10 +281,7 @@ export async function putYearlyBill(req, res) {
         amount: normalizeAmount(row?.amount),
         bill_type: billType,
         action,
-        paid_record_id:
-          billType === 'Manual' && action === 'Paid' && paidRecordId && paidRecordId > 0
-            ? paidRecordId
-            : null
+        paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null
       };
     });
 
@@ -292,12 +300,13 @@ export async function putYearlyBill(req, res) {
         [singlesId, storageBackend, year]
       );
       for (const r of normalized) {
-        await client.query(
+        const { rows: inserted } = await client.query(
           `INSERT INTO helloworldjunktest.yearly_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_month_day, amount, bill_type,
              action, paid_record_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           RETURNING yearly_bill_id`,
           [
             singlesId,
             storageBackend,
@@ -312,6 +321,15 @@ export async function putYearlyBill(req, res) {
             r.paid_record_id
           ]
         );
+        const newBillId = Number(inserted[0]?.yearly_bill_id);
+        if (r.paid_record_id && newBillId) {
+          await client.query(
+            `UPDATE helloworldjunktest.paid_record
+                SET yearly_bill_id = $1, updated_at = now()
+              WHERE paid_record_id = $2 AND singles_id = $3`,
+            [newBillId, r.paid_record_id, singlesId]
+          );
+        }
       }
       const rows = await listYearRows(client, singlesId, year, storageBackend);
       await client.query('COMMIT');

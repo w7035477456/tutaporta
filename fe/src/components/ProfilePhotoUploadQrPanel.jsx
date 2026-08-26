@@ -52,13 +52,16 @@ export default function ProfilePhotoUploadQrPanel({
   disabled = false,
   variant = 'default',
   qrSize: qrSizeProp,
-  purpose = 'profile'
+  purpose = 'profile',
+  paidRecordId = null,
+  messageOverride = null
 }) {
   const inline = variant === 'inline';
   const qrSize = qrSizeProp ?? (inline ? 156 : 168);
-  const message = PROFILE_PHOTO_UPLOAD_QR_MESSAGE;
+  const message = messageOverride || PROFILE_PHOTO_UPLOAD_QR_MESSAGE;
   const uploadPurpose = String(purpose || 'profile').trim().toLowerCase() || 'profile';
   const isPhotoAlbumsPurpose = uploadPurpose === 'photo_albums';
+  const isBillReceiptPurpose = uploadPurpose === 'bill_receipt';
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -76,9 +79,12 @@ export default function ProfilePhotoUploadQrPanel({
     setRemainingMs(null);
     if (resetDelivery) lastDeliveredKeyRef.current = null;
     try {
-      const data = await createMobilePhotoUploadSession(
-        isPhotoAlbumsPurpose ? { purpose: 'photo_albums' } : {}
-      );
+      const data = await createMobilePhotoUploadSession({
+        ...(isPhotoAlbumsPurpose ? { purpose: 'photo_albums' } : {}),
+        ...(isBillReceiptPurpose
+          ? { purpose: 'bill_receipt', paidRecordId: Number(paidRecordId) }
+          : {})
+      });
       mobilePhotoUploadDebugLog('desktop QR session created', {
         purpose: data?.purpose,
         expiresAt: data?.expiresAt,
@@ -100,7 +106,7 @@ export default function ProfilePhotoUploadQrPanel({
     } finally {
       setLoading(false);
     }
-  }, [isPhotoAlbumsPurpose]);
+  }, [isPhotoAlbumsPurpose, isBillReceiptPurpose, paidRecordId]);
 
   useEffect(() => {
     if (disabled) return;
@@ -137,17 +143,21 @@ export default function ProfilePhotoUploadQrPanel({
     async (status) => {
       const statusPurpose = String(status?.purpose || uploadPurpose).trim().toLowerCase();
       const albumsFlow = isPhotoAlbumsPurpose || statusPurpose === 'photo_albums';
+      const billFlow = isBillReceiptPurpose || statusPurpose === 'bill_receipt';
 
-      if (albumsFlow) {
+      if (albumsFlow || billFlow) {
         if (status?.completed) {
-          const deliveryKey = `albums:${status?.fileName || status?.completedAt || 'done'}`;
+          const deliveryKey = `${billFlow ? 'bill' : 'albums'}:${status?.fileName || status?.completedAt || 'done'}`;
           if (lastDeliveredKeyRef.current !== deliveryKey) {
             lastDeliveredKeyRef.current = deliveryKey;
-            setCheckMessage('Photo received from your phone.');
+            setCheckMessage(
+              billFlow ? 'Receipt received from your phone.' : 'Photo received from your phone.'
+            );
             await onPhoneUploadComplete?.(status?.fileName || status?.photosId, {
-              purpose: 'photo_albums',
+              purpose: billFlow ? 'bill_receipt' : 'photo_albums',
               fileName: status?.fileName || null,
               photosId: status?.photosId ?? null,
+              paidRecordId: status?.paidRecordId ?? null,
               replacedDuplicate: Boolean(status?.replacedDuplicate)
             });
           }
@@ -192,7 +202,7 @@ export default function ProfilePhotoUploadQrPanel({
       }
       return 'pending';
     },
-    [isPhotoAlbumsPurpose, loadSession, onPhoneUploadComplete, uploadPurpose]
+    [isPhotoAlbumsPurpose, isBillReceiptPurpose, loadSession, onPhoneUploadComplete, uploadPurpose]
   );
 
   const checkUploadStatus = useCallback(async () => {
@@ -423,5 +433,7 @@ ProfilePhotoUploadQrPanel.propTypes = {
   disabled: PropTypes.bool,
   variant: PropTypes.oneOf(['default', 'inline']),
   qrSize: PropTypes.number,
-  purpose: PropTypes.string
+  purpose: PropTypes.string,
+  paidRecordId: PropTypes.number,
+  messageOverride: PropTypes.string
 };

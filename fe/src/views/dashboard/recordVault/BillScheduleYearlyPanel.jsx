@@ -10,6 +10,8 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PropTypes from 'prop-types';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
+import BillColumnButton from './BillColumnButton';
+import BillReceiptsPopup from './BillReceiptsPopup';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -42,6 +44,7 @@ function blankRow(rowIndex) {
     bill_type: 'Manual',
     action: null,
     paid_record_id: null,
+    has_bill_content: false,
     status: '',
     status_tone: 'none'
   };
@@ -180,7 +183,8 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
-  const [paidStubOpen, setPaidStubOpen] = useState(false);
+  const [billPopupOpen, setBillPopupOpen] = useState(false);
+  const [billEnsurePayload, setBillEnsurePayload] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const storageKey =
@@ -259,6 +263,43 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
       })
     );
     setSavedMsg('');
+  };
+
+  const openBillForRow = (row) => {
+    setBillEnsurePayload({
+      kind: 'yearly',
+      year,
+      row_index: Number(row.row_index) || 1,
+      yearly_bill_id: row.yearly_bill_id || undefined,
+      bill_description: row.bill_description,
+      bill_month: row.bill_month === '' ? null : row.bill_month,
+      due_month_day: row.due_month_day === '' ? null : row.due_month_day,
+      amount: row.amount,
+      bill_type: row.bill_type,
+      action: row.action
+    });
+    setBillPopupOpen(true);
+  };
+
+  const handleBillChanged = (data) => {
+    if (!data?.paidRecordId) return;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (
+          (data.yearlyBillId && Number(r.yearly_bill_id) === Number(data.yearlyBillId)) ||
+          Number(r.paid_record_id) === Number(data.paidRecordId) ||
+          (Number(r.row_index) === Number(billEnsurePayload?.row_index) && !r.yearly_bill_id)
+        ) {
+          return {
+            ...r,
+            paid_record_id: data.paidRecordId,
+            yearly_bill_id: data.yearlyBillId || r.yearly_bill_id,
+            has_bill_content: Boolean(data.hasBillContent)
+          };
+        }
+        return r;
+      })
+    );
   };
 
   const handleAdd = () => {
@@ -450,6 +491,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
             <th>Bill Description</th>
             <th style={{ width: 160 }}>Due Date</th>
             <th style={{ width: 120 }}>Amount</th>
+            <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
             <th style={{ width: 110 }}>Type</th>
             <th style={{ width: 120 }}>Action</th>
             <th style={{ width: 110 }}>Status</th>
@@ -530,6 +572,13 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
                     sx={inputSx}
                   />
                 </td>
+                <td style={{ textAlign: 'center' }}>
+                  <BillColumnButton
+                    hasContent={Boolean(row.has_bill_content)}
+                    disabled={loading || saving}
+                    onClick={() => openBillForRow(row)}
+                  />
+                </td>
                 <td style={{ background: typeActionStatusBg }}>
                   <Select
                     fullWidth
@@ -552,7 +601,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
                       onChange={(e) => {
                         const next = e.target.value || null;
                         updateRow(index, { action: next });
-                        if (next === 'Paid') setPaidStubOpen(true);
+                        if (next === 'Paid') openBillForRow(row);
                       }}
                       sx={selectSx}
                       renderValue={(v) => {
@@ -674,43 +723,18 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
         )}
       </Box>
 
-      {paidStubOpen ? (
-        <Box
-          role="dialog"
-          aria-label="Paid record"
-          onClick={() => setPaidStubOpen(false)}
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            bgcolor: 'rgba(0,0,0,0.45)',
-            zIndex: 1400,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: 2
+      {billPopupOpen ? (
+        <BillReceiptsPopup
+          open={billPopupOpen}
+          storageType={storageKey}
+          ensurePayload={billEnsurePayload}
+          onClose={() => {
+            setBillPopupOpen(false);
+            setBillEnsurePayload(null);
+            void load(year);
           }}
-        >
-          <Box
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              bgcolor: '#fff',
-              color: '#000',
-              border: '3px solid #000',
-              borderRadius: 1,
-              p: 2,
-              maxWidth: 420,
-              width: '100%'
-            }}
-          >
-            <Typography sx={{ fontWeight: 800, mb: 1 }}>Paid record</Typography>
-            <Typography sx={{ mb: 2 }}>
-              Paid will open a popup linked to table <strong>paid_record</strong> (to be built later).
-            </Typography>
-            <ColorTemplate13DisableGreenButton type="button" onClick={() => setPaidStubOpen(false)}>
-              Close
-            </ColorTemplate13DisableGreenButton>
-          </Box>
-        </Box>
+          onChanged={handleBillChanged}
+        />
       ) : null}
     </Box>
   );

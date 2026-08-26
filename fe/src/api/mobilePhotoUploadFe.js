@@ -7,16 +7,24 @@ import {
 } from 'utils/mobilePhotoUploadDebug';
 
 /** POST /api/mobilePhotoUpload/session — desktop creates phone upload link */
-export async function createMobilePhotoUploadSession({ purpose } = {}) {
+export async function createMobilePhotoUploadSession({ purpose, paidRecordId } = {}) {
   const body = {};
   if (purpose != null && String(purpose).trim() !== '') {
     body.purpose = String(purpose).trim();
   }
-  mobilePhotoUploadDebugLog('createSession START', { purpose: body.purpose || 'profile' });
+  const prId = Number(paidRecordId);
+  if (Number.isFinite(prId) && prId >= 1) {
+    body.paid_record_id = prId;
+  }
+  mobilePhotoUploadDebugLog('createSession START', {
+    purpose: body.purpose || 'profile',
+    paidRecordId: body.paid_record_id || null
+  });
   try {
     const { data } = await api.post('/api/mobilePhotoUpload/session', body);
     mobilePhotoUploadDebugLog('createSession OK', {
       purpose: data?.purpose,
+      paidRecordId: data?.paidRecordId,
       expiresAt: data?.expiresAt,
       mobileUrlHost: (() => {
         try {
