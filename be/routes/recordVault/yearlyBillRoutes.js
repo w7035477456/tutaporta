@@ -14,9 +14,27 @@ function httpError(statusCode, message) {
 
 function sendError(res, error, fallback = 'Yearly bill request failed') {
   const statusCode = Number(error?.statusCode) || 500;
-  const message = statusCode < 500 ? error?.message || fallback : fallback;
-  if (statusCode >= 500) console.error('[yearly-bill]', error);
-  return res.status(statusCode).json({ error: message });
+  const pgCode = String(error?.code || '');
+  let message = error?.message || fallback;
+  if (pgCode === '42P01') {
+    message =
+      'Database table yearly_bill is missing. On Postgres run: be/db/createYearlyBill.sql then be/db/alterBillScheduleStorageBackend.sql';
+  } else if (pgCode === '42703') {
+    message =
+      'Database schema for yearly_bill is outdated. On Postgres run: be/db/alterBillScheduleStorageBackend.sql';
+  }
+  if (statusCode >= 500) {
+    console.error('[yearly-bill]', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+      hint: error?.hint
+    });
+  }
+  return res.status(statusCode).json({
+    error: message,
+    ...(pgCode ? { code: pgCode } : {})
+  });
 }
 
 function requireSinglesId(req) {

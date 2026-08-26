@@ -6,6 +6,7 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 import {
   getVaultSession,
   initializeVaultOnUsbWithKey,
@@ -28,6 +29,8 @@ import {
   loadMemberIdForSingles,
   wipeTutaDriveMemberVault
 } from '../../utils/tutaDriveMemberPaths.js';
+import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
+import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
 
@@ -41,6 +44,16 @@ function requireSinglesId(req, res) {
 }
 
 function unlockErrorResponse(err) {
+  if (isStoragePermissionError(err)) {
+    return {
+      status: 500,
+      body: {
+        code: 'STORAGE_PERMISSION',
+        error: 'Folder permission error. Please contact your admin'
+      },
+      permission: true
+    };
+  }
   if (err?.name === 'RecordVaultUnlockError' || err instanceof RecordVaultUnlockError) {
     return {
       status: Number(err.statusCode) || 403,
@@ -65,14 +78,38 @@ async function resolveMemberContext(singlesId) {
   if (!memberId) {
     throw new Error('Your member number is not set; cannot open TutaDrive storage.');
   }
-  const layout = ensureTutaDriveMemberLayout(memberId);
+  // Creates users/M{id}/notes/TutaNotes + photos for this user; migrates OneDrive staging once.
+  const layout = ensureTutaDriveMemberLayout(memberId, { singlesId });
   return { memberId, ...layout };
+}
+
+/**
+ * Drop a leftover OneDrive-staging session so writes go to TutaDrive M{id} path.
+ * Same 'onedrive' session slot is reused for TutaDrive.
+ */
+async function dropStaleCloudSessionIfWrongMount(singlesId, notesMount) {
+  const session = getVaultSession(singlesId, 'onedrive');
+  if (!session?.unlocked || !session.mountPath) return;
+  const expected = path.resolve(notesMount);
+  const actual = path.resolve(String(session.mountPath));
+  if (actual === expected) {
+    session.tutaDrive = true;
+    session.label = 'TutaDrive';
+    return;
+  }
+  console.warn(
+    `[tutaDrive] clearing stale cloud session mount ${actual} (expected ${expected})`
+  );
+  await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
 }
 
 function sessionPayload(singlesId, memberId, notesMount) {
   const session = getVaultSession(singlesId, 'onedrive');
+  const expected = path.resolve(notesMount);
+  const actual = session?.mountPath ? path.resolve(String(session.mountPath)) : null;
+  const unlocked = Boolean(session?.unlocked && actual === expected);
   return {
-    unlocked: Boolean(session?.unlocked),
+    unlocked,
     storageType: 'onedrive',
     tutaDrive: true,
     memberId,
@@ -127,22 +164,28 @@ export async function getRecordVaultTutaDriveStatus(req, res) {
         session: { unlocked: false }
       });
     }
-    const { memberId, notesMount } = await resolveMemberContext(singlesId);
+    const { memberId, notesMount, vaultRoot, memberFolder } = await resolveMemberContext(singlesId);
+    await dropStaleCloudSessionIfWrongMount(singlesId, notesMount);
     const flags = vaultStatusFlags(notesMount);
     return res.json({
       leftSide: 'TutaDrive',
       tutadrive: {
         enabled: true,
         memberId,
-        memberFolder: `M${String(memberId).replace(/^M/i, '')}`,
+        memberFolder: memberFolder || `M${String(memberId).replace(/^M/i, '')}`,
         notesPath: notesMount,
+        vaultPath: vaultRoot,
         ...flags
       },
       session: sessionPayload(singlesId, memberId, notesMount)
     });
   } catch (err) {
     console.error('[getRecordVaultTutaDriveStatus]', err?.message || err);
-    return res.status(400).json({ error: err?.message || 'Unable to read TutaDrive status' });
+    return sendRecordVaultError(res, err, 'Unable to read TutaDrive status', {
+      route: 'getRecordVaultTutaDriveStatus',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
   }
 }
 
@@ -161,7 +204,11 @@ export async function formatRecordVaultTutaDrive(req, res) {
     });
   } catch (err) {
     console.error('[formatRecordVaultTutaDrive]', err?.message || err);
-    return res.status(400).json({ error: err?.message || 'Unable to format TutaDrive' });
+    return sendRecordVaultError(res, err, 'Unable to format TutaDrive', {
+      route: 'formatRecordVaultTutaDrive',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
   }
 }
 
@@ -176,11 +223,15 @@ export async function initRecordVaultTutaDrive(req, res) {
     }
     const keyMaterial = await resolveTutaDriveKeyMaterial();
     await initializeVaultOnUsbWithKey(notesMount, keyMaterial?.key ?? null, keyMaterial);
-    ensureTutaDriveMemberLayout(memberId);
+    ensureTutaDriveMemberLayout(memberId, { singlesId });
     return res.json({ success: true, memberId, hasVault: true });
   } catch (err) {
     console.error('[initRecordVaultTutaDrive]', err?.message || err);
-    return res.status(400).json({ error: err?.message || 'Unable to initialize TutaDrive vault' });
+    return sendRecordVaultError(res, err, 'Unable to initialize TutaDrive vault', {
+      route: 'initRecordVaultTutaDrive',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
   }
 }
 
@@ -193,13 +244,14 @@ export async function unlockRecordVaultTutaDrive(req, res) {
   if (!singlesId) return;
   try {
     const { memberId, notesMount } = await resolveMemberContext(singlesId);
+    await dropStaleCloudSessionIfWrongMount(singlesId, notesMount);
     let flags = vaultStatusFlags(notesMount);
 
     if (!flags.hasVault) {
       const keyMaterial = await resolveTutaDriveKeyMaterial();
       if (!fs.existsSync(vaultMetaPath(notesMount))) {
         await initializeVaultOnUsbWithKey(notesMount, keyMaterial?.key ?? null, keyMaterial);
-        ensureTutaDriveMemberLayout(memberId);
+        ensureTutaDriveMemberLayout(memberId, { singlesId });
       }
       flags = vaultStatusFlags(notesMount);
     }
@@ -218,6 +270,12 @@ export async function unlockRecordVaultTutaDrive(req, res) {
       ...flags
     });
   } catch (err) {
+    if (isStoragePermissionError(err)) {
+      return sendRecordVaultError(res, err, 'Folder permission error. Please contact your admin', {
+        route: 'unlockRecordVaultTutaDrive',
+        singlesId
+      });
+    }
     const mapped = unlockErrorResponse(err);
     if (mapped.status >= 500) console.error('[unlockRecordVaultTutaDrive]', err);
     return res.status(mapped.status).json(mapped.body);

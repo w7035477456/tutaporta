@@ -19,10 +19,16 @@ import {
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
 export function readRecordVaultApiError(err, fallback = 'Request failed') {
   const data = err?.response?.data;
+  if (data?.code === 'STORAGE_PERMISSION') {
+    return String(data?.error || 'Folder permission error. Please contact your admin');
+  }
   if (typeof data === 'string' && data.trim()) {
     const raw = data.trim();
     try {
       const parsed = JSON.parse(raw);
+      if (parsed?.code === 'STORAGE_PERMISSION') {
+        return String(parsed?.error || 'Folder permission error. Please contact your admin');
+      }
       if (parsed?.error) return String(parsed.error);
     } catch {
       // plain text body
@@ -31,6 +37,9 @@ export function readRecordVaultApiError(err, fallback = 'Request failed') {
   }
   if (data?.error) return String(data.error);
   const message = String(err?.message || '').trim();
+  if (/permission denied|EACCES|EPERM|EROFS|Folder permission error/i.test(message)) {
+    return 'Folder permission error. Please contact your admin';
+  }
   if (message && !/^Request failed with status code \d+$/i.test(message)) return message;
   return fallback;
 }

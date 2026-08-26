@@ -13,15 +13,26 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { logFolderPermissionError } from './appStorageFolderPerms.js';
 
 export const STORAGE_PERMISSION_CODE = 'STORAGE_PERMISSION';
-export const STORAGE_PERMISSION_USER_MESSAGE = 'Upload failed. Permission error. Please contact admin.';
+export const STORAGE_PERMISSION_USER_MESSAGE =
+  'Folder permission error. Please contact your admin';
+/** @deprecated Use STORAGE_PERMISSION_USER_MESSAGE — same wording for vault/TutaDrive. */
+export const VAULT_STORAGE_PERMISSION_USER_MESSAGE = STORAGE_PERMISSION_USER_MESSAGE;
 
 const PERMISSION_CODES = new Set(['EACCES', 'EPERM', 'EROFS']);
 const TAG = '[STORAGE_PERMISSION]';
 
 export function isStoragePermissionError(err) {
-  return PERMISSION_CODES.has(String(err?.code ?? '').trim());
+  if (!err) return false;
+  if (PERMISSION_CODES.has(String(err?.code ?? '').trim())) return true;
+  if (PERMISSION_CODES.has(String(err?.cause?.code ?? '').trim())) return true;
+  // Wrapped messages that lost errno but still describe a permission fault
+  const msg = String(err?.message || '');
+  if (/\b(EACCES|EPERM|EROFS)\b/i.test(msg)) return true;
+  if (/permission denied/i.test(msg)) return true;
+  return false;
 }
 
 /** uid/gid -> name via /etc/passwd, /etc/group. Numeric fallback keeps this safe on any host. */
@@ -142,4 +153,40 @@ export function logStoragePermissionFailure(err, context = {}) {
   );
 
   console.error(lines.join('\n'));
+}
+
+/**
+ * JSON 500 for Record Vault / TutaDrive when the Node process cannot read/write storage.
+ * Logs the ownership chain, then returns the short user-facing message.
+ */
+export function respondVaultStoragePermissionError(res, err, context = {}) {
+  const folder =
+    context.folder ||
+    err?.storageRoots?.[0] ||
+    process.env.LARGE_CHEAP_STORAGE_FOLDER ||
+    process.env.STORAGE_FOLDER ||
+    '';
+  const folders = Array.isArray(err?.storageRoots) && err.storageRoots.length
+    ? err.storageRoots
+    : folder
+      ? [folder]
+      : [];
+
+  // Preferred short PM2 line (ops wording)
+  logFolderPermissionError(folders.length ? folders : [folder || '(unknown)'], {
+    route: context.route || 'recordVault',
+    singlesId: context.singlesId ?? null,
+    err: err?.cause && isStoragePermissionError(err.cause) ? err.cause : err
+  });
+  // Keep detailed ownership chain for admins grepping PM2
+  logStoragePermissionFailure(err?.cause && isStoragePermissionError(err.cause) ? err.cause : err, {
+    route: context.route || 'recordVault',
+    envKey: context.envKey || 'LARGE_CHEAP_STORAGE_FOLDER',
+    folder,
+    singlesId: context.singlesId ?? null
+  });
+  return res.status(500).json({
+    code: STORAGE_PERMISSION_CODE,
+    error: STORAGE_PERMISSION_USER_MESSAGE
+  });
 }

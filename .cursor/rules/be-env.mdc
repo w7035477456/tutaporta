@@ -187,7 +187,7 @@ JSON_LIMIT_MB=400
 LEFT_SIDE=TutaDrive
 RIGHT_SIDE=USB
 STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
-LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
+LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_largecheapstorage
 ```
 
 | Variable | Notes |

@@ -46,6 +46,7 @@ import {
 import { parseMediaDataUrl } from '../../utils/parseMediaDataUrl.js';
 import { DEFAULT_BODY_TEXT } from '../../utils/recordVaultUsb/vaultSchema.js';
 import { addVaultSessionFileCounts } from '../../utils/vaultSessionFileCounts.js';
+import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
 
 async function bumpUiFileCount(session, { usb = false } = {}) {
   if (!session?.singlesId) return;
@@ -292,8 +293,10 @@ export async function getRecordVaultTree(req, res) {
     }
     return res.json(tree);
   } catch (err) {
-    console.error('[getRecordVaultTree]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to load record vault' });
+    return sendRecordVaultError(res, err, 'Failed to load record vault', {
+      route: 'getRecordVaultTree',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -313,8 +316,10 @@ export async function getRecordVaultNote(req, res) {
     await addVaultSessionFileCounts(session.singlesId, { uiDelta: 1 });
     return res.json({ note });
   } catch (err) {
-    console.error('[getRecordVaultNote]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to load note' });
+    return sendRecordVaultError(res, err, 'Failed to load note', {
+      route: 'getRecordVaultNote',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -337,8 +342,10 @@ export async function createRecordVaultNotebook(req, res) {
       }
     });
   } catch (err) {
-    console.error('[createRecordVaultNotebook]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to create notebook' });
+    return sendRecordVaultError(res, err, 'Failed to create notebook', {
+      route: 'createRecordVaultNotebook',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -371,8 +378,10 @@ export async function updateRecordVaultNotebook(req, res) {
       }
     });
   } catch (err) {
-    console.error('[updateRecordVaultNotebook]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to update notebook' });
+    return sendRecordVaultError(res, err, 'Failed to update notebook', {
+      route: 'updateRecordVaultNotebook',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -391,8 +400,10 @@ export async function deleteRecordVaultNotebook(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_id: notebookId, soft_deleted: true });
   } catch (err) {
-    console.error('[deleteRecordVaultNotebook]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to delete notebook' });
+    return sendRecordVaultError(res, err, 'Failed to delete notebook', {
+      route: 'deleteRecordVaultNotebook',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -433,9 +444,12 @@ export async function createRecordVaultNote(req, res) {
     await bumpUiFileCount(session, { usb: true });
     return res.json({ note });
   } catch (err) {
-    console.error('[createRecordVaultNote]', err?.message || err);
-    return res.status(err?.message === 'Notebook not found' ? 404 : 500).json({
-      error: err?.message || 'Failed to create note'
+    if (err?.message === 'Notebook not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    return sendRecordVaultError(res, err, 'Failed to create note', {
+      route: 'createRecordVaultNote',
+      singlesId: req.auth?.singles_id
     });
   }
 }
@@ -466,7 +480,10 @@ export async function updateRecordVaultNote(req, res) {
     if (message === 'Unsupported image type') {
       return res.status(400).json({ error: message });
     }
-    return res.status(500).json({ error: message });
+    return sendRecordVaultError(res, err, 'Failed to update note', {
+      route: 'updateRecordVaultNote',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -492,9 +509,12 @@ export async function moveRecordVaultNoteImage(req, res) {
     logImpersonatedMutation(req);
     return res.json(result);
   } catch (err) {
-    console.error('[moveRecordVaultNoteImage]', err?.message || err);
-    return res.status(err?.message === 'Note not found' ? 404 : 500).json({
-      error: err?.message || 'Failed to move note image'
+    if (err?.message === 'Note not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    return sendRecordVaultError(res, err, 'Failed to move note image', {
+      route: 'moveRecordVaultNoteImage',
+      singlesId: req.auth?.singles_id
     });
   }
 }
@@ -514,9 +534,12 @@ export async function deleteRecordVaultNote(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, note_id: noteId, soft_deleted: true });
   } catch (err) {
-    console.error('[deleteRecordVaultNote]', err?.message || err);
-    return res.status(err?.message === 'Note not found' ? 404 : 500).json({
-      error: err?.message || 'Failed to delete note'
+    if (err?.message === 'Note not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    return sendRecordVaultError(res, err, 'Failed to delete note', {
+      route: 'deleteRecordVaultNote',
+      singlesId: req.auth?.singles_id
     });
   }
 }
@@ -541,8 +564,10 @@ export async function getRecordVaultNoteImage(req, res) {
     res.setHeader('Cache-Control', 'private, no-store');
     return res.send(image.buffer);
   } catch (err) {
-    console.error('[getRecordVaultNoteImage]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to load image' });
+    return sendRecordVaultError(res, err, 'Failed to load image', {
+      route: 'getRecordVaultNoteImage',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -566,8 +591,10 @@ export async function getRecordVaultNoteExtraImage(req, res) {
     res.setHeader('Cache-Control', 'private, no-store');
     return res.send(image.buffer);
   } catch (err) {
-    console.error('[getRecordVaultNoteExtraImage]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to load image' });
+    return sendRecordVaultError(res, err, 'Failed to load image', {
+      route: 'getRecordVaultNoteExtraImage',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -598,7 +625,10 @@ export async function uploadRecordVaultNoteExtraImage(req, res) {
     console.error('[uploadRecordVaultNoteExtraImage]', err?.message || err);
     const message = err?.message || 'Failed to upload image';
     if (message === 'Note not found') return res.status(404).json({ error: message });
-    return res.status(500).json({ error: message });
+    return sendRecordVaultError(res, err, 'Failed to upload image', {
+      route: 'uploadRecordVaultNoteExtraImage',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -623,7 +653,10 @@ export async function deleteRecordVaultNoteExtraImage(req, res) {
     if (message === 'Note not found' || message === 'Image not found') {
       return res.status(404).json({ error: message });
     }
-    return res.status(500).json({ error: message });
+    return sendRecordVaultError(res, err, 'Failed to delete image', {
+      route: 'deleteRecordVaultNoteExtraImage',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -647,8 +680,10 @@ export async function reorderRecordVaultNotebooks(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_ids: notebookIds });
   } catch (err) {
-    console.error('[reorderRecordVaultNotebooks]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to reorder notebooks' });
+    return sendRecordVaultError(res, err, 'Failed to reorder notebooks', {
+      route: 'reorderRecordVaultNotebooks',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -677,8 +712,10 @@ export async function reorderRecordVaultNotes(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, note_ids: noteIds });
   } catch (err) {
-    console.error('[reorderRecordVaultNotes]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to reorder notes' });
+    return sendRecordVaultError(res, err, 'Failed to reorder notes', {
+      route: 'reorderRecordVaultNotes',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -706,8 +743,10 @@ export async function createRecordVaultShortcut(req, res) {
     logImpersonatedMutation(req);
     return res.json({ shortcut });
   } catch (err) {
-    console.error('[createRecordVaultShortcut]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to create shortcut' });
+    return sendRecordVaultError(res, err, 'Failed to create shortcut', {
+      route: 'createRecordVaultShortcut',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -726,8 +765,10 @@ export async function deleteRecordVaultShortcut(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, shortcut_id: shortcutId });
   } catch (err) {
-    console.error('[deleteRecordVaultShortcut]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to delete shortcut' });
+    return sendRecordVaultError(res, err, 'Failed to delete shortcut', {
+      route: 'deleteRecordVaultShortcut',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -751,8 +792,10 @@ export async function reorderRecordVaultShortcuts(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, shortcut_ids: shortcutIds });
   } catch (err) {
-    console.error('[reorderRecordVaultShortcuts]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to reorder shortcuts' });
+    return sendRecordVaultError(res, err, 'Failed to reorder shortcuts', {
+      route: 'reorderRecordVaultShortcuts',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -782,8 +825,10 @@ export async function getRecordVaultNoteAttachment(req, res) {
     res.setHeader('Cache-Control', 'private, no-store');
     return res.send(file.buffer);
   } catch (err) {
-    console.error('[getRecordVaultNoteAttachment]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to load attachment' });
+    return sendRecordVaultError(res, err, 'Failed to load attachment', {
+      route: 'getRecordVaultNoteAttachment',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -823,8 +868,10 @@ export async function openRecordVaultNoteAttachmentNative(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, opened: true });
   } catch (err) {
-    console.error('[openRecordVaultNoteAttachmentNative]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Failed to open attachment in desktop app' });
+    return sendRecordVaultError(res, err, 'Failed to open attachment in desktop app', {
+      route: 'openRecordVaultNoteAttachmentNative',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -868,7 +915,10 @@ export async function uploadRecordVaultNoteAttachment(req, res) {
     console.error('[uploadRecordVaultNoteAttachment]', err?.message || err);
     const message = err?.message || 'Failed to upload attachment';
     if (message === 'Note not found') return res.status(404).json({ error: message });
-    return res.status(500).json({ error: message });
+    return sendRecordVaultError(res, err, 'Failed to upload attachment', {
+      route: 'uploadRecordVaultNoteAttachment',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -893,7 +943,10 @@ export async function deleteRecordVaultNoteAttachment(req, res) {
     if (message === 'Attachment not found' || message === 'Note not found') {
       return res.status(404).json({ error: message });
     }
-    return res.status(500).json({ error: message });
+    return sendRecordVaultError(res, err, 'Failed to delete attachment', {
+      route: 'deleteRecordVaultNoteAttachment',
+      singlesId: req.auth?.singles_id
+    });
   }
 }
 
@@ -917,7 +970,9 @@ export async function searchRecordVaultNotes(req, res) {
     const results = vaultSearch(session, chain, evaluateRecordVaultSearchChain);
     return res.json({ results });
   } catch (err) {
-    console.error('[searchRecordVaultNotes]', err?.message || err);
-    return res.status(500).json({ error: err?.message || 'Search failed' });
+    return sendRecordVaultError(res, err, 'Search failed', {
+      route: 'searchRecordVaultNotes',
+      singlesId: req.auth?.singles_id
+    });
   }
 }

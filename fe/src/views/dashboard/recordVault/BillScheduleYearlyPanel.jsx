@@ -198,7 +198,14 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
       setRows(withDerived(data?.rows || [], y));
       setPeerHasRows(Boolean(data?.peer_has_rows));
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to load yearly bills');
+      setError(
+        err?.response?.data?.error ||
+          (err?.response?.status
+            ? `Yearly bill failed (${err.response.status})`
+            : null) ||
+          err?.message ||
+          'Failed to load yearly bills'
+      );
       setRows([]);
       setPeerHasRows(false);
     } finally {

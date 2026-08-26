@@ -1843,6 +1843,21 @@ httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Mobile upload API: GET /api/mobilePhotoUpload/ping → {"ok":true,"apiVersion":2}`);
+  void import('./utils/appStorageFolderPerms.js')
+    .then(({ ensureAllAppStorageFoldersWritable }) => {
+      const perm = ensureAllAppStorageFoldersWritable({ route: 'startup' });
+      if (perm.ok) {
+        console.log(
+          '[startup] storage folder perms OK:',
+          perm.roots.join(' | ') || '(none configured)'
+        );
+      } else {
+        console.error(
+          '[startup] storage folder perms FAILED — UI will show Folder permission error until fixed'
+        );
+      }
+    })
+    .catch((err) => console.error('[startup] storage folder perm check failed:', err?.message ?? err));
   void initUserActivityStatsSchema()
     .then(() => console.log('[startup] user activity / search event tables ready'))
     .catch((err) => console.error('[startup] user activity schema bootstrap failed:', err?.message ?? err));

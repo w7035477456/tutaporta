@@ -3,9 +3,13 @@ import path from 'path';
 import pool from '../db/connection.js';
 import {
   ensureVaultLayoutDirs,
+  vaultFilesRoot,
+  vaultHasDbFile,
   vaultPhotosRoot,
   vaultRootOnMount
 } from './recordVaultUsb/vaultPaths.js';
+import { oneDriveStagingMountPath } from './recordVaultOneDriveStagingRoot.js';
+import { ensurePathWritableOrThrow } from './appStorageFolderPerms.js';
 
 /** LEFT_SIDE=OneDrive (default) | TutaDrive | None */
 export function getLeftSideMode() {
@@ -102,38 +106,108 @@ export function tutaDrivePhotosPath(memberId) {
 }
 
 /**
- * Ensure …/users/M{id}/notes and …/users/M{id}/photos exist.
- * Point vault photos dir at sibling photos/ via symlink when possible.
+ * Link …/notes/TutaNotes/photos → …/users/M{id}/photos when possible.
+ * If vault photos is a real dir with files, merge into sibling photos/ first.
  */
-export function ensureTutaDriveMemberLayout(memberId) {
-  const notesMount = tutaDriveNotesMountPath(memberId);
-  const photosAbs = tutaDrivePhotosPath(memberId);
-  fs.mkdirSync(notesMount, { recursive: true });
-  fs.mkdirSync(photosAbs, { recursive: true });
-  ensureVaultLayoutDirs(notesMount);
-
+function linkVaultPhotosToMemberPhotos(notesMount, photosAbs) {
   const vaultPhotos = vaultPhotosRoot(notesMount);
   try {
     if (fs.existsSync(vaultPhotos)) {
       const st = fs.lstatSync(vaultPhotos);
       if (st.isSymbolicLink()) {
-        return { notesMount, photosAbs, vaultRoot: vaultRootOnMount(notesMount) };
+        return;
       }
-      // Replace empty photos dir with symlink to sibling photos/
       const entries = fs.readdirSync(vaultPhotos);
       if (entries.length === 0) {
         fs.rmdirSync(vaultPhotos);
+      } else {
+        fs.mkdirSync(photosAbs, { recursive: true });
+        fs.cpSync(vaultPhotos, photosAbs, { recursive: true, force: true });
+        fs.rmSync(vaultPhotos, { recursive: true, force: true });
       }
     }
     if (!fs.existsSync(vaultPhotos)) {
       fs.symlinkSync(photosAbs, vaultPhotos, 'dir');
     }
   } catch (err) {
-    // Symlink may fail on some FS — vault keeps photos under notes/TutaNotes/photos.
+    // Symlink may fail on some FS — keep photos under notes/TutaNotes/photos.
     console.warn('[tutaDrive] photos symlink skipped:', err?.message || err);
     fs.mkdirSync(vaultPhotos, { recursive: true });
   }
-  return { notesMount, photosAbs, vaultRoot: vaultRootOnMount(notesMount) };
+}
+
+/**
+ * One-time: if TutaDrive vault is empty but OneDrive staging has a vault for this
+ * singles_id, copy it into …/users/M{memberId}/notes/TutaNotes.
+ */
+export function migrateLegacyOneDriveStagingToTutaDrive(singlesId, memberId) {
+  const notesMount = tutaDriveNotesMountPath(memberId);
+  if (vaultHasDbFile(notesMount)) return { migrated: false, reason: 'dest_has_vault' };
+
+  const stagingMount = oneDriveStagingMountPath(singlesId);
+  const stagingVault = vaultRootOnMount(stagingMount);
+  if (!vaultHasDbFile(stagingMount) && !fs.existsSync(path.join(stagingVault, 'vault.meta.json'))) {
+    return { migrated: false, reason: 'no_staging_vault' };
+  }
+  if (!fs.existsSync(stagingVault)) {
+    return { migrated: false, reason: 'no_staging_vault' };
+  }
+
+  const destVault = vaultRootOnMount(notesMount);
+  fs.mkdirSync(destVault, { recursive: true });
+  fs.cpSync(stagingVault, destVault, { recursive: true, force: true });
+  console.info(
+    `[tutaDrive] migrated OneDrive staging vault singles_id=${singlesId} → ${destVault}`
+  );
+  return { migrated: true, from: stagingVault, to: destVault };
+}
+
+/**
+ * Ensure per-member TutaDrive tree for the current user:
+ *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/
+ *     notes/TutaNotes/{files,photos,vault.db,…}
+ *     photos/   (sibling; vault photos/ usually symlinks here)
+ *
+ * Called on every TutaDrive status/unlock/init for that singles session.
+ * When singlesId is passed, also migrates leftover OneDrive staging vault once.
+ */
+export function ensureTutaDriveMemberLayout(memberId, options = {}) {
+  const singlesId = options?.singlesId != null ? Number(options.singlesId) : null;
+  const notesMount = tutaDriveNotesMountPath(memberId);
+  const photosAbs = tutaDrivePhotosPath(memberId);
+  const memberRoot = tutaDriveMemberRoot(memberId);
+
+  // Create M{id} and all subfolders (same as the manual mkdir/rsync/ln script).
+  ensurePathWritableOrThrow(memberRoot, {
+    route: 'ensureTutaDriveMemberLayout',
+    singlesId: Number.isFinite(singlesId) ? singlesId : undefined
+  });
+  fs.mkdirSync(notesMount, { recursive: true });
+  fs.mkdirSync(photosAbs, { recursive: true });
+  ensureVaultLayoutDirs(notesMount); // notes/TutaNotes/{files,photos}
+  fs.mkdirSync(vaultFilesRoot(notesMount), { recursive: true });
+  ensurePathWritableOrThrow(notesMount, { route: 'ensureTutaDriveMemberLayout:notes' });
+  ensurePathWritableOrThrow(photosAbs, { route: 'ensureTutaDriveMemberLayout:photos' });
+
+  if (Number.isFinite(singlesId) && singlesId >= 1) {
+    try {
+      migrateLegacyOneDriveStagingToTutaDrive(singlesId, memberId);
+      // Re-ensure dirs after copy (staging may omit empty folders).
+      ensureVaultLayoutDirs(notesMount);
+    } catch (err) {
+      console.warn('[tutaDrive] staging migrate skipped:', err?.message || err);
+    }
+  }
+
+  linkVaultPhotosToMemberPhotos(notesMount, photosAbs);
+
+  return {
+    notesMount,
+    photosAbs,
+    vaultRoot: vaultRootOnMount(notesMount),
+    memberRoot,
+    memberFolder: memberFolderName(memberId)
+  };
 }
 
 export function wipeTutaDriveMemberVault(memberId) {

@@ -27,6 +27,7 @@ import {
   STORAGE_PERMISSION_CODE,
   STORAGE_PERMISSION_USER_MESSAGE
 } from '../../utils/storagePermissionError.js';
+import { logFolderPermissionError } from '../../utils/appStorageFolderPerms.js';
 import { resolveRegularMemberActivityTimestamp, loadLatestPhotoCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
 
 // Max upload size from ~/.ssh/be/.env — NOTES_MAX_SIZE_UPLOAD_MB, else MAX_SIZE_UPLOAD_MB, default 2 MiB
@@ -653,9 +654,17 @@ export async function uploadPhoto(req, res) {
       logStoragePermissionFailure(err, {
         route: mobileToken ? 'uploadPhoto (phone QR)' : 'uploadPhoto',
         envKey: 'VSINGLES_PHOTO_FOLDER',
-        folder: process.env.VSINGLES_PHOTO_FOLDER,
+        folder: process.env.VSINGLES_PHOTO_FOLDER || process.env.STORAGE_FOLDER,
         singlesId: req.auth?.singles_id
       });
+      logFolderPermissionError(
+        [
+          process.env.STORAGE_FOLDER,
+          process.env.LARGE_CHEAP_STORAGE_FOLDER,
+          process.env.VSINGLES_PHOTO_FOLDER
+        ].filter(Boolean),
+        { route: 'uploadPhoto', singlesId: req.auth?.singles_id, err }
+      );
       return res.status(500).json({
         code: STORAGE_PERMISSION_CODE,
         error: STORAGE_PERMISSION_USER_MESSAGE

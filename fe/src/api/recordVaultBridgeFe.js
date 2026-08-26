@@ -139,6 +139,9 @@ function pathWithoutQuery(url) {
 }
 
 function bridgeErrorMessage(status, data) {
+  if (data?.code === 'STORAGE_PERMISSION') {
+    return String(data?.error || 'Folder permission error. Please contact your admin');
+  }
   if (typeof data === 'string' && data.trim()) return data.trim();
   if (data?.error) return String(data.error);
   return `Request failed with status code ${status}`;

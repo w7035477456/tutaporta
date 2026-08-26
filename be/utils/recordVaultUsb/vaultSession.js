@@ -771,10 +771,14 @@ export async function initializeVaultOnUsbWithKey(mountPath, key, kdfMaterial = 
   } catch (err) {
     const code = err?.code;
     if (code === 'EROFS' || code === 'EPERM' || code === 'EACCES' || code === 'ENOENT') {
-      throw new Error(
+      const wrapped = new Error(
         'Cannot create TutaNotes on this volume (read-only or not a real USB). ' +
           'Eject the Record Vault USB Bridge installer DMG if it is open, then pick your USB drive (for example TutaNotes).'
       );
+      wrapped.code = code;
+      wrapped.cause = err;
+      wrapped.path = err?.path;
+      throw wrapped;
     }
     throw err;
   }
