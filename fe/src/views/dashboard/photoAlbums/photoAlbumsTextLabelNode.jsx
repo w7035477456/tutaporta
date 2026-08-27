@@ -171,9 +171,38 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
     }
   });
   const onActiveBookPage = useMemo(() => {
-    if (!pageBands.length) return true;
-    return labelCenterInBands(pageBands);
-  }, [pageBands, layoutLockVersion, labelCenterInBands]);
+    const bandsFromCtx = Array.isArray(pageBands) ? pageBands : [];
+    const bandsFromStore = Array.isArray(attachmentStore?.activePageBands)
+      ? attachmentStore.activePageBands
+      : [];
+    const bands = bandsFromCtx.length
+      ? bandsFromCtx
+      : bandsFromStore.length
+        ? bandsFromStore
+        : null;
+    const legacyBand = activePageBand || attachmentStore?.activePageBand || null;
+    if (!bands?.length && !legacyBand) return true;
+    if (bands?.length) return labelCenterInBands(bands);
+    if (!(legacyBand.height > 0)) return true;
+    const cx = posLeft + labelBoxW / 2;
+    const cy = posTop + labelBoxH / 2;
+    return (
+      cx >= legacyBand.left &&
+      cx <= legacyBand.left + legacyBand.width &&
+      cy >= legacyBand.top &&
+      cy <= legacyBand.top + legacyBand.height
+    );
+  }, [
+    pageBands,
+    layoutLockVersion,
+    labelCenterInBands,
+    attachmentStore,
+    activePageBand,
+    posLeft,
+    posTop,
+    labelBoxW,
+    labelBoxH
+  ]);
 
   const liveLeft = dragPos?.left ?? posLeft;
   const liveTop = dragPos?.top ?? posTop;

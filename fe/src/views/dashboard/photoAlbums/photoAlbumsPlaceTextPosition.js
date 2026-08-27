@@ -1,6 +1,7 @@
 import { PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME, newLabelId } from './photoAlbumsTextLabelNode';
 import {
   listTextAndEmojiNearPhoto,
+  PHOTO_ALBUMS_ATTACHMENT_NODE_NAME,
   photoPageRectFromAttrs
 } from './photoAlbumsAttachmentNode';
 import { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
@@ -222,7 +223,15 @@ function labelToPageAttrs(label, photoRect) {
 /** Apply overlay label positions/styles onto the album document. */
 export function commitPlaceTextPositionSession(editor, session) {
   if (!editor || !session?.photoRect || !Array.isArray(session.labels)) return false;
-  const { photoRect, labels } = session;
+  let photoRect = session.photoRect;
+  const photoPos = Number(session.photoPos);
+  if (Number.isFinite(photoPos)) {
+    const liveNode = editor.state.doc.nodeAt(photoPos);
+    if (liveNode?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
+      photoRect = photoPageRectFromAttrs(liveNode.attrs) || photoRect;
+    }
+  }
+  const { labels } = session;
 
   const keptIds = new Set(
     labels.map((l) => String(l.labelId || '').trim()).filter(Boolean)
@@ -278,6 +287,12 @@ export function commitPlaceTextPositionSession(editor, session) {
     }));
     const insertAt = editor.state.doc.content.size;
     editor.chain().focus(null, { scrollIntoView: false }).insertContentAt(insertAt, nodes).run();
+  }
+
+  const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+  if (store) {
+    store.layoutLockVersion = (Number(store.layoutLockVersion) || 0) + 1;
+    store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
   }
 
   return true;

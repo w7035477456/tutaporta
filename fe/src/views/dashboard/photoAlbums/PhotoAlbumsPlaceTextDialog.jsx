@@ -1046,9 +1046,10 @@ export default function PhotoAlbumsPlaceTextDialog({
           onClick={handleTogglePanZoom}
           title="Pan & Zoom — drag the photo inside its slot on the album page"
           sx={{
-            minWidth: 72,
+            minWidth: 88,
             fontWeight: 800,
-            lineHeight: 1.05,
+            lineHeight: 1.15,
+            whiteSpace: 'nowrap',
             ...(panEnabled
               ? {
                   bgcolor: '#FFEB3B !important',
@@ -1059,10 +1060,7 @@ export default function PhotoAlbumsPlaceTextDialog({
               : null)
           }}
         >
-          <Box component="span" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Box component="span">Pan</Box>
-            <Box component="span">Zoom</Box>
-          </Box>
+          Pan & Zoom
         </GreenButton>
         <GreenButton
           type="button"
@@ -1389,12 +1387,25 @@ export default function PhotoAlbumsPlaceTextDialog({
   return (
     <ColorTemplate16PopupCenterWide
       open={open}
-      onClose={onClose}
+      onClose={handleOk}
       closeOnBackdrop={false}
+      showCloseButton
+      maxWidth={hasMedia ? '90vw' : undefined}
       resizable={hasMedia}
-      fillViewportHeight={hasMedia}
-      defaultResizeHeight={hasMedia ? '100vh' : undefined}
-      maxResizeHeight={hasMedia ? '100vh' : undefined}
+      fillViewportHeight={false}
+      defaultResizeHeight={hasMedia ? '90vh' : undefined}
+      maxResizeHeight={hasMedia ? '90vh' : undefined}
+      panelShellSx={
+        hasMedia
+          ? {
+              width: '90vw',
+              maxWidth: '90vw',
+              height: '90vh',
+              maxHeight: '90vh',
+              minHeight: '90vh'
+            }
+          : undefined
+      }
       contentSx={
         hasMedia
           ? {

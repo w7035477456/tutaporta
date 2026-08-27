@@ -654,13 +654,13 @@
       }
     }
 
-    /* Free-placed rotatable text labels (above photos). */
+    /* Free-placed rotatable text labels (above photos, including selected/pinned slots). */
     .rv-text-label {
       position: absolute !important;
       display: block;
       margin: 0 !important;
       flex: none !important;
-      z-index: 6;
+      z-index: 55;
       max-width: none !important;
       width: max-content;
       transform-origin: center center;

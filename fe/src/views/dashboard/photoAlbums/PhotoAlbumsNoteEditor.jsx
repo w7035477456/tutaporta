@@ -19,7 +19,6 @@ import {
   detachTextAndEmojiNearPhoto,
   insertCompanionLabelsOnPhoto,
   photoPageRectFromAttrs,
-  setPinnedPhotoEditPos,
   clearPinnedPhotoEditPos,
   listTextAndEmojiNearPhoto
 } from './photoAlbumsAttachmentNode';
@@ -3277,24 +3276,30 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     setPlaceTextOpen(true);
   }, [editable, albumTitle]);
 
-  const restorePhotoEditSelection = useCallback(
-    (photoPos) => {
-      if (!editor || !Number.isFinite(photoPos)) return;
-      requestAnimationFrame(() => {
-        const stillThere = editor.state.doc.nodeAt(photoPos);
-        if (stillThere?.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-        setPinnedPhotoEditPos(editor, photoPos);
-        try {
-          editor.view.dispatch(
-            editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, photoPos))
-          );
-        } catch {
-          // ignore
+  /** Close Add Text → normal album (no yellow/red photo edit chrome). */
+  const exitPlaceTextToNormalAlbum = useCallback(() => {
+    if (!editor) return;
+    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+    if (store) {
+      store.dialogPanZoom = false;
+      store.selectedPhotoPanZoom = false;
+      store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
+    }
+    clearPinnedPhotoEditPos(editor);
+    requestAnimationFrame(() => {
+      try {
+        const { state, dispatch } = editor.view;
+        if (state.selection instanceof NodeSelection) {
+          dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
+        } else {
+          // Force node views to re-read pin/pan state after clear.
+          dispatch(state.tr.setMeta('paContextTutorial', store?.contextTutorialTick || 0));
         }
-      });
-    },
-    [editor]
-  );
+      } catch {
+        // ignore
+      }
+    });
+  }, [editor]);
 
   const handlePlaceTextConfirm = useCallback(
     (style) => {
@@ -3326,6 +3331,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         setPlaceTextStyle(null);
         setPlaceTextSeed('');
         placeTextPhotoPosRef.current = null;
+        exitPlaceTextToNormalAlbum();
         return;
       }
 
@@ -3352,7 +3358,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       if (style?.placeTextSession) {
         commitPlaceTextPositionSession(editor, style.placeTextSession);
         requestAnimationFrame(() => emitHtml(editor.getHTML()));
-        restorePhotoEditSelection(style.placeTextSession.photoPos);
+        exitPlaceTextToNormalAlbum();
         return;
       }
 
@@ -3398,6 +3404,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           );
           requestAnimationFrame(() => emitHtml(editor.getHTML()));
         }
+        exitPlaceTextToNormalAlbum();
         return;
       }
 
@@ -3466,8 +3473,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           .run();
       }
       requestAnimationFrame(() => emitHtml(editor.getHTML()));
+      exitPlaceTextToNormalAlbum();
     },
-    [editor, editable, albumZoom, emitHtml, albumTitle, onAlbumTitleChange, restorePhotoEditSelection]
+    [editor, editable, albumZoom, emitHtml, albumTitle, onAlbumTitleChange, exitPlaceTextToNormalAlbum]
   );
 
   useEffect(() => {
@@ -6266,7 +6274,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         storageType={storageType}
         onPhotoChromeChange={handlePlaceTextPhotoChromeChange}
         onClose={() => {
-          const cancelPhotoPos = placeTextMediaSession?.photoPos ?? placeTextPhotoPosRef.current;
           placeTextEditingLabelIdRef.current = null;
           placeTextEditingPosRef.current = null;
           placeTextAlbumTitleModeRef.current = false;
@@ -6278,7 +6285,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           setPlaceTextStyle(null);
           setPlaceTextMediaSession(null);
           setPlaceTextOpen(false);
-          restorePhotoEditSelection(cancelPhotoPos);
+          exitPlaceTextToNormalAlbum();
         }}
         onConfirm={handlePlaceTextConfirm}
       />
