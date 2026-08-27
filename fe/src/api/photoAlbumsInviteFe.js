@@ -63,7 +63,7 @@ export async function fetchPhotoAlbumsSharedAlbumContent(sharedAlbumId) {
 export async function fetchPhotoAlbumsSharedAlbumAttachmentBlob(
   sharedAlbumId,
   attachmentId,
-  { inline = true } = {}
+  { inline = true, variant = 'full' } = {}
 ) {
   const albumId = Number(sharedAlbumId);
   const attId = Number(attachmentId);
@@ -71,8 +71,12 @@ export async function fetchPhotoAlbumsSharedAlbumAttachmentBlob(
     throw new Error('Invalid shared album or attachment id');
   }
   const path = `/api/photoAlbums/shared-albums/${albumId}/attachments/${attId}`;
+  const params = {};
+  if (inline) params.inline = 1;
+  const v = String(variant || 'full').trim().toLowerCase();
+  if (v && v !== 'full') params.variant = v;
   const { data } = await api.get(path, {
-    params: inline ? { inline: 1 } : undefined,
+    params: Object.keys(params).length ? params : undefined,
     responseType: 'blob'
   });
   return data;

@@ -93,7 +93,8 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
       try {
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
           inline: true,
-          storageType
+          storageType,
+          variant: 'thumb'
         });
         if (cancelled || !blob || blob.size < 1) return;
         const type = String(blob.type || '').toLowerCase();

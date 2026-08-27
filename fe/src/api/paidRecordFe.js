@@ -1,10 +1,23 @@
 import api from './axios';
 
-function isPreviewable(mime, fileName) {
+/** @returns {'image'|'pdf'|'docx'|null} */
+export function getPaidRecordAttachmentPreviewKind(mime, fileName) {
   const m = String(mime || '').toLowerCase();
-  if (m.startsWith('image/')) return true;
   const n = String(fileName || '').toLowerCase();
-  return /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(n);
+  if (m.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|heic)$/i.test(n)) return 'image';
+  if (m === 'application/pdf' || n.endsWith('.pdf')) return 'pdf';
+  if (
+    m.includes('wordprocessingml.document') ||
+    m === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    n.endsWith('.docx')
+  ) {
+    return 'docx';
+  }
+  return null;
+}
+
+function isPreviewable(mime, fileName) {
+  return getPaidRecordAttachmentPreviewKind(mime, fileName) != null;
 }
 
 function mapAttachment(row) {
@@ -24,6 +37,7 @@ function mapAttachment(row) {
     checksum: row.checksum ? String(row.checksum).toLowerCase() : null,
     relativePath: row.relativePath ?? row.relative_path ?? '',
     createdAt: row.createdAt ?? row.created_at ?? null,
+    previewKind: getPaidRecordAttachmentPreviewKind(mimeType, originalFileName),
     previewable: row.previewable != null ? Boolean(row.previewable) : isPreviewable(mimeType, originalFileName)
   };
 }
@@ -111,6 +125,15 @@ export async function uploadPaidRecordAttachment(paidRecordId, file) {
       null;
   }
   return full;
+}
+
+/** Fetch attachment bytes (cookie auth) for in-app PDF/DOCX preview. */
+export async function fetchPaidRecordAttachmentBlob(paidRecordId, attachmentId) {
+  const { data } = await api.get(
+    `/api/paidRecord/${encodeURIComponent(paidRecordId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    { responseType: 'blob' }
+  );
+  return data;
 }
 
 /** Inline preview URL (same-origin cookie auth). */

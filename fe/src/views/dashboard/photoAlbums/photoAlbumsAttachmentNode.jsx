@@ -6,12 +6,12 @@ import { NodeSelection, TextSelection, Plugin, PluginKey } from '@tiptap/pm/stat
 import Box from '@mui/material/Box';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
-import SliderControlButton, {
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE
-} from 'ui-component/SliderControlButton';
+import SliderControlButton from 'ui-component/SliderControlButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
+import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
+import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   canViewPhotoAlbumsAttachment,
   canNativeOpenPhotoAlbumsAttachment,
@@ -34,6 +34,7 @@ import {
   usePhotoAlbumsAlbumLayout
 } from './photoAlbumsAlbumLayoutContext';
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
+import { getAttachmentVariantPreview } from './photoAlbumsAttachmentVariantCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
 import { findFramedPhotoInFrame } from './photoAlbumsSlotOccupancy';
 
@@ -536,15 +537,15 @@ const photoTopRightChromeSx = {
 
 /** Hover action chips — fill each cell of the action row (wrap when narrow). */
 const photoSlotActionBtnSx = {
-  flex: '1 1 auto',
+  flex: '1 1 0',
   width: 'auto',
-  minWidth: { xs: '3.2rem', sm: '3.8rem' },
+  minWidth: 0,
   maxWidth: '100%',
-  px: { xs: 0.55, sm: 0.85 },
-  py: { xs: 0.7, sm: 0.85 },
-  fontSize: { xs: '0.78rem !important', sm: '0.92rem !important' },
+  px: { xs: 0.4, sm: 0.65 },
+  py: { xs: 0.65, sm: 0.8 },
+  fontSize: { xs: '0.72rem !important', sm: '0.85rem !important' },
   fontWeight: 800,
-  minHeight: { xs: '2.35rem', sm: '2.65rem' },
+  minHeight: { xs: '2.2rem', sm: '2.5rem' },
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -700,6 +701,7 @@ function transferFramedPanZoomToSlot({
   panX,
   panY,
   slotFit,
+  rotationDeg,
   fromFrameW,
   fromFrameH,
   toFrameLeft,
@@ -734,6 +736,11 @@ function transferFramedPanZoomToSlot({
     toH
   );
 
+  const rotN = Number(rotationDeg);
+  const rot = Number.isFinite(rotN)
+    ? ((Math.round(rotN / 90) * 90) % 360 + 360) % 360
+    : 0;
+
   return {
     posLeft: toFrameLeft,
     posTop: toFrameTop,
@@ -745,7 +752,8 @@ function transferFramedPanZoomToSlot({
     frameTop: toFrameTop,
     frameWidth: toFrameW,
     frameHeight: toFrameH,
-    slotFit: normalizeSlotFit(slotFit) || 'cover'
+    slotFit: normalizeSlotFit(slotFit) || 'cover',
+    rotationDeg: rot
   };
 }
 
@@ -771,10 +779,15 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const panX = parseOptionalPx(node?.attrs?.panX) ?? 0;
   const panY = parseOptionalPx(node?.attrs?.panY) ?? 0;
   const slotFit = normalizeSlotFit(node?.attrs?.slotFit);
+  const rotationDeg = (() => {
+    const n = Number(node?.attrs?.rotationDeg);
+    if (!Number.isFinite(n)) return 0;
+    return ((Math.round(n / 90) * 90) % 360 + 360) % 360;
+  })();
   const placedLeft = parseOptionalPx(node?.attrs?.posLeft);
   const placedTop = parseOptionalPx(node?.attrs?.posTop);
   const inFrame = frameWidth != null && frameHeight != null && frameLeft != null && frameTop != null;
-  const { openPhotoFullscreen, activePageBand, activePageBands, photoLoadBands } =
+  const { openPhotoFullscreen, activePageBand, activePageBands } =
     usePhotoAlbumsAlbumLayout();
   const layoutLockVersion = useEditorState({
     editor,
@@ -845,41 +858,10 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   ]);
 
   /**
-   * Path A: fetch photo blobs only for active page ±1. Stateless per-attachment GETs
-   * (safe under multi-server round-robin; no sticky session).
+   * Load all album page photos (no Path A lazy unload). Display uses *_1000px.jpg;
+   * full att_N.jpg only in Edit Photo popup / slideshow.
    */
-  const shouldLoadPhotoBlob = useMemo(() => {
-    const fromCtx = Array.isArray(photoLoadBands) ? photoLoadBands : [];
-    const fromStore = Array.isArray(
-      editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.photoLoadBands
-    )
-      ? editor.storage[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME].photoLoadBands
-      : [];
-    const bands = fromCtx.length ? fromCtx : fromStore;
-    // No page bands yet (plain note / hydrate) — allow load.
-    if (!bands.length) return true;
-    const left = inFrame ? frameLeft : placedLeft;
-    const top = inFrame ? frameTop : placedTop;
-    const w = inFrame ? frameWidth : displayWidth;
-    const h = inFrame ? frameHeight : displayHeight;
-    if (left == null || top == null) return true;
-    const cx = left + Math.max(1, Number(w) || 40) / 2;
-    const cy = top + Math.max(1, Number(h) || 40) / 2;
-    return pointInAnyAlbumBand(cx, cy, bands);
-  }, [
-    photoLoadBands,
-    editor,
-    layoutLockVersion,
-    inFrame,
-    frameLeft,
-    frameTop,
-    frameWidth,
-    frameHeight,
-    placedLeft,
-    placedTop,
-    displayWidth,
-    displayHeight
-  ]);
+  const shouldLoadPhotoBlob = true;
   const attachment = {
     attachment_id: attachmentId,
     file_name: node?.attrs?.fileName || '',
@@ -914,8 +896,12 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const [isMoving, setIsMoving] = useState(false);
   /** Hover/selected filename — inline top-right next to return X. */
   const [nameHover, setNameHover] = useState(false);
-  /** Yellow double-click choice menu: View FullScreen / Edit Photo / Exit. */
-  const [photoChoiceMenuOpen, setPhotoChoiceMenuOpen] = useState(false);
+  /** ColorTemplate16 edit popup — opened by double-click (replaces yellow choice menu). */
+  const [photoEditPopupOpen, setPhotoEditPopupOpen] = useState(false);
+  /** Full att_N.jpg for Edit Photo popup only (page tiles use *_1000px). */
+  const [editFullUrl, setEditFullUrl] = useState('');
+  const editFullUrlRef = useRef('');
+  editFullUrlRef.current = editFullUrl;
 
   const readContext = useCallback(() => editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME] || {}, [editor]);
 
@@ -950,6 +936,53 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const isPhoto = viewKind === 'image';
   const isAlbumVideo = viewKind === 'video' && isPhotoAlbumsStagingVideoExtension(ext);
   const isAlbumSlotMedia = isPhoto || isAlbumVideo;
+
+  // Edit Photo popup: load full att_N.jpg (not *_1000px).
+  useEffect(() => {
+    if (!photoEditPopupOpen || !isPhoto || isAlbumVideo) {
+      return undefined;
+    }
+    let cancelled = false;
+    let owned = '';
+    (async () => {
+      try {
+        const ctx = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME] || {};
+        const sharedAlbumId = Number(ctx.sharedAlbumId);
+        const noteId = Number(ctx.noteId);
+        const blob =
+          Number.isFinite(sharedAlbumId) && sharedAlbumId > 0
+            ? await fetchPhotoAlbumsSharedAlbumAttachmentBlob(sharedAlbumId, attachmentId, {
+                inline: true,
+                variant: 'full'
+              })
+            : await fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
+                inline: true,
+                storageType: ctx.storageType,
+                variant: 'full'
+              });
+        if (cancelled || !blob) return;
+        owned = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(owned);
+          return;
+        }
+        const prev = String(editFullUrlRef.current || '');
+        setEditFullUrl(owned);
+        if (prev.startsWith('blob:') && prev !== owned) {
+          try {
+            URL.revokeObjectURL(prev);
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // Keep display thumb in popup until full loads / if it fails.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [photoEditPopupOpen, isPhoto, isAlbumVideo, attachmentId, editor]);
   const canView = canViewPhotoAlbumsAttachment(ext) || isAlbumSlotMedia;
   const launchesNative = canNativeOpenPhotoAlbumsAttachment(ext);
   const actionLabel = launchesNative ? 'Launch' : 'View';
@@ -1005,7 +1038,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   /** Mouse wheel scrolls the album page — zoom only via the yellow slider (not wheel). */
   // (Previously wheel zoomed the selected photo and blocked page scroll.)
 
-  /** Select this photo node (solid red border) — via yellow menu “Edit Photo”. */
+  /** Select this photo node (solid red border) — via Edit Photo popup. */
   const selectThisPhoto = useCallback(() => {
     const pos = typeof getPos === 'function' ? getPos() : null;
     if (pos == null || !editor?.view) return;
@@ -1018,20 +1051,44 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)));
   }, [editor, getPos]);
 
+  const exitPhotoEditPopup = useCallback(() => {
+    setPhotoEditPopupOpen(false);
+    setPanEnabled(false);
+    const prev = String(editFullUrlRef.current || '');
+    setEditFullUrl('');
+    if (prev.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(prev);
+      } catch {
+        // ignore
+      }
+    }
+    const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+    if (store && store.pinnedPhotoEditPos != null) {
+      store.pinnedPhotoEditPos = null;
+      store.contextTutorialTick = (store.contextTutorialTick || 0) + 1;
+    }
+    if (editor?.view) {
+      const { state, dispatch } = editor.view;
+      if (state.selection instanceof NodeSelection) {
+        dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
+      }
+    }
+  }, [editor]);
+
   /**
    * Framed + Pan&Zoom on: drag pans inside the slot.
    * Framed + Pan&Zoom off: drag relocates — tray return, slot swap, or cancel
    * (release elsewhere restores original position / pan / zoom).
    * Framed photos also relocate in View/Create (no Edit Photo) after a short
-   * drag threshold so plain click / double-click menu still work.
+   * drag threshold so plain click / double-click edit popup still work.
    * Free-placed + selected: drag moves the photo.
-   * Edit chrome (Text / Reset / Pan&Zoom) is entered only via yellow menu “Edit Photo”.
+   * Edit chrome (Text / Reset / Pan Zoom) opens via double-click Edit Photo popup.
    */
   const startPhotoMove = useCallback(
     (event) => {
       if (!editable || event.button !== 0) return;
       if (event.target?.closest?.('.rv-photo-tile__actions')) return;
-      if (event.target?.closest?.('.rv-photo-tile__choice-menu')) return;
       if (event.target?.closest?.('.rv-attachment-photo__return-x, .rv-attachment-photo__top-chrome')) return;
       if (event.target?.closest?.('.rv-album-video-indicator')) return;
       if (event.target?.closest?.('.rv-photo-tile__zoom-bar')) return;
@@ -1042,7 +1099,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
       if (!editActive && !framedRelocateWithoutEdit) return;
 
       // Unselected framed: defer preventDefault until drag passes threshold
-      // so double-click → yellow menu still fires.
+      // so double-click → Edit Photo popup still fires.
       const deferRelocateUi = !editActive;
       if (!deferRelocateUi) {
         event.preventDefault();
@@ -1466,6 +1523,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               panX: livePanX,
               panY: livePanY,
               slotFit: node?.attrs?.slotFit,
+              rotationDeg: node?.attrs?.rotationDeg,
               fromFrameW: homeFrame.width,
               fromFrameH: homeFrame.height,
               toFrameLeft: targetFrame.left,
@@ -1480,6 +1538,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               panX: other.node.attrs.panX,
               panY: other.node.attrs.panY,
               slotFit: other.node.attrs.slotFit,
+              rotationDeg: other.node.attrs.rotationDeg,
               fromFrameW: other.fw,
               fromFrameH: other.fh,
               toFrameLeft: homeFrame.left,
@@ -1536,6 +1595,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               panX: livePanX,
               panY: livePanY,
               slotFit: node?.attrs?.slotFit,
+              rotationDeg: node?.attrs?.rotationDeg,
               fromFrameW: homeFrame.width,
               fromFrameH: homeFrame.height,
               toFrameLeft: targetFrame.left,
@@ -1830,13 +1890,23 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         return;
       }
 
-      // Instant paint from tray cache while vault blob fetch runs (Auto Layout).
-      const stagedPreview = String(getStagingAttachmentPreview(attachmentId) || '').trim();
+      // Prefetched *_1000px or tray cache while vault blob fetch runs.
+      const displayCached = String(
+        getAttachmentVariantPreview(noteId, attachmentId, 'display') || ''
+      ).trim();
+      const stagedPreview = String(
+        displayCached || getStagingAttachmentPreview(attachmentId) || ''
+      ).trim();
       if (stagedPreview && !cancelled) {
         setThumbUrl(stagedPreview);
         thumbUrlRef.current = stagedPreview;
         setThumbLoadError('');
         setThumbLoading(false);
+        if (displayCached) {
+          vaultThumbReadyRef.current = true;
+          vaultThumbAttachmentIdRef.current = attachmentId;
+          return;
+        }
       } else if (!cancelled) {
         setThumbLoading(true);
       }
@@ -1845,11 +1915,13 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         const blob =
           Number.isFinite(sharedAlbumId) && sharedAlbumId > 0
             ? await fetchPhotoAlbumsSharedAlbumAttachmentBlob(sharedAlbumId, attachmentId, {
-                inline: true
+                inline: true,
+                variant: isAlbumVideo ? 'full' : 'display'
               })
             : await fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
                 inline: true,
-                storageType: ctx.storageType
+                storageType: ctx.storageType,
+                variant: isAlbumVideo ? 'full' : 'display'
               });
         if (cancelled) return;
         if (!blob) {
@@ -1905,6 +1977,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     };
   }, [
     isAlbumSlotMedia,
+    isAlbumVideo,
     attachmentId,
     editor,
     attachmentCtxVersion,
@@ -2039,6 +2112,17 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     }
   }, []);
 
+  const openPhotoEditPopup = useCallback(() => {
+    if (!editable) {
+      cancelScheduledPhotoViewInNewTab();
+      void openPhotoInNewTab();
+      return;
+    }
+    cancelScheduledPhotoViewInNewTab();
+    selectThisPhoto();
+    setPhotoEditPopupOpen(true);
+  }, [editable, cancelScheduledPhotoViewInNewTab, openPhotoInNewTab, selectThisPhoto]);
+
   const schedulePhotoViewInNewTab = useCallback(
     (event) => {
       if (!photoViewModeActive || isAlbumVideo) return;
@@ -2110,50 +2194,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
       void openPhotoInNewTab();
     },
     [cancelScheduledPhotoViewInNewTab, openPhotoInNewTab]
-  );
-
-  const handlePhotoChoiceViewFullscreen = useCallback(
-    (event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      setPhotoChoiceMenuOpen(false);
-      cancelScheduledPhotoViewInNewTab();
-      void openPhotoInNewTab();
-    },
-    [cancelScheduledPhotoViewInNewTab, openPhotoInNewTab]
-  );
-
-  const handlePhotoChoiceEditPhoto = useCallback(
-    (event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      setPhotoChoiceMenuOpen(false);
-      cancelScheduledPhotoViewInNewTab();
-      if (!editable) return;
-      selectThisPhoto();
-    },
-    [editable, cancelScheduledPhotoViewInNewTab, selectThisPhoto]
-  );
-
-  const handlePhotoChoiceExit = useCallback(
-    (event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      setPhotoChoiceMenuOpen(false);
-      cancelScheduledPhotoViewInNewTab();
-      const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      if (store && store.pinnedPhotoEditPos != null) {
-        store.pinnedPhotoEditPos = null;
-        store.contextTutorialTick = (store.contextTutorialTick || 0) + 1;
-      }
-      if (editor?.view) {
-        const { state, dispatch } = editor.view;
-        if (state.selection instanceof NodeSelection) {
-          dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-        }
-      }
-    },
-    [cancelScheduledPhotoViewInNewTab, editor]
   );
 
   const handleAlbumVideoViewClick = useCallback(
@@ -2288,6 +2328,8 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         });
         deleteNode();
       }
+      setPhotoEditPopupOpen(false);
+      setPanEnabled(false);
       return;
     }
 
@@ -2537,10 +2579,14 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
             setPanEnabled((v) => !v);
           }}
           title="Toggle Pan & Zoom mode — drag to pan; use the yellow slider to zoom"
-          aria-label={`Pan&Zoom ${label}`}
+          aria-label={`Pan Zoom ${label}`}
           aria-pressed={panEnabled}
           sx={{
             ...photoSlotActionBtnSx,
+            whiteSpace: 'normal',
+            lineHeight: 1.05,
+            minWidth: { xs: '2.6rem', sm: '3rem' },
+            px: { xs: 0.4, sm: 0.55 },
             ...(panEnabled
               ? {
                   bgcolor: '#FFEB3B !important',
@@ -2559,7 +2605,36 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               : null)
           }}
         >
-          Pan&Zoom
+          <Box
+            component="span"
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1.05,
+              whiteSpace: 'normal',
+              textAlign: 'center'
+            }}
+          >
+            <Box component="span">Pan</Box>
+            <Box component="span">Zoom</Box>
+          </Box>
+        </SliderControlButton>
+      ) : null}
+      {isPhoto && editable && inFrame ? (
+        <SliderControlButton
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            commitAttrs({ rotationDeg: (rotationDeg + 90) % 360 });
+          }}
+          title="Rotate photo 90° clockwise"
+          aria-label={`Rotate ${label} 90 degrees`}
+          sx={photoSlotActionBtnSx}
+        >
+          Rotate
         </SliderControlButton>
       ) : null}
       {editable && inFrame && isPhoto ? (
@@ -2730,9 +2805,16 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
                     overflow: 'hidden',
                     boxShadow: 'none',
                     border: 'none',
-                    borderRadius: 0
+                    borderRadius: 0,
+                    transform: rotationDeg ? `rotate(${rotationDeg}deg)` : undefined,
+                    transformOrigin: 'center center'
                   }
-                : null)
+                : rotationDeg
+                  ? {
+                      transform: `rotate(${rotationDeg}deg)`,
+                      transformOrigin: 'center center'
+                    }
+                  : null)
             }}
             onMouseDown={editable ? startPhotoMove : undefined}
             onDragStart={(event) => {
@@ -2745,140 +2827,28 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
             onDoubleClick={(event) => {
               cancelScheduledPhotoViewInNewTab();
               if (event.target?.closest?.('.rv-photo-tile__actions')) return;
-              if (event.target?.closest?.('.rv-photo-tile__choice-menu')) return;
               if (event.target?.closest?.('.rv-attachment-photo__return-x, .rv-attachment-photo__top-chrome')) return;
               if (event.target?.closest?.('.rv-attachment-photo__top-chrome')) return;
               if (event.target?.closest?.('.rv-album-video-indicator')) return;
               if (event.target?.closest?.('button')) return;
-              // Always show yellow choice menu — edit mode only via menu “Edit Photo/Video”.
               event.preventDefault();
               event.stopPropagation();
-              setPhotoChoiceMenuOpen(true);
+              openPhotoEditPopup();
             }}
               title={
-              photoChoiceMenuOpen
-                ? undefined
-                : editable
+                editable
                   ? editActive
                     ? isAlbumVideo
-                      ? 'Selected · Text and Reset on the video · drag to another slot to swap · drag to thumbnails to return'
+                      ? 'Selected · Text and Reset · drag to another slot to swap · drag to thumbnails to return'
                       : framed
                         ? panEnabled
-                          ? 'Pan&Zoom mode — drag to move the photo inside the slot · use yellow slider to zoom'
-                          : 'Selected · drag to another slot to swap (keeps pan & zoom) · drag to thumbnails to return · release elsewhere to cancel · toggle Pan&Zoom to pan/zoom'
-                        : 'Selected · drag to move · drag onto a dotted slot to snap · drag up to thumbnails to Reset'
-                    : framed
-                      ? 'Drag to another slot to swap · drag to thumbnails to return · double-click for View FullScreen or Edit Photo'
-                      : isAlbumVideo
-                        ? 'Double-click for View FullScreen or Edit Video'
-                        : 'Double-click for View FullScreen or Edit Photo'
-                  : 'Double-click for View FullScreen'
+                          ? 'Pan Zoom mode — drag to move the photo inside the slot · use yellow slider to zoom'
+                          : 'Selected · drag to another slot to swap · drag to thumbnails to return · double-click to edit'
+                        : 'Selected · drag to move · double-click to edit'
+                    : 'Double-click to edit photo'
+                  : 'Double-click to view full screen'
             }
           >
-            {photoChoiceMenuOpen ? (
-              <Box
-                className="rv-photo-tile__choice-menu"
-                role="dialog"
-                aria-label={isAlbumVideo ? 'Video actions' : 'Photo actions'}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onClick={(e) => {
-                  // Click dimmed area (not a button) closes the menu.
-                  if (e.target === e.currentTarget) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setPhotoChoiceMenuOpen(false);
-                    return;
-                  }
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onDoubleClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                sx={{
-                  position: 'absolute',
-                  inset: 0,
-                  zIndex: 40,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'rgba(0,0,0,0.35)',
-                  pointerEvents: 'auto'
-                }}
-              >
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    gap: 1,
-                    px: 1.25,
-                    py: 1.25,
-                    minWidth: { xs: 148, sm: 168 },
-                    maxWidth: '92%',
-                    bgcolor: '#FFEB3B',
-                    border: '3px solid #000000',
-                    borderRadius: 1,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  {[
-                    {
-                      key: 'view',
-                      label: 'View FullScreen',
-                      onClick: handlePhotoChoiceViewFullscreen
-                    },
-                    {
-                      key: 'edit',
-                      label: isAlbumVideo ? 'Edit Video' : 'Edit Photo',
-                      onClick: handlePhotoChoiceEditPhoto,
-                      disabled: !editable
-                    },
-                    {
-                      key: 'exit',
-                      label: 'Exit',
-                      onClick: handlePhotoChoiceExit
-                    }
-                  ].map((btn) => (
-                    <SliderControlButton
-                      key={btn.key}
-                      type="button"
-                      disabled={Boolean(btn.disabled)}
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE}
-                      onClick={btn.onClick}
-                      sx={{
-                        width: '100%',
-                        minWidth: 0,
-                        px: 1,
-                        py: 0.85,
-                        fontWeight: 800,
-                        fontSize: { xs: '0.85rem !important', sm: '0.95rem !important' },
-                        bgcolor: '#FFEB3B !important',
-                        color: '#000000 !important',
-                        WebkitTextFillColor: '#000000 !important',
-                        border: '3px solid #000000 !important',
-                        boxShadow: 'none',
-                        '@media (hover: hover)': {
-                          '&:hover:not(.Mui-disabled)': {
-                            bgcolor: '#60C446 !important',
-                            color: '#000000 !important',
-                            WebkitTextFillColor: '#000000 !important',
-                            border: '3px solid #000000 !important'
-                          }
-                        }
-                      }}
-                    >
-                      {btn.label}
-                    </SliderControlButton>
-                  ))}
-                </Box>
-              </Box>
-            ) : null}
             {showTopRightChrome ? (
               <Box className="rv-attachment-photo__top-chrome" sx={photoTopRightChromeSx}>
                 {showFileName ? (
@@ -3220,6 +3190,22 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               bottom: 0,
               width: '100%',
               zIndex: 5,
+              display: 'none'
+            }}
+          />
+          {/* Edit controls live in ColorTemplate16 popup (double-click). */}
+          {false ? (
+          <Box
+            className="rv-photo-tile__actions"
+            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            sx={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              zIndex: 5,
               display: 'flex',
               flexDirection: 'column',
               gap: 0,
@@ -3284,6 +3270,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               </Box>
             ) : null}
           </Box>
+          ) : null}
           {error ? (
             <Typography
               sx={{
@@ -3330,6 +3317,164 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               document.body
             )
           : null}
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(photoEditPopupOpen)}
+          onClose={exitPhotoEditPopup}
+          closeOnBackdrop
+          showCloseButton
+          defaultResizeHeight="78vh"
+          maxResizeHeight="92vh"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={1.25}>
+            <ColorTemplate16PopupCenterWide.Title>
+              {isAlbumVideo ? 'Edit Video' : 'Edit Photo'}
+            </ColorTemplate16PopupCenterWide.Title>
+            <Box
+              sx={{
+                position: 'relative',
+                width: '100%',
+                minHeight: { xs: 220, sm: 320 },
+                maxHeight: '52vh',
+                bgcolor: '#111',
+                border: panEnabled ? '3px solid #FFEB3B' : '2px solid #000',
+                borderRadius: 1,
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                ...(panEnabled ? panModeFrameBlinkSx : null)
+              }}
+            >
+              {thumbUrl || editFullUrl ? (
+                isAlbumVideo ? (
+                  <Box
+                    component="video"
+                    src={thumbUrl}
+                    controls
+                    playsInline
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: '52vh',
+                      objectFit: 'contain',
+                      display: 'block'
+                    }}
+                  />
+                ) : (
+                  <Box
+                    component="img"
+                    src={editFullUrl || thumbUrl}
+                    alt={label}
+                    draggable={false}
+                    onPointerDown={(e) => {
+                      if (!panEnabled || !inFrame) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const startX = e.clientX;
+                      const startY = e.clientY;
+                      const originPanX = livePanX;
+                      const originPanY = livePanY;
+                      const photoW = livePhotoW || displayWidth || 1;
+                      const photoH = livePhotoH || displayHeight || 1;
+                      const fw = frameWidth || 1;
+                      const fh = frameHeight || 1;
+                      const onMove = (ev) => {
+                        const next = clampPhotoPan(
+                          originPanX + (ev.clientX - startX),
+                          originPanY + (ev.clientY - startY),
+                          photoW,
+                          photoH,
+                          fw,
+                          fh
+                        );
+                        commitAttrs({ panX: next.panX, panY: next.panY });
+                      };
+                      const onUp = () => {
+                        window.removeEventListener('pointermove', onMove);
+                        window.removeEventListener('pointerup', onUp);
+                      };
+                      window.addEventListener('pointermove', onMove);
+                      window.addEventListener('pointerup', onUp);
+                    }}
+                    sx={{
+                      maxWidth: '100%',
+                      maxHeight: '52vh',
+                      objectFit: slotFit === 'contain' ? 'contain' : 'cover',
+                      transform: rotationDeg ? `rotate(${rotationDeg}deg)` : undefined,
+                      transformOrigin: 'center center',
+                      cursor: panEnabled ? 'grab' : 'default',
+                      display: 'block',
+                      userSelect: 'none'
+                    }}
+                  />
+                )
+              ) : (
+                <Typography sx={{ color: '#fff', fontWeight: 700 }}>Loading…</Typography>
+              )}
+              {!isAlbumVideo ? (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    maxWidth: '55%',
+                    bgcolor: 'rgba(80,80,80,0.88)',
+                    color: '#fff',
+                    px: 1,
+                    py: 0.75,
+                    borderRadius: 1,
+                    fontFamily: MAIN_FONT_FAMILY,
+                    fontWeight: 700,
+                    fontSize: '0.78rem',
+                    lineHeight: 1.25,
+                    pointerEvents: 'none',
+                    textAlign: 'left'
+                  }}
+                >
+                  Place text on or next to photo. Then rotate like a sticker.
+                </Box>
+              ) : null}
+            </Box>
+            {framed && !isAlbumVideo ? (
+              <Box sx={slotZoomSliderRowSx(panEnabled)} title="Zoom photo in slot (Pan Zoom mode)">
+                <Typography component="span" sx={slotZoomPctLabelSx(panEnabled)}>
+                  0%
+                </Typography>
+                <Slider
+                  size="small"
+                  disabled={!panEnabled}
+                  value={framedZoomPct}
+                  min={SLOT_ZOOM_PCT_MIN}
+                  max={SLOT_ZOOM_PCT_MAX}
+                  step={1}
+                  onChange={(_, v) => {
+                    if (!panEnabled) return;
+                    applyFramedZoomPercent(v);
+                  }}
+                  aria-label="Zoom photo in slot"
+                  valueLabelDisplay={panEnabled ? 'auto' : 'off'}
+                  valueLabelFormat={(v) => `${v}%`}
+                  sx={slotZoomSliderSx(panEnabled)}
+                />
+                <Typography component="span" sx={slotZoomPctLabelSx(panEnabled)}>
+                  100%
+                </Typography>
+              </Box>
+            ) : null}
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'nowrap',
+                alignItems: 'stretch',
+                justifyContent: 'stretch',
+                gap: 0.5,
+                width: '100%',
+                overflowX: 'auto'
+              }}
+            >
+              {actionButtons}
+            </Box>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
       </NodeViewWrapper>
     );
   }
@@ -3494,6 +3639,20 @@ export const PhotoAlbumsAttachmentNode = Node.create({
           return raw === 'contain' || raw === 'cover' ? raw : null;
         },
         renderHTML: (attrs) => attrToData(attrs.slotFit, 'data-slot-fit')
+      },
+      /** Photo rotation in the slot (degrees, multiples of 90). */
+      rotationDeg: {
+        default: 0,
+        parseHTML: (el) => {
+          const n = Number(el.getAttribute('data-rotation'));
+          if (!Number.isFinite(n)) return 0;
+          return ((Math.round(n / 90) * 90) % 360 + 360) % 360;
+        },
+        renderHTML: (attrs) => {
+          const n = Number(attrs.rotationDeg);
+          if (!Number.isFinite(n) || n === 0) return {};
+          return attrToData(((Math.round(n / 90) * 90) % 360 + 360) % 360, 'data-rotation');
+        }
       }
     };
   },
@@ -3506,7 +3665,7 @@ export const PhotoAlbumsAttachmentNode = Node.create({
     return ['div', mergeAttributes(HTMLAttributes, { 'data-rv-attachment': '' })];
   },
 
-  /** Block TipTap single-click NodeSelection — edit mode is via yellow menu “Edit Photo”. */
+  /** Block TipTap single-click NodeSelection — edit mode is via double-click Edit Photo popup. */
   addProseMirrorPlugins() {
     return [
       new Plugin({

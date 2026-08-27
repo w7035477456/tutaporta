@@ -147,7 +147,12 @@ async function listDirectoryEntries(dirHandle) {
  * Finder-like local folder browser for staging photos into the green thumbnail tray.
  * Remembers the last folder the user browsed (IndexedDB handle + breadcrumb).
  */
-export default function PhotoAlbumsFilesExplorerPanel({ active = true, onStageOsFiles, disabled = false }) {
+export default function PhotoAlbumsFilesExplorerPanel({
+  active = true,
+  onStageOsFiles,
+  onStageTrayBusyChange,
+  disabled = false
+}) {
   const [rootHandle, setRootHandle] = useState(null);
   const [relativePath, setRelativePath] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -619,20 +624,26 @@ export default function PhotoAlbumsFilesExplorerPanel({ active = true, onStageOs
       setError('Select one or more photos first, then add them to the thumbnail tray.');
       return;
     }
-    const files = await materializeExplorerEntries(selected);
-    if (!files.length) {
-      setError('Could not read the selected photo files. Try “Open folder…” if access was revoked.');
-      return;
+    onStageTrayBusyChange?.(true, 'Adding photos to Thumbnail Tray');
+    try {
+      const files = await materializeExplorerEntries(selected);
+      if (!files.length) {
+        setError('Could not read the selected photo files. Try “Open folder…” if access was revoked.');
+        return;
+      }
+      if (rootHandle && !rootHandle.__synthetic) {
+        persistLocation(rootHandle, relativePath);
+      }
+      await onStageOsFiles(files);
+    } finally {
+      onStageTrayBusyChange?.(false);
     }
-    if (rootHandle && !rootHandle.__synthetic) {
-      persistLocation(rootHandle, relativePath);
-    }
-    onStageOsFiles(files);
   }, [
     disabled,
     filesForKeys,
     materializeExplorerEntries,
     onStageOsFiles,
+    onStageTrayBusyChange,
     persistLocation,
     relativePath,
     rootHandle,
@@ -646,20 +657,26 @@ export default function PhotoAlbumsFilesExplorerPanel({ active = true, onStageOs
       setError('No photos in this folder to add to the thumbnail tray.');
       return;
     }
-    const files = await materializeExplorerEntries(allFiles);
-    if (!files.length) {
-      setError('Could not read photo files in this folder. Try “Open folder…” if access was revoked.');
-      return;
+    onStageTrayBusyChange?.(true, 'Adding photos to Thumbnail Tray');
+    try {
+      const files = await materializeExplorerEntries(allFiles);
+      if (!files.length) {
+        setError('Could not read photo files in this folder. Try “Open folder…” if access was revoked.');
+        return;
+      }
+      if (rootHandle && !rootHandle.__synthetic) {
+        persistLocation(rootHandle, relativePath);
+      }
+      await onStageOsFiles(files);
+    } finally {
+      onStageTrayBusyChange?.(false);
     }
-    if (rootHandle && !rootHandle.__synthetic) {
-      persistLocation(rootHandle, relativePath);
-    }
-    onStageOsFiles(files);
   }, [
     disabled,
     entries,
     materializeExplorerEntries,
     onStageOsFiles,
+    onStageTrayBusyChange,
     persistLocation,
     relativePath,
     rootHandle
@@ -902,5 +919,6 @@ export default function PhotoAlbumsFilesExplorerPanel({ active = true, onStageOs
 PhotoAlbumsFilesExplorerPanel.propTypes = {
   active: PropTypes.bool,
   onStageOsFiles: PropTypes.func,
+  onStageTrayBusyChange: PropTypes.func,
   disabled: PropTypes.bool
 };

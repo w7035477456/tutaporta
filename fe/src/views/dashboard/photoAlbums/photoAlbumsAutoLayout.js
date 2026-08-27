@@ -340,12 +340,28 @@ function loadImageAspectFromUrl(url) {
 
 /**
  * Resolve natural aspect (width/height) for each staging-tray item.
+ * @param {object} [opts]
+ * @param {number} [opts.noteId]
+ * @param {string|null} [opts.storageType]
+ * @param {(info: { index: number, total: number, item: object }) => void} [opts.onProgress]
  */
-export async function resolveStagingPhotoAspects(stagedItems, { noteId, storageType } = {}) {
+export async function resolveStagingPhotoAspects(
+  stagedItems,
+  { noteId, storageType, onProgress } = {}
+) {
   const list = Array.isArray(stagedItems) ? stagedItems : [];
   const out = [];
+  const total = list.length;
 
-  for (const item of list) {
+  for (let i = 0; i < list.length; i += 1) {
+    const item = list[i];
+    if (typeof onProgress === 'function') {
+      onProgress({ index: i + 1, total, item });
+    }
+    // Yield so Auto Layout hourglass / % can paint between items.
+    if (i % 4 === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
     let aspect = null;
     const isVideo = isPhotoAlbumsStagingVideoExtension(item?.fileExtension);
     const previewUrl = String(item?.localPreviewUrl || getStagingAttachmentPreview(item?.attachmentId) || '');
@@ -361,7 +377,8 @@ export async function resolveStagingPhotoAspects(stagedItems, { noteId, storageT
       try {
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
           inline: true,
-          storageType
+          storageType,
+          variant: 'display'
         });
         if (blob && blob.size > 0) {
           const objUrl = URL.createObjectURL(blob);

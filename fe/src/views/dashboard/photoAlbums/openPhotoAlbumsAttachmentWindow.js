@@ -153,7 +153,8 @@ export async function openPhotoAlbumsAttachmentInNewWindow({
 
   try {
     const blob = await fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
-      storageType
+      storageType,
+      variant: viewKind === 'image' ? 'display' : 'full'
     });
 
     if (viewKind === 'pdf') {

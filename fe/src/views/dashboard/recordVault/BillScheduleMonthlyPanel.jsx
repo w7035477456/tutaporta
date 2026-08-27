@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
@@ -117,10 +117,13 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [billPopupOpen, setBillPopupOpen] = useState(false);
   const [billEnsurePayload, setBillEnsurePayload] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const storageKey =
     String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
   const peerKey = storageKey === 'usb' ? 'onedrive' : 'usb';
@@ -131,6 +134,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
     setLoading(true);
     setError('');
     setSavedMsg('');
+    setDirty(false);
     try {
       const data = await fetchMonthlyBill(y, m, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], y, m));
@@ -190,20 +194,62 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
       })
     );
     setSavedMsg('');
+    setDirty(true);
   };
 
-  const openBillForRow = (row) => {
+  /** Persist current (or override) rows; clears dirty/blink on success. Returns saved rows or null. */
+  const persistSchedule = useCallback(
+    async (rowsOverride) => {
+      const toSave = Array.isArray(rowsOverride) ? rowsOverride : rowsRef.current;
+      setSaving(true);
+      setError('');
+      try {
+        const payload = toSave.map((r, i) => ({
+          row_index: Number(r.row_index) || i + 1,
+          bill_description: r.bill_description,
+          due_day: r.due_day === '' || r.due_day == null ? null : Number(r.due_day),
+          amount: normalizeAmountLocal(r.amount),
+          bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
+          action: r.bill_type === 'Auto' ? null : r.action,
+          paid_record_id: r.paid_record_id
+        }));
+        const data = await saveMonthlyBill(year, month, payload, { storageType: storageKey });
+        const next = withDerived(data?.rows || [], year, month);
+        setRows(next);
+        setSavedMsg('Saved');
+        setDirty(false);
+        return next;
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Failed to save');
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [year, month, storageKey]
+  );
+
+  const openBillForRow = async (row) => {
+    let target = row;
+    if (dirty) {
+      const saved = await persistSchedule();
+      if (!saved) return;
+      target =
+        saved.find((r) => Number(r.row_index) === Number(row.row_index)) ||
+        saved.find((r) => Number(r.monthly_bill_id) === Number(row.monthly_bill_id)) ||
+        row;
+    }
     setBillEnsurePayload({
       kind: 'monthly',
       year,
       month,
-      row_index: Number(row.row_index) || 1,
-      monthly_bill_id: row.monthly_bill_id || undefined,
-      bill_description: row.bill_description,
-      due_day: row.due_day === '' ? null : row.due_day,
-      amount: row.amount,
-      bill_type: row.bill_type,
-      action: row.action
+      row_index: Number(target.row_index) || 1,
+      monthly_bill_id: target.monthly_bill_id || undefined,
+      bill_description: target.bill_description,
+      due_day: target.due_day === '' ? null : target.due_day,
+      amount: target.amount,
+      bill_type: target.bill_type,
+      action: target.action
     });
     setBillPopupOpen(true);
   };
@@ -214,9 +260,8 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
       prev.map((r) => {
         if (
           (data.monthlyBillId && Number(r.monthly_bill_id) === Number(data.monthlyBillId)) ||
-          (Number(r.paid_record_id) === Number(data.paidRecordId)) ||
-          (Number(r.row_index) === Number(billEnsurePayload?.row_index) &&
-            !r.monthly_bill_id)
+          Number(r.paid_record_id) === Number(data.paidRecordId) ||
+          (Number(r.row_index) === Number(billEnsurePayload?.row_index) && !r.monthly_bill_id)
         ) {
           return {
             ...r,
@@ -230,36 +275,18 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
     );
   };
 
-  const handleAdd = () => {
-    setRows((prev) => {
-      const nextIndex = prev.reduce((max, r) => Math.max(max, Number(r.row_index) || 0), 0) + 1;
-      return [...prev, blankRow(nextIndex)];
-    });
+  const handleAdd = async () => {
+    const prev = rowsRef.current;
+    const nextIndex = prev.reduce((max, r) => Math.max(max, Number(r.row_index) || 0), 0) + 1;
+    const nextRows = [...prev, blankRow(nextIndex)];
+    setRows(nextRows);
     setSavedMsg('');
+    await persistSchedule(nextRows);
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setError('');
     setSavedMsg('');
-    try {
-      const payload = rows.map((r, i) => ({
-        row_index: Number(r.row_index) || i + 1,
-        bill_description: r.bill_description,
-        due_day: r.due_day === '' || r.due_day == null ? null : Number(r.due_day),
-        amount: normalizeAmountLocal(r.amount),
-        bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
-        action: r.bill_type === 'Auto' ? null : r.action,
-        paid_record_id: r.paid_record_id
-      }));
-      const data = await saveMonthlyBill(year, month, payload, { storageType: storageKey });
-      setRows(withDerived(data?.rows || [], year, month));
-      setSavedMsg('Saved');
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
+    await persistSchedule();
   };
 
   const calendarMarks = useMemo(() => {
@@ -491,7 +518,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                   <BillColumnButton
                     hasContent={Boolean(row.has_bill_content)}
                     disabled={loading || saving}
-                    onClick={() => openBillForRow(row)}
+                    onClick={() => void openBillForRow(row)}
                   />
                 </td>
                 <td style={{ background: typeActionStatusBg }}>
@@ -516,7 +543,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                       onChange={(e) => {
                         const next = e.target.value || null;
                         updateRow(index, { action: next });
-                        if (next === 'Paid') openBillForRow(row);
+                        if (next === 'Paid') void openBillForRow(row);
                       }}
                       sx={selectSx}
                       renderValue={(v) => {
@@ -554,10 +581,19 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
           gap: 1
         }}
       >
-        <ColorTemplate13DisableGreenButton type="button" onClick={handleAdd} disabled={loading || saving}>
+        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
           Add
         </ColorTemplate13DisableGreenButton>
-        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleSave()} disabled={loading || saving}>
+        <ColorTemplate13DisableGreenButton
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={loading || saving}
+          sx={
+            dirty && !saving
+              ? { animation: 'blink 1s step-start infinite' }
+              : undefined
+          }
+        >
           {saving ? 'Saving…' : 'SAVE'}
         </ColorTemplate13DisableGreenButton>
       </Box>

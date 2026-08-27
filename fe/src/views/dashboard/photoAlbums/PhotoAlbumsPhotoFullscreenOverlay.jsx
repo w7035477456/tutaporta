@@ -201,9 +201,13 @@ export default function PhotoAlbumsPhotoFullscreenOverlay({
           .replace(/^\./, '');
         const mime = MIME_BY_EXT[ext] || 'image/jpeg';
         const blob = hasShared
-          ? await fetchPhotoAlbumsSharedAlbumAttachmentBlob(sharedId, attachmentId, { inline: true })
+          ? await fetchPhotoAlbumsSharedAlbumAttachmentBlob(sharedId, attachmentId, {
+              inline: true,
+              variant: 'full'
+            })
           : await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
-              storageType
+              storageType,
+              variant: 'full'
             });
         const trimmed = await trimSolidImageBorder(blobWithMime(blob, mime));
         if (cancelled) return;

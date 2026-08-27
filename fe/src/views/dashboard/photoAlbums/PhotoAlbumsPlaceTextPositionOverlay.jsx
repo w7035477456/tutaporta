@@ -375,7 +375,8 @@ export default function PhotoAlbumsPlaceTextPositionOverlay({
         const mime = MIME_BY_EXT[ext] || (session.isVideo ? 'video/mp4' : 'image/jpeg');
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
           inline: true,
-          storageType: storageType || undefined
+          storageType: storageType || undefined,
+          variant: session.isVideo ? 'full' : 'display'
         });
         if (cancelled) return;
         const typed = blob?.type === mime ? blob : new Blob([blob], { type: mime });

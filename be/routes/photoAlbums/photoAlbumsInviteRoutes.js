@@ -582,14 +582,40 @@ export async function getPhotoAlbumsSharedAlbumAttachment(req, res) {
       return res.status(404).json({ error: 'Attachment not found in shared album' });
     }
 
-    const buffer = readSharedInviteAttachmentFile(row.invite_id, meta.storageFileName);
+    const variantRaw = String(req.query?.variant || req.query?.v || 'full')
+      .trim()
+      .toLowerCase();
+    let storageName = meta.storageFileName;
+    let contentType = meta.mimeType || 'application/octet-stream';
+    let fileName = meta.fileName || 'file';
+    if (variantRaw === 'display' || variantRaw === '1000' || variantRaw === '1000px' || variantRaw === 'page') {
+      if (meta.storageDisplayFileName) {
+        storageName = meta.storageDisplayFileName;
+        contentType = 'image/jpeg';
+        fileName = String(meta.fileName || 'photo').replace(/\.[^.]+$/, '') + '_1000px.jpg';
+      }
+    } else if (variantRaw === 'thumb' || variantRaw === 'thumbnail' || variantRaw === 'alley') {
+      if (meta.storageThumbFileName) {
+        storageName = meta.storageThumbFileName;
+        contentType = 'image/jpeg';
+        fileName = String(meta.fileName || 'photo').replace(/\.[^.]+$/, '') + '_thumbnail.jpg';
+      }
+    }
+
+    const buffer = readSharedInviteAttachmentFile(row.invite_id, storageName);
     if (!buffer?.length) return res.status(404).json({ error: 'Attachment file missing' });
 
     const inline =
       req.query.inline === '1' || req.query.inline === 'true' || req.query.view === '1' || req.query.view === 'true';
     let payload = buffer;
-    let contentType = meta.mimeType || 'application/octet-stream';
-    if (inline) {
+    const servedVariant =
+      storageName === meta.storageDisplayFileName
+        ? 'display'
+        : storageName === meta.storageThumbFileName
+          ? 'thumb'
+          : 'full';
+    // Full + inline: may convert exotic formats. Display/thumb variants are already JPEG.
+    if (inline && servedVariant === 'full') {
       const preview = await photoAlbumsInlinePreviewPayload(
         buffer,
         meta.fileExtension || String(meta.fileName || '').split('.').pop() || '',
@@ -601,9 +627,10 @@ export async function getPhotoAlbumsSharedAlbumAttachment(req, res) {
     res.setHeader('Content-Type', contentType);
     res.setHeader(
       'Content-Disposition',
-      `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(meta.fileName || 'file')}"`
+      `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(fileName)}"`
     );
     res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Photo-Albums-Variant', servedVariant);
     return res.send(payload);
   } catch (err) {
     console.error(LOG_PREFIX, 'shared-attachment', err?.message || err);

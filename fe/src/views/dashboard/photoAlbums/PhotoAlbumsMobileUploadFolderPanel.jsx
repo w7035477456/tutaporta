@@ -110,6 +110,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
   active = true,
   disabled = false,
   onStageOsFiles,
+  onStageTrayBusyChange,
   refreshToken = 0
 }) {
   const [files, setFiles] = useState([]);
@@ -222,6 +223,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
       return;
     }
     setError('');
+    onStageTrayBusyChange?.(true, 'Adding photos to Thumbnail Tray');
     try {
       const staged = [];
       for (const entry of selected) {
@@ -232,11 +234,13 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
         setError('Could not download selected files.');
         return;
       }
-      onStageOsFiles(staged);
+      await onStageOsFiles(staged);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to stage mobile uploads');
+    } finally {
+      onStageTrayBusyChange?.(false);
     }
-  }, [blobToFile, disabled, files, onStageOsFiles, selectedNames]);
+  }, [blobToFile, disabled, files, onStageOsFiles, onStageTrayBusyChange, selectedNames]);
 
   const stageAll = useCallback(async () => {
     if (disabled || typeof onStageOsFiles !== 'function') return;
@@ -245,6 +249,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
       return;
     }
     setError('');
+    onStageTrayBusyChange?.(true, 'Adding photos to Thumbnail Tray');
     try {
       const staged = [];
       for (const entry of files) {
@@ -255,11 +260,13 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
         setError('Could not download mobile upload files.');
         return;
       }
-      onStageOsFiles(staged);
+      await onStageOsFiles(staged);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to stage mobile uploads');
+    } finally {
+      onStageTrayBusyChange?.(false);
     }
-  }, [blobToFile, disabled, files, onStageOsFiles]);
+  }, [blobToFile, disabled, files, onStageOsFiles, onStageTrayBusyChange]);
 
   const removeSelected = useCallback(async () => {
     if (disabled) return;
@@ -415,5 +422,6 @@ PhotoAlbumsMobileUploadFolderPanel.propTypes = {
   active: PropTypes.bool,
   disabled: PropTypes.bool,
   onStageOsFiles: PropTypes.func,
+  onStageTrayBusyChange: PropTypes.func,
   refreshToken: PropTypes.number
 };

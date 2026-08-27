@@ -58,18 +58,33 @@ export function capturePhotoAlbumsInviteSnapshot(session, inviteId, noteId) {
     const attachmentId = Number(row.attachment_id ?? row.attachmentId);
     if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
 
-    const file = vaultGetNoteAttachment(session, nid, attachmentId);
+    const file = vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'full' });
     if (!file?.buffer?.length) continue;
 
     const storageFileName = `${attachmentId}_${sanitizeFileToken(row.file_name || file.fileName || 'file')}`;
     fs.writeFileSync(path.join(dir, storageFileName), file.buffer);
+
+    let storageDisplayFileName = null;
+    let storageThumbFileName = null;
+    const display = vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'display' });
+    if (display?.buffer?.length && display.variant === 'display') {
+      storageDisplayFileName = `${attachmentId}_1000px.jpg`;
+      fs.writeFileSync(path.join(dir, storageDisplayFileName), display.buffer);
+    }
+    const thumb = vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'thumb' });
+    if (thumb?.buffer?.length && thumb.variant === 'thumb') {
+      storageThumbFileName = `${attachmentId}_thumbnail.jpg`;
+      fs.writeFileSync(path.join(dir, storageThumbFileName), thumb.buffer);
+    }
 
     snapshotAttachments.push({
       attachmentId,
       fileName: String(row.file_name || file.fileName || ''),
       fileExtension: String(row.file_extension || ''),
       mimeType: String(file.contentType || row.mime_type || 'application/octet-stream'),
-      storageFileName
+      storageFileName,
+      storageDisplayFileName,
+      storageThumbFileName
     });
   }
 

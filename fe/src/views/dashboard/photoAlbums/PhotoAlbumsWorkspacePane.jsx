@@ -27,7 +27,8 @@ import {
   readPhotoAlbumsApiError,
   readPhotoAlbumsOpenFailureMessage,
   readFileAsDataUrl,
-  createPhotoAlbumsPaneApi
+  createPhotoAlbumsPaneApi,
+  fetchPhotoAlbumsNoteAttachmentBlob
 } from 'api/photoAlbumsFe';
 import { registerPhotoAlbumsLeavePrepare } from 'utils/photoAlbumsLeavePrepare';
 import { useAuth } from 'contexts/AuthContext';
@@ -36,6 +37,7 @@ import {
   isAllowedPhotoAlbumsFile,
   isMacOsMetadataFileName,
   isPhotoAlbumsStagingPhotoFile,
+  isPhotoAlbumsStagingPhotoExtension,
   isPhotoAlbumsStagingVideoFile,
   photoAlbumsUploadFileName,
   probePhotoAlbumsImageFile
@@ -60,6 +62,10 @@ import PhotoAlbumsUsbBackupDialog from './PhotoAlbumsUsbBackupDialog';
 import PhotoAlbumsStorageFilesPanel from './PhotoAlbumsStorageFilesPanel';
 import PhotoAlbumsFilesExplorerPanel from './PhotoAlbumsFilesExplorerPanel';
 import PhotoAlbumsNoteEditor from './PhotoAlbumsNoteEditor';
+import {
+  clearAttachmentVariantPreviewsForNote,
+  setAttachmentVariantPreview
+} from './photoAlbumsAttachmentVariantCache';
 import { formatPhotoAlbumsSidebarAlbumLines } from './photoAlbumsAlbumTitleStyle';
 import {
   countPhotoAlbumsSidebarMediaInAttachments,
@@ -1601,7 +1607,7 @@ export default function PhotoAlbumsWorkspacePane({
   const [loading, setLoading] = useState(true);
   const [vaultUiReady, setVaultUiReady] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [batchUploadProgress] = useState(null);
+  const [batchUploadProgress, setBatchUploadProgress] = useState(null);
   const [vaultLeaving, setVaultLeaving] = useState(false);
   /** Honest 0–100% while Log off Cloud syncs dirty vault files to OneDrive. */
   const [vaultLeavingProgressPercent, setVaultLeavingProgressPercent] = useState(0);
@@ -3170,7 +3176,40 @@ export default function PhotoAlbumsWorkspacePane({
       setError('');
       try {
         // Always fetch on display so BE runs size+checksum attachment purge + ENV folder hard-file cleanup.
-        await loadNoteContent(id);
+        const note = await loadNoteContent(id);
+        if (cancelled) return;
+        // Prefetch all album page photos as *_1000px (never full) before clearing hourglass.
+        clearAttachmentVariantPreviewsForNote(id);
+        const attachments = Array.isArray(note?.attachments) ? note.attachments : [];
+        const photoIds = [];
+        for (const row of attachments) {
+          const aid = Number(row?.attachment_id ?? row?.attachmentId);
+          const ext = String(row?.file_extension ?? row?.fileExtension ?? '')
+            .replace(/^\./, '')
+            .toLowerCase();
+          if (!Number.isFinite(aid) || aid < 1) continue;
+          if (!isPhotoAlbumsStagingPhotoExtension(ext)) continue;
+          photoIds.push(aid);
+        }
+        if (photoIds.length) {
+          await Promise.all(
+            photoIds.map(async (aid) => {
+              if (cancelled) return;
+              try {
+                const blob = await fetchPhotoAlbumsNoteAttachmentBlob(id, aid, {
+                  inline: true,
+                  storageType: paneStorageType,
+                  variant: 'display'
+                });
+                if (cancelled || !blob) return;
+                const url = URL.createObjectURL(blob);
+                setAttachmentVariantPreview(id, aid, 'display', url);
+              } catch {
+                // Node view will retry individually.
+              }
+            })
+          );
+        }
         if (!cancelled) loadedNoteIdRef.current = id;
       } catch (err) {
         if (!cancelled) {
@@ -3187,7 +3226,7 @@ export default function PhotoAlbumsWorkspacePane({
     return () => {
       cancelled = true;
     };
-  }, [unlocked, selectedNoteId, loadNoteContent, leaveUnlockedWorkspace]);
+  }, [unlocked, selectedNoteId, loadNoteContent, leaveUnlockedWorkspace, paneStorageType]);
 
   // Push the resolved note body into the TipTap editor once per note/lock-state.
   // Guarded by a hydration key so autosave (which updates body_text in the tree)
@@ -4602,7 +4641,7 @@ export default function PhotoAlbumsWorkspacePane({
    * Do not gate on `busy` — multi-file drops must queue, not silently skip.
    */
   const uploadNoteVaultFileToStaging = useCallback(
-    async (file) => {
+    async (file, { skipBusy = false } = {}) => {
       if (!selectedNote || !file) return;
       const noteId = Number(selectedNote.note_id);
       if (!isAllowedPhotoAlbumsFile(file)) {
@@ -4630,7 +4669,7 @@ export default function PhotoAlbumsWorkspacePane({
 
       let localPreviewUrl = createPhotoStagingPreviewObjectUrl(file, file.name || '');
 
-      setBusy(true);
+      if (!skipBusy) setBusy(true);
       setError('');
       try {
         const dataUrl = await readFileAsDataUrl(file);
@@ -4689,7 +4728,7 @@ export default function PhotoAlbumsWorkspacePane({
         }
         setError(readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`));
       } finally {
-        setBusy(false);
+        if (!skipBusy) setBusy(false);
         bumpVaultUsage();
       }
     },
@@ -4782,18 +4821,47 @@ export default function PhotoAlbumsWorkspacePane({
         }
         return;
       }
-      for (const file of photoFiles) {
-        // eslint-disable-next-line no-await-in-loop
-        await uploadNoteVaultFileToStaging(file);
-      }
-      if (rejected.length) {
-        setError(
-          `Staged ${photoFiles.length} photo(s). Skipped ${rejected.length} unsupported preview type(s) (e.g. RAW, PSD, PDF, JXL).`
-        );
+      const total = photoFiles.length;
+      setBatchUploadProgress({
+        label: `Adding to Thumbnail Tray (0 of ${total})`,
+        percent: 0
+      });
+      try {
+        for (let i = 0; i < total; i += 1) {
+          setBatchUploadProgress({
+            label: `Adding to Thumbnail Tray (${i + 1} of ${total})`,
+            percent: Math.round((i / total) * 100)
+          });
+          // eslint-disable-next-line no-await-in-loop
+          await uploadNoteVaultFileToStaging(photoFiles[i], { skipBusy: true });
+        }
+        setBatchUploadProgress({
+          label: `Adding to Thumbnail Tray (${total} of ${total})`,
+          percent: 100
+        });
+        if (rejected.length) {
+          setError(
+            `Staged ${photoFiles.length} photo(s). Skipped ${rejected.length} unsupported preview type(s) (e.g. RAW, PSD, PDF, JXL).`
+          );
+        }
+      } finally {
+        setBatchUploadProgress(null);
       }
     },
     [uploadNoteVaultFileToStaging]
   );
+
+  /** Spinning busy while Files Explorer / Mobile Upload reads local files before upload. */
+  const handleStageTrayBusyChange = useCallback((open, label) => {
+    if (open) {
+      setBatchUploadProgress({
+        label: label || 'Adding photos to Thumbnail Tray',
+        percent: 0
+      });
+    } else {
+      setBatchUploadProgress(null);
+    }
+  }, []);
 
   const handleRemoveStagedAttachment = useCallback(
     async (attachmentId) => {
@@ -7214,7 +7282,17 @@ export default function PhotoAlbumsWorkspacePane({
       
       <BusyHourglassOverlay
         open={Boolean(batchUploadProgress)}
-        label={batchUploadProgress?.label || 'Uploading files'}
+        label={batchUploadProgress?.label || 'Adding photos to Thumbnail Tray'}
+        progressPercent={
+          batchUploadProgress?.percent != null ? Number(batchUploadProgress.percent) : null
+        }
+        progressLabel={batchUploadProgress?.label || ''}
+        backdropSx={vaultLeavingBackdropSx}
+        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+      />
+      <BusyHourglassOverlay
+        open={Boolean(noteContentLoading)}
+        label="Loading album photos"
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
@@ -9020,7 +9098,7 @@ export default function PhotoAlbumsWorkspacePane({
                             setError(readPhotoAlbumsApiError(err, 'Failed to rename note'));
                           });
                       }}
-                      onStageOsFiles={(files) => void handleStageOsFiles(files)}
+                      onStageOsFiles={(files) => handleStageOsFiles(files)}
                       onRemoveStagedAttachment={(id) => void handleRemoveStagedAttachment(id)}
                       onRemoveAllStagedAttachments={(ids) =>
                         void handleRemoveAllStagedAttachments(ids)
@@ -9410,15 +9488,17 @@ export default function PhotoAlbumsWorkspacePane({
                     {filesSidebarTab === FILES_EXPLORER_TAB_EXPLORER ? (
                       <PhotoAlbumsFilesExplorerPanel
                         active={unlocked && filesSidebarTab === FILES_EXPLORER_TAB_EXPLORER}
-                        disabled={busy || !unlocked}
-                        onStageOsFiles={(files) => void handleStageOsFiles(files)}
+                        disabled={busy || !unlocked || Boolean(batchUploadProgress)}
+                        onStageOsFiles={(files) => handleStageOsFiles(files)}
+                        onStageTrayBusyChange={handleStageTrayBusyChange}
                       />
                     ) : filesSidebarTab === FILES_EXPLORER_TAB_MOBILE_UPLOAD ? (
                       <PhotoAlbumsMobileUploadFolderPanel
                         active={unlocked && filesSidebarTab === FILES_EXPLORER_TAB_MOBILE_UPLOAD}
-                        disabled={busy || !unlocked}
+                        disabled={busy || !unlocked || Boolean(batchUploadProgress)}
                         refreshToken={mobileUploadFolderRefreshToken}
-                        onStageOsFiles={(files) => void handleStageOsFiles(files)}
+                        onStageOsFiles={(files) => handleStageOsFiles(files)}
+                        onStageTrayBusyChange={handleStageTrayBusyChange}
                       />
                     ) : (
                       <PhotoAlbumsStorageFilesPanel

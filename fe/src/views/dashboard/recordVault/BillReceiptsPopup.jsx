@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import ProfilePhotoUploadQrPanel, {
   PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE
 } from 'components/ProfilePhotoUploadQrPanel';
@@ -13,14 +14,16 @@ import {
   ensurePaidRecord,
   fetchPaidRecord,
   paidRecordAttachmentDownloadUrl,
-  paidRecordAttachmentUrl,
   savePaidRecordNotes,
   uploadPaidRecordAttachment
 } from 'api/paidRecordFe';
 import { recordVaultPopupCloseSx } from './recordVaultPopupCloseSx';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import BillReceiptAttachmentPreview from './BillReceiptAttachmentPreview';
 
 const DROP_BG = 'rgba(74, 144, 217, 0.35)';
+const SKIP_DUPLICATE_MESSAGE = 'Skipping upload duplicate file';
+const SKIP_DUPLICATE_TOAST_MS = 3000;
 
 /**
  * Bills/Receipts popup: preview | upload+QR+notes | thumbnail strip.
@@ -34,14 +37,26 @@ export default function BillReceiptsPopup({
 }) {
   const fileInputRef = useRef(null);
   const notesTimerRef = useRef(null);
+  const skipToastTimerRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [skipToast, setSkipToast] = useState('');
   const [paidRecordId, setPaidRecordId] = useState(null);
   const [notesText, setNotesText] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+
+  const showSkipDuplicateToast = useCallback((message = SKIP_DUPLICATE_MESSAGE) => {
+    const text = String(message || SKIP_DUPLICATE_MESSAGE).trim() || SKIP_DUPLICATE_MESSAGE;
+    setSkipToast(text);
+    if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
+    skipToastTimerRef.current = window.setTimeout(() => {
+      skipToastTimerRef.current = null;
+      setSkipToast('');
+    }, SKIP_DUPLICATE_TOAST_MS);
+  }, []);
 
   const applyPayload = useCallback((data, { mergeAttachments = false } = {}) => {
     if (!data) return;
@@ -96,6 +111,7 @@ export default function BillReceiptsPopup({
   useEffect(() => {
     return () => {
       if (notesTimerRef.current) window.clearTimeout(notesTimerRef.current);
+      if (skipToastTimerRef.current) window.clearTimeout(skipToastTimerRef.current);
     };
   }, []);
 
@@ -115,6 +131,26 @@ export default function BillReceiptsPopup({
     },
     [applyPayload, onChanged, paidRecordId]
   );
+
+  const flushNotesNow = useCallback(async () => {
+    if (notesTimerRef.current) {
+      window.clearTimeout(notesTimerRef.current);
+      notesTimerRef.current = null;
+    }
+    if (!paidRecordId) return;
+    try {
+      const data = await savePaidRecordNotes(paidRecordId, notesText);
+      applyPayload(data);
+      onChanged?.(data);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to save notes');
+    }
+  }, [applyPayload, notesText, onChanged, paidRecordId]);
+
+  const handleClose = useCallback(async () => {
+    await flushNotesNow();
+    onClose?.();
+  }, [flushNotesNow, onClose]);
 
   const handleFiles = async (fileList) => {
     if (!paidRecordId || !fileList?.length) return;
@@ -143,14 +179,14 @@ export default function BillReceiptsPopup({
             ? sizeMatches.find((a) => a.checksum && String(a.checksum).toLowerCase() === digest)
             : null;
           if (dup) {
-            skipNotes.push('Skipping upload duplicate file');
+            skipNotes.push(SKIP_DUPLICATE_MESSAGE);
             continue;
           }
         }
         // eslint-disable-next-line no-await-in-loop
         last = await uploadPaidRecordAttachment(paidRecordId, file);
         if (last?.skipped) {
-          skipNotes.push(last.skipMessage || 'Skipping upload duplicate file');
+          skipNotes.push(last.skipMessage || SKIP_DUPLICATE_MESSAGE);
         }
       }
       if (last) {
@@ -159,7 +195,7 @@ export default function BillReceiptsPopup({
         if (last.uploadedAttachmentId && !last.skipped) setSelectedId(last.uploadedAttachmentId);
       }
       if (skipNotes.length) {
-        setError(skipNotes[0]);
+        showSkipDuplicateToast(skipNotes[0]);
       }
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Upload failed');
@@ -184,15 +220,12 @@ export default function BillReceiptsPopup({
   };
 
   const selected = attachments.find((a) => a.attachmentId === selectedId) || null;
-  const previewUrl =
-    selected && paidRecordId
-      ? paidRecordAttachmentUrl(paidRecordId, selected.attachmentId)
-      : null;
 
   return (
+    <>
     <ColorTemplate7PopupLargeDark
       open={open}
-      onClose={onClose}
+      onClose={() => void handleClose()}
       closeOnBackdrop
       closeButtonAriaLabel="Close bills receipts"
       maxWidth="min(96vw, 1100px)"
@@ -275,19 +308,12 @@ export default function BillReceiptsPopup({
                   minHeight: 0
                 }}
               >
-                {previewUrl && selected?.previewable ? (
-                  <Box
-                    component="img"
-                    src={previewUrl}
-                    alt={selected.originalFileName || 'Receipt'}
-                    sx={{ maxWidth: '100%', maxHeight: 360, objectFit: 'contain' }}
+                {selected && paidRecordId ? (
+                  <BillReceiptAttachmentPreview
+                    paidRecordId={paidRecordId}
+                    attachment={selected}
+                    mode="preview"
                   />
-                ) : previewUrl ? (
-                  <Typography sx={{ fontWeight: 700, textAlign: 'center', px: 2 }}>
-                    {selected?.originalFileName || 'File'}
-                    <br />
-                    Preview not available — use Download.
-                  </Typography>
                 ) : (
                   <Typography sx={{ opacity: 0.55, fontWeight: 700 }}>
                     Select a receipt below
@@ -337,7 +363,7 @@ export default function BillReceiptsPopup({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf,application/pdf"
+                  accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   multiple
                   hidden
                   onChange={(e) => {
@@ -426,9 +452,6 @@ export default function BillReceiptsPopup({
           >
             {attachments.map((att) => {
               const active = att.attachmentId === selectedId;
-              const url = paidRecordId
-                ? paidRecordAttachmentUrl(paidRecordId, att.attachmentId)
-                : '';
               return (
                 <Box
                   key={att.attachmentId}
@@ -445,12 +468,11 @@ export default function BillReceiptsPopup({
                   }}
                   onClick={() => setSelectedId(att.attachmentId)}
                 >
-                  {att.previewable ? (
-                    <Box
-                      component="img"
-                      src={url}
-                      alt={att.originalFileName}
-                      sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  {att.previewable || att.previewKind ? (
+                    <BillReceiptAttachmentPreview
+                      paidRecordId={paidRecordId}
+                      attachment={att}
+                      mode="thumb"
                     />
                   ) : (
                     <Typography
@@ -500,6 +522,25 @@ export default function BillReceiptsPopup({
         </Box>
       </ColorTemplate7PopupLargeDark.Body>
     </ColorTemplate7PopupLargeDark>
+      <ColorTemplate16PopupCenterWide
+        open={Boolean(skipToast)}
+        onClose={() => {
+          if (skipToastTimerRef.current) {
+            window.clearTimeout(skipToastTimerRef.current);
+            skipToastTimerRef.current = null;
+          }
+          setSkipToast('');
+        }}
+        closeOnBackdrop
+        showCloseButton={false}
+        closeButtonAriaLabel="Close skip duplicate notice"
+      >
+        <ColorTemplate16PopupCenterWide.Body spacing={2}>
+          <ColorTemplate16PopupCenterWide.Title>Bills / Receipts</ColorTemplate16PopupCenterWide.Title>
+          <ColorTemplate16PopupCenterWide.BodyText>{skipToast}</ColorTemplate16PopupCenterWide.BodyText>
+        </ColorTemplate16PopupCenterWide.Body>
+      </ColorTemplate16PopupCenterWide>
+    </>
   );
 }
 

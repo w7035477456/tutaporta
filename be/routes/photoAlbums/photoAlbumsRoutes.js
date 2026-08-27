@@ -804,15 +804,17 @@ export async function getPhotoAlbumsNoteAttachment(req, res) {
   }
 
   try {
-    await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId);
-    const file = vaultGetNoteAttachment(session, noteId, attachmentId);
+    const variant = String(req.query?.variant || req.query?.v || 'full');
+    await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId, { variant });
+    const file = vaultGetNoteAttachment(session, noteId, attachmentId, { variant });
     if (!file) return res.status(404).json({ error: 'Attachment not found' });
     await bumpUiFileCount(session);
     const inline =
       req.query.inline === '1' || req.query.inline === 'true' || req.query.view === '1' || req.query.view === 'true';
     let payload = file.buffer;
     let contentType = file.contentType || 'application/octet-stream';
-    if (inline) {
+    // Full + inline: may convert exotic formats. Display/thumb variants are already JPEG.
+    if (inline && (!file.variant || file.variant === 'full')) {
       const preview = await photoAlbumsInlinePreviewPayload(
         file.buffer,
         file.fileExtension || String(file.fileName || '').split('.').pop() || '',
@@ -827,6 +829,7 @@ export async function getPhotoAlbumsNoteAttachment(req, res) {
       `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(file.fileName || 'file')}"`
     );
     res.setHeader('Cache-Control', 'private, no-store');
+    if (file.variant) res.setHeader('X-Photo-Albums-Variant', file.variant);
     return res.send(payload);
   } catch (err) {
     console.error('[getPhotoAlbumsNoteAttachment]', err?.message || err);
@@ -902,7 +905,7 @@ export async function uploadPhotoAlbumsNoteAttachment(req, res) {
   }
 
   try {
-    const attachment = vaultAddNoteAttachment(session, noteId, {
+    const attachment = await vaultAddNoteAttachment(session, noteId, {
       buffer: parsed.buffer,
       fileName: parsed.fileName,
       ext: parsed.ext,

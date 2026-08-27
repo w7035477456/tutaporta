@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
@@ -183,10 +183,13 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [savedMsg, setSavedMsg] = useState('');
+  const [dirty, setDirty] = useState(false);
   const [billPopupOpen, setBillPopupOpen] = useState(false);
   const [billEnsurePayload, setBillEnsurePayload] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
   const storageKey =
     String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
   const peerKey = storageKey === 'usb' ? 'onedrive' : 'usb';
@@ -197,6 +200,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
     setLoading(true);
     setError('');
     setSavedMsg('');
+    setDirty(false);
     try {
       const data = await fetchYearlyBill(y, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], y));
@@ -263,20 +267,64 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
       })
     );
     setSavedMsg('');
+    setDirty(true);
   };
 
-  const openBillForRow = (row) => {
+  /** Persist current (or override) rows; clears dirty/blink on success. Returns saved rows or null. */
+  const persistSchedule = useCallback(
+    async (rowsOverride) => {
+      const toSave = Array.isArray(rowsOverride) ? rowsOverride : rowsRef.current;
+      setSaving(true);
+      setError('');
+      try {
+        const payload = toSave.map((r, i) => ({
+          row_index: Number(r.row_index) || i + 1,
+          bill_description: r.bill_description,
+          bill_month: r.bill_month === '' || r.bill_month == null ? null : Number(r.bill_month),
+          due_month_day:
+            r.due_month_day === '' || r.due_month_day == null ? null : Number(r.due_month_day),
+          amount: normalizeAmountLocal(r.amount),
+          bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
+          action: r.bill_type === 'Auto' ? null : r.action,
+          paid_record_id: r.paid_record_id
+        }));
+        const data = await saveYearlyBill(year, payload, { storageType: storageKey });
+        const next = withDerived(data?.rows || [], year);
+        setRows(next);
+        setSavedMsg('Saved');
+        setDirty(false);
+        return next;
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Failed to save');
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [year, storageKey]
+  );
+
+  const openBillForRow = async (row) => {
+    let target = row;
+    if (dirty) {
+      const saved = await persistSchedule();
+      if (!saved) return;
+      target =
+        saved.find((r) => Number(r.row_index) === Number(row.row_index)) ||
+        saved.find((r) => Number(r.yearly_bill_id) === Number(row.yearly_bill_id)) ||
+        row;
+    }
     setBillEnsurePayload({
       kind: 'yearly',
       year,
-      row_index: Number(row.row_index) || 1,
-      yearly_bill_id: row.yearly_bill_id || undefined,
-      bill_description: row.bill_description,
-      bill_month: row.bill_month === '' ? null : row.bill_month,
-      due_month_day: row.due_month_day === '' ? null : row.due_month_day,
-      amount: row.amount,
-      bill_type: row.bill_type,
-      action: row.action
+      row_index: Number(target.row_index) || 1,
+      yearly_bill_id: target.yearly_bill_id || undefined,
+      bill_description: target.bill_description,
+      bill_month: target.bill_month === '' ? null : target.bill_month,
+      due_month_day: target.due_month_day === '' ? null : target.due_month_day,
+      amount: target.amount,
+      bill_type: target.bill_type,
+      action: target.action
     });
     setBillPopupOpen(true);
   };
@@ -302,38 +350,18 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
     );
   };
 
-  const handleAdd = () => {
-    setRows((prev) => {
-      const nextIndex = prev.reduce((max, r) => Math.max(max, Number(r.row_index) || 0), 0) + 1;
-      return [...prev, blankRow(nextIndex)];
-    });
+  const handleAdd = async () => {
+    const prev = rowsRef.current;
+    const nextIndex = prev.reduce((max, r) => Math.max(max, Number(r.row_index) || 0), 0) + 1;
+    const nextRows = [...prev, blankRow(nextIndex)];
+    setRows(nextRows);
     setSavedMsg('');
+    await persistSchedule(nextRows);
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    setError('');
     setSavedMsg('');
-    try {
-      const payload = rows.map((r, i) => ({
-        row_index: Number(r.row_index) || i + 1,
-        bill_description: r.bill_description,
-        bill_month: r.bill_month === '' || r.bill_month == null ? null : Number(r.bill_month),
-        due_month_day:
-          r.due_month_day === '' || r.due_month_day == null ? null : Number(r.due_month_day),
-        amount: normalizeAmountLocal(r.amount),
-        bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
-        action: r.bill_type === 'Auto' ? null : r.action,
-        paid_record_id: r.paid_record_id
-      }));
-      const data = await saveYearlyBill(year, payload, { storageType: storageKey });
-      setRows(withDerived(data?.rows || [], year));
-      setSavedMsg('Saved');
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
+    await persistSchedule();
   };
 
   /** marksByMonth: Map<month, Map<day, tone>> */
@@ -576,7 +604,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
                   <BillColumnButton
                     hasContent={Boolean(row.has_bill_content)}
                     disabled={loading || saving}
-                    onClick={() => openBillForRow(row)}
+                    onClick={() => void openBillForRow(row)}
                   />
                 </td>
                 <td style={{ background: typeActionStatusBg }}>
@@ -601,7 +629,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
                       onChange={(e) => {
                         const next = e.target.value || null;
                         updateRow(index, { action: next });
-                        if (next === 'Paid') openBillForRow(row);
+                        if (next === 'Paid') void openBillForRow(row);
                       }}
                       sx={selectSx}
                       renderValue={(v) => {
@@ -639,10 +667,129 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
           gap: 1
         }}
       >
-        <ColorTemplate13DisableGreenButton type="button" onClick={handleAdd} disabled={loading || saving}>
+        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
           Add
         </ColorTemplate13DisableGreenButton>
-        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleSave()} disabled={loading || saving}>
+        <Box
+          component="aside"
+          aria-label="Calendar legend"
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            border: '2px solid #000',
+            borderRadius: 1,
+            bgcolor: '#fff',
+            px: 1,
+            py: 0.65,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: { xs: 0.75, sm: 1.25 },
+            boxSizing: 'border-box'
+          }}
+        >
+          {[
+            {
+              key: 'today',
+              label: 'Today Date',
+              sample: 26,
+              sx: {
+                borderRadius: 1,
+                bgcolor: 'transparent',
+                outline: `2px solid ${RED}`,
+                outlineOffset: 0
+              }
+            },
+            {
+              key: 'upcoming',
+              label: 'Manual Pay Note Due yet',
+              sample: 29,
+              sx: {
+                borderRadius: '50%',
+                bgcolor: 'transparent',
+                outline: '3px solid #000',
+                outlineOffset: 0
+              }
+            },
+            {
+              key: 'auto',
+              label: 'Auto pay',
+              sample: 15,
+              sx: {
+                borderRadius: 1,
+                bgcolor: YELLOW,
+                color: '#000'
+              }
+            },
+            {
+              key: 'paid',
+              label: 'Manual Paid',
+              sample: 1,
+              sx: {
+                borderRadius: 1,
+                bgcolor: GREEN,
+                color: '#000'
+              }
+            },
+            {
+              key: 'overdue',
+              label: 'Manual NotPaid Overdue/Late',
+              sample: 25,
+              sx: {
+                borderRadius: 1,
+                bgcolor: RED,
+                color: '#fff'
+              }
+            }
+          ].map((item) => (
+            <Box
+              key={item.key}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.6
+              }}
+            >
+              <Box
+                sx={{
+                  width: 26,
+                  height: 26,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  boxSizing: 'border-box',
+                  ...item.sx
+                }}
+              >
+                {item.sample}
+              </Box>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                  lineHeight: 1.15,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {item.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <ColorTemplate13DisableGreenButton
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={loading || saving}
+          sx={
+            dirty && !saving
+              ? { animation: 'blink 1s step-start infinite' }
+              : undefined
+          }
+        >
           {saving ? 'Saving…' : 'SAVE'}
         </ColorTemplate13DisableGreenButton>
       </Box>

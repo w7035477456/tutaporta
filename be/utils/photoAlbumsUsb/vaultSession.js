@@ -91,6 +91,14 @@ import {
 import { requireVaultAccessSession } from '../photoAlbumsAccessPassword.js';
 import { mimeTypeForPhotoAlbumsExtension } from '../photoAlbumsFileFormats.js';
 import {
+  buildPhotoAlbumsDisplay1000pxBuffer,
+  buildPhotoAlbumsThumbnailBuffer,
+  fileRelativePathForVariant,
+  isPhotoAlbumsRasterImageExtension,
+  normalizeAttachmentVariant,
+  normalizePhotoAlbumsAttachmentBuffer
+} from '../photoAlbumsAttachmentVariants.js';
+import {
   scheduleTrackedOneDriveUpload,
   uploadOneDriveVaultOnLogoff,
   ensureOneDriveVaultPhotoOnDisk,
@@ -1242,7 +1250,10 @@ export function vaultDedupeNoteAttachments(session, noteId) {
     const [, ...dupes] = group;
     for (const dupe of dupes) {
       try {
-        if (dupe.relative_path) deleteEncryptedVaultFile(session, dupe.relative_path);
+        if (dupe.relative_path) {
+          deleteEncryptedVaultFile(session, dupe.relative_path);
+          deleteAttachmentVariants(session, dupe.relative_path);
+        }
       } catch {
         // ignore missing file
       }
@@ -1532,6 +1543,20 @@ export function vaultUpdateNotebook(session, notebookId, notebookName) {
 }
 
 export function vaultDeleteNotebook(session, notebookId) {
+  const noteRows = queryAll(
+    session.db,
+    `SELECT note_id FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
+    [notebookId]
+  );
+  for (const note of noteRows) {
+    try {
+      vaultDeleteNote(session, Number(note.note_id), { skipFlush: true });
+    } catch (err) {
+      console.error('[vaultDeleteNotebook] note cleanup', note?.note_id, err?.message || err);
+    }
+  }
+  // Wipe leftover files/{notebookId}/ and photos/{notebookId}/ (orphans + empty dirs).
+  removeNotebookMediaDirs(session, notebookId);
   session.db.run(`UPDATE notebooks SET deleted_at = datetime('now') WHERE notebook_id = ?`, [notebookId]);
   session.db.run(
     `UPDATE notes SET deleted_at = datetime('now') WHERE notebook_id = ? AND deleted_at IS NULL`,
@@ -1857,7 +1882,35 @@ function vaultReplaceKeywords(session, noteId, keywords) {
   refreshNoteSearchText(session.db, noteId);
 }
 
-export function vaultDeleteNote(session, noteId) {
+/**
+ * Remove on-disk media for one album (note): files/{notebookId}/{noteId}/ (all att_* +
+ * _1000px / _thumbnail siblings) and any known photos/ slots. Works under
+ * LARGE_CHEAP_STORAGE_FOLDER (TutaDrive), USB, and OneDrive staging mirrors.
+ */
+function removeNoteMediaDirs(session, notebookId, noteId) {
+  const nb = String(notebookId);
+  const nid = String(noteId);
+  writeToMirrorPaths(session, (mountPath) => {
+    removeDirRecursive(path.join(vaultFilesRoot(mountPath), nb, nid));
+  });
+  if (session.storageType === 'onedrive') {
+    scheduleCloudRelativeSync(session, `${VAULT_FILES_DIR}/${nb}/${nid}`);
+  }
+}
+
+function removeNotebookMediaDirs(session, notebookId) {
+  const nb = String(notebookId);
+  writeToMirrorPaths(session, (mountPath) => {
+    removeDirRecursive(path.join(vaultFilesRoot(mountPath), nb));
+    removeDirRecursive(path.join(vaultPhotosRoot(mountPath), nb));
+  });
+  if (session.storageType === 'onedrive') {
+    scheduleCloudRelativeSync(session, `${VAULT_FILES_DIR}/${nb}`);
+    scheduleCloudRelativeSync(session, `${VAULT_PHOTOS_DIR}/${nb}`);
+  }
+}
+
+export function vaultDeleteNote(session, noteId, { skipFlush = false } = {}) {
   const row = loadNote(session, noteId);
   if (!row) throw new Error('Note not found');
   for (const rel of [row.image_relative_path, row.image_top_relative_path, row.image_bottom_relative_path]) {
@@ -1876,21 +1929,26 @@ export function vaultDeleteNote(session, noteId) {
       noteId
     ]);
   }
+  // Include already soft-deleted rows so orphaned disk files are still removed.
   const attachmentRows = queryAll(
     session.db,
-    `SELECT relative_path FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL`,
+    `SELECT relative_path FROM note_attachments WHERE note_id = ?`,
     [noteId]
   );
   for (const att of attachmentRows) {
+    if (!att.relative_path) continue;
     deleteEncryptedVaultFile(session, att.relative_path);
+    deleteAttachmentVariants(session, att.relative_path);
   }
+  // Nuclear: remove entire album folder (catches any leftover variants / orphans).
+  removeNoteMediaDirs(session, row.notebook_id, noteId);
   session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
     noteId
   ]);
   session.db.run(`UPDATE notes SET deleted_at = datetime('now') WHERE note_id = ?`, [noteId]);
   session.db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [noteId]);
   markDirty(session);
-  flushDbToUsb(session);
+  if (!skipFlush) flushDbToUsb(session);
 }
 
 export function vaultReorderNotes(session, notebookId, noteIds) {
@@ -1941,7 +1999,7 @@ export async function vaultEnsureNoteExtraImageOnDisk(session, noteId, imageId) 
   await ensureOneDriveVaultPhotoOnDisk(session.driveSinglesId, session.mountPath, row.relative_path, session.meta);
 }
 
-export async function vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId) {
+export async function vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId, { variant: variantRaw } = {}) {
   if (session.storageType !== 'onedrive') return;
   const row = queryOne(
     session.db,
@@ -1951,6 +2009,17 @@ export async function vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmen
   );
   if (!row?.relative_path) return;
   await ensureOneDriveVaultFileOnDisk(session.driveSinglesId, session.mountPath, row.relative_path, session.meta);
+  const variant = normalizeAttachmentVariant(variantRaw);
+  if (variant === 'display' || variant === 'thumb') {
+    const sibling = fileRelativePathForVariant(row.relative_path, variant);
+    if (sibling && sibling !== row.relative_path) {
+      try {
+        await ensureOneDriveVaultFileOnDisk(session.driveSinglesId, session.mountPath, sibling, session.meta);
+      } catch {
+        // Missing sibling → vaultGetNoteAttachment falls back to full.
+      }
+    }
+  }
 }
 
 export function vaultAddNoteExtraImage(session, noteId, { buffer, ext }) {
@@ -2012,17 +2081,40 @@ export function vaultGetNoteExtraImage(session, noteId, imageId) {
   return { buffer, contentType };
 }
 
-export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType }) {
+export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType }) {
   const row = loadNote(session, noteId);
   if (!row) throw new Error('Note not found');
   if (!buffer?.length) throw new Error('File is empty');
 
-  const cleanExt = String(ext || 'bin').replace(/^\./, '').toLowerCase();
-  const safeName = String(fileName || `file.${cleanExt}`)
-    .trim()
-    .slice(0, 240) || `file.${cleanExt}`;
-  const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
-  const sizeBytes = buffer.length;
+  let workingBuffer = buffer;
+  let cleanExt = String(ext || 'bin').replace(/^\./, '').toLowerCase();
+  let resolvedMime = mimeType || mimeTypeForPhotoAlbumsExtension(cleanExt);
+  let safeName =
+    String(fileName || `file.${cleanExt}`)
+      .trim()
+      .slice(0, 240) || `file.${cleanExt}`;
+
+  // Photos >1MB → ~0.5MB JPEG full file; always emit _1000px + _thumbnail siblings.
+  let writeVariants = false;
+  if (isPhotoAlbumsRasterImageExtension(cleanExt)) {
+    try {
+      const normalized = await normalizePhotoAlbumsAttachmentBuffer(workingBuffer);
+      if (normalized.changed) {
+        workingBuffer = normalized.buffer;
+        cleanExt = 'jpg';
+        resolvedMime = 'image/jpeg';
+        const base = String(safeName).replace(/\.[^.]+$/, '');
+        safeName = `${base || 'photo'}.jpg`;
+      }
+      writeVariants = true;
+    } catch (err) {
+      console.warn('[vaultAddNoteAttachment] normalize skipped:', err?.message || err);
+      writeVariants = isPhotoAlbumsRasterImageExtension(cleanExt);
+    }
+  }
+
+  const checksum = crypto.createHash('sha256').update(workingBuffer).digest('hex');
+  const sizeBytes = workingBuffer.length;
 
   // Duplicate shortcut: same byte size → confirm with checksum. Reuse existing row.
   const sameSizeRows = queryAll(
@@ -2064,7 +2156,6 @@ export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext,
     [noteId]
   );
   const displayOrder = Number(orderRow?.next_order ?? 0);
-  const resolvedMime = mimeType || mimeTypeForPhotoAlbumsExtension(cleanExt);
 
   session.db.run(
     `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order)
@@ -2077,7 +2168,23 @@ export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext,
     relativePath,
     attachmentId
   ]);
-  writeEncryptedVaultFile(session, relativePath, buffer);
+  writeEncryptedVaultFile(session, relativePath, workingBuffer);
+
+  if (writeVariants) {
+    try {
+      const displayBuf = await buildPhotoAlbumsDisplay1000pxBuffer(workingBuffer);
+      const thumbBuf = await buildPhotoAlbumsThumbnailBuffer(workingBuffer);
+      writeEncryptedVaultFile(
+        session,
+        fileRelativePathForVariant(relativePath, 'display'),
+        displayBuf
+      );
+      writeEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'thumb'), thumbBuf);
+    } catch (err) {
+      console.warn('[vaultAddNoteAttachment] variant write failed:', err?.message || err);
+    }
+  }
+
   refreshNoteSearchText(session.db, noteId);
   scheduleFlushDbToUsb(session);
   try {
@@ -2095,6 +2202,12 @@ export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext,
   );
 }
 
+function deleteAttachmentVariants(session, relativePath) {
+  if (!relativePath) return;
+  deleteEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'display'));
+  deleteEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'thumb'));
+}
+
 export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
   const row = queryOne(
     session.db,
@@ -2104,6 +2217,7 @@ export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
   );
   if (!row) throw new Error('Attachment not found');
   deleteEncryptedVaultFile(session, row.relative_path);
+  deleteAttachmentVariants(session, row.relative_path);
   session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE attachment_id = ?`, [attachmentId]);
   refreshNoteSearchText(session.db, noteId);
   markDirty(session);
@@ -2111,7 +2225,7 @@ export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
   return { success: true, attachment_id: Number(attachmentId) };
 }
 
-export function vaultGetNoteAttachment(session, noteId, attachmentId) {
+export function vaultGetNoteAttachment(session, noteId, attachmentId, { variant: variantRaw } = {}) {
   const row = queryOne(
     session.db,
     `SELECT attachment_id, note_id, file_name, file_extension, relative_path, mime_type
@@ -2120,14 +2234,49 @@ export function vaultGetNoteAttachment(session, noteId, attachmentId) {
     [attachmentId, noteId]
   );
   if (!row) return null;
-  const buffer = readEncryptedVaultFile(session, row.relative_path);
+  const variant = normalizeAttachmentVariant(variantRaw);
+  const basePath = row.relative_path;
+  let rel = basePath;
+  if (variant === 'display' || variant === 'thumb') {
+    const preferred = fileRelativePathForVariant(basePath, variant);
+    const preferredBuf = readEncryptedVaultFile(session, preferred);
+    if (preferredBuf?.length) {
+      return {
+        buffer: preferredBuf,
+        fileName:
+          variant === 'display'
+            ? String(row.file_name || 'photo').replace(/\.[^.]+$/, '') + '_1000px.jpg'
+            : String(row.file_name || 'photo').replace(/\.[^.]+$/, '') + '_thumbnail.jpg',
+        fileExtension: 'jpg',
+        contentType: 'image/jpeg',
+        variant
+      };
+    }
+    // Fallback: display missing → try thumb then full; thumb missing → full.
+    if (variant === 'display') {
+      const thumbPath = fileRelativePathForVariant(basePath, 'thumb');
+      const thumbBuf = readEncryptedVaultFile(session, thumbPath);
+      if (thumbBuf?.length) {
+        return {
+          buffer: thumbBuf,
+          fileName: String(row.file_name || 'photo').replace(/\.[^.]+$/, '') + '_thumbnail.jpg',
+          fileExtension: 'jpg',
+          contentType: 'image/jpeg',
+          variant: 'thumb'
+        };
+      }
+    }
+    rel = basePath;
+  }
+  const buffer = readEncryptedVaultFile(session, rel);
   if (!buffer) return null;
   const ext = String(row.file_extension || '').toLowerCase();
   return {
     buffer,
     fileName: row.file_name,
     fileExtension: ext,
-    contentType: row.mime_type || mimeTypeForPhotoAlbumsExtension(ext)
+    contentType: row.mime_type || mimeTypeForPhotoAlbumsExtension(ext),
+    variant: 'full'
   };
 }
 

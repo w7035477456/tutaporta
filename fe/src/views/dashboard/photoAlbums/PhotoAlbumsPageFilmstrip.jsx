@@ -163,7 +163,8 @@ function FilmstripPhoto({ attachmentId, noteId, storageType, isVideo = false }) 
       try {
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, aid, {
           inline: true,
-          storageType
+          storageType,
+          variant: 'thumb'
         });
         if (cancelled || !blob) return;
         if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);

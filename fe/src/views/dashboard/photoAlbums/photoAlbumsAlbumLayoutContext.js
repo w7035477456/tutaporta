@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
 /**
- * Album page layout context for book-flip visibility and Path A photo blob loading.
+ * Album page layout context for book-flip visibility and photo loading.
  * Also hosts full-page photo viewer / slideshow opener.
  */
 export const PhotoAlbumsAlbumLayoutContext = createContext({
@@ -13,8 +13,8 @@ export const PhotoAlbumsAlbumLayoutContext = createContext({
    */
   activePageBands: [],
   /**
-   * Bands whose photo blobs may load (active page ±1). Client-only Path A lazy load —
-   * each blob GET is still a stateless vault API call (safe under round-robin).
+   * All album page bands — photos load with *_1000px for the whole album (no lazy unload).
+   * Each blob GET is still a stateless vault API call (safe under round-robin).
    */
   photoLoadBands: [],
   openPhotoFullscreen: null

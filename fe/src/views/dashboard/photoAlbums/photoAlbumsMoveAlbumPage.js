@@ -153,6 +153,7 @@ function attachmentAttrsToHtml(attrs) {
     attrPair('data-pan-x', attrs.panX) +
     attrPair('data-pan-y', attrs.panY) +
     attrPair('data-slot-fit', attrs.slotFit) +
+    attrPair('data-rotation', attrs.rotationDeg) +
     `></div>`
   );
 }

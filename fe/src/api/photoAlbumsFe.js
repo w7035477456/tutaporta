@@ -332,15 +332,24 @@ export function photoAlbumsNoteExtraImageUrl(noteId, imageId) {
   return `${photoAlbumsMediaBaseUrl()}/api/photoAlbums/notes/${note}/extra-images/${image}`;
 }
 
-export function photoAlbumsNoteAttachmentUrl(noteId, attachmentId, { inline = false } = {}) {
+export function photoAlbumsNoteAttachmentUrl(noteId, attachmentId, { inline = false, variant = 'full' } = {}) {
   const note = Number(noteId);
   const attachment = Number(attachmentId);
   if (!Number.isFinite(note) || note < 1 || !Number.isFinite(attachment) || attachment < 1) return '';
   const base = `${photoAlbumsMediaBaseUrl()}/api/photoAlbums/notes/${note}/attachments/${attachment}`;
-  return inline ? `${base}?inline=1` : base;
+  const params = new URLSearchParams();
+  if (inline) params.set('inline', '1');
+  const v = String(variant || 'full').trim().toLowerCase();
+  if (v && v !== 'full') params.set('variant', v);
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
-export async function fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, { inline = true, storageType = null } = {}) {
+export async function fetchPhotoAlbumsNoteAttachmentBlob(
+  noteId,
+  attachmentId,
+  { inline = true, storageType = null, variant = 'full' } = {}
+) {
   const note = Number(noteId);
   const attachment = Number(attachmentId);
   if (!Number.isFinite(note) || note < 1 || !Number.isFinite(attachment) || attachment < 1) {
@@ -348,7 +357,13 @@ export async function fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
   }
 
   const path = `/api/photoAlbums/notes/${note}/attachments/${attachment}`;
-  const query = inline ? '?inline=1' : '';
+  const params = {};
+  if (inline) params.inline = 1;
+  const v = String(variant || 'full').trim().toLowerCase();
+  if (v && v !== 'full') params.variant = v;
+  const query = Object.keys(params).length
+    ? `?${new URLSearchParams(params).toString()}`
+    : '';
   if (shouldRoutePhotoAlbumsThroughBridge(path, storageType)) {
     const blob = await bridgeFetchBlob(`${path}${query}`);
     void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
@@ -357,7 +372,7 @@ export async function fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
 
   try {
     const { data } = await api.get(path, {
-      params: inline ? { inline: 1 } : undefined,
+      params: Object.keys(params).length ? params : undefined,
       responseType: 'blob',
       headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
     });

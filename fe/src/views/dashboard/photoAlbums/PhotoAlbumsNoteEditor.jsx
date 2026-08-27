@@ -6,6 +6,8 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import 'katex/dist/katex.min.css';
 import GreenButton from 'ui-component/GreenButton';
+import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
+import { BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE } from 'config/busyHourglassEnv';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import Typography from '@mui/material/Typography';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
@@ -1844,6 +1846,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     parseAlbumTitleStyleFromHtml(initialContent)
   );
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  /** Auto Layout / Auto Layout 1 — hourglass + % + stats. */
+  const [autoLayoutProgress, setAutoLayoutProgress] = useState(null);
   /** Guide popup: drop photo with no template, or return a page photo to the tray. */
   const [needTemplateGuideOpen, setNeedTemplateGuideOpen] = useState(false);
   const [contextTutorialOpenKey, setContextTutorialOpenKey] = useState(0);
@@ -4233,188 +4237,269 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const tray = stagedPhotosRef.current || [];
       if (!tray.length) return;
 
+      const oneSpreadOnly = Number.isFinite(maxSpreads) && maxSpreads <= 1;
+      const modeLabel = oneSpreadOnly ? 'Auto Layout 1' : 'Auto Layout';
+      const trayTotal = tray.length;
+      const report = (percent, lines) => {
+        setAutoLayoutProgress({
+          percent: Math.max(0, Math.min(100, Math.round(Number(percent) || 0))),
+          label: [modeLabel, ...(Array.isArray(lines) ? lines : [String(lines || '')])]
+            .filter(Boolean)
+            .join('\n')
+        });
+      };
+
       setTemplatePickerOpen(false);
+      report(1, [`Tray photos: ${trayTotal}`, 'Starting…']);
+      // Let the hourglass paint before heavy work.
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      });
 
-      const binderW =
-        syncAlbumBinderFromViewport(zoomScrollRef.current) || albumBinderWidthPxRef.current || 0;
-      const pw = albumPageWidthFromViewport(zoomScrollRef.current);
-      applyAlbumCanvasWidth(pw, binderW);
-      albumBinderWidthPxRef.current = binderW;
+      try {
+        const binderW =
+          syncAlbumBinderFromViewport(zoomScrollRef.current) || albumBinderWidthPxRef.current || 0;
+        const pw = albumPageWidthFromViewport(zoomScrollRef.current);
+        applyAlbumCanvasWidth(pw, binderW);
+        albumBinderWidthPxRef.current = binderW;
 
-      const photosWithAspect = await resolveStagingPhotoAspects(tray, { noteId, storageType });
-      const orientStart = pageOrientationRef.current;
+        report(3, [`Tray photos: ${trayTotal}`, 'Measuring photo sizes…']);
+        const photosWithAspect = await resolveStagingPhotoAspects(tray, {
+          noteId,
+          storageType,
+          onProgress: ({ index, total }) => {
+            const pct = 3 + Math.round((index / Math.max(1, total)) * 62);
+            report(pct, [
+              `Measuring photo ${index} of ${total}`,
+              `Tray photos: ${trayTotal}`
+            ]);
+          }
+        });
+        const orientStart = pageOrientationRef.current;
 
-      // Restack existing pages into left|right columns BEFORE fill/plan so occupancy
-      // and placement never confuse left-page photos with right-page slots.
-      let current = sortAlbumPagesByBand(templatesRef.current || []);
-      if (current.length) {
-        current = restackTemplatesFlushToPages(
+        report(68, [
+          `Measured ${photosWithAspect.length} of ${trayTotal}`,
+          'Planning page templates…'
+        ]);
+
+        // Restack existing pages into left|right columns BEFORE fill/plan so occupancy
+        // and placement never confuse left-page photos with right-page slots.
+        let current = sortAlbumPagesByBand(templatesRef.current || []);
+        if (current.length) {
+          current = restackTemplatesFlushToPages(
+            current,
+            pw,
+            orientStart,
+            editor,
+            binderW
+          );
+          templatesRef.current = current;
+          setTemplates(current);
+        }
+
+        const occupiedByKey = collectOccupiedSlotsByInstanceKey(
+          editor,
           current,
           pw,
           orientStart,
+          binderW
+        );
+
+        const spreadLeft = albumSpreadLeftPageIndex(albumPageIndexRef.current || 0);
+        const fillStart = oneSpreadOnly ? spreadLeft : 0;
+        const fillLimit = oneSpreadOnly ? ALBUM_SPREAD_PAGE_COUNT : Infinity;
+
+        const { fills, remainingPhotos } = planFillEmptyTemplatePages(
+          current,
+          photosWithAspect,
+          occupiedByKey,
+          { maxPages: fillLimit, startIndex: fillStart }
+        );
+
+        const pagesOnCurrentSpread = oneSpreadOnly
+          ? Math.min(ALBUM_SPREAD_PAGE_COUNT, Math.max(0, current.length - spreadLeft))
+          : 0;
+        const albumEndsOnLeftOnly = current.length % ALBUM_SPREAD_PAGE_COUNT === 1;
+        const pagesNeededOnSpread = oneSpreadOnly
+          ? Math.max(0, ALBUM_SPREAD_PAGE_COUNT - pagesOnCurrentSpread)
+          : 0;
+        const firstSpreadPageCount = oneSpreadOnly
+          ? pagesNeededOnSpread
+          : albumEndsOnLeftOnly
+            ? 1
+            : 2;
+        const appendSpreads = oneSpreadOnly
+          ? pagesNeededOnSpread > 0
+            ? 1
+            : 0
+          : maxSpreads;
+
+        const tryBothPageOrientations = current.length === 0 && fills.length === 0;
+        const { plan, pageOrientation: plannedOrient } = planAutoLayoutPages(
+          remainingPhotos,
+          pw,
+          orientStart,
+          {
+            tryBothPageOrientations,
+            maxSpreads: appendSpreads,
+            firstSpreadPageCount: firstSpreadPageCount === 1 ? 1 : 2
+          }
+        );
+
+        if (!fills.length && !plan.length) {
+          report(100, ['Nothing to place — tray unchanged']);
+          return;
+        }
+
+        const fillPhotoCount = fills.reduce(
+          (n, f) => n + (Array.isArray(f.photos) ? f.photos.length : 0),
+          0
+        );
+        const planPhotoCount = plan.reduce(
+          (n, p) => n + (Array.isArray(p.photos) ? p.photos.length : 0),
+          0
+        );
+        const placeTotal = fillPhotoCount + planPhotoCount;
+        const newPageCount = plan.length;
+
+        report(78, [
+          `Placing ${placeTotal} photo${placeTotal === 1 ? '' : 's'}`,
+          `Fill existing pages: ${fillPhotoCount}`,
+          `New pages: ${newPageCount} (${planPhotoCount} photos)`,
+          `Tray remaining after: ${Math.max(0, trayTotal - placeTotal)}`
+        ]);
+
+        if (plannedOrient !== pageOrientationRef.current) {
+          pageOrientationRef.current = plannedOrient;
+          setPageOrientation(plannedOrient);
+        }
+
+        const orient = pageOrientationRef.current;
+        const blockH = albumTemplateBlockHeight(pw, orient);
+        const newInstances = plan.map((page) =>
+          createAlbumTemplateInstance({
+            id: page.templateId,
+            x: 0,
+            y: 0,
+            w: pw,
+            h: blockH
+          })
+        );
+
+        const nextOrdered = [...current, ...newInstances];
+        const nextList = restackTemplatesFlushToPages(
+          nextOrdered,
+          pw,
+          orient,
           editor,
           binderW
         );
-        templatesRef.current = current;
-        setTemplates(current);
-      }
+        // Guarantee every page has spread-column x/y/w (matches on-screen overlays).
+        const placedList = withSpreadPageGeometry(nextList, pw, binderW, orient);
+        const placedIds = new Set();
 
-      const occupiedByKey = collectOccupiedSlotsByInstanceKey(
-        editor,
-        current,
-        pw,
-        orientStart,
-        binderW
-      );
+        report(88, [
+          `Inserting ${placeTotal} photo${placeTotal === 1 ? '' : 's'} onto album…`,
+          `Pages in album: ${placedList.length}`
+        ]);
 
-      const oneSpreadOnly = Number.isFinite(maxSpreads) && maxSpreads <= 1;
-      const spreadLeft = albumSpreadLeftPageIndex(albumPageIndexRef.current || 0);
-      const fillStart = oneSpreadOnly ? spreadLeft : 0;
-      const fillLimit = oneSpreadOnly ? ALBUM_SPREAD_PAGE_COUNT : Infinity;
+        withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
+          let tr = editor.state.tr;
+          let insertPos = editor.state.doc.content.size;
+          const nodes = [];
 
-      const { fills, remainingPhotos } = planFillEmptyTemplatePages(
-        current,
-        photosWithAspect,
-        occupiedByKey,
-        { maxPages: fillLimit, startIndex: fillStart }
-      );
-
-      const pagesOnCurrentSpread = oneSpreadOnly
-        ? Math.min(ALBUM_SPREAD_PAGE_COUNT, Math.max(0, current.length - spreadLeft))
-        : 0;
-      const albumEndsOnLeftOnly = current.length % ALBUM_SPREAD_PAGE_COUNT === 1;
-      const pagesNeededOnSpread = oneSpreadOnly
-        ? Math.max(0, ALBUM_SPREAD_PAGE_COUNT - pagesOnCurrentSpread)
-        : 0;
-      const firstSpreadPageCount = oneSpreadOnly
-        ? pagesNeededOnSpread
-        : albumEndsOnLeftOnly
-          ? 1
-          : 2;
-      const appendSpreads = oneSpreadOnly
-        ? pagesNeededOnSpread > 0
-          ? 1
-          : 0
-        : maxSpreads;
-
-      const tryBothPageOrientations = current.length === 0 && fills.length === 0;
-      const { plan, pageOrientation: plannedOrient } = planAutoLayoutPages(
-        remainingPhotos,
-        pw,
-        orientStart,
-        {
-          tryBothPageOrientations,
-          maxSpreads: appendSpreads,
-          firstSpreadPageCount: firstSpreadPageCount === 1 ? 1 : 2
-        }
-      );
-
-      if (!fills.length && !plan.length) return;
-
-      if (plannedOrient !== pageOrientationRef.current) {
-        pageOrientationRef.current = plannedOrient;
-        setPageOrientation(plannedOrient);
-      }
-
-      const orient = pageOrientationRef.current;
-      const blockH = albumTemplateBlockHeight(pw, orient);
-      const newInstances = plan.map((page) =>
-        createAlbumTemplateInstance({
-          id: page.templateId,
-          x: 0,
-          y: 0,
-          w: pw,
-          h: blockH
-        })
-      );
-
-      const nextOrdered = [...current, ...newInstances];
-      const nextList = restackTemplatesFlushToPages(
-        nextOrdered,
-        pw,
-        orient,
-        editor,
-        binderW
-      );
-      // Guarantee every page has spread-column x/y/w (matches on-screen overlays).
-      const placedList = withSpreadPageGeometry(nextList, pw, binderW, orient);
-      const placedIds = new Set();
-
-      withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-        let tr = editor.state.tr;
-        let insertPos = editor.state.doc.content.size;
-        const nodes = [];
-
-        for (const fill of fills) {
-          const inst =
-            placedList.find((t) => t.key === fill.inst.key) || fill.inst;
-          const band = templateBand(inst, pw, orient);
-          nodes.push(
-            ...buildAutoLayoutPhotoNodes(editor, inst, fill.photos, fill.slots, band, placedIds)
-          );
-        }
-
-        for (let pi = 0; pi < plan.length; pi += 1) {
-          const pagePlan = plan[pi];
-          const inst = placedList[current.length + pi];
-          if (!inst) continue;
-          const layout = getPhotoAlbumsPageTemplate(inst.id);
-          if (!layout) continue;
-          const photoSlots = resolveAlbumTemplateSlots(layout, inst.slots).filter(
-            (s) => s.type === 'photo'
-          );
-          const band = templateBand(inst, pw, orient);
-          nodes.push(
-            ...buildAutoLayoutPhotoNodes(
-              editor,
-              inst,
-              pagePlan.photos,
-              photoSlots,
-              band,
-              placedIds
-            )
-          );
-        }
-
-        if (nodes.length) {
-          for (const node of nodes) {
-            tr = tr.insert(insertPos, node);
-            insertPos += node.nodeSize;
+          for (const fill of fills) {
+            const inst =
+              placedList.find((t) => t.key === fill.inst.key) || fill.inst;
+            const band = templateBand(inst, pw, orient);
+            nodes.push(
+              ...buildAutoLayoutPhotoNodes(editor, inst, fill.photos, fill.slots, band, placedIds)
+            );
           }
-          editor.view.dispatch(tr);
+
+          for (let pi = 0; pi < plan.length; pi += 1) {
+            const pagePlan = plan[pi];
+            const inst = placedList[current.length + pi];
+            if (!inst) continue;
+            const layout = getPhotoAlbumsPageTemplate(inst.id);
+            if (!layout) continue;
+            const photoSlots = resolveAlbumTemplateSlots(layout, inst.slots).filter(
+              (s) => s.type === 'photo'
+            );
+            const band = templateBand(inst, pw, orient);
+            nodes.push(
+              ...buildAutoLayoutPhotoNodes(
+                editor,
+                inst,
+                pagePlan.photos,
+                photoSlots,
+                band,
+                placedIds
+              )
+            );
+          }
+
+          if (nodes.length) {
+            for (const node of nodes) {
+              tr = tr.insert(insertPos, node);
+              insertPos += node.nodeSize;
+            }
+            editor.view.dispatch(tr);
+          }
+        });
+
+        templatesRef.current = placedList;
+        setTemplates(placedList);
+        setAlbumCanvasWidth(editor, pw, binderW);
+
+        if (oneSpreadOnly) {
+          setAlbumPageIndex(spreadLeft);
+        } else if (current.length < placedList.length) {
+          setAlbumPageIndex(albumSpreadLeftPageIndex(current.length));
+        } else if (fills.length) {
+          setAlbumPageIndex(albumSpreadLeftPageIndex(fillStart));
         }
-      });
 
-      templatesRef.current = placedList;
-      setTemplates(placedList);
-      setAlbumCanvasWidth(editor, pw, binderW);
+        const nextStaged = (stagedPhotosRef.current || []).filter(
+          (item) => !placedIds.has(Number(item.attachmentId))
+        );
+        persistStagedPhotos(nextStaged);
 
-      if (oneSpreadOnly) {
-        setAlbumPageIndex(spreadLeft);
-      } else if (current.length < placedList.length) {
-        setAlbumPageIndex(albumSpreadLeftPageIndex(current.length));
-      } else if (fills.length) {
-        setAlbumPageIndex(albumSpreadLeftPageIndex(fillStart));
+        const titleBand = String(albumTitle || '').trim()
+          ? albumPageTitleBandHeightPx(albumTitleStyleRef.current)
+          : 0;
+        ensureAlbumCanvasMinHeight(editor, lowestTemplateBottom(placedList) + titleBand, {
+          allowShrink: true
+        });
+        albumAutoZoomRef.current = true;
+
+        report(96, [
+          `Placed ${placedIds.size} photo${placedIds.size === 1 ? '' : 's'}`,
+          `Album pages: ${placedList.length}`,
+          `Still in tray: ${nextStaged.length}`,
+          'Fitting page to viewport…'
+        ]);
+
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => {
+            emitHtml(editor.getHTML());
+            evictDuplicateFramedPhotosInSlots(editor);
+            fitAlbumPageFlushToViewportRef.current?.();
+            requestAnimationFrame(() => {
+              fitAlbumPageFlushToViewportRef.current?.();
+              resolve();
+            });
+          });
+        });
+
+        report(100, [
+          `Done — placed ${placedIds.size} of ${trayTotal}`,
+          `Album pages: ${placedList.length}`,
+          `Remaining in tray: ${nextStaged.length}`
+        ]);
+      } finally {
+        window.setTimeout(() => setAutoLayoutProgress(null), 350);
       }
-
-      const nextStaged = (stagedPhotosRef.current || []).filter(
-        (item) => !placedIds.has(Number(item.attachmentId))
-      );
-      persistStagedPhotos(nextStaged);
-
-      const titleBand = String(albumTitle || '').trim()
-        ? albumPageTitleBandHeightPx(albumTitleStyleRef.current)
-        : 0;
-      ensureAlbumCanvasMinHeight(editor, lowestTemplateBottom(placedList) + titleBand, {
-        allowShrink: true
-      });
-      albumAutoZoomRef.current = true;
-      requestAnimationFrame(() => {
-        emitHtml(editor.getHTML());
-        evictDuplicateFramedPhotosInSlots(editor);
-        fitAlbumPageFlushToViewportRef.current?.();
-        requestAnimationFrame(() => fitAlbumPageFlushToViewportRef.current?.());
-      });
     },
     [
       editor,
@@ -5048,38 +5133,29 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     if (activeRightAlbumPageBand) bands.push(activeRightAlbumPageBand);
     return bands;
   }, [activeAlbumPageBand, activeRightAlbumPageBand]);
-  /** Active spread ±1 rows — photo blobs load only for these (Path A lazy load). */
+  /** All album pages — load every *_1000px photo when the album opens (no Path A lazy unload). */
   const photoLoadBands = useMemo(() => {
     const pw = spreadPageWidthPx;
     const bw = albumBinderWidthPx;
     const pages = albumPagesSorted;
     if (!pages.length) return activeAlbumPageBand ? [activeAlbumPageBand] : [];
-    const spreadRow = albumSpreadRowForPageIndex(albumSpreadLeftIndex);
     const bands = [];
     const orient = pageOrientationRef.current || 'portrait';
-    for (
-      let row = Math.max(0, spreadRow - 1);
-      row <= Math.min(Math.ceil(pages.length / 2) - 1, spreadRow + 1);
-      row += 1
-    ) {
-      for (let col = 0; col < ALBUM_SPREAD_PAGE_COUNT; col += 1) {
-        const pageIdx = row * ALBUM_SPREAD_PAGE_COUNT + col;
-        if (pageIdx >= pages.length) continue;
-        const inst = pages[pageIdx];
-        const h =
-          inst.h > 40 ? Math.round(inst.h) : albumTemplateBlockHeight(pw, orient);
-        bands.push({
-          left: albumPageXForSpreadColumn(pageIdx, pw, bw),
-          top: albumPageTopForSpreadRow(row, h),
-          width: pw,
-          height: h
-        });
-      }
+    for (let pageIdx = 0; pageIdx < pages.length; pageIdx += 1) {
+      const row = albumSpreadRowForPageIndex(pageIdx);
+      const inst = pages[pageIdx];
+      const h =
+        inst.h > 40 ? Math.round(inst.h) : albumTemplateBlockHeight(pw, orient);
+      bands.push({
+        left: albumPageXForSpreadColumn(pageIdx, pw, bw),
+        top: albumPageTopForSpreadRow(row, h),
+        width: pw,
+        height: h
+      });
     }
     return bands;
   }, [
     albumPagesSorted,
-    albumSpreadLeftIndex,
     spreadPageWidthPx,
     albumBinderWidthPx,
     activeAlbumPageBand
@@ -6246,7 +6322,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   void handleAutoLayout();
                 });
               }}
-              disabled={!stagedPhotos.length}
+              disabled={!stagedPhotos.length || Boolean(autoLayoutProgress)}
               aria-label="Auto Layout — create left+right page templates as spreads and fill both from the tray"
               title="Places tray photos onto the album in two-page spreads: left template + right template, then the next spread, until the tray is empty."
               sx={albumTemplateBarButtonSx}
@@ -6261,7 +6337,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   void handleAutoLayout({ maxSpreads: 1 });
                 });
               }}
-              disabled={!stagedPhotos.length}
+              disabled={!stagedPhotos.length || Boolean(autoLayoutProgress)}
               aria-label="Auto Layout 1 — create/fill one two-page spread (left + right templates) and stop"
               title="Creates or fills one open book only: left page template + right page template, filled from the tray. Remaining photos stay in the tray."
               sx={albumTemplateBarButtonSx}
@@ -7143,6 +7219,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         sharedAlbumId={sharedAlbumId}
         storageType={storageType}
         onClose={() => setPhotoViewer(null)}
+      />
+      <BusyHourglassOverlay
+        open={Boolean(autoLayoutProgress)}
+        label="Auto Layout"
+        progressPercent={autoLayoutProgress?.percent ?? null}
+        progressLabel={autoLayoutProgress?.label || ''}
+        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
       <PhotoAlbumsContextTutorial
         active={Boolean(effectiveEditable && !presentationMode && !albumFullscreen)}
