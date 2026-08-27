@@ -1,3 +1,5 @@
+import { isRegularMemberCategory as isRegularMemberCategoryEnum } from './memberCategory.js';
+
 /**
  * RegularMember demo/test accounts: stamp activity rows with a random time
  * instead of CURRENT_TIMESTAMP.
@@ -8,7 +10,6 @@
  * - Non–RegularMember: callers get null and keep normal “now” defaults.
  */
 
-const REGULAR_MEMBER_CATEGORY = 'regularmember';
 export const DEFAULT_LOOKBACK_YEARS = 3;
 /** Do not stamp RegularMember activity on the current calendar day. */
 const EXCLUDE_RECENT_MS = 24 * 60 * 60 * 1000;
@@ -25,7 +26,7 @@ function maxAllowedStampMs() {
  * @returns {boolean}
  */
 export function isRegularMemberCategory(raw) {
-  return String(raw ?? '').trim().toLowerCase() === REGULAR_MEMBER_CATEGORY;
+  return isRegularMemberCategoryEnum(raw);
 }
 
 /**

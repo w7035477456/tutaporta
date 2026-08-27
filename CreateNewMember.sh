@@ -63,15 +63,15 @@ psql_q -f "$MIGRATION_SQL" >/dev/null
 # ---------------------------------------------------------------------------
 echo
 echo "singles.member_category:"
-echo "  1) DemoUser"
-echo "  2) RegularMember"
-echo "  3) AnyMember"
+echo "  1) DEMOUSER"
+echo "  2) REGULARMEMBER"
+echo "  3) ANYMEMBER"
 while true; do
   read -r -p "Choose [1-3]: " cat_choice
   case "$cat_choice" in
-    1) MEMBER_CATEGORY="DemoUser"; break ;;
-    2) MEMBER_CATEGORY="RegularMember"; break ;;
-    3) MEMBER_CATEGORY="AnyMember"; break ;;
+    1) MEMBER_CATEGORY="DEMOUSER"; break ;;
+    2) MEMBER_CATEGORY="REGULARMEMBER"; break ;;
+    3) MEMBER_CATEGORY="ANYMEMBER"; break ;;
     *) echo "Please enter 1, 2, or 3." ;;
   esac
 done
@@ -263,7 +263,7 @@ generate_alias
 # AnyMember: random unique 6-digit (100000–999999).
 # ---------------------------------------------------------------------------
 allocate_member_id() {
-  if [[ "$MEMBER_CATEGORY" == "AnyMember" ]]; then
+  if [[ "$MEMBER_CATEGORY" == "ANYMEMBER" ]]; then
     local cand attempt
     for attempt in $(seq 1 50); do
       cand=$(rand_int 100000 999999)
@@ -284,7 +284,7 @@ allocate_member_id() {
       MAX(
         CASE
           WHEN member_id::text ~ '^[0-9]{7}$'
-           AND member_category::text IN ('DemoUser', 'RegularMember')
+           AND member_category::text IN ('DEMOUSER', 'REGULARMEMBER')
           THEN substring(member_id::text from 1 for 2)::int
           ELSE NULL
         END
@@ -319,7 +319,7 @@ allocate_member_id
 # ---------------------------------------------------------------------------
 # 4–5) password_hash + status + initial_setup_done
 # ---------------------------------------------------------------------------
-if [[ "$MEMBER_CATEGORY" == "DemoUser" || "$MEMBER_CATEGORY" == "RegularMember" ]]; then
+if [[ "$MEMBER_CATEGORY" == "DEMOUSER" || "$MEMBER_CATEGORY" == "REGULARMEMBER" ]]; then
   PASSWORD_HASH=$(psql_q -Atc "SELECT password_hash FROM ${SCHEMA}.singles WHERE lower(email)=lower('${DM1_EMAIL}') LIMIT 1;")
   if [[ -z "$PASSWORD_HASH" ]]; then
     echo "ERROR: could not clone password_hash from ${DM1_EMAIL}"

@@ -53,7 +53,7 @@ export function buildToolsOnlyAdminSessionUser(decoded = {}, sysRow = null) {
     sysRow?.singles_id != null && Number.isFinite(Number(sysRow.singles_id))
       ? Number(sysRow.singles_id)
       : Number(decoded.singles_id) || 0;
-  const memberCategory = String(sysRow?.member_category ?? 'Admin');
+  const memberCategory = String(sysRow?.member_category ?? 'ADMIN');
   return {
     singles_id: singlesId,
     email: TOOLS_ONLY_ADMIN_LOGIN_ID,

@@ -550,7 +550,7 @@ export default function AdminToolsLookupTab({ onError }) {
     for (const row of rows) {
       if (row?.singlesId != null) {
         savedStatus[row.singlesId] = String(row.status ?? 'blank');
-        savedMemberCategory[row.singlesId] = String(row.memberCategory ?? 'Public');
+        savedMemberCategory[row.singlesId] = String(row.memberCategory ?? 'PUBLIC');
         savedAccountBalanceToken[row.singlesId] = parseTokenBalanceValue(row.accountBalanceToken);
       }
     }
@@ -699,7 +699,7 @@ export default function AdminToolsLookupTab({ onError }) {
       const id = row.singlesId;
       return (
         String(row.status ?? 'blank') !== String(savedStatusById[id] ?? 'blank') ||
-        String(row.memberCategory ?? 'Public') !== String(savedMemberCategoryById[id] ?? 'Public') ||
+        String(row.memberCategory ?? 'PUBLIC') !== String(savedMemberCategoryById[id] ?? 'PUBLIC') ||
         parseTokenBalanceValue(row.accountBalanceToken) !==
           parseTokenBalanceValue(savedAccountBalanceTokenById[id] ?? 0)
       );
@@ -721,7 +721,7 @@ export default function AdminToolsLookupTab({ onError }) {
           await saveAdminSinglesStatus({ singlesId: row.singlesId, status: row.status });
         }
         if (
-          String(row.memberCategory ?? 'Public') !== String(savedMemberCategoryById[row.singlesId] ?? 'Public')
+          String(row.memberCategory ?? 'PUBLIC') !== String(savedMemberCategoryById[row.singlesId] ?? 'PUBLIC')
         ) {
           await saveAdminSinglesMemberCategory({
             singlesId: row.singlesId,

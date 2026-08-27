@@ -1,12 +1,16 @@
+import { normalizeMemberCategoryEnum } from './utils/memberCategory.js';
+
 /**
  * Mall tile visibility from ~/.ssh/be/.env using member-category keys
  * (loaded by loadEnv.js → process.env).
  *
- * Supported keys:
- * - Public
- * - DemoUser
- * - PilotUser
- * - Admin
+ * Supported keys (uppercase, match DB singles.member_category):
+ * - PUBLIC
+ * - DEMOUSER
+ * - PILOTUSER
+ * - ADMIN
+ * - REGULARMEMBER
+ * - ANYMEMBER
  *
  * Values (case-insensitive):
  * - show_all
@@ -37,11 +41,12 @@ function normalizeMode(raw) {
   return SHOW_ALL;
 }
 
-/** Read exact member category key from env. */
+/** Read uppercase member category key from env (legacy PascalCase keys still accepted). */
 function envForMemberCategory(memberCategory) {
-  const category = String(memberCategory ?? '').trim();
+  const normalized = normalizeMemberCategoryEnum(memberCategory);
+  const category = normalized ?? String(memberCategory ?? '').trim().toUpperCase();
   if (!category) return '';
-  return process.env[category] ?? process.env[category.toUpperCase()] ?? '';
+  return process.env[category] ?? '';
 }
 
 /**

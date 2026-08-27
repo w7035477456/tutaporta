@@ -32,7 +32,7 @@ export async function lookupSystemToolsAdminSingles(db = pool) {
     singles_id: Number(row.singles_id),
     email: String(row.email ?? SYSTEM_TOOLS_ADMIN_EMAIL),
     alias: String(row.alias ?? 'Admin'),
-    member_category: String(row.member_category ?? 'Admin')
+    member_category: String(row.member_category ?? 'ADMIN')
   };
 }
 

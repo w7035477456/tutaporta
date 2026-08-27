@@ -1,12 +1,23 @@
 /** Cycle order matches helloworldjunktest.member_category_enum sort order. */
 export const MEMBER_CATEGORY_VALUES = Object.freeze([
-  'Public',
-  'Admin',
-  'DemoUser',
-  'PilotUser',
-  'RegularMember',
-  'AnyMember'
+  'PUBLIC',
+  'ADMIN',
+  'DEMOUSER',
+  'PILOTUSER',
+  'REGULARMEMBER',
+  'ANYMEMBER'
 ]);
+
+/** Legacy PascalCase / mixed-case labels → canonical uppercase enum. */
+const MEMBER_CATEGORY_ALIASES = Object.freeze({
+  public: 'PUBLIC',
+  admin: 'ADMIN',
+  demouser: 'DEMOUSER',
+  pilotuser: 'PILOTUSER',
+  regularmember: 'REGULARMEMBER',
+  anymember: 'ANYMEMBER',
+  allmember: 'ANYMEMBER'
+});
 
 /**
  * @param {unknown} raw
@@ -15,8 +26,8 @@ export const MEMBER_CATEGORY_VALUES = Object.freeze([
 export function normalizeMemberCategoryEnum(raw) {
   const value = String(raw ?? '').trim();
   if (!value) return null;
-  const lower = value.toLowerCase();
-  return MEMBER_CATEGORY_VALUES.find((entry) => entry.toLowerCase() === lower) ?? null;
+  const key = value.toLowerCase();
+  return MEMBER_CATEGORY_ALIASES[key] ?? null;
 }
 
 /**
@@ -24,7 +35,7 @@ export function normalizeMemberCategoryEnum(raw) {
  * @returns {string}
  */
 export function nextMemberCategory(current) {
-  const normalized = normalizeMemberCategoryEnum(current) ?? 'Public';
+  const normalized = normalizeMemberCategoryEnum(current) ?? 'PUBLIC';
   const index = MEMBER_CATEGORY_VALUES.indexOf(normalized);
   const nextIndex = index < 0 ? 0 : (index + 1) % MEMBER_CATEGORY_VALUES.length;
   return MEMBER_CATEGORY_VALUES[nextIndex];
@@ -42,15 +53,15 @@ export function formatMemberCategoryLabel(raw) {
 }
 
 export function isDemoUserCategory(raw) {
-  return normalizeMemberCategoryEnum(raw) === 'DemoUser';
+  return normalizeMemberCategoryEnum(raw) === 'DEMOUSER';
 }
 
 export function isRegularMemberCategory(raw) {
-  return normalizeMemberCategoryEnum(raw) === 'RegularMember';
+  return normalizeMemberCategoryEnum(raw) === 'REGULARMEMBER';
 }
 
 export function isAnyMemberCategory(raw) {
-  return normalizeMemberCategoryEnum(raw) === 'AnyMember';
+  return normalizeMemberCategoryEnum(raw) === 'ANYMEMBER';
 }
 
 /** DemoUser / RegularMember: skip mandatory setup / IDV nav locks. */

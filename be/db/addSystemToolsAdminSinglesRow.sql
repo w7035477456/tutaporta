@@ -25,7 +25,7 @@ SELECT
     '$2b$12$toolsadminplaceholderhashnotusedforloginxxxxxxxxxxxxxxxxxxxx'
   ),
   'Admin',
-  'Admin'::helloworldjunktest.member_category_enum,
+  'ADMIN'::helloworldjunktest.member_category_enum,
   'blank'::helloworldjunktest.singles_status,
   'coffey dark',
   '999999',

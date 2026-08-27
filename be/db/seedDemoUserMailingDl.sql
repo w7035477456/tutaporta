@@ -11,14 +11,14 @@ SET
   dl_middlename = CHR(65 + ((singles_id * 7 + 3) % 26)::int),
   dl_lastname = NULLIF(BTRIM(mailing_lastname), ''),
   updated_at = CURRENT_TIMESTAMP
-WHERE member_category = 'DemoUser';
+WHERE member_category = 'DEMOUSER';
 
 WITH ranked AS (
   SELECT
     s.singles_id,
     ROW_NUMBER() OVER (ORDER BY s.singles_id)::int AS rn
   FROM helloworldjunktest.singles s
-  WHERE s.member_category = 'DemoUser'
+  WHERE s.member_category = 'DEMOUSER'
 ),
 addrs(rn, mailing_street, mailing_city, mailing_zip, mailing_country) AS (
   VALUES
@@ -48,7 +48,7 @@ SELECT singles_id, email, mailing_firstname, mailing_lastname,
   dl_firstname, dl_middlename, dl_lastname,
   mailing_street, mailing_city, mailing_zip, mailing_country
 FROM helloworldjunktest.singles
-WHERE member_category = 'DemoUser'
+WHERE member_category = 'DEMOUSER'
 ORDER BY singles_id;
 
 COMMIT;

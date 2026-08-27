@@ -396,7 +396,7 @@ export async function postAdminSetSinglesMemberCategory(req, res) {
       return res.status(404).json({ error: 'Singles row not found.' });
     }
 
-    const currentCategory = normalizeMemberCategoryEnum(row.member_category) ?? 'Public';
+    const currentCategory = normalizeMemberCategoryEnum(row.member_category) ?? 'PUBLIC';
     if (currentCategory !== nextCategory) {
       await client.query(
         `UPDATE helloworldjunktest.singles

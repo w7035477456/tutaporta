@@ -1043,7 +1043,7 @@ app.get('/api/publicConfig', (_req, res) => {
     oneDriveVaultEnabled: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()).enabled,
     linkedInEnabled: isLinkedInOAuthConfigured(),
     blockMobile: isBlockMobileEnabled(),
-    duplicatePhoneAllow: isDuplicatePhoneAllowed('AnyMember'),
+    duplicatePhoneAllow: isDuplicatePhoneAllowed('ANYMEMBER'),
     onenoteUsbUpgrade: ['true', '1', 'yes', 'on'].includes(
       String(process.env.ONENOTE_USB_UPGRADE ?? '').trim().toLowerCase()
     ),

@@ -1,4 +1,5 @@
 import { formatAliasWithMemberCode, formatMemberCode, formatMemberLabel, formatMemberNumber } from 'utils/memberLabel';
+import { isDemoUserCategory } from 'utils/memberCategory';
 import {
   APPROVAL_STATUS,
   isNoResponseApprovalStatus,
@@ -64,10 +65,6 @@ export const SELF_REPORT_COMPLETION_FIELD_KEYS = Object.freeze([
   ...SELF_REPORT_COMPLETION_FULL_FIELD_KEYS
 ]);
 
-function isDemoUserMemberCategory(raw) {
-  return String(raw ?? '').trim().toLowerCase() === 'demouser';
-}
-
 function findBioReviewCompletionRow(bioReview, key) {
   const brief = Array.isArray(bioReview?.briefBio) ? bioReview.briefBio : [];
   const full = Array.isArray(bioReview?.fullBio) ? bioReview.fullBio : [];
@@ -92,7 +89,7 @@ export function isSelfReportCompletionFieldCompleted(row, { demoUser = false } =
 export function calcSelfReportCompletionPercent(bioReview, fieldKeys = SELF_REPORT_COMPLETION_FIELD_KEYS) {
   const keys = Array.isArray(fieldKeys) ? fieldKeys : SELF_REPORT_COMPLETION_FIELD_KEYS;
   if (!keys.length) return 0;
-  const demoUser = isDemoUserMemberCategory(bioReview?.member?.memberCategory);
+  const demoUser = isDemoUserCategory(bioReview?.member?.memberCategory);
   let matched = 0;
   for (const key of keys) {
     const row = findBioReviewCompletionRow(bioReview, key);

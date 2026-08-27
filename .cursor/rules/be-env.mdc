@@ -127,10 +127,10 @@ BLOCK_MOBILE=false
 ## Member visibility (listings)
 
 ```bash
-SHOW_MEMBER_CATEGORY=PILOTUSER,DemoUser,PUBLIC
+SHOW_MEMBER_CATEGORY=REGULARMEMBER,DEMOUSER,ANYMEMBER
 ```
 
-Filters All Singles–style listings to active users whose `member_category` is in this comma list (`be/routes/singles/memberVisibility.js`). Case-insensitive match.
+Filters All Singles–style listings to active users whose `member_category` is in this comma list (`be/routes/singles/memberVisibility.js`). Values are uppercase and match DB enum labels (`PUBLIC`, `ADMIN`, `DEMOUSER`, `PILOTUSER`, `REGULARMEMBER`, `ANYMEMBER`). `ALLMEMBER` is accepted as an alias for `ANYMEMBER`. `REGULARMEMBER` and `ANYMEMBER` are always included when the env list is non-empty.
 
 ## Dev login shortcut
 
@@ -477,13 +477,13 @@ After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on p
 ## Menu visibility by member category
 
 ```bash
-Admin=show_all
-DemoUser=show_all
-PilotUser=show_all
-Public=show_vsingles, show_eMarketPlace
+ADMIN=show_all
+DEMOUSER=show_all
+PILOTUSER=show_all
+PUBLIC=show_vsingles, show_eMarketPlace
 ```
 
-Loaded by `be/mallDepartmentMode.js` → `mallDepartmentMode` on user. Keys must match DB **`singles.member_category`**.
+Loaded by `be/mallDepartmentMode.js` → `mallDepartmentMode` on user. Keys must match DB **`singles.member_category`** (uppercase enum labels).
 
 ## API port and logging
 

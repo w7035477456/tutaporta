@@ -277,7 +277,7 @@ export async function postAdminPasswordCheckSetMemberCategory(req, res) {
            password_attempt_count = 0,
            password_attempt_datetime = $2::timestamptz,
            updated_at = CURRENT_TIMESTAMP
-       WHERE member_category::text IN ('DemoUser', 'PilotUser')
+       WHERE member_category::text IN ('DEMOUSER', 'PILOTUSER')
        RETURNING singles_id`,
       [parsed.hash, PASSWORD_ATTEMPT_EPOCH]
     );

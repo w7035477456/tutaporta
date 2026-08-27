@@ -9,6 +9,7 @@
 import pool from '../db/connection.js';
 import { allocateMemberIdForCategory } from '../utils/allocateMemberId.js';
 import { formatMemberDisplayCode } from '../utils/memberDisplayCode.js';
+import { normalizeMemberCategoryEnum } from '../utils/memberCategory.js';
 
 async function main() {
   const client = await pool.connect();
@@ -23,7 +24,7 @@ async function main() {
 
     const updates = [];
     for (const row of rows) {
-      const category = String(row.member_category ?? 'Public').trim() || 'Public';
+      const category = normalizeMemberCategoryEnum(row.member_category) ?? 'PUBLIC';
       const newMemberId = await allocateMemberIdForCategory(client, {
         memberCategory: category,
         singlesId: row.singles_id

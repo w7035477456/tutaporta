@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import pool from '../../db/connection.js';
+import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
 import { getPrivateKey } from '../../jwtKeys.js';
 import { getMallDepartmentMode } from '../../mallDepartmentMode.js';
 import { getAuthJwtExpiresInSeconds, setAuthCookie } from '../../utils/authCookie.js';
@@ -91,7 +92,7 @@ async function findUserByLoginIdentifier(identifier) {
 
 /** Normalized member_category for LOCK_OUT checks */
 function normalizeMemberCategory(raw) {
-  return String(raw ?? '').trim();
+  return normalizeMemberCategoryEnum(raw) ?? String(raw ?? '').trim().toUpperCase();
 }
 
 function rejectAdminLoginWrongIp(req, res, log, context) {
@@ -342,10 +343,10 @@ export async function beVerifyLoginPassword(req, res) {
       .trim()
       .toLowerCase() === 'true';
     if (lockOut) {
-      const memberCategory = normalizeMemberCategory(user.member_category).toLowerCase();
-      const lockOutAllowed = memberCategory === 'pilotuser' || memberCategory === 'admin';
+      const memberCategory = normalizeMemberCategory(user.member_category);
+      const lockOutAllowed = memberCategory === 'PILOTUSER' || memberCategory === 'ADMIN';
       if (!lockOutAllowed) {
-        log('[beVerifyLoginPassword.js] reject: LOCK_OUT=true and member_category not in {PilotUser,Admin}', {
+        log('[beVerifyLoginPassword.js] reject: LOCK_OUT=true and member_category not in {PILOTUSER,ADMIN}', {
           singles_id: user.singles_id,
           member_category: user.member_category
         });

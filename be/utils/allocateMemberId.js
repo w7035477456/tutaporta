@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import pool, { getDBSchema } from '../db/connection.js';
+import { isDemoUserCategory } from './memberCategory.js';
 
 const PUBLIC_MEMBER_ID_MIN = 100_000;
 const PUBLIC_MEMBER_ID_MAX = 999_999;
@@ -71,8 +72,7 @@ export async function allocateRandomSixDigitMemberId(client) {
 }
 
 export async function allocateMemberIdForCategory(client, { memberCategory, singlesId }) {
-  const category = String(memberCategory ?? 'Public').trim();
-  if (category === 'DemoUser') {
+  if (isDemoUserCategory(memberCategory)) {
     return allocateDemoUserMemberId(client, singlesId);
   }
   return allocatePublicMemberId(client, { excludeSinglesId: singlesId });

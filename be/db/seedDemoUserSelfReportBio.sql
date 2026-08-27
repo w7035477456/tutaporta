@@ -19,7 +19,7 @@ SELECT
   lower(s.email::text) AS email,
   ROW_NUMBER() OVER (ORDER BY s.singles_id)::int AS rn
 FROM helloworldjunktest.singles s
-WHERE s.member_category = 'DemoUser'
+WHERE s.member_category = 'DEMOUSER'
    OR lower(s.email::text) ~ '^dm([1-9]|10)@gmail\.com$'
    OR lower(s.email::text) ~ '^dem([1-9]|10)@gmail\.com$';
 
