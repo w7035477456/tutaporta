@@ -89,6 +89,9 @@ console.log('[loadEnv] Record Vault env:', {
   NOTES_ENCRYPT_PHOTO_AND_DB: process.env.NOTES_ENCRYPT_PHOTO_AND_DB ?? '(unset)',
   NOTES_ICON_RETRY_DELAY_SEC: process.env.NOTES_ICON_RETRY_DELAY_SEC ?? '(unset, default 300 seconds)'
 });
+console.log('[loadEnv] TutaPhotoAlbums enc gate:', {
+  SKIP_TUTAPHOTO_ENC: process.env.SKIP_TUTAPHOTO_ENC ?? '(unset, default false)'
+});
 
 if (!globalThis.__vsinglesProcessGuardsInstalled) {
   globalThis.__vsinglesProcessGuardsInstalled = true;

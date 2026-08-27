@@ -27,7 +27,7 @@ export const PHOTO_ALBUMS_CONTEXT_TUTORIAL_COPY = {
       'You are currently in Album View Mode.',
       '• Choose a Layout: Click the Template button to select a layout for your new album page.',
       '• Add Photos: If your chosen template has an empty slot, simply drag and drop a photo from the Thumbnail Tray into the space.',
-      '• Edit Photos: Double-click any photo and select "Edit Video" on popup to enter Album Edit Mode.To exit, click anywhere on the album page outside of the selected photo.',
+      '• Edit Photos: Double-click any photo to open Add Text (captions, emoji, Pan Zoom / Rotate / Full / Zoom).',
       '• Rearrange or Remove: Drag a photo back to the Thumbnail Tray to remove it, or drag it to another slot on the page to swap locations.',
       '• Additional Features: While in View Mode, you can also:',
       '  • Play a Photo or Album Slideshow.',
@@ -40,20 +40,20 @@ export const PHOTO_ALBUMS_CONTEXT_TUTORIAL_COPY = {
   edit: {
     title: 'Current Context Tutorial:',
     body: [
-      'You are in Album Edit Mode (Pan & Zoom is OFF).',
-      '• Rearrange: Drag and drop photos back to the thumbnail tray or onto another slot to swap them.',
-      '• Actions: Click any green button to make edits.',
-      '• Switch Modes: Click the Pan & Zoom button to activate it.',
-      '• Exit: Click anywhere on the album outside the active photo.'
+      'You are in Album Edit Mode (opened by double-click — Add Text).',
+      '• Captions: Type in Add Text; use Emoji for stickers. OK saves onto the photo.',
+      '• Photo fit: Use Pan Zoom, Rotate, Full, and Zoom in the Add Text button row.',
+      '• Rearrange: After closing Add Text, drag photos to swap slots or return to the tray.',
+      '• Exit: Close Add Text with Cancel/OK, or click outside the photo on the album.'
     ].join('\n')
   },
   editPanZoom: {
     title: 'Current Context Tutorial:',
     body: [
       'You are in Album Edit Mode (Pan & Zoom is ON).',
-      '• Pan: Drag the photo to reposition it.',
-      '• Resize: Drag the yellow slider at the bottom of the photo.',
-      '• Switch Modes: Click the Pan & Zoom button again to turn it off.',
+      '• Pan: Drag the photo to reposition it in its slot.',
+      '• Resize: Use the yellow zoom slider when Pan Zoom is on.',
+      '• Switch Modes: Click Pan Zoom again to turn it off.',
       '• Exit: Click anywhere on the album outside the active photo.'
     ].join('\n')
   }

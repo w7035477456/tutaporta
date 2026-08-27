@@ -9,7 +9,6 @@ import Typography from '@mui/material/Typography';
 import SliderControlButton from 'ui-component/SliderControlButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
-import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
@@ -896,13 +895,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const [isMoving, setIsMoving] = useState(false);
   /** Hover/selected filename — inline top-right next to return X. */
   const [nameHover, setNameHover] = useState(false);
-  /** ColorTemplate16 edit popup — opened by double-click (replaces yellow choice menu). */
-  const [photoEditPopupOpen, setPhotoEditPopupOpen] = useState(false);
-  /** Full att_N.jpg for Edit Photo popup only (page tiles use *_1000px). */
-  const [editFullUrl, setEditFullUrl] = useState('');
-  const editFullUrlRef = useRef('');
-  editFullUrlRef.current = editFullUrl;
-
   const readContext = useCallback(() => editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME] || {}, [editor]);
 
   const commitAttrs = useCallback(
@@ -937,52 +929,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const isAlbumVideo = viewKind === 'video' && isPhotoAlbumsStagingVideoExtension(ext);
   const isAlbumSlotMedia = isPhoto || isAlbumVideo;
 
-  // Edit Photo popup: load full att_N.jpg (not *_1000px).
-  useEffect(() => {
-    if (!photoEditPopupOpen || !isPhoto || isAlbumVideo) {
-      return undefined;
-    }
-    let cancelled = false;
-    let owned = '';
-    (async () => {
-      try {
-        const ctx = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME] || {};
-        const sharedAlbumId = Number(ctx.sharedAlbumId);
-        const noteId = Number(ctx.noteId);
-        const blob =
-          Number.isFinite(sharedAlbumId) && sharedAlbumId > 0
-            ? await fetchPhotoAlbumsSharedAlbumAttachmentBlob(sharedAlbumId, attachmentId, {
-                inline: true,
-                variant: 'full'
-              })
-            : await fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
-                inline: true,
-                storageType: ctx.storageType,
-                variant: 'full'
-              });
-        if (cancelled || !blob) return;
-        owned = URL.createObjectURL(blob);
-        if (cancelled) {
-          URL.revokeObjectURL(owned);
-          return;
-        }
-        const prev = String(editFullUrlRef.current || '');
-        setEditFullUrl(owned);
-        if (prev.startsWith('blob:') && prev !== owned) {
-          try {
-            URL.revokeObjectURL(prev);
-          } catch {
-            // ignore
-          }
-        }
-      } catch {
-        // Keep display thumb in popup until full loads / if it fails.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [photoEditPopupOpen, isPhoto, isAlbumVideo, attachmentId, editor]);
   const canView = canViewPhotoAlbumsAttachment(ext) || isAlbumSlotMedia;
   const launchesNative = canNativeOpenPhotoAlbumsAttachment(ext);
   const actionLabel = launchesNative ? 'Launch' : 'View';
@@ -1038,7 +984,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   /** Mouse wheel scrolls the album page — zoom only via the yellow slider (not wheel). */
   // (Previously wheel zoomed the selected photo and blocked page scroll.)
 
-  /** Select this photo node (solid red border) — via Edit Photo popup. */
+  /** Select this photo node (solid red border) — via double-click Add Text. */
   const selectThisPhoto = useCallback(() => {
     const pos = typeof getPos === 'function' ? getPos() : null;
     if (pos == null || !editor?.view) return;
@@ -1050,31 +996,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     const { state, dispatch } = editor.view;
     dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)));
   }, [editor, getPos]);
-
-  const exitPhotoEditPopup = useCallback(() => {
-    setPhotoEditPopupOpen(false);
-    setPanEnabled(false);
-    const prev = String(editFullUrlRef.current || '');
-    setEditFullUrl('');
-    if (prev.startsWith('blob:')) {
-      try {
-        URL.revokeObjectURL(prev);
-      } catch {
-        // ignore
-      }
-    }
-    const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (store && store.pinnedPhotoEditPos != null) {
-      store.pinnedPhotoEditPos = null;
-      store.contextTutorialTick = (store.contextTutorialTick || 0) + 1;
-    }
-    if (editor?.view) {
-      const { state, dispatch } = editor.view;
-      if (state.selection instanceof NodeSelection) {
-        dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-      }
-    }
-  }, [editor]);
 
   /**
    * Framed + Pan&Zoom on: drag pans inside the slot.
@@ -2120,8 +2041,40 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     }
     cancelScheduledPhotoViewInNewTab();
     selectThisPhoto();
-    setPhotoEditPopupOpen(true);
-  }, [editable, cancelScheduledPhotoViewInNewTab, openPhotoInNewTab, selectThisPhoto]);
+    // Double-click opens Add Text (Pan Zoom / Rotate / Full / Zoom live there).
+    const openPlaceText = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.openPlaceText;
+    if (typeof openPlaceText !== 'function') return;
+    const baseLeft = inFrame ? frameLeft : placedLeft;
+    const baseTop = inFrame ? frameTop : placedTop;
+    const posLeft =
+      Number.isFinite(baseLeft) && Number.isFinite(frameWidth)
+        ? Math.round(baseLeft + Math.max(8, frameWidth * 0.08))
+        : Number.isFinite(baseLeft)
+          ? Math.round(baseLeft + 12)
+          : undefined;
+    const posTop =
+      Number.isFinite(baseTop) && Number.isFinite(frameHeight)
+        ? Math.round(baseTop + Math.max(8, frameHeight * 0.08))
+        : Number.isFinite(baseTop)
+          ? Math.round(baseTop + 12)
+          : undefined;
+    openPlaceText(
+      Number.isFinite(posLeft) && Number.isFinite(posTop) ? { posLeft, posTop } : null
+    );
+  }, [
+    editable,
+    cancelScheduledPhotoViewInNewTab,
+    openPhotoInNewTab,
+    selectThisPhoto,
+    editor,
+    inFrame,
+    frameLeft,
+    frameTop,
+    placedLeft,
+    placedTop,
+    frameWidth,
+    frameHeight
+  ]);
 
   const schedulePhotoViewInNewTab = useCallback(
     (event) => {
@@ -2328,7 +2281,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         });
         deleteNode();
       }
-      setPhotoEditPopupOpen(false);
       setPanEnabled(false);
       return;
     }
@@ -2443,8 +2395,17 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   );
 
   useEffect(() => {
-    if (!editActive) setPanEnabled(false);
-  }, [editActive]);
+    if (!editActive) {
+      setPanEnabled(false);
+      return;
+    }
+    // Add Text Pan Zoom toggle writes dialogPanZoom onto the pinned photo.
+    const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+    if (!store || typeof store.dialogPanZoom !== 'boolean') return;
+    const pos = typeof getPos === 'function' ? getPos() : null;
+    if (store.pinnedPhotoEditPos !== pos) return;
+    setPanEnabled(Boolean(store.dialogPanZoom));
+  }, [editActive, editor, getPos, pinnedPhotoEditPos]);
 
   /** Publish Pan&Zoom ON/OFF so the floating context tutorial can switch copy. */
   useEffect(() => {
@@ -2516,26 +2477,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     );
   }, [editor, inFrame, frameLeft, frameTop, placedLeft, placedTop, frameWidth, frameHeight]);
 
-  const placeTextActionBtn = editable ? (
-    <SliderControlButton
-      type="button"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        openPlaceTextNearThisMedia();
-      }}
-      title={
-        isAlbumVideo
-          ? 'Place text on or over this video — drag and rotate like a sticker'
-          : 'Place text on or near this photo — drag and rotate like a sticker'
-      }
-      aria-label={isAlbumVideo ? `Place text on ${label}` : `Place text near ${label}`}
-      sx={photoSlotActionBtnSx}
-    >
-      Text
-    </SliderControlButton>
-  ) : null;
-
   const resetMediaActionBtn = editable ? (
     <SliderControlButton
       type="button"
@@ -2562,10 +2503,9 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     </SliderControlButton>
   ) : null;
 
-  /** Video edit mode: Text + Reset only (on the video). Photos keep full chrome. */
+  /** Video edit mode: Reset only (Add Text opens via double-click). Photos keep chrome in Add Text. */
   const actionButtons = isAlbumVideo && editable ? (
     <>
-      {placeTextActionBtn}
       {resetMediaActionBtn}
     </>
   ) : (
@@ -2675,7 +2615,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           </SliderControlButton>
         </>
       ) : null}
-      {isPhoto && editable ? placeTextActionBtn : null}
       {canView && !isAlbumSlotMedia ? (
         <SliderControlButton
           type="button"
@@ -3193,7 +3132,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               display: 'none'
             }}
           />
-          {/* Edit controls live in ColorTemplate16 popup (double-click). */}
+          {/* Edit controls live in Add Text (double-click). */}
           {false ? (
           <Box
             className="rv-photo-tile__actions"
@@ -3317,164 +3256,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               document.body
             )
           : null}
-        <ColorTemplate16PopupCenterWide
-          open={Boolean(photoEditPopupOpen)}
-          onClose={exitPhotoEditPopup}
-          closeOnBackdrop
-          showCloseButton
-          defaultResizeHeight="78vh"
-          maxResizeHeight="92vh"
-        >
-          <ColorTemplate16PopupCenterWide.Body spacing={1.25}>
-            <ColorTemplate16PopupCenterWide.Title>
-              {isAlbumVideo ? 'Edit Video' : 'Edit Photo'}
-            </ColorTemplate16PopupCenterWide.Title>
-            <Box
-              sx={{
-                position: 'relative',
-                width: '100%',
-                minHeight: { xs: 220, sm: 320 },
-                maxHeight: '52vh',
-                bgcolor: '#111',
-                border: panEnabled ? '3px solid #FFEB3B' : '2px solid #000',
-                borderRadius: 1,
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                ...(panEnabled ? panModeFrameBlinkSx : null)
-              }}
-            >
-              {thumbUrl || editFullUrl ? (
-                isAlbumVideo ? (
-                  <Box
-                    component="video"
-                    src={thumbUrl}
-                    controls
-                    playsInline
-                    sx={{
-                      maxWidth: '100%',
-                      maxHeight: '52vh',
-                      objectFit: 'contain',
-                      display: 'block'
-                    }}
-                  />
-                ) : (
-                  <Box
-                    component="img"
-                    src={editFullUrl || thumbUrl}
-                    alt={label}
-                    draggable={false}
-                    onPointerDown={(e) => {
-                      if (!panEnabled || !inFrame) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startX = e.clientX;
-                      const startY = e.clientY;
-                      const originPanX = livePanX;
-                      const originPanY = livePanY;
-                      const photoW = livePhotoW || displayWidth || 1;
-                      const photoH = livePhotoH || displayHeight || 1;
-                      const fw = frameWidth || 1;
-                      const fh = frameHeight || 1;
-                      const onMove = (ev) => {
-                        const next = clampPhotoPan(
-                          originPanX + (ev.clientX - startX),
-                          originPanY + (ev.clientY - startY),
-                          photoW,
-                          photoH,
-                          fw,
-                          fh
-                        );
-                        commitAttrs({ panX: next.panX, panY: next.panY });
-                      };
-                      const onUp = () => {
-                        window.removeEventListener('pointermove', onMove);
-                        window.removeEventListener('pointerup', onUp);
-                      };
-                      window.addEventListener('pointermove', onMove);
-                      window.addEventListener('pointerup', onUp);
-                    }}
-                    sx={{
-                      maxWidth: '100%',
-                      maxHeight: '52vh',
-                      objectFit: slotFit === 'contain' ? 'contain' : 'cover',
-                      transform: rotationDeg ? `rotate(${rotationDeg}deg)` : undefined,
-                      transformOrigin: 'center center',
-                      cursor: panEnabled ? 'grab' : 'default',
-                      display: 'block',
-                      userSelect: 'none'
-                    }}
-                  />
-                )
-              ) : (
-                <Typography sx={{ color: '#fff', fontWeight: 700 }}>Loading…</Typography>
-              )}
-              {!isAlbumVideo ? (
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    maxWidth: '55%',
-                    bgcolor: 'rgba(80,80,80,0.88)',
-                    color: '#fff',
-                    px: 1,
-                    py: 0.75,
-                    borderRadius: 1,
-                    fontFamily: MAIN_FONT_FAMILY,
-                    fontWeight: 700,
-                    fontSize: '0.78rem',
-                    lineHeight: 1.25,
-                    pointerEvents: 'none',
-                    textAlign: 'left'
-                  }}
-                >
-                  Place text on or next to photo. Then rotate like a sticker.
-                </Box>
-              ) : null}
-            </Box>
-            {framed && !isAlbumVideo ? (
-              <Box sx={slotZoomSliderRowSx(panEnabled)} title="Zoom photo in slot (Pan Zoom mode)">
-                <Typography component="span" sx={slotZoomPctLabelSx(panEnabled)}>
-                  0%
-                </Typography>
-                <Slider
-                  size="small"
-                  disabled={!panEnabled}
-                  value={framedZoomPct}
-                  min={SLOT_ZOOM_PCT_MIN}
-                  max={SLOT_ZOOM_PCT_MAX}
-                  step={1}
-                  onChange={(_, v) => {
-                    if (!panEnabled) return;
-                    applyFramedZoomPercent(v);
-                  }}
-                  aria-label="Zoom photo in slot"
-                  valueLabelDisplay={panEnabled ? 'auto' : 'off'}
-                  valueLabelFormat={(v) => `${v}%`}
-                  sx={slotZoomSliderSx(panEnabled)}
-                />
-                <Typography component="span" sx={slotZoomPctLabelSx(panEnabled)}>
-                  100%
-                </Typography>
-              </Box>
-            ) : null}
-            <Box
-              sx={{
-                display: 'flex',
-                flexWrap: 'nowrap',
-                alignItems: 'stretch',
-                justifyContent: 'stretch',
-                gap: 0.5,
-                width: '100%',
-                overflowX: 'auto'
-              }}
-            >
-              {actionButtons}
-            </Box>
-          </ColorTemplate16PopupCenterWide.Body>
-        </ColorTemplate16PopupCenterWide>
       </NodeViewWrapper>
     );
   }

@@ -4,6 +4,10 @@ import {
   photoPageRectFromAttrs
 } from './photoAlbumsAttachmentNode';
 import { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
+import {
+  PLACE_TEXT_PREVIEW_MIN_REL_H,
+  PLACE_TEXT_PREVIEW_MIN_REL_W
+} from './photoAlbumsPlaceTextPreviewShared';
 
 function parseOptionalPx(raw) {
   if (raw == null || raw === '') return null;
@@ -17,6 +21,42 @@ function isEmojiStickerLabel(text, fontFamily) {
   if (!t || /\s/.test(t)) return false;
   if (/[A-Za-z0-9]/.test(t)) return false;
   return [...t].length <= 8;
+}
+
+/** Corner offset after CSS rotate (clockwise +), y-down screen coords. */
+function rotateCornerCss(localX, localY, deg) {
+  const rad = (Number(deg) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    x: localX * cos + localY * sin,
+    y: -localX * sin + localY * cos
+  };
+}
+
+/**
+ * Place label box so its rotated extent sits flush on the photo bottom-right edge.
+ * relW/relH are fractions of photo width/height; margin is also relative (0 = flush).
+ */
+export function computePlaceTextBottomRightRel({ relW, relH, rotationDeg, margin = 0 }) {
+  const w = Math.max(PLACE_TEXT_PREVIEW_MIN_REL_W, Number(relW) || 0);
+  const h = Math.max(PLACE_TEXT_PREVIEW_MIN_REL_H, Number(relH) || 0);
+  const deg = Number.isFinite(Number(rotationDeg)) ? Number(rotationDeg) : PLACE_TEXT_DEFAULTS.rotationDeg;
+  const m = Math.max(0, Number(margin) || 0);
+  const corners = [
+    [-w / 2, -h / 2],
+    [w / 2, -h / 2],
+    [w / 2, h / 2],
+    [-w / 2, h / 2]
+  ].map(([lx, ly]) => rotateCornerCss(lx, ly, deg));
+  const maxDx = Math.max(...corners.map((c) => c.x));
+  const maxDy = Math.max(...corners.map((c) => c.y));
+  const cx = 1 - m - maxDx;
+  const cy = 1 - m - maxDy;
+  return {
+    relX: Math.max(0, cx - w / 2),
+    relY: Math.max(0, cy - h / 2)
+  };
 }
 
 /** @returns {import('./PhotoAlbumsPlaceTextPositionOverlay').PlaceTextPositionSession | null} */
@@ -88,16 +128,27 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     }
   } else {
     const fs = Math.max(10, Math.round(Number(style?.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
-    const estW = Math.max(0.18, Math.min(0.75, (fs * 6) / pw));
+    const caption = String(style?.text || PLACE_TEXT_DEFAULTS.text).trim();
+    const charFactor = Math.max(6, Math.min(Math.max(caption.length, 6), 24));
+    const estW = Math.max(0.18, Math.min(0.75, (fs * charFactor) / pw));
     const estH = Math.max(0.08, Math.min(0.35, (fs * 1.4) / ph));
+    const rotationDeg = Number.isFinite(Number(style?.rotationDeg))
+      ? Math.round(Number(style.rotationDeg))
+      : PLACE_TEXT_DEFAULTS.rotationDeg;
+    const { relX, relY } = computePlaceTextBottomRightRel({
+      relW: estW,
+      relH: estH,
+      rotationDeg,
+      margin: 0
+    });
     labels.push({
       clientKey: `new_${Date.now()}`,
       isNew: true,
       docPos: null,
       labelId: newLabelId(),
-      rotationDeg: -12,
-      relX: 0.12,
-      relY: 0.12,
+      rotationDeg,
+      relX,
+      relY,
       relW: estW,
       relH: estH,
       ...applyStyle({})
@@ -111,7 +162,24 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     fileExtension: ext,
     isVideo,
     photoRect,
-    labels
+    labels,
+    rotationDeg: Number.isFinite(Number(photoNode.attrs?.rotationDeg))
+      ? Number(photoNode.attrs.rotationDeg)
+      : 0,
+    slotFit: String(photoNode.attrs?.slotFit || 'cover').toLowerCase() === 'contain' ? 'contain' : 'cover',
+    panX: Number.isFinite(Number(photoNode.attrs?.panX)) ? Number(photoNode.attrs.panX) : null,
+    panY: Number.isFinite(Number(photoNode.attrs?.panY)) ? Number(photoNode.attrs.panY) : null,
+    photoW: Number.isFinite(Number(photoNode.attrs?.width))
+      ? Number(photoNode.attrs.width)
+      : null,
+    photoH: Number.isFinite(Number(photoNode.attrs?.height))
+      ? Number(photoNode.attrs.height)
+      : null,
+    hasFrame:
+      Number.isFinite(Number(photoNode.attrs?.frameWidth)) &&
+      Number.isFinite(Number(photoNode.attrs?.frameHeight)) &&
+      Number(photoNode.attrs.frameWidth) > 0 &&
+      Number(photoNode.attrs.frameHeight) > 0
   };
 }
 
@@ -143,7 +211,7 @@ function labelToPageAttrs(label, photoRect) {
       ? Math.round(Number(label.rotationDeg))
       : emoji
         ? 0
-        : -12,
+        : PLACE_TEXT_DEFAULTS.rotationDeg,
     posLeft: Math.round(photoRect.left + (Number(label.relX) || 0) * pw),
     posTop: Math.round(photoRect.top + (Number(label.relY) || 0) * ph),
     boxWidth: boxW,

@@ -240,6 +240,7 @@ import {
   unlockRecordVaultTutaDrive
 } from './routes/recordVault/recordVaultTutaDriveRoutes.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
+import { isSkipTutaPhotoEncEnabled } from './utils/skipTutaPhotoEncConfig.js';
 import { getRecordVaultStorageConfig, logoffRecordVaultStorage } from './routes/recordVault/recordVaultStorageRoutes.js';
 import { downloadRecordVaultBridgeInstaller } from './routes/recordVault/recordVaultBridgeInstaller.js';
 import {
@@ -1049,7 +1050,9 @@ app.get('/api/publicConfig', (_req, res) => {
     // TutaNotes panels: LEFT_SIDE=OneDrive|TutaDrive|None, RIGHT_SIDE=USB|None (~/.ssh/be/.env)
     leftSide: getLeftSideMode(),
     tutaDrive: isLeftSideTutaDrive(),
-    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None'
+    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
+    // SKIP_TUTAPHOTO_ENC — skip Full Disk Encryption for TutaPhotoAlbums only (TutaNotes always encrypts)
+    skipTutaPhotoEnc: isSkipTutaPhotoEncEnabled()
   });
 });
 

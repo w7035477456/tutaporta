@@ -26,6 +26,7 @@ import { readPhotoAlbumsLastUsbLocation } from 'utils/photoAlbumsUsbPreference';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
 import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
+import { isSkipTutaPhotoEncFromVite } from 'config/skipTutaPhotoEncEnv';
 import PhotoAlbumsAccessGate from './PhotoAlbumsAccessGate';
 import PhotoAlbumsOneDriveGate from './PhotoAlbumsOneDriveGate';
 import PhotoAlbumsTutaDriveGate from './PhotoAlbumsTutaDriveGate';
@@ -345,6 +346,8 @@ export default function MyPhotoAlbums() {
   /** Header Profile & Records — full page overlay (no dating sidebar). */
   const [profilesRecordsOpen, setProfilesRecordsOpen] = useState(false);
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
+  /** SKIP_TUTAPHOTO_ENC — skip Full Disk Encryption for TutaPhoto only (TutaNotes always encrypts). */
+  const [skipTutaPhotoEnc, setSkipTutaPhotoEnc] = useState(() => isSkipTutaPhotoEncFromVite());
 
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myPhotoAlbums visit.
@@ -427,7 +430,12 @@ export default function MyPhotoAlbums() {
         const pubRes = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
         if (pubRes.ok) {
           const pub = await pubRes.json();
-          if (!cancelled) applyPanelSides(pub);
+          if (!cancelled) {
+            applyPanelSides(pub);
+            if (typeof pub.skipTutaPhotoEnc === 'boolean') {
+              setSkipTutaPhotoEnc(pub.skipTutaPhotoEnc);
+            }
+          }
         }
       } catch {
         // keep Vite / prior value
@@ -618,28 +626,35 @@ export default function MyPhotoAlbums() {
   }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded, tutaDriveMode]);
 
   // Open TutaPhotoAlbums Cloud / USB share one vault-password popup (Step 1), then resume icon unlock.
+  // SKIP_TUTAPHOTO_ENC=true → skip Full Disk Encryption and open vault directly (TutaNotes still encrypts).
   const handleOneDriveOpenClicked = useCallback(() => {
-    if (accessUnlockedRef.current) return false;
+    if (accessUnlockedRef.current || skipTutaPhotoEnc) {
+      if (skipTutaPhotoEnc) accessUnlockedRef.current = true;
+      return false;
+    }
     pendingOpenRef.current = { storageType: 'onedrive' };
     setAccessGateStorageType('onedrive');
     setAccessGateUsbMountPath('');
     setAccessGateOpen(true);
     return true;
-  }, []);
+  }, [skipTutaPhotoEnc]);
 
   const handleUsbLocationChange = useCallback((label) => {
     setUsbVolumeLabel(String(label || '').trim());
   }, []);
 
   const handleUsbOpenClicked = useCallback((opts = {}) => {
-    if (accessUnlockedRef.current) return false;
+    if (accessUnlockedRef.current || skipTutaPhotoEnc) {
+      if (skipTutaPhotoEnc) accessUnlockedRef.current = true;
+      return false;
+    }
     const mountPath = String(opts?.mountPath ?? '').trim();
     pendingOpenRef.current = { storageType: 'usb', mountPath };
     setAccessGateStorageType('usb');
     setAccessGateUsbMountPath(mountPath);
     setAccessGateOpen(true);
     return true;
-  }, []);
+  }, [skipTutaPhotoEnc]);
 
   const handleAccessUnlocked = useCallback(() => {
     accessUnlockedRef.current = true;
@@ -890,6 +905,7 @@ export default function MyPhotoAlbums() {
         storageType={accessGateStorageType}
         usbMountPath={accessGateUsbMountPath}
         onVaultFormatted={handleAccessVaultFormatted}
+        skipEncryptGate={skipTutaPhotoEnc}
       />
 
       <BusyHourglassOverlay

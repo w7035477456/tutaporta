@@ -3120,6 +3120,45 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   }, [editor, editable]);
   handlePlaceFloatingTextRef.current = handlePlaceFloatingText;
 
+  const handlePlaceTextPhotoChromeChange = useCallback(
+    (patch) => {
+      if (!editor || !patch || typeof patch !== 'object') return;
+      const pos = placeTextPhotoPosRef.current;
+      if (!Number.isFinite(pos)) return;
+      const { panZoom, ...attrs } = patch;
+      if (Object.keys(attrs).length) {
+        editor
+          .chain()
+          .command(({ tr, dispatch }) => {
+            const node = tr.doc.nodeAt(pos);
+            if (!node || node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return false;
+            tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
+            if (dispatch) dispatch(tr);
+            return true;
+          })
+          .run();
+        setPlaceTextMediaSession((prev) => {
+          if (!prev) return prev;
+          const next = { ...prev, ...attrs };
+          if ('width' in attrs) next.photoW = attrs.width;
+          if ('height' in attrs) next.photoH = attrs.height;
+          if ('panX' in attrs) next.panX = attrs.panX;
+          if ('panY' in attrs) next.panY = attrs.panY;
+          return next;
+        });
+      }
+      if (typeof panZoom === 'boolean') {
+        const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+        if (store) {
+          store.dialogPanZoom = panZoom;
+          store.pinnedPhotoEditPos = pos;
+          store.contextTutorialTick = (store.contextTutorialTick || 0) + 1;
+        }
+      }
+    },
+    [editor]
+  );
+
   const placeEmojiAtClientPoint = useCallback(
     (emoji, clientX, clientY) => {
       if (!editor || !editable) return;
@@ -3391,7 +3430,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fontSize: style?.fontSize || PLACE_TEXT_DEFAULTS.fontSize,
         fontFamily: style?.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily,
         fontWeight: style?.fontWeight || PLACE_TEXT_DEFAULTS.fontWeight,
-        rotationDeg: -12,
+        rotationDeg: PLACE_TEXT_DEFAULTS.rotationDeg,
         posLeft,
         posTop
       };
@@ -6225,6 +6264,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         mediaSession={placeTextMediaSession}
         noteId={noteId}
         storageType={storageType}
+        onPhotoChromeChange={handlePlaceTextPhotoChromeChange}
         onClose={() => {
           const cancelPhotoPos = placeTextMediaSession?.photoPos ?? placeTextPhotoPosRef.current;
           placeTextEditingLabelIdRef.current = null;
@@ -6413,14 +6453,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                     </Box>
                   </Box>
                   <Box component="li" sx={{ mb: 1 }}>
-                    <strong>Edit &amp; Adjust:</strong> Double-click any photo (the border turns red) to enter edit mode;
-                    double-click again to exit. With Pan&Zoom off, drag to swap slots or return to the thumbnail alley
-                    (release elsewhere cancels with no change). Turn on Pan&Zoom to pan inside the frame and use the
-                    yellow zoom slider.
+                    <strong>Edit &amp; Adjust:</strong> Double-click any photo to open Add Text — add captions,
+                    emoji, and use Pan Zoom / Rotate / Full / Zoom. With Pan&Zoom off on the page, drag to swap
+                    slots or return to the thumbnail alley.
                   </Box>
                   <Box component="li" sx={{ mb: 1 }}>
-                    <strong>Add Story &amp; Context:</strong> Click the Text button to add details like who, where,
-                    when, and the story behind the photo.
+                    <strong>Add Story &amp; Context:</strong> In Add Text (double-click), type details like who,
+                    where, when, and the story behind the photo.
                   </Box>
                 </Box>
                 <Typography sx={{ fontWeight: 700, lineHeight: 1.45, mt: 0.5 }}>

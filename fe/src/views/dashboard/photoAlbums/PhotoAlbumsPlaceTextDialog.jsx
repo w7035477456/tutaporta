@@ -17,6 +17,18 @@ import PhotoAlbumsPlaceTextMediaPreview from './PhotoAlbumsPlaceTextMediaPreview
 import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
 import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
 import { newLabelId } from './photoAlbumsTextLabelNode';
+import {
+  SLOT_ZOOM_PCT_MAX,
+  SLOT_ZOOM_PCT_MIN,
+  centeredPan,
+  computeFramedZoomPatch,
+  coverSizeForFrame,
+  fitSizeForFrame,
+  framedZoomPercentFromWidth,
+  slotZoomPctLabelSx,
+  slotZoomSliderRowSx,
+  slotZoomSliderSx
+} from './photoAlbumsSlotZoom';
 
 export const PLACE_TEXT_FONT_FAMILIES = [
   { label: 'Algerian', value: 'Algerian, fantasy' },
@@ -100,13 +112,14 @@ export const PLACE_TEXT_STYLE_PRESETS = [
 ];
 
 export const PLACE_TEXT_DEFAULTS = {
-  text: 'Hawaii Feb 2025',
-  color: PLACE_TEXT_STYLE_PRESETS[0].color,
-  outlineColor: PLACE_TEXT_STYLE_PRESETS[0].outlineColor,
-  fontFamily: PLACE_TEXT_STYLE_PRESETS[0].fontFamily,
-  fontWeight: PLACE_TEXT_STYLE_PRESETS[0].fontWeight,
-  fontSize: PLACE_TEXT_STYLE_PRESETS[0].fontSize,
-  outlineWidth: PLACE_TEXT_STYLE_PRESETS[0].outlineWidth
+  text: 'Sample Feb 2025',
+  color: '#F8E618',
+  outlineColor: '#000000',
+  fontFamily: 'Algerian, fantasy',
+  fontWeight: 700,
+  fontSize: 13,
+  outlineWidth: 5,
+  rotationDeg: -45
 };
 
 export const PLACE_TEXT_MAX_CHARS = 1_073_741_823;
@@ -237,7 +250,9 @@ export default function PhotoAlbumsPlaceTextDialog({
   noteId = null,
   storageType = null,
   onClose,
-  onConfirm
+  onConfirm,
+  /** Apply rotate / slot-fit / pan-zoom patches onto the album photo node. */
+  onPhotoChromeChange = null
 }) {
   const hasMedia = Boolean(mediaSession?.photoRect);
   const [text, setText] = useState(PLACE_TEXT_DEFAULTS.text);
@@ -252,8 +267,14 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [labels, setLabels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [emojiPickerAnchor, setEmojiPickerAnchor] = useState(null);
+  const [panEnabled, setPanEnabled] = useState(false);
+  const [photoRotationDeg, setPhotoRotationDeg] = useState(0);
+  const [photoSlotFit, setPhotoSlotFit] = useState('cover');
+  const [mediaAspect, setMediaAspect] = useState(0);
   const skipStyleSyncRef = useRef(false);
   const splitContainerRef = useRef(null);
+  const openSnapshotRef = useRef(null);
+  const dialogInitRef = useRef(false);
   const [previewSplitRatio, setPreviewSplitRatio] = useState(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
 
   const labelOptions = useMemo(() => {
@@ -309,15 +330,31 @@ export default function PhotoAlbumsPlaceTextDialog({
   useEffect(() => {
     if (!open) {
       setEmojiPickerAnchor(null);
+      setPanEnabled(false);
+      dialogInitRef.current = false;
+      openSnapshotRef.current = null;
       return;
     }
+    // Seed once per open — do not re-init when mediaSession chrome updates (pan/zoom).
+    if (dialogInitRef.current) return;
+    dialogInitRef.current = true;
+
     if (hasMedia) setPreviewSplitRatio(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
+    const rot0 = Number(mediaSession?.rotationDeg) || 0;
+    const fit0 =
+      String(mediaSession?.slotFit || 'cover').toLowerCase() === 'contain' ? 'contain' : 'cover';
+    setPhotoRotationDeg(rot0);
+    setPhotoSlotFit(fit0);
+    setPanEnabled(false);
+
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
     const seeded = String(initialText || '').trim();
     applyStyleFields(next, seeded || next.text || PLACE_TEXT_DEFAULTS.text);
 
+    let nextLabels = [];
+    let nextActiveKey = '';
     if (hasMedia && mediaSession?.labels?.length) {
-      const nextLabels = mediaSession.labels.map((l) => ({ ...l }));
+      nextLabels = mediaSession.labels.map((l) => ({ ...l }));
       setLabels(nextLabels);
       const preferred =
         initialExistingId &&
@@ -327,20 +364,71 @@ export default function PhotoAlbumsPlaceTextDialog({
             l.clientKey === String(initialExistingId)
         );
       const active = preferred || nextLabels[nextLabels.length - 1];
-      setActiveKey(active?.clientKey || '');
+      nextActiveKey = active?.clientKey || '';
+      setActiveKey(nextActiveKey);
       if (active) applyStyleFields(active, active.text);
     } else {
       setLabels([]);
       setActiveKey('');
     }
 
+    let nextExistingPick = '';
     if (showExistingSelect && initialExistingId) {
       const match = labelOptions.find(
         (o) => o.labelId === String(initialExistingId) || o.key === String(initialExistingId)
       );
-      setExistingPick(match?.key || '');
+      nextExistingPick = match?.key || '';
+      setExistingPick(nextExistingPick);
     } else {
       setExistingPick('');
+    }
+
+    openSnapshotRef.current = {
+      text: seeded || next.text || PLACE_TEXT_DEFAULTS.text,
+      color: next.color || PLACE_TEXT_DEFAULTS.color,
+      outlineColor: next.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor,
+      fontFamily: next.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily,
+      fontWeight: Number(next.fontWeight) || PLACE_TEXT_DEFAULTS.fontWeight,
+      fontSize: Number(next.fontSize) || PLACE_TEXT_DEFAULTS.fontSize,
+      outlineWidth:
+        next.outlineWidth != null && Number.isFinite(Number(next.outlineWidth))
+          ? Number(next.outlineWidth)
+          : PLACE_TEXT_DEFAULTS.outlineWidth,
+      selectedPresetId: PLACE_TEXT_STYLE_PRESETS[0].id,
+      labels: nextLabels.map((l) => ({ ...l })),
+      activeKey: nextActiveKey,
+      existingPick: nextExistingPick,
+      panEnabled: false,
+      photoRotationDeg: rot0,
+      photoSlotFit: fit0,
+      photoChrome: {
+        rotationDeg: rot0,
+        slotFit: fit0,
+        panX: mediaSession?.panX ?? null,
+        panY: mediaSession?.panY ?? null,
+        width: mediaSession?.photoW ?? null,
+        height: mediaSession?.photoH ?? null,
+        panZoom: false
+      }
+    };
+    // Re-apply active label style into snapshot after preferred label override.
+    if (nextActiveKey) {
+      const active = nextLabels.find((l) => l.clientKey === nextActiveKey);
+      if (active) {
+        openSnapshotRef.current = {
+          ...openSnapshotRef.current,
+          text: active.text || openSnapshotRef.current.text,
+          color: active.color || openSnapshotRef.current.color,
+          outlineColor: active.outlineColor || openSnapshotRef.current.outlineColor,
+          fontFamily: active.fontFamily || openSnapshotRef.current.fontFamily,
+          fontWeight: Number(active.fontWeight) || openSnapshotRef.current.fontWeight,
+          fontSize: Number(active.fontSize) || openSnapshotRef.current.fontSize,
+          outlineWidth:
+            active.outlineWidth != null && Number.isFinite(Number(active.outlineWidth))
+              ? Number(active.outlineWidth)
+              : openSnapshotRef.current.outlineWidth
+        };
+      }
     }
   }, [
     open,
@@ -359,7 +447,149 @@ export default function PhotoAlbumsPlaceTextDialog({
     [selectedPresetId]
   );
 
-  const displayText = String(text || '').trim() || 'Hawaii Feb 2025';
+  const displayText = String(text || '').trim() || PLACE_TEXT_DEFAULTS.text;
+
+  const previewSession = useMemo(() => {
+    if (!mediaSession) return null;
+    return {
+      ...mediaSession,
+      rotationDeg: photoRotationDeg,
+      slotFit: photoSlotFit
+    };
+  }, [mediaSession, photoRotationDeg, photoSlotFit]);
+
+  const applyPhotoChrome = useCallback(
+    (patch) => {
+      if (typeof onPhotoChromeChange === 'function') onPhotoChromeChange(patch);
+    },
+    [onPhotoChromeChange]
+  );
+
+  const handleTogglePanZoom = useCallback(() => {
+    setPanEnabled((v) => {
+      const next = !v;
+      applyPhotoChrome({ panZoom: next });
+      return next;
+    });
+  }, [applyPhotoChrome]);
+
+  const handleRotatePhoto = useCallback(() => {
+    setPhotoRotationDeg((prev) => {
+      const next = (((Number(prev) || 0) + 90) % 360 + 360) % 360;
+      applyPhotoChrome({ rotationDeg: next });
+      return next;
+    });
+  }, [applyPhotoChrome]);
+
+  const handlePhotoFitFull = useCallback(() => {
+    setPhotoSlotFit('contain');
+    const rect = mediaSession?.photoRect;
+    const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
+    if (rect?.width && rect?.height) {
+      const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'contain');
+      const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
+      applyPhotoChrome({
+        slotFit: 'contain',
+        width: fit.width,
+        height: fit.height,
+        panX: pan.panX,
+        panY: pan.panY
+      });
+    } else {
+      applyPhotoChrome({ slotFit: 'contain' });
+    }
+  }, [applyPhotoChrome, mediaSession, mediaAspect]);
+
+  const handlePhotoFitZoom = useCallback(() => {
+    setPhotoSlotFit('cover');
+    const rect = mediaSession?.photoRect;
+    const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
+    if (rect?.width && rect?.height) {
+      const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'cover');
+      const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
+      applyPhotoChrome({
+        slotFit: 'cover',
+        width: fit.width,
+        height: fit.height,
+        panX: pan.panX,
+        panY: pan.panY
+      });
+    } else {
+      applyPhotoChrome({ slotFit: 'cover' });
+    }
+  }, [applyPhotoChrome, mediaSession, mediaAspect]);
+
+  const photoZoomPct = useMemo(() => {
+    const rect = mediaSession?.photoRect;
+    if (!rect?.width || !rect?.height) return 0;
+    const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
+    const cover = coverSizeForFrame(aspect, rect.width, rect.height);
+    const photoW = mediaSession?.photoW || cover.width;
+    return framedZoomPercentFromWidth(photoW, aspect, rect.width, rect.height);
+  }, [mediaSession, mediaAspect]);
+
+  const handlePhotoZoomSliderChange = useCallback(
+    (_, v) => {
+      const pct = Array.isArray(v) ? v[0] : v;
+      const rect = mediaSession?.photoRect;
+      if (!rect?.width || !rect?.height) return;
+      const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
+      const patch = computeFramedZoomPatch({
+        pct,
+        aspect,
+        frameW: rect.width,
+        frameH: rect.height,
+        photoW: mediaSession?.photoW,
+        photoH: mediaSession?.photoH,
+        panX: mediaSession?.panX,
+        panY: mediaSession?.panY
+      });
+      applyPhotoChrome(patch);
+    },
+    [mediaSession, mediaAspect, applyPhotoChrome]
+  );
+
+  const handleNaturalAspectRatio = useCallback((aspect) => {
+    if (aspect > 0) setMediaAspect(aspect);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    const snap = openSnapshotRef.current;
+    if (!snap) return;
+    applyStyleFields(
+      {
+        text: snap.text,
+        color: snap.color,
+        outlineColor: snap.outlineColor,
+        fontFamily: snap.fontFamily,
+        fontWeight: snap.fontWeight,
+        fontSize: snap.fontSize,
+        outlineWidth: snap.outlineWidth
+      },
+      snap.text
+    );
+    setSelectedPresetId(snap.selectedPresetId || PLACE_TEXT_STYLE_PRESETS[0].id);
+    setLabels((snap.labels || []).map((l) => ({ ...l })));
+    setActiveKey(snap.activeKey || '');
+    setExistingPick(snap.existingPick || '');
+    setPanEnabled(Boolean(snap.panEnabled));
+    setPhotoRotationDeg(Number(snap.photoRotationDeg) || 0);
+    setPhotoSlotFit(snap.photoSlotFit === 'contain' ? 'contain' : 'cover');
+    const chrome = snap.photoChrome || {};
+    const patch = { panZoom: false };
+    if (chrome.rotationDeg != null) patch.rotationDeg = chrome.rotationDeg;
+    if (chrome.slotFit != null) patch.slotFit = chrome.slotFit;
+    if (chrome.panX != null) patch.panX = chrome.panX;
+    if (chrome.panY != null) patch.panY = chrome.panY;
+    if (chrome.width != null) patch.width = chrome.width;
+    if (chrome.height != null) patch.height = chrome.height;
+    // Clear pan/size when they were unset at open so zoom returns to cover default.
+    if (chrome.panX == null) patch.panX = null;
+    if (chrome.panY == null) patch.panY = null;
+    if (chrome.width == null) patch.width = null;
+    if (chrome.height == null) patch.height = null;
+    applyPhotoChrome(patch);
+  }, [applyStyleFields, applyPhotoChrome]);
 
   const patchActiveLabel = useCallback(
     (patch) => {
@@ -762,7 +992,7 @@ export default function PhotoAlbumsPlaceTextDialog({
       <TextField
         value={text}
         onChange={(e) => setText(String(e.target.value ?? '').slice(0, PLACE_TEXT_MAX_CHARS))}
-        placeholder="Hawaii Feb 2025"
+        placeholder={PLACE_TEXT_DEFAULTS.text}
         autoFocus={!hasMedia}
         fullWidth
         multiline={!compact}
@@ -798,6 +1028,86 @@ export default function PhotoAlbumsPlaceTextDialog({
       />
     </>
   );
+
+  const photoChromeButtonRow =
+    hasMedia && !mediaSession?.isVideo ? (
+      <Stack
+        direction="row"
+        spacing={0.75}
+        justifyContent="center"
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        sx={{ mt: 0.75, mb: 0.25, flexShrink: 0 }}
+      >
+        <GreenButton
+          type="button"
+          aria-pressed={panEnabled}
+          onClick={handleTogglePanZoom}
+          title="Pan & Zoom — drag the photo inside its slot on the album page"
+          sx={{
+            minWidth: 72,
+            fontWeight: 800,
+            lineHeight: 1.05,
+            ...(panEnabled
+              ? {
+                  bgcolor: '#FFEB3B !important',
+                  color: '#000 !important',
+                  WebkitTextFillColor: '#000 !important',
+                  border: '2px solid #000 !important'
+                }
+              : null)
+          }}
+        >
+          <Box component="span" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Box component="span">Pan</Box>
+            <Box component="span">Zoom</Box>
+          </Box>
+        </GreenButton>
+        <GreenButton
+          type="button"
+          onClick={handleRotatePhoto}
+          title="Rotate photo 90° clockwise"
+          sx={{ minWidth: 72, fontWeight: 800 }}
+        >
+          Rotate
+        </GreenButton>
+        <GreenButton
+          type="button"
+          aria-pressed={photoSlotFit === 'contain'}
+          onClick={handlePhotoFitFull}
+          title="Show the full photo in the slot (may leave edges)"
+          sx={{
+            minWidth: 64,
+            fontWeight: 800,
+            ...(photoSlotFit === 'contain' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
+          }}
+        >
+          Full
+        </GreenButton>
+        <GreenButton
+          type="button"
+          aria-pressed={photoSlotFit === 'cover'}
+          onClick={handlePhotoFitZoom}
+          title="Fill the slot (may clip edges)"
+          sx={{
+            minWidth: 64,
+            fontWeight: 800,
+            ...(photoSlotFit === 'cover' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
+          }}
+        >
+          Zoom
+        </GreenButton>
+        <GreenButton
+          type="button"
+          onClick={handleReset}
+          title="Restore photo and text to how this popup opened"
+          sx={{ minWidth: 72, fontWeight: 800 }}
+        >
+          Reset
+        </GreenButton>
+      </Stack>
+    ) : null;
 
   const sizeSliderRow = (
     <Stack
@@ -931,6 +1241,7 @@ export default function PhotoAlbumsPlaceTextDialog({
             >
               {stylePresetButtons(true)}
               {textInputBlock(true)}
+              {photoChromeButtonRow}
               {sizeSliderRow}
             </Box>
 
@@ -978,9 +1289,11 @@ export default function PhotoAlbumsPlaceTextDialog({
               </Box>
               <Stack
                 direction="row"
-                spacing={1}
+                spacing={0.75}
                 justifyContent="flex-end"
                 alignItems="center"
+                flexWrap="wrap"
+                useFlexGap
                 sx={{ mt: 'auto', pt: 1, flexShrink: 0 }}
               >
                 <GreenButton
@@ -1128,7 +1441,7 @@ export default function PhotoAlbumsPlaceTextDialog({
           sx={hasMedia ? { flexShrink: 0, mb: 0, lineHeight: 1.3, fontSize: '0.88rem' } : undefined}
         >
           {hasMedia
-            ? 'Type below — text updates live on the photo. Use Emoji to place stickers. Drag corners to scale; drag sides to stretch the box. Drag the yellow bar to resize preview vs controls.'
+            ? 'Type below — text updates live on the photo. Use Emoji for stickers. Use Pan Zoom / Rotate / Full / Zoom for the photo. Drag corners to scale text; drag sides to stretch. Drag the yellow bar to resize preview vs controls.'
             : 'Style your text, then OK to place it on the page (drag & rotate like a photo).'}
         </ColorTemplate16PopupCenterWide.SectionDescription>
 
@@ -1144,17 +1457,41 @@ export default function PhotoAlbumsPlaceTextDialog({
             }}
           >
             <Box sx={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <PhotoAlbumsPlaceTextMediaPreview
-                session={mediaSession}
-                labels={labels}
-                activeKey={activeKey}
-                noteId={noteId}
-                storageType={storageType}
-                onActivate={activateLabel}
-                onLabelChange={handleLabelChange}
-                onLabelDelete={handleLabelDelete}
-                onDoubleClickLabel={activateLabel}
-              />
+              <Box sx={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+                <PhotoAlbumsPlaceTextMediaPreview
+                  session={previewSession}
+                  labels={labels}
+                  activeKey={activeKey}
+                  noteId={noteId}
+                  storageType={storageType}
+                  panZoomActive={panEnabled}
+                  onNaturalAspectRatio={handleNaturalAspectRatio}
+                  onPhotoChromeChange={applyPhotoChrome}
+                  onActivate={activateLabel}
+                  onLabelChange={handleLabelChange}
+                  onLabelDelete={handleLabelDelete}
+                  onDoubleClickLabel={activateLabel}
+                />
+              </Box>
+              {panEnabled && !mediaSession?.isVideo ? (
+                <Box sx={slotZoomSliderRowSx(true)}>
+                  <Typography component="span" sx={slotZoomPctLabelSx(true)}>
+                    {SLOT_ZOOM_PCT_MIN}%
+                  </Typography>
+                  <Slider
+                    min={SLOT_ZOOM_PCT_MIN}
+                    max={SLOT_ZOOM_PCT_MAX}
+                    step={1}
+                    value={photoZoomPct}
+                    onChange={handlePhotoZoomSliderChange}
+                    sx={slotZoomSliderSx(true)}
+                    aria-label="Photo zoom in slot"
+                  />
+                  <Typography component="span" sx={slotZoomPctLabelSx(true)}>
+                    {SLOT_ZOOM_PCT_MAX}%
+                  </Typography>
+                </Box>
+              ) : null}
             </Box>
             <Box
               role="separator"
@@ -1277,5 +1614,6 @@ PhotoAlbumsPlaceTextDialog.propTypes = {
   noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   storageType: PropTypes.string,
   onClose: PropTypes.func,
-  onConfirm: PropTypes.func
+  onConfirm: PropTypes.func,
+  onPhotoChromeChange: PropTypes.func
 };

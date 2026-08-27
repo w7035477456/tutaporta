@@ -38,6 +38,8 @@ export default function ColorTemplate16PopupCenterWide({
   maxResizeHeight = '92vh',
   /** Stretch panel from top to bottom of the browser window (Add Text photo editor). */
   fillViewportHeight = false,
+  /** Override default `75vw` panel width (e.g. `'90vw'`). */
+  maxWidth: maxWidthProp,
   verticalHalf: _verticalHalf,
   overlaySx: overlaySxOverride,
   panelShellSx: panelShellSxOverride,
@@ -46,12 +48,13 @@ export default function ColorTemplate16PopupCenterWide({
   ...rest
 }) {
   const { overlaySx, panelShellSx } = useColorTemplate16PopupCenterWideLayout();
+  const panelWidthCap = maxWidthProp || COLOR_TEMPLATE16_POPUP_PANEL_WIDTH;
   const effectiveDefaultHeight = fillViewportHeight ? '100vh' : defaultResizeHeight;
   const effectiveMaxHeight = fillViewportHeight ? '100vh' : maxResizeHeight;
   const { panelSize, onResizeStart } = usePopupBottomRightResize({
     open,
     enabled: resizable,
-    defaultWidth: COLOR_TEMPLATE16_POPUP_PANEL_WIDTH,
+    defaultWidth: panelWidthCap,
     defaultHeight: effectiveDefaultHeight,
     maxHeight: effectiveMaxHeight
   });
@@ -66,7 +69,7 @@ export default function ColorTemplate16PopupCenterWide({
       }
     : null;
 
-  const panelWidth = panelSize?.width ?? COLOR_TEMPLATE16_POPUP_PANEL_WIDTH;
+  const panelWidth = panelSize?.width ?? panelWidthCap;
 
   const fillViewportPanelSx = fillViewportHeight
     ? {
@@ -103,7 +106,7 @@ export default function ColorTemplate16PopupCenterWide({
                 maxHeight: panelSize.height
               }
             : {
-                width: COLOR_TEMPLATE16_POPUP_PANEL_WIDTH,
+                width: panelWidthCap,
                 height: effectiveDefaultHeight,
                 maxHeight: effectiveDefaultHeight
               }),
@@ -113,7 +116,12 @@ export default function ColorTemplate16PopupCenterWide({
         }
     : fillViewportHeight
       ? fillViewportPanelSx
-      : { ...panelShellSx };
+      : { ...panelShellSx, width: panelWidthCap, maxWidth: panelWidthCap };
+
+  const mergedPanelShellSx = {
+    ...resizedPanelShellSx,
+    ...(panelShellSxOverride || {})
+  };
 
   return (
     <ColorTemplate7PopupLargeDark
@@ -121,13 +129,13 @@ export default function ColorTemplate16PopupCenterWide({
       onClose={onClose}
       closeOnBackdrop={closeOnBackdrop}
       showCloseButton={showCloseButton}
-      maxWidth={COLOR_TEMPLATE16_POPUP_PANEL_WIDTH}
+      maxWidth={panelWidthCap}
       centerInWindow
       bodyTextAlignLeft={bodyTextAlignLeft}
       centeredLeadLines={centeredLeadLines}
       closeButtonSx={closeButtonSx ?? colorTemplate16PopupCloseSx()}
       overlaySx={{ ...overlaySx, ...(overlaySxOverride || {}), ...(fillViewportOverlaySx || {}) }}
-      panelShellSx={resizedPanelShellSx}
+      panelShellSx={mergedPanelShellSx}
       contentSx={contentSx}
       cardSx={cardSx}
       resizable={resizable}
@@ -173,6 +181,8 @@ ColorTemplate16PopupCenterWide.propTypes = {
   maxResizeHeight: PropTypes.string,
   /** Panel fills viewport top-to-bottom (`100vh`). */
   fillViewportHeight: PropTypes.bool,
+  /** Panel width cap (default `75vw`). */
+  maxWidth: PropTypes.string,
   /** @deprecated Ignored — half-viewport shade removed; popups are full-window centered. */
   verticalHalf: PropTypes.oneOf(['top', 'bottom']),
   overlaySx: PropTypes.object,

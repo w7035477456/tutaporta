@@ -357,14 +357,19 @@ Code accepts `TWILIO_ServiceSID` or `TWILIO_SERVICE_SID` (`be/lib/twilioVerifySm
 
 ```bash
 ONENOTE_USB_UPGRADE=false
+SKIP_TUTAPHOTO_ENC=true
 ```
 
 | Variable | Value | Behavior |
 |----------|-------|----------|
 | `ONENOTE_USB_UPGRADE` | `false` | Mall tiles **TutaPhotoAlbums** and **TutaNotes** navigate normally. |
 | `ONENOTE_USB_UPGRADE` | `true` | Those tiles show the system-notification popup (no navigate). |
+| `SKIP_TUTAPHOTO_ENC` | `true` | Skip Full Disk Encryption (Encrypt Password) for **TutaPhotoAlbums** only. |
+| `SKIP_TUTAPHOTO_ENC` | `false` / unset | TutaPhotoAlbums shows Full Disk Encryption as usual. |
 
-Exposed at runtime via `GET /api/publicConfig` → `onenoteUsbUpgrade` (`Landing.jsx`). Also mirrored into the Vite bundle (`fe/vite.config.mjs`, `fe/.env`). After changing on prod: **`pm2 restart onlinemallwebsite`**; redeploy FE once so `/mall` reads runtime config (not build-time only).
+**TutaNotes always requires Encrypt Password** — no skip flag for notes.
+
+Exposed at runtime via `GET /api/publicConfig` → `onenoteUsbUpgrade` / `skipTutaPhotoEnc`. Also mirrored into the Vite bundle (`fe/vite.config.mjs`). After changing on prod: **`pm2 restart onlinemallwebsite`**; restart Vite / redeploy FE so the client picks up the flag.
 
 ## Production checklist
 

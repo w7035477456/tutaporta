@@ -8,6 +8,7 @@ import {
   clusterRedisSet
 } from './clusterRedisState.js';
 import { isVaultE2eYellow } from './photoAlbumsE2eYellowConfig.js';
+import { isSkipTutaPhotoEncEnabled } from './skipTutaPhotoEncConfig.js';
 
 const ACCESS_UNLOCK_PREFIX = 'v1:photo_albums:access_unlock:';
 const ACCESS_UNLOCK_TTL_SEC = 24 * 60 * 60;
@@ -63,14 +64,16 @@ export async function getVaultAccessStatus(singlesId) {
   const hint = normalizeVaultAccessHint(row?.photoalbums_access_password_hint);
   const enabled = Boolean(row?.photoalbums_access_password_enabled);
   const unlocked = await isVaultAccessUnlocked(id);
+  const skipPasswordCheck = isSkipTutaPhotoEncEnabled();
 
-  // PHOTOALBUMS_SKIP_PASSWORD_CHECK is ignored — Encrypt Password always applies when enabled.
+  // SKIP_TUTAPHOTO_ENC=true → skip Full Disk Encryption for TutaPhotoAlbums only.
+  // TutaNotes (NOTES_*) never honors a skip flag — always encrypt.
   return {
-    enabled,
+    enabled: skipPasswordCheck ? false : enabled,
     configured: Boolean(hash),
-    unlocked,
+    unlocked: skipPasswordCheck ? true : unlocked,
     hint: hint || null,
-    skipPasswordCheck: false
+    skipPasswordCheck
   };
 }
 
@@ -225,11 +228,15 @@ export async function requireVaultAccessSession(req, res) {
     return singlesId;
   }
 
+  // Dev/ops: SKIP_TUTAPHOTO_ENC=true skips Encrypt Password for TutaPhotoAlbums only.
+  if (isSkipTutaPhotoEncEnabled()) {
+    return singlesId;
+  }
+
   const enabled =
     req.auth?.photoalbums_access_password_enabled != null
       ? Boolean(req.auth.photoalbums_access_password_enabled)
       : await isVaultAccessPasswordEnabled(singlesId);
-  // PHOTOALBUMS_SKIP_PASSWORD_CHECK is ignored — never skip this gate via env.
   if (!enabled) {
     return singlesId;
   }

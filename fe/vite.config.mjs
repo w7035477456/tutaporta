@@ -56,7 +56,8 @@ const BE_ENV_KEYS_FROM_HOME_FILE = [
   'TOPRIGHT_VIDEO_TUTORIAL',
   'SPEEDDATING',
   'LEFT_SIDE',
-  'RIGHT_SIDE'
+  'RIGHT_SIDE',
+  'SKIP_TUTAPHOTO_ENC'
 ];
 
 function loadBeEnvKeysFromHomeFile() {
@@ -106,6 +107,7 @@ export default defineConfig(({ mode }) => {
       // ALL_SINGLES_ / PICKS_ / ACQUAINT*_ / MYALBUM_ / … — page Video Tutorials URLs (pageVideoTutorialEnv.js)
       // SPEEDDATING — sidebar Speed Dating item (speedDatingEnv.js); mirrored from ~/.ssh/be/.env
       // LEFT_SIDE / RIGHT_SIDE — TutaNotes panels (leftSideEnv.js, rightSideEnv.js); from ~/.ssh/be/.env
+      // SKIP_TUTAPHOTO_ENC — skip Full Disk Encryption for TutaPhotoAlbums only (skipTutaPhotoEncEnv.js)
       envPrefix: [
       'VITE_',
       'FE_',
@@ -153,6 +155,8 @@ export default defineConfig(({ mode }) => {
       'TOPRIGHT_',
       'SPEEDDATING',
       'LEFT_',
+      'RIGHT_',
+      'SKIP_',
       'BSIZE'
     ],
     server: {

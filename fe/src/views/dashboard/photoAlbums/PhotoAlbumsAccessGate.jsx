@@ -104,7 +104,8 @@ export default function PhotoAlbumsAccessGate({
   onClose,
   storageType = 'onedrive',
   usbMountPath = '',
-  onVaultFormatted: _onVaultFormatted
+  onVaultFormatted: _onVaultFormatted,
+  skipEncryptGate = false
 }) {
   const side = normalizeStorageType(storageType);
   const [configured, setConfigured] = useState(false);
@@ -126,6 +127,12 @@ export default function PhotoAlbumsAccessGate({
       setBusy(false);
       return undefined;
     }
+    // SKIP_TUTAPHOTO_ENC — never show Full Disk Encryption; proceed as unlocked.
+    if (skipEncryptGate) {
+      setChecking(false);
+      onUnlocked?.();
+      return undefined;
+    }
     closeErrorPopup();
     let cancelled = false;
     setCurrentPassword('');
@@ -144,6 +151,10 @@ export default function PhotoAlbumsAccessGate({
           fetchPhotoAlbumsAccessStatus().catch(() => null)
         ]);
         if (cancelled) return;
+        if (accessStatus?.skipPasswordCheck) {
+          onUnlocked?.();
+          return;
+        }
         setConfigured(Boolean(e2e.configured));
         setVaultRow(e2e.vault || null);
         setHint(accessStatus?.hint || '');
@@ -159,7 +170,7 @@ export default function PhotoAlbumsAccessGate({
     return () => {
       cancelled = true;
     };
-  }, [open, side]);
+  }, [open, side, skipEncryptGate, onUnlocked]);
 
   const persistHint = async (nextHint = hint) => {
     try {
@@ -473,7 +484,7 @@ export default function PhotoAlbumsAccessGate({
   return (
     <>
       <BusyHourglassOverlay
-        open={Boolean(open) && (checking || busy)}
+        open={Boolean(open) && !skipEncryptGate && (checking || busy)}
         label={
           checking
             ? 'Checking vault access…'
@@ -486,7 +497,7 @@ export default function PhotoAlbumsAccessGate({
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <ColorTemplate16PopupCenterWide
-      open={open}
+      open={Boolean(open) && !skipEncryptGate}
       onClose={handleClose}
       closeOnBackdrop={false}
       closeButtonDisabled={busy}

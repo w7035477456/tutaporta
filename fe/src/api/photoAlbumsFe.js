@@ -1492,8 +1492,8 @@ export async function fetchPhotoAlbumsAccessStatus() {
     configured: Boolean(data?.configured),
     unlocked: Boolean(data?.unlocked),
     hint: data?.hint ? String(data.hint) : null,
-    // Env skip is ignored — always treat as false.
-    skipPasswordCheck: false
+    // SKIP_TUTAPHOTO_ENC from BE — TutaPhotoAlbums only (TutaNotes never skips).
+    skipPasswordCheck: Boolean(data?.skipPasswordCheck)
   };
 }
 
