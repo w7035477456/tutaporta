@@ -7,7 +7,7 @@ import GreenButton from 'ui-component/GreenButton';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { themedConfirm } from 'utils/themedDialog';
 import {
-  downloadPhotoAlbumsUsbBackupZip,
+  downloadPhotoAlbumsAlbumBackupZip,
   formatPhotoAlbumsUsb,
   restorePhotoAlbumsUsbBackupZip
 } from 'api/photoAlbumsFe';
@@ -17,6 +17,20 @@ import {
   tutaPhotoAlbumsOrangePostLoginButtonSx,
   tutaPhotoAlbumsPostLoginActionButtonSx
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
+
+const BACKUP_POPUP_WIDTH = '90vw';
+const BACKUP_POPUP_HEIGHT = '90vh';
+
+const backupPopupShellSx = {
+  width: BACKUP_POPUP_WIDTH,
+  maxWidth: BACKUP_POPUP_WIDTH,
+  height: BACKUP_POPUP_HEIGHT,
+  maxHeight: BACKUP_POPUP_HEIGHT,
+  minHeight: BACKUP_POPUP_HEIGHT,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+};
 
 const actionRowSx = {
   display: 'flex',
@@ -64,7 +78,9 @@ const vaultTreeSectionSx = {
   borderTop: '2px solid rgba(255, 255, 255, 0.2)',
   display: 'flex',
   flexDirection: 'column',
-  gap: 1.5
+  gap: 1.5,
+  flex: 1,
+  minHeight: 0
 };
 
 function formatBackupZipSizeLabel(sizeBytes) {
@@ -72,6 +88,31 @@ function formatBackupZipSizeLabel(sizeBytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   const mb = bytes / (1024 * 1024);
   return `${mb.toFixed(1)}mb`;
+}
+
+function formatBytesLabel(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${n} B`;
+}
+
+function buildBackupProgressLabel(progress, albumLabel) {
+  const lines = [];
+  const label = String(progress?.label || '').trim();
+  if (label) lines.push(label);
+  else if (albumLabel) {
+    lines.push(`Backing up only photo album: '${albumLabel}' as zip`);
+  }
+  const fileIndex = Number(progress?.fileIndex) || 0;
+  const fileTotal = Number(progress?.fileTotal) || 0;
+  if (fileTotal > 0) {
+    lines.push(`Files: ${fileIndex} / ${fileTotal}`);
+  }
+  const bytesLabel = formatBytesLabel(progress?.bytesDone);
+  if (bytesLabel) lines.push(`Data: ${bytesLabel}`);
+  return lines.join('\n');
 }
 
 const backupSuccessMessageSx = {
@@ -96,6 +137,7 @@ export default function PhotoAlbumsUsbBackupDialog({
   open,
   onClose,
   folderLabel = 'USB',
+  albumContext = null,
   onFormatted,
   onRestored,
   onOpenMyPhotoAlbums
@@ -103,10 +145,15 @@ export default function PhotoAlbumsUsbBackupDialog({
   const fileInputRef = useRef(null);
   const needsRelockRef = useRef(false);
   const [busy, setBusy] = useState(false);
+  const [backupProgress, setBackupProgress] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [successTone, setSuccessTone] = useState('');
   const [treeRefreshToken, setTreeRefreshToken] = useState(0);
+
+  const albumLabel = String(albumContext?.albumLabel || '').trim();
+  const canBackupAlbum =
+    Number(albumContext?.notebookId) > 0 && Number(albumContext?.noteId) > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -118,6 +165,7 @@ export default function PhotoAlbumsUsbBackupDialog({
     setError('');
     setSuccess('');
     setSuccessTone('');
+    setBackupProgress(null);
   };
 
   const notifyParentRelockIfNeeded = async () => {
@@ -150,15 +198,26 @@ export default function PhotoAlbumsUsbBackupDialog({
   };
 
   const handleBackup = async () => {
+    if (!canBackupAlbum) {
+      setError('Open a photo album first, then click Backup.');
+      return;
+    }
+
     resetMessages();
     setBusy(true);
     try {
-      const result = await downloadPhotoAlbumsUsbBackupZip();
+      const result = await downloadPhotoAlbumsAlbumBackupZip({
+        storageType: 'usb',
+        notebookId: albumContext.notebookId,
+        noteId: albumContext.noteId,
+        albumLabel,
+        onProgress: setBackupProgress
+      });
       const fileName = result?.fileName || 'MyPhotoAlbums_USB.zip';
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
       setSuccess(
-        `Backup to zip completed. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
+        `Backup to zip completed for '${albumLabel}'. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
       );
       setSuccessTone('backup');
       refreshVaultTree();
@@ -166,6 +225,7 @@ export default function PhotoAlbumsUsbBackupDialog({
       setError(err?.response?.data?.error || err?.message || 'Backup failed');
     } finally {
       setBusy(false);
+      setBackupProgress(null);
     }
   };
 
@@ -223,9 +283,17 @@ export default function PhotoAlbumsUsbBackupDialog({
     }
   };
 
+  const hourglassLabel = busy && backupProgress ? 'Backing up album' : 'Working on USB backup';
+
   return (
     <>
-      <BusyHourglassOverlay open={open && busy} label="Working on USB backup" fontSize={BUSY_HOURGLASS_MODAL_SIZE} />
+      <BusyHourglassOverlay
+        open={open && busy}
+        label={hourglassLabel}
+        fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+        progressPercent={backupProgress?.percent ?? null}
+        progressLabel={buildBackupProgressLabel(backupProgress, albumLabel)}
+      />
       <input
         ref={fileInputRef}
         type="file"
@@ -237,19 +305,26 @@ export default function PhotoAlbumsUsbBackupDialog({
         open={open}
         onClose={handleClose}
         closeOnBackdrop={!busy}
+        maxWidth={BACKUP_POPUP_WIDTH}
+        resizable
+        defaultResizeHeight={BACKUP_POPUP_HEIGHT}
+        maxResizeHeight={BACKUP_POPUP_HEIGHT}
+        panelShellSx={backupPopupShellSx}
+        contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
       >
         <ColorTemplate16PopupCenterWide.Title>
           Backup &amp; Restore TutaPhotoAlbums USB
         </ColorTemplate16PopupCenterWide.Title>
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
+        <ColorTemplate16PopupCenterWide.Body spacing={2} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
-            You can backup entire TutaPhotoAlbums folder from USB to a zip file to save on your computer and restore from it back
-            to USB (overwrite USB).
+            Backup saves only the photo album you currently have open
+            {albumLabel ? ` ('${albumLabel}')` : ''} to a zip file on your computer. Restore can overwrite USB from a
+            backup zip.
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
-            &apos;Backup USB&apos; will zip entire USB as as 1 zip archive. You will need to &apos;Restore to USB&apos; to
-            view the files again
+            &apos;Backup Current Album&apos; zips only the open album. You will need to &apos;Restore to USB&apos; to
+            merge a full vault backup back onto USB.
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -258,11 +333,11 @@ export default function PhotoAlbumsUsbBackupDialog({
             <Box sx={actionRowSx}>
               <GreenButton
                 type="button"
-                disabled={busy}
+                disabled={busy || !canBackupAlbum}
                 onClick={() => void handleBackup()}
                 sx={backupRestoreOrangeButtonSx}
               >
-                Backup TutaPhotoAlbums USB
+                Backup Current Album
               </GreenButton>
               <GreenButton type="button" disabled={busy} onClick={() => void handleFormat()} sx={formatRedButtonSx}>
                 Format TutaPhotoAlbums USB
@@ -296,7 +371,7 @@ export default function PhotoAlbumsUsbBackupDialog({
               active={open}
               storageType="usb"
               refreshToken={treeRefreshToken}
-              maxHeight="22vh"
+              maxHeight="38vh"
             />
           </Box>
         </ColorTemplate16PopupCenterWide.Body>

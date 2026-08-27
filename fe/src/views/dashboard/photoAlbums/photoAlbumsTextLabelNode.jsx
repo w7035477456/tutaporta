@@ -4,7 +4,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, useEditorState } from '@tiptap/
 import { NodeSelection } from '@tiptap/pm/state';
 import Box from '@mui/material/Box';
 import { usePhotoAlbumsAlbumLayout, pointInAnyAlbumBand } from './photoAlbumsAlbumLayoutContext';
-import { PHOTO_ALBUMS_ATTACHMENT_NODE_NAME } from './photoAlbumsAttachmentNode';
+import { PHOTO_ALBUMS_ATTACHMENT_NODE_NAME, photoPageRectFromAttrs } from './photoAlbumsAttachmentNode';
 import Typography from '@mui/material/Typography';
 
 export const PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME = 'photoAlbumsTextLabel';
@@ -104,6 +104,17 @@ function attrToData(value, key) {
   return value == null || value === '' ? {} : { [key]: String(value) };
 }
 
+function rectsOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  const p = Math.max(0, Number(pad) || 0);
+  return !(
+    a.left + a.width + p < b.left ||
+    b.left + b.width + p < a.left ||
+    a.top + a.height + p < b.top ||
+    b.top + b.height + p < a.top
+  );
+}
+
 function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttributes, selected, getPos }) {
   const text = String(node?.attrs?.text || 'Text');
   const color = String(node?.attrs?.color || DEFAULT_COLOR);
@@ -132,6 +143,22 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
     editor,
     selector: ({ editor: ed }) =>
       ed?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.layoutLockVersion ?? 0
+  });
+  const placeTextDialogOpen = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => {
+      const store = ed?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+      void (store?.contextTutorialTick ?? 0);
+      return Boolean(store?.placeTextDialogOpen);
+    }
+  });
+  const pinnedPhotoEditPos = useEditorState({
+    editor,
+    selector: ({ editor: ed }) => {
+      const store = ed?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+      void (store?.contextTutorialTick ?? 0);
+      return store?.pinnedPhotoEditPos ?? null;
+    }
   });
   const labelBoxW = Math.max(1, Number(boxWidth) || 40);
   const labelBoxH = Math.max(1, Number(boxHeight) || 40);
@@ -203,6 +230,30 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
     labelBoxW,
     labelBoxH
   ]);
+
+  const hiddenForPlaceTextPreview = useMemo(() => {
+    if (!placeTextDialogOpen || !Number.isFinite(Number(pinnedPhotoEditPos))) return false;
+    const photoPos = Number(pinnedPhotoEditPos);
+    const photoNode = editor?.state?.doc?.nodeAt(photoPos);
+    if (!photoNode || photoNode.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return false;
+    const photoRect = photoPageRectFromAttrs(photoNode.attrs);
+    if (!photoRect) return false;
+    return rectsOverlap(
+      photoRect,
+      { left: posLeft, top: posTop, width: labelBoxW, height: labelBoxH },
+      12
+    );
+  }, [
+    placeTextDialogOpen,
+    pinnedPhotoEditPos,
+    editor,
+    posLeft,
+    posTop,
+    labelBoxW,
+    labelBoxH
+  ]);
+
+  const visibleOnPage = onActiveBookPage && !hiddenForPlaceTextPreview;
 
   const liveLeft = dragPos?.left ?? posLeft;
   const liveTop = dragPos?.top ?? posTop;
@@ -501,7 +552,7 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
         left: `${liveLeft}px`,
         top: `${liveTop}px`,
         transform: `rotate(${liveRotation}deg)`,
-        ...(onActiveBookPage
+        ...(visibleOnPage
           ? null
           : { display: 'none', visibility: 'hidden', pointerEvents: 'none' })
       }}
@@ -783,6 +834,11 @@ export const PhotoAlbumsTextLabelNode = Node.create({
         default: null,
         parseHTML: (el) => el.getAttribute('data-label-id') || null,
         renderHTML: (attrs) => attrToData(attrs.labelId, 'data-label-id')
+      },
+      hostAttachmentId: {
+        default: null,
+        parseHTML: (el) => parseOptionalNum(el.getAttribute('data-host-attachment-id')),
+        renderHTML: (attrs) => attrToData(attrs.hostAttachmentId, 'data-host-attachment-id')
       },
       text: {
         default: 'Text',

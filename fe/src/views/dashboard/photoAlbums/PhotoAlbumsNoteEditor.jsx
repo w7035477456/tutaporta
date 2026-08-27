@@ -20,7 +20,8 @@ import {
   insertCompanionLabelsOnPhoto,
   photoPageRectFromAttrs,
   clearPinnedPhotoEditPos,
-  listTextAndEmojiNearPhoto
+  listTextAndEmojiNearPhoto,
+  listTextAndEmojiForPhotoPos
 } from './photoAlbumsAttachmentNode';
 import { evictFramedPhotoInFrameToStaging, evictDuplicateFramedPhotosInSlots } from './photoAlbumsSlotOccupancy';
 import {
@@ -30,7 +31,8 @@ import {
 import PhotoAlbumsPlaceTextDialog, { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
 import {
   buildPlaceTextPositionSession,
-  commitPlaceTextPositionSession
+  commitPlaceTextPositionSession,
+  resolvePlaceTextCaption
 } from './photoAlbumsPlaceTextPosition';
 import {
   albumPageTitleBandHeightPx,
@@ -589,7 +591,7 @@ function collectPlaceTextLabelsNearPhoto(editor, photoPos) {
   if (!node || node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return [];
   const rect = photoPageRectFromAttrs(node.attrs);
   if (!rect) return [];
-  return listTextAndEmojiNearPhoto(editor.state, rect)
+  return listTextAndEmojiForPhotoPos(editor.state, photoPos)
     .filter((item) => !isPlaceTextEmojiSticker(item.attrs))
     .map((item) => ({
       labelId: String(item.attrs?.labelId || ''),
@@ -3101,6 +3103,15 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         : null;
     const photoPos = placeTextPhotoPosRef.current;
     const nearLabels = collectPlaceTextLabelsNearPhoto(editor, photoPos);
+    const nearOverlays = Number.isFinite(photoPos)
+      ? listTextAndEmojiForPhotoPos(editor.state, photoPos)
+      : [];
+    const overlayCount = nearOverlays.length;
+    const seedText = resolvePlaceTextCaption({
+      explicitText: text,
+      existingOverlayCount: overlayCount,
+      editing: false
+    });
     setPlaceTextExistingLabels(nearLabels.length >= 2 ? nearLabels : []);
     setPlaceTextInitialExistingId(null);
     setPlaceTextStyle(null);
@@ -3110,11 +3121,25 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         ? buildPlaceTextPositionSession(
             editor,
             photoPos,
-            { text: text || PLACE_TEXT_DEFAULTS.text, ...PLACE_TEXT_DEFAULTS },
-            {}
+            { ...PLACE_TEXT_DEFAULTS, text: seedText },
+            { existingOverlayCount: overlayCount }
           )
         : null
     );
+    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+    if (store) {
+      store.placeTextDialogOpen = Number.isFinite(photoPos);
+      if (Number.isFinite(photoPos)) {
+        store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
+        try {
+          editor.view.dispatch(
+            editor.state.tr.setMeta('paContextTutorial', store.contextTutorialTick)
+          );
+        } catch {
+          // ignore
+        }
+      }
+    }
     setPlaceTextOpen(true);
   }, [editor, editable]);
   handlePlaceFloatingTextRef.current = handlePlaceFloatingText;
@@ -3233,6 +3258,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         placeTextPhotoPosRef.current = Number.isFinite(pinned) ? pinned : null;
       }
       const nearLabels = collectPlaceTextLabelsNearPhoto(editor, placeTextPhotoPosRef.current);
+      const photoPos = placeTextPhotoPosRef.current;
+      const nearOverlays = Number.isFinite(photoPos)
+        ? listTextAndEmojiForPhotoPos(editor.state, photoPos)
+        : [];
+      const overlayCount = nearOverlays.length;
       setPlaceTextExistingLabels(nearLabels.length >= 2 ? nearLabels : []);
       setPlaceTextInitialExistingId(payload.labelId || null);
       setPlaceTextSeed(String(payload.text || '').trim());
@@ -3246,15 +3276,27 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fontWeight: payload.fontWeight
       };
       setPlaceTextStyle(editStyle);
-      const photoPos = placeTextPhotoPosRef.current;
       setPlaceTextMediaSession(
         Number.isFinite(photoPos)
           ? buildPlaceTextPositionSession(editor, photoPos, editStyle, {
               editLabelId: payload.labelId || null,
-              editPos: Number.isFinite(payload.pos) ? payload.pos : null
+              editPos: Number.isFinite(payload.pos) ? payload.pos : null,
+              existingOverlayCount: overlayCount
             })
           : null
       );
+      const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+      if (store && Number.isFinite(photoPos)) {
+        store.placeTextDialogOpen = true;
+        store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
+        try {
+          editor.view.dispatch(
+            editor.state.tr.setMeta('paContextTutorial', store.contextTutorialTick)
+          );
+        } catch {
+          // ignore
+        }
+      }
       setPlaceTextOpen(true);
     },
     [editor, editable]
@@ -3283,6 +3325,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     if (store) {
       store.dialogPanZoom = false;
       store.selectedPhotoPanZoom = false;
+      store.placeTextDialogOpen = false;
       store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
     }
     clearPinnedPhotoEditPos(editor);
@@ -6705,6 +6748,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           >
             <PhotoAlbumsPageFilmstrip
               inline
+              stagingCount={stagedPhotos.length}
               pages={albumPagesSorted}
               pageIndex={orderFilmstripActive ? orderFilmstripIndex : albumPageIndex}
               pageCount={

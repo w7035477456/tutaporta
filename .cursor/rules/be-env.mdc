@@ -127,7 +127,7 @@ BLOCK_MOBILE=false
 ## Member visibility (listings)
 
 ```bash
-SHOW_MEMBER_CATEGORY=REGULARMEMBER,DEMOUSER,ANYMEMBER
+SHOW_MEMBER_CATEGORY=REGULARMEMBER,DEMOUSER,ALLMEMBER
 ```
 
 Filters All Singles–style listings to active users whose `member_category` is in this comma list (`be/routes/singles/memberVisibility.js`). Values are uppercase and match DB enum labels (`PUBLIC`, `ADMIN`, `DEMOUSER`, `PILOTUSER`, `REGULARMEMBER`, `ANYMEMBER`). `ALLMEMBER` is accepted as an alias for `ANYMEMBER`. `REGULARMEMBER` and `ANYMEMBER` are always included when the env list is non-empty.

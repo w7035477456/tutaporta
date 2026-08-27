@@ -35,7 +35,7 @@ async function main() {
       `SELECT p.post_id, p.singles_id, s.alias, p.created_at
        FROM "${schema}".postings p
        INNER JOIN "${schema}".singles s ON s.singles_id = p.singles_id
-       WHERE LOWER(TRIM(s.member_category::text)) = 'demouser'
+       WHERE TRIM(s.member_category::text) = 'DEMOUSER'
        ORDER BY p.singles_id, p.post_id`
     );
 

@@ -1,5 +1,6 @@
 import { PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME, newLabelId } from './photoAlbumsTextLabelNode';
 import {
+  listTextAndEmojiForPhotoPos,
   listTextAndEmojiNearPhoto,
   PHOTO_ALBUMS_ATTACHMENT_NODE_NAME,
   photoPageRectFromAttrs
@@ -22,6 +23,22 @@ function isEmojiStickerLabel(text, fontFamily) {
   if (!t || /\s/.test(t)) return false;
   if (/[A-Za-z0-9]/.test(t)) return false;
   return [...t].length <= 8;
+}
+
+/**
+ * Caption for a new text overlay. "Sample Feb 2025" only when the photo has no text or emoji yet.
+ * @param {{ explicitText?: unknown, existingOverlayCount?: number, editing?: boolean }} opts
+ */
+export function resolvePlaceTextCaption({ explicitText, existingOverlayCount = 0, editing = false }) {
+  const trimmed = String(explicitText ?? '').trim();
+  const hasOverlays = (Number(existingOverlayCount) || 0) >= 1;
+  if (hasOverlays && !editing) {
+    if (trimmed && trimmed !== PLACE_TEXT_DEFAULTS.text) return trimmed;
+    return trimmed || '';
+  }
+  if (editing) return trimmed;
+  if (trimmed) return trimmed;
+  return PLACE_TEXT_DEFAULTS.text;
 }
 
 /** Corner offset after CSS rotate (clockwise +), y-down screen coords. */
@@ -78,7 +95,11 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
   const pw = Math.max(1, photoRect.width);
   const ph = Math.max(1, photoRect.height);
 
-  const near = listTextAndEmojiNearPhoto(editor.state, photoRect);
+  const near = listTextAndEmojiForPhotoPos(editor.state, photoPos);
+  const preExistingOverlayCount = Math.max(
+    near.length,
+    Number(editMeta.existingOverlayCount) || 0
+  );
 
   const labels = near.map((item) => ({
     clientKey: String(item.attrs?.labelId || item.pos),
@@ -125,11 +146,17 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
         (editingPos != null && l.docPos === editingPos)
     );
     if (idx >= 0) {
-      labels[idx] = { ...labels[idx], ...applyStyle(labels[idx]) };
+      labels[idx] = { ...labels[idx], ...applyStyle(style) };
     }
-  } else {
+  } else if (labels.length === 0 && preExistingOverlayCount < 1) {
+    // Only seed "Sample Feb 2025" when the photo has no existing text or emoji.
+    const caption = resolvePlaceTextCaption({
+      explicitText: style?.text,
+      existingOverlayCount: preExistingOverlayCount,
+      editing: false
+    });
+    if (caption) {
     const fs = Math.max(10, Math.round(Number(style?.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
-    const caption = String(style?.text || PLACE_TEXT_DEFAULTS.text).trim();
     const charFactor = Math.max(6, Math.min(Math.max(caption.length, 6), 24));
     const estW = Math.max(0.18, Math.min(0.75, (fs * charFactor) / pw));
     const estH = Math.max(0.08, Math.min(0.35, (fs * 1.4) / ph));
@@ -152,8 +179,15 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
       relY,
       relW: estW,
       relH: estH,
-      ...applyStyle({})
+      ...applyStyle({ text: caption })
     });
+    }
+  }
+
+  if (preExistingOverlayCount >= 1) {
+    for (let i = labels.length - 1; i >= 0; i -= 1) {
+      if (labels[i]?.isNew) labels.splice(i, 1);
+    }
   }
 
   return {
@@ -163,6 +197,7 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     fileExtension: ext,
     isVideo,
     photoRect,
+    existingOverlayCount: preExistingOverlayCount,
     labels,
     rotationDeg: Number.isFinite(Number(photoNode.attrs?.rotationDeg))
       ? Number(photoNode.attrs.rotationDeg)
@@ -184,7 +219,7 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
   };
 }
 
-function labelToPageAttrs(label, photoRect) {
+function labelToPageAttrs(label, photoRect, attachmentId = null) {
   const pw = Math.max(1, photoRect.width);
   const ph = Math.max(1, photoRect.height);
   const fs = Math.max(10, Math.round(Number(label.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
@@ -216,7 +251,10 @@ function labelToPageAttrs(label, photoRect) {
     posLeft: Math.round(photoRect.left + (Number(label.relX) || 0) * pw),
     posTop: Math.round(photoRect.top + (Number(label.relY) || 0) * ph),
     boxWidth: boxW,
-    boxHeight: boxH
+    boxHeight: boxH,
+    ...(Number.isFinite(Number(attachmentId)) && Number(attachmentId) >= 1
+      ? { hostAttachmentId: Number(attachmentId) }
+      : null)
   };
 }
 
@@ -232,13 +270,16 @@ export function commitPlaceTextPositionSession(editor, session) {
     }
   }
   const { labels } = session;
+  const hostAttachmentId = Number.isFinite(Number(session.attachmentId)) ? Number(session.attachmentId) : null;
 
   const keptIds = new Set(
     labels.map((l) => String(l.labelId || '').trim()).filter(Boolean)
   );
 
   // Remove stickers/text deleted in Add Text before position updates shift doc positions.
-  const near = listTextAndEmojiNearPhoto(editor.state, photoRect);
+  const near = Number.isFinite(photoPos)
+    ? listTextAndEmojiForPhotoPos(editor.state, photoPos)
+    : listTextAndEmojiNearPhoto(editor.state, photoRect, 24, hostAttachmentId);
   const toDelete = near
     .filter((item) => {
       const id = String(item.attrs?.labelId || '').trim();
@@ -272,7 +313,7 @@ export function commitPlaceTextPositionSession(editor, session) {
     if (!current || current.type.name !== PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) continue;
     tr = tr.setNodeMarkup(pos, undefined, {
       ...current.attrs,
-      ...labelToPageAttrs(label, photoRect)
+      ...labelToPageAttrs(label, photoRect, hostAttachmentId)
     });
   }
   if (tr.docChanged) {
@@ -283,7 +324,7 @@ export function commitPlaceTextPositionSession(editor, session) {
   if (newLabels.length) {
     const nodes = newLabels.map((label) => ({
       type: PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME,
-      attrs: labelToPageAttrs(label, photoRect)
+      attrs: labelToPageAttrs(label, photoRect, hostAttachmentId)
     }));
     const insertAt = editor.state.doc.content.size;
     editor.chain().focus(null, { scrollIntoView: false }).insertContentAt(insertAt, nodes).run();

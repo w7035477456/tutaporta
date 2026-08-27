@@ -53,7 +53,7 @@ function resolveVaultRootFromExtractedDir(extractDir) {
   throw new Error(`Backup zip must contain a ${folderName} folder with ${VAULT_META_FILE}`);
 }
 
-function formatMyPhotoAlbumsBackupZipStamp(date = new Date()) {
+export function formatMyPhotoAlbumsBackupZipStamp(date = new Date()) {
   const y = date.getFullYear();
   const mo = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');

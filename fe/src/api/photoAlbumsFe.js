@@ -1114,6 +1114,99 @@ function triggerBrowserBlobDownload(blob, fileName) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Poll Redis-backed album backup percent while album zip GET runs. */
+export async function fetchPhotoAlbumsAlbumBackupProgress(storageType = 'onedrive') {
+  const path =
+    storageType === 'usb'
+      ? '/api/photoAlbums/usb/album-backup-progress'
+      : '/api/photoAlbums/onedrive/album-backup-progress';
+  const config = storageType === 'usb' ? { headers: { 'X-Record-Vault-Storage': 'usb' } } : {};
+  const { data } = await api.get(path, config);
+  return {
+    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
+    label: data?.label ? String(data.label) : '',
+    fileIndex: Math.max(0, Math.round(Number(data?.fileIndex) || 0)),
+    fileTotal: Math.max(0, Math.round(Number(data?.fileTotal) || 0)),
+    bytesDone: Math.max(0, Math.round(Number(data?.bytesDone) || 0))
+  };
+}
+
+/** Zip only the currently open album and save to the browser download folder. */
+export async function downloadPhotoAlbumsAlbumBackupZip({
+  storageType = 'onedrive',
+  notebookId,
+  noteId,
+  albumLabel = '',
+  onProgress
+} = {}) {
+  const nb = Number(notebookId);
+  const nid = Number(noteId);
+  if (!Number.isFinite(nb) || nb < 1 || !Number.isFinite(nid) || nid < 1) {
+    throw new Error('Choose an album to back up first');
+  }
+
+  const params = new URLSearchParams();
+  params.set('notebookId', String(nb));
+  params.set('noteId', String(nid));
+  const label = String(albumLabel || '').trim();
+  if (label) params.set('albumLabel', label);
+  const qs = params.toString();
+  const path =
+    storageType === 'usb'
+      ? `/api/photoAlbums/usb/album-backup-zip?${qs}`
+      : `/api/photoAlbums/onedrive/album-backup-zip?${qs}`;
+
+  let pollId = null;
+  let stopped = false;
+  if (typeof onProgress === 'function') {
+    onProgress({
+      percent: 1,
+      label: label ? `Backing up only photo album: '${label}' as zip` : 'Starting album backup…',
+      fileIndex: 0,
+      fileTotal: 0,
+      bytesDone: 0
+    });
+    pollId = window.setInterval(() => {
+      if (stopped) return;
+      void fetchPhotoAlbumsAlbumBackupProgress(storageType)
+        .then(onProgress)
+        .catch(() => {
+          // Ignore poll blips; zip GET is the source of truth.
+        });
+    }, 250);
+  }
+
+  try {
+    if (storageType === 'usb' && isPhotoAlbumsBridgeActive()) {
+      const { blob, fileName: headerName } = await bridgeFetchBlobDownload(path);
+      const fileName = headerName || buildMyPhotoAlbumsBackupZipFileNameClient('usb');
+      triggerBrowserBlobDownload(blob, fileName);
+      if (typeof onProgress === 'function') {
+        onProgress({ percent: 100, label: 'Done', fileIndex: 0, fileTotal: 0, bytesDone: blob?.size ?? 0 });
+      }
+      return { fileName, sizeBytes: blob?.size ?? 0 };
+    }
+    const response = await api.get(path, {
+      responseType: 'blob',
+      ...(storageType === 'usb' ? { headers: { 'X-Record-Vault-Storage': 'usb' } } : null)
+    });
+    const fileName =
+      parseContentDispositionFilename(response.headers?.['content-disposition']) ||
+      buildMyPhotoAlbumsBackupZipFileNameClient(storageType === 'usb' ? 'usb' : 'onedrive');
+    triggerBrowserBlobDownload(response.data, fileName);
+    const sizeBytes = response.data?.size ?? 0;
+    if (typeof onProgress === 'function') {
+      onProgress({ percent: 100, label: 'Done', fileIndex: 0, fileTotal: 0, bytesDone: sizeBytes });
+    }
+    return { fileName, sizeBytes };
+  } catch (err) {
+    throw await normalizePhotoAlbumsBlobFetchError(err);
+  } finally {
+    stopped = true;
+    if (pollId != null) window.clearInterval(pollId);
+  }
+}
+
 /** Zip the entire OneDrive vault folder and save to the browser download folder. */
 export async function downloadPhotoAlbumsOneDriveBackupZip() {
   try {

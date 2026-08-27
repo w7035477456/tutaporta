@@ -19,6 +19,11 @@ import { clearPhotoAlbumsCacheIcon, readPhotoAlbumsCacheIcon } from '../../utils
 import { isVaultBackupUsbEnabled } from '../../utils/photoAlbumsStorageFlags.js';
 import fs from 'fs';
 import { streamUsbVaultBackupZip, restoreUsbVaultFromZipFile } from '../../utils/photoAlbumsUsb/usbVaultBackup.js';
+import { streamPhotoAlbumsAlbumBackupZip } from '../../utils/photoAlbumsAlbumBackup.js';
+import {
+  clearAlbumBackupProgress,
+  getAlbumBackupProgress
+} from '../../utils/photoAlbumsAlbumBackupProgress.js';
 import { parseOneDriveBackupZipUpload } from '../../utils/photoAlbumsOneDrive/parseOneDriveBackupZipUpload.js';
 import {
   clearVaultLogoffProgress,
@@ -169,6 +174,44 @@ export async function getPhotoAlbumsUsbVaultTree(req, res) {
   } catch (err) {
     console.error('[getPhotoAlbumsUsbVaultTree]', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Unable to list USB vault folder' });
+  }
+}
+
+/** GET /api/photoAlbums/usb/album-backup-progress — poll during album zip download. */
+export async function getPhotoAlbumsUsbAlbumBackupProgress(req, res) {
+  const singlesId = await requireVaultAccessSession(req, res);
+  if (!singlesId) return;
+  try {
+    const progress = await getAlbumBackupProgress(singlesId);
+    return res.json(progress);
+  } catch (err) {
+    console.error('[getPhotoAlbumsUsbAlbumBackupProgress]', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Unable to read album backup progress' });
+  }
+}
+
+/** GET /api/photoAlbums/usb/album-backup-zip — zip only the selected album from unlocked USB vault. */
+export async function downloadPhotoAlbumsUsbAlbumBackupZip(req, res) {
+  const singlesId = await requireVaultAccessSession(req, res);
+  if (!singlesId) return;
+
+  const noteId = Number(req.query?.noteId ?? req.query?.note_id);
+  const notebookId = Number(req.query?.notebookId ?? req.query?.notebook_id);
+  const albumLabel = String(req.query?.albumLabel ?? req.query?.album_label ?? '').trim();
+
+  try {
+    await streamPhotoAlbumsAlbumBackupZip(singlesId, 'usb', { noteId, notebookId, albumLabel }, res);
+  } catch (err) {
+    console.error('[downloadPhotoAlbumsUsbAlbumBackupZip]', err?.message || err);
+    await clearAlbumBackupProgress(singlesId);
+    if (!res.headersSent) {
+      const message = err?.message || 'Unable to create album backup zip';
+      const status = /not unlocked/i.test(message) ? 428 : 400;
+      return res.status(status).json({
+        error: message,
+        ...(status === 428 ? { code: 'PHOTO_ALBUMS_USB_REQUIRED' } : null)
+      });
+    }
   }
 }
 

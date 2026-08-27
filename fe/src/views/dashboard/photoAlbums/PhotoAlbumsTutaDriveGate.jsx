@@ -6,11 +6,9 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import { themedConfirm } from 'utils/themedDialog';
 import {
   fetchPhotoAlbumsStorageConfig,
   fetchPhotoAlbumsTutaDriveStatus,
-  formatPhotoAlbumsTutaDrive,
   readPhotoAlbumsApiError,
   unlockPhotoAlbumsTutaDrive
 } from 'api/photoAlbumsFe';
@@ -24,10 +22,8 @@ import {
   tutaPhotoAlbumsHalfPanelSx
 } from './tutaPhotoAlbumsBranding';
 import {
-  tutaPhotoAlbumsMoreChoicesButtonSx,
   tutaPhotoAlbumsPostLoginActionButtonSx,
-  tutaPhotoAlbumsPostLoginButtonRowSx,
-  tutaPhotoAlbumsFormatPostLoginButtonSx
+  tutaPhotoAlbumsPostLoginButtonRowSx
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 
 /**
@@ -40,16 +36,18 @@ export default function PhotoAlbumsTutaDriveGate({
   onUnlocked,
   onOpenClicked,
   proceedOpenToken = 0,
-  accessFormatRefreshToken = 0
+  accessFormatRefreshToken = 0,
+  autoOpenOnMount = false
 }) {
   const [busy, setBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState('Opening TutaDrive');
   const [error, setError] = useState('');
   const [memberFolder, setMemberFolder] = useState('');
-  const [showMoreChoices, setShowMoreChoices] = useState(false);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const lastProceedRef = useRef(0);
   const lastFormatRefreshRef = useRef(0);
+  const autoOpenAttemptedRef = useRef(false);
+  const [autoOpenAwaitingAccess, setAutoOpenAwaitingAccess] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -69,7 +67,8 @@ export default function PhotoAlbumsTutaDriveGate({
     if (!open) {
       setStatusLoaded(false);
       setError('');
-      setShowMoreChoices(false);
+      autoOpenAttemptedRef.current = false;
+      setAutoOpenAwaitingAccess(false);
       return undefined;
     }
     let cancelled = false;
@@ -121,34 +120,29 @@ export default function PhotoAlbumsTutaDriveGate({
     void refreshStatus();
   }, [accessFormatRefreshToken, refreshStatus]);
 
-  const handleFormat = async () => {
-    if (busy) return;
-    const ok = await themedConfirm(
-      `Format TutaDrive for ${memberFolder || 'this member'}?\n\nThis deletes photo albums under your member photoalbums folder only.`
-    );
-    if (!ok) return;
-    setBusy(true);
-    setBusyLabel('Formatting TutaDrive');
-    setError('');
-    try {
-      await formatPhotoAlbumsTutaDrive();
-      await refreshStatus();
-    } catch (err) {
-      setError(readPhotoAlbumsApiError(err, 'Unable to format TutaDrive'));
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    if (!open || !autoOpenOnMount || !statusLoaded || busy) return;
+    if (autoOpenAttemptedRef.current) return;
+    autoOpenAttemptedRef.current = true;
+    if (onOpenClicked?.() === true) {
+      setAutoOpenAwaitingAccess(true);
+      return;
     }
-  };
+    void openVaultAfterAccess();
+  }, [open, autoOpenOnMount, statusLoaded, busy, onOpenClicked, openVaultAfterAccess]);
 
   if (!open && !embedded) return null;
+
+  const showLoginChrome = !autoOpenOnMount || Boolean(error);
 
   return (
     <>
       <BusyHourglassOverlay
-        open={open && busy}
-        label={busyLabel}
+        open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
+        label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
+      {showLoginChrome ? (
       <Box
         sx={{
           ...tutaPhotoAlbumsHalfPanelSx,
@@ -213,50 +207,19 @@ export default function PhotoAlbumsTutaDriveGate({
           ) : null}
 
           <Box sx={tutaPhotoAlbumsPostLoginButtonRowSx}>
-            {showMoreChoices ? (
-              <>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  onClick={() => setShowMoreChoices(false)}
-                  sx={tutaPhotoAlbumsPostLoginActionButtonSx}
-                >
-                  Less Choices
-                </GreenButton>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  disabled={busy}
-                  onClick={() => void handleFormat()}
-                  sx={tutaPhotoAlbumsFormatPostLoginButtonSx}
-                >
-                  Format TutaDrive Cloud
-                </GreenButton>
-              </>
-            ) : (
-              <>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  disabled={busy}
-                  onClick={handleOpen}
-                  sx={tutaPhotoAlbumsPostLoginActionButtonSx}
-                >
-                  {busy ? 'Opening…' : TUTAPHOTOALBUMS_TUTADRIVE_OPEN_LABEL}
-                </GreenButton>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  onClick={() => setShowMoreChoices(true)}
-                  sx={tutaPhotoAlbumsMoreChoicesButtonSx}
-                >
-                  More Choices
-                </GreenButton>
-              </>
-            )}
+            <GreenButton
+              type="button"
+              singleLineLabel={false}
+              disabled={busy}
+              onClick={handleOpen}
+              sx={tutaPhotoAlbumsPostLoginActionButtonSx}
+            >
+              {busy ? 'Opening…' : TUTAPHOTOALBUMS_TUTADRIVE_OPEN_LABEL}
+            </GreenButton>
           </Box>
         </Box>
       </Box>
+      ) : null}
     </>
   );
 }
@@ -267,5 +230,6 @@ PhotoAlbumsTutaDriveGate.propTypes = {
   onUnlocked: PropTypes.func,
   onOpenClicked: PropTypes.func,
   proceedOpenToken: PropTypes.number,
-  accessFormatRefreshToken: PropTypes.number
+  accessFormatRefreshToken: PropTypes.number,
+  autoOpenOnMount: PropTypes.bool
 };

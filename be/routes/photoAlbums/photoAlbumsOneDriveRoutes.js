@@ -58,6 +58,11 @@ import {
   restoreOneDriveVaultFromZipFile,
   streamOneDriveVaultBackupZip
 } from '../../utils/photoAlbumsOneDrive/oneDriveVaultBackup.js';
+import { streamPhotoAlbumsAlbumBackupZip } from '../../utils/photoAlbumsAlbumBackup.js';
+import {
+  clearAlbumBackupProgress,
+  getAlbumBackupProgress
+} from '../../utils/photoAlbumsAlbumBackupProgress.js';
 import { parseOneDriveBackupZipUpload } from '../../utils/photoAlbumsOneDrive/parseOneDriveBackupZipUpload.js';
 import { readPhotoAlbumsCacheIcon, clearPhotoAlbumsCacheIcon } from '../../utils/photoAlbumsCacheIcon.js';
 import {
@@ -565,6 +570,51 @@ export async function rememberPhotoAlbumsOneDriveEmail(req, res) {
   } catch (err) {
     console.error('[rememberPhotoAlbumsOneDriveEmail]', err?.message || err);
     return res.status(400).json({ error: err?.message || 'Unable to save OneDrive email' });
+  }
+}
+
+/** GET /api/photoAlbums/onedrive/album-backup-progress — poll during album zip download. */
+export async function getPhotoAlbumsOneDriveAlbumBackupProgress(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    const progress = await getAlbumBackupProgress(singlesId);
+    return res.json(progress);
+  } catch (err) {
+    console.error('[getPhotoAlbumsOneDriveAlbumBackupProgress]', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Unable to read album backup progress' });
+  }
+}
+
+/** GET /api/photoAlbums/onedrive/album-backup-zip — zip only the selected album. */
+export async function downloadPhotoAlbumsOneDriveAlbumBackupZip(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+
+  const noteId = Number(req.query?.noteId ?? req.query?.note_id);
+  const notebookId = Number(req.query?.notebookId ?? req.query?.notebook_id);
+  const albumLabel = String(req.query?.albumLabel ?? req.query?.album_label ?? '').trim();
+
+  try {
+    await streamPhotoAlbumsAlbumBackupZip(
+      singlesId,
+      'onedrive',
+      { noteId, notebookId, albumLabel },
+      res
+    );
+  } catch (err) {
+    if (isPhotoAlbumsCloudColumnMissingError(err)) {
+      const once = logPhotoAlbumsCloudSchemaMissingOnce('OneDrive', err);
+      if (once) rvCloudWarn('OneDrive', 'cloud schema missing — run addSinglesPhotoAlbumsCloud.sql on Primary', once);
+      const mapped = photoAlbumsCloudSchemaErrorResponse('OneDrive', err);
+      if (!res.headersSent) return res.status(mapped.status).json(mapped.body);
+      return;
+    }
+    console.error('[downloadPhotoAlbumsOneDriveAlbumBackupZip]', err?.message || err);
+    await clearAlbumBackupProgress(singlesId);
+    if (!res.headersSent) {
+      return res.status(400).json({ error: err?.message || 'Unable to create album backup zip' });
+    }
   }
 }
 

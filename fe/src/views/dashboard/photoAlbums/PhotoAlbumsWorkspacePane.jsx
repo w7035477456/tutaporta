@@ -1906,6 +1906,17 @@ export default function PhotoAlbumsWorkspacePane({
     return (selectedNotebook.notes || []).find((n) => Number(n.note_id) === Number(selectedNoteId)) ?? null;
   }, [selectedNotebook, selectedNoteId]);
 
+  const albumBackupContext = useMemo(() => {
+    if (!selectedNote || !selectedNotebook) return null;
+    const notesInNotebook = selectedNotebook.notes || [];
+    const albumLabel = resolveOpenNoteTitlePlain(selectedNote, notebooks, notesInNotebook);
+    return {
+      notebookId: Number(selectedNote.notebook_id),
+      noteId: Number(selectedNote.note_id),
+      albumLabel
+    };
+  }, [selectedNote, selectedNotebook, notebooks]);
+
   useEffect(() => {
     selectedNotebookIdRef.current = selectedNotebookId;
   }, [selectedNotebookId]);
@@ -7602,6 +7613,7 @@ export default function PhotoAlbumsWorkspacePane({
         open={oneDriveBackupOpen}
         onClose={() => setOneDriveBackupOpen(false)}
         folderName={oneDriveVaultFolderName}
+        albumContext={albumBackupContext}
         onOpenMyPhotoAlbums={() => setOneDriveBackupOpen(false)}
         onRestored={() => void handleOneDriveVaultRestored()}
       />
@@ -7609,6 +7621,7 @@ export default function PhotoAlbumsWorkspacePane({
         open={usbBackupOpen}
         onClose={() => setUsbBackupOpen(false)}
         folderLabel={usbVaultFolderLabel}
+        albumContext={albumBackupContext}
         onOpenMyPhotoAlbums={() => setUsbBackupOpen(false)}
         onRestored={() => handleUsbVaultRestoredOrFormatted()}
       />

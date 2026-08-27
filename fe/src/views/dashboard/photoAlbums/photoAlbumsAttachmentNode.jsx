@@ -138,19 +138,44 @@ function deleteTextAndEmojiNearPhoto(editor, photoRect) {
 }
 
 /** List text/emoji labels overlapping a photo box (with relative geometry). */
-function listTextAndEmojiNearPhoto(state, photoRect, pad = 12) {
+function labelAssociatesWithPhoto(labelAttrs, photoRect, pad = 24) {
+  const left = parseOptionalPx(labelAttrs?.posLeft) ?? 0;
+  const top = parseOptionalPx(labelAttrs?.posTop) ?? 0;
+  const fontSize = Number(labelAttrs?.fontSize) || 40;
+  const width =
+    parseOptionalPx(labelAttrs?.boxWidth) || Math.max(24, Math.round(fontSize * 1.2));
+  const height =
+    parseOptionalPx(labelAttrs?.boxHeight) || Math.max(24, Math.round(fontSize * 1.2));
+  const box = { left, top, width, height };
+  if (rectsOverlap(photoRect, box, pad)) return true;
+  const cx = left + width / 2;
+  const cy = top + height / 2;
+  const p = Math.max(0, Number(pad) || 0);
+  return (
+    cx >= photoRect.left - p &&
+    cx <= photoRect.left + photoRect.width + p &&
+    cy >= photoRect.top - p &&
+    cy <= photoRect.top + photoRect.height + p
+  );
+}
+
+function listTextAndEmojiNearPhoto(state, photoRect, pad = 24, attachmentId = null) {
   if (!state?.doc || !photoRect) return [];
   const pw = Math.max(1, photoRect.width);
   const ph = Math.max(1, photoRect.height);
+  const photoAttachmentId = Number(attachmentId);
   const items = [];
   state.doc.descendants((n, pos) => {
     if (n.type.name !== PHOTO_ALBUMS_TEXT_LABEL_NODE) return;
+    const hostId = Number(n.attrs?.hostAttachmentId);
+    const matchesHost =
+      photoAttachmentId >= 1 && hostId >= 1 && hostId === photoAttachmentId;
+    if (!matchesHost && !labelAssociatesWithPhoto(n.attrs, photoRect, pad)) return;
     const left = parseOptionalPx(n.attrs.posLeft) ?? 0;
     const top = parseOptionalPx(n.attrs.posTop) ?? 0;
     const fontSize = Number(n.attrs.fontSize) || 40;
     const width = parseOptionalPx(n.attrs.boxWidth) || Math.max(24, Math.round(fontSize * 1.2));
     const height = parseOptionalPx(n.attrs.boxHeight) || Math.max(24, Math.round(fontSize * 1.2));
-    if (!rectsOverlap(photoRect, { left, top, width, height }, pad)) return;
     items.push({
       pos,
       size: n.nodeSize,
@@ -162,6 +187,17 @@ function listTextAndEmojiNearPhoto(state, photoRect, pad = 12) {
     });
   });
   return items;
+}
+
+/** Labels on a specific photo slot (overlap + hostAttachmentId when set). */
+function listTextAndEmojiForPhotoPos(state, photoPos, pad = 24) {
+  if (!state?.doc || !Number.isFinite(photoPos)) return [];
+  const photoNode = state.doc.nodeAt(photoPos);
+  if (!photoNode || photoNode.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE) return [];
+  const photoRect = photoPageRectFromAttrs(photoNode.attrs);
+  if (!photoRect) return [];
+  const attachmentId = Number(photoNode.attrs?.attachmentId);
+  return listTextAndEmojiNearPhoto(state, photoRect, pad, attachmentId);
 }
 
 /** Remove overlapping labels from the doc; return companion payloads for staging / restore. */
@@ -3315,6 +3351,8 @@ export const PhotoAlbumsAttachmentNode = Node.create({
        * the user clicks outside the photo.
        */
       pinnedPhotoEditPos: null,
+      /** Add Text dialog open — hide on-album labels on the pinned photo (preview owns them). */
+      placeTextDialogOpen: false,
       /** Visible open-spread page bands (left + right). */
       activePageBands: [],
       /** @deprecated Prefer activePageBands. */
@@ -3477,5 +3515,5 @@ export function clearPinnedPhotoEditPos(editor) {
   setPinnedPhotoEditPos(editor, null);
 }
 
-export { photoPageRectFromAttrs, detachTextAndEmojiNearPhoto, insertCompanionLabelsOnPhoto, listTextAndEmojiNearPhoto };
+export { photoPageRectFromAttrs, detachTextAndEmojiNearPhoto, insertCompanionLabelsOnPhoto, listTextAndEmojiNearPhoto, listTextAndEmojiForPhotoPos };
 export default PhotoAlbumsAttachmentNode;

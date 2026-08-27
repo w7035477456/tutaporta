@@ -5,7 +5,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate9TableData, { useColorTemplate9AutoFitColumnWidths } from 'ui-component/ColorTemplate9TableData';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
-import { formatMemberCategoryLabel } from 'utils/memberCategory';
+import { formatMemberCategoryLabel, isAdminMemberCategory } from 'utils/memberCategory';
 import { themedConfirm } from 'utils/themedDialog';
 import {
   saveAdminSinglesStatus,
@@ -89,9 +89,8 @@ function truncateLookupDisplay(value) {
 }
 
 function isAdminSinglesLookupRow(row) {
-  const memberCategory = String(row?.memberCategory ?? '').trim().toLowerCase();
   const alias = String(row?.alias ?? '').trim().toLowerCase();
-  return memberCategory === 'admin' || alias === 'admin';
+  return isAdminMemberCategory(row?.memberCategory) || alias === 'admin';
 }
 
 /** Same impersonate action as All Singles; yellow table button label "Impersonate". */

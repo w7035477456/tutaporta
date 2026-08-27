@@ -13,6 +13,7 @@ import {
 import { getPhotoAlbumsAttachmentViewKind } from 'utils/photoAlbumsFileFormats';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
+import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 
 const THUMB_H_PX = 96;
 const ACTIVE_BORDER = '4px solid #e53935';
@@ -476,6 +477,8 @@ export default function PhotoAlbumsPageFilmstrip({
   onPageDragEnd,
   /** When set, filmstrip shows these cross-note order entries instead of current-note pages. */
   overrideEntries = null,
+  /** Photos waiting in the green thumbnail tray — included in Count= alongside on-page photos. */
+  stagingCount = 0,
   /** (pageIndex, entry?) => void — delete album page or ForOrder queue entry. */
   onDeletePage = null,
   /** () => void — delete every album page (photos return to tray). */
@@ -513,6 +516,16 @@ export default function PhotoAlbumsPageFilmstrip({
 
   const effectivePageCount = hasOverride ? displayEntries.length : pageCount;
   const labelText = `Page ${Math.min(pageIndex + 1, Math.max(1, effectivePageCount))} of ${Math.max(1, effectivePageCount)}`;
+
+  const placedPhotoCount = useMemo(() => {
+    if (hasOverride) {
+      return displayEntries.reduce((sum, entry) => sum + (entry.model?.photos?.length || 0), 0);
+    }
+    return allModels.reduce((sum, model) => sum + (model.photos?.length || 0), 0);
+  }, [hasOverride, displayEntries, allModels]);
+
+  const albumImageCount =
+    Math.max(0, Math.round(Number(stagingCount) || 0)) + placedPhotoCount;
 
   const goPrev = () => {
     onGoToPage?.(pageIndex - 1);
@@ -737,7 +750,9 @@ export default function PhotoAlbumsPageFilmstrip({
         minHeight: 28
       }}
     >
-      <Box sx={{ flex: '1 1 0', minWidth: 0 }} />
+      <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+        <PhotoAlbumsTrayCountLabel count={albumImageCount} />
+      </Box>
       {navRow}
       <Box
         sx={{
@@ -829,6 +844,7 @@ PhotoAlbumsPageFilmstrip.propTypes = {
   draggablePages: PropTypes.bool,
   onPageDragStart: PropTypes.func,
   onPageDragEnd: PropTypes.func,
+  stagingCount: PropTypes.number,
   overrideEntries: PropTypes.arrayOf(
     PropTypes.shape({
       model: PropTypes.object,

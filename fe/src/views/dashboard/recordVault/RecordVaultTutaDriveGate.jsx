@@ -6,11 +6,9 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import { themedConfirm } from 'utils/themedDialog';
 import {
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveStatus,
-  formatRecordVaultTutaDrive,
   readRecordVaultApiError,
   unlockRecordVaultTutaDrive
 } from 'api/recordVaultFe';
@@ -24,10 +22,8 @@ import {
   tutaNotesHalfPanelSx
 } from './tutaNotesBranding';
 import {
-  tutaNotesMoreChoicesButtonSx,
   tutaNotesPostLoginActionButtonSx,
-  tutaNotesPostLoginButtonRowSx,
-  tutaNotesFormatPostLoginButtonSx
+  tutaNotesPostLoginButtonRowSx
 } from './tutaNotesPostLoginActionButtonSx';
 
 /**
@@ -40,16 +36,18 @@ export default function RecordVaultTutaDriveGate({
   onUnlocked,
   onOpenClicked,
   proceedOpenToken = 0,
-  accessFormatRefreshToken = 0
+  accessFormatRefreshToken = 0,
+  autoOpenOnMount = false
 }) {
   const [busy, setBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState('Opening TutaDrive');
   const [error, setError] = useState('');
   const [memberFolder, setMemberFolder] = useState('');
-  const [showMoreChoices, setShowMoreChoices] = useState(false);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const lastProceedRef = useRef(0);
   const lastFormatRefreshRef = useRef(0);
+  const autoOpenAttemptedRef = useRef(false);
+  const [autoOpenAwaitingAccess, setAutoOpenAwaitingAccess] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -69,7 +67,8 @@ export default function RecordVaultTutaDriveGate({
     if (!open) {
       setStatusLoaded(false);
       setError('');
-      setShowMoreChoices(false);
+      autoOpenAttemptedRef.current = false;
+      setAutoOpenAwaitingAccess(false);
       return undefined;
     }
     let cancelled = false;
@@ -121,34 +120,29 @@ export default function RecordVaultTutaDriveGate({
     void refreshStatus();
   }, [accessFormatRefreshToken, refreshStatus]);
 
-  const handleFormat = async () => {
-    if (busy) return;
-    const ok = await themedConfirm(
-      `Format TutaDrive for ${memberFolder || 'this member'}?\n\nThis deletes notes under your member notes folder only (not the whole storage disk). Photos folder is kept.`
-    );
-    if (!ok) return;
-    setBusy(true);
-    setBusyLabel('Formatting TutaDrive');
-    setError('');
-    try {
-      await formatRecordVaultTutaDrive();
-      await refreshStatus();
-    } catch (err) {
-      setError(readRecordVaultApiError(err, 'Unable to format TutaDrive'));
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    if (!open || !autoOpenOnMount || !statusLoaded || busy) return;
+    if (autoOpenAttemptedRef.current) return;
+    autoOpenAttemptedRef.current = true;
+    if (onOpenClicked?.() === true) {
+      setAutoOpenAwaitingAccess(true);
+      return;
     }
-  };
+    void openVaultAfterAccess();
+  }, [open, autoOpenOnMount, statusLoaded, busy, onOpenClicked, openVaultAfterAccess]);
 
   if (!open && !embedded) return null;
+
+  const showLoginChrome = !autoOpenOnMount || Boolean(error);
 
   return (
     <>
       <BusyHourglassOverlay
-        open={open && busy}
-        label={busyLabel}
+        open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
+        label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
+      {showLoginChrome ? (
       <Box
         sx={{
           ...tutaNotesHalfPanelSx,
@@ -213,50 +207,19 @@ export default function RecordVaultTutaDriveGate({
           ) : null}
 
           <Box sx={tutaNotesPostLoginButtonRowSx}>
-            {showMoreChoices ? (
-              <>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  onClick={() => setShowMoreChoices(false)}
-                  sx={tutaNotesPostLoginActionButtonSx}
-                >
-                  Less Choices
-                </GreenButton>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  disabled={busy}
-                  onClick={() => void handleFormat()}
-                  sx={tutaNotesFormatPostLoginButtonSx}
-                >
-                  Format TutaDrive Cloud
-                </GreenButton>
-              </>
-            ) : (
-              <>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  disabled={busy}
-                  onClick={handleOpen}
-                  sx={tutaNotesPostLoginActionButtonSx}
-                >
-                  {busy ? 'Opening…' : TUTANOTES_TUTADRIVE_OPEN_LABEL}
-                </GreenButton>
-                <GreenButton
-                  type="button"
-                  singleLineLabel={false}
-                  onClick={() => setShowMoreChoices(true)}
-                  sx={tutaNotesMoreChoicesButtonSx}
-                >
-                  More Choices
-                </GreenButton>
-              </>
-            )}
+            <GreenButton
+              type="button"
+              singleLineLabel={false}
+              disabled={busy}
+              onClick={handleOpen}
+              sx={tutaNotesPostLoginActionButtonSx}
+            >
+              {busy ? 'Opening…' : TUTANOTES_TUTADRIVE_OPEN_LABEL}
+            </GreenButton>
           </Box>
         </Box>
       </Box>
+      ) : null}
     </>
   );
 }
@@ -267,5 +230,6 @@ RecordVaultTutaDriveGate.propTypes = {
   onUnlocked: PropTypes.func,
   onOpenClicked: PropTypes.func,
   proceedOpenToken: PropTypes.number,
-  accessFormatRefreshToken: PropTypes.number
+  accessFormatRefreshToken: PropTypes.number,
+  autoOpenOnMount: PropTypes.bool
 };

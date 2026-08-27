@@ -518,15 +518,17 @@ export default function MyPhotoAlbums() {
     setError('');
     void (async () => {
       try {
-        const oneDriveStatus = await fetchPhotoAlbumsOneDriveStatus();
-        if (oneDriveStatus?.session?.unlocked) {
+        const cloudStatus = tutaDriveMode
+          ? await fetchPhotoAlbumsTutaDriveStatus()
+          : await fetchPhotoAlbumsOneDriveStatus();
+        if (cloudStatus?.session?.unlocked) {
           setOneDriveUnlocked(true);
         }
       } catch {
         // keep optimistic unlock
       }
     })();
-  }, [localUsbOffered, oneDriveOffered]);
+  }, [localUsbOffered, oneDriveOffered, tutaDriveMode]);
 
   const selectOneDriveTab = useCallback(() => {
     setPaneFocus((prev) => {
@@ -774,7 +776,9 @@ export default function MyPhotoAlbums() {
                 onOpenClicked={handleOneDriveOpenClicked}
                 proceedOpenToken={oneDriveProceedOpenToken}
                 accessFormatRefreshToken={oneDriveGateRefreshToken}
-                {...(tutaDriveMode ? {} : { sessionNotice: oneDriveSessionNotice })}
+                {...(tutaDriveMode
+                  ? { autoOpenOnMount: !localUsbOffered }
+                  : { sessionNotice: oneDriveSessionNotice })}
               />
             </Box>
           ) : (
@@ -785,7 +789,9 @@ export default function MyPhotoAlbums() {
               onOpenClicked={handleOneDriveOpenClicked}
               proceedOpenToken={oneDriveProceedOpenToken}
               accessFormatRefreshToken={oneDriveGateRefreshToken}
-              {...(tutaDriveMode ? {} : { sessionNotice: oneDriveSessionNotice })}
+              {...(tutaDriveMode
+                ? { autoOpenOnMount: !localUsbOffered }
+                : { sessionNotice: oneDriveSessionNotice })}
             />
           )}
         </LoginScrollArea>

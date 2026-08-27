@@ -1,5 +1,5 @@
 import pool from '../../db/connection.js';
-import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
+import { isAdminMemberCategory } from '../../utils/memberCategory.js';
 import { isAdminAuth } from '../../utils/adminAuth.js';
 import {
   DEFAULT_CUSTOM_LOGOUT_DURATION,
@@ -22,7 +22,7 @@ async function resolveAdminCustomAllowed(singlesId, auth) {
        LIMIT 1`,
       [id]
     );
-    return normalizeMemberCategoryEnum(rows[0]?.member_category) === 'ADMIN';
+    return isAdminMemberCategory(rows[0]?.member_category);
   } catch {
     return false;
   }

@@ -294,7 +294,7 @@ export default function AuthLogin() {
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
             id="outlined-adornment-email-login"
-            label="Email or Phone"
+            label="Email or Phone (Not Case Sensitive)"
             type="text"
             value={email}
             onChange={handleEmailChange}
@@ -319,7 +319,7 @@ export default function AuthLogin() {
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
             id="outlined-adornment-password-login"
-            label="Password"
+            label="Password (Case Sensitive)"
             type={passwordVisible ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}

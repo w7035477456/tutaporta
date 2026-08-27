@@ -26,6 +26,8 @@ const MEMBER_CATEGORY_ALIASES = Object.freeze({
 export function normalizeMemberCategoryEnum(raw) {
   const value = String(raw ?? '').trim();
   if (!value) return null;
+  const upper = value.toUpperCase();
+  if (MEMBER_CATEGORY_VALUES.includes(upper)) return upper;
   const key = value.toLowerCase();
   return MEMBER_CATEGORY_ALIASES[key] ?? null;
 }
@@ -50,6 +52,10 @@ export function formatMemberCategoryLabel(raw) {
   if (normalized) return normalized;
   const fallback = String(raw ?? '').trim();
   return fallback || '—';
+}
+
+export function isAdminMemberCategory(raw) {
+  return normalizeMemberCategoryEnum(raw) === 'ADMIN';
 }
 
 export function isDemoUserCategory(raw) {

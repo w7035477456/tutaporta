@@ -18,6 +18,10 @@ import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
 import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
 import { newLabelId } from './photoAlbumsTextLabelNode';
 import {
+  computePlaceTextBottomRightRel,
+  resolvePlaceTextCaption
+} from './photoAlbumsPlaceTextPosition';
+import {
   SLOT_ZOOM_PCT_MAX,
   SLOT_ZOOM_PCT_MIN,
   centeredPan,
@@ -221,12 +225,15 @@ function stylePatchFromControls({
   fontWeight,
   fontSize,
   outlineWidth,
-  selectedPreset
+  selectedPreset,
+  allowSampleFallback = true
 }) {
-  const trimmed = String(text || '').trim() || PLACE_TEXT_DEFAULTS.text;
-  const finalText = selectedPreset?.uppercase ? trimmed.toUpperCase() : trimmed;
+  const trimmed = String(text || '').trim();
+  const finalText =
+    trimmed || (allowSampleFallback ? PLACE_TEXT_DEFAULTS.text : trimmed);
+  const presetText = selectedPreset?.uppercase ? finalText.toUpperCase() : finalText;
   return {
-    text: finalText,
+    text: presetText,
     color,
     outlineColor,
     fontFamily,
@@ -275,6 +282,7 @@ export default function PhotoAlbumsPlaceTextDialog({
   const splitContainerRef = useRef(null);
   const openSnapshotRef = useRef(null);
   const dialogInitRef = useRef(false);
+  const seedSampleOnEmptyRef = useRef(true);
   const [previewSplitRatio, setPreviewSplitRatio] = useState(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
 
   const labelOptions = useMemo(() => {
@@ -303,9 +311,14 @@ export default function PhotoAlbumsPlaceTextDialog({
 
   const showExistingSelect = labelOptions.length >= 2;
 
-  const applyStyleFields = useCallback((next, seededText) => {
+  const applyStyleFields = useCallback((next, seededText, allowSampleFallback = true) => {
     skipStyleSyncRef.current = true;
-    setText(seededText || next.text || PLACE_TEXT_DEFAULTS.text);
+    const resolvedText =
+      seededText != null
+        ? String(seededText)
+        : String(next.text ?? '').trim() ||
+          (allowSampleFallback ? PLACE_TEXT_DEFAULTS.text : '');
+    setText(resolvedText);
     setColor(next.color || PLACE_TEXT_DEFAULTS.color);
     setOutlineColor(next.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor);
     setFontFamily(next.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily);
@@ -331,6 +344,8 @@ export default function PhotoAlbumsPlaceTextDialog({
     if (!open) {
       setEmojiPickerAnchor(null);
       setPanEnabled(false);
+      setLabels([]);
+      setActiveKey('');
       dialogInitRef.current = false;
       openSnapshotRef.current = null;
       return;
@@ -348,14 +363,21 @@ export default function PhotoAlbumsPlaceTextDialog({
     setPanEnabled(false);
 
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
-    const seeded = String(initialText || '').trim();
-    applyStyleFields(next, seeded || next.text || PLACE_TEXT_DEFAULTS.text);
+    const seeded = String(initialText ?? '').trim();
+    const preExistingOverlayCount = Number.isFinite(Number(mediaSession?.existingOverlayCount))
+      ? Math.max(0, Number(mediaSession.existingOverlayCount))
+      : Array.isArray(mediaSession?.labels)
+        ? mediaSession.labels.filter((l) => !l.isNew).length
+        : 0;
+    seedSampleOnEmptyRef.current = preExistingOverlayCount < 1;
 
     let nextLabels = [];
     let nextActiveKey = '';
     if (hasMedia && mediaSession?.labels?.length) {
       nextLabels = mediaSession.labels.map((l) => ({ ...l }));
-      setLabels(nextLabels);
+      if (preExistingOverlayCount >= 1) {
+        nextLabels = nextLabels.filter((l) => !l.isNew);
+      }
       const preferred =
         initialExistingId &&
         nextLabels.find(
@@ -365,7 +387,25 @@ export default function PhotoAlbumsPlaceTextDialog({
         );
       const active = preferred || nextLabels[nextLabels.length - 1];
       nextActiveKey = active?.clientKey || '';
+    }
+
+    const activeLabelText = nextActiveKey
+      ? String(nextLabels.find((l) => l.clientKey === nextActiveKey)?.text || '').trim()
+      : '';
+    const initialFieldText = resolvePlaceTextCaption({
+      explicitText:
+        seeded ||
+        activeLabelText ||
+        (preExistingOverlayCount >= 1 ? '' : next.text),
+      existingOverlayCount: preExistingOverlayCount,
+      editing: Boolean(initialExistingId)
+    });
+    applyStyleFields(next, initialFieldText, seedSampleOnEmptyRef.current);
+
+    if (hasMedia && nextLabels.length) {
+      setLabels(nextLabels);
       setActiveKey(nextActiveKey);
+      const active = nextLabels.find((l) => l.clientKey === nextActiveKey);
       if (active) applyStyleFields(active, active.text);
     } else {
       setLabels([]);
@@ -384,7 +424,7 @@ export default function PhotoAlbumsPlaceTextDialog({
     }
 
     openSnapshotRef.current = {
-      text: seeded || next.text || PLACE_TEXT_DEFAULTS.text,
+      text: initialFieldText,
       color: next.color || PLACE_TEXT_DEFAULTS.color,
       outlineColor: next.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor,
       fontFamily: next.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily,
@@ -447,7 +487,9 @@ export default function PhotoAlbumsPlaceTextDialog({
     [selectedPresetId]
   );
 
-  const displayText = String(text || '').trim() || PLACE_TEXT_DEFAULTS.text;
+  const displayText =
+    String(text || '').trim() ||
+    (seedSampleOnEmptyRef.current ? PLACE_TEXT_DEFAULTS.text : '');
 
   const previewSession = useMemo(() => {
     if (!mediaSession) return null;
@@ -652,7 +694,8 @@ export default function PhotoAlbumsPlaceTextDialog({
         fontWeight,
         fontSize,
         outlineWidth,
-        selectedPreset
+        selectedPreset,
+        allowSampleFallback: seedSampleOnEmptyRef.current
       })
     );
   }, [
@@ -721,7 +764,47 @@ export default function PhotoAlbumsPlaceTextDialog({
 
   const handleExistingPick = (key) => {
     setExistingPick(key);
-    if (!key) return;
+    if (!key) {
+      if (!hasMedia || !mediaSession?.photoRect) {
+        applyStyleFields({ ...PLACE_TEXT_DEFAULTS, text: '' }, '', false);
+        return;
+      }
+      const pw = Math.max(1, mediaSession.photoRect.width);
+      const ph = Math.max(1, mediaSession.photoRect.height);
+      const fs = Math.max(10, Math.round(Number(fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
+      const estW = Math.max(0.18, Math.min(0.75, (fs * 12) / pw));
+      const estH = Math.max(0.08, Math.min(0.35, (fs * 1.4) / ph));
+      const rotationDeg = PLACE_TEXT_DEFAULTS.rotationDeg;
+      const { relX, relY } = computePlaceTextBottomRightRel({
+        relW: estW,
+        relH: estH,
+        rotationDeg,
+        margin: 0
+      });
+      const clientKey = `new_${Date.now()}`;
+      const nextLabel = {
+        clientKey,
+        isNew: true,
+        docPos: null,
+        labelId: newLabelId(),
+        text: '',
+        rotationDeg,
+        relX,
+        relY,
+        relW: estW,
+        relH: estH,
+        color,
+        outlineColor,
+        outlineWidth,
+        fontSize: fs,
+        fontFamily,
+        fontWeight
+      };
+      setLabels((prev) => [...prev, nextLabel]);
+      setActiveKey(clientKey);
+      applyStyleFields({ ...PLACE_TEXT_DEFAULTS, text: '' }, '', false);
+      return;
+    }
     const opt = labelOptions.find((o) => o.key === key);
     if (!opt) return;
     applyStyleFields(
@@ -823,7 +906,8 @@ export default function PhotoAlbumsPlaceTextDialog({
       fontWeight,
       fontSize,
       outlineWidth,
-      selectedPreset
+      selectedPreset,
+      allowSampleFallback: seedSampleOnEmptyRef.current
     });
     const picked = existingPick ? labelOptions.find((o) => o.key === existingPick) : null;
 

@@ -13,6 +13,7 @@ import {
   isPhotoAlbumsStagingPhotoFile,
   isPhotoAlbumsStagingVideoFile
 } from 'utils/photoAlbumsFileFormats';
+import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import {
   ensureDirectoryReadPermission,
@@ -696,6 +697,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
     (sum, entry) => sum + (entry.kind === 'file' ? Number(entry.size) || 0 : 0),
     0
   );
+  const folderFileCount = entries.filter((entry) => entry.kind === 'file' && entry.file).length;
   const breadcrumb = formatFilesExplorerBreadcrumb(rootName, relativePath);
   const crumbParts = [rootName, ...relativePath].filter(Boolean);
   const hasFolder = Boolean(rootHandle) && !rootHandle.__synthetic;
@@ -800,9 +802,20 @@ export default function PhotoAlbumsFilesExplorerPanel({
         ) : null}
         {!showEmptyPick && crumbParts.length ? (
           <>
-            <Typography component="span" sx={{ display: 'block', fontWeight: 700, mb: 0.5 }}>
-              {formatTotalSizeMb(totalBytes)}
-            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 1,
+                mb: 0.5
+              }}
+            >
+              <Typography component="span" sx={{ display: 'block', fontWeight: 700 }}>
+                {formatTotalSizeMb(totalBytes)}
+              </Typography>
+              <PhotoAlbumsTrayCountLabel count={folderFileCount} />
+            </Box>
             <Box
               sx={{
                 display: 'flex',

@@ -11,6 +11,7 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   fetchRecordVaultOneDriveStatus,
   fetchRecordVaultStorageConfig,
+  fetchRecordVaultTutaDriveStatus,
   fetchRecordVaultUsbStatus,
   logoffRecordVaultStorage,
   readRecordVaultApiError,
@@ -346,7 +347,12 @@ export default function MyRecordVault() {
     setError('');
     try {
       const [oneDriveStatus, usbStatus] = await Promise.all([
-        oneDriveOffered ? fetchRecordVaultOneDriveStatus().catch(() => null) : Promise.resolve(null),
+        oneDriveOffered
+          ? (tutaDriveMode
+              ? fetchRecordVaultTutaDriveStatus()
+              : fetchRecordVaultOneDriveStatus()
+            ).catch(() => null)
+          : Promise.resolve(null),
         localUsbOffered ? fetchRecordVaultUsbStatus().catch(() => null) : Promise.resolve(null)
       ]);
       setOneDriveUnlocked(Boolean(oneDriveStatus?.session?.unlocked));
@@ -362,7 +368,7 @@ export default function MyRecordVault() {
     } finally {
       setSessionChecking(false);
     }
-  }, [oneDriveOffered, localUsbOffered]);
+  }, [oneDriveOffered, localUsbOffered, tutaDriveMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -477,15 +483,17 @@ export default function MyRecordVault() {
     setError('');
     void (async () => {
       try {
-        const oneDriveStatus = await fetchRecordVaultOneDriveStatus();
-        if (oneDriveStatus?.session?.unlocked) {
+        const cloudStatus = tutaDriveMode
+          ? await fetchRecordVaultTutaDriveStatus()
+          : await fetchRecordVaultOneDriveStatus();
+        if (cloudStatus?.session?.unlocked) {
           setOneDriveUnlocked(true);
         }
       } catch {
         // keep optimistic unlock
       }
     })();
-  }, [localUsbOffered, oneDriveOffered]);
+  }, [localUsbOffered, oneDriveOffered, tutaDriveMode]);
 
   const selectOneDriveTab = useCallback(() => {
     setPaneFocus((prev) => {
@@ -706,6 +714,7 @@ export default function MyRecordVault() {
                 onOpenClicked={handleOneDriveOpenClicked}
                 proceedOpenToken={oneDriveProceedOpenToken}
                 accessFormatRefreshToken={oneDriveGateRefreshToken}
+                {...(tutaDriveMode && !localUsbOffered ? { autoOpenOnMount: true } : {})}
               />
             </Box>
           ) : (
@@ -716,6 +725,7 @@ export default function MyRecordVault() {
               onOpenClicked={handleOneDriveOpenClicked}
               proceedOpenToken={oneDriveProceedOpenToken}
               accessFormatRefreshToken={oneDriveGateRefreshToken}
+              {...(tutaDriveMode && !localUsbOffered ? { autoOpenOnMount: true } : {})}
             />
           )}
         </LoginScrollArea>

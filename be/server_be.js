@@ -310,6 +310,8 @@ import {
   getPhotoAlbumsUsbIconDerivedKey,
   getPhotoAlbumsUsbVaultTree,
   downloadPhotoAlbumsUsbBackupZip,
+  downloadPhotoAlbumsUsbAlbumBackupZip,
+  getPhotoAlbumsUsbAlbumBackupProgress,
   restorePhotoAlbumsUsbBackupZip,
   initPhotoAlbumsUsb,
   listPhotoAlbumsUsbIcons,
@@ -321,6 +323,8 @@ import {
 import {
   disconnectPhotoAlbumsOneDrive,
   downloadPhotoAlbumsOneDriveBackupZip,
+  downloadPhotoAlbumsOneDriveAlbumBackupZip,
+  getPhotoAlbumsOneDriveAlbumBackupProgress,
   formatPhotoAlbumsOneDrive,
   getPhotoAlbumsOneDriveConfig,
   getPhotoAlbumsOneDriveEmails,
@@ -1565,6 +1569,8 @@ app.get('/api/photoAlbums/usb/scan', requireAuth, scanPhotoAlbumsUsb);
 app.get('/api/photoAlbums/usb/locations', requireAuth, listPhotoAlbumsUsbLocations);
 app.get('/api/photoAlbums/usb/browse', requireAuth, browsePhotoAlbumsUsbPath);
 app.get('/api/photoAlbums/usb/vault-tree', requireAuth, getPhotoAlbumsUsbVaultTree);
+app.get('/api/photoAlbums/usb/album-backup-progress', requireAuth, getPhotoAlbumsUsbAlbumBackupProgress);
+app.get('/api/photoAlbums/usb/album-backup-zip', requireAuth, downloadPhotoAlbumsUsbAlbumBackupZip);
 app.get('/api/photoAlbums/usb/backup-zip', requireAuth, downloadPhotoAlbumsUsbBackupZip);
 app.post('/api/photoAlbums/usb/restore-zip', requireAuth, restorePhotoAlbumsUsbBackupZip);
 app.get('/api/photoAlbums/usb/status', requireAuth, getPhotoAlbumsUsbStatus);
@@ -1591,6 +1597,8 @@ app.post('/api/photoAlbums/session-file-counts', requireAuth, postPhotoAlbumsSes
 app.get('/api/photoAlbums/onedrive/config', requireAuth, getPhotoAlbumsOneDriveConfig);
 app.get('/api/photoAlbums/onedrive/status', requireAuth, getPhotoAlbumsOneDriveStatus);
 app.get('/api/photoAlbums/onedrive/vault-tree', requireAuth, getPhotoAlbumsOneDriveVaultTree);
+app.get('/api/photoAlbums/onedrive/album-backup-progress', requireAuth, getPhotoAlbumsOneDriveAlbumBackupProgress);
+app.get('/api/photoAlbums/onedrive/album-backup-zip', requireAuth, downloadPhotoAlbumsOneDriveAlbumBackupZip);
 app.get('/api/photoAlbums/onedrive/backup-zip', requireAuth, downloadPhotoAlbumsOneDriveBackupZip);
 app.get('/api/photoAlbums/onedrive/emails', requireAuth, getPhotoAlbumsOneDriveEmails);
 app.post('/api/photoAlbums/onedrive/emails', requireAuth, rememberPhotoAlbumsOneDriveEmail);

@@ -12,6 +12,7 @@ import {
   fetchMobileUploadFileBlob,
   listMobileUploadFiles
 } from 'api/photoAlbumsMobileUploadFolderFe';
+import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 
 const panelShellSx = {
   flex: '1 1 0',
@@ -370,6 +371,11 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
           <Typography component="span" sx={{ display: 'block', fontWeight: 400 }}>
             Scan Mobile Upload QR — photos appear here
           </Typography>
+        ) : null}
+        {files.length ? (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 0.5 }}>
+            <PhotoAlbumsTrayCountLabel count={files.length} />
+          </Box>
         ) : null}
         {files.map((entry) => {
           const selected = selectedNames.has(entry.name);

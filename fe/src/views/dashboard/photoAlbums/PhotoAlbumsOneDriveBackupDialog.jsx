@@ -7,7 +7,7 @@ import GreenButton from 'ui-component/GreenButton';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { themedConfirm } from 'utils/themedDialog';
 import {
-  downloadPhotoAlbumsOneDriveBackupZip,
+  downloadPhotoAlbumsAlbumBackupZip,
   formatPhotoAlbumsOneDrive,
   restorePhotoAlbumsOneDriveBackupZip
 } from 'api/photoAlbumsFe';
@@ -18,6 +18,20 @@ import {
   tutaPhotoAlbumsPostLoginActionButtonSx,
   tutaPhotoAlbumsYellowPostLoginButtonSx
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
+
+const BACKUP_POPUP_WIDTH = '90vw';
+const BACKUP_POPUP_HEIGHT = '90vh';
+
+const backupPopupShellSx = {
+  width: BACKUP_POPUP_WIDTH,
+  maxWidth: BACKUP_POPUP_WIDTH,
+  height: BACKUP_POPUP_HEIGHT,
+  maxHeight: BACKUP_POPUP_HEIGHT,
+  minHeight: BACKUP_POPUP_HEIGHT,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+};
 
 const actionRowSx = {
   display: 'flex',
@@ -72,7 +86,9 @@ const vaultTreeSectionSx = {
   borderTop: '2px solid rgba(255, 255, 255, 0.2)',
   display: 'flex',
   flexDirection: 'column',
-  gap: 1.5
+  gap: 1.5,
+  flex: 1,
+  minHeight: 0
 };
 
 function formatBackupZipSizeLabel(sizeBytes) {
@@ -80,6 +96,31 @@ function formatBackupZipSizeLabel(sizeBytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   const mb = bytes / (1024 * 1024);
   return `${mb.toFixed(1)}mb`;
+}
+
+function formatBytesLabel(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${n} B`;
+}
+
+function buildBackupProgressLabel(progress, albumLabel) {
+  const lines = [];
+  const label = String(progress?.label || '').trim();
+  if (label) lines.push(label);
+  else if (albumLabel) {
+    lines.push(`Backing up only photo album: '${albumLabel}' as zip`);
+  }
+  const fileIndex = Number(progress?.fileIndex) || 0;
+  const fileTotal = Number(progress?.fileTotal) || 0;
+  if (fileTotal > 0) {
+    lines.push(`Files: ${fileIndex} / ${fileTotal}`);
+  }
+  const bytesLabel = formatBytesLabel(progress?.bytesDone);
+  if (bytesLabel) lines.push(`Data: ${bytesLabel}`);
+  return lines.join('\n');
 }
 
 const backupSuccessMessageSx = {
@@ -104,16 +145,22 @@ export default function PhotoAlbumsOneDriveBackupDialog({
   open,
   onClose,
   folderName = 'onlinemallwebsitevault',
+  albumContext = null,
   onFormatted,
   onRestored,
   onOpenMyPhotoAlbums
 }) {
   const fileInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [backupProgress, setBackupProgress] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [successTone, setSuccessTone] = useState('');
   const [treeRefreshToken, setTreeRefreshToken] = useState(0);
+
+  const albumLabel = String(albumContext?.albumLabel || '').trim();
+  const canBackupAlbum =
+    Number(albumContext?.notebookId) > 0 && Number(albumContext?.noteId) > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -124,6 +171,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
     setError('');
     setSuccess('');
     setSuccessTone('');
+    setBackupProgress(null);
   };
 
   const handleClose = () => {
@@ -137,15 +185,26 @@ export default function PhotoAlbumsOneDriveBackupDialog({
   };
 
   const handleBackup = async () => {
+    if (!canBackupAlbum) {
+      setError('Open a photo album first, then click Backup.');
+      return;
+    }
+
     resetMessages();
     setBusy(true);
     try {
-      const result = await downloadPhotoAlbumsOneDriveBackupZip();
-      const fileName = result?.fileName || 'onlinemallwebsitevault-backup.zip';
+      const result = await downloadPhotoAlbumsAlbumBackupZip({
+        storageType: 'onedrive',
+        notebookId: albumContext.notebookId,
+        noteId: albumContext.noteId,
+        albumLabel,
+        onProgress: setBackupProgress
+      });
+      const fileName = result?.fileName || 'MyPhotoAlbums_OneDrive.zip';
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
       setSuccess(
-        `Backup to zip completed. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
+        `Backup to zip completed for '${albumLabel}'. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
       );
       setSuccessTone('backup');
       refreshVaultTree();
@@ -153,6 +212,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
       setError(err?.response?.data?.error || err?.message || 'Backup failed');
     } finally {
       setBusy(false);
+      setBackupProgress(null);
     }
   };
 
@@ -207,9 +267,17 @@ export default function PhotoAlbumsOneDriveBackupDialog({
     }
   };
 
+  const hourglassLabel = busy && backupProgress ? 'Backing up album' : 'Working on OneDrive backup';
+
   return (
     <>
-      <BusyHourglassOverlay open={open && busy} label="Working on OneDrive backup" fontSize={BUSY_HOURGLASS_MODAL_SIZE} />
+      <BusyHourglassOverlay
+        open={open && busy}
+        label={hourglassLabel}
+        fontSize={BUSY_HOURGLASS_MODAL_SIZE}
+        progressPercent={backupProgress?.percent ?? null}
+        progressLabel={buildBackupProgressLabel(backupProgress, albumLabel)}
+      />
       <input
         ref={fileInputRef}
         type="file"
@@ -221,21 +289,28 @@ export default function PhotoAlbumsOneDriveBackupDialog({
         open={open}
         onClose={handleClose}
         closeOnBackdrop={!busy}
+        maxWidth={BACKUP_POPUP_WIDTH}
+        resizable
+        defaultResizeHeight={BACKUP_POPUP_HEIGHT}
+        maxResizeHeight={BACKUP_POPUP_HEIGHT}
+        panelShellSx={backupPopupShellSx}
+        contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
       >
         <ColorTemplate16PopupCenterWide.Title>
           Backup &amp; Restore TutaPhotoAlbums Cloud
         </ColorTemplate16PopupCenterWide.Title>
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
+        <ColorTemplate16PopupCenterWide.Body spacing={2} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
-            You can backup entire TutaPhotoAlbums Cloud folder from OneDrive to a zip file in your browser download folder. You
-            can also Restore from it back to OneDrive (overwrite OneDrive).
+            Backup saves only the photo album you currently have open
+            {albumLabel ? ` ('${albumLabel}')` : ''} to a zip file in your browser download folder. Restore can
+            overwrite OneDrive from a backup zip.
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
             If you do not want to store your data on OneDrive, before you select the &quot;Format TutaPhotoAlbums Cloud&quot;
-            button below, backup all your data first to a zip file on your storage. Click Backup TutaPhotoAlbums Cloud. Once you
-            have done that, you may use Format TutaPhotoAlbums Cloud to delete your online data. Later, when you decide to
-            restore your backup to OneDrive, choose Restore TutaPhotoAlbums Cloud below.
+            button below, backup your open album first to a zip file on your storage. Once you have done that, you may use
+            Format TutaPhotoAlbums Cloud to delete your online data. Later, when you decide to restore your backup to
+            OneDrive, choose Restore TutaPhotoAlbums Cloud below.
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -244,11 +319,11 @@ export default function PhotoAlbumsOneDriveBackupDialog({
             <Box sx={actionRowSx}>
               <GreenButton
                 type="button"
-                disabled={busy}
+                disabled={busy || !canBackupAlbum}
                 onClick={() => void handleBackup()}
                 sx={backupOrangeButtonSx}
               >
-                Backup TutaPhotoAlbums Cloud
+                Backup Current Album
               </GreenButton>
               <GreenButton
                 type="button"
@@ -291,7 +366,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
             <PhotoAlbumsOneDriveVaultTreePanel
               active={open}
               refreshToken={treeRefreshToken}
-              maxHeight="22vh"
+              maxHeight="38vh"
             />
           </Box>
         </ColorTemplate16PopupCenterWide.Body>

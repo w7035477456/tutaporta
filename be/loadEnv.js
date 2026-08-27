@@ -8,6 +8,7 @@
  * (single source of truth with the Vite frontend).
  */
 import dotenv from 'dotenv';
+import dotenvExpand from 'dotenv-expand';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
@@ -26,6 +27,62 @@ if (hadDbHostBefore) {
 
 // Supports ${STORAGE_FOLDER}, ${ROOT_FOLDER}, etc. in ~/.ssh/be/.env
 let result = loadHomeEnvExpanded(homeEnvPath, { override: true });
+
+/**
+ * Mac dev: ~/.ssh/be/.env often lists Ubuntu STORAGE_* paths after Mac paths; dotenv
+ * last-wins → /mnt/pgdata16/… which is missing on Mac → TutaDrive "Folder permission error".
+ */
+function reconcileStoragePathsForPlatform() {
+  if (process.platform !== 'darwin') return;
+  const keys = ['STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER'];
+  const home = os.homedir();
+  const macDefaults = {
+    STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_storage'),
+    LARGE_CHEAP_STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_largecheapstorage')
+  };
+  let changed = false;
+  for (const key of keys) {
+    const cur = String(process.env[key] || '').trim();
+    if (!cur.startsWith('/mnt/')) continue;
+    let writable = false;
+    try {
+      fs.mkdirSync(cur, { recursive: true });
+      fs.accessSync(cur, fs.constants.W_OK);
+      writable = true;
+    } catch {
+      writable = false;
+    }
+    if (writable) continue;
+    const fallback = macDefaults[key];
+    console.warn(`[loadEnv] Mac: ${key}=${cur} is not writable — using ${fallback}`);
+    process.env[key] = fallback;
+    changed = true;
+  }
+  if (!changed || !fileExists) return;
+  try {
+    const parsed = dotenv.parse(fs.readFileSync(homeEnvPath, 'utf8'));
+    parsed.STORAGE_FOLDER = process.env.STORAGE_FOLDER;
+    parsed.LARGE_CHEAP_STORAGE_FOLDER = process.env.LARGE_CHEAP_STORAGE_FOLDER;
+    const expanded = dotenvExpand.expand({ parsed });
+    for (const [k, v] of Object.entries(expanded.parsed || {})) {
+      if (v == null || v === '') continue;
+      if (
+        k.includes('FOLDER') ||
+        k.includes('STORAGE') ||
+        k.startsWith('RECORD_') ||
+        k.startsWith('UPLOAD_') ||
+        k.startsWith('VSINGLES_') ||
+        k.startsWith('USB_')
+      ) {
+        process.env[k] = v;
+      }
+    }
+  } catch (e) {
+    console.warn('[loadEnv] Mac storage path re-expand skipped:', e?.message || e);
+  }
+}
+
+reconcileStoragePathsForPlatform();
 
 // `npm run dev` in be/ sets RUN_LOCAL_API_DEV=1 so NODE_ENV from ~/.ssh/be/.env does not force
 // production (which requires fe/dist). Use Vite on :3000 + API on PORT without building fe.

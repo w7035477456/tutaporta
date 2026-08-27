@@ -40,7 +40,7 @@ async function main() {
     const { rows: members } = await client.query(
       `SELECT s.singles_id, s.alias, s.email
        FROM "${schema}".singles s
-       WHERE LOWER(TRIM(s.member_category::text)) = 'regularmember'
+       WHERE TRIM(s.member_category::text) = 'REGULARMEMBER'
        ORDER BY s.singles_id`
     );
 
@@ -48,7 +48,7 @@ async function main() {
       `SELECT p.post_id, p.singles_id, p.created_at
        FROM "${schema}".postings p
        INNER JOIN "${schema}".singles s ON s.singles_id = p.singles_id
-       WHERE LOWER(TRIM(s.member_category::text)) = 'regularmember'
+       WHERE TRIM(s.member_category::text) = 'REGULARMEMBER'
        ORDER BY p.singles_id, p.post_id`
     );
 

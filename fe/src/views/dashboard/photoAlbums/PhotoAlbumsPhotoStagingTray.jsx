@@ -15,6 +15,7 @@ import {
 } from './photoAlbumsFilesExplorerDrag';
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
+import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 
 export const DRAG_STAGED_ATTACHMENT = 'application/x-pa-staged-attachment';
 export const DRAG_STAGED_FLAG = 'application/x-pa-staged-flag';
@@ -476,6 +477,7 @@ export default function PhotoAlbumsPhotoStagingTray({
         }
       }}
     >
+      <PhotoAlbumsTrayCountLabel count={items.length} sx={{ alignSelf: 'flex-start', px: 0.25 }} />
       <Box
         sx={{
           flex: '0 0 auto',

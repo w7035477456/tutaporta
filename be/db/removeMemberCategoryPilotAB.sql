@@ -31,12 +31,12 @@ BEGIN
   END IF;
 
   UPDATE helloworldjunktest.singles
-  SET member_category = 'Public'::helloworldjunktest.member_category_enum,
+  SET member_category = 'PUBLIC'::helloworldjunktest.member_category_enum,
       updated_at = CURRENT_TIMESTAMP
   WHERE member_category::text IN ('PilotA', 'PilotB');
 
   CREATE TYPE helloworldjunktest.member_category_enum_new AS ENUM (
-    'Public', 'Admin', 'DemoUser', 'PilotUser'
+    'PUBLIC', 'ADMIN', 'DEMOUSER', 'PILOTUSER'
   );
 
   ALTER TABLE helloworldjunktest.singles
@@ -47,7 +47,7 @@ BEGIN
     USING member_category::text::helloworldjunktest.member_category_enum_new;
 
   ALTER TABLE helloworldjunktest.singles
-    ALTER COLUMN member_category SET DEFAULT 'Public'::helloworldjunktest.member_category_enum_new;
+    ALTER COLUMN member_category SET DEFAULT 'PUBLIC'::helloworldjunktest.member_category_enum_new;
 
   DROP TYPE helloworldjunktest.member_category_enum;
   ALTER TYPE helloworldjunktest.member_category_enum_new RENAME TO member_category_enum;
