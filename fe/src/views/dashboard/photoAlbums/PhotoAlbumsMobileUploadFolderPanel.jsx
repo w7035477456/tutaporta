@@ -14,9 +14,11 @@ import {
 } from 'api/photoAlbumsMobileUploadFolderFe';
 import {
   PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
-  PHOTO_ALBUMS_THEME_INVERSE_FG
+  PHOTO_ALBUMS_THEME_INVERSE_FG,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
 } from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const panelShellSx = {
   flex: '1 1 0',
@@ -36,7 +38,7 @@ const panelScrollSx = {
   bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
   WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
-  border: '2px solid #000',
+  border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: 1,
   p: 1,
   boxSizing: 'border-box',
@@ -298,6 +300,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
           onClick={() => void loadFiles()}
           disabled={disabled || loading}
           aria-label="Refresh mobile uploads"
+          {...guestDemoBlockProps()}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -316,6 +319,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
           onClick={() => void removeSelected()}
           disabled={disabled || selectedNames.size < 1}
           aria-label="Delete selected mobile uploads"
+          {...guestDemoBlockProps()}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -335,6 +339,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
         onClick={() => void stageSelected()}
         disabled={disabled || selectedNames.size < 1}
         aria-label="Add selected photos to Thumbnail Tray"
+        {...guestDemoBlockProps()}
         sx={{ ...trayButtonSx, mb: 0.5 }}
       >
         Add selected to Thumbnail Tray
@@ -345,6 +350,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
         onClick={() => void stageAll()}
         disabled={disabled || !files.length}
         aria-label="Add all mobile uploads to Thumbnail Tray"
+        {...guestDemoBlockProps()}
         sx={{ ...trayButtonSx, mb: 0.5 }}
       >
         Add ALL to Thumbnail Tray

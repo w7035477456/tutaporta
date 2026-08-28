@@ -15,9 +15,11 @@ import {
 } from 'utils/photoAlbumsFileFormats';
 import {
   PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
-  PHOTO_ALBUMS_THEME_INVERSE_FG
+  PHOTO_ALBUMS_THEME_INVERSE_FG,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
 } from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import {
   ensureDirectoryReadPermission,
@@ -53,7 +55,7 @@ const panelScrollSx = {
   bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
   WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
-  border: '2px solid #000',
+  border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: 1,
   p: 1,
   boxSizing: 'border-box',
@@ -739,6 +741,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
           onClick={() => void openFolderPicker()}
           disabled={disabled}
           aria-label={hasFolder ? 'Reopen last folder' : 'Open folder'}
+          {...guestDemoBlockProps()}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -757,6 +760,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
           onClick={() => void changeFolder()}
           disabled={disabled}
           aria-label="Choose a different folder"
+          {...guestDemoBlockProps()}
           sx={{
             flex: 1,
             minWidth: 0,
@@ -776,6 +780,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
         onClick={() => void stageSelectedPhotos()}
         disabled={disabled || selectedKeys.size < 1}
         aria-label="Add selected photos to Thumbnail Tray"
+        {...guestDemoBlockProps()}
         sx={{ ...trayButtonSx, mb: 0.5 }}
       >
         Add selected to Thumbnail Tray
@@ -786,6 +791,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
         onClick={() => void stageAllPhotosInFolder()}
         disabled={disabled || !entries.some(explorerFileEntry)}
         aria-label="Add all photos in this folder to Thumbnail Tray"
+        {...guestDemoBlockProps()}
         sx={{ ...trayButtonSx, mb: 0.5 }}
       >
         Add ALL to Thumbnail Tray

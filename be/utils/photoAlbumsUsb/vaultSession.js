@@ -125,6 +125,7 @@ import {
   normalizePhotoAlbumsAttachmentBuffer,
   photoAlbumsExtensionRequiresJpegFullFile
 } from '../photoAlbumsAttachmentVariants.js';
+import { normalizePhotoAlbumsVideoBuffer } from '../photoAlbumsNormalizeVideo.js';
 import {
   scheduleTrackedOneDriveUpload,
   uploadOneDriveVaultOnLogoff,
@@ -2343,6 +2344,19 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
     } catch (err) {
       console.warn('[vaultAddNoteAttachment] normalize skipped:', err?.message || err);
       writeVariants = isPhotoAlbumsRasterImageExtension(cleanExt);
+    }
+  } else if (isPhotoAlbumsStagingVideoExtension(cleanExt)) {
+    try {
+      const normalized = await normalizePhotoAlbumsVideoBuffer(workingBuffer, { ext: cleanExt });
+      if (normalized.changed) {
+        workingBuffer = normalized.buffer;
+        cleanExt = normalized.ext || 'mp4';
+        resolvedMime = normalized.mimeType || 'video/mp4';
+        const base = String(safeName).replace(/\.[^.]+$/, '');
+        safeName = `${base || 'video'}.${cleanExt}`;
+      }
+    } catch (err) {
+      console.warn('[vaultAddNoteAttachment] video normalize skipped:', err?.message || err);
     }
   }
 

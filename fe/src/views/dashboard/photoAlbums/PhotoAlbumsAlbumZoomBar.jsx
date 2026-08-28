@@ -4,6 +4,11 @@ import IconButton from '@mui/material/IconButton';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
 import { IconMinus, IconPlus } from '@tabler/icons-react';
+import {
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_FG,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
+} from './photoAlbumsNoteFontTokens';
 
 export const PHOTO_ALBUMS_ZOOM_MIN = 0;
 export const PHOTO_ALBUMS_ZOOM_MAX = 100;
@@ -30,20 +35,36 @@ export default function PhotoAlbumsAlbumZoomBar({ value = 100, onChange }) {
         gap: 1,
         px: 1.25,
         py: 0.5,
-        bgcolor: '#eceff1',
-        borderBottom: '1px solid #cfd8dc',
+        bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+        borderTop: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+        borderBottom: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+        color: PHOTO_ALBUMS_THEME_INVERSE_FG,
         zIndex: 8
       }}
     >
       <Typography
         component="span"
-        sx={{ fontSize: '0.75rem', fontWeight: 800, userSelect: 'none', flexShrink: 0 }}
+        sx={{
+          fontSize: '0.75rem',
+          fontWeight: 800,
+          userSelect: 'none',
+          flexShrink: 0,
+          color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+          WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
+        }}
       >
         Zoom
       </Typography>
       <Typography
         component="span"
-        sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#546e7a', userSelect: 'none', flexShrink: 0 }}
+        sx={{
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+          WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
+          userSelect: 'none',
+          flexShrink: 0
+        }}
       >
         0%
       </Typography>
@@ -52,7 +73,7 @@ export default function PhotoAlbumsAlbumZoomBar({ value = 100, onChange }) {
         aria-label="Zoom album out"
         disabled={zoom <= PHOTO_ALBUMS_ZOOM_MIN}
         onClick={() => onChange?.(Math.max(PHOTO_ALBUMS_ZOOM_MIN, zoom - PHOTO_ALBUMS_ZOOM_STEP))}
-        sx={{ p: 0.25 }}
+        sx={{ p: 0.25, color: PHOTO_ALBUMS_THEME_INVERSE_FG }}
       >
         <IconMinus size={16} />
       </IconButton>
@@ -77,13 +98,20 @@ export default function PhotoAlbumsAlbumZoomBar({ value = 100, onChange }) {
         aria-label="Zoom album in"
         disabled={zoom >= PHOTO_ALBUMS_ZOOM_MAX}
         onClick={() => onChange?.(Math.min(PHOTO_ALBUMS_ZOOM_MAX, zoom + PHOTO_ALBUMS_ZOOM_STEP))}
-        sx={{ p: 0.25 }}
+        sx={{ p: 0.25, color: PHOTO_ALBUMS_THEME_INVERSE_FG }}
       >
         <IconPlus size={16} />
       </IconButton>
       <Typography
         component="span"
-        sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#546e7a', userSelect: 'none', flexShrink: 0 }}
+        sx={{
+          fontSize: '0.7rem',
+          fontWeight: 700,
+          color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+          WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
+          userSelect: 'none',
+          flexShrink: 0
+        }}
       >
         100%
       </Typography>
@@ -95,7 +123,9 @@ export default function PhotoAlbumsAlbumZoomBar({ value = 100, onChange }) {
           minWidth: 40,
           textAlign: 'right',
           userSelect: 'none',
-          flexShrink: 0
+          flexShrink: 0,
+          color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+          WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
         }}
       >
         {zoom}%

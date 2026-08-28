@@ -12,6 +12,7 @@ import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCen
 import Typography from '@mui/material/Typography';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { themedConfirm } from 'utils/themedDialog';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 import { buildPhotoAlbumsEditorExtensions } from './photoAlbumsEditorExtensions';
 import {
@@ -156,8 +157,8 @@ const thumbRowResizeHandleSx = {
   bgcolor: 'var(--theme-daynight-color)',
   position: 'relative',
   zIndex: 90,
-  borderLeft: '1px solid rgba(0,0,0,0.35)',
-  borderRight: '1px solid rgba(0,0,0,0.35)',
+  borderLeft: '1px solid var(--theme-inverse-daynight-color)',
+  borderRight: '1px solid var(--theme-inverse-daynight-color)',
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -6504,6 +6505,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               disabled={!stagedPhotos.length || Boolean(autoLayoutProgress)}
               aria-label="Auto Layout — create left+right page templates as spreads and fill both from the tray"
               title="Places tray photos onto the album in two-page spreads: left template + right template, then the next spread, until the tray is empty."
+              {...guestDemoBlockProps()}
               sx={albumTemplateBarButtonSx}
             >
               Auto Layout
@@ -6519,6 +6521,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               disabled={!stagedPhotos.length || Boolean(autoLayoutProgress)}
               aria-label="Auto Layout 1 — create/fill one two-page spread (left + right templates) and stop"
               title="Creates or fills one open book only: left page template + right page template, filled from the tray. Remaining photos stay in the tray."
+              {...guestDemoBlockProps()}
               sx={albumTemplateBarButtonSx}
             >
               Auto Layout 1
@@ -6544,6 +6547,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 aria-expanded={templatePickerOpen}
                 aria-haspopup="dialog"
                 aria-label="Choose page template"
+                {...guestDemoBlockProps()}
                 sx={albumTemplateBarButtonSx}
               >
                 Template
@@ -6621,6 +6625,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               {
                 key: 'reset',
                 label: 'Reset Page',
+                demoBlock: true,
                 onClick: handleResetPage,
                 ariaLabel:
                   'Reset page — clear content, return photos to tray, zoom 95%, flush top-left, stretch to page edge',
@@ -6630,6 +6635,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               {
                 key: 'resize',
                 label: 'Resize Page',
+                demoBlock: true,
                 onClick: handleResizePage,
                 ariaLabel: 'Resize page — turn AUTO-ZOOM on and fit the album page in the shell',
                 title:
@@ -6638,6 +6644,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               {
                 key: 'portrait',
                 label: 'Portrait',
+                demoBlock: true,
                 onClick: () => applyPageOrientation('portrait'),
                 ariaLabel: 'Portrait — page proportion 10 wide by 12 tall',
                 title: 'Portrait — page proportion 10 width × 12 height',
@@ -6646,6 +6653,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               {
                 key: 'landscape',
                 label: 'Landscape',
+                demoBlock: true,
                 onClick: () => applyPageOrientation('landscape'),
                 ariaLabel: 'Landscape — page proportion 12 wide by 10 tall',
                 title: 'Landscape — page proportion 12 width × 10 height',
@@ -6654,6 +6662,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               {
                 key: 'fullscreen',
                 label: 'Full screen',
+                demoBlock: true,
                 onClick: () => enterAlbumFullscreen(),
                 ariaLabel: 'Full screen — open album in a new tab with the whole page visible',
                 title: 'Open a new tab showing the entire album page. Esc or Close to leave.'
@@ -6668,6 +6677,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 aria-label={btn.ariaLabel}
                 aria-pressed={btn.pressed != null ? Boolean(btn.pressed) : undefined}
                 title={btn.title}
+                {...(btn.demoBlock ? guestDemoBlockProps() : null)}
                 sx={{
                   ...albumTemplateBarButtonSx,
                   ...(btn.pressed
@@ -6709,6 +6719,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               {
                 key: 'orderPrint',
                 label: 'Order Print',
+                demoBlock: true,
                 onClick: () => onOrderPrint?.(),
                 disabled: typeof onOrderPrint !== 'function',
                 ariaLabel: 'Order Print — add this album page to For Order',
@@ -6739,6 +6750,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 aria-label={btn.ariaLabel}
                 aria-pressed={btn.pressed != null ? Boolean(btn.pressed) : undefined}
                 title={btn.title}
+                {...(btn.demoBlock ? guestDemoBlockProps() : null)}
                 sx={albumTemplateBarButtonSx}
               >
                 {btn.label}
@@ -6765,7 +6777,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             py: 0.75,
             boxSizing: 'border-box',
             bgcolor: 'var(--theme-daynight-color)',
-            borderBottom: '2px solid var(--theme-daynight-color)',
+            borderBottom: '2px solid var(--theme-inverse-daynight-color)',
             /* Above album zoom pane (zIndex 1) so hover filename plates are fully visible. */
             position: 'relative',
             zIndex: 80,

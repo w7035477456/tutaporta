@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import SliderControlButton from 'ui-component/SliderControlButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
@@ -2591,6 +2592,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           : 'Remove file'
       }
       aria-label={isAlbumSlotMedia ? `Reset ${label}` : `Remove ${label}`}
+      {...guestDemoBlockProps()}
       sx={
         isAlbumSlotMedia
           ? photoSlotActionBtnSx
@@ -2908,6 +2910,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
                     className="rv-attachment-photo__return-x"
                     aria-label={`Return ${label} to thumbnail alley`}
                     title="Return photo to thumbnail alley (not deleted from storage)"
+                    {...guestDemoBlockProps()}
                     onClose={(event) => {
                       event?.preventDefault?.();
                       event?.stopPropagation?.();

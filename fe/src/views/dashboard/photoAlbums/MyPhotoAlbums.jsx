@@ -20,7 +20,7 @@ import {
 } from 'api/photoAlbumsFe';
 import { probePhotoAlbumsBridge } from 'api/photoAlbumsBridgeFe';
 import { useAuth } from 'contexts/AuthContext';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { clearPhotoAlbumsE2eSession } from 'utils/photoAlbumsClientSession';
 import { readPhotoAlbumsLastUsbLocation } from 'utils/photoAlbumsUsbPreference';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
@@ -109,6 +109,7 @@ function DualLogOffButton({ label, onClick, disabled }) {
       disabled={Boolean(disabled)}
       aria-label={label}
       title={label}
+      {...guestDemoBlockProps()}
       sx={{
         px: 2,
         py: 0.75,

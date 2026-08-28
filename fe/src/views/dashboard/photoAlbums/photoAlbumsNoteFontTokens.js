@@ -114,6 +114,10 @@ export function photoAlbumsContentPanelBgColor(bgColorIndex) {
 /** Shared day/night surface tokens for album chrome (sidebar rows, page slots, trays). */
 export const PHOTO_ALBUMS_THEME_DAYNIGHT_BG = 'var(--theme-daynight-color)';
 export const PHOTO_ALBUMS_THEME_INVERSE_FG = 'var(--theme-inverse-daynight-color)';
+/** Panel/list borders on day/night surfaces — black on light themes, white on dark. */
+export const PHOTO_ALBUMS_THEME_INVERSE_BORDER = PHOTO_ALBUMS_THEME_INVERSE_FG;
+export const PHOTO_ALBUMS_THEME_INVERSE_BORDER_2 = `2px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER}`;
+export const PHOTO_ALBUMS_THEME_INVERSE_BORDER_1 = `1px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER}`;
 
 export const photoAlbumsThemeDaynightSurfaceSx = {
   bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,

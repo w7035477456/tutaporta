@@ -10,9 +10,11 @@ import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import GreenButton from 'ui-component/GreenButton';
 import YellowButtonTemplate from 'ui-component/YellowButtonTemplate';
+import { useAuth } from 'contexts/AuthContext';
+import { guestDemoBlockProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCenterWide';
-import { colorTemplate7PopupSliderSx } from 'config/colorTemplate7PopupLargeDark';
+import { colorTemplate7PopupSliderSx, colorTemplate7PopupActionButtonSx } from 'config/colorTemplate7PopupLargeDark';
 import PhotoAlbumsFillOutlineColorPicker from './PhotoAlbumsFillOutlineColorPicker';
 import PhotoAlbumsPlaceTextMediaPreview from './PhotoAlbumsPlaceTextMediaPreview';
 import PhotoAlbumsVideoPlaybackControls from './PhotoAlbumsVideoPlaybackControls';
@@ -268,6 +270,8 @@ export default function PhotoAlbumsPlaceTextDialog({
   /** Apply rotate / slot-fit / pan-zoom patches onto the album photo node. */
   onPhotoChromeChange = null
 }) {
+  const { user } = useAuth();
+  const guestDemo = isGuestDemoLogin(user);
   const hasMedia = Boolean(mediaSession?.photoRect);
   const [text, setText] = useState(PLACE_TEXT_DEFAULTS.text);
   const [color, setColor] = useState(PLACE_TEXT_DEFAULTS.color);
@@ -939,6 +943,12 @@ export default function PhotoAlbumsPlaceTextDialog({
     applyPhotoChrome(patch);
   }, [applyStyleFields, applyPhotoChrome]);
 
+  /** Revert live photo chrome + form edits, then close without saving. */
+  const handleDiscardChanges = useCallback(() => {
+    handleReset();
+    onClose?.();
+  }, [handleReset, onClose]);
+
   const patchActiveLabel = useCallback(
     (patch) => {
       if (!hasMedia || !activeKey) return;
@@ -1244,6 +1254,14 @@ export default function PhotoAlbumsPlaceTextDialog({
     });
   };
 
+  const handleDialogClose = () => {
+    if (guestDemo) {
+      handleDiscardChanges();
+      return;
+    }
+    handleOk();
+  };
+
   const handlePlaceEmoji = useCallback(
     (em) => {
       const emoji = String(em || '').trim();
@@ -1466,7 +1484,7 @@ export default function PhotoAlbumsPlaceTextDialog({
     >
       <YellowButtonTemplate
         type="button"
-        onClick={onClose}
+        onClick={handleDiscardChanges}
         title="Ignore all changes and exit"
         sx={{ minWidth: 88, fontWeight: 800 }}
       >
@@ -1565,7 +1583,8 @@ export default function PhotoAlbumsPlaceTextDialog({
         type="button"
         onClick={handleOk}
         title="Save all changes and exit"
-        sx={{ minWidth: 88, fontWeight: 800 }}
+        {...guestDemoBlockProps()}
+        sx={{ ...colorTemplate7PopupActionButtonSx(), minWidth: 88, fontWeight: 800 }}
       >
         Save
       </GreenButton>
@@ -1827,7 +1846,7 @@ export default function PhotoAlbumsPlaceTextDialog({
   return (
     <ColorTemplate16PopupCenterWide
       open={open}
-      onClose={handleOk}
+      onClose={handleDialogClose}
       closeOnBackdrop={false}
       showCloseButton
       maxWidth={hasMedia ? '90vw' : undefined}
@@ -2031,10 +2050,15 @@ export default function PhotoAlbumsPlaceTextDialog({
 
         {!hasMedia ? (
           <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2, flexShrink: 0 }}>
-            <GreenButton type="button" onClick={onClose} sx={{ minWidth: 96, fontWeight: 800 }}>
+            <GreenButton type="button" onClick={handleDiscardChanges} sx={{ minWidth: 96, fontWeight: 800 }}>
               Cancel
             </GreenButton>
-            <GreenButton type="button" onClick={handleOk} sx={{ minWidth: 96, fontWeight: 800 }}>
+            <GreenButton
+              type="button"
+              onClick={handleOk}
+              {...guestDemoBlockProps()}
+              sx={{ ...colorTemplate7PopupActionButtonSx(), minWidth: 96, fontWeight: 800 }}
+            >
               OK
             </GreenButton>
           </Stack>

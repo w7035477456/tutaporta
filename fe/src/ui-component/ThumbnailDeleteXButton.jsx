@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import deleteXImg from 'assets/images/x.png';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 /** Top-right delete control on photo / video thumbnails — uses assets/images/x.png. */
 export default function ThumbnailDeleteXButton({
@@ -19,6 +20,7 @@ export default function ThumbnailDeleteXButton({
       disabled={disabled}
       onClick={onClick}
       onMouseDown={onMouseDown}
+      {...guestDemoBlockProps()}
       sx={{
         position: 'absolute',
         top: 2,

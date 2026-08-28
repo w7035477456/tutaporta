@@ -8,6 +8,7 @@ import {
   resolveAlbumTemplateSlots
 } from './photoAlbumsPageTemplates';
 import { isStagedAttachmentDrag } from './PhotoAlbumsPhotoStagingTray';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const MIN_SLOT_PX = 48;
 const BLUE = '#2979ff';
@@ -502,6 +503,7 @@ export default function PhotoAlbumsPageTemplateOverlay({
             setSelectedSlotId('');
             onDelete();
           }}
+          {...guestDemoBlockProps()}
           sx={{
             position: 'absolute',
             top: 8,

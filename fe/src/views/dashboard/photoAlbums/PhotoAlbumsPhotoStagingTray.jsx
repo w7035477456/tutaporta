@@ -13,6 +13,7 @@ import {
   isFilesExplorerDrag,
   takeFilesExplorerDragFilesAsync
 } from './photoAlbumsFilesExplorerDrag';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
 import {
@@ -353,6 +354,7 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
             type="button"
             aria-label={`Remove ${label} from staging`}
             title="Remove from staging"
+            {...guestDemoBlockProps()}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -591,6 +593,7 @@ export default function PhotoAlbumsPhotoStagingTray({
             hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
             aria-label="X All — remove all photos from thumbnail tray"
             title="X All — remove all photos from the thumbnail tray"
+            {...guestDemoBlockProps()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.preventDefault();

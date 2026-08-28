@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
 import GreenButton from 'ui-component/GreenButton';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import {
   DEFAULT_ORDER_ALBUM_NAME,
@@ -178,6 +179,7 @@ export default function PhotoAlbumsOrderAlbumDialog({
                 component="button"
                 type="button"
                 aria-label={`Remove ${orderAlbumItemLabel(item)}`}
+                {...guestDemoBlockProps()}
                 onClick={() => onRemove?.(item.id)}
                 sx={{
                   border: 'none',

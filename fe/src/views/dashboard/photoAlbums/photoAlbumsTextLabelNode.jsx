@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 import { usePhotoAlbumsAlbumLayout, pointInAnyAlbumBand } from './photoAlbumsAlbumLayoutContext';
 import { PHOTO_ALBUMS_ATTACHMENT_NODE_NAME, photoPageRectFromAttrs } from './photoAlbumsAttachmentNode';
 import Typography from '@mui/material/Typography';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 export const PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME = 'photoAlbumsTextLabel';
 
@@ -779,6 +780,7 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
               type="button"
               aria-label="Delete text label"
               title="Delete"
+              {...guestDemoBlockProps()}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();

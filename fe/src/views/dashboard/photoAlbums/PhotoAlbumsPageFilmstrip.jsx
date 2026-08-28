@@ -13,8 +13,10 @@ import {
 import { getPhotoAlbumsAttachmentViewKind } from 'utils/photoAlbumsFileFormats';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import {
-  PHOTO_ALBUMS_THEME_DAYNIGHT_BG
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
 } from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 
@@ -402,6 +404,7 @@ export function PageThumb({
             e.stopPropagation();
             onDelete?.(pageIndex ?? pageNumber - 1);
           }}
+          {...guestDemoBlockProps()}
           sx={{
             position: 'absolute',
             top: -6,
@@ -688,6 +691,7 @@ export default function PhotoAlbumsPageFilmstrip({
         e.stopPropagation();
         onDeleteAllPages?.();
       }}
+      {...guestDemoBlockProps()}
       sx={{
         flexShrink: 0,
         alignSelf: 'center',
@@ -819,8 +823,8 @@ export default function PhotoAlbumsPageFilmstrip({
         pb: 0,
         minHeight: inline ? 120 : undefined,
         bgcolor: inline ? 'var(--theme-daynight-color)' : 'var(--theme-yellow-color, #ffd700)',
-        border: inline ? '2px solid #000' : 'none',
-        borderBottom: '2px solid #000',
+        border: inline ? PHOTO_ALBUMS_THEME_INVERSE_BORDER_2 : 'none',
+        borderBottom: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
         overflow: 'hidden'
       }}
     >

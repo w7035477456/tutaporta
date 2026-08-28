@@ -8,10 +8,16 @@ import {
   readPhotoAlbumsApiError
 } from 'api/photoAlbumsFe';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
+import {
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_FG,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
+} from './photoAlbumsNoteFontTokens';
 
 const REFRESH_MS = 4000;
 const TREE_INDENT_PX = 14;
-const TREE_LINE_COLOR = '#000';
+const TREE_LINE_COLOR = PHOTO_ALBUMS_THEME_INVERSE_BORDER;
 
 const panelShellSx = {
   flex: '1 1 0',
@@ -28,10 +34,10 @@ const panelScrollSx = {
   minHeight: 0,
   overflowY: 'scroll',
   overflowX: 'auto',
-  bgcolor: 'var(--theme-daynight-color)',
-  color: '#000 !important',
-  WebkitTextFillColor: '#000 !important',
-  border: '2px solid #000',
+  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+  WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+  border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: 1,
   p: 1,
   boxSizing: 'border-box',
@@ -39,20 +45,21 @@ const panelScrollSx = {
   fontSize: '0.78rem',
   lineHeight: 1.35,
   scrollbarWidth: 'thin',
-  scrollbarColor: '#000 rgba(0,0,0,0.15)',
+  scrollbarColor: 'var(--theme-yellow-color) rgba(0,0,0,0.4)',
   '&::-webkit-scrollbar': {
     width: 12
   },
   '&::-webkit-scrollbar-track': {
-    bgcolor: 'rgba(0,0,0,0.12)'
+    bgcolor: 'rgba(0,0,0,0.4)'
   },
   '&::-webkit-scrollbar-thumb': {
-    bgcolor: '#000',
-    borderRadius: 6
+    bgcolor: 'var(--theme-yellow-color)',
+    borderRadius: 6,
+    border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
   },
   '& .MuiTypography-root': {
-    color: '#000 !important',
-    WebkitTextFillColor: '#000 !important'
+    color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+    WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
   }
 };
 
@@ -66,8 +73,8 @@ const treeRowSx = {
 const treeLabelSx = (isFolder) => ({
   fontFamily: 'inherit',
   fontSize: 'inherit',
-  color: '#000 !important',
-  WebkitTextFillColor: '#000 !important',
+  color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+  WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
   fontWeight: isFolder ? 700 : 400,
   alignSelf: 'center',
   pl: 0.25
@@ -293,8 +300,8 @@ export default function PhotoAlbumsStorageFilesPanel({ storageType, active = tru
             fontWeight: 700,
             fontSize: '0.85rem',
             mb: 0.5,
-            color: '#000 !important',
-            WebkitTextFillColor: '#000 !important'
+            color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+            WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
           }}
         >
           Folders &amp; Files

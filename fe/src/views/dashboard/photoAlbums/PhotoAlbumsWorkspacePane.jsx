@@ -33,6 +33,7 @@ import {
 } from 'api/photoAlbumsFe';
 import { registerPhotoAlbumsLeavePrepare } from 'utils/photoAlbumsLeavePrepare';
 import { useAuth } from 'contexts/AuthContext';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import {
   isAllowedPhotoAlbumsFile,
   isMacOsMetadataFileName,
@@ -151,6 +152,9 @@ import {
   normalizePhotoAlbumsFontSizePt,
   PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   PHOTO_ALBUMS_THEME_INVERSE_FG,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_1,
+  PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   photoAlbumsThemeDaynightSurfaceSx
 } from './photoAlbumsNoteFontTokens';
 import {
@@ -698,7 +702,7 @@ const menuColumnShellSx = {
   maxWidth: '100%',
   display: 'flex',
   flexDirection: 'column',
-  border: '2px solid #000',
+  border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: 1,
   p: 1,
   bgcolor: 'var(--theme-daynight-color)',
@@ -727,8 +731,8 @@ const columnResizeHandleSx = {
   bgcolor: 'var(--theme-daynight-color)',
   position: 'relative',
   zIndex: 20,
-  borderLeft: '1px solid rgba(0,0,0,0.35)',
-  borderRight: '1px solid rgba(0,0,0,0.35)',
+  borderLeft: PHOTO_ALBUMS_THEME_INVERSE_BORDER_1,
+  borderRight: PHOTO_ALBUMS_THEME_INVERSE_BORDER_1,
   /* Yellow dashed vertical — red only on hover / drag */
   '&::before': {
     content: '""',
@@ -756,8 +760,8 @@ const rowResizeHandleSx = {
   bgcolor: 'var(--theme-daynight-color)',
   position: 'relative',
   zIndex: 20,
-  borderTop: '1px solid rgba(0,0,0,0.35)',
-  borderBottom: '1px solid rgba(0,0,0,0.35)',
+  borderTop: PHOTO_ALBUMS_THEME_INVERSE_BORDER_1,
+  borderBottom: PHOTO_ALBUMS_THEME_INVERSE_BORDER_1,
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -822,7 +826,7 @@ const photoAlbumsContentScrollSx = {
   '&::-webkit-scrollbar-thumb': {
     bgcolor: 'var(--theme-yellow-color)',
     borderRadius: 7,
-    border: '2px solid #000'
+    border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
   },
   '&::-webkit-scrollbar-thumb:hover': {
     filter: 'brightness(1.08)'
@@ -833,7 +837,7 @@ const photoAlbumsContentScrollSx = {
 const photoAlbumsMenuListScrollSx = {
   ...photoAlbumsContentScrollSx,
   pr: 0.25,
-  border: '2px solid #000',
+  border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: 1,
   boxSizing: 'border-box'
 };
@@ -1063,7 +1067,7 @@ const menuRowCountBadgeSx = {
   fontWeight: 800,
   lineHeight: 1.2,
   textAlign: 'center',
-  border: '2px solid #000000',
+  border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: '4px',
   boxSizing: 'border-box'
 };
@@ -1072,7 +1076,7 @@ const menuRowEditFieldSx = {
   mb: 0.5,
   ...photoAlbumsThemeDaynightSurfaceSx,
   borderRadius: '12px',
-  border: '4px double #000000',
+  border: `4px double ${PHOTO_ALBUMS_THEME_INVERSE_BORDER}`,
   px: 0.75,
   py: 0.25,
   boxSizing: 'border-box',
@@ -1206,8 +1210,8 @@ function MenuRowButton({
                 WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
                 border:
                   multiSelected && !selected
-                    ? '3px solid #000000 !important'
-                    : '2px solid #000000 !important'
+                    ? `3px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER} !important`
+                    : `${PHOTO_ALBUMS_THEME_INVERSE_BORDER_2} !important`
               }
           : null),
         ...(locked ? photoAlbumsInnerLockedMenuSx : null),
@@ -8048,6 +8052,7 @@ export default function PhotoAlbumsWorkspacePane({
                     aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
                     title={!menusOpen ? 'Open menus' : 'Close left and right menus'}
                     onClick={handleMenuLabelsToggle}
+                    {...(menusOpen ? guestDemoBlockProps() : null)}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menusOpen ? (
@@ -8073,7 +8078,7 @@ export default function PhotoAlbumsWorkspacePane({
                   variant="logoff"
                   hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                   singleLineLabel
-                  data-guest-demo-allow="true"
+                  {...guestDemoBlockProps()}
                   onClick={() => void (usePaneLogOff ? handleLogOffPane() : handleExitToMall())}
                   disabled={busy}
                   aria-label={usePaneLogOff ? logOffPaneLabel : 'Exit to Mall'}
@@ -8120,6 +8125,7 @@ export default function PhotoAlbumsWorkspacePane({
                     disabled={busy}
                     aria-label="Backup/Restore"
                     title="Backup / Restore"
+                    {...guestDemoBlockProps()}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
@@ -8138,6 +8144,7 @@ export default function PhotoAlbumsWorkspacePane({
                     disabled={busy}
                     aria-label="Backup/Restore"
                     title="Backup / Restore"
+                    {...guestDemoBlockProps()}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
@@ -8150,7 +8157,7 @@ export default function PhotoAlbumsWorkspacePane({
                     type="button"
                     variant="yellow"
                     hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    data-guest-demo-allow="true"
+                    {...guestDemoBlockProps()}
                     onClick={() => {
                       setMobileUploadOpen(true);
                     }}
@@ -8175,6 +8182,7 @@ export default function PhotoAlbumsWorkspacePane({
                     disabled={busy}
                     aria-label="OneDrive to USB compare"
                     title="Open OneDrive and USB side by side to drag and drop notebooks and notes"
+                    {...guestDemoBlockProps()}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menuLabelsCompact ? '<=>' : 'OneDrive↔USB'}
@@ -8681,6 +8689,7 @@ export default function PhotoAlbumsWorkspacePane({
                         onClick={handleAddNotebook}
                         disabled={busy}
                         hoverScale={1.25}
+                        {...guestDemoBlockProps()}
                         sx={laneContainedButtonTwoLineSx}
                       >
                         Add
@@ -8813,6 +8822,7 @@ export default function PhotoAlbumsWorkspacePane({
                         onClick={handleAddNote}
                         disabled={busy || !selectedNotebookId || notebookGateLocked}
                         hoverScale={1.25}
+                        {...guestDemoBlockProps()}
                         sx={laneContainedButtonTwoLineSx}
                       >
                         Add
@@ -8993,7 +9003,7 @@ export default function PhotoAlbumsWorkspacePane({
                         minHeight: 88,
                         display: 'flex',
                         minWidth: 0,
-                        borderTop: '2px solid #000',
+                        borderTop: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
                         overflow: 'hidden'
                       }}
                     >
@@ -9087,13 +9097,13 @@ export default function PhotoAlbumsWorkspacePane({
                             onDrop={(e) => void handleOrderAlbumDrop(e)}
                             title={`Click to open ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME} pages. Double-click to manage the queue.`}
                             sx={{
-                              border: '2px solid #000 !important',
+                              border: `2px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER} !important`,
                               ...(orderAlbumActive
                                 ? themeDaynightSurfaceImportantSx
                                 : null),
                               ...(orderAlbumDropActive
                                 ? {
-                                    outline: '3px dashed #000',
+                                    outline: `3px dashed ${PHOTO_ALBUMS_THEME_INVERSE_BORDER}`,
                                     outlineOffset: 2,
                                     bgcolor: 'rgba(255, 215, 0, 0.55) !important'
                                   }
@@ -9482,7 +9492,7 @@ export default function PhotoAlbumsWorkspacePane({
                   flexDirection: 'column',
                   bgcolor: 'var(--theme-daynight-color)',
                   minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
-                  borderLeft: { md: '2px solid var(--theme-daynight-color)' },
+                  borderLeft: { md: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2 },
                   overflow: 'hidden',
                   boxSizing: 'border-box'
                 }}
@@ -9532,10 +9542,10 @@ export default function PhotoAlbumsWorkspacePane({
                         ...laneContainedButtonSx,
                         borderRadius: '0 !important',
                         ...themeDaynightSurfaceImportantSx,
-                        border: '2px solid #000000 !important',
+                        border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
                         '&.Mui-disabled': {
                           ...themeDaynightSurfaceImportantSx,
-                          border: '2px solid #000000 !important'
+                          border: `${PHOTO_ALBUMS_THEME_INVERSE_BORDER_2} !important`
                         }
                       }}
                     >
@@ -9673,8 +9683,10 @@ export default function PhotoAlbumsWorkspacePane({
                               flex: 1,
                               minWidth: 0,
                               cursor: 'pointer',
-                              border: '2px solid #000',
-                              borderBottom: selected ? '2px solid var(--theme-daynight-color)' : '2px solid #000',
+                              border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+                              borderBottom: selected
+                                ? `2px solid ${PHOTO_ALBUMS_THEME_DAYNIGHT_BG}`
+                                : PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
                               borderRadius: '6px 6px 0 0',
                               bgcolor: selected ? PHOTO_ALBUMS_THEME_DAYNIGHT_BG : 'rgba(0,0,0,0.08)',
                               color: PHOTO_ALBUMS_THEME_INVERSE_FG,
