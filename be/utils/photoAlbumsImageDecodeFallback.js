@@ -2,9 +2,10 @@
  * Decoders for formats the bundled libvips build cannot read:
  *   - HEIC / HEIF: prebuilt sharp ships libheif without the HEVC codec, so pixel
  *     decode fails ("source: bad seek") even though metadata parses fine.
- *   - BMP / DIB: libvips has no BMP loader at all.
+ *   - BMP / DIB and ICO: the `magick` loader is absent from the prebuilt build,
+ *     so libvips has no reader for either.
  *
- * Both fall back to pure-JS/WASM decoders that hand raw pixels back to sharp.
+ * Each falls back to a pure-JS/WASM decoder that hands pixels back to sharp.
  */
 
 /** ISO-BMFF brands that mean HEVC-coded HEIF (AVIF brands are excluded — sharp reads those). */
@@ -23,11 +24,19 @@ const HEIF_HEVC_BRANDS = new Set([
 
 /**
  * Identify a buffer that may need a fallback decoder, using magic bytes rather
- * than the file extension. Returns 'heic' | 'bmp' | null.
+ * than the file extension. Returns 'heic' | 'bmp' | 'ico' | null.
  */
 export function sniffPhotoAlbumsFallbackFormat(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 16) return null;
   if (buffer[0] === 0x42 && buffer[1] === 0x4d) return 'bmp';
+  // ICONDIR: reserved 0x0000, type 1 (icon) or 2 (cursor), then image count.
+  if (
+    buffer.readUInt16LE(0) === 0 &&
+    (buffer.readUInt16LE(2) === 1 || buffer.readUInt16LE(2) === 2) &&
+    buffer.readUInt16LE(4) >= 1
+  ) {
+    return 'ico';
+  }
   if (buffer.toString('latin1', 4, 8) === 'ftyp') {
     const brand = buffer.toString('latin1', 8, 12).toLowerCase();
     if (HEIF_HEVC_BRANDS.has(brand)) return 'heic';
