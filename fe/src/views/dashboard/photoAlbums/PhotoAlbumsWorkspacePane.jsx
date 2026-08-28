@@ -129,6 +129,10 @@ import { commitAlbumPageMoveToNote } from './photoAlbumsMoveAlbumPage';
 import { setPhotoAlbumsColumnResizing } from './photoAlbumsColumnResizeGate';
 import { mergeStagingItemPreview, primeStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import { createPhotoStagingPreviewObjectUrl } from './photoAlbumsFilesExplorerDrag';
+import {
+  photoAlbumsSourceTakenAtMs,
+  sortPhotoAlbumsFilesBySourceTakenAt
+} from './photoAlbumsSourceTakenAt';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
 import PhotoAlbumsUsageBar from './PhotoAlbumsUsageBar';
@@ -4179,7 +4183,8 @@ export default function PhotoAlbumsWorkspacePane({
         const dataUrl = await readFileAsDataUrl(file);
         const attachment = await vaultApi.uploadPhotoAlbumsNoteAttachment(noteId, {
           file: dataUrl,
-          file_name: photoAlbumsUploadFileName(file)
+          file_name: photoAlbumsUploadFileName(file),
+          source_taken_at_ms: photoAlbumsSourceTakenAtMs(file)
         });
         if (attachment) {
           const fresh = await loadNoteContent(noteId);
@@ -4190,7 +4195,9 @@ export default function PhotoAlbumsWorkspacePane({
                 fileName: attachment.file_name || '',
                 fileExtension: attachment.file_extension || '',
                 fileSizeBytes: attachment.file_size_bytes ?? null,
-                checksum: attachment.checksum || null
+                checksum: attachment.checksum || null,
+                albumPhotoSeq:
+                  attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null
               },
               coords
             );
@@ -4652,7 +4659,7 @@ export default function PhotoAlbumsWorkspacePane({
    * Do not gate on `busy` — multi-file drops must queue, not silently skip.
    */
   const uploadNoteVaultFileToStaging = useCallback(
-    async (file, { skipBusy = false } = {}) => {
+    async (file, { skipBusy = false, skipReconcile = false } = {}) => {
       if (!selectedNote || !file) return;
       const noteId = Number(selectedNote.note_id);
       if (!isAllowedPhotoAlbumsFile(file)) {
@@ -4689,7 +4696,8 @@ export default function PhotoAlbumsWorkspacePane({
         }
         const attachment = await vaultApi.uploadPhotoAlbumsNoteAttachment(noteId, {
           file: dataUrl,
-          file_name: photoAlbumsUploadFileName(file)
+          file_name: photoAlbumsUploadFileName(file),
+          source_taken_at_ms: photoAlbumsSourceTakenAtMs(file)
         });
         if (attachment) {
           const attachmentId = Number(attachment.attachment_id);
@@ -4701,6 +4709,10 @@ export default function PhotoAlbumsWorkspacePane({
             if (previewUrl) localPreviewUrl = previewUrl;
           }
           const fresh = await loadNoteContent(noteId);
+          const attachmentsAfter =
+            !skipReconcile && typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function'
+              ? await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId)
+              : fresh?.attachments || selectedNote.attachments || [];
           const ext = String(attachment.file_extension || '').toLowerCase();
           const isTrayPhoto =
             isPhotoAlbumsStagingPhotoFile({
@@ -4708,6 +4720,11 @@ export default function PhotoAlbumsWorkspacePane({
               type: file.type
             }) || isPhotoAlbumsStagingPhotoFile({ name: `x.${ext}` });
           if (isTrayPhoto && Number.isFinite(attachmentId) && attachmentId > 0) {
+            const seqRow = (attachmentsAfter || []).find(
+              (a) => Number(a?.attachment_id ?? a?.attachmentId) === attachmentId
+            );
+            const albumPhotoSeq =
+              seqRow?.album_photo_seq != null ? Number(seqRow.album_photo_seq) : null;
             noteEditorApiRef.current?.addStagedAttachment?.(
               mergeStagingItemPreview({
                 attachmentId,
@@ -4715,13 +4732,13 @@ export default function PhotoAlbumsWorkspacePane({
                 fileExtension: attachment.file_extension || '',
                 fileSizeBytes: attachment.file_size_bytes ?? null,
                 checksum: attachment.checksum || null,
+                albumPhotoSeq:
+                  Number.isFinite(albumPhotoSeq) && albumPhotoSeq >= 1 ? albumPhotoSeq : null,
                 ...(localPreviewUrl ? { localPreviewUrl } : null)
               })
             );
           }
-          noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(
-            fresh?.attachments || selectedNote.attachments || []
-          );
+          noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(attachmentsAfter);
         } else if (localPreviewUrl) {
           try {
             URL.revokeObjectURL(localPreviewUrl);
@@ -4817,7 +4834,9 @@ export default function PhotoAlbumsWorkspacePane({
   const handleStageOsFiles = useCallback(
     async (files) => {
       const list = Array.isArray(files) ? files : [];
-      const photoFiles = list.filter((file) => isPhotoAlbumsStagingPhotoFile(file));
+      const photoFiles = sortPhotoAlbumsFilesBySourceTakenAt(
+        list.filter((file) => isPhotoAlbumsStagingPhotoFile(file))
+      );
       const rejected = list.filter((file) => !isPhotoAlbumsStagingPhotoFile(file));
       if (!photoFiles.length) {
         const name = rejected[0]?.name || 'file';
@@ -4844,7 +4863,15 @@ export default function PhotoAlbumsWorkspacePane({
             percent: Math.round((i / total) * 100)
           });
           // eslint-disable-next-line no-await-in-loop
-          await uploadNoteVaultFileToStaging(photoFiles[i], { skipBusy: true });
+          await uploadNoteVaultFileToStaging(photoFiles[i], { skipBusy: true, skipReconcile: true });
+        }
+        if (selectedNote && total > 0) {
+          const noteId = Number(selectedNote.note_id);
+          const reconciled = await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId);
+          const fresh = await loadNoteContent(noteId);
+          noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(
+            reconciled.length ? reconciled : fresh?.attachments || []
+          );
         }
         setBatchUploadProgress({
           label: `Adding to Thumbnail Tray (${total} of ${total})`,
@@ -4859,7 +4886,7 @@ export default function PhotoAlbumsWorkspacePane({
         setBatchUploadProgress(null);
       }
     },
-    [uploadNoteVaultFileToStaging]
+    [uploadNoteVaultFileToStaging, selectedNote, vaultApi, loadNoteContent]
   );
 
   /** Spinning busy while Files Explorer / Mobile Upload reads local files before upload. */

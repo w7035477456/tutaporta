@@ -16,6 +16,7 @@ import {
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
+import PhotoAlbumsSeqBadge from './PhotoAlbumsSeqBadge';
 
 export const DRAG_STAGED_ATTACHMENT = 'application/x-pa-staged-attachment';
 export const DRAG_STAGED_FLAG = 'application/x-pa-staged-flag';
@@ -39,7 +40,9 @@ export function readStagedAttachmentDrag(dataTransfer, stagedItems = []) {
           attachmentId: Number(parsed.attachmentId) || attachmentId,
           fileName: String(parsed.fileName || ''),
           fileExtension: String(parsed.fileExtension || ''),
-          fileSizeBytes: parsed.fileSizeBytes ?? null
+          fileSizeBytes: parsed.fileSizeBytes ?? null,
+          albumPhotoSeq:
+            parsed.albumPhotoSeq != null ? Number(parsed.albumPhotoSeq) : null
         };
       }
     } catch {
@@ -53,7 +56,11 @@ export function readStagedAttachmentDrag(dataTransfer, stagedItems = []) {
     attachmentId: Number(meta.attachmentId),
     fileName: String(meta.fileName || ''),
     fileExtension: String(meta.fileExtension || ''),
-    fileSizeBytes: meta.fileSizeBytes ?? null
+    fileSizeBytes: meta.fileSizeBytes ?? null,
+    albumPhotoSeq:
+      meta.albumPhotoSeq != null && Number.isFinite(Number(meta.albumPhotoSeq))
+        ? Number(meta.albumPhotoSeq)
+        : null
   };
 }
 
@@ -196,7 +203,11 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
               attachmentId,
               fileName: item.fileName || '',
               fileExtension: item.fileExtension || '',
-              fileSizeBytes: item.fileSizeBytes ?? null
+              fileSizeBytes: item.fileSizeBytes ?? null,
+              albumPhotoSeq:
+                item.albumPhotoSeq != null && Number.isFinite(Number(item.albumPhotoSeq))
+                  ? Number(item.albumPhotoSeq)
+                  : null
             })
           );
         } catch {
@@ -349,6 +360,7 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
             ×
           </button>
         ) : null}
+        <PhotoAlbumsSeqBadge seq={item.albumPhotoSeq} />
       </div>
     </div>
   );
@@ -360,6 +372,7 @@ StagingThumb.propTypes = {
     fileName: PropTypes.string,
     fileExtension: PropTypes.string,
     fileSizeBytes: PropTypes.oneOfType([PropTypes.number, PropTypes.oneOf([null])]),
+    albumPhotoSeq: PropTypes.oneOfType([PropTypes.number, PropTypes.oneOf([null])]),
     localPreviewUrl: PropTypes.string
   }).isRequired,
   noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),

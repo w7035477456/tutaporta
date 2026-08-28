@@ -32,9 +32,11 @@ import {
   vaultAddNoteAttachment,
   vaultDeleteNoteAttachment,
   vaultGetNoteAttachment,
+  vaultReconcileAlbumPhotoSeq,
   vaultAddNoteExtraImage,
   vaultDeleteNoteExtraImage,
-  vaultGetNoteExtraImage
+  vaultGetNoteExtraImage,
+  flushDbToUsb
 } from '../../utils/photoAlbumsUsb/vaultSession.js';
 import {
   canNativeOpenPhotoAlbumsExtension,
@@ -905,11 +907,13 @@ export async function uploadPhotoAlbumsNoteAttachment(req, res) {
   }
 
   try {
+    const sourceTakenAtMs = Number(req.body?.source_taken_at_ms ?? req.body?.sourceTakenAtMs);
     const attachment = await vaultAddNoteAttachment(session, noteId, {
       buffer: parsed.buffer,
       fileName: parsed.fileName,
       ext: parsed.ext,
-      mimeType: parsed.contentType
+      mimeType: parsed.contentType,
+      ...(Number.isFinite(sourceTakenAtMs) && sourceTakenAtMs > 0 ? { sourceTakenAtMs } : null)
     });
     logImpersonatedMutation(req);
     if (!attachment?.duplicate) {
@@ -919,6 +923,29 @@ export async function uploadPhotoAlbumsNoteAttachment(req, res) {
   } catch (err) {
     console.error('[uploadPhotoAlbumsNoteAttachment]', err?.message || err);
     const message = err?.message || 'Failed to upload attachment';
+    if (message === 'Note not found') return res.status(404).json({ error: message });
+    return res.status(500).json({ error: message });
+  }
+}
+
+/** POST /api/photoAlbums/notes/:noteId/attachments/reconcile-album-seq */
+export async function reconcilePhotoAlbumsAlbumPhotoSeq(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+
+  const noteId = Number(req.params.noteId);
+  if (!Number.isFinite(noteId) || noteId < 1) {
+    return res.status(400).json({ error: 'Invalid note id' });
+  }
+
+  try {
+    const attachments = vaultReconcileAlbumPhotoSeq(session, noteId);
+    logImpersonatedMutation(req);
+    flushDbToUsb(session);
+    return res.json({ success: true, attachments });
+  } catch (err) {
+    console.error('[reconcilePhotoAlbumsAlbumPhotoSeq]', err?.message || err);
+    const message = err?.message || 'Failed to reconcile album photo sequence';
     if (message === 'Note not found') return res.status(404).json({ error: message });
     return res.status(500).json({ error: message });
   }

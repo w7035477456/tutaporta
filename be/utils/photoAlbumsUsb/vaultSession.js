@@ -82,6 +82,24 @@ function ensureNoteInnerEncryptColumns(db) {
   }
   return changed;
 }
+
+function attachmentColumnExists(db, columnName) {
+  const rows = queryAll(db, `PRAGMA table_info(note_attachments)`);
+  return rows.some((row) => String(row.name || row.Name || '') === columnName);
+}
+
+function ensureAttachmentAlbumSeqColumns(db) {
+  let changed = false;
+  if (!attachmentColumnExists(db, 'album_photo_seq')) {
+    db.run(`ALTER TABLE note_attachments ADD COLUMN album_photo_seq INTEGER`);
+    changed = true;
+  }
+  if (!attachmentColumnExists(db, 'source_taken_at_ms')) {
+    db.run(`ALTER TABLE note_attachments ADD COLUMN source_taken_at_ms INTEGER`);
+    changed = true;
+  }
+  return changed;
+}
 import { formatDefaultPhotoAlbumsNoteTitle } from '../photoAlbumsDefaultTitle.js';
 import {
   expandPhotoAlbumsBodyTextForSearch,
@@ -284,6 +302,7 @@ function runSchema(db) {
   db.exec(VAULT_SCHEMA_SQL);
   ensureNoteExtraImagesTable(db);
   ensureNoteInnerEncryptColumns(db);
+  ensureAttachmentAlbumSeqColumns(db);
 }
 
 function exportDb(db) {
@@ -943,6 +962,10 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     markDirty(session);
     flushDbToUsb(session);
   }
+  if (ensureAttachmentAlbumSeqColumns(session.db)) {
+    markDirty(session);
+    flushDbToUsb(session);
+  }
 
   const migrateIconName = String(options?.iconName || '').trim();
   if (
@@ -1167,6 +1190,14 @@ function mapAttachmentRow(row) {
     checksum: row.checksum ? String(row.checksum) : null,
     mime_type: row.mime_type || null,
     display_order: Number(row.display_order ?? 0),
+    album_photo_seq:
+      row.album_photo_seq != null && Number.isFinite(Number(row.album_photo_seq))
+        ? Number(row.album_photo_seq)
+        : null,
+    source_taken_at_ms:
+      row.source_taken_at_ms != null && Number.isFinite(Number(row.source_taken_at_ms))
+        ? Number(row.source_taken_at_ms)
+        : null,
     created_at: row.created_at
   };
 }
@@ -1174,7 +1205,7 @@ function mapAttachmentRow(row) {
 function loadAttachmentsForNote(session, noteId) {
   return queryAll(
     session.db,
-    `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, checksum, mime_type, display_order, created_at
+    `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, checksum, mime_type, display_order, album_photo_seq, source_taken_at_ms, created_at
      FROM note_attachments
      WHERE note_id = ? AND deleted_at IS NULL
      ORDER BY display_order ASC, attachment_id ASC`,
@@ -1194,7 +1225,7 @@ export function vaultDedupeNoteAttachments(session, noteId) {
 
   const rows = queryAll(
     session.db,
-    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, created_at
+    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, album_photo_seq, source_taken_at_ms, created_at
      FROM note_attachments
      WHERE note_id = ? AND deleted_at IS NULL
      ORDER BY attachment_id ASC`,
@@ -1377,6 +1408,7 @@ function mapNoteRow(row, keywords = [], attachments = [], extraImages = []) {
 
 function loadNote(session, noteId) {
   ensureNoteInnerEncryptColumns(session.db);
+  ensureAttachmentAlbumSeqColumns(session.db);
   return queryOne(
     session.db,
     `SELECT note_id, notebook_id, note_name, body_text, display_order, created_at, updated_at,
@@ -1416,6 +1448,7 @@ export function vaultGetNote(session, noteId) {
 /** Notebook/note sidebar tree — metadata only; no body_text, keywords, attachments, or extra_images. */
 export function vaultGetTree(session) {
   ensureNoteInnerEncryptColumns(session.db);
+  ensureAttachmentAlbumSeqColumns(session.db);
   const notebooks = queryAll(
     session.db,
     `SELECT notebook_id, notebook_name, display_order, created_at, updated_at
@@ -2081,7 +2114,34 @@ export function vaultGetNoteExtraImage(session, noteId, imageId) {
   return { buffer, contentType };
 }
 
-export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType }) {
+/**
+ * Assign album_photo_seq 1..N by source_taken_at_ms (oldest first).
+ * Overwrites existing seq — call after batch import so numbers match timestamps.
+ */
+export function vaultReconcileAlbumPhotoSeq(session, noteId) {
+  const id = Number(noteId);
+  if (!session?.db || !Number.isFinite(id) || id < 1) return [];
+  ensureAttachmentAlbumSeqColumns(session.db);
+  const rows = queryAll(
+    session.db,
+    `SELECT attachment_id, source_taken_at_ms, file_name
+     FROM note_attachments
+     WHERE note_id = ? AND deleted_at IS NULL
+     ORDER BY COALESCE(source_taken_at_ms, 0) ASC, file_name COLLATE NOCASE ASC, attachment_id ASC`,
+    [id]
+  );
+  for (let i = 0; i < rows.length; i += 1) {
+    const seq = i + 1;
+    session.db.run(`UPDATE note_attachments SET album_photo_seq = ? WHERE attachment_id = ?`, [
+      seq,
+      rows[i].attachment_id
+    ]);
+  }
+  markDirty(session);
+  return loadAttachmentsForNote(session, id);
+}
+
+export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType, sourceTakenAtMs }) {
   const row = loadNote(session, noteId);
   if (!row) throw new Error('Note not found');
   if (!buffer?.length) throw new Error('File is empty');
@@ -2119,7 +2179,7 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
   // Duplicate shortcut: same byte size → confirm with checksum. Reuse existing row.
   const sameSizeRows = queryAll(
     session.db,
-    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, created_at
+    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, album_photo_seq, source_taken_at_ms, created_at
      FROM note_attachments
      WHERE note_id = ? AND deleted_at IS NULL AND file_size_bytes = ?`,
     [noteId, sizeBytes]
@@ -2156,11 +2216,15 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
     [noteId]
   );
   const displayOrder = Number(orderRow?.next_order ?? 0);
+  const takenMs =
+    Number.isFinite(Number(sourceTakenAtMs)) && Number(sourceTakenAtMs) > 0
+      ? Math.round(Number(sourceTakenAtMs))
+      : Date.now();
 
   session.db.run(
-    `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order)
-     VALUES (?, ?, ?, '', ?, ?, ?, ?)`,
-    [noteId, safeName, cleanExt, sizeBytes, checksum, resolvedMime, displayOrder]
+    `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, source_taken_at_ms)
+     VALUES (?, ?, ?, '', ?, ?, ?, ?, ?)`,
+    [noteId, safeName, cleanExt, sizeBytes, checksum, resolvedMime, displayOrder, takenMs]
   );
   const attachmentId = Number(queryOne(session.db, `SELECT last_insert_rowid() AS attachment_id`).attachment_id);
   const relativePath = fileRelativePath(row.notebook_id, noteId, attachmentId, cleanExt);
@@ -2195,7 +2259,7 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
   return mapAttachmentRow(
     queryOne(
       session.db,
-      `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, checksum, mime_type, display_order, created_at
+      `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, checksum, mime_type, display_order, album_photo_seq, source_taken_at_ms, created_at
        FROM note_attachments WHERE attachment_id = ?`,
       [attachmentId]
     )

@@ -579,6 +579,15 @@ export async function uploadPhotoAlbumsNoteAttachment(noteId, payload = {}, { st
   return data?.attachment;
 }
 
+export async function reconcilePhotoAlbumsAlbumPhotoSeq(noteId, { storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: `/api/photoAlbums/notes/${noteId}/attachments/reconcile-album-seq`,
+    storageType
+  });
+  return Array.isArray(data?.attachments) ? data.attachments : [];
+}
+
 export async function deletePhotoAlbumsNoteAttachment(noteId, attachmentId, { storageType } = {}) {
   const { data } = await rvRequest({method: 'DELETE',
     url: `/api/photoAlbums/notes/${noteId}/attachments/${attachmentId}`, storageType });
@@ -1749,6 +1758,7 @@ export function createPhotoAlbumsPaneApi(storageType) {
     movePhotoAlbumsNoteImage: (payload) => movePhotoAlbumsNoteImage(payload, opts),
     movePhotoAlbumsNote: (noteId, notebookId) => movePhotoAlbumsNote(noteId, notebookId, opts),
     uploadPhotoAlbumsNoteAttachment: (noteId, payload) => uploadPhotoAlbumsNoteAttachment(noteId, payload, opts),
+    reconcilePhotoAlbumsAlbumPhotoSeq: (noteId) => reconcilePhotoAlbumsAlbumPhotoSeq(noteId, opts),
     deletePhotoAlbumsNoteAttachment: (noteId, attachmentId) =>
       deletePhotoAlbumsNoteAttachment(noteId, attachmentId, opts),
     searchPhotoAlbumsNotes: (query) => searchPhotoAlbumsNotes(query, opts),

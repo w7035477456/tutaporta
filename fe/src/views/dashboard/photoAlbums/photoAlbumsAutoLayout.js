@@ -1,5 +1,5 @@
 /**
- * Auto Layout — plan template pages for thumbnail-tray photos (sequential order,
+ * Auto Layout — plan template pages for thumbnail-tray photos (album_photo_seq order,
  * portrait/landscape slot matching, 2–6 photos per page; prefer 3–6).
  */
 
@@ -16,6 +16,26 @@ import { isPhotoAlbumsStagingVideoExtension } from 'utils/photoAlbumsFileFormats
 export const AUTO_LAYOUT_MIN_BATCH = 2;
 export const AUTO_LAYOUT_MAX_BATCH = 6;
 export const AUTO_LAYOUT_PREFERRED_MIN = 3;
+
+/** Permanent tray seq (1 = oldest). Unnumbered items sort after numbered, then by attachmentId. */
+export function compareStagingByAlbumPhotoSeq(a, b) {
+  const sa = Number(a?.albumPhotoSeq);
+  const sb = Number(b?.albumPhotoSeq);
+  const aHas = Number.isFinite(sa) && sa >= 1;
+  const bHas = Number.isFinite(sb) && sb >= 1;
+  if (aHas && bHas) return sa - sb;
+  if (aHas) return -1;
+  if (bHas) return 1;
+  const ia = Number(a?.attachmentId);
+  const ib = Number(b?.attachmentId);
+  if (Number.isFinite(ia) && Number.isFinite(ib) && ia !== ib) return ia - ib;
+  return 0;
+}
+
+/** Chronological tray order for Auto Layout (does not mutate input). */
+export function sortStagingPhotosByAlbumPhotoSeq(items) {
+  return [...(Array.isArray(items) ? items : [])].sort(compareStagingByAlbumPhotoSeq);
+}
 
 /** Photo-only templates eligible for auto layout (by slot count). */
 const AUTO_LAYOUT_TEMPLATES_BY_COUNT = {
@@ -173,7 +193,7 @@ function takeNextAutoLayoutPage(queue, pageWidth, orient, { maxPhotos = Infinity
 }
 
 /**
- * Build a multi-page auto layout plan from staged photos (tray order preserved).
+ * Build a multi-page auto layout plan from staged photos (albumPhotoSeq order).
  * Pages are planned in open-book spreads: left template + right template, then the next spread.
  * When a spread needs 2 pages, left is capped so the right page still gets photos.
  * When `tryBothPageOrientations` is true (empty album), picks portrait vs landscape for the whole run.
@@ -257,7 +277,7 @@ export function planAutoLayoutPages(
 
 /**
  * Fill empty photo slots on existing template pages before appending new pages.
- * Tray order preserved; slots filled left-to-right on each page.
+ * albumPhotoSeq order preserved; slots filled left-to-right on each page.
  * @returns {{ fills: Array<{ inst: object, photos: object[], slots: object[] }>, remainingPhotos: object[] }}
  */
 export function planFillEmptyTemplatePages(

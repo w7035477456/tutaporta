@@ -82,7 +82,8 @@ import {
   buildFramedPhotoAttrsForSlot,
   planAutoLayoutPages,
   planFillEmptyTemplatePages,
-  resolveStagingPhotoAspects
+  resolveStagingPhotoAspects,
+  sortStagingPhotosByAlbumPhotoSeq
 } from './photoAlbumsAutoLayout';
 import { getPhotoAlbumsAttachmentViewKind, fileExtensionLower, isPhotoAlbumsStagingVideoExtension } from 'utils/photoAlbumsFileFormats';
 import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
@@ -335,6 +336,9 @@ function buildAutoLayoutPhotoNodes(editor, inst, photos, slots, band, placedIds)
         fileExtension: String(photo.fileExtension || ''),
         fileSizeBytes: photo.fileSizeBytes ?? null,
         checksum: photo.checksum ? String(photo.checksum) : null,
+        ...(Number.isFinite(Number(photo.albumPhotoSeq)) && Number(photo.albumPhotoSeq) >= 1
+          ? { albumPhotoSeq: Number(photo.albumPhotoSeq) }
+          : null),
         ...frameAttrs
       })
     );
@@ -610,12 +614,14 @@ function serializeStagingItems(items) {
   const list = (Array.isArray(items) ? items : [])
     .map((item) => {
       const companionLabels = normalizeCompanionLabels(item.companionLabels);
+      const seq = Number(item.albumPhotoSeq);
       return {
         attachmentId: Number(item.attachmentId),
         fileName: String(item.fileName || ''),
         fileExtension: String(item.fileExtension || ''),
         fileSizeBytes: item.fileSizeBytes == null ? null : Number(item.fileSizeBytes),
         checksum: item.checksum ? String(item.checksum) : null,
+        ...(Number.isFinite(seq) && seq >= 1 ? { albumPhotoSeq: seq } : null),
         ...(companionLabels.length ? { companionLabels } : null)
       };
     })
@@ -642,12 +648,14 @@ function dedupeStagingItems(items) {
     }
     seenIds.add(id);
     const companionLabels = normalizeCompanionLabels(item.companionLabels);
+    const seq = Number(item.albumPhotoSeq);
     out.push({
       attachmentId: id,
       fileName: String(item.fileName || ''),
       fileExtension: String(item.fileExtension || ''),
       fileSizeBytes: Number.isFinite(size) ? size : null,
       checksum: checksum || null,
+      ...(Number.isFinite(seq) && seq >= 1 ? { albumPhotoSeq: seq } : null),
       ...(item.localPreviewUrl ? { localPreviewUrl: String(item.localPreviewUrl) } : null),
       ...(companionLabels.length ? { companionLabels } : null)
     });
@@ -673,12 +681,40 @@ function parseStagingItemsFromHtml(html) {
         fileExtension: String(item?.fileExtension || item?.file_extension || ''),
         fileSizeBytes: item?.fileSizeBytes ?? item?.file_size_bytes ?? null,
         checksum: item?.checksum ?? null,
+        albumPhotoSeq:
+          item?.albumPhotoSeq != null
+            ? Number(item.albumPhotoSeq)
+            : item?.album_photo_seq != null
+              ? Number(item.album_photo_seq)
+              : null,
         companionLabels: item?.companionLabels ?? item?.companion_labels ?? null
       }))
     );
   } catch {
     return [];
   }
+}
+
+function attachmentAlbumPhotoSeq(a) {
+  const n = Number(a?.album_photo_seq ?? a?.albumPhotoSeq);
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+function syncAlbumPhotoSeqOnPage(editor, liveById) {
+  if (!editor?.view || !liveById?.size) return;
+  let tr = editor.state.tr;
+  let changed = false;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
+    const id = Number(node.attrs.attachmentId);
+    const live = liveById.get(id);
+    const seq = live ? attachmentAlbumPhotoSeq(live) : null;
+    const cur = Number(node.attrs.albumPhotoSeq);
+    if ((seq == null && !Number.isFinite(cur)) || seq === cur) return;
+    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, albumPhotoSeq: seq });
+    changed = true;
+  });
+  if (changed && tr.docChanged) editor.view.dispatch(tr);
 }
 
 function withAlbumMarkers(
@@ -2686,6 +2722,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fileExtension: String(attrs?.fileExtension || ''),
         fileSizeBytes: attrs?.fileSizeBytes ?? null,
         checksum: attrs?.checksum ? String(attrs.checksum) : null,
+        ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
+          ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
+          : null),
         ...(companionLabels.length ? { companionLabels } : null)
       };
       const prev = stagedPhotosRef.current || [];
@@ -2705,6 +2744,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fileExtension: String(attrs?.fileExtension || ''),
         fileSizeBytes: attrs?.fileSizeBytes ?? null,
         checksum: attrs?.checksum ? String(attrs.checksum) : null,
+        ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
+          ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
+          : null),
         ...(Array.isArray(attrs?.companionLabels) && attrs.companionLabels.length
           ? { companionLabels: attrs.companionLabels }
           : null)
@@ -3906,7 +3948,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             fileName: String(a?.file_name ?? a?.fileName ?? ''),
             fileExtension: String(a?.file_extension ?? a?.fileExtension ?? ''),
             fileSizeBytes: a?.file_size_bytes ?? a?.fileSizeBytes ?? null,
-            checksum: a?.checksum ? String(a.checksum) : null
+            checksum: a?.checksum ? String(a.checksum) : null,
+            albumPhotoSeq: attachmentAlbumPhotoSeq(a)
           });
         }
 
@@ -3944,6 +3987,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               fileExtension: item.fileExtension || live.fileExtension,
               fileSizeBytes: item.fileSizeBytes ?? live.fileSizeBytes,
               checksum: item.checksum || live.checksum,
+              albumPhotoSeq: live.albumPhotoSeq ?? item.albumPhotoSeq ?? null,
               ...(item.localPreviewUrl ? { localPreviewUrl: String(item.localPreviewUrl) } : null)
             });
           })
@@ -3961,6 +4005,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         ).map((item) => mergeStagingItemPreview(item));
         stagedPhotosRef.current = next;
         setStagedPhotos(next);
+        syncAlbumPhotoSeqOnPage(editor, liveById);
         requestAnimationFrame(() => emitHtml(editor.getHTML()));
       },
       getStagedAttachmentIds: () =>
@@ -3974,6 +4019,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           fileExtension: String(attrs?.fileExtension || ''),
           fileSizeBytes: attrs?.fileSizeBytes ?? null,
           checksum: attrs?.checksum ? String(attrs.checksum) : null,
+          ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
+            ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
+            : null),
           ...(attrs?.localPreviewUrl ? { localPreviewUrl: String(attrs.localPreviewUrl) } : null)
         };
         const prev = stagedPhotosRef.current || [];
@@ -4324,7 +4372,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const handleAutoLayout = useCallback(
     async ({ maxSpreads = Infinity } = {}) => {
       if (!editor || !effectiveEditable) return;
-      const tray = stagedPhotosRef.current || [];
+      const tray = sortStagingPhotosByAlbumPhotoSeq(stagedPhotosRef.current || []);
       if (!tray.length) return;
 
       const oneSpreadOnly = Number.isFinite(maxSpreads) && maxSpreads <= 1;
@@ -4538,6 +4586,16 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           }
         });
 
+        const seqByAttachmentId = new Map();
+        for (const photo of photosWithAspect) {
+          const id = Number(photo.attachmentId);
+          const seq = Number(photo.albumPhotoSeq);
+          if (Number.isFinite(id) && id > 0 && Number.isFinite(seq) && seq >= 1) {
+            seqByAttachmentId.set(id, { album_photo_seq: seq });
+          }
+        }
+        if (seqByAttachmentId.size) syncAlbumPhotoSeqOnPage(editor, seqByAttachmentId);
+
         templatesRef.current = placedList;
         setTemplates(placedList);
         setAlbumCanvasWidth(editor, pw, binderW);
@@ -4684,6 +4742,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             fileName: String(attrs?.fileName || ''),
             fileExtension: String(attrs?.fileExtension || ''),
             fileSizeBytes: attrs?.fileSizeBytes ?? null,
+            ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
+              ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
+              : null),
             ...coverFitAttrsForSlotRect(
               { left: 0, top: 0, width: snap.width, height: snap.height },
               snap.left,

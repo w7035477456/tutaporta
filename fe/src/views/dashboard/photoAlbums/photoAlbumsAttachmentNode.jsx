@@ -35,6 +35,7 @@ import {
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import { getAttachmentVariantPreview } from './photoAlbumsAttachmentVariantCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
+import PhotoAlbumsSeqBadge from './PhotoAlbumsSeqBadge';
 import { findFramedPhotoInFrame } from './photoAlbumsSlotOccupancy';
 
 /** Human-readable “why blank” line for thumb load failures. */
@@ -799,6 +800,10 @@ function transferFramedPanZoomToSlot({
  */
 function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttributes, selected, getPos }) {
   const attachmentId = Number(node?.attrs?.attachmentId);
+  const albumPhotoSeq = (() => {
+    const n = Number(node?.attrs?.albumPhotoSeq);
+    return Number.isFinite(n) && n >= 1 ? n : null;
+  })();
   const displayWidth = (() => {
     const n = Number(node?.attrs?.width);
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
@@ -1390,6 +1395,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
             fileExtension: node?.attrs?.fileExtension,
             fileSizeBytes: node?.attrs?.fileSizeBytes,
             checksum: node?.attrs?.checksum,
+            albumPhotoSeq: node?.attrs?.albumPhotoSeq,
             _photoRect: photoPageRectFromAttrs(node?.attrs)
           });
           if (!returned) {
@@ -1401,6 +1407,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               fileExtension: node?.attrs?.fileExtension,
               fileSizeBytes: node?.attrs?.fileSizeBytes,
               checksum: node?.attrs?.checksum,
+              albumPhotoSeq: node?.attrs?.albumPhotoSeq,
               companionLabels
             });
             deleteNode?.();
@@ -1603,6 +1610,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
                   fileExtension: occupant.node.attrs.fileExtension,
                   fileSizeBytes: occupant.node.attrs.fileSizeBytes,
                   checksum: occupant.node.attrs.checksum,
+                  albumPhotoSeq: occupant.node.attrs.albumPhotoSeq,
                   _photoRect: {
                     left: occupant.fl,
                     top: occupant.ft,
@@ -2303,6 +2311,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         fileExtension: node?.attrs?.fileExtension,
         fileSizeBytes: node?.attrs?.fileSizeBytes,
         checksum: node?.attrs?.checksum,
+        albumPhotoSeq: node?.attrs?.albumPhotoSeq,
         companionLabels: undefined,
         _photoRect: photoPageRectFromAttrs(node?.attrs)
       });
@@ -2315,6 +2324,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           fileExtension: node?.attrs?.fileExtension,
           fileSizeBytes: node?.attrs?.fileSizeBytes,
           checksum: node?.attrs?.checksum,
+          albumPhotoSeq: node?.attrs?.albumPhotoSeq,
           companionLabels
         });
         deleteNode();
@@ -3268,6 +3278,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
             </Typography>
           ) : null}
         </Box>
+        <PhotoAlbumsSeqBadge seq={albumPhotoSeq} sx={{ zIndex: 25 }} />
         {sizeLabel && !framed ? (
           <Typography
             component="span"
@@ -3396,6 +3407,16 @@ export const PhotoAlbumsAttachmentNode = Node.create({
         default: null,
         parseHTML: (el) => el.getAttribute('data-checksum') || null,
         renderHTML: (attrs) => attrToData(attrs.checksum, 'data-checksum')
+      },
+      /** Permanent album photo index (oldest source file = 1). */
+      albumPhotoSeq: {
+        default: null,
+        parseHTML: (el) => {
+          const raw = el.getAttribute('data-album-photo-seq');
+          const n = raw == null ? NaN : Number(raw);
+          return Number.isFinite(n) && n >= 1 ? n : null;
+        },
+        renderHTML: (attrs) => attrToData(attrs.albumPhotoSeq, 'data-album-photo-seq')
       },
       /** Display width in px for photo tiles; null = collage default sizing. */
       width: {

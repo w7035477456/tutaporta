@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS note_attachments (
   checksum TEXT,
   mime_type TEXT,
   display_order INTEGER NOT NULL DEFAULT 0,
+  album_photo_seq INTEGER,
+  source_taken_at_ms INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
 );

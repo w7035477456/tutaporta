@@ -276,6 +276,7 @@ import {
   openPhotoAlbumsNoteAttachmentNative,
   uploadPhotoAlbumsNoteAttachment,
   deletePhotoAlbumsNoteAttachment,
+  reconcilePhotoAlbumsAlbumPhotoSeq,
   getPhotoAlbumsTree,
   reorderPhotoAlbumsNotebooks,
   reorderPhotoAlbumsNotes,
@@ -1546,6 +1547,11 @@ app.post(
   openPhotoAlbumsNoteAttachmentNative
 );
 app.post('/api/photoAlbums/notes/:noteId/attachments', requireAuth, uploadPhotoAlbumsNoteAttachment);
+app.post(
+  '/api/photoAlbums/notes/:noteId/attachments/reconcile-album-seq',
+  requireAuth,
+  reconcilePhotoAlbumsAlbumPhotoSeq
+);
 app.delete('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', requireAuth, deletePhotoAlbumsNoteAttachment);
 app.post('/api/photoAlbums/shortcuts', requireAuth, createPhotoAlbumsShortcut);
 app.put('/api/photoAlbums/shortcuts/reorder', requireAuth, reorderPhotoAlbumsShortcuts);
