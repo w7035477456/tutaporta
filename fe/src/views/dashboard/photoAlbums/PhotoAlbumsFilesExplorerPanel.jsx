@@ -483,7 +483,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
       const selected = filesForKeys(keys);
       if (!selected.length) {
         setError(
-          'No supported album photos or MP4 videos in the selection. Supported: PNG, JPEG, SVG, WebP, GIF, AVIF, ICO, BMP, TIFF, APNG, HEIC/HEIF, MP4.'
+          'No supported album photos or videos in the selection. Supported photos: PNG, JPEG, SVG, WebP, GIF, AVIF, ICO, BMP, TIFF, APNG, HEIC/HEIF. Videos: MP4, MOV, WebM, MKV, AVI, WMV, MTS/M2TS (AVCHD).'
         );
         return;
       }

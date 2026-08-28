@@ -115,7 +115,8 @@ import {
   fileRelativePathForVariant,
   isPhotoAlbumsRasterImageExtension,
   normalizeAttachmentVariant,
-  normalizePhotoAlbumsAttachmentBuffer
+  normalizePhotoAlbumsAttachmentBuffer,
+  photoAlbumsExtensionRequiresJpegFullFile
 } from '../photoAlbumsAttachmentVariants.js';
 import {
   scheduleTrackedOneDriveUpload,
@@ -2183,6 +2184,102 @@ export function vaultReconcileAlbumPhotoSeq(session, noteId) {
   return loadAttachmentsForNote(session, id);
 }
 
+/**
+ * Repair attachments stored before their format could be decoded (HEIC/HEIF/BMP):
+ * rebuild missing _1000px/_thumbnail siblings and re-encode full files that no
+ * browser can render. Safe to re-run; already-complete attachments are skipped.
+ */
+export async function vaultRepairMissingAttachmentVariants(session, noteId) {
+  const id = Number(noteId);
+  if (!session?.db || !Number.isFinite(id) || id < 1) return { repaired: 0, failed: 0 };
+  const note = loadNote(session, id);
+  if (!note) throw new Error('Note not found');
+
+  const rows = queryAll(
+    session.db,
+    `SELECT attachment_id, file_name, file_extension, relative_path, album_photo_seq
+     FROM note_attachments
+     WHERE note_id = ? AND deleted_at IS NULL`,
+    [id]
+  );
+
+  let repaired = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    const cleanExt = String(row.file_extension || '').replace(/^\./, '').toLowerCase();
+    if (!row.relative_path || !isPhotoAlbumsRasterImageExtension(cleanExt)) continue;
+
+    const needsJpegFull = photoAlbumsExtensionRequiresJpegFullFile(cleanExt);
+    const hasDisplay = !!readEncryptedVaultFile(
+      session,
+      fileRelativePathForVariant(row.relative_path, 'display')
+    )?.length;
+    const hasThumb = !!readEncryptedVaultFile(
+      session,
+      fileRelativePathForVariant(row.relative_path, 'thumb')
+    )?.length;
+    if (hasDisplay && hasThumb && !needsJpegFull) continue;
+
+    try {
+      const original = readEncryptedVaultFile(session, row.relative_path);
+      if (!original?.length) continue;
+
+      let workingBuffer = original;
+      let relativePath = row.relative_path;
+      let variantExt = cleanExt;
+
+      if (needsJpegFull) {
+        const normalized = await normalizePhotoAlbumsAttachmentBuffer(original, {
+          forceJpeg: true,
+          ext: cleanExt
+        });
+        workingBuffer = normalized.buffer;
+        variantExt = 'jpg';
+        relativePath = fileRelativePath(note.notebook_id, id, row.attachment_id, 'jpg', row.album_photo_seq);
+        const safeName = `${String(row.file_name || 'photo').replace(/\.[^.]+$/, '') || 'photo'}.jpg`;
+        writeEncryptedVaultFile(session, relativePath, workingBuffer);
+        session.db.run(
+          `UPDATE note_attachments
+           SET relative_path = ?, file_extension = 'jpg', mime_type = 'image/jpeg', file_name = ?,
+               file_size_bytes = ?, checksum = ?
+           WHERE attachment_id = ?`,
+          [
+            relativePath,
+            safeName,
+            workingBuffer.length,
+            crypto.createHash('sha256').update(workingBuffer).digest('hex'),
+            row.attachment_id
+          ]
+        );
+        if (relativePath !== row.relative_path) {
+          deleteEncryptedVaultFile(session, row.relative_path);
+          deleteEncryptedVaultFile(session, fileRelativePathForVariant(row.relative_path, 'display'));
+          deleteEncryptedVaultFile(session, fileRelativePathForVariant(row.relative_path, 'thumb'));
+        }
+      }
+
+      const displayBuf = await buildPhotoAlbumsDisplay1000pxBuffer(workingBuffer, variantExt);
+      const thumbBuf = await buildPhotoAlbumsThumbnailBuffer(workingBuffer, variantExt);
+      writeEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'display'), displayBuf);
+      writeEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'thumb'), thumbBuf);
+      repaired += 1;
+    } catch (err) {
+      failed += 1;
+      console.warn(
+        `[vaultRepairMissingAttachmentVariants] attachment ${row.attachment_id}:`,
+        err?.message || err
+      );
+    }
+  }
+
+  if (repaired) {
+    markDirty(session);
+    scheduleFlushDbToUsb(session);
+  }
+  return { repaired, failed };
+}
+
 export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType, sourceTakenAtMs }) {
   const row = loadNote(session, noteId);
   if (!row) throw new Error('Note not found');
@@ -2200,7 +2297,10 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
   let writeVariants = false;
   if (isPhotoAlbumsRasterImageExtension(cleanExt)) {
     try {
-      const normalized = await normalizePhotoAlbumsAttachmentBuffer(workingBuffer);
+      const normalized = await normalizePhotoAlbumsAttachmentBuffer(workingBuffer, {
+        forceJpeg: photoAlbumsExtensionRequiresJpegFullFile(cleanExt),
+        ext: cleanExt
+      });
       if (normalized.changed) {
         workingBuffer = normalized.buffer;
         cleanExt = 'jpg';
@@ -2285,8 +2385,8 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
 
   if (writeVariants) {
     try {
-      const displayBuf = await buildPhotoAlbumsDisplay1000pxBuffer(workingBuffer);
-      const thumbBuf = await buildPhotoAlbumsThumbnailBuffer(workingBuffer);
+      const displayBuf = await buildPhotoAlbumsDisplay1000pxBuffer(workingBuffer, cleanExt);
+      const thumbBuf = await buildPhotoAlbumsThumbnailBuffer(workingBuffer, cleanExt);
       writeEncryptedVaultFile(
         session,
         fileRelativePathForVariant(relativePath, 'display'),

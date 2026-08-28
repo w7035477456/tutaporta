@@ -28,10 +28,13 @@ export const PHOTO_ALBUMS_ALLOWED_FILE_EXTENSIONS = new Set([
   'msi',
   'pkg',
   'mp4',
-  'mp3',
-  'avi',
   'mov',
+  'mkv',
+  'webm',
+  'avi',
   'wmv',
+  'mts',
+  'm2ts',
   // Image / design formats (also attachable + encryptable)
   'jpg',
   'jpeg',
@@ -108,11 +111,27 @@ export const PHOTO_ALBUMS_STAGING_PHOTO_EXTENSIONS = new Set([
   'ico',
   'heic',
   'heif',
-  'mp4'
+  'mp4',
+  'mov',
+  'mkv',
+  'webm',
+  'avi',
+  'wmv',
+  'mts',
+  'm2ts'
 ]);
 
-/** Staging-tray / template-slot video (browser-native playback). */
-export const PHOTO_ALBUMS_STAGING_VIDEO_EXTENSIONS = new Set(['mp4']);
+/** Staging-tray / template-slot video (browser-native playback when codec allows). */
+export const PHOTO_ALBUMS_STAGING_VIDEO_EXTENSIONS = new Set([
+  'mp4',
+  'mov',
+  'mkv',
+  'webm',
+  'avi',
+  'wmv',
+  'mts',
+  'm2ts'
+]);
 
 const PHOTO_ALBUMS_MIME_TO_EXTENSION = {
   'application/vnd.ms-powerpoint': 'ppt',
@@ -184,6 +203,9 @@ const PHOTO_ALBUMS_MIME_TO_EXTENSION = {
   'video/mp4': 'mp4',
   'video/x-m4v': 'mp4',
   'video/m4v': 'mp4',
+  'video/webm': 'webm',
+  'video/x-matroska': 'mkv',
+  'video/mp2t': 'mts',
   'audio/mpeg': 'mp3',
   'audio/mp3': 'mp3',
   'video/x-msvideo': 'avi',
@@ -212,8 +234,11 @@ export const PHOTO_ALBUMS_FILE_INPUT_ACCEPT = [
   'image/*',
   'video/mp4',
   'video/quicktime',
+  'video/webm',
+  'video/x-matroska',
   'video/x-msvideo',
   'video/x-ms-wmv',
+  'video/mp2t',
   'audio/mpeg'
 ]
   .map((entry) => (entry.includes('/') ? entry : `.${entry}`))
@@ -248,6 +273,9 @@ export function resolvePhotoAlbumsFileExtension(file) {
   if (mime.includes('zip')) return 'zip';
   if (mime.includes('mpeg')) return 'mp3';
   if (mime.includes('mp4') || mime.includes('m4v')) return 'mp4';
+  if (mime.includes('webm')) return 'webm';
+  if (mime.includes('matroska') || mime.includes('mkv')) return 'mkv';
+  if (mime.includes('mp2t') || mime.includes('mpeg2')) return 'mts';
   if (mime.includes('quicktime')) return 'mov';
   if (mime.includes('msvideo') || mime.includes('avi')) return 'avi';
   if (mime.includes('wmv')) return 'wmv';
@@ -319,6 +347,31 @@ export function isPhotoAlbumsStagingPhotoFile(file) {
   return Boolean(ext && PHOTO_ALBUMS_STAGING_PHOTO_EXTENSIONS.has(ext));
 }
 
+/** Photo tray or MP4 video slot media. */
+export function isPhotoAlbumsStagingAlbumMediaFile(file) {
+  return isPhotoAlbumsStagingPhotoFile(file) || isPhotoAlbumsStagingVideoFile(file);
+}
+
+/** @returns {string} MIME type for `<video src>` / blob URLs */
+export function mimeTypeForPhotoAlbumsVideoExtension(ext) {
+  const normalized = String(ext || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  const last = normalized.includes('.') ? normalized.slice(normalized.lastIndexOf('.') + 1) : normalized;
+  const map = {
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    mkv: 'video/x-matroska',
+    webm: 'video/webm',
+    avi: 'video/x-msvideo',
+    wmv: 'video/x-ms-wmv',
+    mts: 'video/mp2t',
+    m2ts: 'video/mp2t'
+  };
+  return map[last] || 'video/mp4';
+}
+
 export function isPhotoAlbumsStagingVideoExtension(ext) {
   const normalized = String(ext || '')
     .trim()
@@ -343,11 +396,32 @@ export function isPhotoAlbumsAlbumSlotMediaExtension(ext) {
   );
 }
 
+/** Formats the browser often cannot decode locally — trust BE sharp + vault thumb/display JPEG. */
+export const PHOTO_ALBUMS_STAGING_SERVER_THUMB_EXTENSIONS = new Set([
+  'heic',
+  'heif',
+  'tif',
+  'tiff',
+  'ico',
+  'avif',
+  'apng'
+]);
+
+export function photoAlbumsStagingPhotoPrefersServerThumb(ext) {
+  const normalized = String(ext || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  const last = normalized.includes('.') ? normalized.slice(normalized.lastIndexOf('.') + 1) : normalized;
+  return PHOTO_ALBUMS_STAGING_SERVER_THUMB_EXTENSIONS.has(last);
+}
+
 /** Decode-check raster photos before staging (rejects ._ sidecars that mimic .jpg). */
 export async function probePhotoAlbumsImageFile(file) {
   if (!(file instanceof Blob) || file.size < 1) return false;
   const ext = resolvePhotoAlbumsFileExtension(file);
   if (ext === 'svg' || ext === 'svgz') return true;
+  if (photoAlbumsStagingPhotoPrefersServerThumb(ext)) return true;
 
   try {
     if (typeof createImageBitmap === 'function') {
@@ -462,7 +536,7 @@ export function getPhotoAlbumsAttachmentViewKind(ext) {
   if (!normalized) return null;
   if (normalized === 'pdf') return 'pdf';
   if (['txt', 'sql', 'json', 'csv', 'js', 'jsx', 'c', 'java', 'html', 'htm'].includes(normalized)) return 'text';
-  if (['mp4', 'avi', 'mov', 'wmv'].includes(normalized)) return 'video';
+  if (['mp4', 'mov', 'mkv', 'webm', 'avi', 'wmv', 'mts', 'm2ts'].includes(normalized)) return 'video';
   if (normalized === 'mp3') return 'audio';
   if (PHOTO_ALBUMS_STAGING_PHOTO_EXTENSIONS.has(normalized)) {
     return 'image';

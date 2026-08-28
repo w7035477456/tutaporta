@@ -8,7 +8,7 @@ import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
 } from 'ui-component/SliderControlButton';
 import PhotoAlbumsSupportedPhotoFilesDialog from './PhotoAlbumsSupportedPhotoFilesDialog';
-import { isPhotoAlbumsStagingVideoExtension } from 'utils/photoAlbumsFileFormats';
+import { isPhotoAlbumsStagingVideoExtension, photoAlbumsStagingPhotoPrefersServerThumb } from 'utils/photoAlbumsFileFormats';
 import {
   isFilesExplorerDrag,
   takeFilesExplorerDragFilesAsync
@@ -80,7 +80,9 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
   const attachmentId = Number(item.attachmentId);
   const cachedPreview = getStagingAttachmentPreview(attachmentId);
   const localPreviewUrl = String(item?.localPreviewUrl || cachedPreview || '');
-  const [url, setUrl] = useState(() => localPreviewUrl);
+  const fileExt = String(item?.fileExtension || '').toLowerCase().replace(/^\./, '');
+  const preferServerThumb = photoAlbumsStagingPhotoPrefersServerThumb(fileExt);
+  const [url, setUrl] = useState(() => (preferServerThumb ? '' : localPreviewUrl));
   const objectUrlRef = useRef('');
   const thumbRef = useRef(null);
   const [hoverPlate, setHoverPlate] = useState(null);
@@ -89,14 +91,14 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
     let cancelled = false;
     const nid = Number(noteId);
     const freshCache = getStagingAttachmentPreview(attachmentId);
-    const fallback = String(item?.localPreviewUrl || freshCache || '');
+    const fallback = preferServerThumb ? '' : String(item?.localPreviewUrl || freshCache || '');
     if (fallback) setUrl(fallback);
 
     if (!Number.isFinite(attachmentId) || attachmentId < 1 || !Number.isFinite(nid) || nid < 1) {
       return undefined;
     }
-    // Drop preview (Finder / Files Explorer) is already correct — don't replace with a slow/failed vault fetch.
-    if (fallback) return undefined;
+    // HEIC/TIFF/… — always use vault JPEG thumb; local File preview cannot render in <img>.
+    if (fallback && !preferServerThumb) return undefined;
     (async () => {
       try {
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
@@ -128,15 +130,36 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
         objectUrlRef.current = '';
       }
     };
-  }, [attachmentId, noteId, storageType, item?.localPreviewUrl]);
+  }, [attachmentId, noteId, storageType, item?.localPreviewUrl, preferServerThumb]);
 
   const label = stagingDisplayFileName(item, attachmentId);
-  const displayUrl = url || localPreviewUrl || getStagingAttachmentPreview(attachmentId);
+  const displayUrl = preferServerThumb
+    ? url
+    : url || localPreviewUrl || getStagingAttachmentPreview(attachmentId);
   const isVideo = isPhotoAlbumsStagingVideoExtension(item?.fileExtension);
 
   const handleImgError = useCallback(() => {
     setUrl('');
-  }, []);
+    const nid = Number(noteId);
+    if (!Number.isFinite(attachmentId) || attachmentId < 1 || !Number.isFinite(nid) || nid < 1) return;
+    if (isVideo) return;
+    void (async () => {
+      try {
+        const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
+          inline: true,
+          storageType,
+          variant: 'thumb'
+        });
+        if (!blob || blob.size < 1) return;
+        const next = URL.createObjectURL(blob);
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = next;
+        setUrl(next);
+      } catch {
+        // keep filename placeholder
+      }
+    })();
+  }, [attachmentId, isVideo, noteId, storageType]);
 
   const showHoverPlate = useCallback(() => {
     const el = thumbRef.current;
@@ -555,7 +578,7 @@ export default function PhotoAlbumsPhotoStagingTray({
               pointerEvents: 'none'
             }}
           >
-            Please drag and drop photos or MP4 videos here to be put on album
+            Please drag and drop photos or videos (MP4, MOV, WebM, MKV, AVI, WMV, AVCHD) here to be put on album
           </Typography>
         </Box>
         {canRemoveAll ? (

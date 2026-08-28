@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 import GreenButton from 'ui-component/GreenButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import { fetchPhotoAlbumsNoteAttachmentBlob } from 'api/photoAlbumsFe';
+import { mimeTypeForPhotoAlbumsVideoExtension } from 'utils/photoAlbumsFileFormats';
 import { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
 
 const HOURGLASS = '2rem';
@@ -19,8 +20,7 @@ const MIME_BY_EXT = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   gif: 'image/gif',
-  webp: 'image/webp',
-  mp4: 'video/mp4'
+  webp: 'image/webp'
 };
 
 function clamp01(n) {
@@ -372,7 +372,9 @@ export default function PhotoAlbumsPlaceTextPositionOverlay({
           .trim()
           .toLowerCase()
           .replace(/^\./, '');
-        const mime = MIME_BY_EXT[ext] || (session.isVideo ? 'video/mp4' : 'image/jpeg');
+        const mime = session.isVideo
+          ? mimeTypeForPhotoAlbumsVideoExtension(ext)
+          : MIME_BY_EXT[ext] || 'image/jpeg';
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
           inline: true,
           storageType: storageType || undefined,

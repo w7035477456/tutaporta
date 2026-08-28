@@ -24,7 +24,14 @@ const EXT_MIME = {
   avif: 'image/avif',
   heic: 'image/heic',
   heif: 'image/heif',
-  mp4: 'video/mp4'
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  mkv: 'video/x-matroska',
+  webm: 'video/webm',
+  avi: 'video/x-msvideo',
+  wmv: 'video/x-ms-wmv',
+  mts: 'video/mp2t',
+  m2ts: 'video/mp2t'
 };
 
 export function mimeFromPhotoFileName(name) {

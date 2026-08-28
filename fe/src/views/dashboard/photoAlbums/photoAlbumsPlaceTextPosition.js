@@ -6,6 +6,7 @@ import {
   photoPageRectFromAttrs
 } from './photoAlbumsAttachmentNode';
 import { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
+import { isPhotoAlbumsStagingVideoExtension } from 'utils/photoAlbumsFileFormats';
 import {
   PLACE_TEXT_PREVIEW_MIN_REL_H,
   PLACE_TEXT_PREVIEW_MIN_REL_W
@@ -90,7 +91,7 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     .trim()
     .toLowerCase()
     .replace(/^\./, '');
-  const isVideo = ext === 'mp4';
+  const isVideo = isPhotoAlbumsStagingVideoExtension(ext);
 
   const pw = Math.max(1, photoRect.width);
   const ph = Math.max(1, photoRect.height);

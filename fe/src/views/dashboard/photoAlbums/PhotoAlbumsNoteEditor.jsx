@@ -94,6 +94,7 @@ import albumCoverImg from 'assets/images/albumcover.png';
 import albumCoverBackImg from 'assets/images/albumcoverback.png';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
+import zoomIconImg from 'assets/images/zoom.png';
 import { storePhotoAlbumsPresentation } from './photoAlbumsPresentationSession';
 import { useSlideShowMusicPlayback } from 'hooks/useSlideShowMusicPlayback';
 import SlideShowMusicControls from './SlideShowMusicControls';
@@ -1845,6 +1846,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     onRemoveStagedAttachment = null,
     onRemoveAllStagedAttachments = null,
     onAlbumFullscreenChange = null,
+    /** Zoom icon — album-only view (workspace chrome hidden, not true fullscreen). */
+    albumFocusView = false,
+    onAlbumFocusViewChange = null,
     /** New-tab viewer: start in fullscreen chrome-off mode and fit the whole page. */
     presentationMode = false,
     presentationFullSlide = false,
@@ -2029,6 +2033,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   const onAlbumFullscreenChangeRef = useRef(onAlbumFullscreenChange);
   onAlbumFullscreenChangeRef.current = onAlbumFullscreenChange;
+  const onAlbumFocusViewChangeRef = useRef(onAlbumFocusViewChange);
+  onAlbumFocusViewChangeRef.current = onAlbumFocusViewChange;
+
+  const albumChromeHidden = albumFullscreen || albumFocusView;
 
   /** View-only while Full screen — no chrome / no edits. */
   const effectiveEditable = editable && !albumFullscreen;
@@ -3798,6 +3806,17 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     requestAnimationFrame(() => fitAlbumPageFlushToViewportRef.current?.());
   }, [presentationMode]);
 
+  const toggleAlbumFocusView = useCallback(() => {
+    if (presentationMode || albumFullscreen) return;
+    setTemplatePickerOpen(false);
+    const next = !albumFocusView;
+    onAlbumFocusViewChangeRef.current?.(next);
+    requestAnimationFrame(() => {
+      fitAlbumPageFlushToViewportRef.current?.();
+      flushAlbumScrollOrigin(zoomScrollRef.current);
+    });
+  }, [albumFocusView, albumFullscreen, presentationMode]);
+
   /**
    * Full screen / Full Slide: open a new tab that shows the entire album page
    * (auto-fit zoom). Falls back to an in-app overlay if the popup is blocked.
@@ -3862,6 +3881,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       }
 
       // Popup blocked or storage failed — in-app overlay fallback.
+      onAlbumFocusViewChangeRef.current?.(false);
       setAlbumFullSlide(Boolean(opts?.fullSlide));
       setAlbumFullscreen(true);
       if (opts?.fullSlide) setAlbumCoverFace('front');
@@ -3878,18 +3898,26 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     enterAlbumFullscreen({ fullSlide: true });
   }, [enterAlbumFullscreen]);
   useEffect(() => {
-    if (!albumFullscreen) return undefined;
+    if (!albumFullscreen && !albumFocusView) return undefined;
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        exitAlbumFullscreen();
+        if (albumFullscreen) exitAlbumFullscreen();
+        else if (albumFocusView) onAlbumFocusViewChangeRef.current?.(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [albumFullscreen, exitAlbumFullscreen]);
+  }, [albumFullscreen, albumFocusView, exitAlbumFullscreen]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      fitAlbumPageFlushToViewportRef.current?.();
+      flushAlbumScrollOrigin(zoomScrollRef.current);
+    });
+  }, [albumFocusView]);
 
   useImperativeHandle(
     ref,
@@ -6393,8 +6421,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         }}
         onConfirm={handlePlaceTextConfirm}
       />
-      {!albumFullscreen ? header : null}
-      {!albumFullscreen ? <PhotoAlbumsEditorToolbar editor={editor} /> : null}
+      {!albumChromeHidden ? header : null}
+      {!albumChromeHidden ? <PhotoAlbumsEditorToolbar editor={editor} /> : null}
 
       {editor && effectiveEditable ? (
         <BubbleMenu editor={editor} className="rv-bubble">
@@ -6428,7 +6456,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       {/* Template control sits above the binder (not on the page) so the 3×3 picker is never clipped.
           Keep this stacking context above the album zoom-scroll (incl. native scrollbars + page-edge bar).
           Fixed label size + horizontal scroll — no font auto-fit (avoids scrollbar/font jiggle). */}
-      {editable && !albumFullscreen ? (
+      {editable && !albumChromeHidden ? (
         <Box
           className="rv-editor__template-bar"
           sx={{
@@ -6720,7 +6748,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       ) : null}
 
-      {editable && !albumFullscreen ? (
+      {editable && !albumChromeHidden ? (
         <Box
           ref={thumbRowRef}
           className="rv-album-thumb-row"
@@ -6856,7 +6884,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       ) : null}
 
-      {!albumFullscreen ? (
+      {!albumChromeHidden ? (
         <PhotoAlbumsAlbumZoomBar value={albumZoom} onChange={handleAlbumZoomChange} />
       ) : null}
 
@@ -6902,7 +6930,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             : null)
         }}
       >
-        {!albumFullscreen && !presentationMode ? (
+        {!albumChromeHidden && !presentationMode ? (
           <Box
             component="span"
             data-pa-album-mode-badge=""
@@ -6935,6 +6963,45 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             {albumPageSideArrow('prev', 'embedded')}
             {albumPageSideArrow('next', 'embedded')}
           </>
+        ) : null}
+        {!presentationMode && !albumFullscreen ? (
+          <Box
+            component="button"
+            type="button"
+            onClick={toggleAlbumFocusView}
+            aria-label={
+              albumFocusView
+                ? 'Show menus, sidebars, and editing tools'
+                : 'Show album only — hide menus and sidebars'
+            }
+            title={
+              albumFocusView
+                ? 'Restore full workspace (Esc)'
+                : 'Show album only — hide sidebars and toolbars (Esc to restore)'
+            }
+            aria-pressed={albumFocusView}
+            sx={{
+              position: 'absolute',
+              bottom: 12,
+              right: 12,
+              zIndex: 50,
+              p: 0,
+              m: 0,
+              border: 'none',
+              bgcolor: 'transparent',
+              cursor: 'pointer',
+              lineHeight: 0,
+              '&:hover': { filter: 'brightness(1.08)' },
+              '&:active': { transform: 'scale(0.96)' }
+            }}
+          >
+            <Box
+              component="img"
+              src={zoomIconImg}
+              alt=""
+              sx={{ width: { xs: 36, sm: 44 }, height: { xs: 36, sm: 44 }, display: 'block' }}
+            />
+          </Box>
         ) : null}
         <Box
           className="rv-editor__album-zoom-scaler"
@@ -7353,7 +7420,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       </Box>
 
-      {!albumFullscreen ? (
+      {!albumChromeHidden ? (
         <Box className="rv-editor__footer">
           <span>{counts.words} words</span>
           <span>{counts.characters} characters</span>
@@ -7379,7 +7446,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
       <PhotoAlbumsContextTutorial
-        active={Boolean(effectiveEditable && !presentationMode && !albumFullscreen)}
+        active={Boolean(effectiveEditable && !presentationMode && !albumChromeHidden)}
         photoEditActive={photoEditActive}
         panZoomActive={Boolean(photoPanZoomActive)}
         hasPageContext={Boolean(templates?.length)}
@@ -7405,6 +7472,8 @@ PhotoAlbumsNoteEditor.propTypes = {
   onRemoveStagedAttachment: PropTypes.func,
   onRemoveAllStagedAttachments: PropTypes.func,
   onAlbumFullscreenChange: PropTypes.func,
+  albumFocusView: PropTypes.bool,
+  onAlbumFocusViewChange: PropTypes.func,
   presentationMode: PropTypes.bool,
   presentationFullSlide: PropTypes.bool,
   presentationPageIndex: PropTypes.number,

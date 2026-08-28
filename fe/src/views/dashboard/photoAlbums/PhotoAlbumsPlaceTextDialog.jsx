@@ -9,6 +9,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import GreenButton from 'ui-component/GreenButton';
+import YellowButtonTemplate from 'ui-component/YellowButtonTemplate';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCenterWide';
 import { colorTemplate7PopupSliderSx } from 'config/colorTemplate7PopupLargeDark';
@@ -1113,83 +1114,112 @@ export default function PhotoAlbumsPlaceTextDialog({
     </>
   );
 
-  const photoChromeButtonRow =
-    hasMedia && !mediaSession?.isVideo ? (
-      <Stack
-        direction="row"
-        spacing={0.75}
-        justifyContent="center"
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        sx={{ mt: 0.75, mb: 0.25, flexShrink: 0 }}
+  const mediaActionButtonRow = hasMedia ? (
+    <Stack
+      direction="row"
+      spacing={0.75}
+      justifyContent="space-between"
+      alignItems="center"
+      flexWrap="wrap"
+      useFlexGap
+      sx={{ mt: 0.75, mb: 0.25, flexShrink: 0, width: '100%' }}
+    >
+      <YellowButtonTemplate
+        type="button"
+        onClick={onClose}
+        title="Ignore all changes and exit"
+        sx={{ minWidth: 88, fontWeight: 800 }}
       >
-        <GreenButton
-          type="button"
-          aria-pressed={panEnabled}
-          onClick={handleTogglePanZoom}
-          title="Pan & Zoom — drag the photo inside its slot on the album page"
-          sx={{
-            minWidth: 88,
-            fontWeight: 800,
-            lineHeight: 1.15,
-            whiteSpace: 'nowrap',
-            ...(panEnabled
-              ? {
-                  bgcolor: '#FFEB3B !important',
-                  color: '#000 !important',
-                  WebkitTextFillColor: '#000 !important',
-                  border: '2px solid #000 !important'
-                }
-              : null)
-          }}
+        Cancel
+      </YellowButtonTemplate>
+      {!mediaSession?.isVideo ? (
+        <Stack
+          direction="row"
+          spacing={0.75}
+          justifyContent="center"
+          alignItems="center"
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ flex: '1 1 auto', justifyContent: 'center' }}
         >
-          Pan & Zoom
-        </GreenButton>
-        <GreenButton
-          type="button"
-          onClick={handleRotatePhoto}
-          title="Rotate photo 90° clockwise"
-          sx={{ minWidth: 72, fontWeight: 800 }}
-        >
-          Rotate
-        </GreenButton>
-        <GreenButton
-          type="button"
-          aria-pressed={photoSlotFit === 'contain'}
-          onClick={handlePhotoFitFull}
-          title="Show the full photo in the slot (may leave edges)"
-          sx={{
-            minWidth: 64,
-            fontWeight: 800,
-            ...(photoSlotFit === 'contain' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
-          }}
-        >
-          Full
-        </GreenButton>
-        <GreenButton
-          type="button"
-          aria-pressed={photoSlotFit === 'cover'}
-          onClick={handlePhotoFitZoom}
-          title="Fill the slot (may clip edges)"
-          sx={{
-            minWidth: 64,
-            fontWeight: 800,
-            ...(photoSlotFit === 'cover' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
-          }}
-        >
-          Zoom
-        </GreenButton>
-        <GreenButton
-          type="button"
-          onClick={handleReset}
-          title="Restore photo and text to how this popup opened"
-          sx={{ minWidth: 72, fontWeight: 800 }}
-        >
-          Reset
-        </GreenButton>
-      </Stack>
-    ) : null;
+          <GreenButton
+            type="button"
+            aria-pressed={panEnabled}
+            onClick={handleTogglePanZoom}
+            title="Pan & Zoom — drag the photo inside its slot on the album page"
+            sx={{
+              minWidth: 88,
+              fontWeight: 800,
+              lineHeight: 1.15,
+              whiteSpace: 'nowrap',
+              ...(panEnabled
+                ? {
+                    bgcolor: '#FFEB3B !important',
+                    color: '#000 !important',
+                    WebkitTextFillColor: '#000 !important',
+                    border: '2px solid #000 !important'
+                  }
+                : null)
+            }}
+          >
+            Pan & Zoom
+          </GreenButton>
+          <GreenButton
+            type="button"
+            onClick={handleRotatePhoto}
+            title="Rotate photo 90° clockwise"
+            sx={{ minWidth: 72, fontWeight: 800 }}
+          >
+            Rotate
+          </GreenButton>
+          <GreenButton
+            type="button"
+            aria-pressed={photoSlotFit === 'contain'}
+            onClick={handlePhotoFitFull}
+            title="Show the full photo in the slot (may leave edges)"
+            sx={{
+              minWidth: 64,
+              fontWeight: 800,
+              ...(photoSlotFit === 'contain' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
+            }}
+          >
+            Full
+          </GreenButton>
+          <GreenButton
+            type="button"
+            aria-pressed={photoSlotFit === 'cover'}
+            onClick={handlePhotoFitZoom}
+            title="Fill the slot (may clip edges)"
+            sx={{
+              minWidth: 64,
+              fontWeight: 800,
+              ...(photoSlotFit === 'cover' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
+            }}
+          >
+            Zoom
+          </GreenButton>
+          <GreenButton
+            type="button"
+            onClick={handleReset}
+            title="Restore photo and text to how this popup opened"
+            sx={{ minWidth: 72, fontWeight: 800 }}
+          >
+            Reset
+          </GreenButton>
+        </Stack>
+      ) : (
+        <Box sx={{ flex: '1 1 auto' }} aria-hidden />
+      )}
+      <GreenButton
+        type="button"
+        onClick={handleOk}
+        title="Save all changes and exit"
+        sx={{ minWidth: 88, fontWeight: 800 }}
+      >
+        Save
+      </GreenButton>
+    </Stack>
+  ) : null;
 
   const sizeSliderRow = (
     <Stack
@@ -1321,10 +1351,10 @@ export default function PhotoAlbumsPlaceTextDialog({
                 minHeight: 0
               }}
             >
+              {mediaActionButtonRow}
+              {sizeSliderRow}
               {stylePresetButtons(true)}
               {textInputBlock(true)}
-              {photoChromeButtonRow}
-              {sizeSliderRow}
             </Box>
 
             <Box
@@ -1390,12 +1420,6 @@ export default function PhotoAlbumsPlaceTextDialog({
                   sx={{ minWidth: 80, fontWeight: 800 }}
                 >
                   Emoji
-                </GreenButton>
-                <GreenButton type="button" onClick={onClose} sx={{ minWidth: 80, fontWeight: 800 }}>
-                  Cancel
-                </GreenButton>
-                <GreenButton type="button" onClick={handleOk} sx={{ minWidth: 80, fontWeight: 800 }}>
-                  OK
                 </GreenButton>
               </Stack>
               <PhotoAlbumsEmojiPickerPopover
@@ -1515,7 +1539,7 @@ export default function PhotoAlbumsPlaceTextDialog({
       <ColorTemplate16PopupCenterWide.Title
         sx={hasMedia ? { flexShrink: 0, py: 0.75 } : undefined}
       >
-        Add Text
+        {hasMedia ? 'Photo/Video Edit' : 'Add Text'}
       </ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body
         spacing={hasMedia ? 0.75 : 1.5}
@@ -1536,7 +1560,9 @@ export default function PhotoAlbumsPlaceTextDialog({
           sx={hasMedia ? { flexShrink: 0, mb: 0, lineHeight: 1.3, fontSize: '0.88rem' } : undefined}
         >
           {hasMedia
-            ? 'Type below — text updates live on the photo. Use Emoji for stickers. Use Pan Zoom / Rotate / Full / Zoom for the photo. Drag corners to scale text; drag sides to stretch. Drag the yellow bar to resize preview vs controls.'
+            ? mediaSession?.isVideo
+              ? 'Type below — text updates live on the video. Use Play / Pause and the slider to preview. Use Emoji for stickers. Cancel discards changes; Save applies them. Drag the yellow bar to resize preview vs controls.'
+              : 'Type below — text updates live on the photo. Use Emoji for stickers. Use Pan Zoom / Rotate / Full / Zoom for the photo. Cancel discards changes; Save applies them. Drag corners to scale text; drag sides to stretch. Drag the yellow bar to resize preview vs controls.'
             : 'Style your text, then OK to place it on the page (drag & rotate like a photo).'}
         </ColorTemplate16PopupCenterWide.SectionDescription>
 

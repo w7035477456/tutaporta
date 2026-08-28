@@ -37,10 +37,13 @@ import {
   isAllowedPhotoAlbumsFile,
   isMacOsMetadataFileName,
   isPhotoAlbumsStagingPhotoFile,
+  isPhotoAlbumsStagingAlbumMediaFile,
   isPhotoAlbumsStagingPhotoExtension,
   isPhotoAlbumsStagingVideoFile,
+  photoAlbumsStagingPhotoPrefersServerThumb,
   photoAlbumsUploadFileName,
-  probePhotoAlbumsImageFile
+  probePhotoAlbumsImageFile,
+  resolvePhotoAlbumsFileExtension
 } from 'utils/photoAlbumsFileFormats';
 import PhotoAlbumsSearchBar from './PhotoAlbumsSearchBar';
 import PhotoAlbumsInviteBar from './PhotoAlbumsInviteBar';
@@ -1629,6 +1632,9 @@ export default function PhotoAlbumsWorkspacePane({
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
+  /** Zoom icon — hide sidebars/menus and show album only (not true fullscreen overlay). */
+  const [albumFocusView, setAlbumFocusView] = useState(false);
+  const hideWorkspaceChrome = albumFullscreen || albumFocusView;
   const [usbVaultFolderLabel] = useState('USB');
   const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
@@ -4691,7 +4697,11 @@ export default function PhotoAlbumsWorkspacePane({
         }
       }
 
-      let localPreviewUrl = createPhotoStagingPreviewObjectUrl(file, file.name || '');
+      const fileExt = resolvePhotoAlbumsFileExtension(file);
+      let localPreviewUrl = '';
+      if (!photoAlbumsStagingPhotoPrefersServerThumb(fileExt)) {
+        localPreviewUrl = createPhotoStagingPreviewObjectUrl(file, file.name || '');
+      }
 
       if (!skipBusy) setBusy(true);
       setError('');
@@ -4715,12 +4725,12 @@ export default function PhotoAlbumsWorkspacePane({
             if (previewUrl) localPreviewUrl = previewUrl;
           }
           const ext = String(attachment.file_extension || '').toLowerCase();
-          const isTrayPhoto =
-            isPhotoAlbumsStagingPhotoFile({
+          const isTrayMedia =
+            isPhotoAlbumsStagingAlbumMediaFile({
               name: attachment.file_name || file.name,
               type: file.type
-            }) || isPhotoAlbumsStagingPhotoFile({ name: `x.${ext}` });
-          if (isTrayPhoto && Number.isFinite(attachmentId) && attachmentId > 0) {
+            }) || isPhotoAlbumsStagingAlbumMediaFile({ name: `x.${ext}` });
+          if (isTrayMedia && Number.isFinite(attachmentId) && attachmentId > 0) {
             const seqFromUpload =
               attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null;
             noteEditorApiRef.current?.addStagedAttachment?.(
@@ -4804,8 +4814,8 @@ export default function PhotoAlbumsWorkspacePane({
       const attachFiles = files.filter((file) => isAllowedPhotoAlbumsFile(file));
       const markdownOnly = files.filter((file) => classifyNoteImportDropFile(file) === 'md');
       // Onto the album workspace: prefer photo-tray types so they preview in slots.
-      const stagePhotos = attachFiles.filter((file) => isPhotoAlbumsStagingPhotoFile(file));
-      const otherVault = attachFiles.filter((file) => !isPhotoAlbumsStagingPhotoFile(file));
+      const stageMedia = attachFiles.filter((file) => isPhotoAlbumsStagingAlbumMediaFile(file));
+      const otherVault = attachFiles.filter((file) => !isPhotoAlbumsStagingAlbumMediaFile(file));
 
       if (!attachFiles.length) {
         if (markdownOnly.length) {
@@ -4816,14 +4826,14 @@ export default function PhotoAlbumsWorkspacePane({
         return;
       }
 
-      for (const file of stagePhotos.length ? stagePhotos : attachFiles) {
+      for (const file of stageMedia.length ? stageMedia : attachFiles) {
         // eslint-disable-next-line no-await-in-loop
         await uploadNoteVaultFileToStaging(file);
       }
 
-      if (stagePhotos.length && otherVault.length) {
+      if (stageMedia.length && otherVault.length) {
         setError(
-          `Staged ${stagePhotos.length} photo(s). ${otherVault.length} other vault file(s) were not added to the photo tray (preview not supported).`
+          `Staged ${stageMedia.length} photo/video file(s). ${otherVault.length} other vault file(s) were not added to the photo tray (preview not supported).`
         );
       } else if (markdownOnly.length) {
         setError('Staged supported files. Drop Markdown onto the Notes list to import as a new note.');
@@ -4847,9 +4857,9 @@ export default function PhotoAlbumsWorkspacePane({
       }
       const list = Array.isArray(files) ? files : [];
       const photoFiles = sortPhotoAlbumsFilesBySourceTakenAt(
-        list.filter((file) => isPhotoAlbumsStagingPhotoFile(file))
+        list.filter((file) => isPhotoAlbumsStagingAlbumMediaFile(file))
       );
-      const rejected = list.filter((file) => !isPhotoAlbumsStagingPhotoFile(file));
+      const rejected = list.filter((file) => !isPhotoAlbumsStagingAlbumMediaFile(file));
       if (!photoFiles.length) {
         const name = rejected[0]?.name || 'file';
         if (isMacOsMetadataFileName(name)) {
@@ -4858,7 +4868,7 @@ export default function PhotoAlbumsWorkspacePane({
           );
         } else {
           setError(
-            `Cannot preview “${name}” in the photo tray. Supported album media: PNG, JPEG, SVG, WebP, GIF, AVIF, ICO, BMP, TIFF, APNG, HEIC/HEIF, MP4.`
+            `Cannot preview “${name}” in the photo tray. Supported album media: PNG, JPEG, SVG, WebP, GIF, AVIF, ICO, BMP, TIFF, APNG, HEIC/HEIF; videos MP4, MOV, WebM, MKV, AVI, WMV, MTS/M2TS.`
           );
         }
         return;
@@ -7801,7 +7811,7 @@ export default function PhotoAlbumsWorkspacePane({
       ) : (
         <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
           <PhotoAlbumsTrafficWaitHost />
-          {!albumFullscreen ? (
+          {!hideWorkspaceChrome ? (
             <PhotoAlbumsUsageBar
               usage={vaultUsage}
               storageType={paneStorageType}
@@ -7811,7 +7821,7 @@ export default function PhotoAlbumsWorkspacePane({
               onRequestUsageRefresh={() => refreshVaultUsageRef.current?.()}
             />
           ) : null}
-          {!albumFullscreen ? (
+          {!hideWorkspaceChrome ? (
           <Box
             sx={{
               flexShrink: 0,
@@ -8222,7 +8232,7 @@ export default function PhotoAlbumsWorkspacePane({
           </Box>
           ) : null}
 
-          {!albumFullscreen && !compareMode ? (
+          {!hideWorkspaceChrome && !compareMode ? (
           <Box
             aria-label="Search results"
             sx={{
@@ -8459,7 +8469,7 @@ export default function PhotoAlbumsWorkspacePane({
             </Box>
           ) : (
           <>
-          {leftMenuOpen ? (
+          {leftMenuOpen && !hideWorkspaceChrome ? (
             <>
               <Box
                 ref={leftSidebarPaneRef}
@@ -9175,6 +9185,8 @@ export default function PhotoAlbumsWorkspacePane({
                         void handleRemoveAllStagedAttachments(ids)
                       }
                       onAlbumFullscreenChange={setAlbumFullscreen}
+                      albumFocusView={albumFocusView}
+                      onAlbumFocusViewChange={setAlbumFocusView}
                       searchTerms={activeSearchTerms}
                       onSearchMatchPagesChange={handleSearchMatchPagesChange}
                       onAlbumPageDragStart={
@@ -9314,7 +9326,7 @@ export default function PhotoAlbumsWorkspacePane({
             onClose={closeInnerEncryptDialog}
           />
 
-          {rightMenuOpen ? (
+          {rightMenuOpen && !hideWorkspaceChrome ? (
             <>
               {!compareMode ? (
               <ColumnResizeHandle

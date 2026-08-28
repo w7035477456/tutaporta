@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import { fetchPhotoAlbumsNoteAttachmentBlob } from 'api/photoAlbumsFe';
+import { mimeTypeForPhotoAlbumsVideoExtension } from 'utils/photoAlbumsFileFormats';
+import PhotoAlbumsVideoPlaybackControls from './PhotoAlbumsVideoPlaybackControls';
 import { PlaceTextPositionLabel, computePlaceTextContainedRect } from './photoAlbumsPlaceTextPreviewShared';
 import PlaceTextPanDragOverlay from './PlaceTextPanDragOverlay';
 import { clampPhotoPan, coverSizeForFrame, fitSizeForFrame } from './photoAlbumsSlotZoom';
@@ -14,8 +16,7 @@ const MIME_BY_EXT = {
   jpeg: 'image/jpeg',
   png: 'image/png',
   gif: 'image/gif',
-  webp: 'image/webp',
-  mp4: 'video/mp4'
+  webp: 'image/webp'
 };
 
 /**
@@ -144,7 +145,9 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
     (async () => {
       try {
         const ext = fileExtension.trim().toLowerCase().replace(/^\./, '');
-        const mime = MIME_BY_EXT[ext] || (isVideo ? 'video/mp4' : 'image/jpeg');
+        const mime = isVideo
+          ? mimeTypeForPhotoAlbumsVideoExtension(ext)
+          : MIME_BY_EXT[ext] || 'image/jpeg';
         const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, attachmentId, {
           inline: true,
           storageType: storageType || undefined,
@@ -331,25 +334,37 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
       ) : (
         <>
           {isVideo && objectUrl ? (
-            <Box
-              ref={mediaRef}
-              component="video"
-              src={objectUrl}
-              muted
-              playsInline
-              autoPlay
-              loop
-              onLoadedData={reportNaturalAspect}
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                display: 'block',
-                bgcolor: '#000'
-              }}
-            />
+            <>
+              <Box
+                ref={mediaRef}
+                component="video"
+                src={objectUrl}
+                playsInline
+                preload="metadata"
+                onLoadedMetadata={reportNaturalAspect}
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  bgcolor: '#000',
+                  pb: '3.25rem'
+                }}
+              />
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 5
+                }}
+              >
+                <PhotoAlbumsVideoPlaybackControls videoRef={mediaRef} disabled={loading || Boolean(error)} />
+              </Box>
+            </>
           ) : showFramedPhoto ? (
             <Box
               sx={{

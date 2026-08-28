@@ -33,6 +33,7 @@ import {
   vaultDeleteNoteAttachment,
   vaultGetNoteAttachment,
   vaultReconcileAlbumPhotoSeq,
+  vaultRepairMissingAttachmentVariants,
   vaultAddNoteExtraImage,
   vaultDeleteNoteExtraImage,
   vaultGetNoteExtraImage,
@@ -939,10 +940,17 @@ export async function reconcilePhotoAlbumsAlbumPhotoSeq(req, res) {
   }
 
   try {
+    vaultReconcileAlbumPhotoSeq(session, noteId);
+    let repair = { repaired: 0, failed: 0 };
+    try {
+      repair = await vaultRepairMissingAttachmentVariants(session, noteId);
+    } catch (err) {
+      console.warn('[reconcilePhotoAlbumsAlbumPhotoSeq] variant repair', err?.message || err);
+    }
     const attachments = vaultReconcileAlbumPhotoSeq(session, noteId);
     logImpersonatedMutation(req);
     flushDbToUsb(session);
-    return res.json({ success: true, attachments });
+    return res.json({ success: true, attachments, repaired: repair.repaired, repairFailed: repair.failed });
   } catch (err) {
     console.error('[reconcilePhotoAlbumsAlbumPhotoSeq]', err?.message || err);
     const message = err?.message || 'Failed to reconcile album photo sequence';
