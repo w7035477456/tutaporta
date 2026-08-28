@@ -48,6 +48,7 @@ import { useAuth } from 'contexts/AuthContext';
 import { MobileOrientationSimProvider } from 'contexts/MobileOrientationSimContext';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
+import { isVettedFriendsPath } from 'routes/vettedFriendsPaths';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 import ColorTemplate15LandingPage from 'ui-component/ColorTemplate15LandingPage';
@@ -60,6 +61,7 @@ import {
   myPhotoAlbumsHeaderBannerSx
 } from 'config/photoAlbumsLayout';
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { isTutaDatesLandingPath, isTutaDatesPath } from 'constants/tutaDatesRoute';
 
 // ==============================|| MAIN LAYOUT ||============================== //
 
@@ -150,7 +152,7 @@ export default function MainLayout() {
       ? myNoteHeaderBannerSx
       : undefined;
   const isLandingRoute = location.pathname === '/' || location.pathname === '/landing' || location.pathname === '/mall';
-  const isVsinglesLandingRoute = location.pathname === '/vsingles';
+  const isVsinglesLandingRoute = isTutaDatesLandingPath(location.pathname);
   const isMenuDatingRoute =
     location.pathname === '/allSingles' ||
     location.pathname === '/myPicks' ||
@@ -158,13 +160,12 @@ export default function MainLayout() {
     location.pathname === RECEIVED_BIO_REQUESTS_PATH ||
     location.pathname === PROFILES_RECORDS_PATH ||
     location.pathname === ADMIN_TOOLS_PATH ||
-    location.pathname === '/vettedFriends' ||
+    isVettedFriendsPath(location.pathname) ||
     location.pathname === '/request-ive-sent' ||
     location.pathname === '/send-flower' ||
-    location.pathname.startsWith('/vettedFriends/') ||
     location.pathname.startsWith('/request-ive-sent/');
   const isDatingRoute =
-    location.pathname.startsWith('/vsingles') ||
+    isTutaDatesPath(location.pathname) ||
     location.pathname.startsWith('/dashboard') ||
     location.pathname === '/verifyself' ||
     location.pathname === SELF_REPORT_BIOGRAPHY_PATH ||

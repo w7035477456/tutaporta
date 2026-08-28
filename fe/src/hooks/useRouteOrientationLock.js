@@ -4,17 +4,29 @@ import { useLocation } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
+import { isVettedFriendsPath, VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
+import { TUTADATES_MY_STORE_PATH, TUTADATES_PATH } from 'constants/tutaDatesRoute';
 
 /** My photo album, All Singles, My Picks — portrait on mobile/narrow only */
-const PORTRAIT_PATHS = new Set(['/myStory', '/vsingles/myStory', '/vsingles/myStore', '/allSingles', '/myPicks', '/interestedSingles']);
+const PORTRAIT_PATHS = new Set([
+  '/myStory',
+  `${TUTADATES_PATH}/myStory`,
+  `${TUTADATES_PATH}/myStore`,
+  TUTADATES_MY_STORE_PATH,
+  '/vsingles/myStory',
+  '/vsingles/myStore',
+  '/allSingles',
+  '/myPicks',
+  '/interestedSingles'
+]);
 
 /** My Vetting Info, Received Requests, Outgoing Requests — landscape on mobile/narrow only */
-export const LANDSCAPE_PATHS = new Set(['/verifyself', RECEIVED_BIO_REQUESTS_PATH, '/vettedFriends']);
+export const LANDSCAPE_PATHS = new Set(['/verifyself', RECEIVED_BIO_REQUESTS_PATH, VETTED_FRIENDS_PATH]);
 
 function lockModeForPath(pathname) {
   if (PORTRAIT_PATHS.has(pathname)) return 'portrait';
   if (LANDSCAPE_PATHS.has(pathname)) return 'landscape';
-  if (pathname.startsWith('/vettedFriends')) return 'landscape';
+  if (isVettedFriendsPath(pathname)) return 'landscape';
   if (pathname.startsWith('/request-ive-sent')) return 'landscape';
   return null;
 }

@@ -17,6 +17,7 @@ import MainCard from 'ui-component/cards/MainCard';
 import Transitions from 'ui-component/extended/Transitions';
 import NotificationList from './NotificationList';
 import useChatUnreadSenderCount from 'hooks/useChatUnreadSenderCount';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import {
   dismissAllMyPicksPostNotifications,
   dismissMyPicksPostNotification,
@@ -310,7 +311,7 @@ export default function NotificationSection({ clusterTight = false, placement = 
             const params = new URLSearchParams();
             if (Number.isFinite(authorId) && authorId > 0) params.set('focusChat', String(authorId));
             const search = params.toString();
-            navigate(`/vettedFriends${search ? `?${search}` : ''}`, {
+            navigate(`${VETTED_FRIENDS_PATH}${search ? `?${search}` : ''}`, {
               state: {
                 focusSinglesId: Number.isFinite(authorId) && authorId > 0 ? authorId : undefined,
                 openChat: true

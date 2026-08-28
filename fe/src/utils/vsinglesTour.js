@@ -1,12 +1,18 @@
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
+import { isVettedFriendsPath } from 'routes/vettedFriendsPaths';
+import {
+  isTutaDatesPath,
+  TUTADATES_PATH
+} from 'constants/tutaDatesRoute';
 
 export const VSINGLES_TOUR_START_EVENT = 'vsingles-tour-start';
 export const VSINGLES_TOUR_STEP_EVENT = 'vsingles-tour-step';
 export const VSINGLES_TOUR_END_EVENT = 'vsingles-tour-end';
 export const VSINGLES_TOUR_PAUSE_MEDIA_EVENT = 'vsingles-tour-pause-media';
 
-export const VSINGLES_LANDING_PATH = '/vsingles';
+/** Tuta Dates splash — canonical `/tutadates` (legacy name kept for tour imports). */
+export const VSINGLES_LANDING_PATH = TUTADATES_PATH;
 
 export const TOUR_STEP_THEME = 0;
 export const TOUR_STEP_ALL_SINGLES = 1;
@@ -30,8 +36,7 @@ export function getTourStep() {
 /** Dating / vsingles routes where the sidebar tour button is shown. */
 export function isVsinglesTourRoute(pathname) {
   return (
-    pathname === '/vsingles' ||
-    pathname.startsWith('/vsingles/') ||
+    isTutaDatesPath(pathname) ||
     pathname.startsWith('/dashboard') ||
     pathname === '/verifyself' ||
     pathname === SELF_REPORT_BIOGRAPHY_PATH ||
@@ -39,10 +44,9 @@ export function isVsinglesTourRoute(pathname) {
     pathname === '/myPicks' ||
     pathname === '/interestedSingles' ||
     pathname === RECEIVED_BIO_REQUESTS_PATH ||
-    pathname === '/vettedFriends' ||
     pathname === '/request-ive-sent' ||
     pathname === '/send-flower' ||
-    pathname.startsWith('/vettedFriends/') ||
+    isVettedFriendsPath(pathname) ||
     pathname.startsWith('/request-ive-sent/') ||
     pathname.startsWith('/request-')
   );

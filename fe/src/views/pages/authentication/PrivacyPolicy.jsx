@@ -76,7 +76,7 @@ export default function PrivacyPolicy() {
                   Privacy Policy
                 </Typography>
                 <Typography variant="body1" paragraph>
-                  This policy outlines <strong>OnlineMall.Website</strong>&apos;s privacy protocols for data gathering, storage, usage, and sharing. It applies to all information collected via Services (including its eMarketing directories, Classified Ads marketplace, its specialized dating subdomain <strong>Vsingles</strong>, mobile applications, and websites managed by <strong>OnlineMall.Website</strong> and its corporate partners). By using the Services, you agree to the Privacy Policy and Terms and Conditions. The policy may be updated; continued use after updates signifies agreement.
+                  This policy outlines <strong>TutaMall.com (formerly OnlineMall.Website)</strong>&apos;s privacy protocols for data gathering, storage, usage, and sharing. It applies to all information collected via Services (including its eMarketing directories, Classified Ads marketplace, its specialized dating subdomain <strong>Vsingles</strong>, mobile applications, and websites managed by <strong>OnlineMall.Website</strong> and its corporate partners). By using the Services, you agree to the Privacy Policy and Terms and Conditions. The policy may be updated; continued use after updates signifies agreement.
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>1. Data Collection: What and How</Typography>
                 <Typography variant="body1" component="div" paragraph>
@@ -96,7 +96,7 @@ export default function PrivacyPolicy() {
                 <Typography variant="h6" sx={sectionHeaderSx}>3. Sharing and Disclosure</Typography>
                 <Typography variant="body1" component="div" paragraph>
                   <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                    <Box component="li" sx={{ mb: 0.5 }}><strong>No Sale:</strong> <strong>OnlineMall.Website</strong> and <strong>Vsingles</strong> do not sell your contact information or personal details to third parties.</Box>
+                    <Box component="li" sx={{ mb: 0.5 }}><strong>No Sale:</strong> <strong>TutaMall.com (formerly OnlineMall.Website)</strong> and <strong>Vsingles</strong> do not sell your contact information or personal details to third parties.</Box>
                     <Box component="li"><strong>Permitted Sharing:</strong> We may share profile details (login status, compatibility scores, photos, and public classified listings) with potential matches or marketplace browsers; with service providers (hosting, payments, SMS authentication, support); for legal reasons (subpoenas, safety); for abuse prevention; and in connection with business transfers (merger or asset sale).</Box>
                   </Box>
                 </Typography>
@@ -111,13 +111,13 @@ export default function PrivacyPolicy() {
                 <Typography variant="h6" sx={sectionHeaderSx}>6. Jurisdiction-Specific Information</Typography>
                 <Typography variant="body1" component="div" paragraph>
                   <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                    <Box component="li" sx={{ mb: 0.5 }}><strong>U.S. Residents:</strong> May have specific rights regarding targeted advertising. <strong>OnlineMall.Website</strong> does not sell user data for cross-contextual behavioral advertising.</Box>
+                    <Box component="li" sx={{ mb: 0.5 }}><strong>U.S. Residents:</strong> May have specific rights regarding targeted advertising. <strong>TutaMall.com (formerly OnlineMall.Website)</strong> does not sell user data for cross-contextual behavioral advertising.</Box>
                     <Box component="li"><strong>California (CCPA/CPRA) Residents:</strong> Have additional rights regarding access and deletion.</Box>
                   </Box>
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>7. SMS Messaging and Data Privacy</Typography>
                 <Typography variant="body1" paragraph>
-                  <strong>OnlineMall.Website</strong> is committed to protecting your privacy regarding mobile communications.
+                  <strong>TutaMall.com (formerly OnlineMall.Website)</strong> is committed to protecting your privacy regarding mobile communications.
                 </Typography>
                 <Typography variant="body1" component="div" paragraph>
                   <Box component="ul" sx={{ m: 0, pl: 3 }}>
@@ -135,7 +135,7 @@ export default function PrivacyPolicy() {
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>8. Contact and Disputes</Typography>
                 <Typography variant="body1" paragraph>
-                  For privacy concerns or to exercise data rights, you can contact <strong>OnlineMall.Website</strong> at <strong>privacy@OnlineMall.Website</strong>.
+                  For privacy concerns or to exercise data rights, you can contact <strong>TutaMall.com (formerly OnlineMall.Website)</strong> at <strong>privacy@OnlineMall.Website</strong>.
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>

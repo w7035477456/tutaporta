@@ -22,11 +22,13 @@ import {
 const BackgroundMusicContext = createContext(null);
 
 function isVsinglesPath(pathname) {
-  return /(^|\/)vsingles(\/|$)/.test(String(pathname ?? ''));
+  return /(^|\/)(?:tutadates|vsingles)(\/|$)/.test(String(pathname ?? ''));
 }
 
 function isVsinglesMyStoryPath(pathname) {
-  return /(^|\/)(?:vsingles\/(?:myStory|myStore)|myStory|myStore)(\/|$)/.test(String(pathname ?? ''));
+  return /(^|\/)(?:tutadates\/(?:myStory|myStore)|vsingles\/(?:myStory|myStore)|myStory|myStore)(\/|$)/.test(
+    String(pathname ?? '')
+  );
 }
 
 function isMusicSuppressedPath(pathname) {

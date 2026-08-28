@@ -4,6 +4,7 @@
  * Desktop (sm+ / beside sidebar): edge-to-edge in the main column (sidebar → window right); grows when sidebar collapses.
  * Mobile (SIDEBAR_MOBILE_CLOSE_MEDIA): full viewport width — unchanged from current behavior.
  */
+import { isVettedFriendsPath, VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
@@ -19,14 +20,14 @@ export const COLOR_TEMPLATE15_LANDING_PAGE_PATHS = [
   SELF_REPORT_BIOGRAPHY_PATH,
   RECEIVED_BIO_REQUESTS_PATH,
   PROFILES_RECORDS_PATH,
-  '/vettedFriends'
+  VETTED_FRIENDS_PATH
 ];
 
 export function isColorTemplate15LandingPageRoute(pathname) {
   const path = String(pathname ?? '')
     .replace(/\/+$/, '') || '/';
   if (COLOR_TEMPLATE15_LANDING_PAGE_PATHS.includes(path)) return true;
-  return path.startsWith('/vettedFriends/');
+  return isVettedFriendsPath(path);
 }
 
 /** Shared shell — mobile + desktop base (matches current mobile flex column). */

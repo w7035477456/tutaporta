@@ -72,11 +72,11 @@ export default function TermsAndConditions() {
                   Terms and Conditions of Service
                 </Typography>
                 <Typography variant="body1" paragraph>
-                  This Agreement between you and <strong>OnlineMall.Website</strong> applies to the <strong>OnlineMall.Website</strong> website, its specialized dating subdomain <strong>Vsingles</strong> (collectively, the &quot;Services&quot;), our mobile applications (iOS and Android), and all related services. By accessing or using our Services, you acknowledge that you have read, understood, and agree to be bound by these terms (including our Privacy Policy) for the duration of your use. Specific features may have additional rules; we may update this agreement and will post a revised version on this page.
+                  This Agreement between you and <strong>TutaMall.com (formerly OnlineMall.Website)</strong> applies to the <strong>TutaMall.com (formerly OnlineMall.Website)</strong> website, its specialized dating subdomain <strong>Vsingles</strong> (collectively, the &quot;Services&quot;), our mobile applications (iOS and Android), and all related services. By accessing or using our Services, you acknowledge that you have read, understood, and agree to be bound by these terms (including our Privacy Policy) for the duration of your use. Specific features may have additional rules; we may update this agreement and will post a revised version on this page.
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>1. Eligibility</Typography>
                 <Typography variant="body1" paragraph>
-                  You must be 18 or older to register an account or use any of the Services. If you utilize the <strong>Vsingles</strong> dating platform, you explicitly represent and warrant that you are single or legally separated. <strong>OnlineMall.Website</strong> and <strong>Vsingles</strong> do not currently perform automated criminal record checks on users but reserve the right to verify eligibility and user identities at any time.
+                  You must be 18 or older to register an account or use any of the Services. If you utilize the <strong>Vsingles</strong> dating platform, you explicitly represent and warrant that you are single or legally separated. <strong>TutaMall.com (formerly OnlineMall.Website)</strong> and <strong>Vsingles</strong> do not currently perform automated criminal record checks on users but reserve the right to verify eligibility and user identities at any time.
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>2. Use of the Services</Typography>
                 <Typography variant="body1" paragraph>
@@ -92,7 +92,7 @@ export default function TermsAndConditions() {
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>5. Risk and Safety</Typography>
                 <Typography variant="body1" paragraph>
-                  Please review our Safety Guidelines. You agree to interact with other marketplace members, buyers, sellers, and <strong>Vsingles</strong> dating members responsibly. You acknowledge that <strong>OnlineMall.Website</strong> and its subdomains are not liable for the conduct of its users or any offline interactions resulting from the Services.
+                  Please review our Safety Guidelines. You agree to interact with other marketplace members, buyers, sellers, and <strong>Vsingles</strong> dating members responsibly. You acknowledge that <strong>TutaMall.com (formerly OnlineMall.Website)</strong> and its subdomains are not liable for the conduct of its users or any offline interactions resulting from the Services.
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>6. Disclaimer of Warranties</Typography>
                 <Typography variant="body1" paragraph>
@@ -109,13 +109,13 @@ export default function TermsAndConditions() {
                 <Typography variant="h6" sx={sectionHeaderSx}>9. Mobile Messaging Terms</Typography>
                 <Typography variant="body1" paragraph>
                   <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>
-                    By providing your mobile number and opting in, you agree to receive text messages from <strong>OnlineMall.Website</strong> and its <strong>Vsingles</strong> service for account security, identity verification, matching alerts, and service updates.
+                    By providing your mobile number and opting in, you agree to receive text messages from <strong>TutaMall.com (formerly OnlineMall.Website)</strong> and its <strong>Vsingles</strong> service for account security, identity verification, matching alerts, and service updates.
                   </Box>
                 </Typography>
                 <Box component="ul" sx={{ pl: 2.5, m: 0 }}>
                   <Typography component="li" variant="body1" sx={{ mb: 1 }}>
                     <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>
-                      <strong>Voluntary Consent:</strong> Opting into mobile messaging is voluntary. Consent is not a requirement to create an account or use the <strong>OnlineMall.Website</strong> or <strong>Vsingles</strong> services.
+                      <strong>Voluntary Consent:</strong> Opting into mobile messaging is voluntary. Consent is not a requirement to create an account or use the <strong>TutaMall.com (formerly OnlineMall.Website)</strong> or <strong>Vsingles</strong> services.
                     </Box>
                   </Typography>
                   <Typography component="li" variant="body1" sx={{ mb: 1 }}>

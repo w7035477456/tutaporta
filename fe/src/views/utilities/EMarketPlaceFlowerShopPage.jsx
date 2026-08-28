@@ -16,6 +16,7 @@ import api from 'api/axios';
 import { getDesktopButtonFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesButtonFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import useFriendsThemeBackground from 'hooks/useFriendsThemeBackground';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import SendFromAddressFields from './SendFromAddressFields';
 import {
   buildSendFromAddressPayload,
@@ -957,7 +958,7 @@ export default function EMarketPlaceFlowerShopPage() {
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ pt: 1 }}>
                   <Button
                     variant="outlined"
-                    onClick={() => navigate('/vettedFriends')}
+                    onClick={() => navigate(VETTED_FRIENDS_PATH)}
                     fullWidth
                     sx={{
                       fontSize: { xs: getMobileSinglesButtonFontSizeVw(), sm: getDesktopButtonFontSizeVw() },

@@ -24,6 +24,8 @@ import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
 import { IconChevronsLeft, IconMenu2 } from '@tabler/icons-react';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
+import { isVettedFriendsPath } from 'routes/vettedFriendsPaths';
+import { isTutaDatesPath } from 'constants/tutaDatesRoute';
 
 const sidebarMenuFontSize = getSidebarMenuFontSizeResponsive();
 
@@ -46,7 +48,7 @@ function Sidebar() {
   const mallCompactCloseMenuLayout = isUnderConstructionMallSection || isEMarketPlaceSection || isEClassifiedsSection;
 
   const isVsinglesSection =
-    pathname.startsWith('/vsingles') ||
+    isTutaDatesPath(pathname) ||
     pathname.startsWith('/dashboard') ||
     pathname === '/verifyself' ||
     pathname === SELF_REPORT_BIOGRAPHY_PATH ||
@@ -54,10 +56,9 @@ function Sidebar() {
     pathname === '/myPicks' ||
     pathname === '/interestedSingles' ||
     pathname === RECEIVED_BIO_REQUESTS_PATH ||
-    pathname === '/vettedFriends' ||
+    isVettedFriendsPath(pathname) ||
     pathname === '/request-ive-sent' ||
     pathname === '/send-flower' ||
-    pathname.startsWith('/vettedFriends/') ||
     pathname.startsWith('/request-ive-sent/') ||
     pathname.startsWith('/request-');
   const vsinglesSidebarTopOffsetPx = isVsinglesSection ? 76 : 0;

@@ -7988,10 +7988,11 @@ export default function PhotoAlbumsWorkspacePane({
                 flexWrap: { xs: 'wrap', md: 'nowrap' },
                 gap: 0.75,
                 pl: 0.5,
-                pr: { xs: 1.25, sm: 1.75 },
+                pr: { xs: 0.75, sm: 1 },
                 py: 0.25,
                 boxSizing: 'border-box',
-                borderLeft: '2px solid rgba(255,255,255,0.35)'
+                borderLeft: '2px solid rgba(255,255,255,0.35)',
+                overflow: 'visible'
               }}
             >
               {!compareMode &&
@@ -8040,7 +8041,7 @@ export default function PhotoAlbumsWorkspacePane({
                       sx={{
                         flex: '1 1 8rem',
                         minWidth: '6rem',
-                        maxWidth: { xs: '100%', md: '18rem' },
+                        maxWidth: { xs: '100%', md: '14rem' },
                         fontSize: { xs: '0.85rem', sm: '0.95rem' },
                         fontWeight: 600,
                         color: '#000',
@@ -8105,7 +8106,7 @@ export default function PhotoAlbumsWorkspacePane({
                       sx={{
                         flex: '1 1 8rem',
                         minWidth: '6rem',
-                        maxWidth: { xs: '100%', md: '18rem' },
+                        maxWidth: { xs: '100%', md: '14rem' },
                         bgcolor: '#fff',
                         border: '3px solid #000',
                         borderRadius: 0.5,
@@ -8129,8 +8130,9 @@ export default function PhotoAlbumsWorkspacePane({
                     minWidth: 0,
                     display: 'flex',
                     alignItems: 'center',
-                    flexWrap: { xs: 'wrap', md: 'nowrap' },
-                    gap: { xs: 0.5, sm: 0.75 }
+                    flexWrap: { xs: 'wrap', lg: 'nowrap' },
+                    gap: 0,
+                    justifyContent: 'flex-start'
                   }}
                 >
                   <PhotoAlbumsSearchBar
@@ -8141,7 +8143,8 @@ export default function PhotoAlbumsWorkspacePane({
                     searchBusy={searchBusy}
                     clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
                     bgcolor="var(--theme-primary-color)"
-                    fillWidth
+                    fillWidth={false}
+                    headerFlush
                   />
                   <PhotoAlbumsInviteBar
                     disabled={busy}

@@ -2,7 +2,7 @@
 import { IconTypography } from '@tabler/icons-react';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
-import { PRIMARY_COLOR_CSS } from 'utils/themeConfig';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 
 // constant
 const icons = {
@@ -46,7 +46,7 @@ const utilities = {
       id: 'util-requests-sent',
       title: 'Acquaint. & Buddies',
       type: 'item',
-      url: '/vettedFriends',
+      url: VETTED_FRIENDS_PATH,
       alsoHighlightWhenAt: ['/send-flower', '/request-ive-sent'],
       icon: icons.IconTypography,
       breadcrumbs: false,

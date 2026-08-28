@@ -25,16 +25,16 @@ export const PHOTO_ALBUMS_CONTEXT_TUTORIAL_COPY = {
     title: 'Current Context Tutorial:',
     body: [
       'You are currently in Album View Mode.',
-      '• Choose a Layout: Click the Template button to select a layout for your new album page.',
-      '• Add Photos: If your chosen template has an empty slot, simply drag and drop a photo from the Thumbnail Tray into the space.',
+      '• Locate & Import photos: Bottom Right click "Change" (change folder) and navigate to your photo folder. Next click "Add All to Thumbnail Tray."',
+      '• Add photos to Album: Click "Auto Layout" on top left.',
       '• Edit Photos: Double-click any photo to open Add Text (captions, emoji, Pan Zoom / Rotate / Full / Zoom).',
       '• Rearrange or Remove: Drag a photo back to the Thumbnail Tray to remove it, or drag it to another slot on the page to swap locations.',
       '• Additional Features: While in View Mode, you can also:',
-      '  • Play a Photo or Album Slideshow.',
-      '  • Mark the current album for print ordering.',
+      '  • Zoom and Pan photo.',
+      '  • Add Text and Emoji.',
       '  • Change the page orientation (Portrait/Landscape).',
-      '  • Auto-resize images.',
-      '  • Reset (blank out) the entire album page.'
+      '  • Rotate Photo.',
+      '  • Reset all changes.'
     ].join('\n')
   },
   edit: {

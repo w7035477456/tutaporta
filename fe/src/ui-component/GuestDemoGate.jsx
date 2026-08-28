@@ -4,6 +4,7 @@ import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCen
 import { MY_PHOTO_ALBUMS_PATH, MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
 import { MY_STORY_PATH } from 'utils/profilePhotoSetup';
+import { TUTADATES_MY_STORE_PATH, TUTADATES_PATH } from 'constants/tutaDatesRoute';
 import {
   GUEST_DEMO_ALLOW_ATTR,
   GUEST_DEMO_BLOCK_ATTR,
@@ -35,6 +36,8 @@ function isGuestDemoMyStoryPath(pathname) {
   return (
     path === MY_STORY_PATH ||
     path.startsWith(`${MY_STORY_PATH}/`) ||
+    path === `${TUTADATES_PATH}/myStory` ||
+    path.startsWith(`${TUTADATES_PATH}/myStory/`) ||
     path === '/vsingles/myStory' ||
     path.startsWith('/vsingles/myStory/')
   );

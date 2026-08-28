@@ -20,6 +20,23 @@ const searchFieldSx = {
   }
 };
 
+const headerFlushSearchFieldSx = {
+  flex: '1 1 0',
+  minWidth: { xs: '6rem', sm: '8rem' },
+  maxWidth: { xs: '100%', md: '14rem' },
+  '& .MuiInputBase-root': {
+    bgcolor: '#fff',
+    borderRadius: 1,
+    border: '2px solid #000',
+    fontSize: { xs: '0.9rem', sm: '1rem' }
+  },
+  '& .MuiInputBase-input': {
+    color: '#000',
+    WebkitTextFillColor: '#000',
+    py: { xs: 0.85, sm: 1 }
+  }
+};
+
 const searchActionButtonSx = {
   width: 'max-content',
   minWidth: 'max-content',
@@ -40,6 +57,8 @@ export default function PhotoAlbumsSearchBar({
   bgcolor = '#0d0d0d',
   /** When false, bar sits on the right of the strip instead of filling remaining width. */
   fillWidth = true,
+  /** Header row: sit flush against Invite bar (no trailing padding/gap). */
+  headerFlush = false,
   placeholder = 'Search text on album pages'
 }) {
   const handleKeyDown = (event) => {
@@ -52,16 +71,17 @@ export default function PhotoAlbumsSearchBar({
   return (
     <Box
       sx={{
-        flex: fillWidth ? 1 : '0 1 auto',
-        minWidth: fillWidth ? 0 : { xs: 200, sm: 280 },
-        maxWidth: fillWidth ? 'none' : { xs: '100%', sm: 320, md: 380 },
+        flex: headerFlush ? '0 1 auto' : fillWidth ? 1 : '0 1 auto',
+        minWidth: headerFlush ? { xs: '100%', md: '12rem' } : fillWidth ? 0 : { xs: 200, sm: 280 },
+        maxWidth: headerFlush ? { xs: '100%', md: '20rem' } : fillWidth ? 'none' : { xs: '100%', sm: 320, md: 380 },
         display: 'flex',
         alignItems: 'center',
-        gap: { xs: 0.35, sm: 0.5 },
-        px: { xs: 0.5, sm: 0.75 },
-        py: fillWidth ? 0.75 : 0.25,
+        gap: headerFlush ? 0 : { xs: 0.35, sm: 0.5 },
+        pl: headerFlush ? 0 : { xs: 0.5, sm: 0.75 },
+        pr: headerFlush ? 0 : { xs: 0.5, sm: 0.75 },
+        py: headerFlush ? 0.25 : fillWidth ? 0.75 : 0.25,
         bgcolor,
-        ml: fillWidth ? 0 : 'auto'
+        ml: fillWidth && !headerFlush ? 0 : headerFlush ? 0 : 'auto'
       }}
     >
       <Box
@@ -100,7 +120,7 @@ export default function PhotoAlbumsSearchBar({
         value={term1}
         onChange={(e) => onTerm1Change(e.target.value)}
         onKeyDown={handleKeyDown}
-        sx={searchFieldSx}
+        sx={headerFlush ? headerFlushSearchFieldSx : searchFieldSx}
         inputProps={{ 'aria-label': 'Search albums' }}
       />
     </Box>
@@ -116,5 +136,6 @@ PhotoAlbumsSearchBar.propTypes = {
   clearDisabled: PropTypes.bool,
   bgcolor: PropTypes.string,
   fillWidth: PropTypes.bool,
+  headerFlush: PropTypes.bool,
   placeholder: PropTypes.string
 };

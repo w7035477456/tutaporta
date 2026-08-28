@@ -24,6 +24,7 @@ import {
   goToTourStep,
   isVsinglesTourRoute
 } from 'utils/vsinglesTour';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import { markTourDemoMembersAsPicks, requestTourDemoBriefBios } from 'utils/vsinglesTourActions';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 
@@ -711,7 +712,7 @@ export default function VsinglesGuidedTourOverlay() {
       try {
         goToTourStep(TOUR_STEP_VETTED_FRIENDS_SMS);
         handlerDrawerOpen(true);
-        navigate('/vettedFriends');
+        navigate(VETTED_FRIENDS_PATH);
       } finally {
         setAdvancing(false);
       }
@@ -738,7 +739,7 @@ export default function VsinglesGuidedTourOverlay() {
     }
     if (step === TOUR_STEP_ALL_SINGLES) {
       goToTourStep(TOUR_STEP_THEME);
-      navigate('/vsingles');
+      navigate(VSINGLES_LANDING_PATH);
     }
   }, [navigate, step]);
 

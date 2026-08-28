@@ -5,6 +5,7 @@ import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
+import { TUTADATES_MY_STORE_PATH, TUTADATES_PATH } from 'constants/tutaDatesRoute';
 import { isSpeedDatingEnabled } from 'config/speedDatingEnv';
 
 // project imports
@@ -111,7 +112,7 @@ const MainRoutes = {
       element: <UnderConstruction />
     },
     {
-      path: 'vsingles',
+      path: 'tutadates',
       children: [
         {
           index: true,
@@ -128,6 +129,27 @@ const MainRoutes = {
         {
           path: 'allSingles',
           element: <AllSingles />
+        }
+      ]
+    },
+    {
+      path: 'vsingles',
+      children: [
+        {
+          index: true,
+          element: <Navigate to={TUTADATES_PATH} replace />
+        },
+        {
+          path: 'myStory',
+          element: <Navigate to="/myStory" replace />
+        },
+        {
+          path: 'myStore',
+          element: <Navigate to={TUTADATES_MY_STORE_PATH} replace />
+        },
+        {
+          path: 'allSingles',
+          element: <Navigate to="/allSingles" replace />
         }
       ]
     },
@@ -184,12 +206,20 @@ const MainRoutes = {
       element: <Navigate to={RECEIVED_BIO_REQUESTS_PATH} replace />
     },
     {
-      path: 'vettedFriends/member/:memberId',
+      path: 'acquaintNBuddies/member/:memberId',
       element: <RequestApprovedMemberVettingView />
     },
     {
-      path: 'vettedFriends',
+      path: 'acquaintNBuddies',
       element: <RequestsSent />
+    },
+    {
+      path: 'vettedFriends/member/:memberId',
+      element: <RedirectLegacyVettedFriendsMember />
+    },
+    {
+      path: 'vettedFriends',
+      element: <RedirectPreservingLocation />
     },
     {
       path: 'request-ive-sent/member/:memberId',
@@ -289,6 +319,10 @@ const MainRoutes = {
     },
     {
       path: 'dashboard/vettedFriends',
+      element: <Navigate to={VETTED_FRIENDS_PATH} replace />
+    },
+    {
+      path: 'dashboard/acquaintNBuddies',
       element: <Navigate to={VETTED_FRIENDS_PATH} replace />
     },
     {

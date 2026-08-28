@@ -12,7 +12,7 @@ export default function SiteFooterCopyright({ version = 'v2', sx = {} }) {
         ...sx
       }}
     >
-      © {version} 2000-2026 OnlineMall.Website, Inc., San Francisco, CA
+      © {version} 2026 TutalMall.com, Inc., San Francisco, CA
     </Typography>
   );
 }

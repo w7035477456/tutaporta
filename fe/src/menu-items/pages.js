@@ -10,6 +10,7 @@ import {
   settingsIcon,
   vettedFriendsIcon
 } from 'config/menuIcons';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import { PRIMARY_COLOR_CSS } from 'utils/themeConfig';
 
 // ==============================|| AUTHENTICATION MENU ITEMS ||============================== //
@@ -47,7 +48,7 @@ const pages = {
       id: 'util-requests-sent',
       title: 'Acquaint. & Buddies',
       type: 'item',
-      url: '/vettedFriends',
+      url: VETTED_FRIENDS_PATH,
       alsoHighlightWhenAt: ['/send-flower', '/request-ive-sent'],
       iconSrc: vettedFriendsIcon,
       breadcrumbs: false,

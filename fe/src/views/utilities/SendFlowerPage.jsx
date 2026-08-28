@@ -18,6 +18,7 @@ import { getDesktopButtonFontSizeVw, getDesktopTextFontSizeVw } from 'config/des
 import { getMobileSinglesButtonFontSizeVw, getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import useFriendsThemeBackground from 'hooks/useFriendsThemeBackground';
 import { formatAliasWithMemberCode } from 'utils/memberLabel';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import SendFromAddressFields from './SendFromAddressFields';
 import {
   buildSendFromAddressPayload,
@@ -1146,7 +1147,7 @@ export default function SendFlowerPage() {
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ pt: 1 }}>
                     <Button
                       variant="outlined"
-                      onClick={() => navigate('/vettedFriends')}
+                      onClick={() => navigate(VETTED_FRIENDS_PATH)}
                       fullWidth
                       sx={{
                         fontSize: { xs: getMobileSinglesButtonFontSizeVw(), sm: getDesktopButtonFontSizeVw() },

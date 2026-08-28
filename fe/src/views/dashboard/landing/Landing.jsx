@@ -16,6 +16,7 @@ import tutaDatesImg from 'assets/images/tutaDates.png';
 import tutaNotesImg from 'assets/images/tutaNotes.png';
 import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
+import { TUTADATES_PATH } from 'constants/tutaDatesRoute';
 import { isOnenoteUsbUpgrade } from 'config/onenoteUsbUpgradeEnv';
 import { fetchOnenoteUsbUpgradeBlocked } from 'api/onenoteUsbUpgradeFe';
 import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
@@ -25,7 +26,7 @@ import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUp
 const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
 
 const departments = [
-  { id: 'vsingles', title: 'Tuta Dates', url: '/vsingles', image: tutaDatesImg },
+  { id: 'vsingles', title: 'Tuta Dates', url: TUTADATES_PATH, image: tutaDatesImg },
   { id: 'eMarketPlace', title: 'Online MarketPlace', url: '/eMarketPlace', image: eMarketPlaceImg },
   { id: 'photoAlbums', title: 'TutaPhotoAlbums', url: MY_PHOTO_ALBUMS_PATH, image: tutaAlbumsImg },
   { id: 'onlineProfessionals', title: 'onlineProfessionals', url: '/onlineProfessionals', image: vProfessionalsImg },

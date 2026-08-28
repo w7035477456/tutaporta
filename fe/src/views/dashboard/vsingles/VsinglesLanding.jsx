@@ -12,6 +12,7 @@ import {
   VSINGLES_TOUR_PAUSE_MEDIA_EVENT,
   consumePendingVsinglesTourStart
 } from 'utils/vsinglesTour';
+import { isTutaDatesLandingPath } from 'constants/tutaDatesRoute';
 
 import video1_couple1 from 'assets/images/video1_couple1.mp4';
 import video2_couple5 from 'assets/images/video2_couple5.mp4';
@@ -73,7 +74,7 @@ export default function VsinglesLanding() {
   }, []);
 
   useEffect(() => {
-    if (pathname === '/vsingles') {
+    if (isTutaDatesLandingPath(pathname)) {
       consumePendingVsinglesTourStart();
     }
   }, [pathname]);

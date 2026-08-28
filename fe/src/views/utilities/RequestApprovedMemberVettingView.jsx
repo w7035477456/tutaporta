@@ -23,6 +23,7 @@ import verifiedBasicSeal from 'assets/images/verifiedBasicSeal.png';
 import verifiedDetailSeal from 'assets/images/verifiedDetailSeal.png';
 import { getDesktopTitleFontSizeVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv';
+import { VETTED_FRIENDS_PATH } from 'routes/vettedFriendsPaths';
 import { update_vetted_basic_count, update_vetted_detail_count } from 'utils/updateVettedStatusCounts';
 import { formatMemberLabel } from 'utils/memberLabel';
 import { triStateBioRequestApproval } from 'utils/receivedBioRequestDisplay';
@@ -216,7 +217,7 @@ export default function RequestApprovedMemberVettingView() {
         ? showBasicBase
         : showBasicBase || showDetailWhenApproved);
 
-  const onClose = () => navigate('/vettedFriends');
+  const onClose = () => navigate(VETTED_FRIENDS_PATH);
 
   return (
     <Box
