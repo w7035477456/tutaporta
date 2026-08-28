@@ -204,7 +204,9 @@ export default function PhotoAlbumsPageTemplateOverlay({
           continue;
         }
         // Occupied photo/text: let the node receive edit-mode double-click.
-        if (occupancyReady && occupiedSlotIds.has(slot.id)) return;
+        if (occupancyReady && occupiedSlotIds.has(slot.id)) {
+          return;
+        }
         setSelectedSlotId(slot.id);
         return;
       }

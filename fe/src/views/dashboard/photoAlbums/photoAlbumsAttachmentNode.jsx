@@ -81,6 +81,9 @@ function formatPhotoThumbLoadError(
 }
 
 export const PHOTO_ALBUMS_ATTACHMENT_NODE_NAME = 'photoAlbumsAttachment';
+
+/** Fallback when editor.storage.openPlaceText is not wired yet (double-click Add Text). */
+export const PHOTO_ALBUMS_OPEN_PLACE_TEXT_EVENT = 'pa-open-place-text-from-photo';
 /** Same name as `PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME` — avoid circular import with that module. */
 const PHOTO_ALBUMS_TEXT_LABEL_NODE = 'photoAlbumsTextLabel';
 
@@ -1045,6 +1048,8 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const startPhotoMove = useCallback(
     (event) => {
       if (!editable || event.button !== 0) return;
+      // Second mousedown of a double-click must not start relocate/pan — keeps dblclick → Add Text.
+      if (event.detail > 1) return;
       if (event.target?.closest?.('.rv-photo-tile__actions')) return;
       if (event.target?.closest?.('.rv-attachment-photo__return-x, .rv-attachment-photo__top-chrome')) return;
       if (event.target?.closest?.('.rv-album-video-indicator')) return;
@@ -2069,17 +2074,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     }
   }, []);
 
-  const openPhotoEditPopup = useCallback(() => {
-    if (!editable) {
-      cancelScheduledPhotoViewInNewTab();
-      void openPhotoInNewTab();
-      return;
-    }
-    cancelScheduledPhotoViewInNewTab();
-    selectThisPhoto();
-    // Double-click opens Add Text (Pan Zoom / Rotate / Full / Zoom live there).
-    const openPlaceText = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.openPlaceText;
-    if (typeof openPlaceText !== 'function') return;
+  const openPlaceTextNearThisMedia = useCallback(() => {
     const baseLeft = inFrame ? frameLeft : placedLeft;
     const baseTop = inFrame ? frameTop : placedTop;
     const posLeft =
@@ -2094,14 +2089,25 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         : Number.isFinite(baseTop)
           ? Math.round(baseTop + 12)
           : undefined;
-    openPlaceText(
-      Number.isFinite(posLeft) && Number.isFinite(posTop) ? { posLeft, posTop } : null
-    );
+    const pagePos =
+      Number.isFinite(posLeft) && Number.isFinite(posTop) ? { posLeft, posTop } : null;
+
+    const openPlaceText = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.openPlaceText;
+    if (typeof openPlaceText === 'function') {
+      openPlaceText(pagePos);
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(PHOTO_ALBUMS_OPEN_PLACE_TEXT_EVENT, {
+          detail: {
+            pagePos,
+            attachmentId: Number(node?.attrs?.attachmentId) || null
+          }
+        })
+      );
+    }
   }, [
-    editable,
-    cancelScheduledPhotoViewInNewTab,
-    openPhotoInNewTab,
-    selectThisPhoto,
     editor,
     inFrame,
     frameLeft,
@@ -2109,7 +2115,26 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     placedLeft,
     placedTop,
     frameWidth,
-    frameHeight
+    frameHeight,
+    node?.attrs?.attachmentId
+  ]);
+
+  const openPhotoEditPopup = useCallback(() => {
+    if (!editable) {
+      cancelScheduledPhotoViewInNewTab();
+      void openPhotoInNewTab();
+      return;
+    }
+    cancelScheduledPhotoViewInNewTab();
+    selectThisPhoto();
+    // Double-click opens Add Text (Pan Zoom / Rotate / Full / Zoom live there).
+    openPlaceTextNearThisMedia();
+  }, [
+    editable,
+    cancelScheduledPhotoViewInNewTab,
+    openPhotoInNewTab,
+    selectThisPhoto,
+    openPlaceTextNearThisMedia
   ]);
 
   const schedulePhotoViewInNewTab = useCallback(
@@ -2490,28 +2515,6 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     outline: '2px solid #fff',
     outlineOffset: 1
   };
-
-  const openPlaceTextNearThisMedia = useCallback(() => {
-    const openPlaceText = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.openPlaceText;
-    if (typeof openPlaceText !== 'function') return;
-    const baseLeft = inFrame ? frameLeft : placedLeft;
-    const baseTop = inFrame ? frameTop : placedTop;
-    const posLeft =
-      Number.isFinite(baseLeft) && Number.isFinite(frameWidth)
-        ? Math.round(baseLeft + Math.max(8, frameWidth * 0.08))
-        : Number.isFinite(baseLeft)
-          ? Math.round(baseLeft + 12)
-          : undefined;
-    const posTop =
-      Number.isFinite(baseTop) && Number.isFinite(frameHeight)
-        ? Math.round(baseTop + Math.max(8, frameHeight * 0.08))
-        : Number.isFinite(baseTop)
-          ? Math.round(baseTop + 12)
-          : undefined;
-    openPlaceText(
-      Number.isFinite(posLeft) && Number.isFinite(posTop) ? { posLeft, posTop } : null
-    );
-  }, [editor, inFrame, frameLeft, frameTop, placedLeft, placedTop, frameWidth, frameHeight]);
 
   const resetMediaActionBtn = editable ? (
     <SliderControlButton

@@ -16,6 +16,7 @@ import { themedConfirm } from 'utils/themedDialog';
 import { buildPhotoAlbumsEditorExtensions } from './photoAlbumsEditorExtensions';
 import {
   PHOTO_ALBUMS_ATTACHMENT_NODE_NAME,
+  PHOTO_ALBUMS_OPEN_PLACE_TEXT_EVENT,
   detachTextAndEmojiNearPhoto,
   insertCompanionLabelsOnPhoto,
   photoPageRectFromAttrs,
@@ -1997,6 +1998,29 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   /** View-only while Full screen — no chrome / no edits. */
   const effectiveEditable = editable && !albumFullscreen;
 
+  const syncPhotoAlbumsAttachmentStore = useCallback(
+    (ed) => {
+      if (!ed) return;
+      const store = ed.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
+      if (!store) return;
+      const id = Number(noteId);
+      store.noteId = Number.isFinite(id) && id > 0 ? id : null;
+      const sharedId = Number(sharedAlbumId);
+      store.sharedAlbumId = Number.isFinite(sharedId) && sharedId > 0 ? sharedId : null;
+      if (storageType) store.storageType = storageType;
+      store.openPlaceText = (pagePos) => handlePlaceFloatingTextRef.current?.(pagePos);
+      store.openPlaceEmoji = (em, clientX, clientY) =>
+        placeEmojiAtClientPointRef.current?.(em, clientX, clientY);
+      store.attachmentCtxVersion = (Number(store.attachmentCtxVersion) || 0) + 1;
+      try {
+        ed.view.dispatch(ed.state.tr.setMeta('paAttachmentCtx', store.attachmentCtxVersion));
+      } catch {
+        // editor may be unmounting
+      }
+    },
+    [noteId, sharedAlbumId, storageType]
+  );
+
   const editor = useEditor({
     extensions: buildPhotoAlbumsEditorExtensions(),
     content: stripAlbumMarkers(initialContent) || EMPTY_DOC,
@@ -2070,6 +2094,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     },
     onUpdate: ({ editor: e }) => {
       emitHtml(e.getHTML());
+    },
+    onCreate: ({ editor: ed }) => {
+      syncPhotoAlbumsAttachmentStore(ed);
     }
   });
 
@@ -2516,30 +2543,21 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     if (editor) onReadyRef.current?.();
   }, [editor]);
 
-  /**
-   * Attachment node views load photos via editor.storage.noteId / storageType.
-   * WorkspacePane sets this through setAttachmentContext; presentation tabs only
-   * pass props — sync here so Full screen / Full Slide actually show images.
-   */
   useEffect(() => {
-    if (!editor) return;
-    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (!store) return;
-    const id = Number(noteId);
-    store.noteId = Number.isFinite(id) && id > 0 ? id : null;
-    const sharedId = Number(sharedAlbumId);
-    store.sharedAlbumId = Number.isFinite(sharedId) && sharedId > 0 ? sharedId : null;
-    if (storageType) store.storageType = storageType;
-    store.openPlaceText = (pagePos) => handlePlaceFloatingTextRef.current?.(pagePos);
-    store.openPlaceEmoji = (em, clientX, clientY) =>
-      placeEmojiAtClientPointRef.current?.(em, clientX, clientY);
-    store.attachmentCtxVersion = (Number(store.attachmentCtxVersion) || 0) + 1;
-    try {
-      editor.view.dispatch(editor.state.tr.setMeta('paAttachmentCtx', store.attachmentCtxVersion));
-    } catch {
-      // editor may be unmounting
-    }
-  }, [editor, noteId, sharedAlbumId, storageType]);
+    syncPhotoAlbumsAttachmentStore(editor);
+  }, [editor, syncPhotoAlbumsAttachmentStore]);
+
+  useEffect(() => {
+    if (!editor) return undefined;
+    const onOpenPlaceTextFromPhoto = (event) => {
+      const pagePos = event?.detail?.pagePos ?? null;
+      handlePlaceFloatingTextRef.current?.(pagePos);
+    };
+    window.addEventListener(PHOTO_ALBUMS_OPEN_PLACE_TEXT_EVENT, onOpenPlaceTextFromPhoto);
+    return () => {
+      window.removeEventListener(PHOTO_ALBUMS_OPEN_PLACE_TEXT_EVENT, onOpenPlaceTextFromPhoto);
+    };
+  }, [editor]);
 
   useEffect(() => {
     if (!editor) return undefined;
@@ -3067,7 +3085,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
    * Never treat a selected photo/attachment node as “text to replace”.
    */
   const handlePlaceFloatingText = useCallback((pagePos = null) => {
-    if (!editor || !editable) return;
+    if (!editor || !effectiveEditable) return;
     const { state } = editor;
     const { from, to, empty } = state.selection;
     const isNodeSelection = state.selection instanceof NodeSelection;
@@ -3141,7 +3159,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       }
     }
     setPlaceTextOpen(true);
-  }, [editor, editable]);
+  }, [editor, effectiveEditable]);
   handlePlaceFloatingTextRef.current = handlePlaceFloatingText;
 
   const handlePlaceTextPhotoChromeChange = useCallback(
