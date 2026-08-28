@@ -70,15 +70,17 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
   const hasFrame = Boolean(photoRect?.width && photoRect?.height);
   const labelPageWidth = pageFrameW;
 
+  /**
+   * Un-rotated aspect. Rotation is a CSS transform on the same element the photo
+   * width/height size, so the box must stay at the photo's own aspect — the album
+   * page sizes its slot the same way (photoAspectRatio ignores rotationDeg).
+   */
   const naturalAspect = useMemo(() => {
     const nw = naturalSize.width;
     const nh = naturalSize.height;
     if (!(nw > 0 && nh > 0)) return 0;
-    let aspect = nw / nh;
-    const rot = Number(session?.rotationDeg) || 0;
-    if (Math.abs(rot) % 180 === 90) aspect = nh / nw;
-    return aspect;
-  }, [naturalSize.width, naturalSize.height, session?.rotationDeg]);
+    return nw / nh;
+  }, [naturalSize.width, naturalSize.height]);
 
   const measureFrameRect = useCallback(() => {
     const stage = stageRef.current;
@@ -108,12 +110,10 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
     const nh = Number(media?.naturalHeight || media?.videoHeight) || 0;
     if (!nw || !nh) return;
     setNaturalSize({ width: nw, height: nh });
-    let aspect = nw / nh;
-    const rot = Number(session?.rotationDeg) || 0;
-    if (Math.abs(rot) % 180 === 90) aspect = nh / nw;
-    if (typeof onNaturalAspectRatio === 'function') onNaturalAspectRatio(aspect);
+    // Sizing aspect, not footprint aspect — see naturalAspect above.
+    if (typeof onNaturalAspectRatio === 'function') onNaturalAspectRatio(nw / nh);
     measureFrameRect();
-  }, [session?.rotationDeg, onNaturalAspectRatio, measureFrameRect]);
+  }, [onNaturalAspectRatio, measureFrameRect]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -207,9 +207,15 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
     const photoW = Number.isFinite(Number(session?.photoW)) && Number(session.photoW) > 0
       ? Number(session.photoW)
       : fit.width;
-    const photoH = Number.isFinite(Number(session?.photoH)) && Number(session.photoH) > 0
+    const storedH = Number.isFinite(Number(session?.photoH)) && Number(session.photoH) > 0
       ? Number(session.photoH)
-      : Math.round(photoW / naturalAspect);
+      : 0;
+    // The <img> is objectFit:'fill', so a stored width/height pair that disagrees with
+    // the photo's own aspect renders stretched. Width is what the zoom slider drives,
+    // so keep it and re-derive the height.
+    const proportionalH = Math.round(photoW / naturalAspect);
+    const storedHDrift = Math.abs(storedH - proportionalH);
+    const photoH = storedH > 0 && storedHDrift <= Math.max(1, proportionalH * 0.01) ? storedH : proportionalH;
     const panX = Number.isFinite(Number(session?.panX))
       ? Number(session.panX)
       : (pageFrameW - photoW) / 2;

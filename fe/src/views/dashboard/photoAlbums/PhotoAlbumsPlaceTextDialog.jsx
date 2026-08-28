@@ -290,18 +290,29 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [panEnabled, setPanEnabled] = useState(false);
   const [photoRotationDeg, setPhotoRotationDeg] = useState(0);
   const [photoSlotFit, setPhotoSlotFit] = useState('cover');
-  const [mediaAspect, setMediaAspect] = useState(0);
+  /**
+   * Natural aspect tagged with the attachment it was measured from. The dialog is not
+   * unmounted between opens, so an untagged value would still hold the previous photo's
+   * aspect on the next open and auto-fit would stretch the new photo to it.
+   */
+  const [mediaAspectEntry, setMediaAspectEntry] = useState({ key: '', aspect: 0 });
   const skipStyleSyncRef = useRef(false);
   const splitContainerRef = useRef(null);
   const openSnapshotRef = useRef(null);
   const dialogInitRef = useRef(false);
   const seedSampleOnEmptyRef = useRef(true);
   const pendingAutoFitRef = useRef(false);
+  const autoFitMediaKeyRef = useRef('');
   const pendingVideoSeedRef = useRef(false);
   const photoFitAnimTimerRef = useRef(null);
   const [previewPhotoChrome, setPreviewPhotoChrome] = useState(null);
   const [photoFitAnimating, setPhotoFitAnimating] = useState(false);
   const [previewSplitRatio, setPreviewSplitRatio] = useState(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
+
+  const mediaKey = hasMedia
+    ? `${mediaSession?.attachmentId ?? ''}:${mediaSession?.fileExtension ?? ''}`
+    : '';
+  const mediaAspect = mediaAspectEntry.key === mediaKey ? mediaAspectEntry.aspect : 0;
 
   const labelOptions = useMemo(() => {
     const list = Array.isArray(existingLabels) ? existingLabels : [];
@@ -372,6 +383,7 @@ export default function PhotoAlbumsPlaceTextDialog({
       }
       dialogInitRef.current = false;
       openSnapshotRef.current = null;
+      autoFitMediaKeyRef.current = '';
       return;
     }
     // Seed once per open — do not re-init when mediaSession chrome updates (pan/zoom).
@@ -661,9 +673,12 @@ export default function PhotoAlbumsPlaceTextDialog({
     [mediaSession, mediaAspect, applyPhotoChrome]
   );
 
-  const handleNaturalAspectRatio = useCallback((aspect) => {
-    if (aspect > 0) setMediaAspect(aspect);
-  }, []);
+  const handleNaturalAspectRatio = useCallback(
+    (aspect) => {
+      if (aspect > 0) setMediaAspectEntry({ key: mediaKey, aspect });
+    },
+    [mediaKey]
+  );
 
   const resolveFramedPhotoChrome = useCallback(
     (patch = {}) => {
@@ -706,6 +721,14 @@ export default function PhotoAlbumsPlaceTextDialog({
     },
     [mediaSession, mediaAspect, photoSlotFit]
   );
+
+  // Swapping attachments without closing the dialog needs a fresh auto-fit.
+  useEffect(() => {
+    if (!open || !hasMedia) return;
+    if (autoFitMediaKeyRef.current === mediaKey) return;
+    autoFitMediaKeyRef.current = mediaKey;
+    pendingAutoFitRef.current = !mediaSession?.isVideo;
+  }, [open, hasMedia, mediaKey, mediaSession?.isVideo]);
 
   useEffect(() => {
     if (!open || !hasMedia || mediaSession?.isVideo || !pendingAutoFitRef.current) return;

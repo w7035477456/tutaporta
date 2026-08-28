@@ -143,7 +143,12 @@ function Login() {
                     fontSize: `calc(${theme.typography.h5.fontSize} * 2)`
                   })}
                 >
-                  Login OnlineMall.website
+                  <Box component="span" sx={{ display: 'block' }}>
+                    Login TutaMall.com
+                  </Box>
+                  <Box component="span" sx={{ display: 'block' }}>
+                    (formerly OnlineMall.website)
+                  </Box>
                 </Typography>
                 <Typography
                   variant="caption"
