@@ -113,6 +113,10 @@ function entryIcon(entry) {
   return <InsertDriveFileOutlinedIcon sx={{ fontSize: '1rem', color: '#000', flexShrink: 0 }} />;
 }
 
+function explorerFileEntry(en) {
+  return en?.kind === 'file' && (en.file || en.handle);
+}
+
 function sortExplorerEntries(a, b) {
   if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
@@ -444,7 +448,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
   const filesForKeys = useCallback(
     (keys) => {
       const set = keys instanceof Set ? keys : new Set(keys);
-      return entries.filter((en) => set.has(entryKey(en)) && en.kind === 'file' && en.file);
+      return entries.filter((en) => set.has(entryKey(en)) && explorerFileEntry(en));
     },
     [entries]
   );
@@ -653,7 +657,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
 
   const stageAllPhotosInFolder = useCallback(async () => {
     if (disabled || typeof onStageOsFiles !== 'function') return;
-    const allFiles = entries.filter((en) => en.kind === 'file' && en.file);
+    const allFiles = entries.filter(explorerFileEntry);
     if (!allFiles.length) {
       setError('No photos in this folder to add to the thumbnail tray.');
       return;
@@ -697,7 +701,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
     (sum, entry) => sum + (entry.kind === 'file' ? Number(entry.size) || 0 : 0),
     0
   );
-  const folderFileCount = entries.filter((entry) => entry.kind === 'file' && entry.file).length;
+  const folderFileCount = entries.filter(explorerFileEntry).length;
   const breadcrumb = formatFilesExplorerBreadcrumb(rootName, relativePath);
   const crumbParts = [rootName, ...relativePath].filter(Boolean);
   const hasFolder = Boolean(rootHandle) && !rootHandle.__synthetic;
@@ -767,7 +771,7 @@ export default function PhotoAlbumsFilesExplorerPanel({
         type="button"
         hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
         onClick={() => void stageAllPhotosInFolder()}
-        disabled={disabled || !entries.some((en) => en.kind === 'file' && en.file)}
+        disabled={disabled || !entries.some(explorerFileEntry)}
         aria-label="Add all photos in this folder to Thumbnail Tray"
         sx={{ ...trayButtonSx, mb: 0.5 }}
       >

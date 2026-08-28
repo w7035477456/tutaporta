@@ -2048,7 +2048,7 @@ export default function PhotoAlbumsWorkspacePane({
     return nb?.notes || [];
   }, [searchActive, displayNotebooks, notebooks, selectedNotebookId, selectedNotebook]);
 
-  const loadNoteContent = useCallback(async (noteId) => {
+  const loadNoteContent = useCallback(async (noteId, { syncStaging = true } = {}) => {
     const id = Number(noteId);
     if (!Number.isFinite(id) || id < 1) return null;
     const note = await vaultApi.fetchPhotoAlbumsNote(id);
@@ -2069,7 +2069,9 @@ export default function PhotoAlbumsWorkspacePane({
       }))
     );
     // Alley + ENV hard-file purge already ran in vaultGetNote; mirror kept attachments in UI.
-    noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(note.attachments || []);
+    if (syncStaging) {
+      noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(note.attachments || []);
+    }
     return note;
   }, [vaultApi]);
 
@@ -4660,16 +4662,20 @@ export default function PhotoAlbumsWorkspacePane({
    */
   const uploadNoteVaultFileToStaging = useCallback(
     async (file, { skipBusy = false, skipReconcile = false } = {}) => {
-      if (!selectedNote || !file) return;
+      if (!file) return false;
+      if (!selectedNote) {
+        setError('Select an album on the left before adding photos to the Thumbnail Tray.');
+        return false;
+      }
       const noteId = Number(selectedNote.note_id);
       if (!isAllowedPhotoAlbumsFile(file)) {
         setError(`Unsupported vault file type: ${file.name || 'file'}`);
-        return;
+        return false;
       }
       const maxBytes = (maxUploadMb || 20) * 1024 * 1024;
       if (file.size > maxBytes) {
         setError(`${file.name || 'File'} is over the ${maxUploadMb || 20} MB upload limit.`);
-        return;
+        return false;
       }
       if (isPhotoAlbumsStagingPhotoFile(file) && !isPhotoAlbumsStagingVideoFile(file)) {
         const readable = await probePhotoAlbumsImageFile(file);
@@ -4681,7 +4687,7 @@ export default function PhotoAlbumsWorkspacePane({
           } else {
             setError(`“${file.name || 'file'}” is not a readable photo image.`);
           }
-          return;
+          return false;
         }
       }
 
@@ -4708,11 +4714,6 @@ export default function PhotoAlbumsWorkspacePane({
               '';
             if (previewUrl) localPreviewUrl = previewUrl;
           }
-          const fresh = await loadNoteContent(noteId);
-          const attachmentsAfter =
-            !skipReconcile && typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function'
-              ? await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId)
-              : fresh?.attachments || selectedNote.attachments || [];
           const ext = String(attachment.file_extension || '').toLowerCase();
           const isTrayPhoto =
             isPhotoAlbumsStagingPhotoFile({
@@ -4720,11 +4721,8 @@ export default function PhotoAlbumsWorkspacePane({
               type: file.type
             }) || isPhotoAlbumsStagingPhotoFile({ name: `x.${ext}` });
           if (isTrayPhoto && Number.isFinite(attachmentId) && attachmentId > 0) {
-            const seqRow = (attachmentsAfter || []).find(
-              (a) => Number(a?.attachment_id ?? a?.attachmentId) === attachmentId
-            );
-            const albumPhotoSeq =
-              seqRow?.album_photo_seq != null ? Number(seqRow.album_photo_seq) : null;
+            const seqFromUpload =
+              attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null;
             noteEditorApiRef.current?.addStagedAttachment?.(
               mergeStagingItemPreview({
                 attachmentId,
@@ -4733,12 +4731,20 @@ export default function PhotoAlbumsWorkspacePane({
                 fileSizeBytes: attachment.file_size_bytes ?? null,
                 checksum: attachment.checksum || null,
                 albumPhotoSeq:
-                  Number.isFinite(albumPhotoSeq) && albumPhotoSeq >= 1 ? albumPhotoSeq : null,
+                  Number.isFinite(seqFromUpload) && seqFromUpload >= 1 ? seqFromUpload : null,
                 ...(localPreviewUrl ? { localPreviewUrl } : null)
               })
             );
           }
-          noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(attachmentsAfter);
+          const fresh = await loadNoteContent(noteId, { syncStaging: !skipReconcile });
+          if (!skipReconcile) {
+            const attachmentsAfter =
+              typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function'
+                ? await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId)
+                : fresh?.attachments || selectedNote.attachments || [];
+            noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(attachmentsAfter);
+          }
+          return true;
         } else if (localPreviewUrl) {
           try {
             URL.revokeObjectURL(localPreviewUrl);
@@ -4755,10 +4761,12 @@ export default function PhotoAlbumsWorkspacePane({
           }
         }
         setError(readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`));
+        return false;
       } finally {
         if (!skipBusy) setBusy(false);
         bumpVaultUsage();
       }
+      return false;
     },
     [selectedNote, maxUploadMb, vaultApi, bumpVaultUsage, loadNoteContent]
   );
@@ -4833,6 +4841,10 @@ export default function PhotoAlbumsWorkspacePane({
 
   const handleStageOsFiles = useCallback(
     async (files) => {
+      if (!selectedNote) {
+        setError('Select an album on the left before adding photos to the Thumbnail Tray.');
+        return;
+      }
       const list = Array.isArray(files) ? files : [];
       const photoFiles = sortPhotoAlbumsFilesBySourceTakenAt(
         list.filter((file) => isPhotoAlbumsStagingPhotoFile(file))
@@ -4856,6 +4868,7 @@ export default function PhotoAlbumsWorkspacePane({
         label: `Adding to Thumbnail Tray (0 of ${total})`,
         percent: 0
       });
+      let uploaded = 0;
       try {
         for (let i = 0; i < total; i += 1) {
           setBatchUploadProgress({
@@ -4863,23 +4876,38 @@ export default function PhotoAlbumsWorkspacePane({
             percent: Math.round((i / total) * 100)
           });
           // eslint-disable-next-line no-await-in-loop
-          await uploadNoteVaultFileToStaging(photoFiles[i], { skipBusy: true, skipReconcile: true });
+          const ok = await uploadNoteVaultFileToStaging(photoFiles[i], {
+            skipBusy: true,
+            skipReconcile: true
+          });
+          if (ok) uploaded += 1;
         }
-        if (selectedNote && total > 0) {
+        if (total > 0) {
           const noteId = Number(selectedNote.note_id);
-          const reconciled = await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId);
-          const fresh = await loadNoteContent(noteId);
+          let attachmentsAfter = [];
+          try {
+            if (typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function') {
+              attachmentsAfter = await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId);
+            }
+          } catch (reconcileErr) {
+            console.warn('[handleStageOsFiles] reconcile album seq failed', reconcileErr);
+          }
+          const fresh = await loadNoteContent(noteId, { syncStaging: false });
           noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(
-            reconciled.length ? reconciled : fresh?.attachments || []
+            attachmentsAfter.length ? attachmentsAfter : fresh?.attachments || []
           );
         }
         setBatchUploadProgress({
           label: `Adding to Thumbnail Tray (${total} of ${total})`,
           percent: 100
         });
-        if (rejected.length) {
+        if (!uploaded) {
           setError(
-            `Staged ${photoFiles.length} photo(s). Skipped ${rejected.length} unsupported preview type(s) (e.g. RAW, PSD, PDF, JXL).`
+            'No photos were added to the Thumbnail Tray. Select an album on the left, unlock TutaDrive, then try again.'
+          );
+        } else if (rejected.length) {
+          setError(
+            `Staged ${uploaded} photo(s). Skipped ${rejected.length} unsupported preview type(s) (e.g. RAW, PSD, PDF, JXL).`
           );
         }
       } finally {
