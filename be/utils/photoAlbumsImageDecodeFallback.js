@@ -74,6 +74,33 @@ async function decodeHeicToRaw(buffer) {
   };
 }
 
+let icoDecodePromise = null;
+function loadIcoDecode() {
+  if (!icoDecodePromise) {
+    icoDecodePromise = import('decode-ico').then((mod) => mod?.default || mod);
+  }
+  return icoDecodePromise;
+}
+
+async function decodeIcoToRaw(buffer) {
+  const decode = await loadIcoDecode();
+  const frames = decode(buffer);
+  if (!frames?.length) throw new Error('ICO has no frames');
+  // Largest frame wins — icons pack several sizes.
+  const frame = frames.reduce((best, f) =>
+    Number(f.width) * Number(f.height) > Number(best.width) * Number(best.height) ? f : best
+  );
+  const data = Buffer.from(frame.data);
+  // PNG-payload frames come back as encoded PNG bytes; BMP frames as RGBA pixels.
+  if (frame.type === 'png') {
+    return { input: data, options: { failOn: 'none' } };
+  }
+  return {
+    input: data,
+    options: { raw: { width: Number(frame.width), height: Number(frame.height), channels: 4 } }
+  };
+}
+
 async function decodeBmpToRaw(buffer) {
   const bmp = await loadBmpDecode();
   const decoded = bmp.decode(buffer);
@@ -107,8 +134,10 @@ export async function decodePhotoAlbumsImageFallback(buffer, ext = '') {
   if (!kind) {
     if (cleanExt === 'heic' || cleanExt === 'heif' || cleanExt === 'hif') kind = 'heic';
     else if (cleanExt === 'bmp' || cleanExt === 'dib') kind = 'bmp';
+    else if (cleanExt === 'ico' || cleanExt === 'cur') kind = 'ico';
   }
   if (kind === 'heic') return decodeHeicToRaw(buffer);
   if (kind === 'bmp') return decodeBmpToRaw(buffer);
+  if (kind === 'ico') return decodeIcoToRaw(buffer);
   return null;
 }
