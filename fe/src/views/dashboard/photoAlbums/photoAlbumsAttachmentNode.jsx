@@ -193,7 +193,7 @@ function listTextAndEmojiNearPhoto(state, photoRect, pad = 24, attachmentId = nu
 function listTextAndEmojiForPhotoPos(state, photoPos, pad = 24) {
   if (!state?.doc || !Number.isFinite(photoPos)) return [];
   const photoNode = state.doc.nodeAt(photoPos);
-  if (!photoNode || photoNode.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE) return [];
+  if (!photoNode || photoNode.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return [];
   const photoRect = photoPageRectFromAttrs(photoNode.attrs);
   if (!photoRect) return [];
   const attachmentId = Number(photoNode.attrs?.attachmentId);
@@ -1045,6 +1045,8 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
   const startPhotoMove = useCallback(
     (event) => {
       if (!editable || event.button !== 0) return;
+      // Second mousedown of a double-click must not start relocate/pan — dblclick opens Add Text.
+      if (event.detail > 1) return;
       if (event.target?.closest?.('.rv-photo-tile__actions')) return;
       if (event.target?.closest?.('.rv-attachment-photo__return-x, .rv-attachment-photo__top-chrome')) return;
       if (event.target?.closest?.('.rv-album-video-indicator')) return;

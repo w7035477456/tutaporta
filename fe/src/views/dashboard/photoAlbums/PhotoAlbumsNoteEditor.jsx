@@ -3067,7 +3067,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
    * Never treat a selected photo/attachment node as “text to replace”.
    */
   const handlePlaceFloatingText = useCallback((pagePos = null) => {
-    if (!editor || !editable) return;
+    if (!editor || !effectiveEditable) return;
     const { state } = editor;
     const { from, to, empty } = state.selection;
     const isNodeSelection = state.selection instanceof NodeSelection;
@@ -3141,7 +3141,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       }
     }
     setPlaceTextOpen(true);
-  }, [editor, editable]);
+  }, [editor, effectiveEditable]);
   handlePlaceFloatingTextRef.current = handlePlaceFloatingText;
 
   const handlePlaceTextPhotoChromeChange = useCallback(
@@ -3241,7 +3241,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   /** Double-click an existing label — reopen Add Text with its full style. */
   const handleEditExistingTextLabel = useCallback(
     (payload) => {
-      if (!editor || !editable || !payload) return;
+      if (!editor || !effectiveEditable || !payload) return;
       placeTextSelectionRef.current = { from: 0, to: 0, empty: true, replaceableText: false };
       placeTextEditingLabelIdRef.current = payload.labelId || null;
       placeTextEditingPosRef.current = Number.isFinite(payload.pos) ? payload.pos : null;
@@ -3299,7 +3299,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       }
       setPlaceTextOpen(true);
     },
-    [editor, editable]
+    [editor, effectiveEditable]
   );
 
   /** Double-click album page title — style applies to every page. */
