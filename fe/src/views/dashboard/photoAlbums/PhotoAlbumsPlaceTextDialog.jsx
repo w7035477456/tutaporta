@@ -15,11 +15,13 @@ import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCente
 import { colorTemplate7PopupSliderSx } from 'config/colorTemplate7PopupLargeDark';
 import PhotoAlbumsFillOutlineColorPicker from './PhotoAlbumsFillOutlineColorPicker';
 import PhotoAlbumsPlaceTextMediaPreview from './PhotoAlbumsPlaceTextMediaPreview';
+import PhotoAlbumsVideoPlaybackControls from './PhotoAlbumsVideoPlaybackControls';
 import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
 import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
 import { newLabelId } from './photoAlbumsTextLabelNode';
 import {
-  computePlaceTextBottomRightRel,
+  buildSeededPlaceTextSampleLabel,
+  buildSeededPlaceTextVideoLabel,
   resolvePlaceTextCaption
 } from './photoAlbumsPlaceTextPosition';
 import {
@@ -30,6 +32,8 @@ import {
   coverSizeForFrame,
   fitSizeForFrame,
   framedZoomPercentFromWidth,
+  pickAutoSlotFitWithoutClipping,
+  PHOTO_SLOT_FIT_TRANSITION_MS,
   slotZoomPctLabelSx,
   slotZoomSliderRowSx,
   slotZoomSliderSx
@@ -124,15 +128,17 @@ export const PLACE_TEXT_DEFAULTS = {
   fontWeight: 700,
   fontSize: 13,
   outlineWidth: 5,
-  rotationDeg: -45
+  rotationDeg: 0
 };
 
 export const PLACE_TEXT_MAX_CHARS = 1_073_741_823;
 
 /** Preview vs controls split in photo Add Text dialog (0–1). */
-const PLACE_TEXT_PREVIEW_SPLIT_DEFAULT = 0.74;
+const PLACE_TEXT_PREVIEW_SPLIT_DEFAULT = 0.7;
+/** Video edit needs a shorter preview — playback row lives in the controls dashboard. */
+const PLACE_TEXT_VIDEO_PREVIEW_SPLIT_DEFAULT = 0.62;
 const PLACE_TEXT_PREVIEW_SPLIT_MIN = 0.22;
-const PLACE_TEXT_PREVIEW_SPLIT_MAX = 0.82;
+const PLACE_TEXT_PREVIEW_SPLIT_MAX = 0.72;
 const PLACE_TEXT_SPLIT_HANDLE_PX = 10;
 
 const SELECT_MENU_Z = COLOR_TEMPLATE16_POPUP_Z_INDEX + 200;
@@ -275,6 +281,8 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [labels, setLabels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [emojiPickerAnchor, setEmojiPickerAnchor] = useState(null);
+  /** The preview's <video> node, so the action-row Play/Pause/seek can drive it. */
+  const [previewVideoEl, setPreviewVideoEl] = useState(null);
   const [panEnabled, setPanEnabled] = useState(false);
   const [photoRotationDeg, setPhotoRotationDeg] = useState(0);
   const [photoSlotFit, setPhotoSlotFit] = useState('cover');
@@ -284,6 +292,11 @@ export default function PhotoAlbumsPlaceTextDialog({
   const openSnapshotRef = useRef(null);
   const dialogInitRef = useRef(false);
   const seedSampleOnEmptyRef = useRef(true);
+  const pendingAutoFitRef = useRef(false);
+  const pendingVideoSeedRef = useRef(false);
+  const photoFitAnimTimerRef = useRef(null);
+  const [previewPhotoChrome, setPreviewPhotoChrome] = useState(null);
+  const [photoFitAnimating, setPhotoFitAnimating] = useState(false);
   const [previewSplitRatio, setPreviewSplitRatio] = useState(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
 
   const labelOptions = useMemo(() => {
@@ -347,6 +360,12 @@ export default function PhotoAlbumsPlaceTextDialog({
       setPanEnabled(false);
       setLabels([]);
       setActiveKey('');
+      setPreviewPhotoChrome(null);
+      setPhotoFitAnimating(false);
+      if (photoFitAnimTimerRef.current) {
+        clearTimeout(photoFitAnimTimerRef.current);
+        photoFitAnimTimerRef.current = null;
+      }
       dialogInitRef.current = false;
       openSnapshotRef.current = null;
       return;
@@ -355,7 +374,22 @@ export default function PhotoAlbumsPlaceTextDialog({
     if (dialogInitRef.current) return;
     dialogInitRef.current = true;
 
-    if (hasMedia) setPreviewSplitRatio(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
+    const preExistingOverlayCount = Number.isFinite(Number(mediaSession?.existingOverlayCount))
+      ? Math.max(0, Number(mediaSession.existingOverlayCount))
+      : Array.isArray(mediaSession?.labels)
+        ? mediaSession.labels.filter((l) => !l.isNew).length
+        : 0;
+
+    pendingAutoFitRef.current = Boolean(hasMedia && !mediaSession?.isVideo);
+    pendingVideoSeedRef.current = Boolean(hasMedia && mediaSession?.isVideo && preExistingOverlayCount < 1);
+
+    if (hasMedia) {
+      setPreviewSplitRatio(
+        mediaSession?.isVideo
+          ? PLACE_TEXT_VIDEO_PREVIEW_SPLIT_DEFAULT
+          : PLACE_TEXT_PREVIEW_SPLIT_DEFAULT
+      );
+    }
     const rot0 = Number(mediaSession?.rotationDeg) || 0;
     const fit0 =
       String(mediaSession?.slotFit || 'cover').toLowerCase() === 'contain' ? 'contain' : 'cover';
@@ -365,11 +399,6 @@ export default function PhotoAlbumsPlaceTextDialog({
 
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
     const seeded = String(initialText ?? '').trim();
-    const preExistingOverlayCount = Number.isFinite(Number(mediaSession?.existingOverlayCount))
-      ? Math.max(0, Number(mediaSession.existingOverlayCount))
-      : Array.isArray(mediaSession?.labels)
-        ? mediaSession.labels.filter((l) => !l.isNew).length
-        : 0;
     seedSampleOnEmptyRef.current = preExistingOverlayCount < 1;
 
     let nextLabels = [];
@@ -494,19 +523,51 @@ export default function PhotoAlbumsPlaceTextDialog({
 
   const previewSession = useMemo(() => {
     if (!mediaSession) return null;
+    const chrome = previewPhotoChrome || {};
     return {
       ...mediaSession,
       rotationDeg: photoRotationDeg,
-      slotFit: photoSlotFit
+      slotFit: photoSlotFit,
+      photoW: chrome.photoW ?? mediaSession.photoW,
+      photoH: chrome.photoH ?? mediaSession.photoH,
+      panX: chrome.panX ?? mediaSession.panX,
+      panY: chrome.panY ?? mediaSession.panY
     };
-  }, [mediaSession, photoRotationDeg, photoSlotFit]);
+  }, [mediaSession, photoRotationDeg, photoSlotFit, previewPhotoChrome]);
+
+  const syncPreviewPhotoChrome = useCallback((patch) => {
+    if (!patch || typeof patch !== 'object') return;
+    setPreviewPhotoChrome((prev) => {
+      const next = { ...(prev || {}) };
+      if ('width' in patch) next.photoW = patch.width;
+      if ('height' in patch) next.photoH = patch.height;
+      if ('panX' in patch) next.panX = patch.panX;
+      if ('panY' in patch) next.panY = patch.panY;
+      return next;
+    });
+  }, []);
 
   const applyPhotoChrome = useCallback(
     (patch) => {
+      syncPreviewPhotoChrome(patch);
       if (typeof onPhotoChromeChange === 'function') onPhotoChromeChange(patch);
     },
-    [onPhotoChromeChange]
+    [onPhotoChromeChange, syncPreviewPhotoChrome]
   );
+
+  const triggerPhotoFitAnimation = useCallback((applyFitPatch) => {
+    if (photoFitAnimTimerRef.current) clearTimeout(photoFitAnimTimerRef.current);
+    setPhotoFitAnimating(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        applyFitPatch?.();
+      });
+    });
+    photoFitAnimTimerRef.current = setTimeout(() => {
+      setPhotoFitAnimating(false);
+      photoFitAnimTimerRef.current = null;
+    }, PHOTO_SLOT_FIT_TRANSITION_MS);
+  }, []);
 
   const handleTogglePanZoom = useCallback(() => {
     setPanEnabled((v) => {
@@ -525,42 +586,46 @@ export default function PhotoAlbumsPlaceTextDialog({
   }, [applyPhotoChrome]);
 
   const handlePhotoFitFull = useCallback(() => {
-    setPhotoSlotFit('contain');
     const rect = mediaSession?.photoRect;
     const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-    if (rect?.width && rect?.height) {
-      const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'contain');
-      const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
-      applyPhotoChrome({
-        slotFit: 'contain',
-        width: fit.width,
-        height: fit.height,
-        panX: pan.panX,
-        panY: pan.panY
-      });
-    } else {
-      applyPhotoChrome({ slotFit: 'contain' });
-    }
-  }, [applyPhotoChrome, mediaSession, mediaAspect]);
+    triggerPhotoFitAnimation(() => {
+      setPhotoSlotFit('contain');
+      if (rect?.width && rect?.height) {
+        const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'contain');
+        const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
+        applyPhotoChrome({
+          slotFit: 'contain',
+          width: fit.width,
+          height: fit.height,
+          panX: pan.panX,
+          panY: pan.panY
+        });
+      } else {
+        applyPhotoChrome({ slotFit: 'contain' });
+      }
+    });
+  }, [applyPhotoChrome, mediaSession, mediaAspect, triggerPhotoFitAnimation]);
 
   const handlePhotoFitZoom = useCallback(() => {
-    setPhotoSlotFit('cover');
     const rect = mediaSession?.photoRect;
     const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-    if (rect?.width && rect?.height) {
-      const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'cover');
-      const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
-      applyPhotoChrome({
-        slotFit: 'cover',
-        width: fit.width,
-        height: fit.height,
-        panX: pan.panX,
-        panY: pan.panY
-      });
-    } else {
-      applyPhotoChrome({ slotFit: 'cover' });
-    }
-  }, [applyPhotoChrome, mediaSession, mediaAspect]);
+    triggerPhotoFitAnimation(() => {
+      setPhotoSlotFit('cover');
+      if (rect?.width && rect?.height) {
+        const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'cover');
+        const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
+        applyPhotoChrome({
+          slotFit: 'cover',
+          width: fit.width,
+          height: fit.height,
+          panX: pan.panX,
+          panY: pan.panY
+        });
+      } else {
+        applyPhotoChrome({ slotFit: 'cover' });
+      }
+    });
+  }, [applyPhotoChrome, mediaSession, mediaAspect, triggerPhotoFitAnimation]);
 
   const photoZoomPct = useMemo(() => {
     const rect = mediaSession?.photoRect;
@@ -595,6 +660,246 @@ export default function PhotoAlbumsPlaceTextDialog({
   const handleNaturalAspectRatio = useCallback((aspect) => {
     if (aspect > 0) setMediaAspect(aspect);
   }, []);
+
+  const resolveFramedPhotoChrome = useCallback(
+    (patch = {}) => {
+      const rect = mediaSession?.photoRect;
+      const fw = Math.max(1, Number(rect?.width) || 1);
+      const fh = Math.max(1, Number(rect?.height) || 1);
+      const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
+      const slotFit =
+        String(patch.slotFit ?? photoSlotFit ?? 'cover').toLowerCase() === 'contain'
+          ? 'contain'
+          : 'cover';
+      const fit = fitSizeForFrame(aspect, fw, fh, slotFit);
+      const photoW =
+        Number.isFinite(Number(patch.width)) && Number(patch.width) > 0
+          ? Number(patch.width)
+          : Number.isFinite(Number(mediaSession?.photoW)) && Number(mediaSession.photoW) > 0
+            ? Number(mediaSession.photoW)
+            : fit.width;
+      const photoH =
+        Number.isFinite(Number(patch.height)) && Number(patch.height) > 0
+          ? Number(patch.height)
+          : Number.isFinite(Number(mediaSession?.photoH)) && Number(mediaSession.photoH) > 0
+            ? Number(mediaSession.photoH)
+            : Math.round(photoW / aspect);
+      const pan = centeredPan(photoW, photoH, fw, fh);
+      return {
+        photoW,
+        photoH,
+        panX: Number.isFinite(Number(patch.panX))
+          ? Number(patch.panX)
+          : Number.isFinite(Number(mediaSession?.panX))
+            ? Number(mediaSession.panX)
+            : pan.panX,
+        panY: Number.isFinite(Number(patch.panY))
+          ? Number(patch.panY)
+          : Number.isFinite(Number(mediaSession?.panY))
+            ? Number(mediaSession.panY)
+            : pan.panY
+      };
+    },
+    [mediaSession, mediaAspect, photoSlotFit]
+  );
+
+  useEffect(() => {
+    if (!open || !hasMedia || mediaSession?.isVideo || !pendingAutoFitRef.current) return;
+    if (!(mediaAspect > 0)) return;
+    const rect = mediaSession?.photoRect;
+    if (!rect?.width || !rect?.height) return;
+
+    pendingAutoFitRef.current = false;
+
+    const patch = pickAutoSlotFitWithoutClipping(mediaAspect, rect.width, rect.height);
+    setPhotoSlotFit(patch.slotFit);
+    applyPhotoChrome(patch);
+
+    const caption = seedSampleOnEmptyRef.current
+      ? resolvePlaceTextCaption({
+          explicitText: text,
+          existingOverlayCount: 0,
+          editing: false
+        })
+      : '';
+    let nextLabels = labels;
+    let nextActiveKey = activeKey;
+
+    if (caption) {
+      const sampleLabel = buildSeededPlaceTextSampleLabel({
+        caption,
+        style: {
+          ...PLACE_TEXT_DEFAULTS,
+          text: caption,
+          color,
+          outlineColor,
+          outlineWidth,
+          fontSize,
+          fontFamily,
+          fontWeight
+        },
+        frameW: rect.width,
+        frameH: rect.height,
+        photoW: patch.width,
+        photoH: patch.height,
+        panX: patch.panX,
+        panY: patch.panY
+      });
+      nextLabels = [...labels.filter((l) => !l.isNew), sampleLabel];
+      nextActiveKey = sampleLabel.clientKey;
+      setLabels(nextLabels);
+      setActiveKey(nextActiveKey);
+      applyStyleFields(sampleLabel, caption, true);
+    }
+
+    if (openSnapshotRef.current) {
+      openSnapshotRef.current = {
+        ...openSnapshotRef.current,
+        photoSlotFit: patch.slotFit,
+        photoChrome: {
+          rotationDeg: Number(mediaSession?.rotationDeg) || 0,
+          slotFit: patch.slotFit,
+          panX: patch.panX,
+          panY: patch.panY,
+          width: patch.width,
+          height: patch.height,
+          panZoom: false
+        },
+        ...(caption
+          ? {
+              labels: nextLabels.map((l) => ({ ...l })),
+              activeKey: nextActiveKey
+            }
+          : null)
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per open when aspect is known
+  }, [open, hasMedia, mediaSession?.isVideo, mediaAspect, mediaSession?.photoRect]);
+
+  useEffect(() => {
+    if (!open || !hasMedia || !mediaSession?.isVideo || !pendingVideoSeedRef.current) return;
+    if (!(mediaAspect > 0)) return;
+    const rect = mediaSession?.photoRect;
+    if (!rect?.width || !rect?.height) return;
+
+    pendingVideoSeedRef.current = false;
+
+    const caption = seedSampleOnEmptyRef.current
+      ? resolvePlaceTextCaption({
+          explicitText: text,
+          existingOverlayCount: 0,
+          editing: false
+        })
+      : '';
+    if (!caption) return;
+
+    const sampleLabel = buildSeededPlaceTextVideoLabel({
+      caption,
+      style: {
+        ...PLACE_TEXT_DEFAULTS,
+        text: caption,
+        color,
+        outlineColor,
+        outlineWidth,
+        fontSize,
+        fontFamily,
+        fontWeight
+      },
+      frameW: rect.width,
+      frameH: rect.height,
+      mediaAspect,
+      placement: 'below'
+    });
+    const nextLabels = [...labels.filter((l) => !l.isNew), sampleLabel];
+    const nextActiveKey = sampleLabel.clientKey;
+    setLabels(nextLabels);
+    setActiveKey(nextActiveKey);
+    applyStyleFields(sampleLabel, caption, true);
+
+    if (openSnapshotRef.current) {
+      openSnapshotRef.current = {
+        ...openSnapshotRef.current,
+        labels: nextLabels.map((l) => ({ ...l })),
+        activeKey: nextActiveKey
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per open when video metadata is known
+  }, [open, hasMedia, mediaSession?.isVideo, mediaAspect, mediaSession?.photoRect]);
+
+  const buildPreviewTextLabel = useCallback(
+    (caption, styleOverrides = {}) => {
+      const rect = mediaSession?.photoRect;
+      if (!rect?.width || !rect?.height) return null;
+      const mergedStyle = {
+        color,
+        outlineColor,
+        outlineWidth,
+        fontSize,
+        fontFamily,
+        fontWeight,
+        ...styleOverrides
+      };
+      if (mediaSession?.isVideo) {
+        return buildSeededPlaceTextVideoLabel({
+          caption,
+          style: mergedStyle,
+          frameW: rect.width,
+          frameH: rect.height,
+          mediaAspect: mediaAspect > 0 ? mediaAspect : 16 / 9,
+          placement: 'below'
+        });
+      }
+      const framed = resolveFramedPhotoChrome();
+      return buildSeededPlaceTextSampleLabel({
+        caption,
+        style: mergedStyle,
+        frameW: rect.width,
+        frameH: rect.height,
+        photoW: framed.photoW,
+        photoH: framed.photoH,
+        panX: framed.panX,
+        panY: framed.panY
+      });
+    },
+    [
+      mediaSession,
+      mediaAspect,
+      color,
+      outlineColor,
+      outlineWidth,
+      fontSize,
+      fontFamily,
+      fontWeight,
+      resolveFramedPhotoChrome
+    ]
+  );
+
+  const ensureLabelsIncludeTypedText = useCallback(
+    (currentLabels, caption, styleOverrides = {}) => {
+      const trimmed = String(caption || '').trim();
+      if (!trimmed || !hasMedia || !mediaSession?.photoRect) return currentLabels;
+      const textLabels = currentLabels.filter(
+        (l) => !l.isEmoji && !/Emoji/i.test(String(l.fontFamily || ''))
+      );
+      if (textLabels.length >= 1) {
+        if (!activeKey && textLabels.length === 1) {
+          return currentLabels.map((l) =>
+            l.clientKey === textLabels[0].clientKey ? { ...l, text: trimmed, ...styleOverrides } : l
+          );
+        }
+        if (activeKey) {
+          return currentLabels.map((l) =>
+            l.clientKey === activeKey ? { ...l, text: trimmed, ...styleOverrides } : l
+          );
+        }
+        return currentLabels;
+      }
+      const sampleLabel = buildPreviewTextLabel(trimmed, styleOverrides);
+      if (!sampleLabel) return currentLabels;
+      return [...currentLabels, sampleLabel];
+    },
+    [hasMedia, mediaSession, activeKey, buildPreviewTextLabel]
+  );
 
   const handleReset = useCallback(() => {
     const snap = openSnapshotRef.current;
@@ -772,35 +1077,27 @@ export default function PhotoAlbumsPlaceTextDialog({
       }
       const pw = Math.max(1, mediaSession.photoRect.width);
       const ph = Math.max(1, mediaSession.photoRect.height);
-      const fs = Math.max(10, Math.round(Number(fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
-      const estW = Math.max(0.18, Math.min(0.75, (fs * 12) / pw));
-      const estH = Math.max(0.08, Math.min(0.35, (fs * 1.4) / ph));
-      const rotationDeg = PLACE_TEXT_DEFAULTS.rotationDeg;
-      const { relX, relY } = computePlaceTextBottomRightRel({
-        relW: estW,
-        relH: estH,
-        rotationDeg,
-        margin: 0
+      const framed = resolveFramedPhotoChrome();
+      const nextLabel = buildSeededPlaceTextSampleLabel({
+        caption: '',
+        style: {
+          color,
+          outlineColor,
+          outlineWidth,
+          fontSize,
+          fontFamily,
+          fontWeight,
+          rotationDeg: PLACE_TEXT_DEFAULTS.rotationDeg
+        },
+        frameW: pw,
+        frameH: ph,
+        photoW: framed.photoW,
+        photoH: framed.photoH,
+        panX: framed.panX,
+        panY: framed.panY
       });
-      const clientKey = `new_${Date.now()}`;
-      const nextLabel = {
-        clientKey,
-        isNew: true,
-        docPos: null,
-        labelId: newLabelId(),
-        text: '',
-        rotationDeg,
-        relX,
-        relY,
-        relW: estW,
-        relH: estH,
-        color,
-        outlineColor,
-        outlineWidth,
-        fontSize: fs,
-        fontFamily,
-        fontWeight
-      };
+      nextLabel.text = '';
+      const clientKey = nextLabel.clientKey;
       setLabels((prev) => [...prev, nextLabel]);
       setActiveKey(clientKey);
       applyStyleFields({ ...PLACE_TEXT_DEFAULTS, text: '' }, '', false);
@@ -922,6 +1219,11 @@ export default function PhotoAlbumsPlaceTextDialog({
         );
       }
     }
+    finalLabels = ensureLabelsIncludeTypedText(finalLabels, style.text, style);
+    if (finalLabels !== labels) {
+      const created = finalLabels.find((l) => l.isNew && !labels.some((x) => x.clientKey === l.clientKey));
+      if (created) setActiveKey(created.clientKey);
+    }
 
     onConfirm?.({
       ...style,
@@ -981,8 +1283,29 @@ export default function PhotoAlbumsPlaceTextDialog({
     [hasMedia, mediaSession]
   );
 
+  const handleTextChange = useCallback(
+    (raw) => {
+      const next = String(raw ?? '').slice(0, PLACE_TEXT_MAX_CHARS);
+      setText(next);
+      if (!hasMedia || !mediaSession?.photoRect) return;
+      const trimmed = next.trim();
+      if (!trimmed) return;
+      setLabels((prev) => {
+        const ensured = ensureLabelsIncludeTypedText(prev, trimmed);
+        const created = ensured.find((l) => l.isNew && !prev.some((x) => x.clientKey === l.clientKey));
+        if (created) {
+          setActiveKey(created.clientKey);
+        } else if (activeKey) {
+          return ensured.map((l) => (l.clientKey === activeKey ? { ...l, text: trimmed } : l));
+        }
+        return ensured;
+      });
+    },
+    [hasMedia, mediaSession, activeKey, ensureLabelsIncludeTypedText]
+  );
+
   const stylePresetButtons = (compact = false) => (
-    <Stack spacing={compact ? 0.35 : 0.5} sx={{ mb: compact ? 0.5 : 1 }}>
+    <Stack spacing={compact ? 0.35 : 0.5} sx={{ mt: compact ? 0.35 : 1, mb: 0 }}>
       {PLACE_TEXT_STYLE_PRESETS.map((preset) => {
         const selected = preset.id === selectedPresetId;
         const styleForButton = selected
@@ -1076,7 +1399,7 @@ export default function PhotoAlbumsPlaceTextDialog({
       ) : null}
       <TextField
         value={text}
-        onChange={(e) => setText(String(e.target.value ?? '').slice(0, PLACE_TEXT_MAX_CHARS))}
+        onChange={(e) => handleTextChange(e.target.value)}
         placeholder={PLACE_TEXT_DEFAULTS.text}
         autoFocus={!hasMedia}
         fullWidth
@@ -1114,6 +1437,23 @@ export default function PhotoAlbumsPlaceTextDialog({
     </>
   );
 
+  const emojiToolbarButton = (
+    <GreenButton
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={emojiPickerAnchor ? 'true' : undefined}
+      onClick={(e) => {
+        e.preventDefault();
+        const el = e.currentTarget;
+        setEmojiPickerAnchor((prev) => (prev ? null : el));
+      }}
+      title="Add emoji sticker on the photo or video"
+      sx={{ minWidth: 80, fontWeight: 800, flexShrink: 0 }}
+    >
+      Emoji
+    </GreenButton>
+  );
+
   const mediaActionButtonRow = hasMedia ? (
     <Stack
       direction="row"
@@ -1122,7 +1462,7 @@ export default function PhotoAlbumsPlaceTextDialog({
       alignItems="center"
       flexWrap="wrap"
       useFlexGap
-      sx={{ mt: 0.75, mb: 0.25, flexShrink: 0, width: '100%' }}
+      sx={{ mt: 0.5, mb: 0.15, flexShrink: 0, width: '100%' }}
     >
       <YellowButtonTemplate
         type="button"
@@ -1132,7 +1472,19 @@ export default function PhotoAlbumsPlaceTextDialog({
       >
         Cancel
       </YellowButtonTemplate>
-      {!mediaSession?.isVideo ? (
+      {mediaSession?.isVideo ? (
+        <Stack
+          direction="row"
+          spacing={0.75}
+          alignItems="center"
+          flexWrap="wrap"
+          useFlexGap
+          sx={{ flex: '1 1 auto', minWidth: 0, justifyContent: 'center' }}
+        >
+          <PhotoAlbumsVideoPlaybackControls inline video={previewVideoEl} />
+          {emojiToolbarButton}
+        </Stack>
+      ) : (
         <Stack
           direction="row"
           spacing={0.75}
@@ -1206,9 +1558,8 @@ export default function PhotoAlbumsPlaceTextDialog({
           >
             Reset
           </GreenButton>
+          {emojiToolbarButton}
         </Stack>
-      ) : (
-        <Box sx={{ flex: '1 1 auto' }} aria-hidden />
       )}
       <GreenButton
         type="button"
@@ -1219,6 +1570,16 @@ export default function PhotoAlbumsPlaceTextDialog({
         Save
       </GreenButton>
     </Stack>
+  ) : null;
+
+  const emojiPickerPopover = hasMedia ? (
+    <PhotoAlbumsEmojiPickerPopover
+      open={Boolean(emojiPickerAnchor)}
+      anchorEl={emojiPickerAnchor}
+      onClose={() => setEmojiPickerAnchor(null)}
+      onPick={(em) => handlePlaceEmoji(em)}
+      zIndex={EMOJI_PICKER_Z}
+    />
   ) : null;
 
   const sizeSliderRow = (
@@ -1313,7 +1674,7 @@ export default function PhotoAlbumsPlaceTextDialog({
           bgcolor: 'rgba(0,0,0,0.18)',
           flex: hasMedia ? '1 1 auto' : undefined,
           minHeight: hasMedia ? 0 : undefined,
-          overflow: hasMedia ? 'auto' : undefined,
+          overflow: hasMedia ? 'hidden' : undefined,
           display: hasMedia ? 'flex' : 'block',
           flexDirection: hasMedia ? 'column' : undefined
         }}
@@ -1352,9 +1713,10 @@ export default function PhotoAlbumsPlaceTextDialog({
               }}
             >
               {mediaActionButtonRow}
+              {emojiPickerPopover}
               {sizeSliderRow}
-              {stylePresetButtons(true)}
               {textInputBlock(true)}
+              {stylePresetButtons(true)}
             </Box>
 
             <Box
@@ -1399,36 +1761,6 @@ export default function PhotoAlbumsPlaceTextDialog({
                   ))}
                 </Select>
               </Box>
-              <Stack
-                direction="row"
-                spacing={0.75}
-                justifyContent="flex-end"
-                alignItems="center"
-                flexWrap="wrap"
-                useFlexGap
-                sx={{ mt: 'auto', pt: 1, flexShrink: 0 }}
-              >
-                <GreenButton
-                  type="button"
-                  aria-haspopup="dialog"
-                  aria-expanded={emojiPickerAnchor ? 'true' : undefined}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const el = e.currentTarget;
-                    setEmojiPickerAnchor((prev) => (prev ? null : el));
-                  }}
-                  sx={{ minWidth: 80, fontWeight: 800 }}
-                >
-                  Emoji
-                </GreenButton>
-              </Stack>
-              <PhotoAlbumsEmojiPickerPopover
-                open={Boolean(emojiPickerAnchor)}
-                anchorEl={emojiPickerAnchor}
-                onClose={() => setEmojiPickerAnchor(null)}
-                onPick={(em) => handlePlaceEmoji(em)}
-                zIndex={EMOJI_PICKER_Z}
-              />
             </Box>
           </Stack>
         ) : (
@@ -1483,8 +1815,8 @@ export default function PhotoAlbumsPlaceTextDialog({
             </Box>
 
             <Box sx={{ flex: '1 1 34%', minWidth: 180 }}>
-              {stylePresetButtons(false)}
               {textInputBlock(false)}
+              {stylePresetButtons(false)}
             </Box>
           </Stack>
         )}
@@ -1524,8 +1856,8 @@ export default function PhotoAlbumsPlaceTextDialog({
               flex: '1 1 auto',
               overflow: 'hidden',
               overflowY: 'hidden',
-              pt: { xs: 1, sm: 1.25 },
-              px: { xs: 1, sm: 1.5 },
+              pt: 0,
+              px: { xs: 0.75, sm: 1 },
               pb: 0
             }
           : undefined
@@ -1537,12 +1869,12 @@ export default function PhotoAlbumsPlaceTextDialog({
       }
     >
       <ColorTemplate16PopupCenterWide.Title
-        sx={hasMedia ? { flexShrink: 0, py: 0.75 } : undefined}
+        sx={hasMedia ? { flexShrink: 0, py: 0.35, mb: 0 } : undefined}
       >
         {hasMedia ? 'Photo/Video Edit' : 'Add Text'}
       </ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body
-        spacing={hasMedia ? 0.75 : 1.5}
+        spacing={hasMedia ? 0 : 1.5}
         sx={
           hasMedia
             ? {
@@ -1551,27 +1883,25 @@ export default function PhotoAlbumsPlaceTextDialog({
                 height: '100%',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                pb: 0,
+                mb: 0
               }
             : undefined
         }
       >
-        <ColorTemplate16PopupCenterWide.SectionDescription
-          sx={hasMedia ? { flexShrink: 0, mb: 0, lineHeight: 1.3, fontSize: '0.88rem' } : undefined}
-        >
-          {hasMedia
-            ? mediaSession?.isVideo
-              ? 'Type below — text updates live on the video. Use Play / Pause and the slider to preview. Use Emoji for stickers. Cancel discards changes; Save applies them. Drag the yellow bar to resize preview vs controls.'
-              : 'Type below — text updates live on the photo. Use Emoji for stickers. Use Pan Zoom / Rotate / Full / Zoom for the photo. Cancel discards changes; Save applies them. Drag corners to scale text; drag sides to stretch. Drag the yellow bar to resize preview vs controls.'
-            : 'Style your text, then OK to place it on the page (drag & rotate like a photo).'}
-        </ColorTemplate16PopupCenterWide.SectionDescription>
+        {!hasMedia ? (
+          <ColorTemplate16PopupCenterWide.SectionDescription>
+            Style your text, then OK to place it on the page (drag & rotate like a photo).
+          </ColorTemplate16PopupCenterWide.SectionDescription>
+        ) : null}
 
         {hasMedia ? (
           <Box
             ref={splitContainerRef}
             sx={{
               display: 'grid',
-              gridTemplateRows: `${previewSplitRatio}fr ${PLACE_TEXT_SPLIT_HANDLE_PX}px ${1 - previewSplitRatio}fr`,
+              gridTemplateRows: `${Math.round(previewSplitRatio * 100)}% ${PLACE_TEXT_SPLIT_HANDLE_PX}px auto`,
               flex: '1 1 auto',
               minHeight: 0,
               overflow: 'hidden'
@@ -1586,8 +1916,10 @@ export default function PhotoAlbumsPlaceTextDialog({
                   noteId={noteId}
                   storageType={storageType}
                   panZoomActive={panEnabled}
+                  photoFitAnimating={photoFitAnimating}
                   onNaturalAspectRatio={handleNaturalAspectRatio}
                   onPhotoChromeChange={applyPhotoChrome}
+                  onVideoElementChange={setPreviewVideoEl}
                   onActivate={activateLabel}
                   onLabelChange={handleLabelChange}
                   onLabelDelete={handleLabelDelete}
@@ -1637,7 +1969,6 @@ export default function PhotoAlbumsPlaceTextDialog({
             <Box
               sx={{
                 minHeight: 0,
-                height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden'

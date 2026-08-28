@@ -13,6 +13,9 @@ import {
 import { getPhotoAlbumsAttachmentViewKind } from 'utils/photoAlbumsFileFormats';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
+import {
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG
+} from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 
 const THUMB_H_PX = 96;
@@ -316,7 +319,7 @@ export function PageThumb({
         m: 0,
         border: active ? ACTIVE_BORDER : IDLE_BORDER,
         borderRadius: 0.75,
-        bgcolor: '#fff',
+        bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
         cursor: canDragPage ? 'grab' : 'pointer',
         overflow: 'visible',
         height,
@@ -337,7 +340,7 @@ export function PageThumb({
         sx={{
           position: 'absolute',
           inset: 0,
-          bgcolor: '#f5f5f5',
+          bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
           borderRadius: 0.75,
           overflow: 'hidden',
           // Let the thumb own HTML5 drag — nested photo boxes must not steal the gesture.
@@ -354,7 +357,7 @@ export function PageThumb({
               width: `${slot.w}%`,
               height: `${slot.h}%`,
               border: slot.type === 'text' ? '1px dashed #90caf9' : '1px solid #bdbdbd',
-              bgcolor: slot.type === 'text' ? 'rgba(144,202,249,0.15)' : '#eee',
+              bgcolor: slot.type === 'text' ? 'rgba(144,202,249,0.15)' : PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
               boxSizing: 'border-box'
             }}
           />

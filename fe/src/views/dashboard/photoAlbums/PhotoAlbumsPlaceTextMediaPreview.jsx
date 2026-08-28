@@ -4,10 +4,14 @@ import Box from '@mui/material/Box';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import { fetchPhotoAlbumsNoteAttachmentBlob } from 'api/photoAlbumsFe';
 import { mimeTypeForPhotoAlbumsVideoExtension } from 'utils/photoAlbumsFileFormats';
-import PhotoAlbumsVideoPlaybackControls from './PhotoAlbumsVideoPlaybackControls';
 import { PlaceTextPositionLabel, computePlaceTextContainedRect } from './photoAlbumsPlaceTextPreviewShared';
 import PlaceTextPanDragOverlay from './PlaceTextPanDragOverlay';
-import { clampPhotoPan, coverSizeForFrame, fitSizeForFrame } from './photoAlbumsSlotZoom';
+import {
+  clampPhotoPan,
+  coverSizeForFrame,
+  fitSizeForFrame,
+  photoSlotFitTransitionCss
+} from './photoAlbumsSlotZoom';
 
 const HOURGLASS = '2rem';
 
@@ -30,8 +34,10 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
   noteId = null,
   storageType = null,
   panZoomActive = false,
+  photoFitAnimating = false,
   onNaturalAspectRatio = null,
   onPhotoChromeChange = null,
+  onVideoElementChange = null,
   onActivate,
   onLabelChange,
   onLabelDelete,
@@ -49,10 +55,20 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
   const [draggingPan, setDraggingPan] = useState(false);
   const objectUrlRef = useRef('');
 
+  // Play/Pause + seek live in the dialog's action row, so hand the <video> node
+  // up as it mounts. Kept in a ref so the callback ref identity stays stable.
+  const onVideoElementChangeRef = useRef(onVideoElementChange);
+  onVideoElementChangeRef.current = onVideoElementChange;
+  const setVideoNode = useCallback((node) => {
+    mediaRef.current = node;
+    onVideoElementChangeRef.current?.(node || null);
+  }, []);
+
   const photoRect = session?.photoRect;
   const pageFrameW = Math.max(1, Number(photoRect?.width) || 1);
   const pageFrameH = Math.max(1, Number(photoRect?.height) || 1);
   const hasFrame = Boolean(photoRect?.width && photoRect?.height);
+  const labelPageWidth = pageFrameW;
 
   const naturalAspect = useMemo(() => {
     const nw = naturalSize.width;
@@ -334,9 +350,39 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
       ) : (
         <>
           {isVideo && objectUrl ? (
-            <>
+            hasFrame ? (
               <Box
-                ref={mediaRef}
+                sx={{
+                  position: 'absolute',
+                  left: photoDisplayRect.left,
+                  top: photoDisplayRect.top,
+                  width: photoDisplayRect.width,
+                  height: photoDisplayRect.height,
+                  overflow: 'hidden',
+                  bgcolor: '#000'
+                }}
+              >
+                <Box
+                  ref={setVideoNode}
+                  component="video"
+                  src={objectUrl}
+                  playsInline
+                  preload="metadata"
+                  onLoadedMetadata={reportNaturalAspect}
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    bgcolor: '#000'
+                  }}
+                />
+              </Box>
+            ) : (
+              <Box
+                ref={setVideoNode}
                 component="video"
                 src={objectUrl}
                 playsInline
@@ -349,22 +395,10 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
                   height: '100%',
                   objectFit: 'contain',
                   display: 'block',
-                  bgcolor: '#000',
-                  pb: '3.25rem'
+                  bgcolor: '#000'
                 }}
               />
-              <Box
-                sx={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  zIndex: 5
-                }}
-              >
-                <PhotoAlbumsVideoPlaybackControls videoRef={mediaRef} disabled={loading || Boolean(error)} />
-              </Box>
-            </>
+            )
           ) : showFramedPhoto ? (
             <Box
               sx={{
@@ -398,6 +432,8 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
                   display: 'block',
                   transform: rotationDeg ? `rotate(${rotationDeg}deg)` : undefined,
                   transformOrigin: 'center center',
+                  transition:
+                    photoFitAnimating && !draggingPan ? photoSlotFitTransitionCss : 'none',
                   userSelect: 'none',
                   cursor: panZoomActive ? (draggingPan ? 'grabbing' : 'grab') : 'default',
                   touchAction: panZoomActive ? 'none' : 'auto',
@@ -453,7 +489,7 @@ export default function PhotoAlbumsPlaceTextMediaPreview({
               key={label.clientKey}
               label={label}
               photoDisplayRect={photoDisplayRect}
-              pagePhotoWidth={Math.max(1, photoRect?.width || 1)}
+              pagePhotoWidth={labelPageWidth}
               active={label.clientKey === activeKey}
               onActivate={onActivate}
               onChange={onLabelChange}
@@ -474,8 +510,10 @@ PhotoAlbumsPlaceTextMediaPreview.propTypes = {
   noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   storageType: PropTypes.string,
   panZoomActive: PropTypes.bool,
+  photoFitAnimating: PropTypes.bool,
   onNaturalAspectRatio: PropTypes.func,
   onPhotoChromeChange: PropTypes.func,
+  onVideoElementChange: PropTypes.func,
   onActivate: PropTypes.func,
   onLabelChange: PropTypes.func,
   onLabelDelete: PropTypes.func,

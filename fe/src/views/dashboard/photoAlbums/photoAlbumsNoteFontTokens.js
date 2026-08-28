@@ -111,6 +111,16 @@ export function photoAlbumsContentPanelBgColor(bgColorIndex) {
   return color || 'var(--theme-daynight-color)';
 }
 
+/** Shared day/night surface tokens for album chrome (sidebar rows, page slots, trays). */
+export const PHOTO_ALBUMS_THEME_DAYNIGHT_BG = 'var(--theme-daynight-color)';
+export const PHOTO_ALBUMS_THEME_INVERSE_FG = 'var(--theme-inverse-daynight-color)';
+
+export const photoAlbumsThemeDaynightSurfaceSx = {
+  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+  WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
+};
+
 export function photoAlbumsThemeDaynightShellSx(bgColorIndex) {
   const color = photoAlbumsBgColorAt(bgColorIndex);
   if (!color) {

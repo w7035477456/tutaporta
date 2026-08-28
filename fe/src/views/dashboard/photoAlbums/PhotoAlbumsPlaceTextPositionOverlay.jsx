@@ -75,7 +75,7 @@ function PlaceTextPositionLabel({
   const scale = photoDisplayRect.width / Math.max(1, pagePhotoWidth);
   const rot = Number.isFinite(Number(label.rotationDeg))
     ? Number(label.rotationDeg)
-    : -12;
+    : PLACE_TEXT_DEFAULTS.rotationDeg;
   const left = photoDisplayRect.left + (Number(label.relX) || 0) * photoDisplayRect.width;
   const top = photoDisplayRect.top + (Number(label.relY) || 0) * photoDisplayRect.height;
   const w = Math.max(24, (Number(label.relW) || 0.35) * photoDisplayRect.width);

@@ -149,6 +149,9 @@ import {
   PHOTO_ALBUMS_DEFAULT_TEXT_HIGHLIGHT_INDEX,
   PHOTO_ALBUMS_FONT_STYLE_COUNT,
   normalizePhotoAlbumsFontSizePt,
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_FG,
+  photoAlbumsThemeDaynightSurfaceSx
 } from './photoAlbumsNoteFontTokens';
 import {
   getIndexedNoteText,
@@ -1044,14 +1047,18 @@ const menuRowDeleteButtonSx = {
   ...menuRowIconHoverScaleSx
 };
 
+const themeDaynightSurfaceImportantSx = {
+  bgcolor: `${PHOTO_ALBUMS_THEME_DAYNIGHT_BG} !important`,
+  color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+  WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
+};
+
 const menuRowCountBadgeSx = {
   flex: '0 0 auto',
   minWidth: 28,
   px: 0.45,
   py: 0.1,
-  bgcolor: '#ffffff',
-  color: '#000000',
-  WebkitTextFillColor: '#000000',
+  ...photoAlbumsThemeDaynightSurfaceSx,
   fontSize: '0.72rem',
   fontWeight: 800,
   lineHeight: 1.2,
@@ -1063,7 +1070,7 @@ const menuRowCountBadgeSx = {
 
 const menuRowEditFieldSx = {
   mb: 0.5,
-  bgcolor: '#ffffff',
+  ...photoAlbumsThemeDaynightSurfaceSx,
   borderRadius: '12px',
   border: '4px double #000000',
   px: 0.75,
@@ -1071,13 +1078,13 @@ const menuRowEditFieldSx = {
   boxSizing: 'border-box',
   '& .MuiInputBase-root': {
     fontFamily: MAIN_FONT_FAMILY,
-    color: '#000000',
-    WebkitTextFillColor: '#000000'
+    color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+    WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
   },
   '& .MuiInputBase-input': {
-    color: '#000000 !important',
-    WebkitTextFillColor: '#000000 !important',
-    caretColor: '#000000'
+    color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+    WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+    caretColor: PHOTO_ALBUMS_THEME_INVERSE_FG
   },
   '& .MuiInputBase-root::before, & .MuiInputBase-root::after': {
     borderBottomColor: 'transparent !important'
@@ -1194,9 +1201,9 @@ function MenuRowButton({
                 border: '4px double #ffffff !important'
               }
             : {
-                bgcolor: '#ffffff !important',
-                color: '#000000 !important',
-                WebkitTextFillColor: '#000000 !important',
+                bgcolor: `${PHOTO_ALBUMS_THEME_DAYNIGHT_BG} !important`,
+                color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+                WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
                 border:
                   multiSelected && !selected
                     ? '3px solid #000000 !important'
@@ -8244,13 +8251,13 @@ export default function PhotoAlbumsWorkspacePane({
                         maxWidth: { xs: '100%', md: '14rem' },
                         fontSize: { xs: '0.85rem', sm: '0.95rem' },
                         fontWeight: 600,
-                        color: '#000',
-                        WebkitTextFillColor: '#000',
+                        color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                        WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
                         cursor: 'text',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        bgcolor: '#fff',
+                        bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
                         border: '3px solid #000',
                         borderRadius: 0.5,
                         px: 0.85,
@@ -8307,7 +8314,7 @@ export default function PhotoAlbumsWorkspacePane({
                         flex: '1 1 8rem',
                         minWidth: '6rem',
                         maxWidth: { xs: '100%', md: '14rem' },
-                        bgcolor: '#fff',
+                        ...photoAlbumsThemeDaynightSurfaceSx,
                         border: '3px solid #000',
                         borderRadius: 0.5,
                         px: 0.85,
@@ -8315,7 +8322,8 @@ export default function PhotoAlbumsWorkspacePane({
                         '& .MuiInputBase-input': {
                           fontSize: { xs: '0.85rem', sm: '0.95rem' },
                           fontWeight: 600,
-                          color: '#000',
+                          color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                          WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
                           p: 0
                         }
                       }}
@@ -8390,7 +8398,7 @@ export default function PhotoAlbumsWorkspacePane({
                 alignItems: 'center',
                 border: '3px solid #000',
                 borderRadius: 0.5,
-                bgcolor: '#fff',
+                ...photoAlbumsThemeDaynightSurfaceSx,
                 px: 1,
                 py: 0.35,
                 boxSizing: 'border-box'
@@ -8403,8 +8411,8 @@ export default function PhotoAlbumsWorkspacePane({
                   fontWeight: 800,
                   fontSize: { xs: '0.9rem', sm: '1rem' },
                   lineHeight: 1.2,
-                  color: '#000',
-                  WebkitTextFillColor: '#000'
+                  color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                  WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
                 }}
               >
                 Found:
@@ -8439,7 +8447,7 @@ export default function PhotoAlbumsWorkspacePane({
                   gap: 0.25,
                   border: '3px solid #000',
                   borderRadius: 0.75,
-                  bgcolor: '#fff',
+                  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
                   px: 0.5,
                   py: 0.25
                 }}
@@ -9014,15 +9022,11 @@ export default function PhotoAlbumsWorkspacePane({
                             pointerEvents: 'none',
                             cursor: 'default',
                             borderRadius: '0 !important',
-                            bgcolor: '#ffffff !important',
-                            color: '#000000 !important',
-                            WebkitTextFillColor: '#000000 !important',
+                            ...themeDaynightSurfaceImportantSx,
                             border: 'none !important',
                             boxShadow: 'none !important',
                             '&.Mui-disabled': {
-                              bgcolor: '#ffffff !important',
-                              color: '#000000 !important',
-                              WebkitTextFillColor: '#000000 !important',
+                              ...themeDaynightSurfaceImportantSx,
                               border: 'none !important',
                               boxShadow: 'none !important',
                               opacity: 1,
@@ -9085,11 +9089,7 @@ export default function PhotoAlbumsWorkspacePane({
                             sx={{
                               border: '2px solid #000 !important',
                               ...(orderAlbumActive
-                                ? {
-                                    bgcolor: '#ffffff !important',
-                                    color: '#000000 !important',
-                                    WebkitTextFillColor: '#000000 !important'
-                                  }
+                                ? themeDaynightSurfaceImportantSx
                                 : null),
                               ...(orderAlbumDropActive
                                 ? {
@@ -9139,15 +9139,11 @@ export default function PhotoAlbumsWorkspacePane({
                             pointerEvents: 'none',
                             cursor: 'default',
                             borderRadius: '0 !important',
-                            bgcolor: '#ffffff !important',
-                            color: '#000000 !important',
-                            WebkitTextFillColor: '#000000 !important',
+                            ...themeDaynightSurfaceImportantSx,
                             border: 'none !important',
                             boxShadow: 'none !important',
                             '&.Mui-disabled': {
-                              bgcolor: '#ffffff !important',
-                              color: '#000000 !important',
-                              WebkitTextFillColor: '#000000 !important',
+                              ...themeDaynightSurfaceImportantSx,
                               border: 'none !important',
                               boxShadow: 'none !important',
                               opacity: 1,
@@ -9384,7 +9380,7 @@ export default function PhotoAlbumsWorkspacePane({
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: 1.5,
-                          bgcolor: '#fff',
+                          ...photoAlbumsThemeDaynightSurfaceSx,
                           textAlign: 'center',
                           px: 2
                         }}
@@ -9400,8 +9396,8 @@ export default function PhotoAlbumsWorkspacePane({
                             fontWeight: 900,
                             fontSize: { xs: '2rem', sm: '2.5rem' },
                             lineHeight: 1.15,
-                            color: '#000',
-                            WebkitTextFillColor: '#000'
+                            color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                            WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
                           }}
                         >
                           This {lockedEntityLabel} is{' '}
@@ -9500,9 +9496,9 @@ export default function PhotoAlbumsWorkspacePane({
                       ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
                       flex: `${shortcutPanePercent} 1 0`,
                       minHeight: compact ? 64 : 100,
-                      bgcolor: 'var(--theme-daynight-color)',
-                      color: '#000000',
-                      WebkitTextFillColor: '#000000'
+                      bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+                      color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                      WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
                     }}
                     onDragOver={(e) => {
                       const fromLeft = isLeftSidebarDragEvent(e);
@@ -9535,14 +9531,10 @@ export default function PhotoAlbumsWorkspacePane({
                         cursor: 'default',
                         ...laneContainedButtonSx,
                         borderRadius: '0 !important',
-                        bgcolor: '#ffffff !important',
-                        color: '#000000 !important',
-                        WebkitTextFillColor: '#000000 !important',
+                        ...themeDaynightSurfaceImportantSx,
                         border: '2px solid #000000 !important',
                         '&.Mui-disabled': {
-                          bgcolor: '#ffffff !important',
-                          color: '#000000 !important',
-                          WebkitTextFillColor: '#000000 !important',
+                          ...themeDaynightSurfaceImportantSx,
                           border: '2px solid #000000 !important'
                         }
                       }}
@@ -9553,8 +9545,8 @@ export default function PhotoAlbumsWorkspacePane({
                       sx={{
                         fontSize: '0.85rem',
                         mb: 1,
-                        color: '#000000 !important',
-                        WebkitTextFillColor: '#000000 !important'
+                        color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+                        WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
                       }}
                     >
                       Drag notebooks or notes here
@@ -9684,8 +9676,9 @@ export default function PhotoAlbumsWorkspacePane({
                               border: '2px solid #000',
                               borderBottom: selected ? '2px solid var(--theme-daynight-color)' : '2px solid #000',
                               borderRadius: '6px 6px 0 0',
-                              bgcolor: selected ? 'var(--theme-daynight-color)' : 'rgba(0,0,0,0.08)',
-                              color: '#000',
+                              bgcolor: selected ? PHOTO_ALBUMS_THEME_DAYNIGHT_BG : 'rgba(0,0,0,0.08)',
+                              color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                              WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
                               fontWeight: selected ? 800 : 600,
                               fontSize: '0.72rem',
                               lineHeight: 1.2,

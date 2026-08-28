@@ -8,6 +8,10 @@ export const SLOT_ZOOM_PCT_MIN = 0;
 export const SLOT_ZOOM_PCT_MAX = 100;
 export const SLOT_ZOOM_MAX_COVER_MULT = 4;
 export const MIN_PHOTO_WIDTH = 80;
+/** Full ↔ Zoom preview enlargement in Photo/Video Edit dialog. */
+export const PHOTO_SLOT_FIT_TRANSITION_MS = 420;
+export const photoSlotFitTransitionCss =
+  'left 420ms ease-out, top 420ms ease-out, width 420ms ease-out, height 420ms ease-out';
 
 /** Cover-fit size: photo fully covers the slot window (may extend past edges). */
 export function coverSizeForFrame(aspect, frameW, frameH) {
@@ -41,6 +45,32 @@ export function fitSizeForFrame(aspect, frameW, frameH, mode) {
   return mode === 'contain'
     ? containSizeForFrame(aspect, frameW, frameH)
     : coverSizeForFrame(aspect, frameW, frameH);
+}
+
+/**
+ * Pick Full (contain) or Zoom (cover) — whichever shows the photo larger without
+ * cropping. When cover would clip edges, contain wins.
+ */
+export function pickAutoSlotFitWithoutClipping(aspect, frameW, frameH) {
+  const a = aspect > 0 ? aspect : 4 / 3;
+  const fw = Math.max(1, frameW);
+  const fh = Math.max(1, frameH);
+  const contain = containSizeForFrame(a, fw, fh);
+  const cover = coverSizeForFrame(a, fw, fh);
+  const containArea = contain.width * contain.height;
+  const coverArea = cover.width * cover.height;
+  const coverFitsUncropped = cover.width <= fw + 0.5 && cover.height <= fh + 0.5;
+  const useCover = coverFitsUncropped && coverArea >= containArea;
+  const slotFit = useCover ? 'cover' : 'contain';
+  const fit = useCover ? cover : contain;
+  const pan = centeredPan(fit.width, fit.height, fw, fh);
+  return {
+    slotFit,
+    width: fit.width,
+    height: fit.height,
+    panX: pan.panX,
+    panY: pan.panY
+  };
 }
 
 export function centeredPan(photoW, photoH, frameW, frameH) {

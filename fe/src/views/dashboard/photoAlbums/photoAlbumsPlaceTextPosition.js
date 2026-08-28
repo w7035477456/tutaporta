@@ -78,6 +78,191 @@ export function computePlaceTextBottomRightRel({ relW, relH, rotationDeg, margin
   };
 }
 
+/**
+ * Bottom-right of the visible photo inside a slot (not the letterbox/pillarbox).
+ * relW/relH are fractions of the slot width/height.
+ */
+export function computePlaceTextBottomRightOnFramedPhoto({
+  frameW,
+  frameH,
+  photoW,
+  photoH,
+  panX,
+  panY,
+  relW,
+  relH,
+  rotationDeg,
+  margin = 0
+}) {
+  const fw = Math.max(1, Number(frameW) || 1);
+  const fh = Math.max(1, Number(frameH) || 1);
+  const pw = Math.max(1, Number(photoW) || fw);
+  const ph = Math.max(1, Number(photoH) || fh);
+  const px = Number(panX) || 0;
+  const py = Number(panY) || 0;
+  const w = Math.max(PLACE_TEXT_PREVIEW_MIN_REL_W, Number(relW) || 0);
+  const h = Math.max(PLACE_TEXT_PREVIEW_MIN_REL_H, Number(relH) || 0);
+  const labelRelWInPhoto = Math.min(1, (w * fw) / pw);
+  const labelRelHInPhoto = Math.min(1, (h * fh) / ph);
+  const { relX: lx, relY: ly } = computePlaceTextBottomRightRel({
+    relW: labelRelWInPhoto,
+    relH: labelRelHInPhoto,
+    rotationDeg,
+    margin
+  });
+  return {
+    relX: (px + lx * pw) / fw,
+    relY: (py + ly * ph) / fh,
+    relW: w,
+    relH: h
+  };
+}
+
+/** Visible photo/video rect inside a slot frame (contain fit). */
+export function computeContainedMediaInFrame(frameW, frameH, mediaAspect) {
+  const fw = Math.max(1, Number(frameW) || 1);
+  const fh = Math.max(1, Number(frameH) || 1);
+  const a = mediaAspect > 0 ? mediaAspect : 16 / 9;
+  let photoW = fw;
+  let photoH = photoW / a;
+  if (photoH > fh) {
+    photoH = fh;
+    photoW = photoH * a;
+  }
+  const panX = (fw - photoW) / 2;
+  const panY = (fh - photoH) / 2;
+  return { photoW, photoH, panX, panY };
+}
+
+/**
+ * Default text on a video slot — starts in the letterbox below the visible video
+ * (drag anywhere in the slot frame: over video, beside, or below).
+ */
+export function buildSeededPlaceTextVideoLabel({
+  caption,
+  style,
+  frameW,
+  frameH,
+  mediaAspect,
+  placement = 'below'
+}) {
+  const fw = Math.max(1, Number(frameW) || 1);
+  const fh = Math.max(1, Number(frameH) || 1);
+  const text = String(caption || '').trim() || PLACE_TEXT_DEFAULTS.text;
+  const fs = Math.max(10, Math.round(Number(style?.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
+  const charFactor = Math.max(6, Math.min(Math.max(text.length, 6), 24));
+  const estW = Math.max(0.18, Math.min(0.92, (fs * charFactor) / fw));
+  const estH = Math.max(0.06, Math.min(0.28, (fs * 1.4) / fh));
+  const rotationDeg = Number.isFinite(Number(style?.rotationDeg))
+    ? Math.round(Number(style.rotationDeg))
+    : PLACE_TEXT_DEFAULTS.rotationDeg;
+
+  const { photoW, photoH, panX, panY } = computeContainedMediaInFrame(fw, fh, mediaAspect);
+
+  if (placement === 'over') {
+    return buildSeededPlaceTextSampleLabel({
+      caption: text,
+      style,
+      frameW: fw,
+      frameH: fh,
+      photoW,
+      photoH,
+      panX,
+      panY
+    });
+  }
+
+  const gap = 0.015;
+  const videoBottomRel = (panY + photoH) / fh;
+  let relX = Math.max(0, (1 - estW) / 2);
+  let relY = Math.min(1 - estH, videoBottomRel + gap);
+
+  if (placement === 'side') {
+    const videoRightRel = (panX + photoW) / fw;
+    relX = Math.min(1 - estW, videoRightRel + gap);
+    relY = Math.max(0, Math.min(1 - estH, panY / fh + 0.08));
+  }
+
+  if (relY + estH > 1 && placement === 'below') {
+    relY = Math.max(0, panY / fh + gap);
+    placement = 'over';
+  }
+
+  return {
+    clientKey: `new_${Date.now()}`,
+    isNew: true,
+    docPos: null,
+    labelId: newLabelId(),
+    rotationDeg,
+    relX,
+    relY,
+    relW: estW,
+    relH: estH,
+    text,
+    color: style?.color || PLACE_TEXT_DEFAULTS.color,
+    outlineColor: style?.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor,
+    outlineWidth:
+      style?.outlineWidth != null ? style.outlineWidth : PLACE_TEXT_DEFAULTS.outlineWidth,
+    fontSize: fs,
+    fontFamily: style?.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily,
+    fontWeight: style?.fontWeight || PLACE_TEXT_DEFAULTS.fontWeight
+  };
+}
+
+/** Default "Sample Feb 2025" label on the visible photo after auto Full/Zoom. */
+export function buildSeededPlaceTextSampleLabel({
+  caption,
+  style,
+  frameW,
+  frameH,
+  photoW,
+  photoH,
+  panX,
+  panY
+}) {
+  const fw = Math.max(1, Number(frameW) || 1);
+  const fh = Math.max(1, Number(frameH) || 1);
+  const text = String(caption || '').trim() || PLACE_TEXT_DEFAULTS.text;
+  const fs = Math.max(10, Math.round(Number(style?.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
+  const charFactor = Math.max(6, Math.min(Math.max(text.length, 6), 24));
+  const estW = Math.max(0.18, Math.min(0.75, (fs * charFactor) / fw));
+  const estH = Math.max(0.08, Math.min(0.35, (fs * 1.4) / fh));
+  const rotationDeg = Number.isFinite(Number(style?.rotationDeg))
+    ? Math.round(Number(style.rotationDeg))
+    : PLACE_TEXT_DEFAULTS.rotationDeg;
+  const { relX, relY, relW, relH } = computePlaceTextBottomRightOnFramedPhoto({
+    frameW: fw,
+    frameH: fh,
+    photoW,
+    photoH,
+    panX,
+    panY,
+    relW: estW,
+    relH: estH,
+    rotationDeg,
+    margin: 0
+  });
+  return {
+    clientKey: `new_${Date.now()}`,
+    isNew: true,
+    docPos: null,
+    labelId: newLabelId(),
+    rotationDeg,
+    relX,
+    relY,
+    relW,
+    relH,
+    text,
+    color: style?.color || PLACE_TEXT_DEFAULTS.color,
+    outlineColor: style?.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor,
+    outlineWidth:
+      style?.outlineWidth != null ? style.outlineWidth : PLACE_TEXT_DEFAULTS.outlineWidth,
+    fontSize: fs,
+    fontFamily: style?.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily,
+    fontWeight: style?.fontWeight || PLACE_TEXT_DEFAULTS.fontWeight
+  };
+}
+
 /** @returns {import('./PhotoAlbumsPlaceTextPositionOverlay').PlaceTextPositionSession | null} */
 export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta = {}) {
   if (!editor?.state || !Number.isFinite(photoPos)) return null;
@@ -92,9 +277,6 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     .toLowerCase()
     .replace(/^\./, '');
   const isVideo = isPhotoAlbumsStagingVideoExtension(ext);
-
-  const pw = Math.max(1, photoRect.width);
-  const ph = Math.max(1, photoRect.height);
 
   const near = listTextAndEmojiForPhotoPos(editor.state, photoPos);
   const preExistingOverlayCount = Math.max(
@@ -149,41 +331,8 @@ export function buildPlaceTextPositionSession(editor, photoPos, style, editMeta 
     if (idx >= 0) {
       labels[idx] = { ...labels[idx], ...applyStyle(style) };
     }
-  } else if (labels.length === 0 && preExistingOverlayCount < 1) {
-    // Only seed "Sample Feb 2025" when the photo has no existing text or emoji.
-    const caption = resolvePlaceTextCaption({
-      explicitText: style?.text,
-      existingOverlayCount: preExistingOverlayCount,
-      editing: false
-    });
-    if (caption) {
-    const fs = Math.max(10, Math.round(Number(style?.fontSize) || PLACE_TEXT_DEFAULTS.fontSize));
-    const charFactor = Math.max(6, Math.min(Math.max(caption.length, 6), 24));
-    const estW = Math.max(0.18, Math.min(0.75, (fs * charFactor) / pw));
-    const estH = Math.max(0.08, Math.min(0.35, (fs * 1.4) / ph));
-    const rotationDeg = Number.isFinite(Number(style?.rotationDeg))
-      ? Math.round(Number(style.rotationDeg))
-      : PLACE_TEXT_DEFAULTS.rotationDeg;
-    const { relX, relY } = computePlaceTextBottomRightRel({
-      relW: estW,
-      relH: estH,
-      rotationDeg,
-      margin: 0
-    });
-    labels.push({
-      clientKey: `new_${Date.now()}`,
-      isNew: true,
-      docPos: null,
-      labelId: newLabelId(),
-      rotationDeg,
-      relX,
-      relY,
-      relW: estW,
-      relH: estH,
-      ...applyStyle({ text: caption })
-    });
-    }
   }
+  // Sample label is seeded in PhotoAlbumsPlaceTextDialog after auto Full/Zoom.
 
   if (preExistingOverlayCount >= 1) {
     for (let i = labels.length - 1; i >= 0; i -= 1) {

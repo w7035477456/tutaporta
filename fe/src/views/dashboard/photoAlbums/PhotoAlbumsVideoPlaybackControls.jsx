@@ -13,23 +13,27 @@ function formatVideoTime(seconds) {
 }
 
 /**
- * Play / Pause + seek slider for video in Photo/Video Edit popup.
+ * Play / Pause + seek slider for video in the Photo/Video Edit popup.
+ *
+ * Takes the `<video>` element itself rather than a ref so the listener effect
+ * re-runs when the element appears — the controls live in the dialog's action
+ * row and mount before the preview has finished loading the blob.
+ *
+ * @param {boolean} inline drop the dark overlay chrome to sit in a light button row
  */
-export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = false }) {
+export default function PhotoAlbumsVideoPlaybackControls({ video = null, disabled = false, inline = false }) {
   const [playing, setPlaying] = useState(false);
   const [currentSec, setCurrentSec] = useState(0);
   const [durationSec, setDurationSec] = useState(0);
 
   const syncFromVideo = useCallback(() => {
-    const video = videoRef?.current;
     if (!video) return;
     setPlaying(!video.paused && !video.ended);
     setCurrentSec(Number.isFinite(video.currentTime) ? video.currentTime : 0);
     setDurationSec(Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0);
-  }, [videoRef]);
+  }, [video]);
 
   useEffect(() => {
-    const video = videoRef?.current;
     if (!video) return undefined;
     const onTimeUpdate = () => setCurrentSec(video.currentTime || 0);
     const onDuration = () => setDurationSec(video.duration > 0 ? video.duration : 0);
@@ -54,31 +58,30 @@ export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = 
       video.removeEventListener('pause', onPause);
       video.removeEventListener('ended', onEnded);
     };
-  }, [videoRef, syncFromVideo]);
+  }, [video, syncFromVideo]);
 
   const handlePlay = useCallback(() => {
-    const video = videoRef?.current;
     if (!video || disabled) return;
     void video.play().catch(() => {});
-  }, [videoRef, disabled]);
+  }, [video, disabled]);
 
   const handlePause = useCallback(() => {
-    videoRef?.current?.pause?.();
-  }, [videoRef]);
+    video?.pause?.();
+  }, [video]);
 
   const handleSeek = useCallback(
     (_event, value) => {
-      const video = videoRef?.current;
       if (!video || disabled) return;
       const next = Array.isArray(value) ? value[0] : value;
       const sec = Math.max(0, Number(next) || 0);
       video.currentTime = sec;
       setCurrentSec(sec);
     },
-    [videoRef, disabled]
+    [video, disabled]
   );
 
   const maxSec = durationSec > 0 ? durationSec : Math.max(currentSec, 1);
+  const controlsDisabled = disabled || !video;
 
   return (
     <Box
@@ -86,17 +89,23 @@ export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = 
         display: 'flex',
         alignItems: 'center',
         gap: 1,
-        px: 1,
-        py: 0.75,
-        bgcolor: 'rgba(0,0,0,0.72)',
-        borderTop: '2px solid var(--theme-yellow-color)',
-        flexShrink: 0
+        flexShrink: 0,
+        ...(inline
+          ? { flex: '1 1 auto', minWidth: 0 }
+          : {
+              px: 1,
+              py: 0.75,
+              bgcolor: 'rgba(0,0,0,0.72)',
+              borderTop: '2px solid var(--theme-yellow-color)'
+            })
       }}
     >
       <GreenButton
         type="button"
-        disabled={disabled}
+        disabled={controlsDisabled}
         onClick={handlePlay}
+        aria-pressed={playing}
+        title="Play video"
         sx={{ minWidth: 64, fontWeight: 800, flexShrink: 0 }}
       >
         Play
@@ -107,7 +116,7 @@ export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = 
           max={maxSec}
           step={0.1}
           value={Math.min(currentSec, maxSec)}
-          disabled={disabled || maxSec <= 0}
+          disabled={controlsDisabled || maxSec <= 0}
           onChange={handleSeek}
           sx={{
             ...slotZoomSliderSx(true),
@@ -119,7 +128,7 @@ export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = 
         <Box
           component="span"
           sx={{
-            color: '#fff',
+            color: inline ? '#000' : '#fff',
             fontWeight: 700,
             fontSize: '0.78rem',
             whiteSpace: 'nowrap',
@@ -133,8 +142,9 @@ export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = 
       </Box>
       <GreenButton
         type="button"
-        disabled={disabled}
+        disabled={controlsDisabled}
         onClick={handlePause}
+        title="Pause video"
         sx={{ minWidth: 64, fontWeight: 800, flexShrink: 0 }}
       >
         Pause
@@ -144,6 +154,7 @@ export default function PhotoAlbumsVideoPlaybackControls({ videoRef, disabled = 
 }
 
 PhotoAlbumsVideoPlaybackControls.propTypes = {
-  videoRef: PropTypes.shape({ current: PropTypes.object }),
-  disabled: PropTypes.bool
+  video: PropTypes.object,
+  disabled: PropTypes.bool,
+  inline: PropTypes.bool
 };

@@ -28,6 +28,7 @@ import {
 } from 'api/photoAlbumsFe';
 import { fetchPhotoAlbumsSharedAlbumAttachmentBlob } from 'api/photoAlbumsInviteFe';
 import { openPhotoAlbumsAttachmentInNewWindow } from './openPhotoAlbumsAttachmentWindow';
+import { PHOTO_ALBUMS_THEME_DAYNIGHT_BG } from './photoAlbumsNoteFontTokens';
 import {
   pointInAnyAlbumBand,
   usePhotoAlbumsAlbumLayout
@@ -284,6 +285,14 @@ function photoAspectRatio(imgEl, boxW, boxH) {
   return 4 / 3;
 }
 
+/** Photo `<img>` or album `<video>` natural aspect. */
+function mediaAspectRatio(mediaEl, boxW, boxH) {
+  const vw = mediaEl?.videoWidth;
+  const vh = mediaEl?.videoHeight;
+  if (vw > 0 && vh > 0) return vw / vh;
+  return photoAspectRatio(mediaEl, boxW, boxH);
+}
+
 /** Cover-fit size: photo fully covers the slot window (may extend past edges). */
 function coverSizeForFrame(aspect, frameW, frameH) {
   const fw = Math.max(1, frameW);
@@ -352,6 +361,22 @@ function centeredPan(photoW, photoH, frameW, frameH) {
     frameW,
     frameH
   );
+}
+
+/** Size a slot video with contain fit so width/height proportion stays true. */
+function containVideoAttrsForFrame(vid, frameWidth, frameHeight) {
+  if (!(vid?.videoWidth > 0 && vid?.videoHeight > 0)) return null;
+  if (!(frameWidth > 0 && frameHeight > 0)) return null;
+  const aspect = vid.videoWidth / vid.videoHeight;
+  const fit = containSizeForFrame(aspect, frameWidth, frameHeight);
+  const pan = centeredPan(fit.width, fit.height, frameWidth, frameHeight);
+  return {
+    width: fit.width,
+    height: fit.height,
+    panX: pan.panX,
+    panY: pan.panY,
+    slotFit: 'contain'
+  };
 }
 
 /** Fit a photo (by aspect) into a slot window — used when snapping or swapping slots. */
@@ -524,7 +549,7 @@ const photoTileSx = {
   width: '100%',
   borderRadius: '6px',
   overflow: 'visible',
-  bgcolor: '#fff',
+  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   border: '1px solid rgba(0,0,0,0.12)',
   boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
   lineHeight: 0,
@@ -2209,6 +2234,32 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
 
   /** Native video “fullscreen / expand” control → open playback in a new browser tab (edit mode only). */
   useEffect(() => {
+    if (!isAlbumVideo || !inFrame || frameWidth == null || frameHeight == null) return undefined;
+    const vid = albumVideoRef.current;
+    if (!vid) return undefined;
+    const applyContainFit = () => {
+      const next = containVideoAttrsForFrame(vid, frameWidth, frameHeight);
+      if (!next) return;
+      const curW = displayWidth || 0;
+      const curH = displayHeight || 0;
+      if (Math.abs(next.width - curW) <= 2 && Math.abs(next.height - curH) <= 2) return;
+      commitAttrs(next);
+    };
+    if (vid.readyState >= 1) applyContainFit();
+    else vid.addEventListener('loadedmetadata', applyContainFit, { once: true });
+    return () => vid.removeEventListener('loadedmetadata', applyContainFit);
+  }, [
+    isAlbumVideo,
+    inFrame,
+    frameWidth,
+    frameHeight,
+    thumbUrl,
+    displayWidth,
+    displayHeight,
+    commitAttrs
+  ]);
+
+  useEffect(() => {
     if (photoViewModeActive || !isAlbumVideo || !thumbUrl) return undefined;
     const el = albumVideoRef.current;
     if (!el) return undefined;
@@ -2349,19 +2400,21 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     }
   }, [readContext, removing, attachmentId, deleteNode, isAlbumSlotMedia, node?.attrs, editor, label]);
 
-  /** Full = contain (entire photo visible); Zoom = cover (fill slot, may clip). */
+  /** Full = contain (entire photo visible); Zoom = cover (fill slot, may clip). Videos stay contain. */
   const applySlotFit = useCallback(
     (mode) => {
       if (!editable || !inFrame || frameWidth == null || frameHeight == null) return;
       const nextFit = normalizeSlotFit(mode);
+      if (isAlbumVideo && nextFit === 'cover') return;
       const tile = tileRef.current;
-      const imgEl = tile?.querySelector?.('img');
-      const aspect = photoAspectRatio(
-        imgEl,
+      const mediaEl = tile?.querySelector?.('video') || tile?.querySelector?.('img');
+      const aspect = mediaAspectRatio(
+        mediaEl,
         livePhotoW || displayWidth || frameWidth,
         livePhotoH || displayHeight || frameHeight
       );
-      const fit = fitSizeForFrame(aspect, frameWidth, frameHeight, nextFit);
+      const fitMode = isAlbumVideo ? 'contain' : nextFit;
+      const fit = fitSizeForFrame(aspect, frameWidth, frameHeight, fitMode);
       const pan = centeredPan(fit.width, fit.height, frameWidth, frameHeight);
       commitAttrs({
         posLeft: frameLeft,
@@ -2374,12 +2427,13 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
         frameTop,
         frameWidth,
         frameHeight,
-        slotFit: nextFit
+        slotFit: isAlbumVideo ? 'contain' : nextFit
       });
     },
     [
       editable,
       inFrame,
+      isAlbumVideo,
       frameLeft,
       frameTop,
       frameWidth,
@@ -2392,10 +2446,10 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     ]
   );
 
-  /** Slider zoom 0…100% — 0 = cover fill, 100 = max zoom. */
+  /** Slider zoom 0…100% — 0 = cover fill, 100 = max zoom. Not used for video. */
   const applyFramedZoomPercent = useCallback(
     (pct) => {
-      if (!editable || !inFrame || frameWidth == null || frameHeight == null) return;
+      if (!editable || !inFrame || frameWidth == null || frameHeight == null || isAlbumVideo) return;
       const tile = tileRef.current;
       const imgEl = tile?.querySelector?.('img');
       const aspect = photoAspectRatio(
@@ -2430,6 +2484,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
     [
       editable,
       inFrame,
+      isAlbumVideo,
       frameWidth,
       frameHeight,
       livePhotoW,
@@ -2762,7 +2817,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               height: framed ? '100%' : 'auto',
               overflow: framed ? 'hidden' : 'visible',
               borderRadius: framed ? 0 : '6px',
-              bgcolor: framed ? '#fff' : undefined,
+              bgcolor: framed ? PHOTO_ALBUMS_THEME_DAYNIGHT_BG : undefined,
               // Clip zoomed/panned photo to the fixed slot — never grow with the image.
               ...(framed
                 ? {
@@ -2915,29 +2970,19 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
                 }}
                 onLoadedMetadata={(event) => {
                   if (!inFrame || frameWidth == null || frameHeight == null) return;
-                  if (node?.attrs?.slotFit !== 'contain') return;
-                  const vid = event.currentTarget;
-                  if (!(vid.videoWidth > 0 && vid.videoHeight > 0)) return;
-                  const aspect = vid.videoWidth / vid.videoHeight;
-                  const fit = containSizeForFrame(aspect, frameWidth, frameHeight);
-                  const pan = centeredPan(fit.width, fit.height, frameWidth, frameHeight);
+                  const next = containVideoAttrsForFrame(event.currentTarget, frameWidth, frameHeight);
+                  if (!next) return;
                   const curW = displayWidth || 0;
                   const curH = displayHeight || 0;
-                  if (Math.abs(fit.width - curW) <= 2 && Math.abs(fit.height - curH) <= 2) return;
-                  commitAttrs({
-                    width: fit.width,
-                    height: fit.height,
-                    panX: pan.panX,
-                    panY: pan.panY,
-                    slotFit: 'contain'
-                  });
+                  if (Math.abs(next.width - curW) <= 2 && Math.abs(next.height - curH) <= 2) return;
+                  commitAttrs(next);
                 }}
                 sx={{
                   display: 'block',
                   width: '100%',
                   height: framed ? '100%' : 'auto',
                   maxWidth: framed ? 'none' : '100%',
-                  objectFit: framed ? 'fill' : 'contain',
+                  objectFit: 'contain',
                   objectPosition: 'center center',
                   verticalAlign: 'top',
                   WebkitUserDrag: 'none',
@@ -3014,7 +3059,7 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
                           : 'grab'
                         : 'default'
                     : 'default',
-                  bgcolor: '#fff',
+                  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
                   borderRadius: framed ? 0 : '6px',
                   pointerEvents: 'auto'
                 }}

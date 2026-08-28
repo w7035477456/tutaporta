@@ -25,6 +25,8 @@ logs/
 
 # misc
 .DS_Store
+# Built once by BE from initializeSample originals (shared across all new users)
+src/assets/images/initializeSample/.variants/
 .env.local
 .env.development.local
 .env.test.local

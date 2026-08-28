@@ -1,0 +1,84 @@
+{
+  "notebookName": "SAMPLE SET",
+  "albumName": "SAMPLE ALBUM",
+  "bodyHtmlFile": "sampleAlbumBody.html",
+  "attachments": [
+    {
+      "attachmentId": 1,
+      "albumPhotoSeq": 1,
+      "sourceFile": "photo1.jpg",
+      "fileName": "photo1.jpg",
+      "fileExtension": "jpg",
+      "fileSizeBytes": 700959,
+      "checksum": "5d6340445ee8d35cf50694338ebf70c4dfa7076fe304d94473148e6e0ee4877c",
+      "mimeType": "image/jpeg",
+      "sourceTakenAtMs": 1787921879640
+    },
+    {
+      "attachmentId": 2,
+      "albumPhotoSeq": 2,
+      "sourceFile": "photo3_iphone.heic",
+      "fileName": "photo3_iphone.heic",
+      "fileExtension": "heic",
+      "fileSizeBytes": 1721433,
+      "checksum": "65960bf2782cd8ebd29a958e75b6adb7dff2bbff841389e869d917438c729010",
+      "mimeType": "image/heic",
+      "sourceTakenAtMs": 1787922052030
+    },
+    {
+      "attachmentId": 3,
+      "albumPhotoSeq": 3,
+      "sourceFile": "videoBday.mp4",
+      "fileName": "videoBday.mp4",
+      "fileExtension": "mp4",
+      "fileSizeBytes": 28596344,
+      "checksum": "2002c98f28beec957c8dacbc2a68b855bc7d3047cda2b6ee09455b7364c1a430",
+      "mimeType": "video/mp4",
+      "sourceTakenAtMs": 1787922232120
+    },
+    {
+      "attachmentId": 4,
+      "albumPhotoSeq": 4,
+      "sourceFile": "photo2.heif",
+      "fileName": "photo2.heif",
+      "fileExtension": "heif",
+      "fileSizeBytes": 3756282,
+      "checksum": "93e8e1b668ef0964d867a4da3ac7ac4084dbb85cee6cca18e08f6fa46468f363",
+      "mimeType": "image/heif",
+      "sourceTakenAtMs": 1787922397470
+    },
+    {
+      "attachmentId": 5,
+      "albumPhotoSeq": 5,
+      "sourceFile": "photo4.gif",
+      "fileName": "photo4.gif",
+      "fileExtension": "gif",
+      "fileSizeBytes": 463254,
+      "checksum": "69ef79dbc253926bb357220baff04fddd302ff084e77f08c0f497616fdf8cd0b",
+      "mimeType": "image/gif",
+      "sourceTakenAtMs": 1787922474460
+    },
+    {
+      "attachmentId": 6,
+      "albumPhotoSeq": 6,
+      "sourceFile": "photo5.bmp",
+      "fileName": "photo5.bmp",
+      "fileExtension": "bmp",
+      "fileSizeBytes": 10948506,
+      "checksum": "cfe75fd50b72a3a9c0816b8ea4ee18c2c91e0665c37a3ea6b234b81f8d3104ec",
+      "mimeType": "image/bmp",
+      "sourceTakenAtMs": 1787922527500
+    },
+    {
+      "attachmentId": 7,
+      "albumPhotoSeq": 7,
+      "sourceFile": "photo6.tiff",
+      "fileName": "photo6.tiff",
+      "fileExtension": "tiff",
+      "fileSizeBytes": 4955786,
+      "checksum": "770ee7139790ffd67115362f94d152686decd6f8d67b5aaf8d6b82d981f334ba",
+      "mimeType": "image/tiff",
+      "sourceTakenAtMs": 1787922608120
+    }
+  ]
+}

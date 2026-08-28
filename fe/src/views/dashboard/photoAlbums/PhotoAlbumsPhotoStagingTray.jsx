@@ -15,6 +15,10 @@ import {
 } from './photoAlbumsFilesExplorerDrag';
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
+import {
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_FG
+} from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 import PhotoAlbumsSeqBadge from './PhotoAlbumsSeqBadge';
 
@@ -252,7 +256,7 @@ function StagingThumb({ item, noteId, storageType, onRemove, disabled }) {
         borderRadius: 4,
         overflow: 'visible',
         border: '2px solid #1976d2',
-        background: '#eee',
+        background: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
         cursor: disabled ? 'default' : 'grab',
         boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
         userSelect: 'none',

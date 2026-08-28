@@ -13,6 +13,10 @@ import {
   isPhotoAlbumsStagingPhotoFile,
   isPhotoAlbumsStagingVideoFile
 } from 'utils/photoAlbumsFileFormats';
+import {
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_FG
+} from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import {
@@ -46,9 +50,9 @@ const panelScrollSx = {
   minHeight: 0,
   overflowY: 'scroll',
   overflowX: 'auto',
-  bgcolor: 'var(--theme-daynight-color)',
-  color: '#000 !important',
-  WebkitTextFillColor: '#000 !important',
+  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+  WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
   border: '2px solid #000',
   borderRadius: 1,
   p: 1,
@@ -69,8 +73,8 @@ const panelScrollSx = {
     borderRadius: 6
   },
   '& .MuiTypography-root': {
-    color: '#000 !important',
-    WebkitTextFillColor: '#000 !important'
+    color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+    WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
   }
 };
 
@@ -100,17 +104,26 @@ function formatTotalSizeMb(bytes) {
   return `Total size=${mb}mb`;
 }
 
+/** Per-file size for the explorer list (1 decimal under 10 MiB, else whole MiB). */
+function formatEntrySizeMb(bytes) {
+  const n = Number(bytes) || 0;
+  if (n <= 0) return '';
+  const mb = n / (1024 * 1024);
+  if (mb >= 10) return `${Math.round(mb)}mb`;
+  return `${mb.toFixed(1)}mb`;
+}
+
 function entryIcon(entry) {
   if (entry.kind === 'directory') {
-    return <FolderOutlinedIcon sx={{ fontSize: '1rem', color: '#000', flexShrink: 0 }} />;
+    return <FolderOutlinedIcon sx={{ fontSize: '1rem', color: PHOTO_ALBUMS_THEME_INVERSE_FG, flexShrink: 0 }} />;
   }
   if (entry.file && isPhotoAlbumsStagingVideoFile(entry.file)) {
-    return <VideocamOutlinedIcon sx={{ fontSize: '1rem', color: '#000', flexShrink: 0 }} />;
+    return <VideocamOutlinedIcon sx={{ fontSize: '1rem', color: PHOTO_ALBUMS_THEME_INVERSE_FG, flexShrink: 0 }} />;
   }
   if (entry.file && isPhotoAlbumsStagingPhotoFile(entry.file)) {
-    return <ImageOutlinedIcon sx={{ fontSize: '1rem', color: '#000', flexShrink: 0 }} />;
+    return <ImageOutlinedIcon sx={{ fontSize: '1rem', color: PHOTO_ALBUMS_THEME_INVERSE_FG, flexShrink: 0 }} />;
   }
-  return <InsertDriveFileOutlinedIcon sx={{ fontSize: '1rem', color: '#000', flexShrink: 0 }} />;
+  return <InsertDriveFileOutlinedIcon sx={{ fontSize: '1rem', color: PHOTO_ALBUMS_THEME_INVERSE_FG, flexShrink: 0 }} />;
 }
 
 function explorerFileEntry(en) {
@@ -851,8 +864,8 @@ export default function PhotoAlbumsFilesExplorerPanel({
                       cursor: hasFolder && !disabled ? 'pointer' : 'default',
                       font: 'inherit',
                       fontWeight: 700,
-                      color: '#000 !important',
-                      WebkitTextFillColor: '#000 !important',
+                      color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+                      WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
                       textDecoration: index < crumbParts.length - 1 ? 'underline' : 'none'
                     }}
                   >
@@ -881,13 +894,22 @@ export default function PhotoAlbumsFilesExplorerPanel({
                   if (suppressClickRef.current) return;
                   selectEntryAt(e, entry, index);
                 }}
-                sx={{ ...rowSx(selected), cursor: canDrag ? 'grab' : 'pointer' }}
+                sx={{ ...rowSx(selected), cursor: canDrag ? 'grab' : 'pointer', justifyContent: 'space-between' }}
                 title={
                   entry.kind === 'directory'
                     ? `Select ${entry.name} (double-click to open)`
                     : `Select ${entry.name} — drag to Thumbnail Tray, or use “Add selected to Thumbnail Tray”`
                 }
               >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    minWidth: 0,
+                    flex: '1 1 auto'
+                  }}
+                >
                 <Box
                   component="input"
                   type="checkbox"
@@ -913,11 +935,32 @@ export default function PhotoAlbumsFilesExplorerPanel({
                     fontSize: 'inherit',
                     fontWeight: entry.kind === 'directory' ? 700 : 400,
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis'
+                    textOverflow: 'ellipsis',
+                    minWidth: 0
                   }}
                 >
                   {entry.name}
                 </Typography>
+                </Box>
+                {entry.kind === 'file' ? (
+                  <Typography
+                    component="span"
+                    aria-label={`${entry.name} size ${formatEntrySizeMb(entry.size)}`}
+                    sx={{
+                      flexShrink: 0,
+                      ml: 1,
+                      pl: 0.75,
+                      fontFamily: 'inherit',
+                      fontSize: 'inherit',
+                      fontWeight: 400,
+                      fontVariantNumeric: 'tabular-nums',
+                      color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+                      WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
+                    }}
+                  >
+                    {formatEntrySizeMb(entry.size)}
+                  </Typography>
+                ) : null}
               </Box>
               );
             })}

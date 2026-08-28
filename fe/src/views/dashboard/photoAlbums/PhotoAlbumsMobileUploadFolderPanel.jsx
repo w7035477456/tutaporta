@@ -12,6 +12,10 @@ import {
   fetchMobileUploadFileBlob,
   listMobileUploadFiles
 } from 'api/photoAlbumsMobileUploadFolderFe';
+import {
+  PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  PHOTO_ALBUMS_THEME_INVERSE_FG
+} from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 
 const panelShellSx = {
@@ -29,9 +33,9 @@ const panelScrollSx = {
   minHeight: 0,
   overflowY: 'scroll',
   overflowX: 'auto',
-  bgcolor: 'var(--theme-daynight-color)',
-  color: '#000 !important',
-  WebkitTextFillColor: '#000 !important',
+  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+  color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+  WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
   border: '2px solid #000',
   borderRadius: 1,
   p: 1,
@@ -52,8 +56,8 @@ const panelScrollSx = {
     borderRadius: 6
   },
   '& .MuiTypography-root': {
-    color: '#000 !important',
-    WebkitTextFillColor: '#000 !important'
+    color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+    WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
   }
 };
 
@@ -406,9 +410,9 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
                   }}
                 />
               ) : video ? (
-                <VideocamOutlinedIcon sx={{ fontSize: '1.1rem', color: '#000', flexShrink: 0 }} />
+                <VideocamOutlinedIcon sx={{ fontSize: '1.1rem', color: PHOTO_ALBUMS_THEME_INVERSE_FG, flexShrink: 0 }} />
               ) : (
-                <ImageOutlinedIcon sx={{ fontSize: '1.1rem', color: '#000', flexShrink: 0 }} />
+                <ImageOutlinedIcon sx={{ fontSize: '1.1rem', color: PHOTO_ALBUMS_THEME_INVERSE_FG, flexShrink: 0 }} />
               )}
               <Typography component="span" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {displayName(entry.name)}

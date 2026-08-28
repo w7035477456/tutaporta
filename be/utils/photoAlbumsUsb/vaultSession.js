@@ -53,8 +53,6 @@ import {
 } from './unlockGuard.js';
 import {
   DEFAULT_BODY_TEXT,
-  DEFAULT_NOTEBOOKS,
-  DEFAULT_NOTES_PER_NOTEBOOK,
   NOTE_EXTRA_IMAGES_MIGRATION_SQL,
   VAULT_SCHEMA_SQL
 } from './vaultSchema.js';
@@ -101,7 +99,12 @@ function ensureAttachmentAlbumSeqColumns(db) {
   }
   return changed;
 }
-import { formatDefaultPhotoAlbumsNoteTitle } from '../photoAlbumsDefaultTitle.js';
+import {
+  seedPhotoAlbumsNewMemberSampleDb,
+  seedPhotoAlbumsNewMemberSampleMedia
+} from '../photoAlbumsNewMemberSample/seedPhotoAlbumsNewMemberSample.js';
+import { migrateSampleAlbumTutorialLabelsDb } from '../photoAlbumsNewMemberSample/migrateSampleAlbumTutorialLabels.js';
+import { readInitializeSampleVaultBuffer, isBundledInitializeSampleAttachmentId } from '../photoAlbumsNewMemberSample/initializeSampleMedia.js';
 import {
   expandPhotoAlbumsBodyTextForSearch,
   normalizePhotoAlbumsKeyword,
@@ -442,9 +445,12 @@ export function writeEncryptedVaultFile(session, relativePath, buffer) {
 
 export function readEncryptedVaultFile(session, relativePath) {
   const abs = resolveVaultFileStoragePath(session.mountPath, relativePath);
-  if (!fs.existsSync(abs)) return null;
-  const enc = fs.readFileSync(abs);
-  return openVaultBuffer(enc, session.key);
+  if (fs.existsSync(abs)) {
+    const enc = fs.readFileSync(abs);
+    const opened = openVaultBuffer(enc, session.key);
+    if (opened?.length) return opened;
+  }
+  return readInitializeSampleVaultBuffer(relativePath, session.key);
 }
 
 export function deleteEncryptedVaultFile(session, relativePath) {
@@ -501,33 +507,7 @@ function refreshNoteSearchText(db, noteId) {
 }
 
 function seedEmptyVault(db) {
-  const countRow = queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`);
-  if (Number(countRow?.c ?? 0) > 0) return;
-
-  for (let nbIdx = 0; nbIdx < DEFAULT_NOTEBOOKS.length; nbIdx += 1) {
-    db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [
-      DEFAULT_NOTEBOOKS[nbIdx],
-      nbIdx
-    ]);
-    const nbId = queryOne(db, `SELECT last_insert_rowid() AS id`).id;
-    let firstNoteId = null;
-    for (let noteIdx = 0; noteIdx < DEFAULT_NOTES_PER_NOTEBOOK; noteIdx += 1) {
-      const title = formatDefaultPhotoAlbumsNoteTitle(nbIdx + 1, noteIdx + 1);
-      db.run(
-        `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
-         VALUES (?, ?, ?, ?, ?)`,
-        [nbId, title, DEFAULT_BODY_TEXT, noteIdx, `${title} ${DEFAULT_BODY_TEXT}`.toLowerCase()]
-      );
-      const noteId = queryOne(db, `SELECT last_insert_rowid() AS id`).id;
-      if (noteIdx === 0) firstNoteId = noteId;
-    }
-    if (nbIdx === 0 && firstNoteId) {
-      db.run(
-        `INSERT INTO shortcuts (target_type, notebook_id, note_id, display_order) VALUES (?, ?, ?, ?)`,
-        ['note', nbId, firstNoteId, 0]
-      );
-    }
-  }
+  seedPhotoAlbumsNewMemberSampleDb(db);
 }
 
 async function openDbFromBuffer(buffer) {
@@ -832,6 +812,7 @@ export async function initializeVaultOnUsbWithKey(mountPath, key, kdfMaterial = 
   }
   fs.writeFileSync(vaultMetaPath(normalized), JSON.stringify(meta, null, 2));
   const db = await createFreshDb();
+  await seedPhotoAlbumsNewMemberSampleMedia({ mountPath: normalized, key, meta, db });
   fs.writeFileSync(vaultDbPath(normalized), sealVaultBuffer(exportDb(db), key));
   db.close();
   return meta;
@@ -888,6 +869,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
 
   let db;
   let effectiveKey = null;
+  let didSeedNewMemberSample = false;
   try {
     const dbCandidates = [];
     const primaryDb = resolveVaultDbPath(mountPath);
@@ -917,7 +899,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     if (!db) {
       throw openErr || new Error('Vault database is missing or unreadable');
     }
-    seedEmptyVault(db);
+    didSeedNewMemberSample = seedPhotoAlbumsNewMemberSampleDb(db);
   } catch (err) {
     if (err?.name === 'PhotoAlbumsUnlockError') throw err;
     if (treatAsEncryptedVault) {
@@ -951,6 +933,16 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
   });
   session.storageType = targetStorageType;
   sessionsByKey.set(vaultSessionKey(singlesId, targetStorageType), session);
+  if (didSeedNewMemberSample) {
+    await seedPhotoAlbumsNewMemberSampleMedia({
+      mountPath: session.mountPath,
+      key: session.key,
+      meta: session.meta,
+      db: session.db
+    });
+    markDirty(session);
+    flushDbToUsb(session);
+  }
   if (!options?.skipClusterRegister) {
     await registerVaultClusterUnlock({
       singlesId,
@@ -971,6 +963,14 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
   if (ensureAttachmentAlbumSeqColumns(session.db)) {
     markDirty(session);
     flushDbToUsb(session);
+  }
+  const sampleLabelMigrate = migrateSampleAlbumTutorialLabelsDb(session.db);
+  if (sampleLabelMigrate.migrated) {
+    markDirty(session);
+    flushDbToUsb(session);
+    console.info(
+      `[unlockVaultUsbWithKey] migrated SAMPLE ALBUM tutorial labels singles_id=${singlesId} note_id=${sampleLabelMigrate.noteId}`
+    );
   }
 
   const migrateIconName = String(options?.iconName || '').trim();
@@ -2223,7 +2223,9 @@ export async function vaultRepairMissingAttachmentVariants(session, noteId) {
       session,
       fileRelativePathForVariant(row.relative_path, 'thumb')
     )?.length;
-    if (hasDisplay && hasThumb && !needsJpegFull) continue;
+    if (hasDisplay && hasThumb && (!needsJpegFull || isBundledInitializeSampleAttachmentId(row.attachment_id))) {
+      continue;
+    }
 
     try {
       const original = readEncryptedVaultFile(session, row.relative_path);
