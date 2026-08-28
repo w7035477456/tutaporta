@@ -381,7 +381,7 @@ export function isPhotoAlbumsStagingVideoExtension(ext) {
   return PHOTO_ALBUMS_STAGING_VIDEO_EXTENSIONS.has(last);
 }
 
-/** True when the file is an album-tray / template-slot video (currently *.mp4). */
+/** True when the file is an album-tray / template-slot video. */
 export function isPhotoAlbumsStagingVideoFile(file) {
   if (!file) return false;
   if (isMacOsMetadataFileName(file.name)) return false;

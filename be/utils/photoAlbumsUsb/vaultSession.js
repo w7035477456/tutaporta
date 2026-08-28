@@ -108,7 +108,11 @@ import {
   noteMatchesPhotoAlbumsSearchTerm
 } from '../photoAlbumsSearch.js';
 import { requireVaultAccessSession } from '../photoAlbumsAccessPassword.js';
-import { mimeTypeForPhotoAlbumsExtension } from '../photoAlbumsFileFormats.js';
+import {
+  mimeTypeForPhotoAlbumsExtension,
+  isPhotoAlbumsStagingPhotoExtension,
+  isPhotoAlbumsStagingVideoExtension
+} from '../photoAlbumsFileFormats.js';
 import {
   buildPhotoAlbumsDisplay1000pxBuffer,
   buildPhotoAlbumsThumbnailBuffer,
@@ -2278,6 +2282,31 @@ export async function vaultRepairMissingAttachmentVariants(session, noteId) {
     scheduleFlushDbToUsb(session);
   }
   return { repaired, failed };
+}
+
+/**
+ * Free-tier quota counters: how many image / video attachments this account
+ * currently keeps across every album. Counts live attachments only, so deleting
+ * media frees quota back up.
+ *
+ * @returns {{ imageCount: number, videoCount: number }}
+ */
+export function vaultCountAccountMedia(session) {
+  const rows = queryAll(
+    session.db,
+    `SELECT file_extension, COUNT(*) AS n
+       FROM note_attachments
+      WHERE deleted_at IS NULL
+      GROUP BY file_extension`
+  );
+  let imageCount = 0;
+  let videoCount = 0;
+  for (const row of rows) {
+    const n = Number(row?.n) || 0;
+    if (isPhotoAlbumsStagingVideoExtension(row?.file_extension)) videoCount += n;
+    else if (isPhotoAlbumsStagingPhotoExtension(row?.file_extension)) imageCount += n;
+  }
+  return { imageCount, videoCount };
 }
 
 export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType, sourceTakenAtMs }) {

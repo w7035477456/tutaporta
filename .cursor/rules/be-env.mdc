@@ -228,6 +228,32 @@ MAX_PHOTO_PER_ALBUM=10
 
 Maximum photos per album.
 
+## TutaPhoto free-tier quotas
+
+```bash
+TUTAPHOTO_MAX_SIZE_IMAGE_UPLOAD_MB=20
+TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB=100
+TUTAPHOTO_MAX_IMAGE_PER_ACCOUNT=1000
+TUTAPHOTO_MAX_VIDEO_PER_ACCOUNT=100
+```
+
+| Variable | Value | Behavior |
+|----|----|----|
+| `TUTAPHOTO_MAX_SIZE_IMAGE_UPLOAD_MB` | `20` | Per-image cap. Oversized images are auto-downsized in the browser (JPEG re-encode) with a popup; if that fails the user is told to resize externally. |
+| `TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB` | `100` | Per-video cap. Browsers cannot transcode video, so an oversized video is refused with the "Auto downsize failed" popup. |
+| `TUTAPHOTO_MAX_IMAGE_PER_ACCOUNT` | `1000` | Total live images per account across all albums. |
+| `TUTAPHOTO_MAX_VIDEO_PER_ACCOUNT` | `100` | Total live videos per account across all albums. |
+
+Read by `be/utils/tutaPhotoQuotaConfig.js`. Counts come from the member vault
+(`note_attachments`), so deleting media frees quota — no `singles` column needed.
+Exposed to the FE at `GET /api/photoAlbums/mediaQuota` and enforced again in
+`POST /api/photoAlbums/notes/:noteId/attachments`.
+
+**`JSON_LIMIT_MB` interaction:** base64 inflates request bodies by 4/3, so
+`be/server_be.js` raises its own ceiling to `ceil(largest cap × 4/3) + 8` MiB
+(142 MiB at the values above). Raising `TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB`
+raises that ceiling automatically; watch Node memory when doing so.
+
 ## Auto logout (idle warning)
 
 ```bash

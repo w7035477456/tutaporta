@@ -30,6 +30,7 @@ import {
   vaultUpdateNote,
   vaultMoveNoteImage,
   vaultAddNoteAttachment,
+  vaultCountAccountMedia,
   vaultDeleteNoteAttachment,
   vaultGetNoteAttachment,
   vaultReconcileAlbumPhotoSeq,
@@ -47,8 +48,10 @@ import {
 import {
   extensionFromFileName,
   isAllowedPhotoAlbumsFileExtension,
+  isPhotoAlbumsStagingVideoExtension,
   mimeTypeForPhotoAlbumsExtension
 } from '../../utils/photoAlbumsFileFormats.js';
+import { tutaPhotoQuotaConfig } from '../../utils/tutaPhotoQuotaConfig.js';
 import { photoAlbumsInlinePreviewPayload } from '../../utils/photoAlbumsInlinePreview.js';
 import { parseMediaDataUrl } from '../../utils/parseMediaDataUrl.js';
 import { DEFAULT_BODY_TEXT } from '../../utils/photoAlbumsUsb/vaultSchema.js';
@@ -882,6 +885,24 @@ export async function openPhotoAlbumsNoteAttachmentNative(req, res) {
 }
 
 /** POST /api/photoAlbums/notes/:noteId/attachments */
+/**
+ * GET /api/photoAlbums/mediaQuota
+ * Free-tier limits plus this account's live image / video counts, so the FE can
+ * refuse an upload (and offer the VIP upgrade) before reading the file bytes.
+ */
+export async function getPhotoAlbumsMediaQuota(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+  const quota = tutaPhotoQuotaConfig();
+  try {
+    const counts = vaultCountAccountMedia(session);
+    return res.json({ ...quota, ...counts });
+  } catch (err) {
+    console.error('[getPhotoAlbumsMediaQuota]', err?.message || err);
+    return res.status(500).json({ error: 'Failed to read media quota' });
+  }
+}
+
 export async function uploadPhotoAlbumsNoteAttachment(req, res) {
   const session = await requireVaultSession(req, res);
   if (!session) return;
@@ -905,6 +926,36 @@ export async function uploadPhotoAlbumsNoteAttachment(req, res) {
       file_name: req.body?.file_name || null,
       detail: 'File failed vault type/data-URL validation. Check server log [parseFileDataUrl].'
     });
+  }
+
+  // Server-side quota enforcement — the FE checks first for a friendly popup,
+  // but the vault is the authority since counts change across tabs/devices.
+  const quota = tutaPhotoQuotaConfig();
+  const isVideo = isPhotoAlbumsStagingVideoExtension(parsed.ext);
+  const limitMb = isVideo ? quota.videoMaxMb : quota.imageMaxMb;
+  if (parsed.buffer.length > limitMb * 1024 * 1024) {
+    return res.status(413).json({
+      code: 'TUTAPHOTO_FILE_TOO_LARGE',
+      error: `${parsed.fileName || 'File'} exceeds the ${limitMb} MB ${isVideo ? 'video' : 'image'} upload limit.`,
+      kind: isVideo ? 'video' : 'image',
+      limitMb
+    });
+  }
+  try {
+    const counts = vaultCountAccountMedia(session);
+    const used = isVideo ? counts.videoCount : counts.imageCount;
+    const maxAllowed = isVideo ? quota.maxVideosPerAccount : quota.maxImagesPerAccount;
+    if (used >= maxAllowed) {
+      return res.status(409).json({
+        code: 'TUTAPHOTO_ACCOUNT_QUOTA_EXCEEDED',
+        error: `Total image allow per user Free Tier Account is ${quota.maxImagesPerAccount}, and total video per free tier account is ${quota.maxVideosPerAccount}. Please click top left Upgrade to VIP tier to upload beyond free tier limit.`,
+        kind: isVideo ? 'video' : 'image',
+        ...quota,
+        ...counts
+      });
+    }
+  } catch (err) {
+    console.warn('[uploadPhotoAlbumsNoteAttachment] quota count failed', err?.message || err);
   }
 
   try {

@@ -10,6 +10,7 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { themedAlert, themedConfirm } from 'utils/themedDialog';
+import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDownsizeMedia';
 import {
   isPhotoAlbumsStorageNotUnlockedError,
   isPhotoAlbumsVaultOpenFatalError,
@@ -32,7 +33,6 @@ import {
 } from 'api/photoAlbumsFe';
 import { registerPhotoAlbumsLeavePrepare } from 'utils/photoAlbumsLeavePrepare';
 import { useAuth } from 'contexts/AuthContext';
-import { fetchUploadLimits } from 'api/myPhotosFe';
 import {
   isAllowedPhotoAlbumsFile,
   isMacOsMetadataFileName,
@@ -205,6 +205,27 @@ const LAYOUT_LS_KEY = 'photoAlbumsMenuLayout_v2';
 const NOTE_FONT_STYLE_LS_KEY = 'photoAlbumsNoteFontStyle_v1';
 const NOTE_FONT_SIZE_PT_LS_KEY = 'photoAlbumsNoteFontSizePt_v1';
 const DEFAULT_SIDEBAR_WIDTH = 380;
+/** Used until GET /api/photoAlbums/mediaQuota answers; mirrors the TUTAPHOTO_* env defaults. */
+const TUTAPHOTO_QUOTA_FALLBACK = {
+  imageMaxMb: 20,
+  videoMaxMb: 100,
+  maxImagesPerAccount: 1000,
+  maxVideosPerAccount: 100,
+  imageCount: 0,
+  videoCount: 0
+};
+
+const TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE =
+  'Auto downsize failed.  Please resize with online tools and upload again.';
+
+function tutaPhotoQuotaExceededMessage(quota) {
+  return `Total image allow per user Free Tier Account is ${quota.maxImagesPerAccount}, and total video per free tier account is ${quota.maxVideosPerAccount}. Please click top left Upgrade to VIP tier to upload beyond free tier limit.`;
+}
+
+function tutaPhotoDownsizeMessage(originalBytes, quota) {
+  return `We downsize your upload image size ${bytesToMbLabel(originalBytes)} mb to maximum size allowed ${quota.imageMaxMb} mb for image, and ${quota.videoMaxMb} mb for video`;
+}
+
 const DEFAULT_NOTEBOOK_COL_WIDTH = 168;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 200;
 const MIN_SIDEBAR_WIDTH = 260;
@@ -1842,7 +1863,13 @@ export default function PhotoAlbumsWorkspacePane({
   const [] = useState(null);
   const [] = useState(false);
   const [] = useState(null);
-  const [maxUploadMb, setMaxUploadMb] = useState(20);
+  /** Last per-file staging failure, so batch adds can report the real reason. */
+  const stagingFailureRef = useRef('');
+  /** TutaPhoto free-tier caps + live counts; refreshed from the vault per batch. */
+  const mediaQuotaRef = useRef({ ...TUTAPHOTO_QUOTA_FALLBACK });
+  /** Batch-scoped so each drop shows the quota / downsize popup at most once. */
+  const quotaPopupShownRef = useRef(false);
+  const downsizeNoticeShownRef = useRef(false);
   /** File → Payment swaps the editor body for the shared /profileRecords component. */
   const [fileWorkspaceView, setFileWorkspaceView] = useState('notes');
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
@@ -3440,6 +3467,63 @@ export default function PhotoAlbumsWorkspacePane({
     }, 400);
   }, []);
 
+  /**
+   * Pull the free-tier caps and current image/video counts from the vault.
+   * Called at the start of every batch so counts reflect other tabs/devices.
+   */
+  const refreshMediaQuota = useCallback(async () => {
+    try {
+      const quota = await vaultApi.fetchPhotoAlbumsMediaQuota?.();
+      if (quota) {
+        mediaQuotaRef.current = { ...mediaQuotaRef.current, ...quota };
+      }
+    } catch (err) {
+      console.warn('[photoAlbums] media quota fetch failed', err);
+    }
+    return mediaQuotaRef.current;
+  }, [vaultApi]);
+
+  /**
+   * Take one image/video slot from the free-tier allowance, or refuse the upload
+   * with the VIP upgrade popup. Reserving up front keeps a single batch from
+   * blowing past the cap before the server sees any of it.
+   */
+  const reserveMediaQuotaSlot = useCallback(
+    async (isVideo) => {
+      const quota = mediaQuotaRef.current;
+      const used = isVideo ? quota.videoCount : quota.imageCount;
+      const maxAllowed = isVideo ? quota.maxVideosPerAccount : quota.maxImagesPerAccount;
+      if (used >= maxAllowed) {
+        const message = tutaPhotoQuotaExceededMessage(quota);
+        stagingFailureRef.current = message;
+        if (!quotaPopupShownRef.current) {
+          quotaPopupShownRef.current = true;
+          await themedAlert(message, { title: 'Free Tier Limit Reached' });
+        }
+        return false;
+      }
+      if (isVideo) quota.videoCount = used + 1;
+      else quota.imageCount = used + 1;
+      return true;
+    },
+    []
+  );
+
+  const releaseMediaQuotaSlot = useCallback((isVideo) => {
+    const quota = mediaQuotaRef.current;
+    if (isVideo) quota.videoCount = Math.max(0, quota.videoCount - 1);
+    else quota.imageCount = Math.max(0, quota.imageCount - 1);
+  }, []);
+
+  /** One "we are downsizing" popup per batch, awaited so the user reads it. */
+  const announceDownsizeOnce = useCallback(async (originalBytes) => {
+    if (downsizeNoticeShownRef.current) return;
+    downsizeNoticeShownRef.current = true;
+    await themedAlert(tutaPhotoDownsizeMessage(originalBytes, mediaQuotaRef.current), {
+      title: 'Downsizing Upload'
+    });
+  }, []);
+
 
 
 
@@ -4025,18 +4109,6 @@ export default function PhotoAlbumsWorkspacePane({
   );
 
   useEffect(() => {
-    let cancelled = false;
-    void fetchUploadLimits()
-      .then((limits) => {
-        if (!cancelled && limits?.maxUploadMb) setMaxUploadMb(limits.maxUploadMb);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!selectedNotebook) {
       setSelectedNoteId(null);
       return;
@@ -4173,17 +4245,36 @@ export default function PhotoAlbumsWorkspacePane({
    * lightweight reference node.
    */
   const uploadNoteVaultFile = useCallback(
-    async (file, coords) => {
+    async (inputFile, coords) => {
+      let file = inputFile;
       if (!selectedNote || !file || busy) return;
       const noteId = Number(selectedNote.note_id);
       if (!isAllowedPhotoAlbumsFile(file)) {
         setError(`Unsupported vault file type: ${file.name || 'file'}`);
         return;
       }
-      const maxBytes = (maxUploadMb || 20) * 1024 * 1024;
-      if (file.size > maxBytes) {
-        setError(`${file.name || 'File'} is over the ${maxUploadMb || 20} MB upload limit.`);
-        return;
+      const isVideoFile = isPhotoAlbumsStagingVideoFile(file);
+      quotaPopupShownRef.current = false;
+      downsizeNoticeShownRef.current = false;
+      await refreshMediaQuota();
+      if (!(await reserveMediaQuotaSlot(isVideoFile))) return;
+
+      const quota = mediaQuotaRef.current;
+      const limitMb = isVideoFile ? quota.videoMaxMb : quota.imageMaxMb;
+      if (file.size > limitMb * 1024 * 1024) {
+        if (isVideoFile || !isPhotoAlbumsStagingPhotoFile(file)) {
+          releaseMediaQuotaSlot(isVideoFile);
+          setError(TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE);
+          return;
+        }
+        await announceDownsizeOnce(file.size);
+        const smaller = await downsizeImageFileToMaxMb(file, limitMb);
+        if (!smaller) {
+          releaseMediaQuotaSlot(isVideoFile);
+          setError(TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE);
+          return;
+        }
+        file = smaller;
       }
       setBusy(true);
       setError('');
@@ -4221,7 +4312,17 @@ export default function PhotoAlbumsWorkspacePane({
         bumpVaultUsage();
       }
     },
-    [selectedNote, busy, maxUploadMb, vaultApi, bumpVaultUsage, loadNoteContent]
+    [
+      selectedNote,
+      busy,
+      vaultApi,
+      bumpVaultUsage,
+      loadNoteContent,
+      refreshMediaQuota,
+      reserveMediaQuotaSlot,
+      releaseMediaQuotaSlot,
+      announceDownsizeOnce
+    ]
   );
 
   /**
@@ -4667,33 +4768,52 @@ export default function PhotoAlbumsWorkspacePane({
    * Do not gate on `busy` — multi-file drops must queue, not silently skip.
    */
   const uploadNoteVaultFileToStaging = useCallback(
-    async (file, { skipBusy = false, skipReconcile = false } = {}) => {
+    async (inputFile, { skipBusy = false, skipReconcile = false } = {}) => {
+      let file = inputFile;
+      let reservedVideoSlot = null;
+      const failStaging = (message) => {
+        if (reservedVideoSlot !== null) releaseMediaQuotaSlot(reservedVideoSlot);
+        reservedVideoSlot = null;
+        stagingFailureRef.current = message;
+        setError(message);
+        return false;
+      };
       if (!file) return false;
       if (!selectedNote) {
-        setError('Select an album on the left before adding photos to the Thumbnail Tray.');
-        return false;
+        return failStaging('Select an album on the left before adding photos to the Thumbnail Tray.');
       }
       const noteId = Number(selectedNote.note_id);
       if (!isAllowedPhotoAlbumsFile(file)) {
-        setError(`Unsupported vault file type: ${file.name || 'file'}`);
-        return false;
+        return failStaging(`Unsupported vault file type: ${file.name || 'file'}`);
       }
-      const maxBytes = (maxUploadMb || 20) * 1024 * 1024;
-      if (file.size > maxBytes) {
-        setError(`${file.name || 'File'} is over the ${maxUploadMb || 20} MB upload limit.`);
-        return false;
+      const isVideoFile = isPhotoAlbumsStagingVideoFile(file);
+
+      if (!(await reserveMediaQuotaSlot(isVideoFile))) return false;
+      reservedVideoSlot = isVideoFile;
+
+      const quota = mediaQuotaRef.current;
+      const limitMb = isVideoFile ? quota.videoMaxMb : quota.imageMaxMb;
+      if (file.size > limitMb * 1024 * 1024) {
+        // Videos cannot be transcoded in the browser, so oversized ones go
+        // straight to the "resize externally" message.
+        if (isVideoFile || !isPhotoAlbumsStagingPhotoFile(file)) {
+          return failStaging(TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE);
+        }
+        await announceDownsizeOnce(file.size);
+        const smaller = await downsizeImageFileToMaxMb(file, limitMb);
+        if (!smaller) return failStaging(TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE);
+        file = smaller;
       }
-      if (isPhotoAlbumsStagingPhotoFile(file) && !isPhotoAlbumsStagingVideoFile(file)) {
+
+      if (isPhotoAlbumsStagingPhotoFile(file) && !isVideoFile) {
         const readable = await probePhotoAlbumsImageFile(file);
         if (!readable) {
           if (isMacOsMetadataFileName(file.name)) {
-            setError(
+            return failStaging(
               `“${file.name}” is macOS metadata (._ sidecar), not a photo. Choose the file without the ._ prefix (e.g. hike2.jpg).`
             );
-          } else {
-            setError(`“${file.name || 'file'}” is not a readable photo image.`);
           }
-          return false;
+          return failStaging(`“${file.name || 'file'}” is not a readable photo image.`);
         }
       }
 
@@ -4770,15 +4890,24 @@ export default function PhotoAlbumsWorkspacePane({
             // ignore
           }
         }
-        setError(readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`));
-        return false;
+        return failStaging(
+          readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`)
+        );
       } finally {
         if (!skipBusy) setBusy(false);
         bumpVaultUsage();
       }
-      return false;
+      return failStaging(`Vault did not accept “${file.name || 'file'}”.`);
     },
-    [selectedNote, maxUploadMb, vaultApi, bumpVaultUsage, loadNoteContent]
+    [
+      selectedNote,
+      vaultApi,
+      bumpVaultUsage,
+      loadNoteContent,
+      reserveMediaQuotaSlot,
+      releaseMediaQuotaSlot,
+      announceDownsizeOnce
+    ]
   );
 
   /**
@@ -4878,6 +5007,10 @@ export default function PhotoAlbumsWorkspacePane({
         label: `Adding to Thumbnail Tray (0 of ${total})`,
         percent: 0
       });
+      stagingFailureRef.current = '';
+      quotaPopupShownRef.current = false;
+      downsizeNoticeShownRef.current = false;
+      await refreshMediaQuota();
       let uploaded = 0;
       try {
         for (let i = 0; i < total; i += 1) {
@@ -4912,8 +5045,10 @@ export default function PhotoAlbumsWorkspacePane({
           percent: 100
         });
         if (!uploaded) {
+          // Show why the upload actually failed instead of a generic "pick an album" hint.
           setError(
-            'No photos were added to the Thumbnail Tray. Select an album on the left, unlock TutaDrive, then try again.'
+            stagingFailureRef.current ||
+              'No photos were added to the Thumbnail Tray. Select an album on the left, unlock TutaDrive, then try again.'
           );
         } else if (rejected.length) {
           setError(
@@ -4924,7 +5059,7 @@ export default function PhotoAlbumsWorkspacePane({
         setBatchUploadProgress(null);
       }
     },
-    [uploadNoteVaultFileToStaging, selectedNote, vaultApi, loadNoteContent]
+    [uploadNoteVaultFileToStaging, selectedNote, vaultApi, loadNoteContent, refreshMediaQuota]
   );
 
   /** Spinning busy while Files Explorer / Mobile Upload reads local files before upload. */

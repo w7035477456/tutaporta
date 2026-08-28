@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { appLog } from '../logger.js';
 import { oneDriveStagingMountPath, resolveOneDriveStagingRoot } from './photoAlbumsOneDriveStagingRoot.js';
-import { resolvePhotoAlbumsFolderRoot } from './photoAlbumsFolderRoot.js';
 import {
   VAULT_DB_FILE_ENCRYPTED,
   VAULT_DB_FILE_PLAIN,
@@ -95,7 +94,6 @@ function queryAllRows(db, sql, params = []) {
  * Roots to scan for byte-identical duplicates:
  * - unlocked vault photos/ + files/ under session.mountPath
  * - OneDrive staging for this user (RECORD_PHOTOALBUMS_ONEDRIVE_STAGING_ROOT/{id})
- * - RECORD_PHOTOALBUMS_FOLDER when set
  */
 export function listPhotoAlbumsDedupeScanRoots({ session } = {}) {
   const roots = [];
@@ -120,7 +118,7 @@ export function listPhotoAlbumsDedupeScanRoots({ session } = {}) {
       addRoot(files);
       return;
     }
-    // No vault layout yet — scan the folder itself (staging / RECORD_PHOTOALBUMS_FOLDER).
+    // No vault layout yet — scan the folder itself (staging mount).
     addRoot(vaultRootOnMount(base));
     addRoot(base);
   };
@@ -133,11 +131,6 @@ export function listPhotoAlbumsDedupeScanRoots({ session } = {}) {
   if (singlesId != null && String(singlesId).trim() !== '') {
     addVaultOrFolderRoots(oneDriveStagingMountPath(singlesId));
     addRoot(path.join(resolveOneDriveStagingRoot(), String(singlesId)));
-  }
-
-  const folderRoot = resolvePhotoAlbumsFolderRoot();
-  if (folderRoot) {
-    addVaultOrFolderRoots(folderRoot);
   }
 
   return roots;
@@ -196,8 +189,7 @@ function collectReferencedAbsPaths(session) {
  *
  * Covers folders from:
  * - RECORD_PHOTOALBUMS_ONEDRIVE_STAGING_ROOT
- * - RECORD_PHOTOALBUMS_FOLDER
- * - the unlocked session mount (USB / staging)
+ * - the unlocked session mount (USB / TutaDrive / staging)
  */
 export function removeDuplicateFilesInPhotoAlbumsEnvFolders({ session } = {}) {
   const roots = listPhotoAlbumsDedupeScanRoots({ session });

@@ -579,6 +579,12 @@ export async function uploadPhotoAlbumsNoteAttachment(noteId, payload = {}, { st
   return data?.attachment;
 }
 
+/** Free-tier size caps plus this account's live image / video counts. */
+export async function fetchPhotoAlbumsMediaQuota({ storageType } = {}) {
+  const { data } = await rvRequest({ method: 'GET', url: '/api/photoAlbums/mediaQuota', storageType });
+  return data || null;
+}
+
 export async function reconcilePhotoAlbumsAlbumPhotoSeq(noteId, { storageType } = {}) {
   const { data } = await rvRequest({
     method: 'POST',
@@ -1758,6 +1764,7 @@ export function createPhotoAlbumsPaneApi(storageType) {
     movePhotoAlbumsNoteImage: (payload) => movePhotoAlbumsNoteImage(payload, opts),
     movePhotoAlbumsNote: (noteId, notebookId) => movePhotoAlbumsNote(noteId, notebookId, opts),
     uploadPhotoAlbumsNoteAttachment: (noteId, payload) => uploadPhotoAlbumsNoteAttachment(noteId, payload, opts),
+    fetchPhotoAlbumsMediaQuota: () => fetchPhotoAlbumsMediaQuota(opts),
     reconcilePhotoAlbumsAlbumPhotoSeq: (noteId) => reconcilePhotoAlbumsAlbumPhotoSeq(noteId, opts),
     deletePhotoAlbumsNoteAttachment: (noteId, attachmentId) =>
       deletePhotoAlbumsNoteAttachment(noteId, attachmentId, opts),

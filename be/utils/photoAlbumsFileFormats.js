@@ -206,9 +206,25 @@ export const PHOTO_ALBUMS_STAGING_PHOTO_EXTENSIONS = new Set([
   'heif'
 ]);
 
+export const PHOTO_ALBUMS_STAGING_VIDEO_EXTENSIONS = new Set([
+  'mp4',
+  'mov',
+  'mkv',
+  'webm',
+  'avi',
+  'wmv',
+  'mts',
+  'm2ts'
+]);
+
 export function isPhotoAlbumsStagingPhotoExtension(ext) {
   const normalized = normalizePhotoAlbumsFileExtension(ext);
   return normalized != null && PHOTO_ALBUMS_STAGING_PHOTO_EXTENSIONS.has(normalized);
+}
+
+export function isPhotoAlbumsStagingVideoExtension(ext) {
+  const normalized = normalizePhotoAlbumsFileExtension(ext);
+  return normalized != null && PHOTO_ALBUMS_STAGING_VIDEO_EXTENSIONS.has(normalized);
 }
 
 export function normalizePhotoAlbumsFileExtension(raw) {

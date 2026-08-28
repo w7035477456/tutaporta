@@ -29,6 +29,7 @@ import {
 } from '../../utils/storagePermissionError.js';
 import { logFolderPermissionError } from '../../utils/appStorageFolderPerms.js';
 import { resolveRegularMemberActivityTimestamp, loadLatestPhotoCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
+import { tutaPhotoQuotaConfig } from '../../utils/tutaPhotoQuotaConfig.js';
 
 // Max upload size from ~/.ssh/be/.env — NOTES_MAX_SIZE_UPLOAD_MB, else MAX_SIZE_UPLOAD_MB, default 2 MiB
 export function getMaxUploadMb() {
@@ -43,6 +44,14 @@ export function getMaxUploadMb() {
 }
 export function getMaxUploadBytes() {
   return getMaxUploadMb() * 1024 * 1024;
+}
+
+/**
+ * Video attachments (album MP4/MOV/…) are far larger than photos, so TutaPhoto
+ * gives them their own cap via TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB.
+ */
+export function getMaxVideoUploadMb() {
+  return tutaPhotoQuotaConfig().videoMaxMb;
 }
 
 export const ALLOWED_TYPES = [

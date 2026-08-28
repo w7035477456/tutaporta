@@ -78,6 +78,7 @@ import {
   updatePhotoAlbumsNotebook,
   updatePhotoAlbumsNote,
   uploadPhotoAlbumsNoteAttachment,
+  getPhotoAlbumsMediaQuota,
   reconcilePhotoAlbumsAlbumPhotoSeq,
   openPhotoAlbumsNoteAttachmentNative
 } from '../routes/photoAlbums/photoAlbumsRoutes.js';
@@ -240,6 +241,7 @@ export function startBridgeServer({ port = DEFAULT_PORT } = {}) {
   app.get('/api/photoAlbums/notes/:noteId/extra-images/:imageId', getPhotoAlbumsNoteExtraImage);
   app.post('/api/photoAlbums/notes/:noteId/extra-images', uploadPhotoAlbumsNoteExtraImage);
   app.delete('/api/photoAlbums/notes/:noteId/extra-images/:imageId', deletePhotoAlbumsNoteExtraImage);
+  app.get('/api/photoAlbums/mediaQuota', getPhotoAlbumsMediaQuota);
   app.post('/api/photoAlbums/notes/:noteId/attachments', uploadPhotoAlbumsNoteAttachment);
   app.post(
     '/api/photoAlbums/notes/:noteId/attachments/reconcile-album-seq',

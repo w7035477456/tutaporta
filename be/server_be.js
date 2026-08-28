@@ -1,5 +1,6 @@
 import './loadEnv.js'; // load ~/.ssh/be/.env first so DB_* etc. are set regardless of cwd
 import { isDuplicatePhoneAllowed } from './utils/duplicatePhonePolicy.js';
+import { tutaPhotoRequiredJsonLimitMb } from './utils/tutaPhotoQuotaConfig.js';
 import { isBlockMobileEnabled } from './utils/blockMobileConfig.js';
 import { isBypassSmsPhoneVerificationEnabled } from './utils/bypassSmsPhoneVerification.js';
 import { startBlockedAsnDailyRefresh } from './utils/blockedAsnRefresh.js';
@@ -275,6 +276,7 @@ import {
   getPhotoAlbumsNoteAttachment,
   openPhotoAlbumsNoteAttachmentNative,
   uploadPhotoAlbumsNoteAttachment,
+  getPhotoAlbumsMediaQuota,
   deletePhotoAlbumsNoteAttachment,
   reconcilePhotoAlbumsAlbumPhotoSeq,
   getPhotoAlbumsTree,
@@ -701,8 +703,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Allow large JSON bodies for photo upload (base64). From ~/.ssh/be/.env JSON_LIMIT_MB (default 20).
-const JSON_LIMIT_MB = Math.max(1, Math.min(100, Number(process.env.JSON_LIMIT_MB) || 999));
+// Allow large JSON bodies for photo upload (base64). From ~/.ssh/be/.env JSON_LIMIT_MB.
+// The ceiling must clear the largest TutaPhoto upload after base64 inflation, or a
+// video sized exactly at TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB would 413 before routing.
+const JSON_LIMIT_CEILING_MB = Math.max(100, tutaPhotoRequiredJsonLimitMb());
+const JSON_LIMIT_MB = Math.max(
+  1,
+  Math.min(JSON_LIMIT_CEILING_MB, Number(process.env.JSON_LIMIT_MB) || JSON_LIMIT_CEILING_MB)
+);
 const jsonLimitBytes = JSON_LIMIT_MB * 1024 * 1024;
 console.log('[server_be] express.json body limit:', JSON_LIMIT_MB, 'MiB');
 const effectiveMaxUploadMb = Math.max(0.5, Math.min(999, Number(process.env.MAX_SIZE_UPLOAD_MB) || 999));
@@ -1546,6 +1554,7 @@ app.post(
   requireAuth,
   openPhotoAlbumsNoteAttachmentNative
 );
+app.get('/api/photoAlbums/mediaQuota', requireAuth, getPhotoAlbumsMediaQuota);
 app.post('/api/photoAlbums/notes/:noteId/attachments', requireAuth, uploadPhotoAlbumsNoteAttachment);
 app.post(
   '/api/photoAlbums/notes/:noteId/attachments/reconcile-album-seq',

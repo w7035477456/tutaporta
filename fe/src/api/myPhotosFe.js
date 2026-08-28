@@ -45,8 +45,12 @@ export function useMyPhotos(singlesId) {
 export async function fetchUploadLimits() {
   const { data } = await api.get('/api/myPhotos/uploadLimits');
   const maxUploadMb = Number(data?.maxUploadMb);
+  const videoMaxUploadMb = Number(data?.videoMaxUploadMb);
+  const photoMb = Number.isFinite(maxUploadMb) && maxUploadMb > 0 ? maxUploadMb : 2;
   return {
-    maxUploadMb: Number.isFinite(maxUploadMb) && maxUploadMb > 0 ? maxUploadMb : 2,
+    maxUploadMb: photoMb,
+    videoMaxUploadMb:
+      Number.isFinite(videoMaxUploadMb) && videoMaxUploadMb > 0 ? videoMaxUploadMb : photoMb,
     debugPhotoInfo: data?.debugPhotoInfo === true
   };
 }
