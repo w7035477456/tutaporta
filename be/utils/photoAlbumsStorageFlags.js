@@ -1,33 +1,32 @@
-/** Env toggles for TutaPhotoAlbums storage choices (~/.ssh/be/.env). */
-
-import { isRightSideUsb } from './tutaDriveMemberPaths.js';
-
-function parseEnvBool(raw, defaultValue = true) {
-  const value = String(raw ?? '').trim().toLowerCase();
-  if (!value) return defaultValue;
-  if (value === 'true' || value === '1' || value === 'yes' || value === 'on') return true;
-  if (value === 'false' || value === '0' || value === 'no' || value === 'off') return false;
-  return defaultValue;
-}
+/**
+ * Env toggles for TutaPhotoAlbums storage choices (~/.ssh/be/.env).
+ *
+ * Microsoft OneDrive and the USB bridge are retired: TutaPhotoAlbums stores
+ * everything under LARGE_CHEAP_STORAGE_FOLDER (TutaDrive). The TutaDrive vault
+ * borrows the 'onedrive' session slot, so anything that talks to Microsoft
+ * Graph must stay off or it will upload/overwrite the local vault.
+ */
 
 export function isVaultOneDriveOffered() {
-  return parseEnvBool(process.env.PHOTOALBUMS_ONE_DRIVE, true);
+  return false;
+}
+
+/** Local USB bridge /myPhotoAlbums right panel — retired. */
+export function isVaultLocalUsbOffered() {
+  return false;
+}
+
+/** Optional backup USB slot — retired. */
+export function isVaultBackupUsbEnabled() {
+  return false;
 }
 
 /**
- * Local USB bridge /myPhotoAlbums right panel.
- * Prefer RIGHT_SIDE=USB | None when set; else PHOTOALBUMS_LOCAL_USB (default false).
+ * Microsoft Graph sync for the vault (upload on write/logoff, lazy download).
+ * Off: the TutaDrive folder is the only copy.
  */
-export function isVaultLocalUsbOffered() {
-  const rightSideUsb = isRightSideUsb();
-  if (rightSideUsb != null) return rightSideUsb;
-  return parseEnvBool(process.env.PHOTOALBUMS_LOCAL_USB, false);
-}
-
-/** Optional backup USB slot — off when PHOTOALBUMS_BACKUP_USB_DISABLE=true. */
-export function isVaultBackupUsbEnabled() {
-  if (parseEnvBool(process.env.PHOTOALBUMS_BACKUP_USB_DISABLE, false)) return false;
-  return true;
+export function isVaultCloudSyncEnabled() {
+  return false;
 }
 
 export function buildVaultStorageChoice(visible, oauthConfigured = true) {

@@ -14,7 +14,7 @@ import {
   listIconVaultUnlockKeys,
   vaultMetaUsesArgon2idKdf
 } from '../recordVaultIconKeys.js';
-import { isVaultBackupUsbEnabled } from '../recordVaultStorageFlags.js';
+import { isVaultBackupUsbEnabled, isVaultCloudSyncEnabled } from '../recordVaultStorageFlags.js';
 import { vaultMetaUsesPlaintextStorage } from '../recordVaultIconEncryption.js';
 import {
   fileRelativePath,
@@ -162,6 +162,7 @@ class VaultSession {
 }
 
 function scheduleCloudRelativeSync(session, relativePath) {
+  if (!isVaultCloudSyncEnabled()) return;
   if (!session?.driveSinglesId) return;
   if (session.storageType !== 'onedrive') return;
   void (async () => {
@@ -710,11 +711,11 @@ async function tryRehydrateVaultSession(singlesId, storageType) {
   if (!cluster?.mountPath) return null;
 
   let mountPath = String(cluster.mountPath).trim();
-  if (normalizedType === 'onedrive' && !isVaultMountPathPresent(mountPath)) {
+  if (normalizedType === 'onedrive' && isVaultCloudSyncEnabled() && !isVaultMountPathPresent(mountPath)) {
     mountPath = oneDriveStagingMountPath(id);
   }
   if (!isVaultMountPathPresent(mountPath)) {
-    if (normalizedType !== 'onedrive') {
+    if (normalizedType !== 'onedrive' || !isVaultCloudSyncEnabled()) {
       return null;
     }
     try {
@@ -749,8 +750,17 @@ async function tryRehydrateVaultSession(singlesId, storageType) {
 
   const session = getVaultSession(id, normalizedType);
   if (session && normalizedType === 'onedrive') {
-    session.driveSinglesId = id;
-    session.driveFolderId = cluster.driveFolderId || session.driveFolderId || null;
+    // TutaDrive borrows this slot. Tagging it with driveSinglesId would turn a
+    // local-folder vault into a Microsoft-synced one on any rehydrate.
+    if (isVaultCloudSyncEnabled()) {
+      session.driveSinglesId = id;
+      session.driveFolderId = cluster.driveFolderId || session.driveFolderId || null;
+    } else {
+      session.driveSinglesId = null;
+      session.driveFolderId = null;
+      session.tutaDrive = true;
+      session.label = 'TutaDrive';
+    }
   }
   return session;
 }
@@ -1078,6 +1088,11 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
  * Use after PIN encrypt so re-open (which re-downloads vault.db) keeps the ciphertext.
  */
 export async function flushAndAwaitCloudSync(singlesId, storageType = 'onedrive', { onProgress } = {}) {
+  if (!isVaultCloudSyncEnabled()) {
+    const local = getVaultSession(singlesId, normalizeVaultStorageType(storageType));
+    if (local?.dirty) forcePersistVaultDb(local);
+    return { success: true, synced: false };
+  }
   const normalizedType = normalizeVaultStorageType(storageType);
   let session = getVaultSession(singlesId, normalizedType);
   if (!session) {
@@ -1804,6 +1819,7 @@ export function vaultGetNoteImage(session, noteId, slot = 'center') {
 }
 
 export async function vaultEnsureNotePhotoOnDisk(session, noteId, slot = 'center') {
+  if (!isVaultCloudSyncEnabled()) return;
   if (session.storageType !== 'onedrive') return;
   const row = loadNote(session, noteId);
   if (!row) return;
@@ -1814,6 +1830,7 @@ export async function vaultEnsureNotePhotoOnDisk(session, noteId, slot = 'center
 }
 
 export async function vaultEnsureNoteExtraImageOnDisk(session, noteId, imageId) {
+  if (!isVaultCloudSyncEnabled()) return;
   if (session.storageType !== 'onedrive') return;
   const row = queryOne(
     session.db,
@@ -1826,6 +1843,7 @@ export async function vaultEnsureNoteExtraImageOnDisk(session, noteId, imageId) 
 }
 
 export async function vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId) {
+  if (!isVaultCloudSyncEnabled()) return;
   if (session.storageType !== 'onedrive') return;
   const row = queryOne(
     session.db,

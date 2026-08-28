@@ -16,7 +16,11 @@ module.exports = {
     name: 'onlinemallwebsite',
     script: './server_be.js',
     cwd: path.join(__dirname),
-    instances: 2,
+    // Single worker: TutaPhoto / TutaNote hold the member's SQLite vault open in
+    // process memory. With 2+ round-robin workers each one gets its own copy of
+    // vault.db, so notes created on one worker are "Note not found" on the other
+    // and whichever flushes last overwrites the rest.
+    instances: 1,
     exec_mode: 'cluster',
     max_memory_restart: '12G',
     env: {

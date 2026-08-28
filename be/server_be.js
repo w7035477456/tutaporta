@@ -928,6 +928,19 @@ console.log(
     );
   }
 }
+{
+  // TutaPhoto / TutaNote keep the member's SQLite vault open in process memory, so a
+  // second round-robin worker would serve a stale copy ("Note not found") and clobber
+  // vault.db on flush. ecosystem.config.cjs pins instances to 1; a plain
+  // `pm2 restart` keeps whatever cluster size PM2 already had.
+  const workerIndex = Number(process.env.NODE_APP_INSTANCE);
+  if (Number.isFinite(workerIndex) && workerIndex > 0) {
+    console.error(
+      `[startup] CLUSTER WORKER ${workerIndex} DETECTED — TutaPhoto/TutaNote vaults need a single worker. ` +
+        'Run: pm2 delete onlinemallwebsite && pm2 start ecosystem.config.cjs --env production'
+    );
+  }
+}
 console.log(
   `[startup] PhotoCache: every GET /api/photo/:id logs [PhotoCache] HIT|MISS to console/PM2 (window=${PHOTO_CACHE_WINDOW_MINUTES}m; totals need Redis)`
 );
