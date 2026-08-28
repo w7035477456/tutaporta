@@ -20,6 +20,7 @@ import { isVaultBackupUsbEnabled } from '../photoAlbumsStorageFlags.js';
 import { vaultMetaUsesPlaintextStorage } from '../photoAlbumsIconEncryption.js';
 import {
   fileRelativePath,
+  parseAlbumPhotoSeqFromAttRelativePath,
   extraPhotoRelativePath,
   photoRelativePath,
   vaultDbPath,
@@ -1181,6 +1182,13 @@ export async function discardVaultSessionWithoutCloudSync(singlesId, storageType
 }
 
 function mapAttachmentRow(row) {
+  const seqFromDb =
+    row.album_photo_seq != null && Number.isFinite(Number(row.album_photo_seq))
+      ? Number(row.album_photo_seq)
+      : null;
+  const seqFromPath = parseAlbumPhotoSeqFromAttRelativePath(row.relative_path);
+  const albumPhotoSeq =
+    seqFromDb != null && seqFromDb >= 1 ? seqFromDb : seqFromPath != null && seqFromPath >= 1 ? seqFromPath : null;
   return {
     attachment_id: Number(row.attachment_id),
     note_id: Number(row.note_id),
@@ -1190,16 +1198,27 @@ function mapAttachmentRow(row) {
     checksum: row.checksum ? String(row.checksum) : null,
     mime_type: row.mime_type || null,
     display_order: Number(row.display_order ?? 0),
-    album_photo_seq:
-      row.album_photo_seq != null && Number.isFinite(Number(row.album_photo_seq))
-        ? Number(row.album_photo_seq)
-        : null,
+    album_photo_seq: albumPhotoSeq,
     source_taken_at_ms:
       row.source_taken_at_ms != null && Number.isFinite(Number(row.source_taken_at_ms))
         ? Number(row.source_taken_at_ms)
         : null,
     created_at: row.created_at
   };
+}
+
+/** Next permanent album photo seq for a note (1-based). */
+function nextAlbumPhotoSeqForNote(session, noteId) {
+  ensureAttachmentAlbumSeqColumns(session.db);
+  const row = queryOne(
+    session.db,
+    `SELECT COALESCE(MAX(album_photo_seq), 0) + 1 AS next_seq
+     FROM note_attachments
+     WHERE note_id = ? AND deleted_at IS NULL`,
+    [noteId]
+  );
+  const n = Number(row?.next_seq);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
 function loadAttachmentsForNote(session, noteId) {
@@ -2115,8 +2134,8 @@ export function vaultGetNoteExtraImage(session, noteId, imageId) {
 }
 
 /**
- * Assign album_photo_seq 1..N by source_taken_at_ms (oldest first).
- * Overwrites existing seq — call after batch import so numbers match timestamps.
+ * Backfill album_photo_seq for rows that lack it (does not rename on-disk files).
+ * Upload assigns seq + att_{id}_{seq}.* at insert time.
  */
 export function vaultReconcileAlbumPhotoSeq(session, noteId) {
   const id = Number(noteId);
@@ -2124,17 +2143,40 @@ export function vaultReconcileAlbumPhotoSeq(session, noteId) {
   ensureAttachmentAlbumSeqColumns(session.db);
   const rows = queryAll(
     session.db,
-    `SELECT attachment_id, source_taken_at_ms, file_name
+    `SELECT attachment_id, source_taken_at_ms, file_name, relative_path, album_photo_seq
      FROM note_attachments
      WHERE note_id = ? AND deleted_at IS NULL
      ORDER BY COALESCE(source_taken_at_ms, 0) ASC, file_name COLLATE NOCASE ASC, attachment_id ASC`,
     [id]
   );
-  for (let i = 0; i < rows.length; i += 1) {
-    const seq = i + 1;
+  let maxSeq = rows.reduce((m, row) => {
+    const fromDb = Number(row.album_photo_seq);
+    const fromPath = parseAlbumPhotoSeqFromAttRelativePath(row.relative_path);
+    const seq =
+      Number.isFinite(fromDb) && fromDb >= 1
+        ? fromDb
+        : Number.isFinite(fromPath) && fromPath >= 1
+          ? fromPath
+          : 0;
+    return Math.max(m, seq);
+  }, 0);
+  for (const row of rows) {
+    const fromDb = Number(row.album_photo_seq);
+    const fromPath = parseAlbumPhotoSeqFromAttRelativePath(row.relative_path);
+    if ((Number.isFinite(fromDb) && fromDb >= 1) || (Number.isFinite(fromPath) && fromPath >= 1)) {
+      const seq = Number.isFinite(fromDb) && fromDb >= 1 ? fromDb : fromPath;
+      if (!Number.isFinite(fromDb) || fromDb !== seq) {
+        session.db.run(`UPDATE note_attachments SET album_photo_seq = ? WHERE attachment_id = ?`, [
+          seq,
+          row.attachment_id
+        ]);
+      }
+      continue;
+    }
+    maxSeq += 1;
     session.db.run(`UPDATE note_attachments SET album_photo_seq = ? WHERE attachment_id = ?`, [
-      seq,
-      rows[i].attachment_id
+      maxSeq,
+      row.attachment_id
     ]);
   }
   markDirty(session);
@@ -2220,14 +2262,21 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
     Number.isFinite(Number(sourceTakenAtMs)) && Number(sourceTakenAtMs) > 0
       ? Math.round(Number(sourceTakenAtMs))
       : Date.now();
+  const albumPhotoSeq = nextAlbumPhotoSeqForNote(session, noteId);
 
   session.db.run(
-    `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, source_taken_at_ms)
-     VALUES (?, ?, ?, '', ?, ?, ?, ?, ?)`,
-    [noteId, safeName, cleanExt, sizeBytes, checksum, resolvedMime, displayOrder, takenMs]
+    `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, source_taken_at_ms, album_photo_seq)
+     VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+    [noteId, safeName, cleanExt, sizeBytes, checksum, resolvedMime, displayOrder, takenMs, albumPhotoSeq]
   );
   const attachmentId = Number(queryOne(session.db, `SELECT last_insert_rowid() AS attachment_id`).attachment_id);
-  const relativePath = fileRelativePath(row.notebook_id, noteId, attachmentId, cleanExt);
+  const relativePath = fileRelativePath(
+    row.notebook_id,
+    noteId,
+    attachmentId,
+    cleanExt,
+    albumPhotoSeq
+  );
   session.db.run(`UPDATE note_attachments SET relative_path = ? WHERE attachment_id = ?`, [
     relativePath,
     attachmentId

@@ -43,15 +43,18 @@ export function normalizeAttachmentVariant(raw) {
 }
 
 /**
- * Sibling files next to att_{id}.jpg:
- *   att_{id}_1000px.jpg
- *   att_{id}_thumbnail.jpg
+ * Sibling files next to the vault attachment base:
+ *   att_{id}_{seq}.jpg → att_{id}_{seq}_1000px.jpg, att_{id}_{seq}_thumbnail.jpg
+ * Legacy (no seq): att_{id}.jpg → att_{id}_1000px.jpg, att_{id}_thumbnail.jpg
  */
 export function fileRelativePathForVariant(baseRelativePath, variant) {
   const rel = String(baseRelativePath || '').replace(/\\/g, '/');
   const v = normalizeAttachmentVariant(variant);
   if (v === 'full' || !rel) return rel;
-  const m = rel.match(/^(.*\/)?(att_\d+)\.([^.]+)$/i);
+  let m = rel.match(/^(.*\/)?(att_\d+_\d+)\.([^.]+)$/i);
+  if (!m) {
+    m = rel.match(/^(.*\/)?(att_\d+)\.([^.]+)$/i);
+  }
   if (!m) return rel;
   const dir = m[1] || '';
   const stem = m[2];

@@ -214,10 +214,24 @@ export function extraPhotoRelativePath(notebookId, noteId, imageId, ext = 'jpg')
   return `${notebookId}/${noteId}_e${imageId}.${cleanExt}`;
 }
 
-/** Relative path inside files/: {notebookId}/{noteId}/att_{attachmentId}.{ext} */
-export function fileRelativePath(notebookId, noteId, attachmentId, ext = 'bin') {
+/** Relative path inside files/: {notebookId}/{noteId}/att_{attachmentId}_{seq}.{ext} */
+export function fileRelativePath(notebookId, noteId, attachmentId, ext = 'bin', albumPhotoSeq = null) {
   const cleanExt = String(ext || 'bin').replace(/^\./, '').toLowerCase();
-  return `${notebookId}/${noteId}/att_${attachmentId}.${cleanExt}`;
+  const id = Number(attachmentId);
+  const seq = Number(albumPhotoSeq);
+  if (Number.isFinite(id) && id > 0 && Number.isFinite(seq) && seq >= 1) {
+    return `${notebookId}/${noteId}/att_${id}_${seq}.${cleanExt}`;
+  }
+  return `${notebookId}/${noteId}/att_${id}.${cleanExt}`;
+}
+
+/** Parse permanent album seq from att_{id}_{seq}.ext (returns null for legacy att_{id}.ext). */
+export function parseAlbumPhotoSeqFromAttRelativePath(relativePath) {
+  const rel = String(relativePath || '').replace(/\\/g, '/');
+  const m = rel.match(/att_\d+_(\d+)\.[^./]+$/i);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n >= 1 ? n : null;
 }
 
 /** Minimal TutaPhotoAlbums vault layout: meta + photos/ + files/ (db checked separately). */

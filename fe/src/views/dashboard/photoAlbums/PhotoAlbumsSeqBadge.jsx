@@ -1,12 +1,13 @@
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 
-/** Permanent album photo index — yellow fill, black border, bottom-right. */
+/** Permanent album photo index — yellow digits, black outline, no background box. */
 export default function PhotoAlbumsSeqBadge({ seq, sx = {} }) {
   const n = Number(seq);
   if (!Number.isFinite(n) || n < 1) return null;
   return (
     <Box
+      component="span"
       className="rv-album-photo-seq"
       aria-hidden
       sx={{
@@ -14,20 +15,25 @@ export default function PhotoAlbumsSeqBadge({ seq, sx = {} }) {
         right: 4,
         bottom: 4,
         zIndex: 8,
-        minWidth: 22,
-        px: 0.5,
-        py: 0.2,
-        bgcolor: 'var(--theme-yellow-color, #ffd700)',
-        border: '2px solid #000',
-        borderRadius: '4px',
-        color: '#000',
+        display: 'block',
+        bgcolor: 'transparent',
+        border: 'none',
+        borderRadius: 0,
+        boxShadow: 'none',
+        p: 0,
+        m: 0,
+        minWidth: 0,
+        color: '#FFEB3B',
+        WebkitTextFillColor: '#FFEB3B',
+        WebkitTextStroke: '2px #000000',
+        paintOrder: 'stroke fill',
+        textShadow: '0 1px 0 #000, 0 0 3px #000',
         fontWeight: 900,
-        fontSize: '0.85rem',
-        lineHeight: 1.1,
-        textAlign: 'center',
+        fontSize: '1rem',
+        lineHeight: 1,
+        textAlign: 'right',
         pointerEvents: 'none',
         userSelect: 'none',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.35)',
         ...sx
       }}
     >
