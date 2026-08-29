@@ -16,6 +16,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATION_SQL="${SCRIPT_DIR}/be/db/addRegularMemberAnyMemberInactive.sql"
 NICKNAME_JS="${SCRIPT_DIR}/fe/src/config/nicknameSuggestions.js"
 DM1_EMAIL="dm1@gmail.com"
+# Always stored on every new singles row (login alt / recovery).
+ALT_EMAIL="w7035477456@gmail.com"
 
 trim() {
   local s="${1-}"
@@ -129,82 +131,138 @@ done
 # ---------------------------------------------------------------------------
 # 7) Ethnicity + names
 # ---------------------------------------------------------------------------
+# Load gender-aware first / middle / last name pools for one ethnic key.
+# Sets: M_FIRST F_FIRST MIDDLE LAST ETHNIC_ONE_LABEL
+load_ethnic_pools() {
+  local key="$1"
+  case "$key" in
+    asian)
+      M_FIRST=(Wei Jian Hao Ming Kai Chen Wei Li Jun Tao)
+      F_FIRST=(Mei Ling Xia Yan Hui Jing Wei Fang Lan Yun)
+      MIDDLE=(Li Wei Chen Yong An)
+      LAST=(Wang Li Zhang Liu Chen Yang Huang Zhao Wu Zhou)
+      ETHNIC_ONE_LABEL="Asian"
+      ;;
+    white)
+      M_FIRST=(James John Robert Michael William David Richard Joseph Thomas Charles)
+      F_FIRST=(Mary Patricia Jennifer Linda Elizabeth Barbara Susan Jessica Sarah Karen)
+      MIDDLE=(Ann Marie Lee Ray Jo)
+      LAST=(Smith Johnson Williams Brown Jones Miller Davis Wilson Anderson Taylor)
+      ETHNIC_ONE_LABEL="White"
+      ;;
+    hispanic)
+      M_FIRST=(Carlos Miguel Jose Luis Juan Diego Antonio Pedro Pablo Andres)
+      F_FIRST=(Maria Sofia Isabella Camila Valentina Lucia Elena Gabriela Ana Rosa)
+      MIDDLE=(Luis Marie Jose Ann Cruz)
+      LAST=(Garcia Rodriguez Martinez Hernandez Lopez Gonzalez Perez Sanchez Ramirez Torres)
+      ETHNIC_ONE_LABEL="Hispanic"
+      ;;
+    black)
+      M_FIRST=(Jamal Malik Darius Tyrone Andre Marcus DeShawn Khalil Omari Jabari)
+      F_FIRST=(Aaliyah Imani Keisha Latoya Nia Destiny Shanice Ebony Jasmine Monique)
+      MIDDLE=(Lee Ann Marie Ray Jo)
+      LAST=(Williams Johnson Brown Davis Jackson Wilson Harris Thompson Robinson Lewis)
+      ETHNIC_ONE_LABEL="Black"
+      ;;
+    southasian)
+      M_FIRST=(Arjun Rohan Vikram Amir Raj Kabir Nikhil Sameer Dev Aditya)
+      F_FIRST=(Priya Ananya Aisha Meera Kavya Neha Sanya Isha Diya Riya)
+      MIDDLE=(Kumar Devi Ann Marie Das)
+      LAST=(Patel Sharma Khan Singh Gupta Reddy Mehta Joshi Nair Chopra)
+      ETHNIC_ONE_LABEL="South Asian"
+      ;;
+    southeastasian)
+      M_FIRST=(Minh Huy Bao Long Khoa Hai Nam Tuan Duc Somchai)
+      F_FIRST=(Linh Mai Trang Hoa Thao Nga Lan Huong Yen Phuong)
+      MIDDLE=(Anh Thi Van Minh Lee)
+      LAST=(Nguyen Tran Le Pham Hoang Phan Vu Santos Reyes Cruz)
+      ETHNIC_ONE_LABEL="South East Asian"
+      ;;
+    middleeastern)
+      M_FIRST=(Omar Hassan Ali Youssef Karim Samir Rami Tarek Ziad Fadi)
+      F_FIRST=(Layla Nora Yasmin Amira Fatima Hana Sara Rania Dina Maya)
+      MIDDLE=(Ali Noor Ann Marie)
+      LAST=(Hassan Ali Khan Ahmed Ibrahim Mansour Farouk Nasser Saleh Rahman)
+      ETHNIC_ONE_LABEL="Middle Eastern"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Prefix-friendly: w → white (not mixed). se → South East Asian.
+normalize_ethnic_key() {
+  local raw="$1"
+  case "$raw" in
+    a|asian) echo asian ;;
+    w|white|caucasian) echo white ;;
+    h|hispanic|latino|latina) echo hispanic ;;
+    b|black|africanamerican|african) echo black ;;
+    sa|southasian|indian) echo southasian ;;
+    se|southeast|southeastasian) echo southeastasian ;;
+    me|middleeastern|arab) echo middleeastern ;;
+    m|mixed) echo mixed ;;
+    "") echo asian ;;
+    *) echo mixed ;;
+  esac
+}
+
+pick_first_name_from_pools() {
+  if [[ "$GENDER_KEY" == "female" ]]; then
+    pick_from "${F_FIRST[@]}"
+  else
+    pick_from "${M_FIRST[@]}"
+  fi
+}
+
 echo
-echo "Ethnic name groups: asian | white | hispanic | black | southasian | middleeastern | mixed"
+echo "Ethnic name groups: asian | white | hispanic | black | southasian | southeastasian | middleeastern | mixed"
+echo "  mixed = two specific groups (e.g. South East Asian and White); first name from one, last name from the other"
 read -r -p "What ethnic name? [asian]: " ETHNIC_IN
-ETHNIC="$(printf '%s' "${ETHNIC_IN:-asian}" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+ETHNIC="$(normalize_ethnic_key "$(printf '%s' "${ETHNIC_IN:-asian}" | tr '[:upper:]' '[:lower:]' | tr -d ' ')")"
 
-# first|middle|last pools per ethnicity (gender-aware first names)
-case "$ETHNIC" in
-  asian)
-    M_FIRST=(Wei Jian Hao Ming Kai Chen Wei Li Jun Tao)
-    F_FIRST=(Mei Ling Xia Yan Hui Jing Wei Fang Lan Yun)
-    MIDDLE=(Li Wei Chen Yong An)
-    LAST=(Wang Li Zhang Liu Chen Yang Huang Zhao Wu Zhou)
-    ETHNIC_LABEL="Asian"
-    ;;
-  white|caucasian)
-    M_FIRST=(James John Robert Michael William David Richard Joseph Thomas Charles)
-    F_FIRST=(Mary Patricia Jennifer Linda Elizabeth Barbara Susan Jessica Sarah Karen)
-    MIDDLE=(Ann Marie Lee Ray Jo)
-    LAST=(Smith Johnson Williams Brown Jones Miller Davis Wilson Anderson Taylor)
-    ETHNIC_LABEL="White"
-    ;;
-  hispanic|latino|latina)
-    M_FIRST=(Carlos Miguel Jose Luis Juan Diego Antonio Pedro Pablo Andres)
-    F_FIRST=(Maria Sofia Isabella Camila Valentina Lucia Elena Gabriela Ana Rosa)
-    MIDDLE=(Luis Marie Jose Ann Cruz)
-    LAST=(Garcia Rodriguez Martinez Hernandez Lopez Gonzalez Perez Sanchez Ramirez Torres)
-    ETHNIC_LABEL="Hispanic"
-    ;;
-  black|africanamerican|african)
-    M_FIRST=(Jamal Malik Darius Tyrone Andre Marcus DeShawn Khalil Omari Jabari)
-    F_FIRST=(Aaliyah Imani Keisha Latoya Nia Destiny Shanice Ebony Jasmine Monique)
-    MIDDLE=(Lee Ann Marie Ray Jo)
-    LAST=(Williams Johnson Brown Davis Jackson Wilson Harris Thompson Robinson Lewis)
-    ETHNIC_LABEL="Black"
-    ;;
-  southasian|indian)
-    M_FIRST=(Arjun Rohan Vikram Amir Raj Kabir Nikhil Sameer Dev Aditya)
-    F_FIRST=(Priya Ananya Aisha Meera Kavya Neha Sanya Isha Diya Riya)
-    MIDDLE=(Kumar Devi Ann Marie Das)
-    LAST=(Patel Sharma Khan Singh Gupta Reddy Mehta Joshi Nair Chopra)
-    ETHNIC_LABEL="South Asian"
-    ;;
-  middleeastern|arab)
-    M_FIRST=(Omar Hassan Ali Youssef Karim Samir Rami Tarek Ziad Fadi)
-    F_FIRST=(Layla Nora Yasmin Amira Fatima Hana Sara Rania Dina Maya)
-    MIDDLE=(Ali Noor Ann Marie)
-    LAST=(Hassan Ali Khan Ahmed Ibrahim Mansour Farouk Nasser Saleh Rahman)
-    ETHNIC_LABEL="Middle Eastern"
-    ;;
-  mixed|*)
-    M_FIRST=(Alex Jordan Casey Taylor Riley Avery Quinn Morgan Cameron Reese)
-    F_FIRST=(Alex Jordan Casey Taylor Riley Avery Quinn Morgan Cameron Reese)
-    MIDDLE=(Lee Ann Marie Ray Jo)
-    LAST=(Nguyen Garcia Smith Patel Kim Lopez Brown Lee Park Hernandez)
-    ETHNIC_LABEL="Mixed"
-    ;;
-esac
+MIX_KEYS=(asian white hispanic black southasian southeastasian middleeastern)
 
-if [[ "$GENDER_KEY" == "female" ]]; then
-  FIRST_NAME="$(pick_from "${F_FIRST[@]}")"
+if [[ "$ETHNIC" == "mixed" ]]; then
+  local_i=$((RANDOM % ${#MIX_KEYS[@]}))
+  local_j=$((RANDOM % ${#MIX_KEYS[@]}))
+  while [[ "$local_j" -eq "$local_i" ]]; do
+    local_j=$((RANDOM % ${#MIX_KEYS[@]}))
+  done
+  MIX_KEY_A="${MIX_KEYS[$local_i]}"
+  MIX_KEY_B="${MIX_KEYS[$local_j]}"
+  load_ethnic_pools "$MIX_KEY_A"
+  FIRST_NAME="$(pick_first_name_from_pools)"
+  MIDDLE_NAME="$(pick_from "${MIDDLE[@]}")"
+  MIX_LABEL_A="$ETHNIC_ONE_LABEL"
+  load_ethnic_pools "$MIX_KEY_B"
+  LAST_NAME="$(pick_from "${LAST[@]}")"
+  MIX_LABEL_B="$ETHNIC_ONE_LABEL"
+  ETHNIC_LABEL="${MIX_LABEL_A} and ${MIX_LABEL_B}"
 else
-  FIRST_NAME="$(pick_from "${M_FIRST[@]}")"
+  load_ethnic_pools "$ETHNIC"
+  FIRST_NAME="$(pick_first_name_from_pools)"
+  MIDDLE_NAME="$(pick_from "${MIDDLE[@]}")"
+  LAST_NAME="$(pick_from "${LAST[@]}")"
+  ETHNIC_LABEL="$ETHNIC_ONE_LABEL"
 fi
-MIDDLE_NAME="$(pick_from "${MIDDLE[@]}")"
-LAST_NAME="$(pick_from "${LAST[@]}")"
+
 FIRST_NAME="$(title_case "$FIRST_NAME")"
 MIDDLE_NAME="$(title_case "$MIDDLE_NAME")"
 LAST_NAME="$(title_case "$LAST_NAME")"
 
 # ---------------------------------------------------------------------------
-# 8) Alias — adjective (from nicknameSuggestions.js) + real first name
-#     Never repeat the same word (no SillySilly / QuirkyQuirky).
+# 8) Alias — adjective + random first name (never the legal mailing/dl first name)
+#     Same first letter (GentleGina). Never doubled word (SillySilly).
 # ---------------------------------------------------------------------------
+first_letter_key() {
+  printf '%s' "${1-}" | tr -cd 'A-Za-z' | cut -c1 | tr '[:upper:]' '[:lower:]'
+}
+
 load_nickname_adjectives() {
   # Extract adjective words from nicknameSuggestions.js (Alias/Nickname module).
-  ADJECTIVES=(Bubbly Sunny Clever Goofy Flash Turbo Merry Witty Cheeky Cosmic Neon Echo Rogue Frosty Alpha)
+  ADJECTIVES=(Bubbly Sunny Clever Goofy Flash Turbo Merry Witty Cheeky Cosmic Neon Echo Rogue Frosty Alpha Gentle)
   if [[ ! -f "$NICKNAME_JS" ]]; then
     return
   fi
@@ -214,29 +272,75 @@ load_nickname_adjectives() {
     # shellcheck disable=SC2206
     ADJECTIVES=($adj_line)
   fi
-  [[ ${#ADJECTIVES[@]} -gt 0 ]] || ADJECTIVES=(Bubbly Sunny Clever Goofy Flash Turbo Merry Witty Cheeky Cosmic)
+  [[ ${#ADJECTIVES[@]} -gt 0 ]] || ADJECTIVES=(Bubbly Sunny Clever Goofy Flash Turbo Merry Witty Cheeky Cosmic Gentle)
+}
+
+# Gender-aware first-name pool from nicknameSuggestions.js (not the legal first name).
+load_nickname_first_names() {
+  if [[ "$GENDER_KEY" == "female" ]]; then
+    NICK_FIRST_NAMES=(Amy Anna Becca Bonnie Carla Cindy Dana Emma Fran Gina Grace Holly Iris Jill Kara Kim Lana Lisa Mary Nina Nora Pam Quinn Rita Rose Sara Sue Tina Vera Wendy Zara Zoe)
+  else
+    NICK_FIRST_NAMES=(Adam Andy Ben Bill Carl Chris Dan Dave Eric Frank Greg Hank Jack Jeff Ken Leo Luke Mark Matt Nick Omar Pete Ray Sam Ted Tim Vic Will Zack)
+  fi
+  if [[ ! -f "$NICKNAME_JS" ]]; then
+    return
+  fi
+  local names
+  names="$(
+    cd "$SCRIPT_DIR" && node --input-type=module -e '
+      import { listNicknameFirstNames } from "./fe/src/config/nicknameSuggestions.js";
+      const gender = process.argv[1] === "female" ? "female" : "male";
+      const list = listNicknameFirstNames({ gender });
+      if (list.length) process.stdout.write(list.join(" "));
+    ' "${GENDER_KEY:-male}" 2>/dev/null || true
+  )"
+  if [[ -n "$names" ]]; then
+    # shellcheck disable=SC2206
+    NICK_FIRST_NAMES=($names)
+  fi
+}
+
+# Names that share the adjective's first letter and are not the legal first name.
+matching_nick_first_names() {
+  local letter="$1" legal_l="$2" adj_l="$3"
+  local n n_l
+  MATCH_FIRST=()
+  for n in "${NICK_FIRST_NAMES[@]}"; do
+    n="$(printf '%s' "$n" | tr -cd 'A-Za-z')"
+    n_l="$(printf '%s' "$n" | tr '[:upper:]' '[:lower:]')"
+    [[ -n "$n_l" ]] || continue
+    [[ "$(first_letter_key "$n")" == "$letter" ]] || continue
+    [[ "$n_l" != "$legal_l" ]] || continue
+    [[ "$n_l" != "$adj_l" ]] || continue
+    MATCH_FIRST+=("$n")
+  done
 }
 
 generate_alias() {
   load_nickname_adjectives
-  local first_clean first_l attempt adj adj_l
-  first_clean="$(printf '%s' "$FIRST_NAME" | tr -cd 'A-Za-z0-9')"
-  first_l="$(printf '%s' "$first_clean" | tr '[:upper:]' '[:lower:]')"
-  if [[ -z "$first_clean" ]]; then
+  load_nickname_first_names
+  local legal_clean legal_l attempt adj adj_l letter nick_first
+  legal_clean="$(printf '%s' "$FIRST_NAME" | tr -cd 'A-Za-z0-9')"
+  legal_l="$(printf '%s' "$legal_clean" | tr '[:upper:]' '[:lower:]')"
+  if [[ -z "$legal_l" ]]; then
     echo "ERROR: first name is empty; cannot build alias"
     exit 1
   fi
+  if [[ ${#NICK_FIRST_NAMES[@]} -lt 1 ]]; then
+    echo "ERROR: nickname first-name pool is empty"
+    exit 1
+  fi
 
-  for attempt in $(seq 1 60); do
+  for attempt in $(seq 1 80); do
     adj="$(pick_from "${ADJECTIVES[@]}")"
     adj="$(printf '%s' "$adj" | tr -cd 'A-Za-z0-9')"
     adj_l="$(printf '%s' "$adj" | tr '[:upper:]' '[:lower:]')"
-    # Same word twice is not allowed (Silly + Silly → SillySilly).
-    if [[ -z "$adj_l" || "$adj_l" == "$first_l" ]]; then
-      continue
-    fi
-    # Adjective + real first name (gender/ethnicity already chose FIRST_NAME).
-    ALIAS="$(title_case "$adj")$(title_case "$first_clean")"
+    letter="$(first_letter_key "$adj")"
+    [[ -n "$adj_l" && -n "$letter" ]] || continue
+    matching_nick_first_names "$letter" "$legal_l" "$adj_l"
+    [[ ${#MATCH_FIRST[@]} -gt 0 ]] || continue
+    nick_first="$(pick_from "${MATCH_FIRST[@]}")"
+    ALIAS="$(title_case "$adj")$(title_case "$nick_first")"
     ALIAS="$(printf '%s' "$ALIAS" | tr -cd 'A-Za-z0-9' | cut -c1-80)"
     local taken
     taken=$(psql_q -Atc "SELECT 1 FROM ${SCHEMA}.singles WHERE lower(alias)=lower('$(sql_escape "$ALIAS")') LIMIT 1;")
@@ -244,13 +348,27 @@ generate_alias() {
       return 0
     fi
   done
-  # Fallback: adjective + first name + digits (still never doubled word).
+  # Fallback: still never use the legal first name; add digits if needed.
   adj="$(pick_from "${ADJECTIVES[@]}")"
-  adj_l="$(printf '%s' "$adj" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z')"
-  if [[ "$adj_l" == "$first_l" ]]; then
-    adj="Sunny"
+  adj="$(printf '%s' "$adj" | tr -cd 'A-Za-z0-9')"
+  adj_l="$(printf '%s' "$adj" | tr '[:upper:]' '[:lower:]')"
+  letter="$(first_letter_key "$adj")"
+  matching_nick_first_names "$letter" "$legal_l" "$adj_l"
+  if [[ ${#MATCH_FIRST[@]} -gt 0 ]]; then
+    nick_first="$(pick_from "${MATCH_FIRST[@]}")"
+  else
+    nick_first=""
+    local n n_l
+    for n in "${NICK_FIRST_NAMES[@]}"; do
+      n_l="$(printf '%s' "$n" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z')"
+      if [[ -n "$n_l" && "$n_l" != "$legal_l" ]]; then
+        nick_first="$n"
+        break
+      fi
+    done
+    [[ -n "$nick_first" ]] || nick_first="Sam"
   fi
-  ALIAS="$(title_case "$adj")$(title_case "$first_clean")$(rand_int 10 99)"
+  ALIAS="$(title_case "$adj")$(title_case "$nick_first")$(rand_int 10 99)"
   ALIAS="$(printf '%s' "$ALIAS" | tr -cd 'A-Za-z0-9' | cut -c1-80)"
 }
 
@@ -421,6 +539,7 @@ echo " PREVIEW — new member (not inserted yet)"
 echo "============================================================"
 printf "%-22s %s\n" "member_category:" "$MEMBER_CATEGORY"
 printf "%-22s %s\n" "email:" "$EMAIL"
+printf "%-22s %s\n" "alt_email:" "$ALT_EMAIL"
 printf "%-22s %s\n" "member_id:" "$MEMBER_ID"
 printf "%-22s %s\n" "status:" "$STATUS"
 printf "%-22s %s\n" "initial_setup_done:" "$INITIAL_SETUP_DONE"
@@ -466,6 +585,7 @@ WITH new_row AS (
     member_id,
     member_category,
     email,
+    alt_email,
     phone,
     password_hash,
     status,
@@ -496,6 +616,7 @@ WITH new_row AS (
     ${MEMBER_ID},
     '$(sql_escape "$MEMBER_CATEGORY")'::${SCHEMA}.member_category_enum,
     '$(sql_escape "$EMAIL")',
+    '$(sql_escape "$ALT_EMAIL")',
     '$(sql_escape "$PHONE")',
     '$(sql_escape "$PASSWORD_HASH")',
     '$(sql_escape "$STATUS")'::${SCHEMA}.singles_status,
@@ -641,6 +762,7 @@ echo "============================================================"
 psql_q -c "
 SELECT
   email AS \"email\",
+  alt_email AS \"alt_email\",
   member_category::text AS \"member_category\",
   mailing_firstname AS \"firstname\",
   mailing_middlename AS \"middlename\",
