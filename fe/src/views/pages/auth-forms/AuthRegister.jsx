@@ -327,8 +327,21 @@ export default function AuthRegister() {
         <Box component="img" src={enterEmailImg} alt="" sx={emailFieldImageSx} />
       </Box>
       {googleBound ? (
-        <Typography variant="body2" sx={{ mt: 0.5, mb: 0, color: 'var(--theme-primary-color)' }}>
-          Verified with Google. Enter your phone and agree to Terms to finish — no password needed.
+        <Typography
+          variant="body1"
+          sx={{
+            mt: 1.5,
+            mb: 0.5,
+            fontWeight: 700,
+            color: '#d32f2f',
+            lineHeight: 1.4,
+            textAlign: 'left',
+            width: '100%'
+          }}
+        >
+          Congratulation, Signup with Google Success
+          <br />
+          Now just need add Phone below
         </Typography>
       ) : null}
       {derivedEmailError && (
