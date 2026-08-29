@@ -45,6 +45,12 @@ export async function completeSettingsChangeEmail(payload) {
   return data;
 }
 
+/** Pass an empty string to clear the alt/2nd email. */
+export async function updateSettingsAltEmail(altEmail) {
+  const { data } = await api.put('/api/settings/altEmail', { altEmail: altEmail ?? '' });
+  return data;
+}
+
 export async function changeSettingsPhone(payload) {
   const { data } = await api.post('/api/settings/changePhone', payload);
   return data;

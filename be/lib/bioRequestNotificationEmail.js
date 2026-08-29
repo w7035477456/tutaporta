@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import pool from '../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from './emailFrom.js';
-import { enrichMailOptions } from './emailHtml.js';
+import { sendOutboundMail } from './outboundMail.js';
 import { getPublicAppUrl } from '../utils/publicAppUrl.js';
 
 const LOG_PREFIX = '[bioRequestNotificationEmail]';
@@ -123,15 +123,13 @@ export function sendBioRequestNotificationEmailFireAndForget({
       });
 
       const transporter = createTransporter();
-      await transporter.sendMail(
-        enrichMailOptions({
-          from: OUTBOUND_EMAIL_FROM_HEADER,
-          to: toEmail,
-          subject,
-          text,
-          html
-        })
-      );
+      await sendOutboundMail(transporter, {
+        from: OUTBOUND_EMAIL_FROM_HEADER,
+        to: toEmail,
+        subject,
+        text,
+        html
+      });
     } catch (err) {
       console.error(`${LOG_PREFIX} send failed`, err?.message ?? err);
     }

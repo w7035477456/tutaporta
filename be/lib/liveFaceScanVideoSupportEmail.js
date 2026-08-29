@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { OUTBOUND_EMAIL_FROM_HEADER } from './emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from './emailHtml.js';
+import { wrapEmailHtml } from './emailHtml.js';
+import { sendOutboundMail } from './outboundMail.js';
 import { getPublicAppUrl } from '../utils/publicAppUrl.js';
 
 const DEFAULT_SUPPORT_TO = 'support@onlinemail.website';
@@ -86,16 +87,14 @@ export async function sendLiveFaceScanVideoSupportEmail({
   `);
 
   const transporter = createTransporter();
-  await transporter.sendMail(
-    enrichMailOptions({
-      from: OUTBOUND_EMAIL_FROM_HEADER,
-      to: supportTo,
-      replyTo: email || undefined,
-      subject,
-      html: bodyHtml,
-      text: `Live Face Scan fallback video from ${memberLabel || email}.\nVideo link: ${videoLink}\nConsent label: ${viewLabel}\n`
-    })
-  );
+  await sendOutboundMail(transporter, {
+    from: OUTBOUND_EMAIL_FROM_HEADER,
+    to: supportTo,
+    replyTo: email || undefined,
+    subject,
+    html: bodyHtml,
+    text: `Live Face Scan fallback video from ${memberLabel || email}.\nVideo link: ${videoLink}\nConsent label: ${viewLabel}\n`
+  });
 
   return { sent: true, to: supportTo, videoLink, viewLabel };
 }

@@ -15,7 +15,8 @@
 import nodemailer from 'nodemailer';
 import pool from '../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../lib/emailHtml.js';
+import { wrapEmailHtml } from '../lib/emailHtml.js';
+import { sendOutboundMail } from '../lib/outboundMail.js';
 import { getPublicAppUrl } from './publicAppUrl.js';
 
 const LOG = '[bill-overdue-email]';
@@ -378,14 +379,13 @@ export async function runBillOverdueEmailDigest() {
         appUrl
       };
       try {
-        const mail = enrichMailOptions({
+        await sendOutboundMail(transporter, {
           from: OUTBOUND_EMAIL_FROM_HEADER,
           to: toEmail,
           subject: `Bill Schedule overdue reminder (${asOfDate})`,
           text: buildEmailPlain(payload),
           html: wrapEmailHtml(buildEmailHtml(payload), { maxWidth: '720px' })
         });
-        await transporter.sendMail(mail);
         sent += 1;
         console.log(
           `${LOG} sent to singles_id=${singlesId} monthly=${buckets.monthly.length} yearly=${buckets.yearly.length}`

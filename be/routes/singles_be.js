@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import pool from '../db/connection.js';
 import nodemailer from 'nodemailer';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../lib/emailHtml.js';
+import { wrapEmailHtml } from '../lib/emailHtml.js';
+import { sendOutboundMail } from '../lib/outboundMail.js';
 import { isAwsSmsConfigured, sendTransactionalSms } from '../lib/awsPinpointSms.js';
 import { generateSixDigitOtp, safeEqualOtp } from '../lib/smsOtp.js';
 import { DEFAULT_NEW_USER_THEME } from '../lib/defaultNewUserPreferences.js';
@@ -64,7 +65,7 @@ export const registerUser_FFFFFFFF = async (req, res) => {
       const expiresAt = Date.now() + TOKEN_EXPIRY_MS;
       await storeCreatePasswordToken(token, email, expiresAt);
       const createPasswordLink = `https://OnlineMall.Website/pages/createPassword?token=${token}&email=${encodeURIComponent(email)}`;
-      const mailOptions = enrichMailOptions({
+      const mailOptions = {
         from: OUTBOUND_EMAIL_FROM_HEADER,
         to: email,
         subject: 'Complete Your Registration - Create Password',
@@ -83,11 +84,11 @@ export const registerUser_FFFFFFFF = async (req, res) => {
               If you did not register for this account, please ignore this email.
             </p>
           `)
-      });
+      };
 
       // Send email
       try {
-        await transporter.sendMail(mailOptions);
+        await sendOutboundMail(transporter, mailOptions);
         console.log('Registration email sent to:', email);
       } catch (emailError) {
         console.error('Error sending email:', emailError);

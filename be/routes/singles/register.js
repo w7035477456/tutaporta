@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import pool from '../../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import { buildRegistrationEmailHtml } from '../../lib/registrationEmail.js';
 import { getPublicAppUrl } from '../../utils/publicAppUrl.js';
 import {
@@ -177,14 +177,12 @@ export async function registerUser(req, res) {
         });
         const verifyEmailUrl = buildRegistrationVerifyEmailUrl({ base, refRaw: refCode });
 
-        await transporter.sendMail(
-          enrichMailOptions({
-            from: OUTBOUND_EMAIL_FROM_HEADER,
-            to: emailTrimmed,
-            subject: 'Complete Your Registration - Create Password',
-            html: buildRegistrationEmailHtml({ code, createPasswordUrl, verifyEmailUrl })
-          })
-        );
+        await sendOutboundMail(transporter, {
+          from: OUTBOUND_EMAIL_FROM_HEADER,
+          to: emailTrimmed,
+          subject: 'Complete Your Registration - Create Password',
+          html: buildRegistrationEmailHtml({ code, createPasswordUrl, verifyEmailUrl })
+        });
         console.log('Registration email sent to:', emailTrimmed, '(code in link)');
       } catch (emailError) {
         console.error('Error in registration email step:', emailError);

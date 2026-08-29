@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 import pool from '../../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import {
   buildReferralInviteEmailHtml,
   buildReferralInviteEmailPlain,
@@ -90,25 +90,23 @@ export async function sendReferralInviteEmail(req, res) {
     });
 
     const transporter = createTransporter();
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: REFERRAL_EMAIL_FROM,
-        to: toEmail,
-        subject: 'Your friend invitation link - OnlineMall.Website',
-        text: buildReferralInviteEmailPlain({
-          memberGreeting,
-          referralUrl,
-          referCode,
-          forwardedMessage
-        }),
-        html: buildReferralInviteEmailHtml({
-          memberGreeting,
-          referralUrl,
-          referCode,
-          forwardedMessage
-        })
+    await sendOutboundMail(transporter, {
+      from: REFERRAL_EMAIL_FROM,
+      to: toEmail,
+      subject: 'Your friend invitation link - OnlineMall.Website',
+      text: buildReferralInviteEmailPlain({
+        memberGreeting,
+        referralUrl,
+        referCode,
+        forwardedMessage
+      }),
+      html: buildReferralInviteEmailHtml({
+        memberGreeting,
+        referralUrl,
+        referCode,
+        forwardedMessage
       })
-    );
+    });
 
     console.log(LOG_PREFIX, 'sent', { singlesId, toPrefix: `${toEmail.slice(0, 3)}***`, referCode });
     return res.json({ success: true, message: 'Invitation email sent. Check your inbox and forward it to your friend.' });

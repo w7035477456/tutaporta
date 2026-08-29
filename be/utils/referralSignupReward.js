@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer';
 import pool, { getDBSchema } from '../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../lib/emailHtml.js';
+import { wrapEmailHtml } from '../lib/emailHtml.js';
+import { sendOutboundMail } from '../lib/outboundMail.js';
 import { formatMemberDisplayCode } from './memberDisplayCode.js';
 import { DEFAULT_REFER_BY_CODE, isRewardEligibleReferByCode } from './referByCode.js';
 import { formatUserDateTime } from './userTimeZone.js';
@@ -307,14 +308,12 @@ async function sendReferrerRewardEmail({ referrerEmail, description, transaction
   );
 
   const transporter = createTransporter();
-  await transporter.sendMail(
-    enrichMailOptions({
-      from: OUTBOUND_EMAIL_FROM_HEADER,
-      to: referrerEmail,
-      subject: 'Referral reward: +1 token',
-      html
-    })
-  );
+  await sendOutboundMail(transporter, {
+    from: OUTBOUND_EMAIL_FROM_HEADER,
+    to: referrerEmail,
+    subject: 'Referral reward: +1 token',
+    html
+  });
 }
 
 async function sendRefereeRewardEmail({ newMemberEmail, description, transactionId, nextBalance }) {
@@ -338,14 +337,12 @@ async function sendRefereeRewardEmail({ newMemberEmail, description, transaction
   );
 
   const transporter = createTransporter();
-  await transporter.sendMail(
-    enrichMailOptions({
-      from: OUTBOUND_EMAIL_FROM_HEADER,
-      to: newMemberEmail,
-      subject: 'Welcome reward: +1 token',
-      html
-    })
-  );
+  await sendOutboundMail(transporter, {
+    from: OUTBOUND_EMAIL_FROM_HEADER,
+    to: newMemberEmail,
+    subject: 'Welcome reward: +1 token',
+    html
+  });
 }
 
 /**

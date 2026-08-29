@@ -3,7 +3,8 @@ import nodemailer from 'nodemailer';
 import pool from '../../db/connection.js';
 import { getPrivateKey } from '../../jwtKeys.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../../lib/emailHtml.js';
+import { wrapEmailHtml } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import { getAuthJwtExpiresInSeconds, setAuthCookie } from '../../utils/authCookie.js';
 import { startSingleLoginSession } from '../../utils/singleLoginSession.js';
 import { resolveCustomLogoutMinutes } from '../../utils/customLogoutDuration.js';
@@ -44,19 +45,17 @@ async function sendPasswordUpgradeNotificationEmail(emailNorm) {
   }
 
   const transporter = createTransporter();
-  await transporter.sendMail(
-    enrichMailOptions({
-      from: OUTBOUND_EMAIL_FROM_HEADER,
-      to: emailNorm,
-      subject: 'Your password was updated - OnlineMall.Website',
-      html: wrapEmailHtml(`
+  await sendOutboundMail(transporter, {
+    from: OUTBOUND_EMAIL_FROM_HEADER,
+    to: emailNorm,
+    subject: 'Your password was updated - OnlineMall.Website',
+    html: wrapEmailHtml(`
         <h2 style="color: #333;">Password updated</h2>
         <p>Your OnlineMall.Website account password was changed because you signed in with a temporary 6-digit password.</p>
         <p>If you did not make this change, please contact support immediately.</p>
         <p style="margin-top: 30px; color: #999; font-size: 12px;">This is an automated security notification.</p>
       `)
-    })
-  );
+  });
 }
 
 /**

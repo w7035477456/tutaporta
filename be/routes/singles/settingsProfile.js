@@ -12,7 +12,8 @@ import {
 } from '../../utils/aliasValidation.js';
 import nodemailer from 'nodemailer';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../../lib/emailHtml.js';
+import { wrapEmailHtml } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import {
   ApiError,
   CheckoutPaymentIntent,
@@ -60,6 +61,7 @@ const PROFILE_COLUMN_CANDIDATES = {
   mailing_middlename: ['mailing_middlename'],
   mailing_lastname: ['mailing_lastname'],
   email: ['email'],
+  alt_email: ['alt_email'],
   phone: ['phone', 'phone_num'],
   mailing_address: ['mailing_address'],
   mailing_street: ['mailing_street'],
@@ -830,14 +832,12 @@ function sendPaymentReceiptEmailFireAndForget({
         secure: false,
         auth: { user: smtpUser, pass: smtpPass }
       });
-      await transporter.sendMail(
-        enrichMailOptions({
-          from: OUTBOUND_EMAIL_FROM_HEADER,
-          to: PAYMENT_RECEIPT_TO_EMAIL,
-          subject: `Payment receipt${txnLabel ? ` (Txn ${txnLabel})` : ''}`,
-          html
-        })
-      );
+      await sendOutboundMail(transporter, {
+        from: OUTBOUND_EMAIL_FROM_HEADER,
+        to: PAYMENT_RECEIPT_TO_EMAIL,
+        subject: `Payment receipt${txnLabel ? ` (Txn ${txnLabel})` : ''}`,
+        html
+      });
     } catch (err) {
       console.error('[settingsProfile:paymentReceipt] sendMail failed:', err?.message || err);
     }
@@ -1968,6 +1968,7 @@ export async function getSettingsProfile(req, res) {
       mailing_middlename: cleanNullableText(row.mailing_middlename),
       mailing_lastname: cleanNullableText(row.mailing_lastname),
       email: cleanNullableText(row.email),
+      alt_email: cleanNullableText(row.alt_email),
       phone: cleanNullableText(row.phone),
       mailing_address: cleanNullableText(row.mailing_address),
       mailing_street: cleanNullableText(row.mailing_street),

@@ -23,6 +23,7 @@ import {
   sendSettingsChangePhoneSms,
   submitSettingsChangeEmail,
   submitSettingsChangePhone,
+  updateSettingsAltEmail,
   verifySettingsChangeEmailSms,
   verifySettingsChangePasswordSms,
   verifySettingsChangePhoneEmailCode,
@@ -1805,4 +1806,109 @@ ChangePhonePopup.propTypes = {
   onSuccess: PropTypes.func,
   email: PropTypes.string,
   phone: PropTypes.string
+};
+
+/** Add / change / remove singles.alt_email — every email sent to the main address is copied here. */
+export function AltEmailPopup({ open, onClose, onSuccess, email = '', altEmail = '' }) {
+  const [value, setValue] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const storedAltEmail = String(altEmail || '').trim().toLowerCase();
+  const mainEmail = String(email || '').trim().toLowerCase();
+  const normalized = value.trim().toLowerCase();
+  const isSameAsMain = Boolean(normalized) && normalized === mainEmail;
+  const canSave =
+    !submitting && isValidEmailFormat(normalized) && !isSameAsMain && normalized !== storedAltEmail;
+  const canRemove = !submitting && Boolean(storedAltEmail);
+
+  useEffect(() => {
+    if (!open) return;
+    setValue(altEmail || '');
+    setSubmitting(false);
+    setError('');
+  }, [open, altEmail]);
+
+  const submitValue = async (nextValue) => {
+    setSubmitting(true);
+    setError('');
+    try {
+      const data = await updateSettingsAltEmail(nextValue);
+      onSuccess?.(data);
+      onClose();
+    } catch (err) {
+      const formatted = formatSettingsAccountApiError(err, 'Failed to save Alt/2nd Email.');
+      setError(formatted.error);
+      setSubmitting(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (submitting) return;
+    onClose();
+  };
+
+  return (
+    <ColorTemplate7PopupLargeDark
+      open={open}
+      onClose={submitting ? undefined : handleClose}
+      closeOnBackdrop={!submitting}
+      showCloseButton={!submitting}
+    >
+      <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
+        <ColorTemplate7PopupLargeDark.Title>Alt/2nd Email</ColorTemplate7PopupLargeDark.Title>
+        <ColorTemplate7PopupLargeDark.BodyText>
+          Every email we send to your main address{mainEmail ? ` (${mainEmail})` : ''} is also copied
+          to this address. Leave it empty to receive mail at your main address only.
+        </ColorTemplate7PopupLargeDark.BodyText>
+
+        <ColorTemplate7PopupLargeDark.FormRows>
+          <ColorTemplate7PopupLargeDark.FormRow label="Alt/2nd Email">
+            <ColorTemplate7PopupLargeDark.Input
+              formRow
+              size="small"
+              type="email"
+              placeholder="name@example.com"
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setError('');
+              }}
+              disabled={submitting}
+            />
+          </ColorTemplate7PopupLargeDark.FormRow>
+        </ColorTemplate7PopupLargeDark.FormRows>
+
+        {isSameAsMain ? (
+          <ColorTemplate7PopupLargeDark.BodyText>
+            This is already your main email. Enter a different address.
+          </ColorTemplate7PopupLargeDark.BodyText>
+        ) : null}
+
+        <Stack direction="row" spacing={1.5} justifyContent="flex-end" flexWrap="wrap">
+          {canRemove ? (
+            <ColorTemplate13UsableGreenButton onClick={() => void submitValue('')}>
+              Remove
+            </ColorTemplate13UsableGreenButton>
+          ) : null}
+          <ColorTemplate7PopupLargeDark.ActionButton
+            disabled={!canSave}
+            onClick={() => void submitValue(normalized)}
+          >
+            {submitting ? 'Saving…' : 'Save'}
+          </ColorTemplate7PopupLargeDark.ActionButton>
+        </Stack>
+
+        {error ? <ColorTemplate7PopupLargeDark.ErrorBar>{error}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
+      </ColorTemplate7PopupLargeDark.Body>
+    </ColorTemplate7PopupLargeDark>
+  );
+}
+
+AltEmailPopup.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onSuccess: PropTypes.func,
+  email: PropTypes.string,
+  altEmail: PropTypes.string
 };

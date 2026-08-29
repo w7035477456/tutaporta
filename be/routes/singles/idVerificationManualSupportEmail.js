@@ -1,7 +1,8 @@
 import nodemailer from 'nodemailer';
 import pool from '../../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_ADDRESS, OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../../lib/emailHtml.js';
+import { wrapEmailHtml } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import { loadProfilePhotoBytes } from '../../utils/loadProfilePhotoBytes.js';
 import { prepareGovIdImageBytes } from '../../utils/prepareGovIdImageBytes.js';
 
@@ -271,16 +272,14 @@ export async function postIdVerificationManualSupportEmail(req, res) {
     `);
 
     const transporter = createTransporter();
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: SUPPORT_TO,
-        replyTo: email !== '—' ? email : undefined,
-        subject,
-        html: bodyHtml,
-        attachments
-      })
-    );
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: SUPPORT_TO,
+      replyTo: email !== '—' ? email : undefined,
+      subject,
+      html: bodyHtml,
+      attachments
+    });
 
     return res.json({ success: true, message: 'Support has been notified for manual review.' });
   } catch (err) {

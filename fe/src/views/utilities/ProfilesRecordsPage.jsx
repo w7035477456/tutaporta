@@ -37,7 +37,12 @@ import ProfilesRecordsInviteFriendsTab from './ProfilesRecordsInviteFriendsTab';
 import ProfilesRecordsReferEmailTab from './ProfilesRecordsReferEmailTab';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
 import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
-import { ChangeEmailPopup, ChangePasswordPopup, ChangePhonePopup } from './ProfilesRecordsAccountPopups';
+import {
+  AltEmailPopup,
+  ChangeEmailPopup,
+  ChangePasswordPopup,
+  ChangePhonePopup
+} from './ProfilesRecordsAccountPopups';
 import ProfilesRecordsAutoLogout from './ProfilesRecordsAutoLogout';
 import {
   ProfilePhotoChangeConfirmDialog,
@@ -369,6 +374,8 @@ export default function ProfilesRecordsPage({
   const [phoneChangeNotice, setPhoneChangeNotice] = useState('');
   const [changePhoneOpen, setChangePhoneOpen] = useState(false);
   const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+  const [altEmailOpen, setAltEmailOpen] = useState(false);
+  const [altEmail, setAltEmail] = useState('');
   const [lastPasswordChangeDate, setLastPasswordChangeDate] = useState(null);
   const [lastEmailChangeDate, setLastEmailChangeDate] = useState(null);
   const [lastPhoneChangeDate, setLastPhoneChangeDate] = useState(null);
@@ -437,6 +444,7 @@ export default function ProfilesRecordsPage({
       setTokenBalanceFromDb(Number.isFinite(Number(p.token_balance)) ? Number(p.token_balance) : 0);
       setProfileImageFk(p.profile_image_fk ?? null);
       setMyReferCode(String(p.my_refer_code ?? '').trim());
+      setAltEmail(p.alt_email ?? '');
       setLastPasswordChangeDate(p.last_password_change_date ?? null);
       setLastEmailChangeDate(p.last_email_change_date ?? null);
       setLastPhoneChangeDate(p.last_phone_change_date ?? null);
@@ -522,6 +530,7 @@ export default function ProfilesRecordsPage({
   );
   const profileDisplayPhone = String(profileForm.phone || user?.phone || '').trim();
   const profileDisplayEmail = String(profileForm.email || user?.email || '').trim();
+  const profileDisplayAltEmail = String(altEmail || '').trim();
   const profileCurrentValueSx = {
     ...textFontSx,
     color: pageTextColor,
@@ -1007,6 +1016,13 @@ export default function ProfilesRecordsPage({
           setEmailChangeNotice(CHANGE_SUCCESS_MESSAGE);
         }}
       />
+      <AltEmailPopup
+        open={altEmailOpen}
+        onClose={() => setAltEmailOpen(false)}
+        email={profileForm.email || user?.email || ''}
+        altEmail={altEmail}
+        onSuccess={(data) => setAltEmail(data?.alt_email || '')}
+      />
       <ProfilePhotoChangeWaitDialog
         open={profilePhotoEditWaitOpen}
         onClose={() => setProfilePhotoEditWaitOpen(false)}
@@ -1211,6 +1227,17 @@ export default function ProfilesRecordsPage({
                           <Typography className="change-success-notice" sx={changeSuccessNoticeSx}>
                             {emailChangeNotice}
                           </Typography>
+                        ) : null}
+                      </Box>
+                      <Typography sx={{ textAlign: { xs: 'left', sm: 'right' }, whiteSpace: 'nowrap' }}>
+                        Alt/2nd Email:
+                      </Typography>
+                      <Box sx={profileActionRowSx}>
+                        <GreenButton onClick={() => setAltEmailOpen(true)} sx={{ flexShrink: 0 }}>
+                          Click here
+                        </GreenButton>
+                        {profileDisplayAltEmail ? (
+                          <Typography sx={profileCurrentValueSx}>{profileDisplayAltEmail}</Typography>
                         ) : null}
                       </Box>
                       <ProfilesRecordsAutoLogout pageTextColor={pageTextColor} textFontSx={textFontSx} />

@@ -95,6 +95,7 @@ import {
   verifySettingsChangeEmailSms,
   submitSettingsChangeEmail,
   completeSettingsChangeEmail,
+  updateSettingsAltEmail,
   changeSettingsEmail,
   changeSettingsPhone,
   submitSettingsChangePhone,
@@ -1685,6 +1686,7 @@ app.post('/api/settings/changeEmail/sendSms', requireAuth, sendSettingsChangeEma
 app.post('/api/settings/changeEmail/verifySms', requireAuth, verifySettingsChangeEmailSms);
 app.post('/api/settings/changeEmail/submit', requireAuth, submitSettingsChangeEmail);
 app.post('/api/settings/changeEmail/complete', requireAuth, completeSettingsChangeEmail);
+app.put('/api/settings/altEmail', requireAuth, updateSettingsAltEmail);
 app.post('/api/settings/changePhone', requireAuth, changeSettingsPhone);
 app.post('/api/settings/changePhone/submit', requireAuth, submitSettingsChangePhone);
 app.post('/api/settings/changePhone/verifyEmailCode', requireAuth, verifySettingsChangePhoneEmailCode);

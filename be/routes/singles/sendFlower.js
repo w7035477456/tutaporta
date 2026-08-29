@@ -4,7 +4,8 @@ import path from 'path';
 import nodemailer from 'nodemailer';
 import pool, { getDBSchema } from '../../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../../lib/emailHtml.js';
+import { wrapEmailHtml } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 
 const FLORIST_ONE_DEFAULT_BASE_URL = 'https://www.floristone.com/api/rest';
 const FLORIST_ONE_DEFAULT_PRODUCTS_PATH = '/flowershop/getproducts';
@@ -917,26 +918,22 @@ function sendGiftNotificationEmailsFireAndForget({
       const jobs = [];
       if (senderEmail) {
         jobs.push(
-          transporter.sendMail(
-            enrichMailOptions({
-              from: OUTBOUND_EMAIL_FROM_HEADER,
-              to: senderEmail,
-              subject: 'Your flower gift is on the way',
-              html: senderHtml
-            })
-          )
+          sendOutboundMail(transporter, {
+            from: OUTBOUND_EMAIL_FROM_HEADER,
+            to: senderEmail,
+            subject: 'Your flower gift is on the way',
+            html: senderHtml
+          })
         );
       }
       if (recipientEmail) {
         jobs.push(
-          transporter.sendMail(
-            enrichMailOptions({
-              from: OUTBOUND_EMAIL_FROM_HEADER,
-              to: recipientEmail,
-              subject: 'A flower gift has been sent to you',
-              html: recipientHtml
-            })
-          )
+          sendOutboundMail(transporter, {
+            from: OUTBOUND_EMAIL_FROM_HEADER,
+            to: recipientEmail,
+            subject: 'A flower gift has been sent to you',
+            html: recipientHtml
+          })
         );
       }
       await Promise.all(jobs);

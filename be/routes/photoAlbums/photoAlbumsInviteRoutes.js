@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 import pool from '../../db/connection.js';
 import { getDBSchema } from '../../config/envConfig.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import {
   buildPhotoAlbumsInviteAcceptUrl,
   buildPhotoAlbumsInviteEmailHtml,
@@ -264,25 +264,23 @@ export async function createPhotoAlbumsInvite(req, res) {
     const acceptUrl = buildPhotoAlbumsInviteAcceptUrl(getPublicAppUrl(), inviteRow.invite_token || inviteToken);
     const ownerName = ownerDisplayName(owner);
     const transporter = createTransporter();
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: inviteeEmail,
-        subject: `${ownerName} shared a photo album with you — OnlineMall.Website`,
-        text: buildPhotoAlbumsInviteEmailPlain({
-          ownerDisplayName: ownerName,
-          albumSetName,
-          albumName,
-          acceptUrl
-        }),
-        html: buildPhotoAlbumsInviteEmailHtml({
-          ownerDisplayName: ownerName,
-          albumSetName,
-          albumName,
-          acceptUrl
-        })
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: inviteeEmail,
+      subject: `${ownerName} shared a photo album with you — OnlineMall.Website`,
+      text: buildPhotoAlbumsInviteEmailPlain({
+        ownerDisplayName: ownerName,
+        albumSetName,
+        albumName,
+        acceptUrl
+      }),
+      html: buildPhotoAlbumsInviteEmailHtml({
+        ownerDisplayName: ownerName,
+        albumSetName,
+        albumName,
+        acceptUrl
       })
-    );
+    });
 
     console.log(LOG_PREFIX, 'sent', { singlesId, noteId, inviteePrefix: `${inviteeEmail.slice(0, 3)}***` });
     return res.json({

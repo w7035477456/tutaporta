@@ -7,7 +7,8 @@ import {
   sendTwilioVerificationSms
 } from '../../lib/twilioVerifySms.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../../lib/emailHtml.js';
+import { wrapEmailHtml } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import {
   PASSWORD_ATTEMPT_EPOCH,
   verifyCurrentPasswordWithAttemptTracking
@@ -472,13 +473,12 @@ export async function requestSettingsEmailChange(req, res) {
     const confirmUrl = `${getPublicAppUrl()}/pages/confirmEmailChange?email=${encodeURIComponent(newEmailNorm)}&code=${encodeURIComponent(code)}`;
     const transporter = createTransporter();
 
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: newEmailNorm,
-        cc: oldEmail,
-        subject: 'Confirm your new email - OnlineMall.Website',
-        html: wrapEmailHtml(`
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: newEmailNorm,
+      cc: oldEmail,
+      subject: 'Confirm your new email - OnlineMall.Website',
+      html: wrapEmailHtml(`
           <h2 style="color: #333;">Confirm your new email</h2>
           <p>We received a request to change the email on your OnlineMall.Website account to <strong>${newEmailNorm}</strong>.</p>
           <p style="margin: 20px 0;">
@@ -489,8 +489,7 @@ export async function requestSettingsEmailChange(req, res) {
           <p style="margin-top: 20px; font-size: 14px;">Your confirmation code: <strong>${code}</strong></p>
           <p style="margin-top: 30px; color: #999; font-size: 12px;">If you did not request this change, you can ignore this email. Your current email remains unchanged.</p>
         `)
-      })
-    );
+    });
 
     return res.json({
       success: true,
@@ -1113,20 +1112,18 @@ export async function submitSettingsChangeEmail(req, res) {
     );
 
     const transporter = createTransporter();
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: newEmailNorm,
-        subject: 'Your email change verification code - OnlineMall.Website',
-        html: wrapEmailHtml(`
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: newEmailNorm,
+      subject: 'Your email change verification code - OnlineMall.Website',
+      html: wrapEmailHtml(`
           <h2 style="color: #333;">Confirm your new email</h2>
           <p>We received a request to change the email on your OnlineMall.Website account to <strong>${newEmailNorm}</strong>.</p>
           <p style="margin: 20px 0; font-size: 24px; letter-spacing: 4px;"><strong>${code}</strong></p>
           <p>Enter this 6-digit code in the Change Email popup to finish updating your email address.</p>
           <p style="margin-top: 30px; color: #999; font-size: 12px;">If you did not request this change, you can ignore this email. Your current email remains unchanged.</p>
         `)
-      })
-    );
+    });
     await client.query('COMMIT');
 
     return res.json({
@@ -1461,20 +1458,18 @@ export async function submitSettingsChangePhone(req, res) {
 
     const transporter = createTransporter();
     const newPhoneDisplay = formatPhoneForDisplay(newPhoneStored);
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: accountEmailNorm,
-        subject: 'Your phone change verification code - OnlineMall.Website',
-        html: wrapEmailHtml(`
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: accountEmailNorm,
+      subject: 'Your phone change verification code - OnlineMall.Website',
+      html: wrapEmailHtml(`
           <h2 style="color: #333;">Confirm your phone change</h2>
           <p>We received a request to change the phone number on your OnlineMall.Website account to <strong>${newPhoneDisplay}</strong>.</p>
           <p style="margin: 20px 0; font-size: 24px; letter-spacing: 4px;"><strong>${code}</strong></p>
           <p>Enter this 6-digit code in the Change Phone popup to continue updating your phone number.</p>
           <p style="margin-top: 30px; color: #999; font-size: 12px;">If you did not request this change, you can ignore this email. Your current phone number remains unchanged.</p>
         `)
-      })
-    );
+    });
     await client.query('COMMIT');
 
     return res.json({
@@ -1706,5 +1701,49 @@ export async function verifySettingsChangePhoneSms(req, res) {
     return res.status(500).json({ error: 'Failed to verify SMS code.' });
   } finally {
     client.release();
+  }
+}
+
+/**
+ * PUT /api/settings/altEmail — body: { altEmail }
+ * Empty/null clears it. While set, outbound mail to the account email is copied here.
+ */
+export async function updateSettingsAltEmail(req, res) {
+  const singlesId = Number(req.auth?.singles_id);
+  if (!Number.isFinite(singlesId) || singlesId < 1) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const raw = String(req.body?.altEmail ?? '').trim();
+  const altEmail = raw ? normalizeEmailForDb(raw) : null;
+  if (raw && !isValidEmail(raw)) {
+    return res.status(400).json({ error: 'Enter a valid email address.' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE helloworldjunktest.singles
+          SET alt_email = $1,
+              updated_at = CURRENT_TIMESTAMP
+        WHERE singles_id = $2
+          AND ($1::text IS NULL OR LOWER(email) <> $1::text)
+        RETURNING alt_email`,
+      [altEmail, singlesId]
+    );
+
+    if (!rows.length) {
+      return res.status(400).json({
+        error: 'Your Alt/2nd Email must be different from your main email.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      alt_email: rows[0].alt_email || null,
+      message: altEmail ? 'Alt/2nd Email saved.' : 'Alt/2nd Email removed.'
+    });
+  } catch (err) {
+    console.error('[settingsAccount:updateAltEmail]', err);
+    return res.status(500).json({ error: 'Failed to save Alt/2nd Email.' });
   }
 }

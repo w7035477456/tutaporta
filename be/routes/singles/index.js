@@ -117,7 +117,8 @@ export {
   sendSettingsChangeEmailSms,
   verifySettingsChangeEmailSms,
   submitSettingsChangeEmail,
-  completeSettingsChangeEmail
+  completeSettingsChangeEmail,
+  updateSettingsAltEmail
 } from './settingsAccount.js';
 export { sendReferralInviteEmail } from './sendReferralInviteEmail.js';
 export { getPromotionalMessages } from './getPromotionalMessages.js';

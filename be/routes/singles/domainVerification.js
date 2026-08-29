@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 import pool from '../../db/connection.js';
 import { buildDomainVerificationEmailHtml } from '../../lib/domainVerificationEmail.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
-import { enrichMailOptions } from '../../lib/emailHtml.js';
+import { sendOutboundMail } from '../../lib/outboundMail.js';
 import { loadTableColumns, resolveBioSchema, sqlIdent, upsertBioRow } from './checkrBioReviewDb.js';
 import { setVetBioVerificationStatus } from '../../utils/vetBioVerificationServices.js';
 import { trackUserSearchEvent } from '../../utils/userActivityStats.js';
@@ -166,14 +166,12 @@ export async function sendDomainVerificationCode(req, res) {
       }
     });
 
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: companyEmail,
-        subject: 'Your company domain verification code',
-        html: buildDomainVerificationEmailHtml({ code, companyEmail })
-      })
-    );
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: companyEmail,
+      subject: 'Your company domain verification code',
+      html: buildDomainVerificationEmailHtml({ code, companyEmail })
+    });
 
     return res.json({
       success: true,

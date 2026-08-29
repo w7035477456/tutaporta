@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import pool from '../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from '../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../lib/emailHtml.js';
+import { wrapEmailHtml } from '../lib/emailHtml.js';
+import { sendOutboundMail } from '../lib/outboundMail.js';
 import { normalizeEmailForDb } from '../utils/normalizeEmailForDb.js';
 
 const CODE_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -97,12 +98,11 @@ export async function requestPasswordReset(req, res) {
       const base = getPublicAppUrl();
       const resetUrl = `${base}/pages/resetPassword?email=${encodeURIComponent(emailNorm)}&code=${encodeURIComponent(code)}`;
 
-      await transporter.sendMail(
-        enrichMailOptions({
-          from: OUTBOUND_EMAIL_FROM_HEADER,
-          to: emailNorm,
-          subject: 'Reset Your Password - OnlineMall.Website',
-          html: wrapEmailHtml(`
+      await sendOutboundMail(transporter, {
+        from: OUTBOUND_EMAIL_FROM_HEADER,
+        to: emailNorm,
+        subject: 'Reset Your Password - OnlineMall.Website',
+        html: wrapEmailHtml(`
             <h2 style="color: #333;">Password reset</h2>
             <p>We received a request to reset your password. Use the code below and click the button, or open the link.</p>
             <p style="margin: 20px 0; font-size: 24px; font-weight: bold; letter-spacing: 4px;">${code}</p>
@@ -113,8 +113,7 @@ export async function requestPasswordReset(req, res) {
             <p style="color: #666; word-break: break-all;">${resetUrl}</p>
             <p style="margin-top: 30px; color: #999; font-size: 12px;">If you did not request this, you can ignore this email.</p>
           `)
-        })
-      );
+      });
       console.log('[requestPasswordReset] email sent to:', emailNorm);
     } catch (emailError) {
       console.error('[requestPasswordReset] sendMail error:', emailError);

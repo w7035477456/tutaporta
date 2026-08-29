@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { OUTBOUND_EMAIL_FROM_ADDRESS, OUTBOUND_EMAIL_FROM_HEADER } from '../lib/emailFrom.js';
-import { enrichMailOptions, wrapEmailHtml } from '../lib/emailHtml.js';
+import { wrapEmailHtml } from '../lib/emailHtml.js';
+import { sendOutboundMail } from '../lib/outboundMail.js';
 
 const SUPPORT_TO = OUTBOUND_EMAIL_FROM_ADDRESS;
 const MAX_ATTACHMENTS = 2;
@@ -116,14 +117,13 @@ export async function postSupportMessage(req, res) {
     const safeEmail = escapeHtml(emailNorm);
     const safeMessage = escapeHtml(message).replace(/\n/g, '<br />');
 
-    await transporter.sendMail(
-      enrichMailOptions({
-        from: OUTBOUND_EMAIL_FROM_HEADER,
-        to: SUPPORT_TO,
-        cc: emailNorm,
-        replyTo: `"${name.replace(/"/g, '')}" <${emailNorm}>`,
-        subject: `Support message from ${name}`,
-        html: wrapEmailHtml(`
+    await sendOutboundMail(transporter, {
+      from: OUTBOUND_EMAIL_FROM_HEADER,
+      to: SUPPORT_TO,
+      cc: emailNorm,
+      replyTo: `"${name.replace(/"/g, '')}" <${emailNorm}>`,
+      subject: `Support message from ${name}`,
+      html: wrapEmailHtml(`
           <h2 style="color: #333;">Leave us a message</h2>
           <p><strong>Name:</strong> ${safeName}</p>
           <p><strong>Email:</strong> ${safeEmail}</p>
@@ -131,9 +131,8 @@ export async function postSupportMessage(req, res) {
           <p style="white-space: pre-wrap;">${safeMessage}</p>
           ${attachments.length ? `<p style="color: #666; font-size: 12px;">${attachments.length} attachment(s) included.</p>` : ''}
         `),
-        attachments
-      })
-    );
+      attachments
+    });
 
     return res.json({ success: true, message: 'Your message was sent. A copy was emailed to you.' });
   } catch (err) {
