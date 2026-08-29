@@ -3209,6 +3209,7 @@ export default function MyStory() {
         open={showNicknameDialog || suggestListOpen}
         initialNickname={profileBasics.alias || user?.alias || ''}
         excludeFirstName={user?.firstname || user?.first_name || user?.mailing_firstname || ''}
+        genderSelfReport={user?.gender_self_report}
         onSaved={handleNicknameSaved}
         dismissible={suggestListOpen}
         onClose={() => {

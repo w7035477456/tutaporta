@@ -273,6 +273,70 @@ export function buildRhymingNickname(adjective, firstName, suffixDigits = '') {
   return `${adj}${name}${String(suffixDigits || '').replace(/[^0-9]/g, '')}`.slice(0, 80);
 }
 
+const NICKNAME_GENDER_PREFERENCE_KEY = 'nicknamePickerGenderPreference';
+
+/** First female/male name click in this browser session (female | male). */
+export function readNicknameGenderPreference() {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const v = String(sessionStorage.getItem(NICKNAME_GENDER_PREFERENCE_KEY) || '').trim();
+    return v === 'female' || v === 'male' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setNicknameGenderPreferenceOnce(gender) {
+  if (gender !== 'female' && gender !== 'male') return;
+  if (readNicknameGenderPreference()) return;
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(NICKNAME_GENDER_PREFERENCE_KEY, gender);
+  } catch {
+    // ignore
+  }
+}
+
+/** Map singles.gender_self_report ('M'|'F') to nickname name-list gender. */
+export function genderSelfReportToNicknameGender(genderSelfReport) {
+  const g = String(genderSelfReport ?? '')
+    .trim()
+    .toUpperCase();
+  if (g === 'M') return 'male';
+  if (g === 'F') return 'female';
+  return null;
+}
+
+/** Prefer profile gender from login popup, then first female/male name click this session. */
+export function resolveNicknameSuggestGender({ genderSelfReport } = {}) {
+  return genderSelfReportToNicknameGender(genderSelfReport) || readNicknameGenderPreference() || 'any';
+}
+
+/** Random adjective + matching first name; gender from first name-column pick, else any. */
+export function generateRandomRhymingNickname({ gender = 'any', excludeFirstName = '' } = {}) {
+  const adjectives = listNicknameAdjectives();
+  const exclude = titleCaseWord(excludeFirstName).toLowerCase();
+  const resolvedGender = gender === 'female' || gender === 'male' ? gender : 'any';
+
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const letter = firstLetterKey(adj);
+    if (!letter) continue;
+
+    const matchingNames = listNicknameFirstNames({ gender: resolvedGender }).filter(
+      (name) => firstLetterKey(name) === letter && name.toLowerCase() !== exclude
+    );
+    if (!matchingNames.length) continue;
+
+    const firstName = matchingNames[Math.floor(Math.random() * matchingNames.length)];
+    const built = buildRhymingNickname(adj, firstName);
+    if (built && isValidRhymingNickname(built, { excludeFirstName, adjectives, firstNames: listNicknameFirstNames() })) {
+      return built;
+    }
+  }
+  return '';
+}
+
 export function wordsShareFirstLetter(a, b) {
   const la = firstLetterKey(a);
   const lb = firstLetterKey(b);

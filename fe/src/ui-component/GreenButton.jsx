@@ -5,10 +5,12 @@ import { greenButtonSx, GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
 /**
  * Green action button — UnSelectedButtonTemplate + BSIZE label, black border/text,
  * green when enabled / grey when disabled, single-line label width, 25% hover scale.
+ *
+ * hoverTopmost (default true): on hover, raise z-index so the scaled button stays above neighbors.
  */
-export default function GreenButton({ sx, singleLineLabel = true, children, ...rest }) {
+export default function GreenButton({ sx, singleLineLabel = true, hoverTopmost = true, children, ...rest }) {
   const mergedSx = (theme) => {
-    const base = greenButtonSx();
+    const base = greenButtonSx({ hoverTopmost });
     const extra = typeof sx === 'function' ? sx(theme) : sx || {};
     return { ...base, ...extra };
   };
@@ -31,6 +33,7 @@ export default function GreenButton({ sx, singleLineLabel = true, children, ...r
 GreenButton.propTypes = {
   sx: PropTypes.oneOfType([PropTypes.object, PropTypes.func]),
   singleLineLabel: PropTypes.bool,
+  hoverTopmost: PropTypes.bool,
   children: PropTypes.node
 };
 

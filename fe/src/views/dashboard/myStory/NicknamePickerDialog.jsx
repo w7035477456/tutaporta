@@ -16,9 +16,20 @@ import {
   NICKNAME_ADJECTIVE_GROUPS,
   listNicknameAdjectives,
   nicknameFirstLetterKey,
-  titleCaseNicknameWord
+  titleCaseNicknameWord,
+  setNicknameGenderPreferenceOnce,
+  resolveNicknameSuggestGender,
+  generateRandomRhymingNickname
 } from 'config/nicknameSuggestions';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
+import GreenButton from 'ui-component/GreenButton';
+import {
+  COLOR_TEMPLATE7_POPUP_ACTION_GREEN,
+  COLOR_TEMPLATE7_POPUP_INPUT_HEIGHT,
+  COLOR_TEMPLATE7_POPUP_INPUT_WIDTH
+} from 'config/colorTemplate7PopupLargeDark';
+import { greenButtonHoverScaleRaiseSx } from 'config/greenButton';
+import { YELLOW_BUTTON_TEMPLATE_BG, YELLOW_BUTTON_TEMPLATE_TEXT } from 'config/yellowButtonTemplate';
 
 function AdjectiveChips({ items, letterFilter, onPick }) {
   const filtered = letterFilter
@@ -70,7 +81,7 @@ function AdjectivesSection({ letterFilter, onPick }) {
   );
 }
 
-function NameChips({ names, letterFilter, onPick }) {
+function NameChips({ names, letterFilter, gender, onPick }) {
   const filtered = letterFilter
     ? names.filter((name) => nicknameFirstLetterKey(name) === letterFilter)
     : names;
@@ -84,7 +95,7 @@ function NameChips({ names, letterFilter, onPick }) {
   return (
     <Box sx={{ lineHeight: 1.55 }}>
       {filtered.map((name) => (
-        <ColorTemplate7PopupLargeDark.Link key={name} onClick={() => onPick(name)}>
+        <ColorTemplate7PopupLargeDark.Link key={name} onClick={() => onPick(name, { gender })}>
           {name}
         </ColorTemplate7PopupLargeDark.Link>
       ))}
@@ -92,7 +103,60 @@ function NameChips({ names, letterFilter, onPick }) {
   );
 }
 
-function GenderColumn({ title, nameKey, letterFilter, onPick }) {
+const NICKNAME_INPUT_WIDTH = `calc(${COLOR_TEMPLATE7_POPUP_INPUT_WIDTH} / 2)`;
+
+/** Popup content Box forces form-row inputs to 40ch — override with !important. */
+const nicknameInputHalfWidthSx = {
+  '& .MuiTextField-root.color-template7-popup-form-row-input:not(.color-template7-popup-form-row-input-stretch)': {
+    width: `${NICKNAME_INPUT_WIDTH} !important`,
+    maxWidth: `${NICKNAME_INPUT_WIDTH} !important`,
+    minWidth: NICKNAME_INPUT_WIDTH,
+    flex: '0 0 auto !important',
+    mx: '0 !important',
+    alignSelf: 'center'
+  }
+};
+
+const nicknameRowButtonHeightSx = {
+  height: COLOR_TEMPLATE7_POPUP_INPUT_HEIGHT,
+  minHeight: COLOR_TEMPLATE7_POPUP_INPUT_HEIGHT,
+  py: 0,
+  lineHeight: 1,
+  boxShadow: 'none',
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  minWidth: 0
+};
+
+const nicknameSuggestAnotherButtonSx = {
+  ...nicknameRowButtonHeightSx,
+  bgcolor: `${YELLOW_BUTTON_TEMPLATE_BG} !important`,
+  color: `${YELLOW_BUTTON_TEMPLATE_TEXT} !important`,
+  WebkitTextFillColor: `${YELLOW_BUTTON_TEMPLATE_TEXT} !important`,
+  border: '1px solid #000000 !important',
+  ...greenButtonHoverScaleRaiseSx({
+    bgcolor: `${YELLOW_BUTTON_TEMPLATE_BG} !important`,
+    color: `${YELLOW_BUTTON_TEMPLATE_TEXT} !important`,
+    WebkitTextFillColor: `${YELLOW_BUTTON_TEMPLATE_TEXT} !important`,
+    border: '1px solid #000000 !important'
+  })
+};
+
+const nicknameSaveButtonSx = {
+  ...nicknameRowButtonHeightSx,
+  bgcolor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  border: '1px solid #000000 !important',
+  ...greenButtonHoverScaleRaiseSx({
+    bgcolor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important',
+    border: '1px solid #000000 !important'
+  })
+};
+
+function GenderColumn({ title, nameKey, letterFilter, gender, onPick }) {
   return (
     <Box sx={{ flex: 1, minWidth: 0 }}>
       <ColorTemplate7PopupLargeDark.SectionTitle>{title}</ColorTemplate7PopupLargeDark.SectionTitle>
@@ -100,7 +164,7 @@ function GenderColumn({ title, nameKey, letterFilter, onPick }) {
         <Box key={`${nameKey}-${group.key}`} sx={{ mb: 2 }}>
           <ColorTemplate7PopupLargeDark.SectionLabel>{group.label}</ColorTemplate7PopupLargeDark.SectionLabel>
           <ColorTemplate7PopupLargeDark.SectionDescription>{group.description}</ColorTemplate7PopupLargeDark.SectionDescription>
-          <NameChips names={group[nameKey]} letterFilter={letterFilter} onPick={onPick} />
+          <NameChips names={group[nameKey]} letterFilter={letterFilter} gender={gender} onPick={onPick} />
         </Box>
       ))}
     </Box>
@@ -113,7 +177,8 @@ export default function NicknamePickerDialog({
   onSaved,
   onClose,
   dismissible = false,
-  excludeFirstName = ''
+  excludeFirstName = '',
+  genderSelfReport = null
 }) {
   const [nickname, setNickname] = useState(initialNickname);
   const [pendingAdjective, setPendingAdjective] = useState('');
@@ -135,10 +200,14 @@ export default function NicknamePickerDialog({
   const letterFilter = nicknameFirstLetterKey(pendingAdjective) || null;
 
   const handlePickWord = useCallback(
-    (word) => {
+    (word, meta) => {
       setError('');
       const clean = titleCaseNicknameWord(word);
       const isAdjective = adjectiveSet.has(clean.toLowerCase());
+
+      if (meta?.gender === 'female' || meta?.gender === 'male') {
+        setNicknameGenderPreferenceOnce(meta.gender);
+      }
 
       if (!pendingAdjective && isAdjective) {
         setPendingAdjective(clean);
@@ -217,6 +286,21 @@ export default function NicknamePickerDialog({
     }
   }, [nickname, onSaved, dismissible, excludeFirstName]);
 
+  const handleSuggestAnother = useCallback(() => {
+    setError('');
+    const gender = resolveNicknameSuggestGender({ genderSelfReport });
+    const next = generateRandomRhymingNickname({
+      gender,
+      excludeFirstName
+    });
+    if (!next) {
+      setError('Could not suggest a nickname. Pick an adjective and first name, or try again.');
+      return;
+    }
+    setNickname(next);
+    setPendingAdjective('');
+  }, [excludeFirstName, genderSelfReport]);
+
   const hasCloseHandler = typeof onClose === 'function';
 
   return (
@@ -244,15 +328,17 @@ export default function NicknamePickerDialog({
             display: 'flex',
             flexDirection: { xs: 'column', sm: 'row' },
             alignItems: { xs: 'stretch', sm: 'center' },
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             gap: 1.5,
-            width: '100%'
+            width: '100%',
+            ...nicknameInputHalfWidthSx
           }}
         >
-          <ColorTemplate7PopupLargeDark.SectionLabel sx={{ whiteSpace: 'nowrap', mt: 0 }}>
+          <ColorTemplate7PopupLargeDark.SectionLabel sx={{ whiteSpace: 'nowrap', mt: 0, flexShrink: 0 }}>
             Nick name or alias:
           </ColorTemplate7PopupLargeDark.SectionLabel>
           <ColorTemplate7PopupLargeDark.Input
+            formRow
             value={nickname}
             onChange={(e) => {
               setNickname(e.target.value);
@@ -260,10 +346,31 @@ export default function NicknamePickerDialog({
               setError('');
             }}
             disabled={saving}
+            sx={{
+              width: `${NICKNAME_INPUT_WIDTH} !important`,
+              maxWidth: `${NICKNAME_INPUT_WIDTH} !important`,
+              flex: '0 0 auto !important',
+              mx: '0 !important'
+            }}
           />
-          <ColorTemplate7PopupLargeDark.ActionButton onClick={() => void handleSave()} disabled={saving}>
+          <GreenButton
+            type="button"
+            onClick={handleSuggestAnother}
+            disabled={saving}
+            singleLineLabel
+            sx={nicknameSuggestAnotherButtonSx}
+          >
+            Suggest Another
+          </GreenButton>
+          <GreenButton
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            singleLineLabel
+            sx={nicknameSaveButtonSx}
+          >
             {saving ? 'Saving...' : 'Save'}
-          </ColorTemplate7PopupLargeDark.ActionButton>
+          </GreenButton>
         </Box>
 
         {error ? <ColorTemplate7PopupLargeDark.ErrorBar>{error}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
@@ -282,12 +389,14 @@ export default function NicknamePickerDialog({
             title="Female first names"
             nameKey="female"
             letterFilter={letterFilter}
+            gender="female"
             onPick={handlePickWord}
           />
           <GenderColumn
             title="Male first names"
             nameKey="male"
             letterFilter={letterFilter}
+            gender="male"
             onPick={handlePickWord}
           />
         </Box>
@@ -302,5 +411,6 @@ NicknamePickerDialog.propTypes = {
   onSaved: PropTypes.func,
   onClose: PropTypes.func,
   dismissible: PropTypes.bool,
-  excludeFirstName: PropTypes.string
+  excludeFirstName: PropTypes.string,
+  genderSelfReport: PropTypes.string
 };

@@ -17,6 +17,8 @@ export const GREEN_BUTTON_TEXT = '#000000';
 export const GREEN_BUTTON_BORDER = '1px solid #000000';
 /** Whole-button hover scale — 25% larger. */
 export const GREEN_BUTTON_HOVER_SCALE = 1.25;
+/** Raised on hover so scaled button draws above adjacent buttons/UI. */
+export const GREEN_BUTTON_HOVER_Z_INDEX = 9999;
 
 const menuButtonShadow =
   '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)';
@@ -39,8 +41,30 @@ export function greenButtonFontSizeSx(overrides = {}) {
   };
 }
 
+/**
+ * Hover scale + topmost z-index — use on GreenButton overrides that replace default hover styles.
+ * @param {Record<string, unknown>} [hoverOverrides]
+ * @param {{ hoverScale?: number, zIndex?: number, transformOrigin?: string }} [options]
+ */
+export function greenButtonHoverScaleRaiseSx(hoverOverrides = {}, options = {}) {
+  const hoverScale = options.hoverScale ?? GREEN_BUTTON_HOVER_SCALE;
+  const zIndex = options.zIndex ?? GREEN_BUTTON_HOVER_Z_INDEX;
+  const transformOrigin = options.transformOrigin ?? 'center center';
+  return {
+    transformOrigin,
+    '@media (hover: hover)': {
+      '&:hover:not(.Mui-disabled)': {
+        position: 'relative',
+        zIndex,
+        transform: `scale(${hoverScale})`,
+        ...hoverOverrides
+      }
+    }
+  };
+}
+
 /** @returns {import('@mui/material').SxProps} */
-export function greenButtonSx() {
+export function greenButtonSx({ hoverTopmost = true } = {}) {
   return {
     fontFamily: MAIN_FONT_FAMILY,
     ...greenButtonFontSizeSx(),
@@ -74,8 +98,12 @@ export function greenButtonSx() {
         WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
         border: `${GREEN_BUTTON_BORDER} !important`,
         transform: `scale(${GREEN_BUTTON_HOVER_SCALE})`,
-        position: 'relative',
-        zIndex: 1,
+        ...(hoverTopmost
+          ? {
+              position: 'relative',
+              zIndex: GREEN_BUTTON_HOVER_Z_INDEX
+            }
+          : null),
         '& .MuiButton-startIcon': { color: `${GREEN_BUTTON_TEXT} !important` },
         '& svg': { color: `${GREEN_BUTTON_TEXT} !important` }
       }
