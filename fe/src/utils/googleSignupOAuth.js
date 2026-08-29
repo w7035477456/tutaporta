@@ -3,6 +3,7 @@ import { getApiBaseUrl } from 'config/apiBaseUrl';
 export const GOOGLE_SIGNUP_OAUTH_MESSAGE_TYPE = 'google-signup-oauth';
 export const GOOGLE_SIGNUP_OAUTH_ACK_TYPE = 'google-signup-oauth-ack';
 export const GOOGLE_SIGNUP_EMAIL_STORAGE_KEY = 'googleSignupEmail';
+export const GOOGLE_SIGNUP_TOKEN_STORAGE_KEY = 'googleSignupToken';
 export const GOOGLE_SIGNUP_OAUTH_RESULT_KEY = 'googleSignupOAuthResult';
 export const GOOGLE_SIGNUP_BROADCAST_CHANNEL = 'google-signup-oauth';
 
@@ -36,6 +37,26 @@ export function persistGoogleSignupEmail(email) {
   }
 }
 
+export function persistGoogleSignupToken(token) {
+  if (typeof window === 'undefined') return;
+  const raw = String(token || '').trim();
+  if (!raw) return;
+  try {
+    sessionStorage.setItem(GOOGLE_SIGNUP_TOKEN_STORAGE_KEY, raw);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearGoogleSignupToken() {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(GOOGLE_SIGNUP_TOKEN_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 export function readStoredGoogleSignupEmail() {
   if (typeof window === 'undefined') return '';
   try {
@@ -43,6 +64,15 @@ export function readStoredGoogleSignupEmail() {
       .trim()
       .toLowerCase();
     return EMAIL_PATTERN.test(raw) ? raw : '';
+  } catch {
+    return '';
+  }
+}
+
+export function readStoredGoogleSignupToken() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return String(sessionStorage.getItem(GOOGLE_SIGNUP_TOKEN_STORAGE_KEY) || '').trim();
   } catch {
     return '';
   }
@@ -93,9 +123,24 @@ function closePopupQuietly(popup) {
   }
 }
 
+function normalizeOAuthSuccess(parsed) {
+  const email = String(parsed?.email || '')
+    .trim()
+    .toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) return null;
+  const action = String(parsed?.action || '').trim().toLowerCase();
+  const signupToken = String(parsed?.signupToken || '').trim();
+  return {
+    email,
+    action: action === 'login' || action === 'register' ? action : 'register',
+    signupToken: action === 'register' ? signupToken : ''
+  };
+}
+
 /**
- * Opens Google OAuth popup. Waits for Google sign-in to finish, delivers email to this page,
- * sends ack to popup, then closes popup.
+ * Opens Google OAuth popup.
+ * Resolves with { email, action: 'login'|'register', signupToken }.
+ * Cookie is already set when action is 'login'.
  */
 export function openGoogleSignupPopup() {
   return new Promise((resolve, reject) => {
@@ -144,16 +189,20 @@ export function openGoogleSignupPopup() {
       if (closeGraceTimer != null) clearTimeout(closeGraceTimer);
     };
 
-    const finishResolve = (email) => {
+    const finishResolve = (result) => {
       if (settled) return;
       settled = true;
       cleanup();
       clearOAuthResultLocalStorage();
       sendAckToPopup(popup, lastSourceWindow);
       window.setTimeout(() => closePopupQuietly(popup), 50);
-      const normalized = String(email || '').trim().toLowerCase();
-      persistGoogleSignupEmail(normalized);
-      resolve(normalized);
+      persistGoogleSignupEmail(result.email);
+      if (result.action === 'register' && result.signupToken) {
+        persistGoogleSignupToken(result.signupToken);
+      } else {
+        clearGoogleSignupToken();
+      }
+      resolve(result);
     };
 
     const finishReject = (message) => {
@@ -173,9 +222,12 @@ export function openGoogleSignupPopup() {
       if (parsed.email && EMAIL_PATTERN.test(String(parsed.email).trim().toLowerCase())) {
         persistGoogleSignupEmail(parsed.email);
       }
-      if (parsed.success && parsed.email) {
-        finishResolve(String(parsed.email).trim().toLowerCase());
-        return true;
+      if (parsed.success) {
+        const result = normalizeOAuthSuccess(parsed);
+        if (result) {
+          finishResolve(result);
+          return true;
+        }
       }
       if (parsed.error) {
         finishReject(parsed.error);
@@ -187,11 +239,6 @@ export function openGoogleSignupPopup() {
     const tryConsumePendingResult = () => {
       const fromLocal = readOAuthResultFromLocalStorage();
       if (fromLocal && handleOAuthResult(fromLocal, null)) return true;
-      const storedEmail = readStoredGoogleSignupEmail();
-      if (storedEmail) {
-        finishResolve(storedEmail);
-        return true;
-      }
       return false;
     };
 

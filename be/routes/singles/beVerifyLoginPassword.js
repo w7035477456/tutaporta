@@ -1,14 +1,8 @@
-import jwt from 'jsonwebtoken';
 import pool from '../../db/connection.js';
 import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
-import { getPrivateKey } from '../../jwtKeys.js';
-import { getMallDepartmentMode } from '../../mallDepartmentMode.js';
-import { getAuthJwtExpiresInSeconds, setAuthCookie } from '../../utils/authCookie.js';
 import { verifyGlobalToolsPassword } from '../../utils/globalToolsPassword.js';
 import { issueAdminAuthSession, issueToolsOnlyAdminAuthSession, TOOLS_ONLY_ADMIN_LOGIN_ID } from '../../utils/adminAuth.js';
 import { normalizeLoginIdentifier } from '../../utils/loginIdentifier.js';
-import { startSingleLoginSession } from '../../utils/singleLoginSession.js';
-import { resolveCustomLogoutMinutes } from '../../utils/customLogoutDuration.js';
 import {
   LOGIN_PASSWORD_MISMATCH_PRIMARY,
   resetPasswordAttemptsOnSuccess,
@@ -19,9 +13,8 @@ import { isLegacySixDigitPassword } from '../../utils/passwordRequirements.js';
 import { isSinglesStatusLoginAllowed } from '../../utils/singlesStatus.js';
 import { getRequestClientIp, isAdminIpAllowed } from '../../utils/adminIpConfig.js';
 import { resolveDemoGuestLoginAlias } from '../../utils/demoGuestLoginAlias.js';
-import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
-import { createLoginLogSessionToken, insertDemoLoginLog } from '../../utils/loginLog.js';
-import { ensureSeededDemoBuddiesOnLogin } from '../../utils/ensureSeededDemoBuddiesOnLogin.js';
+import { createLoginLogSessionToken } from '../../utils/loginLog.js';
+import { issueUserLoginSession } from '../../utils/issueUserLoginSession.js';
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
                 seeded_demo_buddies_boolean, gender_self_report
@@ -108,102 +101,12 @@ async function checkLoginPassword(storedHash, plainPassword) {
 }
 
 async function issueLoginSuccess(res, user, log, rememberMe = false, options = {}) {
-  const { requiresPasswordUpgrade = false, guestDemoLogin = false, req = null, loginLogSessionToken = null } =
-    options;
-  const { password_hash, ...userWithoutPassword } = user;
-
-  try {
-    await ensureDemoRegularInitialSetupDone(pool, user.singles_id, user.member_category);
-  } catch (err) {
-    console.error('[beVerifyLoginPassword] ensureDemoRegularInitialSetupDone:', err?.message ?? err);
-  }
-
-  try {
-    await ensureSeededDemoBuddiesOnLogin(pool, user.singles_id);
-  } catch (err) {
-    console.error('[beVerifyLoginPassword] ensureSeededDemoBuddiesOnLogin:', err?.message ?? err);
-  }
-
-  try {
-    const flagsRes = await pool.query(
-      `SELECT seeded_demo_buddies_boolean, gender_self_report
-       FROM helloworldjunktest.singles
-       WHERE singles_id = $1`,
-      [user.singles_id]
-    );
-    if (flagsRes.rows[0]) {
-      user.seeded_demo_buddies_boolean = flagsRes.rows[0].seeded_demo_buddies_boolean;
-      user.gender_self_report = flagsRes.rows[0].gender_self_report;
-    }
-  } catch (err) {
-    console.error('[beVerifyLoginPassword] refresh seed flags:', err?.message ?? err);
-  }
-
-  const logoutMins = await resolveCustomLogoutMinutes(user.singles_id);
-  const tokenPayload = {
-    singles_id: user.singles_id,
-    email: user.email,
-    custom_logout_duration: logoutMins
-  };
-  if (guestDemoLogin) {
-    tokenPayload.guest_demo_login = true;
-    if (loginLogSessionToken) {
-      tokenPayload.login_log_session = loginLogSessionToken;
-    }
-  }
-  if (requiresPasswordUpgrade) {
-    tokenPayload.requiresPasswordUpgrade = true;
-  } else if (guestDemoLogin) {
-    // Exception to single-account single-login: concurrent demo/guest alias sessions.
-    // Do not write Redis session_id (would kick other demo/guest alias or real target-account sessions).
-  } else {
-    const sessionId = await startSingleLoginSession(user.singles_id, logoutMins);
-    if (sessionId) {
-      tokenPayload.session_id = sessionId;
-    }
-  }
-
-  if (guestDemoLogin && req) {
-    await insertDemoLoginLog(req, {
-      singlesId: user.singles_id,
-      email: user.email,
-      sessionToken: loginLogSessionToken
-    });
-  }
-
-  const token = jwt.sign(tokenPayload, getPrivateKey(), {
-    algorithm: 'RS256',
-    expiresIn: getAuthJwtExpiresInSeconds({ rememberMe })
+  const body = await issueUserLoginSession(res, user, {
+    rememberMe,
+    log,
+    ...options
   });
-
-  setAuthCookie(res, token, { rememberMe });
-
-  log('[beVerifyLoginPassword.js] → success', {
-    singles_id: user.singles_id,
-    role: 'user',
-    requiresPasswordUpgrade: Boolean(requiresPasswordUpgrade),
-    guestDemoLogin: Boolean(guestDemoLogin)
-  });
-  const mallDepartmentMode = getMallDepartmentMode(userWithoutPassword.member_category);
-  const seededDemoBuddies =
-    String(userWithoutPassword.seeded_demo_buddies_boolean ?? '').trim().toLowerCase() === 'true' ||
-    userWithoutPassword.seeded_demo_buddies_boolean === true;
-  const genderRaw = String(userWithoutPassword.gender_self_report ?? '')
-    .trim()
-    .toUpperCase();
-  const genderSelfReport = genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null;
-  return res.json({
-    success: true,
-    role: 'user',
-    user: {
-      ...userWithoutPassword,
-      mallDepartmentMode,
-      guest_demo_login: Boolean(guestDemoLogin),
-      seeded_demo_buddies_boolean: seededDemoBuddies,
-      gender_self_report: genderSelfReport
-    },
-    requiresPasswordUpgrade: Boolean(requiresPasswordUpgrade)
-  });
+  return res.json(body);
 }
 
 export async function beVerifyLoginPassword(req, res) {

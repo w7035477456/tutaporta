@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import googleIcon from 'assets/images/icons/google.svg';
 import { authButtonBoldSx } from 'views/pages/authentication/authPageLayoutSx';
 
-export default function GoogleSignupButton({ disabled = false, busy = false, onClick }) {
+export default function GoogleSignupButton({ disabled = false, busy = false, onClick, label = 'Sign up with Google' }) {
   return (
     <Button
       type="button"
@@ -33,7 +33,7 @@ export default function GoogleSignupButton({ disabled = false, busy = false, onC
       }}
     >
       <Box component="img" src={googleIcon} alt="" sx={{ width: 40, height: 40, flexShrink: 0 }} />
-      {busy ? 'Connecting to Google…' : 'Sign up with Google'}
+      {busy ? 'Connecting to Google…' : label}
     </Button>
   );
 }
@@ -41,5 +41,6 @@ export default function GoogleSignupButton({ disabled = false, busy = false, onC
 GoogleSignupButton.propTypes = {
   disabled: PropTypes.bool,
   busy: PropTypes.bool,
-  onClick: PropTypes.func
+  onClick: PropTypes.func,
+  label: PropTypes.string
 };

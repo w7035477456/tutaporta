@@ -11,6 +11,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Typography from '@mui/material/Typography';
@@ -20,10 +21,12 @@ import Box from '@mui/material/Box';
 import api from 'api/axios';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
+import GoogleSignupButton from 'ui-component/GoogleSignupButton';
 import { getDesktopIconSizeVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { authFormContentSx } from '../authentication/authPageLayoutSx';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
+import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
 
 // assets
 import Visibility from '@mui/icons-material/Visibility';
@@ -121,11 +124,13 @@ const loginErrorSecondarySx = {
 export default function AuthLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, refreshSessionAfterExternalLogin } = useAuth();
   const { setLoginCredentials, blockDemoAction } = useLoginDemoMode();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleSignupEnabled, setGoogleSignupEnabled] = useState(false);
   const [error, setError] = useState('');
   const [errorSecondary, setErrorSecondary] = useState('');
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
@@ -159,11 +164,15 @@ export default function AuthLogin() {
     void (async () => {
       try {
         const { data } = await api.get('/api/publicConfig');
-        if (!cancelled && typeof data?.blockMobile === 'boolean') {
+        if (cancelled) return;
+        if (typeof data?.blockMobile === 'boolean') {
           setBlockMobile(data.blockMobile);
         }
+        if (typeof data?.googleSignupEnabled === 'boolean') {
+          setGoogleSignupEnabled(data.googleSignupEnabled);
+        }
       } catch {
-        // keep default (block mobile)
+        // keep defaults
       }
     })();
     return () => {
@@ -232,6 +241,40 @@ export default function AuthLogin() {
     [navigate, location.state]
   );
 
+  const handleGoogleSignIn = useCallback(async () => {
+    if (mobileLoginBlocked) return;
+    setError('');
+    setErrorSecondary('');
+    setGoogleBusy(true);
+    try {
+      const result = await openGoogleSignupPopup();
+      if (result.action === 'login') {
+        await refreshSessionAfterExternalLogin();
+        completeLoginNavigation({ success: true });
+        return;
+      }
+      persistGoogleSignupEmail(result.email);
+      if (result.signupToken) persistGoogleSignupToken(result.signupToken);
+      navigate('/register', {
+        state: { email: result.email, from: location.state?.from },
+        replace: false
+      });
+    } catch (err) {
+      const msg = err?.message || 'Google sign-in failed.';
+      if (!/cancelled|closed before completion/i.test(msg)) {
+        setError(msg);
+      }
+    } finally {
+      setGoogleBusy(false);
+    }
+  }, [
+    mobileLoginBlocked,
+    refreshSessionAfterExternalLogin,
+    completeLoginNavigation,
+    navigate,
+    location.state
+  ]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (signInDisabled) return;
@@ -290,6 +333,29 @@ export default function AuthLogin() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {googleSignupEnabled ? (
+        <>
+          <GoogleSignupButton
+            label="Sign in with Google"
+            disabled={mobileLoginBlocked || isLoading}
+            busy={googleBusy}
+            onClick={() => void handleGoogleSignIn()}
+          />
+          <Divider
+            sx={{
+              my: 2,
+              color: 'var(--theme-primary-color)',
+              '&::before, &::after': { borderColor: 'var(--theme-primary-color)' }
+            }}
+          >
+            <Typography variant="body2" sx={{ color: 'var(--theme-primary-color)', fontWeight: 700, px: 1 }}>
+              Or
+            </Typography>
+          </Divider>
+        </>
+      ) : null}
+
       <Box sx={{ ...fieldWithRightImageRowSx, mb: 2 }}>
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate

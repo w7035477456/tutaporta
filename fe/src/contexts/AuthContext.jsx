@@ -326,6 +326,19 @@ export const AuthProvider = ({ children }) => {
     setField('fontFamily', stack);
   };
 
+  /** After Google OAuth (or other cookie-setting login): load /api/me into context. */
+  const refreshSessionAfterExternalLogin = async () => {
+    clearSessionLocalOnboardingLocks();
+    clearSwrCacheForNewSession();
+    cancelPendingSessionEndRedirect();
+    clearSessionEndNotices();
+    sessionStorage.removeItem('logoutBlockBack');
+    await checkAuth();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('user-customization-reload'));
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -337,6 +350,7 @@ export const AuthProvider = ({ children }) => {
         impersonateMember,
         returnToAdmin,
         checkAuth,
+        refreshSessionAfterExternalLogin,
         upgradeLegacyPassword,
         profilePhotoCacheBust,
         bumpProfilePhotoCache,

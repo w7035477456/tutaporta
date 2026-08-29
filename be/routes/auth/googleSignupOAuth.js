@@ -2,14 +2,33 @@ import crypto from 'crypto';
 import pool from '../../db/connection.js';
 import { getPublicAppUrl } from '../../utils/publicAppUrl.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
+import { issueUserLoginSession } from '../../utils/issueUserLoginSession.js';
+import { isSinglesStatusLoginAllowed } from '../../utils/singlesStatus.js';
+import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
+import { insertNewSinglesAccount } from '../../utils/newSinglesAccount.js';
+import { hashPassword } from '../../utils/passwordHash.js';
+import {
+  formatPhoneForDuplicateCheck,
+  isDuplicatePhoneAllowed,
+  respondIfDuplicatePhone
+} from '../../utils/duplicatePhonePolicy.js';
+import { getUsSignupPhoneValidationMessage, validateUsSignupPhone } from '../../utils/usPhoneValidation.js';
+import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
+import { resolveReferByCodeForSignup } from '../../utils/referByCode.js';
+import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
+import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
 
-const EMAIL_EXISTS_ERROR =
-  'This email already exist in out system. Please double check your email.';
 const OAUTH_RESULT_STORAGE_KEY = 'googleSignupOAuthResult';
 const OAUTH_BROADCAST_CHANNEL = 'google-signup-oauth';
 const OAUTH_ACK_TYPE = 'google-signup-oauth-ack';
 const GOOGLE_SIGNUP_EMAIL_STORAGE_KEY = 'googleSignupEmail';
+const GOOGLE_SIGNUP_TOKEN_STORAGE_KEY = 'googleSignupToken';
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
+const SIGNUP_TOKEN_MAX_AGE_MS = 10 * 60 * 1000;
+
+const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
+                seeded_demo_buddies_boolean, gender_self_report
+         FROM helloworldjunktest.singles s`;
 
 function normalizeOrigin(value) {
   try {
@@ -38,24 +57,19 @@ function getOAuthStateSecret() {
   return secret;
 }
 
-function createOAuthState(returnOrigin) {
-  const payload = {
-    n: crypto.randomBytes(16).toString('hex'),
-    t: Date.now(),
-    o: normalizeOrigin(returnOrigin) || getPublicAppUrl()
-  };
+function signPayload(payload) {
   const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   const sig = crypto.createHmac('sha256', getOAuthStateSecret()).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
 
-function verifyOAuthState(stateRaw) {
-  const raw = String(stateRaw || '').trim();
-  if (!raw) return null;
-  const dot = raw.lastIndexOf('.');
+function verifySignedPayload(raw, maxAgeMs) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  const dot = value.lastIndexOf('.');
   if (dot <= 0) return null;
-  const body = raw.slice(0, dot);
-  const sig = raw.slice(dot + 1);
+  const body = value.slice(0, dot);
+  const sig = value.slice(dot + 1);
   if (!body || !sig) return null;
   const expected = crypto.createHmac('sha256', getOAuthStateSecret()).update(body).digest('base64url');
   const sigBuf = Buffer.from(sig);
@@ -66,13 +80,45 @@ function verifyOAuthState(stateRaw) {
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
     const ts = Number(payload?.t);
-    if (!Number.isFinite(ts) || Date.now() - ts > OAUTH_STATE_MAX_AGE_MS) return null;
-    const returnOrigin = normalizeOrigin(payload?.o);
-    if (!returnOrigin) return null;
-    return { returnOrigin };
+    if (!Number.isFinite(ts) || Date.now() - ts > maxAgeMs) return null;
+    return payload;
   } catch {
     return null;
   }
+}
+
+function createOAuthState(returnOrigin) {
+  return signPayload({
+    n: crypto.randomBytes(16).toString('hex'),
+    t: Date.now(),
+    o: normalizeOrigin(returnOrigin) || getPublicAppUrl()
+  });
+}
+
+function verifyOAuthState(stateRaw) {
+  const payload = verifySignedPayload(stateRaw, OAUTH_STATE_MAX_AGE_MS);
+  if (!payload) return null;
+  const returnOrigin = normalizeOrigin(payload?.o);
+  if (!returnOrigin) return null;
+  return { returnOrigin };
+}
+
+/** Short-lived proof that Google verified this email for signup completion. */
+export function createGoogleSignupToken(email) {
+  return signPayload({
+    n: crypto.randomBytes(16).toString('hex'),
+    t: Date.now(),
+    e: normalizeEmailForDb(email),
+    k: 'google_signup'
+  });
+}
+
+export function verifyGoogleSignupToken(tokenRaw, email) {
+  const payload = verifySignedPayload(tokenRaw, SIGNUP_TOKEN_MAX_AGE_MS);
+  if (!payload || payload.k !== 'google_signup') return null;
+  const tokenEmail = normalizeEmailForDb(payload.e);
+  if (!tokenEmail || tokenEmail !== normalizeEmailForDb(email)) return null;
+  return { email: tokenEmail };
 }
 
 export function isGoogleSignupOAuthConfigured() {
@@ -91,18 +137,22 @@ function getGoogleOAuthConfig() {
   return { clientId, clientSecret, redirectUri };
 }
 
-function buildOAuthResultPayload({ success, email = '', error = '' }) {
+function buildOAuthResultPayload({ success, email = '', error = '', action = '', signupToken = '' }) {
   const normalizedEmail = String(email || '').trim().toLowerCase();
   return {
     type: 'google-signup-oauth',
     success: Boolean(success),
     email: normalizedEmail,
+    action: success ? String(action || '') : '',
+    signupToken: success && action === 'register' ? String(signupToken || '') : '',
     error: success ? '' : String(error || 'Google sign-up failed')
   };
 }
 
-function renderPopupResultHtml({ success, email = '', error = '' }) {
-  const payload = JSON.stringify(buildOAuthResultPayload({ success, email, error }));
+function renderPopupResultHtml({ success, email = '', error = '', action = '', signupToken = '' }) {
+  const payload = JSON.stringify(
+    buildOAuthResultPayload({ success, email, error, action, signupToken })
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -117,6 +167,7 @@ function renderPopupResultHtml({ success, email = '', error = '' }) {
       var payload = ${payload};
       var storageKey = ${JSON.stringify(OAUTH_RESULT_STORAGE_KEY)};
       var emailStorageKey = ${JSON.stringify(GOOGLE_SIGNUP_EMAIL_STORAGE_KEY)};
+      var tokenStorageKey = ${JSON.stringify(GOOGLE_SIGNUP_TOKEN_STORAGE_KEY)};
       var channelName = ${JSON.stringify(OAUTH_BROADCAST_CHANNEL)};
       var ackType = ${JSON.stringify(OAUTH_ACK_TYPE)};
       var targetOrigin = window.location.origin;
@@ -145,6 +196,11 @@ function renderPopupResultHtml({ success, email = '', error = '' }) {
               window.opener.sessionStorage.setItem(emailStorageKey, payload.email);
             } catch (e) {}
           }
+          if (payload.signupToken) {
+            try {
+              window.opener.sessionStorage.setItem(tokenStorageKey, payload.signupToken);
+            } catch (e) {}
+          }
         }
       }
 
@@ -167,7 +223,7 @@ function renderPopupResultHtml({ success, email = '', error = '' }) {
         if (!event.data || event.data.type !== ackType) return;
         window.removeEventListener('message', onAck);
         clearInterval(retryTimer);
-        setStatus('Returning to sign-up…');
+        setStatus(payload.action === 'login' ? 'Signed in. Returning…' : 'Returning to sign-up…');
         closePopup();
       }
 
@@ -223,11 +279,24 @@ async function fetchGoogleUserInfo(accessToken) {
   return data;
 }
 
-async function emailAlreadyRegistered(email) {
-  const { rows } = await pool.query('SELECT 1 FROM helloworldjunktest.singles WHERE email = $1 LIMIT 1', [
-    normalizeEmailForDb(email)
-  ]);
-  return rows.length > 0;
+async function findSinglesByEmail(email) {
+  const { rows } = await pool.query(
+    `${USER_SELECT}
+     WHERE LOWER(s.email) = $1
+     ORDER BY COALESCE(s.updated_at, s.created_at) DESC
+     LIMIT 1`,
+    [normalizeEmailForDb(email)]
+  );
+  return rows[0] || null;
+}
+
+function isLockOutBlocking(user) {
+  const lockOut = String(process.env.LOCK_OUT ?? '')
+    .trim()
+    .toLowerCase() === 'true';
+  if (!lockOut) return false;
+  const memberCategory = normalizeMemberCategoryEnum(user.member_category) ?? String(user.member_category ?? '').trim().toUpperCase();
+  return memberCategory !== 'PILOTUSER' && memberCategory !== 'ADMIN';
 }
 
 /** Task 1 start → Tasks 2–3 Google account/consent UI in popup. */
@@ -261,22 +330,17 @@ export function googleSignupStart(req, res) {
   );
   console.log('[googleSignupOAuth]   redirect_uri:', config.redirectUri);
   console.log('[googleSignupOAuth]   client_id:', config.clientId);
-  if (String(process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim()) {
-    console.log('[googleSignupOAuth]   redirect source: GOOGLE_OAUTH_REDIRECT_URI env');
-  } else if (String(process.env.PUBLIC_APP_URL || '').trim()) {
-    console.log('[googleSignupOAuth]   redirect source: PUBLIC_APP_URL =', String(process.env.PUBLIC_APP_URL).trim());
-  } else {
-    console.log('[googleSignupOAuth]   redirect source: getPublicAppUrl() default');
-  }
 
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 }
 
-/** Task 4 — return email to opener; user completes phone sign-up on register page. */
+/**
+ * Existing email → set auth cookie + action=login.
+ * New email → action=register + signupToken (phone + Terms still required).
+ */
 export async function googleSignupCallback(req, res) {
   const config = getGoogleOAuthConfig();
   const verifiedState = verifyOAuthState(req.query?.state);
-  const returnOrigin = verifiedState?.returnOrigin || getPublicAppUrl();
 
   if (!config) {
     return res.status(503).send(
@@ -330,15 +394,42 @@ export async function googleSignupCallback(req, res) {
       throw new Error('Please verify your Google email address before signing up.');
     }
 
-    if (await emailAlreadyRegistered(email)) {
-      console.warn('[googleSignupOAuth] email already registered:', email);
+    const existing = await findSinglesByEmail(email);
+    if (existing) {
+      if (isLockOutBlocking(existing)) {
+        return res.status(200).send(
+          renderPopupResultHtml({
+            success: false,
+            email,
+            error: 'Under construction. Please check back later.'
+          })
+        );
+      }
+      if (!isSinglesStatusLoginAllowed(existing.status, existing.member_category)) {
+        return res.status(200).send(
+          renderPopupResultHtml({
+            success: false,
+            email,
+            error: 'Your account is not active. Please contact support.'
+          })
+        );
+      }
+
+      await issueUserLoginSession(res, existing, {
+        rememberMe: false,
+        log: (msg, data) => console.log('[googleSignupOAuth]', msg, data || '')
+      });
+      console.log('[googleSignupOAuth] login — existing account:', email);
       return res.status(200).send(
-        renderPopupResultHtml({ success: false, email, error: EMAIL_EXISTS_ERROR })
+        renderPopupResultHtml({ success: true, email, action: 'login' })
       );
     }
 
-    console.log('[googleSignupOAuth] success — returning email to register page:', email);
-    return res.status(200).send(renderPopupResultHtml({ success: true, email }));
+    const signupToken = createGoogleSignupToken(email);
+    console.log('[googleSignupOAuth] register — new email, returning token:', email);
+    return res.status(200).send(
+      renderPopupResultHtml({ success: true, email, action: 'register', signupToken })
+    );
   } catch (err) {
     console.error('[googleSignupOAuth] callback failed:', err?.message ?? err);
     return res.status(200).send(
@@ -347,5 +438,106 @@ export async function googleSignupCallback(req, res) {
         error: err?.message || 'Google sign-up failed. Please try again.'
       })
     );
+  }
+}
+
+/**
+ * POST /api/auth/google/signup/complete
+ * body: { email, phone, signupToken, termsAccepted, ref?, referByCode?, token? }
+ * Creates account with random password hash and logs the user in (no create-password email).
+ */
+export async function googleSignupComplete(req, res) {
+  if (!isGoogleSignupOAuthConfigured()) {
+    return res.status(503).json({ error: 'Google sign-up is not configured on this server.' });
+  }
+
+  const emailNorm = normalizeEmailForDb(req.body?.email);
+  const signupToken = String(req.body?.signupToken || '').trim();
+  const phoneRaw = req.body?.phone;
+  const termsAccepted = req.body?.termsAccepted === true || req.body?.termsAccepted === 'true';
+
+  if (!termsAccepted) {
+    return res.status(400).json({ error: 'Please agree to the terms and conditions.' });
+  }
+  if (!emailNorm || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' });
+  }
+  if (!verifyGoogleSignupToken(signupToken, emailNorm)) {
+    return res.status(400).json({
+      error: 'Google sign-up session expired. Please click Sign up with Google again.'
+    });
+  }
+
+  const phoneValidationMessage = getUsSignupPhoneValidationMessage(phoneRaw);
+  if (!validateUsSignupPhone(phoneRaw).valid) {
+    return res.status(400).json({ error: phoneValidationMessage || 'Please enter a valid US phone number.' });
+  }
+
+  const formattedPhone = formatPhoneForDuplicateCheck(phoneRaw);
+  if (!formattedPhone) {
+    return res.status(400).json({ error: 'Please enter a valid US phone number.' });
+  }
+
+  try {
+    const existing = await findSinglesByEmail(emailNorm);
+    if (existing) {
+      if (isLockOutBlocking(existing)) {
+        return res.status(403).json({ error: 'Under construction. Please check back later.' });
+      }
+      if (!isSinglesStatusLoginAllowed(existing.status, existing.member_category)) {
+        return res.status(403).json({ error: 'Your account is not active. Please contact support.' });
+      }
+      const body = await issueUserLoginSession(res, existing, { rememberMe: false });
+      return res.json(body);
+    }
+
+    const signupCategory = resolveSignupMemberCategory(emailNorm);
+    if (!isDuplicatePhoneAllowed(signupCategory)) {
+      if (await respondIfDuplicatePhone(res, formattedPhone, signupCategory)) return;
+    }
+
+    const resolvedReferByCode = resolveReferByCodeForSignup({
+      referByCode: req.body?.referByCode,
+      ref: req.body?.ref,
+      token: req.body?.token
+    });
+
+    const passwordHash = await hashPassword(crypto.randomBytes(32).toString('hex'));
+    const account = await insertNewSinglesAccount(pool, {
+      emailNorm,
+      passwordHash,
+      formattedPhone,
+      referByCode: resolvedReferByCode
+    });
+
+    await processReferralSignupReward({
+      newSinglesId: account.singlesId,
+      newMemberId: account.memberId,
+      newMemberEmail: emailNorm,
+      referByCode: account.referByCode,
+      isNewAccount: true
+    });
+
+    await attachOrInsertSignupLoginLog(req, {
+      singlesId: account.singlesId,
+      email: emailNorm,
+      phone: formattedPhone
+    });
+
+    const user = await findSinglesByEmail(emailNorm);
+    if (!user) {
+      return res.status(500).json({ error: 'Account created but login failed. Please sign in with Google again.' });
+    }
+
+    console.log('[googleSignupOAuth] complete — account created:', {
+      singlesId: account.singlesId,
+      emailPrefix: `${emailNorm.slice(0, 3)}***`
+    });
+
+    const body = await issueUserLoginSession(res, user, { rememberMe: false });
+    return res.json(body);
+  } catch (err) {
+    console.error('[googleSignupOAuth] complete failed:', err?.message ?? err);
+    return res.status(500).json({ error: 'Failed to complete Google sign-up. Please try again.' });
   }
 }

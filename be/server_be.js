@@ -596,6 +596,7 @@ import { saveSecretIcon, verifySecretIcon } from './routes/singles/saveSecretIco
 import {
   googleSignupStart,
   googleSignupCallback,
+  googleSignupComplete,
   isGoogleSignupOAuthConfigured
 } from './routes/auth/googleSignupOAuth.js';
 import {
@@ -1387,6 +1388,7 @@ app.post('/api/requestPasswordReset', requestPasswordReset);
 app.post('/api/supportMessage', postSupportMessage);
 app.get('/api/auth/google/signup/start', googleSignupStart);
 app.get('/api/auth/google/signup/callback', googleSignupCallback);
+app.post('/api/auth/google/signup/complete', googleSignupComplete);
 app.get('/api/auth/linkedin/verify/start', requireAuth, linkedInVerifyStart);
 app.get('/api/auth/linkedin/share/start', requireAuth, linkedInShareStart);
 app.get('/api/auth/linkedin/callback', linkedInOAuthCallback);

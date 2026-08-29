@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 
 // material-ui
 import Checkbox from '@mui/material/Checkbox';
@@ -11,6 +11,7 @@ import Box from '@mui/material/Box';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import { registerUser } from 'api/registerFe';
+import { completeGoogleSignup } from 'api/googleSignupFe';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPhoneImg from 'assets/images/enterPhone.png';
 
@@ -24,8 +25,16 @@ import { getSignupReferralCodeFromSearchParams } from 'utils/signupReferralCode'
 import { authRegisterFormContentSx } from '../authentication/authPageLayoutSx';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
-import { openGoogleSignupPopup, resolveGoogleSignupPrefillEmail, readStoredGoogleSignupEmail } from 'utils/googleSignupOAuth';
+import {
+  openGoogleSignupPopup,
+  resolveGoogleSignupPrefillEmail,
+  readStoredGoogleSignupEmail,
+  readStoredGoogleSignupToken,
+  clearGoogleSignupToken
+} from 'utils/googleSignupOAuth';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
+import { useAuth } from 'contexts/AuthContext';
+import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 
 // ===========================|| JWT - REGISTER ||=========================== //
 
@@ -110,13 +119,17 @@ const registerConsentLinkSx = {
 
 export default function AuthRegister() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { refreshSessionAfterExternalLogin } = useAuth();
   const [checked, setChecked] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleSignupEnabled, setGoogleSignupEnabled] = useState(false);
+  const [googleBound, setGoogleBound] = useState(false);
+  const [googleSignupToken, setGoogleSignupToken] = useState('');
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -135,7 +148,21 @@ export default function AuthRegister() {
     !derivedEmailError &&
     !derivedPhoneError;
 
+  const navigateAfterGoogleLogin = useCallback(async () => {
+    await refreshSessionAfterExternalLogin();
+    const from = location.state?.from;
+    if (from?.pathname) {
+      navigate(
+        { pathname: from.pathname, search: from.search || '', hash: from.hash || '' },
+        { replace: true }
+      );
+      return;
+    }
+    navigate('/mall', { replace: true });
+  }, [refreshSessionAfterExternalLogin, location.state, navigate]);
+
   const handleEmailChange = (e) => {
+    if (googleBound) return;
     setEmail(e.target.value);
     setEmailError('');
     setError('');
@@ -150,7 +177,13 @@ export default function AuthRegister() {
   useEffect(() => {
     getSignupReferralCodeFromSearchParams(searchParams);
     const fromGoogle = resolveGoogleSignupPrefillEmail(searchParams);
-    if (fromGoogle) {
+    const storedToken = readStoredGoogleSignupToken();
+    if (fromGoogle && storedToken) {
+      setEmail(fromGoogle);
+      setGoogleBound(true);
+      setGoogleSignupToken(storedToken);
+      setEmailError('');
+    } else if (fromGoogle) {
       setEmail(fromGoogle);
       setEmailError('');
     }
@@ -177,22 +210,29 @@ export default function AuthRegister() {
     setEmailError('');
     setGoogleBusy(true);
     try {
-      const googleEmail = await openGoogleSignupPopup();
-      setEmail(googleEmail);
+      const result = await openGoogleSignupPopup();
+      if (result.action === 'login') {
+        clearGoogleSignupToken();
+        setGoogleBound(false);
+        setGoogleSignupToken('');
+        await navigateAfterGoogleLogin();
+        return;
+      }
+      setEmail(result.email);
+      setGoogleBound(true);
+      setGoogleSignupToken(result.signupToken || '');
       setEmailError('');
     } catch (err) {
       const storedEmail = readStoredGoogleSignupEmail();
       if (storedEmail) setEmail(storedEmail);
       const msg = err?.message || 'Google sign-up failed.';
-      if (msg.includes('already exist')) {
-        setEmailError(EMAIL_EXISTS_MSG);
-      } else if (!/cancelled|closed before completion/i.test(msg)) {
+      if (!/cancelled|closed before completion/i.test(msg)) {
         setError(msg);
       }
     } finally {
       setGoogleBusy(false);
     }
-  }, []);
+  }, [navigateAfterGoogleLogin]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -223,11 +263,29 @@ export default function AuthRegister() {
       if (formattedPhone) {
         sessionStorage.setItem(SIGNUP_REGISTER_PHONE_KEY, formattedPhone);
       }
+
+      if (googleBound && (googleSignupToken || readStoredGoogleSignupToken())) {
+        const data = await completeGoogleSignup({
+          email: emailTrimmed,
+          phone: formattedPhone,
+          signupToken: googleSignupToken || readStoredGoogleSignupToken(),
+          termsAccepted: true
+        });
+        clearGoogleSignupToken();
+        if (data?.user?.tools_only) {
+          await refreshSessionAfterExternalLogin();
+          navigate(ADMIN_TOOLS_PATH, { replace: true });
+          return;
+        }
+        await navigateAfterGoogleLogin();
+        return;
+      }
+
       await registerUser(emailTrimmed, formattedPhone);
       navigate('/pages/registrationEmailed', { state: { email: emailTrimmed, phone: formattedPhone } });
     } catch (err) {
       console.error('Registration error:', err);
-      const msg = err.message || 'Failed to register. Please try again.';
+      const msg = err?.response?.data?.error || err.message || 'Failed to register. Please try again.';
       if (isPhoneAlreadyRegisteredMessage(msg)) {
         setPhoneError(PHONE_EXISTS_MSG);
       } else if (isEmailAlreadyRegisteredMessage(msg)) {
@@ -263,10 +321,16 @@ export default function AuthRegister() {
             onChange={handleEmailChange}
             name="email"
             required
+            inputProps={googleBound ? { readOnly: true } : undefined}
           />
         </Box>
         <Box component="img" src={enterEmailImg} alt="" sx={emailFieldImageSx} />
       </Box>
+      {googleBound ? (
+        <Typography variant="body2" sx={{ mt: 0.5, mb: 0, color: 'var(--theme-primary-color)' }}>
+          Verified with Google. Enter your phone and agree to Terms to finish — no password needed.
+        </Typography>
+      ) : null}
       {derivedEmailError && (
         <Typography variant="body2" sx={{ mt: 0.5, mb: 0, fontWeight: 500, color: 'var(--theme-error-color)' }}>
           {derivedEmailError}
@@ -352,7 +416,7 @@ export default function AuthRegister() {
           type="submit"
           disabled={isSubmitting || !isSignUpEnabled}
         >
-          {isSubmitting ? 'Sending...' : 'Sign Up'}
+          {isSubmitting ? (googleBound ? 'Creating account…' : 'Sending...') : 'Sign Up'}
         </SelectedButtonTemplate>
       </Box>
     </Box>
