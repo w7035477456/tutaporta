@@ -13,6 +13,11 @@ import { expireElapsedApprovedViewing } from '../../utils/requestApprovedViewing
 import { expireElapsedRequestApprovals } from '../../utils/requestApprovalStay.js';
 import { buildSinglesActiveStatusWhereSql } from './memberVisibility.js';
 import { sqlGalleryVideoIdsSubquery } from '../../utils/galleryMediaSql.js';
+import { loadMemberCategoryForSinglesId } from '../../utils/regularMemberActivityTimestamp.js';
+import {
+  enforceRegularMemberBioRequestApprovalsInDb,
+  sanitizeIncomingBioRequestApprovalRow
+} from '../../utils/regularMemberBioRequestApprovalLock.js';
 
 async function getRequestColumns(schemaName) {
   const cols = await pool.query(
@@ -90,6 +95,7 @@ export async function getRequestsAboutMe(req, res) {
   }
 
   try {
+    const memberCategory = await loadMemberCategoryForSinglesId(pool, me);
     const resolvedSchema = await resolveRequestsAppSchema();
     const schemaCandidates = [...new Set([resolvedSchema, getDBSchema(), 'helloworldjunktest', 'public'].filter(Boolean))];
     let fallbackRows = [];
@@ -100,6 +106,7 @@ export async function getRequestsAboutMe(req, res) {
 
       await expireElapsedRequestApprovals(pool, schemaName, has, me, parseApprovalStayDurationDays());
       await expireElapsedApprovedViewing(pool, schemaName, me, parseApprovedViewingDurationMonths());
+      await enforceRegularMemberBioRequestApprovalsInDb(pool, schemaName, me, memberCategory);
 
       const basicRequestExpr = briefBioRequestSelectExpr(has);
       const fullBioRequestExpr = fullBioRequestSelectExpr(has);
@@ -165,14 +172,16 @@ export async function getRequestsAboutMe(req, res) {
       );
 
       if (result.rows.length > 0) {
-        return res.json(result.rows);
+        return res.json(
+          result.rows.map((row) => sanitizeIncomingBioRequestApprovalRow(row, memberCategory))
+        );
       }
       if (fallbackRows.length === 0) {
         fallbackRows = result.rows;
       }
     }
 
-    return res.json(fallbackRows);
+    return res.json(fallbackRows.map((row) => sanitizeIncomingBioRequestApprovalRow(row, memberCategory)));
   } catch (error) {
     console.error('Error fetching requests about me:', error);
     return res.status(500).json({ error: 'Failed to fetch requests from database' });

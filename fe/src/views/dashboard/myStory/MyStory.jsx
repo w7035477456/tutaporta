@@ -912,7 +912,8 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
         maxWidth: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: 1
+        gap: 1,
+        bgcolor: 'var(--theme-daylight-color)'
       }}
     >
       {displayUrl ? (
@@ -962,7 +963,7 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
           borderRadius: 1,
           border: '1px solid',
           borderColor: 'divider',
-          bgcolor: 'var(--theme-white-color)',
+          bgcolor: 'var(--theme-daylight-color)',
           overflow: 'hidden',
           mx: { xs: 0, md: 0 }
         }}
@@ -1735,7 +1736,7 @@ export default function MyStory() {
         didInitSelectionRef.current = true;
         pendingAutoMakePhotoIdRef.current = null;
         if (wasFirstProfileSetup) {
-          // Demo buddies seed on login / gender popup; retry after first profile photo exists.
+          // Demo buddies seed on login / gender popup; retry if seed had not completed yet.
           try {
             const { default: api } = await import('api/axios');
             const { data } = await api.post('/api/singles/seed-demo-buddies');
@@ -3424,6 +3425,7 @@ export default function MyStory() {
           contentSX={{
             px: { xs: 0, md: 2 },
             py: { xs: 2, md: 2 },
+            bgcolor: 'var(--theme-daylight-color)',
             display: 'flex',
             flexDirection: 'column',
             ...(myStoryPhoneLayout
@@ -3696,6 +3698,7 @@ export default function MyStory() {
             minWidth: { md: 0 },
             maxWidth: { xs: '100%', md: 'none' },
             alignSelf: { xs: 'stretch', md: 'stretch' },
+            bgcolor: 'var(--theme-daylight-color)',
             WebkitTouchCallout: 'none'
           }}
         >

@@ -10,6 +10,8 @@ import {
   approvalTypeToBioKind,
   clearBioResponseNotificationDismissed
 } from './bioResponseNotifications.js';
+import { loadMemberCategoryForSinglesId } from '../../utils/regularMemberActivityTimestamp.js';
+import { regularMemberBioRequestApprovalWriteBlocked } from '../../utils/regularMemberBioRequestApprovalLock.js';
 
 async function getRequestColumns(schemaName, client = pool) {
   const cols = await client.query(
@@ -139,6 +141,13 @@ export async function toggleRequestApprovalAboutMe(req, res) {
   }
   if (nextApproval === null) {
     return res.status(400).json({ error: "approval must be 'approve', 'deny', or 'noresponse'" });
+  }
+
+  const memberCategory = await loadMemberCategoryForSinglesId(pool, me);
+  if (regularMemberBioRequestApprovalWriteBlocked(memberCategory, nextApproval)) {
+    return res.status(403).json({
+      error: 'RegularMember accounts cannot change bio request approval responses.'
+    });
   }
 
   const client = await pool.connect();

@@ -4,10 +4,7 @@
  *   - JazzyJeff: mutual approved Buddy (full bio) + full_paid (skip token debit popup)
  *   - BrainyBobby: mutual approved Acquaint (brief bio) + brief_paid (skip token debit popup)
  *   - LuckyLuke: outgoing Buddy request with noresponse (he never answers)
- *   - 1 public welcome posting with profile photo attached (`posting_photos.photo_url=/api/photo/{profile_image_fk}`)
- *     and created_at a few weeks after this member's previous post (first post: random in last 3 years)
- *
- * Idempotent upserts for requests; upgrades legacy hiking seed post / attaches missing photo.
+ *   - Does not auto-create a welcome posting (members write their own). CLI `--force-post` still can.
  *
  * Library (called on login via ensureSeededDemoBuddiesOnLogin):
  *   import { seedFemaleDemoFriendsForSinglesId } from '../utils/seedFemaleDemoFriends.js';
@@ -23,11 +20,12 @@ import { allocateRequestsId } from '../routes/singles/requestsUpsert.js';
 import { booleanEnumCast, toBooleanEnumLabel } from './booleanEnum.js';
 import { ensurePostingQuarterlyPartitionsBeforeWrite } from './ensureQuarterlyPartitions.js';
 import {
-  DEFAULT_LOOKBACK_YEARS,
-  loadLatestPostingCreatedAt,
-  randomTimestampAfterPrevious,
-  randomTimestampWithinLastYears
-} from './regularMemberActivityTimestamp.js';
+  PROFILE_PHOTO_CHANGE_POST_CONTENT,
+  loadOldestOtherPostingCreatedAt,
+  profilePhotoPostingNeedsEarlierTimestamp,
+  resolveProfilePhotoChangePostingTimestamp,
+  restampPostingCreatedAt
+} from './profilePhotoPostingTimestamp.js';
 import {
   deleteRequestsWithFriendEmails,
   findSinglesByEmail,
@@ -55,11 +53,13 @@ export const WRONG_PACK_FEMALE_DEMO_FRIEND_EMAILS = Object.freeze([
 ]);
 
 /** Public welcome posting (Review Postings) + profile photo attachment. */
-export const FEMALE_DEMO_SAMPLE_POST_CONTENT =
-  'Hi everyone! I am new to this site. Just wanted to drop in and say hello and attached my profile Photo! I\'m looking forward to getting to know you all and making new friends. I look forward to send out a few "Buddies Requests" soon, so please feel free to send one back as well. Ciao!';
+export const FEMALE_DEMO_SAMPLE_POST_CONTENT = PROFILE_PHOTO_CHANGE_POST_CONTENT;
 
-/** Prior seed caption — upgraded in place to the welcome post + photo. */
-const FEMALE_DEMO_LEGACY_POST_CONTENT = 'Hey we just went hiking, here are some photos:';
+/** Prior seed captions — upgraded in place to the current sample posting. */
+const FEMALE_DEMO_LEGACY_POST_CONTENTS = Object.freeze([
+  'Hey we just went hiking, here are some photos:',
+  'Hi everyone! I am new to this site. Just wanted to drop in and say hello and attached my profile Photo! I\'m looking forward to getting to know you all and making new friends. I look forward to send out a few "Buddies Requests" soon, so please feel free to send one back as well. Ciao!'
+]);
 
 const TRUE = toBooleanEnumLabel(true);
 const FALSE = toBooleanEnumLabel(false);
@@ -279,12 +279,12 @@ async function ensureSamplePosting(client, femaleId, { dryRun = false, forcePost
      FROM ${Q}.postings
      WHERE singles_id = $1
        AND parent_post_id IS NULL
-       AND BTRIM(COALESCE(content, '')) IN ($2, $3)
+       AND BTRIM(COALESCE(content, '')) = ANY($2::text[])
      ORDER BY
-       CASE WHEN BTRIM(COALESCE(content, '')) = $2 THEN 0 ELSE 1 END,
+       CASE WHEN BTRIM(COALESCE(content, '')) = $3 THEN 0 ELSE 1 END,
        created_at DESC
      LIMIT 1`,
-    [femaleId, content, FEMALE_DEMO_LEGACY_POST_CONTENT]
+    [femaleId, [content, ...FEMALE_DEMO_LEGACY_POST_CONTENTS], content]
   );
 
   let postId = existing.rows[0] ? Number(existing.rows[0].post_id) : null;
@@ -292,6 +292,7 @@ async function ensureSamplePosting(client, femaleId, { dryRun = false, forcePost
   let upgraded = false;
   let resolvedCreatedAt = existing.rows[0]?.created_at ?? null;
 
+  let restamped = false;
   if (postId && !forcePost) {
     const priorContent = String(existing.rows[0].content ?? '');
     if (priorContent !== content) {
@@ -304,9 +305,21 @@ async function ensureSamplePosting(client, femaleId, { dryRun = false, forcePost
       );
       upgraded = true;
     }
+    const oldestOther = await loadOldestOtherPostingCreatedAt(client, SCHEMA, femaleId, { excludePostId: postId });
+    if (profilePhotoPostingNeedsEarlierTimestamp(resolvedCreatedAt, oldestOther)) {
+      const correctedAt = await resolveProfilePhotoChangePostingTimestamp(client, SCHEMA, femaleId, {
+        excludePostId: postId
+      });
+      await ensurePostingQuarterlyPartitionsBeforeWrite(correctedAt);
+      await restampPostingCreatedAt(client, SCHEMA, postId, correctedAt);
+      resolvedCreatedAt = correctedAt;
+      restamped = true;
+    }
   } else {
     const postCreatedAt =
-      createdAt instanceof Date ? createdAt : randomTimestampWithinLastYears(DEFAULT_LOOKBACK_YEARS);
+      createdAt instanceof Date
+        ? createdAt
+        : await resolveProfilePhotoChangePostingTimestamp(client, SCHEMA, femaleId);
     const { rows } = await client.query(
       `INSERT INTO ${Q}.postings (singles_id, content, posting_visibility, created_at)
        VALUES ($1, $2, 'public', $3::timestamptz)
@@ -333,7 +346,8 @@ async function ensureSamplePosting(client, femaleId, { dryRun = false, forcePost
     photoInserted: photo.inserted,
     inserted,
     upgraded,
-    skipped: !inserted && !upgraded && !photo.inserted
+    restamped,
+    skipped: !inserted && !upgraded && !restamped && !photo.inserted
   };
 }
 
@@ -382,20 +396,30 @@ export async function seedFemaleDemoFriendsForSinglesId(db, femaleSinglesId, opt
       'JazzyJeff → female: mutual Buddy (full approve)',
       'female → BrainyBobby: My Pick + mutual Acquaint (brief approve) + brief_paid',
       'BrainyBobby → female: mutual Acquaint (brief approve)',
-      'female → LuckyLuke: My Pick + Buddy request (noresponse)',
-      'one public welcome posting + profile photo (/api/photo/{profile_image_fk})'
+      'female → LuckyLuke: My Pick + Buddy request (noresponse)'
     ]
   };
-
-  if (dryRun) {
-    return { dryRun: true, ...plan, requests: [], posting: { dryRun: true } };
+  if (forcePost) {
+    plan.relationships.push(
+      'one public welcome posting + profile photo (/api/photo/{profile_image_fk})'
+    );
   }
 
-  const previousAt = await loadLatestPostingCreatedAt(db, SCHEMA, femaleId);
-  const postCreatedAt = previousAt
-    ? randomTimestampAfterPrevious(previousAt)
-    : randomTimestampWithinLastYears(DEFAULT_LOOKBACK_YEARS);
-  await ensurePostingQuarterlyPartitionsBeforeWrite(postCreatedAt);
+  if (dryRun) {
+    return {
+      dryRun: true,
+      ...plan,
+      requests: [],
+      posting: forcePost ? { dryRun: true } : { skipped: true }
+    };
+  }
+
+  // Welcome posting is opt-in (`--force-post`). Partition DDL must run BEFORE BEGIN.
+  let postCreatedAt = null;
+  if (forcePost) {
+    postCreatedAt = await resolveProfilePhotoChangePostingTimestamp(db, SCHEMA, femaleId);
+    await ensurePostingQuarterlyPartitionsBeforeWrite(postCreatedAt);
+  }
 
   const ownsClient = typeof db.connect === 'function';
   const client = ownsClient ? await db.connect() : db;
@@ -474,7 +498,9 @@ export async function seedFemaleDemoFriendsForSinglesId(db, femaleSinglesId, opt
       }))
     });
 
-    const posting = await ensureSamplePosting(client, femaleId, { forcePost, createdAt: postCreatedAt });
+    const posting = forcePost
+      ? await ensureSamplePosting(client, femaleId, { forcePost, createdAt: postCreatedAt })
+      : { skipped: true };
 
     if (ownsClient) await client.query('COMMIT');
 

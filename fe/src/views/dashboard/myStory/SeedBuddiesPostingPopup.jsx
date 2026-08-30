@@ -5,7 +5,7 @@ import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCen
 import seedBuddiesPostingImg from 'assets/images/seedBuddiesPosting.png';
 
 /**
- * After first profile photo: explain seeded demo buddies / welcome posting.
+ * After first profile photo: explain seeded demo buddies (members write their own posts).
  * Continue → existing Identification Verification onboarding.
  */
 export default function SeedBuddiesPostingPopup({ open, onContinue }) {

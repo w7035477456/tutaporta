@@ -21,6 +21,7 @@ import {
 } from 'api/requestsAboutMeFe';
 import { APPROVAL_STATUS } from 'utils/approvalStatusEnum';
 import { isAdminSession } from 'utils/adminSession';
+import { isRegularMemberCategory } from 'utils/memberCategory';
 import { postSaveConsentRecord } from 'api/consentRecordFe';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import api from 'api/axios';
@@ -109,6 +110,7 @@ export default function ReceivedBioRequestsPage() {
     [downSM, pageZoom]
   );
   const { user } = useAuth();
+  const isRegularMember = isRegularMemberCategory(user?.member_category);
   const { requestsAboutMe, requestsAboutMeLoading, requestsAboutMeError, refetch } = useGetRequestsAboutMe();
   const { requestsSent, requestsSentLoading, requestsSentError } = useGetRequestsSent();
   const { approvalStayDurationDays, approvedViewingDurationMonths } = useGetRequestsAboutMeSettings();
@@ -220,6 +222,10 @@ export default function ReceivedBioRequestsPage() {
         if (!fullRequested && fullApproval !== APPROVAL_STATUS.APPROVE) {
           fullApproval = APPROVAL_STATUS.NO_RESPONSE;
         }
+        if (isRegularMember) {
+          briefApproval = APPROVAL_STATUS.NO_RESPONSE;
+          fullApproval = APPROVAL_STATUS.NO_RESPONSE;
+        }
 
         return {
           ...row,
@@ -227,7 +233,7 @@ export default function ReceivedBioRequestsPage() {
           full_bio_request_approval: fullApproval
         };
       }),
-    [rows, approvalStateByRequestId, outgoingByRequesterId]
+    [rows, approvalStateByRequestId, outgoingByRequesterId, isRegularMember]
   );
 
   const expectedFullName = useMemo(() => {
@@ -263,6 +269,7 @@ export default function ReceivedBioRequestsPage() {
   };
 
   const handleApprovalChange = (row, approvalType, next) => {
+    if (isRegularMember) return;
     const requestFlag = approvalType === 'basic' ? row.brief_bio_request : row.full_bio_request;
     if (!isRequestedState(requestFlag) || requestBusyKey || consentSaving) return;
 
@@ -343,6 +350,7 @@ export default function ReceivedBioRequestsPage() {
   };
 
   const handleSubmitResponse = async (row) => {
+    if (isRegularMember) return;
     if (!row || requestBusyKey || consentSaving || consentDialogOpen) return;
 
     const originalRow = rows.find((item) => item.requests_id === row.requests_id);
@@ -413,7 +421,7 @@ export default function ReceivedBioRequestsPage() {
   };
 
   const handleConsentConfirm = async ({ fullNameSigned, viewerApprovedId, dateSigned, consentSignatureImage }) => {
-    if (!pendingConsent) return;
+    if (!pendingConsent || isRegularMember) return;
 
     const { row, approvalType, bioImage, remainingApproveTypes = [] } = pendingConsent;
     const stateField = approvalType === 'basic' ? 'brief_bio_request_approval' : 'full_bio_request_approval';

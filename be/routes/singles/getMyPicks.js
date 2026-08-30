@@ -13,6 +13,10 @@ import { buildSinglesActiveStatusWhereSql } from './memberVisibility.js';
 import { sqlBooleanEnumIsTrue } from '../../utils/booleanEnum.js';
 import { ensurePostingQuarterlyPartitionsBeforeWrite } from '../../utils/ensureQuarterlyPartitions.js';
 import { resolveRegularMemberActivityTimestamp, loadLatestPostingCreatedAt } from '../../utils/regularMemberActivityTimestamp.js';
+import {
+  isProfilePhotoChangePostContent,
+  resolveProfilePhotoChangePostingTimestamp
+} from '../../utils/profilePhotoPostingTimestamp.js';
 import { normalizeApprovalStatus } from '../../utils/approvalStatusEnum.js';
 import { sqlGalleryVideoIdsSubquery } from '../../utils/galleryMediaSql.js';
 import { isToolsOnlyAdminAuth } from '../../utils/adminAuth.js';
@@ -1225,11 +1229,16 @@ export async function createMyPosting(req, res) {
       correctedPhotoUrls.push(await correctPostingMediaUrlForOwner(pool, me, url));
     }
 
-    // RegularMember: random created_at a few weeks after this member's previous post
-    // (first post: random in the last 3 years). Never "now".
+    // Profile-photo change posts are always stamped before every other posting.
+    // RegularMember: other posts are a few weeks after the previous post (never "now").
     // Doing DDL inside an open postings transaction deadlocks (ACCESS EXCLUSIVE vs RowShare).
-    const previousAt = await loadLatestPostingCreatedAt(pool, postingsSchema, me);
-    const activityAt = await resolveRegularMemberActivityTimestamp(pool, me, { previousAt });
+    let activityAt = null;
+    if (isProfilePhotoChangePostContent(content)) {
+      activityAt = await resolveProfilePhotoChangePostingTimestamp(pool, postingsSchema, me);
+    } else {
+      const previousAt = await loadLatestPostingCreatedAt(pool, postingsSchema, me);
+      activityAt = await resolveRegularMemberActivityTimestamp(pool, me, { previousAt });
+    }
     if (activityAt) {
       await ensurePostingQuarterlyPartitionsBeforeWrite(activityAt);
     }

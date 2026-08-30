@@ -56,7 +56,7 @@ gender_self_report F → JazzyJeff, BrainyBobby, LuckyLuke (guys)
 gender_self_report M → RapidRuth, GiddyGail, SillySue (girls)
 Wrong-gender leftover demo pack is removed.
 Skips NULL / unknown gender (those use the new-login popup later).
-Requires profile photo for welcome posting (same as seed utils).`);
+Does not auto-create a welcome posting.`
 }
 
 async function main() {

@@ -129,6 +129,32 @@ while true; do
 done
 
 # ---------------------------------------------------------------------------
+# 6b) Age range — two numbers with a dash (inclusive). Random pick for vet_bio.age
+# ---------------------------------------------------------------------------
+echo
+while true; do
+  read -r -p "Age range [18-25]: " AGE_RANGE_IN
+  AGE_RANGE="$(trim "${AGE_RANGE_IN:-18-25}")"
+  AGE_RANGE="$(printf '%s' "$AGE_RANGE" | tr -d ' ')"
+  if [[ "$AGE_RANGE" =~ ^([0-9]{1,3})-([0-9]{1,3})$ ]]; then
+    AGE_MIN="${BASH_REMATCH[1]}"
+    AGE_MAX="${BASH_REMATCH[2]}"
+    if (( AGE_MIN > AGE_MAX )); then
+      tmp="$AGE_MIN"
+      AGE_MIN="$AGE_MAX"
+      AGE_MAX="$tmp"
+    fi
+    if (( AGE_MIN < 18 || AGE_MAX > 99 )); then
+      echo "Use ages 18–99 (example: 18-25)."
+      continue
+    fi
+    AGE="$(rand_int "$AGE_MIN" "$AGE_MAX")"
+    break
+  fi
+  echo "Enter two numbers with a dash, like 18-25."
+done
+
+# ---------------------------------------------------------------------------
 # 7) Ethnicity + names
 # ---------------------------------------------------------------------------
 # Load gender-aware first / middle / last name pools for one ethnic key.
@@ -480,7 +506,6 @@ done
 # Bio helpers
 HEIGHTS=("5'02\"" "5'04\"" "5'06\"" "5'08\"" "5'10\"" "6'00\"" "6'02\"")
 HEIGHT="$(pick_from "${HEIGHTS[@]}")"
-AGE=$(rand_int 25 45)
 CURRENT_CITY="$(pick_from "Annandale, VA" "Arlington, VA" "Fairfax, VA" "Austin, TX" "Culver City, CA")"
 COMPANIES=("Acme Corp" "Northwind" "Contoso" "Brightside Labs" "Rivertech" "Summit Soft")
 JOBS=("Engineer" "Analyst" "Designer" "Manager" "Teacher" "Consultant" "Nurse" "Developer")
@@ -545,6 +570,7 @@ printf "%-22s %s\n" "status:" "$STATUS"
 printf "%-22s %s\n" "initial_setup_done:" "$INITIAL_SETUP_DONE"
 printf "%-22s %s\n" "password_hash:" "(cloned from ${DM1_EMAIL})"
 printf "%-22s %s\n" "dl_sex:" "$DL_SEX"
+printf "%-22s %s\n" "age:" "$AGE (from ${AGE_MIN}-${AGE_MAX})"
 printf "%-22s %s\n" "ethnicity:" "$ETHNIC_LABEL"
 printf "%-22s %s\n" "dl/mailing name:" "$FIRST_NAME / $MIDDLE_NAME / $LAST_NAME"
 printf "%-22s %s\n" "alias:" "$ALIAS"

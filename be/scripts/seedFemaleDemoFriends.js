@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI: seed an existing female member with RapidRuth-style demo friends + 1 sample posting.
+ * CLI: seed an existing female member with RapidRuth-style demo friends (no auto welcome posting).
  *
  * Usage (Mac, from repo root):
  *   node be/scripts/seedFemaleDemoFriends.js --email=regularmember2@gmail.com
@@ -55,10 +55,9 @@ Creates / upserts:
   • Mutual Buddy with JazzyJeff (approved full bio) + full_paid=true (no token popup)
   • Mutual Acquaint with BrainyBobby (approved brief bio) + brief_paid=true (no token popup)
   • Pending Buddy request to LuckyLuke (noresponse)
-  • One public welcome posting with profile photo attached (requires profile_image_fk)
-    created_at is a few weeks after this member's previous post (first post: random in last 3 years)
+  • Does not auto-create a welcome posting (members write their own)
+  • --force-post: optionally insert the old welcome posting + profile photo
   • Removes leftover wrong pack (RapidRuth / GiddyGail / SillySue) if present
-  • Skips duplicate welcome content; upgrades legacy hiking seed post if present
 
 Does NOT create a new singles row — target member must already exist.`);
 }
@@ -94,19 +93,20 @@ async function main() {
       for (const line of result.relationships) console.log(`  - ${line}`);
     }
     if (result.posting) {
+      const postingStatus = result.posting.skipped
+        ? 'skipped'
+        : result.posting.dryRun
+          ? 'would insert'
+          : result.posting.inserted
+            ? 'inserted'
+            : result.posting.upgraded || result.posting.photoInserted
+              ? 'updated'
+              : 'already existed';
       console.log(
         `  posting: post_id=${result.posting.postId ?? '—'} ` +
           `created_at=${result.posting.createdAt ? new Date(result.posting.createdAt).toISOString() : '—'} ` +
           `photo=${result.posting.photoUrl ?? '—'} ` +
-          `(${
-            result.posting.dryRun
-              ? 'would insert'
-              : result.posting.inserted
-                ? 'inserted'
-                : result.posting.upgraded || result.posting.photoInserted
-                  ? 'updated'
-                  : 'already existed'
-          })`
+          `(${postingStatus})`
       );
     }
     process.exit(0);

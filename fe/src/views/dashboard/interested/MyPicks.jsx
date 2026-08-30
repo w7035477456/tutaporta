@@ -1183,7 +1183,6 @@ export default function MyPicks() {
                 posts={visiblePosts}
                 loading={myPicksFeedLoading}
                 error={myPicksFeedError}
-                nestedScroll={false}
                 photoZoomBarVariant="full"
                 photoZoomBarHint={COLOR_TEMPLATE11_POSTING_PHOTO_FULLSCREEN_HINT_VIEW_ONLY}
                 photoFullscreenOverlayLines={photoFullscreenOverlayLines}
@@ -1207,6 +1206,7 @@ export default function MyPicks() {
                 feedHasMore={feedHasMore && selectedSinglesId != null}
                 loadMoreBusy={loadMoreBusy}
                 onLoadMore={handleLoadMorePosts}
+                sx={{ flex: 1, minHeight: 0, height: '100%', maxHeight: '100%' }}
               />
             ) : null}
           </Box>

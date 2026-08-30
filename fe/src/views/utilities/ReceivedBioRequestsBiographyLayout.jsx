@@ -51,6 +51,7 @@ import {
 } from 'utils/receivedBioRequestDisplay';
 import { APPROVAL_STATUS } from 'utils/approvalStatusEnum';
 import { useAuth } from 'contexts/AuthContext';
+import { isRegularMemberCategory } from 'utils/memberCategory';
 import { isAdminSession } from 'utils/adminSession';
 import CheckrBioReviewPanel from 'views/utilities/CheckrBioReviewPanel';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
@@ -182,6 +183,7 @@ export default function ReceivedBioRequestsBiographyLayout({
   approvedViewingDurationMonths = 12
 }) {
   const { user } = useAuth();
+  const isRegularMember = isRegularMemberCategory(user?.member_category);
   const theme = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -453,30 +455,34 @@ export default function ReceivedBioRequestsBiographyLayout({
     const viewingTermExpired =
       savedApproval === APPROVAL_STATUS.APPROVE && isApprovedViewingExpired(approvalDate, approvedViewingDurationMonths);
     const showExpiredResetPanel = !responseBoxEnabled || viewingTermExpired;
-    const responsePanelEnabled = responseBoxEnabled && !viewingTermExpired;
-    const canRespondToBioRequest = responseBoxEnabled && (responsePanelEnabled || viewingTermExpired);
+    const responsePanelEnabled = responseBoxEnabled && !viewingTermExpired && !isRegularMember;
+    const canRespondToBioRequest = responseBoxEnabled && (responsePanelEnabled || viewingTermExpired) && !isRegularMember;
     const responseBoxInteractive = canRespondToBioRequest;
     const radiosBusy = responseDisabled || Boolean(requestBusyKey) || busy;
     const approvalValue = triStateApproval(approvalState);
     const radioLabelSx = responseBoxInteractive ? responseRadioLabelSx : responseRadioLabelDisabledSx;
     const effectiveSavedApproval = responsePanelEnabled ? savedApproval : APPROVAL_STATUS.NO_RESPONSE;
-    const effectiveApprovalValue = canRespondToBioRequest ? approvalValue : APPROVAL_STATUS.NO_RESPONSE;
+    const effectiveApprovalValue =
+      isRegularMember || !canRespondToBioRequest ? APPROVAL_STATUS.NO_RESPONSE : approvalValue;
     const approvalTouched = Boolean(
       touchedApprovalsByRequestId[Number(row.singles_id_from)]?.[bioKind]
     );
     // Pending requests start with no radio selected until the user clicks one.
-    const radioGroupValue =
-      canRespondToBioRequest && !approvalTouched && approvalValue === APPROVAL_STATUS.NO_RESPONSE
+    const radioGroupValue = isRegularMember
+      ? APPROVAL_STATUS.NO_RESPONSE
+      : canRespondToBioRequest && !approvalTouched && approvalValue === APPROVAL_STATUS.NO_RESPONSE
         ? ''
         : approvalValue;
     const approveDenyLocked =
       responsePanelEnabled &&
       isApprovalLockedDuringStay(effectiveSavedApproval, approvalDate, approvalStayDurationDays);
-    const approveDenyDisabled = !canRespondToBioRequest
+    const approveDenyDisabled = isRegularMember
       ? true
-      : responsePanelEnabled
-        ? radiosBusy || approveDenyLocked
-        : radiosBusy;
+      : !canRespondToBioRequest
+        ? true
+        : responsePanelEnabled
+          ? radiosBusy || approveDenyLocked
+          : radiosBusy;
     const notRequestedResponseMessage = showExpiredResetPanel
       ? formatIncomingBioNotRequestedResponseMessage(bioKind)
       : '';
@@ -892,6 +898,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                     );
                   })()
                     : null}
+                  {!isRegularMember ? (
                   <Box
                     sx={{
                       display: 'flex',
@@ -926,6 +933,7 @@ export default function ReceivedBioRequestsBiographyLayout({
                       {submitResponseBusy ? 'Submitting…' : 'Submit Response'}
                     </GreenButton>
                   </Box>
+                  ) : null}
                   {showRequesterPreview ? (
                     <Box
                       ref={previewCaptureRef}
