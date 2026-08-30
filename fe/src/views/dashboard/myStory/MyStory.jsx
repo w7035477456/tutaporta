@@ -135,7 +135,8 @@ import {
 } from 'utils/signupReferralCode';
 import { MyAlbumPostingsInstructionPopup } from 'views/utilities/MyAlbumPostingsInstruction';
 import ProfilePhotoUploadQrPanel from 'components/ProfilePhotoUploadQrPanel';
-import { ERROR_VAR, readThemeDaylightColor } from 'utils/themeConfig';
+import { ERROR_VAR } from 'utils/themeConfig';
+import { COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG } from 'config/colorTemplate8PhotoGallery';
 import { themedAlert } from 'utils/themedDialog';
 
 const myStoryButtonFontSize = {
@@ -510,11 +511,11 @@ const motivationalPurpleText = {
 const ZOOM_VIEWPORT_W = 380;
 const ZOOM_VIEWPORT_H = 420;
 const VIEWPORT_ASPECT_RATIO = `${ZOOM_VIEWPORT_W} / ${ZOOM_VIEWPORT_H}`;
-/** Editor zoom slider: −50 … +50 (percent) → multiplier 0.5 … 1.5 (desktop & mobile) */
+/** Editor zoom slider: −50 … +200 (percent) → multiplier 0.5 … 3 (desktop & mobile) */
 const MOBILE_ZOOM_PCT_MIN = -50;
-const MOBILE_ZOOM_PCT_MAX = 50;
+const MOBILE_ZOOM_PCT_MAX = 200;
 const MOBILE_ZOOM_MULT_MIN = 0.5;
-const MOBILE_ZOOM_MULT_MAX = 1.5;
+const MOBILE_ZOOM_MULT_MAX = 3;
 
 function mobileZoomFromPercent(pct) {
   const raw = 1 + pct / 100;
@@ -617,7 +618,7 @@ function renderViewportCanvas(img, nw, nh, zoom, panX, panY, Vw, Vh, rotationDeg
   canvas.width = Vw;
   canvas.height = Vh;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = readThemeDaylightColor();
+  ctx.fillStyle = COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG;
   ctx.fillRect(0, 0, Vw, Vh);
   if (!rotationDeg) {
     const dispW = baseW * zoom;
@@ -975,8 +976,8 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
           borderRadius: 1,
           border: '1px solid',
           borderColor: 'divider',
-          bgcolor: 'var(--theme-daylight-color)',
-          backgroundColor: 'var(--theme-daylight-color)',
+          bgcolor: COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG,
+          backgroundColor: COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG,
           overflow: 'hidden',
           mx: { xs: 0, md: 0 }
         }}
@@ -1750,6 +1751,7 @@ export default function MyStory() {
         pendingAutoMakePhotoIdRef.current = null;
         if (wasFirstProfileSetup) {
           // Demo buddies seed on login / gender popup; retry if seed had not completed yet.
+          // Do not show SeedBuddiesPostingPopup after drag-drop / first profile photo.
           try {
             const { default: api } = await import('api/axios');
             const { data } = await api.post('/api/singles/seed-demo-buddies');
@@ -1759,8 +1761,12 @@ export default function MyStory() {
           } catch (seedErr) {
             console.warn('[MyStory] seed-demo-buddies retry failed', seedErr?.response?.data?.error || seedErr?.message || seedErr);
           }
-          pendingRefereeAfterSeedBuddiesRef.current = shouldShowRefereeRewardUxAfterProfileSetup();
-          setShowSeedBuddiesPostingPopup(true);
+          if (shouldShowRefereeRewardUxAfterProfileSetup()) {
+            clearRefereeRewardUxAfterProfileSetup();
+            navigate(PROFILES_RECORDS_PATH, {
+              state: { openTab: PROFILES_RECORDS_TAB_PAY_HISTORY, showRefereeRewardPopup: true }
+            });
+          }
           return;
         }
         if (!String(profileBasics.alias || user?.alias || '').trim()) {
@@ -1779,7 +1785,8 @@ export default function MyStory() {
       bumpProfilePhotoCache,
       profileBasics.alias,
       user?.alias,
-      updateSessionDemoBuddyFlags
+      updateSessionDemoBuddyFlags,
+      navigate
     ]
   );
 

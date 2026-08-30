@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
-import GreenButton from 'ui-component/GreenButton';
+import { COLOR_TEMPLATE7_POPUP_ACTION_GREEN } from 'config/colorTemplate7PopupLargeDark';
 import { saveSecretIcon, verifySecretIcon } from 'api/saveSecretIconFe';
 import RecordVaultIconPickerGrid from 'views/dashboard/recordVault/RecordVaultIconPickerGrid';
 import RecordVaultSecurityIconGlyph from 'views/dashboard/recordVault/RecordVaultSecurityIconGlyph';
@@ -130,14 +130,26 @@ export default function SecurityIconPickerDialog({
           >
             {selectedIcon ? <RecordVaultSecurityIconGlyph iconName={selectedIcon} sizePx={52} /> : null}
           </Box>
-          <GreenButton
+          <ColorTemplate7PopupLargeDark.ActionButton
             onClick={() => void handleSave()}
             disabled={saving || !selectedIcon || maxAttemptsReached}
             aria-busy={saving}
-            sx={saving ? { cursor: 'wait', pointerEvents: 'none' } : undefined}
+            sx={{
+              bgcolor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
+              backgroundColor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
+              color: '#000000 !important',
+              WebkitTextFillColor: '#000000 !important',
+              ...(saving ? { cursor: 'wait', pointerEvents: 'none' } : null),
+              '@media (hover: hover)': {
+                '&:hover:not(.Mui-disabled)': {
+                  bgcolor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
+                  backgroundColor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`
+                }
+              }
+            }}
           >
-            {saving ? 'Working…' : isVerifyMode ? 'Save' : 'Save'}
-          </GreenButton>
+            {saving ? 'Working…' : 'Save'}
+          </ColorTemplate7PopupLargeDark.ActionButton>
         </Box>
 
         {error ? (

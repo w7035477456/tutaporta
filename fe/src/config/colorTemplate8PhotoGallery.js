@@ -27,6 +27,9 @@ import {
 } from 'config/selectedUnselectedButtonTemplate';
 import { DAYNIGHT_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 
+/** Letterbox inside circular profile avatars — same dark grey on every card. */
+export const COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG = '#372E2A';
+
 /** Gallery column background */
 export const COLOR_TEMPLATE8_PHOTO_GALLERY_SHELL_BG = 'var(--theme-daynight-color)';
 /** Unselected stacked photo button — matches UnSelectedButtonTemplate */
@@ -373,10 +376,14 @@ export function colorTemplate8PhotoGalleryAvatarSx(
     transform: selected && !useFlatSelectedStyle ? `scale(${selectedAvatarScale})` : 'scale(1)',
     transformOrigin: 'center',
     transition: 'transform 180ms ease, border-width 180ms ease, border-radius 180ms ease',
+    bgcolor: `${COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG} !important`,
+    backgroundColor: `${COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG} !important`,
     '& img': {
-      objectFit: 'cover',
+      objectFit: 'contain',
       width: '100%',
       height: '100%',
+      bgcolor: COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG,
+      backgroundColor: COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG,
       ...(selected && !useFlatSelectedStyle
         ? {
             transform: 'scale(1.12)',

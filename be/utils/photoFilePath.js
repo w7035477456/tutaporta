@@ -134,12 +134,6 @@ export function isConsentSnapshotPhotoFileName(photoFileName) {
 
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
-export function normalizePhotoFileNameBase(raw, fallbackId) {
-  const value = String(raw || '').trim();
-  if (!value) return String(fallbackId);
-  return value.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
-}
-
 function tryUnlinkFile(targetPath, removed) {
   if (!targetPath || removed.has(targetPath)) return;
   try {
