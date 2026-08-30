@@ -2,7 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import pool from '../../db/connection.js';
 import { extToContentType } from '../../utils/albumUploadFormats.js';
-import { getPhotoFolder, resolvePhotoFilePath } from '../../utils/photoFilePath.js';
+import { getPhotoFolder, resolvePhotoFilePath, resolvePhotoOrigBackupPath } from '../../utils/photoFilePath.js';
 import { resolvePhotoThumbnailPath } from '../../utils/photoThumbnail.js';
 import { resolveRequestsAppSchema } from '../singles/resolveRequestsAppSchema.js';
 import { logMyStoryPhotos, logMyStoryPhotosAlways, myStoryPhotoDebugEnabled } from '../../utils/myStoryPhotoDebug.js';
@@ -351,7 +351,11 @@ export async function getPhoto(req, res) {
       }
     }
 
-    const fullPath = resolvePhotoFilePath(photoFolder, photoFileName, id, ext);
+    const wantOrig =
+      String(req.query?.source ?? '').trim().toLowerCase() === 'orig' && Number(photoOwnerId) === authSinglesId;
+    const fullPath = wantOrig
+      ? resolvePhotoOrigBackupPath(photoFolder, photoFileName, id)
+      : resolvePhotoFilePath(photoFolder, photoFileName, id, ext);
     if (!fullPath) {
       logMyStoryPhotosAlways('[getPhoto] 404 file not on disk', {
         id,

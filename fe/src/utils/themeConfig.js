@@ -174,6 +174,13 @@ export const INVERSE_DAYNIGHT_VAR = '--theme-inverse-daynight-color';
 export const DAYLIGHT_VAR = '--theme-daylight-color';
 export const INVERSE_DAYLIGHT_VAR = '--theme-inverse-daylight-color';
 
+/** Current `--theme-daylight-color` from the document root (editor letterbox / crop fill). */
+export function readThemeDaylightColor(fallback = '#FFFFFF') {
+  if (typeof document === 'undefined') return fallback;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(DAYLIGHT_VAR).trim();
+  return raw || fallback;
+}
+
 export const ERROR_VAR = '--theme-error-color';
 const ERROR_COLOR_VALUE = '#c62828';
 

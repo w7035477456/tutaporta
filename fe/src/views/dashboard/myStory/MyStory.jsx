@@ -135,7 +135,7 @@ import {
 } from 'utils/signupReferralCode';
 import { MyAlbumPostingsInstructionPopup } from 'views/utilities/MyAlbumPostingsInstruction';
 import ProfilePhotoUploadQrPanel from 'components/ProfilePhotoUploadQrPanel';
-import { ERROR_VAR } from 'utils/themeConfig';
+import { ERROR_VAR, readThemeDaylightColor } from 'utils/themeConfig';
 import { themedAlert } from 'utils/themedDialog';
 
 const myStoryButtonFontSize = {
@@ -608,7 +608,7 @@ const myStoryUploadGraphicHoverSx = {
   }
 };
 
-/** Full zoom viewport — white + image at current pan/zoom/rotate (size matches on-screen viewport). */
+/** Full zoom viewport — theme daylight letterbox + image at current pan/zoom/rotate. */
 function renderViewportCanvas(img, nw, nh, zoom, panX, panY, Vw, Vh, rotationDeg = 0) {
   const scaleFit = Math.min(Vw / nw, Vh / nh);
   const baseW = nw * scaleFit;
@@ -617,7 +617,7 @@ function renderViewportCanvas(img, nw, nh, zoom, panX, panY, Vw, Vh, rotationDeg
   canvas.width = Vw;
   canvas.height = Vh;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = readThemeDaylightColor();
   ctx.fillRect(0, 0, Vw, Vh);
   if (!rotationDeg) {
     const dispW = baseW * zoom;
@@ -638,6 +638,25 @@ function renderViewportCanvas(img, nw, nh, zoom, panX, panY, Vw, Vh, rotationDeg
 
 function viewportSnapshotToDataUrl(img, nw, nh, zoom, panX, panY, Vw, Vh, rotationDeg = 0) {
   return renderViewportCanvas(img, nw, nh, zoom, panX, panY, Vw, Vh, rotationDeg).toDataURL('image/jpeg', 0.92);
+}
+
+/** Prefer uncropped orig backup for editor display so letterbox follows live theme (not baked crop fill). */
+async function fetchEditorPhotoBlob(photosId, photoCacheBust) {
+  const cacheParam = photoCacheBust ?? Date.now();
+  try {
+    const origRes = await api.get(`/api/photo/${photosId}`, {
+      responseType: 'blob',
+      params: { v: cacheParam, source: 'orig' },
+      validateStatus: (status) => status === 200 || status === 404
+    });
+    if (origRes.status === 200) return origRes;
+  } catch {
+    /* fall through to main slot */
+  }
+  return api.get(`/api/photo/${photosId}`, {
+    responseType: 'blob',
+    params: { v: cacheParam }
+  });
 }
 
 const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoCacheBust, onPhotoSaved, onSaveError }, ref) {
@@ -702,10 +721,7 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
     if (!photosId) return;
     createdUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
     createdUrlsRef.current = [];
-    const res = await api.get(`/api/photo/${photosId}`, {
-      responseType: 'blob',
-      params: { v: photoCacheBust ?? Date.now() }
-    });
+    const res = await fetchEditorPhotoBlob(photosId, photoCacheBust);
     const u = URL.createObjectURL(res.data);
     createdUrlsRef.current.push(u);
     originalUrlRef.current = u;
@@ -728,11 +744,7 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
     setPanY(0);
     setRotationDeg(0);
     let cancelled = false;
-    api
-      .get(`/api/photo/${photosId}`, {
-        responseType: 'blob',
-        params: { v: photoCacheBust ?? Date.now() }
-      })
+    fetchEditorPhotoBlob(photosId, photoCacheBust)
       .then((res) => {
         if (cancelled) return;
         const u = URL.createObjectURL(res.data);
@@ -964,6 +976,7 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
           border: '1px solid',
           borderColor: 'divider',
           bgcolor: 'var(--theme-daylight-color)',
+          backgroundColor: 'var(--theme-daylight-color)',
           overflow: 'hidden',
           mx: { xs: 0, md: 0 }
         }}

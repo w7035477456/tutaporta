@@ -79,6 +79,24 @@ export function resolvePhotoFilePath(photoFolder, photoFileName, photosId, ext) 
   return hit ? path.resolve(hit) : null;
 }
 
+export function normalizePhotoFileNameBase(raw, fallbackId) {
+  const value = String(raw || '').trim();
+  if (!value) return String(fallbackId);
+  return value.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+}
+
+/** `{photo_file_name}orig.jpg` or legacy `{photosId}orig.jpg` when present on disk. */
+export function resolvePhotoOrigBackupPath(photoFolder, photoFileName, photosId) {
+  if (!photoFolder) return null;
+  const filePathDir = path.resolve(String(photoFolder).replace(/\/+$/, ''));
+  const fileBase = normalizePhotoFileNameBase(photoFileName, photosId);
+  const origPath = path.join(filePathDir, `${fileBase}orig.jpg`);
+  const legacyOrigPath = path.join(filePathDir, `${photosId}orig.jpg`);
+  if (fs.existsSync(origPath)) return path.resolve(origPath);
+  if (fs.existsSync(legacyOrigPath)) return path.resolve(legacyOrigPath);
+  return null;
+}
+
 /**
  * Listing-only resolver: requires `photo_file_name` and never falls back to `{photosId}.{ext}`.
  * Prevents stale on-disk files (e.g. legacy demo `4.jpg`) from appearing for unrelated rows.

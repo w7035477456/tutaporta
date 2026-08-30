@@ -3,12 +3,7 @@ import fs from 'fs';
 import pool from '../../db/connection.js';
 import { getPhotoFolder } from './uploadPhoto.js';
 import { regeneratePhotoThumbnail } from '../../utils/photoThumbnail.js';
-
-function normalizePhotoFileNameBase(raw, fallbackId) {
-  const value = String(raw || '').trim();
-  if (!value) return String(fallbackId);
-  return value.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
-}
+import { normalizePhotoFileNameBase } from '../../utils/photoFilePath.js';
 
 /**
  * POST /api/myPhotos/:id/resetOriginal
