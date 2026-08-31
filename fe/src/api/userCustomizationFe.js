@@ -135,6 +135,15 @@ function parseAllSinglesWelcomeExpanded(data) {
   return true;
 }
 
+function parseNullableFirstVisitFlag(data, key) {
+  if (!data || !Object.prototype.hasOwnProperty.call(data, key)) return null;
+  const value = data[key];
+  if (value === null || value === undefined) return null;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return null;
+}
+
 function mapCustomizationResponse(data) {
   return {
     chatFontSize: parseChatFontSize(data),
@@ -147,6 +156,9 @@ function mapCustomizationResponse(data) {
     customMusicUrls: parseCustomMusicUrls(data),
     loadDefault: parseLoadDefault(data),
     allSinglesWelcomeExpanded: parseAllSinglesWelcomeExpanded(data),
+    firstVisitPicksPosts: parseNullableFirstVisitFlag(data, 'firstVisitPicksPosts'),
+    firstVisitAcquaintBuddies: parseNullableFirstVisitFlag(data, 'firstVisitAcquaintBuddies'),
+    firstVisitRecBioRequest: parseNullableFirstVisitFlag(data, 'firstVisitRecBioRequest'),
     mainFont: String(data?.mainFont || '').trim() || 'Algerian, fantasy',
     ...parseMynoteEditorPrefs(data)
   };
@@ -185,6 +197,15 @@ export async function saveUserCustomization(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'allSinglesWelcomeExpanded')) {
     body.allSinglesWelcomeExpanded = Boolean(patch.allSinglesWelcomeExpanded);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'firstVisitPicksPosts')) {
+    body.firstVisitPicksPosts = patch.firstVisitPicksPosts;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'firstVisitAcquaintBuddies')) {
+    body.firstVisitAcquaintBuddies = patch.firstVisitAcquaintBuddies;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'firstVisitRecBioRequest')) {
+    body.firstVisitRecBioRequest = patch.firstVisitRecBioRequest;
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'mainFont')) {
     body.mainFont = patch.mainFont;

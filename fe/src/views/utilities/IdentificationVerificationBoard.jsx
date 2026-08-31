@@ -14,7 +14,9 @@ import {
   colorTemplate7PopupTextFontSizeResponsive
 } from 'config/colorTemplate7PopupLargeDark';
 import { BUTTON_TEMPLATE_THICK_BLACK_BORDER } from 'config/selectedUnselectedButtonTemplate';
-import { requiredLabelSuffixSx } from 'config/requiredLabelSuffix';
+import { requiredLabelSuffixSx, requiredLabelSuffixYellowSx } from 'config/requiredLabelSuffix';
+import useRequiredLabelSuffixSx from 'hooks/useRequiredLabelSuffixSx';
+import { YELLOW_VAR } from 'utils/themeConfig';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
 import Button from '@mui/material/Button';
@@ -43,11 +45,13 @@ const liveScanStepInstructionBodySx = {
   px: 0.5
 };
 
-const requiredLabelSuffixSxLocal = requiredLabelSuffixSx;
+const optionalLabelSuffixSx = requiredLabelSuffixSx;
 
-export function RequiredLabelSuffix() {
+export function RequiredLabelSuffix({ forceYellow = true }) {
+  const themeSx = useRequiredLabelSuffixSx();
+  const suffixSx = forceYellow ? requiredLabelSuffixYellowSx : themeSx;
   return (
-    <Box component="span" sx={requiredLabelSuffixSxLocal}>
+    <Box component="span" className="required-label-suffix" sx={suffixSx}>
       {' '}
       (Required)
     </Box>
@@ -56,7 +60,7 @@ export function RequiredLabelSuffix() {
 
 export function OptionalLabelSuffix() {
   return (
-    <Box component="span" sx={requiredLabelSuffixSxLocal}>
+    <Box component="span" sx={optionalLabelSuffixSx}>
       {' '}
       (Optional)
     </Box>
@@ -685,40 +689,30 @@ function formatSexDisplay(sex) {
   return String(sex);
 }
 
-/** Yellow badge with black border — shown when OCR age ≥ 18 (two lines). */
-function VerifiedOver18Badge() {
+/** Yellow text + black stroke — replaces DOB when OCR age ≥ 18. */
+function VerifiedOver18AgeLabel() {
   return (
     <Box
+      component="span"
       sx={{
-        bgcolor: '#FFEB3B',
-        color: '#000',
-        border: '2px solid #000',
-        px: 1,
-        py: 0.35,
-        lineHeight: 1.15,
+        color: `var(${YELLOW_VAR}) !important`,
+        WebkitTextFillColor: `var(${YELLOW_VAR}) !important`,
         fontWeight: 700,
-        fontSize: { xs: '0.7rem', sm: '0.75rem' },
-        textAlign: 'center',
-        flexShrink: 0
+        WebkitTextStroke: REQUIRED_LABEL_TEXT_STROKE,
+        paintOrder: 'stroke fill'
       }}
     >
-      <Box component="span" sx={{ display: 'block' }}>
-        (Verified over 18,
-      </Box>
-      <Box component="span" sx={{ display: 'block' }}>
-        require to use site)
-      </Box>
+      (Verified over 18 age)
     </Box>
   );
 }
 
 function DobWithOver18Badge({ dateOfBirth, age }) {
-  const showBadge = Number.isFinite(age) && age >= 18;
+  const showVerifiedLabel = Number.isFinite(age) && age >= 18;
   return (
-    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-      <ColorTemplate7PopupLargeDark.BodyText sx={{ mb: 0 }}>{dateOfBirth || '—'}</ColorTemplate7PopupLargeDark.BodyText>
-      {showBadge ? <VerifiedOver18Badge /> : null}
-    </Box>
+    <ColorTemplate7PopupLargeDark.BodyText sx={{ mb: 0 }}>
+      {showVerifiedLabel ? <VerifiedOver18AgeLabel /> : dateOfBirth || '—'}
+    </ColorTemplate7PopupLargeDark.BodyText>
   );
 }
 

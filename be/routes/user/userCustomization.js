@@ -20,6 +20,37 @@ const SOUND_PREFERENCES = new Set(['piano', 'harpbirds', 'spasauna', 'musictranc
 const VSINGLES_LYRIC_VALUES = new Set(['lyric', 'mute']);
 const CUSTOM_MUSIC_URL_SLOT_COUNT = 10;
 
+const FIRST_VISIT_PAGE_PREF_KEYS = [
+  'firstVisitPicksPosts',
+  'firstVisitAcquaintBuddies',
+  'firstVisitRecBioRequest'
+];
+
+const FIRST_VISIT_PAGE_PREF_API_TO_DB = {
+  firstVisitPicksPosts: 'first_visit_picksposts',
+  firstVisitAcquaintBuddies: 'first_visit_acquaintbuddies',
+  firstVisitRecBioRequest: 'first_visit_rec_biorequest'
+};
+
+function parseNullableBooleanVisitFlag(value) {
+  if (value === null || value === undefined) return null;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return null;
+}
+
+function firstVisitFlagsFromDbRow(row) {
+  return {
+    firstVisitPicksPosts: parseNullableBooleanVisitFlag(row?.first_visit_picksposts),
+    firstVisitAcquaintBuddies: parseNullableBooleanVisitFlag(row?.first_visit_acquaintbuddies),
+    firstVisitRecBioRequest: parseNullableBooleanVisitFlag(row?.first_visit_rec_biorequest)
+  };
+}
+
+function hasAnyFirstVisitPagePref(body) {
+  return FIRST_VISIT_PAGE_PREF_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+}
+
 /** Defaults for new members until they change preferences in the UI. */
 const DEFAULT_NEW_USER_VOLUME = 0;
 const DEFAULT_NEW_USER_LYRIC_VOLUME = 1;
@@ -187,6 +218,9 @@ function rowToPayload(row) {
       loadDefault: true,
       allSinglesWelcomeExpanded: true,
       mainFont: DEFAULT_MAIN_FONT,
+      firstVisitPicksPosts: null,
+      firstVisitAcquaintBuddies: null,
+      firstVisitRecBioRequest: null,
       ...mynotePrefsFromDbRow(null)
     };
   }
@@ -227,6 +261,7 @@ function rowToPayload(row) {
     allSinglesWelcomeExpanded:
       row.all_singles_welcome_expanded != null ? parseBooleanEnumRaw(row.all_singles_welcome_expanded) : true,
     mainFont: normalizeMainFont(row.main_font),
+    ...firstVisitFlagsFromDbRow(row),
     ...mynotePrefsFromDbRow(row)
   };
 }
@@ -328,6 +363,9 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS mynote_note_scroll_top integer NULL,
       ADD COLUMN IF NOT EXISTS mynote_editor_caret_pos integer NULL,
       ADD COLUMN IF NOT EXISTS all_singles_welcome_expanded helloworldjunktest.boolean_enum NOT NULL DEFAULT 'true'::helloworldjunktest.boolean_enum,
+      ADD COLUMN IF NOT EXISTS first_visit_picksposts boolean NULL,
+      ADD COLUMN IF NOT EXISTS first_visit_acquaintbuddies boolean NULL,
+      ADD COLUMN IF NOT EXISTS first_visit_rec_biorequest boolean NULL,
       ADD COLUMN IF NOT EXISTS main_font text NOT NULL DEFAULT 'Algerian, fantasy',
       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW()
   `);
@@ -538,7 +576,7 @@ async function selectCustomizationRow(me) {
              , mynote_last_notebook_id, mynote_last_note_id
              , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
              , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
-             , all_singles_welcome_expanded, main_font
+             , all_singles_welcome_expanded, first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
        FROM helloworldjunktest.user_customization
        WHERE singles_id = $1`,
       [me]
@@ -844,6 +882,7 @@ export async function putUserCustomization(req, res) {
   const hasMynoteFontSize = Object.prototype.hasOwnProperty.call(body, 'mynoteFontSize');
   const hasAllSinglesWelcomeExpanded = Object.prototype.hasOwnProperty.call(body, 'allSinglesWelcomeExpanded');
   const hasMainFont = Object.prototype.hasOwnProperty.call(body, 'mainFont');
+  const hasAnyFirstVisitPref = hasAnyFirstVisitPagePref(body);
   const hasAnyMynotePref = MYNOTE_PREFS_API_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
 
   if (
@@ -857,7 +896,8 @@ export async function putUserCustomization(req, res) {
     !hasVolume &&
     !hasCustomMusicUrls &&
     !hasAllSinglesWelcomeExpanded &&
-    !hasMainFont
+    !hasMainFont &&
+    !hasAnyFirstVisitPref
   ) {
     return res.status(400).json({ error: 'No customization fields provided' });
   }
@@ -955,6 +995,18 @@ export async function putUserCustomization(req, res) {
     mainFont = normalizeMainFont(body.mainFont);
   }
 
+  const firstVisitPatch = {};
+  if (hasAnyFirstVisitPref) {
+    for (const apiKey of FIRST_VISIT_PAGE_PREF_KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(body, apiKey)) continue;
+      const parsed = parseNullableBooleanVisitFlag(body[apiKey]);
+      if (parsed !== true && parsed !== false && parsed !== null) {
+        return res.status(400).json({ error: `Invalid ${apiKey}` });
+      }
+      firstVisitPatch[apiKey] = parsed;
+    }
+  }
+
   try {
     await ensureCustomizationSchema();
     const prev = await selectCustomizationRow(me);
@@ -1026,6 +1078,22 @@ export async function putUserCustomization(req, res) {
         if (!isMissingColumn(fontErr, 'main_font')) throw fontErr;
       }
     }
+    if (hasAnyFirstVisitPref) {
+      for (const [apiKey, dbCol] of Object.entries(FIRST_VISIT_PAGE_PREF_API_TO_DB)) {
+        if (!Object.prototype.hasOwnProperty.call(firstVisitPatch, apiKey)) continue;
+        try {
+          await pool.query(
+            `UPDATE helloworldjunktest.user_customization
+             SET ${dbCol} = $1, updated_at = NOW()
+             WHERE singles_id = $2`,
+            [firstVisitPatch[apiKey], me]
+          );
+        } catch (visitErr) {
+          if (!isMissingColumn(visitErr, dbCol)) throw visitErr;
+        }
+      }
+    }
+    const refreshed = await selectCustomizationRow(me);
     return res.status(200).json(rowToPayload({
       chat_font_size: nextChatFontSize,
       mynote_font_size: nextMynoteFontSize,
@@ -1038,7 +1106,12 @@ export async function putUserCustomization(req, res) {
       all_singles_welcome_expanded: nextAllSinglesWelcomeExpanded,
       load_default: parseLoadDefaultFlag(prev),
       main_font: nextMainFont,
-      ...nextMynoteDb
+      ...nextMynoteDb,
+      ...firstVisitFlagsFromDbRow(refreshed ?? {
+        first_visit_picksposts: firstVisitPatch.firstVisitPicksPosts,
+        first_visit_acquaintbuddies: firstVisitPatch.firstVisitAcquaintBuddies,
+        first_visit_rec_biorequest: firstVisitPatch.firstVisitRecBioRequest
+      })
     }));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {

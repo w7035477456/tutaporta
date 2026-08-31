@@ -34,7 +34,9 @@ import { isAdminImpersonationBypassSession, isAdminSession, isImpersonationSessi
 import NicknamePickerDialog from './NicknamePickerDialog';
 import SecurityIconPickerDialog from './SecurityIconPickerDialog';
 import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
+import GenderSelfReportPopup from 'ui-component/GenderSelfReportPopup';
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
+import { hasGenderSelfReport } from 'utils/firstLoginOnboarding';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { markSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import {
@@ -1162,6 +1164,7 @@ export default function MyStory() {
   const userClearedAliasRef = useRef(false);
   const userDismissedSecurityIconRef = useRef(false);
   const [showFirstPhotoDialog, setShowFirstPhotoDialog] = useState(false);
+  const [showGenderDialog, setShowGenderDialog] = useState(false);
   const [showSeedBuddiesPostingPopup, setShowSeedBuddiesPostingPopup] = useState(false);
   const pendingRefereeAfterSeedBuddiesRef = useRef(false);
   const [showNicknameDialog, setShowNicknameDialog] = useState(false);
@@ -1755,17 +1758,6 @@ export default function MyStory() {
         didInitSelectionRef.current = true;
         pendingAutoMakePhotoIdRef.current = null;
         if (wasFirstProfileSetup) {
-          // Demo buddies seed on login / gender popup; retry if seed had not completed yet.
-          // Do not show SeedBuddiesPostingPopup after drag-drop / first profile photo.
-          try {
-            const { default: apiClient } = await import('api/axios');
-            const { data } = await apiClient.post('/api/singles/seed-demo-buddies');
-            updateSessionDemoBuddyFlags({
-              seeded_demo_buddies_boolean: Boolean(data?.seeded_demo_buddies_boolean)
-            });
-          } catch (seedErr) {
-            console.warn('[MyStory] seed-demo-buddies retry failed', seedErr?.response?.data?.error || seedErr?.message || seedErr);
-          }
           if (shouldShowRefereeRewardUxAfterProfileSetup()) {
             clearRefereeRewardUxAfterProfileSetup();
             navigate(PROFILES_RECORDS_PATH, {
@@ -1773,14 +1765,24 @@ export default function MyStory() {
             });
             return;
           }
-          // Mandatory first-login: continue to alias → secret → IDV.
-          if (FIRST_LOGIN_AUTO_POPUPS_ENABLED && !String(profileBasics.alias || user?.alias || '').trim()) {
-            setShowNicknameDialog(true);
+          // Mandatory first-login: gender → alias → secret → IDV.
+          if (FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
+            if (!hasGenderSelfReport(user)) {
+              setShowGenderDialog(true);
+              return;
+            }
+            if (!String(profileBasics.alias || user?.alias || '').trim()) {
+              setShowNicknameDialog(true);
+            }
           }
           return;
         }
         if (!String(profileBasics.alias || user?.alias || '').trim()) {
-          setShowNicknameDialog(true);
+          if (!hasGenderSelfReport(user)) {
+            setShowGenderDialog(true);
+          } else {
+            setShowNicknameDialog(true);
+          }
         }
       } catch (err) {
         setUploadError(err?.response?.data?.error || err?.message || 'Failed to crop or set profile photo');
@@ -1795,7 +1797,7 @@ export default function MyStory() {
       bumpProfilePhotoCache,
       profileBasics.alias,
       user?.alias,
-      updateSessionDemoBuddyFlags,
+      user?.gender_self_report,
       navigate
     ]
   );
@@ -1840,9 +1842,22 @@ export default function MyStory() {
   useEffect(() => {
     if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;
     if (userClearedAliasRef.current) return;
-    if (myPhotosLoading || pendingAutoMakeProfile || showFirstPhotoDialog || showSeedBuddiesPostingPopup) return;
+    if (
+      myPhotosLoading ||
+      pendingAutoMakeProfile ||
+      showFirstPhotoDialog ||
+      showGenderDialog ||
+      showSeedBuddiesPostingPopup
+    ) {
+      return;
+    }
     if (!profilePhotoId || hasNickname) {
       if (hasNickname) setShowNicknameDialog(false);
+      return;
+    }
+    if (!hasGenderSelfReport(user)) {
+      setShowGenderDialog(true);
+      setShowNicknameDialog(false);
       return;
     }
     setShowNicknameDialog(true);
@@ -1852,8 +1867,24 @@ export default function MyStory() {
     hasNickname,
     pendingAutoMakeProfile,
     showFirstPhotoDialog,
-    showSeedBuddiesPostingPopup
+    showGenderDialog,
+    showSeedBuddiesPostingPopup,
+    user?.gender_self_report
   ]);
+
+  const handleGenderSelfReportCompleted = useCallback(
+    (flags) => {
+      updateSessionDemoBuddyFlags({
+        gender_self_report: flags?.gender_self_report,
+        seeded_demo_buddies_boolean: flags?.seeded_demo_buddies_boolean
+      });
+      setShowGenderDialog(false);
+      if (!String(profileBasics.alias || user?.alias || '').trim()) {
+        setShowNicknameDialog(true);
+      }
+    },
+    [updateSessionDemoBuddyFlags, profileBasics.alias, user?.alias]
+  );
 
   const handleSeedBuddiesPostingContinue = useCallback(() => {
     setShowSeedBuddiesPostingPopup(false);
@@ -1866,7 +1897,11 @@ export default function MyStory() {
       return;
     }
     if (!String(profileBasics.alias || user?.alias || '').trim()) {
-      setShowNicknameDialog(true);
+      if (!hasGenderSelfReport(user)) {
+        setShowGenderDialog(true);
+      } else {
+        setShowNicknameDialog(true);
+      }
       return;
     }
     if (!hasSecretIcon) {
@@ -1877,7 +1912,7 @@ export default function MyStory() {
     navigate(SELF_REPORT_BIOGRAPHY_PATH, {
       state: { openIdentificationVerification: true }
     });
-  }, [navigate, profileBasics.alias, user?.alias, hasSecretIcon]);
+  }, [navigate, profileBasics.alias, user?.alias, user?.gender_self_report, hasSecretIcon]);
 
   const handleNicknameSaved = useCallback(
     (nickname) => {
@@ -1920,6 +1955,7 @@ export default function MyStory() {
     if (userDismissedSecurityIconRef.current) return;
     if (
       profileBasicsLoading ||
+      showGenderDialog ||
       showNicknameDialog ||
       suggestListOpen ||
       showSecurityIconDialog ||
@@ -1933,6 +1969,7 @@ export default function MyStory() {
     profileBasicsLoading,
     hasNickname,
     hasSecretIcon,
+    showGenderDialog,
     showNicknameDialog,
     suggestListOpen,
     showSecurityIconDialog,
@@ -3239,6 +3276,7 @@ export default function MyStory() {
         confirmLabel="Yes"
       />
       <SeedBuddiesPostingPopup open={showSeedBuddiesPostingPopup} onContinue={handleSeedBuddiesPostingContinue} />
+      <GenderSelfReportPopup open={showGenderDialog} onCompleted={handleGenderSelfReportCompleted} />
       <NicknamePickerDialog
         open={showNicknameDialog || suggestListOpen}
         initialNickname={profileBasics.alias || user?.alias || ''}

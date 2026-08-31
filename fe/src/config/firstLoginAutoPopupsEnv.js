@@ -1,6 +1,6 @@
 /**
  * Master switch for mandatory first-login onboarding:
- * profile photo → alias/secret → Identification Verification → All Singles congrats.
+ * profile photo → gender → alias/secret → Identification Verification → All Singles congrats.
  */
 export const FIRST_LOGIN_AUTO_POPUPS_ENABLED = true;
 

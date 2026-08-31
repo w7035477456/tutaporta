@@ -44,6 +44,7 @@ import {
   formatIncomingBioNotRequestedResponseMessage,
   formatIncomingBioRequestMessageParts,
   formatIncomingBioYourResponseHeading,
+  INCOMING_AUTO_MUTUAL_APPROVE_RADIO_LABEL,
   isApprovedViewingExpired,
   isApprovalLockedDuringStay,
   isBioRequestRequested,
@@ -330,14 +331,27 @@ export default function ReceivedBioRequestsBiographyLayout({
     const touched = Number.isFinite(touchKey) ? touchedApprovalsByRequestId[touchKey] ?? {} : {};
     const briefRequested = isBioRequestRequested(selectedRow.brief_bio_request);
     const fullRequested = isBioRequestRequested(selectedRow.full_bio_request);
+    const briefAutoMutualFromOutgoing = Boolean(selectedRow.brief_auto_mutual_from_outgoing);
+    const fullAutoMutualFromOutgoing = Boolean(selectedRow.full_auto_mutual_from_outgoing);
+    const hasActionableResponse =
+      (briefRequested && !briefAutoMutualFromOutgoing) || (fullRequested && !fullAutoMutualFromOutgoing);
+    if (!hasActionableResponse) return false;
+
     const briefApproval = triStateApproval(selectedRow.brief_bio_request_approval);
     const fullApproval = triStateApproval(selectedRow.full_bio_request_approval);
 
     // Approve/Deny: draft leaves noresponse. No Response: requires an explicit radio click (touched).
+    // Auto-mutual from outgoing initiative is already approved and locked.
     const briefChosen =
-      briefRequested && (Boolean(touched.brief) || briefApproval !== APPROVAL_STATUS.NO_RESPONSE);
+      briefRequested &&
+      (briefAutoMutualFromOutgoing ||
+        Boolean(touched.brief) ||
+        briefApproval !== APPROVAL_STATUS.NO_RESPONSE);
     const fullChosen =
-      fullRequested && (Boolean(touched.full) || fullApproval !== APPROVAL_STATUS.NO_RESPONSE);
+      fullRequested &&
+      (fullAutoMutualFromOutgoing ||
+        Boolean(touched.full) ||
+        fullApproval !== APPROVAL_STATUS.NO_RESPONSE);
 
     return briefChosen || fullChosen;
   }, [selectedRow, responseDisabled, requestBusyKey, touchedApprovalsByRequestId]);
@@ -486,10 +500,15 @@ export default function ReceivedBioRequestsBiographyLayout({
     const notRequestedResponseMessage = showExpiredResetPanel
       ? formatIncomingBioNotRequestedResponseMessage(bioKind)
       : '';
-    const approveRadioLabel = 'Approve';
+    const autoMutualFromOutgoing =
+      bioKind === 'brief' ? Boolean(row.brief_auto_mutual_from_outgoing) : Boolean(row.full_auto_mutual_from_outgoing);
+    const approveRadioLabel = autoMutualFromOutgoing
+      ? INCOMING_AUTO_MUTUAL_APPROVE_RADIO_LABEL
+      : 'Approve';
+    const autoMutualLocked = autoMutualFromOutgoing && approvalValue === APPROVAL_STATUS.APPROVE;
 
     const handleRadioChange = (nextValue) => {
-      if (!canRespondToBioRequest || approveDenyDisabled) return;
+      if (!canRespondToBioRequest || approveDenyDisabled || autoMutualLocked) return;
       markApprovalTouched(row.singles_id_from, bioKind);
       if (typeof onApprovalChange === 'function') {
         onApprovalChange(row, approvalType, nextValue);
@@ -595,7 +614,7 @@ export default function ReceivedBioRequestsBiographyLayout({
               </Typography>
             ) : null}
             <RadioGroup
-              value={radioGroupValue}
+              value={autoMutualLocked ? APPROVAL_STATUS.APPROVE : radioGroupValue}
               onChange={(e) => handleRadioChange(e.target.value)}
               sx={{
                 mt: 0,
@@ -605,25 +624,33 @@ export default function ReceivedBioRequestsBiographyLayout({
             >
               <FormControlLabel
                 value={APPROVAL_STATUS.APPROVE}
-                disabled={approveDenyDisabled}
+                disabled={approveDenyDisabled || autoMutualLocked}
                 control={<Radio />}
                 label={approveRadioLabel}
-                sx={approveDenyLocked && responsePanelEnabled ? responseRadioLabelDisabledSx : radioLabelSx}
+                sx={
+                  (approveDenyLocked || autoMutualLocked) && responsePanelEnabled
+                    ? responseRadioLabelDisabledSx
+                    : radioLabelSx
+                }
               />
-              <FormControlLabel
-                value={APPROVAL_STATUS.DENY}
-                disabled={approveDenyDisabled}
-                control={<Radio />}
-                label="Deny"
-                sx={approveDenyLocked && responsePanelEnabled ? responseRadioLabelDisabledSx : radioLabelSx}
-              />
-              <FormControlLabel
-                value={APPROVAL_STATUS.NO_RESPONSE}
-                disabled={approveDenyDisabled}
-                control={<Radio />}
-                label="No Response"
-                sx={approveDenyLocked && responsePanelEnabled ? responseRadioLabelDisabledSx : radioLabelSx}
-              />
+              {!autoMutualLocked ? (
+                <>
+                  <FormControlLabel
+                    value={APPROVAL_STATUS.DENY}
+                    disabled={approveDenyDisabled}
+                    control={<Radio />}
+                    label="Deny"
+                    sx={approveDenyLocked && responsePanelEnabled ? responseRadioLabelDisabledSx : radioLabelSx}
+                  />
+                  <FormControlLabel
+                    value={APPROVAL_STATUS.NO_RESPONSE}
+                    disabled={approveDenyDisabled}
+                    control={<Radio />}
+                    label="No Response"
+                    sx={approveDenyLocked && responsePanelEnabled ? responseRadioLabelDisabledSx : radioLabelSx}
+                  />
+                </>
+              ) : null}
             </RadioGroup>
           </Box>
         </Box>

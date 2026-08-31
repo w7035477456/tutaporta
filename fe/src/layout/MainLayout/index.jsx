@@ -41,7 +41,6 @@ import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeade
 import DemoOnlyModeBanner from 'ui-component/DemoOnlyModeBanner';
 import { getAdminImpersonationHeaderState, adminImpersonationHeaderCenterWrapSx } from 'config/adminImpersonationHeader';
 import LegacyPasswordUpgradeDialog from 'views/auth-forms/LegacyPasswordUpgradeDialog';
-import GenderSelfReportPopup from 'ui-component/GenderSelfReportPopup';
 import RecordVaultLeaveBusyOverlay from 'ui-component/RecordVaultLeaveBusyOverlay';
 import PhotoAlbumsLeaveBusyOverlay from 'ui-component/PhotoAlbumsLeaveBusyOverlay';
 import { useAuth } from 'contexts/AuthContext';
@@ -62,10 +61,8 @@ import {
 } from 'config/photoAlbumsLayout';
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { isTutaDatesLandingPath, isTutaDatesPath } from 'constants/tutaDatesRoute';
-import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
-import { hasProfilePhotoFk, isFirstLoginOnboardingCongratsPending } from 'utils/firstLoginOnboarding';
-import { isOver18Verified, normalizeOver18Verified, OVER18_REQUIRED_SITE_MESSAGE } from 'utils/over18Verified';
+import { normalizeOver18Verified, OVER18_REQUIRED_SITE_MESSAGE } from 'utils/over18Verified';
 import { themedAlert } from 'utils/themedDialog';
 import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 
@@ -126,21 +123,10 @@ export default function MainLayout() {
   const mobileEdgeToEdge = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, updateSessionDemoBuddyFlags, logout } = useAuth();
+  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, logout } = useAuth();
   const adminHeader = getAdminImpersonationHeaderState(user);
   const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
   const idvLockActive = isIdentificationVerificationLockActive(user);
-  const needsGenderSelfReport =
-    FIRST_LOGIN_AUTO_POPUPS_ENABLED &&
-    Boolean(user) &&
-    !user.tools_only &&
-    !isGuestDemoLogin(user) &&
-    isOver18Verified(user.over_18_verified) &&
-    !idvLockActive &&
-    hasProfilePhotoFk(user) &&
-    !isFirstLoginOnboardingCongratsPending() &&
-    !user.seeded_demo_buddies_boolean &&
-    (user.gender_self_report !== 'M' && user.gender_self_report !== 'F');
   useFlowerShopLightThemeOverride();
 
   // over_18_verified === false → block with OK-only message, then logout (status already under18).
@@ -537,15 +523,6 @@ export default function MainLayout() {
       <LegacyPasswordUpgradeDialog
         open={Boolean(user) && requiresPasswordUpgrade}
         onSubmit={upgradeLegacyPassword}
-      />
-      <GenderSelfReportPopup
-        open={needsGenderSelfReport && !requiresPasswordUpgrade}
-        onCompleted={(flags) => {
-          updateSessionDemoBuddyFlags({
-            gender_self_report: flags?.gender_self_report,
-            seeded_demo_buddies_boolean: flags?.seeded_demo_buddies_boolean
-          });
-        }}
       />
       <RecordVaultLeaveBusyOverlay />
       <PhotoAlbumsLeaveBusyOverlay />

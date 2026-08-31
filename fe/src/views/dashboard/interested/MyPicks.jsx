@@ -71,6 +71,8 @@ import { dispatchBellNotificationRefresh } from 'utils/notificationBellStore';
 import { themedAlert } from 'utils/themedDialog';
 import { isMyPicksDedupeRefreshEnabled } from 'config/myPicksRefreshEnv';
 import NotificationSection from 'layout/MainLayout/Header/NotificationSection';
+import FirstVisitPageWelcomePopup from 'ui-component/FirstVisitPageWelcomePopup';
+import useFirstVisitPageWelcomePopup from 'hooks/useFirstVisitPageWelcomePopup';
 import { colorTemplate1WallColorByTheme } from 'config/colorTemplate1';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import {
@@ -137,6 +139,10 @@ function persistMyPicksOrder(storageKey, ids) {
 
 export default function MyPicks() {
   const { user } = useAuth();
+  const {
+    open: firstVisitWelcomeOpen,
+    onClose: closeFirstVisitWelcome
+  } = useFirstVisitPageWelcomePopup('firstVisitPicksPosts', { userSinglesId: user?.singles_id });
   const location = useLocation();
   const navigate = useNavigate();
   const { myPicksList, myPicksListLoading, myPicksListError, refetchMyPicksList } = useGetMyPicksList();
@@ -700,6 +706,11 @@ export default function MyPicks() {
       center={<PageVideoTutorialsButton pageKey="picksPosts" />}
       secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
     >
+      <FirstVisitPageWelcomePopup
+        pageKey="picksPosts"
+        open={firstVisitWelcomeOpen}
+        onClose={closeFirstVisitWelcome}
+      />
       <PageInstructionPopup
         open={instructionOpen}
         onClose={() => setInstructionOpen(false)}

@@ -315,6 +315,14 @@ export function isLightThemeName(name) {
   return /\blight$/i.test(String(name ?? '').trim());
 }
 
+/** Coffey light / Coffey Dark — "(Required)" labels use yellow instead of error red. */
+export function isCoffeyThemeName(name) {
+  return String(name ?? '')
+    .trim()
+    .toLowerCase()
+    .startsWith('coffey');
+}
+
 /** Matching light-series name for a dark theme (e.g. Purple Dark → Purple Light, Red Dark → Red light). */
 export function getLightThemeCounterpart(darkName, options = getThemeOptionsFromEnv()) {
   if (!isDarkThemeName(darkName)) return null;
@@ -375,6 +383,17 @@ export function applyThemeColors(
   document.documentElement.setAttribute('data-theme-surface', isBlackColor(dn) ? 'dark' : 'light');
 }
 
+export function readActiveThemeName(options = getThemeOptionsFromEnv()) {
+  if (typeof document !== 'undefined') {
+    const fromDom = document.documentElement.getAttribute('data-theme-name')?.trim();
+    if (fromDom) {
+      const match = findThemeByName(fromDom, options);
+      if (match) return match.name;
+    }
+  }
+  return readStoredThemeChoice(options) || DEFAULT_NEW_USER_THEME_NAME;
+}
+
 export function applyThemeByName(name, options = getThemeOptionsFromEnv()) {
   const selected = findThemeByName(name, options) || options[0];
   if (!selected) return null;
@@ -385,6 +404,10 @@ export function applyThemeByName(name, options = getThemeOptionsFromEnv()) {
     selected.dayNight2Color,
     selected.inverseDayNightColor
   );
+  if (typeof document !== 'undefined') {
+    document.documentElement.setAttribute('data-theme-name', selected.name);
+    window.dispatchEvent(new CustomEvent('vsingles-theme-choice'));
+  }
   return selected;
 }
 
@@ -408,6 +431,7 @@ export function persistThemeChoice(name) {
   if (!trimmed) return;
   try {
     localStorage.setItem(THEME_CHOICE_LS_KEY, trimmed);
+    window.dispatchEvent(new CustomEvent('vsingles-theme-choice'));
   } catch {
     // ignore quota / private mode
   }

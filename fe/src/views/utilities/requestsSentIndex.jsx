@@ -58,6 +58,8 @@ import {
   getAppPageScrollRegionMaxHeightCss,
   getAppPageZoomFactor
 } from 'utils/appPageScrollRegionEnv';
+import FirstVisitPageWelcomePopup from 'ui-component/FirstVisitPageWelcomePopup';
+import useFirstVisitPageWelcomePopup from 'hooks/useFirstVisitPageWelcomePopup';
 
 const FRIENDS_BG_BY_THEME_FAMILY = {
   purple: friendsPurpleBg,
@@ -155,6 +157,10 @@ export default function RequestsSent() {
     return buildAppPageScrollRegionSx(downSM ? 1 : getAppPageZoomFactor(pageZoom));
   }, [downSM, pageZoom, vettedFriendsPhoneLayout, inlineChatOpen]);
   const { user } = useAuth();
+  const {
+    open: firstVisitWelcomeOpen,
+    onClose: closeFirstVisitWelcome
+  } = useFirstVisitPageWelcomePopup('firstVisitAcquaintBuddies', { userSinglesId: user?.singles_id });
   const themeOptions = useMemo(() => getThemeOptionsFromEnv(), []);
   const [themeFamily, setThemeFamily] = useState(() => resolveThemeFamilyFromCss(themeOptions));
   const { requestsSent, requestsSentLoading, requestsSentError, refetch } = useGetRequestsSent();
@@ -411,6 +417,12 @@ export default function RequestsSent() {
           </Box>
         ) : null}
       </MainCard>
+
+      <FirstVisitPageWelcomePopup
+        pageKey="acquaintBuddies"
+        open={firstVisitWelcomeOpen}
+        onClose={closeFirstVisitWelcome}
+      />
 
       <PageInstructionPopup
         open={instructionOpen}

@@ -22,6 +22,13 @@ export function hasProfilePhotoFk(user) {
   return Number.isFinite(id) && id >= 1;
 }
 
+export function hasGenderSelfReport(user) {
+  const g = String(user?.gender_self_report ?? '')
+    .trim()
+    .toUpperCase();
+  return g === 'M' || g === 'F';
+}
+
 export function hasAliasNickname(user) {
   return Boolean(String(user?.alias ?? '').trim());
 }
@@ -31,11 +38,12 @@ export function hasSecretIconSet(user) {
 }
 
 /**
- * @returns {'profile_photo' | 'alias_secret' | 'id_verification' | 'done'}
+ * @returns {'profile_photo' | 'gender' | 'alias_secret' | 'id_verification' | 'done'}
  */
 export function getFirstLoginOnboardingPhase(user) {
   if (isFirstLoginOnboardingExempt(user)) return 'done';
   if (!hasProfilePhotoFk(user)) return 'profile_photo';
+  if (!hasGenderSelfReport(user)) return 'gender';
   if (!hasAliasNickname(user) || !hasSecretIconSet(user)) return 'alias_secret';
   if (isOver18VerificationPending(user?.over_18_verified)) return 'id_verification';
   return 'done';
@@ -43,7 +51,7 @@ export function getFirstLoginOnboardingPhase(user) {
 
 export function needsMyStoryFirstLoginSetup(user) {
   const phase = getFirstLoginOnboardingPhase(user);
-  return phase === 'profile_photo' || phase === 'alias_secret';
+  return phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret';
 }
 
 export function needsIdentificationVerificationFirstLogin(user) {
@@ -52,7 +60,7 @@ export function needsIdentificationVerificationFirstLogin(user) {
 
 export function isPathAllowedDuringFirstLoginPhase(pathname, phase) {
   const path = String(pathname ?? '');
-  if (phase === 'profile_photo' || phase === 'alias_secret') {
+  if (phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret') {
     return path === MY_STORY_PATH;
   }
   if (phase === 'id_verification') {

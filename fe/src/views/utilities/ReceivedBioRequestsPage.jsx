@@ -47,6 +47,7 @@ import { useGetRequestsSent } from 'api/requestsSentFe';
 import {
   isBioRequestRequested,
   isOutgoingBioRequestApproved,
+  isIncomingAutoMutualApprovedFromOutgoingInitiative,
   mirroredIncomingApprovalFromOutgoing,
   shouldShowOnReceivedBioRequestsPage
 } from 'utils/receivedBioRequestDisplay';
@@ -57,6 +58,8 @@ import { themedAlert } from 'utils/themedDialog';
 import { useTheme } from '@mui/material/styles';
 import useConfig from 'hooks/useConfig';
 import { appPageScrollHostCardSx, buildAppPageScrollRegionSx, getAppPageZoomFactor } from 'utils/appPageScrollRegionEnv';
+import FirstVisitPageWelcomePopup from 'ui-component/FirstVisitPageWelcomePopup';
+import useFirstVisitPageWelcomePopup from 'hooks/useFirstVisitPageWelcomePopup';
 
 function isRequestedState(value) {
   return String(value ?? '').trim().toLowerCase() === 'requested';
@@ -110,6 +113,10 @@ export default function ReceivedBioRequestsPage() {
     [downSM, pageZoom]
   );
   const { user } = useAuth();
+  const {
+    open: firstVisitWelcomeOpen,
+    onClose: closeFirstVisitWelcome
+  } = useFirstVisitPageWelcomePopup('firstVisitRecBioRequest', { userSinglesId: user?.singles_id });
   const isRegularMember = isRegularMemberCategory(user?.member_category);
   const { requestsAboutMe, requestsAboutMeLoading, requestsAboutMeError, refetch } = useGetRequestsAboutMe();
   const { requestsSent, requestsSentLoading, requestsSentError } = useGetRequestsSent();
@@ -227,10 +234,28 @@ export default function ReceivedBioRequestsPage() {
           fullApproval = APPROVAL_STATUS.NO_RESPONSE;
         }
 
-        return {
+        const rowForAutoMutual = {
           ...row,
           brief_bio_request_approval: briefApproval,
           full_bio_request_approval: fullApproval
+        };
+        const briefAutoMutualFromOutgoing = isIncomingAutoMutualApprovedFromOutgoingInitiative(
+          rowForAutoMutual,
+          outgoingRow,
+          'brief'
+        );
+        const fullAutoMutualFromOutgoing = isIncomingAutoMutualApprovedFromOutgoingInitiative(
+          rowForAutoMutual,
+          outgoingRow,
+          'full'
+        );
+
+        return {
+          ...row,
+          brief_bio_request_approval: briefApproval,
+          full_bio_request_approval: fullApproval,
+          brief_auto_mutual_from_outgoing: briefAutoMutualFromOutgoing,
+          full_auto_mutual_from_outgoing: fullAutoMutualFromOutgoing
         };
       }),
     [rows, approvalStateByRequestId, outgoingByRequesterId, isRegularMember]
@@ -272,6 +297,13 @@ export default function ReceivedBioRequestsPage() {
     if (isRegularMember) return;
     const requestFlag = approvalType === 'basic' ? row.brief_bio_request : row.full_bio_request;
     if (!isRequestedState(requestFlag) || requestBusyKey || consentSaving) return;
+
+    if (
+      (approvalType === 'basic' && row.brief_auto_mutual_from_outgoing) ||
+      (approvalType === 'details' && row.full_auto_mutual_from_outgoing)
+    ) {
+      return;
+    }
 
     const stateField = approvalType === 'basic' ? 'brief_bio_request_approval' : 'full_bio_request_approval';
     const nextUpdates = { [stateField]: next };
@@ -363,9 +395,19 @@ export default function ReceivedBioRequestsPage() {
 
     const briefRequested = isRequestedState(row.brief_bio_request);
     const fullRequested = isRequestedState(row.full_bio_request);
+    const briefAutoMutual = Boolean(row.brief_auto_mutual_from_outgoing);
+    const fullAutoMutual = Boolean(row.full_auto_mutual_from_outgoing);
 
-    const briefChanged = briefRequested && draftBrief !== savedBrief && draftBrief !== APPROVAL_STATUS.NO_RESPONSE;
-    const fullChanged = fullRequested && draftFull !== savedFull && draftFull !== APPROVAL_STATUS.NO_RESPONSE;
+    const briefChanged =
+      briefRequested &&
+      !briefAutoMutual &&
+      draftBrief !== savedBrief &&
+      draftBrief !== APPROVAL_STATUS.NO_RESPONSE;
+    const fullChanged =
+      fullRequested &&
+      !fullAutoMutual &&
+      draftFull !== savedFull &&
+      draftFull !== APPROVAL_STATUS.NO_RESPONSE;
 
     if (!briefChanged && !fullChanged) return;
 
@@ -542,6 +584,11 @@ export default function ReceivedBioRequestsPage() {
       center={<PageVideoTutorialsButton pageKey="receivedBioRequest" />}
       secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
     >
+      <FirstVisitPageWelcomePopup
+        pageKey="recBioRequest"
+        open={firstVisitWelcomeOpen}
+        onClose={closeFirstVisitWelcome}
+      />
       <ReceivedBioRequestsInstructionPopup open={instructionOpen} onClose={() => setInstructionOpen(false)} />
       <VerificationAuthorizationDialog
         open={consentDialogOpen}

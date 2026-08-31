@@ -285,6 +285,35 @@ export function mirroredIncomingApprovalFromOutgoing(outgoingRow) {
   return null;
 }
 
+export const INCOMING_AUTO_MUTUAL_APPROVE_RADIO_LABEL = 'Approved: via auto mutual request you initiated';
+
+function outgoingBioKindInitiatedAndApproved(outgoingRow, bioKind) {
+  if (!outgoingRow) return false;
+  if (bioKind === 'full') {
+    return (
+      isBioRequestRequested(outgoingRow.full_bio_request) &&
+      triStateBioRequestApproval(outgoingRow.full_bio_request_approval) === APPROVAL_STATUS.APPROVE
+    );
+  }
+  return (
+    isBioRequestRequested(outgoingRow.brief_bio_request) &&
+    triStateBioRequestApproval(outgoingRow.brief_bio_request_approval) === APPROVAL_STATUS.APPROVE
+  );
+}
+
+/**
+ * Received Bio Req — incoming approve is locked when the viewer initiated the same bio
+ * level (brief/full), the other member approved it, and their incoming request is approved.
+ */
+export function isIncomingAutoMutualApprovedFromOutgoingInitiative(incomingRow, outgoingRow, bioKind) {
+  if (!incomingRow || !outgoingRow || (bioKind !== 'brief' && bioKind !== 'full')) return false;
+  const requestKey = bioKind === 'brief' ? 'brief_bio_request' : 'full_bio_request';
+  const approvalKey = bioKind === 'brief' ? 'brief_bio_request_approval' : 'full_bio_request_approval';
+  if (!isBioRequestRequested(incomingRow[requestKey])) return false;
+  if (triStateBioRequestApproval(incomingRow[approvalKey]) !== APPROVAL_STATUS.APPROVE) return false;
+  return outgoingBioKindInitiatedAndApproved(outgoingRow, bioKind);
+}
+
 /** Received Bio Req left rail — incoming request and/or reciprocal buddy/acquaintance. */
 export function shouldShowOnReceivedBioRequestsPage(incomingRow, outgoingRow) {
   if (hasIncomingBioRequest(incomingRow)) return true;
