@@ -8,23 +8,56 @@ import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import {
+  COLOR_TEMPLATE7_POPUP_INPUT_HEIGHT,
   COLOR_TEMPLATE7_POPUP_INPUT_TEXT,
   COLOR_TEMPLATE7_POPUP_TEXT,
   colorTemplate7PopupCheckboxShellSx,
   colorTemplate7PopupTextFontSizeResponsive
 } from 'config/colorTemplate7PopupLargeDark';
 import { BUTTON_TEMPLATE_THICK_BLACK_BORDER } from 'config/selectedUnselectedButtonTemplate';
-import { requiredLabelSuffixSx, requiredLabelSuffixYellowSx } from 'config/requiredLabelSuffix';
+import {
+  REQUIRED_LABEL_TEXT_SHADOW,
+  REQUIRED_LABEL_TEXT_STROKE,
+  REQUIRED_LABEL_HIGHLIGHT_YELLOW,
+  requiredLabelSuffixSx,
+  requiredLabelSuffixYellowSx
+} from 'config/requiredLabelSuffix';
 import useRequiredLabelSuffixSx from 'hooks/useRequiredLabelSuffixSx';
-import { YELLOW_VAR } from 'utils/themeConfig';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
-import GreenButton from 'ui-component/GreenButton';
 import Button from '@mui/material/Button';
 import IdentificationVerificationUploadDialog from './IdentificationVerificationUploadDialog';
 import LiveFaceScanVideoFallback from './LiveFaceScanVideoFallback';
 
 /** All Identification Verification action buttons use a thick black border. */
 export const IDV_BUTTON_THICK_BLACK_BORDER = true;
+
+/** Fixed green (#60C446) — not theme `--theme-action-green-color` (minimal palette = panel red). */
+export const idvActionButtonSx = {
+  height: 'auto',
+  minHeight: { xs: 48, sm: COLOR_TEMPLATE7_POPUP_INPUT_HEIGHT },
+  whiteSpace: 'normal',
+  lineHeight: 1.25,
+  px: { xs: 2.25, sm: 3 },
+  py: { xs: 0.85, sm: 1 },
+  fontWeight: 700
+};
+
+export function IdvActionButton({ sx, children, ...rest }) {
+  return (
+    <ColorTemplate7PopupLargeDark.ActionButton
+      thickBlackBorder={IDV_BUTTON_THICK_BLACK_BORDER}
+      sx={{ ...idvActionButtonSx, ...(sx || {}) }}
+      {...rest}
+    >
+      {children}
+    </ColorTemplate7PopupLargeDark.ActionButton>
+  );
+}
+
+IdvActionButton.propTypes = {
+  sx: PropTypes.object,
+  children: PropTypes.node
+};
 
 export { IdvBusyHourglass } from 'ui-component/BusyHourglass';
 
@@ -513,20 +546,31 @@ function VerificationSlot({
       ) : null}
       {!hideVerifyButton ? (
         <Stack spacing={1.25} alignItems="center" sx={{ width: '100%' }}>
-          <ColorTemplate7PopupLargeDark.ActionButton
-            thickBlackBorder={IDV_BUTTON_THICK_BLACK_BORDER}
-            onClick={onVerify}
-            disabled={verifyDisabled || verifying || (lockAfterVerified && verified)}
-            sx={{
-              minWidth: 140,
-              ...(verifyLabelSingleLine
-                ? { whiteSpace: 'nowrap', lineHeight: 1.2 }
-                : { whiteSpace: 'normal', lineHeight: 1.25 }),
-              ...(verifyButtonSx || {})
-            }}
-          >
-            {verifying ? 'Verifying…' : verified && lockAfterVerified ? verifyDoneLabel : verifyLabel}
-          </ColorTemplate7PopupLargeDark.ActionButton>
+          {verified && lockAfterVerified && !verifying ? (
+            <Box
+              component="p"
+              role="status"
+              sx={{ ...idvVerifyDoneLabelSx, ...(verifyButtonSx || {}) }}
+            >
+              {verifyDoneLabel}
+            </Box>
+          ) : (
+            <ColorTemplate7PopupLargeDark.ActionButton
+              thickBlackBorder={IDV_BUTTON_THICK_BLACK_BORDER}
+              onClick={onVerify}
+              disabled={verifyDisabled || verifying}
+              sx={{
+                ...idvActionButtonSx,
+                minWidth: 140,
+                ...(verifyLabelSingleLine
+                  ? { whiteSpace: 'nowrap', lineHeight: 1.2 }
+                  : null),
+                ...(verifyButtonSx || {})
+              }}
+            >
+              {verifying ? 'Verifying…' : verifyLabel}
+            </ColorTemplate7PopupLargeDark.ActionButton>
+          )}
           {verifyBypassAction}
         </Stack>
       ) : null}
@@ -607,9 +651,9 @@ function GovIdUploadActions({
 }) {
   if (!adminImpersonationBypass) {
     return (
-      <GreenButton onClick={onUpload} disabled={disabled}>
+      <IdvActionButton onClick={onUpload} disabled={disabled}>
         {uploadLabel}
-      </GreenButton>
+      </IdvActionButton>
     );
   }
   return (
@@ -620,9 +664,9 @@ function GovIdUploadActions({
       justifyContent="center"
       sx={{ width: '100%', maxWidth: 320, mx: 'auto' }}
     >
-      <GreenButton onClick={onUpload} disabled={disabled}>
+      <IdvActionButton onClick={onUpload} disabled={disabled}>
         {uploadLabel}
-      </GreenButton>
+      </IdvActionButton>
       <Button
         variant="contained"
         disableElevation
@@ -660,9 +704,9 @@ function GovIdUploadButton({ uploadButtonLabel, onUploadClick, disabled = false,
     );
   }
   return (
-    <GreenButton onClick={onUploadClick} disabled={disabled}>
+    <IdvActionButton onClick={onUploadClick} disabled={disabled}>
       {uploadButtonLabel}
-    </GreenButton>
+    </IdvActionButton>
   );
 }
 
@@ -689,16 +733,18 @@ function formatSexDisplay(sex) {
   return String(sex);
 }
 
-/** Yellow text + black stroke — replaces DOB when OCR age ≥ 18. */
+/** Yellow text + black stroke — shown beside DOB when age ≥ 18. */
 function VerifiedOver18AgeLabel() {
   return (
     <Box
       component="span"
+      className="required-label-suffix"
       sx={{
-        color: `var(${YELLOW_VAR}) !important`,
-        WebkitTextFillColor: `var(${YELLOW_VAR}) !important`,
+        color: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
+        WebkitTextFillColor: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
         fontWeight: 700,
         WebkitTextStroke: REQUIRED_LABEL_TEXT_STROKE,
+        textShadow: REQUIRED_LABEL_TEXT_SHADOW,
         paintOrder: 'stroke fill'
       }}
     >
@@ -709,9 +755,16 @@ function VerifiedOver18AgeLabel() {
 
 function DobWithOver18Badge({ dateOfBirth, age }) {
   const showVerifiedLabel = Number.isFinite(age) && age >= 18;
+  const dobText = dateOfBirth || '—';
   return (
     <ColorTemplate7PopupLargeDark.BodyText sx={{ mb: 0 }}>
-      {showVerifiedLabel ? <VerifiedOver18AgeLabel /> : dateOfBirth || '—'}
+      {dobText}
+      {showVerifiedLabel ? (
+        <>
+          {' '}
+          <VerifiedOver18AgeLabel />
+        </>
+      ) : null}
     </ColorTemplate7PopupLargeDark.BodyText>
   );
 }
@@ -805,27 +858,29 @@ const verificationRowGapSx = {
 };
 
 const liveFaceVerifyButtonSx = {
-  bgcolor: '#43a047 !important',
-  color: '#ffffff !important',
-  WebkitTextFillColor: '#ffffff !important',
-  border: `${BUTTON_TEMPLATE_THICK_BLACK_BORDER} !important`,
-  boxShadow: 'none !important',
-  whiteSpace: 'normal',
-  lineHeight: 1.25,
+  ...idvActionButtonSx,
   minHeight: { xs: 56, sm: 60 },
-  py: { xs: 1, sm: 1.15 },
+  py: { xs: 1, sm: 1.15 }
+};
+
+/** Yellow label + black text stroke — replaces green button after live scan verifies. */
+const idvVerifyDoneLabelSx = {
+  color: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
+  WebkitTextFillColor: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
   fontWeight: 700,
-  '&:hover': {
-    bgcolor: '#388e3c !important',
-    boxShadow: 'none !important',
-    border: `${BUTTON_TEMPLATE_THICK_BLACK_BORDER} !important`
-  },
-  '&:disabled': {
-    bgcolor: 'rgba(67, 160, 71, 0.45) !important',
-    color: '#ffffff !important',
-    WebkitTextFillColor: '#ffffff !important',
-    border: `${BUTTON_TEMPLATE_THICK_BLACK_BORDER} !important`
-  }
+  fontSize: buttonFontSizeResponsive,
+  lineHeight: 1.2,
+  WebkitTextStroke: REQUIRED_LABEL_TEXT_STROKE,
+  textShadow: REQUIRED_LABEL_TEXT_SHADOW,
+  paintOrder: 'stroke fill',
+  textAlign: 'center',
+  width: '100%',
+  maxWidth: 320,
+  minHeight: { xs: 56, sm: 60 },
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  px: { xs: 2.75, sm: 3.25 }
 };
 
 /** Orange admin-impersonation bypass (DL / passport upload + live scan). */

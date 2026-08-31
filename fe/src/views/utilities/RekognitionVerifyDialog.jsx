@@ -40,9 +40,9 @@ import { captureElementAsPng } from 'utils/captureConsentDialogImage';
 import { formatLiveFaceScanUserError } from 'utils/livenessErrorMessage';
 import { sanitizeUserFacingTechTerms } from 'utils/sanitizeUserFacingTechTerms';
 import { themedAlert } from 'utils/themedDialog';
-import GreenButton from 'ui-component/GreenButton';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import IdentificationVerificationBoard, {
+  IdvActionButton,
   RequiredLabelSuffix,
   WIZARD_STEP_DRIVER_LICENSE,
   WIZARD_STEP_LIVE_SCAN,
@@ -1823,35 +1823,35 @@ export default function RekognitionVerifyDialog({
           sx={{ width: '100%', pt: 1 }}
         >
           {showPilotSkip ? (
-            <GreenButton
+            <IdvActionButton
               onClick={handlePilotSkipIdentificationVerification}
               disabled={closing || submitting}
               aria-label="Skip identification verification"
             >
               Skip
-            </GreenButton>
+            </IdvActionButton>
           ) : null}
           <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ ml: showPilotSkip ? 'auto' : 0 }}>
             {result ? (
-              <GreenButton onClick={() => void handleClose()} disabled={closing || submitting}>
+              <IdvActionButton onClick={() => void handleClose()} disabled={closing || submitting}>
                 {closing ? 'Closing…' : 'Close'}
-              </GreenButton>
+              </IdvActionButton>
             ) : null}
             {!result && wizardStep > IDV_WIZARD_STEP_CONSENT ? (
-              <GreenButton onClick={handleWizardBackOrClose} disabled={closing || submitting}>
+              <IdvActionButton onClick={handleWizardBackOrClose} disabled={closing || submitting}>
                 Previous
-              </GreenButton>
+              </IdvActionButton>
             ) : null}
             {!result && wizardStep < WIZARD_STEP_LIVE_SCAN ? (
-              <GreenButton
+              <IdvActionButton
                 onClick={handleWizardNext}
                 disabled={submitting || livenessCooldownLockdown || !canAdvanceWizardStep}
               >
                 Next
-              </GreenButton>
+              </IdvActionButton>
             ) : null}
             {!result && wizardStep === WIZARD_STEP_LIVE_SCAN ? (
-              <GreenButton
+              <IdvActionButton
                 onClick={() => void handleSubmit()}
                 disabled={
                   submitting ||
@@ -1863,7 +1863,7 @@ export default function RekognitionVerifyDialog({
                 }
               >
                 {submitting ? 'Saving…' : 'Save'}
-              </GreenButton>
+              </IdvActionButton>
             ) : null}
           </Stack>
         </Stack>

@@ -9,6 +9,7 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { colorTemplate2PopupPanelWidth } from 'config/colorTemplate2Popup';
 import { bsizeInputHeightResponsive } from 'config/bsizeEnv';
 import { greenButtonSx } from 'config/greenButton';
+import { requiredLabelSuffixYellowSx } from 'config/requiredLabelSuffix';
 import { ERROR_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 
 export const COLOR_TEMPLATE7_POPUP_BACKDROP = 'rgba(0,0,0,0.55)';
@@ -191,6 +192,8 @@ export function colorTemplate7PopupTextCascadeSx(overrides = {}) {
       color: '#000000 !important',
       WebkitTextFillColor: '#000000 !important'
     },
+    /** IDV / form "(Required)" — fixed yellow beats popup text cascade. */
+    '& .required-label-suffix': requiredLabelSuffixYellowSx,
     '& .MuiButton-root.color-template7-popup-clear-x': {
       ...greenButtonSx(),
       fontSize: `${colorTemplate7PopupButtonFontSizeResponsive.xs} !important`,
