@@ -190,8 +190,14 @@ const matchReadoutFailSx = {
   paintOrder: 'stroke fill'
 };
 
-const MATCH_PERCENT_COLOR = 'var(--theme-yellow-color, #FFEB3B)';
-const MATCH_PERCENT_TEXT_STROKE = '2px #000000';
+/** Fixed yellow + black text stroke — not theme `--theme-yellow-color` (minimal palette ≠ #FFEB3B on red panel). */
+const idvYellowStrokeTextSx = {
+  color: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
+  WebkitTextFillColor: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
+  WebkitTextStroke: REQUIRED_LABEL_TEXT_STROKE,
+  textShadow: REQUIRED_LABEL_TEXT_SHADOW,
+  paintOrder: 'stroke fill'
+};
 
 const matchPctFailSx = {
   color: `${MATCH_READOUT_FAIL_COLOR} !important`,
@@ -201,10 +207,8 @@ const matchPctFailSx = {
 };
 
 const matchPctPassSx = {
-  color: `${MATCH_PERCENT_COLOR} !important`,
-  WebkitTextFillColor: `${MATCH_PERCENT_COLOR} !important`,
-  WebkitTextStroke: `${MATCH_PERCENT_TEXT_STROKE} !important`,
-  paintOrder: 'stroke fill'
+  ...idvYellowStrokeTextSx,
+  fontWeight: 700
 };
 
 function MatchPctReadout({ pct, passed = true }) {
@@ -459,6 +463,7 @@ function VerificationSlot({
   verifyLabel,
   verifyDoneLabel = 'Verify Done',
   lockAfterVerified = true,
+  keepVerifyButtonWhenVerified = false,
   verifyLabelSingleLine = false,
   verifyButtonSx,
   onVerify,
@@ -483,7 +488,11 @@ function VerificationSlot({
   matchReadoutFontSize,
   verifyBypassAction = null
 }) {
-  const slotError = !verified && failLabel ? failLabel : null;
+  const slotError =
+    failLabel && (!verified || keepVerifyButtonWhenVerified) ? failLabel : null;
+  const showVerifyDoneOnly = verified && lockAfterVerified && !verifying && !keepVerifyButtonWhenVerified;
+  const showVerifyDoneWithRescan =
+    verified && lockAfterVerified && !verifying && keepVerifyButtonWhenVerified;
   const defaultImageBoxSx = centerSlotOnPage ? wizardSlotImageBoxSx : slotImageBoxSx;
   const resolvedImageBoxSx = imageBoxSxOverride || defaultImageBoxSx;
   const instructionTextSx = instructionFontSize ? { fontSize: instructionFontSize, lineHeight: 1.25 } : null;
@@ -546,15 +555,7 @@ function VerificationSlot({
       ) : null}
       {!hideVerifyButton ? (
         <Stack spacing={1.25} alignItems="center" sx={{ width: '100%' }}>
-          {verified && lockAfterVerified && !verifying ? (
-            <Box
-              component="p"
-              role="status"
-              sx={{ ...idvVerifyDoneLabelSx, ...(verifyButtonSx || {}) }}
-            >
-              {verifyDoneLabel}
-            </Box>
-          ) : (
+          {!showVerifyDoneOnly ? (
             <ColorTemplate7PopupLargeDark.ActionButton
               thickBlackBorder={IDV_BUTTON_THICK_BLACK_BORDER}
               onClick={onVerify}
@@ -570,7 +571,16 @@ function VerificationSlot({
             >
               {verifying ? 'Verifying…' : verifyLabel}
             </ColorTemplate7PopupLargeDark.ActionButton>
-          )}
+          ) : null}
+          {showVerifyDoneOnly || showVerifyDoneWithRescan ? (
+            <Box
+              component="p"
+              role="status"
+              sx={{ ...idvVerifyDoneLabelSx, ...(verifyButtonSx || {}) }}
+            >
+              {verifyDoneLabel}
+            </Box>
+          ) : null}
           {verifyBypassAction}
         </Stack>
       ) : null}
@@ -606,6 +616,7 @@ VerificationSlot.propTypes = {
   verifyLabel: PropTypes.string.isRequired,
   verifyDoneLabel: PropTypes.string,
   lockAfterVerified: PropTypes.bool,
+  keepVerifyButtonWhenVerified: PropTypes.bool,
   verifyLabelSingleLine: PropTypes.bool,
   verifyButtonSx: PropTypes.object,
   onVerify: PropTypes.func,
@@ -865,14 +876,10 @@ const liveFaceVerifyButtonSx = {
 
 /** Yellow label + black text stroke — replaces green button after live scan verifies. */
 const idvVerifyDoneLabelSx = {
-  color: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
-  WebkitTextFillColor: `${REQUIRED_LABEL_HIGHLIGHT_YELLOW} !important`,
+  ...idvYellowStrokeTextSx,
   fontWeight: 700,
   fontSize: buttonFontSizeResponsive,
   lineHeight: 1.2,
-  WebkitTextStroke: REQUIRED_LABEL_TEXT_STROKE,
-  textShadow: REQUIRED_LABEL_TEXT_SHADOW,
-  paintOrder: 'stroke fill',
   textAlign: 'center',
   width: '100%',
   maxWidth: 320,
@@ -1283,6 +1290,8 @@ export default function IdentificationVerificationBoard({
       verifyLabel: 'Live Scan',
       verifyDoneLabel: 'Verify Done',
       lockAfterVerified: true,
+      keepVerifyButtonWhenVerified:
+        Boolean(liveScanFail) && liveFaceVerified && liveScanMatchSatisfied,
       verifyButtonSx: liveFaceVerifyButtonSx,
       verifyBypassAction: adminImpersonationBypass ? (
         <Button
