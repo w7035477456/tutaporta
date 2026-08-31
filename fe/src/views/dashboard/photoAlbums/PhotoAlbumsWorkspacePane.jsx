@@ -410,8 +410,8 @@ const menuBtnFontRemExpr = () =>
 /** One text line + padding/border. */
 const SINGLE_LINE_MENU_BUTTON_MIN_HEIGHT = `calc((${menuBtnFontRemExpr()} * 1.45 + 0.7) * 1rem)`;
 
-/** Two text lines (Add / Album-Set) + padding/border. */
-const TWO_LINE_LANE_BUTTON_HEIGHT = `calc((${menuBtnFontRemExpr()} * 2.6 + 1.1) * 1rem)`;
+/** Two text lines (sidebar album / album-set / shortcut rows) + padding/border. */
+const TWO_LINE_LANE_BUTTON_HEIGHT = `calc((${menuBtnFontRemExpr()} * 3.05 + 1.35) * 1rem)`;
 
 const headerToggleButtonSx = {
   width: 'max-content',
@@ -549,20 +549,25 @@ const menuButtonSx = {
 /** Album list rows — two-line height tracks menu font; title + dates left-aligned. */
 const menuButtonTwoLineAlbumSx = {
   whiteSpace: 'normal !important',
-  height: TWO_LINE_LANE_BUTTON_HEIGHT,
   minHeight: TWO_LINE_LANE_BUTTON_HEIGHT,
-  maxHeight: TWO_LINE_LANE_BUTTON_HEIGHT,
+  height: 'auto',
+  maxHeight: 'none',
   lineHeight: '1.2 !important',
-  py: { xs: 0.45, sm: 0.55 },
+  py: { xs: 0.5, sm: 0.65 },
+  alignItems: 'center !important',
+  justifyContent: 'center !important',
+  overflow: 'visible',
+  boxSizing: 'border-box',
   '& .MuiButton-label': {
     display: 'flex !important',
     flexDirection: 'column',
     alignItems: 'flex-start !important',
-    justifyContent: 'center',
+    justifyContent: 'center !important',
     width: '100%',
     maxWidth: '100%',
     minWidth: 0,
-    overflow: 'hidden',
+    minHeight: `calc(${menuBtnFontRemExpr()} * 2.2 * 1rem)`,
+    overflow: 'visible',
     whiteSpace: 'normal !important',
     textAlign: 'left !important'
   }
@@ -579,6 +584,32 @@ const sidebarAlbumLineSx = {
   textAlign: 'left'
 };
 
+/** Sidebar album / album-set title — up to two lines, no ellipsis truncation. */
+const sidebarAlbumTitleTwoLineSx = {
+  display: '-webkit-box',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  overflow: 'hidden',
+  whiteSpace: 'normal',
+  wordBreak: 'break-word',
+  overflowWrap: 'anywhere',
+  textAlign: 'left',
+  width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+  lineHeight: 1.2,
+  paddingTop: '0.08em',
+  paddingBottom: '0.04em'
+};
+
+function MenuRowTwoLineLabelText({ children }) {
+  return (
+    <Box component="span" sx={{ ...sidebarAlbumTitleTwoLineSx, flex: '1 1 auto', alignSelf: 'center' }}>
+      {children}
+    </Box>
+  );
+}
+
 function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
   return (
     <Box
@@ -591,10 +622,11 @@ function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
         width: '100%',
         minWidth: 0,
         maxWidth: '100%',
-        lineHeight: 1.15
+        minHeight: `calc(${menuBtnFontRemExpr()} * 2.2 * 1rem)`,
+        lineHeight: 1.2
       }}
     >
-      <Box component="span" sx={sidebarAlbumLineSx}>
+      <Box component="span" sx={sidebarAlbumTitleTwoLineSx}>
         {titleLine}
       </Box>
       <Box component="span" sx={{ ...sidebarAlbumLineSx, minHeight: '1.15em' }}>
@@ -1287,16 +1319,21 @@ function ShortcutMenuRow({
           if (shortcutRaw) onDrop(e, id);
           else if (notebookRaw || noteRaw) onDropFromLeft(e);
         }}
-        sx={
-          isDropTarget
+        sx={{
+          ...(!locked ? menuButtonTwoLineAlbumSx : null),
+          ...(isDropTarget
             ? {
                 outline: '2px dashed var(--theme-primary-color)',
                 outlineOffset: 2
               }
-            : undefined
-        }
+            : null)
+        }}
       >
-        {label ?? shortcut.label}
+        {locked ? (
+          label ?? shortcut.label
+        ) : (
+          <MenuRowTwoLineLabelText>{label ?? shortcut.label}</MenuRowTwoLineLabelText>
+        )}
       </MenuRowButton>
     </MenuRowWithDelete>
   );
@@ -1548,7 +1585,7 @@ function RenamableDraggableMenuRow({
             onDrop(e, id, dragMime);
           }}
           sx={{
-            ...(albumLabelLines ? menuButtonTwoLineAlbumSx : null),
+            ...(!editing && !locked ? menuButtonTwoLineAlbumSx : null),
             ...(isDropTarget
               ? {
                   outline: '2px dashed var(--theme-primary-color)',
@@ -1591,18 +1628,7 @@ function RenamableDraggableMenuRow({
                 gap: 0.5
               }}
             >
-              <Box
-                component="span"
-                sx={{
-                  flex: '1 1 auto',
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {label}
-              </Box>
+              <MenuRowTwoLineLabelText>{label}</MenuRowTwoLineLabelText>
               {sideCount != null ? (
                 <Box component="span" sx={menuRowCountBadgeSx} aria-hidden="true">
                   {sideCount}
@@ -2439,7 +2465,7 @@ export default function PhotoAlbumsWorkspacePane({
           setInnerEncryptError(
             readPhotoAlbumsApiError(
               syncErr,
-              'Note locked locally, but Cloud sync failed. Click Log off Cloud to save, then reopen.'
+              'Note locked locally, but Cloud sync failed. Leave this page to retry saving, then reopen.'
             )
           );
           return { ok: false, timedOut: false };
@@ -8072,6 +8098,7 @@ export default function PhotoAlbumsWorkspacePane({
                   </SliderControlButton>
                 )}
               </Box>
+              {!(usePaneLogOff && paneStorageType === 'onedrive') ? (
               <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                 <SliderControlButton
                   type="button"
@@ -8086,7 +8113,7 @@ export default function PhotoAlbumsWorkspacePane({
                   sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                 >
                   {menuLabelsCompact ? (
-                    usePaneLogOff ? (paneStorageType === 'onedrive' ? 'LC' : 'LO') : 'EM'
+                    usePaneLogOff ? 'LO' : 'EM'
                   ) : usePaneLogOff ? (
                     logOffPaneLabel
                   ) : (
@@ -8101,6 +8128,7 @@ export default function PhotoAlbumsWorkspacePane({
                   )}
                 </SliderControlButton>
               </Box>
+              ) : null}
               </Box>
 
               {!compareMode ? (

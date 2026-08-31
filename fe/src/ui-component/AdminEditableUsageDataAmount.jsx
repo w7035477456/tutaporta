@@ -5,8 +5,8 @@ import { useAuth } from 'contexts/AuthContext';
 import { isImpersonationSession } from 'utils/adminSession';
 import api from 'api/axios';
 
-/** Format MB as mb/gb — GB uses 3 decimal places (e.g. 20.123gb). */
-export function formatUsageDataAmount(mb, { precisionGb = 3, precisionMb = 1 } = {}) {
+/** Format MB as mb/gb — GB display is 1 decimal (e.g. 9.8gb, 10.0gb). */
+export function formatUsageDataAmount(mb, { precisionGb = 1, precisionMb = 1 } = {}) {
   const value = Number(mb);
   if (!Number.isFinite(value)) return '0mb';
   const abs = Math.abs(value);
@@ -81,7 +81,8 @@ export default function AdminEditableUsageDataAmount({
     event.preventDefault();
     event.stopPropagation();
     setError('');
-    setDraft(label);
+    // Extra GB digits in the editor so a no-op save does not round stored MB.
+    setDraft(formatUsageDataAmount(valueMb, { precisionGb: 6 }));
     setEditing(true);
   };
 

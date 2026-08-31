@@ -482,13 +482,100 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9) mailing address
+# 9) mailing address — city weighted by us_population_by_city.percentage_of_total
 # ---------------------------------------------------------------------------
-STREETS=("100 Main St" "245 Oak Ave" "78 Pine Rd" "512 Maple Blvd" "9 Cedar Ln" "330 Elm St" "1501 River Rd" "88 Sunset Dr")
-CITIES=("Annandale" "Arlington" "Fairfax" "Alexandria" "Reston" "Vienna" "McLean" "Falls Church")
-MAILING_STREET="$(pick_from "${STREETS[@]}")"
-MAILING_CITY="$(pick_from "${CITIES[@]}")"
-MAILING_ZIP="$(printf '%05d' "$(rand_int 20001 22315)")"
+state_abbr() {
+  case "$1" in
+    Alabama) echo AL ;;
+    Alaska) echo AK ;;
+    Arizona) echo AZ ;;
+    Arkansas) echo AR ;;
+    California) echo CA ;;
+    Colorado) echo CO ;;
+    Connecticut) echo CT ;;
+    Delaware) echo DE ;;
+    "District of Columbia") echo DC ;;
+    Florida) echo FL ;;
+    Georgia) echo GA ;;
+    Hawaii) echo HI ;;
+    Idaho) echo ID ;;
+    Illinois) echo IL ;;
+    Indiana) echo IN ;;
+    Iowa) echo IA ;;
+    Kansas) echo KS ;;
+    Kentucky) echo KY ;;
+    Louisiana) echo LA ;;
+    Maine) echo ME ;;
+    Maryland) echo MD ;;
+    Massachusetts) echo MA ;;
+    Michigan) echo MI ;;
+    Minnesota) echo MN ;;
+    Mississippi) echo MS ;;
+    Missouri) echo MO ;;
+    Montana) echo MT ;;
+    Nebraska) echo NE ;;
+    Nevada) echo NV ;;
+    "New Hampshire") echo NH ;;
+    "New Jersey") echo NJ ;;
+    "New Mexico") echo NM ;;
+    "New York") echo NY ;;
+    "North Carolina") echo NC ;;
+    "North Dakota") echo ND ;;
+    Ohio) echo OH ;;
+    Oklahoma) echo OK ;;
+    Oregon) echo OR ;;
+    Pennsylvania) echo PA ;;
+    "Rhode Island") echo RI ;;
+    "South Carolina") echo SC ;;
+    "South Dakota") echo SD ;;
+    Tennessee) echo TN ;;
+    Texas) echo TX ;;
+    Utah) echo UT ;;
+    Vermont) echo VT ;;
+    Virginia) echo VA ;;
+    Washington) echo WA ;;
+    "West Virginia") echo WV ;;
+    Wisconsin) echo WI ;;
+    Wyoming) echo WY ;;
+    *) echo "" ;;
+  esac
+}
+
+CITY_COUNT=$(psql_q -Atc "SELECT count(*) FROM ${SCHEMA}.us_population_by_city WHERE percentage_of_total > 0;")
+if [[ -z "$CITY_COUNT" || "$CITY_COUNT" -lt 1 ]]; then
+  echo "ERROR: ${SCHEMA}.us_population_by_city is empty."
+  echo "Load it first: node be/scripts/loadUsPopulationByCity.js"
+  exit 1
+fi
+
+# Weighted sample: P(city) ∝ percentage_of_total (same column as RegularMember scatter).
+CITY_ROW=$(psql_q -Atc "
+  WITH w AS (
+    SELECT
+      city_name,
+      state_name,
+      zipcode,
+      sum(percentage_of_total) OVER (ORDER BY us_population_by_city_id) AS cum,
+      sum(percentage_of_total) OVER () AS tot
+    FROM ${SCHEMA}.us_population_by_city
+    WHERE percentage_of_total > 0
+  )
+  SELECT city_name || E'\t' || state_name || E'\t' || zipcode
+  FROM w
+  WHERE cum >= random() * tot
+  ORDER BY cum
+  LIMIT 1;
+")
+if [[ -z "$CITY_ROW" ]]; then
+  echo "ERROR: could not pick a city from ${SCHEMA}.us_population_by_city"
+  exit 1
+fi
+MAILING_CITY="$(printf '%s' "$CITY_ROW" | cut -f1)"
+MAILING_STATE="$(printf '%s' "$CITY_ROW" | cut -f2)"
+MAILING_ZIP="$(printf '%s' "$CITY_ROW" | cut -f3)"
+MAILING_STATE_ABBR="$(state_abbr "$MAILING_STATE")"
+STREETS=("Main St" "Oak Ave" "Pine Rd" "Maple Blvd" "Cedar Ln" "Elm St" "River Rd" "Sunset Dr" "Park Ave" "Church St" "Market St" "Highland Ave")
+MAILING_STREET="$(rand_int 100 9999) $(pick_from "${STREETS[@]}")"
 MAILING_COUNTRY="USA"
 
 # Unique phone (required NOT NULL)
@@ -506,7 +593,11 @@ done
 # Bio helpers
 HEIGHTS=("5'02\"" "5'04\"" "5'06\"" "5'08\"" "5'10\"" "6'00\"" "6'02\"")
 HEIGHT="$(pick_from "${HEIGHTS[@]}")"
-CURRENT_CITY="$(pick_from "Annandale, VA" "Arlington, VA" "Fairfax, VA" "Austin, TX" "Culver City, CA")"
+if [[ -n "$MAILING_STATE_ABBR" ]]; then
+  CURRENT_CITY="${MAILING_CITY}, ${MAILING_STATE_ABBR}"
+else
+  CURRENT_CITY="${MAILING_CITY}, ${MAILING_STATE}"
+fi
 COMPANIES=("Acme Corp" "Northwind" "Contoso" "Brightside Labs" "Rivertech" "Summit Soft")
 JOBS=("Engineer" "Analyst" "Designer" "Manager" "Teacher" "Consultant" "Nurse" "Developer")
 COLLEGES=("GMU" "UVA" "Virginia Tech" "Georgetown" "UMD" "Stanford")
@@ -576,6 +667,7 @@ printf "%-22s %s\n" "dl/mailing name:" "$FIRST_NAME / $MIDDLE_NAME / $LAST_NAME"
 printf "%-22s %s\n" "alias:" "$ALIAS"
 printf "%-22s %s\n" "mailing_street:" "$MAILING_STREET"
 printf "%-22s %s\n" "mailing_city:" "$MAILING_CITY"
+printf "%-22s %s\n" "mailing_state:" "$MAILING_STATE"
 printf "%-22s %s\n" "mailing_zip:" "$MAILING_ZIP"
 printf "%-22s %s\n" "mailing_country:" "$MAILING_COUNTRY"
 printf "%-22s %s\n" "phone:" "$PHONE"
@@ -710,7 +802,7 @@ ins_vet AS (
     '$(sql_escape "$HEIGHT")',
     '$(sql_escape "$GENDER_WORD")',
     '$(sql_escape "$CURRENT_CITY")',
-    '$(sql_escape "$MAILING_CITY")',
+    '$(sql_escape "$CURRENT_CITY")',
     '$(sql_escape "$CITIZENSHIP")',
     '$(sql_escape "$BIRTH_COUNTRY")',
     '$(sql_escape "$DOMAIN")',

@@ -162,14 +162,14 @@ SessionFileCountLabel.propTypes = {
   uiTxRx: PropTypes.number
 };
 
-/** TutaDrive Total GB from notes+photos folders only (always shown in gb). */
+/** TutaDrive Total GB from notes+photos folders only (always shown in gb, 1 decimal). */
 function formatTutaDriveTotalGb(usage) {
   const bytes = Number(usage?.tutaDriveStorage?.totalBytes);
   if (Number.isFinite(bytes) && bytes >= 0) {
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(3)}gb`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}gb`;
   }
   const mb = Number(usage?.vaultFolderMb) || 0;
-  return `${Math.max(0, mb / 1024).toFixed(3)}gb`;
+  return `${Math.max(0, mb / 1024).toFixed(1)}gb`;
 }
 
 function TutaDriveTotalLabel({ usage }) {

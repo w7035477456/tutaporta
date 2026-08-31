@@ -35,7 +35,7 @@ function formatDataMb(mb) {
   const sign = value < 0 ? '-' : '';
   if (abs >= 1024) {
     const gb = abs / 1024;
-    return `${sign}${gb.toFixed(3)}GB`;
+    return `${sign}${gb.toFixed(1)}GB`;
   }
   return `${sign}${abs.toFixed(1)}MB`;
 }

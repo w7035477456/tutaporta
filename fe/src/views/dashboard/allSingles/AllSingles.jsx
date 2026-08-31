@@ -13,6 +13,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Link from '@mui/material/Link';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
+import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import PageInstructionPopup from 'ui-component/PageInstructionPopup';
 import PageInstructionAudioTutorial from 'ui-component/PageInstructionAudioTutorial';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
@@ -172,6 +173,9 @@ const FILTER_AGE_MIN = 18;
 const FILTER_AGE_MAX = 99;
 const FILTER_DISTANCE_MIN = 0;
 const FILTER_DISTANCE_MAX = 100;
+/** Edit filter stays inactive until All Singles has this many members. */
+const ALL_SINGLES_FILTER_MIN_MEMBERS = 10000;
+const FILTER_INSUFFICIENT_MEMBERS_MESSAGE = 'Insufficient members to activate Filter';
 
 /** US zip lookup: `https://api.zippopotam.us/us/{zip}` — UI accepts 5-digit zip only */
 const ZIP_DIGITS_MAX = 5;
@@ -229,6 +233,7 @@ export default function AllSingles() {
   const [appliedPlaceLabel, setAppliedPlaceLabel] = useState('');
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filterInsufficientOpen, setFilterInsufficientOpen] = useState(false);
   const [draftAge, setDraftAge] = useState([21, 35]);
   const [draftDistanceMiles, setDraftDistanceMiles] = useState(50);
   const [draftPostcode, setDraftPostcode] = useState('22003');
@@ -292,6 +297,11 @@ export default function AllSingles() {
   }, [preferences, preferencesLoading]);
 
   const openFilterModal = () => {
+    const totalAllSingles = Array.isArray(singles) ? singles.length : 0;
+    if (totalAllSingles < ALL_SINGLES_FILTER_MIN_MEMBERS) {
+      setFilterInsufficientOpen(true);
+      return;
+    }
     setDraftAge([...appliedAge]);
     setDraftDistanceMiles(appliedDistanceMiles);
     setDraftPostcode(sanitizeUsZipDigits(appliedPostcode));
@@ -586,6 +596,25 @@ export default function AllSingles() {
           />
         </PageInstructionPopup.Body>
       </PageInstructionPopup>
+
+      <ColorTemplate16PopupCenterWide
+        open={filterInsufficientOpen}
+        onClose={() => setFilterInsufficientOpen(false)}
+        closeOnBackdrop
+        bodyTextAlignLeft={false}
+      >
+        <ColorTemplate16PopupCenterWide.Body spacing={2} sx={{ alignItems: 'center', textAlign: 'center' }}>
+          <ColorTemplate16PopupCenterWide.BodyText sx={{ textAlign: 'center', width: '100%' }}>
+            {FILTER_INSUFFICIENT_MEMBERS_MESSAGE}
+          </ColorTemplate16PopupCenterWide.BodyText>
+          <ColorTemplate16PopupCenterWide.ActionButton
+            type="button"
+            onClick={() => setFilterInsufficientOpen(false)}
+          >
+            OK
+          </ColorTemplate16PopupCenterWide.ActionButton>
+        </ColorTemplate16PopupCenterWide.Body>
+      </ColorTemplate16PopupCenterWide>
 
       <ColorTemplate7PopupLargeDark
         open={filterModalOpen}

@@ -30,9 +30,7 @@ function formatDataMb(mb) {
   const sign = value < 0 ? '-' : '';
   if (abs >= 1024) {
     const gb = abs / 1024;
-    const rounded = Math.round(gb * 10) / 10;
-    const text = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-    return `${sign}${text}GB`;
+    return `${sign}${gb.toFixed(1)}GB`;
   }
   const mb1 = Math.round(abs * 10) / 10;
   const text = Number.isInteger(mb1) ? String(mb1) : mb1.toFixed(1);
