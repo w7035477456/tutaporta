@@ -685,6 +685,43 @@ function formatSexDisplay(sex) {
   return String(sex);
 }
 
+/** Yellow badge with black border — shown when OCR age ≥ 18 (two lines). */
+function VerifiedOver18Badge() {
+  return (
+    <Box
+      sx={{
+        bgcolor: '#FFEB3B',
+        color: '#000',
+        border: '2px solid #000',
+        px: 1,
+        py: 0.35,
+        lineHeight: 1.15,
+        fontWeight: 700,
+        fontSize: { xs: '0.7rem', sm: '0.75rem' },
+        textAlign: 'center',
+        flexShrink: 0
+      }}
+    >
+      <Box component="span" sx={{ display: 'block' }}>
+        (Verified over 18,
+      </Box>
+      <Box component="span" sx={{ display: 'block' }}>
+        require to use site)
+      </Box>
+    </Box>
+  );
+}
+
+function DobWithOver18Badge({ dateOfBirth, age }) {
+  const showBadge = Number.isFinite(age) && age >= 18;
+  return (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+      <ColorTemplate7PopupLargeDark.BodyText sx={{ mb: 0 }}>{dateOfBirth || '—'}</ColorTemplate7PopupLargeDark.BodyText>
+      {showBadge ? <VerifiedOver18Badge /> : null}
+    </Box>
+  );
+}
+
 function ExtractedFieldsPanel({ title, extracted, showPassportLabels, inColumn = false }) {
   if (!extracted) return null;
   return (
@@ -720,7 +757,7 @@ function ExtractedFieldsPanel({ title, extracted, showPassportLabels, inColumn =
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>Sex</ColorTemplate7PopupLargeDark.SectionLabel>
             <ColorTemplate7PopupLargeDark.BodyText>{formatSexDisplay(extracted.sex)}</ColorTemplate7PopupLargeDark.BodyText>
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>Date of birth</ColorTemplate7PopupLargeDark.SectionLabel>
-            <ColorTemplate7PopupLargeDark.BodyText>{extracted.dateOfBirth || '—'}</ColorTemplate7PopupLargeDark.BodyText>
+            <DobWithOver18Badge dateOfBirth={extracted.dateOfBirth} age={extracted.age} />
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>Place of Birth</ColorTemplate7PopupLargeDark.SectionLabel>
             <ColorTemplate7PopupLargeDark.BodyText>
               {extracted.countryOfBirth || extracted.placeOfBirth || '—'}
@@ -735,7 +772,7 @@ function ExtractedFieldsPanel({ title, extracted, showPassportLabels, inColumn =
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>Sex</ColorTemplate7PopupLargeDark.SectionLabel>
             <ColorTemplate7PopupLargeDark.BodyText>{formatSexDisplay(extracted.sex)}</ColorTemplate7PopupLargeDark.BodyText>
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>Date of birth</ColorTemplate7PopupLargeDark.SectionLabel>
-            <ColorTemplate7PopupLargeDark.BodyText>{extracted.dateOfBirth || '—'}</ColorTemplate7PopupLargeDark.BodyText>
+            <DobWithOver18Badge dateOfBirth={extracted.dateOfBirth} age={extracted.age} />
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>Height</ColorTemplate7PopupLargeDark.SectionLabel>
             <ColorTemplate7PopupLargeDark.BodyText>{extracted.height || '—'}</ColorTemplate7PopupLargeDark.BodyText>
             <ColorTemplate7PopupLargeDark.SectionLabel sx={{ fontWeight: 700 }}>City</ColorTemplate7PopupLargeDark.SectionLabel>

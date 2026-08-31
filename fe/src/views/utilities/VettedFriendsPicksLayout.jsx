@@ -264,6 +264,26 @@ function getBioRequestApprovalState(row, kind) {
   return triStateApproval(value);
 }
 
+/** Brief Bio request panel — hide once Full Bio is approved; yellow CTA only when neither is approved. */
+function isOutgoingBriefBioKindApproved(row) {
+  return getBioRequestApprovalState(row, 'brief') === APPROVAL_STATUS.APPROVE;
+}
+
+function isOutgoingFullBioKindApproved(row) {
+  return getBioRequestApprovalState(row, 'full') === APPROVAL_STATUS.APPROVE;
+}
+
+function shouldShowOutgoingBriefBioKindPanel(row) {
+  if (!row) return false;
+  if (isOutgoingFullBioKindApproved(row)) return false;
+  return true;
+}
+
+function shouldShowOutgoingBriefBioRequestAction(row) {
+  if (!row) return false;
+  return !isOutgoingBriefBioKindApproved(row) && !isOutgoingFullBioKindApproved(row);
+}
+
 /** Outgoing request can be canceled only while still awaiting a response. */
 function canCancelOutgoingBioRequest(row, kind) {
   const requested = kind === 'brief' ? isBioRequestFlagged(row?.brief_bio_request) : isFullBioRequestFlagged(row);
@@ -1431,15 +1451,6 @@ export default function VettedFriendsPicksLayout({
       onUnlockApprovedBioViewConsumed();
     }
   }, [unlockApprovedBioViewKind, openApprovedInlineBioView, onUnlockApprovedBioViewConsumed]);
-  const selectedBioMemberLabel = useMemo(() => {
-    if (!selectedRow) return 'this member';
-    return formatMemberLabel({
-      alias: selectedRow.alias,
-      singlesId: selectedRow.singles_id_to,
-      prefix: selectedRow.prefix,
-      memberId: selectedRow.member_id
-    });
-  }, [selectedRow]);
   const photoFullscreenOverlayLines = useMemo(() => {
     if (!selectedRow) return [];
     const { primary, secondary } = getMemberDisplayLines({
@@ -1755,6 +1766,9 @@ export default function VettedFriendsPicksLayout({
     };
 
     if (isNotRequested) {
+      if (isBrief && !shouldShowOutgoingBriefBioRequestAction(row)) {
+        return null;
+      }
       return (
         <BioRequestNumberedLine lineNumber={lineNumber}>
           {renderBioRequestActionDetailLine(
@@ -1812,6 +1826,7 @@ export default function VettedFriendsPicksLayout({
 
   const renderOutgoingBioKindPanel = (row, kind) => {
     if (!row) return null;
+    if (kind === 'brief' && !shouldShowOutgoingBriefBioKindPanel(row)) return null;
     const statusLineNumber = kind === 'brief' ? 1 : 3;
     const actionLineNumber = kind === 'brief' ? 2 : 4;
     return (
@@ -2797,16 +2812,6 @@ export default function VettedFriendsPicksLayout({
                 </Typography>
               ) : (
                 <>
-                  <Typography
-                    sx={{
-                      color: 'var(--theme-primary-color)',
-                      fontWeight: 600,
-                      lineHeight: 1.45,
-                      ...vettedFriendsPanelTextSx
-                    }}
-                  >
-                    {`Want to view ${selectedBioMemberLabel}'s vetted profile? Click Request Brief Bio or Request Full Bio button. As soon as ${selectedBioMemberLabel} responds with 'Approved !', you will have a green button 'View Acquaintance Bio (Brief Bio)' or 'View Buddies Bio (Full Bio)'.`}
-                  </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, width: '100%' }}>
                     {renderOutgoingBioKindPanel(selectedRow, 'brief')}
                     {renderOutgoingBioKindPanel(selectedRow, 'full')}

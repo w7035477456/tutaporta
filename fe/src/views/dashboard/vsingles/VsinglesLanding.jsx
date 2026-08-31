@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography';
 import { useAuth } from 'contexts/AuthContext';
 import { useBackgroundMusic } from 'contexts/BackgroundMusicContext';
 import { MY_STORY_PATH, needsProfilePhotoSetup } from 'utils/profilePhotoSetup';
+import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
 import { LYRIC_CAPTION_CUES, LYRIC_TRACK_SRC } from 'config/soundPreference';
 import {
   VSINGLES_TOUR_PAUSE_MEDIA_EVENT,
@@ -54,7 +55,7 @@ export default function VsinglesLanding() {
   const { user, loading } = useAuth();
   const { lyricMute, lyricVolume, vsinglesMediaPaused, setVsinglesMediaPaused, lyricVolumeGain } = useBackgroundMusic();
 
-  if (!loading && needsProfilePhotoSetup(user)) {
+  if (FIRST_LOGIN_AUTO_POPUPS_ENABLED && !loading && needsProfilePhotoSetup(user)) {
     return <Navigate to={MY_STORY_PATH} replace />;
   }
 

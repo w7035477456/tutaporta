@@ -1,6 +1,6 @@
 import { isRegularMemberCategory } from './memberCategory.js';
 
-/** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive'} SinglesStatus */
+/** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive' | 'under18'} SinglesStatus */
 
 /** Cycle order matches helloworldjunktest.singles_status enum sort order. */
 export const SINGLES_STATUS_VALUES = Object.freeze([
@@ -12,8 +12,12 @@ export const SINGLES_STATUS_VALUES = Object.freeze([
   'unknown',
   'other',
   'blank',
-  'inactive'
+  'inactive',
+  'under18'
 ]);
+
+/** Exact login error when singles.status = under18 (product copy). */
+export const UNDER18_LOGIN_ERROR = 'This site are for over 18 years of age required';
 
 /**
  * @param {unknown} raw
@@ -26,6 +30,7 @@ export function normalizeSinglesStatus(raw) {
   if (value === 'cencel') return 'cancel';
   // Accept "notactive" / "not_active" as inactive.
   if (value === 'notactive' || value === 'not_active' || value === 'not-active') return 'inactive';
+  if (value === 'under_18' || value === 'under-18') return 'under18';
   return SINGLES_STATUS_VALUES.includes(value) ? value : null;
 }
 
@@ -59,6 +64,7 @@ export function mapSinglesStatusToAuditStatus(singlesStatus) {
 export function formatSinglesStatusLabel(raw) {
   const normalized = normalizeSinglesStatus(raw) ?? 'blank';
   if (normalized === 'blank') return 'Blank';
+  if (normalized === 'under18') return 'Under 18';
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
@@ -75,11 +81,34 @@ export function isSinglesStatusActive(rawStatus) {
 
 /**
  * @param {unknown} rawStatus
+ * @returns {boolean}
+ */
+export function isSinglesStatusUnder18(rawStatus) {
+  return normalizeSinglesStatus(rawStatus) === 'under18';
+}
+
+/**
+ * @param {unknown} rawStatus
  * @param {unknown} [memberCategory] RegularMember may log in even when status is inactive / not active
+ *   — except under18, which always blocks.
  * @returns {boolean}
  */
 export function isSinglesStatusLoginAllowed(rawStatus, memberCategory) {
+  if (isSinglesStatusUnder18(rawStatus)) return false;
   if (isRegularMemberCategory(memberCategory)) return true;
   const normalized = normalizeSinglesStatus(rawStatus);
   return normalized != null && SINGLES_LOGIN_ALLOWED_STATUSES.includes(normalized);
+}
+
+/**
+ * @param {unknown} rawStatus
+ * @param {unknown} [memberCategory]
+ * @returns {string | null} Error text when login is blocked; null when allowed.
+ */
+export function singlesStatusLoginRejectMessage(rawStatus, memberCategory) {
+  if (isSinglesStatusUnder18(rawStatus)) return UNDER18_LOGIN_ERROR;
+  if (!isSinglesStatusLoginAllowed(rawStatus, memberCategory)) {
+    return 'Your account is not active. Please contact support.';
+  }
+  return null;
 }

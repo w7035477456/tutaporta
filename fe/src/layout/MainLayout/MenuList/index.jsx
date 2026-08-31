@@ -23,6 +23,7 @@ import { flushRecordVaultSessionsOnLeave } from 'api/recordVaultFe';
 import { navigationDrawerOpenState } from 'config/navigationCollapseEnv';
 import { useAuth } from 'contexts/AuthContext';
 import { applyProfilePhotoMenuDisabled, needsProfilePhotoSetup } from 'utils/profilePhotoSetup';
+import { needsMyStoryFirstLoginSetup } from 'utils/firstLoginOnboarding';
 import { fetchVetBioVerificationServices } from 'api/vetBioVerificationServicesFe';
 import {
   applyIdentificationVerificationMenuDisabled,
@@ -148,6 +149,7 @@ function MenuList() {
   const drawerOpen = navigationDrawerOpenState(menuMaster?.isDashboardDrawerOpened);
   const { pathname } = useLocation();
   const profilePhotoSetupRequired = needsProfilePhotoSetup(user);
+  const myStoryFirstLoginSetupRequired = needsMyStoryFirstLoginSetup(user);
   const [identificationVerificationLockTick, setIdentificationVerificationLockTick] = useState(0);
   const [exitToMallBusy, setExitToMallBusy] = useState(false);
   const identificationVerificationLockActive = isIdentificationVerificationLockActive(user);
@@ -206,13 +208,14 @@ function MenuList() {
           ? underConstructionMenuItems
           : menuItems;
     const withTools = filterToolsMenuItem(base, showToolsMenu);
-    const withProfilePhoto = applyProfilePhotoMenuDisabled(withTools, profilePhotoSetupRequired);
+    const withProfilePhoto = applyProfilePhotoMenuDisabled(withTools, myStoryFirstLoginSetupRequired);
     return applyIdentificationVerificationMenuDisabled(withProfilePhoto, identificationVerificationLockActive);
   }, [
     isEClassifiedsSection,
     isEMarketPlaceSection,
     isUnderConstructionMallSection,
     profilePhotoSetupRequired,
+    myStoryFirstLoginSetupRequired,
     identificationVerificationLockActive,
     identificationVerificationLockTick,
     profileImageFk,

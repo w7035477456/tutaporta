@@ -34,7 +34,7 @@ export function getSignupPhoneFromSearchParams(searchParams) {
 
 import { normalizeSignupReferralCode } from './signupReferralCode';
 
-export function buildCreatePasswordQuery({ email, code, phone, token, ref }) {
+export function buildCreatePasswordQuery({ email, code, phone, token, ref, google }) {
   const params = new URLSearchParams();
   if (email) params.set('email', email.trim().toLowerCase());
   if (code) params.set('code', String(code).trim().toUpperCase());
@@ -42,5 +42,6 @@ export function buildCreatePasswordQuery({ email, code, phone, token, ref }) {
   if (phoneEnc) params.set('phone', decodeURIComponent(phoneEnc));
   const referralToken = normalizeSignupReferralCode(token ?? ref ?? '');
   if (referralToken) params.set('token', referralToken);
+  if (google === true || google === '1' || google === 1) params.set('google', '1');
   return params.toString();
 }

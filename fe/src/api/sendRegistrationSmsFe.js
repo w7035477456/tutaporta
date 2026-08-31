@@ -3,11 +3,16 @@ import { errorMessageFromResponseBody } from 'api/apiErrorMessage';
 
 const API_BASE_URL = getApiBaseUrl();
 
-export const sendRegistrationSms = async (code, email, phone) => {
+export const sendRegistrationSms = async (code, email, phone, options = {}) => {
+  const signupToken = String(options.signupToken || '').trim();
+  const body = { email, phone };
+  if (signupToken) body.signupToken = signupToken;
+  else body.code = code;
+
   const response = await fetch(`${API_BASE_URL}/api/sendRegistrationSms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, email, phone })
+    body: JSON.stringify(body)
   });
 
   const text = await response.text();

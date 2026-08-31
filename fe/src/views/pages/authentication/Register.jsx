@@ -153,6 +153,17 @@ export default function Register() {
                 >
                   Please enter your email address to continue
                 </Typography>
+                <Typography
+                  sx={{
+                    fontSize: authEnvTextFontSize,
+                    textAlign: 'center',
+                    color: 'var(--theme-primary-color)',
+                    lineHeight: 1.4
+                  }}
+                >
+                  Must be 18+ to register. A driver&apos;s license upload will be required upon your first login to
+                  complete verification.
+                </Typography>
               </Stack>
               <Box>
                 <AuthRegister />

@@ -52,6 +52,7 @@ const SINGLES_LOOKUP_SELECT = `SELECT s.singles_id,
             s.my_refer_code,
             s.refer_by_code,
             s.profile_image_fk,
+            s.over_18_verified,
             ref.singles_id AS refer_by_singles_id,
             COALESCE(bal.account_balance_token, 0) AS account_balance_token
      ${SINGLES_LOOKUP_FROM_JOIN}`;
@@ -147,11 +148,23 @@ export async function searchAuditRegistrations(db, body) {
 function mapSinglesLookupRow(row, videosBySinglesId = new Map()) {
   const rawTokenBalance = Number(row.account_balance_token);
   const profileImageFk = Number(row.profile_image_fk);
+  const over18Raw = row.over_18_verified;
+  const over18Verified =
+    over18Raw === true || over18Raw === false
+      ? over18Raw
+      : over18Raw == null
+        ? null
+        : String(over18Raw).trim().toLowerCase() === 'true'
+          ? true
+          : String(over18Raw).trim().toLowerCase() === 'false'
+            ? false
+            : null;
   return {
     singlesId: Number(row.singles_id),
     memberId: row.member_id != null ? Number(row.member_id) : null,
     memberCategory: String(row.member_category ?? ''),
     status: String(row.status ?? 'blank'),
+    over18Verified,
     email: String(row.email ?? ''),
     phone: String(row.phone ?? ''),
     alias: String(row.alias ?? ''),

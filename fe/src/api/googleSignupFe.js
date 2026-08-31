@@ -3,8 +3,8 @@ import { readStoredSignupReferralCode } from 'utils/signupReferralCode';
 import { readStoredGoogleSignupToken } from 'utils/googleSignupOAuth';
 
 /**
- * Finish Google signup after phone + Terms (no create-password email).
- * Sets auth cookie; caller should refresh AuthContext session.
+ * Finish Google signup after SMS verify (no password UI, no auto-login).
+ * Account is created; caller navigates to congratulations / Go to Login.
  */
 export async function completeGoogleSignup({ email, phone, signupToken, termsAccepted = true }) {
   const ref = readStoredSignupReferralCode();

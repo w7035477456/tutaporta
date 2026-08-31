@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 // material-ui
 import { useTheme } from '@mui/material/styles';
@@ -62,6 +62,12 @@ import {
 } from 'config/photoAlbumsLayout';
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { isTutaDatesLandingPath, isTutaDatesPath } from 'constants/tutaDatesRoute';
+import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
+import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
+import { hasProfilePhotoFk, isFirstLoginOnboardingCongratsPending } from 'utils/firstLoginOnboarding';
+import { isOver18Verified, normalizeOver18Verified, OVER18_REQUIRED_SITE_MESSAGE } from 'utils/over18Verified';
+import { themedAlert } from 'utils/themedDialog';
+import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 
 // ==============================|| MAIN LAYOUT ||============================== //
 
@@ -119,16 +125,44 @@ export default function MainLayout() {
   const downLG = useMediaQuery(theme.breakpoints.down('lg'));
   const mobileEdgeToEdge = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const location = useLocation();
-  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, updateSessionDemoBuddyFlags } = useAuth();
+  const navigate = useNavigate();
+  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, updateSessionDemoBuddyFlags, logout } = useAuth();
   const adminHeader = getAdminImpersonationHeaderState(user);
   const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
+  const idvLockActive = isIdentificationVerificationLockActive(user);
   const needsGenderSelfReport =
+    FIRST_LOGIN_AUTO_POPUPS_ENABLED &&
     Boolean(user) &&
     !user.tools_only &&
     !isGuestDemoLogin(user) &&
+    isOver18Verified(user.over_18_verified) &&
+    !idvLockActive &&
+    hasProfilePhotoFk(user) &&
+    !isFirstLoginOnboardingCongratsPending() &&
     !user.seeded_demo_buddies_boolean &&
     (user.gender_self_report !== 'M' && user.gender_self_report !== 'F');
   useFlowerShopLightThemeOverride();
+
+  // over_18_verified === false → block with OK-only message, then logout (status already under18).
+  useEffect(() => {
+    if (!user || requiresPasswordUpgrade) return;
+    if (isToolsOnlyAdminSession(user) || isImpersonationSession(user) || isGuestDemoLogin(user)) return;
+    if (normalizeOver18Verified(user.over_18_verified) !== false) return;
+    let cancelled = false;
+    (async () => {
+      await themedAlert(OVER18_REQUIRED_SITE_MESSAGE, { okLabel: 'OK' });
+      if (cancelled) return;
+      try {
+        await logout();
+      } catch (err) {
+        console.warn('[MainLayout] logout after over_18_verified=false failed', err);
+      }
+      navigate('/pages/login', { replace: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, requiresPasswordUpgrade, logout, navigate]);
 
   const {
     state: { borderRadius, miniDrawer, pageZoom },

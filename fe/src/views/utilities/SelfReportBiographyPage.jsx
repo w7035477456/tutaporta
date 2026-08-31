@@ -18,10 +18,14 @@ import CheckrBioReviewPanel from './CheckrBioReviewPanel';
 import RekognitionVerifyDialog from './RekognitionVerifyDialog';
 import PassportCitizenshipUploadDialog from './PassportCitizenshipUploadDialog';
 import { MY_STORY_PATH } from 'utils/profilePhotoSetup';
+import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
 import {
-  clearSignupIdentificationVerificationRequired,
-  isSignupIdentificationVerificationRequired
+  clearSignupIdentificationVerificationRequired
 } from 'utils/signupIdentificationVerification';
+import {
+  markFirstLoginOnboardingCongratsPending,
+  needsIdentificationVerificationFirstLogin
+} from 'utils/firstLoginOnboarding';
 import { sanitizeUserFacingTechTerms } from 'utils/sanitizeUserFacingTechTerms';
 import { themedAlert } from 'utils/themedDialog';
 import {
@@ -95,9 +99,9 @@ export default function SelfReportBiographyPage() {
   );
   const idVerificationStatus = idVerificationService?.status;
   const mandatoryIdentificationVerification =
+    FIRST_LOGIN_AUTO_POPUPS_ENABLED &&
     !adminCanEdit &&
-    isSignupIdentificationVerificationRequired() &&
-    idVerificationStatus !== 'completed';
+    needsIdentificationVerificationFirstLogin(user);
 
   useEffect(() => {
     void fetchLinkedInStatus()
@@ -106,6 +110,7 @@ export default function SelfReportBiographyPage() {
   }, []);
 
   useEffect(() => {
+    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;
     if (location.state?.openIdentificationVerification !== true) return;
     setIdVerificationUserDismissed(false);
     setRekognitionOpen(true);
@@ -113,18 +118,17 @@ export default function SelfReportBiographyPage() {
   }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
+    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;
     if (verificationServicesLoading) return;
-    if (idVerificationStatus === 'completed') {
+    if (!mandatoryIdentificationVerification) {
       clearSignupIdentificationVerificationRequired();
-      setIdVerificationUserDismissed(false);
       return;
     }
-    if (mandatoryIdentificationVerification && !idVerificationUserDismissed) {
+    if (!idVerificationUserDismissed) {
       setRekognitionOpen(true);
     }
   }, [
     verificationServicesLoading,
-    idVerificationStatus,
     mandatoryIdentificationVerification,
     idVerificationUserDismissed
   ]);
@@ -420,7 +424,9 @@ export default function SelfReportBiographyPage() {
             onVerified={async () => {
               setSuccessText('');
               clearSignupIdentificationVerificationRequired();
+              markFirstLoginOnboardingCongratsPending();
               await refreshAll();
+              navigate('/allSingles');
             }}
             onFailed={async () => {
               await setChannelStatus('id', 'error');

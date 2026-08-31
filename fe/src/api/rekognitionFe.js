@@ -71,6 +71,12 @@ export async function postIdVerificationManualSupportEmail(payload) {
   return data;
 }
 
+/** Dev/support: set singles.over_18_verified = true and dismiss age gate. */
+export async function markOver18Verified() {
+  const { data } = await api.post('/api/rekognition/mark-over-18-verified');
+  return data;
+}
+
 export function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

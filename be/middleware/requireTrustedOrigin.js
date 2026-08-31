@@ -21,6 +21,7 @@ const TRUSTED_ORIGIN_EXEMPT_API_PATHS = new Set([
   '/api/resendPhoneCode',
   '/api/sendRegistrationSms',
   '/api/signup/bypass-sms-phone-verification',
+  '/api/auth/google/signup/complete',
   '/api/completeEmailChange',
   '/api/supportMessage',
   '/api/logout',

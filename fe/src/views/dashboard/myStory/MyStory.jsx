@@ -34,6 +34,7 @@ import { isAdminImpersonationBypassSession, isAdminSession, isImpersonationSessi
 import NicknamePickerDialog from './NicknamePickerDialog';
 import SecurityIconPickerDialog from './SecurityIconPickerDialog';
 import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
+import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { markSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import {
@@ -1122,7 +1123,7 @@ export default function MyStory() {
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
   const myStoryPhoneLayout = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const isMobileUpload = useMediaQuery(MOBILE_UPLOAD_MAX_CSS);
-  const { user, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname, updateSessionDemoBuddyFlags } = useAuth();
+  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname, updateSessionDemoBuddyFlags, updateSessionHasSecretIcon } = useAuth();
   const { photos, myPhotosLoading, refetchMyPhotos } = useMyPhotos(user?.singles_id);
   const { albumVideos, refetchMyAlbumVideos } = useMyAlbumVideos(user?.singles_id);
   const ownerSinglesId = user?.singles_id ?? null;
@@ -1710,6 +1711,10 @@ export default function MyStory() {
       setShowFirstPhotoDialog(false);
       return;
     }
+    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
+      setShowFirstPhotoDialog(false);
+      return;
+    }
     if (photos.length === 0) {
       setShowFirstPhotoDialog(true);
       return;
@@ -1753,8 +1758,8 @@ export default function MyStory() {
           // Demo buddies seed on login / gender popup; retry if seed had not completed yet.
           // Do not show SeedBuddiesPostingPopup after drag-drop / first profile photo.
           try {
-            const { default: api } = await import('api/axios');
-            const { data } = await api.post('/api/singles/seed-demo-buddies');
+            const { default: apiClient } = await import('api/axios');
+            const { data } = await apiClient.post('/api/singles/seed-demo-buddies');
             updateSessionDemoBuddyFlags({
               seeded_demo_buddies_boolean: Boolean(data?.seeded_demo_buddies_boolean)
             });
@@ -1766,6 +1771,11 @@ export default function MyStory() {
             navigate(PROFILES_RECORDS_PATH, {
               state: { openTab: PROFILES_RECORDS_TAB_PAY_HISTORY, showRefereeRewardPopup: true }
             });
+            return;
+          }
+          // Mandatory first-login: continue to alias → secret → IDV.
+          if (FIRST_LOGIN_AUTO_POPUPS_ENABLED && !String(profileBasics.alias || user?.alias || '').trim()) {
+            setShowNicknameDialog(true);
           }
           return;
         }
@@ -1828,6 +1838,7 @@ export default function MyStory() {
   }, [profilePhotoId, photos, pendingAutoMakeProfile, selectedPhotoId]);
 
   useEffect(() => {
+    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;
     if (userClearedAliasRef.current) return;
     if (myPhotosLoading || pendingAutoMakeProfile || showFirstPhotoDialog || showSeedBuddiesPostingPopup) return;
     if (!profilePhotoId || hasNickname) {
@@ -1888,15 +1899,16 @@ export default function MyStory() {
     const isFirstSecurityIconSave = !hasSecretIcon;
     userDismissedSecurityIconRef.current = false;
     setHasSecretIcon(true);
+    updateSessionHasSecretIcon?.(true);
     setShowSecurityIconDialog(false);
     setProfileBasicsMessage('Security icon saved.');
-    if (isFirstSecurityIconSave) {
+    if (isFirstSecurityIconSave && FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
       markSignupIdentificationVerificationRequired();
       navigate(SELF_REPORT_BIOGRAPHY_PATH, {
         state: { openIdentificationVerification: true }
       });
     }
-  }, [navigate, hasSecretIcon]);
+  }, [navigate, hasSecretIcon, updateSessionHasSecretIcon]);
 
   const handleSecurityIconDialogClose = useCallback(() => {
     userDismissedSecurityIconRef.current = true;
@@ -1904,6 +1916,7 @@ export default function MyStory() {
   }, []);
 
   useEffect(() => {
+    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;
     if (userDismissedSecurityIconRef.current) return;
     if (
       profileBasicsLoading ||

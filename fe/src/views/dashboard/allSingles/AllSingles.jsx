@@ -62,6 +62,9 @@ import {
   ALL_SINGLES_INSTRUCTION_POPUP_TEXT,
   ALL_SINGLES_WELCOME_BANNER_TEXT
 } from 'constants/allSinglesInstructionText';
+import { FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE } from 'config/firstLoginAutoPopupsEnv';
+import { consumeFirstLoginOnboardingCongratsPending } from 'utils/firstLoginOnboarding';
+import { themedAlert } from 'utils/themedDialog';
 
 // ==============================|| ALL SINGLES ||============================== //
 
@@ -253,6 +256,7 @@ export default function AllSingles() {
   const { preferences, preferencesLoading } = useSinglesPreferences();
 
   const [instructionOpen, setInstructionOpen] = useState(false);
+  const [instructionAutoPlay, setInstructionAutoPlay] = useState(false);
   const [welcomeExpanded, setWelcomeExpanded] = useState(true);
   const toggleWelcomeExpanded = useCallback(() => {
     setWelcomeExpanded((open) => {
@@ -277,6 +281,20 @@ export default function AllSingles() {
           console.warn('[AllSingles] load welcome panel preference failed', err?.message ?? err);
         }
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!consumeFirstLoginOnboardingCongratsPending()) return undefined;
+    let cancelled = false;
+    void (async () => {
+      await themedAlert(FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE, { okLabel: 'OK' });
+      if (cancelled) return;
+      setInstructionAutoPlay(true);
+      setInstructionOpen(true);
     })();
     return () => {
       cancelled = true;
@@ -575,7 +593,10 @@ export default function AllSingles() {
 
       <PageInstructionPopup
         open={instructionOpen}
-        onClose={() => setInstructionOpen(false)}
+        onClose={() => {
+          setInstructionOpen(false);
+          setInstructionAutoPlay(false);
+        }}
         closeOnBackdrop
         bodyTextAlignLeft
         centeredLeadLines={1}
@@ -583,6 +604,7 @@ export default function AllSingles() {
         <PageInstructionPopup.Body>
           <PageInstructionAudioTutorial
             active={instructionOpen}
+            autoPlay={instructionAutoPlay}
             audioByVoice={ALL_SINGLES_INSTRUCTION_AUDIO_BY_VOICE}
             title={ALL_SINGLES_INSTRUCTION_CONTEXT_TITLE}
             contextStep={ALL_SINGLES_INSTRUCTION_CONTEXT_STEP}

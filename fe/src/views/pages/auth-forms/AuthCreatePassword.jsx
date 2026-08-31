@@ -21,6 +21,7 @@ import { createPassword } from 'api/createPasswordFe';
 import { sendRegistrationSms } from 'api/sendRegistrationSmsFe';
 import { resendPhoneCode, verifyPhone } from 'api/verifyPhoneFe';
 import { bypassSignupSmsVerification } from 'api/bypassSignupSmsVerificationFe';
+import { completeGoogleSignup } from 'api/googleSignupFe';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import emailCodeVerifiedImg from 'assets/images/emailCodeVerified.png';
@@ -40,6 +41,7 @@ import {
   normalizeSignupReferralCode,
   isDefaultReferByCode
 } from 'utils/signupReferralCode';
+import { clearGoogleSignupToken, readStoredGoogleSignupToken } from 'utils/googleSignupOAuth';
 
 // assets
 import CheckCircle from '@mui/icons-material/CheckCircle';
@@ -174,6 +176,7 @@ function readSmsVerificationBypassed() {
 export default function AuthCreatePassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const isGoogleSignup = searchParams.get('google') === '1';
   const [email, setEmail] = useState(() => searchParams.get('email') || '');
   const [registrationCode, setRegistrationCode] = useState(() =>
     (searchParams.get('code') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase()
@@ -203,6 +206,7 @@ export default function AuthCreatePassword() {
   const verificationCode = codeChars.join('');
   /** skipped = no code in URL (user types code manually); loading/valid/invalid when code+email present */
   const [linkStatus, setLinkStatus] = useState(() => {
+    if (searchParams.get('google') === '1') return 'valid';
     const em = searchParams.get('email') || '';
     const cd = (searchParams.get('code') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
     return em && cd ? 'loading' : 'skipped';
@@ -291,13 +295,29 @@ export default function AuthCreatePassword() {
   /** Task 2: keep phone in the URL so email-link opens with email, code, and phone populated */
   useEffect(() => {
     const em = (email || searchParams.get('email') || '').trim().toLowerCase();
+    const phoneDigits = signupPhone.replace(/\D/g, '');
+    const referralToken = getSignupReferralCodeFromSearchParams(searchParams);
+
+    if (isGoogleSignup) {
+      if (!em || phoneDigits.length !== 10) return;
+      const hasPhone = Boolean(searchParams.get('phone'));
+      const hasGoogle = searchParams.get('google') === '1';
+      if (hasPhone && hasGoogle) return;
+      const qs = buildCreatePasswordQuery({
+        email: em,
+        phone: signupPhone,
+        token: referralToken,
+        google: true
+      });
+      navigate(`/pages/createPassword?${qs}`, { replace: true });
+      return;
+    }
+
     const cd = (registrationCode || searchParams.get('code') || '')
       .replace(/[^A-Za-z0-9]/g, '')
       .slice(0, 6)
       .toUpperCase();
-    const phoneDigits = signupPhone.replace(/\D/g, '');
     if (!em || !cd || phoneDigits.length !== 10) return;
-    const referralToken = getSignupReferralCodeFromSearchParams(searchParams);
     const hasPhone = Boolean(searchParams.get('phone'));
     const hasToken = Boolean(searchParams.get('token') || searchParams.get('ref'));
     if (hasPhone && hasToken) return;
@@ -308,7 +328,7 @@ export default function AuthCreatePassword() {
       token: referralToken
     });
     navigate(`/pages/createPassword?${qs}`, { replace: true });
-  }, [email, registrationCode, signupPhone, searchParams, navigate]);
+  }, [email, registrationCode, signupPhone, searchParams, navigate, isGoogleSignup]);
 
   const sendSmsCooldownActive = sendSmsCooldown > 0;
   useEffect(() => {
@@ -320,6 +340,11 @@ export default function AuthCreatePassword() {
   }, [sendSmsCooldownActive]);
 
   useEffect(() => {
+    if (isGoogleSignup) {
+      setLinkStatus('valid');
+      setError('');
+      return undefined;
+    }
     const em = searchParams.get('email') || '';
     const cd = (searchParams.get('code') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
     if (!em || !cd) {
@@ -349,9 +374,10 @@ export default function AuthCreatePassword() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, [searchParams, isGoogleSignup]);
 
   useEffect(() => {
+    if (isGoogleSignup) return;
     if (!bypassSmsPhoneVerification) return;
     if (linkStatus !== 'valid') return;
     if (smsVerifiedAwaitingPassword) return;
@@ -390,12 +416,69 @@ export default function AuthCreatePassword() {
       cancelled = true;
     };
   }, [
+    isGoogleSignup,
     bypassSmsPhoneVerification,
     linkStatus,
     smsVerifiedAwaitingPassword,
     signupPhone,
     registrationCode,
     email
+  ]);
+
+  /** Google signup + BY_PASS_SMS: skip Twilio, create account, go to congratulations. */
+  useEffect(() => {
+    if (!isGoogleSignup || !bypassSmsPhoneVerification) return;
+    if (linkStatus !== 'valid') return;
+    const phoneDigits = signupPhone.replace(/\D/g, '');
+    if (phoneDigits.length !== 10) return;
+    const emailTrimmedLocal = email.trim();
+    if (!emailTrimmedLocal) return;
+    if (bypassSmsAttemptedRef.current) return;
+    if (!readStoredGoogleSignupToken()) {
+      setError('Google sign-up session expired. Please click Sign up with Google again.');
+      return;
+    }
+
+    bypassSmsAttemptedRef.current = true;
+    let cancelled = false;
+    setBypassSmsInProgress(true);
+    setError('');
+
+    completeGoogleSignup({
+      email: emailTrimmedLocal,
+      phone: signupPhone,
+      termsAccepted: true
+    })
+      .then(() => {
+        if (cancelled) return;
+        clearGoogleSignupToken();
+        sessionStorage.removeItem(SIGNUP_CREATE_PASSWORD_PAYLOAD_KEY);
+        sessionStorage.removeItem(SIGNUP_REGISTER_PHONE_KEY);
+        sessionStorage.removeItem(SIGNUP_SMS_VERIFIED_KEY);
+        sessionStorage.removeItem(SIGNUP_SMS_BYPASSED_KEY);
+        markRefereeRewardUxAfterProfileSetup();
+        clearStoredSignupReferralCode();
+        navigate(`/pages/phoneVerificationSuccess?email=${encodeURIComponent(emailTrimmedLocal)}`);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        bypassSmsAttemptedRef.current = false;
+        setError(err?.response?.data?.error || err.message || 'Failed to finish Google sign-up.');
+      })
+      .finally(() => {
+        if (!cancelled) setBypassSmsInProgress(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isGoogleSignup,
+    bypassSmsPhoneVerification,
+    linkStatus,
+    signupPhone,
+    email,
+    navigate
   ]);
 
   const handleCodeChange = (e) => {
@@ -506,14 +589,22 @@ export default function AuthCreatePassword() {
     if (sendSmsCodeButtonDisabled) return;
     setError('');
     const codeTrimmed = registrationCode.trim();
-    if (codeTrimmed.length !== 6) {
+    if (!isGoogleSignup && codeTrimmed.length !== 6) {
       setError('Please enter the 6-character code from your registration email.');
+      return;
+    }
+    if (isGoogleSignup && !readStoredGoogleSignupToken()) {
+      setError('Google sign-up session expired. Please click Sign up with Google again.');
       return;
     }
     setIsSendingSms(true);
     try {
       if (smsSent) {
         await resendPhoneCode(emailTrimmed, displayPhone);
+      } else if (isGoogleSignup) {
+        await sendRegistrationSms('', emailTrimmed, displayPhone, {
+          signupToken: readStoredGoogleSignupToken()
+        });
       } else {
         await sendRegistrationSms(codeTrimmed, emailTrimmed, displayPhone);
       }
@@ -536,6 +627,22 @@ export default function AuthCreatePassword() {
         referByCode: resolveSignupReferByCodeForApi()
       });
       if (data?.needsPassword) {
+        if (isGoogleSignup) {
+          await completeGoogleSignup({
+            email: emailTrimmed,
+            phone: displayPhone,
+            termsAccepted: true
+          });
+          clearGoogleSignupToken();
+          sessionStorage.removeItem(SIGNUP_CREATE_PASSWORD_PAYLOAD_KEY);
+          sessionStorage.removeItem(SIGNUP_REGISTER_PHONE_KEY);
+          sessionStorage.removeItem(SIGNUP_SMS_VERIFIED_KEY);
+          sessionStorage.removeItem(SIGNUP_SMS_BYPASSED_KEY);
+          markRefereeRewardUxAfterProfileSetup();
+          clearStoredSignupReferralCode();
+          navigate(`/pages/phoneVerificationSuccess?email=${encodeURIComponent(emailTrimmed)}`);
+          return;
+        }
         setSmsVerifiedAwaitingPassword(true);
         sessionStorage.setItem(SIGNUP_SMS_VERIFIED_KEY, '1');
         return;
@@ -548,7 +655,11 @@ export default function AuthCreatePassword() {
       clearStoredSignupReferralCode();
       navigate(`/pages/phoneVerificationSuccess?email=${encodeURIComponent(emailTrimmed)}`);
     } catch (err) {
-      setError(err.message || 'The phone verification code is incorrect. Please enter again or register phone number again.');
+      setError(
+        err?.response?.data?.error ||
+          err.message ||
+          'The phone verification code is incorrect. Please enter again or register phone number again.'
+      );
     } finally {
       setIsVerifyingSms(false);
     }
@@ -702,7 +813,7 @@ export default function AuthCreatePassword() {
     hasSignupPhone &&
     !smsVerifiedAwaitingPassword &&
     (!publicConfigLoaded || bypassSmsInProgress);
-  const showPasswordForm = linkAllowsForm && smsVerifiedAwaitingPassword;
+  const showPasswordForm = linkAllowsForm && smsVerifiedAwaitingPassword && !isGoogleSignup;
   const validReferralMessage =
     referralStatus === 'valid' ? formatValidReferralMessage(referrerAlias, referrerMemberCode) : null;
 

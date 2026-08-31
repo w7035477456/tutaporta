@@ -43,7 +43,8 @@ export default function PageInstructionAudioTutorial({
   audioByVoice,
   title = '',
   contextStep = '',
-  active = true
+  active = true,
+  autoPlay = false
 }) {
   const [aiVoice, setAiVoiceState] = useState(() => getAiVoice());
   const audioRef = useRef(null);
@@ -104,6 +105,14 @@ export default function PageInstructionAudioTutorial({
     }
     bumpUi();
   }, [audioUrl, bumpUi, stopAudio]);
+
+  useEffect(() => {
+    if (!active || !autoPlay) return undefined;
+    const timer = window.setTimeout(() => {
+      void startPlay();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [active, autoPlay, startPlay]);
 
   const pausePlay = useCallback(() => {
     const cur = audioRef.current;
@@ -399,5 +408,6 @@ PageInstructionAudioTutorial.propTypes = {
   }).isRequired,
   title: PropTypes.string,
   contextStep: PropTypes.string,
-  active: PropTypes.bool
+  active: PropTypes.bool,
+  autoPlay: PropTypes.bool
 };

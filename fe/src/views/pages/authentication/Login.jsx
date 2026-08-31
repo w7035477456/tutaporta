@@ -19,7 +19,11 @@ import SessionEndNoticeDialog from 'ui-component/SessionEndNoticeDialog';
 import { LoginDemoModeProvider } from 'contexts/LoginDemoModeContext';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { consumeSessionEndNotice } from 'utils/sessionEndNotice';
-import { authShellStackSx, authFixedFooterContentPaddingBottom } from './authPageLayoutSx';
+import {
+  authEnvTextFontSize,
+  authShellStackSx,
+  authFixedFooterContentPaddingBottom
+} from './authPageLayoutSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -163,6 +167,17 @@ function Login() {
                 <Stack sx={{ alignItems: 'center' }}>
                   <LoginSignupPrompt signupEnabled={signupEnabled} signupPromptSx={signupPromptSx} />
                 </Stack>
+                <Typography
+                  sx={{
+                    fontSize: authEnvTextFontSize,
+                    textAlign: 'center',
+                    color: 'var(--theme-primary-color)',
+                    lineHeight: 1.4
+                  }}
+                >
+                  You must be 18 or older to use this website. First-time logins will require a driver&apos;s license upload
+                  for age verification.
+                </Typography>
               </Stack>
             </AuthCardWrapper>
           </AuthStandardDialogFrame>

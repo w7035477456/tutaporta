@@ -117,16 +117,47 @@ Express middleware is weaker than firewall; prefer firewall or HAProxy.
 
 ## Cloudflare WAF: phone QR upload (`/mobilePhotoUpload`)
 
-If a phone scan shows **“Sorry, you have been blocked”** (Cloudflare page with a Ray ID), or the phone page shows **HTTP 403** / **“Server returned HTML instead of JSON”** on upload (while desktop QR status polls show `RESPONSE OK` in PM2 logs), the **POST never reached Node**. Cellular browsers are often flagged by **Bot Fight Mode**, **OWASP**, or **rate limits** on `POST /api/mobilePhotoUpload/photo` even when `GET` validate/status works.
+### Symptoms (production)
 
-**Fix in Cloudflare dashboard (zone onlinemall.website):**
+| Phone network | What you see |
+|---------------|--------------|
+| **Cellular only (WiFi off)** | Phone: **HTTP 403** / “Upload blocked… Cloudflare or the firewall…” — Cloudflare returned an HTML block page; **POST never reached Node**. |
+| **WiFi on** | Phone hangs on **“Uploading photo…”**; desktop QR modal often shows **504**. Upload reached (or partially reached) the edge/proxy but timed out — see HAProxy timeouts below. |
 
-1. **Security → Events** — find the block; note the **Ray ID** and **rule**.
-2. **Security → WAF → Custom rules** — add a skip (or log-only) rule, e.g.:
-   - **Expression:** `(http.request.uri.path contains "/mobilePhotoUpload") or (http.request.uri.path contains "/api/mobilePhotoUpload")`
-   - **Action:** Skip all remaining custom rules (or skip Bot Fight Mode for that path).
-3. Or lower **Security Level** / disable **Bot Fight Mode** for verified mobile upload paths.
+Cellular browsers are often flagged by **Bot Fight Mode**, **OWASP**, or **rate limits** on `POST /api/mobilePhotoUpload/photo` even when `GET` validate/status works. Desktop status polls can still show `RESPONSE OK` in PM2 while the phone POST is blocked.
 
-**App-side (repo):** QR links use path tokens `https://onlinemall.website/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
+### Fix in Cloudflare dashboard (zone `onlinemall.website`) — required for cellular 403
 
-**Verify origin works (bypasses Cloudflare):** from a server on the LAN, `curl -I https://onlinemall.website/mobilePhotoUpload` should return `200` HTML. If only phones fail, it is Cloudflare—not Ubuntu/HAProxy.
+1. **Security → Events** — find the block; note the **Ray ID** and **rule** (often Bot Fight / Managed WAF).
+2. **Security → WAF → Custom rules** — create a **Skip** rule (place it **above** blocking rules):
+   - **Name:** `Allow mobile photo upload`
+   - **Expression:**
+     ```
+     (http.request.uri.path contains "/mobilePhotoUpload") or (http.request.uri.path contains "/api/mobilePhotoUpload")
+     ```
+   - **Action:** **Skip** → enable skip for **All remaining custom rules**, **Super Bot Fight Mode** / **Bot Fight Mode**, and **Rate limiting** (as available on your plan).
+3. Optional: **Security → Bots** — confirm Bot Fight is not still challenging that path; re-check Events after a cellular retry.
+4. Scan a **fresh** QR from the desktop after the rule is **Deployed**.
+
+Also check **RULE2 / ASN block** (`CLOUDFLARE_ASN_*` sync): if a carrier ASN is on the VPN list, cellular will 403 for the whole site—not only upload. Events will show the ASN rule.
+
+### HAProxy timeouts (WiFi hang / 504)
+
+Repo `haproxy/haproxy.cfg` uses longer timeouts for phone multipart POSTs (`timeout http-request 120s`, `client`/`server` `300s`). After pulling that change on the HAProxy host:
+
+```bash
+sudo cp ~/code/main/haproxy/haproxy.cfg /etc/haproxy/haproxy.cfg   # or your install path
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
+```
+
+A **10s `timeout http-request`** aborts slow phone bodies mid-upload → endless spinner + gateway **504**.
+
+### App-side (repo)
+
+QR links use path tokens `https://onlinemall.website/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
+
+### Verify
+
+- **Cloudflare Events:** after a cellular upload attempt, either no block, or the skip rule matched.
+- **PM2:** `[mobilePhotoUpload]` lines for the phone POST (if missing on cellular 403, CF blocked before Ubuntu).
+- **Origin (LAN):** `curl -I https://onlinemall.website/mobilePhotoUpload` → `200`. If only phones fail, it is Cloudflare—not Ubuntu/HAProxy.

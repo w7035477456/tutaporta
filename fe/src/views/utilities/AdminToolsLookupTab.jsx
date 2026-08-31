@@ -1050,6 +1050,7 @@ export default function AdminToolsLookupTab({ onError }) {
                         {row.memberId != null ? ` · member_id ${row.memberId}` : ''}
                         {row.memberCategory ? ` · ${formatMemberCategoryLabel(row.memberCategory)}` : ''}
                         {row.status ? ` · ${formatSinglesStatusLabel(row.status)}` : ''}
+                        {row.over18Verified === true ? ' · 18+' : row.over18Verified === false ? ' · under18' : ''}
                         {` · tokens ${formatTokenBalanceDisplay(row.accountBalanceToken)}`}
                         {row.phone ? ` · ${row.phone}` : ''}
                         {row.alias ? ` · ${row.alias}` : ''}
@@ -1068,20 +1069,28 @@ export default function AdminToolsLookupTab({ onError }) {
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell
                       columnIndex={SINGLES_COL.STATUS}
-                      sx={{ display: 'flex' }}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}
                     >
                       {isAdminSinglesLookupRow(row) ? (
                         <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
                           {formatSinglesStatusLabel(row.status)}
+                          {row.over18Verified === true ? ' · 18+' : ''}
                         </ColorTemplate9TableData.BodyText>
                       ) : (
-                        <SelectedButtonTemplate
-                          type="button"
-                          disabled={saveBusy}
-                          onClick={() => handleCycleStatus(row.singlesId)}
-                        >
-                          {formatSinglesStatusLabel(row.status)}
-                        </SelectedButtonTemplate>
+                        <>
+                          <SelectedButtonTemplate
+                            type="button"
+                            disabled={saveBusy}
+                            onClick={() => handleCycleStatus(row.singlesId)}
+                          >
+                            {formatSinglesStatusLabel(row.status)}
+                          </SelectedButtonTemplate>
+                          {row.over18Verified === true ? (
+                            <ColorTemplate9TableData.BodyText sx={{ ...lookupBodyTextSx, fontWeight: 700, mb: 0 }}>
+                              18+
+                            </ColorTemplate9TableData.BodyText>
+                          ) : null}
+                        </>
                       )}
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell

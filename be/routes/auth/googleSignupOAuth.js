@@ -3,7 +3,7 @@ import pool from '../../db/connection.js';
 import { getPublicAppUrl } from '../../utils/publicAppUrl.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { issueUserLoginSession } from '../../utils/issueUserLoginSession.js';
-import { isSinglesStatusLoginAllowed } from '../../utils/singlesStatus.js';
+import { isSinglesStatusLoginAllowed, singlesStatusLoginRejectMessage } from '../../utils/singlesStatus.js';
 import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
 import { insertNewSinglesAccount } from '../../utils/newSinglesAccount.js';
 import { hashPassword } from '../../utils/passwordHash.js';
@@ -17,6 +17,7 @@ import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js
 import { resolveReferByCodeForSignup } from '../../utils/referByCode.js';
 import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
 import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
+import { isBypassSmsPhoneVerificationEnabled } from '../../utils/bypassSmsPhoneVerification.js';
 
 const OAUTH_RESULT_STORAGE_KEY = 'googleSignupOAuthResult';
 const OAUTH_BROADCAST_CHANNEL = 'google-signup-oauth';
@@ -24,10 +25,12 @@ const OAUTH_ACK_TYPE = 'google-signup-oauth-ack';
 const GOOGLE_SIGNUP_EMAIL_STORAGE_KEY = 'googleSignupEmail';
 const GOOGLE_SIGNUP_TOKEN_STORAGE_KEY = 'googleSignupToken';
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
-const SIGNUP_TOKEN_MAX_AGE_MS = 10 * 60 * 1000;
+/** Long enough for SMS send + verify after Google OAuth (was 10m). */
+const SIGNUP_TOKEN_MAX_AGE_MS = 30 * 60 * 1000;
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
-                seeded_demo_buddies_boolean, gender_self_report
+                seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
+                (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
          FROM helloworldjunktest.singles s`;
 
 function normalizeOrigin(value) {
@@ -410,7 +413,7 @@ export async function googleSignupCallback(req, res) {
           renderPopupResultHtml({
             success: false,
             email,
-            error: 'Your account is not active. Please contact support.'
+            error: singlesStatusLoginRejectMessage(existing.status, existing.member_category)
           })
         );
       }
@@ -444,7 +447,10 @@ export async function googleSignupCallback(req, res) {
 /**
  * POST /api/auth/google/signup/complete
  * body: { email, phone, signupToken, termsAccepted, ref?, referByCode?, token? }
- * Creates account with random password hash and logs the user in (no create-password email).
+ *
+ * After Google OAuth + SMS verify (phone_verified_pending_password), creates the account
+ * with a random password hash. Does **not** log the user in — FE shows congratulations
+ * then "Go to Login" (user signs in with Google). Password creation UI is skipped.
  */
 export async function googleSignupComplete(req, res) {
   if (!isGoogleSignupOAuthConfigured()) {
@@ -481,14 +487,30 @@ export async function googleSignupComplete(req, res) {
   try {
     const existing = await findSinglesByEmail(emailNorm);
     if (existing) {
-      if (isLockOutBlocking(existing)) {
-        return res.status(403).json({ error: 'Under construction. Please check back later.' });
+      return res.status(400).json({
+        error: 'An account with this email already exists. Please sign in with Google.'
+      });
+    }
+
+    const smsBypassed = isBypassSmsPhoneVerificationEnabled();
+    if (!smsBypassed) {
+      const pending = await pool.query(
+        `SELECT id
+         FROM helloworldjunktest.verifications
+         WHERE email = $1
+           AND phone = $2
+           AND kind = 'phone_verified_pending_password'
+           AND used_at IS NULL
+           AND expires_at > now()
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [emailNorm, formattedPhone]
+      );
+      if (!pending.rows[0]) {
+        return res.status(400).json({
+          error: 'Please verify your phone with the SMS code before finishing Google sign-up.'
+        });
       }
-      if (!isSinglesStatusLoginAllowed(existing.status, existing.member_category)) {
-        return res.status(403).json({ error: 'Your account is not active. Please contact support.' });
-      }
-      const body = await issueUserLoginSession(res, existing, { rememberMe: false });
-      return res.json(body);
     }
 
     const signupCategory = resolveSignupMemberCategory(emailNorm);
@@ -524,18 +546,21 @@ export async function googleSignupComplete(req, res) {
       phone: formattedPhone
     });
 
-    const user = await findSinglesByEmail(emailNorm);
-    if (!user) {
-      return res.status(500).json({ error: 'Account created but login failed. Please sign in with Google again.' });
+    try {
+      await pool.query(`DELETE FROM helloworldjunktest.verifications WHERE email = $1`, [emailNorm]);
+    } catch (cleanupErr) {
+      console.warn('[googleSignupOAuth] verification cleanup:', cleanupErr?.message || cleanupErr);
     }
 
-    console.log('[googleSignupOAuth] complete — account created:', {
+    console.log('[googleSignupOAuth] complete — account created (no auto-login):', {
       singlesId: account.singlesId,
       emailPrefix: `${emailNorm.slice(0, 3)}***`
     });
 
-    const body = await issueUserLoginSession(res, user, { rememberMe: false });
-    return res.json(body);
+    return res.json({
+      success: true,
+      message: 'Registration complete. You can log in with Google now.'
+    });
   } catch (err) {
     console.error('[googleSignupOAuth] complete failed:', err?.message ?? err);
     return res.status(500).json({ error: 'Failed to complete Google sign-up. Please try again.' });

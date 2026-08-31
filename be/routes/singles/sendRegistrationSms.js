@@ -6,48 +6,64 @@ import {
 } from '../../utils/duplicatePhonePolicy.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
+import { verifyGoogleSignupToken } from '../auth/googleSignupOAuth.js';
 
 const LOG_PREFIX = '[sendRegistrationSms]';
 
 /**
  * Send Twilio SMS during sign-up before the user sets a password.
- * Validates the registration email code (does not consume it) and opens a phone_verify_session.
+ * Validates the registration email code **or** a Google signup token (does not consume either)
+ * and opens a phone_verify_session.
  */
 export async function sendRegistrationSms(req, res) {
   try {
-    const { code: codeRaw, email, phone } = req.body;
+    const { code: codeRaw, email, phone, signupToken: signupTokenRaw } = req.body;
     const code = typeof codeRaw === 'string' ? codeRaw.trim().toUpperCase() : '';
-
-    if (!code || !email || !phone) {
-      return res.status(400).json({ error: 'Email, registration code, and phone are required.' });
-    }
-
+    const signupToken = String(signupTokenRaw || '').trim();
     const emailNorm = normalizeEmailForDb(email);
 
-    let row;
-    try {
-      const result = await pool.query(
-        `SELECT id, email
-         FROM helloworldjunktest.verifications
-         WHERE code = $1
-           AND kind = 'registration_email'
-           AND used_at IS NULL
-           AND expires_at > now()`,
-        [code]
-      );
-      row = result.rows[0];
-    } catch (dbErr) {
-      console.error(LOG_PREFIX, 'DB error looking up code', dbErr.message);
-      return res.status(500).json({ error: 'Failed to verify code. Please try again.' });
+    if (!email || !phone) {
+      return res.status(400).json({ error: 'Email and phone are required.' });
     }
 
-    if (!row) {
+    if (signupToken) {
+      if (!verifyGoogleSignupToken(signupToken, emailNorm)) {
+        return res.status(400).json({
+          error: 'Google sign-up session expired. Please click Sign up with Google again.'
+        });
+      }
+    } else if (code) {
+      let row;
+      try {
+        const result = await pool.query(
+          `SELECT id, email
+           FROM helloworldjunktest.verifications
+           WHERE code = $1
+             AND kind = 'registration_email'
+             AND used_at IS NULL
+             AND expires_at > now()`,
+          [code]
+        );
+        row = result.rows[0];
+      } catch (dbErr) {
+        console.error(LOG_PREFIX, 'DB error looking up code', dbErr.message);
+        return res.status(500).json({ error: 'Failed to verify code. Please try again.' });
+      }
+
+      if (!row) {
+        return res.status(400).json({
+          error: 'This code is invalid, expired, or already used. Please request a new registration email.'
+        });
+      }
+      if (normalizeEmailForDb(row.email) !== emailNorm) {
+        return res.status(400).json({
+          error: 'Email does not match the registration. Please use the email that received the code.'
+        });
+      }
+    } else {
       return res.status(400).json({
-        error: 'This code is invalid, expired, or already used. Please request a new registration email.'
+        error: 'Email, registration code (or Google sign-up token), and phone are required.'
       });
-    }
-    if (normalizeEmailForDb(row.email) !== emailNorm) {
-      return res.status(400).json({ error: 'Email does not match the registration. Please use the email that received the code.' });
     }
 
     const formattedPhone = formatPhoneForDuplicateCheck(phone);
@@ -79,7 +95,11 @@ export async function sendRegistrationSms(req, res) {
     );
 
     await sendTwilioVerificationSms(formattedPhone);
-    console.log(LOG_PREFIX, 'SMS sent', { emailPrefix: `${emailNorm.slice(0, 3)}***`, to: formattedPhone });
+    console.log(LOG_PREFIX, 'SMS sent', {
+      emailPrefix: `${emailNorm.slice(0, 3)}***`,
+      to: formattedPhone,
+      via: signupToken ? 'google' : 'email_code'
+    });
     return res.json({ success: true, message: 'Verification code sent to your phone' });
   } catch (error) {
     console.error(LOG_PREFIX, 'error', error.message || error);

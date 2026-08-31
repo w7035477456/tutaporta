@@ -23,7 +23,8 @@ import {
   captureDriverLicenseFromIdImage,
   previewFaceMatchForIdImage,
   previewLiveScanProfileMatch,
-  postIdVerificationManualSupportEmail
+  postIdVerificationManualSupportEmail,
+  markOver18Verified
 } from 'api/rekognitionFe';
 import { normalizeVerificationImageFile, normalizeVerificationImageFromUrl } from 'utils/normalizeVerificationImage';
 import { uploadMyPhoto, setProfilePhoto } from 'api/myPhotosFe';
@@ -38,6 +39,7 @@ import {
 import { captureElementAsPng } from 'utils/captureConsentDialogImage';
 import { formatLiveFaceScanUserError } from 'utils/livenessErrorMessage';
 import { sanitizeUserFacingTechTerms } from 'utils/sanitizeUserFacingTechTerms';
+import { themedAlert } from 'utils/themedDialog';
 import GreenButton from 'ui-component/GreenButton';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import IdentificationVerificationBoard, {
@@ -259,7 +261,8 @@ export default function RekognitionVerifyDialog({
   onVerified,
   onFailed
 }) {
-  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto } = useAuth();
+  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, logout, updateSessionOver18Verified } =
+    useAuth();
   const adminImpersonationBypass = isAdminImpersonationBypassSession(user);
   const showPilotSkip = isPilotUserCategory(user?.member_category);
   const navigate = useNavigate();
@@ -939,6 +942,31 @@ export default function RekognitionVerifyDialog({
     [status?.faceMatchThreshold]
   );
 
+  const enforceUnder18FromIdCapture = useCallback(
+    async (data, extracted) => {
+      const age = data?.age ?? extracted?.age;
+      const underage = Boolean(data?.underage) || (Number.isFinite(age) && age < 18);
+      if (!underage) {
+        const over18Flag = data?.over_18_verified ?? data?.over18Verified ?? (Number.isFinite(age) && age >= 18 ? true : null);
+        if (over18Flag === true) {
+          updateSessionOver18Verified?.(true);
+        }
+        return false;
+      }
+      const msg = String(data?.message || '').trim() || 'Sorry you must be over 18 years of age';
+      appendDebugLog('Under 18 from government ID OCR — logout', { age, underage: true });
+      await themedAlert(msg);
+      try {
+        await logout();
+      } catch (logoutErr) {
+        console.warn('[rekognition-verify] logout after under18 failed', logoutErr);
+      }
+      navigate('/pages/login', { replace: true });
+      return true;
+    },
+    [appendDebugLog, logout, navigate, updateSessionOver18Verified]
+  );
+
   const autoProcessDriverLicense = useCallback(async () => {
     if (!driverLicenseUserUploaded || !driverLicensePreview || !profileSlotReady) return;
     setDriverLicenseVerifying(true);
@@ -956,7 +984,9 @@ export default function RekognitionVerifyDialog({
       });
       applyDobOcrTrace(data?.dobOcrTrace, 'auto driver license');
       applySexOcrTrace(data?.sexOcrTrace, 'auto driver license');
-      setDriverLicenseExtracted(buildExtractedFromCapture(data, 'driver_license'));
+      const extracted = buildExtractedFromCapture(data, 'driver_license');
+      setDriverLicenseExtracted(extracted);
+      if (await enforceUnder18FromIdCapture(data, extracted)) return;
       applyProfileIdMatchFromCapture(data);
       setDriverLicenseVerified(true);
       appendDebugLog('Auto driver license processing succeeded', data?.captured);
@@ -979,7 +1009,8 @@ export default function RekognitionVerifyDialog({
     appendDebugLog,
     applyDobOcrTrace,
     applySexOcrTrace,
-    applyProfileIdMatchFromCapture
+    applyProfileIdMatchFromCapture,
+    enforceUnder18FromIdCapture
   ]);
 
   const autoProcessPassport = useCallback(async () => {
@@ -996,7 +1027,9 @@ export default function RekognitionVerifyDialog({
       });
       applyDobOcrTrace(data?.dobOcrTrace, 'auto passport');
       applySexOcrTrace(data?.sexOcrTrace, 'auto passport');
-      setPassportExtracted(buildExtractedFromCapture(data, 'passport'));
+      const extracted = buildExtractedFromCapture(data, 'passport');
+      setPassportExtracted(extracted);
+      if (await enforceUnder18FromIdCapture(data, extracted)) return;
       const matchPct = data?.profileMatchPercentMatch ?? data?.idMatchSimilarity ?? null;
       setPassportMatchPct(matchPct);
       setPassportVerified(true);
@@ -1015,7 +1048,8 @@ export default function RekognitionVerifyDialog({
     profileSlotReady,
     appendDebugLog,
     applyDobOcrTrace,
-    applySexOcrTrace
+    applySexOcrTrace,
+    enforceUnder18FromIdCapture
   ]);
 
   const applyBypassIdCapture = useCallback(
@@ -1040,11 +1074,15 @@ export default function RekognitionVerifyDialog({
         applyDobOcrTrace(data?.dobOcrTrace, `admin bypass ${documentType}`);
         applySexOcrTrace(data?.sexOcrTrace, `admin bypass ${documentType}`);
         if (isDriverLicense) {
-          setDriverLicenseExtracted(buildExtractedFromCapture(data, 'driver_license'));
+          const extracted = buildExtractedFromCapture(data, 'driver_license');
+          setDriverLicenseExtracted(extracted);
+          if (await enforceUnder18FromIdCapture(data, extracted)) return;
           applyProfileIdMatchFromCapture(data);
           setDriverLicenseVerified(true);
         } else {
-          setPassportExtracted(buildExtractedFromCapture(data, 'passport'));
+          const extracted = buildExtractedFromCapture(data, 'passport');
+          setPassportExtracted(extracted);
+          if (await enforceUnder18FromIdCapture(data, extracted)) return;
           const matchPct = data?.profileMatchPercentMatch ?? data?.idMatchSimilarity ?? 100;
           setPassportMatchPct(matchPct);
           setPassportVerified(true);
@@ -1072,7 +1110,7 @@ export default function RekognitionVerifyDialog({
         }
       }
     },
-    [appendDebugLog, applyDobOcrTrace, applySexOcrTrace, applyProfileIdMatchFromCapture]
+    [appendDebugLog, applyDobOcrTrace, applySexOcrTrace, applyProfileIdMatchFromCapture, enforceUnder18FromIdCapture]
   );
 
   const handleBypassDriverLicense = useCallback(() => {
@@ -1482,6 +1520,27 @@ export default function RekognitionVerifyDialog({
     navigate('/allSingles');
   }, [closing, submitting, onClose, navigate]);
 
+  const handleHiddenPassportOOver18Bypass = useCallback(async () => {
+    if (closing || submitting) return;
+    setClosing(true);
+    setErrorText('');
+    try {
+      await markOver18Verified();
+      updateSessionOver18Verified?.(true);
+      clearSignupIdentificationVerificationRequired();
+      const { markFirstLoginOnboardingCongratsPending } = await import('utils/firstLoginOnboarding');
+      markFirstLoginOnboardingCongratsPending();
+      onClose?.();
+      navigate('/allSingles');
+    } catch (err) {
+      setErrorText(
+        sanitizeUserFacingTechTerms(err?.response?.data?.error || err?.message || 'Failed to update over-18 status')
+      );
+    } finally {
+      setClosing(false);
+    }
+  }, [closing, submitting, onClose, updateSessionOver18Verified, navigate]);
+
   const livenessBlocked =
     !adminImpersonationBypass && status?.requireLivenessEffective && !status?.livenessConfigured;
   const liveFaceVerifyDisabled =
@@ -1507,10 +1566,8 @@ export default function RekognitionVerifyDialog({
       <ColorTemplate7PopupLargeDark
       open={open}
       closeOnBackdrop={false}
-      showCloseButton
-      closeButtonDisabled={closing || submitting}
+      showCloseButton={false}
       onClose={() => void handleClose()}
-      closeButtonAriaLabel="Close identification verification"
     >
       <ColorTemplate7PopupLargeDark.Body spacing={2}>
         <Box ref={consentCaptureRef}>
@@ -1518,8 +1575,34 @@ export default function RekognitionVerifyDialog({
 
           <Stack spacing={2} sx={{ width: '100%' }}>
             <Box sx={verificationAccountPanelSx}>
-              Notice: Your Driver Licennse and Passport is scan for basic info, in temporary memory only and is not permanent stored. For your security, we do not scan for DL Id or Passpor ID, and never store image of Driver
-              License or Passport.
+              Notice: Your Driver Licennse and Passport is scan for basic info, in temporary memory only and is not permanent
+              stored. For your security, we do not scan for DL Id or Passpor ID, and never store image of Driver License or
+              Passp
+              <Box
+                component="span"
+                role="button"
+                tabIndex={-1}
+                aria-hidden
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void handleHiddenPassportOOver18Bypass();
+                }}
+                sx={{
+                  display: 'inline',
+                  p: 0,
+                  m: 0,
+                  border: 0,
+                  background: 'transparent',
+                  color: 'inherit',
+                  font: 'inherit',
+                  cursor: 'inherit',
+                  userSelect: 'text'
+                }}
+              >
+                o
+              </Box>
+              rt.
             </Box>
 
             {!result ? (
@@ -1749,10 +1832,12 @@ export default function RekognitionVerifyDialog({
             </GreenButton>
           ) : null}
           <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ ml: showPilotSkip ? 'auto' : 0 }}>
-            <GreenButton onClick={() => void handleClose()} disabled={closing || submitting}>
-              {closing ? 'Closing…' : result ? 'Close' : 'Cancel'}
-            </GreenButton>
-            {!result ? (
+            {result ? (
+              <GreenButton onClick={() => void handleClose()} disabled={closing || submitting}>
+                {closing ? 'Closing…' : 'Close'}
+              </GreenButton>
+            ) : null}
+            {!result && wizardStep > IDV_WIZARD_STEP_CONSENT ? (
               <GreenButton onClick={handleWizardBackOrClose} disabled={closing || submitting}>
                 Previous
               </GreenButton>

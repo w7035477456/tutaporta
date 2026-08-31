@@ -10,14 +10,15 @@ import {
 } from '../../utils/passwordAttemptTracking.js';
 import { hashPassword, passwordNeedsRehash, verifyPassword } from '../../utils/passwordHash.js';
 import { isLegacySixDigitPassword } from '../../utils/passwordRequirements.js';
-import { isSinglesStatusLoginAllowed } from '../../utils/singlesStatus.js';
+import { isSinglesStatusLoginAllowed, singlesStatusLoginRejectMessage } from '../../utils/singlesStatus.js';
 import { getRequestClientIp, isAdminIpAllowed } from '../../utils/adminIpConfig.js';
 import { resolveDemoGuestLoginAlias } from '../../utils/demoGuestLoginAlias.js';
 import { createLoginLogSessionToken } from '../../utils/loginLog.js';
 import { issueUserLoginSession } from '../../utils/issueUserLoginSession.js';
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
-                seeded_demo_buddies_boolean, gender_self_report
+                seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
+                (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
          FROM helloworldjunktest.singles s`;
 
 function parseRememberMe(raw) {
@@ -154,7 +155,7 @@ export async function beVerifyLoginPassword(req, res) {
       }
       if (!isSinglesStatusLoginAllowed(aliasUser.status, aliasUser.member_category)) {
         return res.status(403).json({
-          error: 'Your account is not active. Please contact support.'
+          error: singlesStatusLoginRejectMessage(aliasUser.status, aliasUser.member_category)
         });
       }
       const loginLogSessionToken = createLoginLogSessionToken();
@@ -319,7 +320,7 @@ export async function beVerifyLoginPassword(req, res) {
         member_category: user.member_category
       });
       return res.status(403).json({
-        error: 'Your account is not active. Please contact support.'
+        error: singlesStatusLoginRejectMessage(user.status, user.member_category)
       });
     }
 

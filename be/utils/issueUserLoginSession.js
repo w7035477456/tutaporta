@@ -8,6 +8,7 @@ import { resolveCustomLogoutMinutes } from './customLogoutDuration.js';
 import { ensureDemoRegularInitialSetupDone } from './ensureDemoRegularInitialSetupDone.js';
 import { ensureSeededDemoBuddiesOnLogin } from './ensureSeededDemoBuddiesOnLogin.js';
 import { insertDemoLoginLog } from './loginLog.js';
+import { normalizeOver18Verified } from './over18Verified.js';
 
 /**
  * Issue JWT + auth cookie for a singles row (password login, Google OAuth, etc.).
@@ -40,7 +41,8 @@ export async function issueUserLoginSession(res, user, options = {}) {
 
   try {
     const flagsRes = await pool.query(
-      `SELECT seeded_demo_buddies_boolean, gender_self_report
+      `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
+              (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM helloworldjunktest.singles
        WHERE singles_id = $1`,
       [user.singles_id]
@@ -48,6 +50,8 @@ export async function issueUserLoginSession(res, user, options = {}) {
     if (flagsRes.rows[0]) {
       userWithoutPassword.seeded_demo_buddies_boolean = flagsRes.rows[0].seeded_demo_buddies_boolean;
       userWithoutPassword.gender_self_report = flagsRes.rows[0].gender_self_report;
+      userWithoutPassword.over_18_verified = flagsRes.rows[0].over_18_verified;
+      userWithoutPassword.has_secret_icon = flagsRes.rows[0].has_secret_icon;
     }
   } catch (err) {
     console.error('[issueUserLoginSession] refresh seed flags:', err?.message ?? err);
@@ -107,6 +111,12 @@ export async function issueUserLoginSession(res, user, options = {}) {
     .trim()
     .toUpperCase();
   const genderSelfReport = genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null;
+  const over18Verified = normalizeOver18Verified(userWithoutPassword.over_18_verified);
+  const hasSecretIcon =
+    userWithoutPassword.has_secret_icon === true ||
+    String(userWithoutPassword.has_secret_icon ?? '')
+      .trim()
+      .toLowerCase() === 'true';
 
   return {
     success: true,
@@ -116,7 +126,9 @@ export async function issueUserLoginSession(res, user, options = {}) {
       mallDepartmentMode,
       guest_demo_login: Boolean(guestDemoLogin),
       seeded_demo_buddies_boolean: seededDemoBuddies,
-      gender_self_report: genderSelfReport
+      gender_self_report: genderSelfReport,
+      over_18_verified: over18Verified,
+      has_secret_icon: hasSecretIcon
     },
     requiresPasswordUpgrade: Boolean(requiresPasswordUpgrade)
   };

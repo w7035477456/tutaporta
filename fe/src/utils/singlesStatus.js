@@ -8,7 +8,8 @@ export const SINGLES_STATUS_VALUES = Object.freeze([
   'unknown',
   'other',
   'blank',
-  'inactive'
+  'inactive',
+  'under18'
 ]);
 
 /**
@@ -20,6 +21,7 @@ export function normalizeSinglesStatus(raw) {
     .trim()
     .toLowerCase();
   if (value === 'cencel') return 'cancel';
+  if (value === 'under_18' || value === 'under-18') return 'under18';
   return SINGLES_STATUS_VALUES.includes(value) ? value : null;
 }
 
@@ -37,5 +39,6 @@ export function nextSinglesStatus(current) {
 export function formatSinglesStatusLabel(raw) {
   const normalized = normalizeSinglesStatus(raw) ?? 'blank';
   if (normalized === 'blank') return 'Blank';
+  if (normalized === 'under18') return 'Under 18';
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }

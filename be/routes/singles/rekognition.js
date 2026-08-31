@@ -38,6 +38,53 @@ import {
 
 const CHECKR_SCHEMA = 'helloworldjunktest';
 
+/** Product copy when government ID OCR age is under 18. */
+export const UNDER18_ID_VERIFY_MESSAGE = 'Sorry you must be over 18 years of age';
+
+/**
+ * Persist age gate from OCR DOB:
+ * — age &lt; 18 → over_18_verified = false, status = under18
+ * — age ≥ 18 → over_18_verified = true
+ * @returns {{ age: number | null, underage: boolean, over18Verified: boolean | null }}
+ */
+async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
+  const age = computeAgeFromDob(dateOfBirth);
+  const underage = Number.isFinite(age) && age < 18;
+  const over18 = Number.isFinite(age) && age >= 18;
+  if (underage) {
+    await client.query(
+      `UPDATE helloworldjunktest.singles
+       SET status = 'under18'::helloworldjunktest.singles_status,
+           over_18_verified = false,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE singles_id = $1`,
+      [singlesId]
+    );
+    console.log('[rekognition:idCapture] under18 from OCR DOB', {
+      singlesId,
+      age,
+      dob: dateOfBirth
+    });
+    return { age, underage: true, over18Verified: false };
+  }
+  if (over18) {
+    await client.query(
+      `UPDATE helloworldjunktest.singles
+       SET over_18_verified = true,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE singles_id = $1`,
+      [singlesId]
+    );
+    console.log('[rekognition:idCapture] over_18_verified from OCR DOB', {
+      singlesId,
+      age,
+      dob: dateOfBirth
+    });
+    return { age, underage: false, over18Verified: true };
+  }
+  return { age, underage: false, over18Verified: null };
+}
+
 let checkrTableReady = false;
 
 async function ensureCheckrTable(client) {
@@ -1312,11 +1359,18 @@ export async function captureDriverLicenseFromIdImage(req, res) {
         idBytes,
         cfg
       );
-      console.log('[rekognition:idCapture] admin impersonation bypass', { singlesId, slotDocumentType });
+      const { age, underage, over18Verified } = await applyUnder18StatusFromDob(client, singlesId, parsed.dateOfBirth);
+      console.log('[rekognition:idCapture] admin impersonation bypass', { singlesId, slotDocumentType, age, underage, over18Verified });
       return res.json({
         success: true,
         adminImpersonationBypass: true,
-        message: 'Government ID fields captured (admin impersonation bypass).',
+        underage,
+        age,
+        over18Verified,
+        over_18_verified: over18Verified,
+        message: underage
+          ? UNDER18_ID_VERIFY_MESSAGE
+          : 'Government ID fields captured (admin impersonation bypass).',
         documentType: slotDocumentType,
         captured,
         extracted: {
@@ -1333,7 +1387,8 @@ export async function captureDriverLicenseFromIdImage(req, res) {
           ppNationality: parsed.ppNationality,
           countryOfBirth: parsed.countryOfBirth,
           placeOfBirth: parsed.countryOfBirth,
-          documentType: slotDocumentType
+          documentType: slotDocumentType,
+          age
         },
         profileMatchPercentMatch: profileMatch.percentMatch,
         profileMatchScanResult: profileMatch.scanResult,
@@ -1365,6 +1420,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
     if (slotDocumentType === 'passport') {
       await updateVetBioPassportFieldsFromCapture(client, singlesId, parsed);
     }
+    const { age, underage, over18Verified } = await applyUnder18StatusFromDob(client, singlesId, parsed.dateOfBirth);
 
     try {
       const profileBytes = await loadNormalizedProfilePhotoBytes(singlesId);
@@ -1397,7 +1453,11 @@ export async function captureDriverLicenseFromIdImage(req, res) {
 
     return res.json({
       success: true,
-      message: 'Government ID fields captured.',
+      underage,
+      age,
+      over18Verified,
+      over_18_verified: over18Verified,
+      message: underage ? UNDER18_ID_VERIFY_MESSAGE : 'Government ID fields captured.',
       documentType: slotDocumentType,
       captured,
       extracted: {
@@ -1414,7 +1474,8 @@ export async function captureDriverLicenseFromIdImage(req, res) {
         ppNationality: parsed.ppNationality,
         countryOfBirth: parsed.countryOfBirth,
         placeOfBirth: parsed.countryOfBirth,
-        documentType: slotDocumentType
+        documentType: slotDocumentType,
+        age
       },
       profileMatchPercentMatch: profileMatch.percentMatch,
       profileMatchScanResult: profileMatch.scanResult,
@@ -1439,5 +1500,30 @@ export async function captureDriverLicenseFromIdImage(req, res) {
     return res.status(500).json({ error: error?.message || 'Failed to capture government ID fields' });
   } finally {
     client.release();
+  }
+}
+
+/**
+ * POST /api/rekognition/mark-over-18-verified
+ * Dev/support bypass: set singles.over_18_verified = true for the authenticated member.
+ */
+export async function postMarkOver18Verified(req, res) {
+  const singlesId = Number(req.auth?.singles_id);
+  if (!Number.isFinite(singlesId) || singlesId < 1) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  try {
+    await pool.query(
+      `UPDATE helloworldjunktest.singles
+       SET over_18_verified = true,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE singles_id = $1`,
+      [singlesId]
+    );
+    console.log('[rekognition:mark-over-18-verified]', { singlesId });
+    return res.json({ success: true, over_18_verified: true });
+  } catch (err) {
+    console.error('[rekognition:mark-over-18-verified]', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Failed to mark over 18 verified' });
   }
 }

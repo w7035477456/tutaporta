@@ -11,17 +11,16 @@ import Box from '@mui/material/Box';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import { registerUser } from 'api/registerFe';
-import { completeGoogleSignup } from 'api/googleSignupFe';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPhoneImg from 'assets/images/enterPhone.png';
 
 import { getDesktopIconSizeVw } from 'config/desktopFontEnv';
-import { formatPhoneNumber, SIGNUP_REGISTER_PHONE_KEY } from 'utils/signupParams';
+import { formatPhoneNumber, SIGNUP_REGISTER_PHONE_KEY, buildCreatePasswordQuery } from 'utils/signupParams';
 import {
   getUsSignupPhoneValidationMessage,
   validateUsSignupPhone
 } from 'utils/usPhoneValidation';
-import { getSignupReferralCodeFromSearchParams } from 'utils/signupReferralCode';
+import { getSignupReferralCodeFromSearchParams, resolveSignupReferByCodeForApi } from 'utils/signupReferralCode';
 import { authRegisterFormContentSx } from '../authentication/authPageLayoutSx';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -30,11 +29,12 @@ import {
   resolveGoogleSignupPrefillEmail,
   readStoredGoogleSignupEmail,
   readStoredGoogleSignupToken,
+  persistGoogleSignupToken,
+  persistGoogleSignupEmail,
   clearGoogleSignupToken
 } from 'utils/googleSignupOAuth';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
-import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 
 // ===========================|| JWT - REGISTER ||=========================== //
 
@@ -265,19 +265,17 @@ export default function AuthRegister() {
       }
 
       if (googleBound && (googleSignupToken || readStoredGoogleSignupToken())) {
-        const data = await completeGoogleSignup({
+        const token = googleSignupToken || readStoredGoogleSignupToken();
+        if (token) persistGoogleSignupToken(token);
+        persistGoogleSignupEmail(emailTrimmed);
+        const referralToken = resolveSignupReferByCodeForApi();
+        const qs = buildCreatePasswordQuery({
           email: emailTrimmed,
           phone: formattedPhone,
-          signupToken: googleSignupToken || readStoredGoogleSignupToken(),
-          termsAccepted: true
+          token: referralToken,
+          google: true
         });
-        clearGoogleSignupToken();
-        if (data?.user?.tools_only) {
-          await refreshSessionAfterExternalLogin();
-          navigate(ADMIN_TOOLS_PATH, { replace: true });
-          return;
-        }
-        await navigateAfterGoogleLogin();
+        navigate(`/pages/createPassword?${qs}`, { replace: true });
         return;
       }
 

@@ -134,6 +134,7 @@ import {
   previewFaceMatchForIdImage,
   previewLiveScanProfileMatch,
   postIdVerificationManualSupportEmail,
+  postMarkOver18Verified,
   getMeasureOneEducationStatus,
   startMeasureOneEducationVerification,
   syncMeasureOneEducationVerification,
@@ -435,6 +436,7 @@ import { clearAuthCookie, getAuthTokenFromCookies, getKeepMeLoginDays } from './
 import { getMallDepartmentMode } from './mallDepartmentMode.js';
 import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
 import { ensureSeededDemoBuddiesOnLogin } from './utils/ensureSeededDemoBuddiesOnLogin.js';
+import { normalizeOver18Verified } from './utils/over18Verified.js';
 import { closeLoginLogSession } from './utils/loginLog.js';
 import appLog from './logger.js';
 import { respondSessionInvalid } from './utils/sessionInvalidResponse.js';
@@ -1132,7 +1134,9 @@ app.get('/api/me', async (req, res) => {
         alias,
         member_category,
         seeded_demo_buddies_boolean,
-        gender_self_report
+        gender_self_report,
+        over_18_verified,
+        (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM helloworldjunktest.singles 
        WHERE singles_id = $1`,
       [decoded.singles_id]
@@ -1155,7 +1159,8 @@ app.get('/api/me', async (req, res) => {
     }
     // Re-read flags after possible seed on /api/me
     const flagsRes = await pool.query(
-      `SELECT seeded_demo_buddies_boolean, gender_self_report
+      `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
+              (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM helloworldjunktest.singles
        WHERE singles_id = $1`,
       [row.singles_id]
@@ -1178,6 +1183,11 @@ app.get('/api/me', async (req, res) => {
         String(flags.seeded_demo_buddies_boolean ?? '').trim().toLowerCase() === 'true' ||
         flags.seeded_demo_buddies_boolean === true,
       gender_self_report: genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null,
+      over_18_verified: normalizeOver18Verified(flags.over_18_verified ?? row.over_18_verified),
+      has_secret_icon:
+        flags.has_secret_icon === true ||
+        String(flags.has_secret_icon ?? '').trim().toLowerCase() === 'true' ||
+        row.has_secret_icon === true,
       guest_demo_login: decoded.guest_demo_login === true
     };
     const mallDepartmentMode = getMallDepartmentMode(user.member_category);
@@ -1750,6 +1760,7 @@ app.post('/api/rekognition/face-match-preview', requireAuth, previewFaceMatchFor
 app.post('/api/rekognition/live-scan-profile-match', requireAuth, previewLiveScanProfileMatch);
 app.post('/api/rekognition/id-capture', requireAuth, captureDriverLicenseFromIdImage);
 app.post('/api/rekognition/manual-support-email', requireAuth, postIdVerificationManualSupportEmail);
+app.post('/api/rekognition/mark-over-18-verified', requireAuth, postMarkOver18Verified);
 app.get('/api/measureone/education/status', requireAuth, getMeasureOneEducationStatus);
 app.post('/api/measureone/education/start', requireAuth, startMeasureOneEducationVerification);
 app.post('/api/measureone/education/sync', requireAuth, syncMeasureOneEducationVerification);

@@ -6,6 +6,8 @@ import { applyThemeByName, DEFAULT_NEW_USER_THEME_NAME } from '../utils/themeCon
 import { syncClientApiRateLimitBypass } from '../utils/adminSession';
 import { clearClientApiCooldownState } from '../utils/clientApiCooldown';
 import { clearSignupIdentificationVerificationRequired } from '../utils/signupIdentificationVerification';
+import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from '../config/firstLoginAutoPopupsEnv';
+import { normalizeOver18Verified } from '../utils/over18Verified';
 import { resetMainFontToEnvDefault } from '../config/mainFontEnv';
 import useConfig from '../hooks/useConfig';
 
@@ -15,6 +17,11 @@ function clearSwrCacheForNewSession() {
 
 /** Drop tab-local onboarding locks when switching accounts (login / impersonate / logout). */
 function clearSessionLocalOnboardingLocks() {
+  clearSignupIdentificationVerificationRequired();
+}
+
+// First-login auto popups are off — drop any leftover tab lock from earlier sessions.
+if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
   clearSignupIdentificationVerificationRequired();
 }
 const AuthContext = createContext(null);
@@ -41,6 +48,8 @@ function normalizeUserShape(rawUser, authMeta = {}) {
     member_id: toNullableInteger(rawUser.member_id ?? rawUser.memberId ?? rawUser.memberid),
     prefix: toNullableInteger(rawUser.prefix ?? rawUser.member_prefix ?? rawUser.memberPrefix),
     profile_image_fk: toNullableInteger(rawUser.profile_image_fk ?? rawUser.profileImageFk),
+    over_18_verified: normalizeOver18Verified(rawUser.over_18_verified),
+    has_secret_icon: rawUser.has_secret_icon === true || rawUser.has_secret_icon === 'true',
     role: String(rawUser.role ?? authMeta.role ?? 'user').trim() || 'user',
     tools_only: Boolean(rawUser.tools_only ?? authMeta.tools_only),
     impersonated_by_admin_id: impersonatedByAdminId,
@@ -93,6 +102,26 @@ export const AuthProvider = ({ children }) => {
         ...prev,
         ...(gender_self_report !== undefined ? { gender_self_report } : {}),
         ...(seeded_demo_buddies_boolean !== undefined ? { seeded_demo_buddies_boolean } : {})
+      });
+    });
+  }, []);
+
+  const updateSessionOver18Verified = useCallback((value) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      return normalizeUserShape({
+        ...prev,
+        over_18_verified: normalizeOver18Verified(value)
+      });
+    });
+  }, []);
+
+  const updateSessionHasSecretIcon = useCallback((value) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      return normalizeUserShape({
+        ...prev,
+        has_secret_icon: Boolean(value)
       });
     });
   }, []);
@@ -357,7 +386,9 @@ export const AuthProvider = ({ children }) => {
         updateSessionProfilePhoto,
         refreshAuthProfilePhoto,
         updateSessionNickname,
-        updateSessionDemoBuddyFlags
+        updateSessionDemoBuddyFlags,
+        updateSessionOver18Verified,
+        updateSessionHasSecretIcon
       }}
     >
       {children}
