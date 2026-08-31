@@ -161,7 +161,8 @@ export async function beVerifyLoginPassword(req, res) {
       return issueLoginSuccess(res, aliasUser, log, rememberMe, {
         guestDemoLogin: demoGuestAlias.guestDemoLogin,
         req,
-        loginLogSessionToken
+        loginLogSessionToken,
+        loginAlias: String(loginId).trim().toLowerCase()
       });
     }
 

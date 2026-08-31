@@ -12,6 +12,7 @@ import {
 } from './bioResponseNotifications.js';
 import { loadMemberCategoryForSinglesId } from '../../utils/regularMemberActivityTimestamp.js';
 import { regularMemberBioRequestApprovalWriteBlocked } from '../../utils/regularMemberBioRequestApprovalLock.js';
+import { appendBioApproveHardCopyFromIds } from '../../utils/hardCopyBioRequestLog.js';
 
 async function getRequestColumns(schemaName, client = pool) {
   const cols = await client.query(
@@ -254,6 +255,15 @@ export async function toggleRequestApprovalAboutMe(req, res) {
       } catch (clearErr) {
         console.warn('toggleRequestApprovalAboutMe clearBioResponseNotificationDismissed', clearErr?.message ?? clearErr);
       }
+    }
+
+    if (nextApproval === APPROVAL_STATUS_APPROVE) {
+      void appendBioApproveHardCopyFromIds(req, {
+        approverId: me,
+        requesterId: from,
+        requesteeId: me,
+        bioKind: approvalType === 'details' ? 'full' : 'brief'
+      });
     }
 
     return res.status(200).json({

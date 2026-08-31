@@ -13,6 +13,7 @@ import { normalizeApprovalStatus } from '../../utils/approvalStatusEnum.js';
 import { clearBioRequestNotificationDismissed } from './bioRequestNotifications.js';
 import { sendBioRequestNotificationEmailFireAndForget } from '../../lib/bioRequestNotificationEmail.js';
 import { isSinglesStatusActive } from '../../utils/singlesStatus.js';
+import { appendBioRequestHardCopyFromIds } from '../../utils/hardCopyBioRequestLog.js';
 
 async function resolveAppSchema() {
   const result = await pool.query(
@@ -262,6 +263,20 @@ export async function toggleInterestedRequestInfo(req, res) {
         briefRequested: briefNewlyRequested,
         fullRequested: fullNewlyRequested
       });
+      if (briefNewlyRequested) {
+        void appendBioRequestHardCopyFromIds(req, {
+          requesterId: from,
+          requesteeId: to,
+          bioKind: 'brief'
+        });
+      }
+      if (fullNewlyRequested) {
+        void appendBioRequestHardCopyFromIds(req, {
+          requesterId: from,
+          requesteeId: to,
+          bioKind: 'full'
+        });
+      }
     }
 
     return res.status(200).json({

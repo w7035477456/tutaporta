@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import pool from '../db/connection.js';
 import { getRequestClientIp } from './adminIpConfig.js';
+import { appendDemoLoginHardCopy, appendRegisterHardCopy } from './hardCopyAuthLog.js';
 
 const SCHEMA = 'helloworldjunktest';
 
@@ -72,7 +73,8 @@ export function createLoginLogSessionToken() {
  *   email?: string | null,
  *   phone?: string | null,
  *   sessionToken?: string | null,
- *   clientIp?: string | null
+ *   clientIp?: string | null,
+ *   loginAlias?: string | null
  * }} fields
  * @returns {Promise<number | null>} login_log_id or null
  */
@@ -83,7 +85,11 @@ export async function insertDemoLoginLog(req, fields = {}) {
     const email = String(fields.email ?? '').trim() || null;
     const phone = String(fields.phone ?? '').trim() || null;
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
+    const loginAlias = String(fields.loginAlias ?? '').trim().toLowerCase();
     const rawClientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (loginAlias === 'demo') {
+      appendDemoLoginHardCopy({ clientIp: rawClientIp });
+    }
     if (shouldSkipLoginLogIp(rawClientIp)) return null;
     const clientIp = privacyMaskLoginLogIpForStorage(rawClientIp);
     const userAgent = userAgentFromReq(req);
@@ -123,6 +129,7 @@ export async function insertSignupLoginLog(req, fields = {}) {
     }
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
     const rawClientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    appendRegisterHardCopy({ clientIp: rawClientIp, email, phone });
     if (shouldSkipLoginLogIp(rawClientIp)) return null;
     const clientIp = privacyMaskLoginLogIpForStorage(rawClientIp);
     const userAgent = userAgentFromReq(req);

@@ -20,6 +20,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
     guestDemoLogin = false,
     req = null,
     loginLogSessionToken = null,
+    loginAlias = null,
     log = () => {}
   } = options;
 
@@ -79,7 +80,8 @@ export async function issueUserLoginSession(res, user, options = {}) {
     await insertDemoLoginLog(req, {
       singlesId: user.singles_id,
       email: user.email,
-      sessionToken: loginLogSessionToken
+      sessionToken: loginLogSessionToken,
+      loginAlias
     });
   }
 
