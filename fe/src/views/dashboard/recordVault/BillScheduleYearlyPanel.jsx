@@ -686,7 +686,11 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
             alignItems: 'center',
             justifyContent: 'center',
             gap: { xs: 0.75, sm: 1.25 },
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            '& .MuiTypography-root': {
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important'
+            }
           }}
         >
           {[

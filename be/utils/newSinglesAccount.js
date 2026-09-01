@@ -9,11 +9,13 @@ import {
   COMPLIMENTARY_NEW_MEMBER_DATA_MB,
   grantComplimentaryNewMemberVaultData
 } from './complimentaryNewMemberVaultData.js';
+import { seedDefaultBillScheduleForNewMember } from './defaultBillScheduleForNewMember.js';
 
 /**
  * Insert a new singles row after phone/password signup (status = active).
  * emailNorm should be lowercase (see normalizeEmailForDb); stored as text on singles.email.
- * Also grants 10GB complimentary TutaNotes Tx/Rx data + Balance History row.
+ * Also grants 10GB complimentary TutaNotes Tx/Rx data + Balance History row,
+ * and preloads sample Monthly / Yearly Bill Schedule rows (once per account).
  * @returns {Promise<{ singlesId: number, memberId: number }>}
  */
 export async function insertNewSinglesAccount(client, { emailNorm, passwordHash, formattedPhone, referByCode, memberCategory }) {
@@ -56,6 +58,7 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
       phone: phoneForInsert
     });
     await grantComplimentaryNewMemberVaultData(client, newSinglesId);
+    await seedDefaultBillScheduleForNewMember(client, newSinglesId);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

@@ -620,7 +620,11 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
             borderRadius: 1,
             bgcolor: '#fff',
             p: 2.5,
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            '& .MuiTypography-root': {
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important'
+            }
           }}
         >
           <Box
@@ -723,7 +727,11 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
             display: 'flex',
             flexDirection: 'column',
             gap: 1.25,
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            '& .MuiTypography-root': {
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important'
+            }
           }}
         >
           {[

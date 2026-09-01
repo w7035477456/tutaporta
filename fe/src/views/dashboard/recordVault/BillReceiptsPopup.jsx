@@ -25,8 +25,16 @@ const DROP_BG = 'rgba(74, 144, 217, 0.35)';
 const SKIP_DUPLICATE_MESSAGE = 'Skipping upload duplicate file';
 const SKIP_DUPLICATE_TOAST_MS = 3000;
 
+const quadrantSx = {
+  border: '2px solid #000',
+  borderRadius: 1,
+  overflow: 'hidden',
+  minWidth: 0,
+  minHeight: 0
+};
+
 /**
- * Bills/Receipts popup: preview | upload+QR+notes | thumbnail strip.
+ * Bills/Receipts popup: 2×2 grid — notes | upload | preview+thumbs | phone QR.
  */
 export default function BillReceiptsPopup({
   open,
@@ -264,25 +272,145 @@ export default function BillReceiptsPopup({
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: '1.1fr 1fr' },
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              gridTemplateRows: { xs: 'auto auto auto auto', md: '1fr 1fr' },
               gap: 1.5,
-              minHeight: { md: 420 },
+              minHeight: { md: 480 },
+              height: { md: 'min(72vh, 580px)' },
               fontFamily: MAIN_FONT_FAMILY
             }}
           >
-            {/* Left: large preview */}
+            {/* Top-left: notes */}
             <Box
               sx={{
-                border: '2px solid #000',
-                borderRadius: 1,
-                bgcolor: '#f5f5f5',
-                minHeight: 320,
+                ...quadrantSx,
+                bgcolor: '#fff',
                 display: 'flex',
                 flexDirection: 'column',
-                overflow: 'hidden'
+                minHeight: { xs: 160, md: 0 }
               }}
             >
-              <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start' }}>
+              <Typography sx={{ fontWeight: 800, px: 1.25, pt: 1, pb: 0.5 }}>Notes</Typography>
+              <TextField
+                multiline
+                fullWidth
+                value={notesText}
+                disabled={!paidRecordId || busy}
+                placeholder="Enter text notes here"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNotesText(v);
+                  persistNotes(v);
+                }}
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  '& .MuiOutlinedInput-root': {
+                    height: '100%',
+                    alignItems: 'stretch',
+                    bgcolor: '#fff',
+                    border: 'none',
+                    borderRadius: 0,
+                    fontFamily: MAIN_FONT_FAMILY,
+                    fontWeight: 700
+                  },
+                  '& fieldset': { border: 'none' },
+                  '& textarea': {
+                    height: '100% !important',
+                    overflow: 'auto !important',
+                    textAlign: 'center',
+                    boxSizing: 'border-box'
+                  }
+                }}
+              />
+            </Box>
+
+            {/* Top-right: upload header */}
+            <Box
+              onDragEnter={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                void handleFiles(e.dataTransfer?.files);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                ...quadrantSx,
+                bgcolor: dragOver ? DROP_BG : 'rgba(74, 144, 217, 0.22)',
+                cursor: busy || !paidRecordId ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                px: 2,
+                textAlign: 'center',
+                minHeight: { xs: 120, md: 0 }
+              }}
+            >
+              <Typography sx={{ fontWeight: 800 }}>
+                BILLS/RECEIPTS
+                <br />
+                <Box component="span" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                  Click or drag &amp; drop to upload
+                </Box>
+              </Typography>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                multiple
+                hidden
+                onChange={(e) => {
+                  void handleFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </Box>
+
+            {/* Bottom-left: preview + download + thumbnails */}
+            <Box
+              sx={{
+                ...quadrantSx,
+                bgcolor: '#f5f5f5',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: { xs: 280, md: 0 }
+              }}
+            >
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 1,
+                  minHeight: 0,
+                  overflow: 'hidden'
+                }}
+              >
+                {selected && paidRecordId ? (
+                  <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <BillReceiptAttachmentPreview
+                      paidRecordId={paidRecordId}
+                      attachment={selected}
+                      mode="preview"
+                      fitContainer
+                    />
+                  </Box>
+                ) : (
+                  <Typography sx={{ opacity: 0.55, fontWeight: 700 }}>
+                    Select a receipt below
+                  </Typography>
+                )}
+              </Box>
+              <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', flexShrink: 0 }}>
                 <ColorTemplate13DisableGreenButton
                   type="button"
                   disabled={!selected || !paidRecordId}
@@ -298,227 +426,125 @@ export default function BillReceiptsPopup({
                   Download
                 </ColorTemplate13DisableGreenButton>
               </Box>
-              <Box
-                sx={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  p: 1,
-                  minHeight: 0
-                }}
-              >
-                {selected && paidRecordId ? (
-                  <BillReceiptAttachmentPreview
-                    paidRecordId={paidRecordId}
-                    attachment={selected}
-                    mode="preview"
-                  />
-                ) : (
-                  <Typography sx={{ opacity: 0.55, fontWeight: 700 }}>
-                    Select a receipt below
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-
-            {/* Right: upload + QR + notes */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, minWidth: 0 }}>
-              <Box
-                onDragEnter={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  void handleFiles(e.dataTransfer?.files);
-                }}
-                onClick={() => fileInputRef.current?.click()}
-                sx={{
-                  border: '2px dashed #000',
-                  borderRadius: 1,
-                  bgcolor: dragOver ? DROP_BG : 'rgba(74, 144, 217, 0.22)',
-                  minHeight: 88,
-                  cursor: busy || !paidRecordId ? 'default' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  px: 2,
-                  textAlign: 'center'
-                }}
-              >
-                <Typography sx={{ fontWeight: 800 }}>
-                  BILLS/RECEIPTS
-                  <br />
-                  <Box component="span" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                    Click or drag &amp; drop to upload
-                  </Box>
-                </Typography>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  multiple
-                  hidden
-                  onChange={(e) => {
-                    void handleFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-              </Box>
-
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: 'auto 1fr' },
-                  gap: 1,
-                  alignItems: 'stretch'
-                }}
-              >
+              {attachments.length > 0 ? (
                 <Box
                   sx={{
-                    border: '2px solid #000',
-                    borderRadius: 1,
-                    p: 1,
                     display: 'flex',
-                    justifyContent: 'center',
-                    bgcolor: '#fff'
+                    gap: 1,
+                    overflowX: 'auto',
+                    pb: 0.5,
+                    borderTop: '2px solid #000',
+                    pt: 1,
+                    px: 1,
+                    flexShrink: 0
                   }}
                 >
-                  {paidRecordId ? (
-                    <ProfilePhotoUploadQrPanel
-                      variant="inline"
-                      purpose="bill_receipt"
-                      paidRecordId={paidRecordId}
-                      disabled={busy}
-                      qrSize={148}
-                      messageOverride={PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE}
-                      onPhoneUploadComplete={async () => {
-                        await reload();
-                      }}
-                      sx={{ maxWidth: 180 }}
-                      messageSx={{ color: '#000', WebkitTextFillColor: '#000' }}
-                    />
-                  ) : null}
+                  {attachments.map((att) => {
+                    const active = att.attachmentId === selectedId;
+                    return (
+                      <Box
+                        key={att.attachmentId}
+                        sx={{
+                          position: 'relative',
+                          width: 72,
+                          height: 72,
+                          flexShrink: 0,
+                          border: active ? '3px solid #2e7d32' : '2px solid #000',
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          bgcolor: '#ddd',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => setSelectedId(att.attachmentId)}
+                      >
+                        {att.previewable || att.previewKind ? (
+                          <BillReceiptAttachmentPreview
+                            paidRecordId={paidRecordId}
+                            attachment={att}
+                            mode="thumb"
+                          />
+                        ) : (
+                          <Typography
+                            sx={{
+                              fontSize: '0.65rem',
+                              fontWeight: 800,
+                              p: 0.5,
+                              wordBreak: 'break-all'
+                            }}
+                          >
+                            {att.originalFileName}
+                          </Typography>
+                        )}
+                        <Box
+                          component="button"
+                          type="button"
+                          aria-label="Remove attachment"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleDelete(att.attachmentId);
+                          }}
+                          sx={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 2,
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            border: '1px solid #000',
+                            bgcolor: '#e53935',
+                            color: '#fff',
+                            fontWeight: 900,
+                            fontSize: '0.85rem',
+                            lineHeight: 1,
+                            cursor: 'pointer',
+                            p: 0
+                          }}
+                        >
+                          ×
+                        </Box>
+                      </Box>
+                    );
+                  })}
                 </Box>
-                <TextField
-                  multiline
-                  minRows={6}
-                  fullWidth
-                  value={notesText}
-                  disabled={!paidRecordId || busy}
-                  placeholder="Enter text notes here"
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setNotesText(v);
-                    persistNotes(v);
+              ) : null}
+            </Box>
+
+            {/* Bottom-right: phone upload QR */}
+            <Box
+              sx={{
+                ...quadrantSx,
+                bgcolor: '#fff',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: { xs: 260, md: 0 }
+              }}
+            >
+              {paidRecordId ? (
+                <ProfilePhotoUploadQrPanel
+                  variant="inline"
+                  purpose="bill_receipt"
+                  paidRecordId={paidRecordId}
+                  disabled={busy}
+                  qrSize={132}
+                  messageOverride={PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE}
+                  onPhoneUploadComplete={async () => {
+                    await reload();
                   }}
                   sx={{
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: '#fff',
-                      border: '2px solid #000',
-                      borderRadius: 1,
-                      fontFamily: MAIN_FONT_FAMILY,
-                      fontWeight: 700
-                    },
-                    '& textarea': {
-                      textAlign: 'center'
-                    }
+                    flex: 1,
+                    width: '100%',
+                    minHeight: 0,
+                    border: 'none',
+                    borderRadius: 0
                   }}
+                  messageSx={{ color: '#000', WebkitTextFillColor: '#000' }}
                 />
-              </Box>
+              ) : null}
             </Box>
           </Box>
         )}
 
-        {/* Bottom thumbnails */}
-        {!loading && attachments.length > 0 ? (
-          <Box
-            sx={{
-              mt: 1.5,
-              display: 'flex',
-              gap: 1,
-              overflowX: 'auto',
-              pb: 0.5,
-              borderTop: '2px solid #000',
-              pt: 1
-            }}
-          >
-            {attachments.map((att) => {
-              const active = att.attachmentId === selectedId;
-              return (
-                <Box
-                  key={att.attachmentId}
-                  sx={{
-                    position: 'relative',
-                    width: 88,
-                    height: 88,
-                    flexShrink: 0,
-                    border: active ? '3px solid #2e7d32' : '2px solid #000',
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                    bgcolor: '#ddd',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => setSelectedId(att.attachmentId)}
-                >
-                  {att.previewable || att.previewKind ? (
-                    <BillReceiptAttachmentPreview
-                      paidRecordId={paidRecordId}
-                      attachment={att}
-                      mode="thumb"
-                    />
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontSize: '0.65rem',
-                        fontWeight: 800,
-                        p: 0.5,
-                        wordBreak: 'break-all'
-                      }}
-                    >
-                      {att.originalFileName}
-                    </Typography>
-                  )}
-                  <Box
-                    component="button"
-                    type="button"
-                    aria-label="Remove attachment"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void handleDelete(att.attachmentId);
-                    }}
-                    sx={{
-                      position: 'absolute',
-                      top: 2,
-                      right: 2,
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      border: '1px solid #000',
-                      bgcolor: '#e53935',
-                      color: '#fff',
-                      fontWeight: 900,
-                      fontSize: '0.85rem',
-                      lineHeight: 1,
-                      cursor: 'pointer',
-                      p: 0
-                    }}
-                  >
-                    ×
-                  </Box>
-                </Box>
-              );
-            })}
-          </Box>
-        ) : null}
         </Box>
       </ColorTemplate7PopupLargeDark.Body>
     </ColorTemplate7PopupLargeDark>

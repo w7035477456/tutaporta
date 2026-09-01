@@ -67,7 +67,8 @@ async function docxBlobToHtml(blob) {
 export default function BillReceiptAttachmentPreview({
   paidRecordId,
   attachment,
-  mode = 'preview'
+  mode = 'preview',
+  fitContainer = false
 }) {
   const kind =
     attachment?.previewKind ||
@@ -175,7 +176,9 @@ export default function BillReceiptAttachmentPreview({
         sx={
           mode === 'thumb'
             ? { width: '100%', height: '100%', objectFit: 'cover' }
-            : { maxWidth: '100%', maxHeight: 360, objectFit: 'contain' }
+            : fitContainer
+              ? { width: '100%', height: '100%', maxHeight: '100%', objectFit: 'contain' }
+              : { maxWidth: '100%', maxHeight: 360, objectFit: 'contain' }
         }
       />
     );
@@ -229,7 +232,8 @@ export default function BillReceiptAttachmentPreview({
         src={objectUrl}
         sx={{
           width: '100%',
-          height: 360,
+          height: fitContainer ? '100%' : 360,
+          minHeight: fitContainer ? 120 : undefined,
           border: 0,
           display: 'block',
           bgcolor: '#fff'
@@ -273,7 +277,8 @@ export default function BillReceiptAttachmentPreview({
       <Box
         sx={{
           width: '100%',
-          maxHeight: 360,
+          height: fitContainer ? '100%' : undefined,
+          maxHeight: fitContainer ? '100%' : 360,
           overflow: 'auto',
           bgcolor: '#fff',
           color: '#000',
@@ -302,5 +307,6 @@ export default function BillReceiptAttachmentPreview({
 BillReceiptAttachmentPreview.propTypes = {
   paidRecordId: PropTypes.number,
   attachment: PropTypes.object,
-  mode: PropTypes.oneOf(['preview', 'thumb'])
+  mode: PropTypes.oneOf(['preview', 'thumb']),
+  fitContainer: PropTypes.bool
 };
