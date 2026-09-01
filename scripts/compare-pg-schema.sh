@@ -28,7 +28,8 @@ usage() {
 compare-pg-schema.sh [--ubuntu-host user@host] [--verbose] [--save-dumps dir]
 
 Compares PostgreSQL schema (default: helloworldjunktest) on Mac vs Ubuntu.
-Output: "same" or "difference" (one line).
+Stdout: one line — "same" or "difference".
+--verbose: stderr summary always (hosts, line counts); diff snippet only when different.
 
 SSH defaults (same as f2 alias): port 59221, IdentitiesOnly, corruptedKey_march2024.
 Override: COMPARE_SCHEMA_SSH_BIN, DEPLOY_SSH_KEY, DEPLOY_SSH_PORT (see deploy-ssh-mac.sh).
@@ -128,16 +129,31 @@ if [[ -n "$SAVE_DUMPS" ]]; then
   cp "$UBUNTU_DUMP" "$SAVE_DUMPS/ubuntu_${SCHEMA}.sql"
 fi
 
+mac_lines="$(wc -l <"$MAC_DUMP" | tr -d ' ')"
+ubuntu_lines="$(wc -l <"$UBUNTU_DUMP" | tr -d ' ')"
+
+print_verbose_summary() {
+  local result="$1"
+  [[ "$VERBOSE" -eq 1 ]] || return 0
+  echo "--- schema compare ---" >&2
+  echo "  schema:     $SCHEMA" >&2
+  echo "  Mac:        $(pg_connection_label)" >&2
+  echo "  Ubuntu:     ssh -p ${DEPLOY_SSH_PORT:-59221} $UBUNTU_HOST" >&2
+  echo "  Mac lines:  $mac_lines" >&2
+  echo "  Ubuntu lines: $ubuntu_lines" >&2
+  echo "  result:     $result" >&2
+}
+
 if cmp -s "$MAC_DUMP" "$UBUNTU_DUMP"; then
+  print_verbose_summary "same"
   echo "same"
   exit 0
 fi
 
+print_verbose_summary "difference"
 echo "difference"
 if [[ "$VERBOSE" -eq 1 ]]; then
-  echo "--- Mac: $(pg_connection_label) ---" >&2
-  echo "--- Ubuntu: ssh -p ${DEPLOY_SSH_PORT:-59221} $UBUNTU_HOST ---" >&2
+  echo "--- diff (first 120 lines) ---" >&2
   diff -u "$MAC_DUMP" "$UBUNTU_DUMP" | head -120 >&2 || true
-  echo "Mac lines: $(wc -l <"$MAC_DUMP" | tr -d ' ')  Ubuntu lines: $(wc -l <"$UBUNTU_DUMP" | tr -d ' ')" >&2
 fi
 exit 1
