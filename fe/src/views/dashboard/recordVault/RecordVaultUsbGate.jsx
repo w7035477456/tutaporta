@@ -119,6 +119,7 @@ export default function RecordVaultUsbGate({
   const [usbBridgeInstallerWin, setUsbBridgeInstallerWin] = useState(
     '/api/recordVault/bridge/installer/win'
   );
+  const [includeUsbDmgExe, setIncludeUsbDmgExe] = useState(true);
   const prodBridgeHost = isRecordVaultBridgeHostContext();
   const [oneDriveEnabled, setOneDriveEnabled] = useState(false);
   const [oneDriveVisible, setOneDriveVisible] = useState(false);
@@ -175,6 +176,7 @@ export default function RecordVaultUsbGate({
           clearRecordVaultLastBackupUsbLocation();
         }
         setVideoTutorialUrl(String(cfg?.videoTutorialTutanotes || '').trim());
+        setIncludeUsbDmgExe(cfg?.includeUsbDmgExe !== false);
         if (cfg?.usbBridgeInstallers?.mac) {
           setUsbBridgeInstallerMac(normalizeUsbBridgeInstallerUrl(cfg.usbBridgeInstallers.mac, 'mac'));
         }
@@ -879,7 +881,7 @@ export default function RecordVaultUsbGate({
     </Box>
   );
 
-  const usbBridgeStatus = localUsbVisible ? (
+  const usbBridgeStatus = localUsbVisible && includeUsbDmgExe ? (
     <>
       <RecordVaultUsbBridgeStatusPanel
         bridgeConnected={bridgeConnected}

@@ -37,12 +37,23 @@ function loadEnvKeyFromHomeEnv(key) {
   }
 }
 
+function isIncludeUsbDmgExeEnabled() {
+  const raw = String(process.env.INCLUDE_USB_DMG_EXE ?? 'true').trim().toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(raw);
+}
+
 function loadUsbDmgExeFromHomeEnv() {
+  loadEnvKeyFromHomeEnv('INCLUDE_USB_DMG_EXE');
   loadEnvKeyFromHomeEnv('STORAGE_FOLDER');
   loadEnvKeyFromHomeEnv('USB_DMG_EXE');
 }
 
 loadUsbDmgExeFromHomeEnv();
+
+if (!isIncludeUsbDmgExeEnabled()) {
+  console.log('[copy-installers-to-usb] SKIP — INCLUDE_USB_DMG_EXE=false');
+  process.exit(0);
+}
 
 /** Expand ${STORAGE_FOLDER} / $STORAGE_FOLDER inside USB_DMG_EXE. */
 function expandUsbDmgExeEnv() {

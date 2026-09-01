@@ -16,6 +16,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/include-usb-dmg-exe-env.sh
+source "$ROOT/scripts/lib/include-usb-dmg-exe-env.sh"
+
+if ! is_include_usb_dmg_exe_enabled; then
+  echo "sync-usb-bridge-installers: SKIP (INCLUDE_USB_DMG_EXE=false)"
+  exit 0
+fi
+
 KEY="${DEPLOY_SSH_KEY:-/Volumes/MSWORD2010/.coredump/corruptedKey_march2024}"
 PORT="${DEPLOY_SSH_PORT:-59221}"
 HOST="${1:-lawsen0@192.168.222.202}"

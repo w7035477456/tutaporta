@@ -6,9 +6,13 @@ import {
   resolveUsbBridgeInstallerPath,
   usbBridgeInstallerMissingMessage
 } from '../../utils/usbBridgeInstallerResolve.js';
+import { isIncludeUsbDmgExeEnabled } from '../../utils/includeUsbDmgExeConfig.js';
 
 /** Public paths the FE uses for Click Here (same-origin download). */
 export function getRecordVaultBridgeInstallerUrls() {
+  if (!isIncludeUsbDmgExeEnabled()) {
+    return { mac: null, win: null };
+  }
   return {
     mac: '/api/recordVault/bridge/installer/mac',
     win: '/api/recordVault/bridge/installer/win'
@@ -22,6 +26,9 @@ export { getUsbDmgExeDir };
  * Auth required. Streams packaged installer from USB_DMG_EXE storage (not git LFS stubs).
  */
 export function downloadRecordVaultBridgeInstaller(req, res) {
+  if (!isIncludeUsbDmgExeEnabled()) {
+    return res.status(404).json({ error: usbBridgeInstallerMissingMessage('mac') });
+  }
   const platform = String(req.params.platform || '')
     .trim()
     .toLowerCase();

@@ -18,12 +18,20 @@
 #
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/lib/include-usb-dmg-exe-env.sh
+source "$ROOT/scripts/lib/include-usb-dmg-exe-env.sh"
+
+if ! is_include_usb_dmg_exe_enabled; then
+  echo "publish-usbzip-to-storage: SKIP (INCLUDE_USB_DMG_EXE=false)"
+  exit 0
+fi
+
 if [[ "${SKIP_USBZIP_PUBLISH:-}" == "1" || "${SKIP_USBZIP_PUBLISH:-}" == "true" ]]; then
   echo "publish-usbzip-to-storage: SKIP (SKIP_USBZIP_PUBLISH=${SKIP_USBZIP_PUBLISH})"
   exit 0
 fi
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USBZIP_DIR="${USBZIP_DIR:-$ROOT/usbzip}"
 
 load_usb_dmg_exe_dir() {

@@ -123,6 +123,7 @@ export default function PhotoAlbumsUsbGate({
   const [usbBridgeInstallerWin, setUsbBridgeInstallerWin] = useState(
     '/api/photoAlbums/bridge/installer/win'
   );
+  const [includeUsbDmgExe, setIncludeUsbDmgExe] = useState(true);
   const prodBridgeHost = isPhotoAlbumsBridgeHostContext();
   const [oneDriveEnabled, setOneDriveEnabled] = useState(false);
   const [oneDriveVisible, setOneDriveVisible] = useState(false);
@@ -186,6 +187,7 @@ export default function PhotoAlbumsUsbGate({
           clearPhotoAlbumsLastBackupUsbLocation();
         }
         setVideoTutorialUrl(String(cfg?.videoTutorialTutaphotoalbums || '').trim());
+        setIncludeUsbDmgExe(cfg?.includeUsbDmgExe !== false);
         if (cfg?.usbBridgeInstallers?.mac) {
           setUsbBridgeInstallerMac(normalizeUsbBridgeInstallerUrl(cfg.usbBridgeInstallers.mac, 'mac'));
         }
@@ -945,7 +947,7 @@ export default function PhotoAlbumsUsbGate({
     </Box>
   );
 
-  const usbBridgeStatus = localUsbVisible ? (
+  const usbBridgeStatus = localUsbVisible && includeUsbDmgExe ? (
     <>
       <PhotoAlbumsUsbBridgeStatusPanel
         bridgeConnected={bridgeConnected}

@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { isIncludeUsbDmgExeEnabled } from './includeUsbDmgExeConfig.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const USB_BRIDGE_LEGACY_USB_DIR = path.resolve(__dirname, '..', 'usb');
@@ -141,6 +142,7 @@ export function resolveUsbBridgeInstallerPath(
     winPathEnv: 'RECORD_VAULT_BRIDGE_INSTALLER_WIN_PATH'
   }
 ) {
+  if (!isIncludeUsbDmgExeEnabled()) return null;
   const envKey = platform === 'mac' ? pathEnv.macPathEnv : pathEnv.winPathEnv;
   const envPath = String(process.env[envKey] || '').trim();
   if (envPath && isUsableInstallerFile(envPath)) return envPath;
@@ -157,6 +159,9 @@ export function resolveUsbBridgeInstallerPath(
 }
 
 export function usbBridgeInstallerMissingMessage(platform) {
+  if (!isIncludeUsbDmgExeEnabled()) {
+    return 'USB Bridge is disabled on this server (INCLUDE_USB_DMG_EXE=false).';
+  }
   const meta = USB_BRIDGE_INSTALLERS[platform];
   const expectedDir = getUsbDmgExeDir() || USB_BRIDGE_LEGACY_USB_DIR;
   const name = meta?.fileName || 'installer';

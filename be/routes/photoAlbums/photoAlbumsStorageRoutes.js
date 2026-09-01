@@ -14,6 +14,7 @@ import { logoffVaultUsb } from '../../utils/photoAlbumsUsb/vaultSession.js';
 import { clearPhotoAlbumsCacheIcon, readPhotoAlbumsCacheIcon } from '../../utils/photoAlbumsCacheIcon.js';
 import { loadGlobalVideoTutorialPhotoAlbums } from '../../utils/globalVideoTutorialPhotoAlbums.js';
 import { getPhotoAlbumsBridgeInstallerUrls } from './photoAlbumsBridgeInstaller.js';
+import { isIncludeUsbDmgExeEnabled } from '../../utils/includeUsbDmgExeConfig.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -42,7 +43,8 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
   }
 
   const videoTutorialTutaphotoalbums = await loadGlobalVideoTutorialPhotoAlbums();
-  const usbBridgeInstallers = getPhotoAlbumsBridgeInstallerUrls();
+  const includeUsbDmgExe = isIncludeUsbDmgExeEnabled();
+  const usbBridgeInstallers = includeUsbDmgExe ? getPhotoAlbumsBridgeInstallerUrls() : { mac: null, win: null };
   const leftSide = getLeftSideMode();
   const tutaDrive = isLeftSideTutaDrive();
   let oneDrive;
@@ -67,6 +69,7 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
     cacheOneDriveIcon,
     cacheUsbIcon,
     videoTutorialTutaphotoalbums,
+    includeUsbDmgExe,
     usbBridgeInstallers,
     e2eYellow: isVaultE2eYellow()
   });
