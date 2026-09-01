@@ -24,6 +24,9 @@ export const PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE = 'Scan to upload from your 
 export const PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE =
   'Receiving photo from your phone — please wait…';
 
+export const PROFILE_PHOTO_UPLOAD_QR_WAIT_MESSAGE =
+  'After clicking Phone Barcode Upload, please wait up to 30 seconds for your photo to appear.';
+
 function formatCountdown(remainingMs) {
   const totalSec = Math.max(0, Math.ceil(remainingMs / 1000));
   const minutes = Math.floor(totalSec / 60);
@@ -353,6 +356,11 @@ export default function ProfilePhotoUploadQrPanel({
           {countdownLabel ? (
             <Typography sx={{ ...scanPanelTextSx, width: '100%' }}>{countdownLabel}</Typography>
           ) : null}
+          {session?.mobileUrl && !error ? (
+            <Typography sx={{ ...scanPanelTextSx, mt: 0.5, width: '100%', fontWeight: 600 }}>
+              {PROFILE_PHOTO_UPLOAD_QR_WAIT_MESSAGE}
+            </Typography>
+          ) : null}
           {phoneUploadBusy ? (
             <Typography sx={{ ...scanPanelTextSx, mt: 0.5, fontWeight: 600, width: '100%' }}>
               {PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE}
@@ -455,6 +463,17 @@ export default function ProfilePhotoUploadQrPanel({
                 {countdownLabel}
               </Typography>
             ) : null}
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 1,
+                lineHeight: 1.45,
+                fontWeight: 600,
+                ...messageSx
+              }}
+            >
+              {PROFILE_PHOTO_UPLOAD_QR_WAIT_MESSAGE}
+            </Typography>
           </Box>
           {phoneUploadBusy ? (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mt: 1.5 }}>
