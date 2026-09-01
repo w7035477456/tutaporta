@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import Stack from '@mui/material/Stack';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
+import { COLOR_TEMPLATE7_POPUP_Z_INDEX } from 'config/colorTemplate7PopupLargeDark';
 import { STORAGE_PERMISSION_USER_MESSAGE } from 'utils/storagePermissionError';
 
 export default function StoragePermissionFailDialog({ open, onClose, message = STORAGE_PERMISSION_USER_MESSAGE }) {
@@ -9,6 +10,8 @@ export default function StoragePermissionFailDialog({ open, onClose, message = S
       open={open}
       onClose={onClose}
       closeOnBackdrop
+      centerInWindow
+      overlaySx={{ zIndex: COLOR_TEMPLATE7_POPUP_Z_INDEX + 20 }}
       closeButtonAriaLabel="Close folder permission error dialog"
     >
       <ColorTemplate7PopupLargeDark.Body spacing={2}>

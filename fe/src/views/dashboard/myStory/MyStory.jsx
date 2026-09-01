@@ -1388,6 +1388,15 @@ export default function MyStory() {
     profileBasics.member_id
   ]);
 
+  const reportUploadFailure = useCallback((err, fallback = 'Upload failed') => {
+    if (isStoragePermissionUploadError(err)) {
+      setStoragePermissionDialogOpen(true);
+      setUploadError(storagePermissionFailureMessage(err));
+      return;
+    }
+    setUploadError(err?.response?.data?.error || err?.message || fallback);
+  }, []);
+
   const handleVaultMediaFiles = useCallback(
     async (files) => {
       const fileArray = fileListToArray(files);
@@ -1460,15 +1469,6 @@ export default function MyStory() {
     },
     [adminImpersonationUploadBypass, publicAlbumVideos, refetchMyAlbumVideos, reportUploadFailure]
   );
-
-  const reportUploadFailure = useCallback((err, fallback = 'Upload failed') => {
-    if (isStoragePermissionUploadError(err)) {
-      setStoragePermissionDialogOpen(true);
-      setUploadError(storagePermissionFailureMessage(err));
-      return;
-    }
-    setUploadError(err?.response?.data?.error || err?.message || fallback);
-  }, []);
 
   const handlePhotoFiles = useCallback(
     async (files, { targetAlbumType = null } = {}) => {
@@ -3246,10 +3246,6 @@ export default function MyStory() {
     >
       {wrongFormatDialog}
       {fileTooLargeDialog}
-      <StoragePermissionFailDialog
-        open={storagePermissionDialogOpen}
-        onClose={() => setStoragePermissionDialogOpen(false)}
-      />
       {albumPhotoDeleteConfirmDialog}
       {duplicateUploadDialog}
       {postingAutoMovedDialog}
@@ -3478,6 +3474,11 @@ export default function MyStory() {
           <ColorTemplate7PopupLargeDark.BodyText>We&apos;ll use your first photo as your profile photo.</ColorTemplate7PopupLargeDark.BodyText>
         </ColorTemplate7PopupLargeDark.Body>
       </ColorTemplate7PopupLargeDark>
+
+      <StoragePermissionFailDialog
+        open={storagePermissionDialogOpen}
+        onClose={() => setStoragePermissionDialogOpen(false)}
+      />
 
       <Box
         sx={{
