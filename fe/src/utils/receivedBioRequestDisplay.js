@@ -287,6 +287,10 @@ export function mirroredIncomingApprovalFromOutgoing(outgoingRow) {
 
 export const INCOMING_AUTO_MUTUAL_APPROVE_RADIO_LABEL = 'Approved: via auto mutual request you initiated';
 
+/** Shown instead of silently greying the radios for REGULARMEMBER accounts. */
+export const REGULAR_MEMBER_BIO_RESPONSE_LOCKED_MESSAGE =
+  'RegularMember accounts cannot respond to bio requests — your response stays "No Response".';
+
 function outgoingBioKindInitiatedAndApproved(outgoingRow, bioKind) {
   if (!outgoingRow) return false;
   if (bioKind === 'full') {

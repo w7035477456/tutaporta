@@ -359,8 +359,15 @@ export default function ReceivedBioRequestsPage() {
     requestCaptureInFlightRef.current = true;
     void (async () => {
       try {
+        captureNode.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
         const previewImage = await captureElementAsPng(captureNode, {
-          backgroundColor: '#ffffff'
+          backgroundColor: '#ffffff',
+          forceViewportStaging: true,
+          validateNonEmpty: true,
+          validateLabel: 'Bio preview'
         });
         setPendingConsent({
           row,
@@ -474,8 +481,12 @@ export default function ReceivedBioRequestsPage() {
     setRequestBusyKey(busyKey);
 
     try {
+      if (!consentSignatureImage) {
+        throw new Error('Consent screen was not captured. Please try again.');
+      }
+
       let consentImageToSave = consentSignatureImage;
-      if (bioImage && consentSignatureImage) {
+      if (bioImage) {
         consentImageToSave = await combineImagesSideBySide(bioImage, consentSignatureImage);
       }
 

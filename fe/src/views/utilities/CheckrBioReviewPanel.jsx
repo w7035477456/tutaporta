@@ -1528,7 +1528,10 @@ export default function CheckrBioReviewPanel({
     selfReportCaptureInFlightRef.current = true;
     try {
       const selfReportImage = await captureElementAsPng(selfReportCaptureRef.current, {
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        forceViewportStaging: true,
+        validateNonEmpty: true,
+        validateLabel: 'Self-report bio'
       });
       setPendingSelfReportImage(selfReportImage);
       setAuthDialogOpen(true);
@@ -1557,7 +1560,10 @@ export default function CheckrBioReviewPanel({
     setSubmitSaving(true);
     try {
       let consentImageToSave = consentSignatureImage;
-      if (pendingSelfReportImage && consentSignatureImage) {
+      if (!consentSignatureImage) {
+        throw new Error('Consent screen was not captured. Please try again.');
+      }
+      if (pendingSelfReportImage) {
         consentImageToSave = await combineImagesSideBySide(pendingSelfReportImage, consentSignatureImage);
       }
 

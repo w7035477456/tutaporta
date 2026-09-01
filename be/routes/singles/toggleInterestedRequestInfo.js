@@ -14,6 +14,10 @@ import { clearBioRequestNotificationDismissed } from './bioRequestNotifications.
 import { sendBioRequestNotificationEmailFireAndForget } from '../../lib/bioRequestNotificationEmail.js';
 import { isSinglesStatusActive } from '../../utils/singlesStatus.js';
 import { appendBioRequestHardCopyFromIds } from '../../utils/hardCopyBioRequestLog.js';
+import {
+  isRegularMemberBioRequestApprovalLockedForSinglesId,
+  regularMemberBioRequestApprovalWriteBlocked
+} from '../../utils/regularMemberBioRequestApprovalLock.js';
 
 async function resolveAppSchema() {
   const result = await pool.query(
@@ -128,6 +132,18 @@ export async function toggleInterestedRequestInfo(req, res) {
     const fullApproval = hasDetailsApprovalPayload ? normalizeApprovalValue(req.body.full_bio_request_approval) : null;
     if ((hasBasicApprovalPayload && basicApproval == null) || (hasDetailsApprovalPayload && fullApproval == null)) {
       return res.status(400).json({ error: "Approval flags must be 'approve', 'deny', or 'noresponse'" });
+    }
+    // The approval on this row belongs to `to` (their incoming request), so the
+    // RegularMember lock is keyed on the recipient, not on the admin caller.
+    if (
+      (hasBasicApprovalPayload || hasDetailsApprovalPayload) &&
+      (await isRegularMemberBioRequestApprovalLockedForSinglesId(pool, to)) &&
+      (regularMemberBioRequestApprovalWriteBlocked('REGULARMEMBER', basicApproval) ||
+        regularMemberBioRequestApprovalWriteBlocked('REGULARMEMBER', fullApproval))
+    ) {
+      return res.status(403).json({
+        error: 'RegularMember accounts cannot change bio request approval responses.'
+      });
     }
     if ((hasBasicApprovalPayload && !basicApprovalColumn) || (hasDetailsApprovalPayload && !fullApprovalColumn)) {
       return res.status(500).json({ error: 'Request approval columns are missing in database schema' });

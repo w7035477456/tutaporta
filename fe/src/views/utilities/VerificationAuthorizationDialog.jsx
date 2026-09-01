@@ -7,14 +7,8 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import CheckIcon from '@mui/icons-material/Check';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
-import GreenButton from 'ui-component/GreenButton';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
-import {
-  SELECTED_UNSELECTED_BUTTON_BORDER_RADIUS,
-  UNSELECTED_BUTTON_TEMPLATE_BG,
-  UNSELECTED_BUTTON_TEMPLATE_BORDER,
-  UNSELECTED_BUTTON_TEMPLATE_TEXT
-} from 'config/selectedUnselectedButtonTemplate';
+import { SELECTED_UNSELECTED_BUTTON_BORDER_RADIUS } from 'config/selectedUnselectedButtonTemplate';
 import { ConsentDisclaimerBody, getConsentCheckboxLabel } from 'constants/consentDisclaimerContent';
 import { useGetRequestsAboutMeSettings } from 'api/requestsAboutMeFe';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
@@ -23,31 +17,48 @@ import { useUserTimeZoneProfile } from 'hooks/useUserTimeZoneProfile';
 import { formatUserDateTime } from 'utils/userTimeZone';
 import { themedAlert } from 'utils/themedDialog';
 
+/**
+ * Consent surfaces are fixed colors, not theme vars: this panel is captured to a
+ * PNG legal record, so the signed image must look the same on every theme.
+ */
+const CONSENT_SURFACE_YELLOW = '#FFEB3B';
+const CONSENT_SURFACE_WHITE = '#FFFFFF';
+const CONSENT_SURFACE_TEXT = '#000000';
+
+const consentSurfaceSx = (bgcolor) => ({
+  bgcolor,
+  color: CONSENT_SURFACE_TEXT,
+  WebkitTextFillColor: CONSENT_SURFACE_TEXT,
+  border: `1px solid ${CONSENT_SURFACE_TEXT}`,
+  borderRadius: SELECTED_UNSELECTED_BUTTON_BORDER_RADIUS,
+  boxSizing: 'border-box'
+});
+
+const yellowControlSurfaceSx = consentSurfaceSx(CONSENT_SURFACE_YELLOW);
+const whiteControlSurfaceSx = consentSurfaceSx(CONSENT_SURFACE_WHITE);
+
+/** Viewer Approved / Date are read-only but must still render white, not MUI grey. */
 const disabledConsentFieldSx = {
+  '& .MuiOutlinedInput-notchedOutline': {
+    border: 'none'
+  },
   '& .MuiInputBase-root': {
-    bgcolor: '#A1A1A1',
-    color: '#333333'
+    ...whiteControlSurfaceSx
+  },
+  '& .MuiInputBase-root.Mui-disabled': {
+    ...whiteControlSurfaceSx
   },
   '& .MuiInputBase-input.Mui-disabled': {
-    WebkitTextFillColor: '#333333',
-    color: '#333333'
+    WebkitTextFillColor: CONSENT_SURFACE_TEXT,
+    color: CONSENT_SURFACE_TEXT
   },
   '& .MuiInputLabel-root.Mui-disabled': {
-    color: '#333333'
+    color: CONSENT_SURFACE_TEXT
   }
 };
 
-const unselectedControlSurfaceSx = {
-  bgcolor: UNSELECTED_BUTTON_TEMPLATE_BG,
-  color: UNSELECTED_BUTTON_TEMPLATE_TEXT,
-  WebkitTextFillColor: UNSELECTED_BUTTON_TEMPLATE_TEXT,
-  border: UNSELECTED_BUTTON_TEMPLATE_BORDER,
-  borderRadius: SELECTED_UNSELECTED_BUTTON_BORDER_RADIUS,
-  boxSizing: 'border-box'
-};
-
 const consentCheckboxBoxSx = {
-  ...unselectedControlSurfaceSx,
+  ...yellowControlSurfaceSx,
   width: 72,
   height: 72,
   display: 'inline-flex',
@@ -58,7 +69,7 @@ const consentCheckboxBoxSx = {
 
 function ConsentCheckboxIcon({ checked = false }) {
   return (
-    <Box sx={consentCheckboxBoxSx}>
+    <Box className="consent-checkbox-capture-surface" sx={consentCheckboxBoxSx}>
       {checked ? <CheckIcon sx={{ color: 'inherit', fontSize: 48 }} /> : null}
     </Box>
   );
@@ -71,7 +82,7 @@ const consentFullNameFieldSx = {
     border: 'none'
   },
   '& .MuiInputBase-root': {
-    ...unselectedControlSurfaceSx,
+    ...whiteControlSurfaceSx,
     fontSize: { xs: '0.85rem', sm: getDesktopTextFontSizeVw() }
   },
   '& .MuiInputBase-input': {
@@ -83,7 +94,7 @@ const consentFullNameFieldSx = {
     opacity: 0.72
   },
   '& .MuiInputBase-root.Mui-focused': {
-    ...unselectedControlSurfaceSx
+    ...whiteControlSurfaceSx
   }
 };
 
@@ -128,7 +139,7 @@ const consentNameMismatchLabelSx = {
 };
 
 const consentSignaturePanelSx = {
-  ...unselectedControlSurfaceSx,
+  ...yellowControlSurfaceSx,
   flex: 1,
   minWidth: 0,
   overflow: 'hidden'
@@ -137,11 +148,11 @@ const consentSignaturePanelSx = {
 const consentSignatureCaptionSx = {
   px: 1,
   py: 0.65,
-  color: `${UNSELECTED_BUTTON_TEMPLATE_TEXT} !important`,
-  WebkitTextFillColor: `${UNSELECTED_BUTTON_TEMPLATE_TEXT} !important`,
+  color: `${CONSENT_SURFACE_TEXT} !important`,
+  WebkitTextFillColor: `${CONSENT_SURFACE_TEXT} !important`,
   fontWeight: 700,
   fontSize: { xs: '0.8rem', sm: getDesktopTextFontSizeVw() },
-  borderTop: `1px solid ${UNSELECTED_BUTTON_TEMPLATE_TEXT}`,
+  borderTop: `1px solid ${CONSENT_SURFACE_TEXT}`,
   textAlign: 'center',
   overflowWrap: 'anywhere'
 };
@@ -312,8 +323,8 @@ export default function VerificationAuthorizationDialog({
       };
     }
     return {
-      backgroundColor: UNSELECTED_BUTTON_TEMPLATE_BG,
-      color: UNSELECTED_BUTTON_TEMPLATE_TEXT
+      backgroundColor: CONSENT_SURFACE_YELLOW,
+      color: CONSENT_SURFACE_TEXT
     };
   }, []);
 
@@ -455,12 +466,14 @@ export default function VerificationAuthorizationDialog({
 
   return (
     <ColorTemplate7PopupLargeDark open={open} showCloseButton={false}>
-      <Box ref={captureRef}>
+      <Box ref={captureRef} className="consent-dialog-capture-root">
         <ColorTemplate7PopupLargeDark.Body>
           <ColorTemplate7PopupLargeDark.Title>
             Self-Report authorization &amp; disclosure consent
           </ColorTemplate7PopupLargeDark.Title>
-        <ConsentDisclaimerBody approvedViewingDurationMonths={approvedViewingDurationMonths} />
+        <Box className="consent-disclaimer-body">
+          <ConsentDisclaimerBody approvedViewingDurationMonths={approvedViewingDurationMonths} />
+        </Box>
         <FormControlLabel
           control={
             <Checkbox
@@ -532,7 +545,11 @@ export default function VerificationAuthorizationDialog({
                 flexWrap: { xs: 'wrap', sm: 'nowrap' }
               }}
             >
-              <Box ref={signaturePanelRef} sx={{ ...consentSignaturePanelSx, flex: 1, minWidth: 0 }}>
+              <Box
+                ref={signaturePanelRef}
+                className="consent-signature-capture-surface"
+                sx={{ ...consentSignaturePanelSx, flex: 1, minWidth: 0 }}
+              >
                 <Box
                   component="canvas"
                   ref={signatureCanvasRef}
@@ -553,10 +570,13 @@ export default function VerificationAuthorizationDialog({
                     bgcolor: 'transparent'
                   }}
                 />
-                <Typography sx={consentSignatureCaptionSx}>{signatureCaption}</Typography>
+                <Typography className="consent-surface-text" sx={consentSignatureCaptionSx}>
+                  {signatureCaption}
+                </Typography>
               </Box>
               <UnSelectedButtonTemplate
                 type="button"
+                className="consent-surface-button"
                 disableElevation
                 disableRipple
                 hoverScale={1}
@@ -568,6 +588,7 @@ export default function VerificationAuthorizationDialog({
               </UnSelectedButtonTemplate>
               <UnSelectedButtonTemplate
                 type="button"
+                className="consent-surface-button"
                 disableElevation
                 disableRipple
                 hoverScale={1}
@@ -599,9 +620,9 @@ export default function VerificationAuthorizationDialog({
             </Typography>
           ) : null}
           <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-            <GreenButton disabled={!canSubmit} onClick={() => void handleSubmit()}>
+            <ColorTemplate7PopupLargeDark.ActionButton disabled={!canSubmit} onClick={() => void handleSubmit()}>
               {confirmBusy ? 'Saving...' : capturing ? 'Capturing...' : 'Submit Consent'}
-            </GreenButton>
+            </ColorTemplate7PopupLargeDark.ActionButton>
           </Box>
         </Box>
         </ColorTemplate7PopupLargeDark.Body>

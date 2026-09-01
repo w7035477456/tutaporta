@@ -48,6 +48,7 @@ import {
   isApprovedViewingExpired,
   isApprovalLockedDuringStay,
   isBioRequestRequested,
+  REGULAR_MEMBER_BIO_RESPONSE_LOCKED_MESSAGE,
   triStateBioRequestApproval
 } from 'utils/receivedBioRequestDisplay';
 import { APPROVAL_STATUS } from 'utils/approvalStatusEnum';
@@ -611,6 +612,18 @@ export default function ReceivedBioRequestsBiographyLayout({
                 }}
               >
                 {notRequestedResponseMessage}
+              </Typography>
+            ) : null}
+            {isRegularMember && responseBoxEnabled ? (
+              <Typography
+                sx={{
+                  mb: 0.5,
+                  fontWeight: 700,
+                  lineHeight: 1.35,
+                  color: 'inherit'
+                }}
+              >
+                {REGULAR_MEMBER_BIO_RESPONSE_LOCKED_MESSAGE}
               </Typography>
             ) : null}
             <RadioGroup

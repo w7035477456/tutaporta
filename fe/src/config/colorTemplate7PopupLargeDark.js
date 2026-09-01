@@ -194,6 +194,33 @@ export function colorTemplate7PopupTextCascadeSx(overrides = {}) {
     },
     /** IDV / form "(Required)" — fixed yellow beats popup text cascade. */
     '& .required-label-suffix': requiredLabelSuffixYellowSx,
+    /** Consent yellow/white surfaces — fixed black text beats popup text cascade. */
+    '& .consent-surface-text, & .MuiTypography-root.consent-surface-text': {
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important'
+    },
+    /** Consent dialog — fixed yellow Clear/Cancel (PNG legal record must not follow theme). */
+    '& .MuiButton-root.consent-surface-button': {
+      bgcolor: '#FFEB3B !important',
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important',
+      border: '1px solid #000000 !important',
+      '@media (hover: hover)': {
+        '&:hover:not(.Mui-disabled)': {
+          bgcolor: '#FFEB3B !important',
+          color: '#000000 !important',
+          WebkitTextFillColor: '#000000 !important',
+          border: '1px solid #000000 !important'
+        }
+      },
+      '&.Mui-disabled': {
+        bgcolor: '#9e9e9e !important',
+        color: '#000000 !important',
+        WebkitTextFillColor: '#000000 !important',
+        border: '1px solid #000000 !important',
+        opacity: '1 !important'
+      }
+    },
     '& .MuiButton-root.color-template7-popup-clear-x': {
       ...greenButtonSx(),
       fontSize: `${colorTemplate7PopupButtonFontSizeResponsive.xs} !important`,
