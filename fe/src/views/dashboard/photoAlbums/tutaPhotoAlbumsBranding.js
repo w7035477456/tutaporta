@@ -13,7 +13,7 @@ export const TUTAPHOTOALBUMS_USB_LOGIN_TITLE = 'TutaPhotoAlbums USB Login';
 export const TUTAPHOTOALBUMS_USB_DECRYPT_TITLE = 'Icon Decrypt USB TutaPhotoAlbums';
 
 /** Tab + expanded workspace chrome (matches MyPhotoAlbums dual-login tabs). */
-export const TUTAPHOTOALBUMS_ONEDRIVE_STRIP_COLOR = '#9B3DBA';
+export const TUTAPHOTOALBUMS_ONEDRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';
 export const TUTAPHOTOALBUMS_USB_STRIP_COLOR = '#6EB5E0';
 /** “TutaPhotoAlbums on USB” tab / pane title text on the light-blue strip. */
 export const TUTAPHOTOALBUMS_USB_TAB_LABEL_COLOR = '#9B3DBA';
@@ -30,7 +30,7 @@ export const TUTAPHOTOALBUMS_USB_WORKSPACE_TITLE = 'TutaPhotoAlbums on USB';
 export const TUTAPHOTOALBUMS_TUTADRIVE_WORKSPACE_TITLE = 'TutaPhotoAlbums on TutaDrive';
 export const TUTAPHOTOALBUMS_TUTADRIVE_LOGIN_TITLE = 'TutaPhotoAlbums';
 export const TUTAPHOTOALBUMS_TUTADRIVE_OPEN_LABEL = 'Open TutaDrive Cloud';
-export const TUTAPHOTOALBUMS_TUTADRIVE_STRIP_COLOR = '#4A90D9';
+export const TUTAPHOTOALBUMS_TUTADRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';
 
 /** Volume name only — radio rows append " (vault, 61.9 GB, EXFAT)". */
 export function shortUsbVolumeName(label) {

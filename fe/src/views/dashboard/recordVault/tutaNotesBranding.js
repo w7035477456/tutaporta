@@ -13,7 +13,7 @@ export const TUTANOTES_USB_LOGIN_TITLE = 'TutaNotes USB Login';
 export const TUTANOTES_USB_DECRYPT_TITLE = 'Icon Decrypt USB TutaNotes';
 
 /** Tab + expanded workspace chrome (matches MyRecordVault dual-login tabs). */
-export const TUTANOTES_ONEDRIVE_STRIP_COLOR = '#9B3DBA';
+export const TUTANOTES_ONEDRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';
 export const TUTANOTES_USB_STRIP_COLOR = '#6EB5E0';
 /** “TutaNotes on USB” tab / pane title text on the light-blue strip. */
 export const TUTANOTES_USB_TAB_LABEL_COLOR = '#9B3DBA';
@@ -29,7 +29,7 @@ export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
 export const TUTANOTES_TUTADRIVE_LOGIN_TITLE = 'TutaNotes';
 export const TUTANOTES_TUTADRIVE_OPEN_LABEL = 'Open TutaDrive Cloud';
-export const TUTANOTES_TUTADRIVE_STRIP_COLOR = '#4A90D9';
+export const TUTANOTES_TUTADRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';
 /** Volume name only — radio rows append " (vault, 61.9 GB, EXFAT)". */
 export function shortUsbVolumeName(label) {
   const raw = String(label || '').trim();
