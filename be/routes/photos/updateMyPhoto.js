@@ -77,7 +77,7 @@ export async function updateMyPhoto(req, res) {
     try {
       photoFolder = getPhotoFolder();
     } catch (e) {
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER is not set in .env' });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in .env' });
     }
 
     const { image: dataUrl, file_extension: fileExtensionHint } = req.body || {};

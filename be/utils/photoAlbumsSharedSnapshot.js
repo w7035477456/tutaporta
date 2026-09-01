@@ -16,7 +16,7 @@ function sanitizeFileToken(value) {
 export function getPhotoAlbumsSharedRoot() {
   const fromEnv = String(process.env.PHOTO_ALBUMS_SHARED_ROOT || '').trim();
   if (fromEnv) return fromEnv;
-  const photoRoot = String(process.env.VSINGLES_PHOTO_FOLDER || '').trim();
+  const photoRoot = String(process.env.TUTADATES_PHOTO_FOLDER || '').trim();
   if (photoRoot) return path.join(photoRoot, 'photo_albums_shared');
   return path.join(process.cwd(), 'photo_albums_shared');
 }

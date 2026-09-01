@@ -5,12 +5,13 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import Logo from 'ui-component/Logo';
+import StoragePermissionFailDialog from 'ui-component/StoragePermissionFailDialog';
+import {
+  isStoragePermissionUploadError,
+  STORAGE_PERMISSION_CODE
+} from 'utils/storagePermissionError';
 import {
   fetchMobilePhotoUploadSessionPublic,
   getMobilePhotoUploadDebugLines,
@@ -22,9 +23,6 @@ import { downsizeImageFileToMaxMb } from 'utils/photoAlbumsDownsizeMedia';
 
 const ACCEPT =
   'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff';
-
-/** Matches STORAGE_PERMISSION_CODE in be/utils/storagePermissionError.js. */
-const STORAGE_PERMISSION_CODE = 'STORAGE_PERMISSION';
 
 /**
  * Phone cameras produce 5–15 MB files. Shrinking in the browser keeps the POST
@@ -96,7 +94,7 @@ export default function MobilePhotoUploadPage() {
       } catch (err) {
         const msg = err?.message || 'Upload failed. Scan a fresh QR code from your computer and try again.';
         setError(msg);
-        if (err?.response?.data?.code === STORAGE_PERMISSION_CODE) {
+        if (isStoragePermissionUploadError(err)) {
           setPermissionPopupOpen(true);
         }
         mobilePhotoUploadDebugLog('upload FAIL (page)', { message: msg });
@@ -316,31 +314,10 @@ export default function MobilePhotoUploadPage() {
         ) : null}
       </Stack>
 
-      <Dialog
+      <StoragePermissionFailDialog
         open={permissionPopupOpen}
         onClose={() => setPermissionPopupOpen(false)}
-        aria-labelledby="upload-permission-error-title"
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle id="upload-permission-error-title" sx={{ fontWeight: 700, color: 'error.main' }}>
-          Upload failed
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ mb: 1.5 }}>
-            Permission error on the server. Your photo was received but could not be saved.
-          </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.85 }}>
-            This is a server configuration problem, not a problem with your photo or your phone. Please contact
-            admin — retrying will not help until it is fixed.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <SelectedButtonTemplate fullWidth onClick={() => setPermissionPopupOpen(false)}>
-            Close
-          </SelectedButtonTemplate>
-        </DialogActions>
-      </Dialog>
+      />
     </Box>
   );
 }

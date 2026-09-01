@@ -31,7 +31,7 @@ export async function getAdminPhotoThumbnail(req, res) {
       row.rows[0];
     const photoFolder = getPhotoFolder();
     if (!photoFolder) {
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER not configured' });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER not configured' });
     }
 
     const thumbPath = resolvePhotoThumbnailPath(photoThumbnail, filePathFromDb || photoFolder);

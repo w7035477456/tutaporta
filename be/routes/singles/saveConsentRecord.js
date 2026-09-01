@@ -30,7 +30,7 @@ async function loadConsentRecordColumns(schemaName) {
 /**
  * POST /api/consent-record/save
  * Saves consent with a full vet_bio row snapshot as JSON.
- * Optional consent_signature_image (PNG data URL) is stored in VSINGLES_PHOTO_FOLDER
+ * Optional consent_signature_image (PNG data URL) is stored in TUTADATES_PHOTO_FOLDER
  * and linked via consent_record.consent_signature_image_fk -> photos.photos_id.
  */
 export async function saveConsentRecord(req, res) {

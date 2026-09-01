@@ -9,11 +9,11 @@ MEDIA_ENV_FILE="${BE_ENV_FILE:-$HOME/.ssh/be/.env}"
 
 # "<env key> <required|optional>" — every folder the Node backend writes to.
 MEDIA_FOLDER_KEYS=(
-  "VSINGLES_PHOTO_FOLDER required"
+  "TUTADATES_PHOTO_FOLDER required"
   "UPLOAD_FOLDER required"
   "STORAGE_FOLDER optional"
   "LARGE_CHEAP_STORAGE_FOLDER optional"
-  "VSINGLES_VIDEO_FOLDER optional"
+  "TUTADATES_VIDEO_FOLDER optional"
   "RECORD_NOTES_ONEDRIVE_STAGING_ROOT optional"
 )
 

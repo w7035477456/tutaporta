@@ -5,6 +5,10 @@ import { bumpPhotosAlbumCacheBust, withPhotoApiCacheBust } from './photoCacheBus
 import { invalidateMyPicksFeedCache } from './myPicksFe';
 import { downsizeImageFileToMaxMb } from 'utils/photoAlbumsDownsizeMedia';
 import { isAllowedAlbumPhotoFile } from 'constants/albumUploadFormats';
+import {
+  markStoragePermissionUploadError,
+  STORAGE_PERMISSION_CODE
+} from 'utils/storagePermissionError';
 
 const fetcher = ([url]) => api.get(url).then((res) => res.data);
 
@@ -174,8 +178,8 @@ export async function uploadMyPhoto(file, { maxUploadMb, timeoutMs = MY_PHOTO_UP
             reject(new Error(httpMsg));
             return;
           }
-          if (data?.code === 'STORAGE_PERMISSION') {
-            reject(new Error(data?.error || 'Folder permission error. Please contact your admin'));
+          if (data?.code === STORAGE_PERMISSION_CODE) {
+            reject(markStoragePermissionUploadError(data?.error));
             return;
           }
           reject(err);

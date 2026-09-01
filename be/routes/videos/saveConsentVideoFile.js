@@ -40,7 +40,7 @@ async function nextVideoId(client) {
 }
 
 /**
- * Saves consent video to VSINGLES_VIDEO_FOLDER (or VSINGLES_PHOTO_FOLDER fallback) and inserts videos row.
+ * Saves consent video to TUTADATES_VIDEO_FOLDER (or TUTADATES_PHOTO_FOLDER fallback) and inserts videos row.
  * File base name: video_{singles_id}_{Date.now()}
  * @returns {Promise<number>} video_id
  */
@@ -68,7 +68,7 @@ export async function saveConsentVideoFile(
 
   const videoFolder = getVideoFolder() || getPhotoFolder();
   if (!videoFolder) {
-    throw new Error('VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured');
+    throw new Error('TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured');
   }
   const filePathDir = path.resolve(videoFolder.replace(/\/+$/, ''));
   fs.mkdirSync(filePathDir, { recursive: true });

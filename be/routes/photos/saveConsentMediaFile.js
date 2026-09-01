@@ -87,7 +87,7 @@ const ALLOWED_CONSENT_IMAGE_TYPES = new Set([
 ]);
 
 /**
- * Saves consent images to VSINGLES_PHOTO_FOLDER and inserts photos row.
+ * Saves consent images to TUTADATES_PHOTO_FOLDER and inserts photos row.
  * Video (webm/mp4/mp3) must use saveConsentVideoFile → helloworldjunktest.videos.
  * @returns {Promise<number>} photos_id
  */

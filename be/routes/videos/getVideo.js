@@ -63,7 +63,7 @@ export async function getVideo(req, res) {
 
     const ext = String(fileExt || 'webm').replace(/^\./, '');
     if (!getVideoFolder() && !getPhotoFolder() && !String(filePathFromDb || '').trim()) {
-      return res.status(500).json({ error: 'VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured' });
+      return res.status(500).json({ error: 'TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured' });
     }
 
     const fullPath = resolveVideoFilePath(null, videoFileName, id, ext, filePathFromDb);

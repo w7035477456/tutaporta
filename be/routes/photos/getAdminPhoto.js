@@ -40,7 +40,7 @@ export async function getAdminPhoto(req, res) {
     const ext = String(fileExt || 'jpg').replace(/^\./, '');
     const photoFolder = getPhotoFolder();
     if (!photoFolder) {
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER not configured' });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER not configured' });
     }
 
     const fullPath = resolvePhotoFilePath(photoFolder, photoFileName, id, ext);

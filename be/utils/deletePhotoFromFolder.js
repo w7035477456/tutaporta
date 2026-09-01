@@ -7,8 +7,8 @@ const PHOTOS_TABLE = 'helloworldjunktest.photos';
 function photoFolderLabel() {
   const folder = getPhotoFolder();
   if (folder) return folder.replace(/\/+$/, '');
-  const envRaw = String(process.env.VSINGLES_PHOTO_FOLDER ?? '').trim();
-  return envRaw || '(VSINGLES_PHOTO_FOLDER not set)';
+  const envRaw = String(process.env.TUTADATES_PHOTO_FOLDER ?? '').trim();
+  return envRaw || '(TUTADATES_PHOTO_FOLDER not set)';
 }
 
 export async function fetchPhotoRowsForSinglesId(pool, singlesId) {
@@ -49,7 +49,7 @@ function collectPhotoFolderFilesForSingles(pool, singlesId) {
 }
 
 /**
- * Count on-disk files in VSINGLES_PHOTO_FOLDER tied to one member's photos rows.
+ * Count on-disk files in TUTADATES_PHOTO_FOLDER tied to one member's photos rows.
  * @param {import('pg').Pool} pool
  * @param {number} singlesId
  */
@@ -96,7 +96,7 @@ export async function deletePhotoFolderFilesForSinglesId(pool, singlesId) {
 }
 
 /**
- * Remove on-disk files for one helloworldjunktest.photos row from VSINGLES_PHOTO_FOLDER
+ * Remove on-disk files for one helloworldjunktest.photos row from TUTADATES_PHOTO_FOLDER
  * before the photos row is deleted from Postgres.
  * Deletes main image variants and matching {base}orig.jpg.
  *
@@ -110,7 +110,7 @@ export function deletePhotoFromFolder(photoRow) {
   const { removed, photoFolder } = unlinkMemberPhotoFilesFromDisk(photoRow);
 
   if (!photoFolder) {
-    console.warn(LOG_PREFIX, 'VSINGLES_PHOTO_FOLDER is not set; skipped disk cleanup', { photosId, photoFileName });
+    console.warn(LOG_PREFIX, 'TUTADATES_PHOTO_FOLDER is not set; skipped disk cleanup', { photosId, photoFileName });
   } else if (removed.length === 0) {
     console.log(LOG_PREFIX, 'no files removed', { photosId, photoFileName, photoFolder });
   } else {

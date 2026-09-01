@@ -85,7 +85,7 @@ function describePathChain(target) {
  * this must never be filtered out by PM2_LOG_LEVEL.
  */
 export function logStoragePermissionFailure(err, context = {}) {
-  const { route = 'unknown', envKey = 'VSINGLES_PHOTO_FOLDER', folder = '', singlesId = null } = context;
+  const { route = 'unknown', envKey = 'TUTADATES_PHOTO_FOLDER', folder = '', singlesId = null } = context;
 
   const failedPath = String(err?.path ?? '').trim();
   const targetDir = failedPath ? path.dirname(failedPath) : String(folder || '').replace(/\/+$/, '');

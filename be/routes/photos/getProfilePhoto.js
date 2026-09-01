@@ -52,7 +52,7 @@ export async function getProfilePhoto(req, res) {
     const ext = String(row.file_extension || 'jpg').replace(/^\./, '');
     const photoFolder = getPhotoFolder();
     if (!photoFolder) {
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER not configured in ~/.ssh/be/.env' });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER not configured in ~/.ssh/be/.env' });
     }
 
     const resolved = resolvePhotoFilePath(photoFolder, row.photo_file_name, profilePhotoId, ext);

@@ -89,7 +89,7 @@ async function nextPhotosId(client) {
 }
 
 /**
- * Saves a consent snapshot PNG to VSINGLES_PHOTO_FOLDER and inserts helloworldjunktest.photos row.
+ * Saves a consent snapshot PNG to TUTADATES_PHOTO_FOLDER and inserts helloworldjunktest.photos row.
  * Returns photos_id for linking from consent_record image FK columns.
  */
 export async function saveConsentSnapshotPhoto(

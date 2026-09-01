@@ -326,8 +326,8 @@ export async function getPhoto(req, res) {
     }
     const photoFolder = getPhotoFolder();
     if (!photoFolder) {
-      logMyStoryPhotosAlways('[getPhoto] 500 VSINGLES_PHOTO_FOLDER missing', { id, authSinglesId });
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER not configured in ~/.ssh/be/.env' });
+      logMyStoryPhotosAlways('[getPhoto] 500 TUTADATES_PHOTO_FOLDER missing', { id, authSinglesId });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER not configured in ~/.ssh/be/.env' });
     }
 
     if (wantThumbnail) {

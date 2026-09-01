@@ -42,19 +42,12 @@ async function resolveInitialSetupDoneCaseSql(client) {
   return buildInitialSetupDoneCaseSql(cachedInitialSetupDoneUdt);
 }
 
-/** Folder from VSINGLES_PHOTO_FOLDER only. Expands ~. */
-function getPhotoFolder() {
-  const folder = process.env.VSINGLES_PHOTO_FOLDER;
-  if (!folder || typeof folder !== 'string' || !folder.trim()) return null;
-  const t = folder.trim().replace(/\/+$/, '');
-  const expanded = t.startsWith('~/') ? path.join(os.homedir(), t.slice(2)) : t;
-  return expanded ? expanded + '/' : null;
-}
+import { getPhotoFolder } from '../../utils/photoFilePath.js';
 
 function logPhotoDirStats(label) {
   const folder = getPhotoFolder();
   if (!folder) {
-    console.log('[setProfileImage]', label, 'VSINGLES_PHOTO_FOLDER is not set');
+    console.log('[setProfileImage]', label, 'TUTADATES_PHOTO_FOLDER is not set');
     return;
   }
   try {

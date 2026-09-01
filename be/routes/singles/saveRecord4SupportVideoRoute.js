@@ -32,7 +32,7 @@ export async function saveRecord4SupportVideoRoute(req, res) {
   }
 
   if (!getVideoFolder() && !getPhotoFolder()) {
-    return res.status(500).json({ error: 'VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured' });
+    return res.status(500).json({ error: 'TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured' });
   }
 
   let client;

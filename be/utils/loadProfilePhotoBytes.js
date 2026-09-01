@@ -30,7 +30,7 @@ export async function loadProfilePhotoBytes(singlesId) {
 
   const photoFolder = getPhotoFolder();
   if (!photoFolder) {
-    throw new Error('VSINGLES_PHOTO_FOLDER is not configured');
+    throw new Error('TUTADATES_PHOTO_FOLDER is not configured');
   }
 
   const ext = String(row.file_extension || 'jpg').replace(/^\./, '');

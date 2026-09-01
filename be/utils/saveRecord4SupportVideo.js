@@ -85,7 +85,7 @@ export async function saveRecord4SupportVideo(
 
   const videoFolder = getVideoFolder() || getPhotoFolder();
   if (!videoFolder) {
-    throw new Error('VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured');
+    throw new Error('TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured');
   }
 
   await deletePriorRecord4SupportVideos(client, singlesId);

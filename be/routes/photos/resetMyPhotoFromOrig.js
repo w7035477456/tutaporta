@@ -31,7 +31,7 @@ export async function resetMyPhotoFromOrig(req, res) {
     try {
       photoFolder = getPhotoFolder();
     } catch (e) {
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER is not set in .env' });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in .env' });
     }
 
     const filePathDir = path.resolve(photoFolder);

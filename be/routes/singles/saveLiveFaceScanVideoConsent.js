@@ -90,7 +90,7 @@ export async function saveLiveFaceScanVideoConsent(req, res) {
       return res.status(500).json({ error: 'consent_record schema is missing required columns (run addVideosTable.sql)' });
     }
     if (!getVideoFolder() && !getPhotoFolder()) {
-      return res.status(500).json({ error: 'VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured' });
+      return res.status(500).json({ error: 'TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured' });
     }
 
     client = await pool.connect();

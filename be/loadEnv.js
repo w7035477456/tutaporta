@@ -71,6 +71,7 @@ function reconcileStoragePathsForPlatform() {
         k.includes('STORAGE') ||
         k.startsWith('RECORD_') ||
         k.startsWith('UPLOAD_') ||
+        k.startsWith('TUTADATES_') ||
         k.startsWith('VSINGLES_') ||
         k.startsWith('USB_')
       ) {

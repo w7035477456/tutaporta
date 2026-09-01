@@ -31,14 +31,14 @@ function expandEnvPath(raw) {
 
 /** Configured storage roots from ~/.ssh/be/.env (deduped, absolute). */
 export function listAppStorageRoots() {
-  const keys = ['STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER', 'VSINGLES_PHOTO_FOLDER'];
+  const keys = ['STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER', 'TUTADATES_PHOTO_FOLDER'];
   const out = [];
   const seen = new Set();
   for (const envKey of keys) {
     const abs = expandEnvPath(process.env[envKey]);
     if (!abs || seen.has(abs)) continue;
     // Skip photo folder if it is already under STORAGE_FOLDER (avoid double walk)
-    if (envKey === 'VSINGLES_PHOTO_FOLDER') {
+    if (envKey === 'TUTADATES_PHOTO_FOLDER') {
       const underExisting = out.some(
         (r) => abs === r.abs || abs.startsWith(r.abs + path.sep)
       );

@@ -16,9 +16,9 @@ export function isSystemPhotoFileName(photoFileName) {
   );
 }
 
-/** Folder from VSINGLES_PHOTO_FOLDER only. Expands ~. Ignores DB file_path. */
+/** Folder from TUTADATES_PHOTO_FOLDER only. Expands ~. Ignores DB file_path. */
 export function getPhotoFolder() {
-  const folder = process.env.VSINGLES_PHOTO_FOLDER;
+  const folder = process.env.TUTADATES_PHOTO_FOLDER;
   if (!folder || typeof folder !== 'string' || !folder.trim()) return '';
   const t = folder.trim().replace(/\/+$/, '');
   const expanded = t.startsWith('~/') ? path.join(os.homedir(), t.slice(2)) : t;
@@ -26,13 +26,13 @@ export function getPhotoFolder() {
 }
 
 /**
- * Count regular files in VSINGLES_PHOTO_FOLDER (admin Tools → Tables row).
+ * Count regular files in TUTADATES_PHOTO_FOLDER (admin Tools → Tables row).
  * @returns {{ label: string, fileCount: number | null, missing: boolean }}
  */
 export function countPhotoFolderFiles() {
-  const envRaw = String(process.env.VSINGLES_PHOTO_FOLDER ?? '').trim();
+  const envRaw = String(process.env.TUTADATES_PHOTO_FOLDER ?? '').trim();
   const folder = getPhotoFolder();
-  const label = folder ? folder.replace(/\/+$/, '') : envRaw || '(VSINGLES_PHOTO_FOLDER not set)';
+  const label = folder ? folder.replace(/\/+$/, '') : envRaw || '(TUTADATES_PHOTO_FOLDER not set)';
 
   if (!folder) {
     return { label, fileCount: null, missing: true };
@@ -194,7 +194,7 @@ function addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, 
 }
 
 /**
- * List on-disk files in VSINGLES_PHOTO_FOLDER whose names start with `{memberId}_`.
+ * List on-disk files in TUTADATES_PHOTO_FOLDER whose names start with `{memberId}_`.
  * @param {number | string | null | undefined} memberId
  * @returns {string[]}
  */
@@ -223,7 +223,7 @@ export function listPhotoFolderFilesForMemberId(memberId) {
 }
 
 /**
- * List existing on-disk files in VSINGLES_PHOTO_FOLDER for one photos row.
+ * List existing on-disk files in TUTADATES_PHOTO_FOLDER for one photos row.
  * Accepts DB snake_case (`photo_file_name`) or camelCase keys.
  * @returns {string[]}
  */
@@ -250,7 +250,7 @@ export function listMemberPhotoFilesOnDisk(row) {
 }
 
 /**
- * Remove on-disk member photo files from VSINGLES_PHOTO_FOLDER (main image, all ext variants, orig backups).
+ * Remove on-disk member photo files from TUTADATES_PHOTO_FOLDER (main image, all ext variants, orig backups).
  * @returns {{ removed: string[], photoFolder: string }}
  */
 export function unlinkMemberPhotoFilesFromDisk(row) {

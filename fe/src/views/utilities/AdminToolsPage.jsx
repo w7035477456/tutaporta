@@ -346,7 +346,7 @@ export default function AdminToolsPage() {
           {!loading && activeTab === 'backup' ? (
             <FileListPanel
               files={backupFiles}
-              emptyMessage="No image files found in VSINGLES_PHOTO_FOLDER."
+              emptyMessage="No image files found in TUTADATES_PHOTO_FOLDER."
               showChecksum={false}
             />
           ) : null}

@@ -167,17 +167,19 @@ JWT_PUBLIC_KEY_PATH=/Users/a/.ssh/be/public_key.pem
 | `DEV_ALLOWED_ORIGINS` | **Mac dev only** — comma-separated CORS origins (`be/server_be.js`). Do not use in production. |
 | `JWT_*_KEY_PATH` | RS256 key pair paths; not in repo. |
 
-## Photos
+## Photos / videos
 
 ```bash
-VSINGLES_PHOTO_FOLDER=/Users/a/onlinemallwebsite_storage/photos/
+TUTADATES_PHOTO_FOLDER=${STORAGE_FOLDER}/photos/
+TUTADATES_VIDEO_FOLDER=${STORAGE_FOLDER}/videos/  # optional
 MAX_SIZE_UPLOAD_MB=9
 JSON_LIMIT_MB=400
 ```
 
 | Variable | Notes |
 |----------|-------|
-| `VSINGLES_PHOTO_FOLDER` | On-disk photo root; must exist on each app server (or shared mount). |
+| `TUTADATES_PHOTO_FOLDER` | On-disk photo root; must exist on each app server (or shared mount). |
+| `TUTADATES_VIDEO_FOLDER` | On-disk video root; defaults to `{parent of photos}/videos/` if unset. |
 | `MAX_SIZE_UPLOAD_MB` | Upload cap per photo (`be/routes/photos/uploadPhoto.js`). |
 | `JSON_LIMIT_MB` | Express JSON body limit (base64 uploads). Align nginx `client_max_body_size` if used. |
 

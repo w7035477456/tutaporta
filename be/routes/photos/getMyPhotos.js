@@ -13,7 +13,7 @@ const PHOTOS_TABLE = 'helloworldjunktest.photos';
 function logPhotoDirStats(label) {
   const folder = getPhotoFolder();
   if (!folder) {
-    console.log('[getMyPhotos]', label, 'VSINGLES_PHOTO_FOLDER is not set');
+    console.log('[getMyPhotos]', label, 'TUTADATES_PHOTO_FOLDER is not set');
     return;
   }
   try {
@@ -68,7 +68,7 @@ async function resolveAlbumTypeColumn(client) {
  * GET /api/myPhotos
  * Returns list of { photos_id, display_order, file_extension, file_size_bytes } for the authenticated single.
  * photos_id in response is photos.photos_id (PK); file_extension is stored image extension (jpg/png/webp/etc).
- * file_size_bytes comes from VSINGLES_PHOTO_FOLDER on disk.
+ * file_size_bytes comes from TUTADATES_PHOTO_FOLDER on disk.
  */
 export async function getMyPhotos(req, res) {
   let client;

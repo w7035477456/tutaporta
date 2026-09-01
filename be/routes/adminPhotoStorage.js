@@ -148,12 +148,12 @@ function resolvePhotoFolderOrRespond(res) {
   try {
     const folder = getPhotoFolder();
     if (!folder) {
-      res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER is not set in ~/.ssh/be/.env' });
+      res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in ~/.ssh/be/.env' });
       return null;
     }
     return folder;
   } catch (err) {
-    res.status(500).json({ error: err?.message || 'VSINGLES_PHOTO_FOLDER is not configured' });
+    res.status(500).json({ error: err?.message || 'TUTADATES_PHOTO_FOLDER is not configured' });
     return null;
   }
 }
@@ -164,7 +164,7 @@ function toPublicFileRows(files) {
 
 /**
  * GET /api/admin/photo-storage/files
- * Lists image files in VSINGLES_PHOTO_FOLDER (Backup tab).
+ * Lists image files in TUTADATES_PHOTO_FOLDER (Backup tab).
  */
 export async function getAdminPhotoStorageFiles(req, res) {
   const folder = resolvePhotoFolderOrRespond(res);
@@ -188,7 +188,7 @@ export async function getAdminPhotoStorageFiles(req, res) {
  */
 /**
  * GET /api/admin/photo-storage/file/:fileName
- * Serves one on-disk image from VSINGLES_PHOTO_FOLDER (admin thumbnails).
+ * Serves one on-disk image from TUTADATES_PHOTO_FOLDER (admin thumbnails).
  */
 export async function getAdminPhotoStorageFile(req, res) {
   const folder = resolvePhotoFolderOrRespond(res);

@@ -13,9 +13,9 @@ function expandFolderPath(folder) {
   return expanded ? `${expanded}/` : '';
 }
 
-/** VSINGLES_VIDEO_FOLDER from env; default sibling `{parent of photos}/videos/`. */
+/** TUTADATES_VIDEO_FOLDER from env; default sibling `{parent of photos}/videos/`. */
 export function getVideoFolder() {
-  const explicit = process.env.VSINGLES_VIDEO_FOLDER;
+  const explicit = process.env.TUTADATES_VIDEO_FOLDER;
   if (explicit?.trim()) return expandFolderPath(explicit);
 
   const photoFolder = getPhotoFolder();
@@ -55,7 +55,7 @@ function buildVideoFileCandidates(folder, videoFileName, videoId, ext) {
 }
 
 /**
- * Resolve on-disk path for a videos row (VSINGLES_VIDEO_FOLDER, DB file_path, legacy photos folder).
+ * Resolve on-disk path for a videos row (TUTADATES_VIDEO_FOLDER, DB file_path, legacy photos folder).
  * @returns {string|null}
  */
 export function resolveVideoFilePath(videoFolder, videoFileName, videoId, ext, filePathFromDb = null) {
@@ -95,7 +95,7 @@ function tryUnlinkFile(targetPath, removed) {
 }
 
 /**
- * Remove on-disk files for one videos row from VSINGLES_PHOTO_FOLDER.
+ * Remove on-disk files for one videos row from TUTADATES_PHOTO_FOLDER.
  * @returns {{ removed: string[], videoFolder: string }}
  */
 export function unlinkMemberVideoFilesFromDisk(row) {

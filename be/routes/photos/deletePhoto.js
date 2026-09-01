@@ -6,7 +6,7 @@ import { deletePostingPhotosReferencingAlbumPhotoId } from '../../utils/deletePo
 function logPhotoDirStats(label) {
   const folder = getPhotoFolder();
   if (!folder) {
-    console.log('[deletePhoto]', label, 'VSINGLES_PHOTO_FOLDER is not set');
+    console.log('[deletePhoto]', label, 'TUTADATES_PHOTO_FOLDER is not set');
     return;
   }
   try {
@@ -98,7 +98,7 @@ export async function deletePhoto(req, res) {
     });
 
     if (!photoFolder) {
-      console.warn('[deletePhoto] VSINGLES_PHOTO_FOLDER is not set; DB row removed but no disk cleanup ran', {
+      console.warn('[deletePhoto] TUTADATES_PHOTO_FOLDER is not set; DB row removed but no disk cleanup ran', {
         singlesId,
         photosId
       });

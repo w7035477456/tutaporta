@@ -83,7 +83,7 @@ export async function getVideoThumbnail(req, res) {
     }
 
     if (!getPhotoFolder() && !String(dbRow.file_path || '').trim()) {
-      return res.status(500).json({ error: 'VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured' });
+      return res.status(500).json({ error: 'TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured' });
     }
 
     const fullPath = resolveVideoThumbnailPath(dbRow.video_thumbnail, dbRow.file_path);
@@ -114,7 +114,7 @@ export async function getAdminVideoThumbnail(req, res) {
     }
 
     if (!getPhotoFolder() && !String(dbRow.file_path || '').trim()) {
-      return res.status(500).json({ error: 'VSINGLES_VIDEO_FOLDER or VSINGLES_PHOTO_FOLDER not configured' });
+      return res.status(500).json({ error: 'TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured' });
     }
 
     const fullPath = resolveVideoThumbnailPath(dbRow.video_thumbnail, dbRow.file_path);

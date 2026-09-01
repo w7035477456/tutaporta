@@ -139,6 +139,11 @@ import {
 } from 'utils/signupReferralCode';
 import { MyAlbumPostingsInstructionPopup } from 'views/utilities/MyAlbumPostingsInstruction';
 import ProfilePhotoUploadQrPanel from 'components/ProfilePhotoUploadQrPanel';
+import StoragePermissionFailDialog from 'ui-component/StoragePermissionFailDialog';
+import {
+  isStoragePermissionUploadError,
+  storagePermissionFailureMessage
+} from 'utils/storagePermissionError';
 import { ERROR_VAR } from 'utils/themeConfig';
 import { COLOR_TEMPLATE8_PHOTO_AVATAR_LETTERBOX_BG } from 'config/colorTemplate8PhotoGallery';
 import { themedAlert } from 'utils/themedDialog';
@@ -1185,6 +1190,7 @@ export default function MyStory() {
   const [fileTooLargeDialogOpen, setFileTooLargeDialogOpen] = useState(false);
   const [postingAutoMovedDialogOpen, setPostingAutoMovedDialogOpen] = useState(false);
   const [duplicateUploadDialogOpen, setDuplicateUploadDialogOpen] = useState(false);
+  const [storagePermissionDialogOpen, setStoragePermissionDialogOpen] = useState(false);
   const [fileTooLargeActualMb, setFileTooLargeActualMb] = useState('');
   const [fileTooLargeMaxMb, setFileTooLargeMaxMb] = useState(2);
   const [photoVersion, setPhotoVersion] = useState({});
@@ -1443,7 +1449,7 @@ export default function MyStory() {
               setFileTooLargeMaxMb(String(PUBLIC_VAULT_UPLOAD_MAX_MB));
               setFileTooLargeDialogOpen(true);
             } else {
-              setUploadError(msg);
+              reportUploadFailure(uploadErr);
             }
           }
         }
@@ -1452,8 +1458,17 @@ export default function MyStory() {
         setUploading(false);
       }
     },
-    [adminImpersonationUploadBypass, publicAlbumVideos, refetchMyAlbumVideos]
+    [adminImpersonationUploadBypass, publicAlbumVideos, refetchMyAlbumVideos, reportUploadFailure]
   );
+
+  const reportUploadFailure = useCallback((err, fallback = 'Upload failed') => {
+    if (isStoragePermissionUploadError(err)) {
+      setStoragePermissionDialogOpen(true);
+      setUploadError(storagePermissionFailureMessage(err));
+      return;
+    }
+    setUploadError(err?.response?.data?.error || err?.message || fallback);
+  }, []);
 
   const handlePhotoFiles = useCallback(
     async (files, { targetAlbumType = null } = {}) => {
@@ -1550,15 +1565,7 @@ export default function MyStory() {
                 );
               }
             } else {
-              const msg = data?.error || uploadErr.message;
-              if (data?.code === 'STORAGE_PERMISSION') {
-                setUploadError(
-                  msg ||
-                    'Folder permission error on the server photo folder (VSINGLES_PHOTO_FOLDER). On Ubuntu run: fixstorage'
-                );
-              } else {
-                setUploadError(msg || 'Upload failed');
-              }
+              reportUploadFailure(uploadErr);
             }
             continue;
           }
@@ -1589,7 +1596,7 @@ export default function MyStory() {
           setPendingAutoMakeProfile(true);
         }
       } catch (err) {
-        setUploadError(err.response?.data?.error || err.message || 'Upload failed');
+        reportUploadFailure(err);
       } finally {
         setUploading(false);
       }
@@ -1601,7 +1608,8 @@ export default function MyStory() {
       profilePhotoId,
       bumpAlbumPhotoCache,
       bumpPhotoVersion,
-      maxUploadMb
+      maxUploadMb,
+      reportUploadFailure
     ]
   );
 
@@ -2485,12 +2493,12 @@ export default function MyStory() {
         bumpAlbumPhotoCache();
         await refetchMyPhotos();
       } catch (err) {
-        setUploadError(err?.response?.data?.error || err?.message || 'Failed to upload posting photo');
+        reportUploadFailure(err, 'Failed to upload posting photo');
       } finally {
         setPostingSaving(false);
       }
     },
-    [adminImpersonationUploadBypass, refetchMyPhotos, bumpAlbumPhotoCache, bumpPhotoVersion, maxUploadMb]
+    [adminImpersonationUploadBypass, refetchMyPhotos, bumpAlbumPhotoCache, bumpPhotoVersion, maxUploadMb, reportUploadFailure]
   );
 
   const handlePostingDraftPhotoFile = useCallback(
@@ -3032,7 +3040,7 @@ export default function MyStory() {
         bumpAlbumPhotoCache();
         await Promise.all([refetchMyPhotos(), refetchMyPicksFeed(), invalidateMyPicksFeedCache()]);
       } catch (err) {
-        setUploadError(err?.response?.data?.error || err?.message || 'Failed to attach photo to posting');
+        reportUploadFailure(err, 'Failed to attach photo to posting');
       } finally {
         setAttachBusyPostId(null);
       }
@@ -3045,7 +3053,8 @@ export default function MyStory() {
       bumpPhotoVersion,
       bumpAlbumPhotoCache,
       refetchMyPhotos,
-      refetchMyPicksFeed
+      refetchMyPicksFeed,
+      reportUploadFailure
     ]
   );
 
@@ -3237,6 +3246,10 @@ export default function MyStory() {
     >
       {wrongFormatDialog}
       {fileTooLargeDialog}
+      <StoragePermissionFailDialog
+        open={storagePermissionDialogOpen}
+        onClose={() => setStoragePermissionDialogOpen(false)}
+      />
       {albumPhotoDeleteConfirmDialog}
       {duplicateUploadDialog}
       {postingAutoMovedDialog}

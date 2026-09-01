@@ -12,7 +12,7 @@ import {
   maskMobileUploadToken,
   traceMobilePhotoUpload
 } from '../../utils/mobilePhotoUploadLog.js';
-import { unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
+import { getPhotoFolder as resolvePhotoFolder, unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
 import {
   ALBUM_PHOTO_EXTENSIONS_ERROR,
   contentTypeToExt as albumContentTypeToExt,
@@ -83,7 +83,7 @@ function logPhotoDirStats(label) {
     folder = null;
   }
   if (!folder) {
-    console.log('[uploadPhoto]', label, 'VSINGLES_PHOTO_FOLDER is not set');
+    console.log('[uploadPhoto]', label, 'TUTADATES_PHOTO_FOLDER is not set');
     return;
   }
   try {
@@ -98,15 +98,11 @@ function logPhotoDirStats(label) {
   }
 }
 
-/** Folder from VSINGLES_PHOTO_FOLDER only (~/.ssh/be/.env). Expands ~. Throws if not set. */
+/** Throws if TUTADATES_PHOTO_FOLDER is unset (legacy uploadPhoto export). */
 export function getPhotoFolder() {
-  const folder = process.env.VSINGLES_PHOTO_FOLDER;
-  if (!folder || typeof folder !== 'string' || !folder.trim()) {
-    throw new Error('VSINGLES_PHOTO_FOLDER is not set in .env');
-  }
-  const t = folder.trim().replace(/\/+$/, '');
-  const expanded = t.startsWith('~/') ? path.join(os.homedir(), t.slice(2)) : t;
-  return expanded ? expanded + '/' : (() => { throw new Error('VSINGLES_PHOTO_FOLDER is not set in .env'); })();
+  const folder = resolvePhotoFolder();
+  if (!folder) throw new Error('TUTADATES_PHOTO_FOLDER is not set in .env');
+  return folder;
 }
 
 export function contentTypeToExt(contentType, fileExtension = '') {
@@ -392,7 +388,7 @@ export async function uploadPhoto(req, res) {
     try {
       photoFolder = getPhotoFolder();
     } catch (e) {
-      return res.status(500).json({ error: 'VSINGLES_PHOTO_FOLDER is not set in .env' });
+      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in .env' });
     }
 
     const { image: dataUrl, file_extension: fileExtensionHint } = req.body || {};
@@ -654,15 +650,15 @@ export async function uploadPhoto(req, res) {
     if (isStoragePermissionError(err)) {
       logStoragePermissionFailure(err, {
         route: mobileToken ? 'uploadPhoto (phone QR)' : 'uploadPhoto',
-        envKey: 'VSINGLES_PHOTO_FOLDER',
-        folder: process.env.VSINGLES_PHOTO_FOLDER || process.env.STORAGE_FOLDER,
+        envKey: 'TUTADATES_PHOTO_FOLDER',
+        folder: process.env.TUTADATES_PHOTO_FOLDER || process.env.STORAGE_FOLDER,
         singlesId: req.auth?.singles_id
       });
       logFolderPermissionError(
         [
           process.env.STORAGE_FOLDER,
           process.env.LARGE_CHEAP_STORAGE_FOLDER,
-          process.env.VSINGLES_PHOTO_FOLDER
+          process.env.TUTADATES_PHOTO_FOLDER
         ].filter(Boolean),
         { route: 'uploadPhoto', singlesId: req.auth?.singles_id, err }
       );
