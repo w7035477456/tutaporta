@@ -174,6 +174,10 @@ export async function uploadMyPhoto(file, { maxUploadMb, timeoutMs = MY_PHOTO_UP
             reject(new Error(httpMsg));
             return;
           }
+          if (data?.code === 'STORAGE_PERMISSION') {
+            reject(new Error(data?.error || 'Folder permission error. Please contact your admin'));
+            return;
+          }
           reject(err);
         });
     };

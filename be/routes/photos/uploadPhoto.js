@@ -642,14 +642,6 @@ export async function uploadPhoto(req, res) {
     });
   } catch (err) {
     console.error('[UPLOAD_FAIL] Upload photo error:', err?.code || '', err?.message || err, err?.stack || '');
-    const storageMessage = handleStorageFault(err, {
-      route: 'uploadPhoto',
-      singlesId: req.auth?.singles_id,
-      viaPhoneQr: mobileToken ? 'yes' : 'no'
-    });
-    if (storageMessage) {
-      return res.status(500).json({ error: storageMessage, code: err?.code });
-    }
     if (mobileToken) {
       traceMobilePhotoUpload('uploadPhoto FAIL (phone QR)', {
         token: maskMobileUploadToken(mobileToken),

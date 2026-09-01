@@ -1550,7 +1550,15 @@ export default function MyStory() {
                 );
               }
             } else {
-              setUploadError(msg || 'Upload failed');
+              const msg = data?.error || uploadErr.message;
+              if (data?.code === 'STORAGE_PERMISSION') {
+                setUploadError(
+                  msg ||
+                    'Folder permission error on the server photo folder (VSINGLES_PHOTO_FOLDER). On Ubuntu run: fixstorage'
+                );
+              } else {
+                setUploadError(msg || 'Upload failed');
+              }
             }
             continue;
           }
