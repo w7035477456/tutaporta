@@ -3,8 +3,15 @@ import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { bumpPhotosAlbumCacheBust, withPhotoApiCacheBust } from './photoCacheBust';
 import { invalidateMyPicksFeedCache } from './myPicksFe';
+import { downsizeImageFileToMaxMb } from 'utils/photoAlbumsDownsizeMedia';
+import { isAllowedAlbumPhotoFile } from 'constants/albumUploadFormats';
 
 const fetcher = ([url]) => api.get(url).then((res) => res.data);
+
+/** Same target as phone QR upload — keeps base64 JSON small for WAF / HAProxy / cellular. */
+export const MY_PHOTO_UPLOAD_PREP_MAX_MB = 2;
+
+export const MY_PHOTO_UPLOAD_TIMEOUT_MS = 120000;
 
 export const ALLOWED_UPLOAD_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
 
@@ -60,9 +67,59 @@ export function fileTooLargeMessage(fileSizeBytes, maxUploadMb) {
   return `File size is ${sizeMb} mb. Maximum we allow is ${maxUploadMb} mb`;
 }
 
-export async function uploadMyPhoto(file) {
-  const fileSizeMb = (file.size / (1024 * 1024)).toFixed(2);
-  console.log('[uploadMyPhoto] START', { name: file.name, type: file.type, sizeBytes: file.size, sizeMb: fileSizeMb });
+function uploadTimeoutMessage() {
+  return 'Upload timed out. Try a smaller JPG/PNG or use Scan from your phone.';
+}
+
+function uploadHttpErrorMessage(status) {
+  if (status === 403) {
+    return 'Upload blocked (HTTP 403). Try a smaller photo or use Scan from your phone.';
+  }
+  if (status === 413) {
+    return 'Photo is too large for the server. Try a smaller JPG or use Scan from your phone.';
+  }
+  if (status === 504 || status === 502) {
+    return 'Upload timed out at the server (HTTP 504). Try a smaller photo or use Scan from your phone.';
+  }
+  return null;
+}
+
+/**
+ * Shrink camera JPGs before base64 JSON upload (same idea as mobile QR upload page).
+ */
+export async function prepareMyPhotoFileForUpload(file, { maxUploadMb = MY_PHOTO_UPLOAD_PREP_MAX_MB } = {}) {
+  if (!file || !isAllowedAlbumPhotoFile(file)) return file;
+
+  const serverMaxMb = Number(maxUploadMb);
+  const prepCapMb =
+    Number.isFinite(serverMaxMb) && serverMaxMb > 0
+      ? Math.min(serverMaxMb, MY_PHOTO_UPLOAD_PREP_MAX_MB)
+      : MY_PHOTO_UPLOAD_PREP_MAX_MB;
+
+  const smaller = await downsizeImageFileToMaxMb(file, prepCapMb);
+  if (smaller) return smaller;
+
+  const hardMaxBytes =
+    (Number.isFinite(serverMaxMb) && serverMaxMb > 0 ? serverMaxMb : MY_PHOTO_UPLOAD_PREP_MAX_MB) *
+    1024 *
+    1024;
+  if (file.size > hardMaxBytes) {
+    throw new Error(fileTooLargeMessage(file.size, prepCapMb));
+  }
+
+  return file;
+}
+
+export async function uploadMyPhoto(file, { maxUploadMb, timeoutMs = MY_PHOTO_UPLOAD_TIMEOUT_MS } = {}) {
+  const prepared = await prepareMyPhotoFileForUpload(file, { maxUploadMb });
+  const fileSizeMb = (prepared.size / (1024 * 1024)).toFixed(2);
+  console.log('[uploadMyPhoto] START', {
+    name: prepared.name,
+    type: prepared.type,
+    sizeBytes: prepared.size,
+    sizeMb: fileSizeMb,
+    originalSizeBytes: file.size
+  });
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -77,10 +134,14 @@ export async function uploadMyPhoto(file) {
       });
 
       api
-        .post('/api/myPhotos', {
-          image: dataUrl,
-          file_extension: getUploadImageExtension(file.name) || undefined
-        })
+        .post(
+          '/api/myPhotos',
+          {
+            image: dataUrl,
+            file_extension: getUploadImageExtension(prepared.name) || undefined
+          },
+          { timeout: timeoutMs }
+        )
         .then((res) => {
           console.log('[uploadMyPhoto] SUCCESS', res.data);
           resolve(res.data);
@@ -90,6 +151,7 @@ export async function uploadMyPhoto(file) {
           const data = err.response?.data;
           const headers = err.response?.headers;
           const isNginx413 = status === 413 && (!data?.code || typeof data === 'string');
+          const isTimeout = err.code === 'ECONNABORTED' || /timeout/i.test(String(err.message || ''));
           console.error('[uploadMyPhoto] FAILED', {
             status,
             code: data?.code,
@@ -98,15 +160,25 @@ export async function uploadMyPhoto(file) {
             responseDataType: typeof data,
             server: headers?.server,
             isNginx413,
+            isTimeout,
             hint: isNginx413
               ? 'NGINX is blocking the request. Add "client_max_body_size 20M;" to your nginx server block and reload nginx.'
               : 'Error came from Express (check PM2 logs)'
           });
+          if (isTimeout) {
+            reject(new Error(uploadTimeoutMessage()));
+            return;
+          }
+          const httpMsg = uploadHttpErrorMessage(status);
+          if (httpMsg) {
+            reject(new Error(httpMsg));
+            return;
+          }
           reject(err);
         });
     };
     reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(prepared);
   });
 }
 

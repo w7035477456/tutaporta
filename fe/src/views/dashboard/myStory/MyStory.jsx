@@ -66,6 +66,7 @@ import {
 import {
   useMyPhotos,
   uploadMyPhoto,
+  prepareMyPhotoFileForUpload,
   deleteMyPhoto,
   setProfilePhoto,
   myPhotoUrl,
@@ -1497,16 +1498,23 @@ export default function MyStory() {
             setWrongFormatDialogOpen(true);
             continue;
           }
+          let fileToUpload = file;
+          try {
+            fileToUpload = await prepareMyPhotoFileForUpload(file, { maxUploadMb });
+          } catch (prepErr) {
+            setUploadError(prepErr?.message || 'Could not prepare photo for upload');
+            continue;
+          }
           const photoMaxBytes = maxUploadMb * 1024 * 1024;
-          if (!adminImpersonationUploadBypass && file.size > photoMaxBytes) {
-            setFileTooLargeActualMb((file.size / (1024 * 1024)).toFixed(2));
+          if (!adminImpersonationUploadBypass && fileToUpload.size > photoMaxBytes) {
+            setFileTooLargeActualMb((fileToUpload.size / (1024 * 1024)).toFixed(2));
             setFileTooLargeMaxMb(String(maxUploadMb));
             setFileTooLargeDialogOpen(true);
             continue;
           }
           let result;
           try {
-            result = await uploadMyPhoto(file);
+            result = await uploadMyPhoto(fileToUpload, { maxUploadMb });
           } catch (uploadErr) {
             const status = uploadErr.response?.status;
             const data = uploadErr.response?.data;
@@ -1647,8 +1655,8 @@ export default function MyStory() {
   );
 
   const triggerFilePicker = useCallback(
-    (inputRef) => {
-      if (maxPhotosReached) {
+    (inputRef, { bypassAlbumFull = false } = {}) => {
+      if (!bypassAlbumFull && maxPhotosReached) {
         setUploadError('Uploaded album is full. Please move or delete one before uploading more.');
         return;
       }
@@ -1656,6 +1664,8 @@ export default function MyStory() {
     },
     [maxPhotosReached]
   );
+
+  const allowFirstProfilePhotoUpload = showFirstPhotoDialog && !profilePhotoId;
 
   const handlePhoneUploadComplete = useCallback(
     async (photosId, { replacedDuplicate = false } = {}) => {
@@ -3370,7 +3380,7 @@ export default function MyStory() {
                     component="button"
                     type="button"
                     aria-label="Open camera or photo library"
-                    onClick={() => triggerFilePicker(firstPhotoFileInputRef)}
+                    onClick={() => triggerFilePicker(firstPhotoFileInputRef, { bypassAlbumFull: allowFirstProfilePhotoUpload })}
                     sx={{
                       position: 'absolute',
                       right: 0,
@@ -3395,7 +3405,7 @@ export default function MyStory() {
               onDrop={onDrop}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
-              onClick={() => triggerFilePicker(firstPhotoFileInputRef)}
+              onClick={() => triggerFilePicker(firstPhotoFileInputRef, { bypassAlbumFull: allowFirstProfilePhotoUpload })}
               sx={{
                 border: '3px solid var(--theme-primary-color)',
                 borderRadius: 2,
