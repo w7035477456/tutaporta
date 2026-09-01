@@ -3,10 +3,9 @@
 #
 # Prints exactly one line: "same" or "difference"
 #
-#   comparepgschema                          # Mac vs default Ubuntu host
-#   comparepgschema --ubuntu-host u@host     # Mac vs custom host
-#   comparepgschema --verbose                # show diff summary on mismatch
-#   comparepgschema --save-dumps /tmp/schema-dumps
+#   comparepgschema
+#   comparepgschema --verbose
+#   comparepgschema --ubuntu-host lawsen0@192.168.222.202
 #
 # Ubuntu ~/b:
 #   alias comparepgschema='$HOME/code/main/scripts/compare-pg-schema.sh'
@@ -21,17 +20,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_HOST="${COMPARE_SCHEMA_UBUNTU_HOST:-lawsen0@192.168.222.202}"
 VERBOSE=0
 SAVE_DUMPS=""
-REMOTE_ENV_FILE='~/.ssh/be/.env'
 
 usage() {
   cat <<'EOF'
-compare-pg-schema.sh [--ubuntu-host user@host] [--remote-env path] [--verbose] [--save-dumps dir]
+compare-pg-schema.sh [--ubuntu-host user@host] [--verbose] [--save-dumps dir]
 
 Compares PostgreSQL schema (default: helloworldjunktest) on Mac vs Ubuntu.
 Output: "same" or "difference" (one line).
 
+Requires: SSH to Ubuntu; pipes pg-schema-dump.sh (no separate deploy needed).
 Environment:
-  COMPARE_SCHEMA_UBUNTU_HOST   default SSH target (lawsen0@192.168.222.202)
+  COMPARE_SCHEMA_UBUNTU_HOST   SSH target (default lawsen0@192.168.222.202)
   BE_ENV_FILE                  Mac env file (default ~/.ssh/be/.env)
 EOF
 }
@@ -39,147 +38,65 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ubuntu-host) UBUNTU_HOST="${2:-}"; shift 2 ;;
-    --remote-env) REMOTE_ENV_FILE="${2:-}"; shift 2 ;;
     --verbose|-v) VERBOSE=1; shift ;;
     --save-dumps) SAVE_DUMPS="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
+    *) echo "ERROR: unknown arg: $1" >&2; echo "difference"; exit 2 ;;
   esac
 done
 
-if [[ -z "$UBUNTU_HOST" ]]; then
-  echo "ERROR: --ubuntu-host is required (or set COMPARE_SCHEMA_UBUNTU_HOST)" >&2
+fail() {
+  echo "ERROR: $*" >&2
   echo "difference"
   exit 2
-fi
-
-if ! command -v pg_dump >/dev/null 2>&1; then
-  echo "ERROR: pg_dump not found on Mac PATH" >&2
-  echo "difference"
-  exit 2
-fi
-
-dump_schema_local() {
-  local out="$1"
-  pg_load_connection_defaults || return 1
-  [[ -n "${PGHOST:-}" && -n "${PGPORT:-}" && -n "${PGDATABASE:-}" && -n "${PGUSER:-}" ]] || {
-    echo "ERROR: incomplete DB_* vars in $PG_ENV_FILE" >&2
-    return 1
-  }
-  export PGPASSWORD
-  pg_dump \
-    -h "$PGHOST" \
-    -p "$PGPORT" \
-    -U "$PGUSER" \
-    -d "$PGDATABASE" \
-    --schema-only \
-    --no-owner \
-    --no-privileges \
-    --no-comments \
-    --schema="$PGSCHEMA" \
-    2>/dev/null \
-    | normalize_schema_dump >"$out"
 }
 
-dump_schema_remote() {
-  local out="$1"
-  local raw
-  raw="$(mktemp "${TMPDIR:-/tmp}/pgschema_remote_raw.XXXXXX")"
-  if ! ssh -o ConnectTimeout=20 "$UBUNTU_HOST" "bash -s" -- "$REMOTE_ENV_FILE" "$PGSCHEMA" >"$raw" 2>/dev/null <<'REMOTE'; then
-set -uo pipefail
-REMOTE_ENV="$1"
-SCHEMA="$2"
-ENV_FILE="${REMOTE_ENV/#\~/$HOME}"
-if [[ ! -r "$ENV_FILE" ]]; then
-  echo "ERROR: cannot read $ENV_FILE on $(hostname)" >&2
-  exit 2
-fi
-if ! command -v pg_dump >/dev/null 2>&1; then
-  echo "ERROR: pg_dump not found on $(hostname)" >&2
-  exit 2
-fi
-read_env() {
-  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ENV_FILE" \
-    | tail -n1 \
-    | sed -e 's/[[:space:]]*#.*$//' -e 's/[[:space:]]*$//' -e 's/^["'\'']//' -e 's/["'\'']$//'
-}
-PGHOST="$(read_env DB_HOST)"
-PGPORT="$(read_env DB_PORT)"
-PGDATABASE="$(read_env DB_NAME)"
-PGUSER="$(read_env DB_USER)"
-PGPASSWORD="$(read_env DB_PASSWORD)"
-export PGPASSWORD
-pg_dump \
-  -h "$PGHOST" \
-  -p "$PGPORT" \
-  -U "$PGUSER" \
-  -d "$PGDATABASE" \
-  --schema-only \
-  --no-owner \
-  --no-privileges \
-  --no-comments \
-  --schema="$SCHEMA" \
-  2>/dev/null
-REMOTE
-    rm -f "$raw"
-    return 1
-  fi
-  if grep -q '^ERROR:' "$raw" 2>/dev/null; then
-    cat "$raw" >&2
-    rm -f "$raw"
-    return 1
-  fi
-  normalize_schema_dump <"$raw" >"$out"
-  rm -f "$raw"
-}
+[[ -n "$UBUNTU_HOST" ]] || fail "--ubuntu-host required (or COMPARE_SCHEMA_UBUNTU_HOST)"
 
-normalize_schema_dump() {
-  # Drop noise that differs between hosts/pg_dump versions but not real DDL.
-  sed -E \
-    -e '/^--/d' \
-    -e '/^SET /d' \
-    -e '/^SELECT pg_catalog\./d' \
-    -e '/^\\restrict/d' \
-    -e '/^\\unrestrict/d' \
-    -e 's/[[:space:]]+$//' \
-    | awk 'NF { print }'
-}
+DUMP_SH="${SCRIPT_DIR}/pg-schema-dump.sh"
+[[ -x "$DUMP_SH" || -f "$DUMP_SH" ]] || fail "missing $DUMP_SH"
+
+pg_load_connection_defaults || fail "cannot read Mac DB env from $PG_ENV_FILE"
+SCHEMA="$PGSCHEMA"
 
 TMPDIR="${TMPDIR:-/tmp}"
 MAC_DUMP="$(mktemp "${TMPDIR}/pgschema_mac.XXXXXX")"
 UBUNTU_DUMP="$(mktemp "${TMPDIR}/pgschema_ubuntu.XXXXXX")"
-cleanup() { rm -f "$MAC_DUMP" "$UBUNTU_DUMP"; }
+MAC_ERR="$(mktemp "${TMPDIR}/pgschema_mac_err.XXXXXX")"
+UBUNTU_ERR="$(mktemp "${TMPDIR}/pgschema_ubuntu_err.XXXXXX")"
+cleanup() { rm -f "$MAC_DUMP" "$UBUNTU_DUMP" "$MAC_ERR" "$UBUNTU_ERR"; }
 trap cleanup EXIT
 
-pg_load_connection_defaults || {
+# --- Mac dump ---
+if ! bash "$DUMP_SH" >"$MAC_DUMP" 2>"$MAC_ERR"; then
+  echo "ERROR: Mac pg_dump failed ($(pg_connection_label))" >&2
+  [[ -s "$MAC_ERR" ]] && cat "$MAC_ERR" >&2
+  echo "difference"
+  exit 2
+fi
+[[ -s "$MAC_DUMP" ]] || fail "Mac schema dump empty (schema $SCHEMA missing on Mac?)"
+
+# --- Ubuntu dump via SSH (pipe local script — no deploy required on Ubuntu) ---
+if ! ssh -o ConnectTimeout=25 "$UBUNTU_HOST" \
+  'PG_SCHEMA_SCRIPT_DIR=$HOME/code/main/scripts BE_ENV_FILE=$HOME/.ssh/be/.env bash -s' \
+  <"$DUMP_SH" >"$UBUNTU_DUMP" 2>"$UBUNTU_ERR"; then
+  echo "ERROR: Ubuntu dump failed via ssh $UBUNTU_HOST" >&2
+  [[ -s "$UBUNTU_ERR" ]] && cat "$UBUNTU_ERR" >&2
+  if [[ "$VERBOSE" -eq 1 ]]; then
+    echo "--- ssh probe ---" >&2
+    ssh -o ConnectTimeout=15 "$UBUNTU_HOST" \
+      "hostname; command -v pg_dump; ls /usr/lib/postgresql/*/bin/pg_dump 2>/dev/null | head -1; grep -E '^DB_(HOST|PORT|NAME|USER)=' ~/.ssh/be/.env | head -4" \
+      2>&1 >&2 || true
+  fi
+  echo "difference"
+  exit 2
+fi
+[[ -s "$UBUNTU_DUMP" ]] || {
+  echo "ERROR: Ubuntu schema dump empty (schema $SCHEMA missing on Ubuntu?)" >&2
+  [[ -s "$UBUNTU_ERR" ]] && cat "$UBUNTU_ERR" >&2
   echo "difference"
   exit 2
 }
-SCHEMA="$PGSCHEMA"
-
-if ! dump_schema_local "$MAC_DUMP"; then
-  echo "difference"
-  echo "ERROR: Mac pg_dump failed ($(pg_connection_label))" >&2
-  exit 2
-fi
-
-if ! dump_schema_remote "$UBUNTU_DUMP"; then
-  echo "difference"
-  echo "ERROR: Ubuntu pg_dump failed via ssh $UBUNTU_HOST" >&2
-  exit 2
-fi
-
-if [[ ! -s "$MAC_DUMP" ]]; then
-  echo "difference"
-  echo "ERROR: Mac schema dump is empty (schema $SCHEMA missing?)" >&2
-  exit 2
-fi
-
-if [[ ! -s "$UBUNTU_DUMP" ]]; then
-  echo "difference"
-  echo "ERROR: Ubuntu schema dump is empty (schema $SCHEMA missing?)" >&2
-  exit 2
-fi
 
 if [[ -n "$SAVE_DUMPS" ]]; then
   mkdir -p "$SAVE_DUMPS"
@@ -197,8 +114,6 @@ if [[ "$VERBOSE" -eq 1 ]]; then
   echo "--- Mac: $(pg_connection_label) ---" >&2
   echo "--- Ubuntu: ssh $UBUNTU_HOST ---" >&2
   diff -u "$MAC_DUMP" "$UBUNTU_DUMP" | head -120 >&2 || true
-  mac_lines="$(wc -l <"$MAC_DUMP" | tr -d ' ')"
-  ubuntu_lines="$(wc -l <"$UBUNTU_DUMP" | tr -d ' ')"
-  echo "Mac lines: $mac_lines  Ubuntu lines: $ubuntu_lines" >&2
+  echo "Mac lines: $(wc -l <"$MAC_DUMP" | tr -d ' ')  Ubuntu lines: $(wc -l <"$UBUNTU_DUMP" | tr -d ' ')" >&2
 fi
 exit 1
