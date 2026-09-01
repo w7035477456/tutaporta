@@ -14,9 +14,11 @@ import Logo from 'ui-component/Logo';
 import {
   fetchMobilePhotoUploadSessionPublic,
   getMobilePhotoUploadDebugLines,
-  isMobilePhotoUploadDebugEnabled
+  isMobilePhotoUploadDebugEnabled,
+  uploadPhotoViaMobileSession
 } from 'api/mobilePhotoUploadFe';
 import { mobilePhotoUploadDebugLog } from 'utils/mobilePhotoUploadDebug';
+import { downsizeImageFileToMaxMb } from 'utils/photoAlbumsDownsizeMedia';
 
 const ACCEPT =
   'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff';
@@ -24,44 +26,88 @@ const ACCEPT =
 /** Matches STORAGE_PERMISSION_CODE in be/utils/storagePermissionError.js. */
 const STORAGE_PERMISSION_CODE = 'STORAGE_PERMISSION';
 
+/**
+ * Phone cameras produce 5–15 MB files. Shrinking in the browser keeps the POST
+ * small enough to finish on cellular and avoids proxy/WAF size limits.
+ */
+const UPLOAD_TARGET_MAX_MB = 2;
+
 export default function MobilePhotoUploadPage() {
   const { token: pathToken } = useParams();
   const [searchParams] = useSearchParams();
   const token = String(pathToken ?? searchParams.get('token') ?? '').trim();
-  const cameraFormRef = useRef(null);
-  const galleryFormRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadStage, setUploadStage] = useState('');
+  const [uploadPercent, setUploadPercent] = useState(0);
+  const [uploadedNow, setUploadedNow] = useState(false);
   const [validating, setValidating] = useState(false);
   const [sessionOk, setSessionOk] = useState(null);
   const [error, setError] = useState('');
   const [debugLines, setDebugLines] = useState([]);
   const [permissionPopupOpen, setPermissionPopupOpen] = useState(false);
   const missingToken = !token;
-  const uploaded = searchParams.get('uploaded') === '1';
+  const uploaded = searchParams.get('uploaded') === '1' || uploadedNow;
   const errorFromRedirect = String(searchParams.get('error') ?? '').trim();
   const errorCode = String(searchParams.get('code') ?? '').trim();
   const isPermissionError = errorCode === STORAGE_PERMISSION_CODE;
   const showDebug = isMobilePhotoUploadDebugEnabled();
 
-  const uploadAction = token
-    ? `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(token)}`
-    : '';
-
-  const handleFileChange = (formRef) => (e) => {
-    if (!e.target.files?.[0]) return;
-    const file = e.target.files[0];
-    mobilePhotoUploadDebugLog('file selected — native form POST', {
-      name: file.name,
-      size: file.size,
-      type: file.type
-    });
-    setSubmitting(true);
-    e.currentTarget.form?.requestSubmit();
-  };
-
   const refreshDebugLines = useCallback(() => {
     setDebugLines(getMobilePhotoUploadDebugLines());
   }, []);
+
+  const handleFileChange = useCallback(
+    async (e) => {
+      const input = e.target;
+      const file = input.files?.[0];
+      if (!file) return;
+      input.value = '';
+
+      mobilePhotoUploadDebugLog('file selected', { name: file.name, size: file.size, type: file.type });
+      setSubmitting(true);
+      setUploadedNow(false);
+      setError('');
+      setUploadPercent(0);
+      setUploadStage('Preparing photo…');
+
+      try {
+        let toUpload = file;
+        if (file.size > UPLOAD_TARGET_MAX_MB * 1024 * 1024) {
+          const smaller = await downsizeImageFileToMaxMb(file, UPLOAD_TARGET_MAX_MB);
+          if (smaller) {
+            toUpload = smaller;
+            mobilePhotoUploadDebugLog('downsized before upload', {
+              fromBytes: file.size,
+              toBytes: smaller.size
+            });
+          } else {
+            mobilePhotoUploadDebugLog('downsize skipped — uploading original', { bytes: file.size });
+          }
+        }
+
+        setUploadStage('Uploading photo…');
+        await uploadPhotoViaMobileSession(token, toUpload, {
+          onProgress: (pct) => setUploadPercent(pct)
+        });
+        setUploadPercent(100);
+        setUploadedNow(true);
+      } catch (err) {
+        const msg = err?.message || 'Upload failed. Scan a fresh QR code from your computer and try again.';
+        setError(msg);
+        if (err?.response?.data?.code === STORAGE_PERMISSION_CODE) {
+          setPermissionPopupOpen(true);
+        }
+        mobilePhotoUploadDebugLog('upload FAIL (page)', { message: msg });
+      } finally {
+        setSubmitting(false);
+        setUploadStage('');
+        refreshDebugLines();
+      }
+    },
+    [refreshDebugLines, token]
+  );
 
   useEffect(() => {
     mobilePhotoUploadDebugLog('page mount', {
@@ -181,54 +227,49 @@ export default function MobilePhotoUploadPage() {
 
             {submitting ? (
               <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="center" sx={{ py: 1 }}>
-                <CircularProgress size={28} aria-label="Uploading photo" />
-                <Typography>Uploading photo…</Typography>
+                <CircularProgress
+                  size={28}
+                  aria-label="Uploading photo"
+                  variant={uploadPercent > 0 ? 'determinate' : 'indeterminate'}
+                  value={uploadPercent}
+                />
+                <Typography>
+                  {uploadStage || 'Uploading photo…'}
+                  {uploadStage === 'Uploading photo…' && uploadPercent > 0 ? ` ${uploadPercent}%` : ''}
+                </Typography>
               </Stack>
             ) : null}
 
-            <form
-              ref={cameraFormRef}
-              method="POST"
-              action={uploadAction}
-              encType="multipart/form-data"
+            <input
+              ref={cameraInputRef}
+              type="file"
+              name="photo"
+              accept={ACCEPT}
+              capture="user"
               style={{ display: 'none' }}
-            >
-              <input
-                type="file"
-                name="photo"
-                accept={ACCEPT}
-                capture="user"
-                onChange={handleFileChange(cameraFormRef)}
-              />
-            </form>
-
-            <form
-              ref={galleryFormRef}
-              method="POST"
-              action={uploadAction}
-              encType="multipart/form-data"
+              onChange={handleFileChange}
+            />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              name="photo"
+              accept="image/*"
               style={{ display: 'none' }}
-            >
-              <input
-                type="file"
-                name="photo"
-                accept="image/*"
-                onChange={handleFileChange(galleryFormRef)}
-              />
-            </form>
+              onChange={handleFileChange}
+            />
 
             <Stack spacing={1.5}>
               <SelectedButtonTemplate
                 fullWidth
                 disabled={submitting || validating}
-                onClick={() => cameraFormRef.current?.querySelector('input[type="file"]')?.click()}
+                onClick={() => cameraInputRef.current?.click()}
               >
                 Take photo
               </SelectedButtonTemplate>
               <SelectedButtonTemplate
                 fullWidth
                 disabled={submitting || validating}
-                onClick={() => galleryFormRef.current?.querySelector('input[type="file"]')?.click()}
+                onClick={() => galleryInputRef.current?.click()}
               >
                 Choose from gallery
               </SelectedButtonTemplate>

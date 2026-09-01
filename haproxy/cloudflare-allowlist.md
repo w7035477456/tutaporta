@@ -156,6 +156,16 @@ A **10s `timeout http-request`** aborts slow phone bodies mid-upload → endless
 
 QR links use path tokens `https://onlinemall.website/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
 
+The phone page (`fe/src/views/pages/MobilePhotoUploadPage.jsx`) no longer does a native HTML form POST. It now:
+
+| Behavior | Why it matters |
+|---|---|
+| Re-encodes the photo to **≤ 2 MB JPEG** in the browser before POST | A 5–15 MB camera file is what stalls on cellular and trips size-based edge rules |
+| Uploads with **XHR** (progress % + `180s` timeout) | A blocked or stalled POST now shows an error instead of spinning “Uploading photo…” forever |
+| Retries once as **base64 JSON** when the multipart POST returns **403** | Many WAF managed rules inspect multipart uploads but pass `application/json`, so this can succeed before the Cloudflare skip rule is in place |
+
+The JSON retry is a fallback, not a substitute — still add the skip rule so the (smaller, faster) multipart path works.
+
 ### Verify
 
 - **Cloudflare Events:** after a cellular upload attempt, either no block, or the skip rule matched.

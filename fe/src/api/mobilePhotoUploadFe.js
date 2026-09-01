@@ -190,14 +190,118 @@ export async function fetchMobilePhotoUploadSessionPublic(token) {
   throw lastErr ?? new Error('Upload link is not valid');
 }
 
+/** Phone uplinks are slow; give a big photo time but never spin forever. */
+export const MOBILE_UPLOAD_TIMEOUT_MS = 180_000;
+
+const UPLOAD_BLOCKED_MESSAGE =
+  'Upload blocked (HTTP 403). Cloudflare or the firewall may be blocking phone photo POSTs. Add a WAF skip rule for /api/mobilePhotoUpload (see haproxy/cloudflare-allowlist.md), deploy, then scan a fresh QR code.';
+
+function looksLikeHtml(text, contentType) {
+  return /^\s*</.test(String(text || '')) || String(contentType || '').includes('text/html');
+}
+
+/**
+ * XHR instead of fetch: upload progress events and a real timeout, so a stalled
+ * cellular POST fails with a message instead of spinning forever.
+ */
+function xhrUpload({ url, body, contentType, onProgress, timeoutMs }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.timeout = Number(timeoutMs) || MOBILE_UPLOAD_TIMEOUT_MS;
+    xhr.responseType = 'text';
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (contentType) xhr.setRequestHeader('Content-Type', contentType);
+
+    if (xhr.upload && typeof onProgress === 'function') {
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable || !event.total) return;
+        onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+      };
+    }
+
+    xhr.onload = () => {
+      resolve({
+        status: xhr.status,
+        text: String(xhr.responseText || ''),
+        contentType: xhr.getResponseHeader('content-type') || ''
+      });
+    };
+    xhr.onerror = () => {
+      const err = new Error('Could not reach the server. Check your connection and try again.');
+      err.networkFailure = true;
+      reject(err);
+    };
+    xhr.ontimeout = () => {
+      const err = new Error(
+        'Upload timed out. Your connection may be too slow for this photo — move closer to Wi‑Fi or try a smaller photo.'
+      );
+      err.timedOut = true;
+      reject(err);
+    };
+    xhr.onabort = () => reject(new Error('Upload cancelled.'));
+
+    xhr.send(body);
+  });
+}
+
+function parseUploadResponse({ status, text, contentType }) {
+  const summary = { status, contentType, isHtml: looksLikeHtml(text, contentType), bodyPreview: String(text).slice(0, 240) };
+  if (!text) return { data: {}, summary };
+  try {
+    return { data: JSON.parse(text), summary };
+  } catch {
+    if (summary.isHtml && status === 403) {
+      return { data: { error: UPLOAD_BLOCKED_MESSAGE, _debug: summary }, summary };
+    }
+    if (summary.isHtml) {
+      const sizeHint =
+        status === 413 || status >= 500
+          ? ' Photo may be too large for the server — try a smaller image or scan a fresh QR code.'
+          : '';
+      return {
+        data: {
+          error: `Server returned HTML instead of JSON (HTTP ${status}). Rebuild/deploy the backend with mobile upload routes, or scan a fresh QR code.${sizeHint}`,
+          _debug: summary
+        },
+        summary
+      };
+    }
+    return { data: { error: String(text).slice(0, 200), _debug: summary }, summary };
+  }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read the photo from your phone.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Some WAF managed rules inspect multipart file uploads but pass plain JSON, so
+ * a 403 on the binary POST is retried once as a base64 JSON body.
+ */
+async function uploadAsJsonFallback(url, file, fileName, { onProgress, timeoutMs }) {
+  mobilePhotoUploadDebugLog('upload JSON fallback START', { fileName, fileSize: file?.size });
+  const dataUrl = await readFileAsDataUrl(file);
+  const extMatch = fileName.match(/\.([^.]+)$/);
+  const body = JSON.stringify({
+    image: dataUrl,
+    originalFileName: fileName,
+    ...(extMatch ? { file_extension: extMatch[1].toLowerCase() } : {})
+  });
+  return xhrUpload({ url, body, contentType: 'application/json', onProgress, timeoutMs });
+}
+
 /** POST /api/mobilePhotoUpload/photo?token= — phone upload (no login cookie required) */
-export async function uploadPhotoViaMobileSession(token, file) {
+export async function uploadPhotoViaMobileSession(token, file, { onProgress, timeoutMs } = {}) {
   const trimmed = String(token ?? '').trim().replace(/\s+/g, '');
   const fileName = String(file?.name ?? '').trim() || 'photo.jpg';
-  const form = new FormData();
-  form.append('photo', file, fileName);
-
   const url = `/api/mobilePhotoUpload/photo?token=${encodeURIComponent(trimmed)}`;
+
   mobilePhotoUploadDebugLog('upload START', {
     tokenLen: trimmed.length,
     fileName,
@@ -205,49 +309,33 @@ export async function uploadPhotoViaMobileSession(token, file) {
     fileType: file?.type
   });
 
-  let res;
-  try {
-    // Multipart (binary) — same wire format as the original HTML form POST.
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { Accept: 'application/json' },
-      credentials: 'omit',
-      cache: 'no-store',
-      body: form,
-      redirect: 'manual'
-    });
-  } catch (networkErr) {
-    mobilePhotoUploadDebugLog('upload network error', { message: networkErr?.message });
-    const err = new Error('Could not reach the server. Check your connection and try again.');
-    err.cause = networkErr;
+  const form = new FormData();
+  form.append('photo', file, fileName);
+  // Let the browser set the multipart boundary.
+  let raw = await xhrUpload({ url, body: form, onProgress, timeoutMs });
+  let { data, summary } = parseUploadResponse(raw);
+  mobilePhotoUploadDebugLog('upload response', summary);
+
+  if (raw.status === 403) {
+    mobilePhotoUploadDebugLog('upload 403 — retrying as JSON', summary);
+    try {
+      raw = await uploadAsJsonFallback(url, file, fileName, { onProgress, timeoutMs });
+      ({ data, summary } = parseUploadResponse(raw));
+      mobilePhotoUploadDebugLog('upload JSON fallback response', summary);
+    } catch (fallbackErr) {
+      mobilePhotoUploadDebugLog('upload JSON fallback FAIL', { message: fallbackErr?.message });
+      throw fallbackErr;
+    }
+  }
+
+  if (raw.status < 200 || raw.status >= 300) {
+    mobilePhotoUploadDebugLog('upload FAIL', { status: raw.status, error: data?.error });
+    const err = new Error(data?.error || data?.message || `Upload failed (HTTP ${raw.status})`);
+    err.response = { data, status: raw.status };
+    err.debug = data?._debug;
     throw err;
   }
 
-  mobilePhotoUploadDebugLog('upload response headers', {
-    status: res.status,
-    contentType: res.headers.get('content-type'),
-    location: res.headers.get('location')
-  });
-
-  // Legacy BE: multipart upload redirects back to /mobilePhotoUpload?…&uploaded=1
-  if (res.status >= 300 && res.status < 400) {
-    const location = String(res.headers.get('Location') || '');
-    mobilePhotoUploadDebugLog('upload redirect', { location: location.slice(0, 200) });
-    if (location.includes('uploaded=1')) {
-      return { success: true };
-    }
-    const errMatch = location.match(/[?&]error=([^&]+)/);
-    if (errMatch) {
-      throw new Error(decodeURIComponent(errMatch[1]));
-    }
-    throw new Error('Upload failed. Scan a fresh QR code from your computer and try again.');
-  }
-
-  const data = await parseApiResponse(res);
-  if (!res.ok) {
-    mobilePhotoUploadDebugLog('upload FAIL', { status: res.status, error: data?.error, debug: data?._debug });
-    throw mobileUploadFetchError(res, data, 'Upload failed');
-  }
   mobilePhotoUploadDebugLog('upload OK', { photosId: data?.photos_id, fileName: data?.fileName });
   return data;
 }
