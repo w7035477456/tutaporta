@@ -2,6 +2,9 @@ import {
   createMobilePhotoUploadSession,
   getMobilePhotoUploadSession,
   markMobilePhotoUploadCompleted,
+  markMobilePhotoUploadInProgress,
+  clearMobilePhotoUploadInProgress,
+  isMobilePhotoUploadInProgress,
   normalizeMobilePhotoUploadPurpose,
   readMobilePhotoUploadTokenFromRequest,
   sessionExpired
@@ -180,6 +183,7 @@ export async function getMobilePhotoUploadSessionStatus(req, res) {
       return res.status(404).json({ error: 'Upload session not found' });
     }
     const payload = sessionStatusPayload(row);
+    payload.uploading = await isMobilePhotoUploadInProgress(token);
     debugMobilePhotoUpload('GET /session/:token/status OK', {
       singlesId,
       token: maskMobileUploadToken(token),
@@ -189,6 +193,28 @@ export async function getMobilePhotoUploadSessionStatus(req, res) {
   } catch (err) {
     errorMobilePhotoUpload('GET /session/:token/status FAIL', err, mobileUploadRequestContext(req));
     return res.status(500).json({ error: 'Failed to read upload session' });
+  }
+}
+
+/** POST /api/mobilePhotoUpload/uploading?token= — phone signals upload started (public). */
+export async function postMobilePhotoUploadInProgress(req, res) {
+  const token = readMobilePhotoUploadTokenFromRequest(req);
+  if (!token) {
+    return res.status(400).json({ error: 'Missing upload token.' });
+  }
+  try {
+    const row = await getMobilePhotoUploadSession(token);
+    if (!row) {
+      return res.status(404).json({ error: 'Upload session not found' });
+    }
+    if (sessionExpired(row)) {
+      return res.status(410).json({ error: 'Upload link expired' });
+    }
+    await markMobilePhotoUploadInProgress(token);
+    return res.json({ ok: true, uploading: true });
+  } catch (err) {
+    errorMobilePhotoUpload('POST /uploading FAIL', err, mobileUploadRequestContext(req));
+    return res.status(500).json({ error: 'Failed to mark upload in progress' });
   }
 }
 
@@ -227,6 +253,7 @@ async function handleBillReceiptMobileUpload(req, res, token, singlesId, paidRec
     try {
       ({ buffer, contentType } = decodeImageDataUrl(dataUrl));
     } catch (decodeErr) {
+      await clearMobilePhotoUploadInProgress(token);
       return res.status(400).json({ error: decodeErr?.message || 'Missing image (data URL or base64)' });
     }
   }
@@ -255,6 +282,7 @@ async function handleBillReceiptMobileUpload(req, res, token, singlesId, paidRec
       size: result.size
     });
   } catch (err) {
+    await clearMobilePhotoUploadInProgress(token);
     errorMobilePhotoUpload('bill_receipt write FAIL', err, {
       token: maskMobileUploadToken(token),
       singlesId,
@@ -275,6 +303,7 @@ async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
     try {
       ({ buffer, contentType } = decodeImageDataUrl(dataUrl));
     } catch (decodeErr) {
+      await clearMobilePhotoUploadInProgress(token);
       return res.status(400).json({ error: decodeErr?.message || 'Missing image (data URL or base64)' });
     }
   }
@@ -300,6 +329,7 @@ async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
       size
     });
   } catch (err) {
+    await clearMobilePhotoUploadInProgress(token);
     if (/UPLOAD_FOLDER is not set/i.test(String(err?.message || ''))) {
       errorMobilePhotoUpload('albums write FAIL — UPLOAD_FOLDER missing', err, { singlesId });
       return res.status(500).json({ error: 'UPLOAD_FOLDER is not set in .env' });
@@ -388,6 +418,8 @@ async function handleMobilePhotoUploadPost(req, res, token) {
       return res.status(410).json({ error: 'This upload link has expired. Scan the QR code again from your computer.' });
     }
 
+    await markMobilePhotoUploadInProgress(token);
+
     const singlesId = Number(row.singles_id);
     const purpose = normalizeMobilePhotoUploadPurpose(row.purpose);
 
@@ -402,6 +434,7 @@ async function handleMobilePhotoUploadPost(req, res, token) {
     if (purpose === 'bill_receipt') {
       const paidRecordId = Number(row.paid_record_id);
       if (!Number.isFinite(paidRecordId) || paidRecordId < 1) {
+        await clearMobilePhotoUploadInProgress(token);
         return res.status(400).json({ error: 'Upload link is missing paid_record_id' });
       }
       debugMobilePhotoUpload('POST bill_receipt path', {
@@ -452,6 +485,7 @@ async function handleMobilePhotoUploadPost(req, res, token) {
     });
     return uploadPhoto(req, res);
   } catch (err) {
+    await clearMobilePhotoUploadInProgress(token);
     errorMobilePhotoUpload('POST photo FAIL', err, {
       ...mobileUploadRequestContext(req),
       token: maskMobileUploadToken(token)

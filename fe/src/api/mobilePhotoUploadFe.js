@@ -52,10 +52,28 @@ export async function fetchMobilePhotoUploadSessionStatus(token) {
   mobilePhotoUploadDebugLog('pollStatus OK', {
     valid: data?.valid,
     completed: data?.completed,
+    uploading: data?.uploading,
     photosId: data?.photosId,
     purpose: data?.purpose
   });
   return data;
+}
+
+/** POST /api/mobilePhotoUpload/uploading?token= — phone tells desktop upload started */
+export async function notifyMobilePhotoUploadStarted(token) {
+  const trimmed = String(token ?? '').trim().replace(/\s+/g, '');
+  if (!trimmed) return;
+  mobilePhotoUploadDebugLog('notifyUploading START', { tokenLen: trimmed.length });
+  try {
+    const res = await fetch(`/api/mobilePhotoUpload/uploading?token=${encodeURIComponent(trimmed)}`, {
+      method: 'POST',
+      credentials: 'omit',
+      cache: 'no-store'
+    });
+    mobilePhotoUploadDebugLog('notifyUploading OK', { status: res.status });
+  } catch (err) {
+    mobilePhotoUploadDebugLog('notifyUploading FAIL', { message: err?.message });
+  }
 }
 
 async function parseApiResponse(res) {

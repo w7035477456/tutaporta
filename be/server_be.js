@@ -408,7 +408,8 @@ import {
   getMobilePhotoUploadValidate,
   getMobilePhotoUploadPing,
   postMobilePhotoUploadViaSession,
-  postMobilePhotoUploadPhotoQuery
+  postMobilePhotoUploadPhotoQuery,
+  postMobilePhotoUploadInProgress
 } from './routes/photos/mobilePhotoUpload.js';
 import { updateMyPhoto } from './routes/photos/updateMyPhoto.js';
 import { resetMyPhotoFromOrig } from './routes/photos/resetMyPhotoFromOrig.js';
@@ -1669,6 +1670,7 @@ app.get('/api/mobilePhotoUpload/session/:token/status', requireAuth, getMobilePh
 app.get('/api/mobilePhotoUpload/ping', getMobilePhotoUploadPing);
 app.get('/api/mobilePhotoUpload/validate', getMobilePhotoUploadValidate);
 app.post('/api/mobilePhotoUpload/photo', postMobilePhotoUploadPhotoQuery);
+app.post('/api/mobilePhotoUpload/uploading', postMobilePhotoUploadInProgress);
 app.get('/api/mobilePhotoUpload/session/:token', getMobilePhotoUploadSessionPublic);
 app.post('/api/mobilePhotoUpload/session/:token/photo', postMobilePhotoUploadViaSession);
 app.put('/api/myPhotos/:id', requireAuth, updateMyPhoto);

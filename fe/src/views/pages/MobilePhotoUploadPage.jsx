@@ -16,6 +16,7 @@ import {
   fetchMobilePhotoUploadSessionPublic,
   getMobilePhotoUploadDebugLines,
   isMobilePhotoUploadDebugEnabled,
+  notifyMobilePhotoUploadStarted,
   uploadPhotoViaMobileSession
 } from 'api/mobilePhotoUploadFe';
 import { mobilePhotoUploadDebugLog } from 'utils/mobilePhotoUploadDebug';
@@ -69,6 +70,7 @@ export default function MobilePhotoUploadPage() {
       setError('');
       setUploadPercent(0);
       setUploadStage('Preparing photo…');
+      void notifyMobilePhotoUploadStarted(token);
 
       try {
         let toUpload = file;

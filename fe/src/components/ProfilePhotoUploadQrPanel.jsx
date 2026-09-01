@@ -21,6 +21,9 @@ export const PROFILE_PHOTO_UPLOAD_QR_MESSAGE =
 
 export const PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE = 'Scan to upload from your phone';
 
+export const PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE =
+  'Receiving photo from your phone — please wait…';
+
 function formatCountdown(remainingMs) {
   const totalSec = Math.max(0, Math.ceil(remainingMs / 1000));
   const minutes = Math.floor(totalSec / 60);
@@ -67,6 +70,7 @@ export default function ProfilePhotoUploadQrPanel({
   const [error, setError] = useState('');
   const [checkMessage, setCheckMessage] = useState('');
   const [watchingUpload, setWatchingUpload] = useState(false);
+  const [phoneUploadBusy, setPhoneUploadBusy] = useState(false);
   const [remainingMs, setRemainingMs] = useState(null);
   const lastDeliveredKeyRef = useRef(null);
   const autoRefreshingRef = useRef(false);
@@ -76,6 +80,7 @@ export default function ProfilePhotoUploadQrPanel({
     setError('');
     if (!keepCheckMessage) setCheckMessage('');
     setWatchingUpload(false);
+    setPhoneUploadBusy(false);
     setRemainingMs(null);
     if (resetDelivery) lastDeliveredKeyRef.current = null;
     try {
@@ -141,6 +146,12 @@ export default function ProfilePhotoUploadQrPanel({
 
   const applyUploadStatus = useCallback(
     async (status) => {
+      if (status?.uploading && !status?.completed) {
+        setPhoneUploadBusy(true);
+      } else if (status?.completed) {
+        setPhoneUploadBusy(false);
+      }
+
       const statusPurpose = String(status?.purpose || uploadPurpose).trim().toLowerCase();
       const albumsFlow = isPhotoAlbumsPurpose || statusPurpose === 'photo_albums';
       const billFlow = isBillReceiptPurpose || statusPurpose === 'bill_receipt';
@@ -165,6 +176,7 @@ export default function ProfilePhotoUploadQrPanel({
         }
         if (status?.expired) {
           setWatchingUpload(false);
+          setPhoneUploadBusy(false);
           if (!autoRefreshingRef.current) {
             autoRefreshingRef.current = true;
             void loadSession({ resetDelivery: false, keepCheckMessage: true }).finally(() => {
@@ -192,6 +204,7 @@ export default function ProfilePhotoUploadQrPanel({
       }
       if (status?.expired) {
         setWatchingUpload(false);
+        setPhoneUploadBusy(false);
         if (!autoRefreshingRef.current) {
           autoRefreshingRef.current = true;
           void loadSession({ resetDelivery: false, keepCheckMessage: true }).finally(() => {
@@ -302,7 +315,7 @@ export default function ProfilePhotoUploadQrPanel({
                 maxWidth: '100%'
               }}
             >
-              <Box sx={{ lineHeight: 0 }}>
+              <Box sx={{ lineHeight: 0, opacity: phoneUploadBusy ? 0.35 : 1 }}>
                 <QRCodeSVG
                   value={session.mobileUrl}
                   size={qrSize}
@@ -311,6 +324,19 @@ export default function ProfilePhotoUploadQrPanel({
                   aria-label="QR code to upload a profile photo from your phone"
                 />
               </Box>
+              {phoneUploadBusy ? (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <CircularProgress size={40} sx={{ color: `var(${INVERSE_DAYNIGHT_VAR})` }} />
+                </Box>
+              ) : null}
             </Box>
           ) : null}
         </Box>
@@ -326,6 +352,11 @@ export default function ProfilePhotoUploadQrPanel({
         >
           {countdownLabel ? (
             <Typography sx={{ ...scanPanelTextSx, width: '100%' }}>{countdownLabel}</Typography>
+          ) : null}
+          {phoneUploadBusy ? (
+            <Typography sx={{ ...scanPanelTextSx, mt: 0.5, fontWeight: 600, width: '100%' }}>
+              {PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE}
+            </Typography>
           ) : null}
           {checkMessage ? (
             <Typography sx={{ ...scanPanelTextSx, mt: 0.5, fontWeight: 600, width: '100%' }}>
@@ -387,13 +418,28 @@ export default function ProfilePhotoUploadQrPanel({
                 borderColor: 'grey.300'
               }}
             >
-              <QRCodeSVG
-                value={session.mobileUrl}
-                size={qrSize}
-                level="M"
-                role="img"
-                aria-label="QR code to upload a profile photo from your phone"
-              />
+              <Box sx={{ lineHeight: 0, opacity: phoneUploadBusy ? 0.35 : 1 }}>
+                <QRCodeSVG
+                  value={session.mobileUrl}
+                  size={qrSize}
+                  level="M"
+                  role="img"
+                  aria-label="QR code to upload a profile photo from your phone"
+                />
+              </Box>
+              {phoneUploadBusy ? (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <CircularProgress size={44} />
+                </Box>
+              ) : null}
             </Box>
             {countdownLabel ? (
               <Typography
@@ -410,7 +456,14 @@ export default function ProfilePhotoUploadQrPanel({
               </Typography>
             ) : null}
           </Box>
-          {watchingUpload && !checkMessage ? (
+          {phoneUploadBusy ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, mt: 1.5 }}>
+              <CircularProgress size={24} />
+              <Typography variant="body2" sx={{ lineHeight: 1.45, fontWeight: 600, ...messageSx }}>
+                {PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE}
+              </Typography>
+            </Box>
+          ) : watchingUpload && !checkMessage ? (
             <Typography variant="body2" sx={{ mt: 1.5, lineHeight: 1.45, opacity: 0.9, ...messageSx }}>
               Waiting for upload from your phone — it will appear in Uploaded automatically.
             </Typography>

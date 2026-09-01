@@ -12,6 +12,7 @@ import {
   maskMobileUploadToken,
   traceMobilePhotoUpload
 } from '../../utils/mobilePhotoUploadLog.js';
+import { clearMobilePhotoUploadInProgress } from '../../utils/mobilePhotoUploadSession.js';
 import { getPhotoFolder as resolvePhotoFolder, unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
 import {
   ALBUM_PHOTO_EXTENSIONS_ERROR,
@@ -639,6 +640,7 @@ export async function uploadPhoto(req, res) {
   } catch (err) {
     console.error('[UPLOAD_FAIL] Upload photo error:', err?.code || '', err?.message || err, err?.stack || '');
     if (mobileToken) {
+      await clearMobilePhotoUploadInProgress(mobileToken);
       traceMobilePhotoUpload('uploadPhoto FAIL (phone QR)', {
         token: maskMobileUploadToken(mobileToken),
         singlesId: req.auth?.singles_id,

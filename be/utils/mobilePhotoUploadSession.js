@@ -11,6 +11,7 @@ function getBarcodeRenewMinutes() {
   return Math.min(Math.floor(parsed), 24 * 60);
 }
 const REDIS_SESSION_PREFIX = 'v1:mobilePhotoUpload:';
+const REDIS_UPLOADING_PREFIX = 'v1:mobilePhotoUpload:uploading:';
 export const MOBILE_PHOTO_UPLOAD_PATH = '/mobilePhotoUpload';
 
 const PURPOSE_PROFILE = 'profile';
@@ -93,6 +94,44 @@ async function invalidateSessionInRedis(token) {
     await redisClient.del(`${REDIS_SESSION_PREFIX}${token}`);
   } catch {
     // ignore
+  }
+}
+
+/** Phone picked a photo / POST in flight — desktop polls this for a busy spinner. */
+export async function markMobilePhotoUploadInProgress(token) {
+  const trimmed = normalizeUploadToken(token);
+  if (!trimmed) return;
+  if (redisClient) {
+    try {
+      await redisClient.setex(`${REDIS_UPLOADING_PREFIX}${trimmed}`, 300, '1');
+      debugMobilePhotoUpload('uploading flag SET', { token: maskMobileUploadToken(trimmed) });
+    } catch (err) {
+      debugMobilePhotoUpload('uploading flag SET failed', { message: err?.message ?? err });
+    }
+  }
+}
+
+export async function clearMobilePhotoUploadInProgress(token) {
+  const trimmed = normalizeUploadToken(token);
+  if (!trimmed) return;
+  if (redisClient) {
+    try {
+      await redisClient.del(`${REDIS_UPLOADING_PREFIX}${trimmed}`);
+      debugMobilePhotoUpload('uploading flag CLEAR', { token: maskMobileUploadToken(trimmed) });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export async function isMobilePhotoUploadInProgress(token) {
+  const trimmed = normalizeUploadToken(token);
+  if (!trimmed || !redisClient) return false;
+  try {
+    const raw = await redisClient.get(`${REDIS_UPLOADING_PREFIX}${trimmed}`);
+    return raw === '1';
+  } catch {
+    return false;
   }
 }
 
@@ -255,6 +294,7 @@ export async function markMobilePhotoUploadCompleted(
      WHERE token = $1`,
     [token, photosId, Boolean(replacedDuplicate), fileName]
   );
+  await clearMobilePhotoUploadInProgress(token);
   await invalidateSessionInRedis(token);
   await getMobilePhotoUploadSession(token);
   debugMobilePhotoUpload('mark completed OK', {
