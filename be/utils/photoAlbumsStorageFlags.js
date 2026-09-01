@@ -1,32 +1,42 @@
 /**
  * Env toggles for TutaPhotoAlbums storage choices (~/.ssh/be/.env).
  *
- * Microsoft OneDrive and the USB bridge are retired: TutaPhotoAlbums stores
- * everything under LARGE_CHEAP_STORAGE_FOLDER (TutaDrive). The TutaDrive vault
- * borrows the 'onedrive' session slot, so anything that talks to Microsoft
- * Graph must stay off or it will upload/overwrite the local vault.
+ * DISABLE_ONEDRIVE / DISABLE_USBDRIVE retire Microsoft OneDrive / USB bridge.
+ * LEFT_SIDE=TutaDrive uses local LARGE_CHEAP_STORAGE_FOLDER (not Microsoft Graph).
  */
 
+import {
+  isDisableOnedriveEnabled,
+  isDisableUsbDriveEnabled
+} from './vaultStorageDisableConfig.js';
+import { getLeftSideMode, getRightSideMode } from './tutaDriveMemberPaths.js';
+
 export function isVaultOneDriveOffered() {
-  return false;
+  if (isDisableOnedriveEnabled()) return false;
+  return getLeftSideMode() === 'OneDrive';
 }
 
-/** Local USB bridge /myPhotoAlbums right panel — retired. */
 export function isVaultLocalUsbOffered() {
-  return false;
+  if (isDisableUsbDriveEnabled()) return false;
+  const right = getRightSideMode();
+  if (right === 'None') return false;
+  if (right === 'USB') return true;
+  const legacy = String(process.env.NOTES_LOCAL_USB ?? 'true').trim().toLowerCase();
+  return !['false', '0', 'no', 'off'].includes(legacy);
 }
 
-/** Optional backup USB slot — retired. */
+/** Optional backup USB slot — retired when USB bridge disabled. */
 export function isVaultBackupUsbEnabled() {
-  return false;
+  return isVaultLocalUsbOffered();
 }
 
 /**
  * Microsoft Graph sync for the vault (upload on write/logoff, lazy download).
- * Off: the TutaDrive folder is the only copy.
+ * Off when OneDrive disabled or LEFT_SIDE=TutaDrive.
  */
 export function isVaultCloudSyncEnabled() {
-  return false;
+  if (isDisableOnedriveEnabled()) return false;
+  return getLeftSideMode() === 'OneDrive';
 }
 
 export function buildVaultStorageChoice(visible, oauthConfigured = true) {

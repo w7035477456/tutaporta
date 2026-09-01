@@ -39,6 +39,9 @@ import {
   writeOneDriveTestFile,
   listOneDriveVaultTree
 } from '../../utils/recordVaultOneDrive/oneDriveVaultSync.js';
+import { isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
+import { isDisableOnedriveEnabled } from '../../utils/vaultStorageDisableConfig.js';
+import { listTutaDriveVaultFolderListing } from '../../utils/recordVaultUsb/vaultSession.js';
 import { isOneDriveVaultOAuthConfigured } from './recordVaultOneDriveOAuth.js';
 import { getOneDriveVaultFolderName } from '../../utils/recordVaultOneDrive/oneDriveApi.js';
 import {
@@ -163,6 +166,21 @@ async function openOneDriveVaultSession(singlesId, oneDriveStatus, { onProgress 
 
 /** GET /api/recordVault/onedrive/config */
 export function getRecordVaultOneDriveConfig(req, res) {
+  if (isLeftSideTutaDrive()) {
+    return res.json({
+      visible: true,
+      oauthConfigured: true,
+      enabled: true,
+      tutaDrive: true,
+      iconEncryptionRequired: isRecordVaultIconEncryptionEnabled(),
+      folderName: 'TutaDrive'
+    });
+  }
+  if (isDisableOnedriveEnabled()) {
+    return res.status(404).json({
+      error: 'OneDrive is disabled on this server (DISABLE_ONEDRIVE=true).'
+    });
+  }
   const choice = buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured());
   return res.json({
     ...choice,
@@ -499,12 +517,27 @@ export async function formatRecordVaultOneDrive(req, res) {
   }
 }
 
-/** GET /api/recordVault/onedrive/vault-tree — read-only OneDrive folder tree (any cluster node). */
+/** GET /api/recordVault/onedrive/vault-tree — read-only vault folder tree (OneDrive Graph or TutaDrive local). */
 export async function getRecordVaultOneDriveVaultTree(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
 
   try {
+    if (isLeftSideTutaDrive()) {
+      const listing = listTutaDriveVaultFolderListing(singlesId);
+      if (!listing) {
+        return res.status(428).json({
+          error: 'TutaDrive vault is not unlocked',
+          code: 'RECORD_VAULT_TUTADRIVE_REQUIRED'
+        });
+      }
+      return res.json({ folderName: 'TutaDrive', tree: listing.tree });
+    }
+    if (isDisableOnedriveEnabled()) {
+      return res.status(404).json({
+        error: 'OneDrive is disabled on this server (DISABLE_ONEDRIVE=true).'
+      });
+    }
     const result = await listOneDriveVaultTree(singlesId);
     return res.json(result);
   } catch (err) {

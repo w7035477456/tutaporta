@@ -9,7 +9,8 @@ export default function PhotoAlbumsViewVaultDialog({
   open,
   onClose,
   storageType = 'onedrive',
-  folderName = ''
+  folderName = '',
+  tutaDrive = false
 }) {
   const [treeLoading, setTreeLoading] = useState(false);
   const [loadGeneration, setLoadGeneration] = useState(0);
@@ -19,8 +20,16 @@ export default function PhotoAlbumsViewVaultDialog({
     if (open) setLoadGeneration((value) => value + 1);
   }, [open, storageType]);
 
-  const title = isUsb ? 'View USB Folder/Files' : 'View OneDrive Folder/Files';
-  const busyLabel = isUsb ? 'Loading USB vault tree' : 'Loading OneDrive vault tree';
+  const title = isUsb
+    ? 'View USB Folder/Files'
+    : tutaDrive
+      ? 'View TutaDrive Folder/Files'
+      : 'View OneDrive Folder/Files';
+  const busyLabel = isUsb
+    ? 'Loading USB vault tree'
+    : tutaDrive
+      ? 'Loading TutaDrive vault tree'
+      : 'Loading OneDrive vault tree';
 
   return (
     <>
@@ -50,5 +59,6 @@ PhotoAlbumsViewVaultDialog.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
   storageType: PropTypes.oneOf(['onedrive', 'usb']),
-  folderName: PropTypes.string
+  folderName: PropTypes.string,
+  tutaDrive: PropTypes.bool
 };

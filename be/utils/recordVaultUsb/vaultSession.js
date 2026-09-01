@@ -15,6 +15,7 @@ import {
   vaultMetaUsesArgon2idKdf
 } from '../recordVaultIconKeys.js';
 import { isVaultBackupUsbEnabled, isVaultCloudSyncEnabled } from '../recordVaultStorageFlags.js';
+import { buildVaultFolderListing } from '../vaultFolderTreeListing.js';
 import { vaultMetaUsesPlaintextStorage } from '../recordVaultIconEncryption.js';
 import {
   fileRelativePath,
@@ -2094,70 +2095,13 @@ export async function vaultUsbStatus(singlesId, storageType = null) {
 /** Nested folder tree of the unlocked USB vault root (files + folders). */
 export function listUsbVaultFolderListing(singlesId, { maxDepth = 8 } = {}) {
   const session = getVaultSession(singlesId, 'usb');
-  if (!session?.mountPath) return null;
-  const root = vaultRootOnMount(session.mountPath);
-  const rootName = path.basename(root) || '.recordvault';
+  return buildVaultFolderListing(session, vaultRootOnMount, { maxDepth });
+}
 
-  function readNode(absPath, name, depth) {
-    let st = null;
-    try {
-      st = fs.lstatSync(absPath);
-    } catch {
-      return null;
-    }
-    if (st.isSymbolicLink()) {
-      return { name, type: 'file', size: null };
-    }
-    if (st.isFile()) {
-      return { name, type: 'file', size: st.size };
-    }
-    if (!st.isDirectory()) {
-      return { name, type: 'file', size: null };
-    }
-    const node = { name, type: 'folder', children: [] };
-    if (depth >= maxDepth) return node;
-    let names = [];
-    try {
-      names = fs.readdirSync(absPath);
-    } catch {
-      return node;
-    }
-    const children = [];
-    for (const childName of names) {
-      const child = readNode(path.join(absPath, childName), childName, depth + 1);
-      if (child) children.push(child);
-    }
-    children.sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-    });
-    node.children = children;
-    return node;
-  }
-
-  if (!fs.existsSync(root)) {
-    return {
-      path: root,
-      label: path.basename(session.mountPath),
-      tree: { name: rootName, type: 'folder', children: [] },
-      entries: []
-    };
-  }
-
-  const tree = readNode(root, root, 0) || { name: root, type: 'folder', children: [] };
-  // Root label uses full vault path for clarity in the UI.
-  tree.name = root;
-  const entries = (tree.children || []).map((child) => ({
-    name: child.name,
-    type: child.type,
-    size: child.size ?? null
-  }));
-  return {
-    path: root,
-    label: path.basename(session.mountPath),
-    tree,
-    entries
-  };
+/** TutaDrive uses the 'onedrive' session slot with a local mount (LEFT_SIDE=TutaDrive). */
+export function listTutaDriveVaultFolderListing(singlesId, { maxDepth = 8 } = {}) {
+  const session = getVaultSession(singlesId, 'onedrive');
+  return buildVaultFolderListing(session, vaultRootOnMount, { maxDepth });
 }
 
 export function wipeVaultAtMountPath(mountPath, singlesId) {

@@ -366,11 +366,6 @@ export default function ProfilePhotoUploadQrPanel({
               {PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE}
             </Typography>
           ) : null}
-          {checkMessage ? (
-            <Typography sx={{ ...scanPanelTextSx, mt: 0.5, fontWeight: 600, width: '100%' }}>
-              {checkMessage}
-            </Typography>
-          ) : null}
         </Box>
       </Box>
     );
@@ -485,11 +480,6 @@ export default function ProfilePhotoUploadQrPanel({
           ) : watchingUpload && !checkMessage ? (
             <Typography variant="body2" sx={{ mt: 1.5, lineHeight: 1.45, opacity: 0.9, ...messageSx }}>
               Waiting for upload from your phone — it will appear in Uploaded automatically.
-            </Typography>
-          ) : null}
-          {checkMessage ? (
-            <Typography variant="body2" sx={{ mt: 1.5, lineHeight: 1.45, ...messageSx }}>
-              {checkMessage}
             </Typography>
           ) : null}
         </>

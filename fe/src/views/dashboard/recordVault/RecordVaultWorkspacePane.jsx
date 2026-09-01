@@ -1325,6 +1325,8 @@ export default function RecordVaultWorkspacePane({
   const [oneDriveBackupOpen, setOneDriveBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
+  const isTutaDrivePane = String(paneLabel || '').toLowerCase() === 'tutadrive';
+  const cloudViewLabel = isTutaDrivePane ? 'View TutaDrive' : 'View OneDrive';
   const [usbVaultFolderLabel] = useState('USB');
   const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
@@ -2721,13 +2723,17 @@ export default function RecordVaultWorkspacePane({
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible && cfg.localUsb?.enabled));
         setVideoTutorialUrl(String(cfg?.videoTutorialTutanotes || '').trim());
         if (cfg.oneDrive?.visible && cfg.oneDrive?.enabled) {
-          try {
-            const oneDriveCfg = await fetchRecordVaultOneDriveConfig();
-            if (!cancelled && oneDriveCfg?.folderName) {
-              setOneDriveVaultFolderName(String(oneDriveCfg.folderName));
+          if (cfg.tutaDrive) {
+            setOneDriveVaultFolderName('TutaDrive');
+          } else {
+            try {
+              const oneDriveCfg = await fetchRecordVaultOneDriveConfig();
+              if (!cancelled && oneDriveCfg?.folderName) {
+                setOneDriveVaultFolderName(String(oneDriveCfg.folderName));
+              }
+            } catch {
+              // keep default folder name
             }
-          } catch {
-            // keep default folder name
           }
         }
       } catch (err) {
@@ -6263,6 +6269,7 @@ export default function RecordVaultWorkspacePane({
         onClose={() => setViewVaultOpen(false)}
         storageType={viewVaultStorageType}
         folderName={viewVaultStorageType === 'onedrive' ? oneDriveVaultFolderName : ''}
+        tutaDrive={isTutaDrivePane}
       />
       <RecordVaultOneDriveBackupDialog
         open={oneDriveBackupOpen}
@@ -7786,7 +7793,7 @@ export default function RecordVaultWorkspacePane({
                         setViewVaultOpen(true);
                       }}
                       disabled={busy || !unlocked}
-                      aria-label={paneStorageType === 'onedrive' ? 'View OneDrive' : 'View USB'}
+                      aria-label={paneStorageType === 'onedrive' ? cloudViewLabel : 'View USB'}
                       title={
                         paneStorageType === 'usb'
                           ? usbBridgeHealthy
@@ -7799,7 +7806,7 @@ export default function RecordVaultWorkspacePane({
                         ...laneContainedButtonSx
                       }}
                     >
-                      {paneStorageType === 'onedrive' ? 'View OneDrive' : 'View USB'}
+                      {paneStorageType === 'onedrive' ? cloudViewLabel : 'View USB'}
                     </SliderControlButton>
                     <RecordVaultStorageFilesPanel storageType={paneStorageType || 'usb'} active={unlocked} />
                   </Box>

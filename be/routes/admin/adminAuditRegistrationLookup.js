@@ -214,23 +214,23 @@ export async function searchSinglesForLookup(db, body) {
   const { rows } = await db.query(
     `${SINGLES_LOOKUP_SELECT}
      WHERE ${conditions.join(' OR ')}
-     ORDER BY s.singles_id ASC${limitClause}`,
+     ORDER BY s.singles_id DESC${limitClause}`,
     params
   );
 
   return rows;
 }
 
-/** All singles rows for Admin Tools → Lookup All (ORDER BY singles_id). */
+/** All singles rows for Admin Tools → Lookup All (most recent singles_id first). */
 export async function searchAllSinglesForLookup(db) {
   const { rows } = await db.query(`${SINGLES_LOOKUP_SELECT}
-     ORDER BY s.singles_id ASC`);
+     ORDER BY s.singles_id DESC`);
   return rows;
 }
 
 /**
  * POST /api/admin/singles/lookup-all
- * Returns all helloworldjunktest.singles rows sorted by singles_id.
+ * Returns all helloworldjunktest.singles rows sorted by singles_id descending.
  */
 export async function postAdminSinglesLookupAll(req, res) {
   try {

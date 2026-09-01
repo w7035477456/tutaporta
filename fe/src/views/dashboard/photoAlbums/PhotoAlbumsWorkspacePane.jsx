@@ -1689,6 +1689,7 @@ export default function PhotoAlbumsWorkspacePane({
   const [oneDriveBackupOpen, setOneDriveBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
+  const isTutaDrivePane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
   /** Zoom icon — hide sidebars/menus and show album only (not true fullscreen overlay). */
   const [albumFocusView, setAlbumFocusView] = useState(false);
@@ -3122,13 +3123,17 @@ export default function PhotoAlbumsWorkspacePane({
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible && cfg.localUsb?.enabled));
         setVideoTutorialUrl(String(cfg?.videoTutorialTutaphotoalbums || '').trim());
         if (cfg.oneDrive?.visible && cfg.oneDrive?.enabled) {
-          try {
-            const oneDriveCfg = await fetchPhotoAlbumsOneDriveConfig();
-            if (!cancelled && oneDriveCfg?.folderName) {
-              setOneDriveVaultFolderName(String(oneDriveCfg.folderName));
+          if (cfg.tutaDrive) {
+            setOneDriveVaultFolderName('TutaDrive');
+          } else {
+            try {
+              const oneDriveCfg = await fetchPhotoAlbumsOneDriveConfig();
+              if (!cancelled && oneDriveCfg?.folderName) {
+                setOneDriveVaultFolderName(String(oneDriveCfg.folderName));
+              }
+            } catch {
+              // keep default folder name
             }
-          } catch {
-            // keep default folder name
           }
         }
       } catch (err) {
@@ -7845,6 +7850,7 @@ export default function PhotoAlbumsWorkspacePane({
         onClose={() => setViewVaultOpen(false)}
         storageType={viewVaultStorageType}
         folderName={viewVaultStorageType === 'onedrive' ? oneDriveVaultFolderName : ''}
+        tutaDrive={isTutaDrivePane}
       />
       <PhotoAlbumsOneDriveBackupDialog
         open={oneDriveBackupOpen}
