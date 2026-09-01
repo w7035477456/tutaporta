@@ -27,6 +27,7 @@ import { authFormContentSx } from '../authentication/authPageLayoutSx';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
+import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 
 // assets
 import Visibility from '@mui/icons-material/Visibility';
@@ -228,14 +229,7 @@ export default function AuthLogin() {
           return;
         }
         const from = location.state?.from;
-        if (from?.pathname) {
-          navigate(
-            { pathname: from.pathname, search: from.search || '', hash: from.hash || '' },
-            { replace: true }
-          );
-          return;
-        }
-        navigate('/mall');
+        navigate(resolvePostLoginPath(from), { replace: true });
       }
     },
     [navigate, location.state]

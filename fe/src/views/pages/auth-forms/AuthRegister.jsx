@@ -33,6 +33,7 @@ import {
   persistGoogleSignupEmail,
   clearGoogleSignupToken
 } from 'utils/googleSignupOAuth';
+import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
 
@@ -150,15 +151,7 @@ export default function AuthRegister() {
 
   const navigateAfterGoogleLogin = useCallback(async () => {
     await refreshSessionAfterExternalLogin();
-    const from = location.state?.from;
-    if (from?.pathname) {
-      navigate(
-        { pathname: from.pathname, search: from.search || '', hash: from.hash || '' },
-        { replace: true }
-      );
-      return;
-    }
-    navigate('/mall', { replace: true });
+    navigate(resolvePostLoginPath(location.state?.from), { replace: true });
   }, [refreshSessionAfterExternalLogin, location.state, navigate]);
 
   const handleEmailChange = (e) => {
