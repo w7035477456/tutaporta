@@ -4,15 +4,15 @@ export const DEFAULT_MONTHLY_BILL_ROWS = [
   {
     row_index: 1,
     bill_description: 'SAMPLE Mortgage Bill/Pay',
-    due_day: 1,
-    amount: '$2,842.00',
+    due_day: 15,
+    amount: '$2,542.00',
     bill_type: 'Auto',
     action: null
   },
   {
     row_index: 2,
     bill_description: 'SAMPLE Utility Bill',
-    due_day: 28,
+    due_day: 25,
     amount: '',
     bill_type: 'Manual',
     action: 'Not Paid'
@@ -21,7 +21,7 @@ export const DEFAULT_MONTHLY_BILL_ROWS = [
     row_index: 3,
     bill_description: 'SAMPLE Internet Bill',
     due_day: 5,
-    amount: '$98.00',
+    amount: '$99.00',
     bill_type: 'Manual',
     action: 'Not Paid'
   },
@@ -41,7 +41,7 @@ export const DEFAULT_YEARLY_BILL_ROWS = [
     bill_description: 'SAMPLE Real Estate Tax, 1st of two',
     bill_month: 5,
     due_month_day: 1,
-    amount: '$3,583.20',
+    amount: '$3,583.00',
     bill_type: 'Manual',
     action: null
   },
@@ -50,7 +50,7 @@ export const DEFAULT_YEARLY_BILL_ROWS = [
     bill_description: 'SAMPLE Real Estate Tax, 2nd of two',
     bill_month: 11,
     due_month_day: 1,
-    amount: '$3,583.20',
+    amount: '$3,583.00',
     bill_type: 'Manual',
     action: null
   },
@@ -59,16 +59,16 @@ export const DEFAULT_YEARLY_BILL_ROWS = [
     bill_description: 'SAMPLE Auto registration',
     bill_month: 10,
     due_month_day: 15,
-    amount: '$0.00',
+    amount: '',
     bill_type: 'Manual',
     action: null
   },
   {
     row_index: 4,
-    bill_description: 'SAMPLE Auto Safety inspection',
+    bill_description: 'SAMPLE Auto Safety Inspection',
     bill_month: 10,
     due_month_day: 1,
-    amount: '$0.00',
+    amount: '',
     bill_type: 'Manual',
     action: null
   },
@@ -77,16 +77,16 @@ export const DEFAULT_YEARLY_BILL_ROWS = [
     bill_description: 'SAMPLE Anniversary',
     bill_month: 5,
     due_month_day: 1,
-    amount: '$0.00',
+    amount: '',
     bill_type: 'Manual',
     action: null
   },
   {
     row_index: 6,
-    bill_description: 'SAMPLE Birthday of Jen',
+    bill_description: 'SAMPLE Birthday of xyz',
     bill_month: 6,
-    due_month_day: 12,
-    amount: '$0.00',
+    due_month_day: 15,
+    amount: '',
     bill_type: 'Manual',
     action: null
   }

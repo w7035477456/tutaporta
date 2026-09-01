@@ -49,6 +49,22 @@ export function isSelectableNoteId(id) {
   return isBillMonthlyNoteId(n) || isBillYearlyNoteId(n);
 }
 
+/** Shared red × control at end of Bill Description rows. */
+export const billScheduleRemoveRowBtnSx = {
+  width: 24,
+  height: 24,
+  flexShrink: 0,
+  border: '1px solid #000',
+  bgcolor: '#e53935',
+  color: '#fff',
+  fontWeight: 900,
+  fontSize: '0.85rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+  p: 0,
+  borderRadius: 0.5
+};
+
 export function buildBillScheduleNotebook() {
   return {
     notebook_id: BILL_SCHEDULE_NOTEBOOK_ID,

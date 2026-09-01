@@ -12,6 +12,7 @@ import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
+import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -284,6 +285,28 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
     await persistSchedule(nextRows);
   };
 
+  const handleRemoveRow = async (index) => {
+    const prev = rowsRef.current;
+    const removed = prev[index];
+    const renumbered = prev
+      .filter((_, i) => i !== index)
+      .map((r, i) => ({ ...r, row_index: i + 1 }));
+    setRows(withDerived(renumbered, year, month));
+    setSavedMsg('');
+    if (
+      removed &&
+      billPopupOpen &&
+      billEnsurePayload &&
+      (Number(removed.row_index) === Number(billEnsurePayload.row_index) ||
+        (removed.monthly_bill_id &&
+          Number(removed.monthly_bill_id) === Number(billEnsurePayload.monthly_bill_id)))
+    ) {
+      setBillPopupOpen(false);
+      setBillEnsurePayload(null);
+    }
+    await persistSchedule(renumbered);
+  };
+
   const handleSave = async () => {
     setSavedMsg('');
     await persistSchedule();
@@ -473,14 +496,26 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
               <tr key={`bill-row-${row.row_index}-${index}`}>
                 <td style={{ textAlign: 'center', fontWeight: 700 }}>{row.row_index}</td>
                 <td>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={row.bill_description}
-                    onChange={(e) => updateRow(index, { bill_description: e.target.value })}
-                    placeholder="Bill description"
-                    sx={inputSx}
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={row.bill_description}
+                      onChange={(e) => updateRow(index, { bill_description: e.target.value })}
+                      placeholder="Bill description"
+                      sx={{ ...inputSx, flex: 1, minWidth: 0 }}
+                    />
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Remove row"
+                      disabled={loading || saving}
+                      onClick={() => void handleRemoveRow(index)}
+                      sx={billScheduleRemoveRowBtnSx}
+                    >
+                      ×
+                    </Box>
+                  </Box>
                 </td>
                 <td>
                   <TextField
