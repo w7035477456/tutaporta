@@ -3,11 +3,12 @@
 #
 # Prints exactly one line: "same" or "difference"
 #
+# Uses the same SSH as Mac f2 alias (port 59221 + corruptedKey_march2024 via deploy-ssh-mac.sh).
+#
 #   comparepgschema
 #   comparepgschema --verbose
-#   comparepgschema --ubuntu-host lawsen0@192.168.222.202
 #
-# Ubuntu ~/b:
+# Mac ~/b:
 #   alias comparepgschema='$HOME/code/main/scripts/compare-pg-schema.sh'
 #
 # Exit codes: 0 = same, 1 = difference, 2 = error
@@ -18,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${SCRIPT_DIR}/lib/pg-env.sh"
 
 UBUNTU_HOST="${COMPARE_SCHEMA_UBUNTU_HOST:-lawsen0@192.168.222.202}"
+SSH_BIN="${COMPARE_SCHEMA_SSH_BIN:-${SCRIPT_DIR}/deploy-ssh-mac.sh}"
 VERBOSE=0
 SAVE_DUMPS=""
 
@@ -28,9 +30,12 @@ compare-pg-schema.sh [--ubuntu-host user@host] [--verbose] [--save-dumps dir]
 Compares PostgreSQL schema (default: helloworldjunktest) on Mac vs Ubuntu.
 Output: "same" or "difference" (one line).
 
-Requires: SSH to Ubuntu; pipes pg-schema-dump.sh (no separate deploy needed).
+SSH defaults (same as f2 alias): port 59221, IdentitiesOnly, corruptedKey_march2024.
+Override: COMPARE_SCHEMA_SSH_BIN, DEPLOY_SSH_KEY, DEPLOY_SSH_PORT (see deploy-ssh-mac.sh).
+
 Environment:
   COMPARE_SCHEMA_UBUNTU_HOST   SSH target (default lawsen0@192.168.222.202)
+  COMPARE_SCHEMA_CHECK_VPN     1 = run checkVpn first if available (default 1, like f2)
   BE_ENV_FILE                  Mac env file (default ~/.ssh/be/.env)
 EOF
 }
@@ -49,6 +54,25 @@ fail() {
   echo "ERROR: $*" >&2
   echo "difference"
   exit 2
+}
+
+maybe_check_vpn() {
+  [[ "${COMPARE_SCHEMA_CHECK_VPN:-1}" == "1" ]] || return 0
+  if declare -f checkVpn >/dev/null 2>&1; then
+    checkVpn
+    return $?
+  fi
+  if command -v checkVpn >/dev/null 2>&1; then
+    checkVpn
+    return $?
+  fi
+  return 0
+}
+
+run_ssh() {
+  maybe_check_vpn || fail "VPN check failed (source ~/b and ensure VPN is up, same as f2)"
+  [[ -x "$SSH_BIN" || -f "$SSH_BIN" ]] || fail "SSH helper missing: $SSH_BIN"
+  "$SSH_BIN" -o ConnectTimeout=25 "$UBUNTU_HOST" "$@"
 }
 
 [[ -n "$UBUNTU_HOST" ]] || fail "--ubuntu-host required (or COMPARE_SCHEMA_UBUNTU_HOST)"
@@ -76,15 +100,15 @@ if ! bash "$DUMP_SH" >"$MAC_DUMP" 2>"$MAC_ERR"; then
 fi
 [[ -s "$MAC_DUMP" ]] || fail "Mac schema dump empty (schema $SCHEMA missing on Mac?)"
 
-# --- Ubuntu dump via SSH (pipe local script — no deploy required on Ubuntu) ---
-if ! ssh -o ConnectTimeout=25 "$UBUNTU_HOST" \
+# --- Ubuntu dump via SSH (same path as f2: port 59221 + key) ---
+if ! run_ssh \
   'PG_SCHEMA_SCRIPT_DIR=$HOME/code/main/scripts BE_ENV_FILE=$HOME/.ssh/be/.env bash -s' \
   <"$DUMP_SH" >"$UBUNTU_DUMP" 2>"$UBUNTU_ERR"; then
-  echo "ERROR: Ubuntu dump failed via ssh $UBUNTU_HOST" >&2
+  echo "ERROR: Ubuntu dump failed via ssh $UBUNTU_HOST (port ${DEPLOY_SSH_PORT:-59221})" >&2
   [[ -s "$UBUNTU_ERR" ]] && cat "$UBUNTU_ERR" >&2
   if [[ "$VERBOSE" -eq 1 ]]; then
     echo "--- ssh probe ---" >&2
-    ssh -o ConnectTimeout=15 "$UBUNTU_HOST" \
+    run_ssh \
       "hostname; command -v pg_dump; ls /usr/lib/postgresql/*/bin/pg_dump 2>/dev/null | head -1; grep -E '^DB_(HOST|PORT|NAME|USER)=' ~/.ssh/be/.env | head -4" \
       2>&1 >&2 || true
   fi
@@ -112,7 +136,7 @@ fi
 echo "difference"
 if [[ "$VERBOSE" -eq 1 ]]; then
   echo "--- Mac: $(pg_connection_label) ---" >&2
-  echo "--- Ubuntu: ssh $UBUNTU_HOST ---" >&2
+  echo "--- Ubuntu: ssh -p ${DEPLOY_SSH_PORT:-59221} $UBUNTU_HOST ---" >&2
   diff -u "$MAC_DUMP" "$UBUNTU_DUMP" | head -120 >&2 || true
   echo "Mac lines: $(wc -l <"$MAC_DUMP" | tr -d ' ')  Ubuntu lines: $(wc -l <"$UBUNTU_DUMP" | tr -d ' ')" >&2
 fi
