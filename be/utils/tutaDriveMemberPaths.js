@@ -154,15 +154,31 @@ export async function loadTutaDriveMemberNotesPhotosSizeForSingles(singlesId) {
 /**
  * Link …/notes/TutaNotes/photos → …/users/M{id}/photos when possible.
  * If vault photos is a real dir with files, merge into sibling photos/ first.
+ * Repairs broken or stale symlinks (e.g. after LARGE_CHEAP_STORAGE_FOLDER moved).
  */
 function linkVaultPhotosToMemberPhotos(notesMount, photosAbs) {
   const vaultPhotos = vaultPhotosRoot(notesMount);
+  const expectedAbs = path.resolve(photosAbs);
+
   try {
-    if (fs.existsSync(vaultPhotos)) {
-      const st = fs.lstatSync(vaultPhotos);
-      if (st.isSymbolicLink()) {
-        return;
-      }
+    let st = null;
+    try {
+      st = fs.lstatSync(vaultPhotos);
+    } catch (err) {
+      if (err?.code !== 'ENOENT') throw err;
+    }
+
+    if (st?.isSymbolicLink()) {
+      const rawTarget = fs.readlinkSync(vaultPhotos);
+      const resolvedTarget = path.resolve(path.dirname(vaultPhotos), rawTarget);
+      const targetOk = fs.existsSync(vaultPhotos) && resolvedTarget === expectedAbs;
+      if (targetOk) return;
+      // Broken or points at an old STORAGE path — drop and recreate.
+      fs.unlinkSync(vaultPhotos);
+      st = null;
+    }
+
+    if (st && !st.isSymbolicLink()) {
       const entries = fs.readdirSync(vaultPhotos);
       if (entries.length === 0) {
         fs.rmdirSync(vaultPhotos);
@@ -172,13 +188,37 @@ function linkVaultPhotosToMemberPhotos(notesMount, photosAbs) {
         fs.rmSync(vaultPhotos, { recursive: true, force: true });
       }
     }
+
     if (!fs.existsSync(vaultPhotos)) {
+      fs.mkdirSync(photosAbs, { recursive: true });
       fs.symlinkSync(photosAbs, vaultPhotos, 'dir');
     }
   } catch (err) {
     // Symlink may fail on some FS — keep photos under notes/TutaNotes/photos.
     console.warn('[tutaDrive] photos symlink skipped:', err?.message || err);
+    try {
+      const st = fs.lstatSync(vaultPhotos);
+      if (st.isSymbolicLink()) fs.unlinkSync(vaultPhotos);
+    } catch {
+      // ignore
+    }
     fs.mkdirSync(vaultPhotos, { recursive: true });
+  }
+}
+
+/** Drop a broken vault photos symlink so mkdir/layout can recreate it. */
+function clearBrokenVaultPhotosSymlink(notesMount) {
+  const vaultPhotos = vaultPhotosRoot(notesMount);
+  try {
+    const st = fs.lstatSync(vaultPhotos);
+    if (!st.isSymbolicLink()) return;
+    if (fs.existsSync(vaultPhotos)) return;
+    fs.unlinkSync(vaultPhotos);
+    console.warn(`[tutaDrive] removed broken photos symlink at ${vaultPhotos}`);
+  } catch (err) {
+    if (err?.code !== 'ENOENT') {
+      console.warn('[tutaDrive] clearBrokenVaultPhotosSymlink:', err?.message || err);
+    }
   }
 }
 
@@ -230,6 +270,9 @@ export function ensureTutaDriveMemberLayout(memberId, options = {}) {
   });
   fs.mkdirSync(notesMount, { recursive: true });
   fs.mkdirSync(photosAbs, { recursive: true });
+  // Repair before ensureVaultLayoutDirs — mkdir on a broken photos→old-path symlink throws ENOENT.
+  clearBrokenVaultPhotosSymlink(notesMount);
+  linkVaultPhotosToMemberPhotos(notesMount, photosAbs);
   ensureVaultLayoutDirs(notesMount); // notes/TutaNotes/{files,photos}
   fs.mkdirSync(vaultFilesRoot(notesMount), { recursive: true });
   ensurePathWritableOrThrow(notesMount, { route: 'ensureTutaDriveMemberLayout:notes' });
@@ -239,13 +282,13 @@ export function ensureTutaDriveMemberLayout(memberId, options = {}) {
     try {
       migrateLegacyOneDriveStagingToTutaDrive(singlesId, memberId);
       // Re-ensure dirs after copy (staging may omit empty folders).
+      clearBrokenVaultPhotosSymlink(notesMount);
       ensureVaultLayoutDirs(notesMount);
+      linkVaultPhotosToMemberPhotos(notesMount, photosAbs);
     } catch (err) {
       console.warn('[tutaDrive] staging migrate skipped:', err?.message || err);
     }
   }
-
-  linkVaultPhotosToMemberPhotos(notesMount, photosAbs);
 
   return {
     notesMount,

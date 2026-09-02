@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -28,6 +28,8 @@ import {
   setRecordVaultE2eSession
 } from 'utils/recordVaultClientSession';
 import { formatRecordVaultUnlockCountdown } from 'utils/recordVaultUnlockCountdown';
+import { DEMO_ENCRYPT_PASSWORD, isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { useAuth } from 'contexts/AuthContext';
 import RecordVaultZeroKnowledgeNotice from './RecordVaultZeroKnowledgeNotice';
 import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import { closeErrorPopup } from 'ui-component/ErrorPopup';
@@ -125,6 +127,8 @@ export default function RecordVaultAccessGate({
   usbMountPath = '',
   onVaultFormatted
 }) {
+  const { user } = useAuth();
+  const guestDemo = isGuestDemoLogin(user);
   const side = normalizeStorageType(storageType);
   const [configured, setConfigured] = useState(false);
   const [vaultRow, setVaultRow] = useState(null);
@@ -142,6 +146,11 @@ export default function RecordVaultAccessGate({
   const [cooldownUntilMs, setCooldownUntilMs] = useState(0);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [maxFailedAttempts, setMaxFailedAttempts] = useState(5);
+  /** Guest demo: auto-unlock with DEMO_ENCRYPT_PASSWORD — hide the Encrypt Password popup. */
+  const [demoAutoUnlocking, setDemoAutoUnlocking] = useState(false);
+  const demoAutoTriedRef = useRef(false);
+  const onUnlockedRef = useRef(onUnlocked);
+  onUnlockedRef.current = onUnlocked;
 
   const applyFailStatus = useCallback(
     (status) => {
@@ -192,6 +201,8 @@ export default function RecordVaultAccessGate({
       // Next open must show hourglass immediately (checking starts true again).
       setChecking(true);
       setBusy(false);
+      setDemoAutoUnlocking(false);
+      demoAutoTriedRef.current = false;
       return undefined;
     }
     closeErrorPopup();
@@ -207,6 +218,7 @@ export default function RecordVaultAccessGate({
     setCooldownUntilMs(0);
     setFailedAttempts(0);
     setChecking(true);
+    setDemoAutoUnlocking(guestDemo);
     void (async () => {
       try {
         const [e2e, accessStatus, failStatus] = await Promise.all([
@@ -227,6 +239,7 @@ export default function RecordVaultAccessGate({
       } catch (err) {
         if (!cancelled) {
           setError(err?.response?.data?.error || err?.message || 'Unable to load vault access status');
+          setDemoAutoUnlocking(false);
         }
       } finally {
         if (!cancelled) setChecking(false);
@@ -235,7 +248,70 @@ export default function RecordVaultAccessGate({
     return () => {
       cancelled = true;
     };
-  }, [open, side, applyFailStatus]);
+  }, [open, side, applyFailStatus, guestDemo]);
+
+  // Guest demo (login alias demo/guest): auto Encrypt Password → skip Full Disk Encryption popup.
+  useEffect(() => {
+    if (!open || !guestDemo || checking || demoAutoTriedRef.current) return undefined;
+    if (cooldownSeconds > 0) {
+      setDemoAutoUnlocking(false);
+      return undefined;
+    }
+    demoAutoTriedRef.current = true;
+    let cancelled = false;
+
+    void (async () => {
+      flushSync(() => {
+        setDemoAutoUnlocking(true);
+        setBusy(true);
+        setError('');
+      });
+      try {
+        if (configured && vaultRow?.kdfSaltB64 && vaultRow?.wrappedDekB64) {
+          const { dek, dekRaw } = await unlockVaultWithPassword(vaultRow, DEMO_ENCRYPT_PASSWORD);
+          if (cancelled) return;
+          setRecordVaultE2eSession({ dek, dekRaw, vault: vaultRow });
+          await clearRecordVaultAccessFail(side).catch(() => null);
+          try {
+            await setRecordVaultAccessPasswordHint(String(hint ?? '').trim());
+          } catch {
+            // optional
+          }
+          setCooldownSeconds(0);
+          setCooldownUntilMs(0);
+          setFailedAttempts(0);
+          onUnlockedRef.current?.();
+          return;
+        }
+
+        if (!configured) {
+          const { dek, dekRaw, createPayload } = await createVaultKeyMaterial(DEMO_ENCRYPT_PASSWORD);
+          if (cancelled) return;
+          const result = await saveRecordVaultE2eKeys(createPayload);
+          if (cancelled) return;
+          setRecordVaultE2eSession({ dek, dekRaw, vault: result?.vault || null });
+          setConfigured(true);
+          setVaultRow(result?.vault || null);
+          await clearRecordVaultAccessFail(side).catch(() => null);
+          onUnlockedRef.current?.();
+          return;
+        }
+
+        // Configured but missing key material — show the normal gate.
+        setDemoAutoUnlocking(false);
+      } catch {
+        // Wrong password or setup failed — fall back to manual Encrypt Password UI.
+        clearRecordVaultE2eSession();
+        if (!cancelled) setDemoAutoUnlocking(false);
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, guestDemo, checking, configured, vaultRow, cooldownSeconds, side, hint]);
 
   useEffect(() => {
     if (!open || cooldownUntilMs <= 0) return undefined;
@@ -622,10 +698,12 @@ export default function RecordVaultAccessGate({
   return (
     <>
       <BusyHourglassOverlay
-        open={Boolean(open) && (checking || busy)}
+        open={Boolean(open) && (checking || busy || demoAutoUnlocking)}
         label={
-          checking
-            ? 'Checking vault access…'
+          checking || demoAutoUnlocking
+            ? guestDemo
+              ? 'Opening TutaNotes…'
+              : 'Checking vault access…'
             : changePasswordOpen
               ? 'Updating Encrypt Password…'
               : configured
@@ -635,7 +713,7 @@ export default function RecordVaultAccessGate({
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <ColorTemplate16PopupCenterWide
-        open={open}
+        open={Boolean(open) && !demoAutoUnlocking}
         onClose={handleClose}
         closeOnBackdrop={false}
         closeButtonDisabled={verifyLocked}

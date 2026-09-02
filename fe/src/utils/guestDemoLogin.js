@@ -8,6 +8,12 @@ export const GUEST_DEMO_LOGIN_MESSAGE =
 /** Shown in the password field as soon as login id is "demo". */
 export const DEMO_LOGIN_PASSWORD_HINT = '(not required for demo)';
 
+/**
+ * TutaNotes Full Disk Encryption password used for guest demo auto-unlock
+ * (login alias `demo` / `guest` → skip Encrypt Password popup).
+ */
+export const DEMO_ENCRYPT_PASSWORD = 'q1221q1221';
+
 /** DOM marker for sidebar / footer / theme menu / orange help / TutaNotes login panels — clicks allowed in demo mode. */
 export const GUEST_DEMO_ALLOW_ATTR = 'data-guest-demo-allow';
 

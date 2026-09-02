@@ -239,7 +239,16 @@ export const REQUIRED_VAULT_PATHS = [VAULT_META_FILE, VAULT_PHOTOS_DIR, VAULT_FI
 
 /** Create standard empty vault subfolders (photos, files) if missing — cloud sync may omit empty dirs. */
 export function ensureVaultLayoutDirs(mountPath) {
-  fs.mkdirSync(vaultPhotosRoot(mountPath), { recursive: true });
+  const photosRoot = vaultPhotosRoot(mountPath);
+  try {
+    const st = fs.lstatSync(photosRoot);
+    if (st.isSymbolicLink() && !fs.existsSync(photosRoot)) {
+      fs.unlinkSync(photosRoot);
+    }
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+  }
+  fs.mkdirSync(photosRoot, { recursive: true });
   fs.mkdirSync(vaultFilesRoot(mountPath), { recursive: true });
 }
 
