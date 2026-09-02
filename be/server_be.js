@@ -504,6 +504,10 @@ import {
   postAdminSinglesLookupAll
 } from './routes/admin/adminAuditRegistrationLookup.js';
 import {
+  postAdminSinglesHardReset,
+  postAdminSinglesSoftReset
+} from './routes/admin/adminResetMemberAccount.js';
+import {
   postAdminLoginLogLookup,
   postAdminLoginLogLookupAll
 } from './routes/admin/adminLoginLogLookup.js';
@@ -1346,6 +1350,8 @@ app.post('/api/admin/singles/set-status', requireAuth, requireAdminRole, postAdm
 app.post('/api/admin/singles/set-member-category', requireAuth, requireAdminRole, postAdminSetSinglesMemberCategory);
 app.post('/api/admin/singles/set-token-balance', requireAuth, requireAdminRole, postAdminSetSinglesTokenBalance);
 app.post('/api/admin/singles/reset-password-attempt-count', requireAuth, requireAdminRole, postAdminResetPasswordAttemptCount);
+app.post('/api/admin/singles/soft-reset', requireAuth, requireAdminRole, postAdminSinglesSoftReset);
+app.post('/api/admin/singles/hard-reset', requireAuth, requireAdminRole, postAdminSinglesHardReset);
 app.get('/api/admin/blocked-asn-vpn', requireAuth, requireAdminRole, getAdminBlockedAsnVpn);
 app.get('/api/admin/video/:id', requireAuth, requireAdminRole, getAdminVideo);
 app.get('/api/admin/video/:id/thumbnail', requireAuth, requireAdminRole, getAdminVideoThumbnail);

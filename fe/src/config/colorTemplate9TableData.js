@@ -269,6 +269,17 @@ export function colorTemplate9TableHorizontalScrollShellSx(overrides = {}) {
   };
 }
 
+/** Top mirror scrollbar — same width as bottom shell; use with vertical flip in ColorTemplate9TableData.Table. */
+export function colorTemplate9TableTopHorizontalScrollShellSx(overrides = {}) {
+  return colorTemplate9TableHorizontalScrollShellSx({
+    borderBottom: 'none',
+    flexShrink: 0,
+    minHeight: 16,
+    maxHeight: 16,
+    ...overrides
+  });
+}
+
 /** Outer card-style panel (tabs + table body) */
 export function colorTemplate9TablePanelSx(overrides = {}) {
   return {

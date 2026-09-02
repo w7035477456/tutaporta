@@ -228,6 +228,18 @@ export async function resetAdminPasswordAttemptCount({ singlesId }) {
   return data;
 }
 
+/** Soft Reset — re-init defaults without deleting user photos/postings/bios/custom vault content. */
+export async function softResetAdminMemberAccount({ singlesId }) {
+  const { data } = await api.post('/api/admin/singles/soft-reset', { singlesId });
+  return data;
+}
+
+/** Hard Reset — cascade-delete user content, then re-init defaults. */
+export async function hardResetAdminMemberAccount({ singlesId }) {
+  const { data } = await api.post('/api/admin/singles/hard-reset', { singlesId });
+  return data;
+}
+
 /** Admin Tools → Tables tab */
 export async function fetchAdminTables() {
   const { data } = await api.get('/api/admin/tables');

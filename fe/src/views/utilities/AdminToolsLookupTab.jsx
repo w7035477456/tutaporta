@@ -13,7 +13,8 @@ import {
   saveAdminSinglesTokenBalance,
   fetchAdminAuditRegistrationLookup,
   fetchAdminSinglesLookupAll,
-  resetAdminPasswordAttemptCount,
+  softResetAdminMemberAccount,
+  hardResetAdminMemberAccount,
   cascadeDeleteAdminTableRow,
   fetchAdminVideoObjectUrl
 } from 'api/adminToolsFe';
@@ -33,6 +34,8 @@ import { truncateColorTemplate9AutoFitText } from 'utils/colorTemplate9AutoFitCo
 import { formatVideoFileAge, sortSinglesRowsByVideoAge } from 'utils/formatVideoFileAge';
 
 const CASCADE_DELETE_LABEL = 'Cascd Del';
+const SOFT_RESET_LABEL = 'Default Reset';
+const HARD_RESET_LABEL = 'Factory Reset';
 /** Size / display columns from the first N characters of header + cell text. */
 const LOOKUP_COLUMN_DISPLAY_CHARS = 30;
 
@@ -256,11 +259,12 @@ const SINGLES_COL = {
   TOKEN_BALANCE: 7,
   PHONE: 8,
   CASCADE_DELETE: 9,
-  PWD_RETRY: 10,
-  MY_REFER_CODE: 11,
-  REFER_BY: 12,
-  VIEW_VIDEO: 13,
-  VIDEO_AGE: 14
+  RESET: 10,
+  HARD_RESET: 11,
+  MY_REFER_CODE: 12,
+  REFER_BY: 13,
+  VIEW_VIDEO: 14,
+  VIDEO_AGE: 15
 };
 
 const AUDIT_COL = {
@@ -338,7 +342,7 @@ function formatTokenBalanceDisplay(raw) {
   return String(parseTokenBalanceValue(raw));
 }
 
-function buildSinglesLookupColumnButtons(rows) {
+function buildSinglesLookupColumnButtons() {
   const statusLabels = SINGLES_STATUS_VALUES.map((value) => formatSinglesStatusLabel(value));
   return [
     null,
@@ -361,10 +365,12 @@ function buildSinglesLookupColumnButtons(rows) {
       variant: 'selected'
     },
     {
-      labels: ['Reset', '…'],
-      variant: 'selected',
-      companionTexts: rows.map((row) => String(Number(row.passwordAttemptCount ?? 0))),
-      companionGapPx: 6
+      labels: [SOFT_RESET_LABEL, '…'],
+      variant: 'selected'
+    },
+    {
+      labels: [HARD_RESET_LABEL, '…'],
+      variant: 'selected'
     },
     null,
     null,
@@ -418,8 +424,12 @@ function buildSinglesLookupColumnTexts(rows) {
       ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : CASCADE_DELETE_LABEL))
     ],
     [
-      'Pwd Retry',
-      ...rows.map((row) => truncateLookupDisplay(`${Number(row.passwordAttemptCount ?? 0)} Reset`))
+      SOFT_RESET_LABEL,
+      ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : SOFT_RESET_LABEL))
+    ],
+    [
+      HARD_RESET_LABEL,
+      ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : HARD_RESET_LABEL))
     ],
     ['My Refer Code', ...rows.map((row) => truncateLookupDisplay(row.myReferCode || '—'))],
     ['I refer by', ...rows.map((row) => truncateLookupDisplay(formatReferByDisplay(row)))],
@@ -473,7 +483,8 @@ export default function AdminToolsLookupTab({ onError }) {
   const [lastLookupWasAll, setLastLookupWasAll] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveResultPopup, setSaveResultPopup] = useState(null);
-  const [pwdRetryResetBusyById, setPwdRetryResetBusyById] = useState({});
+  const [softResetBusyById, setSoftResetBusyById] = useState({});
+  const [hardResetBusyById, setHardResetBusyById] = useState({});
   const [cascadeDeleteBusyById, setCascadeDeleteBusyById] = useState({});
   const [playerVideoUrl, setPlayerVideoUrl] = useState('');
   const [playerVideoLabel, setPlayerVideoLabel] = useState('');
@@ -514,7 +525,7 @@ export default function AdminToolsLookupTab({ onError }) {
   );
 
   const singlesColumnTexts = useMemo(() => buildSinglesLookupColumnTexts(singlesRows), [singlesRows]);
-  const singlesColumnButtons = useMemo(() => buildSinglesLookupColumnButtons(singlesRows), [singlesRows]);
+  const singlesColumnButtons = useMemo(() => buildSinglesLookupColumnButtons(), []);
   const displaySinglesRows = useMemo(
     () => sortSinglesRowsByVideoAge(singlesRows, videoAgeSortDir),
     [singlesRows, videoAgeSortDir]
@@ -764,30 +775,91 @@ export default function AdminToolsLookupTab({ onError }) {
     singlesRows
   ]);
 
-  const handleResetPwdRetry = useCallback(
-    async (singlesId) => {
-      const id = Number(singlesId);
-      if (!Number.isFinite(id) || id < 1 || pwdRetryResetBusyById[id]) return;
+  const handleSoftResetMember = useCallback(
+    async (row) => {
+      if (isAdminSinglesLookupRow(row)) return;
+      const id = Number(row?.singlesId);
+      if (!Number.isFinite(id) || id < 1 || softResetBusyById[id] || hardResetBusyById[id] || saveBusy || listBusy) {
+        return;
+      }
 
-      setPwdRetryResetBusyById((prev) => ({ ...prev, [id]: true }));
+      const parts = [`singles_id ${id}`];
+      if (row?.alias) parts.push(`alias ${row.alias}`);
+      if (row?.email) parts.push(`email ${row.email}`);
+
+      if (
+        !(await themedConfirm(
+          `Default Reset ${parts.join(', ')}?\n\nRe-applies new-member defaults (demo buddies/requests).\nReplaces Monthly/Yearly bill schedule with SAMPLE defaults (existing bill rows for this member are deleted first).\nDoes NOT delete user photos, postings, bios, custom albums, or custom notes.`
+        ))
+      ) {
+        return;
+      }
+
+      setSoftResetBusyById((prev) => ({ ...prev, [id]: true }));
       onError?.('');
       try {
-        const result = await resetAdminPasswordAttemptCount({ singlesId: id });
-        const nextCount = Number(result?.passwordAttemptCount ?? 0);
-        setSinglesRows((prev) =>
-          prev.map((row) => (row.singlesId === id ? { ...row, passwordAttemptCount: nextCount } : row))
-        );
+        await softResetAdminMemberAccount({ singlesId: id });
+        setSaveResultPopup({
+          kind: 'ok',
+          message: `Default Reset complete for singles_id ${id}. Defaults re-applied; user content kept.`
+        });
       } catch (err) {
-        onError?.(err?.response?.data?.error || err?.message || 'Failed to reset password attempt count');
+        const message = err?.response?.data?.error || err?.message || 'Failed to soft-reset member account';
+        onError?.(message);
+        setSaveResultPopup({ kind: 'error', message });
       } finally {
-        setPwdRetryResetBusyById((prev) => {
+        setSoftResetBusyById((prev) => {
           const next = { ...prev };
           delete next[id];
           return next;
         });
       }
     },
-    [onError, pwdRetryResetBusyById]
+    [hardResetBusyById, listBusy, onError, saveBusy, softResetBusyById]
+  );
+
+  const handleHardResetMember = useCallback(
+    async (row) => {
+      if (isAdminSinglesLookupRow(row)) return;
+      const id = Number(row?.singlesId);
+      if (!Number.isFinite(id) || id < 1 || hardResetBusyById[id] || softResetBusyById[id] || saveBusy || listBusy) {
+        return;
+      }
+
+      const parts = [`singles_id ${id}`];
+      if (row?.alias) parts.push(`alias ${row.alias}`);
+      if (row?.email) parts.push(`email ${row.email}`);
+
+      if (
+        !(await themedConfirm(
+          `Factory Reset ${parts.join(', ')}?\n\nDeletes user photos, postings, bios, bill rows, and requests, then re-applies new-member defaults.\nEncrypted TutaNotes / TutaPhotoAlbums vault files are not auto-wiped.`
+        ))
+      ) {
+        return;
+      }
+
+      setHardResetBusyById((prev) => ({ ...prev, [id]: true }));
+      onError?.('');
+      try {
+        await hardResetAdminMemberAccount({ singlesId: id });
+        setSaveResultPopup({
+          kind: 'ok',
+          message: `Factory Reset complete for singles_id ${id}. User content wiped and defaults re-applied.`
+        });
+        await runLookup();
+      } catch (err) {
+        const message = err?.response?.data?.error || err?.message || 'Failed to hard-reset member account';
+        onError?.(message);
+        setSaveResultPopup({ kind: 'error', message });
+      } finally {
+        setHardResetBusyById((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    },
+    [hardResetBusyById, listBusy, onError, runLookup, saveBusy, softResetBusyById]
   );
 
   const handleCascadeDeleteSingles = useCallback(
@@ -977,8 +1049,19 @@ export default function AdminToolsLookupTab({ onError }) {
                   <ColorTemplate9TableData.HeaderCell sx={{ justifyContent: 'center', ...lookupScrollHeaderCellSx }}>
                     {CASCADE_DELETE_LABEL}
                   </ColorTemplate9TableData.HeaderCell>
-                  <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}>
-                    Pwd Retry
+                  <ColorTemplate9TableData.HeaderCell
+                    columnIndex={SINGLES_COL.RESET}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    title="Re-apply new-member defaults without deleting user content"
+                  >
+                    {SOFT_RESET_LABEL}
+                  </ColorTemplate9TableData.HeaderCell>
+                  <ColorTemplate9TableData.HeaderCell
+                    columnIndex={SINGLES_COL.HARD_RESET}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    title="Cascade-delete user content, then re-apply new-member defaults"
+                  >
+                    {HARD_RESET_LABEL}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}>
                     My Refer Code
@@ -1000,7 +1083,8 @@ export default function AdminToolsLookupTab({ onError }) {
                 </ColorTemplate9TableData.HeaderRow>
 
                 {displaySinglesRows.map((row, index) => {
-                  const pwdRetryBusy = Boolean(pwdRetryResetBusyById[row.singlesId]);
+                  const softResetBusy = Boolean(softResetBusyById[row.singlesId]);
+                  const hardResetBusy = Boolean(hardResetBusyById[row.singlesId]);
                   const cascadeDeleteBusy = Boolean(cascadeDeleteBusyById[row.singlesId]);
                   const pwdRetryCount = Number(row.passwordAttemptCount ?? 0);
                   return (
@@ -1131,7 +1215,7 @@ export default function AdminToolsLookupTab({ onError }) {
                       {isAdminSinglesLookupRow(row) ? null : (
                         <SelectedButtonTemplate
                           type="button"
-                          disabled={cascadeDeleteBusy || saveBusy || listBusy}
+                          disabled={cascadeDeleteBusy || softResetBusy || hardResetBusy || saveBusy || listBusy}
                           onClick={() => void handleCascadeDeleteSingles(row)}
                           sx={{ whiteSpace: 'nowrap' }}
                         >
@@ -1139,15 +1223,35 @@ export default function AdminToolsLookupTab({ onError }) {
                         </SelectedButtonTemplate>
                       )}
                     </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' }, gap: 0.75, alignItems: 'center' }}>
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>{pwdRetryCount}</ColorTemplate9TableData.BodyText>
-                      <SelectedButtonTemplate
-                        type="button"
-                        disabled={pwdRetryBusy || saveBusy}
-                        onClick={() => void handleResetPwdRetry(row.singlesId)}
-                      >
-                        {pwdRetryBusy ? '…' : 'Reset'}
-                      </SelectedButtonTemplate>
+                    <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.RESET}
+                      sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center' }}
+                    >
+                      {isAdminSinglesLookupRow(row) ? null : (
+                        <SelectedButtonTemplate
+                          type="button"
+                          disabled={softResetBusy || hardResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          onClick={() => void handleSoftResetMember(row)}
+                          sx={{ whiteSpace: 'nowrap' }}
+                        >
+                          {softResetBusy ? '…' : SOFT_RESET_LABEL}
+                        </SelectedButtonTemplate>
+                      )}
+                    </ColorTemplate9TableData.BodyCell>
+                    <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.HARD_RESET}
+                      sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center' }}
+                    >
+                      {isAdminSinglesLookupRow(row) ? null : (
+                        <SelectedButtonTemplate
+                          type="button"
+                          disabled={hardResetBusy || softResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          onClick={() => void handleHardResetMember(row)}
+                          sx={{ whiteSpace: 'nowrap' }}
+                        >
+                          {hardResetBusy ? '…' : HARD_RESET_LABEL}
+                        </SelectedButtonTemplate>
+                      )}
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
                       <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx} title={row.myReferCode || undefined}>

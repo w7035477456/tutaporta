@@ -409,26 +409,42 @@ const laneAddButtonWrapSx = {
   width: '100%'
 };
 
-const menuButtonSx = {
-  fontFamily: MAIN_FONT_FAMILY,
+const menuButtonWordPerLineLabelSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
   width: '100%',
   maxWidth: '100%',
   minWidth: 0,
-  justifyContent: 'flex-start',
-  textAlign: 'left',
+  overflow: 'hidden',
+  whiteSpace: 'normal',
+  wordBreak: 'break-word',
+  overflowWrap: 'anywhere',
+  lineHeight: 1.15,
+  textAlign: 'center'
+};
+
+/** Notebook / note / shortcut list rows — one word per row; button width fits longest word. */
+const menuButtonSx = {
+  fontFamily: MAIN_FONT_FAMILY,
+  width: 'auto !important',
+  maxWidth: '100%',
+  minWidth: 0,
+  flex: '0 1 auto',
+  alignSelf: 'center',
+  justifyContent: 'center',
+  textAlign: 'center',
+  alignItems: 'center',
   mb: 0,
   overflow: 'hidden',
-  whiteSpace: 'nowrap',
-  textOverflow: 'ellipsis',
+  height: 'auto !important',
+  minHeight: { xs: 36, sm: 40 },
+  py: { xs: 0.35, sm: 0.4 },
+  px: { xs: 0.45, sm: 0.55 },
+  whiteSpace: 'normal',
   '& .MuiButton-label': {
-    display: 'block',
-    width: '100%',
-    maxWidth: '100%',
-    minWidth: 0,
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
-    textAlign: 'left'
+    ...menuButtonWordPerLineLabelSx
   }
 };
 
@@ -689,15 +705,42 @@ function measureMenuLabelWidth(label, rem = getVaultDefaultButtonFontSizeRem()) 
   return ctx.measureText(String(label || '')).width;
 }
 
-/** Notebook column width so each notebook label fits on one line. */
+function measureMenuLabelLongestWordWidth(label, rem = getVaultDefaultButtonFontSizeRem()) {
+  const words = String(label ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return measureMenuLabelWidth('Untitled', rem);
+  return Math.max(...words.map((word) => measureMenuLabelWidth(word, rem)));
+}
+
+/** Renders sidebar menu labels with each whitespace-delimited word on its own row. */
+function renderMenuLabelOneWordPerLine(label) {
+  const text = String(label ?? '').trim();
+  if (!text) return '—';
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return text;
+  return words.map((word, index) => (
+    <Box
+      // eslint-disable-next-line react/no-array-index-key
+      key={`${word}-${index}`}
+      component="span"
+      sx={{ display: 'block', width: '100%', textAlign: 'center' }}
+    >
+      {word}
+    </Box>
+  ));
+}
+
+/** Notebook column width — fit the longest single word (labels stack one word per row). */
 function computeNotebookColFitWidth(notebooks, rem = getVaultDefaultButtonFontSizeRem()) {
   if (!notebooks?.length) return DEFAULT_NOTEBOOK_COL_WIDTH;
-  let maxLabel = 0;
+  let maxWord = 0;
   for (const nb of notebooks) {
-    maxLabel = Math.max(maxLabel, measureMenuLabelWidth(nb.notebook_name || 'Untitled', rem));
+    maxWord = Math.max(maxWord, measureMenuLabelLongestWordWidth(nb.notebook_name || 'Untitled', rem));
   }
   const chromePx = 64;
-  return Math.max(MIN_MENU_COL_WIDTH, Math.ceil(maxLabel + chromePx));
+  return Math.max(MIN_MENU_COL_WIDTH, Math.ceil(maxWord + chromePx));
 }
 
 
@@ -888,7 +931,17 @@ function MenuRowWithDelete({
           />
         </Box>
       ) : null}
-      <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'visible' }}>{children}</Box>
+      <Box
+        sx={{
+          flex: '1 1 0',
+          minWidth: 0,
+          overflow: 'visible',
+          display: 'flex',
+          justifyContent: 'center'
+        }}
+      >
+        {children}
+      </Box>
       {onDelete ? (
         <ThumbnailDeleteXButton
           aria-label={deleteLabel}
@@ -939,7 +992,7 @@ function MenuRowButton({
       draggable={draggable}
       sx={{
         ...menuButtonSx,
-        justifyContent: 'flex-start',
+        justifyContent: 'center',
         ...(lookSelected && !locked
           ? selectedBlue && selected
             ? {
@@ -1037,7 +1090,7 @@ function ShortcutMenuRow({
             : undefined
         }
       >
-        {label ?? shortcut.label}
+        {renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
       </MenuRowButton>
     </MenuRowWithDelete>
   );
@@ -1184,7 +1237,10 @@ function RenamableDraggableMenuRow({
       lockTitle={lockTitle}
       locked={locked}
     >
-      <Box id={domId || undefined} sx={{ width: '100%' }}>
+      <Box
+        id={domId || undefined}
+        sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
+      >
         <MenuRowButton
           selected={selected}
           selectedBlue={selectedBlue}
@@ -1269,19 +1325,7 @@ function RenamableDraggableMenuRow({
           {locked ? (
             RECORD_VAULT_INNER_LOCKED_LABEL
           ) : (
-            <Box
-              component="span"
-              sx={{
-                display: 'block',
-                minWidth: 0,
-                maxWidth: '100%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {label}
-            </Box>
+            renderMenuLabelOneWordPerLine(label)
           )}
         </MenuRowButton>
       </Box>

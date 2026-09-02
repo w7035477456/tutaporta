@@ -40,6 +40,7 @@ import {
   colorTemplate9TableRowBg,
   colorTemplate9TableShellSx,
   colorTemplate9TableHorizontalScrollShellSx,
+  colorTemplate9TableTopHorizontalScrollShellSx,
   colorTemplate9TableTabBarSx,
   colorTemplate9TableTitleSx,
   colorTemplate9FrozenColumnStickyCellSx
@@ -292,13 +293,15 @@ function ColorTemplate9TableDataTable({
       isSyncingScrollRef.current = false;
     };
 
+    topEl.scrollLeft = bottomEl.scrollLeft;
+
     topEl.addEventListener('scroll', syncFromTop, { passive: true });
     bottomEl.addEventListener('scroll', syncFromBottom, { passive: true });
     return () => {
       topEl.removeEventListener('scroll', syncFromTop);
       bottomEl.removeEventListener('scroll', syncFromBottom);
     };
-  }, [topHorizontalScrollbar]);
+  }, [topHorizontalScrollbar, minTableWidth]);
 
   const content = (
     <Box sx={{ minWidth: minTableWidth || 0, width: minTableWidth ? minTableWidth : '100%' }}>
@@ -328,15 +331,19 @@ function ColorTemplate9TableDataTable({
         {topHorizontalScrollbar ? (
           <Box
             ref={topScrollRef}
+            aria-hidden
             sx={{
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              height: 12,
-              borderLeft: '1px solid transparent',
-              borderRight: '1px solid transparent'
+              ...colorTemplate9TableTopHorizontalScrollShellSx(),
+              transform: 'scaleY(-1)'
             }}
           >
-            <Box sx={{ minWidth: minTableWidth || 0, height: 1 }} />
+            <Box
+              sx={{
+                minWidth: minTableWidth || 0,
+                height: 1,
+                transform: 'scaleY(-1)'
+              }}
+            />
           </Box>
         ) : null}
         <Box ref={bottomScrollRef} sx={scrollShellSx}>
