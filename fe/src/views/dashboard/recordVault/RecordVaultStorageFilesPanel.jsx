@@ -28,7 +28,7 @@ const panelScrollSx = {
   minHeight: 0,
   overflowY: 'scroll',
   overflowX: 'auto',
-  bgcolor: 'var(--theme-yellow-color)',
+  bgcolor: 'var(--theme-daynight-color)',
   color: '#000 !important',
   WebkitTextFillColor: '#000 !important',
   border: '2px solid #000',

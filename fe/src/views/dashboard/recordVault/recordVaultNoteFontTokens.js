@@ -35,7 +35,7 @@ export const RECORD_VAULT_FONT_SIZE_PT_MAX =
 
 /** Font color swatch: 0 = black (matches user_customization.mynote_font_color_index). */
 export const RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX = 0;
-/** Note panel background: 1 = white (mynote_content_bg_index). NULL in DB → this default. */
+/** Note panel background: 1 = theme daynight (mynote_content_bg_index). NULL in DB → this default. */
 export const RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX = 1;
 /**
  * Text highlight / text-bg (mynote_text_highlight_index).
@@ -107,18 +107,29 @@ export function recordVaultTextHighlightColorAt(index) {
 }
 
 export function recordVaultContentPanelBgColor(bgColorIndex) {
-  const color = recordVaultBgColorAt(bgColorIndex);
-  return color || 'var(--theme-daynight-color)';
+  const i = Number(bgColorIndex);
+  if (
+    !Number.isFinite(i) ||
+    i < 0 ||
+    i >= RECORD_VAULT_BG_COLOR_COUNT ||
+    i === RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX
+  ) {
+    return 'var(--theme-daynight-color)';
+  }
+  return RECORD_VAULT_CONTENT_BG_COLORS[i];
 }
 
 export function recordVaultThemeDaynightShellSx(bgColorIndex) {
-  const color = recordVaultBgColorAt(bgColorIndex);
-  if (!color) {
-    return { bgcolor: 'var(--theme-daynight-color)' };
+  const bg = recordVaultContentPanelBgColor(bgColorIndex);
+  if (bg === 'var(--theme-daynight-color)') {
+    return {
+      bgcolor: 'var(--theme-daynight-color)',
+      color: 'var(--theme-inverse-daynight-color)'
+    };
   }
   return {
-    bgcolor: color,
-    '--theme-daynight-color': color
+    bgcolor: bg,
+    '--theme-daynight-color': bg
   };
 }
 

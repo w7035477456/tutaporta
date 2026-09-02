@@ -5,7 +5,9 @@ import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import 'katex/dist/katex.min.css';
 
-import { buildRecordVaultEditorExtensions } from './recordVaultEditorExtensions';
+import {
+  buildRecordVaultEditorExtensions
+} from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
 import {
   buildRecordVaultPasteHtml,
@@ -13,6 +15,10 @@ import {
   recordVaultPasteSignature,
   shouldHandleRecordVaultPaste
 } from './recordVaultPasteFromClipboard';
+import {
+  RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
+  recordVaultThemeDaynightShellSx
+} from './recordVaultNoteFontTokens';
 import RecordVaultEditorToolbar from './RecordVaultEditorToolbar';
 import './recordVaultEditor.scss';
 
@@ -43,7 +49,8 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
     onReady,
     onContentHeightChange,
     header = null,
-    contentZoom = 100
+    contentZoom = 100,
+    contentBgIndex = RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX
   },
   ref
 ) {
@@ -295,7 +302,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
   });
 
   return (
-    <Box className="rv-editor">
+    <Box className="rv-editor" sx={recordVaultThemeDaynightShellSx(contentBgIndex)}>
       <RecordVaultEditorToolbar editor={editor} />
 
       {editor ? (
@@ -348,7 +355,8 @@ RecordVaultNoteEditor.propTypes = {
   onReady: PropTypes.func,
   onContentHeightChange: PropTypes.func,
   header: PropTypes.node,
-  contentZoom: PropTypes.number
+  contentZoom: PropTypes.number,
+  contentBgIndex: PropTypes.number
 };
 
 export default RecordVaultNoteEditor;

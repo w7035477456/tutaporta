@@ -12,8 +12,14 @@ export const TUTANOTES_USB_TITLE = 'TutaNotes USB';
 export const TUTANOTES_USB_LOGIN_TITLE = 'TutaNotes USB Login';
 export const TUTANOTES_USB_DECRYPT_TITLE = 'Icon Decrypt USB TutaNotes';
 
+/** Workspace panels (header strip, notebook lanes) — theme daylight. */
+export const TUTANOTES_WORKSPACE_PANEL_BG = 'var(--theme-daylight-color)';
+
+/** Main content (note editor, bill schedule, right sidebar) — theme daynight. */
+export const TUTANOTES_WORKSPACE_CONTENT_BG = 'var(--theme-daynight-color)';
+
 /** Tab + expanded workspace chrome (matches MyRecordVault dual-login tabs). */
-export const TUTANOTES_ONEDRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';
+export const TUTANOTES_ONEDRIVE_STRIP_COLOR = TUTANOTES_WORKSPACE_PANEL_BG;
 export const TUTANOTES_USB_STRIP_COLOR = '#6EB5E0';
 /** “TutaNotes on USB” tab / pane title text on the light-blue strip. */
 export const TUTANOTES_USB_TAB_LABEL_COLOR = '#9B3DBA';
@@ -22,14 +28,14 @@ export function tutaNotesStorageStripColor(storageType) {
   return storageType === 'onedrive' ? TUTANOTES_ONEDRIVE_STRIP_COLOR : TUTANOTES_USB_STRIP_COLOR;
 }
 
-/** Expanded workspace yellow header — matches storage tab labels. */
+/** Expanded workspace header strip — theme daylight (OneDrive / TutaDrive). USB keeps light-blue strip. */
 export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = 'TutaNotes on OneDrive';
 export const TUTANOTES_TUTADRIVE_WORKSPACE_TITLE = 'TutaNotes on TutaDrive';
 export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
 export const TUTANOTES_TUTADRIVE_LOGIN_TITLE = 'TutaNotes';
 export const TUTANOTES_TUTADRIVE_OPEN_LABEL = 'Open TutaDrive Cloud';
-export const TUTANOTES_TUTADRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';
+export const TUTANOTES_TUTADRIVE_STRIP_COLOR = TUTANOTES_WORKSPACE_PANEL_BG;
 /** Volume name only — radio rows append " (vault, 61.9 GB, EXFAT)". */
 export function shortUsbVolumeName(label) {
   const raw = String(label || '').trim();

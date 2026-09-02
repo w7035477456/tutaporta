@@ -4,8 +4,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  color: #111111;
+  background: var(--theme-daynight-color);
+  color: var(--theme-inverse-daynight-color);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -128,6 +128,8 @@
     padding: 16px 20px;
     outline: none;
     line-height: 1.6;
+    background: var(--theme-daynight-color);
+    color: var(--theme-inverse-daynight-color);
 
     > * + * {
       margin-top: 0.6em;

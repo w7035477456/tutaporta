@@ -10,7 +10,8 @@ import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
 import {
   TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL,
   TUTANOTES_USB_VIDEO_TUTORIAL_LABEL,
-  TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL
+  TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL,
+  TUTANOTES_WORKSPACE_PANEL_BG
 } from './tutaNotesBranding';
 import RecordVaultDataPlanDialog from './RecordVaultDataPlanDialog';
 import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
@@ -87,7 +88,7 @@ function UsageBarShell({ children, actions, blackBar = false }) {
       sx={{
         flexShrink: 0,
         width: '100%',
-        bgcolor: blackBar ? '#000' : 'var(--theme-secondary-color)',
+        bgcolor: blackBar ? '#000' : TUTANOTES_WORKSPACE_PANEL_BG,
         borderBottom: blackBar ? '2px solid #000' : '2px solid var(--theme-primary-color)',
         px: { xs: 1, md: 1.5 },
         py: 0.55,

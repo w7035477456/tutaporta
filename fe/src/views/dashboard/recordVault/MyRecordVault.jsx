@@ -51,6 +51,7 @@ import {
   TUTANOTES_USB_PANE_TOOLTIP,
   TUTANOTES_USB_STRIP_COLOR,
   TUTANOTES_USB_TAB_LABEL_COLOR,
+  TUTANOTES_WORKSPACE_PANEL_BG,
   formatUsbWorkspaceTitle
 } from './tutaNotesBranding';
 import { clearTutaNotesTutorialChrome } from './tutaNotesTutorialChrome';
@@ -146,7 +147,7 @@ const paneHeaderBarSx = {
   gap: 1,
   px: 1.25,
   py: 0.35,
-  bgcolor: 'var(--theme-yellow-color)',
+  bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
   borderBottom: '2px solid #000'
 };
 
@@ -832,7 +833,7 @@ export default function MyRecordVault() {
         display: 'flex',
         flexDirection: 'column',
         fontFamily: MAIN_FONT_FAMILY,
-        bgcolor: 'var(--theme-daynight-color)'
+        bgcolor: TUTANOTES_WORKSPACE_PANEL_BG
       }}
     >
       <RecordVaultAccessGate
@@ -928,7 +929,7 @@ export default function MyRecordVault() {
                   borderColor: cloudTabColor,
                   overflow: showDual ? 'visible' : 'hidden',
                   bgcolor:
-                    showDual || !oneDriveUnlocked ? cloudTabColor : 'var(--theme-daynight-color)'
+                    showDual || !oneDriveUnlocked ? cloudTabColor : TUTANOTES_WORKSPACE_PANEL_BG
                 }}
               >
                 {/* Yellow title row when only one storage mode is offered, or per-pane titles in compare. */}
@@ -965,7 +966,7 @@ export default function MyRecordVault() {
                   display: usbVisible ? 'flex' : 'none',
                   borderColor: USB_TAB_COLOR,
                   overflow: showDual ? 'visible' : 'hidden',
-                  bgcolor: showDual || !usbUnlocked ? USB_TAB_COLOR : 'var(--theme-daynight-color)'
+                  bgcolor: showDual || !usbUnlocked ? USB_TAB_COLOR : TUTANOTES_WORKSPACE_PANEL_BG
                 }}
               >
                 {!showTabBar || showCompare ? (
@@ -1005,7 +1006,7 @@ export default function MyRecordVault() {
             inset: 0,
             zIndex: 15000,
             overflow: 'auto',
-            bgcolor: 'var(--theme-daynight-color)',
+            bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
             p: { xs: 1, sm: 2 }
           }}
         >

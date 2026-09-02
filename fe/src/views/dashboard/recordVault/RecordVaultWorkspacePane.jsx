@@ -130,7 +130,7 @@ import {
   resolveInnerUnlockLockedUntilMs,
   wipeAllPersistedInnerUnlockPins
 } from 'utils/recordVaultNoteInnerUnlockStorage';
-import { tutaNotesStorageStripColor } from './tutaNotesBranding';
+import { TUTANOTES_WORKSPACE_CONTENT_BG, TUTANOTES_WORKSPACE_PANEL_BG, tutaNotesStorageStripColor } from './tutaNotesBranding';
 import {
   cleanRecordVaultNoteBodyHtml,
   recordVaultRichTextHasContent,
@@ -302,7 +302,7 @@ const myNoteBackgroundPanelSx = {
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat',
-  bgcolor: 'var(--theme-daynight-color)'
+  bgcolor: TUTANOTES_WORKSPACE_PANEL_BG
 };
 
 /** Slight dim so the colorful hourglass reads clearly over myNoteBackground.png. */
@@ -533,7 +533,7 @@ const menuColumnShellSx = {
   border: '2px solid var(--theme-primary-color)',
   borderRadius: 1,
   p: 1,
-  bgcolor: 'var(--theme-secondary-color)',
+  bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
   minHeight: 320,
   // visible so Add Notebook / Add Note +25% hover scale is not clipped
   overflow: 'visible',
@@ -543,6 +543,18 @@ const menuColumnShellSx = {
 
 const menuColumnShellCompactSx = {
   ...menuColumnShellSx,
+  minHeight: 0,
+  p: 0.75
+};
+
+/** Right sidebar Shortcut / Folders columns — daynight content surface. */
+const menuColumnShellContentSx = {
+  ...menuColumnShellSx,
+  bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
+};
+
+const menuColumnShellContentCompactSx = {
+  ...menuColumnShellContentSx,
   minHeight: 0,
   p: 0.75
 };
@@ -5981,7 +5993,7 @@ export default function RecordVaultWorkspacePane({
         display: 'flex',
         flexDirection: 'column',
         fontFamily: MAIN_FONT_FAMILY,
-        bgcolor: 'var(--theme-daynight-color)',
+        bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
         overflow: 'hidden'
       }}
     >
@@ -6840,7 +6852,7 @@ export default function RecordVaultWorkspacePane({
                 minWidth: 0,
                 minHeight: 0,
                 overflow: 'auto',
-                bgcolor: 'var(--theme-daynight-color)',
+                bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
                 p: { xs: 1, sm: 2 }
               }}
             >
@@ -6868,7 +6880,7 @@ export default function RecordVaultWorkspacePane({
                   minWidth: compareMode ? { md: 0 } : undefined,
                   display: 'flex',
                   flexDirection: 'column',
-                  bgcolor: 'var(--theme-secondary-color)',
+                  bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
                   minHeight: compact || compareMode ? 0 : { xs: 280, md: '100%' },
                   overflow: 'hidden',
                   boxSizing: 'border-box'
@@ -7225,7 +7237,7 @@ export default function RecordVaultWorkspacePane({
                     maxWidth: '100%',
                     border: '2px solid var(--theme-primary-color)',
                     borderRadius: 1,
-                    bgcolor: 'var(--theme-secondary-color)',
+                    bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
                     p: compact ? 0.75 : 1,
                     boxSizing: 'border-box',
                     display: 'flex',
@@ -7329,7 +7341,8 @@ export default function RecordVaultWorkspacePane({
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
             }}
           >
             {(() => {
@@ -7366,6 +7379,7 @@ export default function RecordVaultWorkspacePane({
                       onReady={handleEditorReady}
                       onChange={scheduleSave}
                       contentZoom={noteContentZoom}
+                      contentBgIndex={noteContentBgIndex}
                       header={
                         selectedNote && !lockedNow ? (
                           <Box
@@ -7584,7 +7598,7 @@ export default function RecordVaultWorkspacePane({
                   minWidth: compareMode ? { md: 0 } : undefined,
                   display: 'flex',
                   flexDirection: 'column',
-                  bgcolor: 'var(--theme-secondary-color)',
+                  bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
                   minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
                   borderLeft: { md: '2px solid var(--theme-primary-color)' },
                   overflow: 'hidden',
@@ -7597,7 +7611,7 @@ export default function RecordVaultWorkspacePane({
                 >
                   <Box
                     sx={{
-                      ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                      ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
                       flex: `${shortcutPanePercent} 1 0`,
                       minHeight: compact ? 64 : 100
                     }}

@@ -14,6 +14,7 @@ import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
 import BillScheduleTutorialTrigger from './BillScheduleTutorialTrigger';
+import { TUTANOTES_WORKSPACE_CONTENT_BG } from './tutaNotesBranding';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -442,7 +443,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
         display: 'flex',
         flexDirection: 'column',
         overflow: 'auto',
-        bgcolor: '#fff',
+        bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
         color: '#000',
         fontFamily: MAIN_FONT_FAMILY,
         p: 1.5,
@@ -719,7 +720,7 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
             minWidth: 0,
             border: '2px solid #000',
             borderRadius: 1,
-            bgcolor: '#fff',
+            bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
             px: 1,
             py: 0.65,
             display: 'flex',
