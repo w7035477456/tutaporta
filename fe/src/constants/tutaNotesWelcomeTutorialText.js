@@ -8,7 +8,7 @@ export const TUTANOTES_WELCOME_TUTORIAL_CONTEXT_TITLE = 'Current Context Tutoria
 export const TUTANOTES_WELCOME_TUTORIAL_CONTEXT_STEP = 'You are in TutaNotes.';
 
 export const TUTANOTES_WELCOME_TUTORIAL_INTRO =
-  'Welcome! We’ve created a sample note (Note 1) inside Notebook 1 to help you get started (feel free to rename the titles)';
+  'Welcome! We’ve created sample notes (SAMPLE NOTE1 and SAMPLE NOTE2) inside SAMPLE NOTEBOOK to help you get started (feel free to rename the titles)';
 
 /** Numbered tutorial lines shown in the popup (bold labels + body). */
 export const TUTANOTES_WELCOME_TUTORIAL_ITEMS = [
@@ -42,7 +42,7 @@ export const TUTANOTES_WELCOME_TUTORIAL_ITEMS = [
   },
   {
     label: '8. Help & Dictation:',
-    body: 'Click “Tutorial” in the top-right corner to access tutorials and voice dictation.'
+    body: 'Click “Tutorial” in the top-right corner to access tutorials and voice dictation. Starter SAMPLE NOTE1 / SAMPLE NOTE2 can be edited or deleted anytime.'
   },
   {
     label: '9. Upgrade Speed:',

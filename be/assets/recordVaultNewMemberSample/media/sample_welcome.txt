@@ -1,0 +1,2 @@
+TutaNotes shared sample attachment (SAMPLE NOTE1).
+All users point at this same file.

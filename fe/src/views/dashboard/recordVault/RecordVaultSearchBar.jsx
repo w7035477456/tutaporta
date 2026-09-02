@@ -20,37 +20,6 @@ const searchFieldSx = {
   }
 };
 
-function LogicToggle({ value, onChange, ariaLabel }) {
-  const isAnd = value === 'and';
-  return (
-    <SliderControlButton
-      type="button"
-      variant="yellow"
-      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-      aria-label={ariaLabel}
-      aria-pressed={isAnd}
-      onClick={() => onChange(isAnd ? 'or' : 'and')}
-      sx={{
-        flex: '0 0 auto',
-        width: 'auto',
-        minWidth: 0,
-        height: 'auto',
-        flexDirection: 'column',
-        lineHeight: 0.9,
-        px: { xs: 0.2, sm: 0.3 },
-        py: { xs: 0.08, sm: 0.12 }
-      }}
-    >
-      <Box component="span" sx={{ opacity: isAnd ? 1 : 0.4 }}>
-        And
-      </Box>
-      <Box component="span" sx={{ opacity: isAnd ? 0.4 : 1 }}>
-        Or
-      </Box>
-    </SliderControlButton>
-  );
-}
-
 const searchActionButtonSx = {
   width: 'max-content',
   minWidth: 'max-content',
@@ -61,19 +30,9 @@ const searchActionButtonSx = {
   whiteSpace: 'nowrap'
 };
 
-LogicToggle.propTypes = {
-  value: PropTypes.oneOf(['and', 'or']).isRequired,
-  onChange: PropTypes.func.isRequired,
-  ariaLabel: PropTypes.string
-};
-
 export default function RecordVaultSearchBar({
   term1,
-  term2,
-  op1,
   onTerm1Change,
-  onTerm2Change,
-  onOp1Change,
   onSubmit,
   onClear,
   searchBusy = false,
@@ -137,17 +96,7 @@ export default function RecordVaultSearchBar({
         onChange={(e) => onTerm1Change(e.target.value)}
         onKeyDown={handleKeyDown}
         sx={searchFieldSx}
-        inputProps={{ 'aria-label': 'Search term 1' }}
-      />
-      <LogicToggle value={op1} onChange={onOp1Change} ariaLabel="Toggle And or Or between term 1 and term 2" />
-      <TextField
-        size="small"
-        placeholder="Term 2"
-        value={term2}
-        onChange={(e) => onTerm2Change(e.target.value)}
-        onKeyDown={handleKeyDown}
-        sx={searchFieldSx}
-        inputProps={{ 'aria-label': 'Search term 2' }}
+        inputProps={{ 'aria-label': 'Search term' }}
       />
     </Box>
   );
@@ -155,11 +104,7 @@ export default function RecordVaultSearchBar({
 
 RecordVaultSearchBar.propTypes = {
   term1: PropTypes.string,
-  term2: PropTypes.string,
-  op1: PropTypes.oneOf(['and', 'or']),
   onTerm1Change: PropTypes.func,
-  onTerm2Change: PropTypes.func,
-  onOp1Change: PropTypes.func,
   onSubmit: PropTypes.func,
   onClear: PropTypes.func,
   searchBusy: PropTypes.bool,

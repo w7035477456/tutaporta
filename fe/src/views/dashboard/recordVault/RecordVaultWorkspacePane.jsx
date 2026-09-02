@@ -418,15 +418,18 @@ const menuButtonWordPerLineLabelSx = {
   width: '100%',
   maxWidth: '100%',
   minWidth: 0,
-  overflow: 'hidden',
+  overflow: 'visible',
   whiteSpace: 'normal',
-  wordBreak: 'break-word',
-  overflowWrap: 'anywhere',
+  wordBreak: 'normal',
+  overflowWrap: 'normal',
   lineHeight: 1.15,
   textAlign: 'center'
 };
 
-/** Notebook / note / shortcut list rows — one word per row; button width fits longest word. */
+/**
+ * Notebook / note / shortcut list rows — one whitespace-delimited word per row
+ * (MUI Button is inline-flex row by default; force column so stacked word spans show).
+ */
 const menuButtonSx = {
   fontFamily: MAIN_FONT_FAMILY,
   width: 'auto !important',
@@ -434,16 +437,19 @@ const menuButtonSx = {
   minWidth: 0,
   flex: '0 1 auto',
   alignSelf: 'center',
+  display: 'inline-flex !important',
+  flexDirection: 'column !important',
   justifyContent: 'center',
   textAlign: 'center',
   alignItems: 'center',
   mb: 0,
-  overflow: 'hidden',
+  overflow: 'visible',
   height: 'auto !important',
   minHeight: { xs: 36, sm: 40 },
   py: { xs: 0.35, sm: 0.4 },
   px: { xs: 0.45, sm: 0.55 },
-  whiteSpace: 'normal',
+  whiteSpace: 'normal !important',
+  lineHeight: '1.15 !important',
   '& .MuiButton-label': {
     ...menuButtonWordPerLineLabelSx
   }
@@ -720,17 +726,33 @@ function renderMenuLabelOneWordPerLine(label) {
   const text = String(label ?? '').trim();
   if (!text) return '—';
   const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return text;
-  return words.map((word, index) => (
-    <Box
-      // eslint-disable-next-line react/no-array-index-key
-      key={`${word}-${index}`}
-      component="span"
-      sx={{ display: 'block', width: '100%', textAlign: 'center' }}
-    >
-      {word}
+  if (words.length <= 1) {
+    return (
+      <Box component="span" sx={{ ...menuButtonWordPerLineLabelSx, display: 'block' }}>
+        {text}
+      </Box>
+    );
+  }
+  return (
+    <Box component="span" sx={menuButtonWordPerLineLabelSx}>
+      {words.map((word, index) => (
+        <Box
+          // eslint-disable-next-line react/no-array-index-key
+          key={`${word}-${index}`}
+          component="span"
+          sx={{
+            display: 'block',
+            width: '100%',
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+            lineHeight: 1.15
+          }}
+        >
+          {word}
+        </Box>
+      ))}
     </Box>
-  ));
+  );
 }
 
 /** Notebook column width — fit the longest single word (labels stack one word per row). */
@@ -1485,8 +1507,6 @@ export default function RecordVaultWorkspacePane({
   // user clicks it to edit; flips back to highlight view on blur / note swap.
   const [titleEditing, setTitleEditing] = useState(false);
   const [searchTerm1, setSearchTerm1] = useState('');
-  const [searchTerm2, setSearchTerm2] = useState('');
-  const [searchOp1, setSearchOp1] = useState('and');
   /** Non-null only after the user presses Search (or Clear resets to null). */
   const [searchResults, setSearchResults] = useState(null);
   /** Terms from the last Search press — highlights/Found bar ignore typing until then. */
@@ -2516,22 +2536,21 @@ export default function RecordVaultWorkspacePane({
 
   const runSearch = useCallback(async () => {
     const t1 = searchTerm1.trim();
-    const t2 = searchTerm2.trim();
-    if (!t1 && !t2) {
+    if (!t1) {
       setAppliedSearchTerms([]);
       setSearchResults(null);
       setSearchMessage('');
       return;
     }
-    setAppliedSearchTerms([t1, t2].filter(Boolean));
+    setAppliedSearchTerms([t1]);
     setSearchBusy(true);
     setError('');
     try {
       const results = await vaultApi.searchRecordVaultNotes({
         q1: t1,
-        q2: t2,
+        q2: '',
         q3: '',
-        op1: searchOp1,
+        op1: 'and',
         op2: 'and'
       });
       const noteById = new Map();
@@ -2592,19 +2611,17 @@ export default function RecordVaultWorkspacePane({
         ids.add(noteId);
         merged.push(row);
       }
-      for (const query of [t1, t2].filter(Boolean)) {
-        for (const hit of searchIndexedNotes(query, { excludeNoteIds: excludeLockedIds })) {
-          if (ids.has(hit.noteId)) continue;
-          const found = noteById.get(hit.noteId);
-          if (!found) continue;
-          if (isNoteHiddenFromSearch(found.note, found.notebook.notes || [])) continue;
-          ids.add(hit.noteId);
-          merged.push({
-            note_id: hit.noteId,
-            notebook_id: found.notebook.notebook_id,
-            note_name: found.note.note_name || hit.title
-          });
-        }
+      for (const hit of searchIndexedNotes(t1, { excludeNoteIds: excludeLockedIds })) {
+        if (ids.has(hit.noteId)) continue;
+        const found = noteById.get(hit.noteId);
+        if (!found) continue;
+        if (isNoteHiddenFromSearch(found.note, found.notebook.notes || [])) continue;
+        ids.add(hit.noteId);
+        merged.push({
+          note_id: hit.noteId,
+          notebook_id: found.notebook.notebook_id,
+          note_name: found.note.note_name || hit.title
+        });
       }
       setSearchResults(merged);
       setSearchMessage(merged.length ? `${merged.length} note(s) found` : 'No notes match your search');
@@ -2634,17 +2651,13 @@ export default function RecordVaultWorkspacePane({
     noteHasInnerEncryption,
     isInnerNoteUnlocked,
     notebooks,
-    searchOp1,
     searchTerm1,
-    searchTerm2,
     selectNoteId,
     vaultApi
   ]);
 
   const handleClearSearch = useCallback(() => {
     setSearchTerm1('');
-    setSearchTerm2('');
-    setSearchOp1('and');
     setAppliedSearchTerms([]);
     setSearchResults(null);
     setSearchMessage('');
@@ -6706,18 +6719,11 @@ export default function RecordVaultWorkspacePane({
             {!compareMode ? (
             <RecordVaultSearchBar
               term1={searchTerm1}
-              term2={searchTerm2}
-              op1={searchOp1}
               onTerm1Change={setSearchTerm1}
-              onTerm2Change={setSearchTerm2}
-              onOp1Change={setSearchOp1}
               onSubmit={() => void runSearch()}
               onClear={handleClearSearch}
               searchBusy={searchBusy}
-              clearDisabled={
-                busy ||
-                (!(searchTerm1.trim() || searchTerm2.trim()) && !searchActive)
-              }
+              clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
               bgcolor={paneStripColor}
             />
             ) : (

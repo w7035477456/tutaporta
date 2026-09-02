@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "seedMarker": "rv-new-member-sample-v1",
+  "notebookName": "SAMPLE NOTEBOOK",
+  "notes": [
+    {
+      "noteKey": "sample-note-1",
+      "noteName": "SAMPLE NOTE1",
+      "bodyHtmlFile": "sampleNote1Body.html",
+      "displayOrder": 0,
+      "shortcut": true,
+      "attachments": [
+        {
+          "sharedKey": "welcome-pdf",
+          "attachmentId": 1,
+          "sourceFile": "sample_welcome.pdf",
+          "fileName": "sample_welcome.pdf",
+          "fileExtension": "pdf",
+          "fileSizeBytes": 594,
+          "checksum": "01023dc513fffa44eac665782c409e43928c1b6f0a0e30c0a4f1cc9dcd970777",
+          "mimeType": "application/pdf"
+        },
+        {
+          "sharedKey": "welcome-txt",
+          "attachmentId": 2,
+          "sourceFile": "sample_welcome.txt",
+          "fileName": "sample_welcome.txt",
+          "fileExtension": "txt",
+          "fileSizeBytes": 86,
+          "checksum": "73c6a3c61334d14f8d2f38dd249cb2d691ae9bb5da3f03327da756392baedbf4",
+          "mimeType": "text/plain"
+        },
+        {
+          "sharedKey": "welcome-png",
+          "attachmentId": 3,
+          "sourceFile": "sample_welcome.png",
+          "fileName": "sample_welcome.png",
+          "fileExtension": "png",
+          "fileSizeBytes": 69,
+          "checksum": "edee5069c02ce271861c4d58b035e04999703c495b7af23e17d4bbfffd337e45",
+          "mimeType": "image/png"
+        },
+        {
+          "sharedKey": "welcome-jpg",
+          "attachmentId": 4,
+          "sourceFile": "sample_welcome.jpg",
+          "fileName": "sample_welcome.jpg",
+          "fileExtension": "jpg",
+          "fileSizeBytes": 332,
+          "checksum": "3d53287e8f7fe6438170e3ce451a83d4fee21cad67e38cf96ef79492f535e473",
+          "mimeType": "image/jpeg"
+        }
+      ]
+    },
+    {
+      "noteKey": "sample-note-2",
+      "noteName": "SAMPLE NOTE2",
+      "bodyHtmlFile": "sampleNote2Body.html",
+      "displayOrder": 1,
+      "shortcut": false,
+      "attachments": [
+        {
+          "sharedKey": "formats-txt",
+          "attachmentId": 5,
+          "sourceFile": "sample_formats.txt",
+          "fileName": "sample_formats.txt",
+          "fileExtension": "txt",
+          "fileSizeBytes": 135,
+          "checksum": "fd5200c3cca7409b32f7c274ec4b0b6f2b2f0c608a11c14208746bdec9a70bb1",
+          "mimeType": "text/plain"
+        },
+        {
+          "sharedKey": "formats-csv",
+          "attachmentId": 6,
+          "sourceFile": "sample_formats.csv",
+          "fileName": "sample_formats.csv",
+          "fileExtension": "csv",
+          "fileSizeBytes": 46,
+          "checksum": "9a74391ab25a4f510091eebe9593a2feef13b707f0f16ea4e905806f82a3f8f2",
+          "mimeType": "text/csv"
+        }
+      ]
+    }
+  ]
+}

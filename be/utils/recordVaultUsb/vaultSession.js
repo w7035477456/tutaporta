@@ -51,12 +51,19 @@ import {
 } from './unlockGuard.js';
 import {
   DEFAULT_BODY_TEXT,
-  DEFAULT_NOTEBOOKS,
-  DEFAULT_SAMPLE_NOTE_NAME,
-  DEFAULT_SAMPLE_NOTE_BODY_HTML,
   NOTE_EXTRA_IMAGES_MIGRATION_SQL,
   VAULT_SCHEMA_SQL
 } from './vaultSchema.js';
+import {
+  ensureRecordVaultNewMemberSampleDb,
+  ensureRecordVaultSharedContentKeyColumn,
+  seedRecordVaultNewMemberSampleDb,
+  seedRecordVaultNewMemberSampleMedia
+} from '../recordVaultNewMemberSample/seedRecordVaultNewMemberSample.js';
+import {
+  readRecordVaultSharedSampleForAttachmentRow,
+  resolveRecordVaultSharedContentKey
+} from '../recordVaultNewMemberSample/sharedSampleMedia.js';
 
 /** Prefix for FE inner-layer ciphertext stored in notes.body_text (Argon2id + AES-256-GCM). */
 export const NOTE_INNER_ENCRYPT_BODY_PREFIX = '\u2063RVI';
@@ -409,9 +416,27 @@ export function writeEncryptedVaultFile(session, relativePath, buffer) {
 
 export function readEncryptedVaultFile(session, relativePath) {
   const abs = resolveVaultFileStoragePath(session.mountPath, relativePath);
-  if (!fs.existsSync(abs)) return null;
-  const enc = fs.readFileSync(abs);
-  return openVaultBuffer(enc, session.key);
+  if (fs.existsSync(abs)) {
+    try {
+      const enc = fs.readFileSync(abs);
+      const opened = openVaultBuffer(enc, session.key);
+      if (opened?.length) return opened;
+    } catch {
+      // fall through to shared sample pointer
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve attachment bytes: shared_content_key → one global sample file;
+ * else vault-encrypted (or plaintext) path under files/.
+ */
+export function readVaultAttachmentBuffer(session, row) {
+  const shared = readRecordVaultSharedSampleForAttachmentRow(row);
+  if (shared?.length) return shared;
+  if (!row?.relative_path) return null;
+  return readEncryptedVaultFile(session, row.relative_path);
 }
 
 export function deleteEncryptedVaultFile(session, relativePath) {
@@ -468,29 +493,7 @@ function refreshNoteSearchText(db, noteId) {
 }
 
 function seedEmptyVault(db) {
-  const countRow = queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`);
-  if (Number(countRow?.c ?? 0) > 0) return;
-
-  for (let nbIdx = 0; nbIdx < DEFAULT_NOTEBOOKS.length; nbIdx += 1) {
-    db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [
-      DEFAULT_NOTEBOOKS[nbIdx],
-      nbIdx
-    ]);
-    const nbId = queryOne(db, `SELECT last_insert_rowid() AS id`).id;
-    // Format OneDrive / USB: one starter note with onboarding copy (not empty NB n, Note n stubs).
-    const title = DEFAULT_SAMPLE_NOTE_NAME;
-    const bodyHtml = DEFAULT_SAMPLE_NOTE_BODY_HTML;
-    const bodyForSearch = expandRecordVaultBodyTextForSearch(bodyHtml);
-    const searchText = `${title} ${bodyForSearch}`
-      .toLowerCase()
-      .replace(/\s+/g, ' ')
-      .trim();
-    db.run(
-      `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
-       VALUES (?, ?, ?, ?, ?)`,
-      [nbId, title, bodyHtml, 0, searchText]
-    );
-  }
+  return seedRecordVaultNewMemberSampleDb(db);
 }
 
 async function openDbFromBuffer(buffer) {
@@ -498,6 +501,7 @@ async function openDbFromBuffer(buffer) {
   const db = new SQL.Database(buffer);
   runSchema(db);
   ensureNoteExtraImagesTable(db);
+  ensureRecordVaultSharedContentKeyColumn(db);
   return db;
 }
 
@@ -505,6 +509,7 @@ async function createFreshDb() {
   const SQL = await getSqlJs();
   const db = new SQL.Database();
   runSchema(db);
+  ensureRecordVaultSharedContentKeyColumn(db);
   seedEmptyVault(db);
   return db;
 }
@@ -864,6 +869,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
 
   let db;
   let effectiveKey = null;
+  let sampleSeedStatus = 'skipped';
   try {
     const dbCandidates = [];
     const primaryDb = resolveVaultDbPath(mountPath);
@@ -893,7 +899,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     if (!db) {
       throw openErr || new Error('Vault database is missing or unreadable');
     }
-    seedEmptyVault(db);
+    sampleSeedStatus = ensureRecordVaultNewMemberSampleDb(db);
   } catch (err) {
     if (err?.name === 'RecordVaultUnlockError') throw err;
     if (treatAsEncryptedVault) {
@@ -927,6 +933,20 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
   });
   session.storageType = targetStorageType;
   sessionsByKey.set(vaultSessionKey(singlesId, targetStorageType), session);
+  try {
+    await seedRecordVaultNewMemberSampleMedia({
+      mountPath: session.mountPath,
+      key: session.key,
+      meta: session.meta,
+      db: session.db
+    });
+  } catch (err) {
+    console.warn('[recordVault] shared sample media link failed', err?.message || err);
+  }
+  if (sampleSeedStatus === 'inserted') {
+    markDirty(session);
+    flushDbToUsb(session);
+  }
   if (!options?.skipClusterRegister) {
     await registerVaultClusterUnlock({
       singlesId,
@@ -1166,6 +1186,7 @@ function mapAttachmentRow(row) {
     file_size_bytes: row.file_size_bytes != null ? Number(row.file_size_bytes) : 0,
     mime_type: row.mime_type || null,
     display_order: Number(row.display_order ?? 0),
+    shared_content_key: row.shared_content_key || null,
     created_at: row.created_at
   };
 }
@@ -1173,7 +1194,8 @@ function mapAttachmentRow(row) {
 function loadAttachmentsForNote(session, noteId) {
   return queryAll(
     session.db,
-    `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, mime_type, display_order, created_at
+    `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, mime_type, display_order,
+            shared_content_key, created_at
      FROM note_attachments
      WHERE note_id = ? AND deleted_at IS NULL
      ORDER BY display_order ASC, attachment_id ASC`,
@@ -1848,11 +1870,21 @@ export async function vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmen
   if (session.storageType !== 'onedrive') return;
   const row = queryOne(
     session.db,
-    `SELECT relative_path FROM note_attachments
+    `SELECT relative_path, shared_content_key, checksum, file_name FROM note_attachments
      WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
     [attachmentId, noteId]
   );
   if (!row?.relative_path) return;
+  // Shared sample files live on the app server assets — never fetch from OneDrive.
+  if (
+    resolveRecordVaultSharedContentKey({
+      sharedContentKey: row.shared_content_key,
+      checksum: row.checksum,
+      fileName: row.file_name
+    })
+  ) {
+    return;
+  }
   await ensureOneDriveVaultFileOnDisk(session.driveSinglesId, session.mountPath, row.relative_path, session.meta);
 }
 
@@ -1950,7 +1982,8 @@ export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext,
   return mapAttachmentRow(
     queryOne(
       session.db,
-      `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, mime_type, display_order, created_at
+      `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, mime_type, display_order,
+              shared_content_key, created_at
        FROM note_attachments WHERE attachment_id = ?`,
       [attachmentId]
     )
@@ -1960,12 +1993,21 @@ export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext,
 export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
   const row = queryOne(
     session.db,
-    `SELECT attachment_id, relative_path FROM note_attachments
+    `SELECT attachment_id, relative_path, shared_content_key, checksum, file_name
+     FROM note_attachments
      WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
     [attachmentId, noteId]
   );
   if (!row) throw new Error('Attachment not found');
-  deleteEncryptedVaultFile(session, row.relative_path);
+  const sharedKey = resolveRecordVaultSharedContentKey({
+    sharedContentKey: row.shared_content_key,
+    checksum: row.checksum,
+    fileName: row.file_name
+  });
+  // Shared sample bytes are never deleted — only the per-vault pointer row.
+  if (!sharedKey) {
+    deleteEncryptedVaultFile(session, row.relative_path);
+  }
   session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE attachment_id = ?`, [attachmentId]);
   refreshNoteSearchText(session.db, noteId);
   markDirty(session);
@@ -1976,13 +2018,14 @@ export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
 export function vaultGetNoteAttachment(session, noteId, attachmentId) {
   const row = queryOne(
     session.db,
-    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, mime_type
+    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, mime_type,
+            checksum, shared_content_key
      FROM note_attachments
      WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
     [attachmentId, noteId]
   );
   if (!row) return null;
-  const buffer = readEncryptedVaultFile(session, row.relative_path);
+  const buffer = readVaultAttachmentBuffer(session, row);
   if (!buffer) return null;
   const ext = String(row.file_extension || '').toLowerCase();
   return {

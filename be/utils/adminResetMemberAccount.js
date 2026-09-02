@@ -97,7 +97,7 @@ export async function softResetMemberAccount(singlesId) {
         demoBuddies,
         billSchedule: bill,
         vaultNotes:
-          'Default Notebook 1 / Note 1 apply when the member next opens an empty TutaNotes vault (custom notes are not removed).',
+          'Default SAMPLE NOTEBOOK / SAMPLE NOTE1+2 apply when the member next unlocks an empty or upgraded TutaNotes vault (custom notes are not removed).',
         vaultAlbums:
           'Default SAMPLE SET / SAMPLE ALBUM apply when the member next opens an empty TutaPhotoAlbums vault (custom albums are not removed).'
       }

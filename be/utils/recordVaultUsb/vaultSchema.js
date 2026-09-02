@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS note_attachments (
   checksum TEXT,
   mime_type TEXT,
   display_order INTEGER NOT NULL DEFAULT 0,
+  shared_content_key TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   deleted_at TEXT
 );
@@ -130,26 +131,17 @@ ALTER TABLE notes ADD COLUMN inner_unlock_locked_until TEXT;
 
 export const DEFAULT_BODY_TEXT = '';
 
-/** Fresh vault after Format OneDrive / Format USB: one starter notebook. */
-export const DEFAULT_NOTEBOOKS = ['Notebook 1'];
+/** Fresh vault after Format OneDrive / Format USB: sample notebook (see recordVaultNewMemberSample). */
+export const DEFAULT_NOTEBOOKS = ['SAMPLE NOTEBOOK'];
 
-/** Starter note title (UI stores note names uppercase). */
-export const DEFAULT_SAMPLE_NOTE_NAME = 'NOTE 1';
+/** @deprecated Prefer SAMPLE NOTE1 from recordVaultNewMemberSample manifest. */
+export const DEFAULT_SAMPLE_NOTE_NAME = 'SAMPLE NOTE1';
 
 /**
- * TipTap HTML for the starter note shown after format (OneDrive + USB).
- * Keep in sync with the onboarding copy in the product mockup.
+ * @deprecated Prefer HTML files under be/assets/recordVaultNewMemberSample/.
+ * Kept for older callers / docs; new vaults seed via seedRecordVaultNewMemberSampleDb.
  */
 export const DEFAULT_SAMPLE_NOTE_BODY_HTML = [
-  '<p>Welcome! We’ve created a sample note (<strong>Note 1</strong>) inside <strong>Notebook 1</strong> to help you get started (feel free to rename the titles)</p>',
-  '<p><strong>1. Flexible Organization:</strong> You can create multiple Notes within a single Notebook.</p>',
-  '<p><strong>2. Quick Access:</strong> Drag any Notebook or Note to the Shortcuts panel on the right for fast access later.</p>',
-  '<p><strong>3. Powerful Search:</strong> Search instantly across all titles and text within your Notes and Notebooks.</p>',
-  '<p><strong>4. Backup:</strong> Easily back up your work by clicking ‘<strong>Backup/Restore OneDrive</strong>’ to create a ZIP archive.</p>',
-  '<p><strong>5. Seamless File Transfer:</strong> Drag and drop to copy or move Notes and Notebooks between OneDrive and a USB drive.</p>',
-  '<p><strong>6. Safe Disconnection:</strong> Always click ‘<strong>Log off Cloud</strong>’ or ‘<strong>Log off USB</strong>’ before disconnecting to prevent data loss.</p>',
-  '<p><strong>7. Import &amp; Export:</strong> Seamlessly convert files to and from Markdown, HTML, and PDF using the <strong>File</strong> menu.</p>',
-  '<p><strong>8. Help &amp; Dictation:</strong> Click ‘<strong>Click here for Tutorial</strong>’ in the top-right corner to access tutorials and voice dictation.</p>',
-  '<p><strong>9. Upgrade Speed:</strong> Need faster performance? Click ‘<strong>Click Here</strong>’ in the top-left corner to add high-priority server bandwidth (GB allocation).</p>',
-  '<p><strong>10. USB vs OneDrive:</strong> USB is much faster than OneDrive, but requires USB Bridge — OneDrive is accessible on mobile.</p>'
+  '<!-- rv-new-member-sample-v1 note=1 -->',
+  '<p>Welcome! We’ve created sample notes (<strong>SAMPLE NOTE1</strong> and <strong>SAMPLE NOTE2</strong>) inside <strong>SAMPLE NOTEBOOK</strong> to help you get started (feel free to rename the titles)</p>'
 ].join('');
