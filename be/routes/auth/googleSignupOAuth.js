@@ -152,10 +152,18 @@ function buildOAuthResultPayload({ success, email = '', error = '', action = '',
   };
 }
 
-function renderPopupResultHtml({ success, email = '', error = '', action = '', signupToken = '' }) {
+function renderPopupResultHtml({
+  success,
+  email = '',
+  error = '',
+  action = '',
+  signupToken = '',
+  returnOrigin = ''
+}) {
   const payload = JSON.stringify(
     buildOAuthResultPayload({ success, email, error, action, signupToken })
   );
+  const bridgeOrigin = normalizeOrigin(returnOrigin) || getPublicAppUrl();
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -173,6 +181,8 @@ function renderPopupResultHtml({ success, email = '', error = '', action = '', s
       var tokenStorageKey = ${JSON.stringify(GOOGLE_SIGNUP_TOKEN_STORAGE_KEY)};
       var channelName = ${JSON.stringify(OAUTH_BROADCAST_CHANNEL)};
       var ackType = ${JSON.stringify(OAUTH_ACK_TYPE)};
+      var bridgePath = '/pages/login/google-oauth-bridge';
+      var bridgeOrigin = ${JSON.stringify(bridgeOrigin)};
       var targetOrigin = window.location.origin;
       var statusEl = document.getElementById('status');
       var closed = false;
@@ -207,6 +217,13 @@ function renderPopupResultHtml({ success, email = '', error = '', action = '', s
         }
       }
 
+      function redirectToBridge() {
+        if (!bridgeOrigin) return;
+        try {
+          window.location.replace(bridgeOrigin.replace(/\\/$/, '') + bridgePath);
+        } catch (e) {}
+      }
+
       function closePopup() {
         if (closed) return;
         closed = true;
@@ -216,7 +233,7 @@ function renderPopupResultHtml({ success, email = '', error = '', action = '', s
         window.close();
         setTimeout(function () {
           if (!window.closed) {
-            setStatus('Google sign-in complete. You can close this window.');
+            redirectToBridge();
           }
         }, 300);
       }
@@ -234,7 +251,14 @@ function renderPopupResultHtml({ success, email = '', error = '', action = '', s
 
       if (!window.opener || window.opener.closed) {
         deliverToMainPage();
-        setStatus('Google sign-in complete. Return to the sign-up page.');
+        setStatus(
+          payload.action === 'login'
+            ? 'Signed in. Closing…'
+            : payload.success
+              ? 'Returning to sign-up…'
+              : 'Returning…'
+        );
+        closePopup();
         return;
       }
 
@@ -344,10 +368,15 @@ export function googleSignupStart(req, res) {
 export async function googleSignupCallback(req, res) {
   const config = getGoogleOAuthConfig();
   const verifiedState = verifyOAuthState(req.query?.state);
+  const returnOrigin = verifiedState?.returnOrigin || resolveOAuthReturnOrigin(req);
 
   if (!config) {
     return res.status(503).send(
-      renderPopupResultHtml({ success: false, error: 'Google sign-up is not configured.' })
+      renderPopupResultHtml({
+        success: false,
+        error: 'Google sign-up is not configured.',
+        returnOrigin
+      })
     );
   }
 
@@ -357,7 +386,9 @@ export async function googleSignupCallback(req, res) {
       oauthError === 'access_denied'
         ? 'Google sign-up was cancelled.'
         : `Google sign-up failed (${oauthError}).`;
-    return res.status(200).send(renderPopupResultHtml({ success: false, error: message }));
+    return res.status(200).send(
+      renderPopupResultHtml({ success: false, error: message, returnOrigin })
+    );
   }
 
   const code = String(req.query?.code || '').trim();
@@ -372,7 +403,8 @@ export async function googleSignupCallback(req, res) {
     return res.status(200).send(
       renderPopupResultHtml({
         success: false,
-        error: 'Invalid Google sign-up session. Please try again.'
+        error: 'Invalid Google sign-up session. Please try again.',
+        returnOrigin
       })
     );
   }
@@ -404,7 +436,8 @@ export async function googleSignupCallback(req, res) {
           renderPopupResultHtml({
             success: false,
             email,
-            error: 'Under construction. Please check back later.'
+            error: 'Under construction. Please check back later.',
+            returnOrigin
           })
         );
       }
@@ -413,7 +446,8 @@ export async function googleSignupCallback(req, res) {
           renderPopupResultHtml({
             success: false,
             email,
-            error: singlesStatusLoginRejectMessage(existing.status, existing.member_category)
+            error: singlesStatusLoginRejectMessage(existing.status, existing.member_category),
+            returnOrigin
           })
         );
       }
@@ -424,21 +458,28 @@ export async function googleSignupCallback(req, res) {
       });
       console.log('[googleSignupOAuth] login — existing account:', email);
       return res.status(200).send(
-        renderPopupResultHtml({ success: true, email, action: 'login' })
+        renderPopupResultHtml({ success: true, email, action: 'login', returnOrigin })
       );
     }
 
     const signupToken = createGoogleSignupToken(email);
     console.log('[googleSignupOAuth] register — new email, returning token:', email);
     return res.status(200).send(
-      renderPopupResultHtml({ success: true, email, action: 'register', signupToken })
+      renderPopupResultHtml({
+        success: true,
+        email,
+        action: 'register',
+        signupToken,
+        returnOrigin
+      })
     );
   } catch (err) {
     console.error('[googleSignupOAuth] callback failed:', err?.message ?? err);
     return res.status(200).send(
       renderPopupResultHtml({
         success: false,
-        error: err?.message || 'Google sign-up failed. Please try again.'
+        error: err?.message || 'Google sign-up failed. Please try again.',
+        returnOrigin
       })
     );
   }

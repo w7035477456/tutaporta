@@ -138,6 +138,17 @@ function normalizeOAuthSuccess(parsed) {
 }
 
 /**
+ * Read OAuth result written by the callback popup (localStorage fallback).
+ * Clears the stored payload after read.
+ */
+export function consumePendingGoogleOAuthResult() {
+  const parsed = readOAuthResultFromLocalStorage();
+  clearOAuthResultLocalStorage();
+  if (!parsed || !parsed.success) return null;
+  return normalizeOAuthSuccess(parsed);
+}
+
+/**
  * Opens Google OAuth popup.
  * Resolves with { email, action: 'login'|'register', signupToken }.
  * Cookie is already set when action is 'login'.

@@ -26,6 +26,7 @@ const PasswordResetSentPage = Loadable(lazy(() => import('views/pages/authentica
 const ResetPasswordPage = Loadable(lazy(() => import('views/pages/authentication/ResetPassword')));
 const ConfirmEmailChangePage = Loadable(lazy(() => import('views/pages/authentication/ConfirmEmailChange')));
 const MobilePhotoUploadPage = Loadable(lazy(() => import('views/pages/MobilePhotoUploadPage')));
+const GoogleOAuthBridgePage = Loadable(lazy(() => import('views/pages/authentication/GoogleOAuthBridge')));
 const LiveFaceScanPopupPage = Loadable(lazy(() => import('views/utilities/LiveFaceScanPopupPage')));
 
 // ==============================|| AUTHENTICATION ROUTING ||============================== //
@@ -36,6 +37,10 @@ const authenticationChildren = [
     {
       path: '/pages/login',
       element: <LoginPage />
+    },
+    {
+      path: '/pages/login/google-oauth-bridge',
+      element: <GoogleOAuthBridgePage />
     },
     {
       path: '/pages/forgotPassword',
