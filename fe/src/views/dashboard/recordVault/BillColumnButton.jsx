@@ -4,15 +4,16 @@ import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
 
-const GREEN = '#2e7d32';
+const RED = '#e53935';
 
 /**
- * Bill column control: green circle attach (+/paperclip) until notes or files exist,
- * then receipt icon. Hover enlarges 25% (HOVER_MAGNIFY_FACTOR).
+ * Bill column control: white circle attach until notes or files exist,
+ * then red receipt (note) icon. Hover enlarges (HOVER_MAGNIFY_FACTOR).
  */
 export default function BillColumnButton({ hasContent = false, onClick, disabled = false, title }) {
   const scale = getHoverMagnifyFactor();
   const label = title || (hasContent ? 'Open bill receipts' : 'Attach bill / receipt');
+  const noteStyle = hasContent;
   return (
     <Box
       component="button"
@@ -30,8 +31,8 @@ export default function BillColumnButton({ hasContent = false, onClick, disabled
         height: 36,
         borderRadius: '50%',
         border: '2px solid #000',
-        bgcolor: GREEN,
-        color: '#fff',
+        bgcolor: noteStyle ? RED : '#fff',
+        color: noteStyle ? '#fff' : '#000',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -52,7 +53,7 @@ export default function BillColumnButton({ hasContent = false, onClick, disabled
       {hasContent ? (
         <ReceiptLongIcon sx={{ fontSize: 22, color: '#fff' }} />
       ) : (
-        <AttachFileIcon sx={{ fontSize: 22, color: '#fff', transform: 'rotate(45deg)' }} />
+        <AttachFileIcon sx={{ fontSize: 22, color: '#000', transform: 'rotate(45deg)' }} />
       )}
     </Box>
   );

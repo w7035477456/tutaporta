@@ -13,6 +13,7 @@ import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
+import BillScheduleTutorialTrigger from './BillScheduleTutorialTrigger';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -448,8 +449,13 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
         gap: 1.5
       }}
     >
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75, flexShrink: 0 }}>
+        <BillScheduleTutorialTrigger />
+        <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>
+          Yearly Bills: {year}
+        </Typography>
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>Title: Yearly</Typography>
         <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#555' }}>
           ({sideLabel})
         </Typography>
@@ -865,7 +871,17 @@ export default function BillScheduleYearlyPanel({ storageType: storageTypeProp }
           <Box sx={{ width: 44, flexShrink: 0 }} aria-hidden />
         )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800, mb: 1, textAlign: 'center' }}>{year}</Typography>
+          <Typography
+            sx={{
+              fontWeight: 800,
+              mb: 1,
+              textAlign: 'center',
+              fontSize: '1.35rem',
+              lineHeight: 1.2
+            }}
+          >
+            {year}
+          </Typography>
           <Box
             sx={{
               display: 'grid',
