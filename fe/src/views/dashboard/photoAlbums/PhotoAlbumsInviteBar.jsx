@@ -5,12 +5,15 @@ import TextField from '@mui/material/TextField';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
 } from 'ui-component/SliderControlButton';
+import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
 import {
   sendPhotoAlbumsInvite,
   readPhotoAlbumsInviteError
 } from 'api/photoAlbumsInviteFe';
-import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
 import { openPhotoAlbumsContextTutorialPopout } from './photoAlbumsContextTutorialSync';
+
+/** Fallback when site global video_tutorial_tutaphotoalbums is unset. */
+const DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL = 'https://youtu.be/dMiwcH027fM';
 
 function isValidEmailFormat(raw) {
   const value = String(raw ?? '').trim().toLowerCase();
@@ -56,7 +59,8 @@ export default function PhotoAlbumsInviteBar({
   albumSetName,
   albumName,
   onInvited,
-  onOpenReview
+  onOpenReview,
+  videoTutorialUrl = ''
 }) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,9 +69,11 @@ export default function PhotoAlbumsInviteBar({
   const [emailTouched, setEmailTouched] = useState(false);
 
   const canInvite = Boolean(noteId && notebookId && storageType && !disabled);
-  const trimmedEmail = String(email || '').trim();
+  const trimmedEmail = useMemo(() => String(email || '').trim(), [email]);
   const emailFormatValid = useMemo(() => isValidEmailFormat(trimmedEmail), [trimmedEmail]);
   const showEmailFormatError = emailTouched && trimmedEmail.length > 0 && !emailFormatValid;
+  const watchTutorialsHref =
+    String(videoTutorialUrl || '').trim() || DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL;
 
   const openReview = (sendResult) => {
     onOpenReview?.(sendResult || null);
@@ -158,6 +164,14 @@ export default function PhotoAlbumsInviteBar({
             Review
           </SliderControlButton>
         </Box>
+        <WorkspaceVideoTutorialPair
+          videoTutorialUrl={watchTutorialsHref}
+          onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
+          tutorialDisabled={disabled}
+          tutorialAriaLabel="Open context tutorial"
+          tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
+          sx={{ ml: 0.25, mr: 0.25, alignSelf: 'center' }}
+        />
         <TextField
           variant="standard"
           value={email}
@@ -179,34 +193,6 @@ export default function PhotoAlbumsInviteBar({
           inputProps={{ 'aria-label': 'Share this album with this email', type: 'email', inputMode: 'email' }}
           sx={inviteFieldSx}
         />
-        <SliderControlButton
-          type="button"
-          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-          disabled={disabled}
-          onClick={() => openPhotoAlbumsContextTutorialPopout()}
-          aria-label="Open context tutorial"
-          title="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
-          sx={{
-            ...inviteActionSx,
-            flexShrink: 0,
-            ml: 0,
-            mr: '1rem',
-            bgcolor: `${ORANGE_BUTTON_ENABLED_BG} !important`,
-            color: '#000 !important',
-            WebkitTextFillColor: '#000 !important',
-            border: '2px solid #000 !important',
-            fontWeight: 800,
-            '@media (hover: hover)': {
-              '&:hover:not(:disabled)': {
-                bgcolor: `${ORANGE_BUTTON_ENABLED_BG} !important`,
-                color: '#000 !important',
-                WebkitTextFillColor: '#000 !important'
-              }
-            }
-          }}
-        >
-          Tutorial
-        </SliderControlButton>
       </Box>
       {error ? (
         <Box sx={{ color: '#b71c1c', fontWeight: 700, fontSize: '0.78rem', lineHeight: 1.2, pl: 0.25 }}>
@@ -229,5 +215,6 @@ PhotoAlbumsInviteBar.propTypes = {
   albumSetName: PropTypes.string,
   albumName: PropTypes.string,
   onInvited: PropTypes.func,
-  onOpenReview: PropTypes.func
+  onOpenReview: PropTypes.func,
+  videoTutorialUrl: PropTypes.string
 };

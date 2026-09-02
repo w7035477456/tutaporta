@@ -50,6 +50,7 @@ import RecordVaultStorageFilesPanel from './RecordVaultStorageFilesPanel';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
+import BillScheduleInstructionPopup from './BillScheduleInstructionPopup';
 import {
   BILL_SCHEDULE_NOTEBOOK_ID,
   billScheduleCrossPaneKind,
@@ -1373,6 +1374,7 @@ export default function RecordVaultWorkspacePane({
 
   const [vaultUsage, setVaultUsage] = useState(null);
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
+  const [billScheduleTutorialOpen, setBillScheduleTutorialOpen] = useState(false);
   const [oneDriveOffered, setOneDriveOffered] = useState(false);
   const [, setLocalUsbOffered] = useState(false);
   const [, setStorageConfigLoaded] = useState(false);
@@ -6315,6 +6317,10 @@ export default function RecordVaultWorkspacePane({
         onOpenMyNote={() => setUsbBackupOpen(false)}
         onRestored={() => handleUsbVaultRestoredOrFormatted()}
       />
+      <BillScheduleInstructionPopup
+        open={billScheduleTutorialOpen}
+        onClose={() => setBillScheduleTutorialOpen(false)}
+      />
       <RecordVaultCreateItemDialog
         open={Boolean(createItemDialog)}
         mode={createItemDialog}
@@ -7391,10 +7397,22 @@ export default function RecordVaultWorkspacePane({
           >
             {(() => {
               if (isBillMonthlyView) {
-                return <BillScheduleMonthlyPanel storageType={paneStorageType} />;
+                return (
+                  <BillScheduleMonthlyPanel
+                    storageType={paneStorageType}
+                    videoTutorialUrl={videoTutorialUrl}
+                    onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                  />
+                );
               }
               if (isBillYearlyView) {
-                return <BillScheduleYearlyPanel storageType={paneStorageType} />;
+                return (
+                  <BillScheduleYearlyPanel
+                    storageType={paneStorageType}
+                    videoTutorialUrl={videoTutorialUrl}
+                    onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                  />
+                );
               }
               const notebookNotesForLock = selectedNotebook?.notes || [];
               const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);

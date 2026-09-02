@@ -13,12 +13,13 @@ const VIDEO_TUTORIALS_ICON_HEIGHT = {
 };
 
 /**
- * Centered page-header Video Tutorials control — opens the per-page ENV URL in a theater-style
- * popup (full-window player; YouTube has no public URL to force native Theater Mode).
+ * Centered page-header Video Tutorials control — opens the per-page ENV URL (or an explicit
+ * `href`) in a theater-style popup (full-window player).
  * Icon: `assets/images/videoTutorial.png`.
  */
-export default function PageVideoTutorialsButton({ pageKey, sx }) {
-  const href = getPageVideoTutorialUrl(pageKey);
+export default function PageVideoTutorialsButton({ pageKey, href: hrefProp, sx }) {
+  const hrefFromEnv = pageKey ? getPageVideoTutorialUrl(pageKey) : '';
+  const href = String(hrefProp ?? '').trim() || hrefFromEnv;
   const disabled = !href;
 
   const handleClick = (event) => {
@@ -34,7 +35,7 @@ export default function PageVideoTutorialsButton({ pageKey, sx }) {
       href={href || undefined}
       role="link"
       tabIndex={0}
-      aria-label="Video Tutorials"
+      aria-label="Watch Tutorials"
       aria-disabled={disabled}
       onClick={handleClick}
       onKeyDown={(event) => {
@@ -60,7 +61,7 @@ export default function PageVideoTutorialsButton({ pageKey, sx }) {
       <Box
         component="img"
         src={videoTutorialImg}
-        alt="Video Tutorials"
+        alt="Watch Tutorials"
         draggable={false}
         sx={{
           display: 'block',
@@ -85,6 +86,8 @@ PageVideoTutorialsButton.propTypes = {
     'mySelfReportBio',
     'receivedBioRequest',
     'profileRecords'
-  ]).isRequired,
+  ]),
+  /** Explicit YouTube (or other) URL — used when set; otherwise `pageKey` ENV URL. */
+  href: PropTypes.string,
   sx: PropTypes.object
 };

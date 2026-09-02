@@ -8354,6 +8354,7 @@ export default function PhotoAlbumsWorkspacePane({
                     storageType={paneStorageType}
                     albumSetName={activeAlbumSetName}
                     albumName={activeAlbumName}
+                    videoTutorialUrl={videoTutorialUrl}
                     onInvited={() => void refreshSharedAlbums()}
                     onOpenReview={(sendResult) => {
                       setInviteReviewSendResult(sendResult || null);

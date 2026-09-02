@@ -13,7 +13,7 @@ import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
-import BillScheduleTutorialTrigger from './BillScheduleTutorialTrigger';
+import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
   BILL_SCHEDULE_INK,
   BILL_SCHEDULE_SURFACE,
@@ -25,9 +25,11 @@ import {
   billScheduleTableSx
 } from './billScheduleTheme';
 
-const YELLOW = '#ffe566';
+/** Auto-pay fill — white label text on this background. */
+const YELLOW = '#B6A001';
 const GREEN = '#7dcea0';
 const RED = '#e74c3c';
+const AUTO_PAY_TEXT = '#ffffff';
 const MONTH_NAMES = [
   'January',
   'February',
@@ -107,7 +109,11 @@ function firstWeekday(year, month) {
   return new Date(year, month - 1, 1).getDay();
 }
 
-export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp }) {
+export default function BillScheduleMonthlyPanel({
+  storageType: storageTypeProp,
+  videoTutorialUrl = '',
+  onBillScheduleTutorialClick
+}) {
   const paneStorageType = useRecordVaultPaneStorageType();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
@@ -382,8 +388,12 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
         gap: 1.5
       }}
     >
+      <BillScheduleTutorialHeaderBar
+        videoTutorialUrl={videoTutorialUrl}
+        onTutorialClick={onBillScheduleTutorialClick}
+        disabled={loading || saving}
+      />
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75, flexShrink: 0 }}>
-        <BillScheduleTutorialTrigger />
         <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>
           Monthly Bills: {MONTH_NAMES[month - 1]}
         </Typography>
@@ -549,7 +559,21 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                     size="small"
                     value={row.bill_type || 'Manual'}
                     onChange={(e) => updateRow(index, { bill_type: e.target.value })}
-                    sx={{ ...selectSx, bgcolor: auto ? YELLOW : BILL_SCHEDULE_SURFACE }}
+                    sx={{
+                      ...selectSx,
+                      bgcolor: auto ? YELLOW : BILL_SCHEDULE_SURFACE,
+                      ...(auto
+                        ? {
+                            color: AUTO_PAY_TEXT,
+                            WebkitTextFillColor: AUTO_PAY_TEXT,
+                            '& .MuiSelect-select': {
+                              color: AUTO_PAY_TEXT,
+                              WebkitTextFillColor: AUTO_PAY_TEXT
+                            },
+                            '& .MuiSelect-icon': { color: AUTO_PAY_TEXT }
+                          }
+                        : null)
+                    }}
                   >
                     <MenuItem value="Auto">Auto</MenuItem>
                     <MenuItem value="Manual">Manual</MenuItem>
@@ -711,7 +735,8 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                     fontWeight: 700,
                     fontSize: '1.25rem',
                     bgcolor: tone && !upcoming ? cellToneBg(tone) : 'transparent',
-                    color: tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK,
+                    color:
+                      tone === 'overdue' || tone === 'auto' ? AUTO_PAY_TEXT : BILL_SCHEDULE_INK,
                     outline: upcoming
                       ? `3px solid ${BILL_SCHEDULE_INK}`
                       : isToday
@@ -772,7 +797,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
               sx: {
                 borderRadius: 1,
                 bgcolor: YELLOW,
-                color: '#000'
+                color: AUTO_PAY_TEXT
               }
             },
             {
@@ -846,5 +871,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
 }
 
 BillScheduleMonthlyPanel.propTypes = {
-  storageType: PropTypes.oneOf(['onedrive', 'usb'])
+  storageType: PropTypes.oneOf(['onedrive', 'usb']),
+  videoTutorialUrl: PropTypes.string,
+  onBillScheduleTutorialClick: PropTypes.func
 };

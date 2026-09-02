@@ -6,7 +6,7 @@
 
 export const BILL_SCHEDULE_INSTRUCTION_CONTEXT_TITLE = 'Current Context Tutorial';
 export const BILL_SCHEDULE_INSTRUCTION_CONTEXT_STEP = 'You are in Bill Schedule.';
-export const BILL_SCHEDULE_INSTRUCTION_BUTTON_LABEL = 'Click Here for Tutorial';
+export const BILL_SCHEDULE_INSTRUCTION_BUTTON_LABEL = 'Tutorial';
 
 /** Flat narration for Gemini TTS (matches popup body). */
 export const BILL_SCHEDULE_INSTRUCTION_SPEAK_TEXT = [
