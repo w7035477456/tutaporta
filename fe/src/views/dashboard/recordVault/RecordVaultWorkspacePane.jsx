@@ -7369,7 +7369,8 @@ export default function RecordVaultWorkspacePane({
                 minHeight: 0,
                 position: 'relative',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
               };
               return (
                 <>
@@ -7379,7 +7380,6 @@ export default function RecordVaultWorkspacePane({
                       onReady={handleEditorReady}
                       onChange={scheduleSave}
                       contentZoom={noteContentZoom}
-                      contentBgIndex={noteContentBgIndex}
                       header={
                         selectedNote && !lockedNow ? (
                           <Box
@@ -7607,7 +7607,15 @@ export default function RecordVaultWorkspacePane({
               >
                 <Box
                   ref={rightSidebarSplitRef}
-                  sx={{ flex: 1, minHeight: 0, p: compact ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 0 }}
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    p: compact ? 0.5 : 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0,
+                    bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
+                  }}
                 >
                   <Box
                     sx={{
@@ -7741,7 +7749,8 @@ export default function RecordVaultWorkspacePane({
                       display: 'flex',
                       flexDirection: 'column',
                       overflow: 'hidden',
-                      gap: 0.5
+                      gap: 0.5,
+                      bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
                     }}
                   >
                     <SliderControlButton

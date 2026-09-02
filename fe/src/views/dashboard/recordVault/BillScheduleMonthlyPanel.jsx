@@ -14,7 +14,16 @@ import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
 import BillScheduleTutorialTrigger from './BillScheduleTutorialTrigger';
-import { TUTANOTES_WORKSPACE_CONTENT_BG } from './tutaNotesBranding';
+import {
+  BILL_SCHEDULE_INK,
+  BILL_SCHEDULE_SURFACE,
+  billScheduleBorderedBoxSx,
+  billScheduleInputSx,
+  billScheduleNavBtnSx,
+  billSchedulePanelRootSx,
+  billScheduleSelectSx,
+  billScheduleTableSx
+} from './billScheduleTheme';
 
 const YELLOW = '#ffe566';
 const GREEN = '#7dcea0';
@@ -97,18 +106,6 @@ function daysInMonth(year, month) {
 function firstWeekday(year, month) {
   return new Date(year, month - 1, 1).getDay();
 }
-
-const navBtnSx = {
-  border: '2px solid #000',
-  borderRadius: 1,
-  bgcolor: '#fff',
-  px: 1,
-  py: 0.25,
-  fontWeight: 800,
-  cursor: 'pointer',
-  fontSize: '1.1rem',
-  lineHeight: 1
-};
 
 export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp }) {
   const paneStorageType = useRecordVaultPaneStorageType();
@@ -356,20 +353,19 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
   };
 
   const inputSx = {
+    ...billScheduleInputSx,
     '& .MuiInputBase-input': {
-      py: 0.5,
-      px: 0.75,
-      fontSize: '0.95rem',
-      fontFamily: MAIN_FONT_FAMILY,
-      color: '#000'
-    },
-    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#000' }
+      ...billScheduleInputSx['& .MuiInputBase-input'],
+      fontFamily: MAIN_FONT_FAMILY
+    }
   };
 
   const selectSx = {
-    ...inputSx,
-    bgcolor: '#fff',
-    '& .MuiSelect-select': { py: 0.5, px: 0.75 }
+    ...billScheduleSelectSx,
+    '& .MuiSelect-select': {
+      ...billScheduleSelectSx['& .MuiSelect-select'],
+      fontFamily: MAIN_FONT_FAMILY
+    }
   };
 
   return (
@@ -380,8 +376,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
         display: 'flex',
         flexDirection: 'column',
         overflow: 'auto',
-        bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
-        color: '#000',
+        ...billSchedulePanelRootSx,
         fontFamily: MAIN_FONT_FAMILY,
         p: 1.5,
         gap: 1.5
@@ -394,7 +389,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
         </Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
-        <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#555' }}>
+        <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', opacity: 0.72 }}>
           ({sideLabel})
         </Typography>
         <Box sx={{ flex: 1 }} />
@@ -404,7 +399,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
             type="button"
             aria-label="Previous month"
             onClick={() => shiftMonth(-1)}
-            sx={navBtnSx}
+            sx={billScheduleNavBtnSx}
           >
             ‹
           </Box>
@@ -420,7 +415,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
             type="button"
             aria-label="Next month"
             onClick={() => shiftMonth(1)}
-            sx={navBtnSx}
+            sx={billScheduleNavBtnSx}
           >
             ›
           </Box>
@@ -434,7 +429,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
           sx={{
             flexShrink: 0,
             bgcolor: YELLOW,
-            border: '2px solid #000',
+            border: `2px solid ${BILL_SCHEDULE_INK}`,
             borderRadius: 1,
             p: 1.25,
             display: 'flex',
@@ -466,22 +461,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
         <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
       ) : null}
 
-      <Box
-        component="table"
-        sx={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          flexShrink: 0,
-          '& th, & td': {
-            border: '2px solid #000',
-            px: 0.75,
-            py: 0.5,
-            verticalAlign: 'middle',
-            fontSize: '0.95rem'
-          },
-          '& th': { bgcolor: '#e8e8e8', fontWeight: 800, textAlign: 'left' }
-        }}
-      >
+      <Box component="table" sx={billScheduleTableSx}>
         <thead>
           <tr>
             <th style={{ width: 40 }}>#</th>
@@ -569,7 +549,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                     size="small"
                     value={row.bill_type || 'Manual'}
                     onChange={(e) => updateRow(index, { bill_type: e.target.value })}
-                    sx={{ ...selectSx, bgcolor: auto ? YELLOW : '#fff' }}
+                    sx={{ ...selectSx, bgcolor: auto ? YELLOW : BILL_SCHEDULE_SURFACE }}
                   >
                     <MenuItem value="Auto">Auto</MenuItem>
                     <MenuItem value="Manual">Manual</MenuItem>
@@ -603,7 +583,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                     background: statusBg,
                     fontWeight: 800,
                     textAlign: 'center',
-                    color: row.status_tone === 'overdue' ? '#fff' : '#000'
+                    color: row.status_tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK
                   }}
                 >
                   {auto ? '' : row.status}
@@ -658,15 +638,8 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
             flex: '1 1 auto',
             minWidth: 0,
             maxWidth: { sm: 520 },
-            border: '2px solid #000',
-            borderRadius: 1,
-            bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
-            p: 2.5,
-            boxSizing: 'border-box',
-            '& .MuiTypography-root': {
-              color: '#000 !important',
-              WebkitTextFillColor: '#000 !important'
-            }
+            ...billScheduleBorderedBoxSx,
+            p: 2.5
           }}
         >
           <Box
@@ -684,7 +657,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                 type="button"
                 aria-label="Previous month"
                 onClick={() => shiftMonth(-1)}
-                sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+                sx={{ ...billScheduleNavBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
               >
                 ‹
               </Box>
@@ -700,7 +673,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                 type="button"
                 aria-label="Next month"
                 onClick={() => shiftMonth(1)}
-                sx={{ ...navBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+                sx={{ ...billScheduleNavBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
               >
                 ›
               </Box>
@@ -738,9 +711,9 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
                     fontWeight: 700,
                     fontSize: '1.25rem',
                     bgcolor: tone && !upcoming ? cellToneBg(tone) : 'transparent',
-                    color: tone === 'overdue' ? '#fff' : '#000',
+                    color: tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK,
                     outline: upcoming
-                      ? '3px solid #000'
+                      ? `3px solid ${BILL_SCHEDULE_INK}`
                       : isToday
                         ? `2px solid ${RED}`
                         : 'none',
@@ -760,20 +733,13 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
           sx={{
             flex: '0 0 auto',
             alignSelf: { xs: 'stretch', sm: 'flex-start' },
-            border: '2px solid #000',
-            borderRadius: 1,
-            bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
+            ...billScheduleBorderedBoxSx,
             px: 1.75,
             py: 1.5,
             minWidth: { sm: 260 },
             display: 'flex',
             flexDirection: 'column',
-            gap: 1.25,
-            boxSizing: 'border-box',
-            '& .MuiTypography-root': {
-              color: '#000 !important',
-              WebkitTextFillColor: '#000 !important'
-            }
+            gap: 1.25
           }}
         >
           {[
@@ -795,7 +761,7 @@ export default function BillScheduleMonthlyPanel({ storageType: storageTypeProp 
               sx: {
                 borderRadius: '50%',
                 bgcolor: 'transparent',
-                outline: '3px solid #000',
+                outline: `3px solid ${BILL_SCHEDULE_INK}`,
                 outlineOffset: 0
               }
             },

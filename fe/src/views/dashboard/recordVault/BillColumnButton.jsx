@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
+import { BILL_SCHEDULE_INK, BILL_SCHEDULE_SURFACE } from './billScheduleTheme';
 
 const RED = '#e53935';
 
@@ -30,9 +31,9 @@ export default function BillColumnButton({ hasContent = false, onClick, disabled
         width: 36,
         height: 36,
         borderRadius: '50%',
-        border: '2px solid #000',
-        bgcolor: noteStyle ? RED : '#fff',
-        color: noteStyle ? '#fff' : '#000',
+        border: `2px solid ${BILL_SCHEDULE_INK}`,
+        bgcolor: noteStyle ? RED : BILL_SCHEDULE_SURFACE,
+        color: noteStyle ? '#fff' : BILL_SCHEDULE_INK,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -53,7 +54,7 @@ export default function BillColumnButton({ hasContent = false, onClick, disabled
       {hasContent ? (
         <ReceiptLongIcon sx={{ fontSize: 22, color: '#fff' }} />
       ) : (
-        <AttachFileIcon sx={{ fontSize: 22, color: '#000', transform: 'rotate(45deg)' }} />
+        <AttachFileIcon sx={{ fontSize: 22, color: BILL_SCHEDULE_INK, transform: 'rotate(45deg)' }} />
       )}
     </Box>
   );

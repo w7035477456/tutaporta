@@ -54,7 +54,7 @@ export const billScheduleRemoveRowBtnSx = {
   width: 24,
   height: 24,
   flexShrink: 0,
-  border: '1px solid #000',
+  border: '1px solid var(--theme-inverse-daynight-color)',
   bgcolor: '#e53935',
   color: '#fff',
   fontWeight: 900,
