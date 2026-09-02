@@ -6,17 +6,15 @@ import Typography from '@mui/material/Typography';
 import Link from '@mui/material/Link';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
-import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
+import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
 import {
   TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL,
   TUTANOTES_USB_VIDEO_TUTORIAL_LABEL,
-  TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL,
   TUTANOTES_WORKSPACE_PANEL_BG
 } from './tutaNotesBranding';
 import RecordVaultDataPlanDialog from './RecordVaultDataPlanDialog';
 import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
 import { reportRecordVaultOverageThrottleDepleted } from 'utils/recordVaultOverageThrottleUi';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/VaultOverageThrottleNotice';
 import AdminEditableUsageDataAmount, {
   formatUsageDataAmount
@@ -27,43 +25,6 @@ const usageBarFontSx = {
   fontSize: { xs: '0.72rem !important', sm: '0.82rem !important', md: '0.9rem !important' },
   lineHeight: 1.35,
   fontWeight: 700
-};
-
-const usageBarActionBtnSx = {
-  flexShrink: 0,
-  fontFamily: MAIN_FONT_FAMILY,
-  fontWeight: 700,
-  fontSize: { xs: '0.68rem', sm: '0.78rem', md: '0.85rem' },
-  lineHeight: 1.15,
-  px: { xs: 0.85, sm: 1.1 },
-  py: 0.4,
-  minWidth: { xs: '9rem', sm: '11rem', md: '12.5rem' },
-  bgcolor: ORANGE_BUTTON_ENABLED_BG,
-  color: '#000',
-  WebkitTextFillColor: '#000',
-  border: '2px solid #000',
-  borderRadius: 0.5,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-  textAlign: 'center',
-  userSelect: 'none',
-  transform: 'scale(1)',
-  transformOrigin: 'center center',
-  transition: 'transform 0.15s ease, filter 0.15s ease',
-  '@media (hover: hover)': {
-    '&:hover:not(:disabled)': {
-      transform: 'scale(1.08)',
-      filter: 'brightness(0.95)',
-      bgcolor: ORANGE_BUTTON_ENABLED_BG,
-      zIndex: 1
-    }
-  },
-  '&:disabled': {
-    opacity: 0.65,
-    cursor: 'default',
-    filter: 'none',
-    transform: 'none'
-  }
 };
 
 const sessionCountSx = {
@@ -207,7 +168,6 @@ export default function RecordVaultUsageBar({
   const tutorialDetail = isOneDrive
     ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL
     : TUTANOTES_USB_VIDEO_TUTORIAL_LABEL;
-  const tutorialButtonLabel = TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL;
 
   useEffect(() => {
     if (!transfer) {
@@ -222,21 +182,15 @@ export default function RecordVaultUsageBar({
   const actions = (
     <>
       <SessionFileCountLabel usbTxRx={usbTxRx} uiTxRx={uiTxRx} />
-      <Box
-        component="button"
-        type="button"
-        title={tutorialDetail}
-        aria-label={tutorialDetail}
-        {...guestDemoAllowProps()}
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          setTutorialOpen(true);
-        }}
-        sx={usageBarActionBtnSx}
-      >
-        {tutorialButtonLabel}
-      </Box>
+      <WorkspaceVideoTutorialPair
+        videoTutorialUrl={videoTutorialUrl}
+        onTutorialClick={() => setTutorialOpen(true)}
+        tutorialVariant="orange"
+        tutorialAriaLabel={tutorialDetail}
+        tutorialTitle={tutorialDetail}
+        iconHeight={{ xs: 28, sm: 32 }}
+        sx={{ ml: 0 }}
+      />
     </>
   );
 

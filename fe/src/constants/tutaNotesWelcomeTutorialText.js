@@ -42,7 +42,7 @@ export const TUTANOTES_WELCOME_TUTORIAL_ITEMS = [
   },
   {
     label: '8. Help & Dictation:',
-    body: 'Click “Click here for Tutorial” in the top-right corner to access tutorials and voice dictation.'
+    body: 'Click “Tutorial” in the top-right corner to access tutorials and voice dictation.'
   },
   {
     label: '9. Upgrade Speed:',
