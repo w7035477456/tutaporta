@@ -3620,31 +3620,6 @@ export default function PhotoAlbumsWorkspacePane({
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
 
-  const handleLogOffPane = useCallback(async () => {
-    if (busy || !unlocked) return;
-    setBusy(true);
-    setVaultLeaving(true);
-    setVaultLeavingProgressPercent(1);
-    setVaultLeavingProgressLabel(
-      paneStorageType === 'onedrive' ? 'Saving notes to OneDrive…' : 'Logging off USB…'
-    );
-    setError('');
-    try {
-      await performVaultStorageLogoff();
-    } catch (err) {
-      setError(readPhotoAlbumsApiError(err, 'Logoff failed'));
-      setBusy(false);
-      setVaultLeaving(false);
-      setVaultLeavingProgressPercent(0);
-      setVaultLeavingProgressLabel('');
-      return;
-    }
-    setBusy(false);
-    setVaultLeaving(false);
-    setVaultLeavingProgressPercent(0);
-    setVaultLeavingProgressLabel('');
-  }, [busy, unlocked, performVaultStorageLogoff, paneStorageType]);
-
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
     if (unlocked) {
@@ -3672,9 +3647,6 @@ export default function PhotoAlbumsWorkspacePane({
     }
     navigate('/mall');
   }, [busy, unlocked, navigate, performVaultStorageLogoff, paneStorageType]);
-
-  const logOffPaneLabel = paneStorageType === 'onedrive' ? 'Log off Cloud' : 'Log off USB';
-  const usePaneLogOff = typeof onSessionEnded === 'function';
 
   const refreshSharedAlbums = useCallback(async () => {
     if (!user?.singles_id) {
@@ -8105,19 +8077,15 @@ export default function PhotoAlbumsWorkspacePane({
                   </SliderControlButton>
                 )}
               </Box>
-              {!(usePaneLogOff && paneStorageType === 'onedrive') ? (
               <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                 <VaultExitToMallToolbarButton
                   compact={menuLabelsCompact}
                   {...guestDemoBlockProps()}
-                  onClick={() => void (usePaneLogOff ? handleLogOffPane() : handleExitToMall())}
+                  onClick={() => void handleExitToMall()}
                   disabled={busy}
-                  usePaneLogOff={usePaneLogOff}
-                  logOffPaneLabel={logOffPaneLabel}
                   sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                 />
               </Box>
-              ) : null}
               </Box>
 
               {!compareMode ? (

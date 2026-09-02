@@ -332,7 +332,7 @@ export function baseButtonSx(bg, text, border, hoverScale, {
 }
 
 /** Exit to Mall — prominent yellow dashed outline (toolbar, sidebar, profile menu). */
-export const EXIT_TO_MALL_YELLOW_DASHED_BORDER = '3px dashed var(--theme-yellow-color)';
+export const EXIT_TO_MALL_YELLOW_DASHED_BORDER = '3px dashed var(--theme-yellow-color, #FFEB3B)';
 
 export function exitToMallYellowDashedBorderSx() {
   return {
