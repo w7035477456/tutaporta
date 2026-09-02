@@ -274,7 +274,7 @@ export default function RecordVaultOneDriveBackupDialog({
     const ok = await themedConfirm(
       tutaDrive
         ? `Format TutaDrive vault?\n\nThis deletes notes under your member notes/TutaNotes folder. Photos folder is kept.\n\nBack up first if you want to keep your current notes.`
-        : `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with sample Notebook 1 / NOTE 1. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
+        : `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with SAMPLE NOTEBOOK (SAMPLE NOTE1 / SAMPLE NOTE2). Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
     );
     if (!ok) return;
 
@@ -287,7 +287,7 @@ export default function RecordVaultOneDriveBackupDialog({
       } else {
         await formatRecordVaultOneDrive();
         setSuccess(
-          `Formatted ${folderName} on OneDrive. Open TutaNotes again to see sample Notebook 1 / NOTE 1.`
+          `Formatted ${folderName} on OneDrive. Open TutaNotes again to see SAMPLE NOTEBOOK.`
         );
       }
       setSuccessTone('general');

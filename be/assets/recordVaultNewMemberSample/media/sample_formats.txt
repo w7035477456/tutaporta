@@ -1,2 +1,0 @@
-SAMPLE NOTE2 - file format demo (shared across all members).
-PDF, TXT, PNG, JPG attachments on SAMPLE NOTE1 use the same shared store.

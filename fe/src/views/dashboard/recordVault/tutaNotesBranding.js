@@ -30,7 +30,7 @@ export function tutaNotesStorageStripColor(storageType) {
 
 /** Expanded workspace header strip — theme daylight (OneDrive / TutaDrive). USB keeps light-blue strip. */
 export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = 'TutaNotes on OneDrive';
-export const TUTANOTES_TUTADRIVE_WORKSPACE_TITLE = 'TutaNotes on TutaDrive';
+export const TUTANOTES_TUTADRIVE_WORKSPACE_TITLE = 'TutaNotes on TutaCloud';
 export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
 export const TUTANOTES_TUTADRIVE_LOGIN_TITLE = 'TutaNotes';

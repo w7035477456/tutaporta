@@ -522,7 +522,7 @@ export default function RecordVaultOneDriveGate({
   const handleFormatOneDriveVault = async () => {
     if (oneDriveBusy || !oneDriveConnected || !postLoginSessionActive) return;
     const ok = await themedConfirm(
-      `Format ${oneDriveFolderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with sample Notebook 1 / NOTE 1. Other OneDrive files are not touched.`
+      `Format ${oneDriveFolderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with SAMPLE NOTEBOOK (SAMPLE NOTE1 / SAMPLE NOTE2). Other OneDrive files are not touched.`
     );
     if (!ok) return;
     setOneDriveBusyLabel('Formatting MyNote Folder');

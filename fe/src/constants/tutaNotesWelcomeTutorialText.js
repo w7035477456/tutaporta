@@ -8,7 +8,7 @@ export const TUTANOTES_WELCOME_TUTORIAL_CONTEXT_TITLE = 'Current Context Tutoria
 export const TUTANOTES_WELCOME_TUTORIAL_CONTEXT_STEP = 'You are in TutaNotes.';
 
 export const TUTANOTES_WELCOME_TUTORIAL_INTRO =
-  'Welcome! We’ve created sample notes (SAMPLE NOTE1 and SAMPLE NOTE2) inside SAMPLE NOTEBOOK to help you get started (feel free to rename the titles)';
+  'Welcome! We’ve created sample notes (SAMPLE NOTE1 and SAMPLE NOTE2) inside SAMPLE NOTEBOOK 1 to help you get started (feel free to rename the titles)';
 
 /** Numbered tutorial lines shown in the popup (bold labels + body). */
 export const TUTANOTES_WELCOME_TUTORIAL_ITEMS = [

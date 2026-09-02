@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Ensure SAMPLE NOTEBOOK + SAMPLE NOTE1/2 exist for every on-disk TutaNotes vault.
+ * Also soft-deletes the legacy registration default "Notebook 1" / "NOTEBOOK 1".
  *
  * Shared sample attachments use shared_content_key pointers (one media copy under
  * be/assets/recordVaultNewMemberSample/media for all members).
@@ -51,23 +52,43 @@ function storageRoots() {
 
 function findVaultMountPaths(root) {
   const out = [];
+  const seen = new Set();
   const usersDir = path.join(root, 'users');
   if (!fs.existsSync(usersDir)) return out;
+
+  const pushMount = (mountPath) => {
+    let resolved;
+    try {
+      resolved = fs.realpathSync(mountPath);
+    } catch {
+      resolved = path.resolve(mountPath);
+    }
+    // Case-insensitive FS (macOS): notes vs Notes
+    const key = resolved.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(resolved);
+  };
+
   for (const ent of fs.readdirSync(usersDir, { withFileTypes: true })) {
     if (!ent.isDirectory()) continue;
     const memberRoot = path.join(usersDir, ent.name);
     for (const notesName of ['notes', 'Notes']) {
       const notesRoot = path.join(memberRoot, notesName);
       if (!fs.existsSync(notesRoot)) continue;
+      // USB/session APIs expect the mount = parent of TutaNotes (vaultRootOnMount appends VAULT_DIR_NAME).
+      let foundNested = false;
       for (const vaultName of [VAULT_DIR_NAME, ...LEGACY_VAULT_DIR_NAMES]) {
         const vaultDir = path.join(notesRoot, vaultName);
         if (fs.existsSync(path.join(vaultDir, 'vault.meta.json'))) {
-          out.push(vaultDir);
+          pushMount(notesRoot);
+          foundNested = true;
+          break;
         }
       }
-      // Some layouts use notes/ as the mount (meta at notes/vault.meta.json)
-      if (fs.existsSync(path.join(notesRoot, 'vault.meta.json'))) {
-        out.push(notesRoot);
+      // Some layouts use notes/ as the vault root itself (meta at notes/vault.meta.json).
+      if (!foundNested && fs.existsSync(path.join(notesRoot, 'vault.meta.json'))) {
+        pushMount(notesRoot);
       }
     }
   }
@@ -105,7 +126,8 @@ async function migrateOneVault(mountPath, SQL) {
     db.close();
     return { status: 'dry-run', result: before };
   }
-  if (before === 'inserted') {
+  // Persist inserted notes, purged garbage, revived SAMPLE NOTE1, and shared_content_key relinks.
+  if (before === 'inserted' || before === 'upgraded') {
     const sealed = sealVaultBuffer(Buffer.from(db.export()), null);
     atomicWriteFileSync(dbPath, sealed);
   }
@@ -132,7 +154,7 @@ async function main() {
   console.log(`[migrateRecordVaultNewMemberSample] roots=${storageRoots().join(', ') || '(none)'}`);
   console.log(`[migrateRecordVaultNewMemberSample] vaults found=${mounts.length} dryRun=${dryRun}`);
 
-  const tallies = { inserted: 0, present: 0, skipped: 0, encrypted: 0, other: 0 };
+  const tallies = { inserted: 0, present: 0, upgraded: 0, skipped: 0, encrypted: 0, other: 0 };
   for (const mount of mounts) {
     const res = await migrateOneVault(mount, SQL);
     if (res.status === 'ok' || res.status === 'dry-run') {
@@ -155,4 +177,7 @@ async function main() {
 main().catch((err) => {
   console.error(err);
   process.exitCode = 1;
+}).finally(() => {
+  // loadEnv starts a config-refresh interval — force exit so CLI migrations finish.
+  setTimeout(() => process.exit(process.exitCode || 0), 50);
 });

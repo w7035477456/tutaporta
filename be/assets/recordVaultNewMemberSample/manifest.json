@@ -1,7 +1,8 @@
 {
-  "version": 1,
-  "seedMarker": "rv-new-member-sample-v1",
-  "notebookName": "SAMPLE NOTEBOOK",
+  "version": 2,
+  "seedMarker": "rv-new-member-sample-v2",
+  "notebookName": "SAMPLE NOTEBOOK 1",
+  "source": "dm1@gmail.com singles_id=32 member_id=1136631",
   "notes": [
     {
       "noteKey": "sample-note-1",
@@ -9,48 +10,7 @@
       "bodyHtmlFile": "sampleNote1Body.html",
       "displayOrder": 0,
       "shortcut": true,
-      "attachments": [
-        {
-          "sharedKey": "welcome-pdf",
-          "attachmentId": 1,
-          "sourceFile": "sample_welcome.pdf",
-          "fileName": "sample_welcome.pdf",
-          "fileExtension": "pdf",
-          "fileSizeBytes": 594,
-          "checksum": "01023dc513fffa44eac665782c409e43928c1b6f0a0e30c0a4f1cc9dcd970777",
-          "mimeType": "application/pdf"
-        },
-        {
-          "sharedKey": "welcome-txt",
-          "attachmentId": 2,
-          "sourceFile": "sample_welcome.txt",
-          "fileName": "sample_welcome.txt",
-          "fileExtension": "txt",
-          "fileSizeBytes": 86,
-          "checksum": "73c6a3c61334d14f8d2f38dd249cb2d691ae9bb5da3f03327da756392baedbf4",
-          "mimeType": "text/plain"
-        },
-        {
-          "sharedKey": "welcome-png",
-          "attachmentId": 3,
-          "sourceFile": "sample_welcome.png",
-          "fileName": "sample_welcome.png",
-          "fileExtension": "png",
-          "fileSizeBytes": 69,
-          "checksum": "edee5069c02ce271861c4d58b035e04999703c495b7af23e17d4bbfffd337e45",
-          "mimeType": "image/png"
-        },
-        {
-          "sharedKey": "welcome-jpg",
-          "attachmentId": 4,
-          "sourceFile": "sample_welcome.jpg",
-          "fileName": "sample_welcome.jpg",
-          "fileExtension": "jpg",
-          "fileSizeBytes": 332,
-          "checksum": "3d53287e8f7fe6438170e3ce451a83d4fee21cad67e38cf96ef79492f535e473",
-          "mimeType": "image/jpeg"
-        }
-      ]
+      "attachments": []
     },
     {
       "noteKey": "sample-note-2",
@@ -60,24 +20,64 @@
       "shortcut": false,
       "attachments": [
         {
-          "sharedKey": "formats-txt",
-          "attachmentId": 5,
-          "sourceFile": "sample_formats.txt",
-          "fileName": "sample_formats.txt",
-          "fileExtension": "txt",
-          "fileSizeBytes": 135,
-          "checksum": "fd5200c3cca7409b32f7c274ec4b0b6f2b2f0c608a11c14208746bdec9a70bb1",
-          "mimeType": "text/plain"
+          "sharedKey": "dm1-pdf-10mb",
+          "attachmentId": 1,
+          "sourceFile": "sample-pdf-download-10-mb.pdf",
+          "fileName": "sample-pdf-download-10-mb.pdf",
+          "fileExtension": "pdf",
+          "fileSizeBytes": 10635049,
+          "checksum": "2a2ed598e55f481b037c0c92cf75012e212befb47d52c97f54da5ea666a3e308",
+          "mimeType": "application/pdf"
         },
         {
-          "sharedKey": "formats-csv",
+          "sharedKey": "dm1-pptx-report",
+          "attachmentId": 2,
+          "sourceFile": "Report-PPT-Samples.pptx",
+          "fileName": "Report-PPT-Samples.pptx",
+          "fileExtension": "pptx",
+          "fileSizeBytes": 261870,
+          "checksum": "d2ed81ee82b5ae8bf3ed014fc5a19963ea41785e0171285a812f37baa41228e1",
+          "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        },
+        {
+          "sharedKey": "dm1-jpg-insurance",
+          "attachmentId": 4,
+          "sourceFile": "autoInraunceCard.jpg",
+          "fileName": "autoInraunceCard.jpg",
+          "fileExtension": "jpg",
+          "fileSizeBytes": 52586,
+          "checksum": "14342dc2512033997369c60885b1496fcbd0c6368d09ffe6d9cda7a226f9151a",
+          "mimeType": "image/jpeg"
+        },
+        {
+          "sharedKey": "dm1-mov-usethis",
+          "attachmentId": 5,
+          "sourceFile": "USETHIS_MOV.mov",
+          "fileName": "USETHIS_MOV.mov",
+          "fileExtension": "mov",
+          "fileSizeBytes": 17436085,
+          "checksum": "748dddbfbdd246782e13438efa30998ece2b3b4e0dcd1b85bc68edb73589e19d",
+          "mimeType": "video/quicktime"
+        },
+        {
+          "sharedKey": "dm1-mp4-usethis",
           "attachmentId": 6,
-          "sourceFile": "sample_formats.csv",
-          "fileName": "sample_formats.csv",
-          "fileExtension": "csv",
-          "fileSizeBytes": 46,
-          "checksum": "9a74391ab25a4f510091eebe9593a2feef13b707f0f16ea4e905806f82a3f8f2",
-          "mimeType": "text/csv"
+          "sourceFile": "USETHIS_MP4.mp4",
+          "fileName": "USETHIS_MP4.mp4",
+          "fileExtension": "mp4",
+          "fileSizeBytes": 10055355,
+          "checksum": "2f3467224d6529602b38177298c43cfad92fa9db06cfbc1e761f50f800d1ef3b",
+          "mimeType": "video/mp4"
+        },
+        {
+          "sharedKey": "dm1-txt-test",
+          "attachmentId": 7,
+          "sourceFile": "test.txt",
+          "fileName": "test.txt",
+          "fileExtension": "txt",
+          "fileSizeBytes": 35,
+          "checksum": "854b3dade3472447360f976d0593b74c83ec401919ccd88ee4d1d4c054e43505",
+          "mimeType": "text/plain"
         }
       ]
     }

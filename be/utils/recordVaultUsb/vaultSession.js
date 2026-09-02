@@ -943,7 +943,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
   } catch (err) {
     console.warn('[recordVault] shared sample media link failed', err?.message || err);
   }
-  if (sampleSeedStatus === 'inserted') {
+  if (sampleSeedStatus === 'inserted' || sampleSeedStatus === 'upgraded') {
     markDirty(session);
     flushDbToUsb(session);
   }
@@ -1800,11 +1800,20 @@ export function vaultDeleteNote(session, noteId) {
   }
   const attachmentRows = queryAll(
     session.db,
-    `SELECT relative_path FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL`,
+    `SELECT relative_path, shared_content_key, checksum, file_name FROM note_attachments
+     WHERE note_id = ? AND deleted_at IS NULL`,
     [noteId]
   );
   for (const att of attachmentRows) {
-    deleteEncryptedVaultFile(session, att.relative_path);
+    // Shared sample bytes are never deleted — only the per-vault pointer row.
+    const sharedKey = resolveRecordVaultSharedContentKey({
+      sharedContentKey: att.shared_content_key,
+      checksum: att.checksum,
+      fileName: att.file_name
+    });
+    if (!sharedKey) {
+      deleteEncryptedVaultFile(session, att.relative_path);
+    }
   }
   session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
     noteId

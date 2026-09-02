@@ -755,7 +755,7 @@ export default function RecordVaultUsbGate({
     if (!mountPath || busy) return;
     const label = String(location?.label ?? mountPath);
     const confirmed = await themedConfirm(
-      `Format and wipe the TutaNotes vault on "${label}"?\n\nThis permanently deletes the TutaNotes folder on this USB and creates a fresh vault with sample Notebook 1 / NOTE 1. Other files on the drive are not touched.`
+      `Format and wipe the TutaNotes vault on "${label}"?\n\nThis permanently deletes the TutaNotes folder on this USB and creates a fresh vault with SAMPLE NOTEBOOK (SAMPLE NOTE1 / SAMPLE NOTE2). Other files on the drive are not touched.`
     );
     if (!confirmed) return;
     setBusy(true);

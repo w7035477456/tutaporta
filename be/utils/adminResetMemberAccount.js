@@ -232,7 +232,7 @@ export async function hardResetMemberAccount(singlesId) {
         demoBuddies,
         billSchedule: bill,
         vaultNotes:
-          'Custom TutaNotes vault data is not auto-wiped while encrypted on disk/USB. Format/re-open vault or wipe USB from the vault UI if a clean Notebook 1 / Note 1 is required.',
+          'Custom TutaNotes vault data is not auto-wiped while encrypted on disk/USB. Format/re-open vault or wipe USB from the vault UI if a clean SAMPLE NOTEBOOK is required.',
         vaultAlbums:
           'Custom TutaPhotoAlbums vault data is not auto-wiped while encrypted on disk/USB. Format/re-open vault or wipe USB from the vault UI if a clean SAMPLE SET is required.'
       }
