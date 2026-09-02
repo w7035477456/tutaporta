@@ -51,7 +51,7 @@ import { beginFlowerShopLightThemeOverride, isFlowerShopThemeOverrideActive } fr
 import { exitMenuIcon, profileRecordsIcon } from 'config/menuIcons';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import { HEADER_PROFILE_AVATAR_SIZE, headerProfileChipHeightCss } from 'config/headerProfileChipEnv';
-import { SIDEBAR_MENU_ICON_CLASS } from 'config/selectedUnselectedButtonTemplate';
+import { SIDEBAR_MENU_ICON_CLASS, exitToMallYellowDashedBorderSx } from 'config/selectedUnselectedButtonTemplate';
 import { pickRandomProfileMenuGreetingLines } from 'utils/profileMenuGreeting';
 import { requestOpenVaultProfilesRecords } from 'utils/vaultProfilesRecordsGate';
 import {
@@ -887,7 +887,15 @@ export default function ProfileSection({ clusterTight = false }) {
                           disableRipple
                           startIcon={<ProfileMenuExitIcon />}
                           onClick={handleExitOrLogout}
-                          sx={profileMenuButtonSx(false, profileMenuButtonLayoutSx)}
+                          sx={{
+                            ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
+                            ...exitToMallYellowDashedBorderSx(),
+                            '@media (hover: hover)': {
+                              '&:hover': {
+                                ...exitToMallYellowDashedBorderSx()
+                              }
+                            }
+                          }}
                         >
                           {exitLabel}
                         </Button>

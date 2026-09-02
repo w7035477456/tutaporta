@@ -8,6 +8,7 @@ import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_50
 } from 'ui-component/SliderControlButton';
+import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { themedAlert, themedConfirm } from 'utils/themedDialog';
 import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDownsizeMedia';
@@ -8106,33 +8107,15 @@ export default function PhotoAlbumsWorkspacePane({
               </Box>
               {!(usePaneLogOff && paneStorageType === 'onedrive') ? (
               <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                <SliderControlButton
-                  type="button"
-                  variant="logoff"
-                  hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                  singleLineLabel
+                <VaultExitToMallToolbarButton
+                  compact={menuLabelsCompact}
                   {...guestDemoBlockProps()}
                   onClick={() => void (usePaneLogOff ? handleLogOffPane() : handleExitToMall())}
                   disabled={busy}
-                  aria-label={usePaneLogOff ? logOffPaneLabel : 'Exit to Mall'}
-                  title={usePaneLogOff ? logOffPaneLabel : 'Exit to Mall'}
+                  usePaneLogOff={usePaneLogOff}
+                  logOffPaneLabel={logOffPaneLabel}
                   sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                >
-                  {menuLabelsCompact ? (
-                    usePaneLogOff ? 'LO' : 'EM'
-                  ) : usePaneLogOff ? (
-                    logOffPaneLabel
-                  ) : (
-                    <>
-                      <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                        Exit
-                      </Box>
-                      <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                        Exit to Mall
-                      </Box>
-                    </>
-                  )}
-                </SliderControlButton>
+                />
               </Box>
               ) : null}
               </Box>

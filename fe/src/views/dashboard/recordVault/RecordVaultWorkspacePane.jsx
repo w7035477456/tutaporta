@@ -8,6 +8,7 @@ import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_50
 } from 'ui-component/SliderControlButton';
+import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   isRecordVaultUsbRequiredError,
@@ -3075,31 +3076,6 @@ export default function RecordVaultWorkspacePane({
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
 
-  const handleLogOffPane = useCallback(async () => {
-    if (busy || !unlocked) return;
-    setBusy(true);
-    setVaultLeaving(true);
-    setVaultLeavingProgressPercent(1);
-    setVaultLeavingProgressLabel(
-      paneStorageType === 'onedrive' ? 'Saving notes to OneDrive…' : 'Logging off USB…'
-    );
-    setError('');
-    try {
-      await performVaultStorageLogoff();
-    } catch (err) {
-      setError(readRecordVaultApiError(err, 'Logoff failed'));
-      setBusy(false);
-      setVaultLeaving(false);
-      setVaultLeavingProgressPercent(0);
-      setVaultLeavingProgressLabel('');
-      return;
-    }
-    setBusy(false);
-    setVaultLeaving(false);
-    setVaultLeavingProgressPercent(0);
-    setVaultLeavingProgressLabel('');
-  }, [busy, unlocked, performVaultStorageLogoff, paneStorageType]);
-
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
     if (unlocked) {
@@ -3127,9 +3103,6 @@ export default function RecordVaultWorkspacePane({
     }
     navigate('/mall');
   }, [busy, unlocked, navigate, performVaultStorageLogoff, paneStorageType]);
-
-  const logOffPaneLabel = paneStorageType === 'onedrive' ? 'Log off Cloud' : 'Log off USB';
-  const usePaneLogOff = typeof onSessionEnded === 'function';
 
   useEffect(() => {
     let cancelled = false;
@@ -6539,33 +6512,13 @@ export default function RecordVaultWorkspacePane({
                     overflow: 'visible'
                   }}
                 >
-                  <SliderControlButton
-                    type="button"
-                    variant="logoff"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    singleLineLabel
+                  <VaultExitToMallToolbarButton
+                    compact={menuLabelsCompact}
                     data-guest-demo-allow="true"
-                    onClick={() => void (usePaneLogOff ? handleLogOffPane() : handleExitToMall())}
+                    onClick={() => void handleExitToMall()}
                     disabled={busy}
-                    aria-label={usePaneLogOff ? logOffPaneLabel : 'Exit to Mall'}
-                    title={usePaneLogOff ? logOffPaneLabel : 'Exit to Mall'}
                     sx={headerToggleButtonSx}
-                  >
-                    {menuLabelsCompact ? (
-                      (usePaneLogOff ? logOffPaneLabel : 'Exit to Mall').charAt(0)
-                    ) : usePaneLogOff ? (
-                      logOffPaneLabel
-                    ) : (
-                      <>
-                        <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                          Exit
-                        </Box>
-                        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                          Exit to Mall
-                        </Box>
-                      </>
-                    )}
-                  </SliderControlButton>
+                  />
                 </Box>
               </Box>
               {!compareMode ? (

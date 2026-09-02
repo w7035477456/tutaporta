@@ -331,19 +331,29 @@ export function baseButtonSx(bg, text, border, hoverScale, {
   };
 }
 
+/** Exit to Mall — prominent yellow dashed outline (toolbar, sidebar, profile menu). */
+export const EXIT_TO_MALL_YELLOW_DASHED_BORDER = '3px dashed var(--theme-yellow-color)';
+
+export function exitToMallYellowDashedBorderSx() {
+  return {
+    border: `${EXIT_TO_MALL_YELLOW_DASHED_BORDER} !important`
+  };
+}
+
 /** Exit to Mall — unselected base with red hover (sidebar). Merge into `UnSelectedButtonTemplate` `sx`. */
 export function exitToMallUnselectedButtonHoverSx({
   hoverScale = SELECTED_UNSELECTED_BUTTON_HOVER_SCALE,
   transformOrigin = 'left center'
 } = {}) {
   return {
+    ...exitToMallYellowDashedBorderSx(),
     transformOrigin,
     '@media (hover: hover)': {
       '&:hover': {
         bgcolor: 'var(--theme-error-color) !important',
         color: 'var(--theme-white-color) !important',
         WebkitTextFillColor: 'var(--theme-white-color) !important',
-        border: '1px solid var(--theme-error-color) !important',
+        border: `${EXIT_TO_MALL_YELLOW_DASHED_BORDER} !important`,
         ...buttonTemplateHoverBoxScaleOnHoverSx(hoverScale, transformOrigin),
         '& .MuiButton-startIcon': { color: 'var(--theme-white-color) !important' },
         '& svg': { color: 'var(--theme-white-color) !important' }
