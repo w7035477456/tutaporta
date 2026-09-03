@@ -1,7 +1,7 @@
 const STORAGE_AT = 'omStaleModuleHardReloadAt';
 const STORAGE_COUNT = 'omStaleModuleHardReloadCount';
-const RELOAD_WINDOW_MS = 30000;
-const MAX_RELOADS = 3;
+const RELOAD_WINDOW_MS = 60000;
+const MAX_AUTO_RELOADS = 2;
 const CACHE_BUST_PARAM = '_omr';
 const INSTALL_FLAG = '__omStaleModuleHardReloadInstalled';
 
@@ -41,7 +41,13 @@ export function isFailedDynamicImportError(error) {
 export function isAllowedStaleModuleReloadHost() {
   if (typeof window === 'undefined') return false;
   const host = String(window.location.hostname || '').toLowerCase();
-  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'onlinemall.website' || host.endsWith('.onlinemall.website');
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host === 'onlinemall.website' ||
+    host.endsWith('.onlinemall.website')
+  );
 }
 
 function readReloadState() {
@@ -68,7 +74,7 @@ function markReloadStarted() {
   }
 }
 
-/** Drop the guard after a successful lazy import so later Vite HMR can recover again. */
+/** Drop retry guard + strip cache-bust query param from the URL bar. */
 export function clearStaleModuleReloadGuard() {
   reloadStarted = false;
   if (typeof window === 'undefined') return;
@@ -90,35 +96,82 @@ export function clearStaleModuleReloadGuard() {
   }
 }
 
+/**
+ * Call once from index.jsx on every full page load.
+ * Shift-Cmd-R and normal navigation must reset the auto-reload budget (sessionStorage
+ * survives hard refresh, which is why users got stuck until Incognito).
+ */
+export function bootstrapStaleModuleRecovery() {
+  if (typeof window === 'undefined') return;
+  clearStaleModuleReloadGuard();
+}
+
 function sleep(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
 }
 
-/** Retry a lazy importer once — Vite often 404s the old chunk for a tick after HMR. */
-export async function importWithStaleChunkRetry(importer) {
+async function purgeBrowserModuleCaches() {
   try {
-    return await importer();
-  } catch (error) {
-    if (!isFailedDynamicImportError(error)) throw error;
-    await sleep(300);
-    try {
-      return await importer();
-    } catch (retryError) {
-      if (tryHardReloadOnFailedDynamicImport(retryError)) {
-        return new Promise(() => {});
-      }
-      throw retryError;
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.unregister()));
     }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (window.caches?.keys) {
+      const names = await window.caches.keys();
+      await Promise.all(names.map((name) => window.caches.delete(name)));
+    }
+  } catch {
+    /* ignore */
   }
 }
 
-/** Cache-busting navigation (more reliable than location.reload after Vite HMR). */
-function hardReloadLikeShiftCmdR() {
-  const url = new URL(window.location.href);
+/** Cache-busting navigation after clearing SW + Cache Storage (Shift-Cmd-R equivalent). */
+async function hardReloadLikeShiftCmdR() {
+  const href = window.location.href;
+  await purgeBrowserModuleCaches();
+  try {
+    await fetch(href, {
+      cache: 'reload',
+      credentials: 'same-origin',
+      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+    });
+  } catch {
+    /* ignore — still navigate */
+  }
+  const url = new URL(href);
   url.searchParams.set(CACHE_BUST_PARAM, String(Date.now()));
-  window.location.replace(url.pathname + url.search + url.hash);
+  window.location.replace(`${url.pathname}${url.search}${url.hash}`);
+}
+
+/** User-triggered recovery from the error screen — always allowed. */
+export async function forceStaleModuleRecovery() {
+  clearStaleModuleReloadGuard();
+  await hardReloadLikeShiftCmdR();
+}
+
+/** Retry a lazy importer — Vite often 404s the old chunk briefly after HMR. */
+export async function importWithStaleChunkRetry(importer) {
+  const delays = [0, 250, 600];
+  let lastError;
+  for (const delay of delays) {
+    if (delay) await sleep(delay);
+    try {
+      return await importer();
+    } catch (error) {
+      if (!isFailedDynamicImportError(error)) throw error;
+      lastError = error;
+    }
+  }
+  if (tryHardReloadOnFailedDynamicImport(lastError)) {
+    return new Promise(() => {});
+  }
+  throw lastError;
 }
 
 /**
@@ -132,9 +185,9 @@ export function tryHardReloadOnFailedDynamicImport(error) {
   if (!isAllowedStaleModuleReloadHost()) return false;
   if (reloadStarted) return true;
   const { count } = readReloadState();
-  if (count >= MAX_RELOADS) return false;
+  if (count >= MAX_AUTO_RELOADS) return false;
   markReloadStarted();
-  hardReloadLikeShiftCmdR();
+  void hardReloadLikeShiftCmdR();
   return true;
 }
 
@@ -142,11 +195,6 @@ export function installHardReloadOnStaleModule() {
   if (typeof window === 'undefined') return;
   if (window[INSTALL_FLAG]) return;
   window[INSTALL_FLAG] = true;
-
-  window.addEventListener('error', (event) => {
-    tryHardReloadOnFailedDynamicImport(event?.error || event?.message);
-  });
-  window.addEventListener('unhandledrejection', (event) => {
-    tryHardReloadOnFailedDynamicImport(event?.reason);
-  });
+  // Lazy-import recovery is handled in Loadable.jsx — no global listeners here
+  // (they burned the retry budget and fought manual Shift-Cmd-R).
 }

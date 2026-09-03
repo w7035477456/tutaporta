@@ -3,7 +3,13 @@ import { isRouteErrorResponse, useRouteError } from 'react-router-dom';
 
 // material-ui
 import Alert from '@mui/material/Alert';
-import { isFailedDynamicImportError, tryHardReloadOnFailedDynamicImport } from 'utils/hardReloadOnStaleModule';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import {
+  forceStaleModuleRecovery,
+  isFailedDynamicImportError,
+  tryHardReloadOnFailedDynamicImport
+} from 'utils/hardReloadOnStaleModule';
 
 // ==============================|| ELEMENT ERROR - COMMON ||============================== //
 
@@ -11,6 +17,7 @@ export default function ErrorBoundary() {
   const error = useRouteError();
   const staleModule = isFailedDynamicImportError(error);
   const [reloadSkipped, setReloadSkipped] = useState(false);
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     if (!staleModule) return undefined;
@@ -24,7 +31,23 @@ export default function ErrorBoundary() {
   }
 
   if (staleModule) {
-    return <Alert severity="error">This page failed to load. Hard-refresh (Shift-Cmd-R) and try again.</Alert>;
+    return (
+      <Box sx={{ p: 2 }}>
+        <Alert severity="error" sx={{ mb: 1.5 }}>
+          This page failed to load after a code update. Click Reload below (clears cached modules).
+        </Alert>
+        <Button
+          variant="contained"
+          disabled={recovering}
+          onClick={() => {
+            setRecovering(true);
+            void forceStaleModuleRecovery();
+          }}
+        >
+          {recovering ? 'Reloading…' : 'Reload page'}
+        </Button>
+      </Box>
+    );
   }
 
   if (isRouteErrorResponse(error)) {

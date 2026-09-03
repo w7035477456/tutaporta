@@ -282,13 +282,13 @@ export function colorTemplate9TableCustomScrollbarTrackSx(overrides = {}) {
     minWidth: 0,
     boxSizing: 'border-box',
     flexShrink: 0,
-    height: 12,
-    minHeight: 12,
-    maxHeight: 12,
+    height: 16,
+    minHeight: 16,
+    maxHeight: 16,
     position: 'relative',
     overflow: 'hidden',
     cursor: 'pointer',
-    backgroundColor: COLOR_TEMPLATE9_TABLE_SCROLLBAR_TRACK,
+    backgroundColor: `${COLOR_TEMPLATE9_TABLE_SCROLLBAR_TRACK} !important`,
     borderRadius: 0,
     ...overrides
   };
@@ -298,12 +298,15 @@ export function colorTemplate9TableCustomScrollbarTrackSx(overrides = {}) {
 export function colorTemplate9TableCustomScrollbarThumbSx(overrides = {}) {
   return {
     position: 'absolute',
-    top: 0,
-    height: '100%',
-    backgroundColor: COLOR_TEMPLATE9_TABLE_SCROLLBAR_THUMB,
-    borderRadius: 0,
+    top: 2,
+    bottom: 2,
+    height: 'auto',
+    minWidth: 80,
+    backgroundColor: `${COLOR_TEMPLATE9_TABLE_SCROLLBAR_THUMB} !important`,
+    borderRadius: 2,
     cursor: 'grab',
     touchAction: 'none',
+    zIndex: 1,
     '&:active': { cursor: 'grabbing' },
     ...overrides
   };

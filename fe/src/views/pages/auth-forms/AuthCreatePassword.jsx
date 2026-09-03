@@ -14,6 +14,7 @@ import Box from '@mui/material/Box';
 // project imports
 import AnimateButton from 'ui-component/extended/AnimateButton';
 import GreenButton from 'ui-component/GreenButton';
+import SmsVerificationDigitRow from 'ui-component/SmsVerificationDigitRow';
 import CustomFormControl from 'ui-component/extended/Form/CustomFormControl';
 import { verifyRegistrationLink } from 'api/verifyRegistrationLinkFe';
 import { validateReferralCode } from 'api/validateReferralCodeFe';
@@ -134,31 +135,6 @@ const smsCompactPillButtonSx = {
   minHeight: { xs: 40, sm: 44 },
   lineHeight: 1.2
 };
-
-const verificationSlotInputSx = (hasError, enabled) => ({
-  boxSizing: 'border-box',
-  flex: '1 1 0%',
-  minWidth: { xs: 22, sm: 28 },
-  maxWidth: { xs: 44, sm: 48 },
-  width: 0,
-  height: { xs: 44, sm: 48 },
-  textAlign: 'center',
-  fontSize: authEnvButtonFontSize,
-  fontWeight: 600,
-  border: '2px solid',
-  borderColor: hasError ? 'error.main' : enabled ? '#000' : '#bdbdbd',
-  borderRadius: 1,
-  bgcolor: enabled ? '#fff' : '#f5f5f5',
-  color: enabled ? 'text.primary' : 'text.disabled',
-  cursor: enabled ? 'text' : 'not-allowed',
-  '&:focus': enabled
-    ? {
-        outline: 'none',
-        borderColor: 'var(--theme-primary-color)',
-        boxShadow: '0 0 0 1px var(--theme-primary-color)'
-      }
-    : { outline: 'none' }
-});
 
 const SIGNUP_SMS_VERIFIED_KEY = 'signupSmsVerified';
 const SIGNUP_SMS_BYPASSED_KEY = 'signupSmsBypassed';
@@ -338,6 +314,12 @@ export default function AuthCreatePassword() {
     }, 1000);
     return () => clearInterval(id);
   }, [sendSmsCooldownActive]);
+
+  useEffect(() => {
+    if (!smsSent) return undefined;
+    const id = window.requestAnimationFrame(() => verificationSlotRefs.current[0]?.focus());
+    return () => window.cancelAnimationFrame(id);
+  }, [smsSent]);
 
   useEffect(() => {
     if (isGoogleSignup) {
@@ -1096,54 +1078,15 @@ export default function AuthCreatePassword() {
                 Clear
               </Button>
 
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexWrap: 'nowrap',
-                  gap: { xs: 0.5, sm: 0.75 },
-                  minWidth: 0
-                }}
-              >
-                {[0, 1, 2].map((i) => (
-                  <Box
-                    key={i}
-                    component="input"
-                    inputMode="numeric"
-                    autoComplete={i === 0 ? 'one-time-code' : 'off'}
-                    maxLength={1}
-                    disabled={!isSmsCodeEntryEnabled}
-                    value={codeChars[i]}
-                    onChange={(e) => handleVerificationSlotChange(i, e)}
-                    onKeyDown={(e) => handleVerificationSlotKeyDown(i, e)}
-                    ref={(el) => {
-                      verificationSlotRefs.current[i] = el;
-                    }}
-                    sx={verificationSlotInputSx(!!error, isSmsCodeEntryEnabled)}
-                    aria-label={`Verification code digit ${i + 1} of 6`}
-                  />
-                ))}
-                <Box sx={{ width: { xs: 6, sm: 10 }, flexShrink: 0 }} aria-hidden />
-                {[3, 4, 5].map((i) => (
-                  <Box
-                    key={i}
-                    component="input"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={1}
-                    disabled={!isSmsCodeEntryEnabled}
-                    value={codeChars[i]}
-                    onChange={(e) => handleVerificationSlotChange(i, e)}
-                    onKeyDown={(e) => handleVerificationSlotKeyDown(i, e)}
-                    ref={(el) => {
-                      verificationSlotRefs.current[i] = el;
-                    }}
-                    sx={verificationSlotInputSx(!!error, isSmsCodeEntryEnabled)}
-                    aria-label={`Verification code digit ${i + 1} of 6`}
-                  />
-                ))}
-              </Box>
+              <SmsVerificationDigitRow
+                codeChars={codeChars}
+                enabled={isSmsCodeEntryEnabled}
+                hasError={!!error}
+                slotRefs={verificationSlotRefs}
+                onSlotChange={handleVerificationSlotChange}
+                onSlotKeyDown={handleVerificationSlotKeyDown}
+                onPaste={handleVerificationSlotsPaste}
+              />
 
               <GreenButton
                 onClick={(e) => void handleVerifySms(e)}

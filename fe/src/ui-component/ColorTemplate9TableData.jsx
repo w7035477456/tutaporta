@@ -256,33 +256,46 @@ export function useColorTemplate9AutoFitColumnWidths({
   return { columnWidthsPx, gridTemplateColumns, minTableWidthPx };
 }
 
-function ColorTemplate9TableCustomHorizontalScrollbar({ scrollRef, minTableWidth, placement = 'top' }) {
+const CUSTOM_SCROLL_THUMB_MIN_PX = 80;
+const CUSTOM_SCROLL_THUMB_MAX_FRACTION = 0.28;
+
+function measureTableScrollMetrics(scrollEl, trackWidth, minTableWidth) {
+  const clientWidth = Math.max(1, scrollEl?.clientWidth || 0);
+  const scrollWidth = Math.max(
+    scrollEl?.scrollWidth || 0,
+    scrollEl?.firstElementChild?.scrollWidth || 0,
+    Number(minTableWidth) || 0,
+    clientWidth
+  );
+  const maxScroll = Math.max(0, scrollWidth - clientWidth);
+  const proportional = (clientWidth / scrollWidth) * trackWidth;
+  const thumbWidth = Math.max(
+    CUSTOM_SCROLL_THUMB_MIN_PX,
+    Math.min(trackWidth * CUSTOM_SCROLL_THUMB_MAX_FRACTION, proportional || CUSTOM_SCROLL_THUMB_MIN_PX)
+  );
+  return { clientWidth, scrollWidth, maxScroll, thumbWidth: Math.min(trackWidth, thumbWidth) };
+}
+
+function ColorTemplate9TableCustomHorizontalScrollbar({ scrollEl, minTableWidth, placement = 'top' }) {
   const trackRef = useRef(null);
   const draggingRef = useRef(false);
-  const [thumb, setThumb] = useState({ width: 48, left: 0 });
+  const [thumb, setThumb] = useState({ width: CUSTOM_SCROLL_THUMB_MIN_PX, left: 0 });
 
   useLayoutEffect(() => {
-    const scrollEl = scrollRef.current;
     const trackEl = trackRef.current;
     if (!scrollEl || !trackEl) return undefined;
 
     const updateThumb = () => {
-      const trackWidth = trackEl.clientWidth;
-      const clientWidth = scrollEl.clientWidth;
-      const scrollWidth = Math.max(
-        scrollEl.scrollWidth || 0,
-        scrollEl.firstElementChild?.scrollWidth || 0,
-        Number(minTableWidth) || 0,
-        1
-      );
-      const maxScroll = Math.max(0, scrollWidth - clientWidth);
-      const thumbWidth = Math.max(24, Math.min(trackWidth, (clientWidth / scrollWidth) * trackWidth));
-      const thumbLeft = maxScroll > 0 ? (scrollEl.scrollLeft / maxScroll) * (trackWidth - thumbWidth) : 0;
+      const trackWidth = trackEl.clientWidth || 1;
+      const { maxScroll, thumbWidth } = measureTableScrollMetrics(scrollEl, trackWidth, minTableWidth);
+      const maxThumb = Math.max(0, trackWidth - thumbWidth);
+      const thumbLeft = maxScroll > 0 ? (scrollEl.scrollLeft / maxScroll) * maxThumb : 0;
       setThumb({ width: thumbWidth, left: thumbLeft });
     };
 
     updateThumb();
     const rafId = window.requestAnimationFrame(updateThumb);
+    const rafId2 = window.requestAnimationFrame(() => window.requestAnimationFrame(updateThumb));
     scrollEl.addEventListener('scroll', updateThumb, { passive: true });
     window.addEventListener('resize', updateThumb, { passive: true });
 
@@ -296,27 +309,19 @@ function ColorTemplate9TableCustomHorizontalScrollbar({ scrollRef, minTableWidth
 
     return () => {
       window.cancelAnimationFrame(rafId);
+      window.cancelAnimationFrame(rafId2);
       scrollEl.removeEventListener('scroll', updateThumb);
       window.removeEventListener('resize', updateThumb);
       ro?.disconnect();
     };
-  }, [minTableWidth, scrollRef]);
+  }, [minTableWidth, scrollEl]);
 
   const jumpToClientX = (clientX) => {
-    const scrollEl = scrollRef.current;
     const trackEl = trackRef.current;
     if (!scrollEl || !trackEl) return;
     const rect = trackEl.getBoundingClientRect();
-    const trackWidth = rect.width;
-    const clientWidth = scrollEl.clientWidth;
-    const scrollWidth = Math.max(
-      scrollEl.scrollWidth || 0,
-      scrollEl.firstElementChild?.scrollWidth || 0,
-      Number(minTableWidth) || 0,
-      1
-    );
-    const maxScroll = Math.max(0, scrollWidth - clientWidth);
-    const thumbWidth = Math.max(24, Math.min(trackWidth, (clientWidth / scrollWidth) * trackWidth));
+    const trackWidth = rect.width || 1;
+    const { maxScroll, thumbWidth } = measureTableScrollMetrics(scrollEl, trackWidth, minTableWidth);
     const maxThumb = Math.max(0, trackWidth - thumbWidth);
     const nextLeft = Math.max(0, Math.min(maxThumb, clientX - rect.left - thumbWidth / 2));
     scrollEl.scrollLeft = maxThumb > 0 ? (nextLeft / maxThumb) * maxScroll : 0;
@@ -361,7 +366,7 @@ function ColorTemplate9TableCustomHorizontalScrollbar({ scrollRef, minTableWidth
 }
 
 ColorTemplate9TableCustomHorizontalScrollbar.propTypes = {
-  scrollRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
+  scrollEl: PropTypes.object,
   minTableWidth: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   placement: PropTypes.oneOf(['top', 'bottom'])
 };
@@ -377,7 +382,7 @@ function ColorTemplate9TableDataTable({
   frozenColumnWidthsPx = [],
   ...rest
 }) {
-  const bottomScrollRef = useRef(null);
+  const [scrollEl, setScrollEl] = useState(null);
   const frozenContextValue = useMemo(
     () => ({
       frozenColumnCount: Math.max(0, Math.trunc(Number(frozenColumnCount) || 0)),
@@ -428,17 +433,17 @@ function ColorTemplate9TableDataTable({
       >
         {topHorizontalScrollbar ? (
           <ColorTemplate9TableCustomHorizontalScrollbar
-            scrollRef={bottomScrollRef}
+            scrollEl={scrollEl}
             minTableWidth={minTableWidth}
             placement="top"
           />
         ) : null}
-        <Box ref={bottomScrollRef} sx={scrollShellSx}>
+        <Box ref={setScrollEl} sx={scrollShellSx}>
           {content}
         </Box>
         {topHorizontalScrollbar ? (
           <ColorTemplate9TableCustomHorizontalScrollbar
-            scrollRef={bottomScrollRef}
+            scrollEl={scrollEl}
             minTableWidth={minTableWidth}
             placement="bottom"
           />

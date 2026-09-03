@@ -12,9 +12,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
 
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
-import { COLOR_TEMPLATE13_DISABLED_BG } from 'config/colorTemplate13DisableGreenButton';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate13UsableGreenButton from 'ui-component/ColorTemplate13UsableGreenButton';
+import SmsVerificationDigitRow from 'ui-component/SmsVerificationDigitRow';
 import {
   completeSettingsChangeEmail,
   completeSettingsChangePassword,
@@ -177,133 +177,6 @@ const CHANGE_PASSWORD_REQUIREMENT_LABELS = [
   ['numberOrSymbol', 'At least one number or symbol']
 ];
 
-const SMS_SLOT_DISABLED_BG = COLOR_TEMPLATE13_DISABLED_BG;
-const SMS_SLOT_ENABLED_BG = '#fff';
-
-/** SMS code slots: grey before Send SMS; all white after Send SMS (or locked after verify). */
-const changePasswordSmsSlotSx = ({ enabled, locked = false }) => {
-  const activeVisual = enabled || locked;
-  return {
-  boxSizing: 'border-box',
-  flex: '0 0 auto',
-  width: { xs: 46, sm: 52 },
-  height: { xs: 46, sm: 52 },
-  minWidth: { xs: 46, sm: 52 },
-  maxWidth: { xs: 46, sm: 52 },
-  textAlign: 'center',
-  fontSize: { xs: '1.25rem', sm: '1.35rem' },
-  fontWeight: 700,
-  border: '2px solid',
-  borderColor: activeVisual ? '#000' : '#bdbdbd',
-  borderRadius: 1,
-  bgcolor: activeVisual ? `${SMS_SLOT_ENABLED_BG} !important` : SMS_SLOT_DISABLED_BG,
-  backgroundColor: activeVisual ? `${SMS_SLOT_ENABLED_BG} !important` : SMS_SLOT_DISABLED_BG,
-  color: activeVisual ? '#000 !important' : '#757575',
-  WebkitTextFillColor: activeVisual ? '#000 !important' : '#757575',
-  opacity: 1,
-  cursor: enabled ? 'text' : 'not-allowed',
-  WebkitAppearance: 'none',
-  MozAppearance: 'textfield',
-  '&:disabled': {
-    bgcolor: activeVisual ? SMS_SLOT_ENABLED_BG : SMS_SLOT_DISABLED_BG,
-    backgroundColor: activeVisual ? SMS_SLOT_ENABLED_BG : SMS_SLOT_DISABLED_BG,
-    color: activeVisual ? '#000' : '#757575',
-    WebkitTextFillColor: activeVisual ? '#000' : '#757575',
-    opacity: 1
-  },
-  '&:focus': enabled
-    ? {
-        outline: 'none',
-        borderColor: 'var(--theme-primary-color)',
-        boxShadow: '0 0 0 2px var(--theme-primary-color)'
-      }
-    : { outline: 'none' }
-  };
-};
-
-function ChangePasswordSmsDigitRow({
-  codeChars,
-  enabled,
-  locked = false,
-  slotRefs,
-  onSlotChange,
-  onSlotKeyDown,
-  onPaste
-}) {
-  return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexWrap: 'nowrap',
-        gap: { xs: 0.5, sm: 0.75 },
-        width: '100%',
-        minWidth: 0,
-        py: 0.5
-      }}
-      onPaste={onPaste}
-    >
-      {[0, 1, 2].map((i) => (
-        <Box
-          key={i}
-          component="input"
-          inputMode="numeric"
-          autoComplete={i === 0 ? 'one-time-code' : 'off'}
-          maxLength={1}
-          readOnly={!enabled}
-          tabIndex={enabled ? 0 : -1}
-          value={codeChars[i]}
-          onChange={(e) => onSlotChange(i, e)}
-          onKeyDown={(e) => onSlotKeyDown(i, e)}
-          ref={(el) => {
-            slotRefs.current[i] = el;
-          }}
-          sx={{
-            ...changePasswordSmsSlotSx({ enabled, locked }),
-            pointerEvents: enabled ? 'auto' : 'none'
-          }}
-          aria-label={`Verification code digit ${i + 1} of 6`}
-          aria-readonly={!enabled}
-        />
-      ))}
-      <Box sx={{ width: { xs: 10, sm: 14 }, flexShrink: 0 }} aria-hidden />
-      {[3, 4, 5].map((i) => (
-        <Box
-          key={i}
-          component="input"
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={1}
-          readOnly={!enabled}
-          tabIndex={enabled ? 0 : -1}
-          value={codeChars[i]}
-          onChange={(e) => onSlotChange(i, e)}
-          onKeyDown={(e) => onSlotKeyDown(i, e)}
-          ref={(el) => {
-            slotRefs.current[i] = el;
-          }}
-          sx={{
-            ...changePasswordSmsSlotSx({ enabled, locked }),
-            pointerEvents: enabled ? 'auto' : 'none'
-          }}
-          aria-label={`Verification code digit ${i + 1} of 6`}
-          aria-readonly={!enabled}
-        />
-      ))}
-    </Box>
-  );
-}
-
-ChangePasswordSmsDigitRow.propTypes = {
-  codeChars: PropTypes.arrayOf(PropTypes.string).isRequired,
-  enabled: PropTypes.bool.isRequired,
-  locked: PropTypes.bool,
-  slotRefs: PropTypes.shape({ current: PropTypes.array }).isRequired,
-  onSlotChange: PropTypes.func.isRequired,
-  onSlotKeyDown: PropTypes.func.isRequired,
-  onPaste: PropTypes.func.isRequired
-};
 
 function ChangePasswordRequirementRow({ met, label }) {
   return (
@@ -533,7 +406,7 @@ export function ChangePasswordPopup({ open, onClose, onSuccess, phone = '', emai
               Enter code SMS text to your phone below
             </ColorTemplate7PopupLargeDark.BodyText>
 
-            <ChangePasswordSmsDigitRow
+            <SmsVerificationDigitRow
               codeChars={codeChars}
               enabled={isSmsCodeEntryEnabled}
               slotRefs={verificationSlotRefs}
@@ -568,7 +441,7 @@ export function ChangePasswordPopup({ open, onClose, onSuccess, phone = '', emai
               </Box>
             </ColorTemplate7PopupLargeDark.BodyText>
 
-            <ChangePasswordSmsDigitRow
+            <SmsVerificationDigitRow
               codeChars={codeChars}
               enabled={false}
               locked
@@ -969,7 +842,7 @@ export function ChangeEmailPopup({ open, onClose, onSuccess, phone = '', email =
   };
 
   const smsDigitRow = (enabled, locked = false) => (
-    <ChangePasswordSmsDigitRow
+    <SmsVerificationDigitRow
       codeChars={codeChars}
       enabled={enabled}
       locked={locked}
@@ -1140,7 +1013,7 @@ export function ChangeEmailPopup({ open, onClose, onSuccess, phone = '', email =
                   Enter code sent to your new email
                 </ColorTemplate7PopupLargeDark.BodyText>
 
-                <ChangePasswordSmsDigitRow
+                <SmsVerificationDigitRow
                   codeChars={emailCodeChars}
                   enabled={isEmailCodeEntryEnabled}
                   slotRefs={emailCodeSlotRefs}
@@ -1527,7 +1400,7 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
   };
 
   const smsDigitRow = (enabled, locked = false) => (
-    <ChangePasswordSmsDigitRow
+    <SmsVerificationDigitRow
       codeChars={codeChars}
       enabled={enabled}
       locked={locked}
@@ -1712,7 +1585,7 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
                 Enter 6-digit code We emailed you
               </ColorTemplate7PopupLargeDark.BodyText>
 
-              <ChangePasswordSmsDigitRow
+              <SmsVerificationDigitRow
                 codeChars={emailCodeChars}
                 enabled={isEmailCodeEntryEnabled}
                 slotRefs={emailCodeSlotRefs}

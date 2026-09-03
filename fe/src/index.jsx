@@ -1,8 +1,9 @@
 import { createRoot } from 'react-dom/client';
 
 import { isGlobalErrorPopupEnabled } from 'config/globalErrorPopupEnv';
-import { installHardReloadOnStaleModule } from 'utils/hardReloadOnStaleModule';
+import { bootstrapStaleModuleRecovery, installHardReloadOnStaleModule } from 'utils/hardReloadOnStaleModule';
 
+bootstrapStaleModuleRecovery();
 installHardReloadOnStaleModule();
 
 // Patch console.error to show red ERROR popup only when GLOBAL_ERROR_POPUP=true in fe/.env
