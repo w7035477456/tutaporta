@@ -1,7 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { contentTypeToExt, getPhotoFolder } from './uploadPhoto.js';
+import { contentTypeToExt } from './uploadPhoto.js';
+import { resolveTutaDatesPhotoFolderForSingles } from '../../utils/tutaDatesMemberPaths.js';
 import { watermarkConsentImageBuffer } from '../../utils/watermarkConsentImage.js';
 import { deletePriorSystemPhotosByPrefix } from '../../utils/deleteSystemPhotos.js';
 import { appendPhotoThumbnailToInsert } from '../../utils/photoThumbnail.js';
@@ -125,7 +126,7 @@ export async function saveConsentSnapshotPhoto(
 
   await deletePriorSystemPhotosByPrefix(client, singlesId, fileNamePrefix);
 
-  const photoFolder = getPhotoFolder();
+  const photoFolder = await resolveTutaDatesPhotoFolderForSingles(singlesId);
   const filePathDir = path.resolve(photoFolder);
   fs.mkdirSync(filePathDir, { recursive: true });
 

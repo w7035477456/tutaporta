@@ -27,7 +27,7 @@ export const TUTAPHOTOALBUMS_ONEDRIVE_WORKSPACE_TITLE = 'TutaPhotoAlbums on OneD
 export const TUTAPHOTOALBUMS_USB_WORKSPACE_TITLE = 'TutaPhotoAlbums on USB';
 
 /** LEFT_SIDE=TutaDrive — centered cloud gate (matches TutaNotes). */
-export const TUTAPHOTOALBUMS_TUTADRIVE_WORKSPACE_TITLE = 'TutaPhotoAlbums on TutaDrive';
+export const TUTAPHOTOALBUMS_TUTADRIVE_WORKSPACE_TITLE = 'TutaPhotos on TutaCloud';
 export const TUTAPHOTOALBUMS_TUTADRIVE_LOGIN_TITLE = 'TutaPhotoAlbums';
 export const TUTAPHOTOALBUMS_TUTADRIVE_OPEN_LABEL = 'Open TutaDrive Cloud';
 export const TUTAPHOTOALBUMS_TUTADRIVE_STRIP_COLOR = 'var(--theme-secondary-color)';

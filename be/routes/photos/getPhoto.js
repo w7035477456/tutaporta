@@ -2,7 +2,13 @@ import path from 'path';
 import fs from 'fs';
 import pool from '../../db/connection.js';
 import { extToContentType } from '../../utils/albumUploadFormats.js';
-import { getPhotoFolder, resolvePhotoFilePath, resolvePhotoOrigBackupPath } from '../../utils/photoFilePath.js';
+import {
+  buildPhotoSearchFolders,
+  getPhotoFolder,
+  resolvePhotoFilePathInFolders,
+  resolvePhotoOrigBackupPathInFolders
+} from '../../utils/photoFilePath.js';
+import { loadMemberIdForSinglesOrFallback } from '../../utils/tutaDatesMemberPaths.js';
 import { resolvePhotoThumbnailPath } from '../../utils/photoThumbnail.js';
 import { resolveRequestsAppSchema } from '../singles/resolveRequestsAppSchema.js';
 import { logMyStoryPhotos, logMyStoryPhotosAlways, myStoryPhotoDebugEnabled } from '../../utils/myStoryPhotoDebug.js';
@@ -324,14 +330,16 @@ export async function getPhoto(req, res) {
     if (videoExts.has(ext.toLowerCase())) {
       return res.status(404).json({ error: 'Photo not found' });
     }
-    const photoFolder = getPhotoFolder();
-    if (!photoFolder) {
-      logMyStoryPhotosAlways('[getPhoto] 500 TUTADATES_PHOTO_FOLDER missing', { id, authSinglesId });
-      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER not configured in ~/.ssh/be/.env' });
+
+    const memberId = await loadMemberIdForSinglesOrFallback(photoOwnerId);
+    const searchFolders = buildPhotoSearchFolders({ filePathFromDb, memberId });
+    if (!searchFolders.length && !getPhotoFolder()) {
+      logMyStoryPhotosAlways('[getPhoto] 500 Tuta Dates photo storage missing', { id, authSinglesId });
+      return res.status(500).json({ error: 'Tuta Dates photo storage not configured in ~/.ssh/be/.env' });
     }
 
     if (wantThumbnail) {
-      const thumbPath = resolvePhotoThumbnailPath(photoThumbnail, filePathFromDb || photoFolder);
+      const thumbPath = resolvePhotoThumbnailPath(photoThumbnail, filePathFromDb || searchFolders[0] || getPhotoFolder());
       if (thumbPath) {
         const resolvedThumb = path.resolve(thumbPath);
         const stThumb = fs.statSync(resolvedThumb);
@@ -354,8 +362,8 @@ export async function getPhoto(req, res) {
     const wantOrig =
       String(req.query?.source ?? '').trim().toLowerCase() === 'orig' && Number(photoOwnerId) === authSinglesId;
     const fullPath = wantOrig
-      ? resolvePhotoOrigBackupPath(photoFolder, photoFileName, id)
-      : resolvePhotoFilePath(photoFolder, photoFileName, id, ext);
+      ? resolvePhotoOrigBackupPathInFolders(searchFolders, photoFileName, id)
+      : resolvePhotoFilePathInFolders(searchFolders, photoFileName, id, ext);
     if (!fullPath) {
       logMyStoryPhotosAlways('[getPhoto] 404 file not on disk', {
         id,

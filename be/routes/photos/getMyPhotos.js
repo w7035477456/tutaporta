@@ -2,9 +2,10 @@ import fs from 'fs';
 import pool, { getDBSchema } from '../../db/connection.js';
 import { respondSessionInvalid } from '../../utils/sessionInvalidResponse.js';
 import {
+  buildPhotoSearchFolders,
   getPhotoFolder,
   isMemberAlbumPhotoRow,
-  resolvePhotoFilePathForListing
+  resolvePhotoFilePathForListingInFolders
 } from '../../utils/photoFilePath.js';
 
 const VALID_ALBUM_TYPES = new Set(['uploaded', 'public', 'private']);
@@ -96,7 +97,7 @@ export async function getMyPhotos(req, res) {
     const memberId = singlesResult.rows[0]?.member_id ?? null;
     const profileImageFk = singlesResult.rows[0]?.profile_image_fk ?? null;
 
-    const queryText = `SELECT p.photos_id, p.display_order, p.file_extension, p.photo_file_name${
+    const queryText = `SELECT p.photos_id, p.display_order, p.file_extension, p.photo_file_name, p.file_path${
       albumTypeColumn ? `, p.${albumTypeColumn} AS album_type_raw` : ''
     }${checksumColumn ? `, p.${checksumColumn} AS photo_checksum` : ''}
        FROM ${PHOTOS_TABLE} p
@@ -109,7 +110,8 @@ export async function getMyPhotos(req, res) {
        ORDER BY p.display_order ASC, p.photos_id ASC`;
     const result = await client.query(queryText, [singlesId]);
 
-    const photoFolder = getPhotoFolder();
+    const searchFolders = buildPhotoSearchFolders({ memberId });
+    const photoFolder = searchFolders[0] || getPhotoFolder(memberId);
     const visibleRows = result.rows.filter((r) =>
       isMemberAlbumPhotoRow({
         photoFileName: r.photo_file_name,
@@ -127,8 +129,8 @@ export async function getMyPhotos(req, res) {
       visibleRows
         .map((r) => {
           const ext = (r.file_extension || 'jpg').replace(/^\./, '');
-          const fullPath =
-            photoFolder && resolvePhotoFilePathForListing(photoFolder, r.photo_file_name, ext);
+          const rowFolders = buildPhotoSearchFolders({ filePathFromDb: r.file_path, memberId });
+          const fullPath = resolvePhotoFilePathForListingInFolders(rowFolders, r.photo_file_name, ext);
           let fileSizeBytes = null;
           if (fullPath) {
             try {

@@ -252,7 +252,7 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
   try {
-    await setVaultOpenProgress(singlesId, { percent: 0, label: 'Opening TutaPhotoAlbums on TutaDrive' });
+    await setVaultOpenProgress(singlesId, { percent: 0, label: 'Opening TutaPhotos on TutaCloud' });
     const { memberId, albumsMount } = await resolveMemberContext(singlesId);
     await setVaultOpenProgress(singlesId, { percent: 12, label: 'Checking member folder' });
     await dropStaleCloudSessionIfWrongMount(singlesId, albumsMount);

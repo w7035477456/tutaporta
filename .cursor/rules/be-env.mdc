@@ -170,6 +170,7 @@ JWT_PUBLIC_KEY_PATH=/Users/a/.ssh/be/public_key.pem
 ## Photos / videos
 
 ```bash
+# Legacy flat folders (pre-migration reads); new uploads use per-member tutadates paths under LARGE_CHEAP_STORAGE_FOLDER.
 TUTADATES_PHOTO_FOLDER=${STORAGE_FOLDER}/photos/
 TUTADATES_VIDEO_FOLDER=${STORAGE_FOLDER}/videos/  # optional
 MAX_SIZE_UPLOAD_MB=9
@@ -178,8 +179,8 @@ JSON_LIMIT_MB=400
 
 | Variable | Notes |
 |----------|-------|
-| `TUTADATES_PHOTO_FOLDER` | On-disk photo root; must exist on each app server (or shared mount). |
-| `TUTADATES_VIDEO_FOLDER` | On-disk video root; defaults to `{parent of photos}/videos/` if unset. |
+| `TUTADATES_PHOTO_FOLDER` | **Legacy** flat photo root (`…/onlinemallwebsite_storage/photos/`). Still used for reads during migration. **New uploads** go to `{LARGE_CHEAP_STORAGE_FOLDER}/users/M{member_id}/tutadates/photos/`. |
+| `TUTADATES_VIDEO_FOLDER` | **Legacy** flat video root. **New uploads** go to `…/users/M{member_id}/tutadates/videos/`. Defaults to `{parent of legacy photos}/videos/` if unset. |
 | `MAX_SIZE_UPLOAD_MB` | Upload cap per photo (`be/routes/photos/uploadPhoto.js`). |
 | `JSON_LIMIT_MB` | Express JSON body limit (base64 uploads). Align nginx `client_max_body_size` if used. |
 
@@ -197,7 +198,7 @@ LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_largecheapstorage
 | `LEFT_SIDE` | Left panel on `/myNote`: `OneDrive` (default Microsoft OneDrive) \| `TutaDrive` (vault under `LARGE_CHEAP_STORAGE_FOLDER`) \| `None` (hide left panel). |
 | `RIGHT_SIDE` | Right panel on `/myNote`: `USB` (show USB bridge) \| `None` (hide USB). When unset, falls back to `NOTES_LOCAL_USB`. |
 | `STORAGE_FOLDER` | General app storage (photos installers, etc.). |
-| `LARGE_CHEAP_STORAGE_FOLDER` | TutaDrive member data: `{root}/users/M{member_id}/notes` and `…/photos`. Same as `STORAGE_FOLDER` for now; later point at large/slow USB RAID. Falls back to `STORAGE_FOLDER` if unset. |
+| `LARGE_CHEAP_STORAGE_FOLDER` | TutaDrive + **Tuta Dates media**: `{root}/users/M{member_id}/notes`, `…/photoalbums`, and `…/tutadates/{photos,videos}`. Same as `STORAGE_FOLDER` for now; later point at large/slow USB RAID. Falls back to `STORAGE_FOLDER` if unset. Migrate legacy flat photos/videos: `node be/scripts/migrateTutaDatesMediaToMemberFolders.js` (use `--dry-run` first). |
 
 ## ASN / VPN block list
 

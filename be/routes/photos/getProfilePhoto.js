@@ -1,7 +1,12 @@
 import fs from 'fs';
 import pool from '../../db/connection.js';
 import { extToContentType } from '../../utils/albumUploadFormats.js';
-import { getPhotoFolder, resolvePhotoFilePath } from '../../utils/photoFilePath.js';
+import {
+  buildPhotoSearchFolders,
+  getPhotoFolder,
+  resolvePhotoFilePathInFolders
+} from '../../utils/photoFilePath.js';
+import { loadMemberIdForSinglesOrFallback } from '../../utils/tutaDatesMemberPaths.js';
 
 function getBrowserPhotoCacheMaxAgeSeconds() {
   const raw = Number.parseInt(String(process.env.PHOTO_BROWSER_CACHE_MAX_AGE_SEC ?? ''), 10);
@@ -28,7 +33,7 @@ export async function getProfilePhoto(req, res) {
     }
 
     const result = await pool.query(
-      `SELECT s.profile_image_fk, p.file_extension, p.photo_file_name, p.singles_id AS photo_owner_id
+      `SELECT s.profile_image_fk, s.member_id, p.file_extension, p.photo_file_name, p.file_path, p.singles_id AS photo_owner_id
        FROM helloworldjunktest.singles s
        LEFT JOIN helloworldjunktest.photos p ON p.photos_id = s.profile_image_fk
        WHERE s.singles_id = $1
@@ -50,12 +55,13 @@ export async function getProfilePhoto(req, res) {
     }
 
     const ext = String(row.file_extension || 'jpg').replace(/^\./, '');
-    const photoFolder = getPhotoFolder();
-    if (!photoFolder) {
-      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER not configured in ~/.ssh/be/.env' });
+    const memberId = row.member_id ?? (await loadMemberIdForSinglesOrFallback(targetSinglesId));
+    const searchFolders = buildPhotoSearchFolders({ filePathFromDb: row.file_path, memberId });
+    if (!searchFolders.length && !getPhotoFolder()) {
+      return res.status(500).json({ error: 'Tuta Dates photo storage not configured in ~/.ssh/be/.env' });
     }
 
-    const resolved = resolvePhotoFilePath(photoFolder, row.photo_file_name, profilePhotoId, ext);
+    const resolved = resolvePhotoFilePathInFolders(searchFolders, row.photo_file_name, profilePhotoId, ext);
     if (!resolved) {
       return res.status(404).json({ error: 'Profile photo file not found' });
     }

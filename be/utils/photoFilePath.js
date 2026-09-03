@@ -2,6 +2,13 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { photoThumbnailFileNameForBase, unlinkPhotoThumbnailFromDisk } from './photoThumbnail.js';
+import { getLargeCheapStorageFolderRoot } from './tutaDriveMemberPaths.js';
+import {
+  ensureTutaDatesMemberLayout,
+  listMemberTutaDatesPhotoDirs,
+  tutaDatesPhotosPath,
+  TUTADATES_VAULT_DIR
+} from './tutaDatesMemberPaths.js';
 
 /** System/verification photos — hidden from My Album by filename prefix. */
 export function isSystemPhotoFileName(photoFileName) {
@@ -16,13 +23,98 @@ export function isSystemPhotoFileName(photoFileName) {
   );
 }
 
-/** Folder from TUTADATES_PHOTO_FOLDER only. Expands ~. Ignores DB file_path. */
-export function getPhotoFolder() {
+function expandFolderPath(folder) {
+  if (!folder || typeof folder !== 'string' || !folder.trim()) return '';
+  const trimmed = folder.trim().replace(/\/+$/, '');
+  const expanded = trimmed.startsWith('~/') ? path.join(os.homedir(), trimmed.slice(2)) : trimmed;
+  return expanded ? `${expanded}/` : '';
+}
+
+/** Legacy flat folder from TUTADATES_PHOTO_FOLDER (pre per-member tutadates layout). */
+export function getLegacyPhotoFolder() {
   const folder = process.env.TUTADATES_PHOTO_FOLDER;
   if (!folder || typeof folder !== 'string' || !folder.trim()) return '';
-  const t = folder.trim().replace(/\/+$/, '');
-  const expanded = t.startsWith('~/') ? path.join(os.homedir(), t.slice(2)) : t;
-  return expanded ? `${expanded}/` : '';
+  return expandFolderPath(folder);
+}
+
+/**
+ * Photo folder for one member under LARGE_CHEAP_STORAGE/users/M{id}/tutadates/photos/.
+ * Without memberId, returns legacy TUTADATES_PHOTO_FOLDER for admin / fallback reads.
+ */
+export function getPhotoFolder(memberId = null) {
+  const memberPart = memberId != null ? String(memberId).trim() : '';
+  if (memberPart) {
+    return `${tutaDatesPhotosPath(memberPart).replace(/\/+$/, '')}/`;
+  }
+  return getLegacyPhotoFolder();
+}
+
+/** Ensure member layout exists, then return photos folder with trailing slash. */
+export function getPhotoFolderForMember(memberId) {
+  const layout = ensureTutaDatesMemberLayout(memberId);
+  return layout.photosFolder;
+}
+
+/** Ordered folders to search when resolving a photo on disk (new path, DB path, legacy flat). */
+export function buildPhotoSearchFolders({ filePathFromDb = null, memberId = null } = {}) {
+  const folders = [];
+  const seen = new Set();
+  const add = (folder) => {
+    const normalized = expandFolderPath(folder).replace(/\/+$/, '');
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    folders.push(`${normalized}/`);
+  };
+
+  add(filePathFromDb);
+  if (memberId != null && String(memberId).trim()) {
+    add(tutaDatesPhotosPath(memberId));
+  }
+  add(getLegacyPhotoFolder());
+  return folders;
+}
+
+/** All photo roots: legacy flat + every member tutadates/photos dir. */
+export function listTutaDatesPhotoStorageRoots() {
+  const roots = [];
+  const seen = new Set();
+  const add = (dir) => {
+    const normalized = path.resolve(String(dir || '').replace(/\/+$/, ''));
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    roots.push(normalized);
+  };
+
+  const legacy = getLegacyPhotoFolder().replace(/\/+$/, '');
+  if (legacy) add(legacy);
+  for (const dir of listMemberTutaDatesPhotoDirs()) {
+    add(dir);
+  }
+  return roots;
+}
+
+export function resolvePhotoFilePathInFolders(folders, photoFileName, photosId, ext) {
+  for (const folder of folders || []) {
+    const hit = resolvePhotoFilePath(folder, photoFileName, photosId, ext);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export function resolvePhotoFilePathForListingInFolders(folders, photoFileName, ext) {
+  for (const folder of folders || []) {
+    const hit = resolvePhotoFilePathForListing(folder, photoFileName, ext);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export function resolvePhotoOrigBackupPathInFolders(folders, photoFileName, photosId) {
+  for (const folder of folders || []) {
+    const hit = resolvePhotoOrigBackupPath(folder, photoFileName, photosId);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /**
@@ -31,25 +123,40 @@ export function getPhotoFolder() {
  */
 export function countPhotoFolderFiles() {
   const envRaw = String(process.env.TUTADATES_PHOTO_FOLDER ?? '').trim();
-  const folder = getPhotoFolder();
-  const label = folder ? folder.replace(/\/+$/, '') : envRaw || '(TUTADATES_PHOTO_FOLDER not set)';
+  const roots = listTutaDatesPhotoStorageRoots();
+  const cheapRoot = (() => {
+    try {
+      return getLargeCheapStorageFolderRoot();
+    } catch {
+      return '';
+    }
+  })();
+  const label =
+    roots.length > 0
+      ? roots.join(', ')
+      : envRaw || cheapRoot
+        ? `${cheapRoot}/users/M*/${TUTADATES_VAULT_DIR}/photos`
+        : '(TUTADATES photo storage not configured)';
 
-  if (!folder) {
+  if (!roots.length) {
     return { label, fileCount: null, missing: true };
   }
 
-  const dir = folder.replace(/\/+$/, '');
-  if (!fs.existsSync(dir)) {
-    return { label: dir, fileCount: 0, missing: true };
+  let fileCount = 0;
+  let missing = false;
+  for (const dir of roots) {
+    if (!fs.existsSync(dir)) {
+      missing = true;
+      continue;
+    }
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      fileCount += entries.filter((entry) => entry.isFile()).length;
+    } catch {
+      missing = true;
+    }
   }
-
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    const fileCount = entries.filter((entry) => entry.isFile()).length;
-    return { label: dir, fileCount, missing: false };
-  } catch {
-    return { label: dir, fileCount: null, missing: true };
-  }
+  return { label, fileCount, missing };
 }
 
 /**
@@ -199,26 +306,23 @@ function addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, 
  * @returns {string[]}
  */
 export function listPhotoFolderFilesForMemberId(memberId) {
-  const photoFolder = getPhotoFolder();
-  if (!photoFolder) return [];
-
   const memberPart = String(memberId ?? '').trim();
   if (!memberPart) return [];
 
   const prefix = `${memberPart}_`;
-  const dir = photoFolder.replace(/\/+$/, '');
   const found = new Set();
-
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.startsWith(prefix)) continue;
-      found.add(path.resolve(path.join(dir, entry.name)));
+  for (const folder of buildPhotoSearchFolders({ memberId: memberPart })) {
+    const dir = folder.replace(/\/+$/, '');
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.startsWith(prefix)) continue;
+        found.add(path.resolve(path.join(dir, entry.name)));
+      }
+    } catch {
+      // try next folder
     }
-  } catch {
-    return [];
   }
-
   return [...found];
 }
 
@@ -227,13 +331,18 @@ export function listPhotoFolderFilesForMemberId(memberId) {
  * Accepts DB snake_case (`photo_file_name`) or camelCase keys.
  * @returns {string[]}
  */
-export function listMemberPhotoFilesOnDisk(row) {
-  const photoFolder = getPhotoFolder();
-  if (!photoFolder) return [];
+export function listMemberPhotoFilesOnDisk(row, { filePathFromDb = null, memberId = null } = {}) {
+  const folders = buildPhotoSearchFolders({
+    filePathFromDb: filePathFromDb ?? row?.file_path ?? row?.filePath ?? null,
+    memberId
+  });
+  if (!folders.length) return [];
 
   const { photoFileName, fileExtension, photosId } = normalizePhotoRowArgs(row);
   const candidates = new Set();
-  addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, fileExtension, photosId });
+  for (const photoFolder of folders) {
+    addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, fileExtension, photosId });
+  }
 
   const found = new Set();
   for (const candidate of candidates) {
@@ -253,16 +362,21 @@ export function listMemberPhotoFilesOnDisk(row) {
  * Remove on-disk member photo files from TUTADATES_PHOTO_FOLDER (main image, all ext variants, orig backups).
  * @returns {{ removed: string[], photoFolder: string }}
  */
-export function unlinkMemberPhotoFilesFromDisk(row) {
-  const photoFolder = getPhotoFolder();
+export function unlinkMemberPhotoFilesFromDisk(row, { filePathFromDb = null, memberId = null } = {}) {
+  const folders = buildPhotoSearchFolders({
+    filePathFromDb: filePathFromDb ?? row?.file_path ?? row?.filePath ?? null,
+    memberId
+  });
   const removed = new Set();
-  if (!photoFolder) {
+  if (!folders.length) {
     return { removed: [], photoFolder: '' };
   }
 
   const { photoFileName, fileExtension, photosId } = normalizePhotoRowArgs(row);
   const candidates = new Set();
-  addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, fileExtension, photosId });
+  for (const photoFolder of folders) {
+    addMemberPhotoFileCandidates(candidates, photoFolder, { photoFileName, fileExtension, photosId });
+  }
   for (const candidate of candidates) {
     tryUnlinkFile(candidate, removed);
   }
@@ -271,5 +385,5 @@ export function unlinkMemberPhotoFilesFromDisk(row) {
     removed.add(thumbPath);
   }
 
-  return { removed: [...removed], photoFolder };
+  return { removed: [...removed], photoFolder: folders[0] || '' };
 }

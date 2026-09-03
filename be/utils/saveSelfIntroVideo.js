@@ -1,8 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { getPhotoFolder } from './photoFilePath.js';
-import { getVideoFolder } from './videoFilePath.js';
+import { resolveTutaDatesVideoFolderForSingles } from './tutaDatesMemberPaths.js';
 import { sqlPhotoTypeParam } from './pgEnumTypes.js';
 import { parseMediaDataUrl } from './parseMediaDataUrl.js';
 import {
@@ -91,9 +90,9 @@ export async function saveSelfIntroVideo(
     throw duplicateVaultVideoError();
   }
 
-  const videoFolder = getVideoFolder() || getPhotoFolder();
+  const videoFolder = await resolveTutaDatesVideoFolderForSingles(singlesId);
   if (!videoFolder) {
-    throw new Error('TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured');
+    throw new Error('Tuta Dates video storage not configured');
   }
 
   const filePathDir = path.resolve(videoFolder.replace(/\/+$/, ''));

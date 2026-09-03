@@ -1,8 +1,7 @@
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { getPhotoFolder } from './photoFilePath.js';
-import { getVideoFolder, unlinkMemberVideoFilesFromDisk } from './videoFilePath.js';
+import { resolveTutaDatesVideoFolderForSingles } from './tutaDatesMemberPaths.js';
 import { sqlPhotoTypeParam } from './pgEnumTypes.js';
 import { parseMediaDataUrl } from './parseMediaDataUrl.js';
 import { generateAndSaveVideoThumbnail } from './generateVideoThumbnail.js';
@@ -83,9 +82,9 @@ export async function saveRecord4SupportVideo(
     throw new Error('Video exceeds 25 MB limit');
   }
 
-  const videoFolder = getVideoFolder() || getPhotoFolder();
+  const videoFolder = await resolveTutaDatesVideoFolderForSingles(singlesId);
   if (!videoFolder) {
-    throw new Error('TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured');
+    throw new Error('Tuta Dates video storage not configured');
   }
 
   await deletePriorRecord4SupportVideos(client, singlesId);

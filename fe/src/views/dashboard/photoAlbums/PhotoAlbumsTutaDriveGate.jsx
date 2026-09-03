@@ -89,7 +89,7 @@ export default function PhotoAlbumsTutaDriveGate({
   const openVaultAfterAccess = useCallback(async () => {
     setBusy(true);
     setBusyProgressPercent(0);
-    setBusyLabel('Opening TutaPhotoAlbums on TutaDrive');
+    setBusyLabel('Opening TutaPhotos on TutaCloud');
     setError('');
     const reportOpenProgress = async ({ percent, label } = {}) => {
       const next = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));

@@ -13,7 +13,8 @@ import {
   traceMobilePhotoUpload
 } from '../../utils/mobilePhotoUploadLog.js';
 import { clearMobilePhotoUploadInProgress } from '../../utils/mobilePhotoUploadSession.js';
-import { getPhotoFolder as resolvePhotoFolder, unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
+import { getPhotoFolder as resolvePhotoFolder, getPhotoFolderForMember, unlinkMemberPhotoFilesFromDisk } from '../../utils/photoFilePath.js';
+import { loadMemberIdForSinglesOrFallback } from '../../utils/tutaDatesMemberPaths.js';
 import {
   ALBUM_PHOTO_EXTENSIONS_ERROR,
   contentTypeToExt as albumContentTypeToExt,
@@ -99,10 +100,13 @@ function logPhotoDirStats(label) {
   }
 }
 
-/** Throws if TUTADATES_PHOTO_FOLDER is unset (legacy uploadPhoto export). */
-export function getPhotoFolder() {
+/** Throws if Tuta Dates photo storage is unset. Pass memberId for per-member tutadates/photos path. */
+export function getPhotoFolder(memberId = null) {
+  if (memberId != null && String(memberId).trim()) {
+    return getPhotoFolderForMember(memberId);
+  }
   const folder = resolvePhotoFolder();
-  if (!folder) throw new Error('TUTADATES_PHOTO_FOLDER is not set in .env');
+  if (!folder) throw new Error('Tuta Dates photo storage is not configured (~/.ssh/be/.env LARGE_CHEAP_STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
   return folder;
 }
 
@@ -386,10 +390,15 @@ export async function uploadPhoto(req, res) {
     }
 
     let photoFolder;
+    let memberIdPart;
     try {
-      photoFolder = getPhotoFolder();
+      memberIdPart = await loadMemberIdForSinglesOrFallback(singlesId);
+      if (!memberIdPart) {
+        return res.status(400).json({ error: 'Member number not set for this account' });
+      }
+      photoFolder = getPhotoFolder(memberIdPart);
     } catch (e) {
-      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in .env' });
+      return res.status(500).json({ error: 'Tuta Dates photo storage is not configured' });
     }
 
     const { image: dataUrl, file_extension: fileExtensionHint } = req.body || {};

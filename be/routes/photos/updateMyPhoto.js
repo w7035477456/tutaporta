@@ -9,6 +9,7 @@ import {
   contentTypeToExt,
   resizeToFit
 } from './uploadPhoto.js';
+import { loadMemberIdForSinglesOrFallback } from '../../utils/tutaDatesMemberPaths.js';
 import { regeneratePhotoThumbnail } from '../../utils/photoThumbnail.js';
 import {
   ALBUM_PHOTO_EXTENSIONS_ERROR,
@@ -75,9 +76,13 @@ export async function updateMyPhoto(req, res) {
 
     let photoFolder;
     try {
-      photoFolder = getPhotoFolder();
+      const memberId = await loadMemberIdForSinglesOrFallback(singlesId);
+      if (!memberId) {
+        return res.status(400).json({ error: 'Member number not set for this account' });
+      }
+      photoFolder = getPhotoFolder(memberId);
     } catch (e) {
-      return res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in .env' });
+      return res.status(500).json({ error: 'Tuta Dates photo storage is not configured' });
     }
 
     const { image: dataUrl, file_extension: fileExtensionHint } = req.body || {};

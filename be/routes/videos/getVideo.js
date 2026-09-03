@@ -1,9 +1,10 @@
 import path from 'path';
 import fs from 'fs';
 import pool from '../../db/connection.js';
-import { getPhotoFolder } from '../../utils/photoFilePath.js';
+import { getLegacyPhotoFolder } from '../../utils/photoFilePath.js';
 import { canViewerAccessMemberVideo } from '../../utils/canViewerAccessMemberVideo.js';
-import { getVideoFolder, resolveVideoFilePath } from '../../utils/videoFilePath.js';
+import { getLegacyVideoFolder, resolveVideoFilePath } from '../../utils/videoFilePath.js';
+import { loadMemberIdForSinglesOrFallback } from '../../utils/tutaDatesMemberPaths.js';
 import { recordPhotoCacheResult } from '../../utils/photoCacheStats.js';
 
 function getClientIp(req) {
@@ -62,11 +63,17 @@ export async function getVideo(req, res) {
     }
 
     const ext = String(fileExt || 'webm').replace(/^\./, '');
-    if (!getVideoFolder() && !getPhotoFolder() && !String(filePathFromDb || '').trim()) {
-      return res.status(500).json({ error: 'TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured' });
+    const memberId = await loadMemberIdForSinglesOrFallback(videoOwnerId);
+    if (
+      !String(filePathFromDb || '').trim() &&
+      !memberId &&
+      !getLegacyVideoFolder() &&
+      !getLegacyPhotoFolder()
+    ) {
+      return res.status(500).json({ error: 'Tuta Dates video storage not configured' });
     }
 
-    const fullPath = resolveVideoFilePath(null, videoFileName, id, ext, filePathFromDb);
+    const fullPath = resolveVideoFilePath(null, videoFileName, id, ext, filePathFromDb, memberId);
     if (!fullPath) {
       return res.status(404).json({ error: 'Video not found' });
     }

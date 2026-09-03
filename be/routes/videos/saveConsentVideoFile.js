@@ -1,8 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { contentTypeToExt, getPhotoFolder } from '../photos/uploadPhoto.js';
-import { getVideoFolder } from '../../utils/videoFilePath.js';
+import { contentTypeToExt } from '../photos/uploadPhoto.js';
+import { resolveTutaDatesVideoFolderForSingles } from '../../utils/tutaDatesMemberPaths.js';
 import { sqlPhotoTypeParam } from '../../utils/pgEnumTypes.js';
 import { parseMediaDataUrl } from '../../utils/parseMediaDataUrl.js';
 import { generateAndSaveVideoThumbnail } from '../../utils/generateVideoThumbnail.js';
@@ -66,9 +66,9 @@ export async function saveConsentVideoFile(
     throw new Error('Empty consent video file');
   }
 
-  const videoFolder = getVideoFolder() || getPhotoFolder();
+  const videoFolder = await resolveTutaDatesVideoFolderForSingles(singlesId);
   if (!videoFolder) {
-    throw new Error('TUTADATES_VIDEO_FOLDER or TUTADATES_PHOTO_FOLDER not configured');
+    throw new Error('Tuta Dates video storage not configured');
   }
   const filePathDir = path.resolve(videoFolder.replace(/\/+$/, ''));
   fs.mkdirSync(filePathDir, { recursive: true });

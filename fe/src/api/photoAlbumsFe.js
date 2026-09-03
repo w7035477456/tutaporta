@@ -840,7 +840,7 @@ export async function unlockPhotoAlbumsTutaDrive({ onProgress } = {}) {
     const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
     return data;
   }
-  onProgress({ percent: 0, label: 'Opening TutaPhotoAlbums on TutaDrive' });
+  onProgress({ percent: 0, label: 'Opening TutaPhotos on TutaCloud' });
   let stopped = false;
   const poll = window.setInterval(() => {
     if (stopped) return;

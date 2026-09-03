@@ -1,7 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { contentTypeToExt, getPhotoFolder } from './uploadPhoto.js';
+import { contentTypeToExt } from './uploadPhoto.js';
+import { resolveTutaDatesPhotoFolderForSingles } from '../../utils/tutaDatesMemberPaths.js';
 import { sqlPhotoTypeParam } from '../../utils/pgEnumTypes.js';
 import { parseMediaDataUrl } from '../../utils/parseMediaDataUrl.js';
 import { deletePriorSystemPhotosByPrefix } from '../../utils/deleteSystemPhotos.js';
@@ -119,7 +120,7 @@ export async function saveConsentMediaFile(
 
   await deletePriorSystemPhotosByPrefix(client, singlesId, fileNamePrefix);
 
-  const photoFolder = getPhotoFolder();
+  const photoFolder = await resolveTutaDatesPhotoFolderForSingles(singlesId);
   const filePathDir = path.resolve(photoFolder);
   fs.mkdirSync(filePathDir, { recursive: true });
 

@@ -788,8 +788,8 @@ export default function MyPhotoAlbums() {
                 aria-selected={paneFocus === 'onedrive'}
                 title={
                   tutaDriveMode
-                    ? 'Expand TutaPhotoAlbums on TutaDrive to the full window'
-                    : 'Expand TutaPhotoAlbums on OneDrive to the full window'
+                    ? 'Expand TutaPhotos on TutaCloud to the full window'
+                    : 'Expand TutaPhotos on OneDrive to the full window'
                 }
                 onClick={selectOneDriveTab}
                 sx={storageTabButtonSx}

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import pool from '../db/connection.js';
-import { getPhotoFolder as getPhotoFolderFromEnv } from '../utils/photoFilePath.js';
+import { getPhotoFolder as getPhotoFolderFromEnv, listTutaDatesPhotoStorageRoots } from '../utils/photoFilePath.js';
 import { getPhotoFolder } from './photos/uploadPhoto.js';
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp']);
@@ -146,20 +146,45 @@ async function findDuplicateGroups(files) {
 
 function resolvePhotoFolderOrRespond(res) {
   try {
-    const folder = getPhotoFolder();
-    if (!folder) {
-      res.status(500).json({ error: 'TUTADATES_PHOTO_FOLDER is not set in ~/.ssh/be/.env' });
-      return null;
+    const roots = listTutaDatesPhotoStorageRoots();
+    if (!roots.length) {
+      const folder = getPhotoFolderFromEnv();
+      if (!folder) {
+        res.status(500).json({ error: 'Tuta Dates photo storage is not configured in ~/.ssh/be/.env' });
+        return null;
+      }
+      return folder;
     }
-    return folder;
+    return roots[0];
   } catch (err) {
-    res.status(500).json({ error: err?.message || 'TUTADATES_PHOTO_FOLDER is not configured' });
+    res.status(500).json({ error: err?.message || 'Tuta Dates photo storage is not configured' });
     return null;
   }
 }
 
-function toPublicFileRows(files) {
-  return files.map(({ fullPath: _fp, ...row }) => row);
+function readAllImageFilesFromStorageRoots() {
+  const roots = listTutaDatesPhotoStorageRoots();
+  if (!roots.length) {
+    const legacy = getPhotoFolderFromEnv();
+    return legacy ? readImageFilesFromFolder(legacy) : { folder: '', files: [] };
+  }
+  const files = [];
+  for (const root of roots) {
+    const { files: part } = readImageFilesFromFolder(root);
+    files.push(...part);
+  }
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs || a.fileName.localeCompare(b.fileName));
+  return { folder: roots.join(', '), files };
+}
+
+function resolveStorageFilePathAcrossRoots(fileName) {
+  const roots = listTutaDatesPhotoStorageRoots();
+  for (const root of roots) {
+    const hit = resolveStorageFilePath(`${root}/`, fileName);
+    if (hit) return hit;
+  }
+  const legacy = getPhotoFolderFromEnv();
+  return legacy ? resolveStorageFilePath(legacy, fileName) : null;
 }
 
 /**
@@ -167,10 +192,9 @@ function toPublicFileRows(files) {
  * Lists image files in TUTADATES_PHOTO_FOLDER (Backup tab).
  */
 export async function getAdminPhotoStorageFiles(req, res) {
-  const folder = resolvePhotoFolderOrRespond(res);
-  if (!folder) return;
+  if (!resolvePhotoFolderOrRespond(res)) return;
   try {
-    const { folder: resolvedFolder, files } = readImageFilesFromFolder(folder);
+    const { folder: resolvedFolder, files } = readAllImageFilesFromStorageRoots();
     return res.json({
       folder: resolvedFolder,
       fileCount: files.length,
@@ -191,10 +215,9 @@ export async function getAdminPhotoStorageFiles(req, res) {
  * Serves one on-disk image from TUTADATES_PHOTO_FOLDER (admin thumbnails).
  */
 export async function getAdminPhotoStorageFile(req, res) {
-  const folder = resolvePhotoFolderOrRespond(res);
-  if (!folder) return;
+  if (!resolvePhotoFolderOrRespond(res)) return;
   try {
-    const fullPath = resolveStorageFilePath(folder, req.params.fileName);
+    const fullPath = resolveStorageFilePathAcrossRoots(req.params.fileName);
     if (!fullPath) {
       return res.status(404).json({ error: 'File not found' });
     }
