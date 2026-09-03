@@ -269,14 +269,15 @@ export function colorTemplate9TableHorizontalScrollShellSx(overrides = {}) {
   };
 }
 
-/** Top mirror scrollbar — same width as bottom shell; use with vertical flip in ColorTemplate9TableData.Table. */
+/** Top synced horizontal scrollbar — sits directly above the table header row. */
 export function colorTemplate9TableTopHorizontalScrollShellSx(overrides = {}) {
   return colorTemplate9TableHorizontalScrollShellSx({
+    borderTop: 'none',
     borderBottom: 'none',
     flexShrink: 0,
-    height: 20,
-    minHeight: 20,
-    maxHeight: 20,
+    height: 14,
+    minHeight: 14,
+    maxHeight: 14,
     boxSizing: 'border-box',
     ...overrides
   });

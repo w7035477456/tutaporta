@@ -257,7 +257,7 @@ export function useColorTemplate9AutoFitColumnWidths({
 function ColorTemplate9TableDataTable({
   sx,
   children,
-  topHorizontalScrollbar = false,
+  topHorizontalScrollbar = true,
   minTableWidth = null,
   /** When true, documents that caller uses useColorTemplate9AutoFitColumnWidths + minTableWidth (horizontal scroll when wider than viewport). */
   autoFitColumns = false,
@@ -363,21 +363,12 @@ function ColorTemplate9TableDataTable({
             sx={{
               ...colorTemplate9TableTopHorizontalScrollShellSx(),
               ...colorTemplate9TableHorizontalScrollbarSx(),
-              transform: 'scaleY(-1)',
-              visibility: topScrollActive ? 'visible' : 'hidden',
-              height: topScrollActive ? 20 : 0,
-              minHeight: topScrollActive ? 20 : 0,
-              maxHeight: topScrollActive ? 20 : 0,
-              overflow: topScrollActive ? undefined : 'hidden'
+              display: topScrollActive ? 'block' : 'none',
+              overflowX: 'auto',
+              overflowY: 'hidden'
             }}
           >
-            <Box
-              ref={topSpacerRef}
-              sx={{
-                height: '1px',
-                transform: 'scaleY(-1)'
-              }}
-            />
+            <Box ref={topSpacerRef} sx={{ height: 1 }} aria-hidden />
           </Box>
         ) : null}
         <Box ref={bottomScrollRef} sx={scrollShellSx}>
