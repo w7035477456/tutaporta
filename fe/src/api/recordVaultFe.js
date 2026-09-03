@@ -1017,8 +1017,14 @@ export async function fetchRecordVaultTutaDriveBackupStatus() {
   return data;
 }
 
+export async function deleteRecordVaultTutaDriveBackup(fileName) {
+  const enc = encodeURIComponent(String(fileName || ''));
+  const { data } = await api.delete(`/api/recordVault/tutadrive/backup/${enc}`);
+  return data;
+}
+
 /** Download sealed backup, unseal with Encrypt Password DEK, restore vault on server. */
-export async function restoreRecordVaultTutaDriveEncryptedBackup(file) {
+export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName) {
   const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
   const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
   if (!isRecordVaultE2eUnlocked()) {
@@ -1029,7 +1035,8 @@ export async function restoreRecordVaultTutaDriveEncryptedBackup(file) {
   if (file) {
     sealedBytes = new Uint8Array(await file.arrayBuffer());
   } else {
-    const response = await api.get('/api/recordVault/tutadrive/backup', { responseType: 'blob' });
+    const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
+    const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
     sealedBytes = new Uint8Array(await response.data.arrayBuffer());
   }
   const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek);

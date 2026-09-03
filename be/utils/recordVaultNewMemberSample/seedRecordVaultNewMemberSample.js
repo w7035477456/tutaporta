@@ -104,6 +104,8 @@ function noteLooksLikeCanonicalSample(bodyText) {
   const marker = recordVaultNewMemberSampleSeedMarker();
   if (marker && body.includes(marker)) return true;
   if (body.includes('rv-new-member-sample-v3')) return true;
+  if (body.includes('rv-new-member-sample-v4')) return true;
+  if (body.includes('rv-new-member-sample-v5')) return true;
   if (body.includes('SAMPLE MISC') && body.includes('SAMPLE TAX RECORDS')) return true;
   if (body.includes('Formats the code can')) return true;
   if (body.includes('Costco Grocery Receipt') || body.includes('Costco Grocery receipt')) return true;
@@ -459,12 +461,15 @@ function isBundledDefaultSampleNoteRow(row, noteDef) {
   const body = String(row?.body_text || '');
   const noteKey = String(noteDef?.noteKey || '').trim();
   if (body.includes('rv-new-member-sample-v3')) return true;
+  if (body.includes('rv-new-member-sample-v4')) return true;
+  if (body.includes('rv-new-member-sample-v5')) return true;
   if (noteKey && body.includes(`note=${noteKey}`)) return true;
   const name = String(noteDef?.noteName || '')
     .trim()
     .toUpperCase();
   if (name === 'SAMPLE RECEIPTS') {
     return (
+      body.includes('search for') ||
       body.includes('Flexible Organization') ||
       body.includes('Costco Grocery') ||
       body.includes('Home Depo') ||

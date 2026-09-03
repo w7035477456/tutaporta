@@ -232,6 +232,7 @@ import {
 } from './routes/recordVault/recordVaultOneDriveRoutes.js';
 import {
   downloadRecordVaultTutaDriveBackupZip,
+  deleteRecordVaultTutaDriveBackupByName,
   downloadRecordVaultTutaDriveStoredBackup,
   formatRecordVaultTutaDrive,
   getRecordVaultTutaDriveBackupStatus,
@@ -1563,6 +1564,7 @@ app.get('/api/recordVault/tutadrive/backup-zip', requireAuth, downloadRecordVaul
 app.post('/api/recordVault/tutadrive/backup', requireAuth, storeRecordVaultTutaDriveBackup);
 app.get('/api/recordVault/tutadrive/backup', requireAuth, downloadRecordVaultTutaDriveStoredBackup);
 app.get('/api/recordVault/tutadrive/backup/status', requireAuth, getRecordVaultTutaDriveBackupStatus);
+app.delete('/api/recordVault/tutadrive/backup/:fileName', requireAuth, deleteRecordVaultTutaDriveBackupByName);
 app.post('/api/recordVault/tutadrive/restore-zip', requireAuth, restoreRecordVaultTutaDriveBackupZip);
 
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----

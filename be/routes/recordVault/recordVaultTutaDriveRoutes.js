@@ -30,11 +30,13 @@ import {
   wipeTutaDriveMemberVault
 } from '../../utils/tutaDriveMemberPaths.js';
 import {
+  deleteTutaDriveBackupByName,
   listTutaDriveBackups,
   readTutaDriveEncryptedBackup,
   restoreTutaDriveVaultFromZipFile,
   storeTutaDriveEncryptedBackup,
-  streamTutaDriveVaultBackupZip
+  streamTutaDriveVaultBackupZip,
+  TUTADRIVE_BACKUP_MAX
 } from '../../utils/recordVaultTutaDriveBackup.js';
 import { parseOneDriveBackupZipUpload } from '../../utils/recordVaultOneDrive/parseOneDriveBackupZipUpload.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
@@ -379,7 +381,8 @@ export async function downloadRecordVaultTutaDriveStoredBackup(req, res) {
     if (!memberId) {
       return res.status(400).json({ error: 'Your member number is not set' });
     }
-    const current = readTutaDriveEncryptedBackup(memberId);
+    const requestedName = String(req.query?.fileName || '').trim();
+    const current = readTutaDriveEncryptedBackup(memberId, requestedName || null);
     if (!current) {
       return res.status(404).json({ error: 'No TutaDrive backup found' });
     }
@@ -407,16 +410,20 @@ export async function getRecordVaultTutaDriveBackupStatus(req, res) {
     }
     const memberId = await loadMemberIdForSingles(singlesId);
     if (!memberId) {
-      return res.json({ enabled: true, backups: [], memberId: null });
+      return res.json({ enabled: true, backups: [], memberId: null, maxBackups: TUTADRIVE_BACKUP_MAX });
     }
-    ensureTutaDriveMemberLayout(memberId, { singlesId });
-    const backups = listTutaDriveBackups(memberId).map(({ fileName, sizeBytes, mtimeMs, absPath }) => ({
+    try {
+      ensureTutaDriveMemberLayout(memberId, { singlesId });
+    } catch (layoutErr) {
+      // Listing zip files must still work if photos/ layout mkdir fails (EEXIST).
+      console.warn('[getRecordVaultTutaDriveBackupStatus] layout skipped:', layoutErr?.message || layoutErr);
+    }
+    const backups = listTutaDriveBackups(memberId).map(({ fileName, sizeBytes, mtimeMs }) => ({
       fileName,
       sizeBytes,
-      mtimeMs,
-      absPath
+      mtimeMs
     }));
-    return res.json({ enabled: true, memberId, backups });
+    return res.json({ enabled: true, memberId, backups, maxBackups: TUTADRIVE_BACKUP_MAX });
   } catch (err) {
     console.error('[getRecordVaultTutaDriveBackupStatus]', err?.message || err);
     return sendRecordVaultError(res, err, 'Unable to read backup status', {
@@ -457,5 +464,35 @@ export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
         // ignore
       }
     }
+  }
+}
+
+/**
+ * DELETE /api/recordVault/tutadrive/backup/:fileName
+ * Deletes a specific backup_YYYY-MM-DD.zip by name.
+ */
+export async function deleteRecordVaultTutaDriveBackupByName(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const fileName = String(req.params?.fileName || '').trim();
+    if (!/^backup_\d{4}-\d{2}-\d{2}\.zip$/i.test(fileName)) {
+      return res.status(400).json({ error: 'Invalid backup file name' });
+    }
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) return res.status(400).json({ error: 'Member number not set' });
+    const deleted = deleteTutaDriveBackupByName(memberId, fileName);
+    if (!deleted) return res.status(404).json({ error: 'Backup file not found' });
+    return res.json({ success: true, deleted: fileName });
+  } catch (err) {
+    console.error('[deleteRecordVaultTutaDriveBackupByName]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to delete TutaDrive backup', {
+      route: 'deleteRecordVaultTutaDriveBackupByName',
+      singlesId,
+      status: 400
+    });
   }
 }

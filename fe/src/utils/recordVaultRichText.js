@@ -27,7 +27,16 @@ const ALLOWED_TAGS = new Set([
   'td',
   'th',
   'img',
-  'mark'
+  'mark',
+  'div'
+]);
+
+const ATTACHMENT_DIV_ATTRS = new Set([
+  'data-rv-attachment',
+  'data-attachment-id',
+  'data-file-name',
+  'data-file-extension',
+  'data-file-size'
 ]);
 
 const ALLOWED_SPAN_STYLE_PROPS = new Set([
@@ -298,6 +307,23 @@ export function sanitizeRecordVaultHtml(html) {
 
       if (tag === 'br') continue;
 
+      if (tag === 'div') {
+        // TipTap vault file attachment atoms — keep metadata attrs for reload.
+        if (child.hasAttribute('data-rv-attachment')) {
+          for (const attr of Array.from(child.attributes)) {
+            if (!ATTACHMENT_DIV_ATTRS.has(attr.name)) child.removeAttribute(attr.name);
+          }
+          child.setAttribute('data-rv-attachment', '');
+          continue;
+        }
+        walk(child);
+        while (child.firstChild) {
+          node.insertBefore(child.firstChild, child);
+        }
+        child.remove();
+        continue;
+      }
+
       if (tag === 'span') {
         const allowed = readAllowedStyle(child.getAttribute('style'), ALLOWED_SPAN_STYLE_PROPS);
         if (allowed) child.setAttribute('style', allowed);
@@ -518,12 +544,18 @@ function normalizeTitleForBodyMatch(text) {
 
 const TITLE_MATCH_BLOCK_TAGS = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
 
+function isRecordVaultAttachmentBlock(element) {
+  return Boolean(element?.hasAttribute?.('data-rv-attachment'));
+}
+
 function isTitleMatchMediaBlock(element) {
+  if (isRecordVaultAttachmentBlock(element)) return true;
   return Boolean(element?.querySelector?.('img, table, video, audio, iframe, canvas'));
 }
 
 function isTitleMatchEmptyBlock(element) {
   if (!element || element.nodeType !== Node.ELEMENT_NODE) return false;
+  if (isRecordVaultAttachmentBlock(element)) return false;
   const tag = element.tagName.toLowerCase();
   if (!TITLE_MATCH_BLOCK_TAGS.has(tag)) return false;
   if (isTitleMatchMediaBlock(element)) return false;
@@ -562,7 +594,7 @@ export function stripLeadingTitleMatchingBodyRows(html, title) {
         return;
       }
       if (!TITLE_MATCH_BLOCK_TAGS.has(tag)) return;
-      if (isTitleMatchMediaBlock(el)) return;
+      if (isTitleMatchMediaBlock(el) || isRecordVaultAttachmentBlock(el)) return;
 
       const plain = normalizeTitleForBodyMatch(el.textContent);
       if (plain === titlePlain) {
@@ -741,6 +773,10 @@ export function collapseAdjacentDuplicateBodyRows(html) {
         prevPlain = null;
         continue;
       }
+      if (isRecordVaultAttachmentBlock(child)) {
+        prevPlain = null;
+        continue;
+      }
       const plain = normalizeTitleMatchPlain(child.textContent);
       if (!plain) {
         continue;
@@ -765,6 +801,251 @@ export function collapseAdjacentDuplicateBodyRows(html) {
 export function cleanRecordVaultNoteBodyHtml(html, title) {
   const afterTitle = stripLeadingTitleMatchingBodyRows(html, title);
   return collapseAdjacentDuplicateBodyRows(afterTitle);
+}
+
+function normalizeAttachmentLabelPlain(text) {
+  return String(text ?? '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function attachmentMeta(att) {
+  const fileName = String(att?.file_name ?? att?.fileName ?? '').trim();
+  const ext = String(att?.file_extension ?? att?.fileExtension ?? '').trim().toLowerCase();
+  const base = fileName.replace(/\.[^.]+$/, '');
+  return { fileName: fileName.toLowerCase(), base: base.toLowerCase(), ext };
+}
+
+/** Score how well a label paragraph matches a vault attachment (higher = better). */
+export function scoreRecordVaultLabelForAttachment(labelText, att) {
+  const text = normalizeAttachmentLabelPlain(labelText);
+  if (!text) return 0;
+  const { fileName, base, ext } = attachmentMeta(att);
+  if (fileName && text.includes(fileName)) return 100;
+  if (base && text.includes(base)) return 90;
+  const textAlnum = text.replace(/[^a-z0-9]/g, '');
+  const baseAlnum = base.replace(/[^a-z0-9]/g, '');
+  if (baseAlnum.length >= 3 && textAlnum.includes(baseAlnum)) return 75;
+  if (ext && (text.includes(`.${ext}`) || text.endsWith(ext))) return 55;
+  if (ext === 'pdf' && text.includes('pdf')) return 50;
+  if (ext === 'txt' && (text.includes('text') || text.includes('txt'))) return 50;
+  if (ext === 'jpg' && (text.includes('jpg') || text.includes('jpeg') || text.includes('image'))) return 45;
+  if (ext === 'png' && text.includes('png')) return 45;
+  if (ext === 'mp4' && text.includes('mp4')) return 45;
+  if (ext === 'mov' && text.includes('mov')) return 45;
+  return 0;
+}
+
+/** True when the block is an extensions catalog (table cell / allowed-types list), not a caption. */
+function isExtensionCatalogLabel(text) {
+  const matches = String(text || '').match(/\.[a-z0-9]{2,5}\b/gi);
+  return (matches?.length || 0) >= 2;
+}
+
+function labelIsInsideTable(el) {
+  return Boolean(el?.closest?.('table, td, th'));
+}
+
+function hoistAttachmentsOutOfTables(root) {
+  let moved = false;
+  for (const div of Array.from(root.querySelectorAll('div[data-rv-attachment]'))) {
+    const table = div.closest('table');
+    if (!table) continue;
+    table.after(div);
+    moved = true;
+  }
+  return moved;
+}
+
+function nextMeaningfulElementSibling(el) {
+  let n = el?.nextSibling;
+  while (n) {
+    if (n.nodeType === Node.TEXT_NODE && !String(n.textContent || '').trim()) {
+      n = n.nextSibling;
+      continue;
+    }
+    if (n.nodeType === Node.ELEMENT_NODE) return n;
+    n = n.nextSibling;
+  }
+  return null;
+}
+
+function createInlineAttachmentDiv(att) {
+  const div = document.createElement('div');
+  div.setAttribute('data-rv-attachment', '');
+  const attId = att?.attachment_id ?? att?.attachmentId;
+  if (attId != null) div.setAttribute('data-attachment-id', String(attId));
+  const fileName = att?.file_name ?? att?.fileName;
+  if (fileName) div.setAttribute('data-file-name', String(fileName));
+  const ext = att?.file_extension ?? att?.fileExtension;
+  if (ext) div.setAttribute('data-file-extension', String(ext));
+  const size = att?.file_size_bytes ?? att?.fileSizeBytes;
+  if (size != null) div.setAttribute('data-file-size', String(size));
+  return div;
+}
+
+function liveAttachmentId(att) {
+  return String(att?.attachment_id ?? att?.attachmentId ?? '').trim();
+}
+
+function liveAttachmentFileName(att) {
+  return String(att?.file_name ?? att?.fileName ?? '').trim().toLowerCase();
+}
+
+function patchAttachmentDivFromLive(div, att) {
+  const attId = liveAttachmentId(att);
+  if (attId) div.setAttribute('data-attachment-id', attId);
+  const fileName = att?.file_name ?? att?.fileName;
+  if (fileName) div.setAttribute('data-file-name', String(fileName));
+  const ext = att?.file_extension ?? att?.fileExtension;
+  if (ext) div.setAttribute('data-file-extension', String(ext));
+  const size = att?.file_size_bytes ?? att?.fileSizeBytes;
+  if (size != null) div.setAttribute('data-file-size', String(size));
+}
+
+/**
+ * Rewrite stale inline attachment ids (by filename), drop orphans/duplicates,
+ * then sit each live file under its label when a label match exists.
+ *
+ * Fixes notes where top blocks keep dead ids ("Attachment not found") while the
+ * same files were backfilled later with the real ids.
+ */
+export function realignBodyAttachmentBlocks(html, attachments) {
+  const raw = String(html ?? '');
+  if (!raw.trim() || typeof document === 'undefined') return raw;
+
+  const liveList = Array.isArray(attachments) ? attachments.filter((a) => liveAttachmentId(a)) : [];
+  if (!liveList.length) return raw;
+
+  try {
+    const template = document.createElement('template');
+    template.innerHTML = sanitizeRecordVaultHtml(raw);
+    const root = template.content;
+    const liveById = new Map(liveList.map((att) => [liveAttachmentId(att), att]));
+    const unusedByName = new Map();
+    for (const att of liveList) {
+      const name = liveAttachmentFileName(att);
+      if (!name) continue;
+      const list = unusedByName.get(name) || [];
+      list.push(att);
+      unusedByName.set(name, list);
+    }
+
+    const claimedIds = new Set();
+    let changed = false;
+
+    for (const div of Array.from(root.querySelectorAll('div[data-rv-attachment]'))) {
+      const rawId = String(div.getAttribute('data-attachment-id') || '').trim();
+      const name = String(div.getAttribute('data-file-name') || '').trim().toLowerCase();
+
+      if (rawId && liveById.has(rawId) && !claimedIds.has(rawId)) {
+        patchAttachmentDivFromLive(div, liveById.get(rawId));
+        claimedIds.add(rawId);
+        const fileKey = liveAttachmentFileName(liveById.get(rawId));
+        const bucket = unusedByName.get(fileKey);
+        if (bucket) {
+          const idx = bucket.findIndex((a) => liveAttachmentId(a) === rawId);
+          if (idx >= 0) bucket.splice(idx, 1);
+        }
+        continue;
+      }
+
+      const bucket = name ? unusedByName.get(name) : null;
+      const match = bucket?.find((a) => !claimedIds.has(liveAttachmentId(a)));
+      if (match) {
+        patchAttachmentDivFromLive(div, match);
+        claimedIds.add(liveAttachmentId(match));
+        const idx = bucket.findIndex((a) => liveAttachmentId(a) === liveAttachmentId(match));
+        if (idx >= 0) bucket.splice(idx, 1);
+        changed = true;
+        continue;
+      }
+
+      // Orphan or duplicate of an already-claimed live attachment.
+      div.remove();
+      changed = true;
+    }
+
+    const existingById = new Map();
+    for (const div of Array.from(root.querySelectorAll('div[data-rv-attachment]'))) {
+      const id = div.getAttribute('data-attachment-id');
+      if (id) existingById.set(String(id), div);
+    }
+
+    const labelBlocks = Array.from(root.querySelectorAll('p, h1, h2, h3, h4, h5, h6')).filter((el) => {
+      if (isRecordVaultAttachmentBlock(el)) return false;
+      if (isTitleMatchMediaBlock(el)) return false;
+      if (labelIsInsideTable(el)) return false;
+      if (isExtensionCatalogLabel(el.textContent)) return false;
+      return Boolean(normalizeAttachmentLabelPlain(el.textContent));
+    });
+
+    const sortedAtts = [...liveList].sort((a, b) => {
+      const orderDiff = (Number(a.display_order) || 0) - (Number(b.display_order) || 0);
+      if (orderDiff !== 0) return orderDiff;
+      return (Number(a.attachment_id) || 0) - (Number(b.attachment_id) || 0);
+    });
+
+    const claimedLabels = new Set();
+
+    for (const att of sortedAtts) {
+      const attId = liveAttachmentId(att);
+      if (!attId) continue;
+
+      let bestLabel = null;
+      let bestScore = 0;
+      for (const label of labelBlocks) {
+        if (claimedLabels.has(label)) continue;
+        const score = scoreRecordVaultLabelForAttachment(label.textContent, att);
+        if (score > bestScore) {
+          bestScore = score;
+          bestLabel = label;
+        }
+      }
+      if (!bestLabel || bestScore < 40) continue;
+
+      let div = existingById.get(attId);
+      if (!div) {
+        div = createInlineAttachmentDiv(att);
+        existingById.set(attId, div);
+        changed = true;
+      }
+
+      const next = nextMeaningfulElementSibling(bestLabel);
+      if (next === div) {
+        claimedLabels.add(bestLabel);
+        continue;
+      }
+
+      if (div.parentNode) div.remove();
+      bestLabel.after(div);
+      claimedLabels.add(bestLabel);
+      changed = true;
+    }
+
+    if (hoistAttachmentsOutOfTables(root)) changed = true;
+
+    if (!changed) return raw;
+    const out = String(template.innerHTML ?? '').trim();
+    return out || raw;
+  } catch {
+    return raw;
+  }
+}
+
+/** True when saved HTML already references every attachment id inline. */
+export function bodyHtmlHasInlineAttachmentIds(html, attachmentIds) {
+  const body = String(html ?? '');
+  if (!body || !Array.isArray(attachmentIds) || !attachmentIds.length) return false;
+  return attachmentIds.every((id) => {
+    const sid = String(id ?? '').trim();
+    if (!sid) return true;
+    return (
+      body.includes(`data-attachment-id="${sid}"`) || body.includes(`data-attachment-id='${sid}'`)
+    );
+  });
 }
 
 function normalizeSectionMarkerPlain(text) {

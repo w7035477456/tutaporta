@@ -15,7 +15,12 @@ import {
   tutaDriveMemberRoot
 } from './tutaDriveMemberPaths.js';
 import { getVaultSession, flushDbToUsb, logoffVaultUsb } from './recordVaultUsb/vaultSession.js';
-import { vaultRootOnMount, VAULT_DIR_NAME, VAULT_META_FILE } from './recordVaultUsb/vaultPaths.js';
+import {
+  vaultPhotosRoot,
+  vaultRootOnMount,
+  VAULT_DIR_NAME,
+  VAULT_META_FILE
+} from './recordVaultUsb/vaultPaths.js';
 
 const BACKUP_NAME_RE = /^backup_\d{4}-\d{2}-\d{2}\.zip$/i;
 
@@ -35,20 +40,46 @@ export function tutaDriveBackupAbsPath(memberId, dateStamp = todayBackupStamp())
   return path.join(tutaDriveMemberRoot(memberId), tutaDriveBackupFileName(dateStamp));
 }
 
-/** Delete every previous backup_* under the member folder (only one backup allowed). */
-export function clearPreviousTutaDriveBackups(memberId, keepAbsPath = null) {
+export const TUTADRIVE_BACKUP_MAX = 3;
+
+/**
+ * Delete backup_* files that exceed the max limit (oldest first).
+ * Pass keepAbsPath to always preserve a just-written file even before it
+ * appears in the sorted list.
+ */
+export function clearPreviousTutaDriveBackups(memberId, keepAbsPath = null, max = TUTADRIVE_BACKUP_MAX) {
   const root = tutaDriveMemberRoot(memberId);
   if (!fs.existsSync(root)) return [];
   const keep = keepAbsPath ? path.resolve(keepAbsPath) : null;
+  const all = fs
+    .readdirSync(root)
+    .filter((name) => BACKUP_NAME_RE.test(name))
+    .map((name) => ({ name, abs: path.join(root, name), mtime: fs.statSync(path.join(root, name)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime); // newest first
+
+  // How many to keep: slots minus the one we just created (if keepAbsPath is the newest)
+  const keepCount = Math.max(0, max - (keepAbsPath ? 1 : 0));
   const removed = [];
-  for (const name of fs.readdirSync(root)) {
-    if (!BACKUP_NAME_RE.test(name)) continue;
-    const abs = path.join(root, name);
-    if (keep && path.resolve(abs) === keep) continue;
-    fs.rmSync(abs, { force: true });
-    removed.push(abs);
+  let kept = 0;
+  for (const entry of all) {
+    if (keep && path.resolve(entry.abs) === keep) continue; // always keep the new file
+    if (kept < keepCount) { kept += 1; continue; }
+    fs.rmSync(entry.abs, { force: true });
+    removed.push(entry.abs);
   }
   return removed;
+}
+
+/**
+ * Delete a specific backup file by name (safe: only allows backup_*.zip names).
+ * Returns true when deleted, false when not found.
+ */
+export function deleteTutaDriveBackupByName(memberId, fileName) {
+  if (!BACKUP_NAME_RE.test(String(fileName || ''))) return false;
+  const abs = path.join(tutaDriveMemberRoot(memberId), String(fileName));
+  if (!fs.existsSync(abs)) return false;
+  fs.rmSync(abs, { force: true });
+  return true;
 }
 
 export function listTutaDriveBackups(memberId) {
@@ -96,6 +127,22 @@ function copyEntryRecursive(srcPath, destPath) {
 function removeDirRecursive(dirPath) {
   if (!fs.existsSync(dirPath)) return;
   fs.rmSync(dirPath, { recursive: true, force: true });
+}
+
+/**
+ * Drop the live TutaNotes vault so restore can copy into a clean tree.
+ * Unlink photos/ first when it is a symlink (do not follow it and wipe sibling photos/).
+ */
+function wipeTutaDriveVaultForRestore(notesMount) {
+  const vaultRoot = vaultRootOnMount(notesMount);
+  const photosRoot = vaultPhotosRoot(notesMount);
+  try {
+    const st = fs.lstatSync(photosRoot);
+    if (st.isSymbolicLink()) fs.unlinkSync(photosRoot);
+  } catch (err) {
+    if (err?.code !== 'ENOENT') throw err;
+  }
+  removeDirRecursive(vaultRoot);
 }
 
 function resolveVaultRootFromExtractedDir(extractDir) {
@@ -160,7 +207,7 @@ export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes) {
 
   ensureTutaDriveMemberLayout(memberId);
   const dest = tutaDriveBackupAbsPath(memberId);
-  clearPreviousTutaDriveBackups(memberId);
+  clearPreviousTutaDriveBackups(memberId, dest);
   fs.writeFileSync(dest, buf);
   const st = fs.statSync(dest);
   return {
@@ -172,11 +219,15 @@ export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes) {
   };
 }
 
-/** Read the single current sealed backup (if any). */
-export function readTutaDriveEncryptedBackup(memberId) {
+/** Read a sealed backup by file name, or the newest if fileName is omitted. */
+export function readTutaDriveEncryptedBackup(memberId, fileName = null) {
   const list = listTutaDriveBackups(memberId);
   if (!list.length) return null;
-  const current = list[0];
+  const wanted = String(fileName || '').trim();
+  const current = wanted
+    ? list.find((row) => String(row.fileName).toLowerCase() === wanted.toLowerCase())
+    : list[0];
+  if (!current) return null;
   const data = fs.readFileSync(current.absPath);
   return { ...current, data };
 }
@@ -206,7 +257,7 @@ export async function restoreTutaDriveVaultFromZipFile(singlesId, zipFilePath) {
     }
 
     const vaultRoot = vaultRootOnMount(notesMount);
-    removeDirRecursive(vaultRoot);
+    wipeTutaDriveVaultForRestore(notesMount);
     fs.mkdirSync(vaultRoot, { recursive: true });
     for (const name of fs.readdirSync(sourceRoot)) {
       copyEntryRecursive(path.join(sourceRoot, name), path.join(vaultRoot, name));

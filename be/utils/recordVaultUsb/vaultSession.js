@@ -2007,7 +2007,10 @@ export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
      WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
     [attachmentId, noteId]
   );
-  if (!row) throw new Error('Attachment not found');
+  // Idempotent: inline body may reference an attachment whose row is already gone.
+  if (!row) {
+    return { success: true, attachment_id: Number(attachmentId), already_deleted: true };
+  }
   const sharedKey = resolveRecordVaultSharedContentKey({
     sharedContentKey: row.shared_content_key,
     checksum: row.checksum,

@@ -229,13 +229,20 @@ export function ensureVaultLayoutDirs(mountPath) {
   try {
     const st = fs.lstatSync(photosRoot);
     // Broken symlink (e.g. STORAGE_FOLDER relocated) makes mkdirSync throw ENOENT.
-    if (st.isSymbolicLink() && !fs.existsSync(photosRoot)) {
-      fs.unlinkSync(photosRoot);
+    if (st.isSymbolicLink()) {
+      if (!fs.existsSync(photosRoot)) {
+        fs.unlinkSync(photosRoot);
+      }
+      // Valid symlink already satisfies photos/; mkdir would throw EEXIST.
+    } else if (!st.isDirectory()) {
+      fs.rmSync(photosRoot, { force: true });
     }
   } catch (err) {
     if (err?.code !== 'ENOENT') throw err;
   }
-  fs.mkdirSync(photosRoot, { recursive: true });
+  if (!fs.existsSync(photosRoot)) {
+    fs.mkdirSync(photosRoot, { recursive: true });
+  }
   fs.mkdirSync(vaultFilesRoot(mountPath), { recursive: true });
 }
 

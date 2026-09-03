@@ -9,6 +9,7 @@ import {
   buildRecordVaultEditorExtensions
 } from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
+import { scoreRecordVaultLabelForAttachment } from 'utils/recordVaultRichText';
 import {
   buildRecordVaultPasteHtml,
   plainTextToHtml,
@@ -223,6 +224,16 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         });
         return ids;
       },
+      getAttachmentFileNames: () => {
+        if (!editor) return [];
+        const names = [];
+        editor.state.doc.descendants((n) => {
+          if (n.type.name === RECORD_VAULT_ATTACHMENT_NODE_NAME && n.attrs.fileName) {
+            names.push(String(n.attrs.fileName).trim().toLowerCase());
+          }
+        });
+        return names;
+      },
       /**
        * Insert a vault file node at the drop coordinates (falls back to the end of
        * the document when the point can't be resolved). Emits an update so the
@@ -262,6 +273,56 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
           .chain()
           .insertContentAt(editor.state.doc.content.size, content)
           .run();
+      },
+      /**
+       * Insert missing vault files near label paragraphs that mention the file
+       * name or type (instead of dumping them at the end of the note).
+       */
+      insertAttachmentsNearLabels: (attrsList) => {
+        if (!editor || !Array.isArray(attrsList) || !attrsList.length) return;
+        const LABEL_NODE_NAMES = new Set(['paragraph', 'heading']);
+        const claimedLabelKeys = new Set();
+
+        for (const attrs of attrsList) {
+          let bestPos = null;
+          let bestScore = 0;
+          let bestKey = '';
+
+          editor.state.doc.descendants((node, pos) => {
+            if (!LABEL_NODE_NAMES.has(node.type.name)) return;
+            const $pos = editor.state.doc.resolve(pos);
+            for (let d = $pos.depth; d > 0; d -= 1) {
+              const parentName = $pos.node(d).type.name;
+              if (parentName === 'table' || parentName === 'tableCell' || parentName === 'tableHeader') {
+                return;
+              }
+            }
+            const text = node.textContent || '';
+            if ((text.match(/\.[a-z0-9]{2,5}\b/gi) || []).length >= 2) return;
+            const key = `${node.type.name}:${text.trim().toLowerCase()}`;
+            if (claimedLabelKeys.has(key)) return;
+            const score = scoreRecordVaultLabelForAttachment(text, {
+              fileName: attrs.fileName,
+              fileExtension: attrs.fileExtension
+            });
+            if (score > bestScore) {
+              bestScore = score;
+              bestPos = pos;
+              bestKey = key;
+            }
+          });
+
+          const insertPos =
+            bestScore >= 40 && bestPos != null
+              ? bestPos + editor.state.doc.nodeAt(bestPos).nodeSize
+              : editor.state.doc.content.size;
+          if (bestKey) claimedLabelKeys.add(bestKey);
+
+          editor
+            .chain()
+            .insertContentAt(insertPos, { type: RECORD_VAULT_ATTACHMENT_NODE_NAME, attrs })
+            .run();
+        }
       },
       /**
        * Highlight the active search terms, focus the first hit, and return the

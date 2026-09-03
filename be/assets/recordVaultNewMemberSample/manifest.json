@@ -1,7 +1,7 @@
 {
-  "version": 3,
-  "seedMarker": "rv-new-member-sample-v3",
-  "source": "member_id=237112 TutaNotes export (SAMPLE MISC + SAMPLE TAX RECORDS)",
+  "version": 5,
+  "seedMarker": "rv-new-member-sample-v5",
+  "source": "member_id=237112 (dm1@gmail.com) TutaNotes export — SAMPLE MISC + SAMPLE TAX RECORDS, four notes",
   "notebooks": [
     {
       "notebookKey": "sample-misc",
@@ -19,7 +19,7 @@
               "sharedKey": "sample-receipt-costco",
               "attachmentId": 1,
               "sourceFile": "receipt-costco-grocery.png",
-              "fileName": "receipt-costco-grocery.png",
+              "fileName": "2026-09-02_23-03-20.png",
               "fileExtension": "png",
               "fileSizeBytes": 763762,
               "checksum": "1fb6cff815be81931fb63e0ee628d01797b5806ac0f7f883345157b356f4a546",
@@ -29,7 +29,7 @@
               "sharedKey": "sample-receipt-homedepot",
               "attachmentId": 2,
               "sourceFile": "receipt-home-depot-lawn-mower.png",
-              "fileName": "receipt-home-depot-lawn-mower.png",
+              "fileName": "2026-09-02_23-03-56.png",
               "fileExtension": "png",
               "fileSizeBytes": 696912,
               "checksum": "f71a8db7ff742820e9f9cd95e7933ec639dc4c5aea9e2f090f9582899e6453ac",
@@ -39,7 +39,7 @@
               "sharedKey": "sample-receipt-bestbuy",
               "attachmentId": 3,
               "sourceFile": "receipt-best-buy-iphone.png",
-              "fileName": "receipt-best-buy-iphone.png",
+              "fileName": "2026-09-02_23-02-49.png",
               "fileExtension": "png",
               "fileSizeBytes": 237138,
               "checksum": "e76dc5054b5d80c688aa027b0cf977a8b370183e8ada989c8888056d5d0c142f",

@@ -133,7 +133,9 @@ import {
 } from 'utils/recordVaultNoteInnerUnlockStorage';
 import { TUTANOTES_WORKSPACE_CONTENT_BG, TUTANOTES_WORKSPACE_PANEL_BG, tutaNotesStorageStripColor } from './tutaNotesBranding';
 import {
+  bodyHtmlHasInlineAttachmentIds,
   cleanRecordVaultNoteBodyHtml,
+  realignBodyAttachmentBlocks,
   recordVaultRichTextHasContent,
   stripRecordVaultHtml,
 } from 'utils/recordVaultRichText';
@@ -1028,7 +1030,7 @@ function MenuRowButton({
                 bgcolor: '#ffffff !important',
                 color: '#000000 !important',
                 WebkitTextFillColor: '#000000 !important',
-                border: multiSelected && !selected ? '3px solid #000000 !important' : '4px double #000000 !important'
+                border: multiSelected && !selected ? '3px solid #cc0000 !important' : '4px solid #cc0000 !important'
               }
           : null),
         ...(locked ? recordVaultInnerLockedMenuSx : null),
@@ -2953,7 +2955,7 @@ export default function RecordVaultWorkspacePane({
     const locked = noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(id);
     if (!locked && !selectedNote.content_loaded) return;
     // Bump clean-vN when title-strip rules change so already-open notes rehydrate.
-    const key = `${id}:${locked ? 'locked' : 'open'}:clean-v3`;
+    const key = `${id}:${locked ? 'locked' : 'open'}:clean-v6`;
     if (editorHydratedRef.current.key === key) return;
     editorHydratedRef.current.key = key;
     // Track which note the editor holds so switch/flush paths know a draft is live.
@@ -2969,10 +2971,12 @@ export default function RecordVaultWorkspacePane({
         noteTitlePlainText(selectedNote.note_name) ||
         String(draftRef.current?.openNoteTitlePlain || openNoteTitlePlain || '').trim();
       const rawBody = String(selectedNote.body_text ?? '');
+      const atts = Array.isArray(selectedNote.attachments) ? selectedNote.attachments : [];
+      const realignedBody = realignBodyAttachmentBlocks(rawBody, atts);
       // Drop title-matching body rows (ignore [n]/[#]); leave title intact.
-      const cleanedBody = cleanRecordVaultNoteBodyHtml(rawBody, titlePlain);
+      const cleanedBody = cleanRecordVaultNoteBodyHtml(realignedBody, titlePlain);
       api.setContent(cleanedBody || '<p></p>', true);
-      if (cleanedBody !== rawBody) {
+      if (realignedBody !== rawBody || cleanedBody !== rawBody) {
         patchNoteRowInTree(id, { body_text: cleanedBody, content_loaded: true });
         void vaultApi.updateRecordVaultNote(id, { body_text: cleanedBody }).catch(() => {
           // Keep the cleaned editor view even if persist fails; next save retries.
@@ -3356,15 +3360,24 @@ export default function RecordVaultWorkspacePane({
               )
             }))
           );
-          noteEditorApiRef.current?.insertAttachmentAtCoords?.(
-            {
-              attachmentId: Number(attachment.attachment_id),
-              fileName: attachment.file_name || '',
-              fileExtension: attachment.file_extension || '',
-              fileSizeBytes: attachment.file_size_bytes ?? null
-            },
-            coords
-          );
+          if (Number(selectedNoteIdRef.current) === noteId) {
+            noteEditorApiRef.current?.insertAttachmentAtCoords?.(
+              {
+                attachmentId: Number(attachment.attachment_id),
+                fileName: attachment.file_name || '',
+                fileExtension: attachment.file_extension || '',
+                fileSizeBytes: attachment.file_size_bytes ?? null
+              },
+              coords
+            );
+            // Flush body autosave immediately — attachment nodes must persist in
+            // body_text before the user switches notes (sanitize on reload keeps them).
+            if (saveTimerRef.current) {
+              clearTimeout(saveTimerRef.current);
+              saveTimerRef.current = null;
+            }
+            void persistNoteRef.current?.();
+          }
         }
       } catch (err) {
         setError(readRecordVaultApiError(err, `Failed to upload ${file.name || 'file'}`));
@@ -3380,6 +3393,27 @@ export default function RecordVaultWorkspacePane({
    * Remove a vault attachment (server-side file) for the selected note. Returns
    * true on success so the inline node view can then delete itself from the body.
    */
+  const pruneAttachmentFromNoteTree = useCallback((noteId, attachmentId) => {
+    const id = Number(attachmentId);
+    const nid = Number(noteId);
+    if (!Number.isFinite(id) || id < 1 || !Number.isFinite(nid) || nid < 1) return;
+    setNotebooks((prev) =>
+      prev.map((nb) => ({
+        ...nb,
+        notes: (nb.notes || []).map((note) =>
+          Number(note.note_id) === nid
+            ? {
+                ...note,
+                attachments: (note.attachments || []).filter(
+                  (entry) => Number(entry.attachment_id) !== id
+                )
+              }
+            : note
+        )
+      }))
+    );
+  }, []);
+
   const handleDeleteVaultAttachment = useCallback(
     async (attachmentId) => {
       if (!selectedNote || busy) return false;
@@ -3390,31 +3424,25 @@ export default function RecordVaultWorkspacePane({
       setError('');
       try {
         await vaultApi.deleteRecordVaultNoteAttachment(noteId, id);
-        setNotebooks((prev) =>
-          prev.map((nb) => ({
-            ...nb,
-            notes: (nb.notes || []).map((note) =>
-              Number(note.note_id) === noteId
-                ? {
-                    ...note,
-                    attachments: (note.attachments || []).filter(
-                      (entry) => Number(entry.attachment_id) !== id
-                    )
-                  }
-                : note
-            )
-          }))
-        );
+        pruneAttachmentFromNoteTree(noteId, id);
         return true;
       } catch (err) {
-        setError(readRecordVaultApiError(err, 'Failed to remove vault file'));
+        const message = readRecordVaultApiError(err, 'Failed to remove vault file');
+        const missing =
+          err?.response?.status === 404 || /attachment not found/i.test(String(message || ''));
+        if (missing) {
+          // Orphan inline reference — drop from the note body even when the file row is gone.
+          pruneAttachmentFromNoteTree(noteId, id);
+          return true;
+        }
+        setError(message);
         return false;
       } finally {
         setBusy(false);
         bumpVaultUsage();
       }
     },
-    [busy, selectedNote, vaultApi, bumpVaultUsage]
+    [busy, selectedNote, vaultApi, bumpVaultUsage, pruneAttachmentFromNoteTree]
   );
 
   const handleContentDragOver = useCallback((event) => {
@@ -3522,35 +3550,48 @@ export default function RecordVaultWorkspacePane({
   }, [selectedNote, paneStorageType, busy, handleDeleteVaultAttachment, editorReadyTick]);
 
   // Legacy vault files were stored only in a separate list. Now that files live
-  // inline in the note body, append any file not yet referenced by an inline node
-  // to the end of the body once per note load (nothing gets lost when the old
-  // bottom list is gone). New drops already insert their node at the drop point.
-  const attachmentBackfillRef = useRef({});
+  // inline in the note body, insert any file not yet referenced by an inline node
+  // near its label paragraph (not at the end of the note).
   useEffect(() => {
     const api = noteEditorApiRef.current;
-    if (!api?.getAttachmentIds || !api?.appendAttachments) return;
+    if (!api?.getAttachmentIds || !api?.insertAttachmentsNearLabels) return;
     if (!selectedNote) return;
     const id = Number(selectedNote.note_id);
     const locked = noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(id);
     if (locked || !selectedNote.content_loaded) return;
-    if (attachmentBackfillRef.current[id]) return;
     const atts = Array.isArray(selectedNote.attachments) ? selectedNote.attachments : [];
-    attachmentBackfillRef.current[id] = true;
     if (!atts.length) return;
-    const present = new Set(api.getAttachmentIds());
-    const missing = atts.filter((a) => !present.has(String(a.attachment_id)));
-    if (!missing.length) return;
-    api.appendAttachments(
-      missing.map((a) => ({
-        attachmentId: Number(a.attachment_id),
-        fileName: a.file_name || '',
-        fileExtension: a.file_extension || '',
-        fileSizeBytes: a.file_size_bytes ?? null
-      }))
-    );
-    scheduleSave();
+
+    const raf = requestAnimationFrame(() => {
+      const present = new Set(api.getAttachmentIds());
+      const presentNames = new Set(
+        (api.getAttachmentFileNames?.() || []).map((n) => String(n || '').trim().toLowerCase()).filter(Boolean)
+      );
+      const missing = atts.filter((a) => {
+        if (present.has(String(a.attachment_id))) return false;
+        const name = String(a.file_name || '').trim().toLowerCase();
+        // Stale inline node already shows this filename — hydrate rewrite handles id.
+        if (name && presentNames.has(name)) return false;
+        return true;
+      });
+      if (!missing.length) return;
+      const bodyHtml = String(selectedNote.body_text ?? '');
+      // Body already references these ids — editor parse lag; do not duplicate at end.
+      if (bodyHtmlHasInlineAttachmentIds(bodyHtml, missing.map((a) => a.attachment_id))) return;
+      api.insertAttachmentsNearLabels(
+        missing.map((a) => ({
+          attachmentId: Number(a.attachment_id),
+          fileName: a.file_name || '',
+          fileExtension: a.file_extension || '',
+          fileSizeBytes: a.file_size_bytes ?? null
+        }))
+      );
+      scheduleSave();
+    });
+    return () => cancelAnimationFrame(raf);
   }, [
     selectedNote,
+    selectedNote?.attachments,
     editorReadyTick,
     innerUnlockVersion,
     noteRequiresInnerPinToView,

@@ -202,6 +202,13 @@ function linkVaultPhotosToMemberPhotos(notesMount, photosAbs) {
     } catch {
       // ignore
     }
+    try {
+      const st = fs.lstatSync(vaultPhotos);
+      if (st.isDirectory() || st.isSymbolicLink()) return;
+      fs.rmSync(vaultPhotos, { force: true });
+    } catch (existsErr) {
+      if (existsErr?.code !== 'ENOENT') throw existsErr;
+    }
     fs.mkdirSync(vaultPhotos, { recursive: true });
   }
 }
