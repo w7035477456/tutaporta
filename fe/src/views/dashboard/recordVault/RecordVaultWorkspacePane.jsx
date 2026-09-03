@@ -4822,55 +4822,6 @@ export default function RecordVaultWorkspacePane({
     [enqueueImportSuccessPopup]
   );
 
-  /** Drag the open note's content pane out to Finder → HTML export. */
-  const handleContentPaneHtmlExportDragStart = useCallback(
-    (event) => {
-      if (!selectedNoteId) {
-        event.preventDefault();
-        return;
-      }
-      // Keep TipTap editing usable: don't steal toolbar/inputs/image moves or text selection.
-      const t = event.target;
-      if (
-        t?.closest?.(
-          'input, textarea, button, a, img, label, .MuiInputBase-root, [role="toolbar"]'
-        )
-      ) {
-        event.preventDefault();
-        return;
-      }
-      const sel = window.getSelection?.();
-      if (sel && !sel.isCollapsed && event.currentTarget?.contains?.(sel.anchorNode)) {
-        event.preventDefault();
-        return;
-      }
-      const exportPayload = resolveNoteHtmlExportPayload(selectedNoteId);
-      if (!exportPayload) {
-        event.preventDefault();
-        return;
-      }
-      event.dataTransfer.effectAllowed = 'copyMove';
-      event.dataTransfer.setData(DRAG_NOTE, String(selectedNoteId));
-      event.dataTransfer.setData('text/plain', String(selectedNoteId));
-      if (selectedNotebookId != null) {
-        event.dataTransfer.setData(DRAG_NOTEBOOK, String(selectedNotebookId));
-      }
-      attachHtmlExportToDataTransfer(event, [exportPayload]);
-      activeDragRef.current = {
-        kind: DRAG_NOTE,
-        id: Number(selectedNoteId),
-        notebookId: selectedNotebookId != null ? Number(selectedNotebookId) : null
-      };
-      setDraggingNoteId(selectedNoteId);
-    },
-    [
-      selectedNoteId,
-      selectedNotebookId,
-      resolveNoteHtmlExportPayload,
-      attachHtmlExportToDataTransfer
-    ]
-  );
-
   const openCrossPaneTransfer = useCallback(
     (item, targetNotebookId = null) => {
       if (!item || busy || crossPaneBusy) return;
@@ -7385,9 +7336,10 @@ export default function RecordVaultWorkspacePane({
           <Box
             data-record-vault-note-content
             ref={noteContentPaneRef}
-            draggable={Boolean(selectedNoteId) && !isBillMonthlyView && !isBillYearlyView}
-            onDragStart={handleContentPaneHtmlExportDragStart}
-            onDragEnd={handleDragEnd}
+            // Do not make the whole editor pane HTML5-draggable — that steals click-drag
+            // from text selection and drags a huge translucent ghost. Export HTML from
+            // the notebook/note list on the left instead (PhotoAlbums uses the same rule).
+            draggable={false}
             onDragOver={isBillMonthlyView || isBillYearlyView ? undefined : handleContentDragOver}
             onDrop={isBillMonthlyView || isBillYearlyView ? undefined : handleContentFileDrop}
             sx={{
