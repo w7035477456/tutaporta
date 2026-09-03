@@ -125,3 +125,21 @@ psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -c "SELECT * FROM helloworl
 ```
 
 See also `mac-psql-local.mdc` for migrations and one-liners.
+
+## 12) Agent — user action markers
+
+When the reply needs **Andrew to do something manually** (edit a file on another machine, run a command, restart a service, etc.), wrap those instructions exactly like this:
+
+```
+######## DO THIS BEGIN ########
+<steps Andrew must take>
+####### END DO THIS #####
+```
+
+When the reply is **explanation only** and Andrew does **not** need to take any action, end the reply with:
+
+```
+>>>>> DO NOT DO, CURSOR JUST EXPLAIN <<<<<
+```
+
+Use **one** of these markers per reply (not both). Do not use them for steps Cursor already completed itself.
