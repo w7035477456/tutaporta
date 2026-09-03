@@ -988,7 +988,7 @@ export async function downloadRecordVaultOneDriveBackupZip() {
 
 /**
  * TutaDrive backup: zip vault → seal with Encrypt Password DEK in-browser →
- * store as users/M{id}/backup_YYYY-MM-DD.zip (replaces any prior backup_*).
+ * store as users/M{id}/backup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 backup_*).
  */
 export async function createRecordVaultTutaDriveEncryptedBackup() {
   const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');

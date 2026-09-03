@@ -291,8 +291,11 @@ export default function AdminToolsLoginLogTab({ onError }) {
           {!rows.length ? (
             <ColorTemplate9TableData.EmptyText>No matching login_log rows.</ColorTemplate9TableData.EmptyText>
           ) : (
-            <Box sx={{ width: '100%', overflowX: 'auto' }}>
-              <ColorTemplate9TableData.Table sx={{ minWidth: minTableWidthPx }}>
+              <ColorTemplate9TableData.Table
+                topHorizontalScrollbar
+                autoFitColumns
+                minTableWidth={minTableWidthPx}
+              >
                 <ColorTemplate9TableData.HeaderRow gridTemplateColumns={gridTemplateColumns}>
                   <ColorTemplate9TableData.HeaderCell>Type</ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
@@ -355,7 +358,6 @@ export default function AdminToolsLoginLogTab({ onError }) {
                   </ColorTemplate9TableData.BodyRow>
                 ))}
               </ColorTemplate9TableData.Table>
-            </Box>
           )}
         </Box>
       ) : null}

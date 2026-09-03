@@ -329,7 +329,7 @@ export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
 /**
  * POST /api/recordVault/tutadrive/backup
  * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
- * Stores as users/M{id}/backup_YYYY-MM-DD.zip and deletes any prior backup_*.zip.
+ * Stores as users/M{id}/backup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 backup_*.zip).
  */
 export async function storeRecordVaultTutaDriveBackup(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -469,7 +469,7 @@ export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
 
 /**
  * DELETE /api/recordVault/tutadrive/backup/:fileName
- * Deletes a specific backup_YYYY-MM-DD.zip by name.
+ * Deletes a specific backup_YYYY-MM-DD[_HH-MM-SS].zip by name.
  */
 export async function deleteRecordVaultTutaDriveBackupByName(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -479,7 +479,7 @@ export async function deleteRecordVaultTutaDriveBackupByName(req, res) {
       return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
     }
     const fileName = String(req.params?.fileName || '').trim();
-    if (!/^backup_\d{4}-\d{2}-\d{2}\.zip$/i.test(fileName)) {
+    if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(fileName)) {
       return res.status(400).json({ error: 'Invalid backup file name' });
     }
     const memberId = await loadMemberIdForSingles(singlesId);

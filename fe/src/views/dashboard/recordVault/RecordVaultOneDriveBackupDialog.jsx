@@ -344,13 +344,13 @@ export default function RecordVaultOneDriveBackupDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
             {tutaDrive
-              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/backup_YYYY-MM-DD.zip. You can save up to 3 zip files.'
+              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/backup_YYYY-MM-DD_HH-MM-SS.zip. You can save up to 3 zip files.'
               : 'You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You can also Restore from it back to OneDrive (overwrite OneDrive).'}
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
             {tutaDrive
-              ? 'Sealing uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Only one backup_*.zip is kept. Before Format, run Backup first if you need to keep your notes.'
+              ? 'Sealing uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 backup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
               : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup TutaNotes Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore TutaNotes Cloud below.'}
           </Box>
 

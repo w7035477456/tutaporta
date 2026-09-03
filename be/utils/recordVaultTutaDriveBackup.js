@@ -1,8 +1,9 @@
 /**
- * TutaDrive member backup — one encrypted backup file under users/M{id}/.
+ * TutaDrive member backup — encrypted backup files under users/M{id}/.
  * Plain vault zip is produced server-side; Encrypt Password sealing happens in the browser (DEK).
  *
- * Stored name: backup_YYYY-MM-DD.zip  (payload = TNBAK1 sealed bytes from client)
+ * Stored name: backup_YYYY-MM-DD_HH-MM-SS.zip  (payload = TNBAK1 sealed bytes from client)
+ * Legacy date-only names backup_YYYY-MM-DD.zip are still listed / restorable / deletable.
  */
 import fs from 'fs';
 import os from 'os';
@@ -22,14 +23,18 @@ import {
   VAULT_META_FILE
 } from './recordVaultUsb/vaultPaths.js';
 
-const BACKUP_NAME_RE = /^backup_\d{4}-\d{2}-\d{2}\.zip$/i;
+/** Date-only (legacy) or date+time stamp. */
+const BACKUP_NAME_RE = /^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i;
 
 function todayBackupStamp() {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${y}-${m}-${day}_${hh}-${mm}-${ss}`;
 }
 
 export function tutaDriveBackupFileName(dateStamp = todayBackupStamp()) {

@@ -6,6 +6,9 @@
  * Shared sample attachments use shared_content_key pointers (one media copy under
  * be/assets/recordVaultNewMemberSample/media for all members).
  *
+ * When fe/src/assets/zip/tutaNotes_template.zip exists, migration uses full vault
+ * unzip restore instead of SQL seed (see applyTutaNotesTemplate.js).
+ *
  * Usage (from repo root, with ~/.ssh/be/.env loaded as usual for Node scripts):
  *   node be/scripts/migrateRecordVaultNewMemberSample.js
  *   node be/scripts/migrateRecordVaultNewMemberSample.js --dry-run
@@ -37,6 +40,8 @@ import {
   ensureRecordVaultSharedContentKeyColumn
 } from '../utils/recordVaultNewMemberSample/seedRecordVaultNewMemberSample.js';
 import { linkRecordVaultSharedSamplesIntoVault } from '../utils/recordVaultNewMemberSample/sharedSampleMedia.js';
+import { applyTutaNotesTemplate } from '../utils/recordVaultTutaNotesTemplate/applyTutaNotesTemplate.js';
+import { tutaNotesTemplateZipAvailable } from '../utils/recordVaultTutaNotesTemplate/templatePaths.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dryRun = process.argv.includes('--dry-run');
@@ -96,6 +101,23 @@ function findVaultMountPaths(root) {
 }
 
 async function migrateOneVault(mountPath, SQL) {
+  if (tutaNotesTemplateZipAvailable()) {
+    if (dryRun) {
+      return { status: 'dry-run', result: 'template' };
+    }
+    try {
+      const tpl = await applyTutaNotesTemplate(mountPath, { force: true });
+      if (tpl.applied) return { status: 'ok', result: 'template' };
+      if (tpl.reason === 'zip_missing') {
+        // fall through to legacy SQL seed
+      } else {
+        return { status: 'ok', result: 'present' };
+      }
+    } catch (err) {
+      console.warn(`  template apply failed ${mountPath}:`, err?.message || err);
+    }
+  }
+
   const meta = readVaultMeta(mountPath);
   if (!meta) return { status: 'skip', reason: 'no-meta' };
   const dbPath = resolveVaultDbPath(mountPath) || vaultDbPath(mountPath, meta);
@@ -154,7 +176,7 @@ async function main() {
   console.log(`[migrateRecordVaultNewMemberSample] roots=${storageRoots().join(', ') || '(none)'}`);
   console.log(`[migrateRecordVaultNewMemberSample] vaults found=${mounts.length} dryRun=${dryRun}`);
 
-  const tallies = { inserted: 0, present: 0, upgraded: 0, skipped: 0, encrypted: 0, other: 0 };
+  const tallies = { inserted: 0, present: 0, upgraded: 0, template: 0, skipped: 0, encrypted: 0, other: 0 };
   for (const mount of mounts) {
     const res = await migrateOneVault(mount, SQL);
     if (res.status === 'ok' || res.status === 'dry-run') {

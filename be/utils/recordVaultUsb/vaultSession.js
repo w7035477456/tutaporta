@@ -64,6 +64,8 @@ import {
   readRecordVaultSharedSampleForAttachmentRow,
   resolveRecordVaultSharedContentKey
 } from '../recordVaultNewMemberSample/sharedSampleMedia.js';
+import { applyTutaNotesTemplate } from '../recordVaultTutaNotesTemplate/applyTutaNotesTemplate.js';
+import { tutaNotesTemplateZipAvailable } from '../recordVaultTutaNotesTemplate/templatePaths.js';
 
 /** Prefix for FE inner-layer ciphertext stored in notes.body_text (Argon2id + AES-256-GCM). */
 export const NOTE_INNER_ENCRYPT_BODY_PREFIX = '\u2063RVI';
@@ -832,6 +834,15 @@ export async function unlockVaultUsb(singlesId, mountPath, iconName, options = {
 export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options = {}) {
   const targetStorageType = normalizeVaultStorageType(options?.storageType, 'usb');
   ensureVaultLayoutDirs(mountPath);
+  let templateApplied = false;
+  if (tutaNotesTemplateZipAvailable()) {
+    try {
+      const tpl = await applyTutaNotesTemplate(mountPath);
+      templateApplied = Boolean(tpl.applied);
+    } catch (err) {
+      console.warn('[unlockVaultUsbWithKey] template apply failed:', err?.message || err);
+    }
+  }
   const check = validateVaultOnMount(mountPath);
   if (!check.ok) {
     throw new Error(check.error || 'Invalid vault USB');
@@ -899,7 +910,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     if (!db) {
       throw openErr || new Error('Vault database is missing or unreadable');
     }
-    sampleSeedStatus = ensureRecordVaultNewMemberSampleDb(db);
+    sampleSeedStatus = templateApplied ? 'template' : ensureRecordVaultNewMemberSampleDb(db);
   } catch (err) {
     if (err?.name === 'RecordVaultUnlockError') throw err;
     if (treatAsEncryptedVault) {
@@ -933,17 +944,19 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
   });
   session.storageType = targetStorageType;
   sessionsByKey.set(vaultSessionKey(singlesId, targetStorageType), session);
-  try {
-    await seedRecordVaultNewMemberSampleMedia({
-      mountPath: session.mountPath,
-      key: session.key,
-      meta: session.meta,
-      db: session.db
-    });
-  } catch (err) {
-    console.warn('[recordVault] shared sample media link failed', err?.message || err);
+  if (sampleSeedStatus !== 'template') {
+    try {
+      await seedRecordVaultNewMemberSampleMedia({
+        mountPath: session.mountPath,
+        key: session.key,
+        meta: session.meta,
+        db: session.db
+      });
+    } catch (err) {
+      console.warn('[recordVault] shared sample media link failed', err?.message || err);
+    }
   }
-  if (sampleSeedStatus === 'inserted' || sampleSeedStatus === 'upgraded') {
+  if (sampleSeedStatus === 'inserted' || sampleSeedStatus === 'upgraded' || sampleSeedStatus === 'template') {
     markDirty(session);
     flushDbToUsb(session);
   }

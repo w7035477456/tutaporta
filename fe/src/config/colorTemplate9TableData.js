@@ -274,10 +274,28 @@ export function colorTemplate9TableTopHorizontalScrollShellSx(overrides = {}) {
   return colorTemplate9TableHorizontalScrollShellSx({
     borderBottom: 'none',
     flexShrink: 0,
-    minHeight: 16,
-    maxHeight: 16,
+    height: 20,
+    minHeight: 20,
+    maxHeight: 20,
+    boxSizing: 'border-box',
     ...overrides
   });
+}
+
+/** Shared horizontal scrollbar styling for top + bottom table scroll shells. */
+export function colorTemplate9TableHorizontalScrollbarSx(overrides = {}) {
+  return {
+    scrollbarGutter: 'stable',
+    scrollbarColor: (theme) =>
+      `${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'} transparent`,
+    '&::-webkit-scrollbar': { height: 12 },
+    '&::-webkit-scrollbar-track': { backgroundColor: 'rgba(128,128,128,0.2)' },
+    '&::-webkit-scrollbar-thumb': {
+      backgroundColor: 'rgba(128,128,128,0.55)',
+      borderRadius: 6
+    },
+    ...overrides
+  };
 }
 
 /** Outer card-style panel (tabs + table body) */

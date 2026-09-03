@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import {
   buildColorTemplate9AutoFitGridTemplateColumns,
@@ -41,6 +41,7 @@ import {
   colorTemplate9TableShellSx,
   colorTemplate9TableHorizontalScrollShellSx,
   colorTemplate9TableTopHorizontalScrollShellSx,
+  colorTemplate9TableHorizontalScrollbarSx,
   colorTemplate9TableTabBarSx,
   colorTemplate9TableTitleSx,
   colorTemplate9FrozenColumnStickyCellSx
@@ -265,8 +266,10 @@ function ColorTemplate9TableDataTable({
   ...rest
 }) {
   const topScrollRef = useRef(null);
+  const topSpacerRef = useRef(null);
   const bottomScrollRef = useRef(null);
   const isSyncingScrollRef = useRef(false);
+  const [topScrollActive, setTopScrollActive] = useState(false);
   const frozenContextValue = useMemo(
     () => ({
       frozenColumnCount: Math.max(0, Math.trunc(Number(frozenColumnCount) || 0)),
@@ -275,10 +278,22 @@ function ColorTemplate9TableDataTable({
     [frozenColumnCount, frozenColumnWidthsPx]
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const topEl = topScrollRef.current;
     const bottomEl = bottomScrollRef.current;
-    if (!topHorizontalScrollbar || !topEl || !bottomEl) return undefined;
+    const spacerEl = topSpacerRef.current;
+    if (!topHorizontalScrollbar || !topEl || !bottomEl || !spacerEl) return undefined;
+
+    const syncSpacerWidth = () => {
+      const scrollWidth = Math.max(bottomEl.scrollWidth, Number(minTableWidth) || 0);
+      spacerEl.style.width = `${scrollWidth}px`;
+      setTopScrollActive(scrollWidth > bottomEl.clientWidth + 1);
+      if (!isSyncingScrollRef.current) {
+        topEl.scrollLeft = bottomEl.scrollLeft;
+      }
+    };
+
+    syncSpacerWidth();
 
     const syncFromTop = () => {
       if (isSyncingScrollRef.current) return;
@@ -293,15 +308,25 @@ function ColorTemplate9TableDataTable({
       isSyncingScrollRef.current = false;
     };
 
-    topEl.scrollLeft = bottomEl.scrollLeft;
-
     topEl.addEventListener('scroll', syncFromTop, { passive: true });
     bottomEl.addEventListener('scroll', syncFromBottom, { passive: true });
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(syncSpacerWidth);
+      ro.observe(bottomEl);
+      if (bottomEl.firstElementChild) ro.observe(bottomEl.firstElementChild);
+    } else {
+      window.addEventListener('resize', syncSpacerWidth, { passive: true });
+    }
+
     return () => {
       topEl.removeEventListener('scroll', syncFromTop);
       bottomEl.removeEventListener('scroll', syncFromBottom);
+      ro?.disconnect();
+      window.removeEventListener('resize', syncSpacerWidth);
     };
-  }, [topHorizontalScrollbar, minTableWidth]);
+  }, [topHorizontalScrollbar, minTableWidth, children]);
 
   const content = (
     <Box sx={{ minWidth: minTableWidth || 0, width: minTableWidth ? minTableWidth : '100%' }}>
@@ -310,9 +335,12 @@ function ColorTemplate9TableDataTable({
   );
 
   const useHorizontalScrollShell = autoFitColumns || frozenContextValue.frozenColumnCount > 0;
-  const scrollShellSx = useHorizontalScrollShell
-    ? colorTemplate9TableHorizontalScrollShellSx()
-    : colorTemplate9TableShellSx({ overflowX: 'auto' });
+  const scrollShellSx = {
+    ...(useHorizontalScrollShell
+      ? colorTemplate9TableHorizontalScrollShellSx()
+      : colorTemplate9TableShellSx({ overflowX: 'auto' })),
+    ...(topHorizontalScrollbar ? colorTemplate9TableHorizontalScrollbarSx() : null)
+  };
 
   return (
     <TableFrozenColumnsContext.Provider value={frozenContextValue}>
@@ -331,16 +359,22 @@ function ColorTemplate9TableDataTable({
         {topHorizontalScrollbar ? (
           <Box
             ref={topScrollRef}
-            aria-hidden
+            aria-label="Table horizontal scroll"
             sx={{
               ...colorTemplate9TableTopHorizontalScrollShellSx(),
-              transform: 'scaleY(-1)'
+              ...colorTemplate9TableHorizontalScrollbarSx(),
+              transform: 'scaleY(-1)',
+              visibility: topScrollActive ? 'visible' : 'hidden',
+              height: topScrollActive ? 20 : 0,
+              minHeight: topScrollActive ? 20 : 0,
+              maxHeight: topScrollActive ? 20 : 0,
+              overflow: topScrollActive ? undefined : 'hidden'
             }}
           >
             <Box
+              ref={topSpacerRef}
               sx={{
-                minWidth: minTableWidth || 0,
-                height: 1,
+                height: '1px',
                 transform: 'scaleY(-1)'
               }}
             />
