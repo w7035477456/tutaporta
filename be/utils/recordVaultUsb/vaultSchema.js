@@ -132,7 +132,7 @@ ALTER TABLE notes ADD COLUMN inner_unlock_locked_until TEXT;
 export const DEFAULT_BODY_TEXT = '';
 
 /** Fresh vault after Format OneDrive / Format USB: sample notebook (see recordVaultNewMemberSample). */
-export const DEFAULT_NOTEBOOKS = ['SAMPLE NOTEBOOK 1'];
+export const DEFAULT_NOTEBOOKS = ['SAMPLE MISC', 'SAMPLE TAX RECORDS'];
 
 /** @deprecated Prefer SAMPLE NOTE1 from recordVaultNewMemberSample manifest. */
 export const DEFAULT_SAMPLE_NOTE_NAME = 'SAMPLE NOTE1';

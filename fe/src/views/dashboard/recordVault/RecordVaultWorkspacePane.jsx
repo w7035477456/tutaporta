@@ -7832,6 +7832,7 @@ export default function RecordVaultWorkspacePane({
                       }
                       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                       fullWidth
+                      singleLineLabel={false}
                       onClick={() => {
                         setViewVaultStorageType(paneStorageType === 'onedrive' ? 'onedrive' : 'usb');
                         setViewVaultOpen(true);
@@ -7847,10 +7848,26 @@ export default function RecordVaultWorkspacePane({
                       }
                       sx={{
                         flexShrink: 0,
-                        ...laneContainedButtonSx
+                        ...laneContainedButtonSx,
+                        // Stack "View" / "TutaDrive" (or USB / OneDrive) — one word per row.
+                        display: 'inline-flex !important',
+                        flexDirection: 'column !important',
+                        height: 'auto !important',
+                        minHeight: { xs: 36, sm: 40 },
+                        whiteSpace: 'normal !important',
+                        lineHeight: '1.15 !important',
+                        py: { xs: 0.35, sm: 0.45 },
+                        '& .MuiButton-label': {
+                          ...menuButtonWordPerLineLabelSx,
+                          whiteSpace: 'normal',
+                          overflow: 'visible',
+                          textOverflow: 'clip'
+                        }
                       }}
                     >
-                      {paneStorageType === 'onedrive' ? cloudViewLabel : 'View USB'}
+                      {renderMenuLabelOneWordPerLine(
+                        paneStorageType === 'onedrive' ? cloudViewLabel : 'View USB'
+                      )}
                     </SliderControlButton>
                     <RecordVaultStorageFilesPanel storageType={paneStorageType || 'usb'} active={unlocked} />
                   </Box>

@@ -1,12 +1,20 @@
 import { fileRelativePath } from '../recordVaultUsb/vaultPaths.js';
 import {
   loadRecordVaultNewMemberSampleManifest,
-  loadRecordVaultSampleNoteBodyHtml
+  loadRecordVaultSampleNoteBodyHtml,
+  listRecordVaultSampleAttachmentDefs,
+  listRecordVaultSampleNotebooks,
+  listRecordVaultSampleNoteDefs
 } from './sampleManifest.js';
 import {
   linkRecordVaultSharedSamplesIntoVault,
   recordVaultNewMemberSampleSeedMarker
 } from './sharedSampleMedia.js';
+
+/** Prior v2 dm1 placeholder set (single SAMPLE NOTEBOOK 1 + SAMPLE NOTE1/2). */
+const GARBAGE_V2_MARKER = 'rv-new-member-sample-v2';
+const LEGACY_V2_NOTEBOOK_NAMES = new Set(['SAMPLE NOTEBOOK 1', 'SAMPLE NOTEBOOK']);
+const LEGACY_V2_NOTE_NAMES = new Set(['SAMPLE NOTE1', 'SAMPLE NOTE2']);
 
 /** Prior placeholder sample (tiny generated files) — remove on upgrade to dm1 set. */
 const GARBAGE_V1_MARKER = 'rv-new-member-sample-v1';
@@ -78,9 +86,8 @@ function buildSearchText(noteName, bodyHtml, attachments) {
 }
 
 function canonicalChecksumSet() {
-  const manifest = loadRecordVaultNewMemberSampleManifest();
   const set = new Set();
-  for (const note of manifest.notes || []) {
+  for (const note of listRecordVaultSampleNoteDefs()) {
     for (const att of note.attachments || []) {
       const c = String(att.checksum || '')
         .trim()
@@ -91,18 +98,26 @@ function canonicalChecksumSet() {
   return set;
 }
 
-/** dm1 / v2 canonical welcome or formats note — never treat as garbage. */
-function noteLooksLikeCanonicalDm1(bodyText) {
+/** v3 canonical sample note — never treat as garbage. */
+function noteLooksLikeCanonicalSample(bodyText) {
   const body = String(bodyText || '');
+  const marker = recordVaultNewMemberSampleSeedMarker();
+  if (marker && body.includes(marker)) return true;
+  if (body.includes('rv-new-member-sample-v3')) return true;
+  if (body.includes('SAMPLE MISC') && body.includes('SAMPLE TAX RECORDS')) return true;
+  if (body.includes('Formats the code can')) return true;
+  if (body.includes('Costco Grocery Receipt') || body.includes('Costco Grocery receipt')) return true;
+  if (body.includes('2025 1040 Tax') || body.includes('2024 1040 tax')) return true;
+  // Legacy v2 dm1 welcome / formats copy.
   if (body.includes('rv-new-member-sample-v2')) return true;
-  // Original dm1@gmail.com SAMPLE NOTE1 welcome copy (no seed marker).
   if (body.includes('Flexible Organization')) return true;
-  if (body.includes('We’ve created a sample note') || body.includes("We've created a sample note")) {
-    return true;
-  }
-  // Original dm1 SAMPLE NOTE2 formats copy.
   if (body.includes('Formats the code can')) return true;
   return false;
+}
+
+/** @deprecated alias */
+function noteLooksLikeCanonicalDm1(bodyText) {
+  return noteLooksLikeCanonicalSample(bodyText);
 }
 
 function noteLooksLikeGarbageV1(db, noteRow) {
@@ -125,17 +140,15 @@ function noteLooksLikeGarbageV1(db, noteRow) {
     // All live attachments are tiny v1 placeholders → garbage (even if body was later overwritten).
     if (garbageHits > 0 && garbageHits === atts.length) return true;
   }
-  // Canonical dm1 set must never be purged (SAMPLE NOTE1 has zero attachments by design).
-  if (noteLooksLikeCanonicalDm1(body)) return false;
+  // Canonical sample notes must never be purged.
+  if (noteLooksLikeCanonicalSample(body)) return false;
   if (body.includes(GARBAGE_V1_MARKER)) return true;
   // Empty SAMPLE NOTE1 without dm1/v2 body is not auto-purged (avoid wiping user edits).
   return false;
 }
 
 /**
- * Revive soft-deleted SAMPLE NOTE1 that matches the dm1 welcome copy
- * (e.g. earlier buggy purge of empty SAMPLE NOTE1). Never revive SAMPLE NOTE2 —
- * that note must be re-seeded with shared attachment pointers when missing.
+ * Revive soft-deleted canonical SAMPLE RECEIPTS (welcome/tutorial note).
  * @returns {number} notes revived
  */
 function reviveSoftDeletedCanonicalSampleNotes(db) {
@@ -148,9 +161,8 @@ function reviveSoftDeletedCanonicalSampleNotes(db) {
     const name = String(row.note_name || '')
       .trim()
       .toUpperCase();
-    // Only SAMPLE NOTE1 (no required attachments). SAMPLE NOTE2 must be re-inserted with pointers.
-    if (name !== 'SAMPLE NOTE1') continue;
-    if (!noteLooksLikeCanonicalDm1(row.body_text)) continue;
+    if (name !== 'SAMPLE RECEIPTS') continue;
+    if (!noteLooksLikeCanonicalSample(row.body_text)) continue;
     const live = queryOne(
       db,
       `SELECT note_id FROM notes
@@ -194,38 +206,34 @@ function noteHasCanonicalDm1Attachments(db, noteId, expectedAttachments) {
   });
 }
 
+function findLiveNoteByName(db, noteName) {
+  const name = String(noteName || '')
+    .trim()
+    .toUpperCase();
+  if (!name) return null;
+  return queryOne(
+    db,
+    `SELECT note_id, note_name, body_text, notebook_id FROM notes
+     WHERE deleted_at IS NULL AND upper(trim(note_name)) = ?
+     ORDER BY note_id ASC LIMIT 1`,
+    [name]
+  );
+}
+
 function vaultAlreadyHasNewMemberSample(db) {
   const marker = recordVaultNewMemberSampleSeedMarker();
-  const manifest = loadRecordVaultNewMemberSampleManifest();
-  const note1Def = (manifest.notes || []).find((n) => String(n.noteKey) === 'sample-note-1');
-  const note2Def = (manifest.notes || []).find((n) => String(n.noteKey) === 'sample-note-2');
-  const rows = queryAll(
-    db,
-    `SELECT note_id, note_name, body_text FROM notes WHERE deleted_at IS NULL`
-  );
+  const noteDefs = listRecordVaultSampleNoteDefs();
 
-  let note1 = null;
-  let note2 = null;
-  for (const row of rows) {
-    const name = String(row.note_name || '')
-      .trim()
-      .toUpperCase();
+  for (const noteDef of noteDefs) {
+    const noteName = String(noteDef.noteName || '').trim();
+    const row = findLiveNoteByName(db, noteName);
+    if (!row) return false;
+    if (noteLooksLikeGarbageV1(db, row)) return false;
     const body = String(row.body_text || '');
-    if (name === 'SAMPLE NOTE1' || (body.includes(marker) && body.includes('note=1'))) note1 = row;
-    if (name === 'SAMPLE NOTE2' || (body.includes(marker) && body.includes('note=2'))) note2 = row;
+    if (!noteLooksLikeCanonicalSample(body) && !body.includes(marker)) return false;
+    if (!noteHasCanonicalDm1Attachments(db, row.note_id, noteDef.attachments || [])) return false;
   }
-  if (!note1 || !note2) return false;
-  if (noteLooksLikeGarbageV1(db, note1) || noteLooksLikeGarbageV1(db, note2)) return false;
-
-  // SAMPLE NOTE2 must point at the shared dm1 demo attachments (checksum or shared_content_key).
-  if (!noteHasCanonicalDm1Attachments(db, note2.note_id, note2Def?.attachments || [])) {
-    return false;
-  }
-  // SAMPLE NOTE1 may be empty (no attachments) — accept dm1 welcome or v2 marker.
-  if (!noteLooksLikeCanonicalDm1(note1.body_text) && !String(note1.body_text || '').includes(marker)) {
-    return false;
-  }
-  return true;
+  return noteDefs.length > 0;
 }
 
 /** Pre-sample starter notebook name (legacy registration default). */
@@ -269,6 +277,85 @@ export function purgeLegacyDefaultNotebook1(db) {
     db.run(
       `UPDATE notebooks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE notebook_id = ?`,
       [notebookId]
+    );
+    removed += 1;
+  }
+  return removed;
+}
+
+/**
+ * Soft-delete legacy v2 sample set (SAMPLE NOTEBOOK 1 + SAMPLE NOTE1/2) when upgrading to v3.
+ * @returns {number} notebooks removed
+ */
+export function purgeLegacyV2SampleSet(db) {
+  const rows = queryAll(
+    db,
+    `SELECT notebook_id, notebook_name FROM notebooks WHERE deleted_at IS NULL`
+  );
+  let removed = 0;
+  for (const row of rows) {
+    const nbName = String(row.notebook_name || '')
+      .trim()
+      .toUpperCase();
+    if (!LEGACY_V2_NOTEBOOK_NAMES.has(nbName)) continue;
+    const notebookId = Number(row.notebook_id);
+    const notes = queryAll(
+      db,
+      `SELECT note_id, note_name, body_text FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
+      [notebookId]
+    );
+    if (!notes.length) continue;
+    const allLegacyNotes = notes.every((n) => {
+      const name = String(n.note_name || '')
+        .trim()
+        .toUpperCase();
+      return LEGACY_V2_NOTE_NAMES.has(name) || String(n.body_text || '').includes(GARBAGE_V2_MARKER);
+    });
+    if (!allLegacyNotes) continue;
+    for (const note of notes) {
+      db.run(
+        `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
+        [note.note_id]
+      );
+      db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [note.note_id]);
+      db.run(
+        `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE note_id = ?`,
+        [note.note_id]
+      );
+    }
+    db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
+    db.run(
+      `UPDATE notebooks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE notebook_id = ?`,
+      [notebookId]
+    );
+    removed += 1;
+  }
+  return removed;
+}
+
+/** Soft-delete live notes stuck on a deleted notebook (legacy v2 purge leftovers). */
+function purgeOrphanedLegacySampleNotes(db) {
+  const rows = queryAll(
+    db,
+    `SELECT n.note_id, n.note_name, n.notebook_id
+     FROM notes n
+     INNER JOIN notebooks nb ON nb.notebook_id = n.notebook_id
+     WHERE n.deleted_at IS NULL AND nb.deleted_at IS NOT NULL`
+  );
+  let removed = 0;
+  for (const row of rows) {
+    const name = String(row.note_name || '')
+      .trim()
+      .toUpperCase();
+    if (!LEGACY_V2_NOTE_NAMES.has(name)) continue;
+    db.run(
+      `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
+      [row.note_id]
+    );
+    db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [row.note_id]);
+    db.run(
+      `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE note_id = ?`,
+      [row.note_id]
     );
     removed += 1;
   }
@@ -338,15 +425,12 @@ export function purgeGarbageRecordVaultV1SampleNotes(db) {
  */
 function relinkCanonicalAttachmentsToSharedKeys(db) {
   ensureRecordVaultSharedContentKeyColumn(db);
-  const manifest = loadRecordVaultNewMemberSampleManifest();
   const byChecksum = new Map();
-  for (const note of manifest.notes || []) {
-    for (const att of note.attachments || []) {
-      const sum = String(att.checksum || '')
-        .trim()
-        .toLowerCase();
-      if (sum) byChecksum.set(sum, String(att.sharedKey || '').trim());
-    }
+  for (const att of listRecordVaultSampleAttachmentDefs()) {
+    const sum = String(att.checksum || '')
+      .trim()
+      .toLowerCase();
+    if (sum) byChecksum.set(sum, String(att.sharedKey || '').trim());
   }
   if (!byChecksum.size) return 0;
   const rows = queryAll(
@@ -365,6 +449,60 @@ function relinkCanonicalAttachmentsToSharedKeys(db) {
       key,
       row.attachment_id
     ]);
+    updated += 1;
+  }
+  return updated;
+}
+
+/** True when a live note row is the bundled default sample (safe to refresh body from manifest). */
+function isBundledDefaultSampleNoteRow(row, noteDef) {
+  const body = String(row?.body_text || '');
+  const noteKey = String(noteDef?.noteKey || '').trim();
+  if (body.includes('rv-new-member-sample-v3')) return true;
+  if (noteKey && body.includes(`note=${noteKey}`)) return true;
+  const name = String(noteDef?.noteName || '')
+    .trim()
+    .toUpperCase();
+  if (name === 'SAMPLE RECEIPTS') {
+    return (
+      body.includes('Flexible Organization') ||
+      body.includes('Costco Grocery') ||
+      body.includes('Home Depo') ||
+      body.includes('Best Buy')
+    );
+  }
+  if (name === 'SAMPLE VARIOUS FORMATS') return body.includes('Formats the code can');
+  if (name === '2025 TAX') return body.includes('2025') && body.includes('1040');
+  if (name === '2024 TAX') return body.includes('2024') && body.includes('1040');
+  return false;
+}
+
+/**
+ * Refresh bundled default sample note bodies + search_text from manifest HTML
+ * (e.g. receipt label copy fixes) without touching member-edited notes.
+ * @returns {number} notes updated
+ */
+function upgradeCanonicalSampleNoteBodies(db) {
+  let updated = 0;
+  for (const noteDef of listRecordVaultSampleNoteDefs()) {
+    const row = findLiveNoteByName(db, noteDef.noteName);
+    if (!row || !isBundledDefaultSampleNoteRow(row, noteDef)) continue;
+    const canonicalBody = loadRecordVaultSampleNoteBodyHtml(noteDef.bodyHtmlFile);
+    if (!canonicalBody || canonicalBody === String(row.body_text || '')) continue;
+    const attachments = queryAll(
+      db,
+      `SELECT file_name FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL ORDER BY display_order`,
+      [row.note_id]
+    );
+    const searchText = buildSearchText(
+      noteDef.noteName,
+      canonicalBody,
+      attachments.map((a) => ({ fileName: a.file_name }))
+    );
+    db.run(
+      `UPDATE notes SET body_text = ?, search_text = ?, updated_at = datetime('now') WHERE note_id = ?`,
+      [canonicalBody, searchText, row.note_id]
+    );
     updated += 1;
   }
   return updated;
@@ -445,26 +583,74 @@ function insertSampleNote(db, { notebookId, noteDef, nextAttachmentId }) {
   return { noteId, nextAttachmentId: afterId };
 }
 
+function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
+  ensureRecordVaultSharedContentKeyColumn(db);
+  if (onlyWhenEmpty) {
+    const countRow = queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`);
+    if (Number(countRow?.c ?? 0) > 0) return false;
+  }
+
+  const manifest = loadRecordVaultNewMemberSampleManifest();
+  let nextAttachmentId =
+    Number(queryOne(db, `SELECT COALESCE(MAX(attachment_id), 0) AS m FROM note_attachments`)?.m || 0) + 1;
+  let insertedAny = false;
+
+  for (const nbDef of listRecordVaultSampleNotebooks(manifest)) {
+    const notebookName = String(nbDef.notebookName || '').trim();
+    if (!notebookName) continue;
+
+    let notebookRow = queryOne(
+      db,
+      `SELECT notebook_id FROM notebooks
+       WHERE deleted_at IS NULL AND upper(trim(notebook_name)) = upper(trim(?))
+       ORDER BY notebook_id ASC LIMIT 1`,
+      [notebookName]
+    );
+    let notebookId = notebookRow ? Number(notebookRow.notebook_id) : null;
+    if (!notebookId) {
+      const orderRow = queryOne(
+        db,
+        `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM notebooks WHERE deleted_at IS NULL`
+      );
+      db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [
+        notebookName,
+        Number(nbDef.displayOrder ?? orderRow?.next_order ?? 0)
+      ]);
+      notebookId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
+      insertedAny = true;
+    }
+
+    for (const noteDef of nbDef.notes || []) {
+      const noteName = String(noteDef.noteName || '').trim();
+      if (!noteName) continue;
+      const existing = findLiveNoteByName(db, noteName);
+      if (existing) {
+        if (noteLooksLikeGarbageV1(db, existing)) {
+          db.run(
+            `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
+            [existing.note_id]
+          );
+          db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [existing.note_id]);
+          db.run(`UPDATE notes SET deleted_at = datetime('now') WHERE note_id = ?`, [existing.note_id]);
+        } else {
+          continue;
+        }
+      }
+      const result = insertSampleNote(db, { notebookId, noteDef, nextAttachmentId });
+      nextAttachmentId = result.nextAttachmentId;
+      insertedAny = true;
+    }
+  }
+  relinkCanonicalAttachmentsToSharedKeys(db);
+  return insertedAny;
+}
+
 /**
- * Fresh empty vault: SAMPLE NOTEBOOK 1 + SAMPLE NOTE1/2 + shared attachment pointers (dm1 set).
+ * Fresh empty vault: SAMPLE MISC + SAMPLE TAX RECORDS and four sample notes (shared attachment pointers).
  * @returns {boolean} true when seed rows were inserted
  */
 export function seedRecordVaultNewMemberSampleDb(db) {
-  ensureRecordVaultSharedContentKeyColumn(db);
-  const countRow = queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`);
-  if (Number(countRow?.c ?? 0) > 0) return false;
-
-  const manifest = loadRecordVaultNewMemberSampleManifest();
-  const notebookName = String(manifest.notebookName || 'SAMPLE NOTEBOOK 1').trim() || 'SAMPLE NOTEBOOK 1';
-  db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [notebookName, 0]);
-  const notebookId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
-
-  let nextAttachmentId = 1;
-  for (const noteDef of manifest.notes || []) {
-    const inserted = insertSampleNote(db, { notebookId, noteDef, nextAttachmentId });
-    nextAttachmentId = inserted.nextAttachmentId;
-  }
-  return true;
+  return seedSampleNotebooksIntoDb(db, { onlyWhenEmpty: true });
 }
 
 /**
@@ -475,10 +661,20 @@ export function seedRecordVaultNewMemberSampleDb(db) {
 export function ensureRecordVaultNewMemberSampleDb(db) {
   ensureRecordVaultSharedContentKeyColumn(db);
   const purgedLegacyNb1 = purgeLegacyDefaultNotebook1(db);
+  const purgedV2 = purgeLegacyV2SampleSet(db);
+  const purgedOrphans = purgeOrphanedLegacySampleNotes(db);
   const purged = purgeGarbageRecordVaultV1SampleNotes(db);
   const revived = reviveSoftDeletedCanonicalSampleNotes(db);
   const relinked = relinkCanonicalAttachmentsToSharedKeys(db);
-  const changedMeta = purgedLegacyNb1 > 0 || purged > 0 || revived > 0 || relinked > 0;
+  const bodiesSynced = upgradeCanonicalSampleNoteBodies(db);
+  const changedMeta =
+    purgedLegacyNb1 > 0 ||
+    purgedV2 > 0 ||
+    purgedOrphans > 0 ||
+    purged > 0 ||
+    revived > 0 ||
+    relinked > 0 ||
+    bodiesSynced > 0;
 
   if (vaultAlreadyHasNewMemberSample(db)) {
     return changedMeta ? 'upgraded' : 'present';
@@ -490,79 +686,13 @@ export function ensureRecordVaultNewMemberSampleDb(db) {
   if (notebookCount === 0) {
     const seeded = seedRecordVaultNewMemberSampleDb(db);
     if (!seeded) return 'skipped';
-    return purgedLegacyNb1 > 0 || purged > 0 || revived > 0 ? 'upgraded' : 'inserted';
+    return purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0 || revived > 0 ? 'upgraded' : 'inserted';
   }
 
-  const manifest = loadRecordVaultNewMemberSampleManifest();
-  const notebookName = String(manifest.notebookName || 'SAMPLE NOTEBOOK 1').trim() || 'SAMPLE NOTEBOOK 1';
-
-  let notebookRow = queryOne(
-    db,
-    `SELECT notebook_id, notebook_name FROM notebooks
-     WHERE deleted_at IS NULL AND lower(trim(notebook_name)) = lower(?)
-     ORDER BY notebook_id ASC LIMIT 1`,
-    [notebookName]
-  );
-  // Also accept prior "SAMPLE NOTEBOOK" title as host for the two notes.
-  if (!notebookRow) {
-    notebookRow = queryOne(
-      db,
-      `SELECT notebook_id, notebook_name FROM notebooks
-       WHERE deleted_at IS NULL AND upper(trim(notebook_name)) IN ('SAMPLE NOTEBOOK', 'SAMPLE NOTEBOOK 1')
-       ORDER BY notebook_id ASC LIMIT 1`
-    );
-  }
-  let notebookId = notebookRow ? Number(notebookRow.notebook_id) : null;
-  if (!notebookId) {
-    const orderRow = queryOne(
-      db,
-      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM notebooks WHERE deleted_at IS NULL`
-    );
-    db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [
-      notebookName,
-      Number(orderRow?.next_order ?? 0)
-    ]);
-    notebookId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
-  }
-
-  const existingByName = new Map();
-  for (const row of queryAll(db, `SELECT note_id, note_name, body_text FROM notes WHERE deleted_at IS NULL`)) {
-    existingByName.set(
-      String(row.note_name || '')
-        .trim()
-        .toUpperCase(),
-      row
-    );
-  }
-
-  let nextAttachmentId =
-    Number(queryOne(db, `SELECT COALESCE(MAX(attachment_id), 0) AS m FROM note_attachments`)?.m || 0) + 1;
-  let inserted = false;
-  for (const noteDef of manifest.notes || []) {
-    const name = String(noteDef.noteName || '')
-      .trim()
-      .toUpperCase();
-    const existing = existingByName.get(name);
-    if (existing) {
-      if (noteLooksLikeGarbageV1(db, existing)) {
-        db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
-          existing.note_id
-        ]);
-        db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [existing.note_id]);
-        db.run(`UPDATE notes SET deleted_at = datetime('now') WHERE note_id = ?`, [existing.note_id]);
-      } else {
-        // Keep user/dm1 note; ensure shared pointers on matching checksums.
-        continue;
-      }
-    }
-    const result = insertSampleNote(db, { notebookId, noteDef, nextAttachmentId });
-    nextAttachmentId = result.nextAttachmentId;
-    inserted = true;
-  }
-  relinkCanonicalAttachmentsToSharedKeys(db);
+  const inserted = seedSampleNotebooksIntoDb(db, { onlyWhenEmpty: false });
   if (inserted && !changedMeta) return 'inserted';
   if (inserted || changedMeta) {
-    return purgedLegacyNb1 > 0 || purged > 0 || revived > 0 ? 'upgraded' : 'inserted';
+    return purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0 || revived > 0 ? 'upgraded' : 'inserted';
   }
   return changedMeta ? 'upgraded' : 'present';
 }

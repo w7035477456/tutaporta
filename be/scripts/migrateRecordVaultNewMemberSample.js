@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Ensure SAMPLE NOTEBOOK + SAMPLE NOTE1/2 exist for every on-disk TutaNotes vault.
- * Also soft-deletes the legacy registration default "Notebook 1" / "NOTEBOOK 1".
+ * Ensure SAMPLE MISC + SAMPLE TAX RECORDS and four default notes exist for every on-disk TutaNotes vault.
+ * Also soft-deletes legacy registration default "Notebook 1" / "NOTEBOOK 1" and v2 SAMPLE NOTEBOOK 1 set.
  *
  * Shared sample attachments use shared_content_key pointers (one media copy under
  * be/assets/recordVaultNewMemberSample/media for all members).
@@ -170,7 +170,7 @@ async function main() {
   }
   console.log('[migrateRecordVaultNewMemberSample] done', tallies);
   console.log(
-    'Encrypted vaults pick up SAMPLE NOTE1/2 automatically on the member’s next unlock.'
+    'Encrypted vaults pick up SAMPLE MISC / SAMPLE TAX RECORDS automatically on the member’s next unlock.'
   );
 }
 

@@ -823,9 +823,44 @@ export async function fetchPhotoAlbumsTutaDriveStatus() {
   return data;
 }
 
-export async function unlockPhotoAlbumsTutaDrive() {
-  const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
-  return data;
+/** Poll Redis-backed open percent while TutaDrive unlock POST runs. */
+export async function fetchPhotoAlbumsTutaDriveOpenProgress() {
+  const { data } = await api.get('/api/photoAlbums/tutadrive/open-progress');
+  return {
+    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
+    label: data?.label ? String(data.label) : ''
+  };
+}
+
+/**
+ * Unlock TutaDrive vault. Pass onProgress for honest 0–100% via short polling.
+ */
+export async function unlockPhotoAlbumsTutaDrive({ onProgress } = {}) {
+  if (typeof onProgress !== 'function') {
+    const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
+    return data;
+  }
+  onProgress({ percent: 0, label: 'Opening TutaPhotoAlbums on TutaDrive' });
+  let stopped = false;
+  const poll = window.setInterval(() => {
+    if (stopped) return;
+    void fetchPhotoAlbumsTutaDriveOpenProgress()
+      .then((progress) => {
+        if (stopped) return;
+        onProgress(progress);
+      })
+      .catch(() => {
+        // Ignore poll blips; unlock POST is the source of truth.
+      });
+  }, 250);
+  try {
+    const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
+    onProgress({ percent: 100, label: 'Done' });
+    return data;
+  } finally {
+    stopped = true;
+    window.clearInterval(poll);
+  }
 }
 
 export async function formatPhotoAlbumsTutaDrive() {

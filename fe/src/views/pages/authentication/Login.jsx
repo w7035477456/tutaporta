@@ -21,6 +21,7 @@ import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { consumeSessionEndNotice } from 'utils/sessionEndNotice';
 import {
   authEnvTextFontSize,
+  authLinkHoverScaleSx,
   authShellStackSx,
   authFixedFooterContentPaddingBottom
 } from './authPageLayoutSx';
@@ -113,7 +114,8 @@ function Login() {
   const signupPromptSx = {
     textDecoration: 'underline',
     color: 'var(--theme-primary-color)',
-    fontSize: { xs: getMobileSinglesTextFontSizeVw(), sm: getDesktopTextFontSizeVw() }
+    fontSize: { xs: getMobileSinglesTextFontSizeVw(), sm: getDesktopTextFontSizeVw() },
+    ...authLinkHoverScaleSx
   };
 
   return (

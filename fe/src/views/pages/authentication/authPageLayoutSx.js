@@ -18,6 +18,39 @@ import {
   getAuthDialogWidthVwDesktop,
   getAuthDialogWidthVwMobile
 } from 'config/standardAuthDialogEnv';
+import { buttonHoverMagnifyTransitionSx } from 'config/hoverMagnifyEnv';
+
+/** Whole-control hover scale on login / register (Google, Sign In, text links). */
+export const AUTH_INTERACTIVE_HOVER_SCALE = 1.25;
+
+const authHoverScaleTransitionSx = {
+  transformOrigin: 'center center',
+  transform: 'scale(1)',
+  transition: `${buttonHoverMagnifyTransitionSx.transition}, transform 0.15s ease`
+};
+
+/** Typography / Router Link rows — magnify the whole link on hover. */
+export const authLinkHoverScaleSx = {
+  display: 'inline-block',
+  ...authHoverScaleTransitionSx,
+  '@media (hover: hover)': {
+    '&:hover': {
+      transform: `scale(${AUTH_INTERACTIVE_HOVER_SCALE})`
+    }
+  }
+};
+
+/** MUI Button on auth pages — magnify the whole button on hover (disabled rows unchanged). */
+export const authButtonHoverScaleSx = {
+  ...authHoverScaleTransitionSx,
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled):not(:disabled)': {
+      position: 'relative',
+      zIndex: 2,
+      transform: `scale(${AUTH_INTERACTIVE_HOVER_SCALE})`
+    }
+  }
+};
 
 /**
  * fe/.env MOBILE_FONT_SIZE_BUTTON / DESKTOP_FONT_SIZE_BUTTON — auth form fields, copy, and primary buttons.

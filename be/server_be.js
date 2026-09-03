@@ -351,6 +351,7 @@ import {
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
   formatPhotoAlbumsTutaDrive,
+  getPhotoAlbumsTutaDriveOpenProgress,
   getPhotoAlbumsTutaDriveStatus,
   initPhotoAlbumsTutaDrive,
   logoffPhotoAlbumsTutaDrive,
@@ -1632,6 +1633,7 @@ app.post('/api/photoAlbums/usb/init', requireAuth, initPhotoAlbumsUsb);
 app.post('/api/photoAlbums/usb/format', requireAuth, formatPhotoAlbumsUsb);
 app.get('/api/photoAlbums/storage/config', requireAuth, getPhotoAlbumsStorageConfig);
 app.get('/api/photoAlbums/tutadrive/status', requireAuth, getPhotoAlbumsTutaDriveStatus);
+app.get('/api/photoAlbums/tutadrive/open-progress', requireAuth, getPhotoAlbumsTutaDriveOpenProgress);
 app.post('/api/photoAlbums/tutadrive/unlock', requireAuth, unlockPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/init', requireAuth, initPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/format', requireAuth, formatPhotoAlbumsTutaDrive);

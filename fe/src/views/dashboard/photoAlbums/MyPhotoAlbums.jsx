@@ -321,6 +321,8 @@ export default function MyPhotoAlbums() {
   );
   const usbTabLabel = formatUsbWorkspaceTitle(usbVolumeLabel);
   const [sessionChecking, setSessionChecking] = useState(true);
+  const [sessionProgressPercent, setSessionProgressPercent] = useState(null);
+  const [sessionProgressLabel, setSessionProgressLabel] = useState('');
   const [error, setError] = useState('');
   /** 'both' = side-by-side login chooser; 'onedrive' | 'usb' = full-window pane; 'compare' = both workspaces for drag-drop. */
   const [paneFocus, setPaneFocus] = useState('both');
@@ -374,8 +376,15 @@ export default function MyPhotoAlbums() {
 
   const refreshPaneSessions = useCallback(async () => {
     setSessionChecking(true);
+    setSessionProgressPercent(0);
+    setSessionProgressLabel('Starting TutaPhotoAlbums…');
     setError('');
     try {
+      const cloudLabel = tutaDriveMode ? 'TutaDrive' : 'OneDrive';
+      if (oneDriveOffered) {
+        setSessionProgressPercent(15);
+        setSessionProgressLabel(`Checking ${cloudLabel} session…`);
+      }
       const [cloudStatus, usbStatus] = await Promise.all([
         oneDriveOffered
           ? (tutaDriveMode
@@ -383,20 +392,37 @@ export default function MyPhotoAlbums() {
               : fetchPhotoAlbumsOneDriveStatus()
             ).catch(() => null)
           : Promise.resolve(null),
-        localUsbOffered ? fetchPhotoAlbumsUsbStatus().catch(() => null) : Promise.resolve(null)
+        localUsbOffered
+          ? (async () => {
+              if (oneDriveOffered) {
+                setSessionProgressPercent(55);
+                setSessionProgressLabel('Checking USB session…');
+              } else {
+                setSessionProgressPercent(15);
+                setSessionProgressLabel('Checking USB session…');
+              }
+              return fetchPhotoAlbumsUsbStatus().catch(() => null);
+            })()
+          : Promise.resolve(null)
       ]);
+      setSessionProgressPercent(90);
+      setSessionProgressLabel('Preparing workspace…');
       setOneDriveUnlocked(Boolean(cloudStatus?.session?.unlocked));
       setUsbUnlocked(Boolean(usbStatus?.session?.unlocked));
       const sessionUsbLabel = String(usbStatus?.session?.label || '').trim();
       if (usbStatus?.session?.unlocked && sessionUsbLabel && sessionUsbLabel !== 'OneDrive') {
         setUsbVolumeLabel((prev) => prev || sessionUsbLabel);
       }
+      setSessionProgressPercent(100);
+      setSessionProgressLabel('Ready');
     } catch (err) {
       setError(readPhotoAlbumsApiError(err, 'Unable to read vault storage sessions'));
       setOneDriveUnlocked(false);
       setUsbUnlocked(false);
     } finally {
       setSessionChecking(false);
+      setSessionProgressPercent(null);
+      setSessionProgressLabel('');
     }
   }, [oneDriveOffered, localUsbOffered, tutaDriveMode]);
 
@@ -918,6 +944,10 @@ export default function MyPhotoAlbums() {
       <BusyHourglassOverlay
         open={!storageConfigLoaded || sessionChecking}
         label="Loading vault"
+        progressPercent={!storageConfigLoaded ? 5 : sessionProgressPercent}
+        progressLabel={
+          !storageConfigLoaded ? 'Loading TutaPhotoAlbums configuration…' : sessionProgressLabel
+        }
         backdropSx={myPhotoAlbumsLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />

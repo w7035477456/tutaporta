@@ -23,7 +23,7 @@ import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
 import { getDesktopIconSizeVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
-import { authFormContentSx } from '../authentication/authPageLayoutSx';
+import { authFormContentSx, authLinkHoverScaleSx } from '../authentication/authPageLayoutSx';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
@@ -301,7 +301,7 @@ export default function AuthLogin() {
   };
 
   const signInButton = (
-    <GreenButton type="submit" disabled={signInDisabled} {...guestDemoAllowProps()}>
+    <GreenButton type="submit" disabled={signInDisabled} hoverTopmost {...guestDemoAllowProps()}>
       {isLoading ? 'Signing in...' : 'Sign In'}
     </GreenButton>
   );
@@ -418,7 +418,7 @@ export default function AuthLogin() {
           component={Link}
           to="/pages/forgotPassword"
           {...guestDemoAllowProps()}
-          sx={{ textDecoration: 'underline', color: 'var(--theme-primary-color)' }}
+          sx={{ textDecoration: 'underline', color: 'var(--theme-primary-color)', ...authLinkHoverScaleSx }}
         >
           Forgot Password?
         </Typography>
@@ -434,7 +434,9 @@ export default function AuthLogin() {
         </Typography>
       ) : null}
       {!maxAttemptsReached ? (
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', width: 1 }}>{signInButton}</Box>
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', width: 1, overflow: 'visible' }}>
+          {signInButton}
+        </Box>
       ) : null}
     </Box>
   );

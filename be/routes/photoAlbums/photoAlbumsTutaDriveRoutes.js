@@ -30,6 +30,11 @@ import {
 } from '../../utils/tutaDriveMemberPaths.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
+import {
+  clearVaultOpenProgress,
+  getVaultOpenProgress,
+  setVaultOpenProgress
+} from '../../utils/photoAlbumsOneDrive/vaultOpenProgress.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
 
@@ -229,16 +234,32 @@ export async function initPhotoAlbumsTutaDrive(req, res) {
   }
 }
 
+/** GET /api/photoAlbums/tutadrive/open-progress — poll 0–100% during TutaDrive open */
+export async function getPhotoAlbumsTutaDriveOpenProgress(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    const progress = await getVaultOpenProgress(singlesId);
+    return res.json(progress);
+  } catch (err) {
+    console.error('[getPhotoAlbumsTutaDriveOpenProgress]', err?.message || err);
+    return res.json({ percent: 0, label: '' });
+  }
+}
+
 /** POST /api/photoAlbums/tutadrive/unlock */
 export async function unlockPhotoAlbumsTutaDrive(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
   try {
+    await setVaultOpenProgress(singlesId, { percent: 0, label: 'Opening TutaPhotoAlbums on TutaDrive' });
     const { memberId, albumsMount } = await resolveMemberContext(singlesId);
+    await setVaultOpenProgress(singlesId, { percent: 12, label: 'Checking member folder' });
     await dropStaleCloudSessionIfWrongMount(singlesId, albumsMount);
     let flags = vaultStatusFlags(albumsMount);
 
     if (!flags.hasVault) {
+      await setVaultOpenProgress(singlesId, { percent: 28, label: 'Creating new album vault' });
       const keyMaterial = await resolveTutaDriveKeyMaterial();
       if (!fs.existsSync(vaultMetaPath(albumsMount))) {
         await initializeVaultOnUsbWithKey(albumsMount, keyMaterial?.key ?? null, keyMaterial);
@@ -247,12 +268,15 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
       flags = vaultStatusFlags(albumsMount);
     }
 
+    await setVaultOpenProgress(singlesId, { percent: 55, label: 'Reading vault database' });
     const key = await resolveTutaDriveUnlockKey(albumsMount);
+    await setVaultOpenProgress(singlesId, { percent: 78, label: 'Loading sample albums' });
     await unlockVaultUsbWithKey(singlesId, albumsMount, key, {
       storageType: 'onedrive',
       skipBackup: true
     });
     tagSessionAsTutaDrive(singlesId);
+    await setVaultOpenProgress(singlesId, { percent: 100, label: 'Done' });
 
     return res.json({
       success: true,
@@ -261,6 +285,11 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
       ...flags
     });
   } catch (err) {
+    try {
+      await clearVaultOpenProgress(singlesId);
+    } catch {
+      // ignore
+    }
     if (isStoragePermissionError(err)) {
       return sendRecordVaultError(res, err, 'Folder permission error. Please contact your admin', {
         route: 'unlockPhotoAlbumsTutaDrive',
@@ -270,6 +299,10 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
     const mapped = unlockErrorResponse(err);
     if (mapped.status >= 500) console.error('[unlockPhotoAlbumsTutaDrive]', err);
     return res.status(mapped.status).json(mapped.body);
+  } finally {
+    setTimeout(() => {
+      void clearVaultOpenProgress(singlesId);
+    }, 3000);
   }
 }
 

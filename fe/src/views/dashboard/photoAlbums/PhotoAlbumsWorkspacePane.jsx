@@ -513,6 +513,22 @@ const laneAddButtonWrapSx = {
   width: '100%'
 };
 
+const menuButtonWordPerLineLabelSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+  overflow: 'visible',
+  whiteSpace: 'normal',
+  wordBreak: 'normal',
+  overflowWrap: 'normal',
+  lineHeight: 1.15,
+  textAlign: 'center'
+};
+
 const menuToggleIconSx = {
   display: 'block',
   height: { xs: 28, md: 32 },
@@ -522,59 +538,53 @@ const menuToggleIconSx = {
   userSelect: 'none'
 };
 
+/**
+ * Sidebar album / album-set / shortcut list rows — one whitespace-delimited word per row
+ * (MUI Button is inline-flex row by default; force column so stacked word spans show).
+ */
 const menuButtonSx = {
   fontFamily: MAIN_FONT_FAMILY,
-  width: '100%',
+  width: 'auto !important',
   maxWidth: '100%',
   minWidth: 0,
-  justifyContent: 'flex-start',
-  textAlign: 'left',
+  flex: '0 1 auto',
+  alignSelf: 'center',
+  display: 'inline-flex !important',
+  flexDirection: 'column !important',
+  justifyContent: 'center',
+  textAlign: 'center',
+  alignItems: 'center',
   mb: 0,
-  overflow: 'hidden',
-  whiteSpace: 'nowrap',
-  textOverflow: 'ellipsis',
-  minHeight: SINGLE_LINE_MENU_BUTTON_MIN_HEIGHT,
-  py: { xs: 0.45, sm: 0.55 },
+  overflow: 'visible',
+  height: 'auto !important',
+  minHeight: { xs: 36, sm: 40 },
+  py: { xs: 0.35, sm: 0.4 },
+  px: { xs: 0.45, sm: 0.55 },
+  whiteSpace: 'normal !important',
+  lineHeight: '1.15 !important',
   '& .MuiButton-label': {
-    display: 'block',
-    width: '100%',
-    maxWidth: '100%',
-    minWidth: 0,
-    overflow: 'hidden',
-    whiteSpace: 'nowrap',
-    textOverflow: 'ellipsis',
-    textAlign: 'left'
+    ...menuButtonWordPerLineLabelSx
   }
 };
 
-/** Album list rows — two-line height tracks menu font; title + dates left-aligned. */
+/** Album list rows — word-per-line title plus optional dates row beneath. */
 const menuButtonTwoLineAlbumSx = {
   whiteSpace: 'normal !important',
-  minHeight: TWO_LINE_LANE_BUTTON_HEIGHT,
-  height: 'auto',
+  height: 'auto !important',
+  minHeight: { xs: 36, sm: 40 },
   maxHeight: 'none',
-  lineHeight: '1.2 !important',
+  lineHeight: '1.15 !important',
   py: { xs: 0.5, sm: 0.65 },
   alignItems: 'center !important',
   justifyContent: 'center !important',
   overflow: 'visible',
   boxSizing: 'border-box',
   '& .MuiButton-label': {
-    display: 'flex !important',
-    flexDirection: 'column',
-    alignItems: 'flex-start !important',
-    justifyContent: 'center !important',
-    width: '100%',
-    maxWidth: '100%',
-    minWidth: 0,
-    minHeight: `calc(${menuBtnFontRemExpr()} * 2.2 * 1rem)`,
-    overflow: 'visible',
-    whiteSpace: 'normal !important',
-    textAlign: 'left !important'
+    ...menuButtonWordPerLineLabelSx
   }
 };
 
-const sidebarAlbumLineSx = {
+const sidebarAlbumDatesLineSx = {
   display: 'block',
   width: '100%',
   maxWidth: '100%',
@@ -582,60 +592,10 @@ const sidebarAlbumLineSx = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
-  textAlign: 'left'
+  textAlign: 'center',
+  lineHeight: 1.15,
+  minHeight: '1.15em'
 };
-
-/** Sidebar album / album-set title — up to two lines, no ellipsis truncation. */
-const sidebarAlbumTitleTwoLineSx = {
-  display: '-webkit-box',
-  WebkitBoxOrient: 'vertical',
-  WebkitLineClamp: 2,
-  overflow: 'hidden',
-  whiteSpace: 'normal',
-  wordBreak: 'break-word',
-  overflowWrap: 'anywhere',
-  textAlign: 'left',
-  width: '100%',
-  maxWidth: '100%',
-  minWidth: 0,
-  lineHeight: 1.2,
-  paddingTop: '0.08em',
-  paddingBottom: '0.04em'
-};
-
-function MenuRowTwoLineLabelText({ children }) {
-  return (
-    <Box component="span" sx={{ ...sidebarAlbumTitleTwoLineSx, flex: '1 1 auto', alignSelf: 'center' }}>
-      {children}
-    </Box>
-  );
-}
-
-function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
-  return (
-    <Box
-      component="span"
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        width: '100%',
-        minWidth: 0,
-        maxWidth: '100%',
-        minHeight: `calc(${menuBtnFontRemExpr()} * 2.2 * 1rem)`,
-        lineHeight: 1.2
-      }}
-    >
-      <Box component="span" sx={sidebarAlbumTitleTwoLineSx}>
-        {titleLine}
-      </Box>
-      <Box component="span" sx={{ ...sidebarAlbumLineSx, minHeight: '1.15em' }}>
-        {datesLine}
-      </Box>
-    </Box>
-  );
-}
 
 /** Blue used to mark the active search-result note (chip + matching sidebar row). */
 const PHOTO_ALBUMS_SEARCH_HIT_BLUE = '#1e88e5';
@@ -925,18 +885,87 @@ function measureMenuLabelWidth(label, rem = getVaultDefaultButtonFontSizeRem()) 
   return ctx.measureText(String(label || '')).width;
 }
 
-/** Notebook column width so each notebook label fits on one line. */
+function measureMenuLabelLongestWordWidth(label, rem = getVaultDefaultButtonFontSizeRem()) {
+  const words = String(label ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return measureMenuLabelWidth('Untitled', rem);
+  return Math.max(...words.map((word) => measureMenuLabelWidth(word, rem)));
+}
+
+/** Renders sidebar menu labels with each whitespace-delimited word on its own row. */
+function renderMenuLabelOneWordPerLine(label) {
+  const text = String(label ?? '').trim();
+  if (!text) return '—';
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    return (
+      <Box component="span" sx={{ ...menuButtonWordPerLineLabelSx, display: 'block' }}>
+        {text}
+      </Box>
+    );
+  }
+  return (
+    <Box component="span" sx={menuButtonWordPerLineLabelSx}>
+      {words.map((word, index) => (
+        <Box
+          // eslint-disable-next-line react/no-array-index-key
+          key={`${word}-${index}`}
+          component="span"
+          sx={{
+            display: 'block',
+            width: '100%',
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+            lineHeight: 1.15
+          }}
+        >
+          {word}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        minWidth: 0,
+        maxWidth: '100%',
+        lineHeight: 1.15
+      }}
+    >
+      {renderMenuLabelOneWordPerLine(titleLine)}
+      <Box component="span" sx={sidebarAlbumDatesLineSx}>
+        {datesLine}
+      </Box>
+    </Box>
+  );
+}
+
+/** Notebook column width — fit the longest single word (labels stack one word per row). */
 function computeNotebookColFitWidth(notebooks, rem = getVaultDefaultButtonFontSizeRem()) {
   if (!notebooks?.length) return DEFAULT_NOTEBOOK_COL_WIDTH;
-  let maxLabel = 0;
+  let maxWord = 0;
   for (const nb of notebooks) {
-    maxLabel = Math.max(
-      maxLabel,
-      measureMenuLabelWidth(photoAlbumsNotebookSidebarLabel(nb, notebooks) || 'Untitled', rem)
+    maxWord = Math.max(
+      maxWord,
+      measureMenuLabelLongestWordWidth(
+        photoAlbumsNotebookSidebarLabel(nb, notebooks) || 'Untitled',
+        rem
+      )
     );
   }
   const chromePx = 64;
-  return Math.max(MIN_MENU_COL_WIDTH, Math.ceil(maxLabel + chromePx));
+  return Math.max(MIN_MENU_COL_WIDTH, Math.ceil(maxWord + chromePx));
 }
 
 
@@ -1228,7 +1257,7 @@ function MenuRowButton({
       draggable={draggable}
       sx={{
         ...menuButtonSx,
-        justifyContent: 'flex-start',
+        justifyContent: 'center',
         ...(lookSelected && !locked
           ? selectedBlue && selected
             ? {
@@ -1320,21 +1349,16 @@ function ShortcutMenuRow({
           if (shortcutRaw) onDrop(e, id);
           else if (notebookRaw || noteRaw) onDropFromLeft(e);
         }}
-        sx={{
-          ...(!locked ? menuButtonTwoLineAlbumSx : null),
-          ...(isDropTarget
+        sx={
+          isDropTarget
             ? {
                 outline: '2px dashed var(--theme-primary-color)',
                 outlineOffset: 2
               }
-            : null)
-        }}
+            : undefined
+        }
       >
-        {locked ? (
-          label ?? shortcut.label
-        ) : (
-          <MenuRowTwoLineLabelText>{label ?? shortcut.label}</MenuRowTwoLineLabelText>
-        )}
+        {locked ? label ?? shortcut.label : renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
       </MenuRowButton>
     </MenuRowWithDelete>
   );
@@ -1494,7 +1518,7 @@ function RenamableDraggableMenuRow({
       lockTitle={lockTitle}
       locked={locked}
     >
-      <Box id={domId || undefined} sx={{ width: '100%' }}>
+      <Box id={domId || undefined} sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
         <MenuRowButton
           selected={selected}
           selectedBlue={selectedBlue}
@@ -1629,7 +1653,7 @@ function RenamableDraggableMenuRow({
                 gap: 0.5
               }}
             >
-              <MenuRowTwoLineLabelText>{label}</MenuRowTwoLineLabelText>
+              <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>{renderMenuLabelOneWordPerLine(label)}</Box>
               {sideCount != null ? (
                 <Box component="span" sx={menuRowCountBadgeSx} aria-hidden="true">
                   {sideCount}
@@ -1672,6 +1696,8 @@ export default function PhotoAlbumsWorkspacePane({
   const storedLayout = useMemo(() => loadStoredLayout(), []);
   const [loading, setLoading] = useState(true);
   const [vaultUiReady, setVaultUiReady] = useState(false);
+  const [vaultLoadProgressPercent, setVaultLoadProgressPercent] = useState(null);
+  const [vaultLoadProgressLabel, setVaultLoadProgressLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [batchUploadProgress, setBatchUploadProgress] = useState(null);
   const [vaultLeaving, setVaultLeaving] = useState(false);
@@ -1805,6 +1831,8 @@ export default function PhotoAlbumsWorkspacePane({
   /** Matching album-page previews for the open note — shown in the Found bar, not in the filmstrip. */
   const [searchFoundPages, setSearchFoundPages] = useState(null);
   const [noteContentLoading, setNoteContentLoading] = useState(false);
+  const [noteContentLoadProgressPercent, setNoteContentLoadProgressPercent] = useState(null);
+  const [noteContentLoadProgressLabel, setNoteContentLoadProgressLabel] = useState('');
   const innerUnlockRef = useRef({});
   const [innerUnlockVersion, setInnerUnlockVersion] = useState(0);
   /** Inline PIN panel for unlock / re-encrypt / first-time enable. */
@@ -3057,12 +3085,37 @@ export default function PhotoAlbumsWorkspacePane({
     [onSessionEnded, vaultApi]
   );
 
+  const reportVaultLoadProgress = useCallback(async (percent, label = '') => {
+    const next = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+    setVaultLoadProgressPercent(next);
+    if (label != null && String(label).trim()) {
+      setVaultLoadProgressLabel(String(label).trim());
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 0);
+    });
+  }, []);
+
   const loadTree = useCallback(async ({ preferNotebookId, preferNoteId, silent = false } = {}) => {
-    if (!silent) setLoading(true);
+    if (!silent) {
+      setLoading(true);
+      setVaultUiReady(false);
+      setVaultLoadProgressPercent(0);
+      setVaultLoadProgressLabel('Loading album library…');
+    }
     setError('');
     if (!silent) loadedNoteIdRef.current = null;
     try {
+      if (!silent) await reportVaultLoadProgress(8, 'Reading notebooks and albums…');
       const { notebooks: tree, shortcuts: loadedShortcuts } = await vaultApi.fetchPhotoAlbumsTree();
+      if (!silent) {
+        const nbCount = Array.isArray(tree) ? tree.length : 0;
+        const albumCount = (tree || []).reduce((sum, nb) => sum + (nb.notes?.length || 0), 0);
+        await reportVaultLoadProgress(
+          72,
+          `Found ${nbCount} notebook${nbCount === 1 ? '' : 's'}, ${albumCount} album${albumCount === 1 ? '' : 's'}`
+        );
+      }
       setNotebooks(tree);
       setShortcuts(loadedShortcuts);
 
@@ -3094,11 +3147,14 @@ export default function PhotoAlbumsWorkspacePane({
       setError(readPhotoAlbumsApiError(err, 'Failed to load Record Vault'));
     } finally {
       if (!silent) {
+        await reportVaultLoadProgress(100, 'Ready');
         setLoading(false);
         setVaultUiReady(true);
+        setVaultLoadProgressPercent(null);
+        setVaultLoadProgressLabel('');
       }
     }
-  }, [vaultApi, leaveUnlockedWorkspace]);
+  }, [vaultApi, leaveUnlockedWorkspace, reportVaultLoadProgress]);
 
   useEffect(() => {
     const onReload = (event) => {
@@ -3266,8 +3322,15 @@ export default function PhotoAlbumsWorkspacePane({
     let cancelled = false;
     void (async () => {
       setNoteContentLoading(true);
+      setNoteContentLoadProgressPercent(0);
+      setNoteContentLoadProgressLabel('Loading album…');
       setError('');
       try {
+        await new Promise((resolve) => {
+          window.setTimeout(resolve, 0);
+        });
+        setNoteContentLoadProgressPercent(15);
+        setNoteContentLoadProgressLabel('Loading album pages…');
         // Always fetch on display so BE runs size+checksum attachment purge + ENV folder hard-file cleanup.
         const note = await loadNoteContent(id);
         if (cancelled) return;
@@ -3284,7 +3347,11 @@ export default function PhotoAlbumsWorkspacePane({
           if (!isPhotoAlbumsStagingPhotoExtension(ext)) continue;
           photoIds.push(aid);
         }
-        if (photoIds.length) {
+        const photoTotal = photoIds.length;
+        if (photoTotal) {
+          setNoteContentLoadProgressPercent(35);
+          setNoteContentLoadProgressLabel(`Preparing ${photoTotal} photo preview${photoTotal === 1 ? '' : 's'}…`);
+          let done = 0;
           await Promise.all(
             photoIds.map(async (aid) => {
               if (cancelled) return;
@@ -3299,11 +3366,24 @@ export default function PhotoAlbumsWorkspacePane({
                 setAttachmentVariantPreview(id, aid, 'display', url);
               } catch {
                 // Node view will retry individually.
+              } finally {
+                done += 1;
+                if (!cancelled) {
+                  const pct = 35 + Math.round((done / photoTotal) * 60);
+                  setNoteContentLoadProgressPercent(pct);
+                  setNoteContentLoadProgressLabel(
+                    `Loading photo ${done} of ${photoTotal}…`
+                  );
+                }
               }
             })
           );
         }
-        if (!cancelled) loadedNoteIdRef.current = id;
+        if (!cancelled) {
+          setNoteContentLoadProgressPercent(100);
+          setNoteContentLoadProgressLabel('Ready');
+          loadedNoteIdRef.current = id;
+        }
       } catch (err) {
         if (!cancelled) {
           if (isPhotoAlbumsVaultOpenFatalError(err) || isPhotoAlbumsStorageNotUnlockedError(err)) {
@@ -3313,7 +3393,11 @@ export default function PhotoAlbumsWorkspacePane({
           setError(readPhotoAlbumsApiError(err, 'Failed to load note'));
         }
       } finally {
-        if (!cancelled) setNoteContentLoading(false);
+        if (!cancelled) {
+          setNoteContentLoading(false);
+          setNoteContentLoadProgressPercent(null);
+          setNoteContentLoadProgressLabel('');
+        }
       }
     })();
     return () => {
@@ -7519,6 +7603,8 @@ export default function PhotoAlbumsWorkspacePane({
       <BusyHourglassOverlay
         open={Boolean(noteContentLoading)}
         label="Loading album photos"
+        progressPercent={noteContentLoadProgressPercent}
+        progressLabel={noteContentLoadProgressLabel}
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
@@ -7944,6 +8030,8 @@ export default function PhotoAlbumsWorkspacePane({
       <BusyHourglassOverlay
         open={!vaultUiReady && loading && unlocked}
         label="Loading vault"
+        progressPercent={vaultLoadProgressPercent}
+        progressLabel={vaultLoadProgressLabel}
         backdropSx={myPhotoAlbumsLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />

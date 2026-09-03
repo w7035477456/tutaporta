@@ -1,83 +1,165 @@
 {
-  "version": 2,
-  "seedMarker": "rv-new-member-sample-v2",
-  "notebookName": "SAMPLE NOTEBOOK 1",
-  "source": "dm1@gmail.com singles_id=32 member_id=1136631",
-  "notes": [
+  "version": 3,
+  "seedMarker": "rv-new-member-sample-v3",
+  "source": "member_id=237112 TutaNotes export (SAMPLE MISC + SAMPLE TAX RECORDS)",
+  "notebooks": [
     {
-      "noteKey": "sample-note-1",
-      "noteName": "SAMPLE NOTE1",
-      "bodyHtmlFile": "sampleNote1Body.html",
+      "notebookKey": "sample-misc",
+      "notebookName": "SAMPLE MISC",
       "displayOrder": 0,
-      "shortcut": true,
-      "attachments": []
+      "notes": [
+        {
+          "noteKey": "sample-receipts",
+          "noteName": "SAMPLE RECEIPTS",
+          "bodyHtmlFile": "sampleReceiptsBody.html",
+          "displayOrder": 0,
+          "shortcut": true,
+          "attachments": [
+            {
+              "sharedKey": "sample-receipt-costco",
+              "attachmentId": 1,
+              "sourceFile": "receipt-costco-grocery.png",
+              "fileName": "receipt-costco-grocery.png",
+              "fileExtension": "png",
+              "fileSizeBytes": 763762,
+              "checksum": "1fb6cff815be81931fb63e0ee628d01797b5806ac0f7f883345157b356f4a546",
+              "mimeType": "image/png"
+            },
+            {
+              "sharedKey": "sample-receipt-homedepot",
+              "attachmentId": 2,
+              "sourceFile": "receipt-home-depot-lawn-mower.png",
+              "fileName": "receipt-home-depot-lawn-mower.png",
+              "fileExtension": "png",
+              "fileSizeBytes": 696912,
+              "checksum": "f71a8db7ff742820e9f9cd95e7933ec639dc4c5aea9e2f090f9582899e6453ac",
+              "mimeType": "image/png"
+            },
+            {
+              "sharedKey": "sample-receipt-bestbuy",
+              "attachmentId": 3,
+              "sourceFile": "receipt-best-buy-iphone.png",
+              "fileName": "receipt-best-buy-iphone.png",
+              "fileExtension": "png",
+              "fileSizeBytes": 237138,
+              "checksum": "e76dc5054b5d80c688aa027b0cf977a8b370183e8ada989c8888056d5d0c142f",
+              "mimeType": "image/png"
+            }
+          ]
+        },
+        {
+          "noteKey": "sample-various-formats",
+          "noteName": "SAMPLE VARIOUS FORMATS",
+          "bodyHtmlFile": "sampleVariousFormatsBody.html",
+          "displayOrder": 1,
+          "shortcut": false,
+          "attachments": [
+            {
+              "sharedKey": "dm1-pdf-10mb",
+              "attachmentId": 4,
+              "sourceFile": "sample-pdf-download-10-mb.pdf",
+              "fileName": "sample-pdf-download-10-mb.pdf",
+              "fileExtension": "pdf",
+              "fileSizeBytes": 10635049,
+              "checksum": "2a2ed598e55f481b037c0c92cf75012e212befb47d52c97f54da5ea666a3e308",
+              "mimeType": "application/pdf"
+            },
+            {
+              "sharedKey": "dm1-pptx-report",
+              "attachmentId": 5,
+              "sourceFile": "Report-PPT-Samples.pptx",
+              "fileName": "Report-PPT-Samples.pptx",
+              "fileExtension": "pptx",
+              "fileSizeBytes": 261870,
+              "checksum": "d2ed81ee82b5ae8bf3ed014fc5a19963ea41785e0171285a812f37baa41228e1",
+              "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            },
+            {
+              "sharedKey": "dm1-jpg-insurance",
+              "attachmentId": 6,
+              "sourceFile": "autoInraunceCard.jpg",
+              "fileName": "autoInraunceCard.jpg",
+              "fileExtension": "jpg",
+              "fileSizeBytes": 52586,
+              "checksum": "14342dc2512033997369c60885b1496fcbd0c6368d09ffe6d9cda7a226f9151a",
+              "mimeType": "image/jpeg"
+            },
+            {
+              "sharedKey": "dm1-mov-usethis",
+              "attachmentId": 7,
+              "sourceFile": "USETHIS_MOV.mov",
+              "fileName": "USETHIS_MOV.mov",
+              "fileExtension": "mov",
+              "fileSizeBytes": 17436085,
+              "checksum": "748dddbfbdd246782e13438efa30998ece2b3b4e0dcd1b85bc68edb73589e19d",
+              "mimeType": "video/quicktime"
+            },
+            {
+              "sharedKey": "dm1-mp4-usethis",
+              "attachmentId": 8,
+              "sourceFile": "USETHIS_MP4.mp4",
+              "fileName": "USETHIS_MP4.mp4",
+              "fileExtension": "mp4",
+              "fileSizeBytes": 10055355,
+              "checksum": "2f3467224d6529602b38177298c43cfad92fa9db06cfbc1e761f50f800d1ef3b",
+              "mimeType": "video/mp4"
+            },
+            {
+              "sharedKey": "dm1-txt-test",
+              "attachmentId": 9,
+              "sourceFile": "test.txt",
+              "fileName": "test.txt",
+              "fileExtension": "txt",
+              "fileSizeBytes": 35,
+              "checksum": "854b3dade3472447360f976d0593b74c83ec401919ccd88ee4d1d4c054e43505",
+              "mimeType": "text/plain"
+            }
+          ]
+        }
+      ]
     },
     {
-      "noteKey": "sample-note-2",
-      "noteName": "SAMPLE NOTE2",
-      "bodyHtmlFile": "sampleNote2Body.html",
+      "notebookKey": "sample-tax-records",
+      "notebookName": "SAMPLE TAX RECORDS",
       "displayOrder": 1,
-      "shortcut": false,
-      "attachments": [
+      "notes": [
         {
-          "sharedKey": "dm1-pdf-10mb",
-          "attachmentId": 1,
-          "sourceFile": "sample-pdf-download-10-mb.pdf",
-          "fileName": "sample-pdf-download-10-mb.pdf",
-          "fileExtension": "pdf",
-          "fileSizeBytes": 10635049,
-          "checksum": "2a2ed598e55f481b037c0c92cf75012e212befb47d52c97f54da5ea666a3e308",
-          "mimeType": "application/pdf"
+          "noteKey": "tax-2025",
+          "noteName": "2025 TAX",
+          "bodyHtmlFile": "sampleTax2025Body.html",
+          "displayOrder": 0,
+          "shortcut": false,
+          "attachments": [
+            {
+              "sharedKey": "sample-f1040",
+              "attachmentId": 10,
+              "sourceFile": "f1040.pdf",
+              "fileName": "f1040.pdf",
+              "fileExtension": "pdf",
+              "fileSizeBytes": 220237,
+              "checksum": "3d31c226df0d189ced80e039d01cf0f8820c1019681a0f0ca6264de277b7e982",
+              "mimeType": "application/pdf"
+            }
+          ]
         },
         {
-          "sharedKey": "dm1-pptx-report",
-          "attachmentId": 2,
-          "sourceFile": "Report-PPT-Samples.pptx",
-          "fileName": "Report-PPT-Samples.pptx",
-          "fileExtension": "pptx",
-          "fileSizeBytes": 261870,
-          "checksum": "d2ed81ee82b5ae8bf3ed014fc5a19963ea41785e0171285a812f37baa41228e1",
-          "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        },
-        {
-          "sharedKey": "dm1-jpg-insurance",
-          "attachmentId": 4,
-          "sourceFile": "autoInraunceCard.jpg",
-          "fileName": "autoInraunceCard.jpg",
-          "fileExtension": "jpg",
-          "fileSizeBytes": 52586,
-          "checksum": "14342dc2512033997369c60885b1496fcbd0c6368d09ffe6d9cda7a226f9151a",
-          "mimeType": "image/jpeg"
-        },
-        {
-          "sharedKey": "dm1-mov-usethis",
-          "attachmentId": 5,
-          "sourceFile": "USETHIS_MOV.mov",
-          "fileName": "USETHIS_MOV.mov",
-          "fileExtension": "mov",
-          "fileSizeBytes": 17436085,
-          "checksum": "748dddbfbdd246782e13438efa30998ece2b3b4e0dcd1b85bc68edb73589e19d",
-          "mimeType": "video/quicktime"
-        },
-        {
-          "sharedKey": "dm1-mp4-usethis",
-          "attachmentId": 6,
-          "sourceFile": "USETHIS_MP4.mp4",
-          "fileName": "USETHIS_MP4.mp4",
-          "fileExtension": "mp4",
-          "fileSizeBytes": 10055355,
-          "checksum": "2f3467224d6529602b38177298c43cfad92fa9db06cfbc1e761f50f800d1ef3b",
-          "mimeType": "video/mp4"
-        },
-        {
-          "sharedKey": "dm1-txt-test",
-          "attachmentId": 7,
-          "sourceFile": "test.txt",
-          "fileName": "test.txt",
-          "fileExtension": "txt",
-          "fileSizeBytes": 35,
-          "checksum": "854b3dade3472447360f976d0593b74c83ec401919ccd88ee4d1d4c054e43505",
-          "mimeType": "text/plain"
+          "noteKey": "tax-2024",
+          "noteName": "2024 TAX",
+          "bodyHtmlFile": "sampleTax2024Body.html",
+          "displayOrder": 1,
+          "shortcut": false,
+          "attachments": [
+            {
+              "sharedKey": "sample-f1040",
+              "attachmentId": 11,
+              "sourceFile": "f1040.pdf",
+              "fileName": "f1040.pdf",
+              "fileExtension": "pdf",
+              "fileSizeBytes": 220237,
+              "checksum": "3d31c226df0d189ced80e039d01cf0f8820c1019681a0f0ca6264de277b7e982",
+              "mimeType": "application/pdf"
+            }
+          ]
         }
       ]
     }

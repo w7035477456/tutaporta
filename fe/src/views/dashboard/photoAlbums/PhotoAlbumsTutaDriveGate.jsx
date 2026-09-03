@@ -41,6 +41,7 @@ export default function PhotoAlbumsTutaDriveGate({
 }) {
   const [busy, setBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState('Opening TutaDrive');
+  const [busyProgressPercent, setBusyProgressPercent] = useState(null);
   const [error, setError] = useState('');
   const [memberFolder, setMemberFolder] = useState('');
   const [statusLoaded, setStatusLoaded] = useState(false);
@@ -87,15 +88,27 @@ export default function PhotoAlbumsTutaDriveGate({
 
   const openVaultAfterAccess = useCallback(async () => {
     setBusy(true);
-    setBusyLabel('Opening TutaDrive Cloud');
+    setBusyProgressPercent(0);
+    setBusyLabel('Opening TutaPhotoAlbums on TutaDrive');
     setError('');
+    const reportOpenProgress = async ({ percent, label } = {}) => {
+      const next = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+      setBusyProgressPercent((prev) => (next >= 100 ? 100 : Math.max(Number(prev) || 0, next)));
+      if (label != null && String(label).trim()) {
+        setBusyLabel(String(label).trim());
+      }
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, 0);
+      });
+    };
     try {
-      await unlockPhotoAlbumsTutaDrive();
+      await unlockPhotoAlbumsTutaDrive({ onProgress: reportOpenProgress });
       onUnlocked?.();
     } catch (err) {
       setError(readPhotoAlbumsApiError(err, 'Unable to open TutaDrive'));
     } finally {
       setBusy(false);
+      setBusyProgressPercent(null);
     }
   }, [onUnlocked]);
 
@@ -140,6 +153,8 @@ export default function PhotoAlbumsTutaDriveGate({
       <BusyHourglassOverlay
         open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
         label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
+        progressPercent={busyProgressPercent}
+        progressLabel={busyLabel}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       {showLoginChrome ? (

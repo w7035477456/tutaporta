@@ -23,7 +23,7 @@ export default function RecordVaultViewVaultDialog({
   const title = isUsb
     ? 'View USB Folder/Files'
     : tutaDrive
-      ? 'View TutaDrive Folder/Files'
+      ? 'View TutaCloud Folder/Files'
       : 'View OneDrive Folder/Files';
   const busyLabel = isUsb
     ? 'Loading USB vault tree'

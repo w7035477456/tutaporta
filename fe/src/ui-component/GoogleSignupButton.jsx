@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 
 import googleIcon from 'assets/images/icons/google.svg';
-import { authButtonBoldSx } from 'views/pages/authentication/authPageLayoutSx';
+import { authButtonBoldSx, authButtonHoverScaleSx } from 'views/pages/authentication/authPageLayoutSx';
 
 export default function GoogleSignupButton({ disabled = false, busy = false, onClick, label = 'Sign up with Google' }) {
   return (
@@ -15,6 +15,7 @@ export default function GoogleSignupButton({ disabled = false, busy = false, onC
       onClick={onClick}
       sx={{
         ...authButtonBoldSx,
+        ...authButtonHoverScaleSx,
         textTransform: 'none',
         bgcolor: '#ffffff',
         color: '#1f1f1f',
