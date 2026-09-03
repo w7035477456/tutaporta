@@ -16,8 +16,13 @@ import {
   COLOR_TEMPLATE1_BORDER_UNSELECTED,
   COLOR_TEMPLATE1_TEXT_SELECTED,
   COLOR_TEMPLATE1_TEXT_UNSELECTED,
+  COLOR_TEMPLATE1_WALL_COLOR_LIGHT,
   colorTemplate1ButtonSx
 } from 'config/colorTemplate1';
+
+/** Table scrollbar: theme-primary thumb on white track. */
+export const COLOR_TEMPLATE9_TABLE_SCROLLBAR_THUMB = 'var(--theme-primary-color)';
+export const COLOR_TEMPLATE9_TABLE_SCROLLBAR_TRACK = COLOR_TEMPLATE1_WALL_COLOR_LIGHT;
 
 // —— 1–2 Table header ——
 export const COLOR_TEMPLATE9_TABLE_HEADER_BG = 'var(--theme-daynight-color)';
@@ -269,31 +274,51 @@ export function colorTemplate9TableHorizontalScrollShellSx(overrides = {}) {
   };
 }
 
-/** Top synced horizontal scrollbar — sits directly above the table header row. */
-export function colorTemplate9TableTopHorizontalScrollShellSx(overrides = {}) {
-  return colorTemplate9TableHorizontalScrollShellSx({
-    borderTop: 'none',
-    borderBottom: 'none',
-    flexShrink: 0,
-    height: 14,
-    minHeight: 14,
-    maxHeight: 14,
+/** White track for the custom table horizontal scrollbar (top + bottom). */
+export function colorTemplate9TableCustomScrollbarTrackSx(overrides = {}) {
+  return {
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     boxSizing: 'border-box',
+    flexShrink: 0,
+    height: 12,
+    minHeight: 12,
+    maxHeight: 12,
+    position: 'relative',
+    overflow: 'hidden',
+    cursor: 'pointer',
+    backgroundColor: COLOR_TEMPLATE9_TABLE_SCROLLBAR_TRACK,
+    borderRadius: 0,
     ...overrides
-  });
+  };
 }
 
-/** Shared horizontal scrollbar styling for top + bottom table scroll shells. */
-export function colorTemplate9TableHorizontalScrollbarSx(overrides = {}) {
+/** Theme-primary thumb that sits on the white track. */
+export function colorTemplate9TableCustomScrollbarThumbSx(overrides = {}) {
   return {
-    scrollbarGutter: 'stable',
-    scrollbarColor: (theme) =>
-      `${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'} transparent`,
-    '&::-webkit-scrollbar': { height: 12 },
-    '&::-webkit-scrollbar-track': { backgroundColor: 'rgba(128,128,128,0.2)' },
-    '&::-webkit-scrollbar-thumb': {
-      backgroundColor: 'rgba(128,128,128,0.55)',
-      borderRadius: 6
+    position: 'absolute',
+    top: 0,
+    height: '100%',
+    backgroundColor: COLOR_TEMPLATE9_TABLE_SCROLLBAR_THUMB,
+    borderRadius: 0,
+    cursor: 'grab',
+    touchAction: 'none',
+    '&:active': { cursor: 'grabbing' },
+    ...overrides
+  };
+}
+
+/** Hide the native scrollbar — custom red/white bars are the visible control. */
+export function colorTemplate9TableHideNativeScrollbarSx(overrides = {}) {
+  return {
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+    scrollbarGutter: 'auto',
+    '&::-webkit-scrollbar': {
+      display: 'none',
+      height: 0,
+      width: 0
     },
     ...overrides
   };

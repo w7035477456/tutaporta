@@ -2,19 +2,15 @@ import { lazy as reactLazy, Suspense } from 'react';
 
 // project imports
 import Loader from './Loader';
-import { tryHardReloadOnFailedDynamicImport } from 'utils/hardReloadOnStaleModule';
+import { clearStaleModuleReloadGuard, importWithStaleChunkRetry } from 'utils/hardReloadOnStaleModule';
 
-/** Same as React.lazy, but Shift-Cmd-R-equivalent reload once on stale Vite chunks. */
+/** Same as React.lazy, but retries + cache-busts once on stale Vite chunks. */
 export function lazy(importer) {
   return reactLazy(() =>
-    Promise.resolve()
-      .then(importer)
-      .catch((error) => {
-        if (tryHardReloadOnFailedDynamicImport(error)) {
-          return new Promise(() => {});
-        }
-        throw error;
-      })
+    importWithStaleChunkRetry(importer).then((mod) => {
+      clearStaleModuleReloadGuard();
+      return mod;
+    })
   );
 }
 

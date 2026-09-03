@@ -1,5 +1,8 @@
-const STORAGE_KEY = 'omStaleModuleHardReloadAt';
-const RELOAD_COOLDOWN_MS = 20000;
+const STORAGE_AT = 'omStaleModuleHardReloadAt';
+const STORAGE_COUNT = 'omStaleModuleHardReloadCount';
+const RELOAD_WINDOW_MS = 30000;
+const MAX_RELOADS = 3;
+const CACHE_BUST_PARAM = '_omr';
 const INSTALL_FLAG = '__omStaleModuleHardReloadInstalled';
 
 let reloadStarted = false;
@@ -41,13 +44,15 @@ export function isAllowedStaleModuleReloadHost() {
   return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === 'onlinemall.website' || host.endsWith('.onlinemall.website');
 }
 
-function alreadyReloadedRecently() {
-  if (typeof sessionStorage === 'undefined') return false;
+function readReloadState() {
+  if (typeof sessionStorage === 'undefined') return { count: 0, last: 0 };
   try {
-    const last = Number(sessionStorage.getItem(STORAGE_KEY) || 0);
-    return Boolean(last) && Date.now() - last < RELOAD_COOLDOWN_MS;
+    const last = Number(sessionStorage.getItem(STORAGE_AT) || 0);
+    const count = Number(sessionStorage.getItem(STORAGE_COUNT) || 0);
+    if (!last || Date.now() - last > RELOAD_WINDOW_MS) return { count: 0, last: 0 };
+    return { count: Number.isFinite(count) ? count : 0, last };
   } catch {
-    return false;
+    return { count: 0, last: 0 };
   }
 }
 
@@ -55,41 +60,65 @@ function markReloadStarted() {
   reloadStarted = true;
   if (typeof sessionStorage === 'undefined') return;
   try {
-    sessionStorage.setItem(STORAGE_KEY, String(Date.now()));
+    const { count } = readReloadState();
+    sessionStorage.setItem(STORAGE_AT, String(Date.now()));
+    sessionStorage.setItem(STORAGE_COUNT, String(count + 1));
   } catch {
     /* ignore quota */
   }
 }
 
-/** Closest JS equivalent to Shift-Cmd-R: drop SW/cache, refetch the document bypassing HTTP cache, then reload. */
-async function hardReloadLikeShiftCmdR() {
-  const href = window.location.href;
+/** Drop the guard after a successful lazy import so later Vite HMR can recover again. */
+export function clearStaleModuleReloadGuard() {
+  reloadStarted = false;
+  if (typeof window === 'undefined') return;
   try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((reg) => reg.unregister()));
-    }
+    sessionStorage.removeItem(STORAGE_AT);
+    sessionStorage.removeItem(STORAGE_COUNT);
   } catch {
     /* ignore */
   }
   try {
-    if (window.caches?.keys) {
-      const names = await window.caches.keys();
-      await Promise.all(names.map((name) => window.caches.delete(name)));
+    const url = new URL(window.location.href);
+    if (url.searchParams.has(CACHE_BUST_PARAM)) {
+      url.searchParams.delete(CACHE_BUST_PARAM);
+      const next = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(null, '', next);
     }
   } catch {
     /* ignore */
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+/** Retry a lazy importer once — Vite often 404s the old chunk for a tick after HMR. */
+export async function importWithStaleChunkRetry(importer) {
   try {
-    await fetch(href, {
-      cache: 'reload',
-      credentials: 'same-origin',
-      headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
-    });
-  } catch {
-    /* ignore — still reload */
+    return await importer();
+  } catch (error) {
+    if (!isFailedDynamicImportError(error)) throw error;
+    await sleep(300);
+    try {
+      return await importer();
+    } catch (retryError) {
+      if (tryHardReloadOnFailedDynamicImport(retryError)) {
+        return new Promise(() => {});
+      }
+      throw retryError;
+    }
   }
-  window.location.reload();
+}
+
+/** Cache-busting navigation (more reliable than location.reload after Vite HMR). */
+function hardReloadLikeShiftCmdR() {
+  const url = new URL(window.location.href);
+  url.searchParams.set(CACHE_BUST_PARAM, String(Date.now()));
+  window.location.replace(url.pathname + url.search + url.hash);
 }
 
 /**
@@ -102,9 +131,10 @@ export function tryHardReloadOnFailedDynamicImport(error) {
   if (!isFailedDynamicImportError(error)) return false;
   if (!isAllowedStaleModuleReloadHost()) return false;
   if (reloadStarted) return true;
-  if (alreadyReloadedRecently()) return false;
+  const { count } = readReloadState();
+  if (count >= MAX_RELOADS) return false;
   markReloadStarted();
-  void hardReloadLikeShiftCmdR();
+  hardReloadLikeShiftCmdR();
   return true;
 }
 

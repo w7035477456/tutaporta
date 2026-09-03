@@ -169,7 +169,7 @@ function FileListPanel({ files, emptyMessage, showChecksum = false, onRemoveDup,
     return <ColorTemplate9TableData.EmptyText>{emptyMessage}</ColorTemplate9TableData.EmptyText>;
   }
   return (
-    <ColorTemplate9TableData.Table>
+    <ColorTemplate9TableData.Table minTableWidth={showChecksum ? 920 : 720}>
       <FileListHeader showChecksum={showChecksum} onRemoveDup={onRemoveDup} removeDupBusy={removeDupBusy} />
       {files.map((file, index) => (
         <FileListRow key={`${file.fileName}-${index}`} file={file} rowIndex={index} showChecksum={showChecksum} />

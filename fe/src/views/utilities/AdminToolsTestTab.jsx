@@ -528,7 +528,7 @@ export default function AdminToolsTestTab({ onError }) {
       </ColorTemplate9TableData.FooterAction>
 
       {runEvents.length ? (
-        <ColorTemplate9TableData.Table sx={{ mt: 1.25 }}>
+        <ColorTemplate9TableData.Table sx={{ mt: 1.25 }} minTableWidth={645}>
           <ColorTemplate9TableData.HeaderRow gridTemplateColumns="130px 85px 70px 90px 1fr 170px">
             <ColorTemplate9TableData.HeaderCell>Time</ColorTemplate9TableData.HeaderCell>
             <ColorTemplate9TableData.HeaderCell>Event</ColorTemplate9TableData.HeaderCell>

@@ -17,6 +17,7 @@ import { SelectedButtonLabelTextBox } from 'ui-component/SelectedButtonTemplate'
 import { INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 import {
   COLOR_TEMPLATE9_TABLE_PANEL_DIVIDER,
+  COLOR_TEMPLATE9_UI_TEST_TABLE_MIN_WIDTH_PX,
   colorTemplate9TableBodyTextSx,
   colorTemplate9TableEmptyRowSx,
   colorTemplate9TableFooterActionBarSx,
@@ -28,7 +29,6 @@ import {
   colorTemplate9TableUiTestLoopValueSx,
   colorTemplate9TableUiTestNameCellSx,
   colorTemplate9TableUiTestRowSx,
-  colorTemplate9TableUiTestShellSx,
   colorTemplate9TableUiTestCellSx,
   colorTemplate9TablePrimaryActionButtonSx,
   colorTemplate9TableCellSx,
@@ -38,10 +38,12 @@ import {
   colorTemplate9TablePanelFullWidthSx,
   colorTemplate9TablePanelSx,
   colorTemplate9TableRowBg,
+  COLOR_TEMPLATE9_TABLE_CELL_BORDER,
   colorTemplate9TableShellSx,
   colorTemplate9TableHorizontalScrollShellSx,
-  colorTemplate9TableTopHorizontalScrollShellSx,
-  colorTemplate9TableHorizontalScrollbarSx,
+  colorTemplate9TableCustomScrollbarTrackSx,
+  colorTemplate9TableCustomScrollbarThumbSx,
+  colorTemplate9TableHideNativeScrollbarSx,
   colorTemplate9TableTabBarSx,
   colorTemplate9TableTitleSx,
   colorTemplate9FrozenColumnStickyCellSx
@@ -254,6 +256,116 @@ export function useColorTemplate9AutoFitColumnWidths({
   return { columnWidthsPx, gridTemplateColumns, minTableWidthPx };
 }
 
+function ColorTemplate9TableCustomHorizontalScrollbar({ scrollRef, minTableWidth, placement = 'top' }) {
+  const trackRef = useRef(null);
+  const draggingRef = useRef(false);
+  const [thumb, setThumb] = useState({ width: 48, left: 0 });
+
+  useLayoutEffect(() => {
+    const scrollEl = scrollRef.current;
+    const trackEl = trackRef.current;
+    if (!scrollEl || !trackEl) return undefined;
+
+    const updateThumb = () => {
+      const trackWidth = trackEl.clientWidth;
+      const clientWidth = scrollEl.clientWidth;
+      const scrollWidth = Math.max(
+        scrollEl.scrollWidth || 0,
+        scrollEl.firstElementChild?.scrollWidth || 0,
+        Number(minTableWidth) || 0,
+        1
+      );
+      const maxScroll = Math.max(0, scrollWidth - clientWidth);
+      const thumbWidth = Math.max(24, Math.min(trackWidth, (clientWidth / scrollWidth) * trackWidth));
+      const thumbLeft = maxScroll > 0 ? (scrollEl.scrollLeft / maxScroll) * (trackWidth - thumbWidth) : 0;
+      setThumb({ width: thumbWidth, left: thumbLeft });
+    };
+
+    updateThumb();
+    const rafId = window.requestAnimationFrame(updateThumb);
+    scrollEl.addEventListener('scroll', updateThumb, { passive: true });
+    window.addEventListener('resize', updateThumb, { passive: true });
+
+    let ro;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateThumb);
+      ro.observe(scrollEl);
+      ro.observe(trackEl);
+      if (scrollEl.firstElementChild) ro.observe(scrollEl.firstElementChild);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      scrollEl.removeEventListener('scroll', updateThumb);
+      window.removeEventListener('resize', updateThumb);
+      ro?.disconnect();
+    };
+  }, [minTableWidth, scrollRef]);
+
+  const jumpToClientX = (clientX) => {
+    const scrollEl = scrollRef.current;
+    const trackEl = trackRef.current;
+    if (!scrollEl || !trackEl) return;
+    const rect = trackEl.getBoundingClientRect();
+    const trackWidth = rect.width;
+    const clientWidth = scrollEl.clientWidth;
+    const scrollWidth = Math.max(
+      scrollEl.scrollWidth || 0,
+      scrollEl.firstElementChild?.scrollWidth || 0,
+      Number(minTableWidth) || 0,
+      1
+    );
+    const maxScroll = Math.max(0, scrollWidth - clientWidth);
+    const thumbWidth = Math.max(24, Math.min(trackWidth, (clientWidth / scrollWidth) * trackWidth));
+    const maxThumb = Math.max(0, trackWidth - thumbWidth);
+    const nextLeft = Math.max(0, Math.min(maxThumb, clientX - rect.left - thumbWidth / 2));
+    scrollEl.scrollLeft = maxThumb > 0 ? (nextLeft / maxThumb) * maxScroll : 0;
+  };
+
+  return (
+    <Box
+      ref={trackRef}
+      role="scrollbar"
+      aria-orientation="horizontal"
+      aria-label="Table horizontal scroll"
+      onPointerDown={(event) => {
+        event.preventDefault();
+        draggingRef.current = true;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        jumpToClientX(event.clientX);
+      }}
+      onPointerMove={(event) => {
+        if (!draggingRef.current) return;
+        jumpToClientX(event.clientX);
+      }}
+      onPointerUp={() => {
+        draggingRef.current = false;
+      }}
+      onPointerCancel={() => {
+        draggingRef.current = false;
+      }}
+      sx={colorTemplate9TableCustomScrollbarTrackSx({
+        borderBottom: placement === 'top' ? COLOR_TEMPLATE9_TABLE_CELL_BORDER : 'none',
+        borderTop: placement === 'bottom' ? COLOR_TEMPLATE9_TABLE_CELL_BORDER : 'none'
+      })}
+    >
+      <Box
+        sx={{
+          ...colorTemplate9TableCustomScrollbarThumbSx(),
+          width: `${thumb.width}px`,
+          left: `${thumb.left}px`
+        }}
+      />
+    </Box>
+  );
+}
+
+ColorTemplate9TableCustomHorizontalScrollbar.propTypes = {
+  scrollRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
+  minTableWidth: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  placement: PropTypes.oneOf(['top', 'bottom'])
+};
+
 function ColorTemplate9TableDataTable({
   sx,
   children,
@@ -265,11 +377,7 @@ function ColorTemplate9TableDataTable({
   frozenColumnWidthsPx = [],
   ...rest
 }) {
-  const topScrollRef = useRef(null);
-  const topSpacerRef = useRef(null);
   const bottomScrollRef = useRef(null);
-  const isSyncingScrollRef = useRef(false);
-  const [topScrollActive, setTopScrollActive] = useState(false);
   const frozenContextValue = useMemo(
     () => ({
       frozenColumnCount: Math.max(0, Math.trunc(Number(frozenColumnCount) || 0)),
@@ -278,68 +386,30 @@ function ColorTemplate9TableDataTable({
     [frozenColumnCount, frozenColumnWidthsPx]
   );
 
-  useLayoutEffect(() => {
-    const topEl = topScrollRef.current;
-    const bottomEl = bottomScrollRef.current;
-    const spacerEl = topSpacerRef.current;
-    if (!topHorizontalScrollbar || !topEl || !bottomEl || !spacerEl) return undefined;
-
-    const syncSpacerWidth = () => {
-      const scrollWidth = Math.max(bottomEl.scrollWidth, Number(minTableWidth) || 0);
-      spacerEl.style.width = `${scrollWidth}px`;
-      setTopScrollActive(scrollWidth > bottomEl.clientWidth + 1);
-      if (!isSyncingScrollRef.current) {
-        topEl.scrollLeft = bottomEl.scrollLeft;
-      }
-    };
-
-    syncSpacerWidth();
-
-    const syncFromTop = () => {
-      if (isSyncingScrollRef.current) return;
-      isSyncingScrollRef.current = true;
-      bottomEl.scrollLeft = topEl.scrollLeft;
-      isSyncingScrollRef.current = false;
-    };
-    const syncFromBottom = () => {
-      if (isSyncingScrollRef.current) return;
-      isSyncingScrollRef.current = true;
-      topEl.scrollLeft = bottomEl.scrollLeft;
-      isSyncingScrollRef.current = false;
-    };
-
-    topEl.addEventListener('scroll', syncFromTop, { passive: true });
-    bottomEl.addEventListener('scroll', syncFromBottom, { passive: true });
-
-    let ro;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(syncSpacerWidth);
-      ro.observe(bottomEl);
-      if (bottomEl.firstElementChild) ro.observe(bottomEl.firstElementChild);
-    } else {
-      window.addEventListener('resize', syncSpacerWidth, { passive: true });
-    }
-
-    return () => {
-      topEl.removeEventListener('scroll', syncFromTop);
-      bottomEl.removeEventListener('scroll', syncFromBottom);
-      ro?.disconnect();
-      window.removeEventListener('resize', syncSpacerWidth);
-    };
-  }, [topHorizontalScrollbar, minTableWidth, children]);
-
+  const resolvedMinWidth = minTableWidth || 0;
   const content = (
-    <Box sx={{ minWidth: minTableWidth || 0, width: minTableWidth ? minTableWidth : '100%' }}>
+    <Box
+      sx={{
+        minWidth: resolvedMinWidth || '100%',
+        width: resolvedMinWidth ? resolvedMinWidth : '100%',
+        boxSizing: 'border-box'
+      }}
+    >
       {children}
     </Box>
   );
 
-  const useHorizontalScrollShell = autoFitColumns || frozenContextValue.frozenColumnCount > 0;
+  const useHorizontalScrollShell = autoFitColumns || frozenContextValue.frozenColumnCount > 0 || Boolean(minTableWidth);
   const scrollShellSx = {
     ...(useHorizontalScrollShell
-      ? colorTemplate9TableHorizontalScrollShellSx()
-      : colorTemplate9TableShellSx({ overflowX: 'auto' })),
-    ...(topHorizontalScrollbar ? colorTemplate9TableHorizontalScrollbarSx() : null)
+      ? colorTemplate9TableHorizontalScrollShellSx(
+          topHorizontalScrollbar ? { borderTop: 'none' } : undefined
+        )
+      : colorTemplate9TableShellSx({
+          overflowX: 'auto',
+          ...(topHorizontalScrollbar ? { borderTop: 'none' } : null)
+        })),
+    ...(topHorizontalScrollbar ? colorTemplate9TableHideNativeScrollbarSx() : null)
   };
 
   return (
@@ -357,42 +427,38 @@ function ColorTemplate9TableDataTable({
         {...rest}
       >
         {topHorizontalScrollbar ? (
-          <Box
-            ref={topScrollRef}
-            aria-label="Table horizontal scroll"
-            sx={{
-              ...colorTemplate9TableTopHorizontalScrollShellSx(),
-              ...colorTemplate9TableHorizontalScrollbarSx(),
-              display: topScrollActive ? 'block' : 'none',
-              overflowX: 'auto',
-              overflowY: 'hidden'
-            }}
-          >
-            <Box ref={topSpacerRef} sx={{ height: 1 }} aria-hidden />
-          </Box>
+          <ColorTemplate9TableCustomHorizontalScrollbar
+            scrollRef={bottomScrollRef}
+            minTableWidth={minTableWidth}
+            placement="top"
+          />
         ) : null}
         <Box ref={bottomScrollRef} sx={scrollShellSx}>
           {content}
         </Box>
+        {topHorizontalScrollbar ? (
+          <ColorTemplate9TableCustomHorizontalScrollbar
+            scrollRef={bottomScrollRef}
+            minTableWidth={minTableWidth}
+            placement="bottom"
+          />
+        ) : null}
       </Box>
     </TableFrozenColumnsContext.Provider>
   );
 }
 
-/** Test tab table — desire mockup column widths + horizontal scroll when narrow. */
+/** Test tab table — desire mockup column widths + top/bottom horizontal scroll when narrow. */
 function ColorTemplate9TableDataUiTestTable({ sx, children, ...rest }) {
   return (
-    <Box
-      data-color-template9-table=""
-      sx={{
-        ...colorTemplate9TableUiTestShellSx(),
-        ...colorTemplate9TableDataScopeWithAlternateRowsSx(),
-        ...(sx || {})
-      }}
+    <ColorTemplate9TableDataTable
+      topHorizontalScrollbar
+      minTableWidth={COLOR_TEMPLATE9_UI_TEST_TABLE_MIN_WIDTH_PX}
+      sx={sx}
       {...rest}
     >
       {children}
-    </Box>
+    </ColorTemplate9TableDataTable>
   );
 }
 
