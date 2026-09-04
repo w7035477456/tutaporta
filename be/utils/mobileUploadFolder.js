@@ -1,6 +1,6 @@
 /**
  * Phone → desktop staging folder for Photo Albums QR (purpose photo_albums).
- * Files live under UPLOAD_FOLDER (~/.ssh/be/.env, typically ${STORAGE_FOLDER}/mobile_upload).
+ * Files live under UPLOAD_FOLDER (~/.ssh/be/.env, typically ${FAST_STORAGE_FOLDER}/mobile_upload).
  * Namespaced as `{singlesId}_*` so shared storage stays per-user.
  */
 import fs from 'fs/promises';

@@ -32,7 +32,7 @@ export function getUsbDmgExeDir() {
     .trim()
     .replace(/\/+$/, '');
   if (fromEnv) return fromEnv;
-  const storage = String(process.env.STORAGE_FOLDER || '')
+  const storage = String(process.env.FAST_STORAGE_FOLDER || '')
     .trim()
     .replace(/\/+$/, '');
   if (storage) return path.join(storage, 'USB_DMG_EXE');
@@ -115,7 +115,7 @@ function resolveInstallerSearchDirs() {
   const dirs = [];
   const usbDmgExeDir = getUsbDmgExeDir();
   if (usbDmgExeDir) dirs.push(usbDmgExeDir);
-  const storage = String(process.env.STORAGE_FOLDER || '')
+  const storage = String(process.env.FAST_STORAGE_FOLDER || '')
     .trim()
     .replace(/\/+$/, '');
   if (storage) {

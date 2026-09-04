@@ -39,7 +39,7 @@ export function getLegacyPhotoFolder() {
 }
 
 /**
- * Photo folder for one member under STORAGE_FOLDER/users/M{id}/tutadates/photos/.
+ * Photo folder for one member under FAST_STORAGE_FOLDER/users/M{id}/tutadates/photos/.
  * Without memberId, returns legacy flat TUTADATES_PHOTO_FOLDER for admin / fallback reads.
  */
 export function getPhotoFolder(memberId = null) {

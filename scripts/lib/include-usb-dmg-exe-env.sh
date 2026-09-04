@@ -15,7 +15,7 @@ load_be_env_keys() {
     val="${val%%#*}"
     val="$(echo "$val" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
     case "$key" in
-      INCLUDE_USB_DMG_EXE|STORAGE_FOLDER|USB_DMG_EXE)
+      INCLUDE_USB_DMG_EXE|FAST_STORAGE_FOLDER|USB_DMG_EXE)
         if [[ -z "${!key:-}" ]]; then
           printf -v "$key" '%s' "$val"
           export "$key"
@@ -37,10 +37,10 @@ is_include_usb_dmg_exe_enabled() {
 
 expand_usb_dmg_exe_path() {
   local dest="${1:-${USB_DMG_EXE:-}}"
-  local sf="${STORAGE_FOLDER:-}"
+  local sf="${FAST_STORAGE_FOLDER:-}"
   if [[ -n "$dest" && -n "$sf" ]]; then
-    dest="${dest//\$\{STORAGE_FOLDER\}/$sf}"
-    dest="${dest//\$STORAGE_FOLDER/$sf}"
+    dest="${dest//\$\{FAST_STORAGE_FOLDER\}/$sf}"
+    dest="${dest//\$FAST_STORAGE_FOLDER/$sf}"
   fi
   if [[ -z "$dest" && -n "$sf" ]]; then
     dest="${sf%/}/USB_DMG_EXE"

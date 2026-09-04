@@ -17,14 +17,14 @@ read_large_cheap_env() {
 }
 
 large_cheap_env_require_readable
-STORAGE_FOLDER="$(read_large_cheap_env STORAGE_FOLDER)"
+FAST_STORAGE_FOLDER="$(read_large_cheap_env FAST_STORAGE_FOLDER)"
 LARGE_CHEAP_STORAGE_FOLDER="$(read_large_cheap_env LARGE_CHEAP_STORAGE_FOLDER)"
 
-# Mirror be/loadEnv.js / tutaDriveMemberPaths.js — cheap root falls back to STORAGE_FOLDER.
+# Mirror be/loadEnv.js / tutaDriveMemberPaths.js — cheap root falls back to FAST_STORAGE_FOLDER.
 expand_large_cheap_path() {
   local v="$1"
-  v="${v//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-  v="${v//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+  v="${v//\$\{FAST_STORAGE_FOLDER\}/$FAST_STORAGE_FOLDER}"
+  v="${v//\$FAST_STORAGE_FOLDER/$FAST_STORAGE_FOLDER}"
   v="${v//\$\{HOME\}/$HOME}"
   v="${v//\$HOME/$HOME}"
   [[ "$v" == "~/"* ]] && v="$HOME/${v:2}"
@@ -34,7 +34,7 @@ expand_large_cheap_path() {
 resolve_large_cheap_root() {
   local raw="${LARGE_CHEAP_STORAGE_FOLDER:-}"
   if [[ -z "$raw" ]]; then
-    raw="${STORAGE_FOLDER:-}"
+    raw="${FAST_STORAGE_FOLDER:-}"
   fi
   expand_large_cheap_path "$raw"
 }

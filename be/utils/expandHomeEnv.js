@@ -1,5 +1,5 @@
 /**
- * Load ~/.ssh/be/.env with ${VAR} expansion (e.g. STORAGE_FOLDER, ROOT_FOLDER).
+ * Load ~/.ssh/be/.env with ${VAR} expansion (e.g. FAST_STORAGE_FOLDER, ROOT_FOLDER).
  * Plain dotenv does not expand; dotenv-expand does.
  */
 import dotenv from 'dotenv';

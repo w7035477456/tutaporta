@@ -164,7 +164,7 @@ export function respondVaultStoragePermissionError(res, err, context = {}) {
     context.folder ||
     err?.storageRoots?.[0] ||
     process.env.LARGE_CHEAP_STORAGE_FOLDER ||
-    process.env.STORAGE_FOLDER ||
+    process.env.FAST_STORAGE_FOLDER ||
     '';
   const folders = Array.isArray(err?.storageRoots) && err.storageRoots.length
     ? err.storageRoots

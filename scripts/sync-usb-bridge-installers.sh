@@ -10,7 +10,7 @@
 #
 # Env (optional):
 #   DEPLOY_SSH_KEY, DEPLOY_SSH_PORT — same as deploy-ssh-mac.sh
-#   USB_DMG_EXE / STORAGE_FOLDER — local source (from ~/.ssh/be/.env if unset)
+#   USB_DMG_EXE / FAST_STORAGE_FOLDER — local source (from ~/.ssh/be/.env if unset)
 #   REMOTE_USB_DMG_EXE — remote dest
 
 set -euo pipefail
@@ -48,19 +48,19 @@ load_key_from_env_file() {
 }
 
 load_local_usb_dir() {
-  load_key_from_env_file STORAGE_FOLDER
+  load_key_from_env_file FAST_STORAGE_FOLDER
   load_key_from_env_file USB_DMG_EXE
   local d="${USB_DMG_EXE:-}"
-  if [[ -n "$d" && -n "${STORAGE_FOLDER:-}" ]]; then
-    d="${d//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-    d="${d//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+  if [[ -n "$d" && -n "${FAST_STORAGE_FOLDER:-}" ]]; then
+    d="${d//\$\{FAST_STORAGE_FOLDER\}/$FAST_STORAGE_FOLDER}"
+    d="${d//\$FAST_STORAGE_FOLDER/$FAST_STORAGE_FOLDER}"
   fi
   if [[ -n "$d" ]]; then
     echo "${d%/}"
     return
   fi
-  if [[ -n "${STORAGE_FOLDER:-}" ]]; then
-    echo "${STORAGE_FOLDER%/}/USB_DMG_EXE"
+  if [[ -n "${FAST_STORAGE_FOLDER:-}" ]]; then
+    echo "${FAST_STORAGE_FOLDER%/}/USB_DMG_EXE"
     return
   fi
   # Fallback: repo usbzip/ (gitignored local staging)
@@ -120,14 +120,14 @@ REMOTE_DIR="${REMOTE_USB_DMG_EXE:-}"
 if [[ -z "$REMOTE_DIR" ]]; then
   REMOTE_DIR="$("${ssh_cmd[@]}" "$HOST" 'bash -s' <<'EOS'
 set -e
-STORAGE_FOLDER=""
+FAST_STORAGE_FOLDER=""
 USB_DMG_EXE=""
 envf="$HOME/.ssh/be/.env"
 if [[ -f "$envf" ]]; then
   while IFS= read -r line || [[ -n "$line" ]]; do
     case "$line" in ''|\#*) continue ;; esac
     case "$line" in
-      STORAGE_FOLDER=*|USB_DMG_EXE=*)
+      FAST_STORAGE_FOLDER=*|USB_DMG_EXE=*)
         k="${line%%=*}"
         v="${line#*=}"
         v="${v%%#*}"
@@ -139,14 +139,14 @@ if [[ -f "$envf" ]]; then
 fi
 if [[ -n "${USB_DMG_EXE:-}" ]]; then
   d="$USB_DMG_EXE"
-  if [[ -n "${STORAGE_FOLDER:-}" ]]; then
-    d="${d//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-    d="${d//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+  if [[ -n "${FAST_STORAGE_FOLDER:-}" ]]; then
+    d="${d//\$\{FAST_STORAGE_FOLDER\}/$FAST_STORAGE_FOLDER}"
+    d="${d//\$FAST_STORAGE_FOLDER/$FAST_STORAGE_FOLDER}"
   fi
   echo "${d%/}"
   exit 0
 fi
-if [[ -n "${STORAGE_FOLDER:-}" ]]; then echo "${STORAGE_FOLDER%/}/USB_DMG_EXE"; exit 0; fi
+if [[ -n "${FAST_STORAGE_FOLDER:-}" ]]; then echo "${FAST_STORAGE_FOLDER%/}/USB_DMG_EXE"; exit 0; fi
 echo "/mnt/pgdata16/onlinemallwebsite_storage/USB_DMG_EXE"
 EOS
 )"

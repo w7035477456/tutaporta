@@ -1,7 +1,7 @@
 /**
  * Auto-fix permissions on app storage roots (Mac + Ubuntu) when the Node
  * process owns the files. Covers:
- *   - STORAGE_FOLDER          (e.g. …/onlinemallwebsite_storage)
+ *   - FAST_STORAGE_FOLDER          (e.g. …/onlinemallwebsite_storage)
  *   - LARGE_CHEAP_STORAGE_FOLDER (e.g. …/onlinemallwebsite_largecheapstorage)
  * and all subfolders/files under them.
  *
@@ -31,13 +31,13 @@ function expandEnvPath(raw) {
 
 /** Configured storage roots from ~/.ssh/be/.env (deduped, absolute). */
 export function listAppStorageRoots() {
-  const keys = ['STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER', 'TUTADATES_PHOTO_FOLDER'];
+  const keys = ['FAST_STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER', 'TUTADATES_PHOTO_FOLDER'];
   const out = [];
   const seen = new Set();
   for (const envKey of keys) {
     const abs = expandEnvPath(process.env[envKey]);
     if (!abs || seen.has(abs)) continue;
-    // Skip photo folder if it is already under STORAGE_FOLDER (avoid double walk)
+    // Skip photo folder if it is already under FAST_STORAGE_FOLDER (avoid double walk)
     if (envKey === 'TUTADATES_PHOTO_FOLDER') {
       const underExisting = out.some(
         (r) => abs === r.abs || abs.startsWith(r.abs + path.sep)

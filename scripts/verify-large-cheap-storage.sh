@@ -53,7 +53,7 @@ echo "LARGE_CHEAP root -> ${ROOT:-(not set)}"
 echo
 
 if [[ -z "$ROOT" ]]; then
-  echo "FAIL  LARGE_CHEAP_STORAGE_FOLDER and STORAGE_FOLDER are not set"
+  echo "FAIL  LARGE_CHEAP_STORAGE_FOLDER and FAST_STORAGE_FOLDER are not set"
   exit 1
 fi
 

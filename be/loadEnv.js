@@ -25,7 +25,7 @@ if (hadDbHostBefore) {
   console.log('[loadEnv] DB_HOST already set in process environment (before loading file) – env may come from shell/PM2/systemd, not from ~/.ssh/be/.env');
 }
 
-// Supports ${STORAGE_FOLDER}, ${ROOT_FOLDER}, etc. in ~/.ssh/be/.env
+// Supports ${FAST_STORAGE_FOLDER}, ${ROOT_FOLDER}, etc. in ~/.ssh/be/.env
 let result = loadHomeEnvExpanded(homeEnvPath, { override: true });
 
 /**
@@ -34,10 +34,10 @@ let result = loadHomeEnvExpanded(homeEnvPath, { override: true });
  */
 function reconcileStoragePathsForPlatform() {
   if (process.platform !== 'darwin') return;
-  const keys = ['STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER'];
+  const keys = ['FAST_STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER'];
   const home = os.homedir();
   const macDefaults = {
-    STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_storage'),
+    FAST_STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_storage'),
     LARGE_CHEAP_STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_largecheapstorage')
   };
   let changed = false;
@@ -61,7 +61,7 @@ function reconcileStoragePathsForPlatform() {
   if (!changed || !fileExists) return;
   try {
     const parsed = dotenv.parse(fs.readFileSync(homeEnvPath, 'utf8'));
-    parsed.STORAGE_FOLDER = process.env.STORAGE_FOLDER;
+    parsed.FAST_STORAGE_FOLDER = process.env.FAST_STORAGE_FOLDER;
     parsed.LARGE_CHEAP_STORAGE_FOLDER = process.env.LARGE_CHEAP_STORAGE_FOLDER;
     const expanded = dotenvExpand.expand({ parsed });
     for (const [k, v] of Object.entries(expanded.parsed || {})) {

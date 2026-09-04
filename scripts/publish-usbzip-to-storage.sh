@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copy repo usbzip/*.zip → $USB_DMG_EXE (STORAGE_FOLDER/USB_DMG_EXE).
+# Copy repo usbzip/*.zip → $USB_DMG_EXE (FAST_STORAGE_FOLDER/USB_DMG_EXE).
 #
 # Customer downloads are served from USB_DMG_EXE, NOT from the git working tree.
 # Refuses Git LFS pointer stubs (~134 bytes). Copies every real zip found.
@@ -37,9 +37,9 @@ USBZIP_DIR="${USBZIP_DIR:-$ROOT/usbzip}"
 load_usb_dmg_exe_dir() {
   if [[ -n "${USB_DMG_EXE:-}" ]]; then
     local d="$USB_DMG_EXE"
-    if [[ -n "${STORAGE_FOLDER:-}" ]]; then
-      d="${d//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-      d="${d//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+    if [[ -n "${FAST_STORAGE_FOLDER:-}" ]]; then
+      d="${d//\$\{FAST_STORAGE_FOLDER\}/$FAST_STORAGE_FOLDER}"
+      d="${d//\$FAST_STORAGE_FOLDER/$FAST_STORAGE_FOLDER}"
     fi
     echo "${d%/}"
     return
@@ -53,7 +53,7 @@ load_usb_dmg_exe_dir() {
       case "$line" in
         ''|\#*) continue ;;
       esac
-      if [[ "$line" =~ ^(STORAGE_FOLDER|USB_DMG_EXE)= ]]; then
+      if [[ "$line" =~ ^(FAST_STORAGE_FOLDER|USB_DMG_EXE)= ]]; then
         local k="${line%%=*}"
         local v="${line#*=}"
         v="${v%%#*}"
@@ -66,15 +66,15 @@ load_usb_dmg_exe_dir() {
   fi
   if [[ -n "${USB_DMG_EXE:-}" ]]; then
     local d="$USB_DMG_EXE"
-    if [[ -n "${STORAGE_FOLDER:-}" ]]; then
-      d="${d//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-      d="${d//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+    if [[ -n "${FAST_STORAGE_FOLDER:-}" ]]; then
+      d="${d//\$\{FAST_STORAGE_FOLDER\}/$FAST_STORAGE_FOLDER}"
+      d="${d//\$FAST_STORAGE_FOLDER/$FAST_STORAGE_FOLDER}"
     fi
     echo "${d%/}"
     return
   fi
-  if [[ -n "${STORAGE_FOLDER:-}" ]]; then
-    echo "${STORAGE_FOLDER%/}/USB_DMG_EXE"
+  if [[ -n "${FAST_STORAGE_FOLDER:-}" ]]; then
+    echo "${FAST_STORAGE_FOLDER%/}/USB_DMG_EXE"
     return
   fi
   echo ""
@@ -115,7 +115,7 @@ try_git_lfs_pull() {
 
 DEST="$(load_usb_dmg_exe_dir)"
 if [[ -z "$DEST" ]]; then
-  echo "publish-usbzip-to-storage: USB_DMG_EXE / STORAGE_FOLDER not set (see ~/.ssh/be/.env)" >&2
+  echo "publish-usbzip-to-storage: USB_DMG_EXE / FAST_STORAGE_FOLDER not set (see ~/.ssh/be/.env)" >&2
   exit 1
 fi
 

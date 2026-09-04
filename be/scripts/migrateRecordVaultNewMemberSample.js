@@ -13,7 +13,7 @@
  *   node be/scripts/migrateRecordVaultNewMemberSample.js
  *   node be/scripts/migrateRecordVaultNewMemberSample.js --dry-run
  *
- * Scans LARGE_CHEAP_STORAGE_FOLDER / STORAGE_FOLDER member TutaNotes vaults when present.
+ * Scans LARGE_CHEAP_STORAGE_FOLDER / FAST_STORAGE_FOLDER member TutaNotes vaults when present.
  * Unlocked vaults also self-heal on next unlock via ensureRecordVaultNewMemberSampleDb.
  */
 import fs from 'fs';
@@ -48,7 +48,7 @@ const dryRun = process.argv.includes('--dry-run');
 
 function storageRoots() {
   const roots = [];
-  for (const key of ['LARGE_CHEAP_STORAGE_FOLDER', 'STORAGE_FOLDER']) {
+  for (const key of ['LARGE_CHEAP_STORAGE_FOLDER', 'FAST_STORAGE_FOLDER']) {
     const raw = String(process.env[key] || '').trim();
     if (raw) roots.push(path.resolve(raw));
   }

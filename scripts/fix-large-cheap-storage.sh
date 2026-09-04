@@ -100,7 +100,7 @@ if [[ "$APP_USER" == "root" ]]; then
 fi
 
 if [[ -z "$ROOT" || "$ROOT" == "/" ]]; then
-  echo "REFUSING: LARGE_CHEAP_STORAGE_FOLDER (or STORAGE_FOLDER fallback) is empty or /." >&2
+  echo "REFUSING: LARGE_CHEAP_STORAGE_FOLDER (or FAST_STORAGE_FOLDER fallback) is empty or /." >&2
   echo "Set LARGE_CHEAP_STORAGE_FOLDER in $LARGE_CHEAP_ENV_FILE" >&2
   exit 2
 fi

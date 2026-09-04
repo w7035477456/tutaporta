@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Align LARGE_CHEAP_STORAGE_FOLDER permissions with STORAGE_FOLDER so the
+# Align LARGE_CHEAP_STORAGE_FOLDER permissions with FAST_STORAGE_FOLDER so the
 # Node app (TutaNotes / TutaDrive) can CRUD …/users/M{id}/notes|photos.
 #
 # Usage (Mac or Ubuntu, after sourcing env or with paths set):
 #   bash scripts/setup-large-cheap-storage-perms.sh
 # Or:
-#   STORAGE_FOLDER=… LARGE_CHEAP_STORAGE_FOLDER=… bash scripts/setup-large-cheap-storage-perms.sh
+#   FAST_STORAGE_FOLDER=… LARGE_CHEAP_STORAGE_FOLDER=… bash scripts/setup-large-cheap-storage-perms.sh
 
 set -euo pipefail
 
@@ -13,13 +13,13 @@ ENV_FILE="${BE_ENV_FILE:-$HOME/.ssh/be/.env}"
 if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   set -a
-  # Expand ${STORAGE_FOLDER} etc. lightly
+  # Expand ${FAST_STORAGE_FOLDER} etc. lightly
   # shellcheck disable=SC1091
-  source <(grep -E '^(STORAGE_FOLDER|LARGE_CHEAP_STORAGE_FOLDER)=' "$ENV_FILE" | sed 's/\r$//')
+  source <(grep -E '^(FAST_STORAGE_FOLDER|LARGE_CHEAP_STORAGE_FOLDER)=' "$ENV_FILE" | sed 's/\r$//')
   set +a
 fi
 
-STORAGE_FOLDER="${STORAGE_FOLDER:-}"
+FAST_STORAGE_FOLDER="${FAST_STORAGE_FOLDER:-}"
 LARGE_CHEAP_STORAGE_FOLDER="${LARGE_CHEAP_STORAGE_FOLDER:-}"
 
 if [[ -z "$LARGE_CHEAP_STORAGE_FOLDER" ]]; then
@@ -27,23 +27,23 @@ if [[ -z "$LARGE_CHEAP_STORAGE_FOLDER" ]]; then
   exit 1
 fi
 
-if [[ -z "$STORAGE_FOLDER" ]]; then
-  echo "STORAGE_FOLDER is not set; cannot copy ownership reference" >&2
+if [[ -z "$FAST_STORAGE_FOLDER" ]]; then
+  echo "FAST_STORAGE_FOLDER is not set; cannot copy ownership reference" >&2
   exit 1
 fi
 
-if [[ ! -d "$STORAGE_FOLDER" ]]; then
-  echo "STORAGE_FOLDER does not exist: $STORAGE_FOLDER" >&2
+if [[ ! -d "$FAST_STORAGE_FOLDER" ]]; then
+  echo "FAST_STORAGE_FOLDER does not exist: $FAST_STORAGE_FOLDER" >&2
   exit 1
 fi
 
-echo "STORAGE_FOLDER=$STORAGE_FOLDER"
+echo "FAST_STORAGE_FOLDER=$FAST_STORAGE_FOLDER"
 echo "LARGE_CHEAP_STORAGE_FOLDER=$LARGE_CHEAP_STORAGE_FOLDER"
 
-# Owner/group from STORAGE_FOLDER (same app user that already can CRUD there)
-OWNER="$(stat -c '%U' "$STORAGE_FOLDER" 2>/dev/null || stat -f '%Su' "$STORAGE_FOLDER")"
-GROUP="$(stat -c '%G' "$STORAGE_FOLDER" 2>/dev/null || stat -f '%Sg' "$STORAGE_FOLDER")"
-MODE="$(stat -c '%a' "$STORAGE_FOLDER" 2>/dev/null || stat -f '%OLp' "$STORAGE_FOLDER")"
+# Owner/group from FAST_STORAGE_FOLDER (same app user that already can CRUD there)
+OWNER="$(stat -c '%U' "$FAST_STORAGE_FOLDER" 2>/dev/null || stat -f '%Su' "$FAST_STORAGE_FOLDER")"
+GROUP="$(stat -c '%G' "$FAST_STORAGE_FOLDER" 2>/dev/null || stat -f '%Sg' "$FAST_STORAGE_FOLDER")"
+MODE="$(stat -c '%a' "$FAST_STORAGE_FOLDER" 2>/dev/null || stat -f '%OLp' "$FAST_STORAGE_FOLDER")"
 
 echo "Reference owner:mode = ${OWNER}:${GROUP} mode ${MODE}"
 
@@ -68,5 +68,5 @@ echo ok >"$PROBE/notes/w.txt"
 rm -rf "$PROBE"
 echo "Write probe under users/: OK"
 
-ls -lad "$STORAGE_FOLDER" "$LARGE_CHEAP_STORAGE_FOLDER" "$LARGE_CHEAP_STORAGE_FOLDER/users"
+ls -lad "$FAST_STORAGE_FOLDER" "$LARGE_CHEAP_STORAGE_FOLDER" "$LARGE_CHEAP_STORAGE_FOLDER/users"
 echo "Done."

@@ -106,7 +106,7 @@ export function getPhotoFolder(memberId = null) {
     return getPhotoFolderForMember(memberId);
   }
   const folder = resolvePhotoFolder();
-  if (!folder) throw new Error('Tuta Dates photo storage is not configured (~/.ssh/be/.env STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
+  if (!folder) throw new Error('Tuta Dates photo storage is not configured (~/.ssh/be/.env FAST_STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
   return folder;
 }
 
@@ -662,12 +662,12 @@ export async function uploadPhoto(req, res) {
       logStoragePermissionFailure(err, {
         route: mobileToken ? 'uploadPhoto (phone QR)' : 'uploadPhoto',
         envKey: 'TUTADATES_PHOTO_FOLDER',
-        folder: process.env.TUTADATES_PHOTO_FOLDER || process.env.STORAGE_FOLDER,
+        folder: process.env.TUTADATES_PHOTO_FOLDER || process.env.FAST_STORAGE_FOLDER,
         singlesId: req.auth?.singles_id
       });
       logFolderPermissionError(
         [
-          process.env.STORAGE_FOLDER,
+          process.env.FAST_STORAGE_FOLDER,
           process.env.LARGE_CHEAP_STORAGE_FOLDER,
           process.env.TUTADATES_PHOTO_FOLDER
         ].filter(Boolean),

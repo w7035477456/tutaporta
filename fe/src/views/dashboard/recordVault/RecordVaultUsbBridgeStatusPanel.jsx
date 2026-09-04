@@ -247,8 +247,8 @@ export default function RecordVaultUsbBridgeStatusPanel({
         aria-label="Download usbbridge zip"
         title={
           preferMac
-            ? 'Download usbBridgeV3-mac.zip (from server STORAGE_FOLDER / USB_DMG_EXE)'
-            : 'Download usbBridgeV3-win.zip (from server STORAGE_FOLDER / USB_DMG_EXE)'
+            ? 'Download usbBridgeV3-mac.zip (from server FAST_STORAGE_FOLDER / USB_DMG_EXE)'
+            : 'Download usbBridgeV3-win.zip (from server FAST_STORAGE_FOLDER / USB_DMG_EXE)'
         }
         {...guestDemoAllowProps()}
         sx={downloadBridgeButtonSx}

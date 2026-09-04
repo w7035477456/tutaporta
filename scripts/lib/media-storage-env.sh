@@ -11,7 +11,7 @@ MEDIA_ENV_FILE="${BE_ENV_FILE:-$HOME/.ssh/be/.env}"
 MEDIA_FOLDER_KEYS=(
   "TUTADATES_PHOTO_FOLDER required"
   "UPLOAD_FOLDER required"
-  "STORAGE_FOLDER optional"
+  "FAST_STORAGE_FOLDER optional"
   "LARGE_CHEAP_STORAGE_FOLDER optional"
   "TUTADATES_VIDEO_FOLDER optional"
   "RECORD_NOTES_ONEDRIVE_STAGING_ROOT optional"
@@ -32,14 +32,14 @@ read_env() {
 }
 
 media_env_require_readable
-STORAGE_FOLDER="$(read_env STORAGE_FOLDER)"
+FAST_STORAGE_FOLDER="$(read_env FAST_STORAGE_FOLDER)"
 ROOT_FOLDER="$(read_env ROOT_FOLDER)"
 
 # Mirror be/loadEnv.js ${VAR} expansion for the few vars paths actually use.
 expand_path() {
   local v="$1"
-  v="${v//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
-  v="${v//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+  v="${v//\$\{FAST_STORAGE_FOLDER\}/$FAST_STORAGE_FOLDER}"
+  v="${v//\$FAST_STORAGE_FOLDER/$FAST_STORAGE_FOLDER}"
   v="${v//\$\{ROOT_FOLDER\}/$ROOT_FOLDER}"
   v="${v//\$\{HOME\}/$HOME}"
   v="${v//\$HOME/$HOME}"

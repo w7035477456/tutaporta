@@ -228,7 +228,7 @@ export function ensureVaultLayoutDirs(mountPath) {
   const photosRoot = vaultPhotosRoot(mountPath);
   try {
     const st = fs.lstatSync(photosRoot);
-    // Broken symlink (e.g. STORAGE_FOLDER relocated) makes mkdirSync throw ENOENT.
+    // Broken symlink (e.g. FAST_STORAGE_FOLDER relocated) makes mkdirSync throw ENOENT.
     if (st.isSymbolicLink()) {
       if (!fs.existsSync(photosRoot)) {
         fs.unlinkSync(photosRoot);

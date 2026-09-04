@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Move Tuta Dates media from LARGE_CHEAP_STORAGE/users/M{id}/tutadates
- * to STORAGE_FOLDER/users/M{id}/tutadates for every M###### folder found on disk.
+ * to FAST_STORAGE_FOLDER/users/M{id}/tutadates for every M###### folder found on disk.
  *
- * Also sweeps legacy flat STORAGE_FOLDER/photos and /videos for {memberId}_* files.
+ * Also sweeps legacy flat FAST_STORAGE_FOLDER/photos and /videos for {memberId}_* files.
  * Updates helloworldjunktest.photos.file_path and videos.file_path to the new storage paths.
  *
  * Usage (from repo root, ~/.ssh/be/.env loaded via loadEnv.js):
@@ -220,12 +220,12 @@ async function migrateMemberFolder(memberFolderNameOnDisk) {
 async function main() {
   console.log('Source (old):', getLegacyLargeCheapStorageRoot() || '(LARGE_CHEAP_STORAGE_FOLDER unset)');
   console.log('Target (new):', getTutaDatesStorageRoot());
-  console.log('Target layout: STORAGE_FOLDER/users/M{id}/tutadates/{photos,videos}');
+  console.log('Target layout: FAST_STORAGE_FOLDER/users/M{id}/tutadates/{photos,videos}');
   if (dryRun) console.log('DRY RUN — no files moved, no DB updates');
 
   const memberFolders = listAllMemberFolderNamesOnDisk();
   if (!memberFolders.length) {
-    console.log('No M###### folders found under STORAGE_FOLDER/users or LARGE_CHEAP/users.');
+    console.log('No M###### folders found under FAST_STORAGE_FOLDER/users or LARGE_CHEAP/users.');
   }
 
   let totalPhotos = 0;

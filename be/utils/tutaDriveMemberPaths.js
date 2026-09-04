@@ -58,15 +58,15 @@ export function isRightSideUsb() {
 
 /**
  * TutaDrive bulk data root — intended for large/cheap mechanical RAID later.
- * Prefer LARGE_CHEAP_STORAGE_FOLDER; fall back to STORAGE_FOLDER when unset.
+ * Prefer LARGE_CHEAP_STORAGE_FOLDER; fall back to FAST_STORAGE_FOLDER when unset.
  */
 export function getLargeCheapStorageFolderRoot() {
   const cheap = String(process.env.LARGE_CHEAP_STORAGE_FOLDER || '').trim();
-  const storage = String(process.env.STORAGE_FOLDER || '').trim();
+  const storage = String(process.env.FAST_STORAGE_FOLDER || '').trim();
   const root = cheap || storage;
   if (!root) {
     throw new Error(
-      'LARGE_CHEAP_STORAGE_FOLDER (or STORAGE_FOLDER) is not set in ~/.ssh/be/.env'
+      'LARGE_CHEAP_STORAGE_FOLDER (or FAST_STORAGE_FOLDER) is not set in ~/.ssh/be/.env'
     );
   }
   return path.resolve(root);

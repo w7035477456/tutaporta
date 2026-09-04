@@ -107,9 +107,9 @@ for entry in "${MEDIA_FOLDER_KEYS[@]}"; do
 done
 
 echo
-if [[ -n "$STORAGE_FOLDER" && -d "$STORAGE_FOLDER" ]]; then
-  df -h "$STORAGE_FOLDER"
-  avail_pct="$(df -P "$STORAGE_FOLDER" | awk 'NR==2 {print $5}' | tr -dc '0-9')"
+if [[ -n "$FAST_STORAGE_FOLDER" && -d "$FAST_STORAGE_FOLDER" ]]; then
+  df -h "$FAST_STORAGE_FOLDER"
+  avail_pct="$(df -P "$FAST_STORAGE_FOLDER" | awk 'NR==2 {print $5}' | tr -dc '0-9')"
   if [[ -n "$avail_pct" && "$avail_pct" -ge 90 ]]; then
     echo "WARN  disk ${avail_pct}% full — uploads fail with ENOSPC at 100%"
   fi

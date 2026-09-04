@@ -38,7 +38,7 @@ export function getLegacyVideoFolder() {
 }
 
 /**
- * Video folder for one member under STORAGE_FOLDER/users/M{id}/tutadates/videos/.
+ * Video folder for one member under FAST_STORAGE_FOLDER/users/M{id}/tutadates/videos/.
  * Without memberId, returns legacy flat video folder.
  */
 export function getVideoFolder(memberId = null) {

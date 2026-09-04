@@ -44,7 +44,7 @@ function isIncludeUsbDmgExeEnabled() {
 
 function loadUsbDmgExeFromHomeEnv() {
   loadEnvKeyFromHomeEnv('INCLUDE_USB_DMG_EXE');
-  loadEnvKeyFromHomeEnv('STORAGE_FOLDER');
+  loadEnvKeyFromHomeEnv('FAST_STORAGE_FOLDER');
   loadEnvKeyFromHomeEnv('USB_DMG_EXE');
 }
 
@@ -55,15 +55,15 @@ if (!isIncludeUsbDmgExeEnabled()) {
   process.exit(0);
 }
 
-/** Expand ${STORAGE_FOLDER} / $STORAGE_FOLDER inside USB_DMG_EXE. */
+/** Expand ${FAST_STORAGE_FOLDER} / $FAST_STORAGE_FOLDER inside USB_DMG_EXE. */
 function expandUsbDmgExeEnv() {
-  const storage = String(process.env.STORAGE_FOLDER || '')
+  const storage = String(process.env.FAST_STORAGE_FOLDER || '')
     .trim()
     .replace(/\/+$/, '');
   let usb = String(process.env.USB_DMG_EXE || '').trim();
   if (!usb) return;
   if (storage) {
-    usb = usb.replace(/\$\{STORAGE_FOLDER\}/g, storage).replace(/\$STORAGE_FOLDER/g, storage);
+    usb = usb.replace(/\$\{FAST_STORAGE_FOLDER\}/g, storage).replace(/\$FAST_STORAGE_FOLDER/g, storage);
   }
   process.env.USB_DMG_EXE = usb.replace(/\/+$/, '');
 }

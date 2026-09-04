@@ -43,7 +43,7 @@ function checkDirAccess(label, dirPath, issues) {
 }
 
 /**
- * Validates STORAGE_FOLDER/users/M{id}/tutadates and legacy flat folders when set.
+ * Validates FAST_STORAGE_FOLDER/users/M{id}/tutadates and legacy flat folders when set.
  */
 export function validateMediaStorage() {
   const issues = [];
@@ -51,7 +51,7 @@ export function validateMediaStorage() {
   const videoRoots = listTutaDatesVideoStorageRoots();
 
   if (!photoRoots.length && !getLegacyPhotoFolder()) {
-    issues.push('Tuta Dates photo storage is not configured (STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
+    issues.push('Tuta Dates photo storage is not configured (FAST_STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
   }
 
   for (const dir of photoRoots) {
@@ -76,10 +76,10 @@ export function validateMediaStorage() {
   try {
     storageUsersDir = path.join(getTutaDatesStorageRoot(), 'users');
     if (!fs.existsSync(storageUsersDir)) {
-      issues.push(`STORAGE_FOLDER users dir missing (${storageUsersDir}) — expected M*/${TUTADATES_VAULT_DIR}/photos`);
+      issues.push(`FAST_STORAGE_FOLDER users dir missing (${storageUsersDir}) — expected M*/${TUTADATES_VAULT_DIR}/photos`);
     }
   } catch (err) {
-    issues.push(err?.message || 'STORAGE_FOLDER is not set');
+    issues.push(err?.message || 'FAST_STORAGE_FOLDER is not set');
   }
 
   return {

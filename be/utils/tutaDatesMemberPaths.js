@@ -15,21 +15,21 @@ function expandRoot(folder) {
   return path.resolve(trimmed.startsWith('~/') ? path.join(os.homedir(), trimmed.slice(2)) : trimmed);
 }
 
-/** Primary Tuta Dates root: STORAGE_FOLDER (onlinemallwebsite_storage). */
+/** Primary Tuta Dates root: FAST_STORAGE_FOLDER (onlinemallwebsite_storage). */
 export function getTutaDatesStorageRoot() {
-  const storage = expandRoot(process.env.STORAGE_FOLDER);
+  const storage = expandRoot(process.env.FAST_STORAGE_FOLDER);
   if (!storage) {
-    throw new Error('STORAGE_FOLDER is not set in ~/.ssh/be/.env');
+    throw new Error('FAST_STORAGE_FOLDER is not set in ~/.ssh/be/.env');
   }
   return storage;
 }
 
-/** Previous location before move to STORAGE_FOLDER — used for migration reads only. */
+/** Previous location before move to FAST_STORAGE_FOLDER — used for migration reads only. */
 export function getLegacyLargeCheapStorageRoot() {
   return expandRoot(process.env.LARGE_CHEAP_STORAGE_FOLDER);
 }
 
-/** ${STORAGE_FOLDER}/users/M{id}/tutadates */
+/** ${FAST_STORAGE_FOLDER}/users/M{id}/tutadates */
 export function tutaDatesMemberRoot(memberId) {
   return path.join(getTutaDatesStorageRoot(), 'users', memberFolderName(memberId), TUTADATES_VAULT_DIR);
 }
@@ -41,12 +41,12 @@ export function tutaDatesMemberRootLegacyLargeCheap(memberId) {
   return path.join(root, 'users', memberFolderName(memberId), TUTADATES_VAULT_DIR);
 }
 
-/** ${STORAGE_FOLDER}/users/M{id}/tutadates/photos */
+/** ${FAST_STORAGE_FOLDER}/users/M{id}/tutadates/photos */
 export function tutaDatesPhotosPath(memberId) {
   return path.join(tutaDatesMemberRoot(memberId), 'photos');
 }
 
-/** ${STORAGE_FOLDER}/users/M{id}/tutadates/videos */
+/** ${FAST_STORAGE_FOLDER}/users/M{id}/tutadates/videos */
 export function tutaDatesVideosPath(memberId) {
   return path.join(tutaDatesMemberRoot(memberId), 'videos');
 }
@@ -62,7 +62,7 @@ export function tutaDatesVideosPathLegacyLargeCheap(memberId) {
 }
 
 /**
- * Ensure per-member Tuta Dates photos + videos dirs exist under STORAGE_FOLDER.
+ * Ensure per-member Tuta Dates photos + videos dirs exist under FAST_STORAGE_FOLDER.
  * @returns {{ photosPath: string, videosPath: string, photosFolder: string, videosFolder: string }}
  */
 export function ensureTutaDatesMemberLayout(memberId) {
@@ -94,12 +94,12 @@ function listMemberTutaDatesSubdirs(storageRoot, subdir) {
   return out;
 }
 
-/** List STORAGE_FOLDER/users/M{id}/tutadates/photos directories. */
+/** List FAST_STORAGE_FOLDER/users/M{id}/tutadates/photos directories. */
 export function listMemberTutaDatesPhotoDirs() {
   return listMemberTutaDatesSubdirs(getTutaDatesStorageRoot(), 'photos');
 }
 
-/** List STORAGE_FOLDER/users/M{id}/tutadates/videos directories. */
+/** List FAST_STORAGE_FOLDER/users/M{id}/tutadates/videos directories. */
 export function listMemberTutaDatesVideoDirs() {
   return listMemberTutaDatesSubdirs(getTutaDatesStorageRoot(), 'videos');
 }
@@ -114,7 +114,7 @@ export function listLegacyLargeCheapTutaDatesVideoDirs() {
   return listMemberTutaDatesSubdirs(getLegacyLargeCheapStorageRoot(), 'videos');
 }
 
-/** Every M###### folder name under STORAGE_FOLDER/users and LARGE_CHEAP/users. */
+/** Every M###### folder name under FAST_STORAGE_FOLDER/users and LARGE_CHEAP/users. */
 export function listAllMemberFolderNamesOnDisk() {
   const seen = new Set();
   for (const root of [getTutaDatesStorageRoot(), getLegacyLargeCheapStorageRoot()].filter(Boolean)) {
