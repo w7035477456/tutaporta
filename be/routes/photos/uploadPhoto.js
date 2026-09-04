@@ -106,7 +106,7 @@ export function getPhotoFolder(memberId = null) {
     return getPhotoFolderForMember(memberId);
   }
   const folder = resolvePhotoFolder();
-  if (!folder) throw new Error('Tuta Dates photo storage is not configured (~/.ssh/be/.env LARGE_CHEAP_STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
+  if (!folder) throw new Error('Tuta Dates photo storage is not configured (~/.ssh/be/.env STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
   return folder;
 }
 

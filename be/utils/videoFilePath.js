@@ -11,7 +11,8 @@ import { unlinkVideoThumbnailFromDisk } from './videoThumbnailPath.js';
 import {
   ensureTutaDatesMemberLayout,
   listMemberTutaDatesVideoDirs,
-  tutaDatesVideosPath
+  tutaDatesVideosPath,
+  tutaDatesVideosPathLegacyLargeCheap
 } from './tutaDatesMemberPaths.js';
 
 const VIDEO_EXTS = ['webm', 'mp4', 'mp3', 'mov', 'avi', 'wmv'];
@@ -37,7 +38,7 @@ export function getLegacyVideoFolder() {
 }
 
 /**
- * Video folder for one member under …/users/M{id}/tutadates/videos/.
+ * Video folder for one member under STORAGE_FOLDER/users/M{id}/tutadates/videos/.
  * Without memberId, returns legacy flat video folder.
  */
 export function getVideoFolder(memberId = null) {
@@ -66,6 +67,7 @@ export function buildVideoSearchFolders({ filePathFromDb = null, memberId = null
   add(filePathFromDb);
   if (memberId != null && String(memberId).trim()) {
     add(tutaDatesVideosPath(memberId));
+    add(tutaDatesVideosPathLegacyLargeCheap(memberId));
   }
   add(getLegacyVideoFolder());
   for (const folder of buildPhotoSearchFolders({ memberId })) {

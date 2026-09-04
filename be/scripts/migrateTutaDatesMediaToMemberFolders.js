@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * Move Tuta Dates photos/videos from legacy flat STORAGE_FOLDER/{photos,videos}
- * into per-member LARGE_CHEAP_STORAGE/users/M{id}/tutadates/{photos,videos}.
+ * Move Tuta Dates media from LARGE_CHEAP_STORAGE/users/M{id}/tutadates
+ * to STORAGE_FOLDER/users/M{id}/tutadates for every M###### folder found on disk.
+ *
+ * Also sweeps legacy flat STORAGE_FOLDER/photos and /videos for {memberId}_* files.
+ * Updates helloworldjunktest.photos.file_path and videos.file_path to the new storage paths.
  *
  * Usage (from repo root, ~/.ssh/be/.env loaded via loadEnv.js):
- *   node be/scripts/migrateTutaDatesMediaToMemberFolders.js
  *   node be/scripts/migrateTutaDatesMediaToMemberFolders.js --dry-run
+ *   node be/scripts/migrateTutaDatesMediaToMemberFolders.js
  */
 import fs from 'fs';
 import path from 'path';
@@ -22,25 +25,35 @@ import {
 } from '../utils/videoFilePath.js';
 import {
   ensureTutaDatesMemberLayout,
-  memberFolderName
+  getLegacyLargeCheapStorageRoot,
+  getTutaDatesStorageRoot,
+  listAllMemberFolderNamesOnDisk,
+  memberFolderName,
+  tutaDatesMemberRootLegacyLargeCheap,
+  tutaDatesPhotosPathLegacyLargeCheap,
+  tutaDatesVideosPathLegacyLargeCheap
 } from '../utils/tutaDatesMemberPaths.js';
+
 const dryRun = process.argv.includes('--dry-run');
 
-function normalizeMemberId(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return null;
-  return raw.replace(/^M/i, '');
+function memberIdFromFolderName(folderName) {
+  const raw = String(folderName || '').trim().replace(/^M/i, '');
+  return raw || null;
 }
 
 function safeMoveFile(src, dest) {
-  if (src === dest || !src || !dest) return false;
+  if (!src || !dest || src === dest) return false;
   if (!fs.existsSync(src)) return false;
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   if (fs.existsSync(dest)) {
-    const srcStat = fs.statSync(src);
-    const destStat = fs.statSync(dest);
-    if (srcStat.ino === destStat.ino && srcStat.dev === destStat.dev) {
-      return true;
+    try {
+      const srcStat = fs.statSync(src);
+      const destStat = fs.statSync(dest);
+      if (srcStat.ino === destStat.ino && srcStat.dev === destStat.dev) {
+        return true;
+      }
+    } catch {
+      // fall through
     }
     console.warn(`  skip (dest exists): ${dest}`);
     return false;
@@ -51,6 +64,24 @@ function safeMoveFile(src, dest) {
   }
   fs.renameSync(src, dest);
   return true;
+}
+
+function moveAllFilesInDir(srcDir, destDir) {
+  const src = String(srcDir || '').replace(/\/+$/, '');
+  const dest = String(destDir || '').replace(/\/+$/, '');
+  if (!src || !fs.existsSync(src)) return 0;
+  fs.mkdirSync(dest, { recursive: true });
+  let moved = 0;
+  for (const name of fs.readdirSync(src)) {
+    const srcPath = path.join(src, name);
+    try {
+      if (!fs.statSync(srcPath).isFile()) continue;
+    } catch {
+      continue;
+    }
+    if (safeMoveFile(srcPath, path.join(dest, name))) moved += 1;
+  }
+  return moved;
 }
 
 function collectLegacyPrefixFiles(legacyDir, memberId) {
@@ -71,12 +102,34 @@ function collectLegacyPrefixFiles(legacyDir, memberId) {
   return out;
 }
 
-async function migrateMemberMedia({ singlesId, memberId }) {
-  const layout = ensureTutaDatesMemberLayout(memberId);
-  const legacyPhoto = getLegacyPhotoFolder().replace(/\/+$/, '');
-  const legacyVideo = getLegacyVideoFolder().replace(/\/+$/, '');
-  const movedPhotos = new Set();
-  const movedVideos = new Set();
+async function loadSinglesIdsForMemberId(memberId) {
+  const { rows } = await pool.query(
+    `SELECT singles_id
+       FROM helloworldjunktest.singles
+      WHERE trim(both from member_id::text) = $1
+         OR trim(both from member_id::text) = $2`,
+    [memberId, `M${memberId}`]
+  );
+  return rows.map((r) => Number(r.singles_id)).filter((id) => Number.isFinite(id) && id > 0);
+}
+
+async function updateDbPathsForSingles(singlesIds, photosFolder, videosFolder) {
+  if (dryRun || !singlesIds.length) return;
+  for (const singlesId of singlesIds) {
+    await pool.query(
+      `UPDATE helloworldjunktest.photos SET file_path = $2 WHERE singles_id = $1`,
+      [singlesId, photosFolder]
+    );
+    await pool.query(
+      `UPDATE helloworldjunktest.videos SET file_path = $2 WHERE singles_id = $1`,
+      [singlesId, videosFolder]
+    );
+  }
+}
+
+async function migrateDbReferencedFiles({ singlesId, memberId, layout }) {
+  let movedPhotos = 0;
+  let movedVideos = 0;
 
   const photoRows = await pool.query(
     `SELECT photos_id, photo_file_name, file_extension, file_path
@@ -84,22 +137,11 @@ async function migrateMemberMedia({ singlesId, memberId }) {
       WHERE singles_id = $1`,
     [singlesId]
   );
-
   for (const row of photoRows.rows) {
-    const files = listMemberPhotoFilesOnDisk(row, {
-      filePathFromDb: row.file_path,
-      memberId
-    });
-    for (const src of files) {
-      const base = path.basename(src);
-      const dest = path.join(layout.photosPath, base);
-      if (safeMoveFile(src, dest)) movedPhotos.add(dest);
+    for (const src of listMemberPhotoFilesOnDisk(row, { filePathFromDb: row.file_path, memberId })) {
+      const dest = path.join(layout.photosPath, path.basename(src));
+      if (dest.startsWith(layout.photosPath) && safeMoveFile(src, dest)) movedPhotos += 1;
     }
-  }
-
-  for (const src of collectLegacyPrefixFiles(legacyPhoto, memberId)) {
-    const dest = path.join(layout.photosPath, path.basename(src));
-    if (safeMoveFile(src, dest)) movedPhotos.add(dest);
   }
 
   const videoRows = await pool.query(
@@ -108,104 +150,144 @@ async function migrateMemberMedia({ singlesId, memberId }) {
       WHERE singles_id = $1`,
     [singlesId]
   );
-
   for (const row of videoRows.rows) {
     const folders = buildVideoSearchFolders({ filePathFromDb: row.file_path, memberId });
     const ext = String(row.file_extension || 'webm').replace(/^\./, '');
     const raw = String(row.video_file_name || row.video_id || '').trim();
-    const candidates = new Set();
     for (const folder of folders) {
-      if (raw) {
-        candidates.add(path.join(folder.replace(/\/+$/, ''), raw));
-        candidates.add(path.join(folder.replace(/\/+$/, ''), `${raw}.${ext}`));
+      for (const candidate of [
+        raw ? path.join(folder.replace(/\/+$/, ''), raw) : null,
+        raw ? path.join(folder.replace(/\/+$/, ''), `${raw}.${ext}`) : null
+      ].filter(Boolean)) {
+        if (!fs.existsSync(candidate)) continue;
+        const dest = path.join(layout.videosPath, path.basename(candidate));
+        if (dest.startsWith(layout.videosPath) && safeMoveFile(candidate, dest)) movedVideos += 1;
       }
     }
-    for (const src of candidates) {
-      if (!fs.existsSync(src)) continue;
-      const dest = path.join(layout.videosPath, path.basename(src));
-      if (safeMoveFile(src, dest)) movedVideos.add(dest);
-    }
   }
 
-  for (const src of collectLegacyPrefixFiles(legacyVideo, memberId)) {
-    const dest = path.join(layout.videosPath, path.basename(src));
-    if (safeMoveFile(src, dest)) movedVideos.add(dest);
-  }
+  return { movedPhotos, movedVideos };
+}
 
-  // selfintro_ / video_ / consent files often use singles_id in name — move by DB rows above first;
-  // also sweep singles-prefixed video names in legacy video dir.
-  if (legacyVideo && fs.existsSync(legacyVideo)) {
-    const singlesPrefix = `${singlesId}_`;
-    for (const name of fs.readdirSync(legacyVideo)) {
-      if (!name.includes(String(singlesId))) continue;
-      const src = path.join(legacyVideo, name);
-      try {
-        if (!fs.statSync(src).isFile()) continue;
-      } catch {
-        continue;
+async function migrateMemberFolder(memberFolderNameOnDisk) {
+  const memberId = memberIdFromFolderName(memberFolderNameOnDisk);
+  if (!memberId) return null;
+
+  // Avoid mkdir during dry-run; resolve target paths without creating.
+  const layout = dryRun
+    ? {
+        photosPath: path.join(getTutaDatesStorageRoot(), 'users', memberFolderName(memberId), 'tutadates', 'photos'),
+        videosPath: path.join(getTutaDatesStorageRoot(), 'users', memberFolderName(memberId), 'tutadates', 'videos'),
+        photosFolder: `${path.join(getTutaDatesStorageRoot(), 'users', memberFolderName(memberId), 'tutadates', 'photos')}/`,
+        videosFolder: `${path.join(getTutaDatesStorageRoot(), 'users', memberFolderName(memberId), 'tutadates', 'videos')}/`
       }
-      const dest = path.join(layout.videosPath, name);
-      if (safeMoveFile(src, dest)) movedVideos.add(dest);
-    }
+    : ensureTutaDatesMemberLayout(memberId);
+  let movedPhotos = 0;
+  let movedVideos = 0;
+
+  const legacyPhotos = tutaDatesPhotosPathLegacyLargeCheap(memberId);
+  const legacyVideos = tutaDatesVideosPathLegacyLargeCheap(memberId);
+  movedPhotos += moveAllFilesInDir(legacyPhotos, layout.photosPath);
+  movedVideos += moveAllFilesInDir(legacyVideos, layout.videosPath);
+
+  const flatPhoto = getLegacyPhotoFolder().replace(/\/+$/, '');
+  const flatVideo = getLegacyVideoFolder().replace(/\/+$/, '');
+  for (const src of collectLegacyPrefixFiles(flatPhoto, memberId)) {
+    if (safeMoveFile(src, path.join(layout.photosPath, path.basename(src)))) movedPhotos += 1;
+  }
+  for (const src of collectLegacyPrefixFiles(flatVideo, memberId)) {
+    if (safeMoveFile(src, path.join(layout.videosPath, path.basename(src)))) movedVideos += 1;
   }
 
-  if (!dryRun) {
-    await pool.query(
-      `UPDATE helloworldjunktest.photos
-          SET file_path = $2
-        WHERE singles_id = $1`,
-      [singlesId, layout.photosFolder]
-    );
-    await pool.query(
-      `UPDATE helloworldjunktest.videos
-          SET file_path = $2
-        WHERE singles_id = $1`,
-      [singlesId, layout.videosFolder]
+  const singlesIds = await loadSinglesIdsForMemberId(memberId);
+  for (const singlesId of singlesIds) {
+    const dbMoved = await migrateDbReferencedFiles({ singlesId, memberId, layout });
+    movedPhotos += dbMoved.movedPhotos;
+    movedVideos += dbMoved.movedVideos;
+  }
+
+  await updateDbPathsForSingles(singlesIds, layout.photosFolder, layout.videosFolder);
+
+  if (movedPhotos || movedVideos) {
+    console.log(
+      `${memberFolderName(memberId)}: moved ${movedPhotos} photo file(s), ${movedVideos} video file(s) -> ${layout.photosPath}`
     );
   }
 
-  return {
-    memberFolder: memberFolderName(memberId),
-    photosPath: layout.photosPath,
-    videosPath: layout.videosPath,
-    movedPhotoCount: movedPhotos.size,
-    movedVideoCount: movedVideos.size
-  };
+  return { memberId, movedPhotos, movedVideos };
 }
 
 async function main() {
-  const legacyPhoto = getLegacyPhotoFolder();
-  const legacyVideo = getLegacyVideoFolder();
-  console.log('Legacy photo root:', legacyPhoto || '(unset)');
-  console.log('Legacy video root:', legacyVideo || '(unset)');
-  console.log('Target layout: …/users/M{id}/tutadates/{photos,videos}');
+  console.log('Source (old):', getLegacyLargeCheapStorageRoot() || '(LARGE_CHEAP_STORAGE_FOLDER unset)');
+  console.log('Target (new):', getTutaDatesStorageRoot());
+  console.log('Target layout: STORAGE_FOLDER/users/M{id}/tutadates/{photos,videos}');
   if (dryRun) console.log('DRY RUN — no files moved, no DB updates');
 
+  const memberFolders = listAllMemberFolderNamesOnDisk();
+  if (!memberFolders.length) {
+    console.log('No M###### folders found under STORAGE_FOLDER/users or LARGE_CHEAP/users.');
+  }
+
+  let totalPhotos = 0;
+  let totalVideos = 0;
+  for (const folderName of memberFolders) {
+    const result = await migrateMemberFolder(folderName);
+    if (!result) continue;
+    totalPhotos += result.movedPhotos;
+    totalVideos += result.movedVideos;
+  }
+
+  // DB members without on-disk folders yet — still point file_path at storage layout.
   const { rows } = await pool.query(
     `SELECT singles_id, member_id
        FROM helloworldjunktest.singles
       WHERE member_id IS NOT NULL
       ORDER BY singles_id ASC`
   );
-
-  let totalPhotos = 0;
-  let totalVideos = 0;
   for (const row of rows) {
-    const memberId = normalizeMemberId(row.member_id);
+    const memberId = memberIdFromFolderName(`M${String(row.member_id).replace(/^M/i, '')}`);
     if (!memberId) continue;
-    const singlesId = Number(row.singles_id);
-    const result = await migrateMemberMedia({ singlesId, memberId });
-    if (result.movedPhotoCount || result.movedVideoCount) {
-      console.log(
-        `M${memberId} (singles ${singlesId}): moved ${result.movedPhotoCount} photo file(s), ${result.movedVideoCount} video file(s)`
-      );
-    }
-    totalPhotos += result.movedPhotoCount;
-    totalVideos += result.movedVideoCount;
+    if (dryRun) continue;
+    const layout = ensureTutaDatesMemberLayout(memberId);
+    await updateDbPathsForSingles([Number(row.singles_id)], layout.photosFolder, layout.videosFolder);
   }
 
-  console.log(`Done. Moved ${totalPhotos} photo file(s) and ${totalVideos} video file(s) across ${rows.length} member(s).`);
+  console.log(
+    `Done. Moved ${totalPhotos} photo file(s) and ${totalVideos} video file(s) across ${memberFolders.length} on-disk member folder(s); updated DB paths for ${rows.length} member row(s).`
+  );
+
+  // Remove empty leftover tutadates trees under LARGE_CHEAP after a successful move.
+  if (!dryRun) {
+    let removedEmpty = 0;
+    for (const folderName of memberFolders) {
+      const memberId = memberIdFromFolderName(folderName);
+      const legacyRoot = tutaDatesMemberRootLegacyLargeCheap(memberId);
+      if (!legacyRoot || !fs.existsSync(legacyRoot)) continue;
+      try {
+        // Remove empty photos/videos first, then tutadates if empty.
+        for (const sub of ['photos', 'videos']) {
+          const subDir = path.join(legacyRoot, sub);
+          if (fs.existsSync(subDir) && fs.readdirSync(subDir).length === 0) {
+            fs.rmdirSync(subDir);
+          }
+        }
+        if (fs.existsSync(legacyRoot) && fs.readdirSync(legacyRoot).length === 0) {
+          fs.rmdirSync(legacyRoot);
+          removedEmpty += 1;
+        }
+      } catch (err) {
+        console.warn(`Could not remove empty legacy ${legacyRoot}:`, err?.message || err);
+      }
+    }
+    if (removedEmpty) {
+      console.log(`Removed ${removedEmpty} empty LARGE_CHEAP tutadates folder(s).`);
+    } else {
+      console.log('Legacy LARGE_CHEAP tutadates folders left in place if they still contain files.');
+    }
+  }
+
   await pool.end();
+  process.exit(0);
 }
 
 main().catch((err) => {

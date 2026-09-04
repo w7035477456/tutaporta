@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import MyStoryUploadQrPair from 'components/MyStoryUploadQrPair';
-import { PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE } from 'components/ProfilePhotoUploadQrPanel';
+import ProfilePhotoUploadQrPanel, {
+  PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE
+} from 'components/ProfilePhotoUploadQrPanel';
+import dragDropClickUploadImg from 'assets/images/dragDropClickUpload.png';
 import {
   deletePaidRecordAttachment,
   ensurePaidRecord,
@@ -17,6 +20,7 @@ import {
 } from 'api/paidRecordFe';
 import { recordVaultPopupCloseSx } from './recordVaultPopupCloseSx';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
 import BillReceiptAttachmentPreview from './BillReceiptAttachmentPreview';
 
 const SKIP_DUPLICATE_MESSAGE = 'Skipping upload duplicate file';
@@ -38,7 +42,25 @@ const quadrantSx = {
   borderRadius: 1,
   overflow: 'hidden',
   minWidth: 0,
-  minHeight: 0
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100%'
+};
+
+const sectionHeaderSx = {
+  flexShrink: 0,
+  bgcolor: '#000',
+  color: '#fff',
+  WebkitTextFillColor: '#fff',
+  fontFamily: MAIN_FONT_FAMILY,
+  fontWeight: 800,
+  fontSize: '0.95rem',
+  letterSpacing: 0.4,
+  textAlign: 'center',
+  py: 0.6,
+  px: 1,
+  borderBottom: '2px solid #000'
 };
 
 const lightSurfaceTextSx = {
@@ -51,7 +73,9 @@ const lightSurfaceTextSx = {
 };
 
 /**
- * Bills/Receipts popup (ColorTemplate16PopupCenterWide): notes+preview | MyStory upload+QR.
+ * Bills/Receipts popup — four equal quadrants (50/50 × 50/50):
+ * Notes | BILLS/RECEIPTS upload+thumbs
+ * Preview+Download | Phone QR
  */
 export default function BillReceiptsPopup({
   open,
@@ -62,6 +86,7 @@ export default function BillReceiptsPopup({
 }) {
   const notesTimerRef = useRef(null);
   const skipToastTimerRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -70,6 +95,7 @@ export default function BillReceiptsPopup({
   const [notesText, setNotesText] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const showSkipDuplicateToast = useCallback((message = SKIP_DUPLICATE_MESSAGE) => {
     const text = String(message || SKIP_DUPLICATE_MESSAGE).trim() || SKIP_DUPLICATE_MESSAGE;
@@ -243,297 +269,379 @@ export default function BillReceiptsPopup({
   };
 
   const selected = attachments.find((a) => a.attachmentId === selectedId) || null;
+  const uploadDisabled = !paidRecordId || busy;
 
   return (
     <>
-    <ColorTemplate16PopupCenterWide
-      open={open}
-      onClose={() => void handleClose()}
-      closeOnBackdrop
-      closeButtonAriaLabel="Close bills receipts"
-      closeButtonSx={recordVaultPopupCloseSx}
-      resizable
-      defaultResizeHeight={BILL_RECEIPTS_POPUP_HEIGHT}
-      maxResizeHeight={BILL_RECEIPTS_POPUP_HEIGHT}
-      panelShellSx={billReceiptsPopupShellSx}
-      contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
-    >
-      <ColorTemplate16PopupCenterWide.Title>Bills / Receipts</ColorTemplate16PopupCenterWide.Title>
-      <ColorTemplate16PopupCenterWide.Body
-        spacing={1.25}
-        sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      <ColorTemplate16PopupCenterWide
+        open={open}
+        onClose={() => void handleClose()}
+        closeOnBackdrop
+        closeButtonAriaLabel="Close bills receipts"
+        closeButtonSx={recordVaultPopupCloseSx}
+        resizable
+        defaultResizeHeight={BILL_RECEIPTS_POPUP_HEIGHT}
+        maxResizeHeight={BILL_RECEIPTS_POPUP_HEIGHT}
+        panelShellSx={billReceiptsPopupShellSx}
+        contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
       >
-        <Box
-          sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
-          onDragEnter={(e) => {
-            if (e.dataTransfer?.types && Array.from(e.dataTransfer.types).includes('Files')) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-          onDragOver={(e) => {
-            if (e.dataTransfer?.types && Array.from(e.dataTransfer.types).includes('Files')) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-          onDrop={(e) => {
-            // Keep OS file drops inside this popup — never bubble to vault note attach.
-            if (e.dataTransfer?.files?.length) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
+        <ColorTemplate16PopupCenterWide.Title>Bills / Receipts</ColorTemplate16PopupCenterWide.Title>
+        <ColorTemplate16PopupCenterWide.Body
+          spacing={1.25}
+          sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
         >
-        {error ? (
-          <Typography sx={{ color: '#c62828', fontWeight: 700, mb: 1 }}>{error}</Typography>
-        ) : null}
-        {loading ? (
-          <Typography sx={{ fontWeight: 700 }}>Loading…</Typography>
-        ) : (
           <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-              gap: 1.5,
-              flex: 1,
-              minHeight: { xs: 480, md: 0 },
-              fontFamily: MAIN_FONT_FAMILY
+            sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+            onDragEnter={(e) => {
+              if (e.dataTransfer?.types && Array.from(e.dataTransfer.types).includes('Files')) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            onDragOver={(e) => {
+              if (e.dataTransfer?.types && Array.from(e.dataTransfer.types).includes('Files')) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            onDrop={(e) => {
+              // Keep OS file drops inside this popup — never bubble to vault note attach.
+              if (e.dataTransfer?.files?.length) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
             }}
           >
-            {/* Left: notes + preview/download/thumbnails */}
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1.5,
-                minHeight: { xs: 'auto', md: 0 },
-                minWidth: 0
-              }}
-            >
+            {error ? (
+              <Typography sx={{ color: '#c62828', fontWeight: 700, mb: 1, flexShrink: 0 }}>{error}</Typography>
+            ) : null}
+            {loading ? (
+              <Typography sx={{ fontWeight: 700 }}>Loading…</Typography>
+            ) : (
               <Box
                 sx={{
-                  ...quadrantSx,
-                  ...lightSurfaceTextSx,
-                  bgcolor: '#fff',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: { xs: '0 0 auto', md: '1 1 0' },
-                  minHeight: { xs: 140, md: 0 }
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                  gridTemplateRows: { xs: 'auto', md: '1fr 1fr' },
+                  gap: 1.5,
+                  flex: 1,
+                  minHeight: { xs: 640, md: 0 },
+                  height: { md: '100%' },
+                  fontFamily: MAIN_FONT_FAMILY
                 }}
               >
-                <TextField
-                  multiline
-                  fullWidth
-                  value={notesText}
-                  disabled={!paidRecordId || busy}
-                  placeholder="Enter text notes here"
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setNotesText(v);
-                    persistNotes(v);
-                  }}
-                  sx={{
-                    flex: 1,
-                    display: 'flex',
-                    '& .MuiOutlinedInput-root': {
-                      height: '100%',
-                      alignItems: 'stretch',
-                      bgcolor: '#fff',
-                      border: 'none',
-                      borderRadius: 0,
-                      fontFamily: MAIN_FONT_FAMILY,
-                      fontWeight: 700,
-                      color: '#000',
-                      WebkitTextFillColor: '#000'
-                    },
-                    '& fieldset': { border: 'none' },
-                    '& textarea': {
-                      height: '100% !important',
-                      overflow: 'auto !important',
-                      textAlign: 'center',
-                      boxSizing: 'border-box',
-                      color: '#000 !important',
-                      WebkitTextFillColor: '#000 !important'
-                    },
-                    '& textarea::placeholder': {
-                      color: 'rgba(0, 0, 0, 0.45)',
-                      opacity: 1
-                    }
-                  }}
-                />
-              </Box>
-
-              <Box
-                sx={{
-                  ...quadrantSx,
-                  ...lightSurfaceTextSx,
-                  bgcolor: '#f5f5f5',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flex: { xs: '0 0 auto', md: '1 1 0' },
-                  minHeight: { xs: 280, md: 0 }
-                }}
-              >
-                <Box
-                  sx={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    p: 1,
-                    minHeight: 0,
-                    overflow: 'hidden'
-                  }}
-                >
-                  {selected && paidRecordId ? (
-                    <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <BillReceiptAttachmentPreview
-                        paidRecordId={paidRecordId}
-                        attachment={selected}
-                        mode="preview"
-                        fitContainer
-                      />
-                    </Box>
-                  ) : (
-                    <Typography sx={{ color: 'rgba(0, 0, 0, 0.55)', fontWeight: 700 }}>
-                      Select a receipt below
-                    </Typography>
-                  )}
-                </Box>
-                <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', flexShrink: 0 }}>
-                  <ColorTemplate13DisableGreenButton
-                    type="button"
-                    disabled={!selected || !paidRecordId}
-                    onClick={() => {
-                      if (!selected || !paidRecordId) return;
-                      window.open(
-                        paidRecordAttachmentDownloadUrl(paidRecordId, selected.attachmentId),
-                        '_blank',
-                        'noopener,noreferrer'
-                      );
+                {/* Top-left: Notes */}
+                <Box sx={{ ...quadrantSx, ...lightSurfaceTextSx, bgcolor: '#fff' }}>
+                  <Box component="div" sx={sectionHeaderSx}>
+                    notes
+                  </Box>
+                  <TextField
+                    multiline
+                    fullWidth
+                    value={notesText}
+                    disabled={!paidRecordId || busy}
+                    placeholder="Enter text notes here"
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setNotesText(v);
+                      persistNotes(v);
                     }}
-                  >
-                    Download
-                  </ColorTemplate13DisableGreenButton>
-                </Box>
-                {attachments.length > 0 ? (
-                  <Box
                     sx={{
+                      flex: 1,
                       display: 'flex',
-                      gap: 1,
-                      overflowX: 'auto',
-                      pb: 0.5,
-                      borderTop: '2px solid #000',
-                      pt: 1,
-                      px: 1,
-                      flexShrink: 0
+                      minHeight: 0,
+                      '& .MuiOutlinedInput-root': {
+                        height: '100%',
+                        alignItems: 'stretch',
+                        bgcolor: '#fff',
+                        border: 'none',
+                        borderRadius: 0,
+                        fontFamily: MAIN_FONT_FAMILY,
+                        fontWeight: 700,
+                        color: '#000',
+                        WebkitTextFillColor: '#000'
+                      },
+                      '& fieldset': { border: 'none' },
+                      '& textarea': {
+                        height: '100% !important',
+                        overflow: 'auto !important',
+                        textAlign: 'center',
+                        boxSizing: 'border-box',
+                        color: '#000 !important',
+                        WebkitTextFillColor: '#000 !important'
+                      },
+                      '& textarea::placeholder': {
+                        color: 'rgba(0, 0, 0, 0.45)',
+                        opacity: 1
+                      }
+                    }}
+                  />
+                </Box>
+
+                {/* Top-right: BILLS/RECEIPTS upload + thumbnails */}
+                <Box sx={{ ...quadrantSx, bgcolor: 'var(--theme-secondary-color)' }}>
+                  <Box
+                    component="div"
+                    sx={{
+                      ...sectionHeaderSx,
+                      bgcolor: 'var(--theme-primary-color)',
+                      borderBottomColor: '#000'
                     }}
                   >
-                    {attachments.map((att) => {
-                      const active = att.attachmentId === selectedId;
-                      return (
-                        <Box
-                          key={att.attachmentId}
-                          sx={{
-                            position: 'relative',
-                            width: 72,
-                            height: 72,
-                            flexShrink: 0,
-                            border: active ? '3px solid #2e7d32' : '2px solid #000',
-                            borderRadius: 1,
-                            overflow: 'hidden',
-                            bgcolor: '#ddd',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => setSelectedId(att.attachmentId)}
-                        >
-                          {att.previewable || att.previewKind ? (
-                            <BillReceiptAttachmentPreview
-                              paidRecordId={paidRecordId}
-                              attachment={att}
-                              mode="thumb"
-                            />
-                          ) : (
-                            <Typography
-                              sx={{
-                                fontSize: '0.65rem',
-                                fontWeight: 800,
-                                p: 0.5,
-                                wordBreak: 'break-all',
-                                color: '#000 !important',
-                                WebkitTextFillColor: '#000 !important'
-                              }}
-                            >
-                              {att.originalFileName}
-                            </Typography>
-                          )}
+                    BILLS/RECEIPTS
+                  </Box>
+                  <Box
+                    className="bill-receipts-upload-drop"
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!uploadDisabled) setDragOver(true);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!uploadDisabled) setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOver(false);
+                      if (uploadDisabled) return;
+                      void handleFiles(e.dataTransfer?.files);
+                    }}
+                    onClick={() => {
+                      if (uploadDisabled) return;
+                      fileInputRef.current?.click();
+                    }}
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: uploadDisabled ? 'default' : 'pointer',
+                      bgcolor: dragOver ? 'var(--theme-daynight-color)' : 'transparent',
+                      px: 1,
+                      py: 1,
+                      transition: 'background-color 0.15s ease'
+                    }}
+                  >
+                    {busy ? (
+                      <CircularProgress size={40} sx={{ color: 'var(--theme-primary-color)' }} />
+                    ) : (
+                      <Box
+                        component="img"
+                        src={dragDropClickUploadImg}
+                        alt="Drag and drop or click to upload bills or receipts"
+                        sx={{
+                          maxWidth: 'min(100%, 160px)',
+                          width: '100%',
+                          height: 'auto',
+                          display: 'block',
+                          userSelect: 'none',
+                          transition: 'transform 0.15s ease',
+                          '@media (hover: hover)': {
+                            '.bill-receipts-upload-drop:hover &': {
+                              transform: `scale(${getHoverMagnifyFactor()})`
+                            }
+                          }
+                        }}
+                      />
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      multiple
+                      hidden
+                      onChange={(e) => {
+                        void handleFiles(e.target.files);
+                        e.target.value = '';
+                      }}
+                    />
+                  </Box>
+                  {attachments.length > 0 ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 1,
+                        overflowX: 'auto',
+                        borderTop: '2px solid #000',
+                        pt: 1,
+                        pb: 1,
+                        px: 1,
+                        flexShrink: 0,
+                        bgcolor: '#fff',
+                        ...lightSurfaceTextSx
+                      }}
+                    >
+                      {attachments.map((att) => {
+                        const active = att.attachmentId === selectedId;
+                        return (
                           <Box
-                            component="button"
-                            type="button"
-                            aria-label="Remove attachment"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void handleDelete(att.attachmentId);
-                            }}
+                            key={att.attachmentId}
                             sx={{
-                              position: 'absolute',
-                              top: 2,
-                              right: 2,
-                              width: 22,
-                              height: 22,
-                              borderRadius: '50%',
-                              border: '1px solid #000',
-                              bgcolor: '#e53935',
-                              color: '#fff',
-                              fontWeight: 900,
-                              fontSize: '0.85rem',
-                              lineHeight: 1,
-                              cursor: 'pointer',
-                              p: 0
+                              position: 'relative',
+                              width: 64,
+                              height: 64,
+                              flexShrink: 0,
+                              border: active ? '3px solid #2e7d32' : '2px solid #000',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                              bgcolor: '#ddd',
+                              cursor: 'pointer'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedId(att.attachmentId);
                             }}
                           >
-                            ×
+                            {att.previewable || att.previewKind ? (
+                              <BillReceiptAttachmentPreview
+                                paidRecordId={paidRecordId}
+                                attachment={att}
+                                mode="thumb"
+                              />
+                            ) : (
+                              <Typography
+                                sx={{
+                                  fontSize: '0.6rem',
+                                  fontWeight: 800,
+                                  p: 0.5,
+                                  wordBreak: 'break-all',
+                                  color: '#000 !important',
+                                  WebkitTextFillColor: '#000 !important'
+                                }}
+                              >
+                                {att.originalFileName}
+                              </Typography>
+                            )}
+                            <Box
+                              component="button"
+                              type="button"
+                              aria-label="Remove attachment"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                void handleDelete(att.attachmentId);
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                top: 2,
+                                right: 2,
+                                width: 20,
+                                height: 20,
+                                borderRadius: '50%',
+                                border: '1px solid #000',
+                                bgcolor: '#e53935',
+                                color: '#fff',
+                                fontWeight: 900,
+                                fontSize: '0.8rem',
+                                lineHeight: 1,
+                                cursor: 'pointer',
+                                p: 0
+                              }}
+                            >
+                              ×
+                            </Box>
                           </Box>
-                        </Box>
-                      );
-                    })}
+                        );
+                      })}
+                    </Box>
+                  ) : null}
+                </Box>
+
+                {/* Bottom-left: Preview + Download */}
+                <Box sx={{ ...quadrantSx, ...lightSurfaceTextSx, bgcolor: '#f5f5f5' }}>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      p: 1,
+                      minHeight: 0,
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {selected && paidRecordId ? (
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <BillReceiptAttachmentPreview
+                          paidRecordId={paidRecordId}
+                          attachment={selected}
+                          mode="preview"
+                          fitContainer
+                        />
+                      </Box>
+                    ) : (
+                      <Typography sx={{ color: 'rgba(0, 0, 0, 0.55)', fontWeight: 700 }}>
+                        Select a receipt above
+                      </Typography>
+                    )}
                   </Box>
-                ) : null}
+                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', flexShrink: 0 }}>
+                    <ColorTemplate13DisableGreenButton
+                      type="button"
+                      disabled={!selected || !paidRecordId}
+                      onClick={() => {
+                        if (!selected || !paidRecordId) return;
+                        window.open(
+                          paidRecordAttachmentDownloadUrl(paidRecordId, selected.attachmentId),
+                          '_blank',
+                          'noopener,noreferrer'
+                        );
+                      }}
+                    >
+                      Download
+                    </ColorTemplate13DisableGreenButton>
+                  </Box>
+                </Box>
+
+                {/* Bottom-right: Phone QR */}
+                <Box
+                  sx={{
+                    ...quadrantSx,
+                    bgcolor: 'var(--theme-secondary-color)',
+                    p: 1,
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <ProfilePhotoUploadQrPanel
+                    variant="inline"
+                    purpose="bill_receipt"
+                    paidRecordId={paidRecordId}
+                    disabled={busy || !paidRecordId}
+                    messageOverride={PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE}
+                    onPhoneUploadComplete={async () => {
+                      await reload();
+                    }}
+                    messageSx={{
+                      fontFamily: MAIN_FONT_FAMILY,
+                      color: 'var(--theme-primary-color)'
+                    }}
+                    sx={{
+                      flex: 1,
+                      width: '100%',
+                      minHeight: 0,
+                      height: '100%'
+                    }}
+                  />
+                </Box>
               </Box>
-            </Box>
-
-            {/* Right: My Album & Posts upload + phone QR (borrowed from /myStory) */}
-            <Box
-              sx={{
-                minHeight: { xs: 'auto', md: 0 },
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'stretch'
-              }}
-            >
-              <MyStoryUploadQrPair
-                onFiles={(fileList) => void handleFiles(fileList)}
-                uploading={busy}
-                disabled={!paidRecordId}
-                accept="image/*,.pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                purpose="bill_receipt"
-                paidRecordId={paidRecordId}
-                qrMessageOverride={PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE}
-                onPhoneUploadComplete={async () => {
-                  await reload();
-                }}
-                sx={{ flex: 1, minHeight: { md: 0 } }}
-              />
-            </Box>
+            )}
           </Box>
-        )}
-
-        </Box>
-      </ColorTemplate16PopupCenterWide.Body>
-    </ColorTemplate16PopupCenterWide>
+        </ColorTemplate16PopupCenterWide.Body>
+      </ColorTemplate16PopupCenterWide>
       <ColorTemplate16PopupCenterWide
         open={Boolean(skipToast)}
         onClose={() => {

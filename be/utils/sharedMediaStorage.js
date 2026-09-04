@@ -1,15 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { getLargeCheapStorageFolderRoot } from './tutaDriveMemberPaths.js';
-import {
-  getLegacyPhotoFolder,
-  listTutaDatesPhotoStorageRoots
-} from './photoFilePath.js';
+import os from 'os';
+import { getLegacyPhotoFolder, listTutaDatesPhotoStorageRoots } from './photoFilePath.js';
 import {
   getLegacyVideoFolder,
   listTutaDatesVideoStorageRoots
 } from './videoFilePath.js';
-import { TUTADATES_VAULT_DIR } from './tutaDatesMemberPaths.js';
+import { getTutaDatesStorageRoot, TUTADATES_VAULT_DIR } from './tutaDatesMemberPaths.js';
 
 export { getVideoFolder } from './videoFilePath.js';
 
@@ -17,10 +14,14 @@ export function isMultiServerClusterMode() {
   return String(process.env.CLUSTER_MULTI_SERVER || '').trim().toLowerCase() === 'true';
 }
 
+/** True for ephemeral/home-local paths that cannot be shared across cluster web hosts. */
 function isLikelyLocalOnlyPath(dirPath) {
   const normalized = path.resolve(String(dirPath || ''));
-  if (normalized.includes(`${path.sep}onlinemallwebsite_storage${path.sep}`)) return true;
-  if (normalized.includes(`${path.sep}mac_storage${path.sep}onlinemallwebsite_storage`)) return true;
+  const tmp = path.resolve(os.tmpdir());
+  if (normalized.startsWith(tmp + path.sep) || normalized === tmp) return true;
+  // Shared mounts like /mnt/pgdata16/... are fine; only reject bare home-local storage.
+  const homeStorage = path.join(os.homedir(), 'onlinemallwebsite_storage');
+  if (normalized === homeStorage || normalized.startsWith(homeStorage + path.sep)) return true;
   return false;
 }
 
@@ -42,7 +43,7 @@ function checkDirAccess(label, dirPath, issues) {
 }
 
 /**
- * Validates legacy flat folders (if set) and LARGE_CHEAP_STORAGE/users (per-member tutadates layout).
+ * Validates STORAGE_FOLDER/users/M{id}/tutadates and legacy flat folders when set.
  */
 export function validateMediaStorage() {
   const issues = [];
@@ -50,7 +51,7 @@ export function validateMediaStorage() {
   const videoRoots = listTutaDatesVideoStorageRoots();
 
   if (!photoRoots.length && !getLegacyPhotoFolder()) {
-    issues.push('Tuta Dates photo storage is not configured (LARGE_CHEAP_STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
+    issues.push('Tuta Dates photo storage is not configured (STORAGE_FOLDER or TUTADATES_PHOTO_FOLDER)');
   }
 
   for (const dir of photoRoots) {
@@ -59,7 +60,7 @@ export function validateMediaStorage() {
 
   const legacyPhoto = getLegacyPhotoFolder().replace(/\/+$/, '');
   if (legacyPhoto && !photoRoots.includes(path.resolve(legacyPhoto))) {
-    checkDirAccess('Legacy TUTADATES_PHOTO_FOLDER', legacyPhoto, issues);
+    checkDirAccess('Legacy flat TUTADATES_PHOTO_FOLDER', legacyPhoto, issues);
   }
 
   for (const dir of videoRoots) {
@@ -68,17 +69,17 @@ export function validateMediaStorage() {
 
   const legacyVideo = getLegacyVideoFolder().replace(/\/+$/, '');
   if (legacyVideo && !videoRoots.includes(path.resolve(legacyVideo))) {
-    checkDirAccess('Legacy TUTADATES_VIDEO_FOLDER', legacyVideo, issues);
+    checkDirAccess('Legacy flat TUTADATES_VIDEO_FOLDER', legacyVideo, issues);
   }
 
-  let cheapUsersDir = '';
+  let storageUsersDir = '';
   try {
-    cheapUsersDir = path.join(getLargeCheapStorageFolderRoot(), 'users');
-    if (!fs.existsSync(cheapUsersDir)) {
-      issues.push(`LARGE_CHEAP_STORAGE_FOLDER users dir missing (${cheapUsersDir}) — expected M*/${TUTADATES_VAULT_DIR}/photos`);
+    storageUsersDir = path.join(getTutaDatesStorageRoot(), 'users');
+    if (!fs.existsSync(storageUsersDir)) {
+      issues.push(`STORAGE_FOLDER users dir missing (${storageUsersDir}) — expected M*/${TUTADATES_VAULT_DIR}/photos`);
     }
   } catch (err) {
-    issues.push(err?.message || 'LARGE_CHEAP_STORAGE_FOLDER is not set');
+    issues.push(err?.message || 'STORAGE_FOLDER is not set');
   }
 
   return {

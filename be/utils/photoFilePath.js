@@ -2,11 +2,12 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { photoThumbnailFileNameForBase, unlinkPhotoThumbnailFromDisk } from './photoThumbnail.js';
-import { getLargeCheapStorageFolderRoot } from './tutaDriveMemberPaths.js';
 import {
   ensureTutaDatesMemberLayout,
+  getTutaDatesStorageRoot,
   listMemberTutaDatesPhotoDirs,
   tutaDatesPhotosPath,
+  tutaDatesPhotosPathLegacyLargeCheap,
   TUTADATES_VAULT_DIR
 } from './tutaDatesMemberPaths.js';
 
@@ -38,8 +39,8 @@ export function getLegacyPhotoFolder() {
 }
 
 /**
- * Photo folder for one member under LARGE_CHEAP_STORAGE/users/M{id}/tutadates/photos/.
- * Without memberId, returns legacy TUTADATES_PHOTO_FOLDER for admin / fallback reads.
+ * Photo folder for one member under STORAGE_FOLDER/users/M{id}/tutadates/photos/.
+ * Without memberId, returns legacy flat TUTADATES_PHOTO_FOLDER for admin / fallback reads.
  */
 export function getPhotoFolder(memberId = null) {
   const memberPart = memberId != null ? String(memberId).trim() : '';
@@ -69,6 +70,7 @@ export function buildPhotoSearchFolders({ filePathFromDb = null, memberId = null
   add(filePathFromDb);
   if (memberId != null && String(memberId).trim()) {
     add(tutaDatesPhotosPath(memberId));
+    add(tutaDatesPhotosPathLegacyLargeCheap(memberId));
   }
   add(getLegacyPhotoFolder());
   return folders;
@@ -126,7 +128,7 @@ export function countPhotoFolderFiles() {
   const roots = listTutaDatesPhotoStorageRoots();
   const cheapRoot = (() => {
     try {
-      return getLargeCheapStorageFolderRoot();
+      return getTutaDatesStorageRoot();
     } catch {
       return '';
     }
@@ -136,7 +138,7 @@ export function countPhotoFolderFiles() {
       ? roots.join(', ')
       : envRaw || cheapRoot
         ? `${cheapRoot}/users/M*/${TUTADATES_VAULT_DIR}/photos`
-        : '(TUTADATES photo storage not configured)';
+        : '(Tuta Dates photo storage not configured)';
 
   if (!roots.length) {
     return { label, fileCount: null, missing: true };
