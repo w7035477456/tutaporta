@@ -150,35 +150,12 @@ function noteLooksLikeGarbageV1(db, noteRow) {
 }
 
 /**
- * Revive soft-deleted canonical SAMPLE RECEIPTS (welcome/tutorial note).
- * @returns {number} notes revived
+ * Revive soft-deleted canonical SAMPLE RECEIPTS — disabled.
+ * Registration samples are seeded once; user deletes must stick.
+ * @returns {number} always 0
  */
-function reviveSoftDeletedCanonicalSampleNotes(db) {
-  const rows = queryAll(
-    db,
-    `SELECT note_id, note_name, body_text FROM notes WHERE deleted_at IS NOT NULL`
-  );
-  let revived = 0;
-  for (const row of rows) {
-    const name = String(row.note_name || '')
-      .trim()
-      .toUpperCase();
-    if (name !== 'SAMPLE RECEIPTS') continue;
-    if (!noteLooksLikeCanonicalSample(row.body_text)) continue;
-    const live = queryOne(
-      db,
-      `SELECT note_id FROM notes
-       WHERE deleted_at IS NULL AND upper(trim(note_name)) = ?
-       LIMIT 1`,
-      [name]
-    );
-    if (live) continue;
-    db.run(`UPDATE notes SET deleted_at = NULL, updated_at = datetime('now') WHERE note_id = ?`, [
-      row.note_id
-    ]);
-    revived += 1;
-  }
-  return revived;
+function reviveSoftDeletedCanonicalSampleNotes(_db) {
+  return 0;
 }
 
 function noteHasCanonicalDm1Attachments(db, noteId, expectedAttachments) {
@@ -222,6 +199,36 @@ function findLiveNoteByName(db, noteName) {
   );
 }
 
+/** Soft-deleted row with this notebook name (user removed it intentionally). */
+function findSoftDeletedNotebookByName(db, notebookName) {
+  const name = String(notebookName || '')
+    .trim()
+    .toUpperCase();
+  if (!name) return null;
+  return queryOne(
+    db,
+    `SELECT notebook_id, notebook_name, deleted_at FROM notebooks
+     WHERE deleted_at IS NOT NULL AND upper(trim(notebook_name)) = ?
+     ORDER BY notebook_id ASC LIMIT 1`,
+    [name]
+  );
+}
+
+/** Soft-deleted note with this name (user removed it intentionally). */
+function findSoftDeletedNoteByName(db, noteName) {
+  const name = String(noteName || '')
+    .trim()
+    .toUpperCase();
+  if (!name) return null;
+  return queryOne(
+    db,
+    `SELECT note_id, note_name, deleted_at FROM notes
+     WHERE deleted_at IS NOT NULL AND upper(trim(note_name)) = ?
+     ORDER BY note_id ASC LIMIT 1`,
+    [name]
+  );
+}
+
 function vaultAlreadyHasNewMemberSample(db) {
   const marker = recordVaultNewMemberSampleSeedMarker();
   const noteDefs = listRecordVaultSampleNoteDefs();
@@ -236,6 +243,23 @@ function vaultAlreadyHasNewMemberSample(db) {
     if (!noteHasCanonicalDm1Attachments(db, row.note_id, noteDef.attachments || [])) return false;
   }
   return noteDefs.length > 0;
+}
+
+/**
+ * True when the member previously had the registration sample set and soft-deleted it.
+ * Soft-deleted rows mean "seed once already happened; do not recreate."
+ */
+function userRemovedNewMemberSample(db) {
+  const manifest = loadRecordVaultNewMemberSampleManifest();
+  for (const nbDef of listRecordVaultSampleNotebooks(manifest)) {
+    const notebookName = String(nbDef.notebookName || '').trim();
+    if (notebookName && findSoftDeletedNotebookByName(db, notebookName)) return true;
+    for (const noteDef of nbDef.notes || []) {
+      const noteName = String(noteDef.noteName || '').trim();
+      if (noteName && findSoftDeletedNoteByName(db, noteName)) return true;
+    }
+  }
+  return false;
 }
 
 /** Pre-sample starter notebook name (legacy registration default). */
@@ -594,6 +618,8 @@ function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
     const countRow = queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`);
     if (Number(countRow?.c ?? 0) > 0) return false;
   }
+  // Never recreate sample notebooks/notes the member already soft-deleted.
+  if (userRemovedNewMemberSample(db)) return false;
 
   const manifest = loadRecordVaultNewMemberSampleManifest();
   let nextAttachmentId =
@@ -603,6 +629,9 @@ function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
   for (const nbDef of listRecordVaultSampleNotebooks(manifest)) {
     const notebookName = String(nbDef.notebookName || '').trim();
     if (!notebookName) continue;
+
+    // Soft-deleted SAMPLE notebook = user removed it; do not insert a new one.
+    if (findSoftDeletedNotebookByName(db, notebookName)) continue;
 
     let notebookRow = queryOne(
       db,
@@ -628,6 +657,8 @@ function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
     for (const noteDef of nbDef.notes || []) {
       const noteName = String(noteDef.noteName || '').trim();
       if (!noteName) continue;
+      // Soft-deleted sample note = user removed it; do not recreate.
+      if (findSoftDeletedNoteByName(db, noteName)) continue;
       const existing = findLiveNoteByName(db, noteName);
       if (existing) {
         if (noteLooksLikeGarbageV1(db, existing)) {
@@ -659,11 +690,13 @@ export function seedRecordVaultNewMemberSampleDb(db) {
 }
 
 /**
- * Existing vaults: purge garbage v1 placeholders, then ensure dm1 SAMPLE NOTE1/2 exist.
- * Never wipes unrelated user notebooks/notes.
+ * Existing vaults: purge garbage v1 placeholders / legacy sets.
+ * Registration SAMPLE MISC + SAMPLE TAX RECORDS are seeded once (empty vault only).
+ * Soft-deleted or previously seeded (meta / hard-deleted) samples are never recreated.
+ * @param {{ allowSeed?: boolean }} [options] allowSeed=false when vault.meta already marked seeded
  * @returns {'inserted'|'present'|'upgraded'|'skipped'}
  */
-export function ensureRecordVaultNewMemberSampleDb(db) {
+export function ensureRecordVaultNewMemberSampleDb(db, { allowSeed = true } = {}) {
   ensureRecordVaultSharedContentKeyColumn(db);
   const purgedLegacyNb1 = purgeLegacyDefaultNotebook1(db);
   const purgedV2 = purgeLegacyV2SampleSet(db);
@@ -685,20 +718,26 @@ export function ensureRecordVaultNewMemberSampleDb(db) {
     return changedMeta ? 'upgraded' : 'present';
   }
 
+  // Member already deleted the registration samples — leave them gone.
+  if (userRemovedNewMemberSample(db)) {
+    return changedMeta ? 'upgraded' : 'present';
+  }
+
+  // Meta stamp / prior seed — do not recreate after hard delete.
+  if (!allowSeed) {
+    return changedMeta ? 'upgraded' : 'present';
+  }
+
   const notebookCount = Number(
     queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`)?.c ?? 0
   );
+  // Seed only into a truly empty vault (first open / new registration).
   if (notebookCount === 0) {
     const seeded = seedRecordVaultNewMemberSampleDb(db);
-    if (!seeded) return 'skipped';
-    return purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0 || revived > 0 ? 'upgraded' : 'inserted';
+    if (!seeded) return changedMeta ? 'upgraded' : 'skipped';
+    return purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0 ? 'upgraded' : 'inserted';
   }
 
-  const inserted = seedSampleNotebooksIntoDb(db, { onlyWhenEmpty: false });
-  if (inserted && !changedMeta) return 'inserted';
-  if (inserted || changedMeta) {
-    return purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0 || revived > 0 ? 'upgraded' : 'inserted';
-  }
   return changedMeta ? 'upgraded' : 'present';
 }
 

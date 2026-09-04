@@ -107,8 +107,7 @@ export async function uploadPaidRecordAttachment(paidRecordId, file) {
   form.append('file', file, file?.name || 'file');
   const { data } = await api.post(
     `/api/paidRecord/${encodeURIComponent(paidRecordId)}/attachments`,
-    form,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
+    form
   );
   // Re-fetch full record so notes + attachments stay in sync
   const full = await fetchPaidRecord(paidRecordId);

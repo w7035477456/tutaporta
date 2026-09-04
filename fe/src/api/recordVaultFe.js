@@ -645,6 +645,8 @@ export async function fetchRecordVaultStorageConfig() {
     enabled: Boolean(choice?.enabled)
   });
   return {
+    leftSide: data?.leftSide != null ? String(data.leftSide) : '',
+    tutaDrive: Boolean(data?.tutaDrive),
     oneDrive: mapChoice(data?.oneDrive),
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
@@ -1007,7 +1009,9 @@ export async function createRecordVaultTutaDriveEncryptedBackup() {
     'backup.zip'
   );
   const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
   });
   return data;
 }
@@ -1047,7 +1051,9 @@ export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName)
     'TutaNotes-restore.zip'
   );
   const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
   });
   return data;
 }
@@ -1080,9 +1086,7 @@ export async function restoreRecordVaultOneDriveBackupZip(file) {
   if (!file) throw new Error('Choose a backup zip file first');
   const formData = new FormData();
   formData.append('backup', file);
-  const { data } = await api.post('/api/recordVault/onedrive/restore-zip', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  const { data } = await api.post('/api/recordVault/onedrive/restore-zip', formData);
   return data;
 }
 
@@ -1097,7 +1101,6 @@ export async function restoreRecordVaultUsbBackupZip(file) {
   }
   const { data } = await api.post('/api/recordVault/usb/restore-zip', formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
       'X-Record-Vault-Storage': 'usb'
     }
   });

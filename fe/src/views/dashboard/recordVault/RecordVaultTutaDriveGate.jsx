@@ -6,6 +6,7 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
+import RecordVaultOneDriveBackupDialog from './RecordVaultOneDriveBackupDialog';
 import {
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveStatus,
@@ -23,7 +24,8 @@ import {
 } from './tutaNotesBranding';
 import {
   tutaNotesPostLoginActionButtonSx,
-  tutaNotesPostLoginButtonRowSx
+  tutaNotesPostLoginButtonRowSx,
+  tutaNotesYellowPostLoginButtonSx
 } from './tutaNotesPostLoginActionButtonSx';
 
 /**
@@ -48,6 +50,7 @@ export default function RecordVaultTutaDriveGate({
   const lastFormatRefreshRef = useRef(0);
   const autoOpenAttemptedRef = useRef(false);
   const [autoOpenAwaitingAccess, setAutoOpenAwaitingAccess] = useState(false);
+  const [backupDialogOpen, setBackupDialogOpen] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -137,6 +140,16 @@ export default function RecordVaultTutaDriveGate({
 
   return (
     <>
+      <RecordVaultOneDriveBackupDialog
+        open={open && backupDialogOpen}
+        tutaDrive
+        onClose={() => setBackupDialogOpen(false)}
+        onOpenMyNote={() => {
+          setBackupDialogOpen(false);
+          handleOpen();
+        }}
+        onRestored={() => void refreshStatus()}
+      />
       <BusyHourglassOverlay
         open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
         label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
@@ -215,6 +228,15 @@ export default function RecordVaultTutaDriveGate({
               sx={tutaNotesPostLoginActionButtonSx}
             >
               {busy ? 'Opening…' : TUTANOTES_TUTADRIVE_OPEN_LABEL}
+            </GreenButton>
+            <GreenButton
+              type="button"
+              singleLineLabel={false}
+              disabled={busy}
+              onClick={() => setBackupDialogOpen(true)}
+              sx={{ ...tutaNotesPostLoginActionButtonSx, ...tutaNotesYellowPostLoginButtonSx }}
+            >
+              Backup &amp; Restore Cloud
             </GreenButton>
           </Box>
         </Box>

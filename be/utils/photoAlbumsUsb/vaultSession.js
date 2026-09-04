@@ -1619,7 +1619,7 @@ export function vaultUpdateNotebook(session, notebookId, notebookName) {
 export function vaultDeleteNotebook(session, notebookId) {
   const noteRows = queryAll(
     session.db,
-    `SELECT note_id FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
+    `SELECT note_id FROM notes WHERE notebook_id = ?`,
     [notebookId]
   );
   for (const note of noteRows) {
@@ -1631,12 +1631,9 @@ export function vaultDeleteNotebook(session, notebookId) {
   }
   // Wipe leftover files/{notebookId}/ and photos/{notebookId}/ (orphans + empty dirs).
   removeNotebookMediaDirs(session, notebookId);
-  session.db.run(`UPDATE notebooks SET deleted_at = datetime('now') WHERE notebook_id = ?`, [notebookId]);
-  session.db.run(
-    `UPDATE notes SET deleted_at = datetime('now') WHERE notebook_id = ? AND deleted_at IS NULL`,
-    [notebookId]
-  );
   session.db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
+  session.db.run(`DELETE FROM notes WHERE notebook_id = ?`, [notebookId]);
+  session.db.run(`DELETE FROM notebooks WHERE notebook_id = ?`, [notebookId]);
   markDirty(session);
   flushDbToUsb(session);
 }
@@ -1993,15 +1990,12 @@ export function vaultDeleteNote(session, noteId, { skipFlush = false } = {}) {
   if (vaultTableExists(session.db, 'note_extra_images')) {
     const extraImageRows = queryAll(
       session.db,
-      `SELECT relative_path FROM note_extra_images WHERE note_id = ? AND deleted_at IS NULL`,
+      `SELECT relative_path FROM note_extra_images WHERE note_id = ?`,
       [noteId]
     );
     for (const img of extraImageRows) {
       deleteEncryptedPhoto(session, img.relative_path);
     }
-    session.db.run(`UPDATE note_extra_images SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
-      noteId
-    ]);
   }
   // Include already soft-deleted rows so orphaned disk files are still removed.
   const attachmentRows = queryAll(
@@ -2016,11 +2010,15 @@ export function vaultDeleteNote(session, noteId, { skipFlush = false } = {}) {
   }
   // Nuclear: remove entire album folder (catches any leftover variants / orphans).
   removeNoteMediaDirs(session, row.notebook_id, noteId);
-  session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
-    noteId
-  ]);
-  session.db.run(`UPDATE notes SET deleted_at = datetime('now') WHERE note_id = ?`, [noteId]);
+  if (vaultTableExists(session.db, 'note_extra_images')) {
+    session.db.run(`DELETE FROM note_extra_images WHERE note_id = ?`, [noteId]);
+  }
+  if (vaultTableExists(session.db, 'note_keywords')) {
+    session.db.run(`DELETE FROM note_keywords WHERE note_id = ?`, [noteId]);
+  }
+  session.db.run(`DELETE FROM note_attachments WHERE note_id = ?`, [noteId]);
   session.db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [noteId]);
+  session.db.run(`DELETE FROM notes WHERE note_id = ?`, [noteId]);
   markDirty(session);
   if (!skipFlush) flushDbToUsb(session);
 }

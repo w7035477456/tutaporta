@@ -97,7 +97,7 @@ export async function softResetMemberAccount(singlesId) {
         demoBuddies,
         billSchedule: bill,
         vaultNotes:
-          'Default SAMPLE MISC / SAMPLE TAX RECORDS (four sample notes) apply when the member next unlocks an empty or upgraded TutaNotes vault (custom notes are not removed).',
+          'Default SAMPLE MISC / SAMPLE TAX RECORDS (four sample notes) are seeded once into an empty TutaNotes vault on first unlock. If the member deletes them, they stay deleted (not recreated on unlock).',
         vaultAlbums:
           'Default SAMPLE SET / SAMPLE ALBUM apply when the member next opens an empty TutaPhotoAlbums vault (custom albums are not removed).'
       }

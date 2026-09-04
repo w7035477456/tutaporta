@@ -836,6 +836,21 @@ app.use((req, res, next) => {
       note: 'Phone QR upload — if logs stop here, body never reached route (proxy limit or disconnect)'
     });
   }
+  if (
+    req.method === 'POST' &&
+    (req.path === '/api/recordVault/tutadrive/backup' ||
+      req.path === '/api/recordVault/tutadrive/restore-zip')
+  ) {
+    const cl = req.get('content-length');
+    const n = cl ? parseInt(cl, 10) : NaN;
+    uploadTrace('tutadrive-backup-incoming', {
+      path: req.path,
+      contentLength: cl || '(no header)',
+      approxRequestMiB: Number.isFinite(n) ? (n / (1024 * 1024)).toFixed(2) : '?',
+      contentType: String(req.get('content-type') || '').slice(0, 80) || '(none)',
+      note: 'TutaDrive backup/restore multipart — if logs stop here, nginx/HAProxy client_max_body_size may be too small'
+    });
+  }
   next();
 });
 

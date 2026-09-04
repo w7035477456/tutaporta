@@ -91,6 +91,25 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   enforceClientApiCooldown(config.url || '', { base: config.baseURL || getApiBaseUrl() });
+  // FormData must not carry a Content-Type — browser/XHR sets multipart + boundary.
+  // Deleting alone lets axios fall back to application/x-www-form-urlencoded (breaks Busboy).
+  // Setting false tells axios to omit the header entirely.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    // Must omit Content-Type so the browser sets multipart/form-data + boundary.
+    // Default axios instance uses application/json — leaving it breaks Busboy on the server.
+    const headers = config.headers;
+    if (headers && typeof headers.set === 'function') {
+      headers.delete('Content-Type');
+      headers.delete('content-type');
+    } else if (headers) {
+      delete headers['Content-Type'];
+      delete headers['content-type'];
+      if (headers.common) {
+        delete headers.common['Content-Type'];
+        delete headers.common['content-type'];
+      }
+    }
+  }
   return config;
 });
 

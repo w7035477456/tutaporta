@@ -1300,9 +1300,7 @@ export async function restorePhotoAlbumsOneDriveBackupZip(file) {
   if (!file) throw new Error('Choose a backup zip file first');
   const formData = new FormData();
   formData.append('backup', file);
-  const { data } = await api.post('/api/photoAlbums/onedrive/restore-zip', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  const { data } = await api.post('/api/photoAlbums/onedrive/restore-zip', formData);
   return data;
 }
 
@@ -1317,7 +1315,6 @@ export async function restorePhotoAlbumsUsbBackupZip(file) {
   }
   const { data } = await api.post('/api/photoAlbums/usb/restore-zip', formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
       'X-Record-Vault-Storage': 'usb'
     }
   });

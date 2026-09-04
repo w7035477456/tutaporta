@@ -67,6 +67,38 @@ import {
 import { applyTutaNotesTemplate } from '../recordVaultTutaNotesTemplate/applyTutaNotesTemplate.js';
 import { tutaNotesTemplateZipAvailable } from '../recordVaultTutaNotesTemplate/templatePaths.js';
 
+/** vault.meta.json — samples seeded once; hard-delete must not recreate them. */
+export const NEW_MEMBER_SAMPLE_SEEDED_META_KEY = 'newMemberSampleSeeded';
+
+function readNewMemberSampleSeededStamp(mountPath) {
+  try {
+    const meta = readVaultMeta(mountPath) || {};
+    if (meta[NEW_MEMBER_SAMPLE_SEEDED_META_KEY]) return true;
+    // Template zip also delivered SAMPLE notebooks once.
+    if (String(meta.tutaNotesTemplateVersion || '').trim()) return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+function stampNewMemberSampleSeeded(mountPath) {
+  try {
+    const metaPath = vaultMetaPath(mountPath);
+    let meta = {};
+    try {
+      meta = readVaultMeta(mountPath) || {};
+    } catch {
+      meta = {};
+    }
+    if (meta[NEW_MEMBER_SAMPLE_SEEDED_META_KEY]) return;
+    meta[NEW_MEMBER_SAMPLE_SEEDED_META_KEY] = true;
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  } catch (err) {
+    console.warn('[recordVault] could not stamp newMemberSampleSeeded:', err?.message || err);
+  }
+}
+
 /** Prefix for FE inner-layer ciphertext stored in notes.body_text (Argon2id + AES-256-GCM). */
 export const NOTE_INNER_ENCRYPT_BODY_PREFIX = '\u2063RVI';
 
@@ -910,7 +942,18 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     if (!db) {
       throw openErr || new Error('Vault database is missing or unreadable');
     }
-    sampleSeedStatus = templateApplied ? 'template' : ensureRecordVaultNewMemberSampleDb(db);
+    const allowSeed = !readNewMemberSampleSeededStamp(mountPath);
+    sampleSeedStatus = templateApplied
+      ? 'template'
+      : ensureRecordVaultNewMemberSampleDb(db, { allowSeed });
+    if (
+      sampleSeedStatus === 'inserted' ||
+      sampleSeedStatus === 'template' ||
+      sampleSeedStatus === 'present' ||
+      sampleSeedStatus === 'upgraded'
+    ) {
+      stampNewMemberSampleSeeded(mountPath);
+    }
   } catch (err) {
     if (err?.name === 'RecordVaultUnlockError') throw err;
     if (treatAsEncryptedVault) {
@@ -1308,8 +1351,9 @@ function mapNoteRow(row, keywords = [], attachments = [], extraImages = []) {
   };
 }
 
-function loadNote(session, noteId) {
+function loadNote(session, noteId, { includeDeleted = false } = {}) {
   ensureNoteInnerEncryptColumns(session.db);
+  const deletedClause = includeDeleted ? '' : ' AND deleted_at IS NULL';
   return queryOne(
     session.db,
     `SELECT note_id, notebook_id, note_name, body_text, display_order, created_at, updated_at,
@@ -1317,7 +1361,7 @@ function loadNote(session, noteId) {
             image_file_name, image_file_extension, image_relative_path, image_checksum, image_file_size_bytes,
             image_top_file_name, image_top_file_extension, image_top_relative_path, image_top_checksum, image_top_file_size_bytes,
             image_bottom_file_name, image_bottom_file_extension, image_bottom_relative_path, image_bottom_checksum, image_bottom_file_size_bytes
-     FROM notes WHERE note_id = ? AND deleted_at IS NULL`,
+     FROM notes WHERE note_id = ?${deletedClause}`,
     [noteId]
   );
 }
@@ -1467,12 +1511,23 @@ export function vaultUpdateNotebook(session, notebookId, notebookName) {
 }
 
 export function vaultDeleteNotebook(session, notebookId) {
-  session.db.run(`UPDATE notebooks SET deleted_at = datetime('now') WHERE notebook_id = ?`, [notebookId]);
-  session.db.run(
-    `UPDATE notes SET deleted_at = datetime('now') WHERE notebook_id = ? AND deleted_at IS NULL`,
+  const noteRows = queryAll(
+    session.db,
+    `SELECT note_id FROM notes WHERE notebook_id = ?`,
     [notebookId]
   );
+  for (const note of noteRows) {
+    try {
+      vaultDeleteNote(session, Number(note.note_id), { skipFlush: true });
+    } catch (err) {
+      console.error('[vaultDeleteNotebook] note cleanup', note?.note_id, err?.message || err);
+    }
+  }
+  // Wipe leftover files/{notebookId}/ and photos/{notebookId}/ (orphans + empty dirs).
+  removeNotebookMediaDirs(session, notebookId);
   session.db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
+  session.db.run(`DELETE FROM notes WHERE notebook_id = ?`, [notebookId]);
+  session.db.run(`DELETE FROM notebooks WHERE notebook_id = ?`, [notebookId]);
   markDirty(session);
   flushDbToUsb(session);
 }
@@ -1792,33 +1847,66 @@ function vaultReplaceKeywords(session, noteId, keywords) {
   refreshNoteSearchText(session.db, noteId);
 }
 
-export function vaultDeleteNote(session, noteId) {
-  const row = loadNote(session, noteId);
-  if (!row) throw new Error('Note not found');
+/**
+ * Remove on-disk media for one note: files/{notebookId}/{noteId}/.
+ */
+function removeNoteMediaDirs(session, notebookId, noteId) {
+  const nb = String(notebookId);
+  const nid = String(noteId);
+  writeToMirrorPaths(session, (mountPath) => {
+    removeDirRecursive(path.join(vaultFilesRoot(mountPath), nb, nid));
+  });
+  if (session.storageType === 'onedrive') {
+    scheduleCloudRelativeSync(session, `${VAULT_FILES_DIR}/${nb}/${nid}`);
+  }
+}
+
+function removeNotebookMediaDirs(session, notebookId) {
+  const nb = String(notebookId);
+  writeToMirrorPaths(session, (mountPath) => {
+    removeDirRecursive(path.join(vaultFilesRoot(mountPath), nb));
+    removeDirRecursive(path.join(vaultPhotosRoot(mountPath), nb));
+  });
+  if (session.storageType === 'onedrive') {
+    scheduleCloudRelativeSync(session, `${VAULT_FILES_DIR}/${nb}`);
+    scheduleCloudRelativeSync(session, `${VAULT_PHOTOS_DIR}/${nb}`);
+  }
+}
+
+export function vaultDeleteNote(session, noteId, { skipFlush = false } = {}) {
+  const row = loadNote(session, noteId, { includeDeleted: true });
+  if (!row) {
+    // Fall back: note may already be soft-deleted but still have disk folders.
+    const anyRow = queryOne(session.db, `SELECT note_id, notebook_id FROM notes WHERE note_id = ?`, [noteId]);
+    if (!anyRow) throw new Error('Note not found');
+    removeNoteMediaDirs(session, anyRow.notebook_id, noteId);
+    hardDeleteNoteDbRows(session, noteId);
+    markDirty(session);
+    if (!skipFlush) flushDbToUsb(session);
+    return;
+  }
   for (const rel of [row.image_relative_path, row.image_top_relative_path, row.image_bottom_relative_path]) {
     deleteEncryptedPhoto(session, rel);
   }
   if (vaultTableExists(session.db, 'note_extra_images')) {
     const extraImageRows = queryAll(
       session.db,
-      `SELECT relative_path FROM note_extra_images WHERE note_id = ? AND deleted_at IS NULL`,
+      `SELECT relative_path FROM note_extra_images WHERE note_id = ?`,
       [noteId]
     );
     for (const img of extraImageRows) {
       deleteEncryptedPhoto(session, img.relative_path);
     }
-    session.db.run(`UPDATE note_extra_images SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
-      noteId
-    ]);
   }
+  // Include already soft-deleted rows so orphaned disk files are still removed.
   const attachmentRows = queryAll(
     session.db,
-    `SELECT relative_path, shared_content_key, checksum, file_name FROM note_attachments
-     WHERE note_id = ? AND deleted_at IS NULL`,
+    `SELECT relative_path, shared_content_key, checksum, file_name FROM note_attachments WHERE note_id = ?`,
     [noteId]
   );
   for (const att of attachmentRows) {
-    // Shared sample bytes are never deleted — only the per-vault pointer row.
+    if (!att.relative_path) continue;
+    // Shared sample bytes live outside the vault — only remove per-vault copies.
     const sharedKey = resolveRecordVaultSharedContentKey({
       sharedContentKey: att.shared_content_key,
       checksum: att.checksum,
@@ -1828,13 +1916,23 @@ export function vaultDeleteNote(session, noteId) {
       deleteEncryptedVaultFile(session, att.relative_path);
     }
   }
-  session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
-    noteId
-  ]);
-  session.db.run(`UPDATE notes SET deleted_at = datetime('now') WHERE note_id = ?`, [noteId]);
-  session.db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [noteId]);
+  // Nuclear: remove entire note folder under files/ (catches leftovers / orphans).
+  removeNoteMediaDirs(session, row.notebook_id, noteId);
+  hardDeleteNoteDbRows(session, noteId);
   markDirty(session);
-  flushDbToUsb(session);
+  if (!skipFlush) flushDbToUsb(session);
+}
+
+function hardDeleteNoteDbRows(session, noteId) {
+  if (vaultTableExists(session.db, 'note_extra_images')) {
+    session.db.run(`DELETE FROM note_extra_images WHERE note_id = ?`, [noteId]);
+  }
+  if (vaultTableExists(session.db, 'note_keywords')) {
+    session.db.run(`DELETE FROM note_keywords WHERE note_id = ?`, [noteId]);
+  }
+  session.db.run(`DELETE FROM note_attachments WHERE note_id = ?`, [noteId]);
+  session.db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [noteId]);
+  session.db.run(`DELETE FROM notes WHERE note_id = ?`, [noteId]);
 }
 
 export function vaultReorderNotes(session, notebookId, noteIds) {

@@ -349,7 +349,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
     return res.json({
       success: true,
       ...stored,
-      message: `Backup saved (Encrypt Password sealed). Only one backup is kept; previous backup was replaced.`
+      message: `Backup saved (Encrypt Password sealed). Up to ${TUTADRIVE_BACKUP_MAX} backup_*.zip files are kept in your member folder.`
     });
   } catch (err) {
     console.error('[storeRecordVaultTutaDriveBackup]', err?.message || err);

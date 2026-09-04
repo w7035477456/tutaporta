@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Ensure SAMPLE MISC + SAMPLE TAX RECORDS and four default notes exist for every on-disk TutaNotes vault.
+ * Ensure SAMPLE MISC + SAMPLE TAX RECORDS and four default notes exist for empty vaults only.
+ * Soft-deleted sample notebooks are never recreated (member removed them on purpose).
  * Also soft-deletes legacy registration default "Notebook 1" / "NOTEBOOK 1" and v2 SAMPLE NOTEBOOK 1 set.
  *
  * Shared sample attachments use shared_content_key pointers (one media copy under
@@ -14,7 +15,7 @@
  *   node be/scripts/migrateRecordVaultNewMemberSample.js --dry-run
  *
  * Scans LARGE_CHEAP_STORAGE_FOLDER / FAST_STORAGE_FOLDER member TutaNotes vaults when present.
- * Unlocked vaults also self-heal on next unlock via ensureRecordVaultNewMemberSampleDb.
+ * Unlock still runs ensureRecordVaultNewMemberSampleDb (empty vaults only; never recreates user-deleted samples).
  */
 import fs from 'fs';
 import path from 'path';
