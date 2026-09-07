@@ -645,6 +645,8 @@ export default function BillScheduleMonthlyPanel({
         </ColorTemplate13DisableGreenButton>
       </Box>
 
+      <BillScheduleEmailPrefs />
+
       <Box
         sx={{
           flexShrink: 0,
@@ -851,7 +853,6 @@ export default function BillScheduleMonthlyPanel({
               </Typography>
             </Box>
           ))}
-          <BillScheduleEmailPrefs />
         </Box>
       </Box>
 

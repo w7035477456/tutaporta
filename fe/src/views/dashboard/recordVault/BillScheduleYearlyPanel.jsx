@@ -827,30 +827,21 @@ export default function BillScheduleYearlyPanel({
             </Box>
           ))}
         </Box>
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-end',
-            gap: 0.75,
-            flexShrink: 0
-          }}
+        <ColorTemplate13DisableGreenButton
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={loading || saving}
+          sx={
+            dirty && !saving
+              ? { animation: 'blink 1s step-start infinite' }
+              : undefined
+          }
         >
-          <ColorTemplate13DisableGreenButton
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={loading || saving}
-            sx={
-              dirty && !saving
-                ? { animation: 'blink 1s step-start infinite' }
-                : undefined
-            }
-          >
-            {saving ? 'Saving…' : 'SAVE'}
-          </ColorTemplate13DisableGreenButton>
-          <BillScheduleEmailPrefs />
-        </Box>
+          {saving ? 'Saving…' : 'SAVE'}
+        </ColorTemplate13DisableGreenButton>
       </Box>
+
+      <BillScheduleEmailPrefs />
 
       <Box
         sx={{

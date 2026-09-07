@@ -82,7 +82,12 @@ export default function BillScheduleEmailPrefs() {
         flexDirection: 'column',
         alignItems: 'flex-start',
         gap: 0.5,
-        mt: 0.5
+        flexShrink: 0,
+        width: '100%',
+        maxWidth: 920,
+        mx: 'auto',
+        boxSizing: 'border-box',
+        px: { xs: 0, sm: 0.5 }
       }}
     >
       <FormControlLabel
