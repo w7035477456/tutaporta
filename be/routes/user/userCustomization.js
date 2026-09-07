@@ -217,6 +217,8 @@ function rowToPayload(row) {
       customMusicUrls: defaultCustomMusicUrlSlots(),
       loadDefault: true,
       allSinglesWelcomeExpanded: true,
+      sendTuttanoteOverdue: false,
+      sendTuttanote1dayahead: false,
       mainFont: DEFAULT_MAIN_FONT,
       firstVisitPicksPosts: null,
       firstVisitAcquaintBuddies: null,
@@ -260,6 +262,10 @@ function rowToPayload(row) {
     customMusicUrls: normalizeCustomMusicUrlSlots(row.custom_music_url),
     allSinglesWelcomeExpanded:
       row.all_singles_welcome_expanded != null ? parseBooleanEnumRaw(row.all_singles_welcome_expanded) : true,
+    sendTuttanoteOverdue:
+      row.send_tuttanote_overdue != null ? parseBooleanEnumRaw(row.send_tuttanote_overdue) : false,
+    sendTuttanote1dayahead:
+      row.send_tuttanote_1dayahead != null ? parseBooleanEnumRaw(row.send_tuttanote_1dayahead) : false,
     mainFont: normalizeMainFont(row.main_font),
     ...firstVisitFlagsFromDbRow(row),
     ...mynotePrefsFromDbRow(row)
@@ -363,6 +369,8 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS mynote_note_scroll_top integer NULL,
       ADD COLUMN IF NOT EXISTS mynote_editor_caret_pos integer NULL,
       ADD COLUMN IF NOT EXISTS all_singles_welcome_expanded helloworldjunktest.boolean_enum NOT NULL DEFAULT 'true'::helloworldjunktest.boolean_enum,
+      ADD COLUMN IF NOT EXISTS send_tuttanote_overdue helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
+      ADD COLUMN IF NOT EXISTS send_tuttanote_1dayahead helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
       ADD COLUMN IF NOT EXISTS first_visit_picksposts boolean NULL,
       ADD COLUMN IF NOT EXISTS first_visit_acquaintbuddies boolean NULL,
       ADD COLUMN IF NOT EXISTS first_visit_rec_biorequest boolean NULL,
@@ -576,13 +584,29 @@ async function selectCustomizationRow(me) {
              , mynote_last_notebook_id, mynote_last_note_id
              , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
              , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
-             , all_singles_welcome_expanded, first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
+             , all_singles_welcome_expanded
+             , send_tuttanote_overdue, send_tuttanote_1dayahead
+             , first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
        FROM helloworldjunktest.user_customization
        WHERE singles_id = $1`,
       [me]
     );
     return rows[0] ?? null;
   } catch (err) {
+    if (isMissingColumn(err, 'send_tuttanote_overdue') || isMissingColumn(err, 'send_tuttanote_1dayahead')) {
+      const { rows } = await pool.query(
+        `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
+               , custom_music_url, load_default
+               , mynote_last_notebook_id, mynote_last_note_id
+               , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
+               , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
+               , all_singles_welcome_expanded, first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
+         FROM helloworldjunktest.user_customization
+         WHERE singles_id = $1`,
+        [me]
+      );
+      return rows[0] ?? null;
+    }
     if (isMissingColumn(err, 'main_font')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
@@ -881,6 +905,8 @@ export async function putUserCustomization(req, res) {
   const hasCustomMusicUrls = Object.prototype.hasOwnProperty.call(body, 'customMusicUrls');
   const hasMynoteFontSize = Object.prototype.hasOwnProperty.call(body, 'mynoteFontSize');
   const hasAllSinglesWelcomeExpanded = Object.prototype.hasOwnProperty.call(body, 'allSinglesWelcomeExpanded');
+  const hasSendTuttanoteOverdue = Object.prototype.hasOwnProperty.call(body, 'sendTuttanoteOverdue');
+  const hasSendTuttanote1dayahead = Object.prototype.hasOwnProperty.call(body, 'sendTuttanote1dayahead');
   const hasMainFont = Object.prototype.hasOwnProperty.call(body, 'mainFont');
   const hasAnyFirstVisitPref = hasAnyFirstVisitPagePref(body);
   const hasAnyMynotePref = MYNOTE_PREFS_API_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
@@ -896,6 +922,8 @@ export async function putUserCustomization(req, res) {
     !hasVolume &&
     !hasCustomMusicUrls &&
     !hasAllSinglesWelcomeExpanded &&
+    !hasSendTuttanoteOverdue &&
+    !hasSendTuttanote1dayahead &&
     !hasMainFont &&
     !hasAnyFirstVisitPref
   ) {
@@ -988,6 +1016,15 @@ export async function putUserCustomization(req, res) {
   let allSinglesWelcomeExpanded = null;
   if (hasAllSinglesWelcomeExpanded) {
     allSinglesWelcomeExpanded = parseBooleanEnumRaw(body.allSinglesWelcomeExpanded);
+  }
+
+  let sendTuttanoteOverdue = null;
+  if (hasSendTuttanoteOverdue) {
+    sendTuttanoteOverdue = parseBooleanEnumRaw(body.sendTuttanoteOverdue);
+  }
+  let sendTuttanote1dayahead = null;
+  if (hasSendTuttanote1dayahead) {
+    sendTuttanote1dayahead = parseBooleanEnumRaw(body.sendTuttanote1dayahead);
   }
 
   let mainFont = null;
@@ -1093,6 +1130,30 @@ export async function putUserCustomization(req, res) {
         }
       }
     }
+    if (hasSendTuttanoteOverdue) {
+      try {
+        await pool.query(
+          `UPDATE helloworldjunktest.user_customization
+           SET send_tuttanote_overdue = $1::helloworldjunktest.boolean_enum, updated_at = NOW()
+           WHERE singles_id = $2`,
+          [toBooleanEnumLabel(sendTuttanoteOverdue), me]
+        );
+      } catch (flagErr) {
+        if (!isMissingColumn(flagErr, 'send_tuttanote_overdue')) throw flagErr;
+      }
+    }
+    if (hasSendTuttanote1dayahead) {
+      try {
+        await pool.query(
+          `UPDATE helloworldjunktest.user_customization
+           SET send_tuttanote_1dayahead = $1::helloworldjunktest.boolean_enum, updated_at = NOW()
+           WHERE singles_id = $2`,
+          [toBooleanEnumLabel(sendTuttanote1dayahead), me]
+        );
+      } catch (flagErr) {
+        if (!isMissingColumn(flagErr, 'send_tuttanote_1dayahead')) throw flagErr;
+      }
+    }
     const refreshed = await selectCustomizationRow(me);
     return res.status(200).json(rowToPayload({
       chat_font_size: nextChatFontSize,
@@ -1104,6 +1165,18 @@ export async function putUserCustomization(req, res) {
       volume: nextVolume,
       custom_music_url: customMusicUrlSlotsToDb(nextCustomMusicUrls),
       all_singles_welcome_expanded: nextAllSinglesWelcomeExpanded,
+      send_tuttanote_overdue:
+        hasSendTuttanoteOverdue
+          ? sendTuttanoteOverdue
+          : refreshed?.send_tuttanote_overdue != null
+            ? parseBooleanEnumRaw(refreshed.send_tuttanote_overdue)
+            : false,
+      send_tuttanote_1dayahead:
+        hasSendTuttanote1dayahead
+          ? sendTuttanote1dayahead
+          : refreshed?.send_tuttanote_1dayahead != null
+            ? parseBooleanEnumRaw(refreshed.send_tuttanote_1dayahead)
+            : false,
       load_default: parseLoadDefaultFlag(prev),
       main_font: nextMainFont,
       ...nextMynoteDb,

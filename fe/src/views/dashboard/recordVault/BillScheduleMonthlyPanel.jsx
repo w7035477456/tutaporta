@@ -12,6 +12,7 @@ import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
+import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
@@ -850,6 +851,7 @@ export default function BillScheduleMonthlyPanel({
               </Typography>
             </Box>
           ))}
+          <BillScheduleEmailPrefs />
         </Box>
       </Box>
 

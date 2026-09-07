@@ -12,6 +12,7 @@ import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
 import BillReceiptsPopup from './BillReceiptsPopup';
+import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
@@ -826,18 +827,29 @@ export default function BillScheduleYearlyPanel({
             </Box>
           ))}
         </Box>
-        <ColorTemplate13DisableGreenButton
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={loading || saving}
-          sx={
-            dirty && !saving
-              ? { animation: 'blink 1s step-start infinite' }
-              : undefined
-          }
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: 0.75,
+            flexShrink: 0
+          }}
         >
-          {saving ? 'Saving…' : 'SAVE'}
-        </ColorTemplate13DisableGreenButton>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={loading || saving}
+            sx={
+              dirty && !saving
+                ? { animation: 'blink 1s step-start infinite' }
+                : undefined
+            }
+          >
+            {saving ? 'Saving…' : 'SAVE'}
+          </ColorTemplate13DisableGreenButton>
+          <BillScheduleEmailPrefs />
+        </Box>
       </Box>
 
       <Box

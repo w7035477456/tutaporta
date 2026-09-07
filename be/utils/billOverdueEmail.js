@@ -1,11 +1,12 @@
 /**
- * Daily Bill Schedule overdue digest email.
+ * Daily Bill Schedule reminder email (overdue + due-tomorrow).
  *
  * Rules (product):
- * - If the user has any monthly and/or yearly overdue Manual bills, send ONE email that day.
- * - Email shows Monthly + Yearly tables with overdue rows only.
- * - Keep sending daily until no overdue items remain.
- * - At most one email per user per calendar day (bill_overdue_email_log).
+ * - Overdue section: only when user_customization.send_tuttanote_overdue is true
+ *   and user has Manual unpaid bills past due.
+ * - Ahead section: only when user_customization.send_tuttanote_1dayahead is true
+ *   and user has Manual unpaid bills due tomorrow.
+ * - One combined email per user per calendar day (bill_overdue_email_log).
  *
  * Env (~/.ssh/be/.env):
  *   BILL_OVERDUE_EMAIL=true          — master switch (default true when unset)
@@ -84,6 +85,13 @@ function todayYmdLocal(d = new Date()) {
   return `${y}-${m}-${day}`;
 }
 
+function addDaysYmd(ymd, days) {
+  const [y, m, d] = String(ymd).split('-').map((n) => Number(n));
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return todayYmdLocal(dt);
+}
+
 function msUntilNextScheduledRun() {
   const targetHour = getBillOverdueEmailAtHour();
   const now = new Date();
@@ -95,8 +103,12 @@ function msUntilNextScheduledRun() {
   return next.getTime() - now.getTime();
 }
 
+function isPrefTrue(value) {
+  return value === true || value === 'true';
+}
+
 /**
- * Monthly overdue: Manual, not Paid, due (bill_year, bill_month, due_day) < today (local date).
+ * Monthly overdue: Manual, not Paid, due < today; only opted-in users.
  */
 async function loadMonthlyOverdueByUser(client, asOfDate) {
   const { rows } = await client.query(
@@ -113,10 +125,13 @@ async function loadMonthlyOverdueByUser(client, asOfDate) {
       mb.bill_type,
       mb.action
     FROM helloworldjunktest.monthly_bill mb
+    INNER JOIN helloworldjunktest.user_customization uc
+      ON uc.singles_id = mb.singles_id
     WHERE mb.bill_type = 'Manual'
       AND (mb.action IS DISTINCT FROM 'Paid')
       AND mb.due_day IS NOT NULL
       AND mb.due_day BETWEEN 1 AND 31
+      AND uc.send_tuttanote_overdue = 'true'::helloworldjunktest.boolean_enum
       AND (
         (make_date(mb.bill_year, mb.bill_month, 1)
           + ((mb.due_day - 1) * interval '1 day'))::date
@@ -130,7 +145,7 @@ async function loadMonthlyOverdueByUser(client, asOfDate) {
 }
 
 /**
- * Yearly overdue: Manual, not Paid, due (bill_year, bill_month, due_month_day) < today.
+ * Yearly overdue: Manual, not Paid, due < today; only opted-in users.
  */
 async function loadYearlyOverdueByUser(client, asOfDate) {
   const { rows } = await client.query(
@@ -147,12 +162,15 @@ async function loadYearlyOverdueByUser(client, asOfDate) {
       yb.bill_type,
       yb.action
     FROM helloworldjunktest.yearly_bill yb
+    INNER JOIN helloworldjunktest.user_customization uc
+      ON uc.singles_id = yb.singles_id
     WHERE yb.bill_type = 'Manual'
       AND (yb.action IS DISTINCT FROM 'Paid')
       AND yb.bill_month IS NOT NULL
       AND yb.due_month_day IS NOT NULL
       AND yb.bill_month BETWEEN 1 AND 12
       AND yb.due_month_day BETWEEN 1 AND 31
+      AND uc.send_tuttanote_overdue = 'true'::helloworldjunktest.boolean_enum
       AND (
         (make_date(yb.bill_year, yb.bill_month, 1)
           + ((yb.due_month_day - 1) * interval '1 day'))::date
@@ -161,6 +179,82 @@ async function loadYearlyOverdueByUser(client, asOfDate) {
     ORDER BY yb.singles_id, yb.bill_year, yb.bill_month, yb.row_index
     `,
     [asOfDate]
+  );
+  return rows;
+}
+
+/**
+ * Monthly due tomorrow: Manual, not Paid, due = tomorrow; opted-in ahead users.
+ */
+async function loadMonthlyAheadByUser(client, dueDate) {
+  const { rows } = await client.query(
+    `
+    SELECT
+      mb.singles_id,
+      mb.monthly_bill_id,
+      mb.bill_year,
+      mb.bill_month,
+      mb.row_index,
+      mb.bill_description,
+      mb.due_day,
+      mb.amount,
+      mb.bill_type,
+      mb.action
+    FROM helloworldjunktest.monthly_bill mb
+    INNER JOIN helloworldjunktest.user_customization uc
+      ON uc.singles_id = mb.singles_id
+    WHERE mb.bill_type = 'Manual'
+      AND (mb.action IS DISTINCT FROM 'Paid')
+      AND mb.due_day IS NOT NULL
+      AND mb.due_day BETWEEN 1 AND 31
+      AND uc.send_tuttanote_1dayahead = 'true'::helloworldjunktest.boolean_enum
+      AND (
+        (make_date(mb.bill_year, mb.bill_month, 1)
+          + ((mb.due_day - 1) * interval '1 day'))::date
+        = $1::date
+      )
+    ORDER BY mb.singles_id, mb.bill_year, mb.bill_month, mb.row_index
+    `,
+    [dueDate]
+  );
+  return rows;
+}
+
+/**
+ * Yearly due tomorrow: Manual, not Paid, due = tomorrow; opted-in ahead users.
+ */
+async function loadYearlyAheadByUser(client, dueDate) {
+  const { rows } = await client.query(
+    `
+    SELECT
+      yb.singles_id,
+      yb.yearly_bill_id,
+      yb.bill_year,
+      yb.bill_month,
+      yb.row_index,
+      yb.bill_description,
+      yb.due_month_day,
+      yb.amount,
+      yb.bill_type,
+      yb.action
+    FROM helloworldjunktest.yearly_bill yb
+    INNER JOIN helloworldjunktest.user_customization uc
+      ON uc.singles_id = yb.singles_id
+    WHERE yb.bill_type = 'Manual'
+      AND (yb.action IS DISTINCT FROM 'Paid')
+      AND yb.bill_month IS NOT NULL
+      AND yb.due_month_day IS NOT NULL
+      AND yb.bill_month BETWEEN 1 AND 12
+      AND yb.due_month_day BETWEEN 1 AND 31
+      AND uc.send_tuttanote_1dayahead = 'true'::helloworldjunktest.boolean_enum
+      AND (
+        (make_date(yb.bill_year, yb.bill_month, 1)
+          + ((yb.due_month_day - 1) * interval '1 day'))::date
+        = $1::date
+      )
+    ORDER BY yb.singles_id, yb.bill_year, yb.bill_month, yb.row_index
+    `,
+    [dueDate]
   );
   return rows;
 }
@@ -181,19 +275,26 @@ function formatYearlyDue(row) {
   return `${mon} ${d}, ${y}`;
 }
 
-function buildTableHtml(title, headers, bodyRows) {
+function buildTableHtml(title, headers, bodyRows, emptyLabel) {
   if (!bodyRows.length) {
     return `<h2 style="margin:24px 0 8px;font-size:18px;">${escapeHtml(title)}</h2>
-<p style="margin:0 0 16px;color:#555;">No overdue items.</p>`;
+<p style="margin:0 0 16px;color:#555;">${escapeHtml(emptyLabel)}</p>`;
   }
-  const head = headers.map((h) => `<th style="border:1px solid #000;padding:6px 8px;background:#e8e8e8;text-align:left;">${escapeHtml(h)}</th>`).join('');
+  const head = headers
+    .map(
+      (h) =>
+        `<th style="border:1px solid #000;padding:6px 8px;background:#e8e8e8;text-align:left;">${escapeHtml(h)}</th>`
+    )
+    .join('');
   const body = bodyRows
     .map(
       (cells) =>
         `<tr>${cells
           .map(
             (c, i) =>
-              `<td style="border:1px solid #000;padding:6px 8px;${i === cells.length - 1 ? 'background:#e74c3c;color:#fff;font-weight:700;' : ''}">${c}</td>`
+              `<td style="border:1px solid #000;padding:6px 8px;${
+                i === cells.length - 1 ? 'background:#e74c3c;color:#fff;font-weight:700;' : ''
+              }">${c}</td>`
           )
           .join('')}</tr>`
     )
@@ -205,78 +306,183 @@ function buildTableHtml(title, headers, bodyRows) {
 </table>`;
 }
 
-function buildEmailHtml({ alias, monthlyRows, yearlyRows, appUrl }) {
-  const monthlyBody = monthlyRows.map((r) => [
+function mapBillRows(rows, statusLabel, formatDue) {
+  return rows.map((r) => [
     escapeHtml(r.row_index),
     escapeHtml(r.bill_description || ''),
-    escapeHtml(formatMonthlyDue(r)),
+    escapeHtml(formatDue(r)),
     escapeHtml(r.amount || ''),
     escapeHtml(r.bill_type || 'Manual'),
     escapeHtml(r.action || 'Not Paid'),
-    'Over Due'
+    escapeHtml(statusLabel)
   ]);
-  const yearlyBody = yearlyRows.map((r) => [
-    escapeHtml(r.row_index),
-    escapeHtml(r.bill_description || ''),
-    escapeHtml(formatYearlyDue(r)),
-    escapeHtml(r.amount || ''),
-    escapeHtml(r.bill_type || 'Manual'),
-    escapeHtml(r.action || 'Not Paid'),
-    'Over Due'
-  ]);
-  const headers = ['#', 'Bill Description', 'Due Date', 'Amount', 'Type', 'Action', 'Status'];
-  const greeting = alias ? `Hi ${escapeHtml(alias)},` : 'Hi,';
-  // Inner body only — wrapEmailHtml adds logo + container
-  return `<p>${greeting}</p>
-<p>You have overdue bill(s) on your TutaNotes <strong>Bill Schedule</strong>. This reminder is sent once per day until all overdue items are cleared.</p>
-${buildTableHtml('Monthly — Overdue only', headers, monthlyBody)}
-${buildTableHtml('Yearly — Overdue only', headers, yearlyBody)}
-<p style="margin-top:24px;">Open Bill Schedule: <a href="${escapeHtml(appUrl)}/myNote">${escapeHtml(appUrl)}/myNote</a></p>
-<p style="color:#666;font-size:12px;">OnlineMall.Website — Bill Schedule overdue digest</p>`;
 }
 
-function buildEmailPlain({ alias, monthlyRows, yearlyRows, appUrl }) {
-  const lines = [
-    alias ? `Hi ${alias},` : 'Hi,',
-    '',
-    'You have overdue bill(s) on your TutaNotes Bill Schedule.',
-    'This reminder is sent once per day until all overdue items are cleared.',
-    '',
-    '--- Monthly overdue ---'
-  ];
-  if (!monthlyRows.length) lines.push('(none)');
-  else {
-    for (const r of monthlyRows) {
-      lines.push(
-        `#${r.row_index} ${r.bill_description || ''} | due ${formatMonthlyDue(r)} | ${r.amount || ''} | ${r.action || 'Not Paid'} | Over Due`
-      );
+function buildEmailHtml({
+  alias,
+  monthlyOverdue,
+  yearlyOverdue,
+  monthlyAhead,
+  yearlyAhead,
+  includeOverdue,
+  includeAhead,
+  appUrl
+}) {
+  const headers = ['#', 'Bill Description', 'Due Date', 'Amount', 'Type', 'Action', 'Status'];
+  const greeting = alias ? `Hi ${escapeHtml(alias)},` : 'Hi,';
+  const parts = [];
+  if (includeOverdue) {
+    parts.push(
+      buildTableHtml(
+        'Monthly — Overdue only',
+        headers,
+        mapBillRows(monthlyOverdue, 'Over Due', formatMonthlyDue),
+        'No overdue items.'
+      )
+    );
+    parts.push(
+      buildTableHtml(
+        'Yearly — Overdue only',
+        headers,
+        mapBillRows(yearlyOverdue, 'Over Due', formatYearlyDue),
+        'No overdue items.'
+      )
+    );
+  }
+  if (includeAhead) {
+    parts.push(
+      buildTableHtml(
+        'Monthly — Due tomorrow',
+        headers,
+        mapBillRows(monthlyAhead, 'Due tomorrow', formatMonthlyDue),
+        'No bills due tomorrow.'
+      )
+    );
+    parts.push(
+      buildTableHtml(
+        'Yearly — Due tomorrow',
+        headers,
+        mapBillRows(yearlyAhead, 'Due tomorrow', formatYearlyDue),
+        'No bills due tomorrow.'
+      )
+    );
+  }
+  const introBits = [];
+  if (includeOverdue) introBits.push('overdue');
+  if (includeAhead) introBits.push('due tomorrow');
+  const intro =
+    introBits.length === 2
+      ? 'You have overdue and/or upcoming (due tomorrow) bill(s) on your TutaNotes <strong>Bill Schedule</strong>.'
+      : includeOverdue
+        ? 'You have overdue bill(s) on your TutaNotes <strong>Bill Schedule</strong>. This reminder is sent once per day until all overdue items are cleared.'
+        : 'You have bill(s) due tomorrow on your TutaNotes <strong>Bill Schedule</strong>.';
+  return `<p>${greeting}</p>
+<p>${intro}</p>
+${parts.join('\n')}
+<p style="margin-top:24px;">Open Bill Schedule: <a href="${escapeHtml(appUrl)}/myNote">${escapeHtml(appUrl)}/myNote</a></p>
+<p style="color:#666;font-size:12px;">OnlineMall.Website — Bill Schedule reminder</p>`;
+}
+
+function buildEmailPlain({
+  alias,
+  monthlyOverdue,
+  yearlyOverdue,
+  monthlyAhead,
+  yearlyAhead,
+  includeOverdue,
+  includeAhead,
+  appUrl
+}) {
+  const lines = [alias ? `Hi ${alias},` : 'Hi,', ''];
+  if (includeOverdue && includeAhead) {
+    lines.push('You have overdue and/or upcoming (due tomorrow) bill(s) on your TutaNotes Bill Schedule.');
+  } else if (includeOverdue) {
+    lines.push('You have overdue bill(s) on your TutaNotes Bill Schedule.');
+    lines.push('This reminder is sent once per day until all overdue items are cleared.');
+  } else {
+    lines.push('You have bill(s) due tomorrow on your TutaNotes Bill Schedule.');
+  }
+  if (includeOverdue) {
+    lines.push('', '--- Monthly overdue ---');
+    if (!monthlyOverdue.length) lines.push('(none)');
+    else {
+      for (const r of monthlyOverdue) {
+        lines.push(
+          `#${r.row_index} ${r.bill_description || ''} | due ${formatMonthlyDue(r)} | ${r.amount || ''} | ${r.action || 'Not Paid'} | Over Due`
+        );
+      }
+    }
+    lines.push('', '--- Yearly overdue ---');
+    if (!yearlyOverdue.length) lines.push('(none)');
+    else {
+      for (const r of yearlyOverdue) {
+        lines.push(
+          `#${r.row_index} ${r.bill_description || ''} | due ${formatYearlyDue(r)} | ${r.amount || ''} | ${r.action || 'Not Paid'} | Over Due`
+        );
+      }
     }
   }
-  lines.push('', '--- Yearly overdue ---');
-  if (!yearlyRows.length) lines.push('(none)');
-  else {
-    for (const r of yearlyRows) {
-      lines.push(
-        `#${r.row_index} ${r.bill_description || ''} | due ${formatYearlyDue(r)} | ${r.amount || ''} | ${r.action || 'Not Paid'} | Over Due`
-      );
+  if (includeAhead) {
+    lines.push('', '--- Monthly due tomorrow ---');
+    if (!monthlyAhead.length) lines.push('(none)');
+    else {
+      for (const r of monthlyAhead) {
+        lines.push(
+          `#${r.row_index} ${r.bill_description || ''} | due ${formatMonthlyDue(r)} | ${r.amount || ''} | ${r.action || 'Not Paid'} | Due tomorrow`
+        );
+      }
+    }
+    lines.push('', '--- Yearly due tomorrow ---');
+    if (!yearlyAhead.length) lines.push('(none)');
+    else {
+      for (const r of yearlyAhead) {
+        lines.push(
+          `#${r.row_index} ${r.bill_description || ''} | due ${formatYearlyDue(r)} | ${r.amount || ''} | ${r.action || 'Not Paid'} | Due tomorrow`
+        );
+      }
     }
   }
   lines.push('', `Open: ${appUrl}/myNote`);
   return lines.join('\n');
 }
 
-async function claimSendSlot(client, singlesId, sentOn, monthlyCount, yearlyCount) {
-  const { rows } = await client.query(
-    `
-    INSERT INTO helloworldjunktest.bill_overdue_email_log
-      (singles_id, sent_on, monthly_overdue_count, yearly_overdue_count)
-    VALUES ($1, $2::date, $3, $4)
-    ON CONFLICT (singles_id, sent_on) DO NOTHING
-    RETURNING singles_id
-    `,
-    [singlesId, sentOn, monthlyCount, yearlyCount]
-  );
-  return rows.length > 0;
+async function claimSendSlot(client, singlesId, sentOn, counts) {
+  try {
+    const { rows } = await client.query(
+      `
+      INSERT INTO helloworldjunktest.bill_overdue_email_log
+        (singles_id, sent_on, monthly_overdue_count, yearly_overdue_count,
+         monthly_ahead_count, yearly_ahead_count)
+      VALUES ($1, $2::date, $3, $4, $5, $6)
+      ON CONFLICT (singles_id, sent_on) DO NOTHING
+      RETURNING singles_id
+      `,
+      [
+        singlesId,
+        sentOn,
+        counts.monthlyOverdue,
+        counts.yearlyOverdue,
+        counts.monthlyAhead,
+        counts.yearlyAhead
+      ]
+    );
+    return rows.length > 0;
+  } catch (err) {
+    if (err?.code === '42703') {
+      const { rows } = await client.query(
+        `
+        INSERT INTO helloworldjunktest.bill_overdue_email_log
+          (singles_id, sent_on, monthly_overdue_count, yearly_overdue_count)
+        VALUES ($1, $2::date, $3, $4)
+        ON CONFLICT (singles_id, sent_on) DO NOTHING
+        RETURNING singles_id
+        `,
+        [singlesId, sentOn, counts.monthlyOverdue, counts.yearlyOverdue]
+      );
+      return rows.length > 0;
+    }
+    throw err;
+  }
 }
 
 async function releaseSendSlot(client, singlesId, sentOn) {
@@ -298,8 +504,12 @@ async function loadUserEmail(client, singlesId) {
   return rows[0] || null;
 }
 
+function emptyBucket() {
+  return { monthlyOverdue: [], yearlyOverdue: [], monthlyAhead: [], yearlyAhead: [] };
+}
+
 /**
- * One daily run: email each user who has overdue monthly and/or yearly rows (max 1 email/user/day).
+ * One daily run: email opted-in users with overdue and/or due-tomorrow rows (max 1 email/user/day).
  */
 export async function runBillOverdueEmailDigest() {
   if (!isBillOverdueEmailEnabled()) {
@@ -312,6 +522,7 @@ export async function runBillOverdueEmailDigest() {
   }
 
   const asOfDate = todayYmdLocal();
+  const aheadDate = addDaysYmd(asOfDate, 1);
   const client = await pool.connect();
   let locked = false;
   try {
@@ -322,30 +533,44 @@ export async function runBillOverdueEmailDigest() {
       return { ok: true, skipped: true, reason: 'lock' };
     }
 
-    const monthlyRows = await loadMonthlyOverdueByUser(client, asOfDate).catch((err) => {
-      console.warn(`${LOG} monthly query failed:`, err?.message ?? err);
-      return [];
-    });
-    const yearlyRows = await loadYearlyOverdueByUser(client, asOfDate).catch((err) => {
-      console.warn(`${LOG} yearly query failed:`, err?.message ?? err);
-      return [];
-    });
+    const loadSafe = async (label, fn) => {
+      try {
+        return await fn();
+      } catch (err) {
+        console.warn(`${LOG} ${label} query failed:`, err?.message ?? err);
+        return [];
+      }
+    };
+
+    const monthlyOverdueRows = await loadSafe('monthly overdue', () =>
+      loadMonthlyOverdueByUser(client, asOfDate)
+    );
+    const yearlyOverdueRows = await loadSafe('yearly overdue', () =>
+      loadYearlyOverdueByUser(client, asOfDate)
+    );
+    const monthlyAheadRows = await loadSafe('monthly ahead', () =>
+      loadMonthlyAheadByUser(client, aheadDate)
+    );
+    const yearlyAheadRows = await loadSafe('yearly ahead', () =>
+      loadYearlyAheadByUser(client, aheadDate)
+    );
 
     const byUser = new Map();
-    for (const r of monthlyRows) {
-      const id = Number(r.singles_id);
-      if (!byUser.has(id)) byUser.set(id, { monthly: [], yearly: [] });
-      byUser.get(id).monthly.push(r);
-    }
-    for (const r of yearlyRows) {
-      const id = Number(r.singles_id);
-      if (!byUser.has(id)) byUser.set(id, { monthly: [], yearly: [] });
-      byUser.get(id).yearly.push(r);
-    }
+    const push = (rows, key) => {
+      for (const r of rows) {
+        const id = Number(r.singles_id);
+        if (!byUser.has(id)) byUser.set(id, emptyBucket());
+        byUser.get(id)[key].push(r);
+      }
+    };
+    push(monthlyOverdueRows, 'monthlyOverdue');
+    push(yearlyOverdueRows, 'yearlyOverdue');
+    push(monthlyAheadRows, 'monthlyAhead');
+    push(yearlyAheadRows, 'yearlyAhead');
 
     if (byUser.size === 0) {
-      console.log(`${LOG} no overdue bills for ${asOfDate}`);
-      return { ok: true, sent: 0, asOfDate };
+      console.log(`${LOG} no opted-in overdue/ahead bills for ${asOfDate}`);
+      return { ok: true, sent: 0, asOfDate, aheadDate };
     }
 
     const transporter = createTransporter();
@@ -354,13 +579,17 @@ export async function runBillOverdueEmailDigest() {
     let failed = 0;
 
     for (const [singlesId, buckets] of byUser) {
-      const claimed = await claimSendSlot(
-        client,
-        singlesId,
-        asOfDate,
-        buckets.monthly.length,
-        buckets.yearly.length
-      );
+      const includeOverdue =
+        buckets.monthlyOverdue.length > 0 || buckets.yearlyOverdue.length > 0;
+      const includeAhead = buckets.monthlyAhead.length > 0 || buckets.yearlyAhead.length > 0;
+      if (!includeOverdue && !includeAhead) continue;
+
+      const claimed = await claimSendSlot(client, singlesId, asOfDate, {
+        monthlyOverdue: buckets.monthlyOverdue.length,
+        yearlyOverdue: buckets.yearlyOverdue.length,
+        monthlyAhead: buckets.monthlyAhead.length,
+        yearlyAhead: buckets.yearlyAhead.length
+      });
       if (!claimed) continue;
 
       const user = await loadUserEmail(client, singlesId);
@@ -374,21 +603,25 @@ export async function runBillOverdueEmailDigest() {
 
       const payload = {
         alias: user?.alias || '',
-        monthlyRows: buckets.monthly,
-        yearlyRows: buckets.yearly,
+        monthlyOverdue: buckets.monthlyOverdue,
+        yearlyOverdue: buckets.yearlyOverdue,
+        monthlyAhead: buckets.monthlyAhead,
+        yearlyAhead: buckets.yearlyAhead,
+        includeOverdue,
+        includeAhead,
         appUrl
       };
       try {
         await sendOutboundMail(transporter, {
           from: OUTBOUND_EMAIL_FROM_HEADER,
           to: toEmail,
-          subject: `Bill Schedule overdue reminder (${asOfDate})`,
+          subject: `Bill Schedule reminder (${asOfDate})`,
           text: buildEmailPlain(payload),
           html: wrapEmailHtml(buildEmailHtml(payload), { maxWidth: '720px' })
         });
         sent += 1;
         console.log(
-          `${LOG} sent to singles_id=${singlesId} monthly=${buckets.monthly.length} yearly=${buckets.yearly.length}`
+          `${LOG} sent to singles_id=${singlesId} overdue=${buckets.monthlyOverdue.length + buckets.yearlyOverdue.length} ahead=${buckets.monthlyAhead.length + buckets.yearlyAhead.length}`
         );
       } catch (err) {
         failed += 1;
@@ -397,7 +630,7 @@ export async function runBillOverdueEmailDigest() {
       }
     }
 
-    return { ok: true, sent, failed, users: byUser.size, asOfDate };
+    return { ok: true, sent, failed, users: byUser.size, asOfDate, aheadDate };
   } finally {
     if (locked) {
       try {
@@ -444,4 +677,9 @@ function scheduleNextDailyRun() {
 
 export function startBillOverdueEmailDaily() {
   scheduleNextDailyRun();
+}
+
+// Prefer-true helper kept for callers that load prefs outside SQL joins.
+export function billScheduleEmailPrefEnabled(row, key) {
+  return isPrefTrue(row?.[key]);
 }

@@ -135,6 +135,12 @@ function parseAllSinglesWelcomeExpanded(data) {
   return true;
 }
 
+function parseSendTuttanoteFlag(data, key) {
+  if (data?.[key] === true || data?.[key] === 'true') return true;
+  if (data?.[key] === false || data?.[key] === 'false') return false;
+  return false;
+}
+
 function parseNullableFirstVisitFlag(data, key) {
   if (!data || !Object.prototype.hasOwnProperty.call(data, key)) return null;
   const value = data[key];
@@ -156,6 +162,8 @@ function mapCustomizationResponse(data) {
     customMusicUrls: parseCustomMusicUrls(data),
     loadDefault: parseLoadDefault(data),
     allSinglesWelcomeExpanded: parseAllSinglesWelcomeExpanded(data),
+    sendTuttanoteOverdue: parseSendTuttanoteFlag(data, 'sendTuttanoteOverdue'),
+    sendTuttanote1dayahead: parseSendTuttanoteFlag(data, 'sendTuttanote1dayahead'),
     firstVisitPicksPosts: parseNullableFirstVisitFlag(data, 'firstVisitPicksPosts'),
     firstVisitAcquaintBuddies: parseNullableFirstVisitFlag(data, 'firstVisitAcquaintBuddies'),
     firstVisitRecBioRequest: parseNullableFirstVisitFlag(data, 'firstVisitRecBioRequest'),
@@ -197,6 +205,12 @@ export async function saveUserCustomization(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'allSinglesWelcomeExpanded')) {
     body.allSinglesWelcomeExpanded = Boolean(patch.allSinglesWelcomeExpanded);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'sendTuttanoteOverdue')) {
+    body.sendTuttanoteOverdue = Boolean(patch.sendTuttanoteOverdue);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'sendTuttanote1dayahead')) {
+    body.sendTuttanote1dayahead = Boolean(patch.sendTuttanote1dayahead);
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'firstVisitPicksPosts')) {
     body.firstVisitPicksPosts = patch.firstVisitPicksPosts;
