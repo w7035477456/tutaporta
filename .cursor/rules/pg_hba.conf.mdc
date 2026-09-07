@@ -1,0 +1,43 @@
+---
+description: Ubuntu Postgres 16 main pg_hba.conf reference (test_user1 peer/scram, postgres reject)
+alwaysApply: true
+---
+
+# PostgreSQL 16 — `pg_hba.conf` (Ubuntu)
+
+Canonical rules from **`/etc/postgresql/16/main/pg_hba.conf`** on the Ubuntu app/DB host (`192.168.222.202` / xbox2).
+
+After edits: `sudo systemctl reload postgresql@16-main` (or equivalent). Order matters — first matching line wins.
+
+**Local admin:** `local … postgres peer` allows `sudo -u postgres psql` on the unix socket only. The `host … postgres … reject` lines still block **TCP** login as `postgres` from any IP. App access uses **`test_user1`**.
+
+```conf
+local   all             postgres        peer
+local   all             test_user1      peer
+host    all             test_user1      127.0.0.1/32    scram-sha-256
+host    all             test_user1      ::1/128         scram-sha-256
+
+# REJECT postgres from ANY TCP connection (local or remote) — does not affect unix socket
+host    all             postgres        0.0.0.0/0               reject
+host    all             postgres        ::/0                    reject
+
+# ==========================================================
+# Don't work, need to fix
+# ==========================================================
+host    vsingles        test_user1      127.0.0.1/32            scram-sha-256
+host    vsingles        test_user1      192.168.222.202/32      scram-sha-256
+host    all             ser             127.0.0.1/32            scram-sha-256
+
+host    vsingles        test_user2      127.0.0.1/32            scram-sha-256
+host    vsingles        test_user2      192.168.222.202/32      scram-sha-256
+
+##### allow connect from dbeaver from Mac desktop
+# TYPE  DATABASE    USER        ADDRESS             METHOD
+host    vsingles    test_user1  192.168.44.104/32   scram-sha-256
+host    vsingles    test_user2  192.168.44.104/32   scram-sha-256
+```
+
+**Notes for agents**
+
+- DB name in app env is often `onlinemallwebsite` (formerly `vsingles`); rules that name database `vsingles` only match that DB name.
+- Schema remains `helloworldjunktest` (see `postgresql.conf.mdc` `search_path`).

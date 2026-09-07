@@ -908,7 +908,22 @@ const menuRowEditFieldSx = {
   }
 };
 
-/** Content-header rename field — match selected notebook/note: white + double border. */
+/** Content-header rename field — white + double border (edit-in-place). */
+
+/** Notebook / note / shortcut list — selected yellow; unselected gray + black text. */
+const menuRowSelectedSx = {
+  bgcolor: 'var(--theme-yellow-color) !important',
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  border: '4px solid #000000 !important'
+};
+
+const menuRowUnselectedSx = {
+  bgcolor: '#9e9e9e !important',
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  border: '4px solid #000000 !important'
+};
 
 function MenuRowWithDelete({
   onDelete,
@@ -1027,12 +1042,12 @@ function MenuRowButton({
                 border: '4px double #ffffff !important'
               }
             : {
-                bgcolor: '#ffffff !important',
-                color: '#000000 !important',
-                WebkitTextFillColor: '#000000 !important',
-                border: multiSelected && !selected ? '3px solid #cc0000 !important' : '4px solid #cc0000 !important'
+                ...menuRowSelectedSx,
+                ...(multiSelected && !selected ? { border: '3px solid #000000 !important' } : null)
               }
-          : null),
+          : !locked
+            ? menuRowUnselectedSx
+            : null),
         ...(locked ? recordVaultInnerLockedMenuSx : null),
         ...(useDivDragSurface ? { cursor: 'grab', userSelect: 'none' } : null),
         ...sx
