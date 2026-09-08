@@ -18,6 +18,7 @@ import {
   tutaPhotoAlbumsPostLoginActionButtonSx,
   tutaPhotoAlbumsYellowPostLoginButtonSx
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const BACKUP_POPUP_WIDTH = '90vw';
 const BACKUP_POPUP_HEIGHT = '90vh';
@@ -322,6 +323,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 disabled={busy || !canBackupAlbum}
                 onClick={() => void handleBackup()}
                 sx={backupOrangeButtonSx}
+                {...guestDemoBlockProps()}
               >
                 Backup Current Album
               </GreenButton>
@@ -330,6 +332,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 disabled={busy}
                 onClick={() => void handleFormat()}
                 sx={formatRedButtonSx}
+                {...guestDemoBlockProps()}
               >
                 Format TutaPhotoAlbums Cloud
               </GreenButton>
@@ -338,6 +341,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 disabled={busy}
                 onClick={handleRestoreClick}
                 sx={restoreYellowButtonSx}
+                {...guestDemoBlockProps()}
               >
                 Restore TutaPhotoAlbums Cloud
               </GreenButton>

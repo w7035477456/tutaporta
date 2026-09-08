@@ -17,6 +17,7 @@ import {
   tutaPhotoAlbumsOrangePostLoginButtonSx,
   tutaPhotoAlbumsPostLoginActionButtonSx
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
+import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const BACKUP_POPUP_WIDTH = '90vw';
 const BACKUP_POPUP_HEIGHT = '90vh';
@@ -336,10 +337,17 @@ export default function PhotoAlbumsUsbBackupDialog({
                 disabled={busy || !canBackupAlbum}
                 onClick={() => void handleBackup()}
                 sx={backupRestoreOrangeButtonSx}
+                {...guestDemoBlockProps()}
               >
                 Backup Current Album
               </GreenButton>
-              <GreenButton type="button" disabled={busy} onClick={() => void handleFormat()} sx={formatRedButtonSx}>
+              <GreenButton
+                type="button"
+                disabled={busy}
+                onClick={() => void handleFormat()}
+                sx={formatRedButtonSx}
+                {...guestDemoBlockProps()}
+              >
                 Format TutaPhotoAlbums USB
               </GreenButton>
               <GreenButton
@@ -347,6 +355,7 @@ export default function PhotoAlbumsUsbBackupDialog({
                 disabled={busy}
                 onClick={handleRestoreClick}
                 sx={backupRestoreOrangeButtonSx}
+                {...guestDemoBlockProps()}
               >
                 Restore TutaPhotoAlbums USB
               </GreenButton>

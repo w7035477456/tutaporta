@@ -8145,7 +8145,6 @@ export default function PhotoAlbumsWorkspacePane({
                     aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
                     title={!menusOpen ? 'Open menus' : 'Close left and right menus'}
                     onClick={handleMenuLabelsToggle}
-                    {...(menusOpen ? guestDemoBlockProps() : null)}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menusOpen ? (
@@ -8168,7 +8167,6 @@ export default function PhotoAlbumsWorkspacePane({
               <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                 <VaultExitToMallToolbarButton
                   compact={menuLabelsCompact}
-                  {...guestDemoBlockProps()}
                   onClick={() => void handleExitToMall()}
                   disabled={busy}
                   sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
@@ -8198,7 +8196,6 @@ export default function PhotoAlbumsWorkspacePane({
                     disabled={busy}
                     aria-label="Backup/Restore"
                     title="Backup / Restore"
-                    {...guestDemoBlockProps()}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
@@ -8217,7 +8214,6 @@ export default function PhotoAlbumsWorkspacePane({
                     disabled={busy}
                     aria-label="Backup/Restore"
                     title="Backup / Restore"
-                    {...guestDemoBlockProps()}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
                     {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
@@ -8230,7 +8226,6 @@ export default function PhotoAlbumsWorkspacePane({
                     type="button"
                     variant="yellow"
                     hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    {...guestDemoBlockProps()}
                     onClick={() => {
                       setMobileUploadOpen(true);
                     }}

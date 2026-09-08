@@ -34,8 +34,16 @@ export function isFailedDynamicImportError(error) {
     /Importing a module script failed/i.test(text) ||
     /Failed to load module script/i.test(text) ||
     /Loading chunk \d+ failed/i.test(text) ||
-    /Unable to preload CSS/i.test(text)
+    /Unable to preload CSS/i.test(text) ||
+    /Outdated Optimize Dep/i.test(text)
   );
+}
+
+function isStaleViteDepScriptError(event) {
+  const src = String(event?.target?.src || '');
+  if (!src.includes('/node_modules/.vite/deps/')) return false;
+  const msg = String(event?.message || '');
+  return /Outdated Optimize Dep/i.test(msg) || /\b504\b/.test(msg);
 }
 
 export function isAllowedStaleModuleReloadHost() {
@@ -197,4 +205,12 @@ export function installHardReloadOnStaleModule() {
   window[INSTALL_FLAG] = true;
   // Lazy-import recovery is handled in Loadable.jsx — no global listeners here
   // (they burned the retry budget and fought manual Shift-Cmd-R).
+  window.addEventListener(
+    'error',
+    (event) => {
+      if (!isStaleViteDepScriptError(event)) return;
+      tryHardReloadOnFailedDynamicImport(new Error('Outdated Optimize Dep'));
+    },
+    true
+  );
 }

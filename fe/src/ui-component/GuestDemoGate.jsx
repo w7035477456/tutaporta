@@ -89,9 +89,9 @@ function findBlockedInteractive(target) {
  * TutaNotes notebook/note/shortcut chrome + View/Download on attachments,
  * most of /myPhotoAlbums, /myStory, and /receivedBioRequests (path allow);
  * block marked mutating actions (data-guest-demo-block) even on those pages
- * (TutaPhotoAlbums toolbar, sidebar add buttons, Files Explorer / Mobile Upload tray,
- * album template bar + Order Print + photo return X, all ThumbnailDeleteXButton deletes,
- * Photo/Video Edit Save, Submit Response, Make this Profile);
+ * (TutaPhotoAlbums editor/sidebar/tray mutations; Backup/Restore/Format inside
+ * backup popups; Files Explorer / Mobile Upload tray actions — header chrome
+ * File / Close Menu / Exit to Mall / Backup/Restore / Mobile Upload / Search stay allowed);
  * block all photo/file drops on /myStory (album Drop photos here);
  * plus marked controls (data-guest-demo-allow), e.g. vetted-friends "Click to view";
  * always block OS file drag/drop into the page (even over allowlisted regions);

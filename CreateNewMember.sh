@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# CreateNewMember.sh — interactive Mac helper to insert one helloworldjunktest.singles
+# CreateNewMember.sh — interactive helper to insert one helloworldjunktest.singles
 # (+ vet_bio + misc_bio). Run from repo root or anywhere:
-#   bash /Users/a/code/main/CreateNewMember.sh
+#   bash ~/code/main/CreateNewMember.sh
 #
-# Requires: psql, local tunnel DB (127.0.0.1:50010 / onlinemallwebsite / test_user1).
+# Requires: psql, local DB (127.0.0.1:50010 / onlinemallwebsite / test_user1).
+# Password: PGPASSWORD, else DB_PASSWORD from ~/.ssh/be/.env, else interactive prompt.
 
 set -euo pipefail
 
@@ -19,6 +20,20 @@ DM1_EMAIL="dm1@gmail.com"
 # Always stored on every new singles row (login alt / recovery).
 ALT_EMAIL="w7035477456@gmail.com"
 
+# Load DB_PASSWORD from ~/.ssh/be/.env when PGPASSWORD is unset (Ubuntu needs this for TCP auth).
+if [[ -z "${PGPASSWORD:-}" ]]; then
+  _be_env="${HOME}/.ssh/be/.env"
+  if [[ -f "$_be_env" ]]; then
+    _db_pass="$(
+      grep -E '^[[:space:]]*DB_PASSWORD=' "$_be_env" | tail -n1 | cut -d= -f2- | sed 's/\r$//' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
+    )"
+    if [[ -n "$_db_pass" ]]; then
+      export PGPASSWORD="$_db_pass"
+    fi
+  fi
+  unset _be_env _db_pass
+fi
+
 trim() {
   local s="${1-}"
   s="${s#"${s%%[![:space:]]*}"}"
@@ -27,7 +42,18 @@ trim() {
 }
 
 psql_q() {
-  PGPASSWORD="${PGPASSWORD:-}" psql -h "$PSQL_HOST" -p "$PSQL_PORT" -U "$PSQL_USER" -d "$PSQL_DB" -v ON_ERROR_STOP=1 "$@"
+  # -q: quiet; stderr kept for real errors on interactive runs.
+  PGPASSWORD="${PGPASSWORD:-}" psql -h "$PSQL_HOST" -p "$PSQL_PORT" -U "$PSQL_USER" -d "$PSQL_DB" \
+    -v ON_ERROR_STOP=1 -q "$@"
+}
+
+# Capture a single scalar from psql; strip notices like "Expanded display is used automatically."
+psql_scalar() {
+  local out
+  out="$(psql_q -Atc "$@" 2>/dev/null || true)"
+  # Keep last line that is only digits (or empty).
+  out="$(printf '%s\n' "$out" | grep -E '^[0-9]+$' | tail -n1 || true)"
+  printf '%s' "${out:-0}"
 }
 
 sql_escape() {
@@ -84,14 +110,15 @@ done
 next_email_for_prefix() {
   local prefix="$1"
   local max_n
-  max_n=$(psql_q -Atc "
+  max_n="$(psql_scalar "
     SELECT COALESCE(MAX(
       CASE WHEN lower(email) ~ ('^' || lower('${prefix}') || '[0-9]+@gmail\\.com\$')
            THEN NULLIF(regexp_replace(split_part(lower(email), '@', 1), '^' || lower('${prefix}'), '', 'i'), '')::int
            ELSE NULL END
     ), 0)
     FROM ${SCHEMA}.singles;
-  ")
+  ")"
+  max_n="${max_n:-0}"
   # Always lowercase — login matches LOWER(email).
   echo "$(printf '%s' "${prefix}$((max_n + 1))@gmail.com" | tr '[:upper:]' '[:lower:]')"
 }
@@ -108,7 +135,7 @@ fi
 # Login normalizes email to lowercase — always store lowercase.
 EMAIL="$(printf '%s' "$EMAIL" | tr '[:upper:]' '[:lower:]')"
 
-exists=$(psql_q -Atc "SELECT 1 FROM ${SCHEMA}.singles WHERE lower(email)=lower('$(sql_escape "$EMAIL")') LIMIT 1;")
+exists="$(psql_q -Atc "SELECT 1 FROM ${SCHEMA}.singles WHERE lower(email)=lower('$(sql_escape "$EMAIL")') LIMIT 1;" 2>/dev/null | grep -E '^[01]$' | tail -n1 || true)"
 if [[ "$exists" == "1" ]]; then
   echo "ERROR: email already exists: $EMAIL"
   exit 1

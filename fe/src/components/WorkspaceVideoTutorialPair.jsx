@@ -25,7 +25,7 @@ const tutorialButtonSx = {
 };
 
 /**
- * Header pair from mockup: orange VIDEO TUTORIALS graphic + yellow Tutorial button.
+ * Header pair: VIDEO TUTORIALS graphic + orange Tutorial button.
  * - Graphic → floating YouTube theater window
  * - Tutorial → caller opens context / instruction popup
  */
@@ -35,9 +35,10 @@ export default function WorkspaceVideoTutorialPair({
   tutorialDisabled = false,
   tutorialAriaLabel = 'Open tutorial',
   tutorialTitle = 'Open tutorial',
-  /** Album invite bar: yellow SliderControlButton. Bill Schedule center header: orange instruction button. */
-  tutorialVariant = 'yellow',
-  iconHeight = { xs: 36, sm: 42 },
+  /** Prefer orange (site standard). Yellow kept for rare overrides. */
+  tutorialVariant = 'orange',
+  /** Default 2× prior size so the VIDEO TUTORIALS graphic reads clearly in album/notes headers. */
+  iconHeight = { xs: 72, sm: 84 },
   sx
 }) {
   const watchTutorialsHref =

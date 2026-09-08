@@ -8,7 +8,15 @@ import { greenButtonSx, GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
  *
  * hoverTopmost (default true): on hover, raise z-index so the scaled button stays above neighbors.
  */
-export default function GreenButton({ sx, singleLineLabel = true, hoverTopmost = true, children, ...rest }) {
+export default function GreenButton({
+  sx,
+  singleLineLabel = true,
+  hoverTopmost = true,
+  /** Default `button` so form actions (Send SMS, etc.) do not submit the parent form. Pass `type="submit"` when needed. */
+  type = 'button',
+  children,
+  ...rest
+}) {
   const mergedSx = (theme) => {
     const base = greenButtonSx({ hoverTopmost });
     const extra = typeof sx === 'function' ? sx(theme) : sx || {};
@@ -23,6 +31,7 @@ export default function GreenButton({ sx, singleLineLabel = true, hoverTopmost =
       singleLineLabel={singleLineLabel}
       transformOrigin="center center"
       sx={mergedSx}
+      type={type}
       {...rest}
     >
       {children}
@@ -34,6 +43,7 @@ GreenButton.propTypes = {
   sx: PropTypes.oneOfType([PropTypes.object, PropTypes.func]),
   singleLineLabel: PropTypes.bool,
   hoverTopmost: PropTypes.bool,
+  type: PropTypes.string,
   children: PropTypes.node
 };
 

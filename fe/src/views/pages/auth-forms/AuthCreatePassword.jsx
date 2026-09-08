@@ -324,7 +324,9 @@ export default function AuthCreatePassword() {
   useEffect(() => {
     if (isGoogleSignup) {
       setLinkStatus('valid');
-      setError('');
+      if (!readStoredGoogleSignupToken()) {
+        setError('Google sign-up session expired. Please click Sign up with Google again.');
+      }
       return undefined;
     }
     const em = searchParams.get('email') || '';
@@ -809,7 +811,7 @@ export default function AuthCreatePassword() {
 
   return (
     <Box component="form" autoComplete="off" onSubmit={smsVerifiedAwaitingPassword ? handleSubmit : handleVerifySms} sx={authFormContentSx}>
-      {error && !isPhoneError && !isCodeError && (
+      {error && !isPhoneError && !isCodeError && !showSmsSection && (
         <Typography variant="subtitle1" sx={{ color: 'error.main', fontWeight: 700, textAlign: 'center', mb: 2 }}>
           Error: {error}
         </Typography>
@@ -1019,7 +1021,12 @@ export default function AuthCreatePassword() {
               </GreenButton>
             ) : (
               <GreenButton
-                onClick={handleSendSmsCode}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void handleSendSmsCode();
+                }}
                 disabled={sendSmsCodeButtonDisabled}
                 aria-busy={isSendingSms}
               >
@@ -1032,6 +1039,12 @@ export default function AuthCreatePassword() {
             )}
           </Box>
 
+          {error && !isCodeError && showSmsSection ? (
+            <Typography variant="subtitle1" sx={{ color: 'error.main', fontWeight: 700, textAlign: 'center', mt: 1.5 }}>
+              Error: {error}
+            </Typography>
+          ) : null}
+
           <Box sx={{ mt: 2, width: '100%', minWidth: 0 }}>
             <Typography
               variant="body2"
@@ -1041,7 +1054,9 @@ export default function AuthCreatePassword() {
                 mb: 1.25
               }}
             >
-              Enter code SMS text to your phone below
+              {isSmsCodeEntryEnabled
+                ? 'Enter code SMS text to your phone below'
+                : 'Click Send SMS Code first — then enter the 6-digit code below'}
             </Typography>
 
             <Box
@@ -1089,7 +1104,12 @@ export default function AuthCreatePassword() {
               />
 
               <GreenButton
-                onClick={(e) => void handleVerifySms(e)}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void handleVerifySms(e);
+                }}
                 disabled={isVerifyingSms || !isVerifySmsEnabled}
               >
                 {isVerifyingSms ? 'Verifying...' : 'Verify SMS'}

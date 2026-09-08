@@ -21,23 +21,21 @@ host    all             test_user1      ::1/128         scram-sha-256
 host    all             postgres        0.0.0.0/0               reject
 host    all             postgres        ::/0                    reject
 
-# ==========================================================
-# Don't work, need to fix
-# ==========================================================
-host    vsingles        test_user1      127.0.0.1/32            scram-sha-256
-host    vsingles        test_user1      192.168.222.202/32      scram-sha-256
-host    all             ser             127.0.0.1/32            scram-sha-256
+# Local / same-box TCP (DB renamed from vsingles → onlinemallwebsite)
+host    onlinemallwebsite        test_user1      127.0.0.1/32            scram-sha-256
+host    onlinemallwebsite        test_user1      192.168.222.202/32      scram-sha-256
+host    all                      ser             127.0.0.1/32            scram-sha-256
 
-host    vsingles        test_user2      127.0.0.1/32            scram-sha-256
-host    vsingles        test_user2      192.168.222.202/32      scram-sha-256
+host    onlinemallwebsite        test_user2      127.0.0.1/32            scram-sha-256
+host    onlinemallwebsite        test_user2      192.168.222.202/32      scram-sha-256
 
 ##### allow connect from dbeaver from Mac desktop
-# TYPE  DATABASE    USER        ADDRESS             METHOD
-host    vsingles    test_user1  192.168.44.104/32   scram-sha-256
-host    vsingles    test_user2  192.168.44.104/32   scram-sha-256
+# TYPE  DATABASE             USER        ADDRESS             METHOD
+host    onlinemallwebsite    test_user1  192.168.44.104/32   scram-sha-256
+host    onlinemallwebsite    test_user2  192.168.44.104/32   scram-sha-256
 ```
 
 **Notes for agents**
 
-- DB name in app env is often `onlinemallwebsite` (formerly `vsingles`); rules that name database `vsingles` only match that DB name.
+- Database name is **`onlinemallwebsite`** (formerly `vsingles`). HBA rules that still say `vsingles` will not match DBeaver/app connections.
 - Schema remains `helloworldjunktest` (see `postgresql.conf.mdc` `search_path`).
