@@ -1,0 +1,2732 @@
+#!/bin/bash
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# Load ~/.ssh/be/.env without running invalid lines as shell commands.
+# (Plain "source .env" breaks on commas, spaces in values, KEY:val typos, etc.)
+
+
+setbasestorage() {
+    case "$(uname -s)" in
+        Darwin)
+            export BASE_STORAGE="/Users/a/mac_storage"
+            ;;
+        Linux)
+            export BASE_STORAGE="/mnt/pgdata16"
+            ;;
+        *)
+            echo "Unsupported OS" >&2
+            return 1
+            ;;
+    esac
+}
+
+setbasestorage
+
+govideos() {
+    cd "${BASE_STORAGE}/onlinemallwebsite_storage/videos" && ls -latr
+}
+
+gophotos() {
+    cd "${BASE_STORAGE}/onlinemallwebsite_storage/photos" && ls -latr
+}
+
+lsphoto() {
+    cd "${BASE_STORAGE}/onlinemallwebsite_storage" && pwd
+}
+
+bigfiles() {
+  local n="${1:-}"
+
+  if [[ -z "$n" ]]; then
+    read -rp "How many biggest files? " n
+  fi
+
+  if ! [[ "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    echo "bigfiles: need a positive number (e.g. bigfiles 10)" >&2
+    return 1
+  fi
+
+  local root
+  root="$(pwd)"
+
+  find "$root" -type f -print0 2>/dev/null \
+    | while IFS= read -r -d '' f; do
+        if stat --version >/dev/null 2>&1; then
+          stat -c '%s %n' "$f"          # Ubuntu / GNU
+        else
+          stat -f '%z %N' "$f"          # macOS / BSD
+        fi
+      done \
+    | sort -t' ' -k1,1nr \
+    | head -n "$n" \
+    | awk '{
+        bytes = $1
+        $1 = ""
+        sub(/^ /, "")
+        path = $0
+        s = bytes
+        split("B KB MB GB TB PB", u, " ")
+        i = 1
+        while (s >= 1024 && i < 6) { s /= 1024; i++ }
+        printf "%10.1f %-4s  %s\n", s, u[i], path
+      }'
+}
+
+
+load_be_env_file() {
+  local env_file="${1:-$HOME/.ssh/be/.env}"
+  [[ -r "$env_file" ]] || return 1
+  local line key val
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line%"${line##*[![:space:]]}"}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    [[ -z "$line" ]] && continue
+    [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    if [[ ${#val} -ge 2 ]]; then
+      if [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
+        val="${val:1:${#val}-2}"
+      elif [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]]; then
+        val="${val:1:${#val}-2}"
+      fi
+    fi
+    export "$key=$val"
+  done <"$env_file"
+}
+
+if [ -f "$HOME/.ssh/be/.env" ]; then
+  set -a
+  load_be_env_file "$HOME/.ssh/be/.env"
+  set +a
+fi
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+unalias -a
+#-----------------for TutaDates--------------
+alias fixstorage='$HOME/code/main/scripts/fix-media-storage.sh'
+alias checkstorage='$HOME/code/main/scripts/verify-media-storage.sh'
+#----------------for TutatNotes/TutaPhotos---
+alias fixlargecheap='$HOME/code/main/scripts/fix-large-cheap-storage.sh'
+alias checklargecheap='$HOME/code/main/scripts/verify-large-cheap-storage.sh'
+#-----------------BOTH----------------------
+alias checkallstorage='clear;checkstorage && checklargecheap'
+alias fixallstorage='clear;fixstorage && fixlargecheap && clear; checkallstorage && pm2 restart onlinemallwebsite'
+
+
+screw_permission_fortest(){
+    load_be_env_file ~/.ssh/be/.env 2>/dev/null || true
+    local photo_dir="${TUTADATES_PHOTO_FOLDER:-${STORAGE_FOLDER}/photos/}"
+    photo_dir="${photo_dir//\$\{STORAGE_FOLDER\}/${STORAGE_FOLDER:-${BASE_STORAGE}/onlinemallwebsite_storage}}"
+    photo_dir="${photo_dir%/}"
+
+    echo "Breaking permissions on: $photo_dir"
+    sudo chown -R www-data:www-data "$photo_dir"
+    sudo chmod -R 755 "$photo_dir"
+
+    # Confirm lawsen0 cannot write (should fail):
+    sudo -u lawsen0 touch "$photo_dir/.perm_probe" && echo WRITE_OK || echo WRITE_DENIED
+}
+
+alias gostorage='cd /mnt/pgdata16/;ls -latr'
+alias showsize='sudo du -sh ${BASE_STORAGE}/onlinemallwebsite_storage/{photos,videos,USB_DMG_EXE,recordvault-onedrive};sudo du -ah ${BASE_STORAGE}/onlinemallwebsite_storage/videos | sort -h | tail -30'
+#------ barcode upload ------
+alias fixstoragemobileuploadMac='$HOME/code/main/scripts/fix-media-storage.sh'
+alias checkstoragemobileuploadMac='$HOME/code/main/scripts/verify-media-storage.sh'
+alias fixpermissionmobileuploadMac='sudo chown -R "$(id -un):$(id -gn)" "${STORAGE_FOLDER}/mobile_upload" && sudo chmod -R u+rwX "${STORAGE_FOLDER}/mobile_upload"'
+
+alias fixstoragemobileuploadubuntu='$HOME/code/main/scripts/fix-media-storage.sh'
+alias checkstoragemobileuploadubuntu='$HOME/code/main/scripts/verify-media-storage.sh'
+alias fixpermissionmobileuploadubuntu="sudo chown -R lawsen0:lawsen0 '${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload' && sudo chmod -R u+rwX '${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload'"
+
+alias showbarcodedebug="pm2 logs onlinemallwebsite --lines 200 | grep -E 'mobilePhotoUpload|mobile-barcode'"
+#----------------------------
+
+
+testalarm() {
+sudo bash ~/code/main/scripts/install-site-uptime-monitor.sh
+sudo -u lawsen0 ~/bin/site-uptime-monitor.sh --list-audio
+sudo -u lawsen0 ~/bin/site-uptime-monitor.sh --test-alarm
+}
+
+#---Monitor health and text to phone---------------- 
+#tail -f ~/logs/site-uptime-monitor/monitor.log
+#tail -f ~/logs/site-uptime-monitor/sms-sent.log
+#sudo journalctl -u site-uptime-monitor -f
+alias healthlog='sudo journalctl -u site-uptime-monitor -f'
+
+#--Stop watching: Ctrl+C
+#--Start / stop the monitor itself:
+#sudo systemctl status site-uptime-monitor
+#sudo systemctl stop site-uptime-monitor      # deactivate
+#sudo systemctl start site-uptime-monitor     # activate
+#sudo systemctl disable --now site-uptime-monitor   # off + do not start on boot
+#sudo systemctl enable --now site-uptime-monitor    # on + start now
+#---------------------------------------------------
+
+
+
+
+pm2start() {
+    cd ~/code/main/be && \
+    pm2 start ecosystem.config.cjs --env production && \
+    pm2 status && \
+    pm2 save
+}
+
+
+
+resetmonitor() {
+    rm -f "$HOME/logs/site-uptime-monitor/sms-state"
+    sudo bash "$HOME/code/main/scripts/install-site-uptime-monitor.sh"
+    sudo -u "$(whoami)" "$HOME/bin/site-uptime-monitor.sh" --test-sms
+    tail -5 "$HOME/logs/site-uptime-monitor/sms-sent.log"
+}
+
+alias sitemonitorstatus='sudo systemctl status site-uptime-monitor; tail  ~/logs/site-uptime-monitor/sms-sent.log; tail ~/logs/site-uptime-monitor/monitor.log'
+alias sitemonitorstatusf='sudo systemctl status site-uptime-monitor; tail -f ~/logs/site-uptime-monitor/sms-sent.log; tail -f ~/logs/site-uptime-monitor/monitor.log'
+
+
+
+alias testBuguploadPhoto='touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test && rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test && echo WRITE_OK'
+
+fixBugUploadPhoto() {
+    # Confirm env points here
+    grep VSINGLES_PHOTO_FOLDER ~/.ssh/be/.env
+
+    # Fix write access for the PM2 user on the REAL folder
+    sudo mkdir -p ${BASE_STORAGE}/onlinemallwebsite_storage/photos
+    sudo chown -R lawsen0:lawsen0 ${BASE_STORAGE}/onlinemallwebsite_storage
+    sudo chmod u+rwx ${BASE_STORAGE}/onlinemallwebsite_storage/photos
+
+    # Test the same path the app uses
+    touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test \
+      && rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test \
+      && echo WRITE_OK_PGDATA16
+}
+
+
+alias lsphotos='cd  ${STORAGE_FOLDER}; ls -latr  ${STORAGE_FOLDER}/photoalbums_onedrive/photos'
+
+fixstartup() {
+  cd ~/code/main/be   # or /home/lawsen0/code/main/be if that’s the PM2 cwd
+  npm install
+  pm2 restart onlinemallwebsite
+  pm2 logs onlinemallwebsite --lines 40
+  curl -sS http://127.0.0.1:40000/api/health   # or whatever PORT is in ~/.ssh/be/.env
+}
+#--------------------------------------------------
+alias testpm2='pm2 status;pm2 logs onlinemallwebsite --lines 100 --err'
+alias testredis='redis-cli ping;sudo systemctl status redis-server ; sudo systemctl start redis-server' 
+alias testcloud='curl -sS http://127.0.0.1:40000/health; curl -sS http://127.0.0.1:40000/api/health'
+alias testlisten="sudo ss -lntp | grep -E 'node|40000|3005|80|443'"
+alias testdb='pg_isready -h 127.0.0.1 -p 50010'
+alias testproxy='curl -sS -o /dev /null -w "%{http_code}\n" http://127.0.0.1/health; sudo systemctl status haproxy'
+alias testbrowser='curl -sS -o /dev/null -w "%{http_code}\n" https://onlinemall.website/health'
+
+alias testwrite='touch ${STORAGE_FOLDER}/photos/.wtest && rm ${STORAGE_FOLDER}/photos/.wtest && echo WRITE_OK'
+alias fixwrite='ls -ld ${STORAGE_FOLDER}/photos; sudo chown -R lawsen0:lawsen0 ${STORAGE_FOLDER}/photos; sudo chmod u+rwx ${STORAGE_FOLDER}/photos;'
+alias provewrite='sudo -u lawsen0 touch ${STORAGE_FOLDER}/photos/.wtest \
+  && sudo -u lawsen0 rm ${STORAGE_FOLDER}/photos/.wtest \
+  && echo WRITE_OK'
+
+
+#alias testwrite='touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest && rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest && echo WRITE_OK'
+#alias fixwrite='ls -ld ${BASE_STORAGE}/onlinemallwebsite_storage/photos; sudo chown -R lawsen0:lawsen0 ${BASE_STORAGE}/onlinemallwebsite_storage/photos; sudo chmod u+rwx ${BASE_STORAGE}/onlinemallwebsite_storage/photos;'
+#alias provewrite='sudo -u lawsen0 touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest \
+#  && sudo -u lawsen0 rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest \
+#  && echo WRITE_OK'
+
+
+testall() {
+    
+    echo "####### testredis #########"
+    testredis
+    
+    echo "####### testcloud #########"
+    testcloud
+    
+    echo "####### testdb #########"
+    testdb
+    
+    echo "####### testproxy #########"
+    testproxy
+
+    echo "####### testlistern #######"
+    testlisten
+    
+    echo "####### testbrowser #########"
+    testbrowser
+
+    echo "####### testpm2 #########"
+    testpm2
+}
+#--------------------------------------------------
+
+alias redisping="redis-cli -a 'w2332w2332' ping"
+alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-server; pm2 restart onlinemallwebsite'
+
+
+alias lszip='ls  ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE'
+alias clearzip='rm -rf  ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE/*;lsusb'
+
+alias updateubuntu='sudo apt update && sudo apt upgrade -y'
+
+purgecursor() {
+	pkill -9 -f cursor-server
+	pkill -9 -f vscode-server
+	rm -rf ~/.cursor-server
+	rm -rf ~/.vscode-server
+}
+
+#========= UBUNTU HOT DEV (like Mac beall / feall) ============
+# Stop prod first:  pm2 kill
+# Then two terminals:  beall    and    feall
+# Browse http://localhost:3000 (Vite proxies /api → :40000). Not the HAProxy prod URL.
+fkill() {
+  local p=$1
+  [[ -z "$p" ]] && { echo "Usage: fkill <port>"; return 1; }
+  local pids
+  pids=$(lsof -ti ":$p" 2>/dev/null) || true
+  if [[ -n "$pids" ]]; then
+    echo "$pids" | xargs -r kill -9
+    echo "[fkill] killed port $p"
+  else
+    echo "[fkill] nothing on port $p"
+  fi
+}
+killport() { fkill "$@"; }
+
+alias be1='cd ~/code/main/be && npm i -verbose'
+alias be2='cd ~/code/main/be && fkill 40000; npm run dev'
+alias beall='cd ~/code/main/be && be1 && be2'
+
+alias fe1='cd ~/code/main/fe && npm i -verbose'
+alias fe2='fkill 3000; pkill -f "[v]ite" 2>/dev/null; cd ~/code/main/fe && npm start'
+alias feall='cd ~/code/main/fe && fe1 && fe2'
+
+
+
+redishealth() {
+  echo '=== systemd ==='
+  systemctl is-active redis-server; systemctl is-enabled redis-server
+  sudo systemctl status redis-server --no-pager -l | head -n 12
+  echo
+  echo -n 'PING: '; _redis_cli_auth ping || return 1
+  echo
+  echo '=== memory / clients / keyspace ==='
+  _redis_cli_auth INFO memory | grep -E '^(used_memory_human|maxmemory_human|mem_fragmentation_ratio|evicted_keys):'
+  _redis_cli_auth INFO clients | grep -E '^(connected_clients|blocked_clients):'
+  _redis_cli_auth INFO keyspace
+  echo
+  echo -n 'DBSIZE: '; _redis_cli_auth DBSIZE
+  echo -n 'maxmemory-policy: '; _redis_cli_auth CONFIG GET maxmemory-policy | awk 'NR==2'
+  echo
+  echo '=== listen ==='
+  sudo ss -lntp | grep 6379 || echo '(not listening on 6379)'
+}
+
+deployall() {
+    cd ~/code/main || return 1
+    pwd
+    git fetch
+    echo "--------------------------------"
+    git branch
+    echo "--------------------------------"
+
+    local latestBranchName
+    latestBranchName=$(latestbranch)
+
+    echo -n "Please input branch name [default: $latestBranchName]: "
+    read -r branch_name
+
+    if [ -z "$branch_name" ]; then
+        branch_name="$latestBranchName"
+    fi
+
+    if [ -z "$branch_name" ]; then
+        echo "Error: No branch found to deploy."
+        return 1
+    fi
+
+    echo -e "\n____BRANCH COMMENT:_________________"
+    git log -1 "origin/${branch_name}" --pretty=%s 2>/dev/null || git log -1 "$branch_name" --pretty=%s 2>/dev/null || true
+    echo -e "_______________________________________\n"
+    read -p "Deploy this branch to all hosts in scripts/deploy-hosts.txt ? [Y/n]: " CONFIRM
+    CONFIRM_LOWER="$(printf '%s' "$CONFIRM" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$CONFIRM_LOWER" == "n" ]]; then
+        echo "Deploy cancelled."
+        return 1
+    fi
+
+    bash scripts/deploy-all.sh --hosts-file scripts/deploy-hosts.txt --target "$branch_name"
+}
+
+
+#--- checksum build----
+alias showbuild='node fe/scripts/print-build-info.mjs'
+alias showartifact='cd ~/code/main && node scripts/deployIntegrity.mjs show'
+#----------------------------------
+
+#--- Generate new key for vault ----
+alias rotateVaultKey='node ./be/scripts/rotateRecordVaultIconKeysMasterKey.js'
+#----------------------------------
+
+
+alias usbagent='cd ~/code/main/be;npm run record-vault-bridge'
+
+alias restartdb='rm -rf /usr/local/var/postgresql@16/postmaster.pid;brew services restart postgresql@16'
+
+#-----------------------
+
+unalias pm2restart 2>/dev/null || true
+pm2restart() {
+    pm2 restart onlinemallwebsite
+}
+alias pm2logonedrive='pm2 logs onlinemallwebsite --lines 50 | grep RecordVaultCloud:OneDrive'
+
+alias curlforasn='curl -s https://onlinemall.website/api/client-asn-debug | python3 -m json.tool'
+alias watchasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color -F "[blocked-asn]"'
+alias tailblockasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color "BLOCKED AS"'
+
+# Redis password from REDIS_URL in ~/.ssh/be/.env (same as Node). Bare redis-cli needs -a or NOAUTH.
+_redis_cli_auth() {
+  local url pass host port
+  url=$(grep -E '^[[:space:]]*REDIS_URL=' "$HOME/.ssh/be/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+  host=127.0.0.1
+  port=6379
+  pass=""
+  if [[ -n "$url" ]]; then
+    # redis://:password@host:port  or  redis://user:password@host:port
+    if [[ "$url" =~ redis://([^:@]*):([^@]+)@([^:/]+)(:([0-9]+))? ]]; then
+      pass="${BASH_REMATCH[2]}"
+      host="${BASH_REMATCH[3]}"
+      [[ -n "${BASH_REMATCH[5]}" ]] && port="${BASH_REMATCH[5]}"
+    fi
+  fi
+  if [[ -z "$pass" ]]; then
+    echo "[redis] REDIS_URL password not found in ~/.ssh/be/.env" >&2
+    return 1
+  fi
+  # -n suppresses password warning on stdout
+  redis-cli -h "$host" -p "$port" -a "$pass" --no-auth-warning "$@"
+}
+
+alias pingredis='_redis_cli_auth ping'
+
+alias pickupenv='pm2 restart onlinemallwebsite --update-env'
+alias pm2logmobile="pm2 logs onlinemallwebsite --lines 30 | grep -E 'Mobile upload|mobile_photo_upload'"
+alias pm2logmobile2='grep -i mobilePhotoUpload ~/code/main/be/logs/app-out.log | tail -20'
+alias restartredis='sudo systemctl restart redis-server && _redis_cli_auth ping'
+
+logBackup() {
+    local LOG_DIR="$HOME/code/main/be/logs"
+    local BACKUP_BASE="$HOME/dbFolder"
+    local ZIP_FILE="$BACKUP_BASE/logs_backup_$(date +%Y%m%d_%H%M%S).zip"
+
+    # 1. Ensure logs source directory exists
+    if [ ! -d "$LOG_DIR" ]; then
+        echo "Error: Source logs directory $LOG_DIR does not exist."
+        return 1
+    fi
+
+    # 2. Ensure base backup directory exists
+    if [ ! -d "$BACKUP_BASE" ]; then
+        echo "Directory $BACKUP_BASE does not exist. Creating it now..."
+        mkdir -p "$BACKUP_BASE"
+    fi
+
+    # 3. Zip all files inside the log directory
+    echo "Zipping all files inside $LOG_DIR..."
+    pushd "$LOG_DIR" > /dev/null || return 1
+    zip -r "$ZIP_FILE" ./*
+    popd > /dev/null || return 1
+
+    if [ ! -f "$ZIP_FILE" ]; then
+        echo "Error: Failed to create zip file."
+        return 1
+    fi
+
+    # 4. Print details and initiate Magic Wormhole transfer
+    echo "Created backup archive: $(basename "$ZIP_FILE")"
+    ls -lh "$ZIP_FILE"
+    echo "Starting wormhole transfer..."
+
+    wormhole send "$ZIP_FILE"
+    
+    # 5. Cleanup local zip archive
+    rm -f "$ZIP_FILE"
+}
+
+tailtest() {
+    # 1. Change to the target directory
+    cd ~/code/main/be/logs || return
+
+    # 2. Find the most recently modified file matching the pattern
+    local latest_file
+    latest_file=$(ls -t TEST_result_*.log 2>/dev/null | head -n 1)
+
+    # 3. Check if a file was actually found
+    if [ -n "$latest_file" ]; then
+        echo "Tailing latest log: $latest_file"
+        tail -f "$latest_file" | less -S +F
+    else
+        echo "Error: No TEST_result_*.log files found in $(pwd)"
+    fi
+}
+
+
+alias boom='cd ~/code;rm -rf main;gitclone'
+
+#########################
+cascaded() {
+    # 1. Prompt the user for the ID
+    read -p "Enter the singles_id you want to delete: " singles_id
+
+    # 2. Validate that the input is actually a number
+    if [[ ! "$singles_id" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid ID. Please enter a valid numeric ID."
+        return 1
+    fi
+
+# 3. Double-check with the user before destructive action
+read -p "Are you absolutely sure you want to cascade delete singles_id=$singles_id? (Y/n): " confirm
+# Default to 'Y' if the user just hits Enter (empty string)
+confirm="${confirm:-Y}"
+
+if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "Operation cancelled."
+    return 0
+fi
+
+    echo "Executing cascade delete for singles_id $singles_id..."
+
+    # 4. Define connection parameters matching your working getusers() reference
+    DB_HOST="127.0.0.1"
+    DB_PORT="50010"
+    DB_USER="test_user1"
+    DB_NAME="onlinemallwebsite"
+
+    # 5. Run the psql transaction block with the correct connection flags
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v target_id="$singles_id" << 'EOF'
+BEGIN;
+
+-- Delete comments associated with the postings of target_id
+\echo -n 'comments (via postings): '
+DELETE FROM comments WHERE post_id IN (SELECT post_id FROM postings WHERE singles_id = :target_id);
+
+-- Delete comments left directly by target_id
+\echo -n 'comments (direct):       '
+DELETE FROM comments WHERE singles_id = :target_id;
+
+-- Delete from child tables linked directly to singles_id
+\echo -n 'postings:                '
+DELETE FROM postings WHERE singles_id = :target_id;
+
+\echo -n 'payment:                 '
+DELETE FROM payment WHERE singles_id = :target_id;
+
+\echo -n 'user_customization:      '
+DELETE FROM user_customization WHERE singles_id = :target_id;
+
+\echo -n 'singles_checkr:          '
+DELETE FROM singles_checkr WHERE singles_id = :target_id;
+
+\echo -n 'photos:                  '
+DELETE FROM photos WHERE singles_id = :target_id;
+
+-- Finally, delete the parent record
+\echo -n 'singles (parent):        '
+DELETE FROM singles WHERE singles_id = :target_id;
+
+COMMIT;
+EOF
+
+    if [ $? -eq 0 ]; then
+        echo "Successfully deleted singles_id $singles_id and all related records."
+    else
+        echo "Error: Failed to delete singles_id $singles_id."
+    fi
+}
+#########################
+lockdownenv() {
+    echo "🔒 Starting SSH & Environment Lockdown..."
+
+    # 1. Set Ownership (User and Group)
+    # Using 'a' as seen in your terminal screenshot
+    sudo chown -R a:staff ~/.ssh/be
+
+    # 2. Lockdown Directories (Read/Write/Execute for owner ONLY)
+    chmod 700 ~/.ssh
+    chmod 700 ~/.ssh/be
+    echo "✅ Directories secured (700)"
+
+    # 3. Lockdown Private Keys & Secrets (Read/Write for owner ONLY)
+    if [ -f ~/.ssh/be/private_key.pem ]; then
+        chmod 600 ~/.ssh/be/private_key.pem
+        echo "✅ Private key secured (600)"
+    fi
+
+    if [ -f ~/.ssh/be/.env ]; then
+        chmod 600 ~/.ssh/be/.env*
+        echo "✅ Environment files secured (600)"
+    fi
+
+    # 4. Set Public Key (Read-only for others, standard for SSH)
+    if [ -f ~/.ssh/be/public_key.pem ]; then
+        chmod 644 ~/.ssh/be/public_key.pem
+        echo "✅ Public key set to 644"
+    fi
+
+    echo "🛡️  UBUNTU Lockdown complete. Your R830 and Postgres credentials are restricted."
+}
+################
+alias tailcron='tail -F /home/lawsen0/backups/backup-ubuntu.log'
+alias settimeout1='sudo vi /etc/ssh/sshd_config;sudo systemctl restart ssh'
+
+alias settimeout2='sudo vi /etc/profile.d/autologout.sh'
+alias vilogout='sudo vi /etc/profile.d/timeout.sh; source /etc/profile.d/timeout.sh'
+######################
+alias backupnightly='clear; sudo ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env'
+alias cleanupdump='sudo rm -rf ~/backups/restore-ubuntu-*;sudo rm -rf ~/backups/pgdump-ubuntu'
+alias restorenightly='clear; sudo ~/backups/scripts/restore-latest.sh ~/backups/.backup-secrets-ubuntu.env'
+alias testnightly='clear;/home/lawsen0/backups/scripts/restore-into-test-db.sh'
+alias droptestnightly='source ~/backups/.backup-secrets-ubuntu.env; TEST_DB_NAME=${TEST_DB_NAME:-vsingles_restore_test}; PGHOST=${PGHOST:-127.0.0.1}; PGPORT=${PGPORT:-50010}; PGUSER=${PGUSER:-test_user1}; dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists "$TEST_DB_NAME"'
+alias securenightly='sudo chown -R "$USER:$USER" ~/backups ~/TERRAMASTER;sudo chmod -R u=rwX,go= ~/backups ~/TERRAMASTER;sudo chmod 700 ~/backups ~/TERRAMASTER'
+alias fixrestic='sudo chown -R lawsen0:lawsen0 /home/lawsen0/TERRAMASTER /home/lawsen0/backups; chmod -R u=rwX,go= /home/lawsen0/TERRAMASTER /home/lawsen0/backups;chmod 700 /home/lawsen0/TERRAMASTER /home/lawsen0/backups'
+
+alias showdump='clear;ls -lht ~/backups/pgdump-ubuntu;ls -latr'
+alias showrestic='clear;sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"'
+
+alias wipebackuponly='clear;sudo rm -rf ~/TERRAMASTER/restic-ubuntu && showrestic'
+alias wipetestbackup='clear;sudo rm -rf ~/TERRAMASTER/restic-ubuntu && source ~/backups/.backup-secrets-ubuntu.env && restic init --repo $RESTIC_REPOSITORY && bash ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env && backupnightly && showrestic'
+
+resticdiff() {
+    echo -e "\n\n---------- Total size ----------"
+    # Added sudo -E here
+    sudo -E restic stats --mode raw-data
+    
+    echo -e "\n\n---------- Snapshots ----------"
+    # Added sudo -E here
+    sudo -E restic snapshots --json | jq -r '.[-2].id, .[-1].id'
+    
+    echo -e "\n\n---------- Diff of latest 2 snapshots ----------"
+    # Added sudo -E to both parts of the diff command
+    sudo -E restic diff "$(sudo -E restic snapshots --json | jq -r '.[-2].id')" "$(sudo -E restic snapshots --json | jq -r '.[-1].id')"
+}
+
+
+alias showlog='journalctl -u cron --since "today" | grep "backup-nightly.sh"'
+######################
+update_singles_pass() {
+    # 1. Prompt for password
+    read -rs -p "Enter new password for singles table: " plain_pass
+    echo 
+
+    # 2. Generate bcrypt hash
+    local hashed_pass=$(python3 -c "import bcrypt; print(bcrypt.hashpw(b'$plain_pass', bcrypt.gensalt(6)).decode())")
+
+    # 3. Update database using your specific connection parameters
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET password_hash = '$hashed_pass';"
+
+    # 4. Cleanup
+    unset plain_pass
+    unset hashed_pass
+    
+    echo "Update complete."
+}
+
+alias showdiskhealth='clear;sudo smartctl -d sat+megaraid,2 -a /dev/sda'
+alias vipathdbsearch='sudo vi /etc/postgresql/16/main/postgresql.conf'
+###### git agent #############################
+alias startagent='eval "$(ssh-agent -s)"'
+alias addkeyagent='ssh-add /home/lawsen0/.ssh/github_onlinemallwebsite'
+
+###################################
+alias test='sudo cat /etc/sudoers.d/coredump'
+###################################
+
+mygrep() {
+    local search_string
+    local file_ext
+
+    # 1) Get the search string
+    printf "Please enter string to grep: "
+    read search_string
+
+    # 2) Get the extension
+    printf "Please enter file extension to grep [default: *.js, *.jsx]: "
+    read file_ext
+
+    # If input is empty, use the defaults
+    if [ -z "$file_ext" ]; then
+        echo "Searching in *.js and *.jsx..."
+        # GNU grep on Ubuntu supports multiple --include flags
+        grep -rn "$search_string" --include="*.js" --include="*.jsx" .
+    else
+        echo "Searching in $file_ext..."
+        grep -rn "$search_string" --include="$file_ext" .
+    fi
+}
+
+######### test pg #######################################################
+updatepassword() {
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  read -p "Enter new password: " newpassword
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite \
+    -c "UPDATE users SET password = '${newpassword}' WHERE last_name='CEO';"
+}
+
+export DATABASE_URL="postgresql://test_user1@127.0.0.1:50010/onlinemallwebsite"
+alias testConnect="psql '$DATABASE_URL' -c 'select now()'"
+
+getusers(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, mailing_firstname, mailing_lastname, member_category, email, profile_image_fk FROM singles;"
+}
+
+
+getrequests() {
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select requests_id, singles_id_from, singles_id_to, interested from requests;" 
+}  
+
+getbrief(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * FROM singles_brief;"
+}
+
+getusersetup(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  # Using the limited app user now
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, email, initial_setup_done from singles;"
+}
+
+
+getphotos(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, photos_id, photo_id_index, file_path, file_extension FROM vsingles_photos;"
+}
+
+purgephotos() {
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "TRUNCATE TABLE vsingles_photos RESTART IDENTITY;"
+}
+
+alias chownphoto='sudo chown -R www-data:www-data ${BASE_STORAGE}/onlinemallwebsite_storage/photos;sudo ls -latr ${BASE_STORAGE}/onlinemallwebsite_storage/photos'
+
+resestusersetup(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  # test_user1 now has UPDATE permissions, so this will work!
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET initial_setup_done = false;"
+  getusersetup
+}
+
+alias showphotos='sudo ls -latr  ${BASE_STORAGE}/onlinemallwebsite_storage/photos'
+
+clonepassword(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET password_hash = (SELECT password_hash FROM singles WHERE email = 'a7038700246@gmail.com') WHERE email LIKE 'bill7035477456@gmail.com';"
+}
+
+getveri(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from verifications;"
+}
+
+mmveri(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from verifications where email='bill7035477456@gmail.com';"
+}
+
+getemail(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from registration_codes;"
+}
+rmemail(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from registration_codes where email='bill7035477456@gmail.com';"
+}
+getphone(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from pending_phone_verifications;"
+}
+rmphone(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from pending_phone_verifications where phone='+17035477456';"
+}
+getimages(){
+  export PGPASSFILE="$HOME/.ssh/test_user1_pass"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, profile_image_url FROM singles;"
+}
+######## veirfy PG ########################################################
+
+#########################
+# Secure the current project directory with 700/600 permissions
+securecode() {
+    echo "Securing permissions in $(pwd)..."
+    
+    # 1. Ensure lawsen0 owns everything (requires sudo for the chown)
+    sudo chown -R lawsen0:lawsen0 .
+    
+    # 2. Set directories to 700 (drwx------)
+    find . -type d -exec chmod 700 {} +
+    
+    # 3. Set files to 600 (-rw-------)
+    find . -type f -exec chmod 600 {} +
+    
+    # 4. Special case: Make sure the .git folder and scripts are still usable
+    # If you have shell scripts, you might want them to be executable (700)
+    if [ -d ".git" ]; then
+        chmod -R 700 .git
+    fi
+    
+    echo "Permissions updated: Folders (700), Files (600)."
+}
+
+#########################
+# f2 on Mac = SSH to this box (corruptedKey_march2024). On Ubuntu you are already here.
+alias f2='echo "f2 is Mac→xbox2 only. Already on $(hostname -s)." && cd ~/code/main'
+#########################
+updatetype() {
+    # Prompt for input
+    read -p "Enter email address: " user_email
+    read -p "Enter new member_type: " new_type
+
+    # Run the update
+    # The -v flag safely passes these values to psql
+    psql -d onlinemallwebsite -v email="$user_email" -v type="$new_type" -c \
+    "UPDATE singles_brief SET member_type = :type WHERE email = :email;"
+    
+    echo "Update attempted for $user_email."
+}
+
+alias showpm2log='cd ~/code/onlinemallwebsite/main/be/logs;sudo ls -latr '
+alias dellimit='_redis_cli_auth DEL "rl::ffff:127.0.0.1"'
+alias setlimit='_redis_cli_auth SET "rl::ffff:127.0.0.1" 0'
+
+#########################
+generatenewkeypairjwt() {
+    sudo cd ~/.ssh/be
+    sudo ls -latr
+    pwd
+    read -p "You are to generate new keypair for JWT ? continue (y/n)? " answer
+    if [[ "$answer" =~ ^[Yy]$ ]]; then
+        echo "Proceeding..."
+        openssl genrsa -out private_key.pem 2048
+        openssl rsa -in private_key.pem -pubout -out public_key.pem
+        chown lawsen0:lawsen0 ~/.ssh ~/.ssh/be ~/.ssh/be/private_key.pem ~/.ssh/be/public_key.pem && \
+        chmod 700 ~/.ssh && \
+        chmod 700 ~/.ssh/be && \
+        chmod 400 ~/.ssh/be/private_key.pem && \
+        chmod 444 ~/.ssh/be/public_key.pem
+        ls -latr
+    else
+        echo "Operation aborted."
+        return 1
+    fi
+}
+
+
+##### REDIS ####
+# Redis has requirepass — always ping with auth from REDIS_URL (bare redis-cli → NOAUTH).
+alias checkredis='sudo systemctl status redis-server --no-pager; echo; _redis_cli_auth ping'
+alias setupredis='sudo systemctl start redis-server; sudo systemctl enable redis-server; _redis_cli_auth ping'
+fixredis() {
+  sudo systemctl start redis-server
+  sudo systemctl enable redis-server
+  echo -n 'redis-cli ping: '
+  if _redis_cli_auth ping; then
+    echo '[redis] OK'
+  else
+    echo '[redis] FAILED — check REDIS_URL password vs redis requirepass' >&2
+    return 1
+  fi
+  pm2 restart onlinemallwebsite
+}
+
+
+
+#!/bin/bash
+
+# --- secure_all_in_one.sh ---
+# Configures UFW for a combined HAProxy / Web / DB node
+# Targets: Port 59221 (SSH), 50010 (Postgres), 40000 (App)
+
+allinoneufw() {
+    echo "🛡️  Starting Unified UFW Configuration..."
+
+    # 1. Reset & Defaults
+    sudo ufw --force reset
+    sudo ufw default deny incoming
+    sudo ufw default allow outgoing
+
+    # 2. Disable IPv6 (Matching your original logic)
+    if grep -q '^IPV6=yes' /etc/default/ufw; then
+        sed -i 's/^IPV6=yes/IPV6=no/' /etc/default/ufw
+        echo "IPv6 disabled in UFW config."
+    fi
+
+    # 3. SSH Lockdown (Port 59221 from your Trusted Mac)
+    # Using the IP from your original script: 192.168.44.104
+    sudo ufw allow from 192.168.44.104 to any port 59221 proto tcp
+    sudo ufw deny 22/tcp
+    echo "SSH secured on port 59221 for trusted IP."
+
+    # 4. Loopback (Essential for internal Postgres/App comms)
+    sudo ufw allow in on lo
+    sudo ufw allow out on lo
+
+    # 5. Combined Role Rules
+    echo "Applying HAProxy, Webserver, and Postgres rules..."
+    
+    # Web Traffic (HAProxy)
+    sudo ufw allow 80/tcp
+    sudo ufw allow 443/tcp
+    
+    # Internal Nginx/App Traffic
+    sudo ufw allow from 127.0.0.1 to any port 10000 proto tcp
+    sudo ufw allow from 127.0.0.1 to any port 40000 proto tcp
+
+    # Postgres (Primary/Replica)
+    sudo ufw allow in on lo to any port 50010 proto tcp
+
+    # 6. Enable
+    sudo ufw --force enable
+    sudo ufw status verbose
+    echo "✅ UFW secured and active for All-in-One Node."
+}
+
+alias showufw='sudo ufw status verbose; sudo ufw status numbered'
+
+alias wipeufwsetup='sudo rm /usr/local/bin/setupufw ; sudo vi /usr/local/bin/setupufw ; sudo chmod +x /usr/local/bin/setupufw; ufwenable'
+
+settag() {
+    git tag -n
+    local version
+    local comment
+    local force=""
+
+    echo -n "Enter tag version (e.g., 2.5): "
+    read -r version
+
+    # Check if tag already exists locally
+    if git rev-parse "v$version" >/dev/null 2>&1; then
+        echo -n "Tag v$version already exists. Overwrite? (y/n): "
+        read -r response
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            force="-f"
+        else
+            echo "Operation cancelled."
+            return 1
+        fi
+    fi
+
+    echo -n "Enter tag description: "
+    read -r comment
+
+    # Added $force variable to the command
+    git tag $force -a "v$version" -m "$comment"
+
+    if [ $? -eq 0 ]; then
+        echo "Successfully created tag v$version"
+        # If we forced an update, remind you to force push
+        if [ "$force" == "-f" ]; then
+            echo "Note: Use 'git push origin v$version --force' to update remote."
+        fi
+    else
+        echo "Failed to create tag."
+    fi
+
+    git tag -n
+}
+alias githardrevert='git reset --hard HEAD~1;git push origin --force'
+
+###### dbBackup dbRestore #######
+dbBackup(){
+    # Check if directory exists
+    if [ ! -d ~/dbFolder ]; then
+        echo "Error: ~/dbFolder/ needs to exist. Please create it first."
+        return 1
+    fi
+
+    # Prompt with default value shown
+    read -p "Enter filename (prefix only) [default='dbBackup']: " FILENAME
+
+    # If user pressed Enter (FILENAME is empty), set default
+    if [ -z "$FILENAME" ]; then
+        FILENAME="dbBackup"
+    fi
+
+    # Generate date string in mmddyyyy format
+    TODAY=$(date +"%m%d%Y")
+    FULL_PATH="$HOME/dbFolder/${FILENAME}${TODAY}.sql"
+
+    # Execute pg_dump using test_user2
+    echo "Exporting onlinemallwebsite to ${FULL_PATH}..."
+    
+    # CRITICAL FIX: Schema name MUST be in escaped double quotes \" for case-sensitivity
+    pg_dump -U test_user2 -h 127.0.0.1 -p 50010 --no-owner --no-privileges -n 'helloWorldJunkTest' -f "$FULL_PATH" onlinemallwebsite
+    # Check if the dump actually produced a file
+    if [ -f "$FULL_PATH" ]; then
+        ls -latr ~/dbFolder
+        echo "Backup complete. Starting wormhole transfer..."
+        wormhole send "$FULL_PATH"
+    else
+        echo "Error: pg_dump failed to create the backup file."
+        return 1
+    fi
+}
+
+# ####### DB DUMP #######
+# Function to restore the onlinemallwebsite database on Ubuntu
+# ####### DB DUMP #######
+# Function to restore the onlinemallwebsite database on Ubuntu
+dbRestore() {
+    DUMP_DIR="$HOME/dbFolder"
+    # Note: %d/%m/%Y vs %m%d%Y - adjusted to match your screenshot's pattern
+    TODAY=$(date +"%m%d%Y")
+
+    # Step 1: Clear and list files
+    clear
+    echo "--- Current files in $DUMP_DIR ---"
+    # Ensure directory exists before listing
+    if [ -d "$DUMP_DIR" ]; then
+        ls -latr "$DUMP_DIR"
+    else
+        echo "Directory $DUMP_DIR not found."
+    fi
+    echo "-------------------------------------"
+
+    # Step 2: Wormhole receive
+    # Ubuntu bash 'read' syntax: read -p "Prompt: " VARIABLE
+    read -p "Wormhole postfix only? [default: skip]: " WORM_POSTFIX
+
+    if [ -n "$WORM_POSTFIX" ]; then
+        # Check if dir exists before cd
+        cd "$DUMP_DIR" || return 1
+
+        echo "Attempting wormhole receive..."
+        # We use --accept-file to automate
+        wormhole receive --accept-file "$WORM_POSTFIX"
+    fi
+
+    # Step 3: Determine Default File
+    # Using 'head -n 1' to find the most recent .sql file
+    LATEST_FILE=$(ls -t "$DUMP_DIR"/*.sql 2>/dev/null | head -n 1)
+    DEFAULT_VAL=$(basename "$LATEST_FILE" 2>/dev/null)
+
+    if [ -z "$DEFAULT_VAL" ]; then
+        PROMPT_TEXT="Enter file to restore: "
+    else
+        PROMPT_TEXT="Enter file to restore [default: $DEFAULT_VAL]: "
+    fi
+
+    read -p "$PROMPT_TEXT" USER_INPUT
+
+    # Step 4: Logic for Input vs Default
+    if [ -z "$USER_INPUT" ]; then
+        if [ -z "$DEFAULT_VAL" ]; then
+            echo "Error: No default file found and no input provided."
+            return 1
+        fi
+        RESTORE_FILE="$DEFAULT_VAL"
+    else
+        # Bash string matching
+        if [[ "$USER_INPUT" != *.sql ]]; then
+            RESTORE_FILE="${USER_INPUT}${TODAY}.sql"
+        else
+            RESTORE_FILE="$USER_INPUT"
+        fi
+    fi
+
+    FULL_PATH="$DUMP_DIR/$RESTORE_FILE"
+
+    if [ ! -f "$FULL_PATH" ]; then
+        echo "Error: File $FULL_PATH not found."
+        return 1
+    fi
+
+    # MODIFIED: Default to 'y' on Enter
+    read -p "Confirm restore file $RESTORE_FILE? [Y/n]: " CONFIRM
+    if [[ "${CONFIRM,,}" == "n" ]]; then
+        echo "Restore cancelled."
+        return 1
+    fi
+
+    # --- PASSWORD HANDLING ---
+    # Prompt for the database password once, silently (-s)
+    read -s -p "Enter password for test_user1: " PGPASSWORD
+    echo "" # Newline for clean output formatting
+    export PGPASSWORD
+
+    # 4. Clean Database
+    # Using the credentials for your onlinemallwebsite database
+    echo "Dropping existing schema..."
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS helloworldjunktest CASCADE;"
+
+    # 5. Import
+    echo "Importing ${FULL_PATH}..."
+    # -v ON_ERROR_STOP=1 ensures we don't keep running if a query fails
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite \
+        -v ON_ERROR_STOP=1 \
+        --set=search_path=helloworldjunktest,public \
+        -f "$FULL_PATH"
+
+    # 6. Verification
+    echo "--- Verification: Tables in onlinemallwebsite ---"
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt helloworldjunktest.*"
+
+    # --- CLEANUP ---
+    # Unset to prevent the password from lingering in your terminal session
+    unset PGPASSWORD
+
+    echo "Restore process completed."
+}
+
+allRestore() {
+    echo "======================================"
+    echo " Starting Full Restore (DB + Photos)  "
+    echo "======================================"
+
+    echo -e "\n>>> STEP 1: Database Restore <<<"
+    dbRestore
+
+    # Check if DB restore was successful before moving on
+    if [ $? -ne 0 ]; then
+        echo "Error: dbRestore encountered an issue. Aborting full restore."
+        return 1
+    fi
+
+    echo -e "\n>>> STEP 2: Photo Restore <<<"
+    # Passes any arguments you might use
+    photoRestore "$@"
+
+    fixstorage
+    checkstorage
+    echo -e "\n======================================"
+    echo "       Full Restore Complete!         "
+    echo "======================================"
+}
+
+######## MISC STORAGE (photos / videos / USB_DMG_EXE / recordvault-onedrive) ########
+_misc_storage_base() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        echo "${BASE_STORAGE}/onlinemallwebsite_storage"
+    else
+        echo "${BASE_STORAGE}/onlinemallwebsite_storage"
+    fi
+}
+
+_misc_storage_dirs=(photos videos USB_DMG_EXE recordvault-onedrive)
+
+# On Ubuntu, /mnt/pgdata16/... is usually root-owned — use sudo for wipe/extract/chown.
+_misc_run() {
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
+_misc_fix_ownership() {
+    local base="$1"
+    [[ "$OSTYPE" == "linux-gnu"* ]] || return 0
+    # Photos/videos often served by nginx/www-data; bridge installers + vault staging by app user.
+    if [ -d "$base/photos" ]; then
+        sudo chown -R www-data:www-data "$base/photos"
+    fi
+    if [ -d "$base/videos" ]; then
+        sudo chown -R www-data:www-data "$base/videos"
+    fi
+    if [ -d "$base/USB_DMG_EXE" ]; then
+        sudo chown -R "$(whoami):$(id -gn)" "$base/USB_DMG_EXE"
+    fi
+    if [ -d "$base/recordvault-onedrive" ]; then
+        sudo chown -R "$(whoami):$(id -gn)" "$base/recordvault-onedrive"
+    fi
+    # Parent must stay writable for future mkdir by sudo restore; keep root or grant user traverse.
+    sudo chmod -R u+rwX,g+rX,o+rX "$base/USB_DMG_EXE" "$base/recordvault-onedrive" 2>/dev/null || true
+    # Fix common typo folder name if present
+    if [ -d "$base/vidoes" ] && [ ! -d "$base/videos" ]; then
+        sudo mv "$base/vidoes" "$base/videos"
+        sudo chown -R www-data:www-data "$base/videos"
+    fi
+}
+
+miscBackup() {
+    mkdir -p "$HOME/dbFolder"
+
+    (
+        cd "$HOME/dbFolder" || return 1
+
+        local BASE_DIR DATE_STR FILENAME
+        BASE_DIR="$(_misc_storage_base)"
+        DATE_STR=$(date +%m%d%Y)
+        FILENAME="miscBackup${DATE_STR}.tar.gz"
+
+        if [ ! -d "$BASE_DIR" ]; then
+            echo "Error: $BASE_DIR not found."
+            return 1
+        fi
+
+        local -a present=()
+        local d
+        for d in "${_misc_storage_dirs[@]}"; do
+            if [ -d "$BASE_DIR/$d" ]; then
+                present+=("$d")
+            else
+                echo "Skip (missing): $BASE_DIR/$d"
+            fi
+        done
+
+        if [ ${#present[@]} -eq 0 ]; then
+            echo "Error: none of ${_misc_storage_dirs[*]} found under $BASE_DIR"
+            return 1
+        fi
+
+        echo "Archiving under $BASE_DIR: ${present[*]}..."
+        # COPYFILE_DISABLE avoids Mac AppleDouble ._ files that break GNU tar on Ubuntu
+        if COPYFILE_DISABLE=1 tar -czvf "$FILENAME" -C "$BASE_DIR" --exclude='._*' --exclude='.DS_Store' "${present[@]}"; then
+            echo "Starting wormhole send..."
+            wormhole send "$FILENAME"
+        else
+            echo "Compression failed."
+            return 1
+        fi
+    )
+}
+
+miscRestore() {
+    mkdir -p "$HOME/dbFolder"
+    cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
+
+    local DEST_BASE
+    DEST_BASE="$(_misc_storage_base)"
+
+    local RESTORE_FILE=""
+    local EXISTING
+    EXISTING=$(ls -t miscBackup*.tar.gz photoBackup*.tar.gz 2>/dev/null | head -n 1)
+
+    if [ -n "$EXISTING" ]; then
+        printf "Reuse existing %s without wormhole? (Y/n) " "$EXISTING"
+        read -r REUSE
+        if [[ "$REUSE" != "n" && "$REUSE" != "N" ]]; then
+            RESTORE_FILE="$EXISTING"
+        fi
+    fi
+
+    if [ -z "$RESTORE_FILE" ]; then
+        printf "Input wormhole string: "
+        read -r WORMHOLE_CODE
+        wormhole receive "$WORMHOLE_CODE"
+        RESTORE_FILE=$(ls -t miscBackup*.tar.gz photoBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+    fi
+
+    if [ -z "$RESTORE_FILE" ] || [ ! -f "$RESTORE_FILE" ]; then
+        echo "Error: File not received (no miscBackup*/photoBackup* .tar.gz in $(pwd))."
+        return 1
+    fi
+
+    _misc_run mkdir -p "$DEST_BASE"
+
+    local d
+    for d in "${_misc_storage_dirs[@]}"; do
+        echo "Wiping $DEST_BASE/$d..."
+        _misc_run rm -rf "$DEST_BASE/$d"
+        _misc_run mkdir -p "$DEST_BASE/$d"
+    done
+    # Drop typo dir so restore can create correct videos/
+    if [ -d "$DEST_BASE/vidoes" ]; then
+        echo "Removing typo folder $DEST_BASE/vidoes..."
+        _misc_run rm -rf "$DEST_BASE/vidoes"
+    fi
+
+    echo "Extracting $RESTORE_FILE to $DEST_BASE (may need sudo password)..."
+    local ABS_TAR
+    ABS_TAR="$(pwd)/$RESTORE_FILE"
+    # --no-same-owner: after sudo extract, don't keep Mac UIDs; we chown next
+    if _misc_run tar --no-same-owner --warning=no-unknown-keyword -xzvf "$ABS_TAR" -C "$DEST_BASE"; then
+        _misc_fix_ownership "$DEST_BASE"
+        echo "Restore complete under $DEST_BASE (${_misc_storage_dirs[*]})"
+        # Keep archive for retry; delete only if user wants — leave file (was rm before)
+    else
+        echo "Error: Extraction failed."
+        return 1
+    fi
+}
+
+# Legacy names
+photoBackup() { miscBackup "$@"; }
+photoRestore() { miscRestore "$@"; }
+
+###############
+
+
+
+hashpw() {
+    # -s flag hides the input (useful for passwords)
+    # -p flag provides the prompt text
+    read -rs -p "Enter plain text password: " plain_pass
+    echo "" # Moves to a new line after hitting Enter
+    
+    # Run your script using the captured variable
+    node be/scripts/hash-password.js "$plain_pass"
+}
+
+alias setupverify="clear; \
+sudo sed -i '1i #>>>>> 1) You should not see this statement if SuperRestore work.' /etc/haproxy/haproxy.cfg; \
+sudo sed -i '1i #>>>>> 2) You should not see this statement if SuperRestore work.' ~/b; \
+sudo sed -i '1i #>>>>> 3) You should not see this statement if SuperRestore work.' /etc/ssh/sshd_config; \
+sudo sed -i '1i #>>>>> 4) You should not see this statement if SuperRestore work.' /home/lawsen0/.bash_profile; \
+sudo sed -i '1i #>>>>> 5) You should not see this statement if SuperRestore work.' /etc/postgresql/16/main/postgresql.conf"
+
+alias verifyrestore='clear;sudo head /etc/haproxy/haproxy.cfg;sudo head ~/b; sudo head /etc/ssh/sshd_config; sudo head /home/lawsen0/.bash_profile;sudo head /etc/postgresql/16/main/postgresql.conf'
+alias startagent='eval "$(ssh-agent -s)"'
+alias vifix='vi ./be/routes/singles/createPassword.js'
+
+# Finite dump (does not hang). Use pm2logf to follow forever.
+alias pm2logflush='pm2 flush; pm2 logs onlinemallwebsite --lines 80 --nostream | sed "s/\x1b\[[0-9;]*m//g"'
+alias pm2log='pm2 logs onlinemallwebsite --lines 80 --nostream | sed "s/\x1b\[[0-9;]*m//g"'
+alias pm2logtail='pm2 logs onlinemallwebsite --lines 80 | sed -u "s/\x1b\[[0-9;]*m//g"'
+alias pm2logf='pm2 logs onlinemallwebsite | sed "s/\x1b\[[0-9;]*m//g"'
+
+alias cdv='cd  ${BASE_STORAGE}/onlinemallwebsite;ls -latr'
+alias dbconnect='psql -h 127.0.0.1 -U test_user1 -p 50010'
+
+alias rmusers="psql -h 127.0.0.1 -U test_user1 -p 50010 -d onlinemallwebsite -c \"DELETE FROM singles WHERE email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com');\""
+getveri(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from verifications;"
+}
+
+rmveri(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from verifications where email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com')"
+}
+
+
+alias dbtest1='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite'
+alias dbrestoretest='psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles_restore_test'
+alias dbtest2='psql -h 127.0.0.1 -p 50010 -U test_user2 -d onlinemallwebsite'
+alias dbpostgres='psql -p 50010 -U postgres -d onlinemallwebsite'
+alias dbser='psql -h 127.0.0.1 -p 50010 -U ser -d onlinemallwebsite'
+
+
+changeit() {
+    getusers
+    # 1. Prompt for inputs
+    read -p "Enter singles_id: " sid
+    read -p "Enter email: " uemail
+    read -p "Enter password: " upass
+
+    # 2. Match the flags from your working 'dbconnectfull' alias
+    # -h 127.0.0.1 (Force network connection)
+    # -p 50010     (Use the specific port)
+    # -d onlinemallwebsite  (Connect to the correct database)
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+    INSERT INTO singles (singles_id, email, password_hash)
+    VALUES ($sid, '$uemail', '$upass')
+    ON CONFLICT (singles_id) 
+    DO UPDATE SET 
+        email = EXCLUDED.email,
+        password_hash = EXCLUDED.password_hash;
+    "
+    
+    # 3. Refresh the view
+    getusers
+}
+
+#profile_image_url
+
+changeimage() {
+    getimages
+    # 1. Prompt for inputs 
+    read -p "Enter singles_id: " sid
+    read -p "Enter image url: " imageurl
+
+    # 2. Match the flags from your working 'dbconnectfull' alias
+    # -h 127.0.0.1 (Force network connection)
+    # -p 50010     (Use the specific port)
+    # -d onlinemallwebsite  (Connect to the correct database)
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+    INSERT INTO singles (singles_id, profile_image_url)
+    VALUES ($sid, '$imageurl')
+    ON CONFLICT (singles_id)
+    DO UPDATE SET 
+       profile_image_url = EXCLUDED.profile_image_url;
+    "
+    
+    # 3. Refresh the view
+    getimages
+} 
+
+alias fakeenv='sudo cp ~/.ssh/be/.env.4git ./be/.env;cat ./be/.env'
+alias realenv='sudo cp ~/.ssh/be/.env ./be/.env;cat ./be/.env'
+alias cdenv='clear;cd ~/.ssh/be;catenv;ls -latr'
+alias vienv='sudo vi ~/.ssh/be/.env'
+alias catenv='sudo cat ~/.ssh/be/.env'
+alias showenv='echo "***** ssh ******";sudo cat ~/.ssh/be/.env; echo "***** code ./be/.env******"; sudo cat ./be/.env'
+
+merge2main() {
+    # 1) Display the warning message
+    echo "Make sure you check in your branch first, then run this script"
+
+    # 2) Prompt the user for the branch name
+    read -p "Please enter branch name: " branch_name
+
+    # 3) Execute the git sequence
+    echo "Merging $branch_name into main..."
+    
+    git checkout main && \
+    git pull origin main && \
+    git merge "$branch_name" 
+} 
+merge2mainpush() {
+    # 1) Display the warning message
+    echo "Make sure you check in your branch first, then run this script"
+
+    # 2) Prompt the user for the branch name
+    read -p "Please enter branch name: " branch_name
+
+    # 3) Execute the git sequence
+    echo "Merging $branch_name into main..."
+
+    git checkout main && \
+    git pull origin main && \
+    git merge "$branch_name" && \
+    git push origin main
+}
+
+alias hatestreload='haproxy -c -f /etc/haproxy/haproxy.cfg; sudo systemctl reload haproxy;sudo systemctl status haproxy'
+######## veirfy PG ########################################################
+alias verifyreplica='sudo -u test_user1 psql -c "SELECT pid, status, receive_start_lsn, receive_start_tli, written_lsn FROM pg_stat_wal_receiver;"'
+alias verifyprimary='sudo -u test_user1 psql -c "SELECT pid, usesysid, usename, application_name, client_addr FROM pg_stat_replication;"'
+alias verifydatadir='sudo -u test_user1 psql -c "show data_directory;"'
+
+######## PG ###########
+alias pg='sudo -u test_user1 psql'
+alias pglisten='sudo ss -tulnp | grep 50010'
+alias pgstatus='systemctl status "postgresql@*";pglisten;'
+alias pgstart='sudo systemctl start postgresql;pgstatus'
+alias pgstop='sudo systemctl stop postgresql;pgstatus'
+alias pgrestart='sudo systemctl restart postgresql;pgstatus'
+alias pgclusters='pg_lsclusters'
+alias pglog='sudo tail -f /var/log/postgresql/postgresql-16-main.log'
+alias pgconf='sudo vi /etc/postgresql/16/main/postgresql.conf'
+alias pghba='sudo vi /etc/postgresql/16/main/pg_hba.conf; sudo systemctl reload postgresql'
+alias visecurity='sudo vi /etc/postgresql/16/main/pg_hba.conf; sudo systemctl reload postgresql'
+alias pgreload='sudo pg_ctlcluster 16 main reload'
+######################
+
+cleanuptxtfile() {
+    local file="$1"
+
+    if [ -z "$file" ]; then
+        read -p "Enter the filename to clean up: " file
+    fi
+
+    # Check if the file exists
+    if [ ! -f "$file" ]; then
+        echo "Error: File '$file' not found."
+        return 1
+    fi
+
+    # Fix: Use -i '' to work on macOS without creating a backup file
+    sudo sed -i '' \
+        -e '/^[[:space:]]*#/d' \
+        -e '/^[[:space:]]*$/d' \
+        -e 's/@18/@16/g' \
+        -e 's/\/17\//\/18\//g' \
+        -e 's/-18-/-16-/g' \
+        "$file"
+
+    sudo cat "$file"
+}
+###### ha ################## 
+alias wherepghbaconf='sudo -u test_user1 psql -p 50010 -c "SHOW hba_file;"'
+alias hareload='sudo systemctl reload ssh'
+
+
+alias vifile0='sudo -u test_user1 vi /var/lib/postgresql/.pgpass;sudo -u test_user1 chmod 600 /var/lib/postgresql/.pgpass'
+
+alias vireload='sudo systemctl reload ssh; sudo systemctl restart postgresql;sudo pg_ctlcluster 16 main reload;pgstatus'
+
+alias oldlsdata='sudo ls -latr /var/lib/postgresql/16/main'
+alias lsdata='sudo ls -latr /mnt/nvme/pgdata16/'
+
+alias oldvifile1='sudo vi /etc/postgresql/16/main/postgresql.conf;vireload'
+alias vifile1='sudo vi    /etc/postgresql/16/main/postgresql.conf;sudo systemctl reload postgresql'
+
+alias oldvifile2='sudo vi /var/lib/postgresql/16/main/pg_hba.conf;sudo systemctl reload postgresql'
+alias vifile2='sudo vi /etc/postgresql/16/main/pg_hba.conf;sudo systemctl reload postgresql'
+#alias vifile2='sudo vi    /mnt/nvme/pgdata16/pg_hba.conf;vireload'
+
+alias vifile3='sudo vi /etc/nginx/sites-available/default'
+alias vifile4='sudo vi /etc/nginx/nginx.conf; sudo nginx -t && sudo systemctl reload nginx;sudo systemctl daemon-reload'
+
+alias oldvifile8='sudo vi /var/lib/postgresql/16/main/standby.signal;vireload'
+alias vifile8='sudo vi    /mnt/nvme/pgdata16/standby.signal;vireload'
+  
+alias oldvifile5='sudo vi /var/lib/postgresql/16/main/pg_ident.conf'
+alias vifile5='sudo vi    /mnt/nvme/pgdata16/pg_ident.conf'
+
+alias oldvifile6='sudo vi /etc/systemd/system/postgresql@16-main.service'
+alias vifile6='sudo vi /etc/systemd/system/postgresql@16-main.service'
+
+alias oldvifile7='sudo vi /var/lib/postgresql/16/main/postgresql.auto.conf;vireload'
+alias vifile7='sudo vi    /mnt/nvme/pgdata16/postgresql.auto.conf;vireload'
+
+alias securefile3='sudo chmod 600 /var/lib/postgresql/16/main/postgresql.auto.conf;sudo chown test_user1:test_user1 /var/lib/postgresql/16/main/postgresql.auto.conf'
+alias securedatadir='sudo chmod 700 /var/lib/postgresql/16/main;sudo chown test_user1:test_user1 /var/lib/postgresql/16/main'
+###### postres ############
+
+sethostname() {
+    echo -n "New host name ? "
+    read NEW_HOSTNAME
+
+    if [ -z "$NEW_HOSTNAME" ]; then
+        echo "ERROR: hostname cannot be empty"
+        return 1
+    fi
+
+    echo "Setting hostname to: $NEW_HOSTNAME"
+
+    sudo hostname "$NEW_HOSTNAME"
+    sudo hostnamectl set-hostname "$NEW_HOSTNAME"
+
+    echo
+    echo "Edit /etc/hosts now (make sure 127.0.1.1 maps to $NEW_HOSTNAME)"
+    sudo vi /etc/hosts
+
+    echo
+    echo "Current hostname status:"
+    hostnamectl
+
+    echo
+    echo "Rebooting system..."
+    sudo reboot
+}
+
+###############
+
+vinetplan() {
+    echo "=== show ARP/neighbor cache ==="
+    sudo ip neigh show || return 1
+
+    sudo vi /etc/netplan/50-cloud-init.yaml || return 1
+
+    echo "=== netplan generate ==="
+    sudo netplan generate || return 1
+
+    echo "=== netplan apply ==="
+    sudo netplan apply || return 1
+
+    echo "=== ip addr ===" || return 1
+    ip addr || return 1
+
+    echo "=== ip route ===" || return 1
+    ip route || return 1
+
+    echo "=== flushing ARP/neighbor cache and show ==="
+    sudo ip neigh flush all || return 1
+    sudo ip neigh show || return 1
+}
+
+###############
+alias nowaitboot='sudo systemctl disable netplan-wait-online.service; sudo systemctl mask netplan-wait-online.service'
+###############
+alias watchlink='watch -n 1 ip -br link show'
+alias pgrebootenable='sudo systemctl enable postgresql'
+alias ufwrebootenable='systemctl is-enabled ufw'
+
+alias getuuid='clear;sudo blkid /dev/nvme0n1;echo '========';lsblk;echo '=======/etc/fstab file====';cat /etc/fstab;echo '=======';verifymount'
+alias verifymount='df -h | grep pgdata16;mount | grep pgdata16'
+##################################
+memcheck() {
+  clear
+  sudo dmidecode -t memory |
+  awk '
+    /^Memory Device$/ { in_device=1; locator=""; size="" }
+    in_device && /^[[:space:]]*Locator:/ && $0 !~ /Bank Locator/ { locator=$0 }
+    in_device && /^[[:space:]]*Size:/ { size=$0 }
+    in_device && /^$/ {
+      if (size !~ /No Module Installed/ && locator != "") {
+        print locator
+        print size
+        print ""
+      }
+      in_device=0
+    }
+  '
+  sudo edac-util -v
+}
+
+
+#####################################
+showmem () {
+  clear
+  echo '=== Below memory type by sticks==='
+  sudo dmidecode -t memory | grep -i "Type Detail";
+  echo '=== Below memory size by sticks==='
+  sudo dmidecode -t memory | awk '
+  /Memory Device/ {slot=""; size=""}
+  /Locator:/ {slot=$2}
+  /Size:/ {size=$2" "$3}
+  /Type Detail:/ {print slot, size, $0}
+  '
+}
+#####################################
+
+alias vifstab='sudo vi /etc/fstab; sudo mount -a;sudo systemctl daemon-reload'
+
+alias showscript='echo "----.profile----"; cat ~/.profile; \
+echo "----.bash_profile----"; cat ~/.bash_profile; \
+echo "----.bashrc----"; cat ~/.bashrc'
+###################
+alias hitwebserver='echo "nc x.x.230.x now" ; \
+nc -zv 192.168.230.204 40000 ; \
+echo "nc x.x.222.x now" ; \
+nc -zv 192.168.222.204 40000'
+
+
+##### tuning ######
+##### tuning #####
+alias removealltuning="\
+sudo rm -f /etc/systemd/system/40g-tuning@*.service && \
+sudo rm -f /etc/systemd/system/multi-user.target.wants/40g-tuning@*.service && \
+sudo rm -rf /etc/systemd/system/40g-tuning@*.service.d/ && \
+sudo systemctl daemon-reload && \
+systemctl list-units '40g-tuning@*.service' && \
+systemctl list-unit-files '40g-tuning@*.service'"
+
+alias mymtu='ip link show dev enp130s0'
+
+alias edit1500service='EDITOR=vi sudo systemctl edit 40g-tuning@mtu1500.service'
+alias edit8954service='EDITOR=vi sudo systemctl edit 40g-tuning@mtu8954.service'
+
+alias listservice='systemctl list-unit-files "40g-tuning@*.service"'
+alias showtune="cat /sys/class/net/enp130s0/mtu && ip -d link show dev enp130s0 | grep -o 'mtu [0-9]\+'"
+alias showrunningtune='echo "=== Active (now) ==="; systemctl list-units "40g-tuning@*.service" --no-pager; \
+echo; echo "=== Enabled (boot) ==="; systemctl list-unit-files "40g-tuning@*.service" --no-pager; \
+echo; echo "=== MTU ==="; echo "enp130s0 mtu $(cat /sys/class/net/enp130s0/mtu)"'
+
+
+# pick the boot profile (always enables the target profile; harmless if the other isn't enabled)
+alias tune1500='sudo systemctl disable 40g-tuning@mtu8954.service >/dev/null 2>&1 || true; sudo systemctl enable 40g-tuning@mtu1500.service'
+alias tune8954='sudo systemctl disable 40g-tuning@mtu1500.service >/dev/null 2>&1 || true; sudo systemctl enable 40g-tuning@mtu8954.service'
+
+# show which profile(s) are enabled
+#alias showtune="systemctl list-unit-files '40g-tuning@*.service'"
+
+# apply immediately (no reboot)
+alias tunestart1500='sudo systemctl start 40g-tuning@mtu1500.service'
+alias tunestart8954='sudo systemctl start 40g-tuning@mtu8954.service'
+
+# one-shot: set as boot profile AND start now
+alias mumbojumbo='sudo systemctl daemon-reexec && \
+sudo systemctl daemon-reload'
+
+alias tune1500now='mumbojumbo && tune1500; sudo systemctl start 40g-tuning@mtu1500.service'
+alias tune8954now='mumbojumbo && tune8954; sudo systemctl start 40g-tuning@mtu8954.service'
+
+alias enable1500='sudo systemctl disable 40g-tuning@mtu8954.service && \
+sudo systemctl enable 40g-tuning@mtu1500.service && \
+sudo systemctl daemon-reload'
+
+alias enable8954='sudo systemctl disable 40g-tuning@mtu1500.service && \
+sudo systemctl enable 40g-tuning@mtu8954.service && \
+sudo systemctl daemon-reload'
+
+# verification as a function so you can pass the peer IP
+verifytune () {
+  local IFACES="enp130s0"
+  local PEER_IP="${1:?usage: verifytune <peer-ip>}"
+  echo "Interfaces:"
+  ip -br link show $IFACES || return 1
+
+  echo; echo "Ring sizes (first iface):"
+  sudo ethtool -g enp130s0 || return 1
+
+  echo; echo "Offloads (first iface):"
+  sudo ethtool -k enp130s0 | egrep 'tx-checksumming|scatter-gather|tso|gso|lro|gro' || true
+
+  echo; echo "Ping tests:"
+  # Jumbo ping (MTU 8954 → payload 8926), will fail if MTU=1500
+  ping -M do -s 8926 "$PEER_IP" -c 3 || true
+
+  # Standard ping (MTU 1500 → payload 1472)
+  ping -M do -s 1472 "$PEER_IP" -c 3
+}
+
+
+alias vitune1='sudo vi /home/lawsen0/tuning/tuning.sh'
+alias vitune2='sudo vi /etc/systemd/system/40g-tuning@.service'
+alias tuneservicelog='sudo journalctl -u 40g-tuning.service -b --no-pager'
+alias findoldtune="sudo find /etc/systemd/system -name '40g-tuning*'"
+
+#################
+
+
+
+alias testpayloadall='testpayloaddb;testpayloadws;testpayloadinner'
+alias testpayloaddb='ping -M do -s 8926 -c 2 192.168.222.203'
+alias testpayloadws='ping -M do -s 8926 -c 2 192.168.222.204'
+alias testpayloadinner='ping -M do -s 8926 -c 2 192.168.222.220'
+
+alias setpayload9k='sudo ip link set dev enp130s0 mtu 8954'
+alias showpayload9k='ip -br link show | grep -E "enp|eth"'
+##################
+
+alias gitsetemailname='git config --global user.email "a7035477456@gmail.com" && git config --global user.name "Andrew Andrew"'
+alias reloadnginx='sudo nginx -t ;\
+sudo systemctl reload nginx'
+alias visetpasswordssh='sudo vi /etc/ssh/sshd_config; sudo systemctl reload sshd'
+################
+
+#### UFW ########
+alias ufwapply='sudo /usr/local/bin/setupufw'
+alias ufwvi='sudo vi /usr/local/bin/setupufw && sudo chmod +x /usr/local/bin/setupufw && ufwenable'
+alias ufwls='sudo ls -latr /usr/local/bin/setupufw'
+alias ufwrm='sudo rm /usr/local/bin/setupufw'
+alias ufwdisable="sudo ufw disable;ufwstatus"
+alias ufwenable="sudo /usr/local/bin/setupufw;sudo ufw enable;ufwstatus"
+alias ufwstatus="sudo ufw status verbose"
+alias ufwarchive="myarchive /usr/local/bin/setupufw"
+alias ufwls='sudo ls  /etc/ufw/'
+alias ufwcleanup='ufwls;sudo rm /etc/ufw/*.202*;ufwls'
+#################
+alias viprotected='sudo vi /etc/nginx/sites-available/protected && reloadnginx'
+alias viprotectedpassword='sudo vi /etc/nginx/.htpasswd && reloadnginx'
+alias vingxconf='sudo vi /etc/nginx/nginx.conf'
+alias restartngx='sudo nginx -t;sudo systemctl enable nginx;sudo systemctl reload nginx;sudo ss -tlnp | grep nginx;sudo systemctl status nginx'
+alias ngxoff='sudo systemctl stop nginx;systemctl status nginx'
+##### git ########
+alias myfetchpush='git fetch origin;git merge origin/main'
+alias gs='git status'
+alias gl='clear;git log -2'
+alias revertgit='git reset --hard HEAD~1 && git push origin +HEAD'
+alias gitpullpush='git pull origin main --rebase;git push origin main'
+
+
+######## FAN BEGIN##########
+# Dell R630 fan control aliases
+alias fq='nohup sudo /usr/local/sbin/r630-fan-quiet.sh >/tmp/fanquiet.log 2>&1 & disown'
+alias fa='sudo pkill -f r630-fan-quiet.sh; sudo ipmitool raw 0x30 0x30 0x01 0x01'
+alias checkfan='sensors -f; systemctl status r630-fan-quiet.service'
+######## FAN END##########
+
+alias showmaxcon='haproxy -vv | grep -i maxconn'
+############ ha proxy vi files ##########
+alias vihaproxy='sudo vi /etc/haproxy/haproxy.cfg && hacheck && hareload'
+alias viping='sudo vi /etc/ufw/before.rules'
+alias haproxystart='sudo systemctl start haproxy'
+alias vioverride='sudo vi /etc/systemd/system/haproxy.service.d/override.conf;systemctl daemon-reload;'
+alias vihaservice='sudo vi /etc/systemd/system/haproxy.service;systemctl daemon-reload;'
+
+###### from Claudia on MAXCONN #####
+alias vilimits='sudo vi /etc/security/limits.conf'
+alias visysctl='sudo vi /etc/sysctl.conf'
+###################################
+
+alias sshreset='systemctl reload ssh;systemctl restart sshd;sudo ss -tlnp | grep sshd'
+###################################
+# HAProxy Limits Checker Aliases
+alias haproxylimits='~/scripts/check_haproxy_limits.sh'
+###################################
+
+alias vipem='sudo vi /etc/haproxy/certs/site.pem'
+alias viewpem='openssl s_client -connect 127.0.0.1:443 -servername onlinemallwebsite.club'
+hashow() {
+    echo "show servers state" | sudo socat stdio /var/run/haproxy/admin.sock | awk 'NR>2 { status = ($6 == 2) ? "UP" : "DOWN"; print "Server: " $4 " (" $5 "), Status: " status }'
+}
+##################################################
+
+alias pastefix="printf '\e[?2004l'"
+alias vihaconfig='sudo vi /etc/ssh/sshd_config'
+alias validatehaconfig='sudo /usr/sbin/sshd -t '
+alias shreload='sudo systemctl reload ssh'
+
+alias sshsecure='
+  mkdir -p ~/.ssh &&
+  sudo chmod 700 ~/.ssh &&
+  # keys & config
+  sudo chmod 600 ~/.ssh/id_* 2>/dev/null || true &&
+  sudo chmod 600 ~/.ssh/old_corrupted* 2>/dev/null || true &&
+  sudo chmod 600 ~/.ssh/coredump2020* 2>/dev/null || true &&
+  sudo chmod 600 ~/.ssh/secureufw* 2>/dev/null || true &&
+  sudo chmod 600 ~/.ssh/config 2>/dev/null || true &&
+  # authorized_keys (stricter is fine)
+  sudo chmod 600 ~/.ssh/authorized_keys 2>/dev/null || true &&
+  sudo chmod 600 /etc/ssh/sshd_config>/dev/null || true &&
+  sudo chown root:root /etc/ssh/sshd_config>/dev/null || true &&
+  # public keys
+  sudo chmod 644 ~/.ssh/*.pub 2>/dev/null || true &&
+  # fix ownership: user + primary group (macOS-safe)
+  sudo chown -R "$USER":"$(id -gn)" ~/.ssh
+'
+
+export SYSTEMD_PAGER=cat
+
+alias hastart='sudo systemctl start haproxy && systemctl status haproxy --no-pager -l'
+alias hacheck='sudo haproxy -c -f /etc/haproxy/haproxy.cfg'
+alias harestart='sudo systemctl unmask haproxy;sudo systemctl restart haproxy;hareload;restartngx;hashow'
+alias hastatus='sudo systemctl enable --now haproxy;sudo systemctl status haproxy'
+alias hareload='sudo systemctl reload haproxy; sleep 6; hashow'
+alias hastop='sudo systemctl stop haproxy'
+############################
+
+alias securessh='
+  mkdir -p ~/.ssh &&
+  chown -R "$USER":"$(id -gn)" ~/.ssh &&
+  chmod 700 ~/.ssh &&
+  chmod 600 ~/.ssh/id_* ~/.ssh/*key* ~/.ssh/config ~/.ssh/authorized_keys 2>/dev/null || true &&
+  chmod 644 ~/.ssh/*.pub 2>/dev/null || true
+'
+
+
+############################
+alias ll='ls -latr'
+alias off='sudo shutdown -h now'
+alias vbp='unalias -a;vi ~/b;source ~/b'
+alias sbp='source ~/.b;alias'
+
+######## test #########
+alias testgit='ssh -T git@github.com'
+alias testinternet='curl http://example.com'
+alias pingdns='ping -c 4 8.8.8.8'
+
+####### vi ########
+alias vi1='sudo vi /etc/default/ufw'
+alias vi2='sudo vi /etc/ufw/sysctl.conf'
+####### database #########
+alias testpsql='psql -h 192.168.193.53 -p 49155 -U xbox3 -d myappdb'
+
+alias status='showport;showlisten;showlisten2'
+
+alias sshstart='sudo systemctl start ssh'
+alias sshenable='sudo systemctl enable ssh'
+alias sshstatus='sudo systemctl status ssh'
+alias sshready='sshenable;sshstart;sshstatus'
+
+alias showlisten="sudo ss -tuln | grep  -E ':(80|443)'"
+alias showlisten2="sudo lsof -i -P -n | grep listen"
+
+alias showport='sudo ufw status verbose;sudo ufw status numbered;echo "to remove: sudo ufw delete [number]"'
+
+alias startserver='cd ~/both;sudo env "PATH=$PATH" node server.js'
+alias listenserver="sudo ss -tuln | grep ':80'"
+
+alias initsys='clear;startssh;acceptdenysequence;sudo ufw enable;status'
+#alias initsysOFF='clear;startssh;acceptdenysequence;sudo ufw disable;status'
+
+#alias acceptdenysequence='initWebUFW;acceptcloudflares80443;allowmacssh;denyallincomming;allowoutgoing'
+
+initWebUFW() {
+  sudo ufw --force reset
+
+  sudo ufw default deny incoming
+  sudo ufw default deny outgoing
+
+  # Inbound rules
+  sudo ufw allow in from 192.168.207.77 to any port 22 proto tcp comment 'Allow SSH from MAC'
+  sudo ufw allow in to any port 80,443 proto tcp comment 'Allow web'
+
+  # Outbound rules
+  sudo ufw allow out to any port 53 proto udp comment 'Allow DNS'
+  sudo ufw allow out to any port 80,443 proto tcp comment 'Allow HTTP/HTTPS'
+  sudo ufw allow out to 192.168.193.53 port 49155 proto tcp comment 'Allow DB access'
+
+  sudo ufw enable
+  sudo ufw status verbose
+}
+
+alias allowmacssh='sudo ufw allow from 192.168.207.77 to any port 22 proto tcp'
+alias allowoutgoing='sudo ufw default deny outgoing'
+
+alias pingit='ping -c 2 -w 2 192.168.174.22'
+alias curlit='curl http://192.168.174.22'
+alias ncit='nc -zv 192.168.174.22 80'
+
+alias blankbay='~/2009_corruptLogFiles/blankbay.sh'
+
+export TZ=America/New_York
+
+alias gitall='sudo git add . -f && sudo git commit -m "update" && git push'
+alias go='cd ~/2009_corruptLogFiles/xbox0;ls -latr'
+
+# ONE-TIME: make sure your normal user's git identity is set
+git config --global user.name "andrew andrew"
+git config --global user.email "a7035477456@gmail.com"
+
+# clone & cd helpers (unchanged)
+alias gitclone2009='git clone git@github.com:w7035477456/2009_corruptLogFiles.git'
+alias go='cd ~/2009_corruptLogFiles/xbox0; ls -latr'
+
+
+gitrevert() {
+    # -p allows you to put the prompt string directly in the read command
+    read -p "Please enter hash to revert to: " inputHash
+
+    # Exit if the user just hits enter without typing anything
+    if [ -z "$inputHash" ]; then
+        echo "Error: No hash entered. Operation aborted."
+        return 1
+    fi
+
+    # The 'Hard Reset' moves the branch pointer and wipes the 'future' commits
+    git reset --hard "$inputHash"
+
+    echo "--------------------------------------------------"
+    echo "Done! The branch 'tip' is now at $inputHash."
+    echo "All commits that were above this have been removed from your local log."
+}
+
+
+##### git ########
+alias fetchpush='git fetch origin;git merge origin/main'
+alias pushallf='cp ~/b .;sudo git add . -f && git commit -m "update" && git push'
+alias revertgit='git reset --hard HEAD~1 && git push origin +HEAD'
+
+alias vip='vi package.json'
+alias gitclonelg='git clone git@github.com:w7035477456/latestgreatest.git'
+
+alias gitclone='cd ~;rm -rf ~/code/main; cd ~/code && gitclonemain3 && sudo mv tutaporta main && cd main && realenv;gba'
+alias gitclonehellow='git clone git@github.com:w7035477456/hellowworldTest_crashed.git'
+alias gitclonemain2='git clone git@github.com:w7035477456/main2.git'
+alias gitclonemain3='git clone git@github.com:w7035477456/tutaporta.git'
+
+
+
+alias go='cd ~/code/main;ls -latr'
+alias gb='git branch'
+alias gr='git remote -v'
+alias ga='securecode; git add .'
+alias gba='git branch -a'
+alias gs='git status'
+alias gp='git push'
+alias gfp='git stash;git fetch;git pull;gba;git log -2;gb'
+alias gc='git commit -m "whatever"'
+alias gst='git stash'
+
+
+####### BUILD UBUNTU and MAC ###########################################################################################
+####### BUILD UBUNTU and MAC ###########################################################################################
+####### BUILD UBUNTU and MAC ###########################################################################################
+savedir() {
+    export LAST_CD_INPUT="$PWD"
+    echo "Saved: $LAST_CD_INPUT"
+    echo -n "(2)Press Enter to go here, or type a new folder name: "
+    read input
+    if [ -z "$input" ]; then
+        cd "$LAST_CD_INPUT"
+        pwd
+    else
+        # Save the custom input for later use
+        export LAST_CD_INPUT="$input"
+        echo "Saved: $LAST_CD_INPUT"
+        cd "$LAST_CD_INPUT"
+        pwd
+    fi
+}
+
+cdsavedir() {
+    # Check if the variable is set before trying to cd
+    if [ -z "$LAST_CD_INPUT" ]; then
+        echo "Error: No path has been saved yet. Run cdcurrent first."
+    else
+        cd "$LAST_CD_INPUT"
+    fi
+}
+
+#-------- fe common---------
+# Keep package-lock.json (tracked in git) — only wipe install/build outputs.
+alias feclean='cdsavedir;cd ./fe;sudo rm -rf ./node_modules;sudo rm -rfv ./dist'
+
+#-------- be common---------
+alias resetpm2='clear;pm2 stop all; pm2 delete all'
+alias beclean='cdsavedir; cd ./be  ; rm -rf node_modules'
+
+#========= DEV ============
+alias cleancompilebuildfedev='feclean;cdsavedir && cd ./fe && npm ci --include=dev && npm run builddev'
+alias cleancompileresetrunbedev='beclean;cdsavedir && cd ./be && npm ci --include=dev && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save'
+
+#========= PROD ============
+# After FE build: refuse BE/PM2 if fe/dist/index.html is missing (verbose + hard stop).
+# Drop old aliases so these functions are what `work2` / `febeprod` actually run.
+unalias cleancompilebuildfeprod 2>/dev/null || true
+unalias febeprod 2>/dev/null || true
+
+require_fe_dist() {
+    local root="${LAST_CD_INPUT:-$HOME/code/main}"
+    local fe_dist="$root/fe/dist"
+    local fe_index="$fe_dist/index.html"
+    echo "=== FE dist check: $fe_index ==="
+    if [[ ! -f "$fe_index" ]]; then
+        echo "ERROR: FE build failed — missing $fe_index" >&2
+        echo "       Deploy STOPPED here. BE/PM2 will NOT start." >&2
+        echo "       (feclean already wiped dist; buildprod did not recreate it.)" >&2
+        if [[ -d "$fe_dist" ]]; then
+            echo "       fe/dist exists but index.html is missing. Contents:" >&2
+            ls -la "$fe_dist" >&2 | head -30
+        else
+            echo "       fe/dist directory is missing entirely." >&2
+        fi
+        echo "       Fix: cd \"$root/fe\" && npm run buildprod && ls -la dist/index.html" >&2
+        return 1
+    fi
+    echo "OK: fe/dist/index.html present:"
+    ls -la "$fe_index"
+    return 0
+}
+
+# Fail-fast FE prod build (replaces old alias that used ';' after feclean).
+# FE_BUILD_SCRIPT: buildprod (default, obfuscates) | buildprodnoobfuscate
+
+# fe/.env is gitignored — without it Vite omits DEFAULT_THEME / DESKTOP_FONT_* and buttons can render blank.
+require_fe_env_for_prod_build() {
+  local envf="$HOME/code/main/fe/.env"
+  if [[ ! -f "$envf" ]]; then
+    echo "ERROR: missing $envf (gitignored). Copy from Mac fe/.env before FE build." >&2
+    echo "  scp ... fe/.env lawsen0@host:~/code/main/fe/.env" >&2
+    return 1
+  fi
+  if ! grep -qE '^DEFAULT_THEME=' "$envf"; then
+    echo "ERROR: $envf missing DEFAULT_THEME= (needed for button theme colors)" >&2
+    return 1
+  fi
+  if ! grep -qE '^DESKTOP_FONT_SIZE_BUTTON=' "$envf"; then
+    echo "ERROR: $envf missing DESKTOP_FONT_SIZE_BUTTON=" >&2
+    return 1
+  fi
+  echo "=== fe/.env OK (DEFAULT_THEME + DESKTOP_FONT_SIZE_BUTTON present) ==="
+}
+
+cleancompilebuildfeprod() {
+    require_fe_env_for_prod_build || return 1
+
+    local fe_script="${FE_BUILD_SCRIPT:-buildprod}"
+    echo "=== FE step: feclean (wipes fe/node_modules + fe/dist; keeps package-lock.json) ==="
+    feclean || { echo "ERROR: feclean failed — deploy STOPPED" >&2; return 1; }
+    cdsavedir || { echo "ERROR: cdsavedir failed (run savedir / febeprod first) — deploy STOPPED" >&2; return 1; }
+    cd ./fe || { echo "ERROR: cd ./fe failed — deploy STOPPED" >&2; return 1; }
+    if [[ ! -f package-lock.json ]]; then
+        echo "ERROR: missing fe/package-lock.json — deploy STOPPED" >&2
+        echo "       Lockfile must be in git. On Mac: commit fe/package-lock.json, pull on Ubuntu." >&2
+        return 1
+    fi
+    # Ubuntu often has NODE_ENV=production; plain npm ci/i then omits devDependencies
+    # (sass / javascript-obfuscator) and vite build fails: "sass-embedded" / "sass" not found.
+    echo "=== FE step: npm ci --include=dev (NODE_ENV=${NODE_ENV:-unset}; lockfile + sass/obfuscator) ==="
+    npm ci --include=dev || { echo "ERROR: npm ci --include=dev failed — deploy STOPPED (fe/dist not built)" >&2; return 1; }
+    if [[ ! -d node_modules/sass && ! -d node_modules/sass-embedded ]]; then
+        echo "ERROR: neither sass nor sass-embedded installed under fe/node_modules — deploy STOPPED" >&2
+        echo "       Check NODE_ENV / npm omit settings. Expected: npm ci --include=dev installs sass." >&2
+        return 1
+    fi
+    echo "=== FE step: npm run $fe_script ==="
+    npm run "$fe_script" || {
+        echo "ERROR: npm run $fe_script failed — deploy STOPPED (fe/dist not built)" >&2
+        return 1
+    }
+    cdsavedir || return 1
+    require_fe_dist || return 1
+}
+#alias cleancompilebuildfeprod='feclean;cdsavedir && cd ./fe && npm i && if [ "${FE_OBFUSCATE:-false}" = "true" ]; then npm run buildprodobfuscate; else npm run buildprod; fi'
+# Function (not alias): aliases with ';' break `if ! name` inside febeprod —
+# success was treated as failure (PM2 online, then "BE/PM2 start failed").
+unalias cleancompileresetrunbeprod 2>/dev/null || true
+cleancompileresetrunbeprod() {
+    local root="${LAST_CD_INPUT:-$HOME/code/main}"
+    echo "=== BE step: install + PM2 start (root=$root) ==="
+    cd "$root/be" || { echo "ERROR: cd $root/be failed — BE/PM2 STOPPED" >&2; return 1; }
+    if [[ ! -f package-lock.json ]]; then
+        echo "ERROR: missing be/package-lock.json — BE/PM2 STOPPED" >&2
+        return 1
+    fi
+    echo "=== BE step: npm ci --include=dev ==="
+    rm -rf node_modules
+    npm ci --include=dev || { echo "ERROR: npm ci failed — BE/PM2 STOPPED" >&2; return 1; }
+    echo "=== BE step: pm2 kill + reset ~/.pm2 ==="
+    pm2 kill || true
+    rm -rf ~/.pm2
+    pm2 list || true
+    echo "=== BE step: npm run pm2:start ==="
+    npm run pm2:start || { echo "ERROR: npm run pm2:start failed — BE/PM2 STOPPED" >&2; return 1; }
+    echo "=== BE step: pm2 save ==="
+    pm2 save || { echo "ERROR: pm2 save failed — BE/PM2 STOPPED" >&2; return 1; }
+    echo "OK: BE/PM2 start complete"
+    return 0
+}
+
+#========= MAC ============
+alias cleancompilebuildfemac='feclean;cdsavedir && cd ./fe && npm ci --include=dev && npm run build'
+alias cleancompileresetrunbemac='beclean;cdsavedir && cd ./be && npm ci --include=dev && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save && openurl'
+
+#----- USE THIS----
+alias testpg='netstat -an | grep LISTEN | grep 50010'
+
+check_pg() {
+    if testpg > /dev/null 2>&1; then
+        echo "✅ Postgres is active. Proceeding..."
+        return 0
+    else
+        echo "❌ Postgres is NOT active. Operation aborted."
+        return 1
+    fi
+}
+
+# Deploy integrity (ARTIFACT.sha256 at repo root — see scripts/deployIntegrity.mjs)
+deployartifactwrite() {
+    cdsavedir && node scripts/deployIntegrity.mjs write
+}
+deployartifactverify() {
+    cdsavedir && node scripts/deployIntegrity.mjs verify
+}
+
+# Refactored febedev
+#alias febedev='check_pg && (savedir; pm2 flush; cleancompilebuildfedev; cleancompileresetrunbedev)'
+#alias bedev='check_pg && (savedir; pm2 flush; cleancompileresetrunbedev)'
+
+# Copy repo usbzip/*.zip → $USB_DMG_EXE ($STORAGE_FOLDER/USB_DMG_EXE). Customer downloads.
+publishusbzip() {
+  local root="$HOME/code/main"
+  local script="$root/scripts/publish-usbzip-to-storage.sh"
+  cd "$root" || return 1
+  if [[ ! -f "$script" ]]; then
+    echo "[publishusbzip] missing $script — pull branch that has scripts/publish-usbzip-to-storage.sh" >&2
+    return 1
+  fi
+  chmod +x "$script" 2>/dev/null || true
+  # Copies usbzip/*.zip → $USB_DMG_EXE; refuses Git LFS pointer stubs.
+  bash "$script" || return 1
+  local dest="${USB_DMG_EXE:-}"
+  if [[ -z "$dest" && -f "$HOME/.ssh/be/.env" ]]; then
+    dest="$(grep -E "^USB_DMG_EXE=" "$HOME/.ssh/be/.env" | head -1 | cut -d= -f2- | tr -d "\"" | sed "s|#.*||;s/[[:space:]]*$//")"
+    local sf
+    sf="$(grep -E "^STORAGE_FOLDER=" "$HOME/.ssh/be/.env" | head -1 | cut -d= -f2- | tr -d "\"" | sed "s|#.*||;s/[[:space:]]*$//")"
+    dest="${dest//\$\{STORAGE_FOLDER\}/$sf}"
+    dest="${dest//\$STORAGE_FOLDER/$sf}"
+  fi
+  dest="${dest%/}"
+  if [[ -z "$dest" ]]; then
+    dest="${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE"
+  fi
+  echo "[publishusbzip] verify $dest:"
+  ls -lh "$dest"/usbBridgeV3-*.zip 2>&1 || {
+    echo "[publishusbzip] ERROR: no zip in $dest after publish" >&2
+    return 1
+  }
+}
+
+# Verbose fail-fast deploy: stop before BE if FE dist missing (used by work2 / work2_deploy).
+febeprod() {
+	go
+    if [[ -z "${_FEBEPROD_RELOADED:-}" ]]; then
+        _FEBEPROD_RELOADED=1
+        # shellcheck disable=SC1090
+        source "$HOME/b" || { echo "ERROR: source ~/b failed" >&2; return 1; }
+        febeprod "$@"
+        local rc=$?
+        unset _FEBEPROD_RELOADED
+        return "$rc"
+    fi
+    check_pg || return 1
+    savedir
+    pm2 flush
+    echo "=== febeprod 1/6: cleancompilebuildfeprod (must create fe/dist) ==="
+    if ! cleancompilebuildfeprod; then
+        echo "ERROR: febeprod aborted — FE dist/build failed; refusing BE/PM2 deploy" >&2
+        return 1
+    fi
+    echo "=== febeprod 2/6: cleancompileresetrunbeprod ==="
+    if ! cleancompileresetrunbeprod; then
+        echo "ERROR: febeprod aborted — BE/PM2 start failed" >&2
+        return 1
+    fi
+    echo "=== febeprod 3/6: deployartifactwrite ==="
+    deployartifactwrite || { echo "ERROR: deployartifactwrite failed" >&2; return 1; }
+    echo "=== febeprod 4/6: deployartifactverify ==="
+    deployartifactverify || { echo "ERROR: deployartifactverify failed" >&2; return 1; }
+    echo "=== febeprod 5/6: pm2restart ==="
+    pm2restart || { echo "ERROR: pm2restart failed" >&2; return 1; }
+    echo "=== febeprod 6/6: publishusbzip (usbzip → $USB_DMG_EXE / STORAGE) ==="
+    if ! publishusbzip; then
+        echo "ERROR: febeprod aborted — publishusbzip failed (usbzip must contain real PK zips, not Git LFS pointers)" >&2
+        return 1
+    fi
+    echo "=== febeprod OK ==="
+    return 0
+}
+alias beprod='check_pg && (savedir; pm2 flush; cleancompileresetrunbeprod && deployartifactwrite && deployartifactverify && pm2restart)'
+alias runprod='check_pg && (savedir; pm2 flush; pm2 kill && rm -rf ~/.pm2 && pm2 list && cd ./be && npm run pm2:start && pm2restart && pm2 save)'
+
+#alias febemac='check_pg && (savedir; pm2 flush; cleancompilebuildfemac && cleancompileresetrunbemac)'
+
+
+
+mylatestbranch() {
+    # Sorts branches by committer date (descending) 
+    # and picks the top 1 (excluding HEAD)
+    local last_branch=$(git for-each-ref --sort=-committerdate refs/heads/ --format='%(refname:short)' | head -n 1)
+
+    if [ -n "$last_branch" ]; then
+        echo "Latest branch with activity: $last_branch"
+        
+        # Optional: Ask if you want to switch to it
+        read -p "Would you like to checkout $last_branch? (y/n): " choice
+        if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+            git checkout "$last_branch"
+        fi
+    else
+        echo "No local branches found."
+    fi
+}
+
+latestbranch() {
+    # Sorts all branches (local and remote) by committer date, descending
+    # We filter out HEAD and then take the very top one
+    git for-each-ref --sort=-committerdate refs/heads/ refs/remotes/origin/ \
+        --format='%(refname:short)' | sed 's/origin\///' | grep -v 'HEAD' | head -n 1
+}
+alias makeSound='for i in {1..20}; do echo -e "\a"; sleep 0.02; done'
+
+# Interactive: unlock corruptedKey_march2023 and git fetch until passphrase is correct.
+# Wrong passphrase → Permission denied → re-ask; does not proceed until git fetch works.
+work2_git_fetch_until_ok() {
+    local github_key="${UBUNTU_GIT_KEY:-$HOME/.ssh/corruptedKey_march2023}"
+    if [[ ! -f "$github_key" ]]; then
+        echo "ERROR: missing GitHub SSH key: $github_key" >&2
+        return 1
+    fi
+    export GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes -i ${github_key}"
+
+    # Ensure ssh-agent so a correct passphrase is cached for later pull / lfs.
+    if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
+        eval "$(ssh-agent -s)" >/dev/null
+    fi
+
+    # Fast path: key already unlocked in agent and GitHub accepts it.
+    if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ${github_key}" \
+        git fetch 2>/dev/null; then
+        git pull || true
+        return 0
+    fi
+
+    while true; do
+        # Drop any bad/partial agent entry so ssh always re-prompts.
+        ssh-add -d "$github_key" 2>/dev/null || true
+
+        echo ""
+        echo "=== Enter passphrase for ${github_key} ==="
+        echo "Wrong passphrase will re-ask — will not proceed until git fetch succeeds (Ctrl-C to abort)."
+        if ! ssh-add "$github_key"; then
+            echo ""
+            echo "Wrong passphrase (ssh-add failed). Try again."
+            continue
+        fi
+
+        echo "=== git fetch (verifying GitHub access) ==="
+        if git fetch; then
+            echo "=== GitHub SSH OK ==="
+            git pull || true
+            return 0
+        fi
+
+        echo ""
+        echo "ERROR: git fetch failed (Permission denied / publickey)."
+        echo "Removing key from agent and asking again."
+        ssh-add -d "$github_key" 2>/dev/null || true
+    done
+}
+
+work2() {
+    # Stale interactive shells keep old febeprod (alias expanded into function body).
+    # Reload ~/b once, then re-enter so BE/PM2 success is not treated as failure.
+    if [[ -z "${_WORK2_RELOADED:-}" ]]; then
+        _WORK2_RELOADED=1
+        # shellcheck disable=SC1090
+        source "$HOME/b" || { echo "ERROR: source ~/b failed" >&2; return 1; }
+        work2 "$@"
+        local rc=$?
+        unset _WORK2_RELOADED
+        return "$rc"
+    fi
+    cd ~/code/main
+    ls -latr
+    pwd
+    # 1) Update remote — loop until SSH passphrase is correct (no proceed on Permission denied)
+    if ! work2_git_fetch_until_ok; then
+        echo "ERROR: work2 aborted — GitHub SSH auth failed" >&2
+        return 1
+    fi
+    echo "--------------------------------"
+    git branch
+    echo "--------------------------------"
+
+    # Capture the latest branch name silently
+    local latestBranchName=$(latestbranch)
+
+    # 2) Ask for input with the new default
+    echo -n "Please input branch name [default: $latestBranchName]: "
+    read branch_name
+
+    # 3) Logic: If user presses enter (empty input), use the latest branch
+    if [ -z "$branch_name" ]; then
+        branch_name="$latestBranchName"
+    fi
+
+    # Checkout the determined branch
+    if [ -n "$branch_name" ]; then
+        git checkout "$branch_name"
+    else
+        echo "Error: No branch found to checkout."
+        return 1
+    fi
+    echo -e "\n____BRANCH COMMENT:_________________"
+    git log -1 --pretty=format:"%C(yellow)%s"
+    echo -e "_______________________________________\n"
+    read -p "Is this right branch comment ? proceed ? [Y/n]: " CONFIRM
+    CONFIRM_LOWER="$(printf '%s' "$CONFIRM" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$CONFIRM_LOWER" == "n" ]]; then
+        echo "Restore cancelled."
+        return 1
+    fi
+
+    echo "=== work2: git lfs pull usbzip (real installer zips) ==="
+    git lfs pull --include="usbzip/**" 2>/dev/null || git lfs pull 2>/dev/null || true
+
+    # Obfuscate? Y/enter → buildprod; n → buildprodnoobfuscate
+    read -p "Do you want Obfuscate (Y/n)? " OBFUSCATE_CHOICE
+    local obf_lower
+    obf_lower="$(printf '%s' "$OBFUSCATE_CHOICE" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$obf_lower" == "n" ]]; then
+        export FE_BUILD_SCRIPT=buildprodnoobfuscate
+        echo "=== work2: FE build = npm run buildprodnoobfuscate (no obfuscate) ==="
+    else
+        export FE_BUILD_SCRIPT=buildprod
+        echo "=== work2: FE build = npm run buildprod (with obfuscate) ==="
+    fi
+
+    # 4) Build/deploy (requires febeprod above — hard-stops if fe/dist missing)
+    if ! type febeprod >/dev/null 2>&1; then
+        echo "ERROR: febeprod not defined. Run: source ~/b" >&2
+        return 1
+    fi
+    echo "=== work2: febeprod (FE build must produce fe/dist before BE) ==="
+    if ! febeprod; then
+        echo "ERROR: work2 deploy aborted — febeprod failed (see FE dist / build errors above)" >&2
+        return 1
+    fi
+    git branch
+
+    makeSound
+    # 5) Recent logs only — pm2log uses --nostream so work2 exits (use pm2logf to follow)
+    pm2log
+}
+
+# Same steps as work2, non-interactive — Mac deployall2 / deploy-all.sh call this over SSH.
+# Uses febeprod from this file (myscript/ubuntu/b). Do NOT source ~/b over SSH (keychain prompts).
+# GitHub SSH: same as work2() — ~/.ssh/config → IdentityFile ~/.ssh/corruptedKey_march2023
+work2_git_fetch() {
+    export GIT_TERMINAL_PROMPT=0
+    local github_key="$HOME/.ssh/corruptedKey_march2023"
+
+    # Explicit key first — avoids ssh trying githubkey / other keys with passphrases.
+    if [[ -f "$github_key" ]]; then
+        if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i $github_key -o ConnectTimeout=20" git fetch origin 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    # ssh-agent on Ubuntu (if march2023 was loaded in an interactive session)
+    if [[ -n "${SSH_AUTH_SOCK:-}" ]] && ssh-add -l >/dev/null 2>&1; then
+        if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=20" git fetch origin 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    # Fallback: trust ~/.ssh/config (Host github.com block)
+    if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=20" git fetch origin 2>/dev/null; then
+        return 0
+    fi
+
+    return 1
+}
+
+work2_deploy() {
+    if [[ -z "${_WORK2_DEPLOY_RELOADED:-}" ]]; then
+        _WORK2_DEPLOY_RELOADED=1
+        # shellcheck disable=SC1090
+        source "$HOME/b" || { echo "ERROR: source ~/b failed" >&2; return 1; }
+        work2_deploy "$@"
+        local rc=$?
+        unset _WORK2_DEPLOY_RELOADED
+        return "$rc"
+    fi
+    local branch_name="${1:?work2_deploy: branch name required}"
+    cd ~/code/main || return 1
+    pwd
+    if ! work2_git_fetch; then
+        if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+            echo "WARN: git fetch failed (no ssh-agent). Using cached origin/$branch_name — may be stale."
+        else
+            echo "ERROR: git fetch failed. Ubuntu expects ~/.ssh/config → corruptedKey_march2023 (same as work2)." >&2
+            echo "       On Ubuntu test: GIT_TERMINAL_PROMPT=0 ssh -o BatchMode=yes -T git@github.com" >&2
+            return 1
+        fi
+    fi
+    echo "--------------------------------"
+    git branch
+    echo "--------------------------------"
+    if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+        if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+            git checkout "$branch_name"
+        else
+            git checkout -b "$branch_name" "origin/$branch_name"
+        fi
+        git reset --hard "origin/$branch_name"
+    else
+        git checkout "$branch_name" || return 1
+    fi
+    echo -e "\n____BRANCH COMMENT:_________________"
+    git log -1 --pretty=%s
+    echo -e "_______________________________________\n"
+    savedir 2>/dev/null || export LAST_CD_INPUT="$HOME/code/main"
+    echo "=== work2_deploy: febeprod (FE build must produce fe/dist before BE) ==="
+        echo "=== work2_deploy: git lfs pull usbzip ==="
+    git lfs pull --include="usbzip/**" 2>/dev/null || git lfs pull 2>/dev/null || true
+if ! febeprod; then
+        echo "ERROR: work2_deploy aborted — febeprod failed (see FE dist / build errors above)" >&2
+        return 1
+    fi
+    git branch
+    if [[ -f "$HOME/code/main/scripts/deployIntegrity.mjs" ]]; then
+        node "$HOME/code/main/scripts/deployIntegrity.mjs" verify
+        node "$HOME/code/main/fe/scripts/print-build-info.mjs" 2>/dev/null | sed 's/^/Build stamp: /'
+    fi
+}
+
+hashCompare() {
+read -p "Enter path to the first file: " file1
+    read -p "Enter path to the second file: " file2
+
+    # Expand the tilde (~) to the actual home directory path
+    file1="${file1/#\~/$HOME}"
+    file2="${file2/#\~/$HOME}"
+
+    # Use sudo test to check if files exist, bypassing permission blocks
+    if ! sudo test -f "$file1"; then
+        echo "Error: File '$file1' does not exist or cannot be accessed."
+        return 1
+    fi
+    if ! sudo test -f "$file2"; then
+        echo "Error: File '$file2' does not exist or cannot be accessed."
+        return 1
+    fi
+
+    # Calculate hashes using sudo and extract just the string portion
+    hash1=$(sudo md5sum "$file1" | awk '{print $1}')
+    hash2=$(sudo md5sum "$file2" | awk '{print $1}')
+
+    echo "-----------------------------------"
+    echo "File 1 MD5: $hash1"
+    echo "File 2 MD5: $hash2"
+    echo "-----------------------------------"
+
+    # Compare the hash strings
+    if [[ "$hash1" == "$hash2" ]]; then
+        echo "✅ Result: The files are byte-for-byte identical."
+    else
+        echo "❌ Result: The files are different."
+    fi
+}
+
+
+
+######## BUILD THE END ###########################################################################################
+######## BUILD THE END ###########################################################################################
+######## BUILD THE END ###########################################################################################
+####### Ubuntu version: superarchive/superrestore #########
+
+######## BEGIN BEGIN Ubuntu version: superarchive/superrestore #########
+archive() {
+  local target="$1"
+  if [ -z "$target" ]; then
+    echo "[!] ERROR: No target directory specified."
+    return 1
+  fi
+
+  # Ensure target is an absolute path for rsync stability
+  mkdir -p "$target"
+  local abs_target=$(cd "$target"; pwd)
+
+  echo "[+] Starting Ubuntu Archive..."
+  echo "[+] Destination: $abs_target"
+  x_backup
+  
+  local items=(
+"/etc/default/ufw"
+"/home/lawsen0/.bash_profile"
+"/home/lawsen0/.bashrc"
+"/home/lawsen0/.coredump"
+"/home/lawsen0/.pm2/dump.pm2"
+"/home/lawsen0/.profile"
+"/home/lawsen0/b"
+"/home/lawsen0/x_backup/x_backup.tar.gz.enc"
+"/home/lawsen0/backups"
+"/home/lawsen0/buildnvme"
+"/home/lawsen0/code/onlinemallwebsite/CRON/cleanup_verifications.sql"
+"/home/lawsen0/tuning/tuning.sh"
+"/etc/fstab"
+"/etc/haproxy/certs/site.pem"
+"/etc/haproxy/cloudflare-allowlist.md"
+"/etc/haproxy/cloudflare-ips-v4.txt"
+"/etc/haproxy/cloudflare-ips-v6.txt"
+"/etc/haproxy/haproxy.cfg"
+"/etc/netplan/50-cloud-init.yaml"
+"/etc/nginx/nginx.conf"
+"/etc/nginx/sites-available/protected"
+"/etc/postgresql/16/main/postgresql.conf"
+"/etc/profile.d/autologout.sh"
+"/etc/security/limits.conf"
+"/etc/ssh/ssh_config"
+"/etc/ssh/sshd_config"
+"/etc/sudoers.d/coredump"
+"/etc/sysctl.conf"
+"/etc/sysctl.d/99-ssh-keepalive.conf"
+"/etc/systemd/system/40g-tuning.service"
+"/etc/systemd/system/haproxy.service"
+"/etc/systemd/system/haproxy.service.d/override.conf"
+"/etc/systemd/system/postgresql@16-main.service"
+"/etc/ufw/before.rules"
+"/etc/ufw/user.rules"
+"/etc/ufw/user6.rules"
+
+"/mnt/nvme/pgdata16/pg_hba.conf"
+"/mnt/nvme/pgdata16/pg_ident.conf"
+"/mnt/nvme/pgdata16/postgresql.auto.conf"
+"/mnt/nvme/pgdata16/standby.signal"
+"/usr/local/bin/setupufw"
+"/usr/local/coredump"
+"/usr/local/var/postgresql@16/postgresql.conf"
+"/var/lib/postgresql/16/main/postgresql.auto.conf"
+"/var/lib/postgresql/16/main/standby.signal"
+)
+
+  for item in "${items[@]}"; do
+    if [ -e "$item" ]; then
+      echo "  -> Backing up: $item"
+      # -R (relative) recreates the path inside the target
+      # -a (archive) preserves permissions/timestamps
+      sudo rsync -Ra "$item" "$abs_target/"
+    else
+      echo "  [?] Path not found, skipping: $item"
+    fi
+  done
+
+  echo "[+] Fixing ownership for: $USER"
+  sudo chown -R "$USER" "$abs_target"
+  echo "[✓] Completed. Files are in: $abs_target"
+}
+
+# ubuntu version 2
+superarchive() {
+  local today
+  # Ubuntu compatible date string
+  today=$(date +'%b%d_%I%p' | tr '[:upper:]' '[:lower:]')
+
+  local base_dir="/home/lawsen0/2009_corruptLogFiles"
+  local sub_dir="$base_dir/xbox0"
+
+  echo "[1/6] Cleaning environment: $base_dir"
+  sudo rm -rf "$base_dir"
+
+  echo "[2/6] Re-cloning repository..."
+  cd "/home/lawsen0/" || return
+  gitclone2009
+
+  if [ ! -d "$base_dir" ]; then
+    echo "[!] ERROR: Directory $base_dir was not created by gitclone."
+    return 1
+  fi
+
+  echo "[3/6] Entering workspace..."
+  mkdir -p "$sub_dir"
+  cd "$sub_dir" || return 1
+
+  echo "[4/6] Executing archive sub-routine for: $today"
+  # This creates the folder $today inside xbox0/
+  archive "$today"
+
+  echo "[5/6] Pushing changes to Git..."
+  cd "$base_dir" || return 1
+
+  # Verbose git tracking
+  git add -A -f
+  if git commit -m "Ubuntu Backup: $today"; then
+    git push
+    echo "[✓] Git push successful."
+  else
+    echo "[!] Nothing to commit or git error."
+  fi
+
+  echo "[6/6] Current status of $sub_dir:"
+  ls -l "$sub_dir/$today"
+
+  echo "[✓] All operations finished. Target: $sub_dir/$today"
+
+  echo "To recover: 1)find . -name *.enc  2)cd there 3)x_restore"
+}
+
+####### superarchive/superrestore #########
+######## Ubuntu version: superarchive/superrestore #########
+x_restore() {
+    local archive_file=""
+    local restore_dir="$HOME/x_backup/restore"
+    local user_choice=""
+
+    while true; do
+        echo "Where is your x_backup.tar.gz.enc ?"
+        echo "1) ~/x_backup/x_backup.tar.gz.enc"
+        echo "2) current folder: ./x_backup.tar.gz.enc"
+        read -p "Enter 1 or 2: " user_choice
+
+        if [ "$user_choice" = "1" ]; then
+            archive_file="$HOME/x_backup/x_backup.tar.gz.enc"
+            break
+        elif [ "$user_choice" = "2" ]; then
+            archive_file="./x_backup.tar.gz.enc"
+            break
+        else
+            echo "Invalid input. You must answer 1 or 2."
+            echo ""
+        fi
+    done
+
+    if [ ! -f "$archive_file" ]; then
+        echo "Error: Backup file not found at $archive_file"
+        return 1
+    fi
+
+    mkdir -p "$restore_dir"
+
+    read -rs -p "Enter decryption password: " RESTORE_PASS
+    echo ""
+
+    echo "Decrypting and restoring to $restore_dir..."
+
+    cat "$archive_file" | \
+    openssl enc -d -aes-256-cbc -md sha256 -salt -pbkdf2 -iter 100000 -pass pass:"$RESTORE_PASS" 2>/dev/null | \
+    tar -xzvf - -C "$restore_dir"
+
+    if [ $? -eq 0 ]; then
+        echo "Success! Backup has been safely restored to $restore_dir"
+        chown -R "$USER:$USER" "$restore_dir"
+        chmod 700 "$restore_dir"
+    else
+        echo "Restore failed. Incorrect password or corrupted archive."
+    fi
+
+    unset RESTORE_PASS
+}
+
+x_backup() {
+  local staging_file="/tmp/x_backup.tar.gz.enc"
+  local final_dir="/home/lawsen0/x_backup"
+  local output_file="$final_dir/x_backup.tar.gz.enc"
+
+  # Clean out any old files in the backup directory if it exists
+  if [ -d "$final_dir" ]; then
+    echo "Cleaning up old files in $final_dir..."
+    rm -rf "$final_dir"/*
+  fi
+
+  # Ensure the target directory exists before running
+  mkdir -p "$final_dir"
+
+  # Prompt for password safely without echoing characters
+  read -rs -p "Enter encryption password: " ARCHIVE_PASS
+  echo ""
+  read -rs -p "Confirm encryption password: " ARCHIVE_PASS_CONFIRM
+  echo ""
+
+  if [ "$ARCHIVE_PASS" != "$ARCHIVE_PASS_CONFIRM" ]; then
+    echo "Error: Passwords do not match."
+    return 1
+  fi
+
+  echo "Archiving and encrypting ~/.ssh securely..."
+
+  # 1. Run tar with sudo to read all restricted files.
+  # 2. OpenSSL encrypts and saves cleanly to /tmp, preventing terminal pipeline hangs.
+  sudo tar -czf - --exclude='*agent*' -C "/home/lawsen0/" .ssh 2>/dev/null | \
+  openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$ARCHIVE_PASS" > "$staging_file"
+
+  if [ $? -ne 0 ] || [ ! -s "$staging_file" ]; then
+    echo "Encryption step failed."
+    rm -f "$staging_file"
+    unset ARCHIVE_PASS ARCHIVE_PASS_CONFIRM
+    return 1
+  fi
+
+  # 3. Move the final file right into your git repository folder.
+  echo "Moving archive to $final_dir..."
+  mv "$staging_file" "$output_file"
+
+  # 4. Correct ownership back to your user account so git can modify it without sudo.
+  chown "$USER:$USER" "$output_file"
+
+  if [ $? -eq 0 ]; then
+    echo "Success! Secure backup created at: $output_file"
+  else
+    echo "Failed to move file to your repository directory."
+    rm -f "$staging_file"
+  fi
+
+  # Clear variables from memory
+  unset ARCHIVE_PASS ARCHIVE_PASS_CONFIRM
+}
+####### END END END superarchive/superrestore #########
+
+
+
+
+lconf() {
+ sudo chattr +i /etc/postgresql/16/main/pg_hba.conf
+}
+ulconf() {
+ sudo chattr -i /etc/postgresql/16/main/pg_hba.conf
+}
+
+alias showsub='clear;ls -latr -R'
+
+superrestore() {
+    local current_dir=$(pwd)
+    
+    # Validation: Ensure you are in a valid xbox timestamp folder
+    local valid_pattern="\/2009_corruptLogFiles\/xbox[0-9]\/[a-z]{3}[0-9]{2}_[0-9]{2}(am|pm)$"
+
+    if [[ ! "$current_dir" =~ $valid_pattern ]]; then
+        echo "ERROR: Restore BLOCKED. You are in: $current_dir"
+        echo "You must 'cd' into a timestamp folder first."
+        return 1
+    fi
+
+    echo "--- STARTING RESTORE AUDIT (DRY RUN) ---"
+    # -n (no-clobber) + -v (verbose) shows the mapping without overwriting
+    sudo cp -anv "$current_dir"/* / 
+
+    echo ""
+    echo "--- END OF AUDIT ---"
+    read -p "Do you want to proceed with the LIVE restore? (y/n): " confirm
+
+    if [[ "$confirm" == "y" ]]; then
+        echo "Executing LIVE restore..."
+        # -a (archive/permissions) + -v (verbose) for the real deal
+        sudo cp -av "$current_dir"/* /
+        echo "Restore complete."
+    else
+        echo "Restore cancelled by user."
+    fi
+}
+
+
+export PS1="\[\e[32m\]\u@\[\e[37;40m\]\h\[\e[0m\] \[\e[36m\](\$(hostname -I | awk '{print \$1}'))\[\e[0m\] \[\e[34m\]\w\[\e[0m\] \$ --------"

@@ -5,6 +5,9 @@ const MAX_AUTO_RELOADS = 2;
 const CACHE_BUST_PARAM = '_omr';
 const INSTALL_FLAG = '__omStaleModuleHardReloadInstalled';
 
+/** Must match devCacheRecoveryPlugin.mjs inline bootstrap (omOmrPurge). */
+export const DEV_CACHE_RECOVERY_CLEAR_OMR_FLAG = 'omOmrPurge';
+
 let reloadStarted = false;
 
 function errorText(error) {
@@ -39,11 +42,24 @@ export function isFailedDynamicImportError(error) {
   );
 }
 
+function isStaleViteModuleScript(event) {
+  const target = event?.target;
+  if (!target || target.tagName !== 'SCRIPT') return false;
+  const src = String(target.src || '');
+  if (!src) return false;
+  return (
+    src.includes('/node_modules/.vite/deps/') ||
+    src.includes('/@vite/') ||
+    src.includes('/@react-refresh') ||
+    (src.includes('/src/') && src.includes('.jsx'))
+  );
+}
+
 function isStaleViteDepScriptError(event) {
-  const src = String(event?.target?.src || '');
-  if (!src.includes('/node_modules/.vite/deps/')) return false;
+  if (!isStaleViteModuleScript(event)) return false;
   const msg = String(event?.message || '');
-  return /Outdated Optimize Dep/i.test(msg) || /\b504\b/.test(msg);
+  if (!msg) return true;
+  return /Outdated Optimize Dep/i.test(msg) || /\b504\b/.test(msg) || /Failed to load module script/i.test(msg);
 }
 
 export function isAllowedStaleModuleReloadHost() {
@@ -213,4 +229,8 @@ export function installHardReloadOnStaleModule() {
     },
     true
   );
+  window.addEventListener('unhandledrejection', (event) => {
+    if (!tryHardReloadOnFailedDynamicImport(event.reason)) return;
+    event.preventDefault();
+  });
 }

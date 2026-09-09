@@ -5,6 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { buildInfoVitePlugin } from './scripts/buildInfo.mjs';
+import { devCacheRecoveryPlugin } from './scripts/devCacheRecoveryPlugin.mjs';
 
 function parseSimpleEnvFile(raw) {
   const out = {};
@@ -165,7 +166,9 @@ export default defineConfig(({ mode }) => {
       // this sets a default port to 3000
       port: PORT,
       host: true,
-      proxy: apiProxy
+      proxy: apiProxy,
+      // Mac dev: stop Chrome caching stale Vite dep bundles across restarts
+      headers: mode === 'development' ? { 'Cache-Control': 'no-store' } : undefined
     },
     build: {
       chunkSizeWarningLimit: 1600
@@ -196,6 +199,6 @@ export default defineConfig(({ mode }) => {
       }
     },
     base: '/',
-    plugins: [react(), jsconfigPaths(), buildInfoVitePlugin()]
+    plugins: [react(), jsconfigPaths(), buildInfoVitePlugin(), devCacheRecoveryPlugin()]
   };
 });

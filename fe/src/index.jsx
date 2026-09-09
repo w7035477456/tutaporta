@@ -1,7 +1,11 @@
 import { createRoot } from 'react-dom/client';
 
 import { isGlobalErrorPopupEnabled } from 'config/globalErrorPopupEnv';
-import { bootstrapStaleModuleRecovery, installHardReloadOnStaleModule } from 'utils/hardReloadOnStaleModule';
+import {
+  bootstrapStaleModuleRecovery,
+  DEV_CACHE_RECOVERY_CLEAR_OMR_FLAG,
+  installHardReloadOnStaleModule
+} from 'utils/hardReloadOnStaleModule';
 
 bootstrapStaleModuleRecovery();
 installHardReloadOnStaleModule();
@@ -70,6 +74,14 @@ root.render(
     </SiteAudioProvider>
   </ConfigProvider>
 );
+
+if (import.meta.env.DEV && typeof sessionStorage !== 'undefined') {
+  try {
+    sessionStorage.removeItem(DEV_CACHE_RECOVERY_CLEAR_OMR_FLAG);
+  } catch {
+    /* ignore */
+  }
+}
 
 // If you want your app to work offline and load faster, you can change
 // unregister() to register() below. Note this comes with some pitfalls.
