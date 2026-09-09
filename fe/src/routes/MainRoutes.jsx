@@ -162,6 +162,10 @@ const MainRoutes = {
       element: <MyRecordVault />
     },
     {
+      path: 'myNotes',
+      element: <Navigate to="/myNote" replace />
+    },
+    {
       path: 'myRecordVault',
       element: <Navigate to="/myNote" replace />
     },

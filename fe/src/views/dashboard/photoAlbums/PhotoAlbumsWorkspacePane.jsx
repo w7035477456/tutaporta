@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -95,6 +95,8 @@ import PhotoAlbumsFileMenu, {
 import ProfilesRecordsPage from 'views/utilities/ProfilesRecordsPage';
 import { PROFILES_RECORDS_PAYMENT_TABS } from 'constants/profilesRecordsRoute';
 import PhotoAlbumsMobileUploadDialog from './PhotoAlbumsMobileUploadDialog';
+import RecordVaultMobileDirectUploadDialog from '../recordVault/RecordVaultMobileDirectUploadDialog';
+import { consumeMobileTutaPhotoUploadPending, peekMobileTutaPhotoUploadPending } from 'utils/mobilePostLoginChoice';
 import PhotoAlbumsMobileUploadFolderPanel from './PhotoAlbumsMobileUploadFolderPanel';
 import PhotoAlbumsCrossPaneTransferDialog from './PhotoAlbumsCrossPaneTransferDialog';
 import PhotoAlbumsOrderAlbumDialog from './PhotoAlbumsOrderAlbumDialog';
@@ -1690,6 +1692,7 @@ export default function PhotoAlbumsWorkspacePane({
   onSessionEnded
 }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const paneStorageType = usePhotoAlbumsPaneStorageType();
   const vaultApi = useMemo(() => createPhotoAlbumsPaneApi(paneStorageType), [paneStorageType]);
   const { user } = useAuth();
@@ -1853,6 +1856,7 @@ export default function PhotoAlbumsWorkspacePane({
   /** Imperative handle to the TipTap editor (get/set HTML, toggle editable). */
   const noteEditorApiRef = useRef(null);
   const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
+  const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
   const [inviteReviewOpen, setInviteReviewOpen] = useState(false);
   const [inviteReviewSendResult, setInviteReviewSendResult] = useState(null);
   const [sharedAlbums, setSharedAlbums] = useState([]);
@@ -4482,6 +4486,39 @@ export default function PhotoAlbumsWorkspacePane({
       event.dataTransfer.dropEffect = 'copy';
     }
   }, []);
+
+
+  /** Mobile post-login chooser → direct camera/gallery into open album note. */
+  useEffect(() => {
+    if (!unlocked || loading || busy || mobileDirectUploadOpen) return undefined;
+    const fromQuery = searchParams.get('mobileUpload') === '1';
+    const fromFlag = peekMobileTutaPhotoUploadPending();
+    if (!fromQuery && !fromFlag) return undefined;
+    if (!selectedNote) return undefined;
+    consumeMobileTutaPhotoUploadPending();
+    if (fromQuery) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('mobileUpload');
+      setSearchParams(next, { replace: true });
+    }
+    setMobileDirectUploadOpen(true);
+    return undefined;
+  }, [
+    unlocked,
+    loading,
+    busy,
+    mobileDirectUploadOpen,
+    searchParams,
+    setSearchParams,
+    selectedNote
+  ]);
+
+  const handleMobileDirectPhotoUploadFile = useCallback(
+    async (file) => {
+      await uploadNoteVaultFile(file, null);
+    },
+    [uploadNoteVaultFile]
+  );
 
   /** Phone QR upload (photo_albums) → UPLOAD_FOLDER; switch to Mobile Upload tab (no note insert). */
   const handleMobilePhoneUploadComplete = useCallback(async (_fileNameOrId, meta = {}) => {
@@ -7644,6 +7681,15 @@ export default function PhotoAlbumsWorkspacePane({
         onClose={() => setMobileUploadOpen(false)}
         disabled={busy || !selectedNote}
         onPhoneUploadComplete={(fileNameOrId, meta) => void handleMobilePhoneUploadComplete(fileNameOrId, meta)}
+      />
+
+      <RecordVaultMobileDirectUploadDialog
+        open={mobileDirectUploadOpen}
+        onClose={() => setMobileDirectUploadOpen(false)}
+        disabled={busy || !selectedNote}
+        title="Upload photo to TutaPhoto"
+        noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
+        onPickFile={handleMobileDirectPhotoUploadFile}
       />
 
       <PhotoAlbumsInviteReviewDialog

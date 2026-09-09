@@ -37,7 +37,8 @@ export default function RecordVaultSearchBar({
   onClear,
   searchBusy = false,
   clearDisabled = false,
-  bgcolor = '#0d0d0d'
+  bgcolor = '#0d0d0d',
+  sx
 }) {
   const handleKeyDown = (event) => {
     if (event.key === 'Enter') {
@@ -56,7 +57,8 @@ export default function RecordVaultSearchBar({
         gap: { xs: 0.35, sm: 0.5 },
         px: { xs: 0.5, sm: 0.75 },
         py: 0.75,
-        bgcolor
+        bgcolor,
+        ...sx
       }}
     >
       <Box
@@ -109,5 +111,6 @@ RecordVaultSearchBar.propTypes = {
   onClear: PropTypes.func,
   searchBusy: PropTypes.bool,
   clearDisabled: PropTypes.bool,
-  bgcolor: PropTypes.string
+  bgcolor: PropTypes.string,
+  sx: PropTypes.object
 };

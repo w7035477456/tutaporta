@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -33,6 +33,7 @@ import {
   isAllowedRecordVaultFile,
   recordVaultUploadFileName
 } from 'utils/recordVaultFileFormats';
+import { consumeMobileTutaNotesUploadPending, peekMobileTutaNotesUploadPending } from 'utils/mobilePostLoginChoice';
 import RecordVaultSearchBar from './RecordVaultSearchBar';
 import {
   recordVaultMenuButtonFontRemFromTenths,
@@ -75,6 +76,7 @@ import RecordVaultFileMenu, {
 import ProfilesRecordsPage from 'views/utilities/ProfilesRecordsPage';
 import { PROFILES_RECORDS_PAYMENT_TABS } from 'constants/profilesRecordsRoute';
 import RecordVaultMobileUploadDialog from './RecordVaultMobileUploadDialog';
+import RecordVaultMobileDirectUploadDialog from './RecordVaultMobileDirectUploadDialog';
 import RecordVaultCrossPaneTransferDialog from './RecordVaultCrossPaneTransferDialog';
 import api from 'api/axios';
 import {
@@ -1396,6 +1398,7 @@ export default function RecordVaultWorkspacePane({
   onSessionEnded
 }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const paneStorageType = useRecordVaultPaneStorageType();
   const vaultApi = useMemo(() => createRecordVaultPaneApi(paneStorageType), [paneStorageType]);
   const { user } = useAuth();
@@ -1554,6 +1557,8 @@ export default function RecordVaultWorkspacePane({
   /** Imperative handle to the TipTap editor (get/set HTML, toggle editable). */
   const noteEditorApiRef = useRef(null);
   const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
+  /** Phone post-login: direct camera/gallery into the open note (not desktop QR). */
+  const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
   /** Highlight the notes-list column while dragging an importable file over it. */
   const [noteLaneFileDragActive, setNoteLaneFileDragActive] = useState(false);
   /** Bumped when the TipTap instance is created, so hydration effects can run. */
@@ -3341,20 +3346,20 @@ export default function RecordVaultWorkspacePane({
    */
   const uploadNoteVaultFile = useCallback(
     async (file, coords) => {
-      if (!selectedNote || !file || busy) return;
+      if (!selectedNote || !file || busy) return false;
       const noteId = Number(selectedNote.note_id);
       // Bill Schedule Monthly/Yearly use synthetic negative ids — not vault notes.
       if (!Number.isFinite(noteId) || noteId < 1 || isBillScheduleSystemId(noteId)) {
-        return;
+        return false;
       }
       if (!isAllowedRecordVaultFile(file)) {
         setError(`Unsupported vault file type: ${file.name || 'file'}`);
-        return;
+        return false;
       }
       const maxBytes = (maxUploadMb || 20) * 1024 * 1024;
       if (file.size > maxBytes) {
         setError(`${file.name || 'File'} is over the ${maxUploadMb || 20} MB upload limit.`);
-        return;
+        return false;
       }
       setBusy(true);
       setError('');
@@ -3394,8 +3399,10 @@ export default function RecordVaultWorkspacePane({
             void persistNoteRef.current?.();
           }
         }
+        return true;
       } catch (err) {
         setError(readRecordVaultApiError(err, `Failed to upload ${file.name || 'file'}`));
+        return false;
       } finally {
         setBusy(false);
         bumpVaultUsage();
@@ -3505,6 +3512,47 @@ export default function RecordVaultWorkspacePane({
       }
     },
     [selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked, bumpVaultUsage]
+  );
+
+  /** Mobile post-login chooser → open direct upload once a real note is selected. */
+  useEffect(() => {
+    if (!unlocked || loading || busy || mobileDirectUploadOpen) return undefined;
+    const fromQuery = searchParams.get('mobileUpload') === '1';
+    const fromFlag = peekMobileTutaNotesUploadPending();
+    if (!fromQuery && !fromFlag) return undefined;
+    if (!selectedNote || isBillScheduleSystemId(selectedNote.note_id)) return undefined;
+    if (noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)) {
+      setError('Unlock this note before uploading a photo from your phone');
+      return undefined;
+    }
+    consumeMobileTutaNotesUploadPending();
+    if (fromQuery) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('mobileUpload');
+      setSearchParams(next, { replace: true });
+    }
+    setMobileDirectUploadOpen(true);
+    return undefined;
+  }, [
+    unlocked,
+    loading,
+    busy,
+    mobileDirectUploadOpen,
+    searchParams,
+    setSearchParams,
+    selectedNote,
+    noteHasInnerEncryption,
+    isInnerNoteUnlocked
+  ]);
+
+  const handleMobileDirectUploadFile = useCallback(
+    async (file) => {
+      const ok = await uploadNoteVaultFile(file, null);
+      if (!ok) {
+        throw new Error('Upload failed. Check the note is unlocked and try again.');
+      }
+    },
+    [uploadNoteVaultFile]
   );
 
   const scheduleSave = useCallback(() => {
@@ -6114,6 +6162,20 @@ export default function RecordVaultWorkspacePane({
         onPhoneUploadComplete={(photosId) => void handleMobilePhoneUploadComplete(photosId)}
       />
 
+      <RecordVaultMobileDirectUploadDialog
+        open={mobileDirectUploadOpen}
+        onClose={() => setMobileDirectUploadOpen(false)}
+        disabled={
+          busy ||
+          !selectedNote ||
+          (selectedNote &&
+            noteHasInnerEncryption(selectedNote) &&
+            !isInnerNoteUnlocked(selectedNote.note_id))
+        }
+        noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
+        onPickFile={handleMobileDirectUploadFile}
+      />
+
       <RecordVaultCrossPaneTransferDialog
         open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
         item={crossPaneTransfer?.item || null}
@@ -6499,19 +6561,15 @@ export default function RecordVaultWorkspacePane({
                 display: 'flex',
                 flexDirection: 'column',
                 bgcolor: 'transparent',
-                // Keep this rail width stable when menus close so File / Search / Backup
-                // stay put; only the notebook sidebar below collapses.
+                // Keep a stable minimum when menus are open (align with notebook sidebar),
+                // but allow the rail to grow so File / Close Menu / Exit never spill into Search.
                 minWidth: {
                   xs: menuLabelsCompact ? 0 : 148,
                   md: compareMode ? 220 : menuLabelsCompact ? 0 : sidebarWidth
                 },
                 maxWidth: {
                   xs: '100%',
-                  md: compareMode
-                    ? 280
-                    : menuLabelsCompact
-                      ? 'fit-content'
-                      : sidebarWidth
+                  md: compareMode ? 280 : menuLabelsCompact ? 'fit-content' : 'none'
                 },
                 width: menuLabelsCompact ? 'auto' : undefined,
                 overflow: 'visible',
@@ -6732,6 +6790,13 @@ export default function RecordVaultWorkspacePane({
               searchBusy={searchBusy}
               clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
               bgcolor={paneStripColor}
+              sx={{
+                // Clear of Exit / left chrome — search zone starts after the button rail.
+                ml: { xs: 0.75, sm: 1 },
+                pl: { xs: 0.75, sm: 1 },
+                borderLeft: '2px solid rgba(255,255,255,0.35)',
+                boxSizing: 'border-box'
+              }}
             />
             ) : (
               <Box sx={{ flex: 1, minWidth: 0, bgcolor: paneStripColor }} aria-hidden />

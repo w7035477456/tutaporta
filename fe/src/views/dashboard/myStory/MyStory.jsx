@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import Typography from '@mui/material/Typography';
@@ -82,6 +82,11 @@ import {
   isAllowedAlbumPhotoFile
 } from 'constants/albumUploadFormats';
 import { useMyAlbumVideos, updateMyVideoType, deleteMyVideo } from 'api/myAlbumVideosFe';
+import RecordVaultMobileDirectUploadDialog from 'views/dashboard/recordVault/RecordVaultMobileDirectUploadDialog';
+import {
+  consumeMobileTutaDatesUploadPending,
+  peekMobileTutaDatesUploadPending
+} from 'utils/mobilePostLoginChoice';
 import { bumpPhotosAlbumCacheBust } from 'api/photoCacheBust';
 import {
   invalidateMyPicksFeedCache,
@@ -1127,6 +1132,7 @@ async function waitForPhotoEditorReady(editorRef, { timeoutMs = 12000, intervalM
 export default function MyStory() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const theme = useTheme();
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
   const myStoryPhoneLayout = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
@@ -1157,6 +1163,7 @@ export default function MyStory() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [selectedPhotoId, setSelectedPhotoId] = useState(null);
+  const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [deletingVideoId, setDeletingVideoId] = useState(null);
   const [draggingPhotoId, setDraggingPhotoId] = useState(null);
@@ -1705,6 +1712,35 @@ export default function MyStory() {
       }
     },
     [refetchMyPhotos, updateSessionProfilePhoto, refreshAuthProfilePhoto, bumpProfilePhotoCache, bumpPhotoVersion, bumpAlbumPhotoCache, profilePhotoId]
+  );
+
+  /** Mobile post-login → Upload photo to TutaDates. */
+  useEffect(() => {
+    if (mobileDirectUploadOpen) return undefined;
+    const fromQuery = searchParams.get('mobileUpload') === '1';
+    const fromFlag = peekMobileTutaDatesUploadPending();
+    if (!fromQuery && !fromFlag) return undefined;
+    consumeMobileTutaDatesUploadPending();
+    if (fromQuery) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('mobileUpload');
+      setSearchParams(next, { replace: true });
+    }
+    setMobileDirectUploadOpen(true);
+    return undefined;
+  }, [mobileDirectUploadOpen, searchParams, setSearchParams]);
+
+  const handleMobileDirectDatesUpload = useCallback(
+    async (file) => {
+      const result = await uploadMyPhoto(file);
+      const id = Number(result?.photos_id ?? result?.photosId ?? result?.id);
+      if (Number.isFinite(id) && id > 0) {
+        await handlePhoneUploadComplete(id);
+      } else {
+        await refetchMyPhotos();
+      }
+    },
+    [handlePhoneUploadComplete, refetchMyPhotos]
   );
 
   useEffect(() => {
@@ -3250,6 +3286,14 @@ export default function MyStory() {
       {duplicateUploadDialog}
       {postingAutoMovedDialog}
       {moreSharingPopup}
+      <RecordVaultMobileDirectUploadDialog
+        open={mobileDirectUploadOpen}
+        onClose={() => setMobileDirectUploadOpen(false)}
+        disabled={uploading}
+        title="Upload photo to TutaDates"
+        noteTitle="TutaDates album"
+        onPickFile={handleMobileDirectDatesUpload}
+      />
       <input
         ref={fileInputRef}
         id="my-story-file-input"

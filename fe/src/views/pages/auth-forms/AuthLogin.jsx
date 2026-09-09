@@ -6,11 +6,6 @@ import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 import { DEMO_LOGIN_PASSWORD_HINT, guestDemoAllowProps, isDemoLoginAliasId } from 'utils/guestDemoLogin';
 
 // material-ui
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -28,41 +23,14 @@ import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { markMobilePostLoginChooserPending } from 'utils/mobilePostLoginChoice';
 
 // assets
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 // ===============================|| JWT - LOGIN ||=============================== //
-
-const MOBILE_LOGIN_NOTICE =
-  'We are smoothing final fixes to Mobile UI for Android and Iphone, so this application will be availble soon.  Mean while, please use dekstop browser for this website at URL https://OnlineMall.Website. Thank you for your patient';
-
-/** Avoid a bare max-height rule: mobile browsers change the layout viewport when the URL bar hides,
- *  which can flip (max-height: 667px) off and re-enable Sign In after the dialog closes.
- *  - Portrait phones: max-width 600px (stable width).
- *  - Landscape phones: short viewports that are still "phone-wide", not a shrink-tall desktop window. */
-const COMPACT_LOGIN_MEDIA = '(max-width: 600px), ((max-width: 926px) and (max-height: 540px))';
-
-function compactLoginMatches() {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-  return Boolean(window.matchMedia(COMPACT_LOGIN_MEDIA).matches);
-}
-
-function useCompactLoginViewport() {
-  const [compact, setCompact] = useState(() => compactLoginMatches());
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const mq = window.matchMedia(COMPACT_LOGIN_MEDIA);
-    const sync = () => setCompact(Boolean(mq.matches));
-    sync();
-    mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
-  }, []);
-
-  return compact;
-}
 
 const fieldWithRightImageRowSx = {
   display: 'flex',
@@ -135,15 +103,13 @@ export default function AuthLogin() {
   const [error, setError] = useState('');
   const [errorSecondary, setErrorSecondary] = useState('');
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
-  const [mobileNoticeDismissed, setMobileNoticeDismissed] = useState(false);
-  const [blockMobile, setBlockMobile] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const isMobileViewport = useCompactLoginViewport();
-  const mobileLoginBlocked = blockMobile && isMobileViewport;
   const isDemoAliasLogin = isDemoLoginAliasId(email);
   const passwordVisible = showPassword || isDemoAliasLogin;
   const isFormValid = email.trim().length > 0 && (isDemoAliasLogin || password.trim().length > 0);
-  const signInDisabled = mobileLoginBlocked || isLoading || !isFormValid || maxAttemptsReached;
+  /** Compact/mobile: allow login, then show post-login upload chooser (not the old hard block). */
+  const signInDisabled = isLoading || !isFormValid || maxAttemptsReached;
 
   useEffect(() => {
     setLoginCredentials(email, password);
@@ -166,9 +132,6 @@ export default function AuthLogin() {
       try {
         const { data } = await api.get('/api/publicConfig');
         if (cancelled) return;
-        if (typeof data?.blockMobile === 'boolean') {
-          setBlockMobile(data.blockMobile);
-        }
         if (typeof data?.googleSignupEnabled === 'boolean') {
           setGoogleSignupEnabled(data.googleSignupEnabled);
         }
@@ -180,12 +143,6 @@ export default function AuthLogin() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!mobileLoginBlocked) setMobileNoticeDismissed(false);
-  }, [mobileLoginBlocked]);
-
-  const dismissMobileNotice = useCallback(() => setMobileNoticeDismissed(true), []);
 
   const handleEmailChange = (event) => {
     const next = event.target.value;
@@ -228,15 +185,17 @@ export default function AuthLogin() {
           navigate(ADMIN_TOOLS_PATH);
           return;
         }
+        if (isMobileViewport) {
+          markMobilePostLoginChooserPending();
+        }
         const from = location.state?.from;
         navigate(resolvePostLoginPath(from), { replace: true });
       }
     },
-    [navigate, location.state]
+    [navigate, location.state, isMobileViewport]
   );
 
   const handleGoogleSignIn = useCallback(async () => {
-    if (mobileLoginBlocked) return;
     setError('');
     setErrorSecondary('');
     setGoogleBusy(true);
@@ -262,7 +221,6 @@ export default function AuthLogin() {
       setGoogleBusy(false);
     }
   }, [
-    mobileLoginBlocked,
     refreshSessionAfterExternalLogin,
     completeLoginNavigation,
     navigate,
@@ -308,31 +266,11 @@ export default function AuthLogin() {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', ...authFormContentSx }}>
-      <Dialog
-        open={mobileLoginBlocked && !mobileNoticeDismissed}
-        onClose={dismissMobileNotice}
-        aria-labelledby="mobile-login-notice-title"
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle id="mobile-login-notice-title">Please use a desktop browser</DialogTitle>
-        <DialogContent>
-          <Typography component="p" variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-            {MOBILE_LOGIN_NOTICE}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={dismissMobileNotice} variant="contained" color="primary" autoFocus>
-            OK
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {googleSignupEnabled ? (
         <>
           <GoogleSignupButton
             label="Sign in with Google"
-            disabled={mobileLoginBlocked || isLoading}
+            disabled={isLoading}
             busy={googleBusy}
             onClick={() => void handleGoogleSignIn()}
           />

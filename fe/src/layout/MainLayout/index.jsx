@@ -39,6 +39,7 @@ import IdentificationVerificationSetupRedirect from 'ui-component/Identification
 import AdminImpersonationBanner from 'ui-component/AdminImpersonationBanner';
 import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeaderCenter';
 import DemoOnlyModeBanner from 'ui-component/DemoOnlyModeBanner';
+import MobilePostLoginChooserDialog from 'ui-component/MobilePostLoginChooserDialog';
 import { getAdminImpersonationHeaderState, adminImpersonationHeaderCenterWrapSx } from 'config/adminImpersonationHeader';
 import LegacyPasswordUpgradeDialog from 'views/auth-forms/LegacyPasswordUpgradeDialog';
 import RecordVaultLeaveBusyOverlay from 'ui-component/RecordVaultLeaveBusyOverlay';
@@ -520,6 +521,7 @@ export default function MainLayout() {
       <VsinglesGuidedTourOverlay />
       <ProfilePhotoSetupRedirect />
       <IdentificationVerificationSetupRedirect />
+      <MobilePostLoginChooserDialog />
       <LegacyPasswordUpgradeDialog
         open={Boolean(user) && requiresPasswordUpgrade}
         onSubmit={upgradeLegacyPassword}
