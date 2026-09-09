@@ -81,6 +81,14 @@ export function markMobileTutaPhotoUploadPending() {
   }
 }
 
+export function peekMobileTutaPhotoUploadPending() {
+  try {
+    return sessionStorage.getItem(MOBILE_TUTAPHOTO_UPLOAD_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function consumeMobileTutaPhotoUploadPending() {
   try {
     const v = sessionStorage.getItem(MOBILE_TUTAPHOTO_UPLOAD_KEY);
@@ -99,6 +107,14 @@ export function markMobileTutaDatesUploadPending() {
     sessionStorage.setItem(MOBILE_TUTADATES_UPLOAD_KEY, '1');
   } catch {
     // ignore
+  }
+}
+
+export function peekMobileTutaDatesUploadPending() {
+  try {
+    return sessionStorage.getItem(MOBILE_TUTADATES_UPLOAD_KEY) === '1';
+  } catch {
+    return false;
   }
 }
 
