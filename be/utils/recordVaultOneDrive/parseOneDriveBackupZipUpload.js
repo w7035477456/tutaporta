@@ -37,10 +37,16 @@ export function parseOneDriveBackupZipUpload(req) {
     let fileReceived = false;
     let writeError = null;
     let bytesWritten = 0;
+    let note = '';
 
     const busboy = Busboy({
       headers: req.headers,
       limits: { files: 1, fileSize: MAX_BACKUP_ZIP_BYTES }
+    });
+    busboy.on('field', (fieldname, value) => {
+      if (fieldname === 'note') {
+        note = String(value || '');
+      }
     });
     busboy.on('file', (fieldname, stream) => {
       if (fieldname !== 'backup') {
@@ -81,7 +87,7 @@ export function parseOneDriveBackupZipUpload(req) {
         reject(new Error(formatUploadHint(contentLength)));
         return;
       }
-      resolve({ tmpDir, zipPath, sizeBytes: st.size, bytesWritten });
+      resolve({ tmpDir, zipPath, sizeBytes: st.size, bytesWritten, note: note.trim() });
     });
     req.pipe(busboy);
   });

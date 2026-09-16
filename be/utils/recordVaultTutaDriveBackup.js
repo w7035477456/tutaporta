@@ -25,6 +25,87 @@ import {
 
 /** Date-only (legacy) or date+time stamp. */
 const BACKUP_NAME_RE = /^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i;
+const BACKUP_NOTES_FILE = 'backup_notes.json';
+const BACKUP_NOTE_MAX_LEN = 500;
+
+function sanitizeBackupNote(note) {
+  return String(note || '').trim().slice(0, BACKUP_NOTE_MAX_LEN);
+}
+
+function backupNotesAbsPath(memberId) {
+  return path.join(tutaDriveMemberRoot(memberId), BACKUP_NOTES_FILE);
+}
+
+function readBackupNotesMap(memberId) {
+  const abs = backupNotesAbsPath(memberId);
+  if (!fs.existsSync(abs)) return {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(abs, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out = {};
+    for (const [fileName, note] of Object.entries(parsed)) {
+      if (!BACKUP_NAME_RE.test(fileName)) continue;
+      const trimmed = sanitizeBackupNote(note);
+      if (trimmed) out[fileName] = trimmed;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeBackupNotesMap(memberId, map) {
+  ensureTutaDriveMemberLayout(memberId);
+  const abs = backupNotesAbsPath(memberId);
+  const cleaned = {};
+  for (const [fileName, note] of Object.entries(map || {})) {
+    if (!BACKUP_NAME_RE.test(fileName)) continue;
+    const trimmed = sanitizeBackupNote(note);
+    if (trimmed) cleaned[fileName] = trimmed;
+  }
+  if (!Object.keys(cleaned).length) {
+    if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
+    return;
+  }
+  fs.writeFileSync(abs, `${JSON.stringify(cleaned, null, 2)}\n`, 'utf8');
+}
+
+export function setTutaDriveBackupNote(memberId, fileName, note) {
+  const wanted = String(fileName || '').trim();
+  if (!BACKUP_NAME_RE.test(wanted)) return '';
+  const trimmed = sanitizeBackupNote(note);
+  const map = readBackupNotesMap(memberId);
+  if (trimmed) {
+    map[wanted] = trimmed;
+  } else {
+    delete map[wanted];
+  }
+  writeBackupNotesMap(memberId, map);
+  return trimmed;
+}
+
+function deleteTutaDriveBackupNote(memberId, fileName) {
+  setTutaDriveBackupNote(memberId, fileName, '');
+}
+
+function pruneTutaDriveBackupNotes(memberId) {
+  const map = readBackupNotesMap(memberId);
+  const existing = new Set(listTutaDriveBackupFileNames(memberId));
+  let changed = false;
+  for (const fileName of Object.keys(map)) {
+    if (!existing.has(fileName)) {
+      delete map[fileName];
+      changed = true;
+    }
+  }
+  if (changed) writeBackupNotesMap(memberId, map);
+}
+
+function listTutaDriveBackupFileNames(memberId) {
+  const root = tutaDriveMemberRoot(memberId);
+  if (!fs.existsSync(root)) return [];
+  return fs.readdirSync(root).filter((name) => BACKUP_NAME_RE.test(name));
+}
 
 function todayBackupStamp() {
   const d = new Date();
@@ -70,8 +151,10 @@ export function clearPreviousTutaDriveBackups(memberId, keepAbsPath = null, max 
     if (keep && path.resolve(entry.abs) === keep) continue; // always keep the new file
     if (kept < keepCount) { kept += 1; continue; }
     fs.rmSync(entry.abs, { force: true });
+    deleteTutaDriveBackupNote(memberId, entry.name);
     removed.push(entry.abs);
   }
+  pruneTutaDriveBackupNotes(memberId);
   return removed;
 }
 
@@ -84,19 +167,28 @@ export function deleteTutaDriveBackupByName(memberId, fileName) {
   const abs = path.join(tutaDriveMemberRoot(memberId), String(fileName));
   if (!fs.existsSync(abs)) return false;
   fs.rmSync(abs, { force: true });
+  deleteTutaDriveBackupNote(memberId, String(fileName));
+  pruneTutaDriveBackupNotes(memberId);
   return true;
 }
 
 export function listTutaDriveBackups(memberId) {
   const root = tutaDriveMemberRoot(memberId);
   if (!fs.existsSync(root)) return [];
+  const notesMap = readBackupNotesMap(memberId);
   return fs
     .readdirSync(root)
     .filter((name) => BACKUP_NAME_RE.test(name))
     .map((name) => {
       const abs = path.join(root, name);
       const st = fs.statSync(abs);
-      return { fileName: name, absPath: abs, sizeBytes: st.size, mtimeMs: st.mtimeMs };
+      return {
+        fileName: name,
+        absPath: abs,
+        sizeBytes: st.size,
+        mtimeMs: st.mtimeMs,
+        note: notesMap[name] || ''
+      };
     })
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
@@ -206,7 +298,7 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
 /**
  * Store the client-sealed backup (Encrypt Password / DEK). Replaces any prior backup_*.zip.
  */
-export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes) {
+export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes, note = '') {
   const buf = Buffer.isBuffer(encryptedBytes) ? encryptedBytes : Buffer.from(encryptedBytes || []);
   if (!buf.length) throw new Error('Encrypted backup is empty');
 
@@ -215,12 +307,45 @@ export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes) {
   clearPreviousTutaDriveBackups(memberId, dest);
   fs.writeFileSync(dest, buf);
   const st = fs.statSync(dest);
+  const fileName = path.basename(dest);
+  const savedNote = setTutaDriveBackupNote(memberId, fileName, note);
+  return {
+    fileName,
+    absPath: dest,
+    sizeBytes: st.size,
+    memberFolder: path.basename(tutaDriveMemberRoot(memberId)),
+    relativePath: path.join(path.basename(tutaDriveMemberRoot(memberId)), fileName),
+    note: savedNote
+  };
+}
+
+/** Replace an existing backup_*.zip in place (same file name, new sealed bytes). */
+export function replaceTutaDriveEncryptedBackup(memberId, fileName, encryptedBytes, note = undefined) {
+  const wanted = String(fileName || '').trim();
+  if (!BACKUP_NAME_RE.test(wanted)) {
+    throw new Error('Invalid backup file name');
+  }
+  const buf = Buffer.isBuffer(encryptedBytes) ? encryptedBytes : Buffer.from(encryptedBytes || []);
+  if (!buf.length) throw new Error('Encrypted backup is empty');
+
+  ensureTutaDriveMemberLayout(memberId);
+  const dest = path.join(tutaDriveMemberRoot(memberId), wanted);
+  if (!fs.existsSync(dest)) {
+    throw new Error('Backup file not found');
+  }
+  fs.writeFileSync(dest, buf);
+  const st = fs.statSync(dest);
+  const savedNote =
+    note === undefined
+      ? readBackupNotesMap(memberId)[wanted] || ''
+      : setTutaDriveBackupNote(memberId, wanted, note);
   return {
     fileName: path.basename(dest),
     absPath: dest,
     sizeBytes: st.size,
     memberFolder: path.basename(tutaDriveMemberRoot(memberId)),
-    relativePath: path.join(path.basename(tutaDriveMemberRoot(memberId)), path.basename(dest))
+    relativePath: path.join(path.basename(tutaDriveMemberRoot(memberId)), path.basename(dest)),
+    note: savedNote
   };
 }
 

@@ -239,6 +239,7 @@ import {
   getRecordVaultTutaDriveStatus,
   initRecordVaultTutaDrive,
   logoffRecordVaultTutaDrive,
+  replaceRecordVaultTutaDriveBackup,
   restoreRecordVaultTutaDriveBackupZip,
   storeRecordVaultTutaDriveBackup,
   unlockRecordVaultTutaDrive
@@ -842,9 +843,10 @@ app.use((req, res, next) => {
     });
   }
   if (
-    req.method === 'POST' &&
-    (req.path === '/api/recordVault/tutadrive/backup' ||
-      req.path === '/api/recordVault/tutadrive/restore-zip')
+    (req.method === 'POST' &&
+      (req.path === '/api/recordVault/tutadrive/backup' ||
+        req.path === '/api/recordVault/tutadrive/restore-zip')) ||
+    (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutadrive/backup/'))
   ) {
     const cl = req.get('content-length');
     const n = cl ? parseInt(cl, 10) : NaN;
@@ -1582,6 +1584,7 @@ app.post('/api/recordVault/tutadrive/format', requireAuth, formatRecordVaultTuta
 app.post('/api/recordVault/tutadrive/logoff', requireAuth, logoffRecordVaultTutaDrive);
 app.get('/api/recordVault/tutadrive/backup-zip', requireAuth, downloadRecordVaultTutaDriveBackupZip);
 app.post('/api/recordVault/tutadrive/backup', requireAuth, storeRecordVaultTutaDriveBackup);
+app.put('/api/recordVault/tutadrive/backup/:fileName', requireAuth, replaceRecordVaultTutaDriveBackup);
 app.get('/api/recordVault/tutadrive/backup', requireAuth, downloadRecordVaultTutaDriveStoredBackup);
 app.get('/api/recordVault/tutadrive/backup/status', requireAuth, getRecordVaultTutaDriveBackupStatus);
 app.delete('/api/recordVault/tutadrive/backup/:fileName', requireAuth, deleteRecordVaultTutaDriveBackupByName);

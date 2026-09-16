@@ -53,7 +53,8 @@ const formatWarningBoxSx = {
   borderRadius: 1,
   border: '2px solid #000',
   bgcolor: '#000',
-  color: '#fff',
+  color: '#fff !important',
+  WebkitTextFillColor: '#fff !important',
   textAlign: 'center',
   fontWeight: 700,
   lineHeight: 1.45

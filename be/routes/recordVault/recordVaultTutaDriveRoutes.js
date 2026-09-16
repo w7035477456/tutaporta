@@ -33,6 +33,7 @@ import {
   deleteTutaDriveBackupByName,
   listTutaDriveBackups,
   readTutaDriveEncryptedBackup,
+  replaceTutaDriveEncryptedBackup,
   restoreTutaDriveVaultFromZipFile,
   storeTutaDriveEncryptedBackup,
   streamTutaDriveVaultBackupZip,
@@ -345,7 +346,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
     }
     upload = await parseOneDriveBackupZipUpload(req);
     const encrypted = fs.readFileSync(upload.zipPath);
-    const stored = storeTutaDriveEncryptedBackup(memberId, encrypted);
+    const stored = storeTutaDriveEncryptedBackup(memberId, encrypted, upload.note);
     return res.json({
       success: true,
       ...stored,
@@ -357,6 +358,64 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
       route: 'storeRecordVaultTutaDriveBackup',
       singlesId,
       status: isStoragePermissionError(err) ? 500 : 400
+    });
+  } finally {
+    if (upload?.tmpDir) {
+      try {
+        fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+/**
+ * PUT /api/recordVault/tutadrive/backup/:fileName
+ * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
+ * Replaces that specific backup_*.zip in the member folder.
+ */
+export async function replaceRecordVaultTutaDriveBackup(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  let upload = null;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const fileName = String(req.params?.fileName || '').trim();
+    if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(fileName)) {
+      return res.status(400).json({ error: 'Invalid backup file name' });
+    }
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.status(400).json({ error: 'Your member number is not set; cannot store backup.' });
+    }
+    upload = await parseOneDriveBackupZipUpload(req);
+    const encrypted = fs.readFileSync(upload.zipPath);
+    const stored = replaceTutaDriveEncryptedBackup(
+      memberId,
+      fileName,
+      encrypted,
+      upload.note === '' ? undefined : upload.note
+    );
+    return res.json({
+      success: true,
+      ...stored,
+      message: `Backup "${fileName}" updated (Encrypt Password sealed).`
+    });
+  } catch (err) {
+    console.error('[replaceRecordVaultTutaDriveBackup]', err?.message || err);
+    const status =
+      err?.message === 'Backup file not found'
+        ? 404
+        : isStoragePermissionError(err)
+          ? 500
+          : 400;
+    return sendRecordVaultError(res, err, 'Unable to replace TutaDrive backup', {
+      route: 'replaceRecordVaultTutaDriveBackup',
+      singlesId,
+      status
     });
   } finally {
     if (upload?.tmpDir) {
@@ -418,10 +477,11 @@ export async function getRecordVaultTutaDriveBackupStatus(req, res) {
       // Listing zip files must still work if photos/ layout mkdir fails (EEXIST).
       console.warn('[getRecordVaultTutaDriveBackupStatus] layout skipped:', layoutErr?.message || layoutErr);
     }
-    const backups = listTutaDriveBackups(memberId).map(({ fileName, sizeBytes, mtimeMs }) => ({
+    const backups = listTutaDriveBackups(memberId).map(({ fileName, sizeBytes, mtimeMs, note }) => ({
       fileName,
       sizeBytes,
-      mtimeMs
+      mtimeMs,
+      note: note || ''
     }));
     return res.json({ enabled: true, memberId, backups, maxBackups: TUTADRIVE_BACKUP_MAX });
   } catch (err) {

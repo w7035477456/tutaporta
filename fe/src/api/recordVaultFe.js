@@ -992,7 +992,7 @@ export async function downloadRecordVaultOneDriveBackupZip() {
  * TutaDrive backup: zip vault → seal with Encrypt Password DEK in-browser →
  * store as users/M{id}/backup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 backup_*).
  */
-export async function createRecordVaultTutaDriveEncryptedBackup() {
+export async function createRecordVaultTutaDriveEncryptedBackup(note = '') {
   const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
   const { sealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
   if (!isRecordVaultE2eUnlocked()) {
@@ -1008,6 +1008,7 @@ export async function createRecordVaultTutaDriveEncryptedBackup() {
     new Blob([sealed], { type: 'application/octet-stream' }),
     'backup.zip'
   );
+  formData.append('note', String(note || '').trim());
   const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
@@ -1024,6 +1025,59 @@ export async function fetchRecordVaultTutaDriveBackupStatus() {
 export async function deleteRecordVaultTutaDriveBackup(fileName) {
   const enc = encodeURIComponent(String(fileName || ''));
   const { data } = await api.delete(`/api/recordVault/tutadrive/backup/${enc}`);
+  return data;
+}
+
+/** Download one sealed backup_*.zip from the member folder to the browser. */
+export async function downloadRecordVaultTutaDriveStoredBackup(fileName) {
+  if (!fileName) throw new Error('Backup file name is required');
+  try {
+    const q = `?fileName=${encodeURIComponent(String(fileName))}`;
+    const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
+    const resolvedName =
+      parseContentDispositionFilename(response.headers?.['content-disposition']) || String(fileName);
+    triggerBrowserBlobDownload(response.data, resolvedName);
+    return { fileName: resolvedName, sizeBytes: response.data?.size ?? 0 };
+  } catch (err) {
+    throw await normalizeRecordVaultBlobFetchError(err);
+  }
+}
+
+function isTutaDriveSealedBackupBytes(bytes) {
+  const magic = new TextEncoder().encode('TNBAK1');
+  if (!bytes || bytes.length < magic.length) return false;
+  for (let i = 0; i < magic.length; i += 1) {
+    if (bytes[i] !== magic[i]) return false;
+  }
+  return true;
+}
+
+/** Replace one stored backup_*.zip (sealed TNBAK1, or plain zip sealed with Encrypt Password DEK). */
+export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileName) {
+  if (!file) throw new Error('Choose a backup zip file first');
+  if (!replaceFileName) throw new Error('Backup file name is required');
+  const rawBytes = new Uint8Array(await file.arrayBuffer());
+  let sealed = rawBytes;
+  if (!isTutaDriveSealedBackupBytes(rawBytes)) {
+    const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+    const { sealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+    if (!isRecordVaultE2eUnlocked()) {
+      throw new Error('Unlock with your Encrypt Password first, then upload again');
+    }
+    sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek());
+  }
+  const formData = new FormData();
+  formData.append(
+    'backup',
+    new Blob([sealed], { type: 'application/octet-stream' }),
+    String(replaceFileName)
+  );
+  const enc = encodeURIComponent(String(replaceFileName));
+  const { data } = await api.put(`/api/recordVault/tutadrive/backup/${enc}`, formData, {
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
+  });
   return data;
 }
 

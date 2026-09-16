@@ -10,12 +10,14 @@ import {
   createRecordVaultTutaDriveEncryptedBackup,
   deleteRecordVaultTutaDriveBackup,
   downloadRecordVaultOneDriveBackupZip,
+  downloadRecordVaultTutaDriveStoredBackup,
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveBackupStatus,
   formatRecordVaultOneDrive,
   formatRecordVaultTutaDrive,
   restoreRecordVaultOneDriveBackupZip,
-  restoreRecordVaultTutaDriveEncryptedBackup
+  restoreRecordVaultTutaDriveEncryptedBackup,
+  uploadRecordVaultTutaDriveStoredBackup
 } from 'api/recordVaultFe';
 import RecordVaultOneDriveVaultTreePanel from './RecordVaultOneDriveVaultTreePanel';
 import {
@@ -26,7 +28,7 @@ import {
 } from './tutaNotesPostLoginActionButtonSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
-import { themedConfirm } from 'utils/themedDialog';
+import { themedConfirm, themedPrompt } from 'utils/themedDialog';
 
 const actionRowSx = {
   display: 'flex',
@@ -64,13 +66,32 @@ const formatRedButtonSx = {
   minWidth: { xs: '100%', sm: 200 }
 };
 
+const backupRowButtonSx = {
+  ...actionButtonSx,
+  minWidth: 'unset',
+  px: 1.25,
+  py: 0.5,
+  fontSize: '0.78rem',
+  lineHeight: 1.15
+};
+
+const backupRowDeleteButtonSx = {
+  ...formatRedButtonSx,
+  minWidth: 'unset',
+  px: 1.25,
+  py: 0.5,
+  fontSize: '0.9rem',
+  fontWeight: 700
+};
+
 const formatWarningBoxSx = {
   px: 1.5,
   py: 1.25,
   borderRadius: 1,
   border: '2px solid #000',
   bgcolor: '#000',
-  color: '#fff',
+  color: '#fff !important',
+  WebkitTextFillColor: '#fff !important',
   textAlign: 'center',
   fontWeight: 600,
   lineHeight: 1.45
@@ -109,6 +130,18 @@ const generalSuccessMessageSx = {
   lineHeight: 1.45
 };
 
+const backupRowNoteSx = {
+  color: 'rgba(255, 255, 255, 0.82)',
+  fontWeight: 500,
+  fontStyle: 'italic',
+  lineHeight: 1.35,
+  mt: 0.35,
+  fontSize: getMobileSinglesTextFontSizeVw(),
+  '@media (min-width: 600px)': {
+    fontSize: getDesktopTextFontSizeVw()
+  }
+};
+
 export default function RecordVaultOneDriveBackupDialog({
   open,
   onClose,
@@ -119,6 +152,7 @@ export default function RecordVaultOneDriveBackupDialog({
   onOpenMyNote
 }) {
   const fileInputRef = useRef(null);
+  const uploadInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -129,8 +163,9 @@ export default function RecordVaultOneDriveBackupDialog({
   /** Server-backed TutaDrive mode (prop + /api/recordVault/storage/config + backup status). */
   const [tutaDriveActive, setTutaDriveActive] = useState(() => Boolean(tutaDrive));
   const [memberFolderLabel, setMemberFolderLabel] = useState('');
-  // fileName currently being restored/deleted
+  // fileName currently being restored/deleted/downloaded/uploaded
   const [actioningFile, setActioningFile] = useState('');
+  const [uploadTargetFile, setUploadTargetFile] = useState('');
 
   const applyBackupStatus = (status) => {
     const backups = Array.isArray(status?.backups) ? status.backups : [];
@@ -201,16 +236,27 @@ export default function RecordVaultOneDriveBackupDialog({
       setError(`Maximum limit of ${maxBackups} backup copies reached. Please delete at least one older backup before creating a new one.`);
       return;
     }
+    let backupNote = '';
+    if (tutaDriveActive) {
+      const entered = await themedPrompt('You can add note of this backup:', '', {
+        title: 'Backup note',
+        okLabel: 'Backup',
+        cancelLabel: 'Cancel'
+      });
+      if (entered === null) return;
+      backupNote = String(entered || '').trim();
+    }
     setBusy(true);
     try {
       if (tutaDriveActive) {
-        const result = await createRecordVaultTutaDriveEncryptedBackup();
+        const result = await createRecordVaultTutaDriveEncryptedBackup(backupNote);
         const fileName = result?.fileName || 'backup.zip';
         const rel = result?.relativePath || fileName;
         const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
+        const noteText = result?.note ? ` Note: ${result.note}.` : '';
         setSuccess(
-          `Backup sealed with your Encrypt Password and saved as ${rel}${sizeText}.`
+          `Backup sealed with your Encrypt Password and saved as ${rel}${sizeText}.${noteText}`
         );
         setSuccessTone('backup');
         await loadBackupList();
@@ -251,6 +297,58 @@ export default function RecordVaultOneDriveBackupDialog({
       await onRestored?.(result);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Restore failed');
+    } finally {
+      setBusy(false);
+      setActioningFile('');
+    }
+  };
+
+  const handleDownloadBackup = async (fileName) => {
+    resetMessages();
+    setBusy(true);
+    setActioningFile(fileName);
+    try {
+      const result = await downloadRecordVaultTutaDriveStoredBackup(fileName);
+      const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
+      const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
+      setSuccess(`Downloaded ${result?.fileName || fileName}${sizeText} to your browser download folder.`);
+      setSuccessTone('backup');
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Download failed');
+    } finally {
+      setBusy(false);
+      setActioningFile('');
+    }
+  };
+
+  const handleUploadClick = (fileName) => {
+    if (busy) return;
+    resetMessages();
+    setUploadTargetFile(fileName);
+    uploadInputRef.current?.click();
+  };
+
+  const handleUploadFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const targetFileName = uploadTargetFile;
+    setUploadTargetFile('');
+    if (!file || !targetFileName) return;
+
+    resetMessages();
+    setBusy(true);
+    setActioningFile(targetFileName);
+    try {
+      const result = await uploadRecordVaultTutaDriveStoredBackup(file, targetFileName);
+      const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
+      const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
+      setSuccess(
+        `Uploaded and saved ${result?.fileName || targetFileName}${sizeText}. You can now Restore TutaNotes from this row.`
+      );
+      setSuccessTone('general');
+      await loadBackupList();
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Upload failed');
     } finally {
       setBusy(false);
       setActioningFile('');
@@ -359,6 +457,13 @@ export default function RecordVaultOneDriveBackupDialog({
         hidden
         onChange={(event) => void handleRestoreFile(event)}
       />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept=".zip,application/octet-stream,application/zip"
+        hidden
+        onChange={(event) => void handleUploadFile(event)}
+      />
       <ColorTemplate16PopupCenterWide open={open} onClose={handleClose} closeOnBackdrop={!busy}>
         <ColorTemplate16PopupCenterWide.Title>
           Backup &amp; Restore TutaNotes Cloud
@@ -430,12 +535,14 @@ export default function RecordVaultOneDriveBackupDialog({
                 const mb = Number(bk.sizeBytes) > 0 ? (Number(bk.sizeBytes) / (1024 * 1024)).toFixed(1) : '';
                 const label = mb ? `${bk.fileName} (${mb}mb)` : bk.fileName;
                 const isActioning = actioningFile === bk.fileName;
+                const rowNote = String(bk.note || '').trim();
                 return (
                   <Box
                     key={bk.fileName}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
+                      flexWrap: 'wrap',
                       gap: 1,
                       py: 0.75,
                       borderBottom: idx < backupList.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none'
@@ -444,6 +551,7 @@ export default function RecordVaultOneDriveBackupDialog({
                     <Box
                       sx={{
                         flex: 1,
+                        minWidth: { xs: '100%', sm: 220 },
                         color: '#fff',
                         fontWeight: 700,
                         lineHeight: 1.3,
@@ -453,13 +561,30 @@ export default function RecordVaultOneDriveBackupDialog({
                         }
                       }}
                     >
-                      {idx + 1}) {label}
+                      <Box>{idx + 1}) {label}</Box>
+                      {rowNote ? <Box sx={backupRowNoteSx}>(Note: {rowNote})</Box> : null}
                     </Box>
                     <GreenButton
                       type="button"
                       disabled={busy}
+                      onClick={() => void handleDownloadBackup(bk.fileName)}
+                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                    >
+                      Download
+                    </GreenButton>
+                    <GreenButton
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleUploadClick(bk.fileName)}
+                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                    >
+                      Upload
+                    </GreenButton>
+                    <GreenButton
+                      type="button"
+                      disabled={busy}
                       onClick={() => void handleTutaDriveRestoreFromStored(bk.fileName)}
-                      sx={{ ...restoreYellowButtonSx, minWidth: 'unset', px: 1.5, fontSize: '0.8rem', opacity: isActioning ? 0.6 : 1 }}
+                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
                     >
                       Restore TutaNotes
                     </GreenButton>
@@ -467,7 +592,7 @@ export default function RecordVaultOneDriveBackupDialog({
                       type="button"
                       disabled={busy}
                       onClick={() => void handleDeleteBackup(bk.fileName)}
-                      sx={{ ...formatRedButtonSx, minWidth: 'unset', px: 1.5, fontSize: '0.9rem', fontWeight: 700, opacity: isActioning ? 0.6 : 1 }}
+                      sx={{ ...backupRowDeleteButtonSx, opacity: isActioning ? 0.6 : 1 }}
                     >
                       X
                     </GreenButton>
