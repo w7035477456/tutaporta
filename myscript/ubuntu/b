@@ -106,6 +106,35 @@ unalias -a
 #-----------------for TutaDates--------------
 alias fixstorage='$HOME/code/main/scripts/fix-media-storage.sh'
 alias checkstorage='$HOME/code/main/scripts/verify-media-storage.sh'
+
+backupUserAll() {
+  local email
+
+  read -p "Enter email address: " email
+
+  if [[ -z "$email" ]]; then
+    echo "Error: Email cannot be empty." >&2
+    return 1
+  fi
+
+  echo "Backing up TutaNotes + TutaPhoto + TutaDates for $email..."
+  (cd "$HOME/code/main" && node be/scripts/backupUserAll.js --email="$email")
+}
+
+restoreUserAll() {
+  local email
+
+  read -p "Enter email address: " email
+
+  if [[ -z "$email" ]]; then
+    echo "Error: Email cannot be empty." >&2
+    return 1
+  fi
+
+  echo "Restoring TutaNotes + TutaPhoto + TutaDates for $email from ~/tutamallBackup/{prefix}/..."
+  (cd "$HOME/code/main" && node be/scripts/restoreUserAll.js --email="$email" --yes)
+}
+
 #----------------for TutatNotes/TutaPhotos---
 alias fixlargecheap='$HOME/code/main/scripts/fix-large-cheap-storage.sh'
 alias checklargecheap='$HOME/code/main/scripts/verify-large-cheap-storage.sh'
