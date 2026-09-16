@@ -37,19 +37,27 @@ Usage:
 Default backup folder: ~/tutamallBackup/{email-prefix}/`);
 }
 
+async function exitCli(code) {
+  try {
+    await pool.end();
+  } catch {
+    // ignore pool shutdown errors on CLI exit
+  }
+  // envConfig + connection.js start setInterval timers; must exit explicitly for shell prompt.
+  process.exit(code);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || !args.email) {
     printHelp();
-    process.exitCode = args.help ? 0 : 1;
-    return;
+    await exitCli(args.help ? 0 : 1);
   }
 
   const backupRoot = args.backupRoot || defaultBackupRootForEmail(args.email);
   if (args.dryRun) {
     console.log(`[backupUserAll] dry-run — would write to ${backupRoot}`);
-    process.exitCode = 0;
-    return;
+    await exitCli(0);
   }
 
   try {
@@ -61,11 +69,10 @@ async function main() {
     console.log(`  backupDir:  ${result.backupDir}`);
     console.log(`  copied:     ${result.summary.copied.length} path(s)`);
     console.log(`  skipped:    ${result.summary.skipped.length} path(s)`);
+    await exitCli(0);
   } catch (err) {
     console.error('[backupUserAll] failed:', err?.message ?? err);
-    process.exitCode = 1;
-  } finally {
-    await pool.end().catch(() => {});
+    await exitCli(1);
   }
 }
 

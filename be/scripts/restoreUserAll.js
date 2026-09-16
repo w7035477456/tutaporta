@@ -38,12 +38,21 @@ Usage:
 Default restore folder: ~/tutamallBackup/{email-prefix}/`);
 }
 
+async function exitCli(code) {
+  try {
+    await pool.end();
+  } catch {
+    // ignore pool shutdown errors on CLI exit
+  }
+  // envConfig + connection.js start setInterval timers; must exit explicitly for shell prompt.
+  process.exit(code);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || !args.email) {
     printHelp();
-    process.exitCode = args.help ? 0 : 1;
-    return;
+    await exitCli(args.help ? 0 : 1);
   }
 
   const backupRoot = args.backupRoot || defaultBackupRootForEmail(args.email);
@@ -53,14 +62,12 @@ async function main() {
     console.log(`  email:      ${preview.email}`);
     console.log(`  backupDir:  ${preview.backupDir}`);
     console.log(`  createdAt:  ${preview.manifest?.createdAt ?? '(unknown)'}`);
-    await pool.end().catch(() => {});
-    return;
+    await exitCli(0);
   }
 
   if (!args.yes) {
     console.error('[restoreUserAll] Refusing to restore without --yes (overwrites live data).');
-    process.exitCode = 1;
-    return;
+    await exitCli(1);
   }
 
   try {
@@ -71,11 +78,10 @@ async function main() {
     console.log(`  backupDir:  ${result.backupDir}`);
     console.log(`  restored:   ${result.summary.restored.length} path(s)`);
     console.log(`  skipped:    ${result.summary.skipped.length} path(s)`);
+    await exitCli(0);
   } catch (err) {
     console.error('[restoreUserAll] failed:', err?.message ?? err);
-    process.exitCode = 1;
-  } finally {
-    await pool.end().catch(() => {});
+    await exitCli(1);
   }
 }
 
