@@ -26,6 +26,8 @@ import {
 import { loadVideosBySinglesIds, mapSinglesLookupVideos } from '../../utils/loadVideosBySinglesIds.js';
 import { RECORD4SUPPORT_FILE_PREFIX } from '../../utils/saveRecord4SupportVideo.js';
 import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
+import { clearTutaNotesLock } from '../../utils/tutaNotesLock.js';
+import { clearVaultAccessFailStatus } from '../../utils/recordVaultAccessFailGuard.js';
 
 const SINGLES_LOOKUP_WILDCARD_LIMIT = 500;
 
@@ -49,6 +51,7 @@ const SINGLES_LOOKUP_SELECT = `SELECT s.singles_id,
             s.phone,
             s.alias,
             s.password_attempt_count,
+            s.lock_tuta_notes,
             s.my_refer_code,
             s.refer_by_code,
             s.profile_image_fk,
@@ -174,6 +177,7 @@ function mapSinglesLookupRow(row, videosBySinglesId = new Map()) {
       row.password_attempt_count != null && Number.isFinite(Number(row.password_attempt_count))
         ? Number(row.password_attempt_count)
         : 0,
+    lockTutaNotes: Boolean(row.lock_tuta_notes),
     myReferCode: String(row.my_refer_code ?? '').trim(),
     referByCode: String(row.refer_by_code ?? '').trim(),
     referBySinglesId:
@@ -477,6 +481,34 @@ export async function postAdminResetPasswordAttemptCount(req, res) {
   } catch (err) {
     console.error('[postAdminResetPasswordAttemptCount]', err?.message ?? err);
     return res.status(500).json({ error: 'Failed to reset password attempt count.' });
+  }
+}
+
+/**
+ * POST /api/admin/singles/clear-lock-tuta-notes
+ * Body: { singlesId } — admin clears TutaNotes lock after 5 failed Encrypt Password attempts.
+ */
+export async function postAdminClearLockTutaNotes(req, res) {
+  const singlesId = parseSinglesIdInput(req.body?.singlesId ?? req.body?.singles_id);
+  if (!singlesId) {
+    return res.status(400).json({ error: 'singlesId is required.' });
+  }
+  if (!(await allowSinglesMutationForId(res, singlesId))) {
+    return;
+  }
+
+  try {
+    const cleared = await clearTutaNotesLock(singlesId);
+    await clearVaultAccessFailStatus(singlesId, 'onedrive');
+    await clearVaultAccessFailStatus(singlesId, 'usb');
+    return res.json({
+      success: true,
+      singlesId: cleared.singlesId,
+      lockTutaNotes: cleared.lockTutaNotes
+    });
+  } catch (err) {
+    console.error('[postAdminClearLockTutaNotes]', err?.message ?? err);
+    return res.status(500).json({ error: err?.message || 'Failed to clear TutaNotes lock.' });
   }
 }
 

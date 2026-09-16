@@ -37,11 +37,12 @@ export default function ThemedDialogHost() {
   const open = Boolean(dialog);
   const isConfirm = dialog?.type === 'confirm';
   const isPrompt = dialog?.type === 'prompt';
+  const isOverwriteSkip = dialog?.type === 'overwriteSkip';
 
   return (
     <ColorTemplate16PopupCenterWide
       open={open}
-      onClose={() => closeWith(isConfirm ? false : isPrompt ? null : undefined)}
+      onClose={() => closeWith(isConfirm ? false : isPrompt || isOverwriteSkip ? null : undefined)}
       closeOnBackdrop={false}
       bodyTextAlignLeft={false}
       centeredLeadLines={0}
@@ -78,24 +79,43 @@ export default function ThemedDialogHost() {
               flexWrap="wrap"
               sx={{ width: '100%', pt: 0.5 }}
             >
-              {isConfirm || isPrompt ? (
-                <ColorTemplate16PopupCenterWide.ActionButton
-                  type="button"
-                  onClick={() => closeWith(isConfirm ? false : null)}
-                >
-                  {dialog.cancelLabel}
-                </ColorTemplate16PopupCenterWide.ActionButton>
-              ) : null}
-              <ColorTemplate16PopupCenterWide.ActionButton
-                type="button"
-                onClick={() => {
-                  if (isConfirm) closeWith(true);
-                  else if (isPrompt) closeWith(dialog.inputValue);
-                  else closeWith(undefined);
-                }}
-              >
-                {dialog.okLabel}
-              </ColorTemplate16PopupCenterWide.ActionButton>
+              {isOverwriteSkip ? (
+                <>
+                  <ColorTemplate16PopupCenterWide.ActionButton
+                    type="button"
+                    onClick={() => closeWith('skip')}
+                  >
+                    {dialog.skipLabel || 'Skip'}
+                  </ColorTemplate16PopupCenterWide.ActionButton>
+                  <ColorTemplate16PopupCenterWide.ActionButton
+                    type="button"
+                    onClick={() => closeWith('overwrite')}
+                  >
+                    {dialog.overwriteLabel || 'Overwrite'}
+                  </ColorTemplate16PopupCenterWide.ActionButton>
+                </>
+              ) : (
+                <>
+                  {isConfirm || isPrompt ? (
+                    <ColorTemplate16PopupCenterWide.ActionButton
+                      type="button"
+                      onClick={() => closeWith(isConfirm ? false : null)}
+                    >
+                      {dialog.cancelLabel}
+                    </ColorTemplate16PopupCenterWide.ActionButton>
+                  ) : null}
+                  <ColorTemplate16PopupCenterWide.ActionButton
+                    type="button"
+                    onClick={() => {
+                      if (isConfirm) closeWith(true);
+                      else if (isPrompt) closeWith(dialog.inputValue);
+                      else closeWith(undefined);
+                    }}
+                  >
+                    {dialog.okLabel}
+                  </ColorTemplate16PopupCenterWide.ActionButton>
+                </>
+              )}
             </Stack>
           </ColorTemplate16PopupCenterWide.Body>
         </>

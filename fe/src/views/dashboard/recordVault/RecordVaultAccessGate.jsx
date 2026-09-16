@@ -11,8 +11,6 @@ import {
   fetchRecordVaultAccessFailStatus,
   fetchRecordVaultAccessStatus,
   fetchRecordVaultE2eKeys,
-  formatRecordVaultOneDrive,
-  formatRecordVaultUsb,
   recordRecordVaultAccessFail,
   saveRecordVaultE2eKeys,
   setRecordVaultAccessPasswordHint,
@@ -95,29 +93,29 @@ function normalizeStorageType(storageType) {
   return storageType === 'usb' ? 'usb' : 'onedrive';
 }
 
-function storageSideLabel(storageType) {
-  return normalizeStorageType(storageType) === 'usb' ? 'USB' : 'OneDrive';
-}
+const TUTANOTES_LOCK_WARNING_SUFFIX =
+  'Five consecutive fails will lock TutaNotes, and you must contact tech support after that.';
+
+const TUTANOTES_LOCKED_MESSAGE =
+  'TutaNotes is locked after five failed Encrypt Password attempts. Please contact tech support.';
 
 /** Fail bar while cooldown is active (live countdown). */
 function buildVaultAccessFailCooldownMessage({
   failedAttempts,
   maxFailedAttempts,
-  cooldownSeconds,
-  storageType
+  cooldownSeconds
 }) {
   const attempt = Math.max(1, Math.floor(Number(failedAttempts) || 1));
   const max = Math.max(attempt, Math.floor(Number(maxFailedAttempts) || 5));
-  const sideLabel = storageSideLabel(storageType);
   const countdown = formatRecordVaultUnlockCountdown(cooldownSeconds);
-  return `Incorrect Encrypt Password try ${attempt} of ${max}. Retry cooldown ${countdown}. Five consecutive fails will cause format to ${sideLabel}`;
+  return `Incorrect Encrypt Password try ${attempt} of ${max}. Retry cooldown ${countdown}. ${TUTANOTES_LOCK_WARNING_SUFFIX}`;
 }
 
 /**
  * Shared vault-password popup for Open TutaNotes Cloud and Open TutaNotes USB.
  * Yellow E2E: password → KEK → DEK in the browser; server stores salt + wrapped DEK only.
  *
- * Wrong password: 2-minute retry cooldown. Five fails → format the pending side (OneDrive or USB).
+ * Wrong password: 2-minute retry cooldown. Five fails → lock TutaNotes until admin clears.
  */
 export default function RecordVaultAccessGate({
   open,
@@ -146,6 +144,7 @@ export default function RecordVaultAccessGate({
   const [cooldownUntilMs, setCooldownUntilMs] = useState(0);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [maxFailedAttempts, setMaxFailedAttempts] = useState(5);
+  const [tutaNotesLocked, setTutaNotesLocked] = useState(false);
   /** Guest demo: auto-unlock with DEMO_ENCRYPT_PASSWORD — hide the Encrypt Password popup. */
   const [demoAutoUnlocking, setDemoAutoUnlocking] = useState(false);
   const demoAutoTriedRef = useRef(false);
@@ -160,15 +159,15 @@ export default function RecordVaultAccessGate({
       setFailedAttempts(attempts);
       setMaxFailedAttempts(maxAttempts);
 
-      if (status?.vaultFormatted || status?.needsClientFormat) {
+      if (status?.tutaNotesLocked) {
+        setTutaNotesLocked(true);
         setCooldownSeconds(0);
         setCooldownUntilMs(0);
-        setError(
-          status?.error ||
-            `Incorrect Encrypt Password. Five failed attempts — ${storageSideLabel(side)} vault has been formatted.`
-        );
+        setError(status?.error || TUTANOTES_LOCKED_MESSAGE);
         return;
       }
+
+      setTutaNotesLocked(false);
 
       if (remaining > 0) {
         setCooldownSeconds(remaining);
@@ -182,8 +181,7 @@ export default function RecordVaultAccessGate({
           buildVaultAccessFailCooldownMessage({
             failedAttempts: attempts,
             maxFailedAttempts: maxAttempts,
-            cooldownSeconds: remaining,
-            storageType: side
+            cooldownSeconds: remaining
           })
         );
         return;
@@ -193,7 +191,7 @@ export default function RecordVaultAccessGate({
       setCooldownUntilMs(0);
       if (status?.error) setError(status.error);
     },
-    [side]
+    []
   );
 
   useEffect(() => {
@@ -217,6 +215,7 @@ export default function RecordVaultAccessGate({
     setCooldownSeconds(0);
     setCooldownUntilMs(0);
     setFailedAttempts(0);
+    setTutaNotesLocked(false);
     setChecking(true);
     setDemoAutoUnlocking(guestDemo);
     void (async () => {
@@ -231,7 +230,9 @@ export default function RecordVaultAccessGate({
         setVaultRow(e2e.vault || null);
         setHint(accessStatus?.hint || '');
         setNewHint(accessStatus?.hint || '');
-        if (failStatus?.remainingSeconds > 0 || failStatus?.failedAttempts > 0) {
+        if (accessStatus?.lockTutaNotes || failStatus?.tutaNotesLocked) {
+          applyFailStatus(failStatus?.tutaNotesLocked ? failStatus : { tutaNotesLocked: true, error: TUTANOTES_LOCKED_MESSAGE });
+        } else if (failStatus?.remainingSeconds > 0 || failStatus?.failedAttempts > 0) {
           applyFailStatus(failStatus);
         } else {
           setError('');
@@ -355,24 +356,14 @@ export default function RecordVaultAccessGate({
     }
   };
 
-  const formatPendingSide = async () => {
-    if (side === 'usb') {
-      const mountPath = String(usbMountPath || '').trim();
-      if (!mountPath) {
-        throw new Error('USB mount path required to format after too many failed password attempts');
-      }
-      await formatRecordVaultUsb(mountPath);
-    } else {
-      await formatRecordVaultOneDrive();
-    }
-    await clearRecordVaultAccessFail(side);
-    onVaultFormatted?.(side);
-  };
-
   const handleVerifyVaultPassword = async () => {
     const value = currentPassword.trim();
     if (!value) {
       setError('Enter your Encrypt Password');
+      return;
+    }
+    if (tutaNotesLocked) {
+      setError(TUTANOTES_LOCKED_MESSAGE);
       return;
     }
     if (cooldownSeconds > 0) {
@@ -407,22 +398,6 @@ export default function RecordVaultAccessGate({
           mountPath: side === 'usb' ? usbMountPath : undefined
         });
         applyFailStatus(failStatus);
-        if (failStatus.needsClientFormat || failStatus.vaultFormatted) {
-          try {
-            if (failStatus.needsClientFormat) {
-              await formatPendingSide();
-            } else {
-              onVaultFormatted?.(side);
-            }
-          } catch (formatErr) {
-            setError(
-              formatErr?.response?.data?.error ||
-                formatErr?.message ||
-                failStatus.error ||
-                'Unable to format vault after failed attempts'
-            );
-          }
-        }
       } catch (failErr) {
         setError(
           failErr?.response?.data?.error ||
@@ -528,7 +503,7 @@ export default function RecordVaultAccessGate({
   };
 
   const setPasswordReady = vaultPasswordReady(newPassword, confirmPassword);
-  const verifyLocked = cooldownSeconds > 0;
+  const verifyLocked = cooldownSeconds > 0 || tutaNotesLocked;
   const inputsLocked = busy || verifyLocked;
 
   const handleClose = useCallback(() => {
@@ -790,13 +765,15 @@ export default function RecordVaultAccessGate({
 
           {error ? (
             <ColorTemplate16PopupCenterWide.ErrorBar>
-              {cooldownSeconds > 0 ? (
+              {tutaNotesLocked ? (
+                error
+              ) : cooldownSeconds > 0 ? (
                 <>
                   Incorrect Encrypt Password try {Math.max(1, failedAttempts)} of {maxFailedAttempts}.{' '}
                   <Box component="span" sx={{ fontWeight: 800 }}>
                     Retry cooldown {formatRecordVaultUnlockCountdown(cooldownSeconds)}.
                   </Box>{' '}
-                  Five consecutive fails will cause format to {storageSideLabel(side)}
+                  {TUTANOTES_LOCK_WARNING_SUFFIX}
                 </>
               ) : (
                 error

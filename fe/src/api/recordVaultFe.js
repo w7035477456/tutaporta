@@ -1112,6 +1112,46 @@ export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName)
   return data;
 }
 
+async function unsealRecordVaultTutaDriveStoredBackupBytes(file, fileName) {
+  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+  const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  if (!isRecordVaultE2eUnlocked()) {
+    throw new Error('Unlock with your Encrypt Password first, then try again');
+  }
+  const dek = getRecordVaultE2eDek();
+  let sealedBytes;
+  if (file) {
+    sealedBytes = new Uint8Array(await file.arrayBuffer());
+  } else {
+    const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
+    const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
+    sealedBytes = new Uint8Array(await response.data.arrayBuffer());
+  }
+  return unsealTutaDriveBackupZipWithDek(sealedBytes, dek);
+}
+
+/** Preview merge from a stored sealed backup (requires TutaNotes Cloud open/unlocked on server). */
+export async function previewRecordVaultTutaDriveMergeFromStoredBackup(fileName) {
+  const plainZip = await unsealRecordVaultTutaDriveStoredBackupBytes(undefined, fileName);
+  const formData = new FormData();
+  formData.append('backup', new Blob([plainZip], { type: 'application/zip' }), 'TutaNotes-merge.zip');
+  const { data } = await api.post('/api/recordVault/tutadrive/merge/preview', formData, {
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
+  });
+  return data;
+}
+
+/** Apply merge decisions from a prior preview mergeId. */
+export async function applyRecordVaultTutaDriveMerge(mergeId, decisions) {
+  const { data } = await api.post('/api/recordVault/tutadrive/merge/apply', {
+    mergeId,
+    decisions
+  });
+  return data;
+}
+
 /** Zip the unlocked USB `.recordvault` folder and save to the browser download folder. */
 export async function downloadRecordVaultUsbBackupZip() {
   try {
@@ -1410,6 +1450,7 @@ export async function fetchRecordVaultAccessStatus() {
     configured: Boolean(data?.configured),
     unlocked: Boolean(data?.unlocked),
     hint: data?.hint ? String(data.hint) : null,
+    lockTutaNotes: Boolean(data?.lockTutaNotes),
     // Env skip is ignored — always treat as false.
     skipPasswordCheck: false
   };
@@ -1473,6 +1514,7 @@ function mapVaultAccessFailStatus(data) {
     lockoutSeconds: Math.max(0, Math.floor(Number(data?.lockoutSeconds) || 120)),
     vaultFormatted: Boolean(data?.vaultFormatted),
     needsClientFormat: Boolean(data?.needsClientFormat),
+    tutaNotesLocked: Boolean(data?.tutaNotesLocked),
     storageType: data?.storageType === 'usb' ? 'usb' : 'onedrive',
     mountPath: data?.mountPath ? String(data.mountPath) : null,
     error: data?.error ? String(data.error) : '',
@@ -1490,7 +1532,7 @@ export async function fetchRecordVaultAccessFailStatus(storageType = 'onedrive')
 
 /**
  * Record a client-side vault-password verify failure (password never sent).
- * On 5th fail: OneDrive is formatted server-side; USB returns needsClientFormat.
+ * On 5th fail: TutaNotes is locked (singles.lock_tuta_notes) until admin clears.
  */
 export async function recordRecordVaultAccessFail({ storageType = 'onedrive', mountPath } = {}) {
   try {

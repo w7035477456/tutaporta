@@ -20,7 +20,8 @@ async function loadVaultAccessRow(singlesId) {
   const result = await pool.query(
     `SELECT notes_access_password_hash,
             notes_access_password_hint,
-            notes_access_password_enabled
+            notes_access_password_enabled,
+            lock_tuta_notes
      FROM helloworldjunktest.singles
      WHERE singles_id = $1
      LIMIT 1`,
@@ -70,7 +71,8 @@ export async function getVaultAccessStatus(singlesId) {
     configured: Boolean(hash),
     unlocked,
     hint: hint || null,
-    skipPasswordCheck: false
+    skipPasswordCheck: false,
+    lockTutaNotes: Boolean(row?.lock_tuta_notes)
   };
 }
 

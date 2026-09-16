@@ -42,6 +42,13 @@ import {
 import { parseOneDriveBackupZipUpload } from '../../utils/recordVaultOneDrive/parseOneDriveBackupZipUpload.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
+import {
+  applyTutaDriveMerge,
+  cleanupTutaDriveMergeStaging,
+  extractTutaDriveMergeZip,
+  loadTutaDriveMergeStaging,
+  previewTutaDriveMerge
+} from '../../utils/recordVaultTutaDriveMerge.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
 
@@ -520,6 +527,102 @@ export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
     if (upload?.tmpDir) {
       try {
         fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+function requireUnlockedTutaDriveSession(req, res, singlesId) {
+  const session = getVaultSession(singlesId, 'onedrive');
+  if (!session?.unlocked || !session.mountPath) {
+    res.status(400).json({
+      error: 'Open TutaNotes Cloud with your Encrypt Password first, then run Merge again.'
+    });
+    return null;
+  }
+  return session;
+}
+
+/**
+ * POST /api/recordVault/tutadrive/merge/preview
+ * Multipart field `backup` = plain vault zip (client unsealed with Encrypt Password).
+ */
+export async function previewRecordVaultTutaDriveMerge(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  let upload = null;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const session = requireUnlockedTutaDriveSession(req, res, singlesId);
+    if (!session) return;
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.status(400).json({ error: 'Your member number is not set; cannot merge backup.' });
+    }
+    upload = await parseOneDriveBackupZipUpload(req);
+    const staging = await extractTutaDriveMergeZip(memberId, singlesId, upload.zipPath);
+    const preview = await previewTutaDriveMerge(session, staging);
+    return res.json({ success: true, mergeId: staging.mergeId, ...preview });
+  } catch (err) {
+    console.error('[previewRecordVaultTutaDriveMerge]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to preview TutaDrive merge', {
+      route: 'previewRecordVaultTutaDriveMerge',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  } finally {
+    if (upload?.tmpDir) {
+      try {
+        fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+/**
+ * POST /api/recordVault/tutadrive/merge/apply
+ * Body: { mergeId, decisions: { [backupNoteId]: 'add'|'overwrite'|'skip' } }
+ */
+export async function applyRecordVaultTutaDriveMerge(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  let stagingRoot = null;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const session = requireUnlockedTutaDriveSession(req, res, singlesId);
+    if (!session) return;
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.status(400).json({ error: 'Your member number is not set; cannot merge backup.' });
+    }
+    const mergeId = String(req.body?.mergeId || '').trim();
+    if (!mergeId) return res.status(400).json({ error: 'mergeId is required' });
+    const decisions = req.body?.decisions && typeof req.body.decisions === 'object' ? req.body.decisions : {};
+    const staging = loadTutaDriveMergeStaging(memberId, mergeId, singlesId);
+    stagingRoot = staging.stagingRoot;
+    const result = await applyTutaDriveMerge(session, staging, decisions);
+    cleanupTutaDriveMergeStaging(stagingRoot);
+    stagingRoot = null;
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[applyRecordVaultTutaDriveMerge]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to apply TutaDrive merge', {
+      route: 'applyRecordVaultTutaDriveMerge',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  } finally {
+    if (stagingRoot) {
+      try {
+        cleanupTutaDriveMergeStaging(stagingRoot);
       } catch {
         // ignore
       }

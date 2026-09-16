@@ -228,6 +228,11 @@ export async function resetAdminPasswordAttemptCount({ singlesId }) {
   return data;
 }
 
+export async function clearAdminLockTutaNotes({ singlesId }) {
+  const { data } = await api.post('/api/admin/singles/clear-lock-tuta-notes', { singlesId });
+  return data;
+}
+
 /** Soft Reset — re-init defaults without deleting user photos/postings/bios/custom vault content. */
 export async function softResetAdminMemberAccount({ singlesId }) {
   const { data } = await api.post('/api/admin/singles/soft-reset', { singlesId });

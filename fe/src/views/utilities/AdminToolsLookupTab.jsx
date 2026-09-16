@@ -16,6 +16,7 @@ import {
   softResetAdminMemberAccount,
   hardResetAdminMemberAccount,
   cascadeDeleteAdminTableRow,
+  clearAdminLockTutaNotes,
   fetchAdminVideoObjectUrl
 } from 'api/adminToolsFe';
 import { invalidateAllSinglesCache } from 'api/allSinglesFe';
@@ -486,6 +487,7 @@ export default function AdminToolsLookupTab({ onError }) {
   const [softResetBusyById, setSoftResetBusyById] = useState({});
   const [hardResetBusyById, setHardResetBusyById] = useState({});
   const [cascadeDeleteBusyById, setCascadeDeleteBusyById] = useState({});
+  const [lockTutaNotesBusyById, setLockTutaNotesBusyById] = useState({});
   const [playerVideoUrl, setPlayerVideoUrl] = useState('');
   const [playerVideoLabel, setPlayerVideoLabel] = useState('');
   const [playerVideoLoading, setPlayerVideoLoading] = useState(false);
@@ -677,6 +679,36 @@ export default function AdminToolsLookupTab({ onError }) {
   }, [onError]);
 
   const listBusy = lookupBusy || lookupAllBusy;
+
+  const handleClearLockTutaNotes = useCallback(
+    async (row) => {
+      const id = Number(row?.singlesId);
+      if (!Number.isFinite(id) || id < 1 || isAdminSinglesLookupRow(row) || lockTutaNotesBusyById[id]) {
+        return;
+      }
+      const ok = await themedConfirm(
+        `Clear TutaNotes lock for singles_id ${id} (${row.alias || row.email || 'member'})?\n\nThey can try Encrypt Password again.`
+      );
+      if (!ok) return;
+      setLockTutaNotesBusyById((prev) => ({ ...prev, [id]: true }));
+      onError?.('');
+      try {
+        await clearAdminLockTutaNotes({ singlesId: id });
+        setSinglesRows((prev) =>
+          prev.map((entry) => (entry.singlesId === id ? { ...entry, lockTutaNotes: false } : entry))
+        );
+      } catch (err) {
+        onError?.(err?.response?.data?.error || err?.message || 'Failed to clear TutaNotes lock.');
+      } finally {
+        setLockTutaNotesBusyById((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    },
+    [lockTutaNotesBusyById, onError]
+  );
 
   const handleCycleStatus = useCallback((singlesId) => {
     const id = Number(singlesId);
@@ -1086,6 +1118,7 @@ export default function AdminToolsLookupTab({ onError }) {
                   const softResetBusy = Boolean(softResetBusyById[row.singlesId]);
                   const hardResetBusy = Boolean(hardResetBusyById[row.singlesId]);
                   const cascadeDeleteBusy = Boolean(cascadeDeleteBusyById[row.singlesId]);
+                  const lockTutaNotesBusy = Boolean(lockTutaNotesBusyById[row.singlesId]);
                   const pwdRetryCount = Number(row.passwordAttemptCount ?? 0);
                   return (
                   <ColorTemplate9TableData.BodyRow
@@ -1139,6 +1172,7 @@ export default function AdminToolsLookupTab({ onError }) {
                         {row.phone ? ` · ${row.phone}` : ''}
                         {row.alias ? ` · ${row.alias}` : ''}
                         {` · pwd retry ${pwdRetryCount}`}
+                        {row.lockTutaNotes ? ' · TutaNotes LOCKED' : ''}
                         {row.myReferCode ? ` · my refer ${row.myReferCode}` : ''}
                         {row.referByCode ? ` · refer by ${formatReferByDisplay(row)}` : ''}
                       </ColorTemplate9TableData.BodyText>
@@ -1162,6 +1196,16 @@ export default function AdminToolsLookupTab({ onError }) {
                         </ColorTemplate9TableData.BodyText>
                       ) : (
                         <>
+                          {row.lockTutaNotes ? (
+                            <SelectedButtonTemplate
+                              type="button"
+                              disabled={lockTutaNotesBusy || saveBusy || listBusy}
+                              onClick={() => void handleClearLockTutaNotes(row)}
+                              sx={{ whiteSpace: 'nowrap', width: '100%' }}
+                            >
+                              {lockTutaNotesBusy ? 'Unlocking…' : 'Unlock TutaNotes'}
+                            </SelectedButtonTemplate>
+                          ) : null}
                           <SelectedButtonTemplate
                             type="button"
                             disabled={saveBusy}

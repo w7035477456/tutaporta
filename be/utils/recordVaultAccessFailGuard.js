@@ -1,19 +1,18 @@
 /**
  * Encrypt Password fail guard (Step 1 gate).
  * Cluster-safe via PostgreSQL: 2-minute cooldown after each wrong password;
- * 5 consecutive fails → format/wipe the pending storage side (OneDrive or USB).
+ * 5 consecutive fails → lock TutaNotes (singles.lock_tuta_notes) until admin clears.
  */
 
 import pool from '../db/connection.js';
 import { getDBSchema } from '../config/envConfig.js';
-import { wipeOneDriveVaultFolder, cleanupOneDriveStaging } from './recordVaultOneDrive/oneDriveVaultSync.js';
-import {
-  isLeftSideTutaDrive,
-  loadMemberIdForSingles,
-  wipeTutaDriveMemberVault
-} from './tutaDriveMemberPaths.js';
-import { clearRecordVaultCacheIcon } from './recordVaultCacheIcon.js';
 import { formatCountdown } from './recordVaultUsb/unlockGuard.js';
+import {
+  isTutaNotesLocked,
+  lockTutaNotesForSingles,
+  TUTANOTES_LOCK_WARNING_SUFFIX,
+  TUTANOTES_LOCKED_MESSAGE
+} from './tutaNotesLock.js';
 
 export const VAULT_ACCESS_MAX_FAILED_ATTEMPTS = 5;
 /** Default 2 minutes — env VAULT_ACCESS_RETRY_DELAY_SEC. */
@@ -42,6 +41,22 @@ function remainingLockSeconds(lockedUntil, nowMs = Date.now()) {
   return Math.max(0, Math.ceil((untilMs - nowMs) / 1000));
 }
 
+function buildTutaNotesLockedStatus(storageType, failedAttempts = VAULT_ACCESS_MAX_FAILED_ATTEMPTS) {
+  return {
+    locked: false,
+    remainingSeconds: 0,
+    failedAttempts,
+    maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
+    lockoutSeconds: getVaultAccessRetryDelaySeconds(),
+    storageType: normalizeStorageType(storageType),
+    tutaNotesLocked: true,
+    vaultFormatted: false,
+    needsClientFormat: false,
+    error: TUTANOTES_LOCKED_MESSAGE,
+    cooldownLabel: ''
+  };
+}
+
 export async function getVaultAccessFailStatus(singlesId, storageType = 'onedrive') {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) {
@@ -51,8 +66,12 @@ export async function getVaultAccessFailStatus(singlesId, storageType = 'onedriv
       failedAttempts: 0,
       maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
       lockoutSeconds: getVaultAccessRetryDelaySeconds(),
-      storageType: normalizeStorageType(storageType)
+      storageType: normalizeStorageType(storageType),
+      tutaNotesLocked: false
     };
+  }
+  if (await isTutaNotesLocked(id)) {
+    return buildTutaNotesLockedStatus(storageType);
   }
   const side = normalizeStorageType(storageType);
   const { rows } = await pool.query(
@@ -76,7 +95,8 @@ export async function getVaultAccessFailStatus(singlesId, storageType = 'onedriv
     failedAttempts,
     maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
     lockoutSeconds: getVaultAccessRetryDelaySeconds(),
-    storageType: side
+    storageType: side,
+    tutaNotesLocked: false
   };
 }
 
@@ -94,29 +114,19 @@ export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedr
   );
 }
 
-async function formatOneDriveFailSide(singlesId) {
-  if (isLeftSideTutaDrive()) {
-    const memberId = await loadMemberIdForSingles(singlesId);
-    if (memberId) wipeTutaDriveMemberVault(memberId);
-    await clearRecordVaultCacheIcon(singlesId, 'onedrive');
-    return { vaultFormatted: true, storageType: 'onedrive', tutaDrive: true };
-  }
-  await wipeOneDriveVaultFolder(singlesId);
-  cleanupOneDriveStaging(singlesId);
-  await clearRecordVaultCacheIcon(singlesId, 'onedrive');
-  return { vaultFormatted: true, storageType: 'onedrive' };
-}
-
 /**
  * Record a wrong vault-password attempt for the pending open side.
- * OneDrive: server formats on the 5th fail.
- * USB: client formats via bridge (`needsClientFormat`) — mount paths are local.
+ * 5 consecutive fails → singles.lock_tuta_notes (admin must clear).
  */
 export async function recordVaultAccessFail(singlesId, storageType = 'onedrive', { mountPath } = {}) {
   const id = Number(singlesId);
   const side = normalizeStorageType(storageType);
   if (!Number.isFinite(id) || id < 1) {
     throw new Error('Invalid singles id');
+  }
+
+  if (await isTutaNotesLocked(id)) {
+    return buildTutaNotesLockedStatus(side);
   }
 
   const client = await pool.connect();
@@ -147,7 +157,6 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
     const currentRemainingSeconds = remainingLockSeconds(currentLockedUntil);
     if (currentRemainingSeconds > 0) {
       await client.query('COMMIT');
-      const sideLabel = side === 'usb' ? 'USB' : 'OneDrive';
       const attempt = Math.max(1, currentAttempts);
       return {
         locked: true,
@@ -157,10 +166,11 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
         maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
         lockoutSeconds: getVaultAccessRetryDelaySeconds(),
         storageType: side,
-        error: `Incorrect Encrypt Password try ${attempt} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}. Retry cooldown ${formatCountdown(currentRemainingSeconds)}. Five consecutive fails will cause format to ${sideLabel}`,
+        error: `Incorrect Encrypt Password try ${attempt} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}. Retry cooldown ${formatCountdown(currentRemainingSeconds)}. ${TUTANOTES_LOCK_WARNING_SUFFIX}`,
         cooldownLabel: `Retry cooldown ${formatCountdown(currentRemainingSeconds)}`,
         vaultFormatted: false,
-        needsClientFormat: false
+        needsClientFormat: false,
+        tutaNotesLocked: false
       };
     }
 
@@ -191,32 +201,12 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
   }
 
   if (nextAttempts >= VAULT_ACCESS_MAX_FAILED_ATTEMPTS) {
-    const sideLabel = side === 'usb' ? 'USB' : 'OneDrive';
-    const pathValue = String(mountPath || '').trim() || null;
-
-    if (side === 'usb') {
-      await clearRecordVaultCacheIcon(id, 'usb');
-      return {
-        locked: false,
-        remainingSeconds: 0,
-        failedAttempts: nextAttempts,
-        maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
-        lockoutSeconds: getVaultAccessRetryDelaySeconds(),
-        vaultFormatted: false,
-        needsClientFormat: true,
-        storageType: 'usb',
-        mountPath: pathValue,
-        error: `Incorrect Encrypt Password. Five failed attempts — ${sideLabel} vault has been formatted.`,
-        cooldownLabel: ''
-      };
-    }
-
-    let formatResult = { vaultFormatted: false };
     try {
-      formatResult = await formatOneDriveFailSide(id);
-      await clearVaultAccessFailStatus(id, side);
+      await lockTutaNotesForSingles(id);
+      await clearVaultAccessFailStatus(id, 'onedrive');
+      await clearVaultAccessFailStatus(id, 'usb');
     } catch (err) {
-      console.error('[recordVaultAccessFail] OneDrive format failed:', err?.message || err);
+      console.error('[recordVaultAccessFail] TutaNotes lock failed:', err?.message || err);
       return {
         locked: false,
         remainingSeconds: 0,
@@ -225,27 +215,17 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
         lockoutSeconds: getVaultAccessRetryDelaySeconds(),
         vaultFormatted: false,
         needsClientFormat: false,
-        storageType: 'onedrive',
-        error: err?.message || 'Unable to format OneDrive vault after failed attempts',
+        tutaNotesLocked: false,
+        storageType: side,
+        mountPath: String(mountPath || '').trim() || null,
+        error: err?.message || 'Unable to lock TutaNotes after failed attempts',
         cooldownLabel: ''
       };
     }
-    return {
-      locked: false,
-      remainingSeconds: 0,
-      failedAttempts: nextAttempts,
-      maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
-      lockoutSeconds: getVaultAccessRetryDelaySeconds(),
-      vaultFormatted: Boolean(formatResult.vaultFormatted),
-      needsClientFormat: false,
-      storageType: 'onedrive',
-      error: `Incorrect Encrypt Password. Five failed attempts — ${sideLabel} vault has been formatted.`,
-      cooldownLabel: ''
-    };
+    return buildTutaNotesLockedStatus(side, nextAttempts);
   }
 
   const remainingSeconds = remainingLockSeconds(lockedUntil);
-  const sideLabel = side === 'usb' ? 'USB' : 'OneDrive';
   return {
     locked: true,
     lockedUntil,
@@ -255,8 +235,9 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
     lockoutSeconds: getVaultAccessRetryDelaySeconds(),
     vaultFormatted: false,
     needsClientFormat: false,
+    tutaNotesLocked: false,
     storageType: side,
-    error: `Incorrect Encrypt Password try ${nextAttempts} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}. Retry cooldown ${formatCountdown(remainingSeconds)}. Five consecutive fails will cause format to ${sideLabel}`,
+    error: `Incorrect Encrypt Password try ${nextAttempts} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}. Retry cooldown ${formatCountdown(remainingSeconds)}. ${TUTANOTES_LOCK_WARNING_SUFFIX}`,
     cooldownLabel: `Retry cooldown ${formatCountdown(remainingSeconds)}`
   };
 }

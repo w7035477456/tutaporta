@@ -239,6 +239,8 @@ import {
   getRecordVaultTutaDriveStatus,
   initRecordVaultTutaDrive,
   logoffRecordVaultTutaDrive,
+  applyRecordVaultTutaDriveMerge,
+  previewRecordVaultTutaDriveMerge,
   replaceRecordVaultTutaDriveBackup,
   restoreRecordVaultTutaDriveBackupZip,
   storeRecordVaultTutaDriveBackup,
@@ -507,6 +509,7 @@ import {
   postAdminAuditRegistrationLookup,
   postAdminCycleSinglesStatus,
   postAdminResetPasswordAttemptCount,
+  postAdminClearLockTutaNotes,
   postAdminSetSinglesMemberCategory,
   postAdminSetSinglesStatus,
   postAdminSinglesLookupAll
@@ -845,7 +848,8 @@ app.use((req, res, next) => {
   if (
     (req.method === 'POST' &&
       (req.path === '/api/recordVault/tutadrive/backup' ||
-        req.path === '/api/recordVault/tutadrive/restore-zip')) ||
+        req.path === '/api/recordVault/tutadrive/restore-zip' ||
+        req.path === '/api/recordVault/tutadrive/merge/preview')) ||
     (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutadrive/backup/'))
   ) {
     const cl = req.get('content-length');
@@ -1374,6 +1378,7 @@ app.post('/api/admin/singles/set-status', requireAuth, requireAdminRole, postAdm
 app.post('/api/admin/singles/set-member-category', requireAuth, requireAdminRole, postAdminSetSinglesMemberCategory);
 app.post('/api/admin/singles/set-token-balance', requireAuth, requireAdminRole, postAdminSetSinglesTokenBalance);
 app.post('/api/admin/singles/reset-password-attempt-count', requireAuth, requireAdminRole, postAdminResetPasswordAttemptCount);
+app.post('/api/admin/singles/clear-lock-tuta-notes', requireAuth, requireAdminRole, postAdminClearLockTutaNotes);
 app.post('/api/admin/singles/soft-reset', requireAuth, requireAdminRole, postAdminSinglesSoftReset);
 app.post('/api/admin/singles/hard-reset', requireAuth, requireAdminRole, postAdminSinglesHardReset);
 app.get('/api/admin/blocked-asn-vpn', requireAuth, requireAdminRole, getAdminBlockedAsnVpn);
@@ -1589,6 +1594,8 @@ app.get('/api/recordVault/tutadrive/backup', requireAuth, downloadRecordVaultTut
 app.get('/api/recordVault/tutadrive/backup/status', requireAuth, getRecordVaultTutaDriveBackupStatus);
 app.delete('/api/recordVault/tutadrive/backup/:fileName', requireAuth, deleteRecordVaultTutaDriveBackupByName);
 app.post('/api/recordVault/tutadrive/restore-zip', requireAuth, restoreRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutadrive/merge/preview', requireAuth, previewRecordVaultTutaDriveMerge);
+app.post('/api/recordVault/tutadrive/merge/apply', requireAuth, applyRecordVaultTutaDriveMerge);
 
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----
 app.use('/api/photoAlbums', ...photoAlbumsTransferMeterStack);

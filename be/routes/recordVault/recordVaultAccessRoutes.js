@@ -169,7 +169,11 @@ export async function postRecordVaultAccessFail(req, res) {
   try {
     const mountPath = req.body?.mountPath ?? req.body?.mount_path ?? '';
     const status = await recordVaultAccessFail(singlesId, readStorageType(req), { mountPath });
-    const httpStatus = status.vaultFormatted || status.needsClientFormat ? 403 : status.locked ? 429 : 401;
+    const httpStatus = status.tutaNotesLocked || status.vaultFormatted || status.needsClientFormat
+      ? 403
+      : status.locked
+        ? 429
+        : 401;
     return res.status(httpStatus).json(status);
   } catch (err) {
     console.error('[postRecordVaultAccessFail]', err?.message || err);

@@ -28,6 +28,10 @@ function requestDialog(payload) {
   if (payload?.type === 'prompt') {
     return Promise.resolve(window.prompt(message, payload?.defaultValue ?? ''));
   }
+  if (payload?.type === 'overwriteSkip') {
+    const overwrite = window.confirm(`${message}\n\nOK = Overwrite, Cancel = Skip`);
+    return Promise.resolve(overwrite ? 'overwrite' : 'skip');
+  }
   window.alert(message);
   return Promise.resolve();
 }
@@ -75,5 +79,20 @@ export function themedPrompt(message, defaultValue = '', options = {}) {
     title: options.title || 'Input',
     okLabel: options.okLabel || 'OK',
     cancelLabel: options.cancelLabel || 'Cancel'
+  });
+}
+
+/**
+ * @param {string} message
+ * @param {{ title?: string, overwriteLabel?: string, skipLabel?: string }} [options]
+ * @returns {Promise<'overwrite'|'skip'|null>}
+ */
+export function themedOverwriteSkip(message, options = {}) {
+  return requestDialog({
+    type: 'overwriteSkip',
+    message: String(message ?? ''),
+    title: options.title || 'Note conflict',
+    overwriteLabel: options.overwriteLabel || 'Overwrite',
+    skipLabel: options.skipLabel || 'Skip'
   });
 }

@@ -16,6 +16,8 @@ import {
   formatRecordVaultOneDrive,
   formatRecordVaultTutaDrive,
   restoreRecordVaultOneDriveBackupZip,
+  applyRecordVaultTutaDriveMerge,
+  previewRecordVaultTutaDriveMergeFromStoredBackup,
   restoreRecordVaultTutaDriveEncryptedBackup,
   uploadRecordVaultTutaDriveStoredBackup
 } from 'api/recordVaultFe';
@@ -28,7 +30,7 @@ import {
 } from './tutaNotesPostLoginActionButtonSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
-import { themedConfirm, themedPrompt } from 'utils/themedDialog';
+import { themedConfirm, themedOverwriteSkip, themedPrompt } from 'utils/themedDialog';
 
 const actionRowSx = {
   display: 'flex',
@@ -278,6 +280,54 @@ export default function RecordVaultOneDriveBackupDialog({
     }
   };
 
+  const handleMergeBackup = async (fileName) => {
+    resetMessages();
+    setBusy(true);
+    setActioningFile(fileName);
+    try {
+      const preview = await previewRecordVaultTutaDriveMergeFromStoredBackup(fileName);
+      const mergeId = preview?.mergeId;
+      const notes = Array.isArray(preview?.notes) ? preview.notes : [];
+      if (!mergeId || !notes.length) {
+        setSuccess('No notes found in this backup to merge.');
+        setSuccessTone('general');
+        return;
+      }
+
+      setBusy(false);
+      const decisions = {};
+      for (const row of notes) {
+        const backupNoteId = String(row.backupNoteId);
+        const noteName = String(row.noteName || '').trim();
+        if (row.conflict) {
+          const choice = await themedOverwriteSkip(
+            `Note "${noteName}" exist, overwrite current with version from zip or skip?`
+          );
+          decisions[backupNoteId] = choice === 'overwrite' ? 'overwrite' : 'skip';
+        } else {
+          decisions[backupNoteId] = 'add';
+        }
+      }
+
+      setBusy(true);
+      const result = await applyRecordVaultTutaDriveMerge(mergeId, decisions);
+      const added = Number(result?.added) || 0;
+      const overwritten = Number(result?.overwritten) || 0;
+      const skipped = Number(result?.skipped) || 0;
+      setSuccess(
+        `Merge complete: ${added} note${added === 1 ? '' : 's'} added, ${overwritten} overwritten, ${skipped} skipped.`
+      );
+      setSuccessTone('general');
+      refreshVaultTree();
+      await onRestored?.(result);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Merge failed');
+    } finally {
+      setBusy(false);
+      setActioningFile('');
+    }
+  };
+
   const handleTutaDriveRestoreFromStored = async (fileName) => {
     const ok = await themedConfirm(
       `Restore backup "${fileName}" from your member folder?\n\nThis replaces your current TutaDrive vault. You will need to open TutaNotes again afterward.`
@@ -478,7 +528,7 @@ export default function RecordVaultOneDriveBackupDialog({
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
               ? 'Sealing uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 backup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
-              : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup TutaNotes Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore TutaNotes Cloud below.'}
+              : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore TutaNotes Cloud below.'}
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -491,7 +541,7 @@ export default function RecordVaultOneDriveBackupDialog({
                 onClick={() => void handleBackup()}
                 sx={backupOrangeButtonSx}
               >
-                Backup TutaNotes Cloud
+                Backup/Encrypt TutaNote to Cloud
               </GreenButton>
               <GreenButton
                 type="button"
@@ -525,7 +575,7 @@ export default function RecordVaultOneDriveBackupDialog({
           {tutaDriveActive && backupList.length === 0 ? (
             <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
               No backup_*.zip files found in your member folder{memberFolderLabel ? ` (${memberFolderLabel})` : ''} yet.
-              Click Backup TutaNotes Cloud to create one.
+              Click Backup/Encrypt TutaNote to Cloud to create one.
             </ColorTemplate16PopupCenterWide.SectionDescription>
           ) : null}
 
@@ -579,6 +629,14 @@ export default function RecordVaultOneDriveBackupDialog({
                       sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
                     >
                       Upload
+                    </GreenButton>
+                    <GreenButton
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleMergeBackup(bk.fileName)}
+                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                    >
+                      Merge TutaNotes
                     </GreenButton>
                     <GreenButton
                       type="button"
