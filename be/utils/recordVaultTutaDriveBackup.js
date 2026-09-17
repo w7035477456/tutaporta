@@ -266,7 +266,7 @@ async function resolveMemberNotesMount(singlesId) {
 export async function streamTutaDriveVaultBackupZip(singlesId, res) {
   const { memberId, notesMount } = await resolveMemberNotesMount(singlesId);
   const session = getVaultSession(singlesId, 'onedrive');
-  if (session?.unlocked && session.mountPath) {
+  if (session?.mountPath) {
     const expected = path.resolve(notesMount);
     const actual = path.resolve(String(session.mountPath));
     if (actual === expected) {

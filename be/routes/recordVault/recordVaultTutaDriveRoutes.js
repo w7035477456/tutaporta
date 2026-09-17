@@ -108,7 +108,7 @@ async function resolveMemberContext(singlesId) {
  */
 async function dropStaleCloudSessionIfWrongMount(singlesId, notesMount) {
   const session = getVaultSession(singlesId, 'onedrive');
-  if (!session?.unlocked || !session.mountPath) return;
+  if (!session?.mountPath) return;
   const expected = path.resolve(notesMount);
   const actual = path.resolve(String(session.mountPath));
   if (actual === expected) {
@@ -126,7 +126,7 @@ function sessionPayload(singlesId, memberId, notesMount) {
   const session = getVaultSession(singlesId, 'onedrive');
   const expected = path.resolve(notesMount);
   const actual = session?.mountPath ? path.resolve(String(session.mountPath)) : null;
-  const unlocked = Boolean(session?.unlocked && actual === expected);
+  const unlocked = Boolean(session && actual === expected);
   return {
     unlocked,
     storageType: 'onedrive',
@@ -535,11 +535,59 @@ export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
   }
 }
 
-function requireUnlockedTutaDriveSession(req, res, singlesId) {
+/** Live TutaDrive vault session on this app server (getVaultSession already excludes locked). */
+function getLiveTutaDriveSession(singlesId, notesMount) {
   const session = getVaultSession(singlesId, 'onedrive');
-  if (!session?.unlocked || !session.mountPath) {
+  if (!session?.mountPath) return null;
+  const expected = path.resolve(notesMount);
+  const actual = path.resolve(String(session.mountPath));
+  if (actual !== expected) return null;
+  return session;
+}
+
+/** Ensure vault is unlocked on server for merge — auto-open if backup dialog already verified password. */
+async function ensureUnlockedTutaDriveSession(req, res, singlesId) {
+  const authId = await requireVaultAccessSession(req, res);
+  if (!authId) return null;
+
+  const { notesMount } = await resolveMemberContext(singlesId);
+  await dropStaleCloudSessionIfWrongMount(singlesId, notesMount);
+
+  let session = getLiveTutaDriveSession(singlesId, notesMount);
+  if (session) return session;
+
+  try {
+    let flags = vaultStatusFlags(notesMount);
+    if (!flags.hasVault) {
+      const keyMaterial = await resolveTutaDriveKeyMaterial();
+      if (!fs.existsSync(vaultMetaPath(notesMount))) {
+        await initializeVaultOnUsbWithKey(notesMount, keyMaterial?.key ?? null, keyMaterial);
+        ensureTutaDriveMemberLayout(await loadMemberIdForSingles(singlesId), { singlesId });
+      }
+      flags = vaultStatusFlags(notesMount);
+    }
+    const key = await resolveTutaDriveUnlockKey(notesMount);
+    await unlockVaultUsbWithKey(singlesId, notesMount, key, {
+      storageType: 'onedrive',
+      skipBackup: true
+    });
+    tagSessionAsTutaDrive(singlesId);
+  } catch (err) {
+    console.error('[ensureUnlockedTutaDriveSession]', err?.message || err);
+    if (!res.headersSent) {
+      return sendRecordVaultError(res, err, 'Unable to open TutaDrive vault for merge', {
+        route: 'ensureUnlockedTutaDriveSession',
+        singlesId,
+        status: isStoragePermissionError(err) ? 500 : 400
+      });
+    }
+    return null;
+  }
+
+  session = getLiveTutaDriveSession(singlesId, notesMount);
+  if (!session) {
     res.status(400).json({
-      error: 'Open TutaNotes Cloud with your Encrypt Password first, then run Merge again.'
+      error: 'Unable to open your live TutaDrive vault for merge. Try Open from the main TutaNotes screen, then Merge again.'
     });
     return null;
   }
@@ -610,7 +658,7 @@ export async function previewRecordVaultTutaDriveMerge(req, res) {
     if (!isLeftSideTutaDrive()) {
       return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
     }
-    const session = requireUnlockedTutaDriveSession(req, res, singlesId);
+    const session = await ensureUnlockedTutaDriveSession(req, res, singlesId);
     if (!session) return;
     const memberId = await loadMemberIdForSingles(singlesId);
     if (!memberId) {
@@ -650,7 +698,7 @@ export async function applyRecordVaultTutaDriveMerge(req, res) {
     if (!isLeftSideTutaDrive()) {
       return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
     }
-    const session = requireUnlockedTutaDriveSession(req, res, singlesId);
+    const session = await ensureUnlockedTutaDriveSession(req, res, singlesId);
     if (!session) return;
     const memberId = await loadMemberIdForSingles(singlesId);
     if (!memberId) {
