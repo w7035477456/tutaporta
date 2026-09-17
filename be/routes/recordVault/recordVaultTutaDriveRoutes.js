@@ -37,7 +37,8 @@ import {
   restoreTutaDriveVaultFromZipFile,
   storeTutaDriveEncryptedBackup,
   streamTutaDriveVaultBackupZip,
-  TUTADRIVE_BACKUP_MAX
+  TUTADRIVE_BACKUP_MAX,
+  TUTADRIVE_BACKUP_NAME_RE
 } from '../../utils/recordVaultTutaDriveBackup.js';
 import { parseOneDriveBackupZipUpload } from '../../utils/recordVaultOneDrive/parseOneDriveBackupZipUpload.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
@@ -338,7 +339,7 @@ export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
 /**
  * POST /api/recordVault/tutadrive/backup
  * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
- * Stores as users/M{id}/backup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 backup_*.zip).
+ * Stores as users/M{id}/EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 zips).
  */
 export async function storeRecordVaultTutaDriveBackup(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -358,7 +359,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
     return res.json({
       success: true,
       ...stored,
-      message: `Backup saved (Encrypt Password sealed). Up to ${TUTADRIVE_BACKUP_MAX} backup_*.zip files are kept in your member folder.`
+      message: `Backup saved (Encrypt Password sealed). Up to ${TUTADRIVE_BACKUP_MAX} EncryptedBackup_*.zip files are kept in your member folder.`
     });
   } catch (err) {
     console.error('[storeRecordVaultTutaDriveBackup]', err?.message || err);
@@ -381,7 +382,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
 /**
  * PUT /api/recordVault/tutadrive/backup/:fileName
  * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
- * Replaces that specific backup_*.zip in the member folder.
+ * Replaces that specific EncryptedBackup_* / legacy backup_* zip in the member folder.
  */
 export async function replaceRecordVaultTutaDriveBackup(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -392,7 +393,7 @@ export async function replaceRecordVaultTutaDriveBackup(req, res) {
       return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
     }
     const fileName = String(req.params?.fileName || '').trim();
-    if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(fileName)) {
+    if (!TUTADRIVE_BACKUP_NAME_RE.test(fileName)) {
       return res.status(400).json({ error: 'Invalid backup file name' });
     }
     const memberId = await loadMemberIdForSingles(singlesId);
@@ -733,7 +734,7 @@ export async function applyRecordVaultTutaDriveMerge(req, res) {
 
 /**
  * DELETE /api/recordVault/tutadrive/backup/:fileName
- * Deletes a specific backup_YYYY-MM-DD[_HH-MM-SS].zip by name.
+ * Deletes a specific EncryptedBackup_YYYY-MM-DD[_HH-MM-SS].zip (or legacy backup_*) by name.
  */
 export async function deleteRecordVaultTutaDriveBackupByName(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -743,7 +744,7 @@ export async function deleteRecordVaultTutaDriveBackupByName(req, res) {
       return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
     }
     const fileName = String(req.params?.fileName || '').trim();
-    if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(fileName)) {
+    if (!TUTADRIVE_BACKUP_NAME_RE.test(fileName)) {
       return res.status(400).json({ error: 'Invalid backup file name' });
     }
     const memberId = await loadMemberIdForSingles(singlesId);

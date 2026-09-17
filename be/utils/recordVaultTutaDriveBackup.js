@@ -2,8 +2,8 @@
  * TutaDrive member backup — encrypted backup files under users/M{id}/.
  * Plain vault zip is produced server-side; Encrypt Password sealing happens in the browser (DEK).
  *
- * Stored name: backup_YYYY-MM-DD_HH-MM-SS.zip  (payload = TNBAK1 sealed bytes from client)
- * Legacy date-only names backup_YYYY-MM-DD.zip are still listed / restorable / deletable.
+ * Stored name: EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip  (payload = TNBAK1 sealed bytes from client)
+ * Legacy names backup_YYYY-MM-DD[_HH-MM-SS].zip are still listed / restorable / deletable.
  */
 import fs from 'fs';
 import os from 'os';
@@ -23,8 +23,10 @@ import {
   VAULT_META_FILE
 } from './recordVaultUsb/vaultPaths.js';
 
-/** Date-only (legacy) or date+time stamp. */
-const BACKUP_NAME_RE = /^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i;
+/** EncryptedBackup_* (current) or legacy backup_* — date-only or date+time stamp. */
+export const TUTADRIVE_BACKUP_NAME_RE =
+  /^(?:EncryptedBackup|backup)_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i;
+const BACKUP_NAME_RE = TUTADRIVE_BACKUP_NAME_RE;
 const BACKUP_NOTES_FILE = 'backup_notes.json';
 const BACKUP_NOTE_MAX_LEN = 500;
 
@@ -119,7 +121,7 @@ function todayBackupStamp() {
 }
 
 export function tutaDriveBackupFileName(dateStamp = todayBackupStamp()) {
-  return `backup_${dateStamp}.zip`;
+  return `EncryptedBackup_${dateStamp}.zip`;
 }
 
 export function tutaDriveBackupAbsPath(memberId, dateStamp = todayBackupStamp()) {
@@ -129,7 +131,7 @@ export function tutaDriveBackupAbsPath(memberId, dateStamp = todayBackupStamp())
 export const TUTADRIVE_BACKUP_MAX = 3;
 
 /**
- * Delete backup_* files that exceed the max limit (oldest first).
+ * Delete EncryptedBackup_* / legacy backup_* files that exceed the max limit (oldest first).
  * Pass keepAbsPath to always preserve a just-written file even before it
  * appears in the sorted list.
  */
@@ -159,7 +161,7 @@ export function clearPreviousTutaDriveBackups(memberId, keepAbsPath = null, max 
 }
 
 /**
- * Delete a specific backup file by name (safe: only allows backup_*.zip names).
+ * Delete a specific backup file by name (safe: EncryptedBackup_* or legacy backup_*).
  * Returns true when deleted, false when not found.
  */
 export function deleteTutaDriveBackupByName(memberId, fileName) {
@@ -296,7 +298,7 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
 }
 
 /**
- * Store the client-sealed backup (Encrypt Password / DEK). Replaces any prior backup_*.zip.
+ * Store the client-sealed backup (Encrypt Password / DEK). Keeps up to TUTADRIVE_BACKUP_MAX zips.
  */
 export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes, note = '') {
   const buf = Buffer.isBuffer(encryptedBytes) ? encryptedBytes : Buffer.from(encryptedBytes || []);
@@ -319,7 +321,7 @@ export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes, note = '
   };
 }
 
-/** Replace an existing backup_*.zip in place (same file name, new sealed bytes). */
+/** Replace an existing EncryptedBackup_* / legacy backup_* zip in place (same file name, new sealed bytes). */
 export function replaceTutaDriveEncryptedBackup(memberId, fileName, encryptedBytes, note = undefined) {
   const wanted = String(fileName || '').trim();
   if (!BACKUP_NAME_RE.test(wanted)) {

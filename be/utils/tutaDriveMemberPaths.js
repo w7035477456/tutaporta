@@ -117,7 +117,7 @@ export function tutaDrivePhotosPath(memberId) {
  *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/notes
  *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/photos
  * Symlinks are skipped (so notes→photos link is not double-counted).
- * Does not include photoalbums/, backup_*.zip, or other siblings.
+ * Does not include photoalbums/, EncryptedBackup_*.zip / legacy backup_*.zip, or other siblings.
  */
 export function computeTutaDriveMemberNotesPhotosSize(memberId) {
   const notesPath = tutaDriveNotesMountPath(memberId);

@@ -161,7 +161,7 @@ function copyMemberBackupZips(memberRoot, destDir, summary) {
   if (!memberRoot || !fs.existsSync(memberRoot)) return;
   fs.mkdirSync(destDir, { recursive: true });
   for (const name of fs.readdirSync(memberRoot)) {
-    if (!/^backup_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(name)) continue;
+    if (!/^(?:EncryptedBackup|backup)_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(name)) continue;
     const src = path.join(memberRoot, name);
     try {
       if (!fs.statSync(src).isFile()) continue;

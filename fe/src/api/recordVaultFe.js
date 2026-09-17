@@ -990,7 +990,7 @@ export async function downloadRecordVaultOneDriveBackupZip() {
 
 /**
  * TutaDrive backup: zip vault → seal with Encrypt Password DEK in-browser →
- * store as users/M{id}/backup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 backup_*).
+ * store as users/M{id}/EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3).
  */
 export async function createRecordVaultTutaDriveEncryptedBackup(note = '') {
   const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
@@ -1006,7 +1006,7 @@ export async function createRecordVaultTutaDriveEncryptedBackup(note = '') {
   formData.append(
     'backup',
     new Blob([sealed], { type: 'application/octet-stream' }),
-    'backup.zip'
+    'EncryptedBackup.zip'
   );
   formData.append('note', String(note || '').trim());
   const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
@@ -1028,7 +1028,7 @@ export async function deleteRecordVaultTutaDriveBackup(fileName) {
   return data;
 }
 
-/** Download one sealed backup_*.zip from the member folder to the browser. */
+/** Download one sealed EncryptedBackup_*.zip from the member folder to the browser. */
 export async function downloadRecordVaultTutaDriveStoredBackup(fileName) {
   if (!fileName) throw new Error('Backup file name is required');
   try {
@@ -1052,10 +1052,13 @@ function isTutaDriveSealedBackupBytes(bytes) {
   return true;
 }
 
-/** Replace one stored backup_*.zip (sealed TNBAK1, or plain zip sealed with Encrypt Password DEK). */
+/**
+ * Upload a sealed EncryptedBackup_*.zip into the member folder.
+ * - With replaceFileName: PUT replace that slot in place.
+ * - Without replaceFileName: POST as a new EncryptedBackup_*.zip (server keeps up to 3, oldest pruned).
+ */
 export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileName) {
   if (!file) throw new Error('Choose a backup zip file first');
-  if (!replaceFileName) throw new Error('Backup file name is required');
   const rawBytes = new Uint8Array(await file.arrayBuffer());
   let sealed = rawBytes;
   if (!isTutaDriveSealedBackupBytes(rawBytes)) {
@@ -1067,13 +1070,22 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
     sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek());
   }
   const formData = new FormData();
+  const uploadName = replaceFileName ? String(replaceFileName) : 'EncryptedBackup.zip';
   formData.append(
     'backup',
     new Blob([sealed], { type: 'application/octet-stream' }),
-    String(replaceFileName)
+    uploadName
   );
-  const enc = encodeURIComponent(String(replaceFileName));
-  const { data } = await api.put(`/api/recordVault/tutadrive/backup/${enc}`, formData, {
+  if (replaceFileName) {
+    const enc = encodeURIComponent(String(replaceFileName));
+    const { data } = await api.put(`/api/recordVault/tutadrive/backup/${enc}`, formData, {
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
+      timeout: 0
+    });
+    return data;
+  }
+  const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
     timeout: 0
@@ -1144,7 +1156,7 @@ export async function previewRecordVaultTutaDriveMergeFromStoredBackup(fileName)
 }
 
 /**
- * Browse notebook → note titles from a sealed backup_*.zip (Encrypt Password DEK in-tab).
+ * Browse notebook → note titles from a sealed EncryptedBackup_*.zip (Encrypt Password DEK in-tab).
  * Does not modify the live vault.
  */
 export async function fetchRecordVaultTutaDriveBackupNotebookTree(fileName) {

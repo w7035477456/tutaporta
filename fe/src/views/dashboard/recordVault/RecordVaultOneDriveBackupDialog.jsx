@@ -212,6 +212,40 @@ const backupOpenTreeNoteSx = {
   color: 'rgba(255,255,255,0.92)'
 };
 
+/** Build exactly maxSlots rows; empty slots keep Upload available. */
+function buildBackupSlots(backups, maxSlots) {
+  const max = Math.max(1, Number(maxSlots) || 3);
+  const list = Array.isArray(backups) ? backups.slice(0, max) : [];
+  const slots = [];
+  for (let i = 0; i < max; i += 1) {
+    const bk = list[i] || null;
+    slots.push({
+      slotIndex: i,
+      rowNumber: i + 1,
+      empty: !bk?.fileName,
+      fileName: bk?.fileName || '',
+      sizeBytes: Number(bk?.sizeBytes) || 0,
+      mtimeMs: Number(bk?.mtimeMs) || 0,
+      note: String(bk?.note || '').trim()
+    });
+  }
+  return slots;
+}
+
+/** Among filled display slots, find the oldest by mtime (fallback: last filled). */
+function findOldestBackupSlot(slots) {
+  const filled = (slots || []).filter((s) => !s.empty && s.fileName);
+  if (!filled.length) return null;
+  let oldest = filled[0];
+  for (let i = 1; i < filled.length; i += 1) {
+    const row = filled[i];
+    if (row.mtimeMs > 0 && (oldest.mtimeMs <= 0 || row.mtimeMs < oldest.mtimeMs)) {
+      oldest = row;
+    }
+  }
+  return oldest;
+}
+
 export default function RecordVaultOneDriveBackupDialog({
   open,
   onClose,
@@ -231,20 +265,22 @@ export default function RecordVaultOneDriveBackupDialog({
   const [maxBackups, setMaxBackups] = useState(3);
   /** Server-backed TutaDrive mode (prop + /api/recordVault/storage/config + backup status). */
   const [tutaDriveActive, setTutaDriveActive] = useState(() => Boolean(tutaDrive));
-  const [memberFolderLabel, setMemberFolderLabel] = useState('');
   // fileName currently being restored/deleted/downloaded/uploaded
   const [actioningFile, setActioningFile] = useState('');
-  const [uploadTargetFile, setUploadTargetFile] = useState('');
+  /** Upload mode: replace a fileName, or null to POST a new EncryptedBackup_*.zip. */
+  const [uploadTargetFile, setUploadTargetFile] = useState(null);
+  const [uploadMode, setUploadMode] = useState(''); // 'replace' | 'new'
   const [openBackupFileName, setOpenBackupFileName] = useState('');
   const [openBackupNotebooks, setOpenBackupNotebooks] = useState([]);
+
+  const backupSlots = buildBackupSlots(backupList, maxBackups);
+  const slotsFull = backupSlots.every((s) => !s.empty);
+  const oldestSlot = findOldestBackupSlot(backupSlots);
 
   const applyBackupStatus = (status) => {
     const backups = Array.isArray(status?.backups) ? status.backups : [];
     setBackupList(backups);
     if (status?.maxBackups) setMaxBackups(Number(status.maxBackups));
-    if (status?.memberId) {
-      setMemberFolderLabel(`M${String(status.memberId).replace(/^[Mm]/, '')}`);
-    }
     if (status?.enabled === true || backups.length > 0) {
       setTutaDriveActive(true);
     }
@@ -261,6 +297,8 @@ export default function RecordVaultOneDriveBackupDialog({
     setTutaDriveActive(Boolean(tutaDrive));
     setOpenBackupFileName('');
     setOpenBackupNotebooks([]);
+    setUploadTargetFile(null);
+    setUploadMode('');
     setTreeRefreshToken((value) => value + 1);
     let cancelled = false;
     void (async () => {
@@ -298,6 +336,8 @@ export default function RecordVaultOneDriveBackupDialog({
     resetMessages();
     setOpenBackupFileName('');
     setOpenBackupNotebooks([]);
+    setUploadTargetFile(null);
+    setUploadMode('');
     onClose?.();
   };
 
@@ -307,9 +347,11 @@ export default function RecordVaultOneDriveBackupDialog({
 
   const handleBackup = async () => {
     resetMessages();
-    if (tutaDriveActive && backupList.length >= maxBackups) {
-      setError(`Maximum limit of ${maxBackups} backup copies reached. Please delete at least one older backup before creating a new one.`);
-      return;
+    if (tutaDriveActive && slotsFull && oldestSlot) {
+      const ok = await themedConfirm(
+        `All ${maxBackups} backup slots are full.\n\nThe oldest slot (row ${oldestSlot.rowNumber}) will be overwritten:\n${oldestSlot.fileName}\n\nContinue with Backup?`
+      );
+      if (!ok) return;
     }
     let backupNote = '';
     if (tutaDriveActive) {
@@ -325,7 +367,7 @@ export default function RecordVaultOneDriveBackupDialog({
     try {
       if (tutaDriveActive) {
         const result = await createRecordVaultTutaDriveEncryptedBackup(backupNote);
-        const fileName = result?.fileName || 'backup.zip';
+        const fileName = result?.fileName || 'EncryptedBackup.zip';
         const rel = result?.relativePath || fileName;
         const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
@@ -483,30 +525,58 @@ export default function RecordVaultOneDriveBackupDialog({
     }
   };
 
-  const handleUploadClick = (fileName) => {
-    if (busy) return;
+  const handleUploadClick = async (slot) => {
+    if (busy || !slot) return;
     resetMessages();
-    setUploadTargetFile(fileName);
+
+    if (slotsFull && oldestSlot) {
+      const ok = await themedConfirm(
+        `All ${maxBackups} backup slots are full.\n\nThe oldest slot (row ${oldestSlot.rowNumber}) will be overwritten:\n${oldestSlot.fileName}\n\nContinue with Upload?`
+      );
+      if (!ok) return;
+      setUploadMode('replace');
+      setUploadTargetFile(oldestSlot.fileName);
+      uploadInputRef.current?.click();
+      return;
+    }
+
+    if (slot.empty) {
+      setUploadMode('new');
+      setUploadTargetFile(null);
+      uploadInputRef.current?.click();
+      return;
+    }
+
+    const ok = await themedConfirm(
+      `Overwrite slot (row ${slot.rowNumber})?\n\n${slot.fileName}`
+    );
+    if (!ok) return;
+    setUploadMode('replace');
+    setUploadTargetFile(slot.fileName);
     uploadInputRef.current?.click();
   };
 
   const handleUploadFile = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
+    const mode = uploadMode;
     const targetFileName = uploadTargetFile;
-    setUploadTargetFile('');
-    if (!file || !targetFileName) return;
+    setUploadMode('');
+    setUploadTargetFile(null);
+    if (!file || (mode === 'replace' && !targetFileName)) return;
 
     resetMessages();
     setBusy(true);
-    setActioningFile(targetFileName);
+    setActioningFile(targetFileName || 'new-upload');
     try {
-      const result = await uploadRecordVaultTutaDriveStoredBackup(file, targetFileName);
+      const result =
+        mode === 'replace'
+          ? await uploadRecordVaultTutaDriveStoredBackup(file, targetFileName)
+          : await uploadRecordVaultTutaDriveStoredBackup(file);
+      const uploadedName = result?.fileName || targetFileName || 'EncryptedBackup.zip';
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
-      setSuccess(
-        `Uploaded and saved ${result?.fileName || targetFileName}${sizeText}. You can now Restore from this row.`
-      );
+      setSuccess(`Uploaded and saved ${uploadedName}${sizeText}.`);
       setSuccessTone('general');
       await loadBackupList();
     } catch (err) {
@@ -614,6 +684,116 @@ export default function RecordVaultOneDriveBackupDialog({
     }
   };
 
+  const renderBackupRowActionButtons = (slot) => {
+    const fileName = slot?.fileName || '';
+    const empty = Boolean(slot?.empty);
+    const isActioning = Boolean(fileName) && actioningFile === fileName;
+    const filledDisabled = busy || empty;
+    return (
+      <>
+        <GreenButton
+          type="button"
+          disabled={filledDisabled}
+          onClick={() => void handleDownloadBackup(fileName)}
+          sx={{ ...backupRowButtonSx, opacity: isActioning || empty ? 0.45 : 1 }}
+        >
+          Download
+        </GreenButton>
+        <GreenButton
+          type="button"
+          disabled={busy}
+          onClick={() => void handleUploadClick(slot)}
+          sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+        >
+          Upload
+        </GreenButton>
+        <GreenButton
+          type="button"
+          disabled={filledDisabled}
+          onClick={() => void handleMergeBackup(fileName)}
+          sx={{ ...backupRowButtonSx, opacity: isActioning || empty ? 0.45 : 1 }}
+        >
+          Merge
+        </GreenButton>
+        <GreenButton
+          type="button"
+          disabled={filledDisabled}
+          onClick={() => void handleTutaDriveRestoreFromStored(fileName)}
+          sx={{ ...backupRowButtonSx, opacity: isActioning || empty ? 0.45 : 1 }}
+        >
+          Restore
+        </GreenButton>
+        <GreenButton
+          type="button"
+          disabled={filledDisabled}
+          onClick={() => void handleOpenBackupTree(fileName)}
+          sx={{ ...backupRowButtonSx, opacity: isActioning || empty ? 0.45 : 1 }}
+        >
+          Open
+        </GreenButton>
+        <GreenButton
+          type="button"
+          disabled={filledDisabled}
+          onClick={() => void handleDeleteBackup(fileName)}
+          sx={{ ...backupRowDeleteButtonSx, opacity: isActioning || empty ? 0.45 : 1 }}
+        >
+          X
+        </GreenButton>
+      </>
+    );
+  };
+
+  const renderOpenBackupTree = (fileName) => {
+    if (openBackupFileName !== fileName) return null;
+    return (
+      <Box sx={backupOpenTreeSectionSx}>
+        <ColorTemplate16PopupCenterWide.SectionDescription
+          sx={{ ...generalSuccessMessageSx, mb: 0, textAlign: 'left' }}
+        >
+          Opened notebook list from {fileName}.
+        </ColorTemplate16PopupCenterWide.SectionDescription>
+        <ColorTemplate16PopupCenterWide.SectionDescription
+          sx={{ mb: 0, textAlign: 'left', fontWeight: 700 }}
+        >
+          Notebooks &amp; notes in {fileName}
+        </ColorTemplate16PopupCenterWide.SectionDescription>
+        <Box sx={backupOpenTreeScrollSx} role="tree" aria-label={`Notebooks in ${fileName}`}>
+          {openBackupNotebooks.length === 0 ? (
+            <Typography component="div" sx={{ fontFamily: 'inherit', fontSize: 'inherit' }}>
+              (No notebooks found in this backup)
+            </Typography>
+          ) : (
+            openBackupNotebooks.map((nb) => (
+              <Box key={`nb-${nb.notebookId}-${nb.notebookName}`}>
+                <Typography component="div" sx={backupOpenTreeNotebookSx}>
+                  📁 {nb.notebookName}
+                </Typography>
+                {(nb.notes || []).length === 0 ? (
+                  <Typography
+                    component="div"
+                    sx={{ ...backupOpenTreeNoteSx, fontStyle: 'italic', opacity: 0.75 }}
+                  >
+                    (no notes)
+                  </Typography>
+                ) : (
+                  (nb.notes || []).map((note) => (
+                    <Typography
+                      key={`note-${note.noteId}-${note.noteName}`}
+                      component="div"
+                      sx={backupOpenTreeNoteSx}
+                    >
+                      • {note.noteName}
+                    </Typography>
+                  ))
+                )}
+              </Box>
+            ))
+          )}
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <>
       <BusyHourglassOverlay
@@ -642,13 +822,13 @@ export default function RecordVaultOneDriveBackupDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
             {tutaDriveActive
-              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/backup_YYYY-MM-DD_HH-MM-SS.zip. You can save up to 3 zip files.  Beyond that we recommend you download and upload as needed.'
+              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip. You can save up to 3 zip files. When all 3 slots are full, Backup or Upload overwrites the oldest slot (after you confirm).'
               : 'You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You can also Restore from it back to OneDrive (overwrite OneDrive).'}
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
-              ? 'Backup Encryption uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 backup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
+              ? 'Backup Encryption uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 EncryptedBackup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
               : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore below.'}
           </Box>
 
@@ -685,23 +865,20 @@ export default function RecordVaultOneDriveBackupDialog({
             </Box>
           </Stack>
 
-          {tutaDriveActive && backupList.length === 0 ? (
-            <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
-              No backup_*.zip files found in your member folder{memberFolderLabel ? ` (${memberFolderLabel})` : ''} yet.
-              Click Backup/Encrypt TutaNote to Cloud to create one.
-            </ColorTemplate16PopupCenterWide.SectionDescription>
-          ) : null}
-
-          {tutaDriveActive && backupList.length > 0 && (
+          {tutaDriveActive ? (
             <Box sx={{ pt: 0.5 }}>
-              {backupList.map((bk, idx) => {
-                const mb = Number(bk.sizeBytes) > 0 ? (Number(bk.sizeBytes) / (1024 * 1024)).toFixed(1) : '';
-                const label = mb ? `${bk.fileName} (${mb}mb)` : bk.fileName;
-                const isActioning = actioningFile === bk.fileName;
-                const rowNote = String(bk.note || '').trim();
-                const isOpenTree = openBackupFileName === bk.fileName;
+              {backupSlots.map((slot) => {
+                const mb =
+                  !slot.empty && Number(slot.sizeBytes) > 0
+                    ? (Number(slot.sizeBytes) / (1024 * 1024)).toFixed(1)
+                    : '';
+                const label = slot.empty
+                  ? ''
+                  : mb
+                    ? `${slot.fileName} (${mb}mb)`
+                    : slot.fileName;
                 return (
-                  <Box key={bk.fileName} sx={backupRowOuterSx}>
+                  <Box key={`backup-slot-${slot.rowNumber}`} sx={backupRowOuterSx}>
                     <Box sx={backupRowControlsSx}>
                       <Box
                         sx={{
@@ -717,116 +894,20 @@ export default function RecordVaultOneDriveBackupDialog({
                         }}
                       >
                         <Box>
-                          {idx + 1}) {label}
+                          {slot.rowNumber}) {label}
                         </Box>
-                        {rowNote ? <Box sx={backupRowNoteSx}>(Note: {rowNote})</Box> : null}
+                        {!slot.empty && slot.note ? (
+                          <Box sx={backupRowNoteSx}>(Note: {slot.note})</Box>
+                        ) : null}
                       </Box>
-                      <GreenButton
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void handleDownloadBackup(bk.fileName)}
-                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                      >
-                        Download
-                      </GreenButton>
-                      <GreenButton
-                        type="button"
-                        disabled={busy}
-                        onClick={() => handleUploadClick(bk.fileName)}
-                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                      >
-                        Upload
-                      </GreenButton>
-                      <GreenButton
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void handleMergeBackup(bk.fileName)}
-                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                      >
-                        Merge
-                      </GreenButton>
-                      <GreenButton
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void handleTutaDriveRestoreFromStored(bk.fileName)}
-                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                      >
-                        Restore
-                      </GreenButton>
-                      <GreenButton
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void handleOpenBackupTree(bk.fileName)}
-                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                      >
-                        Open
-                      </GreenButton>
-                      <GreenButton
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void handleDeleteBackup(bk.fileName)}
-                        sx={{ ...backupRowDeleteButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                      >
-                        X
-                      </GreenButton>
+                      {renderBackupRowActionButtons(slot)}
                     </Box>
-
-                    {isOpenTree ? (
-                      <Box sx={backupOpenTreeSectionSx}>
-                        <ColorTemplate16PopupCenterWide.SectionDescription
-                          sx={{ ...generalSuccessMessageSx, mb: 0, textAlign: 'left' }}
-                        >
-                          Opened notebook list from {bk.fileName}.
-                        </ColorTemplate16PopupCenterWide.SectionDescription>
-                        <ColorTemplate16PopupCenterWide.SectionDescription
-                          sx={{ mb: 0, textAlign: 'left', fontWeight: 700 }}
-                        >
-                          Notebooks &amp; notes in {bk.fileName}
-                        </ColorTemplate16PopupCenterWide.SectionDescription>
-                        <Box
-                          sx={backupOpenTreeScrollSx}
-                          role="tree"
-                          aria-label={`Notebooks in ${bk.fileName}`}
-                        >
-                          {openBackupNotebooks.length === 0 ? (
-                            <Typography component="div" sx={{ fontFamily: 'inherit', fontSize: 'inherit' }}>
-                              (No notebooks found in this backup)
-                            </Typography>
-                          ) : (
-                            openBackupNotebooks.map((nb) => (
-                              <Box key={`nb-${nb.notebookId}-${nb.notebookName}`}>
-                                <Typography component="div" sx={backupOpenTreeNotebookSx}>
-                                  📁 {nb.notebookName}
-                                </Typography>
-                                {(nb.notes || []).length === 0 ? (
-                                  <Typography
-                                    component="div"
-                                    sx={{ ...backupOpenTreeNoteSx, fontStyle: 'italic', opacity: 0.75 }}
-                                  >
-                                    (no notes)
-                                  </Typography>
-                                ) : (
-                                  (nb.notes || []).map((note) => (
-                                    <Typography
-                                      key={`note-${note.noteId}-${note.noteName}`}
-                                      component="div"
-                                      sx={backupOpenTreeNoteSx}
-                                    >
-                                      • {note.noteName}
-                                    </Typography>
-                                  ))
-                                )}
-                              </Box>
-                            ))
-                          )}
-                        </Box>
-                      </Box>
-                    ) : null}
+                    {!slot.empty ? renderOpenBackupTree(slot.fileName) : null}
                   </Box>
                 );
               })}
             </Box>
-          )}
+          ) : null}
 
           {success ? (
             successTone === 'backup' ? (
