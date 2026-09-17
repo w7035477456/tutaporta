@@ -79,9 +79,24 @@ import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { postTutaMallBackupAll, postTutaMallRestoreAll } from 'api/tutaMallUserBackupFe';
 import { themedConfirm, themedAlert } from 'utils/themedDialog';
 import { tutaNotesFormatPostLoginButtonSx } from 'views/dashboard/recordVault/tutaNotesPostLoginActionButtonSx';
+import { guestDemoBlockProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 
 const PROFILE_MENU_PANEL_WIDTH_RATIO = 0.35;
 const PROFILE_MENU_PANEL_MIN_PX = 280;
+
+/** Show ~/tutamallBackup/{prefix} as /tutamallBackup/{prefix} (hide OS home path). */
+function formatTutaMallBackupLocation(backupDir) {
+  const raw = String(backupDir || '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '');
+  if (!raw) return '';
+  const marker = '/tutamallBackup/';
+  const idx = raw.toLowerCase().lastIndexOf(marker.toLowerCase());
+  if (idx >= 0) return raw.slice(idx);
+  const base = raw.split('/').filter(Boolean).pop();
+  return base ? `/tutamallBackup/${base}` : raw;
+}
 
 /** Pixel width from viewport — 50% of window, grows/shrinks on resize. */
 function profileMenuPanelWidthPx(viewportWidth) {
@@ -218,6 +233,7 @@ export default function ProfileSection({ clusterTight = false }) {
     setField
   } = useConfig();
   const { user, profilePhotoCacheBust, logout } = useAuth();
+  const guestDemo = isGuestDemoLogin(user);
   const selectedMainFontStack = findMainFontOptionByStack(fontFamily || ENV_MAIN_FONT_FAMILY).stack;
 
   const avatarSrc =
@@ -472,15 +488,16 @@ export default function ProfileSection({ clusterTight = false }) {
   };
 
   const handleBackupAll = async () => {
-    if (tourActive || tutaMallBackupBusy || mainFontBusy) return;
+    if (guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy) return;
     closeProfileMenu();
     setTutaMallBackupBusy(true);
     try {
       const result = await postTutaMallBackupAll();
+      const location = formatTutaMallBackupLocation(result.backupDir);
       await themedAlert(
         `Backup All completed for ${result.email}.\n\n` +
           `${result.copied} folder(s) copied to server backup.\n` +
-          `Location: ${result.backupDir}`
+          `Location: ${location || result.backupDir}`
       );
     } catch (err) {
       const message = err?.response?.data?.error || err?.message || 'Backup failed';
@@ -491,7 +508,7 @@ export default function ProfileSection({ clusterTight = false }) {
   };
 
   const handleRestoreAll = async () => {
-    if (tourActive || tutaMallBackupBusy || mainFontBusy) return;
+    if (guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy) return;
     closeProfileMenu();
     const ok = await themedConfirm(
       'Restore All from your server backup?\n\n' +
@@ -501,9 +518,10 @@ export default function ProfileSection({ clusterTight = false }) {
     setTutaMallBackupBusy(true);
     try {
       const result = await postTutaMallRestoreAll();
+      const location = formatTutaMallBackupLocation(result.backupDir);
       await themedAlert(
         `Restore All completed for ${result.email}.\n\n` +
-          `${result.restored} path(s) restored from ${result.backupDir}`
+          `${result.restored} path(s) restored from ${location || result.backupDir}`
       );
     } catch (err) {
       const message = err?.response?.data?.error || err?.message || 'Restore failed';
@@ -630,6 +648,14 @@ export default function ProfileSection({ clusterTight = false }) {
       window.removeEventListener(VSINGLES_TOUR_END_EVENT, onTourEnd);
     };
   }, [location.pathname]);
+
+  const backupRestoreEmail = String(user?.email || profileMenuIdentity.email || '').trim();
+  const backupAllLabel = backupRestoreEmail
+    ? `Backup All apps of ${backupRestoreEmail}`
+    : 'Backup All';
+  const restoreAllLabel = backupRestoreEmail
+    ? `Restore All apps of ${backupRestoreEmail}`
+    : 'Restore All';
 
   return (
     <>
@@ -1250,28 +1276,30 @@ export default function ProfileSection({ clusterTight = false }) {
                         fullWidth
                         disableElevation
                         disableRipple
-                        disabled={tourActive || tutaMallBackupBusy || mainFontBusy}
+                        disabled={guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy}
                         onClick={() => void handleBackupAll()}
+                        {...guestDemoBlockProps()}
                         sx={{
                           ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
                           ...tutaNotesFormatPostLoginButtonSx
                         }}
                       >
-                        Backup All
+                        {backupAllLabel}
                       </Button>
                       <Button
                         type="button"
                         fullWidth
                         disableElevation
                         disableRipple
-                        disabled={tourActive || tutaMallBackupBusy || mainFontBusy}
+                        disabled={guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy}
                         onClick={() => void handleRestoreAll()}
+                        {...guestDemoBlockProps()}
                         sx={{
                           ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
                           ...tutaNotesFormatPostLoginButtonSx
                         }}
                       >
-                        Restore All
+                        {restoreAllLabel}
                       </Button>
                     </Stack>
                     <Stack spacing={0.5} sx={{ ...PROFILE_MENU_PANEL_FILL_SX, px: 2, pt: 0.5, pb: 2 }}>
