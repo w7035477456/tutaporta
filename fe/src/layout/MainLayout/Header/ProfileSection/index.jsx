@@ -76,7 +76,7 @@ import { formatLastFirstMiddleName } from 'utils/fullNameFormat';
 import api from 'api/axios';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
-import { postTutaMallBackupAll, postTutaMallRestoreAll } from 'api/tutaMallUserBackupFe';
+import { fetchTutaMallBackupStatus, postTutaMallBackupAll, postTutaMallRestoreAll } from 'api/tutaMallUserBackupFe';
 import { themedConfirm, themedAlert } from 'utils/themedDialog';
 import { tutaNotesFormatPostLoginButtonSx } from 'views/dashboard/recordVault/tutaNotesPostLoginActionButtonSx';
 import { guestDemoBlockProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
@@ -96,6 +96,26 @@ function formatTutaMallBackupLocation(backupDir) {
   if (idx >= 0) return raw.slice(idx);
   const base = raw.split('/').filter(Boolean).pop();
   return base ? `/tutamallBackup/${base}` : raw;
+}
+
+/** Format manifest.createdAt for Restore All confirm (local date + time). */
+function formatTutaMallBackupManifestDate(createdAt) {
+  const raw = String(createdAt || '').trim();
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(d);
+  } catch {
+    return d.toLocaleString();
+  }
 }
 
 /** Pixel width from viewport — 50% of window, grows/shrinks on resize. */
@@ -510,13 +530,26 @@ export default function ProfileSection({ clusterTight = false }) {
   const handleRestoreAll = async () => {
     if (guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy) return;
     closeProfileMenu();
-    const ok = await themedConfirm(
-      'Restore All from your server backup?\n\n' +
-        'This replaces your current TutaNotes, TutaPhotoAlbums, and TutaDates files and database rows for this account.'
-    );
-    if (!ok) return;
     setTutaMallBackupBusy(true);
     try {
+      const status = await fetchTutaMallBackupStatus();
+      const hasBackup = Boolean(status?.exists && status?.manifest);
+      if (!hasBackup) {
+        await themedAlert('Unable Restore since you never made backup before');
+        return;
+      }
+      const dated = formatTutaMallBackupManifestDate(status.manifest?.createdAt);
+      const datedLine = dated
+        ? `From cloud copy dated ${dated}`
+        : 'From cloud copy (date unknown)';
+      setTutaMallBackupBusy(false);
+      const ok = await themedConfirm(
+        `Restore All from your server backup?\n\n` +
+          `${datedLine}\n\n` +
+          'This replaces your current TutaNotes, TutaPhotoAlbums, and TutaDates files and database rows for this account.'
+      );
+      if (!ok) return;
+      setTutaMallBackupBusy(true);
       const result = await postTutaMallRestoreAll();
       const location = formatTutaMallBackupLocation(result.backupDir);
       await themedAlert(

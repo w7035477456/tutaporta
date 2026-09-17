@@ -184,7 +184,17 @@ function linkVaultPhotosToMemberPhotos(notesMount, photosAbs) {
         fs.rmdirSync(vaultPhotos);
       } else {
         fs.mkdirSync(photosAbs, { recursive: true });
-        fs.cpSync(vaultPhotos, photosAbs, { recursive: true, force: true });
+        // Never cpSync when vault photos already resolves to the sibling photos/
+        // folder (symlink race / realpath collision).
+        let sameTarget = false;
+        try {
+          sameTarget = fs.realpathSync(vaultPhotos) === path.resolve(photosAbs);
+        } catch {
+          sameTarget = false;
+        }
+        if (!sameTarget) {
+          fs.cpSync(vaultPhotos, photosAbs, { recursive: true, force: true });
+        }
         fs.rmSync(vaultPhotos, { recursive: true, force: true });
       }
     }

@@ -143,9 +143,35 @@ function copyTreeIfExists(src, dest, summary, label) {
     summary.skipped.push({ label, reason: 'missing', src: resolved || src });
     return;
   }
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.cpSync(resolved, dest, { recursive: true, force: true, dereference: false });
-  summary.copied.push({ label, src: resolved, dest });
+  const resolvedDest = path.resolve(String(dest || ''));
+  // Re-backup must wipe first: a prior copy may have left notes/TutaNotes/photos as an
+  // absolute symlink to sibling users/M{id}/photos. Node fs.cpSync then errors with
+  // "Cannot copy …/photos to a subdirectory of self …/photos".
+  if (fs.existsSync(resolvedDest)) {
+    fs.rmSync(resolvedDest, { recursive: true, force: true });
+  }
+  fs.mkdirSync(path.dirname(resolvedDest), { recursive: true });
+  fs.cpSync(resolved, resolvedDest, {
+    recursive: true,
+    force: true,
+    dereference: false,
+    filter: (srcPath) => {
+      try {
+        const st = fs.lstatSync(srcPath);
+        if (!st.isSymbolicLink()) return true;
+        // Skip outbound symlinks (vault photos/ → sibling member photos/). They are
+        // machine-absolute and recreated on restore by ensureTutaDriveMemberLayout.
+        const linkTarget = fs.readlinkSync(srcPath);
+        const targetAbs = path.resolve(path.dirname(srcPath), linkTarget);
+        const insideSrc =
+          targetAbs === resolved || targetAbs.startsWith(`${resolved}${path.sep}`);
+        return insideSrc;
+      } catch {
+        return true;
+      }
+    }
+  });
+  summary.copied.push({ label, src: resolved, dest: resolvedDest });
 }
 
 function copyFileIfExists(src, destDir, summary, label) {
@@ -694,6 +720,15 @@ export async function restoreUserAll(pool, opts = {}) {
     summary,
     'tutadrive-photos'
   );
+  // Recreate notes/TutaNotes/photos → sibling photos/ (skipped as outbound symlink on backup).
+  try {
+    ensureTutaDriveMemberLayout(memberId, { singlesId });
+  } catch (err) {
+    summary.skipped.push({
+      label: 'tutadrive-photos-symlink',
+      reason: err?.message || String(err)
+    });
+  }
   await restoreTree(
     path.join(filesRoot('tutanotes'), 'notes-onedrive-staging'),
     notesOneDriveStagingMountPath(singlesId),
