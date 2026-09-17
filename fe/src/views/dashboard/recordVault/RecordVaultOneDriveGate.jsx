@@ -571,10 +571,6 @@ export default function RecordVaultOneDriveGate({
         open={open && backupDialogOpen}
         folderName={oneDriveFolderName}
         onClose={() => setBackupDialogOpen(false)}
-        onOpenMyNote={() => {
-          setBackupDialogOpen(false);
-          void handleOpenMyNote();
-        }}
         onFormatted={async () => {
           setOneDriveHasVault(false);
           setOneDriveNeedsReformat(false);

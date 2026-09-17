@@ -12,6 +12,7 @@ import {
   downloadRecordVaultOneDriveBackupZip,
   downloadRecordVaultTutaDriveStoredBackup,
   fetchRecordVaultStorageConfig,
+  fetchRecordVaultTutaDriveBackupNotebookTree,
   fetchRecordVaultTutaDriveBackupStatus,
   formatRecordVaultOneDrive,
   formatRecordVaultTutaDrive,
@@ -31,6 +32,8 @@ import {
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { themedConfirm, themedOverwriteSkip, themedPrompt } from 'utils/themedDialog';
+import { promptEncryptPasswordForBackupDecrypt } from 'utils/recordVaultBackupDecryptPrompt';
+import Typography from '@mui/material/Typography';
 
 const actionRowSx = {
   display: 'flex',
@@ -144,14 +147,78 @@ const backupRowNoteSx = {
   }
 };
 
+const backupOpenTreeSectionSx = {
+  pt: 1,
+  mt: 0.5,
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.75,
+  minHeight: 0
+};
+
+const backupRowOuterSx = {
+  border: '2px solid rgba(255, 255, 255, 0.55)',
+  borderRadius: 1,
+  px: 1.25,
+  py: 1,
+  mb: 1.25,
+  boxSizing: 'border-box',
+  bgcolor: 'rgba(0, 0, 0, 0.18)'
+};
+
+const backupRowControlsSx = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 1
+};
+
+const backupOpenTreeScrollSx = {
+  width: '100%',
+  maxHeight: '28vh',
+  minHeight: 120,
+  overflowY: 'auto',
+  overflowX: 'auto',
+  border: '2px solid #000',
+  bgcolor: 'rgba(0,0,0,0.35)',
+  p: 1.5,
+  boxSizing: 'border-box',
+  fontFamily: 'monospace',
+  fontSize: '0.92rem',
+  lineHeight: 1.45,
+  color: '#fff',
+  scrollbarWidth: 'thin',
+  scrollbarColor: 'var(--theme-yellow-color) rgba(0,0,0,0.4)',
+  '&::-webkit-scrollbar': { width: 14 },
+  '&::-webkit-scrollbar-track': { bgcolor: 'rgba(0,0,0,0.4)' },
+  '&::-webkit-scrollbar-thumb': {
+    bgcolor: 'var(--theme-yellow-color)',
+    borderRadius: 7,
+    border: '2px solid #000'
+  }
+};
+
+const backupOpenTreeNotebookSx = {
+  fontWeight: 800,
+  color: 'var(--theme-yellow-color)',
+  mt: 0.75,
+  '&:first-of-type': { mt: 0 }
+};
+
+const backupOpenTreeNoteSx = {
+  fontWeight: 500,
+  pl: 2.5,
+  color: 'rgba(255,255,255,0.92)'
+};
+
 export default function RecordVaultOneDriveBackupDialog({
   open,
   onClose,
   folderName = 'onlinemallwebsitevault',
   tutaDrive = false,
   onFormatted,
-  onRestored,
-  onOpenMyNote
+  onRestored
 }) {
   const fileInputRef = useRef(null);
   const uploadInputRef = useRef(null);
@@ -168,6 +235,8 @@ export default function RecordVaultOneDriveBackupDialog({
   // fileName currently being restored/deleted/downloaded/uploaded
   const [actioningFile, setActioningFile] = useState('');
   const [uploadTargetFile, setUploadTargetFile] = useState('');
+  const [openBackupFileName, setOpenBackupFileName] = useState('');
+  const [openBackupNotebooks, setOpenBackupNotebooks] = useState([]);
 
   const applyBackupStatus = (status) => {
     const backups = Array.isArray(status?.backups) ? status.backups : [];
@@ -190,6 +259,8 @@ export default function RecordVaultOneDriveBackupDialog({
   useEffect(() => {
     if (!open) return undefined;
     setTutaDriveActive(Boolean(tutaDrive));
+    setOpenBackupFileName('');
+    setOpenBackupNotebooks([]);
     setTreeRefreshToken((value) => value + 1);
     let cancelled = false;
     void (async () => {
@@ -225,6 +296,8 @@ export default function RecordVaultOneDriveBackupDialog({
   const handleClose = () => {
     if (busy) return;
     resetMessages();
+    setOpenBackupFileName('');
+    setOpenBackupNotebooks([]);
     onClose?.();
   };
 
@@ -280,8 +353,40 @@ export default function RecordVaultOneDriveBackupDialog({
     }
   };
 
+  const handleOpenBackupTree = async (fileName) => {
+    resetMessages();
+    try {
+      const unlocked = await promptEncryptPasswordForBackupDecrypt('open');
+      if (!unlocked) return;
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
+      return;
+    }
+    setBusy(true);
+    setActioningFile(fileName);
+    try {
+      const tree = await fetchRecordVaultTutaDriveBackupNotebookTree(fileName);
+      setOpenBackupFileName(fileName);
+      setOpenBackupNotebooks(Array.isArray(tree?.notebooks) ? tree.notebooks : []);
+    } catch (err) {
+      setOpenBackupFileName('');
+      setOpenBackupNotebooks([]);
+      setError(err?.response?.data?.error || err?.message || 'Unable to open backup');
+    } finally {
+      setBusy(false);
+      setActioningFile('');
+    }
+  };
+
   const handleMergeBackup = async (fileName) => {
     resetMessages();
+    try {
+      const unlocked = await promptEncryptPasswordForBackupDecrypt('merge');
+      if (!unlocked) return;
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
+      return;
+    }
     setBusy(true);
     setActioningFile(fileName);
     try {
@@ -334,6 +439,13 @@ export default function RecordVaultOneDriveBackupDialog({
     );
     if (!ok) return;
     resetMessages();
+    try {
+      const unlocked = await promptEncryptPasswordForBackupDecrypt('restore');
+      if (!unlocked) return;
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
+      return;
+    }
     setBusy(true);
     setActioningFile(fileName);
     try {
@@ -393,7 +505,7 @@ export default function RecordVaultOneDriveBackupDialog({
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
       setSuccess(
-        `Uploaded and saved ${result?.fileName || targetFileName}${sizeText}. You can now Restore TutaNotes from this row.`
+        `Uploaded and saved ${result?.fileName || targetFileName}${sizeText}. You can now Restore from this row.`
       );
       setSuccessTone('general');
       await loadBackupList();
@@ -434,6 +546,15 @@ export default function RecordVaultOneDriveBackupDialog({
     if (!file) return;
 
     resetMessages();
+    if (tutaDriveActive) {
+      try {
+        const unlocked = await promptEncryptPasswordForBackupDecrypt('restore');
+        if (!unlocked) return;
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
+        return;
+      }
+    }
     setBusy(true);
     try {
       if (tutaDriveActive) {
@@ -521,14 +642,14 @@ export default function RecordVaultOneDriveBackupDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
             {tutaDriveActive
-              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/backup_YYYY-MM-DD_HH-MM-SS.zip. You can save up to 3 zip files.'
+              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/backup_YYYY-MM-DD_HH-MM-SS.zip. You can save up to 3 zip files.  Beyond that we recommend you download and upload as needed.'
               : 'You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You can also Restore from it back to OneDrive (overwrite OneDrive).'}
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
-              ? 'Sealing uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 backup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
-              : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore TutaNotes Cloud below.'}
+              ? 'Backup Encryption uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 backup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
+              : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore below.'}
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -558,17 +679,9 @@ export default function RecordVaultOneDriveBackupDialog({
                   onClick={handleRestoreClick}
                   sx={restoreYellowButtonSx}
                 >
-                  Restore TutaNotes Cloud
+                  Restore
                 </GreenButton>
               )}
-              <GreenButton
-                type="button"
-                disabled={busy}
-                onClick={() => onOpenMyNote?.()}
-                sx={actionButtonSx}
-              >
-                Open TutaNotes Cloud
-              </GreenButton>
             </Box>
           </Stack>
 
@@ -586,74 +699,129 @@ export default function RecordVaultOneDriveBackupDialog({
                 const label = mb ? `${bk.fileName} (${mb}mb)` : bk.fileName;
                 const isActioning = actioningFile === bk.fileName;
                 const rowNote = String(bk.note || '').trim();
+                const isOpenTree = openBackupFileName === bk.fileName;
                 return (
-                  <Box
-                    key={bk.fileName}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 1,
-                      py: 0.75,
-                      borderBottom: idx < backupList.length - 1 ? '1px solid rgba(255,255,255,0.12)' : 'none'
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        flex: 1,
-                        minWidth: { xs: '100%', sm: 220 },
-                        color: '#fff',
-                        fontWeight: 700,
-                        lineHeight: 1.3,
-                        fontSize: getMobileSinglesTextFontSizeVw(),
-                        '@media (min-width: 600px)': {
-                          fontSize: getDesktopTextFontSizeVw()
-                        }
-                      }}
-                    >
-                      <Box>{idx + 1}) {label}</Box>
-                      {rowNote ? <Box sx={backupRowNoteSx}>(Note: {rowNote})</Box> : null}
+                  <Box key={bk.fileName} sx={backupRowOuterSx}>
+                    <Box sx={backupRowControlsSx}>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          minWidth: { xs: '100%', sm: 220 },
+                          color: '#fff',
+                          fontWeight: 700,
+                          lineHeight: 1.3,
+                          fontSize: getMobileSinglesTextFontSizeVw(),
+                          '@media (min-width: 600px)': {
+                            fontSize: getDesktopTextFontSizeVw()
+                          }
+                        }}
+                      >
+                        <Box>
+                          {idx + 1}) {label}
+                        </Box>
+                        {rowNote ? <Box sx={backupRowNoteSx}>(Note: {rowNote})</Box> : null}
+                      </Box>
+                      <GreenButton
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleDownloadBackup(bk.fileName)}
+                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                      >
+                        Download
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleUploadClick(bk.fileName)}
+                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                      >
+                        Upload
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleMergeBackup(bk.fileName)}
+                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                      >
+                        Merge
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleTutaDriveRestoreFromStored(bk.fileName)}
+                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                      >
+                        Restore
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleOpenBackupTree(bk.fileName)}
+                        sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                      >
+                        Open
+                      </GreenButton>
+                      <GreenButton
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void handleDeleteBackup(bk.fileName)}
+                        sx={{ ...backupRowDeleteButtonSx, opacity: isActioning ? 0.6 : 1 }}
+                      >
+                        X
+                      </GreenButton>
                     </Box>
-                    <GreenButton
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleDownloadBackup(bk.fileName)}
-                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                    >
-                      Download
-                    </GreenButton>
-                    <GreenButton
-                      type="button"
-                      disabled={busy}
-                      onClick={() => handleUploadClick(bk.fileName)}
-                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                    >
-                      Upload
-                    </GreenButton>
-                    <GreenButton
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleMergeBackup(bk.fileName)}
-                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                    >
-                      Merge TutaNotes
-                    </GreenButton>
-                    <GreenButton
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleTutaDriveRestoreFromStored(bk.fileName)}
-                      sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                    >
-                      Restore TutaNotes
-                    </GreenButton>
-                    <GreenButton
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleDeleteBackup(bk.fileName)}
-                      sx={{ ...backupRowDeleteButtonSx, opacity: isActioning ? 0.6 : 1 }}
-                    >
-                      X
-                    </GreenButton>
+
+                    {isOpenTree ? (
+                      <Box sx={backupOpenTreeSectionSx}>
+                        <ColorTemplate16PopupCenterWide.SectionDescription
+                          sx={{ ...generalSuccessMessageSx, mb: 0, textAlign: 'left' }}
+                        >
+                          Opened notebook list from {bk.fileName}.
+                        </ColorTemplate16PopupCenterWide.SectionDescription>
+                        <ColorTemplate16PopupCenterWide.SectionDescription
+                          sx={{ mb: 0, textAlign: 'left', fontWeight: 700 }}
+                        >
+                          Notebooks &amp; notes in {bk.fileName}
+                        </ColorTemplate16PopupCenterWide.SectionDescription>
+                        <Box
+                          sx={backupOpenTreeScrollSx}
+                          role="tree"
+                          aria-label={`Notebooks in ${bk.fileName}`}
+                        >
+                          {openBackupNotebooks.length === 0 ? (
+                            <Typography component="div" sx={{ fontFamily: 'inherit', fontSize: 'inherit' }}>
+                              (No notebooks found in this backup)
+                            </Typography>
+                          ) : (
+                            openBackupNotebooks.map((nb) => (
+                              <Box key={`nb-${nb.notebookId}-${nb.notebookName}`}>
+                                <Typography component="div" sx={backupOpenTreeNotebookSx}>
+                                  📁 {nb.notebookName}
+                                </Typography>
+                                {(nb.notes || []).length === 0 ? (
+                                  <Typography
+                                    component="div"
+                                    sx={{ ...backupOpenTreeNoteSx, fontStyle: 'italic', opacity: 0.75 }}
+                                  >
+                                    (no notes)
+                                  </Typography>
+                                ) : (
+                                  (nb.notes || []).map((note) => (
+                                    <Typography
+                                      key={`note-${note.noteId}-${note.noteName}`}
+                                      component="div"
+                                      sx={backupOpenTreeNoteSx}
+                                    >
+                                      • {note.noteName}
+                                    </Typography>
+                                  ))
+                                )}
+                              </Box>
+                            ))
+                          )}
+                        </Box>
+                      </Box>
+                    ) : null}
                   </Box>
                 );
               })}
@@ -691,6 +859,5 @@ RecordVaultOneDriveBackupDialog.propTypes = {
   folderName: PropTypes.string,
   tutaDrive: PropTypes.bool,
   onFormatted: PropTypes.func,
-  onRestored: PropTypes.func,
-  onOpenMyNote: PropTypes.func
+  onRestored: PropTypes.func
 };

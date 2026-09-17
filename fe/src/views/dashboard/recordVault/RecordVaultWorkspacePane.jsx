@@ -6389,7 +6389,6 @@ export default function RecordVaultWorkspacePane({
         onClose={() => setOneDriveBackupOpen(false)}
         folderName={oneDriveVaultFolderName}
         tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
-        onOpenMyNote={() => setOneDriveBackupOpen(false)}
         onRestored={() => void handleOneDriveVaultRestored()}
       />
       <RecordVaultUsbBackupDialog

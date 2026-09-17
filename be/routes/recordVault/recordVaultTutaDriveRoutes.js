@@ -46,6 +46,7 @@ import {
   applyTutaDriveMerge,
   cleanupTutaDriveMergeStaging,
   extractTutaDriveMergeZip,
+  listTutaDriveBackupNotebookTree,
   loadTutaDriveMergeStaging,
   previewTutaDriveMerge
 } from '../../utils/recordVaultTutaDriveMerge.js';
@@ -543,6 +544,58 @@ function requireUnlockedTutaDriveSession(req, res, singlesId) {
     return null;
   }
   return session;
+}
+
+/**
+ * POST /api/recordVault/tutadrive/backup-tree
+ * Multipart field `backup` = plain vault zip (client unsealed with Encrypt Password).
+ * Returns notebook → note title tree for browse-only Open TutaNotes on a backup row.
+ */
+export async function listRecordVaultTutaDriveBackupTree(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  let upload = null;
+  let stagingRoot = null;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) {
+      return res.status(400).json({ error: 'Your member number is not set; cannot open backup.' });
+    }
+    upload = await parseOneDriveBackupZipUpload(req);
+    const staging = await extractTutaDriveMergeZip(memberId, singlesId, upload.zipPath);
+    stagingRoot = staging.stagingRoot;
+    let key = getVaultSession(singlesId, 'onedrive')?.key ?? null;
+    if (!key && isRecordVaultIconEncryptionEnabled()) {
+      key = await resolveTutaDriveUnlockKey(staging.mountPath);
+    }
+    const tree = await listTutaDriveBackupNotebookTree(staging.mountPath, key);
+    return res.json({ success: true, ...tree });
+  } catch (err) {
+    console.error('[listRecordVaultTutaDriveBackupTree]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to open backup notebook tree', {
+      route: 'listRecordVaultTutaDriveBackupTree',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  } finally {
+    if (stagingRoot) {
+      try {
+        cleanupTutaDriveMergeStaging(stagingRoot);
+      } catch {
+        // ignore
+      }
+    }
+    if (upload?.tmpDir) {
+      try {
+        fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+      } catch {
+        // ignore
+      }
+    }
+  }
 }
 
 /**

@@ -240,6 +240,7 @@ import {
   initRecordVaultTutaDrive,
   logoffRecordVaultTutaDrive,
   applyRecordVaultTutaDriveMerge,
+  listRecordVaultTutaDriveBackupTree,
   previewRecordVaultTutaDriveMerge,
   replaceRecordVaultTutaDriveBackup,
   restoreRecordVaultTutaDriveBackupZip,
@@ -849,6 +850,7 @@ app.use((req, res, next) => {
     (req.method === 'POST' &&
       (req.path === '/api/recordVault/tutadrive/backup' ||
         req.path === '/api/recordVault/tutadrive/restore-zip' ||
+        req.path === '/api/recordVault/tutadrive/backup-tree' ||
         req.path === '/api/recordVault/tutadrive/merge/preview')) ||
     (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutadrive/backup/'))
   ) {
@@ -1594,6 +1596,7 @@ app.get('/api/recordVault/tutadrive/backup', requireAuth, downloadRecordVaultTut
 app.get('/api/recordVault/tutadrive/backup/status', requireAuth, getRecordVaultTutaDriveBackupStatus);
 app.delete('/api/recordVault/tutadrive/backup/:fileName', requireAuth, deleteRecordVaultTutaDriveBackupByName);
 app.post('/api/recordVault/tutadrive/restore-zip', requireAuth, restoreRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutadrive/backup-tree', requireAuth, listRecordVaultTutaDriveBackupTree);
 app.post('/api/recordVault/tutadrive/merge/preview', requireAuth, previewRecordVaultTutaDriveMerge);
 app.post('/api/recordVault/tutadrive/merge/apply', requireAuth, applyRecordVaultTutaDriveMerge);
 

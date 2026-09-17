@@ -144,10 +144,6 @@ export default function RecordVaultTutaDriveGate({
         open={open && backupDialogOpen}
         tutaDrive
         onClose={() => setBackupDialogOpen(false)}
-        onOpenMyNote={() => {
-          setBackupDialogOpen(false);
-          handleOpen();
-        }}
         onRestored={() => void refreshStatus()}
       />
       <BusyHourglassOverlay

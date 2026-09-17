@@ -1143,6 +1143,35 @@ export async function previewRecordVaultTutaDriveMergeFromStoredBackup(fileName)
   return data;
 }
 
+/**
+ * Browse notebook → note titles from a sealed backup_*.zip (Encrypt Password DEK in-tab).
+ * Does not modify the live vault.
+ */
+export async function fetchRecordVaultTutaDriveBackupNotebookTree(fileName) {
+  const plainZip = await unsealRecordVaultTutaDriveStoredBackupBytes(undefined, fileName);
+  const formData = new FormData();
+  formData.append('backup', new Blob([plainZip], { type: 'application/zip' }), 'TutaNotes-open.zip');
+  const { data } = await api.post('/api/recordVault/tutadrive/backup-tree', formData, {
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
+  });
+  return {
+    notebooks: Array.isArray(data?.notebooks)
+      ? data.notebooks.map((nb) => ({
+          notebookId: Number(nb.notebookId) || 0,
+          notebookName: String(nb.notebookName || '').trim() || 'Notebook',
+          notes: Array.isArray(nb.notes)
+            ? nb.notes.map((n) => ({
+                noteId: Number(n.noteId) || 0,
+                noteName: String(n.noteName || '').trim() || 'Untitled'
+              }))
+            : []
+        }))
+      : []
+  };
+}
+
 /** Apply merge decisions from a prior preview mergeId. */
 export async function applyRecordVaultTutaDriveMerge(mergeId, decisions) {
   const { data } = await api.post('/api/recordVault/tutadrive/merge/apply', {

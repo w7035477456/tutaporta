@@ -68,7 +68,7 @@ export function themedConfirm(message, options = {}) {
 /**
  * @param {string} message
  * @param {string} [defaultValue]
- * @param {{ title?: string, okLabel?: string, cancelLabel?: string }} [options]
+ * @param {{ title?: string, okLabel?: string, cancelLabel?: string, inputType?: string }} [options]
  * @returns {Promise<string|null>} entered value, or null if cancelled
  */
 export function themedPrompt(message, defaultValue = '', options = {}) {
@@ -78,7 +78,8 @@ export function themedPrompt(message, defaultValue = '', options = {}) {
     defaultValue: defaultValue == null ? '' : String(defaultValue),
     title: options.title || 'Input',
     okLabel: options.okLabel || 'OK',
-    cancelLabel: options.cancelLabel || 'Cancel'
+    cancelLabel: options.cancelLabel || 'Cancel',
+    inputType: options.inputType || 'text'
   });
 }
 

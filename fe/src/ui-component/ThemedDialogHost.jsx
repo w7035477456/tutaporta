@@ -21,6 +21,9 @@ export default function ThemedDialogHost() {
           defaultValue: req.defaultValue == null ? '' : String(req.defaultValue),
           okLabel: req.okLabel || 'OK',
           cancelLabel: req.cancelLabel || 'Cancel',
+          overwriteLabel: req.overwriteLabel || 'Overwrite',
+          skipLabel: req.skipLabel || 'Skip',
+          inputType: req.inputType || 'text',
           inputValue: req.defaultValue == null ? '' : String(req.defaultValue),
           resolve
         });
@@ -60,6 +63,7 @@ export default function ThemedDialogHost() {
               <ColorTemplate16PopupCenterWide.Input
                 fullWidth
                 autoFocus
+                type={dialog.inputType === 'password' ? 'password' : 'text'}
                 value={dialog.inputValue}
                 onChange={(e) =>
                   setDialog((prev) => (prev ? { ...prev, inputValue: e.target.value } : prev))
@@ -69,6 +73,9 @@ export default function ThemedDialogHost() {
                     e.preventDefault();
                     closeWith(dialog.inputValue);
                   }
+                }}
+                inputProps={{
+                  autoComplete: dialog.inputType === 'password' ? 'current-password' : 'off'
                 }}
               />
             ) : null}

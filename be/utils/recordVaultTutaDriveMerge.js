@@ -125,6 +125,55 @@ async function openBackupVaultDb(mountPath, key) {
   throw openErr || new Error('Unable to open backup vault database');
 }
 
+/** Notebook → notes title tree from an extracted backup mount (read-only). */
+export async function listTutaDriveBackupNotebookTree(mountPath, key) {
+  const backupCtx = await openBackupVaultDb(mountPath, key);
+  try {
+    const notebooks = queryAll(
+      backupCtx.db,
+      `SELECT notebook_id, notebook_name, display_order
+       FROM notebooks
+       WHERE deleted_at IS NULL
+       ORDER BY display_order ASC, notebook_id ASC`
+    );
+    const notes = listBackupNotes(backupCtx);
+    const notesByNotebook = new Map();
+    for (const row of notes) {
+      const notebookId = Number(row.notebook_id);
+      if (!notesByNotebook.has(notebookId)) notesByNotebook.set(notebookId, []);
+      notesByNotebook.get(notebookId).push({
+        noteId: Number(row.note_id),
+        noteName: String(row.note_name || '').trim() || 'Untitled'
+      });
+    }
+    return {
+      notebooks: notebooks.map((nb) => {
+        const notebookId = Number(nb.notebook_id);
+        return {
+          notebookId,
+          notebookName: String(nb.notebook_name || '').trim() || 'Notebook',
+          notes: notesByNotebook.get(notebookId) || []
+        };
+      })
+    };
+  } finally {
+    backupCtx.db.close();
+  }
+}
+
+/**
+ * Extract plain vault zip → notebook/note title tree → cleanup staging.
+ * @param {Buffer|null} key vault AES key (env/icon); null when vault DB is plaintext
+ */
+export async function listTutaDriveBackupNotebookTreeFromZip(memberId, singlesId, zipFilePath, key) {
+  const staging = await extractTutaDriveMergeZip(memberId, singlesId, zipFilePath);
+  try {
+    return await listTutaDriveBackupNotebookTree(staging.mountPath, key);
+  } finally {
+    cleanupTutaDriveMergeStaging(staging.stagingRoot);
+  }
+}
+
 function readBackupBytes(mountPath, key, relativePath, kind = 'photo') {
   if (!relativePath) return null;
   const resolver = kind === 'file' ? resolveVaultFileStoragePath : resolveVaultPhotoStoragePath;
