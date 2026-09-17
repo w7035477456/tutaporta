@@ -78,7 +78,6 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { fetchTutaMallBackupStatus, postTutaMallBackupAll, postTutaMallRestoreAll } from 'api/tutaMallUserBackupFe';
 import { themedConfirm, themedAlert } from 'utils/themedDialog';
-import { tutaNotesFormatPostLoginButtonSx } from 'views/dashboard/recordVault/tutaNotesPostLoginActionButtonSx';
 import { guestDemoBlockProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 
 const PROFILE_MENU_PANEL_WIDTH_RATIO = 0.35;
@@ -115,6 +114,30 @@ function formatTutaMallBackupManifestDate(createdAt) {
     }).format(d);
   } catch {
     return d.toLocaleString();
+  }
+}
+
+/** Button label pieces from manifest.createdAt → "Sep 17, 2026" + "7:28:00 PM". */
+function formatTutaMallBackupManifestDateTimeParts(createdAt) {
+  const raw = String(createdAt || '').trim();
+  if (!raw) return { datePart: '', timePart: '' };
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return { datePart: raw, timePart: '' };
+  try {
+    return {
+      datePart: new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }).format(d),
+      timePart: new Intl.DateTimeFormat(undefined, {
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      }).format(d)
+    };
+  } catch {
+    return { datePart: d.toLocaleDateString(), timePart: d.toLocaleTimeString() };
   }
 }
 
@@ -267,6 +290,8 @@ export default function ProfileSection({ clusterTight = false }) {
   /** Site-wide font swap can take several seconds (theme + Google Font load). */
   const [mainFontBusy, setMainFontBusy] = useState(false);
   const [tutaMallBackupBusy, setTutaMallBackupBusy] = useState(false);
+  /** Latest server backup for Restore All button (null = not loaded yet). */
+  const [tutaMallBackupStatus, setTutaMallBackupStatus] = useState(null);
   const [menuPanelWidthPx, setMenuPanelWidthPx] = useState(() =>
     typeof window !== 'undefined' ? profileMenuPanelWidthPx(window.innerWidth) : PROFILE_MENU_PANEL_MIN_PX
   );
@@ -496,6 +521,13 @@ export default function ProfileSection({ clusterTight = false }) {
     fetchBuildLabel().then((label) => {
       if (!cancelled) setBuildLabel(label);
     });
+    fetchTutaMallBackupStatus()
+      .then((status) => {
+        if (!cancelled) setTutaMallBackupStatus(status || { exists: false });
+      })
+      .catch(() => {
+        if (!cancelled) setTutaMallBackupStatus({ exists: false });
+      });
     return () => {
       cancelled = true;
     };
@@ -514,6 +546,12 @@ export default function ProfileSection({ clusterTight = false }) {
     try {
       const result = await postTutaMallBackupAll();
       const location = formatTutaMallBackupLocation(result.backupDir);
+      setTutaMallBackupStatus({
+        exists: true,
+        email: result.email,
+        backupDir: result.backupDir,
+        manifest: result.manifest
+      });
       await themedAlert(
         `Backup All completed for ${result.email}.\n\n` +
           `${result.copied} folder(s) copied to server backup.\n` +
@@ -529,15 +567,21 @@ export default function ProfileSection({ clusterTight = false }) {
 
   const handleRestoreAll = async () => {
     if (guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy) return;
+    if (!tutaMallBackupStatus?.exists) {
+      await themedAlert('Unable Restore since you never made backup before');
+      return;
+    }
     closeProfileMenu();
     setTutaMallBackupBusy(true);
     try {
       const status = await fetchTutaMallBackupStatus();
       const hasBackup = Boolean(status?.exists && status?.manifest);
       if (!hasBackup) {
+        setTutaMallBackupStatus({ exists: false });
         await themedAlert('Unable Restore since you never made backup before');
         return;
       }
+      setTutaMallBackupStatus(status);
       const dated = formatTutaMallBackupManifestDate(status.manifest?.createdAt);
       const datedLine = dated
         ? `From cloud copy dated ${dated}`
@@ -686,9 +730,22 @@ export default function ProfileSection({ clusterTight = false }) {
   const backupAllLabel = backupRestoreEmail
     ? `Backup All apps of ${backupRestoreEmail}`
     : 'Backup All';
-  const restoreAllLabel = backupRestoreEmail
-    ? `Restore All apps of ${backupRestoreEmail}`
-    : 'Restore All';
+  const hasTutaMallBackup = Boolean(tutaMallBackupStatus?.exists && tutaMallBackupStatus?.manifest);
+  const restoreManifestParts = hasTutaMallBackup
+    ? formatTutaMallBackupManifestDateTimeParts(tutaMallBackupStatus.manifest?.createdAt)
+    : { datePart: '', timePart: '' };
+  const restoreAllLabel = (() => {
+    const base = backupRestoreEmail
+      ? `Restore All apps of ${backupRestoreEmail}`
+      : 'Restore All';
+    if (!hasTutaMallBackup || !restoreManifestParts.datePart) return base;
+    const timeBit = restoreManifestParts.timePart
+      ? ` time:${restoreManifestParts.timePart}`
+      : '';
+    return `${base} ${restoreManifestParts.datePart}${timeBit}`;
+  })();
+  const restoreAllDisabled =
+    guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy || !hasTutaMallBackup;
 
   return (
     <>
@@ -1312,10 +1369,7 @@ export default function ProfileSection({ clusterTight = false }) {
                         disabled={guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy}
                         onClick={() => void handleBackupAll()}
                         {...guestDemoBlockProps()}
-                        sx={{
-                          ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
-                          ...tutaNotesFormatPostLoginButtonSx
-                        }}
+                        sx={profileMenuButtonSx(false, profileMenuButtonLayoutSx)}
                       >
                         {backupAllLabel}
                       </Button>
@@ -1324,13 +1378,10 @@ export default function ProfileSection({ clusterTight = false }) {
                         fullWidth
                         disableElevation
                         disableRipple
-                        disabled={guestDemo || tourActive || tutaMallBackupBusy || mainFontBusy}
+                        disabled={restoreAllDisabled}
                         onClick={() => void handleRestoreAll()}
                         {...guestDemoBlockProps()}
-                        sx={{
-                          ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
-                          ...tutaNotesFormatPostLoginButtonSx
-                        }}
+                        sx={profileMenuButtonSx(false, profileMenuButtonLayoutSx)}
                       >
                         {restoreAllLabel}
                       </Button>
