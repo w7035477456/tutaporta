@@ -618,6 +618,15 @@ export default function ProfileSection({ clusterTight = false }) {
           `${result.restored} path(s) restored from ${location || result.backupDir}`,
         { highlightMessage: TUTA_MALL_RESTORE_REFRESH_HINT }
       );
+      try {
+        await flushRecordVaultSessionsOnLeave();
+        const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');
+        await flushPhotoAlbumsSessionsOnLeave();
+      } catch (flushErr) {
+        console.error(flushErr);
+      }
+      window.location.assign('/mall');
+      return;
     } catch (err) {
       const message = err?.response?.data?.error || err?.message || 'Restore failed';
       await themedAlert(message);
