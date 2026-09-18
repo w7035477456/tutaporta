@@ -18,6 +18,7 @@ export default function ThemedDialogHost() {
           type: req.type || 'alert',
           title: req.title || 'Notice',
           message: String(req.message ?? ''),
+          highlightMessage: req.highlightMessage ? String(req.highlightMessage) : '',
           defaultValue: req.defaultValue == null ? '' : String(req.defaultValue),
           okLabel: req.okLabel || 'OK',
           cancelLabel: req.cancelLabel || 'Cancel',
@@ -59,6 +60,25 @@ export default function ThemedDialogHost() {
             <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap', fontWeight: 700 }}>
               {dialog.message}
             </ColorTemplate16PopupCenterWide.BodyText>
+            {dialog.highlightMessage ? (
+              <Box
+                sx={{
+                  mt: 0.5,
+                  px: 1.5,
+                  py: 1.25,
+                  bgcolor: '#fff176',
+                  color: '#000',
+                  border: '2px solid rgba(0, 0, 0, 0.35)',
+                  borderRadius: 1
+                }}
+              >
+                <ColorTemplate16PopupCenterWide.BodyText
+                  sx={{ whiteSpace: 'pre-wrap', fontWeight: 700, color: 'inherit' }}
+                >
+                  {dialog.highlightMessage}
+                </ColorTemplate16PopupCenterWide.BodyText>
+              </Box>
+            ) : null}
             {isPrompt ? (
               <ColorTemplate16PopupCenterWide.Input
                 fullWidth

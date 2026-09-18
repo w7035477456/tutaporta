@@ -430,7 +430,9 @@ import { getPublicPrivateAlbum } from './routes/photos/getPublicPrivateAlbum.js'
 import {
   getTutaMallBackupStatus,
   postTutaMallBackupAll,
-  postTutaMallRestoreAll
+  postTutaMallBackupApp,
+  postTutaMallRestoreAll,
+  postTutaMallRestoreApp
 } from './routes/tutaMall/tutaMallUserBackupRoutes.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { enforceSingleLoginSession } from './middleware/enforceSingleLogin.js';
@@ -1735,7 +1737,9 @@ app.get('/api/settings/custom-logout-duration', requireAuth, getSettingsCustomLo
 app.put('/api/settings/custom-logout-duration', requireAuth, updateSettingsCustomLogoutDuration);
 app.get('/api/tutaMall/backup-status', requireAuth, getTutaMallBackupStatus);
 app.post('/api/tutaMall/backup-all', requireAuth, postTutaMallBackupAll);
+app.post('/api/tutaMall/backup', requireAuth, postTutaMallBackupApp);
 app.post('/api/tutaMall/restore-all', requireAuth, postTutaMallRestoreAll);
+app.post('/api/tutaMall/restore', requireAuth, postTutaMallRestoreApp);
 app.post('/api/settings/nickname', requireAuth, saveOnlineNickname);
 app.post('/api/settings/secretIcon', requireAuth, saveSecretIcon);
 app.post('/api/settings/secretIcon/verify', requireAuth, verifySecretIcon);

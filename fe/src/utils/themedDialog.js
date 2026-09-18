@@ -45,6 +45,7 @@ export function themedAlert(message, options = {}) {
   return requestDialog({
     type: 'alert',
     message: String(message ?? ''),
+    highlightMessage: options.highlightMessage ? String(options.highlightMessage) : '',
     title: options.title || 'Notice',
     okLabel: options.okLabel || 'OK'
   });
