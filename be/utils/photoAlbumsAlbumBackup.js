@@ -10,7 +10,7 @@ import {
   clearAlbumBackupProgress,
   setAlbumBackupProgress
 } from './photoAlbumsAlbumBackupProgress.js';
-import { flushDbToUsb, getVaultSession, vaultGetNote } from './photoAlbumsUsb/vaultSession.js';
+import { flushDbToUsb, getVaultSession, vaultGetNote, vaultGetTree } from './photoAlbumsUsb/vaultSession.js';
 import {
   VAULT_DIR_NAME,
   VAULT_FILES_DIR,
@@ -75,16 +75,34 @@ function collectAlbumDiskEntries(session, notebookId, noteId) {
   return entries;
 }
 
-function buildAlbumManifest(note, albumLabel) {
+function buildAlbumManifest(note, albumLabel, notebookName = '') {
+  const attachments = Array.isArray(note?.attachments)
+    ? note.attachments.map((a) => ({
+        file_name: a.file_name,
+        file_extension: a.file_extension,
+        relative_path: a.relative_path,
+        file_size_bytes: a.file_size_bytes,
+        checksum: a.checksum,
+        mime_type: a.mime_type,
+        display_order: a.display_order,
+        album_photo_seq: a.album_photo_seq,
+        source_taken_at_ms: a.source_taken_at_ms
+      }))
+    : [];
   return {
     version: 1,
     kind: 'photo_albums_album_backup',
     albumLabel: String(albumLabel || note.note_name || '').trim(),
     notebookId: Number(note.notebook_id),
     noteId: Number(note.note_id),
+    notebookName: String(notebookName || '').trim(),
     noteName: String(note.note_name || ''),
     bodyText: String(note.body_text || ''),
-    attachmentCount: Array.isArray(note.attachments) ? note.attachments.length : 0,
+    keywords: Array.isArray(note?.keywords)
+      ? note.keywords.map((k) => String(k).trim()).filter(Boolean)
+      : [],
+    attachments,
+    attachmentCount: attachments.length,
     createdAt: note.created_at || null,
     updatedAt: note.updated_at || null,
     exportedAt: new Date().toISOString()
@@ -150,6 +168,10 @@ export async function streamPhotoAlbumsAlbumBackupZip(
     throw new Error('Album does not belong to the selected album set');
   }
 
+  const tree = vaultGetTree(session);
+  const nb = tree.notebooks.find((row) => Number(row.notebook_id) === ids.notebookId);
+  const notebookName = String(nb?.notebook_name || '').trim();
+
   const resolvedLabel =
     String(albumLabel || note.note_name || '').trim() ||
     `Set ${ids.notebookId}/Album ${ids.noteId}`;
@@ -165,7 +187,7 @@ export async function streamPhotoAlbumsAlbumBackupZip(
   });
 
   let entries = collectAlbumDiskEntries(session, ids.notebookId, ids.noteId);
-  const manifest = buildAlbumManifest(note, resolvedLabel);
+  const manifest = buildAlbumManifest(note, resolvedLabel, notebookName);
   const manifestJson = Buffer.from(JSON.stringify(manifest, null, 2), 'utf8');
   entries.push({
     zipPath: 'album-backup.manifest.json',

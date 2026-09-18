@@ -1631,9 +1631,7 @@ export async function fetchPhotoAlbumsAccessStatus() {
     enabled: Boolean(data?.enabled),
     configured: Boolean(data?.configured),
     unlocked: Boolean(data?.unlocked),
-    hint: data?.hint ? String(data.hint) : null,
-    // SKIP_TUTAPHOTO_ENC from BE — TutaPhotoAlbums only (TutaNotes never skips).
-    skipPasswordCheck: Boolean(data?.skipPasswordCheck)
+    hint: data?.hint ? String(data.hint) : null
   };
 }
 
@@ -1692,7 +1690,7 @@ function mapVaultAccessFailStatus(data) {
     remainingSeconds: Math.max(0, Math.floor(Number(data?.remainingSeconds) || 0)),
     failedAttempts: Math.max(0, Math.floor(Number(data?.failedAttempts) || 0)),
     maxFailedAttempts: Math.max(1, Math.floor(Number(data?.maxFailedAttempts) || 5)),
-    lockoutSeconds: Math.max(0, Math.floor(Number(data?.lockoutSeconds) || 120)),
+    lockoutSeconds: Math.max(0, Math.floor(Number(data?.lockoutSeconds) || 180)),
     vaultFormatted: Boolean(data?.vaultFormatted),
     needsClientFormat: Boolean(data?.needsClientFormat),
     storageType: data?.storageType === 'usb' ? 'usb' : 'onedrive',
@@ -1714,11 +1712,16 @@ export async function fetchPhotoAlbumsAccessFailStatus(storageType = 'onedrive')
  * Record a client-side vault-password verify failure (password never sent).
  * On 5th fail: OneDrive is formatted server-side; USB returns needsClientFormat.
  */
-export async function recordPhotoAlbumsAccessFail({ storageType = 'onedrive', mountPath } = {}) {
+export async function recordPhotoAlbumsAccessFail({
+  storageType = 'onedrive',
+  mountPath,
+  wrongPasswordKind
+} = {}) {
   try {
     const { data } = await api.post('/api/photoAlbums/access/fail', {
       storageType: storageType === 'usb' ? 'usb' : 'onedrive',
-      mountPath: mountPath || undefined
+      mountPath: mountPath || undefined,
+      wrongPasswordKind: wrongPasswordKind || undefined
     });
     return mapVaultAccessFailStatus(data);
   } catch (err) {

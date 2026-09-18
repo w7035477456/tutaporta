@@ -7,6 +7,9 @@ import { trackVaultTransferBytes } from '../photoAlbumsTransferTracking.js';
 import { VAULT_META_FILE } from '../photoAlbumsUsb/vaultPaths.js';
 import { getOneDriveVaultFolderName, upsertOneDriveFileAtPath, downloadOneDriveFile, listOneDriveChildren } from './oneDriveApi.js';
 import { getAccessTokenForSingles } from './oneDriveVaultSync.js';
+import { restorePhotoAlbumsAlbumBackupZipMerge } from '../photoAlbumsAlbumRestoreMerge.js';
+
+const ALBUM_MANIFEST_NAME = 'album-backup.manifest.json';
 
 async function downloadOneDriveTree(accessToken, folderId, localRoot) {
   fs.mkdirSync(localRoot, { recursive: true });
@@ -47,10 +50,26 @@ function resolveVaultRootFromExtractedDir(extractDir) {
   if (fs.existsSync(path.join(namedRoot, VAULT_META_FILE))) {
     return namedRoot;
   }
+  if (fs.existsSync(path.join(namedRoot, ALBUM_MANIFEST_NAME))) {
+    return namedRoot;
+  }
   if (fs.existsSync(path.join(extractDir, VAULT_META_FILE))) {
     return extractDir;
   }
-  throw new Error(`Backup zip must contain a ${folderName} folder with ${VAULT_META_FILE}`);
+  if (fs.existsSync(path.join(extractDir, ALBUM_MANIFEST_NAME))) {
+    return extractDir;
+  }
+  throw new Error(`Backup zip must contain a ${folderName} folder with ${VAULT_META_FILE} or ${ALBUM_MANIFEST_NAME}`);
+}
+
+function readAlbumBackupManifest(vaultRoot) {
+  const manifestPath = path.join(vaultRoot, ALBUM_MANIFEST_NAME);
+  if (!fs.existsSync(manifestPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 export function formatMyPhotoAlbumsBackupZipStamp(date = new Date()) {
@@ -134,6 +153,11 @@ export async function restoreOneDriveVaultFromZipFile(singlesId, zipFilePath) {
       .promise();
 
     const vaultRoot = resolveVaultRootFromExtractedDir(extractDir);
+    const albumManifest = readAlbumBackupManifest(vaultRoot);
+    if (albumManifest?.kind === 'photo_albums_album_backup') {
+      return restorePhotoAlbumsAlbumBackupZipMerge(singlesId, 'onedrive', zipFilePath);
+    }
+
     const relFiles = walkLocalFiles(vaultRoot);
     if (!relFiles.length) {
       throw new Error('Backup zip is empty');

@@ -8,7 +8,6 @@ import {
   clusterRedisSet
 } from './clusterRedisState.js';
 import { isVaultE2eYellow } from './photoAlbumsE2eYellowConfig.js';
-import { isSkipTutaPhotoEncEnabled } from './skipTutaPhotoEncConfig.js';
 
 const ACCESS_UNLOCK_PREFIX = 'v1:photo_albums:access_unlock:';
 const ACCESS_UNLOCK_TTL_SEC = 24 * 60 * 60;
@@ -64,16 +63,12 @@ export async function getVaultAccessStatus(singlesId) {
   const hint = normalizeVaultAccessHint(row?.photoalbums_access_password_hint);
   const enabled = Boolean(row?.photoalbums_access_password_enabled);
   const unlocked = await isVaultAccessUnlocked(id);
-  const skipPasswordCheck = isSkipTutaPhotoEncEnabled();
 
-  // SKIP_TUTAPHOTO_ENC=true → skip Full Disk Encryption for TutaPhotoAlbums only.
-  // TutaNotes (NOTES_*) never honors a skip flag — always encrypt.
   return {
-    enabled: skipPasswordCheck ? false : enabled,
+    enabled,
     configured: Boolean(hash),
-    unlocked: skipPasswordCheck ? true : unlocked,
-    hint: hint || null,
-    skipPasswordCheck
+    unlocked,
+    hint: hint || null
   };
 }
 
@@ -225,11 +220,6 @@ export async function requireVaultAccessSession(req, res) {
 
   // Yellow E2E: Encrypt Password / DEK live only in the browser tab — no server unlock session.
   if (isVaultE2eYellow()) {
-    return singlesId;
-  }
-
-  // Dev/ops: SKIP_TUTAPHOTO_ENC=true skips Encrypt Password for TutaPhotoAlbums only.
-  if (isSkipTutaPhotoEncEnabled()) {
     return singlesId;
   }
 

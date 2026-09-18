@@ -233,9 +233,19 @@ export default function PhotoAlbumsOneDriveBackupDialog({
     try {
       const result = await restorePhotoAlbumsOneDriveBackupZip(file);
       const count = Number(result?.restoredFiles) || 0;
-      setSuccess(
-        `Restored ${count} file${count === 1 ? '' : 's'} to OneDrive (${folderName}). Open MyPhotoAlbums again with your Encrypt Password to load the restored notes.`
-      );
+      if (result?.merged) {
+        const setName = String(result.notebookName || '').trim();
+        const albumName = String(result.albumName || '').trim();
+        const label =
+          setName && albumName ? `'${setName}' / '${albumName}'` : folderName;
+        setSuccess(
+          `Merged ${count} file${count === 1 ? '' : 's'} from zip into ${label}. Refresh the album list to see the restored album.`
+        );
+      } else {
+        setSuccess(
+          `Restored ${count} file${count === 1 ? '' : 's'} to OneDrive (${folderName}). Open MyPhotoAlbums again with your Encrypt Password to load the restored notes.`
+        );
+      }
       setSuccessTone('general');
       refreshVaultTree();
       await onRestored?.(result);
@@ -249,7 +259,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
   const handleFormat = async () => {
     if (busy) return;
     const ok = await themedConfirm(
-      `Format ${folderName}?\n\nThis deletes the existing OneDrive MyPhotoAlbums folder and creates a fresh blank vault. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
+      `Format/Clear Entire TutaPhotoAlbums Cloud?\n\nThis deletes the existing OneDrive MyPhotoAlbums folder and creates a fresh blank vault. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current albums.`
     );
     if (!ok) return;
 
@@ -302,16 +312,16 @@ export default function PhotoAlbumsOneDriveBackupDialog({
         </ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body spacing={2} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
-            Backup saves only the photo album you currently have open
-            {albumLabel ? ` ('${albumLabel}')` : ''} to a zip file in your browser download folder. Restore can
-            overwrite OneDrive from a backup zip.
+            Backup and download zip saves only the photo album you currently have open
+            {albumLabel ? ` ('${albumLabel}')` : ''} to a zip file in your browser download folder. Upload and Restore
+            from zip merges that album into your cloud vault (album set / album names get _2, _3, … if needed).
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
-            If you do not want to store your data on OneDrive, before you select the &quot;Format TutaPhotoAlbums Cloud&quot;
-            button below, backup your open album first to a zip file on your storage. Once you have done that, you may use
-            Format TutaPhotoAlbums Cloud to delete your online data. Later, when you decide to restore your backup to
-            OneDrive, choose Restore TutaPhotoAlbums Cloud below.
+            If you do not want to store your data on OneDrive, before you select &quot;Format/Clear Entire
+            TutaPhotoAlbums Cloud&quot; below, use Backup and download zip first. Once you have done that, you may format
+            to delete your online data. Later, use Upload and Restore from zip to merge a backup zip back into your
+            vault.
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -325,7 +335,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 sx={backupOrangeButtonSx}
                 {...guestDemoBlockProps()}
               >
-                Backup Current Album
+                Backup and download zip
               </GreenButton>
               <GreenButton
                 type="button"
@@ -334,7 +344,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 sx={formatRedButtonSx}
                 {...guestDemoBlockProps()}
               >
-                Format TutaPhotoAlbums Cloud
+                Format/Clear Entire TutaPhotoAlbums Cloud
               </GreenButton>
               <GreenButton
                 type="button"
@@ -343,15 +353,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 sx={restoreYellowButtonSx}
                 {...guestDemoBlockProps()}
               >
-                Restore TutaPhotoAlbums Cloud
-              </GreenButton>
-              <GreenButton
-                type="button"
-                disabled={busy}
-                onClick={() => onOpenMyPhotoAlbums?.()}
-                sx={actionButtonSx}
-              >
-                Open TutaPhotoAlbums Cloud
+                Upload and Restore from zip
               </GreenButton>
             </Box>
           </Stack>

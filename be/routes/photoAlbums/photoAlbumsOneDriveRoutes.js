@@ -682,6 +682,9 @@ export async function restorePhotoAlbumsOneDriveBackupZip(req, res) {
   try {
     upload = await parseOneDriveBackupZipUpload(req);
     const result = await restoreOneDriveVaultFromZipFile(singlesId, upload.zipPath);
+    if (result?.merged) {
+      return res.json({ success: true, ...result, requiresReunlock: false });
+    }
     if (getVaultSession(singlesId, 'onedrive')) {
       await discardVaultSessionWithoutCloudSync(singlesId, 'onedrive');
     }

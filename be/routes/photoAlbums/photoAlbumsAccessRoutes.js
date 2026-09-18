@@ -10,6 +10,8 @@ import {
 import {
   clearVaultAccessFailStatus,
   getVaultAccessFailStatus,
+  PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR,
+  PHOTO_ALBUMS_WRONG_PASSWORD_ERROR,
   photoAlbumsAccessFail
 } from '../../utils/photoAlbumsAccessFailGuard.js';
 
@@ -167,8 +169,12 @@ export async function postPhotoAlbumsAccessFail(req, res) {
   if (!singlesId) return;
 
   try {
-    const mountPath = req.body?.mountPath ?? req.body?.mount_path ?? '';
-    const status = await photoAlbumsAccessFail(singlesId, readStorageType(req), { mountPath });
+    const wrongPasswordKind = String(req.body?.wrongPasswordKind ?? '').trim().toLowerCase();
+    const wrongPasswordError =
+      wrongPasswordKind === 'current'
+        ? PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR
+        : PHOTO_ALBUMS_WRONG_PASSWORD_ERROR;
+    const status = await photoAlbumsAccessFail(singlesId, readStorageType(req), { wrongPasswordError });
     const httpStatus = status.vaultFormatted || status.needsClientFormat ? 403 : status.locked ? 429 : 401;
     return res.status(httpStatus).json(status);
   } catch (err) {
