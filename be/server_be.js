@@ -253,6 +253,7 @@ import {
   unlockRecordVaultTutaDrive
 } from './routes/recordVault/recordVaultTutaDriveRoutes.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
+import { getRecordVaultRagConfig } from './utils/recordVaultRagConfig.js';
 import { isIncludeUsbDmgExeEnabled } from './utils/includeUsbDmgExeConfig.js';
 import { getRecordVaultStorageConfig, logoffRecordVaultStorage } from './routes/recordVault/recordVaultStorageRoutes.js';
 import { downloadRecordVaultBridgeInstaller } from './routes/recordVault/recordVaultBridgeInstaller.js';
@@ -1141,7 +1142,8 @@ app.get('/api/publicConfig', (_req, res) => {
     leftSide: getLeftSideMode(),
     tutaDrive: isLeftSideTutaDrive(),
     rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
-    includeUsbDmgExe: isIncludeUsbDmgExeEnabled()
+    includeUsbDmgExe: isIncludeUsbDmgExeEnabled(),
+    ragUiEnabled: getRecordVaultRagConfig().ragUiEnabled
   });
 });
 
