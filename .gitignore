@@ -31,9 +31,6 @@ scripts/deploy-hosts.txt
 # USB bridge installer binaries (served by BE download API)
 be/usb/
 
-# USB bridge installer zips (publish via scripts/sync-usb-bridge-installers.sh)
-usbzip/*.zip
-
 # Python RAG microservice local venv
 rag_service/.venv/
 

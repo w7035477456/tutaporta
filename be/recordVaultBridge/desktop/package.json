@@ -61,7 +61,7 @@
       "category": "public.app-category.utilities",
       "artifactName": "usbBridgeV3.${ext}",
       "target": [
-        "zip"
+        "dmg"
       ],
       "icon": "assets/icon.png",
       "hardenedRuntime": true,

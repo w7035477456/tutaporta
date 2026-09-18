@@ -1,4 +1,0 @@
-# Installer zips are NOT in git (GitHub rejects >100MB; LFS breaks Ubuntu without git-lfs).
-# Build on Mac: usball → $USB_DMG_EXE (+ local usbzip/)
-# Publish to Ubuntu storage: scripts/sync-usb-bridge-installers.sh
-*.zip

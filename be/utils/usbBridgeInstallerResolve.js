@@ -1,9 +1,5 @@
 /**
  * Resolve USB Bridge installer files under USB_DMG_EXE (storage), not git.
- *
- * Long-term: build on Mac (`usball` → copy-installers-to-usb.mjs), then
- * `scripts/sync-usb-bridge-installers.sh` to Ubuntu USB_DMG_EXE.
- * Never serve Git LFS pointer stubs checked out without `git lfs pull`.
  */
 import fs from 'fs';
 import path from 'path';
@@ -15,14 +11,14 @@ export const USB_BRIDGE_LEGACY_USB_DIR = path.resolve(__dirname, '..', 'usb');
 
 export const USB_BRIDGE_INSTALLERS = {
   mac: {
-    fileName: 'usbBridgeV3-mac.zip',
-    alternateFileNames: ['usbBridgeV3.zip', 'usbBridgeV3.dmg'],
-    contentType: 'application/zip'
+    fileName: 'usbBridgeV3.dmg',
+    alternateFileNames: ['usbBridgeV3-mac.zip', 'usbBridgeV3.zip'],
+    contentType: 'application/x-apple-diskimage'
   },
   win: {
-    fileName: 'usbBridgeV3-win.zip',
-    alternateFileNames: ['usbBridgeV3.exe'],
-    contentType: 'application/zip'
+    fileName: 'usbBridgeV3.exe',
+    alternateFileNames: ['usbBridgeV3-win.zip'],
+    contentType: 'application/octet-stream'
   }
 };
 
@@ -81,10 +77,6 @@ export function isZipArchiveFile(filePath) {
   }
 }
 
-/**
- * Reject LFS stubs and non-zip files when the expected artifact is a .zip.
- * Legacy .dmg / .exe alternates only need to exist and not be LFS pointers.
- */
 export function isUsableInstallerFile(filePath) {
   if (!filePath || !fs.existsSync(filePath)) return false;
   if (isGitLfsPointerFile(filePath)) return false;
@@ -167,7 +159,6 @@ export function usbBridgeInstallerMissingMessage(platform) {
   const name = meta?.fileName || 'installer';
   return (
     `USB Bridge installer not available on this server (${name}). ` +
-    `Expected a real zip under ${expectedDir} (not a Git LFS pointer). ` +
-    `On Mac: usball, then scripts/sync-usb-bridge-installers.sh`
+    `Place the built installer under ${expectedDir}.`
   );
 }

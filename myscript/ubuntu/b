@@ -296,8 +296,7 @@ alias redisping="redis-cli -a 'w2332w2332' ping"
 alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-server; pm2 restart onlinemallwebsite'
 
 
-alias lszip='ls  ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE'
-alias clearzip='rm -rf  ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE/*;lsusb'
+alias lsusbbridge='ls -lah ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE'
 
 alias updateubuntu='sudo apt update && sudo apt upgrade -y'
 
@@ -2114,37 +2113,6 @@ deployartifactverify() {
 #alias febedev='check_pg && (savedir; pm2 flush; cleancompilebuildfedev; cleancompileresetrunbedev)'
 #alias bedev='check_pg && (savedir; pm2 flush; cleancompileresetrunbedev)'
 
-# Copy repo usbzip/*.zip → $USB_DMG_EXE ($STORAGE_FOLDER/USB_DMG_EXE). Customer downloads.
-publishusbzip() {
-  local root="$HOME/code/main"
-  local script="$root/scripts/publish-usbzip-to-storage.sh"
-  cd "$root" || return 1
-  if [[ ! -f "$script" ]]; then
-    echo "[publishusbzip] missing $script — pull branch that has scripts/publish-usbzip-to-storage.sh" >&2
-    return 1
-  fi
-  chmod +x "$script" 2>/dev/null || true
-  # Copies usbzip/*.zip → $USB_DMG_EXE; refuses Git LFS pointer stubs.
-  bash "$script" || return 1
-  local dest="${USB_DMG_EXE:-}"
-  if [[ -z "$dest" && -f "$HOME/.ssh/be/.env" ]]; then
-    dest="$(grep -E "^USB_DMG_EXE=" "$HOME/.ssh/be/.env" | head -1 | cut -d= -f2- | tr -d "\"" | sed "s|#.*||;s/[[:space:]]*$//")"
-    local sf
-    sf="$(grep -E "^STORAGE_FOLDER=" "$HOME/.ssh/be/.env" | head -1 | cut -d= -f2- | tr -d "\"" | sed "s|#.*||;s/[[:space:]]*$//")"
-    dest="${dest//\$\{STORAGE_FOLDER\}/$sf}"
-    dest="${dest//\$STORAGE_FOLDER/$sf}"
-  fi
-  dest="${dest%/}"
-  if [[ -z "$dest" ]]; then
-    dest="${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE"
-  fi
-  echo "[publishusbzip] verify $dest:"
-  ls -lh "$dest"/usbBridgeV3-*.zip 2>&1 || {
-    echo "[publishusbzip] ERROR: no zip in $dest after publish" >&2
-    return 1
-  }
-}
-
 # Verbose fail-fast deploy: stop before BE if FE dist missing (used by work2 / work2_deploy).
 febeprod() {
 	go
@@ -2160,27 +2128,22 @@ febeprod() {
     check_pg || return 1
     savedir
     pm2 flush
-    echo "=== febeprod 1/6: cleancompilebuildfeprod (must create fe/dist) ==="
+    echo "=== febeprod 1/5: cleancompilebuildfeprod (must create fe/dist) ==="
     if ! cleancompilebuildfeprod; then
         echo "ERROR: febeprod aborted — FE dist/build failed; refusing BE/PM2 deploy" >&2
         return 1
     fi
-    echo "=== febeprod 2/6: cleancompileresetrunbeprod ==="
+    echo "=== febeprod 2/5: cleancompileresetrunbeprod ==="
     if ! cleancompileresetrunbeprod; then
         echo "ERROR: febeprod aborted — BE/PM2 start failed" >&2
         return 1
     fi
-    echo "=== febeprod 3/6: deployartifactwrite ==="
+    echo "=== febeprod 3/5: deployartifactwrite ==="
     deployartifactwrite || { echo "ERROR: deployartifactwrite failed" >&2; return 1; }
-    echo "=== febeprod 4/6: deployartifactverify ==="
+    echo "=== febeprod 4/5: deployartifactverify ==="
     deployartifactverify || { echo "ERROR: deployartifactverify failed" >&2; return 1; }
-    echo "=== febeprod 5/6: pm2restart ==="
+    echo "=== febeprod 5/5: pm2restart ==="
     pm2restart || { echo "ERROR: pm2restart failed" >&2; return 1; }
-    echo "=== febeprod 6/6: publishusbzip (usbzip → $USB_DMG_EXE / STORAGE) ==="
-    if ! publishusbzip; then
-        echo "ERROR: febeprod aborted — publishusbzip failed (usbzip must contain real PK zips, not Git LFS pointers)" >&2
-        return 1
-    fi
     echo "=== febeprod OK ==="
     return 0
 }
@@ -2319,9 +2282,6 @@ work2() {
         return 1
     fi
 
-    echo "=== work2: git lfs pull usbzip (real installer zips) ==="
-    git lfs pull --include="usbzip/**" 2>/dev/null || git lfs pull 2>/dev/null || true
-
     # Obfuscate? Y/enter → buildprod; n → buildprodnoobfuscate
     read -p "Do you want Obfuscate (Y/n)? " OBFUSCATE_CHOICE
     local obf_lower
@@ -2420,9 +2380,7 @@ work2_deploy() {
     echo -e "_______________________________________\n"
     savedir 2>/dev/null || export LAST_CD_INPUT="$HOME/code/main"
     echo "=== work2_deploy: febeprod (FE build must produce fe/dist before BE) ==="
-        echo "=== work2_deploy: git lfs pull usbzip ==="
-    git lfs pull --include="usbzip/**" 2>/dev/null || git lfs pull 2>/dev/null || true
-if ! febeprod; then
+    if ! febeprod; then
         echo "ERROR: work2_deploy aborted — febeprod failed (see FE dist / build errors above)" >&2
         return 1
     fi

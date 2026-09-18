@@ -2,11 +2,10 @@
  * Copy packaged USB bridge installers for website download.
  * Prefer USB_DMG_EXE from env / ~/.ssh/be/.env; fallback be/usb/.
  *
- * Publishes platform zips (unsigned-friendly Mac distribution):
- *   usbBridgeV3-mac.zip  — from electron-builder Mac zip (contains .app)
- *   usbBridgeV3-win.zip  — wraps usbBridgeV3.exe
+ * Copies electron-builder artifacts as-is (no zip repackaging):
+ *   usbBridgeV3.dmg  — Mac
+ *   usbBridgeV3.exe  — Windows (NSIS)
  */
-import { execFileSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -73,10 +72,8 @@ expandUsbDmgExeEnv();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const desktopDir = path.resolve(__dirname, '..');
 const beRoot = path.resolve(desktopDir, '..', '..');
-const repoRoot = path.resolve(beRoot, '..');
 const distDir = path.join(desktopDir, 'dist');
 const legacyUsbDir = path.join(beRoot, 'usb');
-const repoUsbzipDir = path.join(repoRoot, 'usbzip');
 
 function resolveDestDir() {
   const fromEnv = String(process.env.USB_DMG_EXE || '')
@@ -94,108 +91,29 @@ function copyFile(src, dest) {
   console.log(`[copy-installers-to-usb] ${src} -> ${dest}`);
 }
 
-/** Also stage into repo usbzip/ for git commit + Ubuntu work2 publish. */
-function mirrorToRepoUsbzip(filePath) {
-  if (!filePath || !fs.existsSync(filePath)) return;
-  ensureDir(repoUsbzipDir);
-  const dest = path.join(repoUsbzipDir, path.basename(filePath));
-  fs.copyFileSync(filePath, dest);
-  console.log(`[copy-installers-to-usb] mirrored -> ${dest} (commit this for Ubuntu work2)`);
-}
-
-/** electron-builder Mac zip → usbBridgeV3-mac.zip (+ Open .command for Gatekeeper). */
-function publishMacZip(destDir) {
-  const candidates = [
-    path.join(distDir, 'usbBridgeV3.zip'),
-    path.join(distDir, 'usbBridgeV3-mac.zip')
-  ];
-  const src = candidates.find((p) => fs.existsSync(p));
-  if (!src) {
-    console.log('[copy-installers-to-usb] skip (not built): Mac zip');
+function publishMacDmg(destDir) {
+  const src = path.join(distDir, 'usbBridgeV3.dmg');
+  if (!fs.existsSync(src)) {
+    console.log('[copy-installers-to-usb] skip (not built): usbBridgeV3.dmg');
     return false;
   }
-
-  const dest = path.join(destDir, 'usbBridgeV3-mac.zip');
-  const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'usbBridgeV3-mac-'));
-  try {
-    execFileSync('unzip', ['-o', '-q', src, '-d', stagingRoot], { stdio: 'inherit' });
-    const appPath = path.join(stagingRoot, 'usbBridgeV3.app');
-    if (!fs.existsSync(appPath)) {
-      console.error('[copy-installers-to-usb] Mac zip missing usbBridgeV3.app after unzip');
-      return false;
-    }
-
-    // End-user Mac zip: instructions + .command opener (webloc x-apple.* URLs fail on Sequoia).
-    const macEndUserDir = path.join(__dirname, '..', 'mac-end-user');
-    const startHereName = '1-START-HERE-Read-Me-First.txt';
-    const privacyOpenName = '2-Open-Privacy-Settings.command';
-    const startHereSrc = path.join(macEndUserDir, startHereName);
-    const privacyOpenSrc = path.join(macEndUserDir, privacyOpenName);
-    if (!fs.existsSync(startHereSrc) || !fs.existsSync(privacyOpenSrc)) {
-      console.error(
-        '[copy-installers-to-usb] missing mac-end-user instructions:',
-        startHereSrc,
-        privacyOpenSrc
-      );
-      return false;
-    }
-    fs.copyFileSync(startHereSrc, path.join(stagingRoot, startHereName));
-    const privacyOpenDest = path.join(stagingRoot, privacyOpenName);
-    fs.copyFileSync(privacyOpenSrc, privacyOpenDest);
-    fs.chmodSync(privacyOpenDest, 0o755);
-
-    if (fs.existsSync(dest)) fs.unlinkSync(dest);
-    execFileSync(
-      'zip',
-      ['-r', '-q', '-y', dest, 'usbBridgeV3.app', startHereName, privacyOpenName],
-      {
-        cwd: stagingRoot,
-        stdio: 'inherit'
-      }
-    );
-    console.log(
-      `[copy-installers-to-usb] ${src} -> ${dest} (with ${startHereName} + ${privacyOpenName})`
-    );
-    mirrorToRepoUsbzip(dest);
-    return true;
-  } catch (err) {
-    console.error(
-      '[copy-installers-to-usb] failed to publish Mac zip with Open .command:',
-      err?.message || err
-    );
-    return false;
-  } finally {
-    fs.rmSync(stagingRoot, { recursive: true, force: true });
-  }
+  copyFile(src, path.join(destDir, 'usbBridgeV3.dmg'));
+  return true;
 }
 
-/** Wrap NSIS usbBridgeV3.exe in usbBridgeV3-win.zip */
-function publishWinZip(destDir) {
-  const exeSrc = path.join(distDir, 'usbBridgeV3.exe');
-  if (!fs.existsSync(exeSrc)) {
+function publishWinExe(destDir) {
+  const src = path.join(distDir, 'usbBridgeV3.exe');
+  if (!fs.existsSync(src)) {
     console.log('[copy-installers-to-usb] skip (not built): usbBridgeV3.exe');
     return false;
   }
-  const destZip = path.join(destDir, 'usbBridgeV3-win.zip');
-  const stagingZip = path.join(distDir, 'usbBridgeV3-win.zip');
-  try {
-    if (fs.existsSync(stagingZip)) fs.unlinkSync(stagingZip);
-    execFileSync('zip', ['-j', '-q', stagingZip, exeSrc], { stdio: 'inherit' });
-  } catch (err) {
-    console.error(
-      '[copy-installers-to-usb] failed to zip Windows exe (need `zip` on PATH):',
-      err?.message || err
-    );
-    return false;
-  }
-  copyFile(stagingZip, destZip);
-  mirrorToRepoUsbzip(destZip);
+  copyFile(src, path.join(destDir, 'usbBridgeV3.exe'));
   return true;
 }
 
 const destDir = resolveDestDir();
 ensureDir(destDir);
-const copied = [publishMacZip(destDir), publishWinZip(destDir)].filter(Boolean);
+const copied = [publishMacDmg(destDir), publishWinExe(destDir)].filter(Boolean);
 if (copied.length === 0) {
   console.warn(
     '[copy-installers-to-usb] no installers found in dist/ — run dist:mac or dist:win first'

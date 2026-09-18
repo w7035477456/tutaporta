@@ -885,7 +885,7 @@ export async function downloadUsbBridgeInstaller(platform = 'mac') {
   try {
     const response = await api.get(apiPath, { responseType: 'blob' });
     const blob = response.data;
-    const defaultName = platform === 'win' ? 'usbBridgeV3-win.zip' : 'usbBridgeV3-mac.zip';
+    const defaultName = platform === 'win' ? 'usbBridgeV3.exe' : 'usbBridgeV3.dmg';
     let filename = defaultName;
     const disposition = String(response.headers?.['content-disposition'] || '');
     const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
