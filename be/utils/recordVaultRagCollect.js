@@ -1,5 +1,5 @@
 import { vaultGetNote, vaultGetNoteAttachment } from './recordVaultUsb/vaultSession.js';
-import { recordVaultHtmlToPlainText } from './recordVaultHtmlToText.js';
+import { expandRecordVaultBodyTextForSearch } from './recordVaultSearch.js';
 
 /**
  * Load note bodies + attachment bytes for RAG. Skips missing notes; rejects inner-encrypted notes.
@@ -47,7 +47,8 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
     notes.push({
       note_id: Number(note.note_id),
       title: String(note.note_name || `Note ${note.note_id}`),
-      text_content: recordVaultHtmlToPlainText(note.body_text || ''),
+      // Match editor/search: unwrap v2 segmented bodies and strip HTML tags.
+      text_content: expandRecordVaultBodyTextForSearch(note.body_text || ''),
       attachments
     });
   }

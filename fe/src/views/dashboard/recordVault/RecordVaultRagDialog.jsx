@@ -12,13 +12,33 @@ import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { fetchRecordVaultRagStatus, queryRecordVaultRag, readRecordVaultApiError } from 'api/recordVaultFe';
 import { tutaNotesPostLoginActionButtonSx } from './tutaNotesPostLoginActionButtonSx';
 
+const THEME_DAYNIGHT = 'var(--theme-daynight-color)';
+const THEME_INVERSE_DAYNIGHT = 'var(--theme-inverse-daynight-color)';
+
+const popupContentBleedSx = {
+  mx: { xs: -1, sm: -2 },
+  px: { xs: 1, sm: 2 }
+};
+
+const ragHeaderSx = {
+  ...popupContentBleedSx,
+  bgcolor: THEME_INVERSE_DAYNIGHT,
+  color: THEME_DAYNIGHT,
+  mt: { xs: -1.5, sm: -2 },
+  py: 1,
+  mb: 0.5,
+  textAlign: 'center',
+  fontWeight: 700,
+  flexShrink: 0
+};
+
 const scrollableAnswerBoxSx = {
   px: 1.5,
   py: 1.25,
   borderRadius: 1,
   border: '2px solid #000',
-  bgcolor: '#fff',
-  color: '#000',
+  bgcolor: THEME_DAYNIGHT,
+  color: THEME_INVERSE_DAYNIGHT,
   flex: '1 1 auto',
   minHeight: 120,
   maxHeight: '100%',
@@ -35,8 +55,17 @@ const scrollableAnswerBoxSx = {
 const promptFieldSx = {
   flexShrink: 0,
   '& .MuiInputBase-root': {
-    bgcolor: '#fff',
-    color: '#000'
+    bgcolor: THEME_DAYNIGHT,
+    color: THEME_INVERSE_DAYNIGHT
+  },
+  '& .MuiInputBase-input': {
+    color: `${THEME_INVERSE_DAYNIGHT} !important`,
+    WebkitTextFillColor: `${THEME_INVERSE_DAYNIGHT} !important`
+  },
+  '& .MuiInputBase-input::placeholder': {
+    color: `${THEME_INVERSE_DAYNIGHT} !important`,
+    WebkitTextFillColor: `${THEME_INVERSE_DAYNIGHT} !important`,
+    opacity: 0.55
   }
 };
 
@@ -52,6 +81,28 @@ const dialogButtonSx = {
   fontSize: { xs: '0.9rem', sm: '1rem' }
 };
 
+const footerSectionSx = {
+  ...popupContentBleedSx,
+  flexShrink: 0,
+  bgcolor: THEME_INVERSE_DAYNIGHT,
+  color: THEME_DAYNIGHT,
+  mb: { xs: -1.5, sm: -1.5 },
+  pt: 1,
+  pb: 0.5,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.75,
+  width: '100%',
+  boxSizing: 'border-box'
+};
+
+const footerMetaSx = {
+  color: THEME_DAYNIGHT,
+  flexShrink: 0,
+  lineHeight: 1.35,
+  textAlign: 'center'
+};
+
 const footerRowSx = {
   flexShrink: 0,
   display: 'flex',
@@ -60,8 +111,6 @@ const footerRowSx = {
   justifyContent: 'center',
   alignItems: 'center',
   gap: 1,
-  pt: 1,
-  pb: 0.5,
   px: 0.5,
   width: '100%',
   boxSizing: 'border-box'
@@ -217,7 +266,9 @@ export default function RecordVaultRagDialog({
       }}
     >
       <BusyHourglassOverlay open={busy} size={BUSY_HOURGLASS_MODAL_SIZE} />
-      <ColorTemplate16PopupCenterWide.Title>RAG — Ask your notes</ColorTemplate16PopupCenterWide.Title>
+      <ColorTemplate16PopupCenterWide.Title sx={ragHeaderSx}>
+        RAG — Ask your notes
+      </ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body
         spacing={1.25}
         sx={{
@@ -309,26 +360,6 @@ export default function RecordVaultRagDialog({
                     {currentEntry.prompt}
                   </Box>
                   <Box sx={scrollableAnswerBoxSx}>{currentEntry.answer || '(empty answer)'}</Box>
-                  {Number.isFinite(currentEntry.elapsedMs) ||
-                  Number.isFinite(currentEntry.modelLoadMs) ||
-                  currentEntry.sourceNotes?.length ||
-                  currentEntry.model ? (
-                    <Typography
-                      variant="caption"
-                      sx={{ color: 'rgba(255,255,255,0.85)', flexShrink: 0, lineHeight: 1.35 }}
-                    >
-                      {Number.isFinite(currentEntry.modelLoadMs)
-                        ? `Time to load model: ${formatRagModelLoadTime(currentEntry.modelLoadMs)}`
-                        : null}
-                      {Number.isFinite(currentEntry.elapsedMs)
-                        ? `${Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Total time: ${formatRagElapsed(currentEntry.elapsedMs)}`
-                        : null}
-                      {currentEntry.sourceNotes?.length
-                        ? `${Number.isFinite(currentEntry.elapsedMs) || Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Sources: ${currentEntry.sourceNotes.join(', ')}`
-                        : null}
-                      {currentEntry.model ? ` · model: ${currentEntry.model}` : ''}
-                    </Typography>
-                  ) : null}
                 </>
               ) : null}
             </>
@@ -342,25 +373,45 @@ export default function RecordVaultRagDialog({
               Processing and retrieving answer… {formatRagElapsed(liveElapsedMs)}
             </Typography>
           ) : (
-            <Box sx={{ ...scrollableAnswerBoxSx, color: '#666', fontStyle: 'italic' }}>
+            <Box sx={{ ...scrollableAnswerBoxSx, opacity: 0.72, fontStyle: 'italic' }}>
               Answers appear here after you ask a question. Only notes with the RAG checkbox checked are
               included.
             </Box>
           )}
         </Stack>
 
-        <Box sx={footerRowSx}>
-          <GreenButton
-            type="button"
-            disabled={disabled || busy || !prompt.trim() || !noteCount}
-            onClick={() => void handleAsk()}
-            sx={dialogButtonSx}
-          >
-            {busy ? 'Thinking…' : 'Ask'}
-          </GreenButton>
-          <GreenButton type="button" disabled={busy} onClick={handleClose} sx={dialogButtonSx}>
-            Close
-          </GreenButton>
+        <Box sx={footerSectionSx}>
+          {currentEntry &&
+          (Number.isFinite(currentEntry.elapsedMs) ||
+            Number.isFinite(currentEntry.modelLoadMs) ||
+            currentEntry.sourceNotes?.length ||
+            currentEntry.model) ? (
+            <Typography variant="caption" sx={footerMetaSx}>
+              {Number.isFinite(currentEntry.modelLoadMs)
+                ? `Time to load model: ${formatRagModelLoadTime(currentEntry.modelLoadMs)}`
+                : null}
+              {Number.isFinite(currentEntry.elapsedMs)
+                ? `${Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Total time: ${formatRagElapsed(currentEntry.elapsedMs)}`
+                : null}
+              {currentEntry.sourceNotes?.length
+                ? `${Number.isFinite(currentEntry.elapsedMs) || Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Sources: ${currentEntry.sourceNotes.join(', ')}`
+                : null}
+              {currentEntry.model ? ` · model: ${currentEntry.model}` : ''}
+            </Typography>
+          ) : null}
+          <Box sx={footerRowSx}>
+            <GreenButton
+              type="button"
+              disabled={disabled || busy || !prompt.trim() || !noteCount}
+              onClick={() => void handleAsk()}
+              sx={dialogButtonSx}
+            >
+              {busy ? 'Thinking…' : 'Ask'}
+            </GreenButton>
+            <GreenButton type="button" disabled={busy} onClick={handleClose} sx={dialogButtonSx}>
+              Close
+            </GreenButton>
+          </Box>
         </Box>
       </ColorTemplate16PopupCenterWide.Body>
     </ColorTemplate16PopupCenterWide>

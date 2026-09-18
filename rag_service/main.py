@@ -28,6 +28,13 @@ OLLAMA_KEEP_ALIVE_PINNED = os.environ.get("OLLAMA_KEEP_ALIVE_PINNED", "-1")
 CHUNK_SIZE = int(os.environ.get("RAG_CHUNK_SIZE", "900"))
 CHUNK_OVERLAP = int(os.environ.get("RAG_CHUNK_OVERLAP", "150"))
 TOP_K = int(os.environ.get("RAG_TOP_K", "10"))
+BODY_CHUNK_SCORE_BOOST = float(os.environ.get("RAG_BODY_CHUNK_SCORE_BOOST", "4"))
+JUNK_TEXT_MARKERS = (
+    "Service Update | OnlineMall",
+    "We're Fine-Tuning Things",
+    "OnlineMall.Website",
+    "support@onlinemall.website",
+)
 
 app = FastAPI(title="TutaNotes RAG Service", version="1.0.0")
 
@@ -71,11 +78,17 @@ def _strip_html(text: str) -> str:
     return cleaned.strip()
 
 
-def _extract_pdf_text(content_base64: str) -> str:
-    if not content_base64:
+def _is_junk_text(text: str) -> bool:
+    hay = (text or "").strip()
+    if not hay:
+        return True
+    return any(marker.lower() in hay.lower() for marker in JUNK_TEXT_MARKERS)
+
+
+def _extract_pdf_text_from_bytes(raw: bytes) -> str:
+    if not raw:
         return ""
     try:
-        raw = base64.b64decode(content_base64)
         reader = PdfReader(io.BytesIO(raw))
         parts: list[str] = []
         for page in reader.pages:
@@ -87,21 +100,59 @@ def _extract_pdf_text(content_base64: str) -> str:
         return ""
 
 
-def _chunk_text(text: str, note_title: str, note_id: int) -> list[dict[str, Any]]:
+def _extract_attachment_text(content_base64: str) -> str:
+    if not content_base64:
+        return ""
+    try:
+        raw = base64.b64decode(content_base64)
+    except Exception:
+        return ""
+    pdf_text = _extract_pdf_text_from_bytes(raw)
+    if pdf_text:
+        return pdf_text
+    # Some uploads are HTML/text saved with a .pdf extension.
+    try:
+        decoded = raw.decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+    lowered = decoded.lower()
+    if "<html" in lowered or "<!doctype" in lowered or "<title" in lowered:
+        return _strip_html(decoded)
+    return ""
+
+
+def _extract_pdf_text(content_base64: str) -> str:
+    if not content_base64:
+        return ""
+    try:
+        raw = base64.b64decode(content_base64)
+    except Exception:
+        return ""
+    return _extract_pdf_text_from_bytes(raw)
+
+
+def _chunk_text(
+    text: str,
+    note_title: str,
+    note_id: int,
+    *,
+    source: str = "body",
+) -> list[dict[str, Any]]:
     text = (text or "").strip()
-    if not text:
+    if not text or _is_junk_text(text):
         return []
     chunks: list[dict[str, Any]] = []
     start = 0
     while start < len(text):
         end = min(len(text), start + CHUNK_SIZE)
         piece = text[start:end].strip()
-        if piece:
+        if piece and not _is_junk_text(piece):
             chunks.append(
                 {
                     "note_id": note_id,
                     "title": note_title,
                     "text": piece,
+                    "source": source,
                 }
             )
         if end >= len(text):
@@ -123,6 +174,8 @@ def _score_chunk(chunk: dict[str, Any], terms: set[str]) -> float:
     for term in terms:
         if term in hay:
             score += hay.count(term)
+    if chunk.get("source") == "body" and score > 0:
+        score *= BODY_CHUNK_SCORE_BOOST
     return score
 
 
@@ -131,18 +184,19 @@ def _build_documents(notes: list[RagNote]) -> list[dict[str, Any]]:
     for note in notes:
         title = (note.title or f"Note {note.note_id}").strip()
         body = _strip_html(note.text_content or "")
-        pdf_parts: list[str] = []
+        documents.extend(_chunk_text(body, title, note.note_id, source="body"))
         for att in note.attachments or []:
             ext = (att.file_extension or "").lower()
-            if ext == "pdf" or (att.file_name or "").lower().endswith(".pdf"):
-                pdf_text = _extract_pdf_text(att.content_base64)
-                if pdf_text:
-                    label = att.file_name or "attachment.pdf"
-                    pdf_parts.append(f"[PDF {label}]\n{pdf_text}")
-        combined = body
-        if pdf_parts:
-            combined = (combined + "\n\n" + "\n\n".join(pdf_parts)).strip()
-        documents.extend(_chunk_text(combined, title, note.note_id))
+            name = (att.file_name or "").lower()
+            if ext != "pdf" and not name.endswith(".pdf"):
+                continue
+            pdf_text = _extract_attachment_text(att.content_base64)
+            if not pdf_text or _is_junk_text(pdf_text):
+                continue
+            label = att.file_name or "attachment.pdf"
+            documents.extend(
+                _chunk_text(f"[PDF {label}]\n{pdf_text}", title, note.note_id, source="pdf")
+            )
     return documents
 
 
