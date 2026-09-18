@@ -1441,7 +1441,8 @@ export default function RecordVaultWorkspacePane({
   canEnterCompare = false,
   onEnterCompare,
   onReturnFromCompare,
-  onSessionEnded
+  onSessionEnded,
+  ragUiEnabled = true
 }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -6770,7 +6771,7 @@ export default function RecordVaultWorkspacePane({
                     sx={headerToggleButtonSx}
                   />
                 </Box>
-                {!compareMode ? (
+                {!compareMode && ragUiEnabled ? (
                   <Box
                     sx={{
                       ...menuRailButtonCellSx,
@@ -6950,31 +6951,33 @@ export default function RecordVaultWorkspacePane({
                       </SliderControlButton>
                     </Box>
                   ) : null}
-                  <Box
-                    sx={{
-                      ...menuRailButtonCellSx,
-                      flex: '1 1 0',
-                      width: 'auto',
-                      minWidth: 0,
-                      maxWidth: canEnterCompare ? '25%' : '33%',
-                      overflow: 'visible'
-                    }}
-                  >
-                    <SliderControlButton
-                      type="button"
-                      variant="yellow"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      fullWidth
-                      data-guest-demo-allow="true"
-                      onClick={() => setRagDialogOpen(true)}
-                      disabled={busy || !unlocked}
-                      aria-label="RAG question and answer"
-                      title="Ask questions about notes with the yellow RAG checkbox checked"
-                      sx={headerFullWidthButtonSx}
+                  {ragUiEnabled ? (
+                    <Box
+                      sx={{
+                        ...menuRailButtonCellSx,
+                        flex: '1 1 0',
+                        width: 'auto',
+                        minWidth: 0,
+                        maxWidth: canEnterCompare ? '25%' : '33%',
+                        overflow: 'visible'
+                      }}
                     >
-                      RAG
-                    </SliderControlButton>
-                  </Box>
+                      <SliderControlButton
+                        type="button"
+                        variant="yellow"
+                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                        fullWidth
+                        data-guest-demo-allow="true"
+                        onClick={() => setRagDialogOpen(true)}
+                        disabled={busy || !unlocked}
+                        aria-label="RAG question and answer"
+                        title="Ask questions about notes with the yellow RAG checkbox checked"
+                        sx={headerFullWidthButtonSx}
+                      >
+                        RAG
+                      </SliderControlButton>
+                    </Box>
+                  ) : null}
                 </Box>
               ) : null}
             </Box>

@@ -21,6 +21,8 @@ function parseSimpleEnvFile(raw) {
       (val.startsWith("'") && val.endsWith("'"))
     ) {
       val = val.slice(1, -1);
+    } else {
+      val = val.replace(/\s+#.*$/, '').trim();
     }
     out[key] = val;
   }
@@ -56,6 +58,7 @@ const BE_ENV_KEYS_FROM_HOME_FILE = [
   'PROFILE_RECORDS_VIDEO_TUTORIAL',
   'TOPRIGHT_VIDEO_TUTORIAL',
   'SPEEDDATING',
+  'RAG_UI_ENABLED',
   'LEFT_SIDE',
   'RIGHT_SIDE'
 ];
@@ -79,6 +82,17 @@ function loadBeEnvKeysFromHomeFile() {
 }
 
 loadBeEnvKeysFromHomeFile();
+
+/** Mirrored ~/.ssh/be/.env keys → import.meta.env.* (Vite does not always pick up process.env alone). */
+function buildBeImportMetaEnvDefine() {
+  const define = {};
+  for (const key of BE_ENV_KEYS_FROM_HOME_FILE) {
+    if (process.env[key] != null) {
+      define[`import.meta.env.${key}`] = JSON.stringify(String(process.env[key]));
+    }
+  }
+  return define;
+}
 
 export default defineConfig(({ mode }) => {
   // depending on your application, base can also be "/"
@@ -153,6 +167,7 @@ export default defineConfig(({ mode }) => {
       'PROFILE_',
       'TOPRIGHT_',
       'SPEEDDATING',
+      'RAG_',
       'LEFT_',
       'RIGHT_',
       'SKIP_',
@@ -177,7 +192,8 @@ export default defineConfig(({ mode }) => {
       proxy: apiProxy
     },
     define: {
-      global: 'window'
+      global: 'window',
+      ...buildBeImportMetaEnvDefine()
     },
     resolve: {
       alias: {

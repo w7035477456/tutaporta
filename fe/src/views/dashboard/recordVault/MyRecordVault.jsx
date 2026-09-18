@@ -39,6 +39,7 @@ import { GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
 import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
+import { isRecordVaultRagUiEnabled } from 'config/recordVaultRagUiEnv';
 import {
   TUTANOTES_CLOUD_LOGO,
   TUTANOTES_CLOUD_PANE_TOOLTIP,
@@ -328,6 +329,7 @@ export default function MyRecordVault() {
   /** Header Profile & Records — full page overlay (no dating sidebar). */
   const [profilesRecordsOpen, setProfilesRecordsOpen] = useState(false);
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
+  const [ragUiEnabled, setRagUiEnabled] = useState(() => isRecordVaultRagUiEnabled());
 
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myNote visit.
@@ -403,7 +405,12 @@ export default function MyRecordVault() {
         const pubRes = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
         if (pubRes.ok) {
           const pub = await pubRes.json();
-          if (!cancelled) applyPanelSides(pub);
+          if (!cancelled) {
+            applyPanelSides(pub);
+            if (pub.ragUiEnabled != null) {
+              setRagUiEnabled(Boolean(pub.ragUiEnabled));
+            }
+          }
         }
       } catch {
         // keep Vite / prior value
@@ -685,6 +692,7 @@ export default function MyRecordVault() {
             onEnterCompare={enterCompareMode}
             onReturnFromCompare={returnFromCompareMode}
             onSessionEnded={handleOneDriveSessionEnded}
+            ragUiEnabled={ragUiEnabled}
           />
         </RecordVaultPaneProvider>
       );
@@ -770,6 +778,7 @@ export default function MyRecordVault() {
             onEnterCompare={enterCompareMode}
             onReturnFromCompare={returnFromCompareMode}
             onSessionEnded={handleUsbSessionEnded}
+            ragUiEnabled={ragUiEnabled}
           />
         </RecordVaultPaneProvider>
       );
