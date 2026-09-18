@@ -63,26 +63,64 @@ export function colorTemplate16PopupCloseSx(overrides = {}) {
 
 /** Bottom-right corner drag handle for resizable ColorTemplate16 popups. */
 export function colorTemplate16PopupResizeHandleSx(overrides = {}) {
-  return {
+  return colorTemplate16PopupCornerResizeHandleSx('se', overrides);
+}
+
+/** Corner drag handle — corner: nw | ne | sw | se */
+export function colorTemplate16PopupCornerResizeHandleSx(corner = 'se', overrides = {}) {
+  const isTop = corner === 'nw' || corner === 'ne';
+  const isLeft = corner === 'nw' || corner === 'sw';
+  const cursor =
+    corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize';
+
+  const beforeSx = {
+    content: '""',
     position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 20,
-    height: 20,
-    cursor: 'nwse-resize',
-    zIndex: 6,
-    touchAction: 'none',
-    '&::before': {
-      content: '""',
-      position: 'absolute',
+    width: 12,
+    height: 12,
+    opacity: 0.9
+  };
+
+  if (corner === 'se') {
+    Object.assign(beforeSx, {
       right: 4,
       bottom: 4,
-      width: 12,
-      height: 12,
       borderRight: '2px solid var(--theme-primary-color)',
-      borderBottom: '2px solid var(--theme-primary-color)',
-      opacity: 0.9
-    },
+      borderBottom: '2px solid var(--theme-primary-color)'
+    });
+  } else if (corner === 'sw') {
+    Object.assign(beforeSx, {
+      left: 4,
+      bottom: 4,
+      borderLeft: '2px solid var(--theme-primary-color)',
+      borderBottom: '2px solid var(--theme-primary-color)'
+    });
+  } else if (corner === 'ne') {
+    Object.assign(beforeSx, {
+      right: 4,
+      top: 4,
+      borderRight: '2px solid var(--theme-primary-color)',
+      borderTop: '2px solid var(--theme-primary-color)'
+    });
+  } else {
+    Object.assign(beforeSx, {
+      left: 4,
+      top: 4,
+      borderLeft: '2px solid var(--theme-primary-color)',
+      borderTop: '2px solid var(--theme-primary-color)'
+    });
+  }
+
+  return {
+    position: 'absolute',
+    ...(isTop ? { top: 0 } : { bottom: 0 }),
+    ...(isLeft ? { left: 0 } : { right: 0 }),
+    width: 20,
+    height: 20,
+    cursor,
+    zIndex: 6,
+    touchAction: 'none',
+    '&::before': beforeSx,
     ...overrides
   };
 }

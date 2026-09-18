@@ -47,6 +47,18 @@ import { BUSY_HOURGLASS_MY_NOTE_SIZE } from 'config/busyHourglassEnv';
 import RecordVaultViewVaultDialog from './RecordVaultViewVaultDialog';
 import RecordVaultOneDriveBackupDialog from './RecordVaultOneDriveBackupDialog';
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
+import RecordVaultRagDialog from './RecordVaultRagDialog';
+import TutaNotesRagCheckboxMark, { tutaNotesRagCheckboxButtonSx } from './TutaNotesRagCheckboxMark';
+import {
+  loadRecordVaultRagSelection,
+  saveRecordVaultRagSelection,
+  toggleRecordVaultRagSelection
+} from 'utils/recordVaultRagSelection';
+import {
+  loadRecordVaultRagKeepModelInMemory,
+  saveRecordVaultRagKeepModelInMemory
+} from 'utils/recordVaultRagKeepModel';
+import { setRecordVaultRagKeepModel } from 'api/recordVaultFe';
 import RecordVaultStorageFilesPanel from './RecordVaultStorageFilesPanel';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
@@ -935,7 +947,11 @@ function MenuRowWithDelete({
   onToggleLock,
   lockTitle,
   lockDisabled = false,
-  locked = false
+  locked = false,
+  ragSelected = false,
+  onToggleRag,
+  ragDisabled = false,
+  ragTitle = 'Include in RAG Q&A'
 }) {
   return (
     <Box
@@ -949,6 +965,27 @@ function MenuRowWithDelete({
         overflow: 'visible'
       }}
     >
+      {onToggleRag ? (
+        <Box
+          component="button"
+          type="button"
+          role="checkbox"
+          aria-checked={ragSelected}
+          aria-label={ragTitle}
+          title={ragSelected ? 'Included in RAG (click to exclude)' : 'Not in RAG (click to include)'}
+          disabled={disabled || ragDisabled}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleRag();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          sx={tutaNotesRagCheckboxButtonSx}
+        >
+          <TutaNotesRagCheckboxMark selected={ragSelected} disabled={disabled || ragDisabled} />
+        </Box>
+      ) : null}
       {onToggleLock ? (
         <Box
           component="button"
@@ -1173,6 +1210,9 @@ function RenamableDraggableMenuRow({
   acceptForeignDrop = false,
   onToggleLock,
   lockTitle,
+  ragSelected = false,
+  onToggleRag,
+  ragDisabled = false,
   /** Optional warm-up before drag (e.g. fetch note body for Finder HTML export). */
   onPrefetchDrag
 }) {
@@ -1243,6 +1283,9 @@ function RenamableDraggableMenuRow({
         onToggleLock={onToggleLock}
         lockTitle={lockTitle}
         locked={locked}
+        ragSelected={ragSelected}
+        onToggleRag={onToggleRag}
+        ragDisabled={ragDisabled}
       >
         <Box data-record-vault-rename-row onMouseDown={(e) => e.stopPropagation()}>
           <TextField
@@ -1278,6 +1321,9 @@ function RenamableDraggableMenuRow({
       onToggleLock={onToggleLock}
       lockTitle={lockTitle}
       locked={locked}
+      ragSelected={ragSelected}
+      onToggleRag={onToggleRag}
+      ragDisabled={ragDisabled}
     >
       <Box
         id={domId || undefined}
@@ -1425,6 +1471,11 @@ export default function RecordVaultWorkspacePane({
   const [viewVaultStorageType, setViewVaultStorageType] = useState('onedrive');
   const [oneDriveBackupOpen, setOneDriveBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
+  const [ragDialogOpen, setRagDialogOpen] = useState(false);
+  const [ragSelectedNoteIds, setRagSelectedNoteIds] = useState([]);
+  const [ragKeepModelInMemory, setRagKeepModelInMemory] = useState(() => loadRecordVaultRagKeepModelInMemory());
+  const [ragKeepModelBusy, setRagKeepModelBusy] = useState(false);
+  const [ragKeepModelNotice, setRagKeepModelNotice] = useState('');
   const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
   const isTutaDrivePane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const cloudViewLabel = isTutaDrivePane ? 'View TutaDrive' : 'View OneDrive';
@@ -1473,6 +1524,40 @@ export default function RecordVaultWorkspacePane({
     },
     []
   );
+
+  useEffect(() => {
+    setRagSelectedNoteIds(loadRecordVaultRagSelection(paneStorageType, user?.singles_id));
+  }, [paneStorageType, user?.singles_id]);
+
+  const handleToggleRagNote = useCallback(
+    (noteId, selected) => {
+      const next = toggleRecordVaultRagSelection(paneStorageType, user?.singles_id, noteId, selected);
+      setRagSelectedNoteIds(next);
+    },
+    [paneStorageType, user?.singles_id]
+  );
+
+  const handleToggleRagKeepModel = useCallback(async () => {
+    if (ragKeepModelBusy || !unlocked) return;
+    const prev = ragKeepModelInMemory;
+    const next = !prev;
+    setRagKeepModelInMemory(next);
+    saveRecordVaultRagKeepModelInMemory(next);
+    setRagKeepModelBusy(true);
+    try {
+      await setRecordVaultRagKeepModel({ enabled: next, storageType: paneStorageType });
+    } catch (err) {
+      setRagKeepModelInMemory(prev);
+      saveRecordVaultRagKeepModelInMemory(prev);
+      const message = readRecordVaultApiError(err, 'Keep-model toggle failed');
+      console.error('[RAG keep-model]', message);
+      setRagKeepModelNotice(
+        `${message}\n\nIf you recently updated code: restart ./scripts/start-rag-service.sh and beall.`
+      );
+    } finally {
+      setRagKeepModelBusy(false);
+    }
+  }, [ragKeepModelBusy, ragKeepModelInMemory, unlocked, paneStorageType]);
 
   /**
    * Queue a success popup without blocking the caller.
@@ -6398,6 +6483,14 @@ export default function RecordVaultWorkspacePane({
         onOpenMyNote={() => setUsbBackupOpen(false)}
         onRestored={() => handleUsbVaultRestoredOrFormatted()}
       />
+      <RecordVaultRagDialog
+        open={ragDialogOpen}
+        onClose={() => setRagDialogOpen(false)}
+        selectedNoteIds={ragSelectedNoteIds}
+        storageType={paneStorageType}
+        keepModelInMemory={ragKeepModelInMemory}
+        disabled={busy || !unlocked}
+      />
       <BillScheduleInstructionPopup
         open={billScheduleTutorialOpen}
         onClose={() => setBillScheduleTutorialOpen(false)}
@@ -6428,6 +6521,24 @@ export default function RecordVaultWorkspacePane({
           </ColorTemplate16PopupCenterWide.BodyText>
           <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
             <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultFileTooLargeOpen(false)}>
+              OK
+            </ColorTemplate16PopupCenterWide.ActionButton>
+          </Stack>
+        </ColorTemplate16PopupCenterWide.Body>
+      </ColorTemplate16PopupCenterWide>
+      <ColorTemplate16PopupCenterWide
+        open={Boolean(ragKeepModelNotice)}
+        onClose={() => setRagKeepModelNotice('')}
+        closeOnBackdrop
+        closeButtonAriaLabel="Close keep model dialog"
+      >
+        <ColorTemplate16PopupCenterWide.Body spacing={2}>
+          <ColorTemplate16PopupCenterWide.Title>Keep Model ON</ColorTemplate16PopupCenterWide.Title>
+          <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
+            {ragKeepModelNotice}
+          </ColorTemplate16PopupCenterWide.BodyText>
+          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setRagKeepModelNotice('')}>
               OK
             </ColorTemplate16PopupCenterWide.ActionButton>
           </Stack>
@@ -6659,6 +6770,68 @@ export default function RecordVaultWorkspacePane({
                     sx={headerToggleButtonSx}
                   />
                 </Box>
+                {!compareMode ? (
+                  <Box
+                    sx={{
+                      ...menuRailButtonCellSx,
+                      flex: '0 0 auto',
+                      width: 'auto',
+                      minWidth: 0,
+                      overflow: 'visible'
+                    }}
+                  >
+                    <SliderControlButton
+                      type="button"
+                      variant="green"
+                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                      aria-pressed={ragKeepModelInMemory}
+                      aria-label={
+                        ragKeepModelInMemory
+                          ? 'Keep model ON — Ollama stays in memory'
+                          : 'Keep model OFF — Ollama default timeout (~5 min)'
+                      }
+                      title={
+                        ragKeepModelInMemory
+                          ? 'Model pinned in RAM (click to use default ~5 min keep-alive)'
+                          : 'Click to load and keep Ollama model in memory'
+                      }
+                      disabled={busy || ragKeepModelBusy || !unlocked}
+                      onClick={() => void handleToggleRagKeepModel()}
+                      sx={{
+                        ...headerToggleButtonSx,
+                        ...(ragKeepModelInMemory
+                          ? {
+                              bgcolor: '#60C446 !important',
+                              color: '#000 !important',
+                              WebkitTextFillColor: '#000 !important',
+                              border: '4px solid #000 !important',
+                              '@media (hover: hover)': {
+                                '&:hover:not(.Mui-disabled)': {
+                                  bgcolor: '#55b03d !important'
+                                }
+                              }
+                            }
+                          : {
+                              bgcolor: '#9e9e9e !important',
+                              color: '#000 !important',
+                              WebkitTextFillColor: '#000 !important',
+                              border: '4px solid #000 !important',
+                              '@media (hover: hover)': {
+                                '&:hover:not(.Mui-disabled)': {
+                                  bgcolor: '#8a8a8a !important'
+                                }
+                              }
+                            })
+                      }}
+                    >
+                      {ragKeepModelBusy
+                        ? 'Loading…'
+                        : menuLabelsCompact
+                          ? 'Model'
+                          : 'Keep Model ON'}
+                    </SliderControlButton>
+                  </Box>
+                ) : null}
               </Box>
               {!compareMode ? (
                 <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
@@ -6777,6 +6950,31 @@ export default function RecordVaultWorkspacePane({
                       </SliderControlButton>
                     </Box>
                   ) : null}
+                  <Box
+                    sx={{
+                      ...menuRailButtonCellSx,
+                      flex: '1 1 0',
+                      width: 'auto',
+                      minWidth: 0,
+                      maxWidth: canEnterCompare ? '25%' : '33%',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <SliderControlButton
+                      type="button"
+                      variant="yellow"
+                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                      fullWidth
+                      data-guest-demo-allow="true"
+                      onClick={() => setRagDialogOpen(true)}
+                      disabled={busy || !unlocked}
+                      aria-label="RAG question and answer"
+                      title="Ask questions about notes with the yellow RAG checkbox checked"
+                      sx={headerFullWidthButtonSx}
+                    >
+                      RAG
+                    </SliderControlButton>
+                  </Box>
                 </Box>
               ) : null}
             </Box>
@@ -7346,6 +7544,20 @@ export default function RecordVaultWorkspacePane({
                               ? 'Unlock note (enter 6-digit PIN)'
                               : 'Lock note with a 6-digit PIN'
                           }
+                          ragSelected={ragSelectedNoteIds.some(
+                            (id) => Number(id) === Number(note.note_id)
+                          )}
+                          onToggleRag={
+                            isSystemNote || noteInnerLocked
+                              ? undefined
+                              : () => {
+                                  const selected = !ragSelectedNoteIds.some(
+                                    (id) => Number(id) === Number(note.note_id)
+                                  );
+                                  handleToggleRagNote(note.note_id, selected);
+                                }
+                          }
+                          ragDisabled={isSystemNote || noteInnerLocked}
                           disabled={busy || crossPaneBusy || !selectedNotebookId || isBillScheduleView}
                         />
                         </Box>

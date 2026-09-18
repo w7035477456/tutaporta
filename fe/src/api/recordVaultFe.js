@@ -1629,6 +1629,37 @@ export function readFileAsDataUrl(file) {
   });
 }
 
+export async function fetchRecordVaultRagStatus({ storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'GET',
+    url: '/api/recordVault/rag/status',
+    storageType: storageType === 'onedrive' ? 'onedrive' : 'usb'
+  });
+  return data;
+}
+
+export async function queryRecordVaultRag({ noteIds, prompt, storageType, keepModelInMemory = false } = {}) {
+  const ids = [...new Set((noteIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
+  const question = String(prompt || '').trim();
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: '/api/recordVault/rag/query',
+    data: { noteIds: ids, prompt: question, keepModelInMemory: Boolean(keepModelInMemory) },
+    storageType: storageType === 'onedrive' ? 'onedrive' : 'usb'
+  });
+  return data;
+}
+
+export async function setRecordVaultRagKeepModel({ enabled, storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: '/api/recordVault/rag/keep-model',
+    data: { enabled: Boolean(enabled) },
+    storageType: storageType === 'onedrive' ? 'onedrive' : 'usb'
+  });
+  return data;
+}
+
 export function createRecordVaultPaneApi(storageType) {
   const type = storageType === 'onedrive' ? 'onedrive' : 'usb';
   const opts = { storageType: type };
@@ -1662,7 +1693,10 @@ export function createRecordVaultPaneApi(storageType) {
     searchRecordVaultNotes: (query) => searchRecordVaultNotes(query, opts),
     fetchRecordVaultUsage: () => fetchRecordVaultUsage(opts),
     logoffRecordVaultStorage: (extra = {}) => logoffRecordVaultStorage({ ...opts, ...extra }),
-    syncRecordVaultStorage: (extra = {}) => syncRecordVaultStorage({ ...opts, ...extra })
+    syncRecordVaultStorage: (extra = {}) => syncRecordVaultStorage({ ...opts, ...extra }),
+    fetchRecordVaultRagStatus: () => fetchRecordVaultRagStatus(opts),
+    queryRecordVaultRag: (payload) => queryRecordVaultRag({ ...opts, ...payload }),
+    setRecordVaultRagKeepModel: (payload) => setRecordVaultRagKeepModel({ ...opts, ...payload })
   };
 }
 

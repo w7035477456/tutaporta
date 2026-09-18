@@ -41,6 +41,11 @@ import {
   openRecordVaultNoteAttachmentNative
 } from '../routes/recordVault/recordVaultRoutes.js';
 import {
+  getRecordVaultRagStatus,
+  postRecordVaultRagKeepModel,
+  postRecordVaultRagQuery
+} from '../routes/recordVault/recordVaultRagRoutes.js';
+import {
   browsePhotoAlbumsUsbPath,
   formatPhotoAlbumsUsb,
   getPhotoAlbumsUsbStatus,
@@ -187,6 +192,9 @@ export function startBridgeServer({ port = DEFAULT_PORT } = {}) {
 
   app.get('/api/recordVault', getRecordVaultTree);
   app.get('/api/recordVault/search', searchRecordVaultNotes);
+  app.get('/api/recordVault/rag/status', getRecordVaultRagStatus);
+  app.post('/api/recordVault/rag/keep-model', postRecordVaultRagKeepModel);
+  app.post('/api/recordVault/rag/query', postRecordVaultRagQuery);
   app.post('/api/recordVault/notebooks', createRecordVaultNotebook);
   app.put('/api/recordVault/notebooks/reorder', reorderRecordVaultNotebooks);
   app.patch('/api/recordVault/notebooks/:notebookId', updateRecordVaultNotebook);

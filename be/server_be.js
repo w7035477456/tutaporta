@@ -178,6 +178,11 @@ import {
   moveRecordVaultNoteImage
 } from './routes/recordVault/recordVaultRoutes.js';
 import {
+  getRecordVaultRagStatus,
+  postRecordVaultRagKeepModel,
+  postRecordVaultRagQuery
+} from './routes/recordVault/recordVaultRagRoutes.js';
+import {
   changeRecordVaultAccessPassword,
   clearRecordVaultAccessFail,
   getRecordVaultAccessFailStatus,
@@ -1519,6 +1524,9 @@ app.patch('/api/myVideos/:id/type', requireAuth, updateMyVideoType);
 app.delete('/api/myVideos/:id', requireAuth, deleteMyVideo);
 app.get('/api/recordVault', requireAuth, getRecordVaultTree);
 app.get('/api/recordVault/search', requireAuth, searchRecordVaultNotes);
+app.get('/api/recordVault/rag/status', requireAuth, getRecordVaultRagStatus);
+app.post('/api/recordVault/rag/keep-model', requireAuth, postRecordVaultRagKeepModel);
+app.post('/api/recordVault/rag/query', requireAuth, postRecordVaultRagQuery);
 app.post('/api/recordVault/notebooks', requireAuth, createRecordVaultNotebook);
 app.put('/api/recordVault/notebooks/reorder', requireAuth, reorderRecordVaultNotebooks);
 app.patch('/api/recordVault/notebooks/:notebookId', requireAuth, updateRecordVaultNotebook);

@@ -34,6 +34,9 @@ be/usb/
 # USB bridge installer zips (publish via scripts/sync-usb-bridge-installers.sh)
 usbzip/*.zip
 
+# Python RAG microservice local venv
+rag_service/.venv/
+
 # USB bridge desktop — installers live in repo-root usb/ after build
 be/recordVaultBridge/desktop/dist/
 be/recordVaultBridge/desktop/staging/

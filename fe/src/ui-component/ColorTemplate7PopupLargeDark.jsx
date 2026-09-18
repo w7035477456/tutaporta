@@ -405,8 +405,11 @@ export default function ColorTemplate7PopupLargeDark({
   fillViewportHeight = false,
   /** Show bottom-right drag handle to resize panel (requires panelShellSx width/height). */
   resizable = false,
+  fourCornerResize = false,
   onResizePointerDown,
-  resizeHandleSx
+  onCornerResizeStart,
+  resizeHandleSx,
+  cornerResizeHandleSx
 }) {
   const { overlaySx, panelShellSx } = useColorTemplate7PopupLargeDarkLayout({
     maxWidth,
@@ -549,7 +552,22 @@ export default function ColorTemplate7PopupLargeDark({
             </Box>
           </Box>
         </AuthCardWrapper>
-        {resizable && typeof onResizePointerDown === 'function' ? (
+        {resizable && fourCornerResize && typeof onCornerResizeStart === 'function'
+          ? ['nw', 'ne', 'sw', 'se'].map((corner) => (
+              <Box
+                key={corner}
+                role="separator"
+                aria-label={`Resize dialog ${corner} corner`}
+                onMouseDown={onCornerResizeStart(corner)}
+                sx={
+                  typeof cornerResizeHandleSx === 'function'
+                    ? cornerResizeHandleSx(corner)
+                    : resizeHandleSx ?? colorTemplate7PopupResizeHandleSx()
+                }
+              />
+            ))
+          : null}
+        {resizable && !fourCornerResize && typeof onResizePointerDown === 'function' ? (
           <Box
             role="separator"
             aria-label="Resize dialog"
@@ -607,8 +625,11 @@ ColorTemplate7PopupLargeDark.propTypes = {
   centerInGallery: PropTypes.bool,
   fillViewportHeight: PropTypes.bool,
   resizable: PropTypes.bool,
+  fourCornerResize: PropTypes.bool,
   onResizePointerDown: PropTypes.func,
-  resizeHandleSx: PropTypes.object
+  onCornerResizeStart: PropTypes.func,
+  resizeHandleSx: PropTypes.object,
+  cornerResizeHandleSx: PropTypes.oneOfType([PropTypes.func, PropTypes.object])
 };
 
 ColorTemplate7PopupLargeDarkTitle.propTypes = {

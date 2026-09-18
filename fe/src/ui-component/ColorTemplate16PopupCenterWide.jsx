@@ -5,10 +5,12 @@ import {
   COLOR_TEMPLATE16_POPUP_PANEL_WIDTH,
   COLOR_TEMPLATE16_POPUP_DEFAULT_RESIZE_HEIGHT,
   colorTemplate16PopupCloseSx,
+  colorTemplate16PopupCornerResizeHandleSx,
   colorTemplate16PopupResizeHandleSx
 } from 'config/colorTemplate16PopupCenterWide';
 import useColorTemplate16PopupCenterWideLayout from 'hooks/useColorTemplate16PopupCenterWideLayout';
 import usePopupBottomRightResize from 'hooks/usePopupBottomRightResize';
+import usePopupFourCornerResize from 'hooks/usePopupFourCornerResize';
 
 /**
  * Viewport-centered wide popup (ColorTemplate16PopupCenterWide).
@@ -34,6 +36,8 @@ export default function ColorTemplate16PopupCenterWide({
   bodyTextAlignLeft = true,
   centeredLeadLines = 2,
   resizable = false,
+  /** When true with `resizable`, drag any of the four corners to resize. */
+  fourCornerResize = false,
   defaultResizeHeight = COLOR_TEMPLATE16_POPUP_DEFAULT_RESIZE_HEIGHT,
   maxResizeHeight = '92vh',
   /** Stretch panel from top to bottom of the browser window (Add Text photo editor). */
@@ -51,13 +55,23 @@ export default function ColorTemplate16PopupCenterWide({
   const panelWidthCap = maxWidthProp || COLOR_TEMPLATE16_POPUP_PANEL_WIDTH;
   const effectiveDefaultHeight = fillViewportHeight ? '100vh' : defaultResizeHeight;
   const effectiveMaxHeight = fillViewportHeight ? '100vh' : maxResizeHeight;
-  const { panelSize, onResizeStart } = usePopupBottomRightResize({
+  const bottomRightResize = usePopupBottomRightResize({
     open,
-    enabled: resizable,
+    enabled: resizable && !fourCornerResize,
     defaultWidth: panelWidthCap,
     defaultHeight: effectiveDefaultHeight,
     maxHeight: effectiveMaxHeight
   });
+  const fourCorner = usePopupFourCornerResize({
+    open,
+    enabled: resizable && fourCornerResize,
+    defaultWidth: panelWidthCap,
+    defaultHeight: effectiveDefaultHeight,
+    maxHeight: effectiveMaxHeight
+  });
+  const panelSize = fourCornerResize ? fourCorner.panelSize : bottomRightResize.panelSize;
+  const onResizeStart = fourCornerResize ? undefined : bottomRightResize.onResizeStart;
+  const onCornerResizeStart = fourCornerResize ? fourCorner.onCornerResizeStart : undefined;
 
   const fillViewportOverlaySx = fillViewportHeight
     ? {
@@ -103,7 +117,12 @@ export default function ColorTemplate16PopupCenterWide({
                 width: panelSize.width,
                 maxWidth: panelSize.width,
                 height: panelSize.height,
-                maxHeight: panelSize.height
+                maxHeight: panelSize.height,
+                ...(fourCornerResize && (panelSize.offsetX || panelSize.offsetY)
+                  ? {
+                      transform: `translate(${panelSize.offsetX || 0}px, ${panelSize.offsetY || 0}px)`
+                    }
+                  : null)
               }
             : {
                 width: panelWidthCap,
@@ -112,7 +131,8 @@ export default function ColorTemplate16PopupCenterWide({
               }),
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }
     : fillViewportHeight
       ? fillViewportPanelSx
@@ -139,9 +159,12 @@ export default function ColorTemplate16PopupCenterWide({
       contentSx={contentSx}
       cardSx={cardSx}
       resizable={resizable}
+      fourCornerResize={fourCornerResize}
       fillViewportHeight={fillViewportHeight}
       onResizePointerDown={onResizeStart}
+      onCornerResizeStart={onCornerResizeStart}
       resizeHandleSx={colorTemplate16PopupResizeHandleSx()}
+      cornerResizeHandleSx={colorTemplate16PopupCornerResizeHandleSx}
       {...rest}
     >
       {children}
@@ -175,6 +198,7 @@ ColorTemplate16PopupCenterWide.propTypes = {
   bodyTextAlignLeft: PropTypes.bool,
   centeredLeadLines: PropTypes.number,
   resizable: PropTypes.bool,
+  fourCornerResize: PropTypes.bool,
   /** Initial panel height when `resizable` (e.g. `'100vh'`). */
   defaultResizeHeight: PropTypes.string,
   /** Max drag-resize height (e.g. `'100vh'`). */
