@@ -302,6 +302,15 @@ function collectOccupiedSlotsByInstanceKey(editor, instances, pageWidth, pageOri
       if (fl == null || ft == null || fw == null || fh == null) return;
       const cx = fl + fw / 2;
       const cy = ft + fh / 2;
+      // Only count photos that actually sit on this page band (not other spreads).
+      if (
+        cx < band.left ||
+        cx > band.left + band.width ||
+        cy < band.top ||
+        cy > band.top + band.height
+      ) {
+        return;
+      }
       for (const slot of resolveAlbumTemplateSlots(layout, inst.slots)) {
         if (slot.type !== 'photo') continue;
         const rect = albumSlotToPx(slot, band.width, band.height);
@@ -3965,6 +3974,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
        * Rebuild alley from vault attachments (size+checksum dedupe).
        * Drops staging entries whose attachment was purged; keeps page-placed photos out of alley.
        * Also removes inline page nodes whose attachments were hard-deleted as duplicates.
+       *
+       * Important: when the tray already has photos, do NOT pull in unrelated vault orphans.
+       * Auto Layout uses tray order (album_photo_seq) — silently injecting older vault photos
+       * caused "I dropped SET_BLUE photos but party/dogs appeared on the album" bugs.
+       * Orphans are only seeded when the tray is empty (open album / shared / first load).
        */
       syncStagingAlleyFromAttachments: (attachments) => {
         if (!editor) return;
@@ -4008,7 +4022,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
         const fromMarker = (stagedPhotosRef.current || [])
           .map((item) => {
-            const live = liveById.get(Number(item.attachmentId));
+            const id = Number(item.attachmentId);
+            if (!Number.isFinite(id) || id < 1) return null;
+            // Drop purged vault rows when we have a live inventory.
+            if (liveById.size > 0 && !liveById.has(id)) return null;
+            const live = liveById.get(id);
             if (!live) return mergeStagingItemPreview(item);
             return mergeStagingItemPreview({
               ...live,
@@ -4020,18 +4038,21 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               ...(item.localPreviewUrl ? { localPreviewUrl: String(item.localPreviewUrl) } : null)
             });
           })
-          .filter((item) => item && Number.isFinite(Number(item.attachmentId)));
+          .filter((item) => item && Number.isFinite(Number(item.attachmentId)))
+          .filter((item) => !onPage.has(Number(item.attachmentId)));
 
-        const extras = [];
-        for (const [id, live] of liveById) {
-          if (onPage.has(id)) continue;
-          if (fromMarker.some((m) => Number(m.attachmentId) === id)) continue;
-          extras.push(mergeStagingItemPreview(live));
+        // Only seed vault orphans when the tray is empty — never merge them into an active tray.
+        let seed = fromMarker;
+        if (!seed.length) {
+          const extras = [];
+          for (const [id, live] of liveById) {
+            if (onPage.has(id)) continue;
+            extras.push(mergeStagingItemPreview(live));
+          }
+          seed = extras;
         }
 
-        const next = dedupeStagingItems(
-          [...fromMarker, ...extras].filter((item) => !onPage.has(Number(item.attachmentId)))
-        ).map((item) => mergeStagingItemPreview(item));
+        const next = dedupeStagingItems(seed).map((item) => mergeStagingItemPreview(item));
         stagedPhotosRef.current = next;
         setStagedPhotos(next);
         syncAlbumPhotoSeqOnPage(editor, liveById);

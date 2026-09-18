@@ -99,14 +99,17 @@ api.interceptors.request.use((config) => {
     // Default axios instance uses application/json — leaving it breaks Busboy on the server.
     const headers = config.headers;
     if (headers && typeof headers.set === 'function') {
+      headers.set('Content-Type', undefined);
       headers.delete('Content-Type');
       headers.delete('content-type');
     } else if (headers) {
       delete headers['Content-Type'];
       delete headers['content-type'];
+      headers['Content-Type'] = undefined;
       if (headers.common) {
         delete headers.common['Content-Type'];
         delete headers.common['content-type'];
+        headers.common['Content-Type'] = undefined;
       }
     }
   }

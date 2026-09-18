@@ -1295,30 +1295,52 @@ export async function downloadPhotoAlbumsUsbBackupZip() {
   }
 }
 
-/** Upload a MyPhotoAlbums backup zip and restore files to OneDrive. */
-export async function restorePhotoAlbumsOneDriveBackupZip(file) {
+/** POST multipart restore zip — fetch() so the browser sets multipart boundary (axios defaults break Busboy). */
+async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {} } = {}) {
   if (!file) throw new Error('Choose a backup zip file first');
   const formData = new FormData();
-  formData.append('backup', file);
-  const { data } = await api.post('/api/photoAlbums/onedrive/restore-zip', formData);
-  return data;
+  formData.append('backup', file, file.name || 'backup.zip');
+  const base = getApiBaseUrl().replace(/\/$/, '');
+  const url = `${base}${String(path || '').startsWith('/') ? path : `/${path}`}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+    headers: extraHeaders
+  });
+  const text = await response.text();
+  let payload = null;
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { error: text.trim() || response.statusText || 'Restore failed' };
+    }
+  }
+  if (!response.ok) {
+    const err = new Error(payload?.error || payload?.message || 'Restore failed');
+    err.response = { data: payload, status: response.status };
+    throw err;
+  }
+  return payload;
+}
+
+/** Upload a MyPhotoAlbums backup zip and restore files to OneDrive. */
+export async function restorePhotoAlbumsOneDriveBackupZip(file) {
+  return postPhotoAlbumsRestoreZip('/api/photoAlbums/onedrive/restore-zip', file);
 }
 
 /** Upload a MyPhotoAlbums backup zip and restore files onto the unlocked USB vault. */
 export async function restorePhotoAlbumsUsbBackupZip(file) {
-  if (!file) throw new Error('Choose a backup zip file first');
-  const formData = new FormData();
-  formData.append('backup', file);
   if (shouldRoutePhotoAlbumsThroughBridge('/api/photoAlbums/usb/restore-zip', 'usb')) {
+    const formData = new FormData();
+    formData.append('backup', file, file.name || 'backup.zip');
     const { data } = await bridgeUploadFormData('/api/photoAlbums/usb/restore-zip', formData);
     return data;
   }
-  const { data } = await api.post('/api/photoAlbums/usb/restore-zip', formData, {
-    headers: {
-      'X-Record-Vault-Storage': 'usb'
-    }
+  return postPhotoAlbumsRestoreZip('/api/photoAlbums/usb/restore-zip', file, {
+    extraHeaders: { 'X-Record-Vault-Storage': 'usb' }
   });
-  return data;
 }
 
 /** Poll Redis-backed logoff percent while Cloud/USB logoff POST runs. */

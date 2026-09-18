@@ -25,7 +25,6 @@ import {
 import RecordVaultOneDriveVaultTreePanel from './RecordVaultOneDriveVaultTreePanel';
 import {
   tutaNotesFormatPostLoginButtonSx,
-  tutaNotesOrangePostLoginButtonSx,
   tutaNotesPostLoginActionButtonSx,
   tutaNotesYellowPostLoginButtonSx
 } from './tutaNotesPostLoginActionButtonSx';
@@ -48,13 +47,6 @@ const actionButtonSx = {
   px: 2,
   ...tutaNotesPostLoginActionButtonSx,
   width: { xs: '100%', sm: 'auto' }
-};
-
-const backupOrangeButtonSx = {
-  ...actionButtonSx,
-  ...tutaNotesOrangePostLoginButtonSx,
-  width: { xs: '100%', sm: 'auto' },
-  minWidth: { xs: '100%', sm: 200 }
 };
 
 const restoreYellowButtonSx = {
@@ -829,7 +821,7 @@ export default function RecordVaultOneDriveBackupDialog({
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
               ? 'Backup Encryption uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 EncryptedBackup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
-              : 'If you do not want to store your data on OneDrive, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore below.'}
+              : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore below.'}
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -840,7 +832,7 @@ export default function RecordVaultOneDriveBackupDialog({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleBackup()}
-                sx={backupOrangeButtonSx}
+                sx={actionButtonSx}
               >
                 Backup/Encrypt TutaNote to Cloud
               </GreenButton>
@@ -848,7 +840,7 @@ export default function RecordVaultOneDriveBackupDialog({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleFormat()}
-                sx={formatRedButtonSx}
+                sx={actionButtonSx}
               >
                 Format TutaNotes Cloud
               </GreenButton>

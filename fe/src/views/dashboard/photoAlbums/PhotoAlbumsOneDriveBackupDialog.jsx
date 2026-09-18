@@ -12,12 +12,7 @@ import {
   restorePhotoAlbumsOneDriveBackupZip
 } from 'api/photoAlbumsFe';
 import PhotoAlbumsOneDriveVaultTreePanel from './PhotoAlbumsOneDriveVaultTreePanel';
-import {
-  tutaPhotoAlbumsFormatPostLoginButtonSx,
-  tutaPhotoAlbumsOrangePostLoginButtonSx,
-  tutaPhotoAlbumsPostLoginActionButtonSx,
-  tutaPhotoAlbumsYellowPostLoginButtonSx
-} from './tutaPhotoAlbumsPostLoginActionButtonSx';
+import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const BACKUP_POPUP_WIDTH = '90vw';
@@ -47,27 +42,6 @@ const actionButtonSx = {
   px: 2,
   ...tutaPhotoAlbumsPostLoginActionButtonSx,
   width: { xs: '100%', sm: 'auto' }
-};
-
-const backupOrangeButtonSx = {
-  ...actionButtonSx,
-  ...tutaPhotoAlbumsOrangePostLoginButtonSx,
-  width: { xs: '100%', sm: 'auto' },
-  minWidth: { xs: '100%', sm: 200 }
-};
-
-const restoreYellowButtonSx = {
-  ...actionButtonSx,
-  ...tutaPhotoAlbumsYellowPostLoginButtonSx,
-  width: { xs: '100%', sm: 'auto' },
-  minWidth: { xs: '100%', sm: 200 }
-};
-
-const formatRedButtonSx = {
-  ...actionButtonSx,
-  ...tutaPhotoAlbumsFormatPostLoginButtonSx,
-  width: { xs: '100%', sm: 'auto' },
-  minWidth: { xs: '100%', sm: 200 }
 };
 
 const formatWarningBoxSx = {
@@ -318,7 +292,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
-            If you do not want to store your data on OneDrive, before you select &quot;Format/Clear Entire
+            If you do not want to store your data on TutaCloud, before you select &quot;Format/Clear Entire
             TutaPhotoAlbums Cloud&quot; below, use Backup and download zip first. Once you have done that, you may format
             to delete your online data. Later, use Upload and Restore from zip to merge a backup zip back into your
             vault.
@@ -332,7 +306,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 type="button"
                 disabled={busy || !canBackupAlbum}
                 onClick={() => void handleBackup()}
-                sx={backupOrangeButtonSx}
+                sx={actionButtonSx}
                 {...guestDemoBlockProps()}
               >
                 Backup and download zip
@@ -341,7 +315,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleFormat()}
-                sx={formatRedButtonSx}
+                sx={actionButtonSx}
                 {...guestDemoBlockProps()}
               >
                 Format/Clear Entire TutaPhotoAlbums Cloud
@@ -350,7 +324,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
                 type="button"
                 disabled={busy}
                 onClick={handleRestoreClick}
-                sx={restoreYellowButtonSx}
+                sx={actionButtonSx}
                 {...guestDemoBlockProps()}
               >
                 Upload and Restore from zip

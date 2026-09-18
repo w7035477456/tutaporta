@@ -4973,12 +4973,24 @@ export default function PhotoAlbumsWorkspacePane({
         });
         if (attachment) {
           const attachmentId = Number(attachment.attachment_id);
-          if (Number.isFinite(attachmentId) && attachmentId > 0) {
+          const isDuplicate = Boolean(attachment.duplicate);
+          const seqFromUpload =
+            attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null;
+          // Never bind a new File object-URL to a reused (duplicate) attachment id —
+          // tray thumb would disagree with the vault bytes Auto Layout places on the page.
+          if (!isDuplicate && Number.isFinite(attachmentId) && attachmentId > 0) {
             const previewUrl =
               localPreviewUrl ||
               primeStagingAttachmentPreview(attachmentId, file, file.name || '') ||
               '';
             if (previewUrl) localPreviewUrl = previewUrl;
+          } else if (isDuplicate && localPreviewUrl) {
+            try {
+              URL.revokeObjectURL(localPreviewUrl);
+            } catch {
+              // ignore
+            }
+            localPreviewUrl = '';
           }
           const ext = String(attachment.file_extension || '').toLowerCase();
           const isTrayMedia =
@@ -4987,8 +4999,6 @@ export default function PhotoAlbumsWorkspacePane({
               type: file.type
             }) || isPhotoAlbumsStagingAlbumMediaFile({ name: `x.${ext}` });
           if (isTrayMedia && Number.isFinite(attachmentId) && attachmentId > 0) {
-            const seqFromUpload =
-              attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null;
             noteEditorApiRef.current?.addStagedAttachment?.(
               mergeStagingItemPreview({
                 attachmentId,
@@ -4998,7 +5008,7 @@ export default function PhotoAlbumsWorkspacePane({
                 checksum: attachment.checksum || null,
                 albumPhotoSeq:
                   Number.isFinite(seqFromUpload) && seqFromUpload >= 1 ? seqFromUpload : null,
-                ...(localPreviewUrl ? { localPreviewUrl } : null)
+                ...(!isDuplicate && localPreviewUrl ? { localPreviewUrl } : null)
               })
             );
           }

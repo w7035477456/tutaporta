@@ -848,6 +848,23 @@ app.use((req, res, next) => {
     });
   }
   if (
+    req.method === 'POST' &&
+    (req.path === '/api/photoAlbums/onedrive/restore-zip' ||
+      req.path === '/api/photoAlbums/usb/restore-zip' ||
+      req.path === '/api/recordVault/onedrive/restore-zip' ||
+      req.path === '/api/recordVault/usb/restore-zip')
+  ) {
+    const cl = req.get('content-length');
+    const n = cl ? parseInt(cl, 10) : NaN;
+    uploadTrace('photoalbums-restore-incoming', {
+      path: req.path,
+      contentLength: cl || '(no header)',
+      approxRequestMiB: Number.isFinite(n) ? (n / (1024 * 1024)).toFixed(2) : '?',
+      contentType: String(req.get('content-type') || '').slice(0, 80) || '(none)',
+      note: 'TutaPhoto restore multipart — if logs stop here, body never reached route'
+    });
+  }
+  if (
     (req.method === 'POST' &&
       (req.path === '/api/recordVault/tutadrive/backup' ||
         req.path === '/api/recordVault/tutadrive/restore-zip' ||

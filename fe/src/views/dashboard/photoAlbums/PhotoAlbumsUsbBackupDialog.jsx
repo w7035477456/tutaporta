@@ -12,11 +12,7 @@ import {
   restorePhotoAlbumsUsbBackupZip
 } from 'api/photoAlbumsFe';
 import PhotoAlbumsOneDriveVaultTreePanel from './PhotoAlbumsOneDriveVaultTreePanel';
-import {
-  tutaPhotoAlbumsFormatPostLoginButtonSx,
-  tutaPhotoAlbumsOrangePostLoginButtonSx,
-  tutaPhotoAlbumsPostLoginActionButtonSx
-} from './tutaPhotoAlbumsPostLoginActionButtonSx';
+import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const BACKUP_POPUP_WIDTH = '90vw';
@@ -46,20 +42,6 @@ const actionButtonSx = {
   px: 2,
   ...tutaPhotoAlbumsPostLoginActionButtonSx,
   width: { xs: '100%', sm: 'auto' }
-};
-
-const backupRestoreOrangeButtonSx = {
-  ...actionButtonSx,
-  ...tutaPhotoAlbumsOrangePostLoginButtonSx,
-  width: { xs: '100%', sm: 'auto' },
-  minWidth: { xs: '100%', sm: 200 }
-};
-
-const formatRedButtonSx = {
-  ...actionButtonSx,
-  ...tutaPhotoAlbumsFormatPostLoginButtonSx,
-  width: { xs: '100%', sm: 'auto' },
-  minWidth: { xs: '100%', sm: 200 }
 };
 
 const formatWarningBoxSx = {
@@ -336,7 +318,7 @@ export default function PhotoAlbumsUsbBackupDialog({
                 type="button"
                 disabled={busy || !canBackupAlbum}
                 onClick={() => void handleBackup()}
-                sx={backupRestoreOrangeButtonSx}
+                sx={actionButtonSx}
                 {...guestDemoBlockProps()}
               >
                 Backup Current Album
@@ -345,7 +327,7 @@ export default function PhotoAlbumsUsbBackupDialog({
                 type="button"
                 disabled={busy}
                 onClick={() => void handleFormat()}
-                sx={formatRedButtonSx}
+                sx={actionButtonSx}
                 {...guestDemoBlockProps()}
               >
                 Format TutaPhotoAlbums USB
@@ -354,7 +336,7 @@ export default function PhotoAlbumsUsbBackupDialog({
                 type="button"
                 disabled={busy}
                 onClick={handleRestoreClick}
-                sx={backupRestoreOrangeButtonSx}
+                sx={actionButtonSx}
                 {...guestDemoBlockProps()}
               >
                 Restore TutaPhotoAlbums USB
