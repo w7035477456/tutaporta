@@ -9,7 +9,12 @@ import Typography from '@mui/material/Typography';
 import SliderControlButton from 'ui-component/SliderControlButton';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
-import { guestDemoBlockProps } from 'utils/guestDemoLogin';
+import { useAuth } from 'contexts/AuthContext';
+import {
+  guestDemoBlockProps,
+  isGuestDemoLogin,
+  notifyGuestDemoBlocked
+} from 'utils/guestDemoLogin';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
@@ -825,6 +830,7 @@ function transferFramedPanZoomToSlot({
  * Other files keep the yellow bar. Runtime context is read from editor storage.
  */
 function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttributes, selected, getPos }) {
+  const { user } = useAuth();
   const attachmentId = Number(node?.attrs?.attachmentId);
   const albumPhotoSeq = (() => {
     const n = Number(node?.attrs?.albumPhotoSeq);
@@ -1083,6 +1089,14 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
       if (event.target?.closest?.('.rv-album-video-indicator')) return;
       if (event.target?.closest?.('.rv-photo-tile__zoom-bar')) return;
       if (event.target?.closest?.('button')) return;
+
+      // Guest demo: block page↔page relocate / slot swap / free-place drag.
+      if (isGuestDemoLogin(user)) {
+        event.preventDefault();
+        event.stopPropagation();
+        notifyGuestDemoBlocked();
+        return;
+      }
 
       // Slot rearrange without Edit Photo; free-place / pan still need selection.
       const framedRelocateWithoutEdit = Boolean(inFrame && !panEnabled);
@@ -1725,7 +1739,8 @@ function PhotoAlbumsAttachmentNodeView({ node, editor, deleteNode, updateAttribu
       node?.attrs?.fileSizeBytes,
       node?.attrs?.checksum,
       node?.attrs?.slotFit,
-      panEnabled
+      panEnabled,
+      user
     ]
   );
 

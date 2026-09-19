@@ -59,3 +59,11 @@ export function guestDemoAllowProps() {
 export function guestDemoBlockProps() {
   return { [GUEST_DEMO_BLOCK_ATTR]: 'true' };
 }
+
+/** Open the shared demo restriction popup (GuestDemoGate listens). */
+export const GUEST_DEMO_BLOCKED_EVENT = 'guest-demo-blocked';
+
+export function notifyGuestDemoBlocked() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(GUEST_DEMO_BLOCKED_EVENT));
+}

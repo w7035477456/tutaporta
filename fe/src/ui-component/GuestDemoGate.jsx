@@ -8,6 +8,7 @@ import { TUTADATES_MY_STORE_PATH, TUTADATES_PATH } from 'constants/tutaDatesRout
 import {
   GUEST_DEMO_ALLOW_ATTR,
   GUEST_DEMO_BLOCK_ATTR,
+  GUEST_DEMO_BLOCKED_EVENT,
   GUEST_DEMO_LOGIN_MESSAGE,
   guestDemoAllowProps,
   isGuestDemoLogin
@@ -185,6 +186,8 @@ export default function GuestDemoGate() {
     document.addEventListener('dragstart', blockDragDrop, true);
     document.addEventListener('dragover', preventMyStoryFileDragOver, true);
     document.addEventListener('drop', blockDragDrop, true);
+    const onProgrammaticBlock = () => setOpen(true);
+    window.addEventListener(GUEST_DEMO_BLOCKED_EVENT, onProgrammaticBlock);
 
     return () => {
       document.removeEventListener('click', blockEvent, true);
@@ -194,6 +197,7 @@ export default function GuestDemoGate() {
       document.removeEventListener('dragstart', blockDragDrop, true);
       document.removeEventListener('dragover', preventMyStoryFileDragOver, true);
       document.removeEventListener('drop', blockDragDrop, true);
+      window.removeEventListener(GUEST_DEMO_BLOCKED_EVENT, onProgrammaticBlock);
     };
   }, [guestDemo]);
 
