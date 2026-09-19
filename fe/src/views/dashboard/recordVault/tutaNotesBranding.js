@@ -13,7 +13,7 @@ export const TUTANOTES_USB_LOGIN_TITLE = 'TutaNotes USB Login';
 export const TUTANOTES_USB_DECRYPT_TITLE = 'Icon Decrypt USB TutaNotes';
 
 /** Workspace panels (header strip, notebook lanes) — theme daylight. */
-export const TUTANOTES_WORKSPACE_PANEL_BG = 'var(--theme-daylight-color)';
+export const TUTANOTES_WORKSPACE_PANEL_BG = 'var(--theme-daynight-color)';
 
 /** Main content (note editor, bill schedule, right sidebar) — theme daynight. */
 export const TUTANOTES_WORKSPACE_CONTENT_BG = 'var(--theme-daynight-color)';

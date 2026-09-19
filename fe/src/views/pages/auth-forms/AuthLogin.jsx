@@ -17,14 +17,14 @@ import api from 'api/axios';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
-import { getDesktopIconSizeVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
+import { getDesktopIconSizeVw, getDesktopTextFontSizeHalfVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { authFormContentSx, authLinkHoverScaleSx } from '../authentication/authPageLayoutSx';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
-import { markMobilePostLoginChooserPending } from 'utils/mobilePostLoginChoice';
+import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
 
 // assets
 import Visibility from '@mui/icons-material/Visibility';
@@ -34,7 +34,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
 const fieldWithRightImageRowSx = {
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   justifyContent: 'flex-start',
   gap: { xs: 0.5, sm: 0.75 },
   width: '100%',
@@ -46,6 +46,15 @@ const fieldWithRightImageInputColSx = {
   flex: '1 1 0%',
   minWidth: 0,
   width: '100%'
+};
+
+const fieldCaseHintSx = {
+  mt: 0.35,
+  mb: 0,
+  fontSize: { xs: '0.7rem', sm: getDesktopTextFontSizeHalfVw() },
+  lineHeight: 1.25,
+  color: 'var(--theme-primary-color)',
+  fontWeight: 500
 };
 
 /** fe/.env DESKTOP_ICON_SIZE — enter email / enter password graphics beside fields */
@@ -186,7 +195,7 @@ export default function AuthLogin() {
           return;
         }
         if (isMobileViewport) {
-          markMobilePostLoginChooserPending();
+          requestMobilePostLoginChooser();
         }
         const from = location.state?.from;
         navigate(resolvePostLoginPath(from), { replace: true });
@@ -292,7 +301,7 @@ export default function AuthLogin() {
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
             id="outlined-adornment-email-login"
-            label="Email or Phone (Not Case Sensitive)"
+            label="Email or Phone"
             type="text"
             value={email}
             onChange={handleEmailChange}
@@ -301,6 +310,9 @@ export default function AuthLogin() {
             required
             inputProps={{ onKeyDown: handleCredentialKeyDown }}
           />
+          <Typography component="div" sx={fieldCaseHintSx}>
+            Not case sensitive
+          </Typography>
         </Box>
         <Box
           component="img"
@@ -317,7 +329,7 @@ export default function AuthLogin() {
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
             id="outlined-adornment-password-login"
-            label="Password (Case Sensitive)"
+            label="Password"
             type={passwordVisible ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -338,6 +350,9 @@ export default function AuthLogin() {
               </InputAdornment>
             }
           />
+          <Typography component="div" sx={fieldCaseHintSx}>
+            Case sensitive
+          </Typography>
         </Box>
         <Box
           component="img"

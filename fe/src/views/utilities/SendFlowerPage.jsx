@@ -1153,17 +1153,17 @@ export default function SendFlowerPage() {
                         fontSize: { xs: getMobileSinglesButtonFontSizeVw(), sm: getDesktopButtonFontSizeVw() },
                         textTransform: 'none',
                         minHeight: { xs: 38, sm: 36 },
-                        bgcolor: 'var(--theme-daylight-color)',
+                        bgcolor: 'var(--theme-daynight-color)',
                         color: 'var(--theme-primary-color)',
                         borderColor: 'var(--theme-primary-color)',
                         '&:hover': {
-                          bgcolor: 'var(--theme-daylight-color)',
+                          bgcolor: 'var(--theme-daynight-color)',
                           color: 'var(--theme-primary-color)',
                           borderColor: 'var(--theme-primary-color)',
                           filter: 'brightness(0.96)'
                         },
                         '&.Mui-disabled': {
-                          bgcolor: 'var(--theme-daylight-color)',
+                          bgcolor: 'var(--theme-daynight-color)',
                           color: 'var(--theme-primary-color)',
                           borderColor: 'var(--theme-primary-color)',
                           opacity: 0.6

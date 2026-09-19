@@ -4,8 +4,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  /* Workspace surround (around binder) — theme primary */
-  background: var(--theme-primary-color);
+  /* Workspace surround (around binder) — theme daynight */
+  background: var(--theme-daynight-color);
   color: #111111;
   border-radius: 6px;
   overflow: hidden;
@@ -14,14 +14,14 @@
 .rv-editor--album-fullscreen {
   border-radius: 0;
   overflow: hidden;
-  background: #000000 !important;
+  background: var(--theme-daynight-color) !important;
 
   .rv-editor__album-zoom-scroll {
     flex: 1 1 auto;
     min-height: 0;
-    /* Black margins for Prev/Next strips — keep controls off the photos. */
+    /* Daynight margins for Prev/Next strips — keep controls off the photos. */
     padding: 56px 8px !important;
-    background-color: #000000 !important;
+    background-color: var(--theme-daynight-color) !important;
   }
 
   .rv-editor__album-zoom-scaler {
@@ -169,12 +169,12 @@
   overflow: hidden !important;
   scrollbar-gutter: auto;
   /*
-   * 5–10px theme-primary gutter around the binder/page (AUTO-ZOOM “border”).
+   * 5–10px theme-daynight gutter around the binder/page (AUTO-ZOOM “border”).
    * Fit zoom subtracts this padding + an extra inset so the page never clips it.
    */
   padding: 8px;
   box-sizing: border-box;
-  background-color: var(--theme-primary-color);
+  background-color: var(--theme-daynight-color);
   display: flex;
   align-items: center;
   justify-content: center;

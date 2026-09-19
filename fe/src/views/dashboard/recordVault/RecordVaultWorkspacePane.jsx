@@ -92,8 +92,12 @@ import ProfilesRecordsPage from 'views/utilities/ProfilesRecordsPage';
 import { PROFILES_RECORDS_PAYMENT_TABS } from 'constants/profilesRecordsRoute';
 import RecordVaultMobileUploadDialog from './RecordVaultMobileUploadDialog';
 import RecordVaultMobileDirectUploadDialog from './RecordVaultMobileDirectUploadDialog';
+import RecordVaultMobileUploadTray, {
+  isRecordVaultMobileUploadDrag,
+  materializeRecordVaultMobileUploadFile,
+  readRecordVaultMobileUploadDragFileName
+} from './RecordVaultMobileUploadTray';
 import RecordVaultCrossPaneTransferDialog from './RecordVaultCrossPaneTransferDialog';
-import api from 'api/axios';
 import {
   clearActiveCrossPaneDrag,
   DRAG_CROSS_PANE,
@@ -1717,6 +1721,7 @@ export default function RecordVaultWorkspacePane({
   /** Imperative handle to the TipTap editor (get/set HTML, toggle editable). */
   const noteEditorApiRef = useRef(null);
   const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
+  const [mobileUploadTrayRefreshToken, setMobileUploadTrayRefreshToken] = useState(0);
   /** Phone post-login: direct camera/gallery into the open note (not desktop QR). */
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
   /** Highlight the notes-list column while dragging an importable file over it. */
@@ -3642,37 +3647,22 @@ export default function RecordVaultWorkspacePane({
     ) {
       return;
     }
-    if (types.includes('Files')) {
+    if (types.includes('Files') || isRecordVaultMobileUploadDrag(event.dataTransfer)) {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
     }
   }, [selectedNoteId]);
 
   /** Phone QR upload → fetch album photo → insert into open note body. */
-  const handleMobilePhoneUploadComplete = useCallback(
-    async (photosId) => {
-      const id = Number(photosId);
-      if (!selectedNote || !Number.isFinite(id) || id < 1) return;
-      if (noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)) {
-        setError('Unlock this note before adding a phone photo');
-        return;
-      }
-      setBusy(true);
+  const handleMobilePhoneUploadComplete = useCallback(async (_fileNameOrId, meta = {}) => {
+    // Phone QR uses purpose=photo_albums → UPLOAD_FOLDER; show in Mobile Upload tray
+    // (drag onto note) instead of auto-inserting into the open note.
+    setMobileUploadOpen(false);
+    setMobileUploadTrayRefreshToken((n) => n + 1);
+    if (meta?.purpose === 'photo_albums' || meta?.fileName) {
       setError('');
-      try {
-        const res = await api.get(`/api/photo/${id}`, { responseType: 'blob' });
-        const image = await readFileAsDataUrl(res.data);
-        noteEditorApiRef.current?.insertImage?.(image);
-        setMobileUploadOpen(false);
-      } catch (err) {
-        setError(readRecordVaultApiError(err, 'Failed to add phone upload to note'));
-      } finally {
-        setBusy(false);
-        bumpVaultUsage();
-      }
-    },
-    [selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked, bumpVaultUsage]
-  );
+    }
+  }, []);
 
   /** Mobile post-login chooser → open direct upload once a real note is selected. */
   useEffect(() => {
@@ -4108,8 +4098,11 @@ export default function RecordVaultWorkspacePane({
       ) {
         return;
       }
+      const mobileUploadName = isRecordVaultMobileUploadDrag(event.dataTransfer)
+        ? readRecordVaultMobileUploadDragFileName(event.dataTransfer)
+        : '';
       const isFileDrag = types.includes('Files');
-      if (!isFileDrag) return;
+      if (!isFileDrag && !mobileUploadName) return;
       event.preventDefault();
       event.stopPropagation();
       if (noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)) {
@@ -4119,12 +4112,24 @@ export default function RecordVaultWorkspacePane({
         setError('Vault is busy — try dropping again in a moment.');
         return;
       }
+      const coords = { x: event.clientX, y: event.clientY };
+
+      if (mobileUploadName) {
+        try {
+          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName);
+          const ok = await uploadNoteVaultFile(file, coords);
+          if (ok) setMobileUploadTrayRefreshToken((n) => n + 1);
+        } catch (err) {
+          setError(readRecordVaultApiError(err, 'Failed to add mobile upload to note'));
+        }
+        return;
+      }
+
       const files = Array.from(event.dataTransfer?.files || []);
       if (!files.length) return;
 
       const attachFiles = files.filter((file) => isAllowedRecordVaultFile(file));
       const markdownOnly = files.filter((file) => classifyNoteImportDropFile(file) === 'md');
-      const coords = { x: event.clientX, y: event.clientY };
 
       if (!attachFiles.length) {
         if (markdownOnly.length) {
@@ -6319,8 +6324,10 @@ export default function RecordVaultWorkspacePane({
       <RecordVaultMobileUploadDialog
         open={mobileUploadOpen}
         onClose={() => setMobileUploadOpen(false)}
-        disabled={busy || !selectedNote}
-        onPhoneUploadComplete={(photosId) => void handleMobilePhoneUploadComplete(photosId)}
+        disabled={busy}
+        onPhoneUploadComplete={(fileNameOrId, meta) =>
+          void handleMobilePhoneUploadComplete(fileNameOrId, meta)
+        }
       />
 
       <RecordVaultMobileDirectUploadDialog
@@ -6984,17 +6991,9 @@ export default function RecordVaultWorkspacePane({
                       fullWidth
                       data-guest-demo-allow="true"
                       onClick={() => setMobileUploadOpen(true)}
-                      disabled={
-                        busy ||
-                        innerEncryptBusy ||
-                        notebookGateLocked ||
-                        !selectedNote ||
-                        (selectedNote &&
-                          noteHasInnerEncryption(selectedNote) &&
-                          !isInnerNoteUnlocked(selectedNote.note_id))
-                      }
+                      disabled={busy || innerEncryptBusy}
                       aria-label="Mobile Upload"
-                      title="Mobile Upload"
+                      title="Mobile Upload — scan QR; drag thumbnails from the Mobile Upload row onto a note"
                       sx={headerFullWidthButtonSx}
                     >
                       {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
@@ -7280,6 +7279,23 @@ export default function RecordVaultWorkspacePane({
               </Typography>
             ) : null}
           </Box>
+          ) : null}
+
+          {!compareMode ? (
+            <RecordVaultMobileUploadTray
+              active={unlocked}
+              disabled={
+                busy ||
+                innerEncryptBusy ||
+                !selectedNote ||
+                isBillScheduleSystemId(selectedNote?.note_id) ||
+                (selectedNote &&
+                  noteHasInnerEncryption(selectedNote) &&
+                  !isInnerNoteUnlocked(selectedNote.note_id))
+              }
+              refreshToken={mobileUploadTrayRefreshToken}
+              onError={(msg) => setError(String(msg || ''))}
+            />
           ) : null}
 
           <Box

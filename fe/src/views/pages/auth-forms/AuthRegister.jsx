@@ -34,6 +34,8 @@ import {
   clearGoogleSignupToken
 } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
 
@@ -123,6 +125,7 @@ export default function AuthRegister() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { refreshSessionAfterExternalLogin } = useAuth();
+  const isMobileViewport = useCompactLoginViewport();
   const [checked, setChecked] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -151,8 +154,11 @@ export default function AuthRegister() {
 
   const navigateAfterGoogleLogin = useCallback(async () => {
     await refreshSessionAfterExternalLogin();
+    if (isMobileViewport) {
+      requestMobilePostLoginChooser();
+    }
     navigate(resolvePostLoginPath(location.state?.from), { replace: true });
-  }, [refreshSessionAfterExternalLogin, location.state, navigate]);
+  }, [refreshSessionAfterExternalLogin, location.state, navigate, isMobileViewport]);
 
   const handleEmailChange = (e) => {
     if (googleBound) return;

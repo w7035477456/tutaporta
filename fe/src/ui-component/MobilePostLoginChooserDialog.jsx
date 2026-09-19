@@ -1,4 +1,3 @@
-import PropTypes from 'prop-types';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Stack from '@mui/material/Stack';
@@ -13,6 +12,7 @@ import {
   markMobileTutaDatesUploadPending,
   markMobileTutaNotesUploadPending,
   markMobileTutaPhotoUploadPending,
+  MOBILE_POST_LOGIN_CHOOSER_EVENT,
   peekMobilePostLoginChooserPending
 } from 'utils/mobilePostLoginChoice';
 
@@ -22,6 +22,7 @@ const DESKTOP_RECOMMEND_MESSAGE =
 const choiceButtonSx = {
   width: '100%',
   maxWidth: '100%',
+  minWidth: '0 !important',
   whiteSpace: 'normal',
   lineHeight: 1.25,
   py: 1.25,
@@ -29,8 +30,23 @@ const choiceButtonSx = {
   textAlign: 'center'
 };
 
+/** Long label — smaller than BSIZE so the full line fits on narrow phones. */
+const useAppsButtonSx = {
+  ...choiceButtonSx,
+  fontSize: { xs: '3.4vw !important', sm: '1.35vw !important' },
+  '&.MuiButton-root': {
+    fontSize: { xs: '3.4vw !important', sm: '1.35vw !important' }
+  },
+  '& .MuiButton-label': {
+    fontSize: { xs: '3.4vw !important', sm: '1.35vw !important' },
+    whiteSpace: 'normal',
+    lineHeight: 1.2
+  }
+};
+
 /**
  * After mobile/compact login: pick upload destination or see desktop recommendation.
+ * Mall taps on Tuta Dates / Albums / Notes reopen this chooser on compact viewports.
  */
 export default function MobilePostLoginChooserDialog() {
   const navigate = useNavigate();
@@ -39,12 +55,19 @@ export default function MobilePostLoginChooserDialog() {
   const [open, setOpen] = useState(false);
   const [desktopRecommendOpen, setDesktopRecommendOpen] = useState(false);
 
-  useEffect(() => {
-    if (!user || !isCompact) return undefined;
-    if (!peekMobilePostLoginChooserPending()) return undefined;
+  const tryOpenChooser = useCallback(() => {
+    if (!user || !isCompact) return;
+    if (!peekMobilePostLoginChooserPending()) return;
     setOpen(true);
-    return undefined;
   }, [user, isCompact]);
+
+  useEffect(() => {
+    tryOpenChooser();
+    if (typeof window === 'undefined') return undefined;
+    const onRequest = () => tryOpenChooser();
+    window.addEventListener(MOBILE_POST_LOGIN_CHOOSER_EVENT, onRequest);
+    return () => window.removeEventListener(MOBILE_POST_LOGIN_CHOOSER_EVENT, onRequest);
+  }, [tryOpenChooser]);
 
   const closeChooser = useCallback(() => {
     clearMobilePostLoginChooserPending();
@@ -92,16 +115,16 @@ export default function MobilePostLoginChooserDialog() {
             Choose where to upload a photo, or continue to the apps.
           </Typography>
           <Stack spacing={1.25} sx={{ width: '100%' }}>
-            <GreenButton type="button" onClick={goTutaNotesUpload} sx={choiceButtonSx}>
+            <GreenButton type="button" onClick={goTutaNotesUpload} singleLineLabel={false} sx={choiceButtonSx}>
               Upload Photo to TutaNotes
             </GreenButton>
-            <GreenButton type="button" onClick={goTutaPhotoUpload} sx={choiceButtonSx}>
+            <GreenButton type="button" onClick={goTutaPhotoUpload} singleLineLabel={false} sx={choiceButtonSx}>
               Upload Photo to TutaPhoto
             </GreenButton>
-            <GreenButton type="button" onClick={goTutaDatesUpload} sx={choiceButtonSx}>
+            <GreenButton type="button" onClick={goTutaDatesUpload} singleLineLabel={false} sx={choiceButtonSx}>
               Upload photo to TutaDates
             </GreenButton>
-            <GreenButton type="button" onClick={goUseApps} sx={choiceButtonSx}>
+            <GreenButton type="button" onClick={goUseApps} singleLineLabel={false} sx={useAppsButtonSx}>
               Use TutaDates/TutaNotes/TutaPhotos
             </GreenButton>
           </Stack>

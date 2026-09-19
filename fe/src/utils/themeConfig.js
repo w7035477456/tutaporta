@@ -171,13 +171,12 @@ export const SECONDARY_VAR = '--theme-secondary-color';
 export const DAYNIGHT_VAR = '--theme-daynight-color';
 export const DAYNIGHT2_VAR = '--theme-daynight2-color';
 export const INVERSE_DAYNIGHT_VAR = '--theme-inverse-daynight-color';
-export const DAYLIGHT_VAR = '--theme-daylight-color';
-export const INVERSE_DAYLIGHT_VAR = '--theme-inverse-daylight-color';
+export const INVERSE_DAYNIGHT2_VAR = '--theme-inverse-daynight2-color';
 
-/** Current `--theme-daylight-color` from the document root (editor letterbox / crop fill). */
+/** Current `--theme-daynight-color` from the document root (editor letterbox / crop fill). */
 export function readThemeDaylightColor(fallback = '#FFFFFF') {
   if (typeof document === 'undefined') return fallback;
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(DAYLIGHT_VAR).trim();
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(DAYNIGHT_VAR).trim();
   return raw || fallback;
 }
 
@@ -229,11 +228,34 @@ export function getColorFullPalete() {
   return Boolean(COLOR_FULL_PALETE);
 }
 
+function parseHexRgbChannels(value) {
+  const raw = String(value ?? '').trim();
+  const match = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!match) return null;
+  let hex = match[1];
+  if (hex.length === 3) {
+    hex = hex
+      .split('')
+      .map((ch) => ch + ch)
+      .join('');
+  }
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  if (![r, g, b].every(Number.isFinite)) return null;
+  return [r, g, b];
+}
+
 export function isBlackColor(value) {
   const raw = String(value ?? '')
     .trim()
     .toLowerCase();
   if (raw === '#000' || raw === '#000000' || raw === 'black') return true;
+  const hexRgb = parseHexRgbChannels(raw);
+  if (hexRgb) {
+    const [r, g, b] = hexRgb;
+    return r === 0 && g === 0 && b === 0;
+  }
   const nums = raw.match(/\d+(\.\d+)?/g);
   if (!nums || nums.length < 3) return false;
   const [r, g, b] = nums.slice(0, 3).map((n) => Number(n));
@@ -245,6 +267,11 @@ export function isWhiteColor(value) {
     .trim()
     .toLowerCase();
   if (raw === '#fff' || raw === '#ffffff' || raw === 'white') return true;
+  const hexRgb = parseHexRgbChannels(raw);
+  if (hexRgb) {
+    const [r, g, b] = hexRgb;
+    return r === 255 && g === 255 && b === 255;
+  }
   const nums = raw.match(/\d+(\.\d+)?/g);
   if (!nums || nums.length < 3) return false;
   const [r, g, b] = nums.slice(0, 3).map((n) => Number(n));
@@ -364,9 +391,8 @@ export function applyThemeColors(
   document.documentElement.style.setProperty(DAYNIGHT_VAR, dn);
   document.documentElement.style.setProperty(DAYNIGHT2_VAR, dn2);
   document.documentElement.style.setProperty(INVERSE_DAYNIGHT_VAR, inverseDn);
-  document.documentElement.style.setProperty(DAYLIGHT_VAR, dn2);
   document.documentElement.style.setProperty(
-    INVERSE_DAYLIGHT_VAR,
+    INVERSE_DAYNIGHT2_VAR,
     isBlackColor(dn2) ? '#FFFFFF' : '#000000'
   );
   document.documentElement.style.setProperty(ERROR_VAR, ERROR_COLOR_VALUE);

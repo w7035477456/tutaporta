@@ -33,6 +33,39 @@ import { RecordVaultSearchHighlight } from './recordVaultSearchHighlight';
 const lowlight = createLowlight(common);
 
 /**
+ * Stock LineHeight only sets a textStyle mark (span), so the toolbar ↕ control
+ * never affected the gaps between <p> blocks. Apply line-height on paragraph /
+ * heading nodes instead.
+ */
+const RecordVaultLineHeight = LineHeight.extend({
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading']
+    };
+  },
+
+  addCommands() {
+    return {
+      setLineHeight:
+        (lineHeight) =>
+        ({ commands }) => {
+          // Try both node types — chain() would stop if heading isn't active.
+          const onParagraph = commands.updateAttributes('paragraph', { lineHeight });
+          const onHeading = commands.updateAttributes('heading', { lineHeight });
+          return onParagraph || onHeading;
+        },
+      unsetLineHeight:
+        () =>
+        ({ commands }) => {
+          const onParagraph = commands.updateAttributes('paragraph', { lineHeight: null });
+          const onHeading = commands.updateAttributes('heading', { lineHeight: null });
+          return onParagraph || onHeading;
+        }
+    };
+  }
+});
+
+/**
  * Default mention directory. Replace with real vault members when wiring a
  * backend data source — the suggestion UI stays the same.
  */
@@ -59,7 +92,7 @@ export function buildRecordVaultEditorExtensions() {
     BackgroundColor,
     FontFamily,
     FontSize,
-    LineHeight,
+    RecordVaultLineHeight,
 
     // Marks
     Highlight.configure({ multicolor: true }),

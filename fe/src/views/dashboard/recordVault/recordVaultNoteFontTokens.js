@@ -133,7 +133,15 @@ export function recordVaultThemeDaynightShellSx(bgColorIndex) {
   };
 }
 
+/**
+ * Default typeface for note body text only (TipTap / ProseMirror).
+ * UI chrome stays on MAIN_FONT (Algerian); do not apply this site-wide.
+ * Matches toolbar label “Sans”.
+ */
+export const RECORD_VAULT_DEFAULT_NOTE_TEXT_FONT_FAMILY = 'Arial, Helvetica, sans-serif';
+
 export const RECORD_VAULT_FONT_FAMILY_OPTIONS = [
+  RECORD_VAULT_DEFAULT_NOTE_TEXT_FONT_FAMILY,
   'Algerian, fantasy',
   'Inter, sans-serif',
   'Georgia, serif',

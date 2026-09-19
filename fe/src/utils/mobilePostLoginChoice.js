@@ -1,6 +1,9 @@
 /** sessionStorage — show mobile post-login destination chooser once after sign-in. */
 export const MOBILE_POST_LOGIN_CHOOSER_KEY = 'mobilePostLoginChooserPending';
 
+/** window event — reopen Mobile upload chooser while already logged in (mall tile taps). */
+export const MOBILE_POST_LOGIN_CHOOSER_EVENT = 'mobile-post-login-chooser';
+
 /** sessionStorage — after choosing Upload → TutaNotes, open direct upload on /myNote. */
 export const MOBILE_TUTANOTES_UPLOAD_KEY = 'mobileTutaNotesUploadPending';
 
@@ -10,6 +13,17 @@ export const MOBILE_TUTADATES_UPLOAD_KEY = 'mobileTutaDatesUploadPending';
 export function markMobilePostLoginChooserPending() {
   try {
     sessionStorage.setItem(MOBILE_POST_LOGIN_CHOOSER_KEY, '1');
+  } catch {
+    // ignore
+  }
+}
+
+/** Mark pending and notify MainLayout dialog (login + mall tile redirects). */
+export function requestMobilePostLoginChooser() {
+  markMobilePostLoginChooserPending();
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(MOBILE_POST_LOGIN_CHOOSER_EVENT));
   } catch {
     // ignore
   }

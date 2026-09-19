@@ -1,0 +1,48 @@
+---
+description: Mac → Ubuntu SSH — use f2-style hardened SSH (VPN, key, port 59221)
+alwaysApply: true
+---
+
+# SSH — Mac → Ubuntu (xbox2)
+
+To connect from Mac to the Ubuntu app server (`192.168.222.202` / xbox2), **always use the same hardened path as the `f2` alias** — not plain `ssh user@host`.
+
+## Canonical alias (`f2`)
+
+After `source ~/b` (repo: `myscript/mac/b`):
+
+```bash
+alias f2='checkVpn && sudo ssh -v -o IdentitiesOnly=yes -i /Volumes/MSWORD2010/.coredump/corruptedKey_march2024 -p 59221 lawsen0@192.168.222.202'
+```
+
+| Piece | Value | Why |
+|-------|--------|-----|
+| `checkVpn` | run first | VPN must be up before SSH |
+| `sudo ssh` | with sudo | Required for this key / setup |
+| `-o IdentitiesOnly=yes` | | Use only the `-i` key; ignore ssh-agent |
+| `-i` | `/Volumes/MSWORD2010/.coredump/corruptedKey_march2024` | Private key on mounted volume |
+| `-p` | `59221` | Non-default SSH port |
+| user@host | `lawsen0@192.168.222.202` | Primary Ubuntu host |
+
+Interactive login: run **`f2`**.
+
+## Agents / scripts (non-interactive)
+
+Do **not** invent a different SSH command. Match `f2`:
+
+1. Ensure VPN (`checkVpn` if available; same as `f2`).
+2. Mount volume so the key path is readable (or set `DEPLOY_SSH_KEY`).
+3. Prefer **`scripts/deploy-ssh-mac.sh`** (wraps the same options as `f2`):
+
+```bash
+scripts/deploy-ssh-mac.sh lawsen0@192.168.222.202 'hostname'
+```
+
+Overrides: `DEPLOY_SSH_KEY`, `DEPLOY_SSH_PORT` (default `59221`).
+
+## Rules for agents
+
+- **Never** `ssh lawsen0@192.168.222.202` without `-p 59221`, `IdentitiesOnly=yes`, and the corruptedKey path (or `deploy-ssh-mac.sh`).
+- **Never** use agent keys / `githubkey` for this host — IdentitiesOnly + explicit `-i` only.
+- `scp` / `rsync` over SSH must use the **same** port, key, and IdentitiesOnly options.
+- On Ubuntu itself, `f2` is a no-op reminder (already on the box) — see `myscript/ubuntu/b`.

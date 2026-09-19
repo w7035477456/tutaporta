@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import Button from '@mui/material/Button';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { buttonTemplateSingleLineLabelSx } from 'config/selectedUnselectedButtonTemplate';
-import { DAYLIGHT_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
+import { DAYNIGHT_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 import { useRecordVaultSliderControlButtonFontRem } from 'views/dashboard/recordVault/RecordVaultSliderControlButtonContext';
 import { usePhotoAlbumsSliderControlButtonFontRem } from 'views/dashboard/photoAlbums/PhotoAlbumsSliderControlButtonContext';
 import { isPhotoAlbumsRoute } from 'config/photoAlbumsLayout';
@@ -48,9 +48,9 @@ function resolveVariantSx(variant, selected) {
   if (selected === false) {
     return {
       bgcolor: 'var(--theme-primary-color) !important',
-      color: `var(${DAYLIGHT_VAR}) !important`,
-      WebkitTextFillColor: `var(${DAYLIGHT_VAR}) !important`,
-      border: `4px solid var(${DAYLIGHT_VAR}) !important`
+      color: `var(${DAYNIGHT_VAR}) !important`,
+      WebkitTextFillColor: `var(${DAYNIGHT_VAR}) !important`,
+      border: `4px solid var(${DAYNIGHT_VAR}) !important`
     };
   }
 

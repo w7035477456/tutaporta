@@ -6954,14 +6954,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           zIndex: 1,
           ...(albumFullscreen
             ? {
-                // Black margins for top/bottom page-nav strips — keep them off the photos.
+                // Daynight margins for top/bottom page-nav strips — keep them off the photos.
                 pt: `${ALBUM_FS_NAV_PAD_PX}px`,
                 pb: `${ALBUM_FS_NAV_PAD_PX}px`,
                 px: '8px',
-                bgcolor: '#000000'
+                bgcolor: 'var(--theme-daynight-color)'
               }
-            : // Outer album shell (Task 2) — theme primary.
-              { bgcolor: 'var(--theme-primary-color)' })
+            : // Outer album shell — theme daynight (letterbox around cover / pages).
+              { bgcolor: 'var(--theme-daynight-color)' })
         }}
       >
         {!albumChromeHidden && !presentationMode ? (
@@ -7072,7 +7072,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 : { width: 'max-content' }),
               overflow: 'hidden',
               // Letterbox around the album page (Task 3) — theme daylight.
-              bgcolor: 'var(--theme-daylight-color)'
+              bgcolor: 'var(--theme-daynight-color)'
             }}
             >
             <Box
@@ -7085,7 +7085,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 minHeight: `${albumPageViewHeight}px`,
                 maxHeight: `${albumPageViewHeight}px`,
                 overflow: 'hidden',
-                bgcolor: 'var(--theme-daylight-color)',
+                bgcolor: 'var(--theme-daynight-color)',
                 ...(albumSpreadShellWidthPx > 0
                   ? {
                       width: `${albumSpreadShellWidthPx}px`,
@@ -7363,7 +7363,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    bgcolor: '#000',
+                    bgcolor: 'var(--theme-daynight-color)',
                     pointerEvents: 'auto',
                     overflow: 'hidden'
                   }}

@@ -37,9 +37,11 @@ export default function RecordVaultMobileUploadDialog({
         >
           <ProfilePhotoUploadQrPanel
             variant="inline"
+            purpose="photo_albums"
             disabled={disabled}
             qrSize={MOBILE_UPLOAD_QR_SIZE}
             onPhoneUploadComplete={onPhoneUploadComplete}
+            messageOverride="Scan to upload from your phone — photos appear in the Mobile Upload row. Drag a thumbnail onto a note."
             sx={{ maxWidth: MOBILE_UPLOAD_QR_SIZE + 48 }}
           />
         </Box>

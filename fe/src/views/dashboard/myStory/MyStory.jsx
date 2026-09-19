@@ -940,7 +940,7 @@ const StoryPhotoEditor = forwardRef(function StoryPhotoEditor({ photosId, photoC
         display: 'flex',
         flexDirection: 'column',
         gap: 1,
-        bgcolor: 'var(--theme-daylight-color)'
+        bgcolor: 'var(--theme-daynight-color)'
       }}
     >
       {displayUrl ? (
@@ -3572,7 +3572,7 @@ export default function MyStory() {
           contentSX={{
             px: { xs: 0, md: 2 },
             py: { xs: 2, md: 2 },
-            bgcolor: 'var(--theme-daylight-color)',
+            bgcolor: 'var(--theme-daynight-color)',
             display: 'flex',
             flexDirection: 'column',
             ...(myStoryPhoneLayout
@@ -3845,7 +3845,7 @@ export default function MyStory() {
             minWidth: { md: 0 },
             maxWidth: { xs: '100%', md: 'none' },
             alignSelf: { xs: 'stretch', md: 'stretch' },
-            bgcolor: 'var(--theme-daylight-color)',
+            bgcolor: 'var(--theme-daynight-color)',
             WebkitTouchCallout: 'none'
           }}
         >

@@ -1,17 +1,24 @@
 import PropTypes from 'prop-types';
 import { useEditorState } from '@tiptap/react';
 import { themedPrompt } from 'utils/themedDialog';
+import {
+  RECORD_VAULT_DEFAULT_NOTE_TEXT_FONT_FAMILY,
+  RECORD_VAULT_LINE_HEIGHT_OPTIONS
+} from './recordVaultNoteFontTokens';
 
 const FONT_FAMILIES = [
-  { label: 'Default', value: '' },
-  { label: 'Sans', value: 'Arial, Helvetica, sans-serif' },
+  { label: 'Sans', value: RECORD_VAULT_DEFAULT_NOTE_TEXT_FONT_FAMILY },
   { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
   { label: 'Mono', value: '"Courier New", monospace' },
   { label: 'Algerian', value: 'Algerian, fantasy' }
 ];
 
 const FONT_SIZES = ['', '12px', '14px', '16px', '18px', '24px', '32px', '48px'];
-const LINE_HEIGHTS = ['', '1', '1.15', '1.5', '2'];
+/** Default CSS line-height on .ProseMirror — keep dropdown in sync when unset. */
+const DEFAULT_LINE_HEIGHT = '1.25';
+const LINE_HEIGHTS = RECORD_VAULT_LINE_HEIGHT_OPTIONS.includes(DEFAULT_LINE_HEIGHT)
+  ? RECORD_VAULT_LINE_HEIGHT_OPTIONS
+  : [DEFAULT_LINE_HEIGHT, ...RECORD_VAULT_LINE_HEIGHT_OPTIONS];
 
 function Btn({ onClick, active, disabled, title, children }) {
   return (
@@ -65,7 +72,12 @@ export default function RecordVaultEditorToolbar({ editor }) {
         alignRight: e.isActive({ textAlign: 'right' }),
         alignJustify: e.isActive({ textAlign: 'justify' }),
         heading:
-          [1, 2, 3, 4].find((l) => e.isActive('heading', { level: l })) ?? 0
+          [1, 2, 3, 4].find((l) => e.isActive('heading', { level: l })) ?? 0,
+        fontFamily: e.getAttributes('textStyle')?.fontFamily || '',
+        lineHeight:
+          e.getAttributes('paragraph')?.lineHeight ||
+          e.getAttributes('heading')?.lineHeight ||
+          ''
       };
     }
   });
@@ -73,6 +85,13 @@ export default function RecordVaultEditorToolbar({ editor }) {
   if (!editor || !s) return null;
 
   const chain = () => editor.chain().focus();
+  const fontFamilyValue =
+    FONT_FAMILIES.some((f) => f.value === s.fontFamily)
+      ? s.fontFamily
+      : RECORD_VAULT_DEFAULT_NOTE_TEXT_FONT_FAMILY;
+  const lineHeightValue = LINE_HEIGHTS.includes(s.lineHeight)
+    ? s.lineHeight
+    : DEFAULT_LINE_HEIGHT;
 
   const onHeading = (value) => {
     const level = Number(value);
@@ -133,9 +152,16 @@ export default function RecordVaultEditorToolbar({ editor }) {
         <select
           className="rv-tb__select"
           title="Font family"
-          onChange={(e) =>
-            e.target.value ? chain().setFontFamily(e.target.value).run() : chain().unsetFontFamily().run()
-          }
+          value={fontFamilyValue}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (!next || next === RECORD_VAULT_DEFAULT_NOTE_TEXT_FONT_FAMILY) {
+              // Sans is the CSS default on .ProseMirror — clear the mark.
+              chain().unsetFontFamily().run();
+              return;
+            }
+            chain().setFontFamily(next).run();
+          }}
         >
           {FONT_FAMILIES.map((f) => (
             <option key={f.label} value={f.value}>
@@ -159,13 +185,19 @@ export default function RecordVaultEditorToolbar({ editor }) {
         <select
           className="rv-tb__select"
           title="Line height"
-          onChange={(e) =>
-            e.target.value ? chain().setLineHeight(e.target.value).run() : chain().unsetLineHeight().run()
-          }
+          value={lineHeightValue}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (!next || next === DEFAULT_LINE_HEIGHT) {
+              chain().unsetLineHeight().run();
+              return;
+            }
+            chain().setLineHeight(next).run();
+          }}
         >
           {LINE_HEIGHTS.map((v) => (
-            <option key={v || 'default'} value={v}>
-              {v ? `↕ ${v}` : '↕'}
+            <option key={v} value={v}>
+              {`↕ ${v}`}
             </option>
           ))}
         </select>

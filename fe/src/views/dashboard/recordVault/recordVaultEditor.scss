@@ -127,12 +127,38 @@
     min-height: 100%;
     padding: 16px 20px;
     outline: none;
-    line-height: 1.6;
+    /* Tight default; toolbar ↕ overrides via paragraph/heading line-height attr. */
+    line-height: 1.25;
+    /* Note body only — not title / chrome (those keep MAIN_FONT / Algerian). */
+    font-family: Arial, Helvetica, sans-serif;
     background: var(--theme-daynight-color);
     color: var(--theme-inverse-daynight-color);
 
-    > * + * {
-      margin-top: 0.6em;
+    /* Browser UA gives <p> ~1em margins — that looked like “huge line spacing”. */
+    p {
+      margin: 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      margin: 0.75em 0 0.25em;
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    ul,
+    ol,
+    blockquote,
+    pre,
+    table,
+    hr,
+    .rv-attachment-node,
+    .rv-resizable-image {
+      margin: 0.5em 0;
     }
 
     h1 { font-size: 1.9em; font-weight: 700; }

@@ -6,6 +6,8 @@ import Typography from '@mui/material/Typography';
 
 import { useAuth } from 'contexts/AuthContext';
 import { useSiteAudio } from 'contexts/SiteAudioContext';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
 
 import onlinemall from 'assets/images/onlineMallInside.png';
 import eMarketPlaceImg from 'assets/images/onlineMarketPlace.png';
@@ -24,6 +26,9 @@ import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUp
 // ==============================|| LANDING PAGE ||============================== //
 
 const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
+
+/** Compact/mobile: these mall tiles reopen Mobile upload instead of entering the apps. */
+const MOBILE_UPLOAD_REDIRECT_TILE_IDS = new Set(['vsingles', 'photoAlbums', 'recordVault']);
 
 const departments = [
   { id: 'vsingles', title: 'Tuta Dates', url: TUTADATES_PATH, image: tutaDatesImg },
@@ -79,6 +84,7 @@ function getMallStageSize(cols, rows) {
 export default function Landing() {
   const { user } = useAuth();
   const { mediaVolume } = useSiteAudio();
+  const isCompact = useCompactLoginViewport();
   const audioContextRef = useRef(null);
   const mallAreaRef = useRef(null);
   const [mallScale, setMallScale] = useState(1);
@@ -100,6 +106,12 @@ export default function Landing() {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setUpgradePopupOpen(true);
+  }, []);
+
+  const openMobileUploadChooser = useCallback((event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    requestMobilePostLoginChooser();
   }, []);
 
   const visibleDepartments = useMemo(() => {
@@ -265,7 +277,15 @@ export default function Landing() {
           >
             {rowDepts.map((d) => {
               const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
-              const isLink = Boolean(d.url) && !gateUpgrade;
+              const gateMobileUpload =
+                !gateUpgrade && isCompact && MOBILE_UPLOAD_REDIRECT_TILE_IDS.has(d.id);
+              const isLink = Boolean(d.url) && !gateUpgrade && !gateMobileUpload;
+              const tileActivatesPopup = gateUpgrade || gateMobileUpload;
+              const onTileActivate = gateUpgrade
+                ? openUpgradePopup
+                : gateMobileUpload
+                  ? openMobileUploadChooser
+                  : undefined;
 
               return (
                 <Box
@@ -274,14 +294,14 @@ export default function Landing() {
                   {...(isLink ? { to: d.url } : {})}
                   data-guest-demo-allow="true"
                   onMouseEnter={handleTileHover}
-                  onClick={gateUpgrade ? openUpgradePopup : undefined}
-                  role={gateUpgrade ? 'button' : undefined}
-                  tabIndex={gateUpgrade ? 0 : undefined}
+                  onClick={onTileActivate}
+                  role={tileActivatesPopup ? 'button' : undefined}
+                  tabIndex={tileActivatesPopup ? 0 : undefined}
                   onKeyDown={
-                    gateUpgrade
+                    tileActivatesPopup
                       ? (event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
-                            openUpgradePopup(event);
+                            onTileActivate(event);
                           }
                         }
                       : undefined
@@ -298,7 +318,7 @@ export default function Landing() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: isLink || gateUpgrade ? 'pointer' : 'default',
+                    cursor: isLink || tileActivatesPopup ? 'pointer' : 'default',
                     textDecoration: 'none',
                     WebkitTouchCallout: 'none',
                     WebkitUserSelect: 'none',
