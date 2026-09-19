@@ -6960,8 +6960,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 px: '8px',
                 bgcolor: '#000000'
               }
-            : // Album viewing area around the fitted page — theme daylight.
-              { bgcolor: 'var(--theme-daylight-color)' })
+            : // Outer album shell (Task 2) — theme primary.
+              { bgcolor: 'var(--theme-primary-color)' })
         }}
       >
         {!albumChromeHidden && !presentationMode ? (
@@ -7071,7 +7071,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   }
                 : { width: 'max-content' }),
               overflow: 'hidden',
-              bgcolor: 'var(--theme-primary-color)'
+              // Letterbox around the album page (Task 3) — theme daylight.
+              bgcolor: 'var(--theme-daylight-color)'
             }}
             >
             <Box
@@ -7084,7 +7085,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 minHeight: `${albumPageViewHeight}px`,
                 maxHeight: `${albumPageViewHeight}px`,
                 overflow: 'hidden',
-                bgcolor: 'var(--theme-primary-color)',
+                bgcolor: 'var(--theme-daylight-color)',
                 ...(albumSpreadShellWidthPx > 0
                   ? {
                       width: `${albumSpreadShellWidthPx}px`,

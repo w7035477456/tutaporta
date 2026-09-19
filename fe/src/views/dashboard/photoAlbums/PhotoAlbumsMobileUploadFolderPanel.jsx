@@ -84,13 +84,13 @@ const trayButtonSx = {
   flexShrink: 0,
   fontSize: '0.72rem',
   py: 0.35,
-  bgcolor: 'var(--theme-secondary-color) !important',
+  bgcolor: 'var(--theme-primary-color) !important',
   color: '#000 !important',
   WebkitTextFillColor: '#000 !important',
   border: '2px solid #000',
-  // Always theme secondary — beats SliderControlButton's grey disabled fill.
+  // Always theme primary — beats SliderControlButton's grey disabled fill.
   '&.Mui-disabled': {
-    bgcolor: 'var(--theme-secondary-color) !important',
+    bgcolor: 'var(--theme-primary-color) !important',
     color: '#000 !important',
     WebkitTextFillColor: '#000 !important',
     border: '2px solid #000',
@@ -314,9 +314,15 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
             minWidth: 0,
             fontSize: '0.72rem',
             py: 0.25,
-            bgcolor: 'var(--theme-secondary-color) !important',
+            bgcolor: 'var(--theme-primary-color) !important',
             color: '#000 !important',
-            WebkitTextFillColor: '#000 !important'
+            WebkitTextFillColor: '#000 !important',
+            '&.Mui-disabled': {
+              bgcolor: 'var(--theme-primary-color) !important',
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important',
+              opacity: 1
+            }
           }}
         >
           Refresh
@@ -333,9 +339,15 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
             minWidth: 0,
             fontSize: '0.72rem',
             py: 0.25,
-            bgcolor: 'var(--theme-secondary-color) !important',
+            bgcolor: 'var(--theme-primary-color) !important',
             color: '#000 !important',
-            WebkitTextFillColor: '#000 !important'
+            WebkitTextFillColor: '#000 !important',
+            '&.Mui-disabled': {
+              bgcolor: 'var(--theme-primary-color) !important',
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important',
+              opacity: 1
+            }
           }}
         >
           Delete selected

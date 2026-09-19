@@ -619,7 +619,7 @@ const headerThirdSectionSx = {
   py: 0.25,
   boxSizing: 'border-box',
   overflow: 'visible',
-  bgcolor: 'var(--theme-primary-color)'
+  bgcolor: 'var(--theme-secondary-color)'
 };
 
 /**
@@ -8201,12 +8201,12 @@ export default function PhotoAlbumsWorkspacePane({
               width: '100%',
               minWidth: 0,
               overflow: 'visible',
-              borderBottom: '2px solid var(--theme-primary-color)',
+              borderBottom: '2px solid var(--theme-secondary-color)',
               zIndex: 3,
               pt: 0.35,
               pb: 0.35,
               alignItems: 'center',
-              bgcolor: 'var(--theme-primary-color)',
+              bgcolor: 'var(--theme-secondary-color)',
               gap: { xs: 0.5, sm: 0.75 },
               px: { xs: 0.5, sm: 0.75 },
               boxSizing: 'border-box'
@@ -8404,7 +8404,7 @@ export default function PhotoAlbumsWorkspacePane({
                   onClear={handleClearSearch}
                   searchBusy={searchBusy}
                   clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
-                  bgcolor="var(--theme-primary-color)"
+                  bgcolor="var(--theme-secondary-color)"
                   fillWidth={false}
                   headerFlush
                 />
