@@ -178,6 +178,7 @@ export default function PhotoAlbumsSearchBar({
         />
       </Box>
     </Box>
+    </>
   );
 }
 
