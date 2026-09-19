@@ -13,11 +13,24 @@ export async function getRecordVaultRagStatus(req, res) {
   try {
     const resp = await fetch(`${serviceUrl}/health`, { signal: AbortSignal.timeout(8000) });
     const data = await resp.json().catch(() => ({}));
+    const pythonModel = data?.ollama?.configured_model
+      ? String(data.ollama.configured_model)
+      : null;
+    const envModel = process.env.OLLAMA_MODEL ? String(process.env.OLLAMA_MODEL).trim() : null;
+    const configuredModel = envModel || pythonModel;
+    const ragModelMismatch =
+      Boolean(envModel && pythonModel) &&
+      envModel !== pythonModel &&
+      !pythonModel.startsWith(`${envModel}:`) &&
+      envModel !== pythonModel.split(':')[0];
     return res.json({
       enabled: true,
       serviceUrl,
       status: data?.status || (resp.ok ? 'ok' : 'error'),
       modelReady: Boolean(data?.model_ready),
+      configuredModel: configuredModel || null,
+      ragModelMismatch,
+      activeRagServiceModel: pythonModel,
       ollama: data?.ollama || null,
       error: data?.error || null
     });
@@ -99,7 +112,7 @@ export async function postRecordVaultRagQuery(req, res) {
   }
 
   try {
-    const { notes, skipped } = collectRecordVaultNotesForRag(session, noteIds);
+    const { notes, skipped, meta: ragCollectMeta } = collectRecordVaultNotesForRag(session, noteIds);
     const keepModelInMemory = req.body?.keepModelInMemory === true;
     const resp = await fetch(`${serviceUrl}/query-notes`, {
       method: 'POST',
@@ -129,7 +142,12 @@ export async function postRecordVaultRagQuery(req, res) {
       model: data.model,
       chunksUsed: data.chunks_used,
       modelLoadMs: Number(data.model_load_ms) || 0,
-      skippedNotes: skipped
+      skippedNotes: skipped,
+      ragCollectMeta: ragCollectMeta || null,
+      extractionWarnings: data.extraction_warnings || [],
+      pdfNotesWithText: Number(data.pdf_notes_with_text) || 0,
+      pdfAttachmentsInRequest: Number(data.pdf_attachments_in_request) || 0,
+      pdfDebug: Array.isArray(data.pdf_debug) ? data.pdf_debug : []
     });
   } catch (err) {
     if (err?.code === 'RAG_NO_NOTES' || err?.code === 'RAG_INNER_LOCKED') {

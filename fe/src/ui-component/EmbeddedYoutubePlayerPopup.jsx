@@ -10,17 +10,12 @@ import { YOUTUBE_MUSIC_URL_INPUT_MAX_CHARS } from 'config/youtubeMusicUrl';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
-import {
-  COLOR_TEMPLATE10_MENU_UNSELECTED_BG,
-  COLOR_TEMPLATE10_MENU_UNSELECTED_BORDER,
-  COLOR_TEMPLATE10_MENU_UNSELECTED_TEXT
-} from 'config/colorTemplate10Menu';
 import { COLOR_TEMPLATE7_POPUP_PANEL_BG, COLOR_TEMPLATE7_POPUP_TEXT } from 'config/colorTemplate7PopupLargeDark';
 import { greenButtonSx } from 'config/greenButton';
 
 const TRACK_SLOT_COUNT = SLIDE_SHOW_MUSIC_SLOT_INDEX;
 
-/** Inputs match theme-menu unselected buttons (primary bg + daynight text). */
+/** URL slots: white field, black text for readability on the dark popup. */
 const themeMenuInputSx = {
   width: '100%',
   maxWidth: 'none',
@@ -29,13 +24,13 @@ const themeMenuInputSx = {
   flex: '1 1 0%',
   minWidth: 0,
   '& .MuiInputBase-root': {
-    bgcolor: `${COLOR_TEMPLATE10_MENU_UNSELECTED_BG} !important`,
-    border: COLOR_TEMPLATE10_MENU_UNSELECTED_BORDER,
+    bgcolor: '#ffffff !important',
+    border: '1px solid rgba(0, 0, 0, 0.23)',
     borderRadius: 1
   },
   '& .MuiInputBase-input': {
-    color: `${COLOR_TEMPLATE10_MENU_UNSELECTED_TEXT} !important`,
-    WebkitTextFillColor: `${COLOR_TEMPLATE10_MENU_UNSELECTED_TEXT} !important`,
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important',
     fontWeight: 700
   },
   '& .MuiOutlinedInput-notchedOutline': {

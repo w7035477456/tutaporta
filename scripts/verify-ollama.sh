@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=scripts/load-be-rag-env.sh
+source "$ROOT/scripts/load-be-rag-env.sh"
+load_be_rag_env
+# shellcheck source=scripts/rag-default-model.sh
+source "$ROOT/scripts/rag-default-model.sh"
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.2}"
 
 echo "Checking Ollama at ${OLLAMA_BASE_URL} ..."
 if ! curl -fsS "${OLLAMA_BASE_URL}/api/tags" >/tmp/ollama-tags.json; then
@@ -15,7 +20,7 @@ fi
 echo "OK: Ollama responded."
 python3 - <<'PY'
 import json, os, sys
-model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+model = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
 with open("/tmp/ollama-tags.json") as f:
     data = json.load(f)
 names = [m.get("name") for m in data.get("models") or [] if m.get("name")]

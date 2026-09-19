@@ -333,7 +333,11 @@ alias fe1='cd ~/code/main/fe && npm i -verbose'
 alias fe2='fkill 3000; pkill -f "[v]ite" 2>/dev/null; cd ~/code/main/fe && npm start'
 alias feall='cd ~/code/main/fe && fe1 && fe2'
 
-
+# TutaNotes RAG — Ollama runtime + Qwen model (see rag_service/README.md)
+alias pullqwen='ollama pull "${OLLAMA_MODEL:-qwen2.5:7b}"'
+alias verifyollama='$HOME/code/main/scripts/verify-ollama.sh'
+alias startrag='$HOME/code/main/scripts/start-rag-service.sh'
+alias verifyrag='$HOME/code/main/scripts/verify-rag-demo.sh'
 
 redishealth() {
   echo '=== systemd ==='

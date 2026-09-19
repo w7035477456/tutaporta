@@ -116,12 +116,18 @@ const footerRowSx = {
   boxSizing: 'border-box'
 };
 
-/** Format milliseconds as M:SS (e.g. 1:05). */
+/** Format milliseconds as M:SS (e.g. 1:05) — live timer while busy. */
 function formatRagElapsed(ms) {
   const totalSec = Math.max(0, Math.floor(Number(ms) / 1000));
   const min = Math.floor(totalSec / 60);
   const sec = totalSec % 60;
   return `${min}:${String(sec).padStart(2, '0')}`;
+}
+
+/** Whole seconds for header (e.g. "42 sec"). */
+function formatRagSeconds(ms) {
+  const sec = Math.max(0, Math.round(Number(ms) / 1000));
+  return `${sec} sec`;
 }
 
 /** Ollama load_duration for this question — 0 when model was already in RAM. */
@@ -152,6 +158,13 @@ export default function RecordVaultRagDialog({
   const noteCount = selectedNoteIds.length;
   const currentEntry = historyIndex >= 0 ? history[historyIndex] : null;
 
+  const configuredModelName = useMemo(() => {
+    if (currentEntry?.model) return String(currentEntry.model);
+    if (serviceStatus?.configuredModel) return String(serviceStatus.configuredModel);
+    if (serviceStatus?.ollama?.configured_model) return String(serviceStatus.ollama.configured_model);
+    return '';
+  }, [currentEntry?.model, serviceStatus]);
+
   const statusLine = useMemo(() => {
     if (!serviceStatus) return '';
     if (serviceStatus.status === 'disabled') return 'RAG is disabled on this server.';
@@ -159,15 +172,28 @@ export default function RecordVaultRagDialog({
       return 'RAG service offline — run scripts/start-rag-service.sh and scripts/verify-ollama.sh';
     }
     if (serviceStatus.modelReady === false) {
-      return 'Ollama is up but the model is missing — run: ollama pull llama3.2';
+      return 'Ollama is up but the Qwen model is missing — run: ollama pull qwen2.5:7b';
     }
     if (serviceStatus.status === 'ok') {
       return keepModelInMemory
-        ? 'Ollama + RAG ready. Model pinned in memory (Keep Model ON).'
-        : 'Ollama + RAG service ready. Model uses default ~5 min keep-alive.';
+        ? 'RAG ready — model pinned in memory (Keep Model ON).'
+        : 'RAG ready — model uses default ~5 min keep-alive.';
     }
     return serviceStatus.error || '';
   }, [serviceStatus, keepModelInMemory]);
+
+  const headerModelLine = useMemo(() => {
+    const parts = [];
+    if (configuredModelName) {
+      parts.push(`Model: ${configuredModelName}`);
+    }
+    if (busy) {
+      parts.push(`Processing… ${formatRagSeconds(liveElapsedMs)}`);
+    } else if (currentEntry && Number.isFinite(currentEntry.elapsedMs)) {
+      parts.push(`Answer time: ${formatRagSeconds(currentEntry.elapsedMs)}`);
+    }
+    return parts.join(' · ');
+  }, [configuredModelName, busy, liveElapsedMs, currentEntry]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -218,13 +244,30 @@ export default function RecordVaultRagDialog({
         keepModelInMemory
       });
       const elapsedMs = Math.round(performance.now() - startedAt);
+      const pdfNotesWithText = Number(data?.pdfNotesWithText) || 0;
+      const pdfAttachments = Number(data?.pdfAttachmentsInRequest) || 0;
+      const collectPdfCount = Number(data?.ragCollectMeta?.pdfAttachmentCount) || 0;
+      let answer = String(data?.answer || '');
+      const extractWarn = Array.isArray(data?.extractionWarnings) ? data.extractionWarnings : [];
+      if (collectPdfCount > 0 && pdfNotesWithText === 0) {
+        answer =
+          'PDF attachments were sent but no text could be extracted. Restart RAG after: pip install -r rag_service/requirements.txt (PyMuPDF).';
+      } else if (extractWarn.length) {
+        answer = `${answer}\n\n(PDF notes: ${extractWarn.slice(0, 3).join('; ')})`;
+      }
       const entry = {
         prompt: question,
-        answer: String(data?.answer || ''),
+        answer,
         sourceNotes: data?.sourceNotes || [],
         model: data?.model || '',
         elapsedMs,
-        modelLoadMs: Number(data?.modelLoadMs) || 0
+        modelLoadMs: Number(data?.modelLoadMs) || 0,
+        pdfNotesWithText,
+        pdfAttachments: pdfAttachments || collectPdfCount,
+        pdfPagesRead: (Array.isArray(data?.pdfDebug) ? data.pdfDebug : []).reduce(
+          (sum, d) => sum + (Number(d?.pages) || 0),
+          0
+        )
       };
       setHistory((prev) => [...prev, entry]);
       setHistoryIndex((prev) => prev + 1);
@@ -267,7 +310,18 @@ export default function RecordVaultRagDialog({
     >
       <BusyHourglassOverlay open={busy} size={BUSY_HOURGLASS_MODAL_SIZE} />
       <ColorTemplate16PopupCenterWide.Title sx={ragHeaderSx}>
-        RAG — Ask your notes
+        <Box component="span" sx={{ display: 'block' }}>
+          RAG — Ask your notes
+        </Box>
+        {headerModelLine ? (
+          <Typography
+            component="div"
+            variant="body2"
+            sx={{ fontWeight: 600, mt: 0.75, fontSize: { xs: '0.85rem', sm: '0.95rem' }, lineHeight: 1.35 }}
+          >
+            {headerModelLine}
+          </Typography>
+        ) : null}
       </ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body
         spacing={1.25}
@@ -382,21 +436,19 @@ export default function RecordVaultRagDialog({
 
         <Box sx={footerSectionSx}>
           {currentEntry &&
-          (Number.isFinite(currentEntry.elapsedMs) ||
-            Number.isFinite(currentEntry.modelLoadMs) ||
-            currentEntry.sourceNotes?.length ||
-            currentEntry.model) ? (
+          (Number.isFinite(currentEntry.modelLoadMs) || currentEntry.sourceNotes?.length) ? (
             <Typography variant="caption" sx={footerMetaSx}>
               {Number.isFinite(currentEntry.modelLoadMs)
                 ? `Time to load model: ${formatRagModelLoadTime(currentEntry.modelLoadMs)}`
                 : null}
-              {Number.isFinite(currentEntry.elapsedMs)
-                ? `${Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Total time: ${formatRagElapsed(currentEntry.elapsedMs)}`
+              {currentEntry.pdfNotesWithText
+                ? ` · PDFs read: ${currentEntry.pdfNotesWithText}${
+                    currentEntry.pdfPagesRead ? ` (${currentEntry.pdfPagesRead} pages)` : ''
+                  }`
                 : null}
               {currentEntry.sourceNotes?.length
-                ? `${Number.isFinite(currentEntry.elapsedMs) || Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Sources: ${currentEntry.sourceNotes.join(', ')}`
+                ? `${Number.isFinite(currentEntry.modelLoadMs) ? ' · ' : ''}Sources: ${currentEntry.sourceNotes.join(', ')}`
                 : null}
-              {currentEntry.model ? ` · model: ${currentEntry.model}` : ''}
             </Typography>
           ) : null}
           <Box sx={footerRowSx}>

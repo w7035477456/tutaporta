@@ -3,7 +3,7 @@ TutaNotes RAG microservice — ephemeral in-memory retrieval + Ollama generation
 
 Env:
   OLLAMA_BASE_URL  default http://127.0.0.1:11434
-  OLLAMA_MODEL     default llama3.2
+  OLLAMA_MODEL     default qwen2.5:7b
   RAG_HOST         default 127.0.0.1
   RAG_PORT         default 8765
 """
@@ -11,7 +11,6 @@ Env:
 from __future__ import annotations
 
 import base64
-import io
 import os
 import re
 from typing import Any
@@ -19,16 +18,47 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from pypdf import PdfReader
+from pdf_text import build_pdf_context
+
+
+def _load_rag_keys_from_be_env() -> None:
+    """Apply OLLAMA_* from ~/.ssh/be/.env so Python matches Node (loadEnv.js)."""
+    env_path = os.path.join(os.path.expanduser("~"), ".ssh", "be", ".env")
+    if not os.path.isfile(env_path):
+        return
+    try:
+        with open(env_path, encoding="utf-8") as f:
+            for raw in f:
+                line = raw.split("#", 1)[0].strip()
+                if not line or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if key in ("OLLAMA_MODEL", "OLLAMA_BASE_URL") and val:
+                    os.environ[key] = val
+    except OSError:
+        return
+
+
+_load_rag_keys_from_be_env()
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
 OLLAMA_KEEP_ALIVE_DEFAULT = os.environ.get("OLLAMA_KEEP_ALIVE", "5m")
 OLLAMA_KEEP_ALIVE_PINNED = os.environ.get("OLLAMA_KEEP_ALIVE_PINNED", "-1")
 CHUNK_SIZE = int(os.environ.get("RAG_CHUNK_SIZE", "900"))
 CHUNK_OVERLAP = int(os.environ.get("RAG_CHUNK_OVERLAP", "150"))
 TOP_K = int(os.environ.get("RAG_TOP_K", "10"))
-BODY_CHUNK_SCORE_BOOST = float(os.environ.get("RAG_BODY_CHUNK_SCORE_BOOST", "4"))
+# Ollama defaults to a 4k window and silently drops the rest of the prompt.
+OLLAMA_NUM_CTX = int(os.environ.get("OLLAMA_NUM_CTX", "16384"))
+# Roughly 3.5 chars/token, leaving room for the answer.
+RAG_CONTEXT_CHAR_BUDGET = int(
+    os.environ.get("RAG_CONTEXT_CHAR_BUDGET", str(max(4000, OLLAMA_NUM_CTX * 3)))
+)
+RAG_PDF_CHAR_BUDGET_PER_NOTE = int(os.environ.get("RAG_PDF_CHAR_BUDGET_PER_NOTE", "9000"))
+BODY_CHUNK_SCORE_BOOST = float(os.environ.get("RAG_BODY_CHUNK_SCORE_BOOST", "2"))
+PDF_CHUNK_SCORE_BOOST = float(os.environ.get("RAG_PDF_CHUNK_SCORE_BOOST", "3"))
 JUNK_TEXT_MARKERS = (
     "Service Update | OnlineMall",
     "We're Fine-Tuning Things",
@@ -68,6 +98,15 @@ class QueryNotesResponse(BaseModel):
     model: str
     chunks_used: int
     model_load_ms: int = 0
+    extraction_warnings: list[str] = Field(default_factory=list)
+    pdf_notes_with_text: int = 0
+    pdf_attachments_in_request: int = 0
+    pdf_debug: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DebugExtractRequest(BaseModel):
+    file_name: str = ""
+    content_base64: str = ""
 
 
 def _strip_html(text: str) -> str:
@@ -85,32 +124,17 @@ def _is_junk_text(text: str) -> bool:
     return any(marker.lower() in hay.lower() for marker in JUNK_TEXT_MARKERS)
 
 
-def _extract_pdf_text_from_bytes(raw: bytes) -> str:
-    if not raw:
-        return ""
-    try:
-        reader = PdfReader(io.BytesIO(raw))
-        parts: list[str] = []
-        for page in reader.pages:
-            page_text = page.extract_text() or ""
-            if page_text.strip():
-                parts.append(page_text.strip())
-        return "\n".join(parts).strip()
-    except Exception:
-        return ""
-
-
-def _extract_attachment_text(content_base64: str) -> str:
+def _decode_attachment_bytes(content_base64: str) -> bytes:
     if not content_base64:
-        return ""
+        return b""
     try:
-        raw = base64.b64decode(content_base64)
+        return base64.b64decode(content_base64)
     except Exception:
-        return ""
-    pdf_text = _extract_pdf_text_from_bytes(raw)
-    if pdf_text:
-        return pdf_text
-    # Some uploads are HTML/text saved with a .pdf extension.
+        return b""
+
+
+def _html_fallback_text(raw: bytes) -> str:
+    """Some uploads are HTML/text saved with a .pdf extension."""
     try:
         decoded = raw.decode("utf-8", errors="ignore")
     except Exception:
@@ -119,16 +143,6 @@ def _extract_attachment_text(content_base64: str) -> str:
     if "<html" in lowered or "<!doctype" in lowered or "<title" in lowered:
         return _strip_html(decoded)
     return ""
-
-
-def _extract_pdf_text(content_base64: str) -> str:
-    if not content_base64:
-        return ""
-    try:
-        raw = base64.b64decode(content_base64)
-    except Exception:
-        return ""
-    return _extract_pdf_text_from_bytes(raw)
 
 
 def _chunk_text(
@@ -163,7 +177,12 @@ def _chunk_text(
 
 def _tokenize(query: str) -> set[str]:
     words = re.findall(r"[a-z0-9]+", query.lower())
-    return {w for w in words if len(w) > 2}
+    terms = {w for w in words if len(w) > 2 or w in ("1a", "1z", "11")}
+    if "agi" in terms:
+        terms.update(["adjusted", "gross", "income"])
+    if "line" in terms or "1040" in terms:
+        terms.update(["1a", "1040", "form", "w-2", "w2", "amount", "income"])
+    return terms
 
 
 def _score_chunk(chunk: dict[str, Any], terms: set[str]) -> float:
@@ -174,30 +193,172 @@ def _score_chunk(chunk: dict[str, Any], terms: set[str]) -> float:
     for term in terms:
         if term in hay:
             score += hay.count(term)
-    if chunk.get("source") == "body" and score > 0:
+    if score <= 0:
+        return 0.0
+    source = chunk.get("source")
+    if source == "body":
         score *= BODY_CHUNK_SCORE_BOOST
+    elif source in ("pdf", "pdf_lead"):
+        score *= PDF_CHUNK_SCORE_BOOST
     return score
 
 
-def _build_documents(notes: list[RagNote]) -> list[dict[str, Any]]:
+def _is_tax_financial_query(prompt: str) -> bool:
+    p = (prompt or "").lower()
+    needles = (
+        "agi",
+        "adjusted gross",
+        "taxable income",
+        "tax return",
+        "federal",
+        "deduction",
+        "refund",
+        "each year",
+        "each tax",
+        "tax year",
+        "1040",
+        "line 1",
+        "line 1a",
+        "1a",
+        "w-2",
+        "w2",
+    )
+    return any(n in p for n in needles)
+
+
+def _count_pdf_attachments(notes: list[RagNote]) -> int:
+    total = 0
+    for note in notes:
+        for att in note.attachments or []:
+            ext = (att.file_extension or "").lower().lstrip(".")
+            name = (att.file_name or "").lower()
+            if ext in ("pdf", "application/pdf") or name.endswith(".pdf"):
+                total += 1
+    return total
+
+
+def _select_context_chunks(
+    documents: list[dict[str, Any]], prompt: str, terms: set[str], top_k: int
+) -> list[dict[str, Any]]:
+    pdf_leads = [d for d in documents if d.get("source") == "pdf_lead"]
+    if pdf_leads and _is_tax_financial_query(prompt):
+        pdf_leads.sort(key=lambda d: (str(d.get("title") or ""), int(d.get("note_id") or 0)))
+        return pdf_leads
+
+    ranked = sorted(
+        ((_score_chunk(doc, terms), doc) for doc in documents),
+        key=lambda item: item[0],
+        reverse=True,
+    )
+    top = [doc for score, doc in ranked if score > 0][:top_k]
+    if not top:
+        top = [doc for _, doc in ranked[:top_k]]
+    top = _ensure_pdf_chunks_in_context(top, documents, terms, top_k)
+
+    if pdf_leads:
+        merged: list[dict[str, Any]] = []
+        seen: set[int] = set()
+        for doc in pdf_leads + top:
+            key = id(doc)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(doc)
+        return merged[: max(top_k + len(pdf_leads), top_k)]
+    return top
+
+
+def _ensure_pdf_chunks_in_context(
+    top: list[dict[str, Any]], documents: list[dict[str, Any]], terms: set[str], top_k: int
+) -> list[dict[str, Any]]:
+    """Always include the best PDF chunk per note so tax PDFs are not dropped by body-only ranking."""
+    pdf_docs = [d for d in documents if d.get("source") == "pdf"]
+    if not pdf_docs:
+        return top[:top_k]
+    by_note: dict[int, list[dict[str, Any]]] = {}
+    for doc in pdf_docs:
+        by_note.setdefault(int(doc["note_id"]), []).append(doc)
+    merged: list[dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    for doc in top:
+        merged.append(doc)
+        seen_ids.add(id(doc))
+    for note_id, chunks in by_note.items():
+        if any(d.get("note_id") == note_id and d.get("source") == "pdf" for d in merged):
+            continue
+        best = max(chunks, key=lambda c: _score_chunk(c, terms))
+        if id(best) not in seen_ids:
+            merged.insert(0, best)
+            seen_ids.add(id(best))
+    return merged[: max(top_k, min(top_k + len(by_note), top_k + 5))]
+
+
+def _build_documents(
+    notes: list[RagNote],
+) -> tuple[list[dict[str, Any]], list[str], list[dict[str, Any]]]:
     documents: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    debug: list[dict[str, Any]] = []
     for note in notes:
         title = (note.title or f"Note {note.note_id}").strip()
         body = _strip_html(note.text_content or "")
         documents.extend(_chunk_text(body, title, note.note_id, source="body"))
         for att in note.attachments or []:
-            ext = (att.file_extension or "").lower()
+            ext = (att.file_extension or "").lower().lstrip(".")
             name = (att.file_name or "").lower()
-            if ext != "pdf" and not name.endswith(".pdf"):
+            mime_pdf = ext in ("pdf", "application/pdf") or name.endswith(".pdf")
+            if not mime_pdf:
                 continue
-            pdf_text = _extract_attachment_text(att.content_base64)
-            if not pdf_text or _is_junk_text(pdf_text):
-                continue
+            raw = _decode_attachment_bytes(att.content_base64)
             label = att.file_name or "attachment.pdf"
-            documents.extend(
-                _chunk_text(f"[PDF {label}]\n{pdf_text}", title, note.note_id, source="pdf")
+            if not raw:
+                warnings.append(f"{title}: attachment {label} has no bytes (re-open note or re-sync vault).")
+                continue
+            if not raw.startswith(b"%PDF"):
+                warnings.append(f"{title}: {label} is not a readable PDF file.")
+                continue
+            context_text, full_text, meta = build_pdf_context(
+                raw, char_budget=RAG_PDF_CHAR_BUDGET_PER_NOTE
             )
-    return documents
+            if not context_text:
+                fallback = _html_fallback_text(raw)
+                if fallback:
+                    context_text, full_text = fallback, fallback
+                    meta = {"extractor": "html", "page_count": 0, "tax_pages": []}
+            if not context_text or _is_junk_text(context_text):
+                warnings.append(
+                    f"{title}: could not extract text from {label} "
+                    "(install pymupdf in rag_service/.venv, then restart the RAG service)."
+                )
+                debug.append({"note": title, "file": label, "pages": 0, "extracted": False})
+                continue
+
+            extractor = str(meta.get("extractor") or "pymupdf")
+            debug.append(
+                {
+                    "note": title,
+                    "file": label,
+                    "pages": meta.get("page_count", 0),
+                    "tax_pages": meta.get("tax_pages", []),
+                    "parsed_amounts": meta.get("parsed_amounts", []),
+                    "extracted": True,
+                    "extractor": extractor,
+                }
+            )
+            documents.append(
+                {
+                    "note_id": note.note_id,
+                    "title": title,
+                    "text": f"[PDF «{label}» attached to note «{title}» — {extractor}]\n{context_text}",
+                    "source": "pdf_lead",
+                }
+            )
+            documents.extend(
+                _chunk_text(
+                    f"[PDF full text {label}]\n{full_text}", title, note.note_id, source="pdf"
+                )
+            )
+    return documents, warnings, debug
 
 
 def _resolve_keep_alive(keep_model_in_memory: bool | None) -> str:
@@ -240,6 +401,8 @@ async def _ollama_chat(system_prompt: str, user_prompt: str, keep_alive: str) ->
         ],
         "stream": False,
         "keep_alive": _ollama_keep_alive_json_value(keep_alive),
+        # Without num_ctx Ollama uses a small default window and drops most of the excerpts.
+        "options": {"num_ctx": OLLAMA_NUM_CTX, "temperature": 0.1},
     }
     async with httpx.AsyncClient(timeout=180.0) as client:
         resp = await client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
@@ -326,44 +489,62 @@ async def query_notes(body: QueryNotesRequest) -> QueryNotesResponse:
     if not body.notes:
         raise HTTPException(status_code=400, detail="At least one note is required")
 
-    documents = _build_documents(body.notes)
-    if not documents:
-        raise HTTPException(
-            status_code=400,
-            detail="Selected notes have no readable text. Add note body text or PDF attachments.",
+    pdf_attachments_in_request = _count_pdf_attachments(body.notes)
+    documents, pdf_warnings, pdf_debug = _build_documents(body.notes)
+    pdf_notes_with_text = len({d["note_id"] for d in documents if d.get("source") == "pdf_lead"})
+
+    if pdf_attachments_in_request > 0 and pdf_notes_with_text == 0:
+        detail = (
+            "Attached PDFs had no extractable text. Run: cd rag_service && source .venv/bin/activate "
+            "&& pip install -r requirements.txt (needs pymupdf), then restart ./scripts/start-rag-service.sh."
         )
+        if pdf_warnings:
+            detail += " Details: " + "; ".join(pdf_warnings[:6])
+        raise HTTPException(status_code=400, detail=detail)
+
+    if not documents:
+        detail = "Selected notes have no readable text. Add note body text or PDF attachments."
+        if pdf_warnings:
+            detail += " PDF issues: " + "; ".join(pdf_warnings[:5])
+        raise HTTPException(status_code=400, detail=detail)
 
     terms = _tokenize(prompt)
-    ranked = sorted(
-        ((_score_chunk(doc, terms), doc) for doc in documents),
-        key=lambda item: item[0],
-        reverse=True,
-    )
-    top = [doc for score, doc in ranked if score > 0][:TOP_K]
-    if not top:
-        top = [doc for _, doc in ranked[:TOP_K]]
+    top = _select_context_chunks(documents, prompt, terms, TOP_K)
 
     context_blocks: list[str] = []
     source_titles: list[str] = []
     seen_titles: set[str] = set()
+    used_chars = 0
+    per_doc_budget = max(1500, RAG_CONTEXT_CHAR_BUDGET // max(1, len(top)))
     for doc in top:
+        if used_chars >= RAG_CONTEXT_CHAR_BUDGET:
+            break
         title = doc["title"]
+        text = doc["text"]
+        if len(text) > per_doc_budget:
+            text = text[:per_doc_budget]
         if title not in seen_titles:
             seen_titles.add(title)
             source_titles.append(title)
-        context_blocks.append(f"### Note: {title}\n{doc['text']}")
+        block = f"### Note: {title}\n{text}"
+        context_blocks.append(block)
+        used_chars += len(block)
 
     context = "\n\n---\n\n".join(context_blocks)
     system_prompt = (
         "You are a helpful assistant for TutaNotes. Answer ONLY using the provided note excerpts. "
-        "If the answer is not in the excerpts, say you could not find it in the selected notes. "
-        "When comparing documents (for example tax years), cite specific numbers and line items when present. "
+        "Each ### Note section is a separate selected note (often a tax year). "
+        "Excerpts are text from PDF attachments (often IRS Form 1040 inside a TurboTax PDF). "
+        "Prefer lines labeled 1a, 11 (AGI), taxable income, and sections titled 'Structured Form 1040 amounts parsed'. "
+        "Do NOT answer from refund/balance-due summary alone when the user asks for a specific 1040 line. "
+        "When the user asks for each year, list every note title/year with the requested line amount if present. "
+        "If a value appears in the excerpts, you MUST report it — do not say it is missing. "
         "Be concise but complete."
     )
     user_prompt = (
         f"User question:\n{prompt}\n\n"
         f"Selected note excerpts:\n{context}\n\n"
-        "Answer the user question based on the excerpts above."
+        "Answer using the excerpts. For multi-year questions, use one bullet per note title/year."
     )
 
     keep_alive = _resolve_keep_alive(body.keep_model_in_memory)
@@ -374,4 +555,27 @@ async def query_notes(body: QueryNotesRequest) -> QueryNotesResponse:
         model=OLLAMA_MODEL,
         chunks_used=len(top),
         model_load_ms=model_load_ms,
+        extraction_warnings=pdf_warnings[:10],
+        pdf_notes_with_text=pdf_notes_with_text,
+        pdf_attachments_in_request=pdf_attachments_in_request,
+        pdf_debug=pdf_debug,
     )
+
+
+@app.post("/debug-extract")
+async def debug_extract(body: DebugExtractRequest) -> dict[str, Any]:
+    """Inspect what RAG actually reads from one PDF (no model call)."""
+    raw = _decode_attachment_bytes(body.content_base64)
+    if not raw:
+        raise HTTPException(status_code=400, detail="content_base64 is required")
+    context_text, full_text, meta = build_pdf_context(
+        raw, char_budget=RAG_PDF_CHAR_BUDGET_PER_NOTE
+    )
+    return {
+        "file_name": body.file_name,
+        "bytes": len(raw),
+        "is_pdf": raw.startswith(b"%PDF"),
+        "meta": meta,
+        "full_text_chars": len(full_text),
+        "context_preview": context_text[:4000],
+    }

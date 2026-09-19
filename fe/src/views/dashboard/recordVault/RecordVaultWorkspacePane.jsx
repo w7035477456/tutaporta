@@ -58,7 +58,8 @@ import {
   loadRecordVaultRagKeepModelInMemory,
   saveRecordVaultRagKeepModelInMemory
 } from 'utils/recordVaultRagKeepModel';
-import { setRecordVaultRagKeepModel } from 'api/recordVaultFe';
+import { fetchRecordVaultRagStatus, setRecordVaultRagKeepModel } from 'api/recordVaultFe';
+import { formatRagModelButtonLabel } from 'utils/recordVaultRagModelDisplay';
 import RecordVaultStorageFilesPanel from './RecordVaultStorageFilesPanel';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
@@ -924,12 +925,19 @@ const menuRowEditFieldSx = {
 
 /** Content-header rename field — white + double border (edit-in-place). */
 
-/** Notebook / note / shortcut list — selected yellow; unselected gray + black text. */
+/** Notebook / note / Monthly / Yearly / shortcut list — current item: yellow; others: gray. */
 const menuRowSelectedSx = {
-  bgcolor: 'var(--theme-yellow-color) !important',
+  bgcolor: 'var(--theme-yellow-color, #FFEB3B) !important',
   color: '#000000 !important',
   WebkitTextFillColor: '#000000 !important',
-  border: '4px solid #000000 !important'
+  border: '4px solid #000000 !important',
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled)': {
+      bgcolor: 'var(--theme-yellow-color, #FFEB3B) !important',
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important'
+    }
+  }
 };
 
 const menuRowUnselectedSx = {
@@ -1053,9 +1061,14 @@ function MenuRowButton({
 }) {
   const useDivDragSurface = Boolean(draggable);
   const lookSelected = selected || multiSelected;
+  // Search hit on the open note: blue. Otherwise current notebook/note/Monthly/Yearly: yellow.
+  const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
+  const currentYellow = Boolean(lookSelected && !locked && !searchHitBlue);
   return (
     <SliderControlButton
-      selected={lookSelected}
+      // Do not pass selected={true} — that forces theme-secondary. Use yellow/gray via variant + sx.
+      variant={currentYellow || searchHitBlue ? 'yellow' : 'green'}
+      aria-pressed={lookSelected}
       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
       disableSelectedTranslate
       {...(useDivDragSurface ? { component: 'div', role: 'button', tabIndex: 0 } : { type: 'button' })}
@@ -1072,21 +1085,21 @@ function MenuRowButton({
       sx={{
         ...menuButtonSx,
         justifyContent: 'center',
-        ...(lookSelected && !locked
-          ? selectedBlue && selected
+        ...(searchHitBlue
+          ? {
+              bgcolor: `${RECORD_VAULT_SEARCH_HIT_BLUE} !important`,
+              color: '#ffffff !important',
+              WebkitTextFillColor: '#ffffff !important',
+              border: '4px double #ffffff !important'
+            }
+          : currentYellow
             ? {
-                bgcolor: `${RECORD_VAULT_SEARCH_HIT_BLUE} !important`,
-                color: '#ffffff !important',
-                WebkitTextFillColor: '#ffffff !important',
-                border: '4px double #ffffff !important'
-              }
-            : {
                 ...menuRowSelectedSx,
                 ...(multiSelected && !selected ? { border: '3px solid #000000 !important' } : null)
               }
-          : !locked
-            ? menuRowUnselectedSx
-            : null),
+            : !locked
+              ? menuRowUnselectedSx
+              : null),
         ...(locked ? recordVaultInnerLockedMenuSx : null),
         ...(useDivDragSurface ? { cursor: 'grab', userSelect: 'none' } : null),
         ...sx
@@ -1477,6 +1490,7 @@ export default function RecordVaultWorkspacePane({
   const [ragKeepModelInMemory, setRagKeepModelInMemory] = useState(() => loadRecordVaultRagKeepModelInMemory());
   const [ragKeepModelBusy, setRagKeepModelBusy] = useState(false);
   const [ragKeepModelNotice, setRagKeepModelNotice] = useState('');
+  const [ragConfiguredModel, setRagConfiguredModel] = useState('');
   const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
   const isTutaDrivePane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const cloudViewLabel = isTutaDrivePane ? 'View TutaDrive' : 'View OneDrive';
@@ -1529,6 +1543,31 @@ export default function RecordVaultWorkspacePane({
   useEffect(() => {
     setRagSelectedNoteIds(loadRecordVaultRagSelection(paneStorageType, user?.singles_id));
   }, [paneStorageType, user?.singles_id]);
+
+  useEffect(() => {
+    if (!ragUiEnabled || !unlocked) {
+      setRagConfiguredModel('');
+      return undefined;
+    }
+    let cancelled = false;
+    void fetchRecordVaultRagStatus({ storageType: paneStorageType })
+      .then((data) => {
+        if (cancelled) return;
+        const name = data?.configuredModel || data?.ollama?.configured_model || '';
+        setRagConfiguredModel(String(name).trim());
+      })
+      .catch(() => {
+        if (!cancelled) setRagConfiguredModel('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ragUiEnabled, unlocked, paneStorageType, ragDialogOpen]);
+
+  const ragModelButtonLabel = useMemo(
+    () => formatRagModelButtonLabel(ragConfiguredModel),
+    [ragConfiguredModel]
+  );
 
   const handleToggleRagNote = useCallback(
     (noteId, selected) => {
@@ -1882,9 +1921,9 @@ export default function RecordVaultWorkspacePane({
   const activeSearchTerms = appliedSearchTerms;
 
   // Search never prunes the tree: every notebook (and every note) stays visible on
-  // the left. A match is shown purely by selection styling — the containing
-  // notebook goes white (selected) and the matched note goes blue (selectedBlue) —
-  // so the user keeps their full notebook list while jumping between hits.
+  // the left. A match is shown by selection styling — containing notebook stays yellow
+  // (current) and the matched note goes blue (selectedBlue) — so the user keeps their
+  // full notebook list while jumping between hits.
   // Bill Schedule lives in a separate bottom box (not in displayNotebooks).
 
   const loadNoteContent = useCallback(async (noteId) => {
@@ -6970,11 +7009,55 @@ export default function RecordVaultWorkspacePane({
                         data-guest-demo-allow="true"
                         onClick={() => setRagDialogOpen(true)}
                         disabled={busy || !unlocked}
-                        aria-label="RAG question and answer"
-                        title="Ask questions about notes with the yellow RAG checkbox checked"
-                        sx={headerFullWidthButtonSx}
+                        aria-label={
+                          ragModelButtonLabel
+                            ? `RAG question and answer — model ${ragConfiguredModel}`
+                            : 'RAG question and answer'
+                        }
+                        title={
+                          ragConfiguredModel
+                            ? `Ask about yellow-checked notes (model: ${ragConfiguredModel})`
+                            : 'Ask questions about notes with the yellow RAG checkbox checked'
+                        }
+                        sx={{
+                          ...headerFullWidthButtonSx,
+                          whiteSpace: 'normal',
+                          lineHeight: 1.05,
+                          py: { xs: 0.25, sm: 0.3 }
+                        }}
                       >
-                        RAG
+                        <Box
+                          component="span"
+                          sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '100%',
+                            minWidth: 0,
+                            gap: 0.1
+                          }}
+                        >
+                          <Box component="span" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
+                            RAG
+                          </Box>
+                          {ragModelButtonLabel ? (
+                            <Box
+                              component="span"
+                              sx={{
+                                fontSize: '0.52em',
+                                fontWeight: 600,
+                                lineHeight: 1.05,
+                                maxWidth: '100%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {ragModelButtonLabel}
+                            </Box>
+                          ) : null}
+                        </Box>
                       </SliderControlButton>
                     </Box>
                   ) : null}

@@ -1,162 +1,215 @@
-# TutaNotes RAG Service (Python + Ollama)
+# TutaNotes RAG Service (Python + Ollama + Qwen)
 
-Ephemeral RAG microservice for TutaNotes. The Node backend sends selected note text + PDF attachments; this service chunks them, retrieves relevant passages, and asks a local **Ollama** model for an answer.
+Ephemeral RAG microservice for TutaNotes. The Node backend sends selected note text + PDF attachments; this service chunks them, retrieves relevant passages, and asks a local **Qwen** model through **Ollama** (the local LLM runtime).
 
-## A → Z — Mac dev demo
+> **Llama → Qwen:** You keep **Ollama** installed; you change the **model tag** from `llama3.2` to **`qwen2.5:7b`** (or another Qwen tag). The app reads `OLLAMA_MODEL` from the environment.
 
-### 1. Install Ollama
+## Model choice
 
-**macOS**
+| Tag | RAM (approx.) | Use when |
+|-----|---------------|----------|
+| **`qwen2.5:7b`** (default) | ~8 GB | Mac / Ubuntu with enough RAM |
+| **`qwen2.5:3b`** | ~4 GB | Lighter machines — set `OLLAMA_MODEL=qwen2.5:3b` everywhere |
+
+List models: `ollama list`
+
+---
+
+## Mac — install Qwen + demo
+
+### 1. Install Ollama (runtime)
 
 ```bash
 brew install ollama
-# Or download from https://ollama.com/download and open the Ollama app
 ```
 
-Start Ollama (app menu bar, or):
+Or install the menu-bar app from [https://ollama.com/download](https://ollama.com/download) and open it once.
+
+Ensure the API is up:
 
 ```bash
-ollama serve
+ollama serve          # if not using the Mac app
+curl -fsS http://127.0.0.1:11434/api/tags
 ```
 
-Pull the default model:
+### 2. Pull Qwen (replaces Llama)
 
 ```bash
-ollama pull llama3.2
+ollama pull qwen2.5:7b
+# optional smaller: ollama pull qwen2.5:3b
+```
+
+Remove old Llama models if you want disk back:
+
+```bash
+ollama rm llama3.2    # only if listed in `ollama list`
 ```
 
 Verify:
 
 ```bash
+cd ~/code/main
+chmod +x scripts/*.sh
 ./scripts/verify-ollama.sh
 ```
 
-Expected: `OK: Ollama responded.` and `OK: model 'llama3.2' is available.`
+### 3. Python RAG service
 
-### 2. Start the Python RAG service
-
-From repo root:
+Terminal A:
 
 ```bash
+cd ~/code/main
 ./scripts/start-rag-service.sh
 ```
 
-Leave this terminal open. Service listens on **http://127.0.0.1:8765**.
-
-Health check:
+Terminal B — full demo (health + sample question):
 
 ```bash
-curl -s http://127.0.0.1:8765/health | python3 -m json.tool
+cd ~/code/main
+./scripts/verify-rag-demo.sh
 ```
 
-### 3. Configure the Node backend
+### 4. Node backend + UI
 
-Add to **`~/.ssh/be/.env`** (Mac) or server env (Ubuntu):
+Add to **`~/.ssh/be/.env`**:
 
 ```bash
 RAG_ENABLED=true
 RAG_SERVICE_URL=http://127.0.0.1:8765
-OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL=qwen2.5:7b
 ```
 
-Restart backend:
+Restart BE (`beall` on Mac), start FE (`feall`).
+
+**TutaNotes demo:** open `/myNote`, yellow-check two notes (e.g. 2024 / 2025 tax), click **RAG**, ask:  
+`Show and compare my 2024 and 2025 tax deductions`
+
+First answer may take **30–120 s** while Qwen loads into GPU/RAM.
+
+---
+
+## Ubuntu — install Qwen + demo
+
+Run on the **same host** as the Node API (or point `RAG_SERVICE_URL` at another machine that runs RAG + Ollama).
+
+### 1. Install Ollama
 
 ```bash
-# Mac
-beall
+curl -fsSL https://ollama.com/install.sh | sh
+sudo systemctl enable ollama
+sudo systemctl start ollama
+systemctl status ollama --no-pager
+```
 
-# Ubuntu production
+### 2. Pull Qwen
+
+```bash
+ollama pull qwen2.5:7b
+./scripts/verify-ollama.sh   # from repo root after git pull
+```
+
+### 3. RAG Python venv + run
+
+One-shot (foreground, for testing):
+
+```bash
+cd ~/code/main
+./scripts/start-rag-service.sh
+```
+
+**Production:** run uvicorn under **systemd** or **PM2** on `127.0.0.1:8765`, same env as Mac:
+
+```bash
+cd ~/code/main/rag_service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export OLLAMA_MODEL=qwen2.5:7b
+export OLLAMA_BASE_URL=http://127.0.0.1:11434
+uvicorn main:app --host 127.0.0.1 --port 8765
+```
+
+Demo check (with RAG running):
+
+```bash
+cd ~/code/main
+./scripts/verify-rag-demo.sh
+```
+
+### 4. Server env + PM2
+
+In **`~/.ssh/be/.env`** on Ubuntu:
+
+```bash
+RAG_ENABLED=true
+RAG_SERVICE_URL=http://127.0.0.1:8765
+OLLAMA_MODEL=qwen2.5:7b
+```
+
+```bash
 pm2 restart onlinemallwebsite
 ```
 
-### 4. Start frontend
-
-```bash
-feall
-```
-
-Open **TutaNotes** (`/myNote`), log into Cloud or USB.
-
-### 5. Demo — compare 2024 vs 2025 tax notes
-
-1. Open notebook with sample tax notes (or upload your own **1040 PDFs** as note attachments).
-2. Check the **yellow RAG checkbox** on **2024** and **2025** tax notes.
-3. Click **RAG** in the toolbar.
-4. Ask: `Show and compare my 2024 and 2025 tax deductions`
-5. Wait for the answer (first run may take 30–90 seconds while the model loads).
+---
 
 ## Architecture
 
 ```
 React (checkboxes + RAG popup)
     → POST /api/recordVault/rag/query  (Node)
-        → loads note HTML + PDF bytes from vault session
-        → POST /query-notes  (Python FastAPI)
-            → PDF text via pypdf
+        → POST /query-notes  (Python FastAPI :8765)
             → chunk + keyword retrieval
-            → Ollama /api/chat
-    ← answer JSON
+            → Ollama POST /api/chat  (model: qwen2.5:7b)
 ```
-
-## Ubuntu production
-
-1. Install Ollama on the **same host** as the Node API (or set `RAG_SERVICE_URL` to a reachable RAG host).
-2. `ollama pull llama3.2`
-3. Create venv and run RAG under systemd or PM2, e.g.:
-
-```bash
-cd /path/to/main/rag_service
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-OLLAMA_MODEL=llama3.2 uvicorn main:app --host 127.0.0.1 --port 8765
-```
-
-4. Set `RAG_SERVICE_URL=http://127.0.0.1:8765` in `~/.ssh/be/.env` on the server and restart PM2.
 
 ## Environment variables
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API |
-| `OLLAMA_MODEL` | `llama3.2` | Chat model |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Qwen tag in Ollama |
+| `OLLAMA_NUM_CTX` | `16384` | Model context window. Ollama's own default (4k) truncates long PDF excerpts. |
+| `RAG_PDF_MAX_PAGES` | `400` | Pages scanned per PDF. TurboTax puts Form 1040 well past page 40. |
+| `RAG_PDF_CHAR_BUDGET_PER_NOTE` | `9000` | Chars of PDF text sent per note. |
 | `RAG_HOST` / `RAG_PORT` | `127.0.0.1` / `8765` | FastAPI bind |
 | `RAG_SERVICE_URL` | (Node) `http://127.0.0.1:8765` | Node → Python |
 | `RAG_ENABLED` | `true` | Set `false` to disable route |
+
+Shared default: `scripts/rag-default-model.sh` (sourced by start/verify scripts).
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
-| RAG service offline | Run `./scripts/start-rag-service.sh` |
-| Ollama unreachable | Run `ollama serve` or open Ollama app |
-| Model missing | `ollama pull llama3.2` |
-| Empty answer from PDFs | Ensure PDF is text-based (not scanned image-only) |
-| PIN-locked note error | Unlock note before including in RAG |
-| USB vault | Restart USB bridge app after pulling latest BE (RAG route added to bridge) |
+| RAG service offline | `./scripts/start-rag-service.sh` |
+| Ollama unreachable | Mac: open Ollama app; Ubuntu: `sudo systemctl start ollama` |
+| Model missing | `ollama pull qwen2.5:7b` (match `OLLAMA_MODEL`) |
+| Still using Llama | Set `OLLAMA_MODEL=qwen2.5:7b` in `~/.ssh/be/.env`, restart RAG + BE |
+| Slow first query | Normal — Qwen load time; use **Keep model ON** in RAG UI |
+| Out of memory | Use `OLLAMA_MODEL=qwen2.5:3b` and `ollama pull qwen2.5:3b` |
+| RAG ignores PDF / no AGI | Restart RAG after `pip install -r requirements.txt` (**PyMuPDF**). Yellow-check each tax note with a PDF attached. |
+| PDF text extract failed | PDF may be scan-only (OCR not enabled yet). Re-save as text PDF or type AGI in note body. |
+| Wrong/garbled numbers from a big PDF | Check what RAG actually read (below). |
+
+### Inspect what RAG reads from one PDF
+
+```bash
+python3 - <<'PY'
+import base64, json, urllib.request
+raw = open('/path/to/FINAL_FILING_Federal_efile.pdf','rb').read()
+body = {"file_name":"tax.pdf","content_base64":base64.b64encode(raw).decode()}
+req = urllib.request.Request("http://127.0.0.1:8765/debug-extract",
+    data=json.dumps(body).encode(), headers={'Content-Type':'application/json'})
+d = json.loads(urllib.request.urlopen(req, timeout=120).read())
+print(d["meta"]); print(d["context_preview"][:1500])
+PY
+```
+
+`meta.page_count` is how many pages were read, `meta.tax_pages` which pages held Form 1040,
+and `meta.parsed_amounts` the line values (1a, 11/AGI, 15) handed to the model.
 
 ## API
 
-**POST /query-notes**
-
-```json
-{
-  "prompt": "Compare 2024 and 2025 deductions",
-  "notes": [
-    {
-      "note_id": 1,
-      "title": "2024 tax",
-      "text_content": "plain text from note body",
-      "attachments": [
-        {
-          "file_name": "f1040.pdf",
-          "file_extension": "pdf",
-          "content_base64": "..."
-        }
-      ]
-    }
-  ]
-}
-```
+**POST /query-notes** — see previous section in git history or `main.py` `QueryNotesRequest`.
 
 Response: `{ "answer", "source_notes", "model", "chunks_used" }`

@@ -16,6 +16,8 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
 
   const notes = [];
   const skipped = [];
+  let pdfAttachmentCount = 0;
+  let pdfBytesTotal = 0;
 
   for (const noteId of ids) {
     const note = vaultGetNote(session, noteId);
@@ -37,11 +39,18 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
       if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
       const got = vaultGetNoteAttachment(session, noteId, attachmentId);
       if (!got?.buffer?.length) continue;
+      let ext = String(att.file_extension || '').toLowerCase().replace(/^\./, '');
+      const fileName = String(att.file_name || got.fileName || 'attachment');
+      if (!ext && fileName.toLowerCase().endsWith('.pdf')) ext = 'pdf';
       attachments.push({
-        file_name: String(att.file_name || got.fileName || 'attachment'),
-        file_extension: String(att.file_extension || '').toLowerCase(),
+        file_name: fileName,
+        file_extension: ext,
         content_base64: got.buffer.toString('base64')
       });
+      if (ext === 'pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+        pdfAttachmentCount += 1;
+        pdfBytesTotal += got.buffer.length;
+      }
     }
 
     notes.push({
@@ -59,5 +68,12 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
     throw err;
   }
 
-  return { notes, skipped };
+  return {
+    notes,
+    skipped,
+    meta: {
+      pdfAttachmentCount,
+      pdfBytesTotal
+    }
+  };
 }
