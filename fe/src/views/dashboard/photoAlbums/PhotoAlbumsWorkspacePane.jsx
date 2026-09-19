@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
+import GlobalStyles from '@mui/material/GlobalStyles';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50
+  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50,
+  SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
@@ -1161,6 +1163,48 @@ const menuRowEditFieldSx = {
 
 /** Content-header rename field — match selected notebook/note: white + double border. */
 
+/**
+ * Hard Material yellow for current album-set / album.
+ * Do NOT use --theme-yellow-color — Minimal Palete remaps it to secondary (blue).
+ */
+const MENU_ROW_CURRENT_YELLOW = SLIDER_CONTROL_TRUE_YELLOW;
+const MENU_ROW_IDLE_GREY = '#9e9e9e';
+const MENU_ROW_CURRENT_CLASS = 'pa-menu-row-current';
+const MENU_ROW_IDLE_CLASS = 'pa-menu-row-idle';
+
+/** Document-level kill switch — beats theme Button overrides + Minimal secondary remap. */
+const menuRowCurrentYellowGlobalStyles = {
+  [`button.${MENU_ROW_CURRENT_CLASS}, div.${MENU_ROW_CURRENT_CLASS}[role="button"]`]: {
+    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundImage: 'none !important',
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important',
+    border: '4px solid #000000 !important'
+  },
+  [`button.${MENU_ROW_CURRENT_CLASS}:hover, div.${MENU_ROW_CURRENT_CLASS}[role="button"]:hover`]: {
+    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundImage: 'none !important',
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important'
+  },
+  [`button.${MENU_ROW_CURRENT_CLASS} .MuiButton-label, div.${MENU_ROW_CURRENT_CLASS}[role="button"] .MuiButton-label`]: {
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important'
+  },
+  [`button.${MENU_ROW_IDLE_CLASS}, div.${MENU_ROW_IDLE_CLASS}[role="button"]`]: {
+    backgroundColor: `${MENU_ROW_IDLE_GREY} !important`,
+    backgroundImage: 'none !important',
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important',
+    border: '4px solid #000000 !important'
+  },
+  [`button.${MENU_ROW_IDLE_CLASS}:hover, div.${MENU_ROW_IDLE_CLASS}[role="button"]:hover`]: {
+    backgroundColor: `${MENU_ROW_IDLE_GREY} !important`,
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important'
+  }
+};
+
 function MenuRowWithDelete({
   onDelete,
   deleteLabel,
@@ -1234,18 +1278,46 @@ function MenuRowButton({
   children,
   onClick,
   sx,
+  className,
   draggable,
   onKeyDown,
   ...rest
 }) {
   const useDivDragSurface = Boolean(draggable);
   const lookSelected = selected || multiSelected;
+  // Search hit on the open album: blue. Otherwise current album-set / album: yellow + black.
+  const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
+  const currentYellow = Boolean(lookSelected && !locked && !searchHitBlue);
+  const rowClass = locked
+    ? undefined
+    : currentYellow
+      ? MENU_ROW_CURRENT_CLASS
+      : searchHitBlue
+        ? undefined
+        : MENU_ROW_IDLE_CLASS;
+  // Hard RGB via forceBgcolor (last in SliderControlButton merge) + GlobalStyles class.
+  // Never selected={true} (theme-secondary). Never aria-pressed for color.
+  const forceBg = searchHitBlue
+    ? PHOTO_ALBUMS_SEARCH_HIT_BLUE
+    : currentYellow
+      ? MENU_ROW_CURRENT_YELLOW
+      : !locked
+        ? MENU_ROW_IDLE_GREY
+        : undefined;
+  const forceFg = searchHitBlue ? '#ffffff' : '#000000';
   return (
     <SliderControlButton
-      variant="yellow"
+      {...rest}
+      variant={currentYellow ? 'yellow' : 'green'}
+      selected={undefined}
+      aria-pressed={undefined}
+      forceBgcolor={forceBg}
+      forceColor={forceFg}
+      data-pa-current={currentYellow ? 'true' : undefined}
+      className={[className, rowClass].filter(Boolean).join(' ') || undefined}
       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
       disableSelectedTranslate
-      aria-pressed={lookSelected || undefined}
+      disableHoverScale={currentYellow || searchHitBlue}
       {...(useDivDragSurface ? { component: 'div', role: 'button', tabIndex: 0 } : { type: 'button' })}
       onClick={onClick}
       onKeyDown={(event) => {
@@ -1257,32 +1329,18 @@ function MenuRowButton({
         onKeyDown?.(event);
       }}
       draggable={draggable}
-      sx={{
-        ...menuButtonSx,
-        justifyContent: 'center',
-        ...(lookSelected && !locked
-          ? selectedBlue && selected
-            ? {
-                bgcolor: `${PHOTO_ALBUMS_SEARCH_HIT_BLUE} !important`,
-                color: '#ffffff !important',
-                WebkitTextFillColor: '#ffffff !important',
-                border: '4px double #ffffff !important'
-              }
-            : {
-                bgcolor: `${PHOTO_ALBUMS_THEME_DAYNIGHT_BG} !important`,
-                color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
-                WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
-                border:
-                  multiSelected && !selected
-                    ? `3px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER} !important`
-                    : `${PHOTO_ALBUMS_THEME_INVERSE_BORDER_2} !important`
-              }
-          : null),
-        ...(locked ? photoAlbumsInnerLockedMenuSx : null),
-        ...(useDivDragSurface ? { cursor: 'grab', userSelect: 'none' } : null),
-        ...sx
-      }}
-      {...rest}
+      sx={[
+        menuButtonSx,
+        { justifyContent: 'center' },
+        searchHitBlue
+          ? { border: '4px double #ffffff !important' }
+          : currentYellow && multiSelected && !selected
+            ? { border: '3px solid #000000 !important' }
+            : null,
+        locked ? photoAlbumsInnerLockedMenuSx : null,
+        useDivDragSurface ? { cursor: 'grab', userSelect: 'none' } : null,
+        sx
+      ]}
     >
       {children}
     </SliderControlButton>
@@ -7599,6 +7657,7 @@ export default function PhotoAlbumsWorkspacePane({
 
   return (
     <PhotoAlbumsSliderControlButtonProvider fontRem={menuButtonFontRem}>
+    <GlobalStyles styles={menuRowCurrentYellowGlobalStyles} />
     <Box
       data-record-vault-pane
       data-record-vault-storage={paneStorageType}

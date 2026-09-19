@@ -233,7 +233,8 @@ export function colorTemplate15ApplicationFrameFooterShellSx({ inline = false } 
     display: 'flex',
     alignItems: 'center',
     gap: { xs: 0.5, sm: 1 },
-    overflow: 'visible',
+    overflowX: 'clip',
+    overflowY: 'visible',
     flexShrink: 0,
     ...(inline ? {} : { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1200 }),
     ...overrides
@@ -243,29 +244,33 @@ export function colorTemplate15ApplicationFrameFooterShellSx({ inline = false } 
 /** Region 5 — centered legal links + copyright. */
 export function colorTemplate15ApplicationFrameFooterLeftSx(overrides = {}) {
   return {
+    // Do not use width:100% — that forces FooterRight (Mute/Track) off the right edge.
     flex: '1 1 auto',
-    width: '100%',
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 0.5,
-    minWidth: 0,
     textAlign: 'center',
     px: { xs: 0.5, sm: 1 },
     ...overrides
   };
 }
 
-/** Region 6 — mute / track / support cluster (single compact row). */
+/** Region 6 — mute / track / support cluster (single compact row, flush right). */
 export function colorTemplate15ApplicationFrameFooterRightSx(overrides = {}) {
   return {
-    flex: '0 0 auto',
+    flex: '0 1 auto',
+    marginLeft: 'auto',
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: { xs: 0.5, sm: 0.75 },
     minWidth: 0,
+    // Cap to viewport so Track never clips past the right edge on narrow VW.
+    maxWidth: { xs: 'min(100%, 72vw)', sm: 'min(560px, 55vw)' },
     flexWrap: 'nowrap',
+    overflow: 'hidden',
     ...overrides
   };
 }

@@ -22,6 +22,11 @@ const BLOCK_BORDER = '4px solid #000000';
 const GREEN_ENABLED_BG = 'var(--theme-action-green-color, #60C446)';
 const RED_ENABLED_BG = '#c62828';
 const GREEN_DISABLED_BG = '#737373';
+/**
+ * True Material yellow — never use `--theme-yellow-color` here.
+ * Minimal Palete remaps that CSS var to secondary (blue), so “yellow” buttons looked blue.
+ */
+export const SLIDER_CONTROL_TRUE_YELLOW = '#FFEB3B';
 
 /** Selected / pressed controls lift up 10% on Y. */
 export const SLIDER_CONTROL_SELECTED_TRANSLATE_Y = '-20%';
@@ -52,14 +57,16 @@ function resolveVariantSx(variant, selected) {
   switch (variant) {
     case 'yellow':
       return {
-        bgcolor: 'var(--theme-yellow-color) !important',
+        bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
+        backgroundColor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
         color: '#000000 !important',
         WebkitTextFillColor: '#000000 !important',
         border: BLOCK_BORDER
       };
     case 'logoff':
       return {
-        bgcolor: 'var(--theme-yellow-color) !important',
+        bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
+        backgroundColor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
         color: '#000000 !important',
         WebkitTextFillColor: '#000000 !important',
         border: BLOCK_BORDER
@@ -82,11 +89,29 @@ function resolveVariantSx(variant, selected) {
   }
 }
 
-function hoverSx(variant, disableHoverScale, isLifted = false, hoverScale = SLIDER_CONTROL_BUTTON_HOVER_SCALE) {
+function hoverSx(
+  variant,
+  disableHoverScale,
+  isLifted = false,
+  hoverScale = SLIDER_CONTROL_BUTTON_HOVER_SCALE,
+  forceBgcolor,
+  forceColor = '#000000'
+) {
+  const forcedFill = forceBgcolor
+    ? {
+        bgcolor: `${forceBgcolor} !important`,
+        backgroundColor: `${forceBgcolor} !important`,
+        backgroundImage: 'none !important',
+        color: `${forceColor} !important`,
+        WebkitTextFillColor: `${forceColor} !important`
+      }
+    : null;
+
   if (disableHoverScale) {
     return {
       '@media (hover: hover)': {
         '&:hover:not(.Mui-disabled)': {
+          ...forcedFill,
           transform: isLifted ? selectedTransform() : 'none !important',
           zIndex: 'auto !important'
         }
@@ -99,7 +124,7 @@ function hoverSx(variant, disableHoverScale, isLifted = false, hoverScale = SLID
     Number.isFinite(factor) && factor > 1 ? factor : SLIDER_CONTROL_BUTTON_HOVER_SCALE;
   const scale = `scale(${safeFactor})`;
   const hoverTransform = isLifted ? selectedTransform(scale) : scale;
-  if (variant === 'logoff') {
+  if (variant === 'logoff' && !forceBgcolor) {
     return {
       '@media (hover: hover)': {
         '&:hover:not(.Mui-disabled)': {
@@ -118,6 +143,7 @@ function hoverSx(variant, disableHoverScale, isLifted = false, hoverScale = SLID
   return {
     '@media (hover: hover)': {
       '&:hover:not(.Mui-disabled)': {
+        ...forcedFill,
         transform: hoverTransform,
         position: 'relative',
         zIndex: 1
@@ -126,10 +152,43 @@ function hoverSx(variant, disableHoverScale, isLifted = false, hoverScale = SLID
   };
 }
 
+/** Root-level forced fill — last in sx merge so it beats variant + theme secondary. */
+function forceBgcolorSx(forceBgcolor, forceColor = '#000000') {
+  if (!forceBgcolor) return null;
+  const bg = `${forceBgcolor} !important`;
+  const fg = `${forceColor} !important`;
+  return {
+    bgcolor: bg,
+    backgroundColor: bg,
+    backgroundImage: 'none !important',
+    color: fg,
+    WebkitTextFillColor: fg,
+    border: '4px solid #000000 !important',
+    borderColor: '#000000 !important',
+    '&.Mui-focusVisible': {
+      bgcolor: bg,
+      backgroundColor: bg,
+      color: fg,
+      WebkitTextFillColor: fg
+    },
+    '&[aria-pressed="true"]': {
+      bgcolor: bg,
+      backgroundColor: bg,
+      color: fg,
+      WebkitTextFillColor: fg
+    },
+    '& .MuiButton-label': {
+      color: fg,
+      WebkitTextFillColor: fg
+    }
+  };
+}
+
 /**
  * myNote unified button — font size from slider (user_customization.mynote_font_size / env default).
  * Block (bold) label, block (thick) border, green unless variant/selected overrides, 25% hover scale.
  * `singleLineLabel` — same width-fits-label base as GreenButton (grows wider so text never clips).
+ * `forceBgcolor` — hard RGB fill that wins over Minimal palette yellow→secondary remapping.
  */
 export default function SliderControlButton({
   variant = 'green',
@@ -139,9 +198,12 @@ export default function SliderControlButton({
   hoverScale = SLIDER_CONTROL_BUTTON_HOVER_SCALE,
   singleLineLabel = false,
   fullWidth = false,
+  forceBgcolor,
+  forceColor = '#000000',
   sx,
   children,
   'aria-pressed': ariaPressed,
+  className,
   ...rest
 }) {
   const location = useLocation();
@@ -149,15 +211,25 @@ export default function SliderControlButton({
   const albumsFontRem = usePhotoAlbumsSliderControlButtonFontRem();
   const fontRem = isPhotoAlbumsRoute(location.pathname) ? albumsFontRem : notesFontRem;
   const fontSize = `${fontRem}rem !important`;
-  const variantStyles = resolveVariantSx(variant, selected);
-  const isSelected = selected === true || ariaPressed === true || ariaPressed === 'true';
+  // forceBgcolor means we own the fill — never take the selected→secondary path.
+  const effectiveSelected = forceBgcolor ? undefined : selected;
+  const variantStyles = resolveVariantSx(variant, effectiveSelected);
+  const isSelected =
+    !forceBgcolor &&
+    (effectiveSelected === true || ariaPressed === true || ariaPressed === 'true');
   // Notebook/note list rows keep selected colors but stay in place (no translateY lift).
   const isLifted = isSelected && !disableSelectedTranslate;
   // GreenButton base: single-line label wins over fullWidth stretch so text stays visible.
   const effectiveFullWidth = fullWidth && !singleLineLabel;
 
   const mergedSx = (theme) => {
-    const extra = typeof sx === 'function' ? sx(theme) : sx || {};
+    const extraRaw = typeof sx === 'function' ? sx(theme) : sx;
+    // MUI allows sx arrays; flatten so later entries win (needed for forced yellow overrides).
+    const extraList = Array.isArray(extraRaw) ? extraRaw : extraRaw ? [extraRaw] : [];
+    const extra = Object.assign(
+      {},
+      ...extraList.map((item) => (typeof item === 'function' ? item(theme) : item || {}))
+    );
     const baseTransform = isLifted ? selectedTransform() : 'scale(1)';
     return {
       fontFamily: MAIN_FONT_FAMILY,
@@ -187,18 +259,26 @@ export default function SliderControlButton({
         opacity: 1,
         transform: 'none !important'
       },
-      ...hoverSx(variant, disableHoverScale, isLifted, hoverScale),
+      ...hoverSx(variant, disableHoverScale, isLifted, hoverScale, forceBgcolor, forceColor),
       '@media (min-width: 600px)': {
         fontSize,
         '& .MuiButton-label': { fontSize, fontWeight: 900 }
       },
       ...(singleLineLabel ? buttonTemplateSingleLineLabelSx() : null),
-      ...extra
+      ...extra,
+      // Absolute last — hard yellow/grey/blue for TutaNotes current rows.
+      ...forceBgcolorSx(forceBgcolor, forceColor)
     };
   };
 
   return (
-    <Button sx={mergedSx} fullWidth={effectiveFullWidth} aria-pressed={ariaPressed} {...rest}>
+    <Button
+      sx={mergedSx}
+      fullWidth={effectiveFullWidth}
+      aria-pressed={ariaPressed}
+      className={className}
+      {...rest}
+    >
       {children}
     </Button>
   );
@@ -212,6 +292,9 @@ SliderControlButton.propTypes = {
   hoverScale: PropTypes.number,
   singleLineLabel: PropTypes.bool,
   fullWidth: PropTypes.bool,
-  sx: PropTypes.oneOfType([PropTypes.object, PropTypes.func]),
-  children: PropTypes.node
+  forceBgcolor: PropTypes.string,
+  forceColor: PropTypes.string,
+  sx: PropTypes.oneOfType([PropTypes.object, PropTypes.func, PropTypes.array]),
+  children: PropTypes.node,
+  className: PropTypes.string
 };

@@ -87,6 +87,8 @@ function VolumeControlLabel({ children, onClick, disabled, align = 'left', under
         textDecoration: underline && !disabled ? 'underline' : 'none',
         textDecorationColor: color || `var(${INVERSE_DAYNIGHT_VAR})`,
         opacity: disabled ? 0.6 : 1,
+        flexShrink: 0,
+        whiteSpace: 'nowrap',
         ...volumeLabelHoverSx()
       }}
     >
@@ -272,12 +274,13 @@ export default function BackgroundMusicFooterControls({
               }
             : isFooterBar
               ? {
-                  maxWidth: { xs: '100%', sm: 520 },
+                  maxWidth: '100%',
                   minWidth: 0,
-                  width: 'auto',
+                  width: '100%',
                   flex: '1 1 auto',
                   '& .MuiSlider-root': {
-                    minWidth: { xs: 56, sm: 88 }
+                    // Allow slider to collapse so Track stays visible on narrow VW.
+                    minWidth: 0
                   }
                 }
               : isVsinglesToolbar
@@ -414,8 +417,8 @@ export default function BackgroundMusicFooterControls({
             aria-label="Music volume"
             valueLabelDisplay="off"
             sx={{
-              flex: 1,
-              minWidth: { xs: 56, sm: 88 },
+              flex: '1 1 auto',
+              minWidth: 0,
               color: accent,
               '& .MuiSlider-track': { border: 'none', backgroundColor: accent },
               '& .MuiSlider-rail': { opacity: 0.35, backgroundColor: isFooterMuted ? '#bdbdbd' : accent },

@@ -4,9 +4,11 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import GlobalStyles from '@mui/material/GlobalStyles';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50
+  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50,
+  SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
@@ -925,26 +927,46 @@ const menuRowEditFieldSx = {
 
 /** Content-header rename field — white + double border (edit-in-place). */
 
-/** Notebook / note / Monthly / Yearly / shortcut list — current item: yellow; others: gray. */
-const menuRowSelectedSx = {
-  bgcolor: 'var(--theme-yellow-color, #FFEB3B) !important',
-  color: '#000000 !important',
-  WebkitTextFillColor: '#000000 !important',
-  border: '4px solid #000000 !important',
-  '@media (hover: hover)': {
-    '&:hover:not(.Mui-disabled)': {
-      bgcolor: 'var(--theme-yellow-color, #FFEB3B) !important',
-      color: '#000000 !important',
-      WebkitTextFillColor: '#000000 !important'
-    }
-  }
-};
+/**
+ * Hard Material yellow for current notebook / note / Monthly / Yearly.
+ * Do NOT use --theme-yellow-color — Minimal Palete remaps it to secondary (blue).
+ */
+const MENU_ROW_CURRENT_YELLOW = SLIDER_CONTROL_TRUE_YELLOW;
+const MENU_ROW_IDLE_GREY = '#9e9e9e';
+const MENU_ROW_CURRENT_CLASS = 'rv-menu-row-current';
+const MENU_ROW_IDLE_CLASS = 'rv-menu-row-idle';
 
-const menuRowUnselectedSx = {
-  bgcolor: '#9e9e9e !important',
-  color: '#000000 !important',
-  WebkitTextFillColor: '#000000 !important',
-  border: '4px solid #000000 !important'
+/** Document-level kill switch — beats theme Button overrides + Minimal secondary remap. */
+const menuRowCurrentYellowGlobalStyles = {
+  [`button.${MENU_ROW_CURRENT_CLASS}, div.${MENU_ROW_CURRENT_CLASS}[role="button"]`]: {
+    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundImage: 'none !important',
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important',
+    border: '4px solid #000000 !important'
+  },
+  [`button.${MENU_ROW_CURRENT_CLASS}:hover, div.${MENU_ROW_CURRENT_CLASS}[role="button"]:hover`]: {
+    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundImage: 'none !important',
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important'
+  },
+  [`button.${MENU_ROW_CURRENT_CLASS} .MuiButton-label, div.${MENU_ROW_CURRENT_CLASS}[role="button"] .MuiButton-label`]: {
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important'
+  },
+  [`button.${MENU_ROW_IDLE_CLASS}, div.${MENU_ROW_IDLE_CLASS}[role="button"]`]: {
+    backgroundColor: `${MENU_ROW_IDLE_GREY} !important`,
+    backgroundImage: 'none !important',
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important',
+    border: '4px solid #000000 !important'
+  },
+  [`button.${MENU_ROW_IDLE_CLASS}:hover, div.${MENU_ROW_IDLE_CLASS}[role="button"]:hover`]: {
+    backgroundColor: `${MENU_ROW_IDLE_GREY} !important`,
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000 !important'
+  }
 };
 
 function MenuRowWithDelete({
@@ -1055,6 +1077,7 @@ function MenuRowButton({
   children,
   onClick,
   sx,
+  className,
   draggable,
   onKeyDown,
   ...rest
@@ -1064,13 +1087,36 @@ function MenuRowButton({
   // Search hit on the open note: blue. Otherwise current notebook/note/Monthly/Yearly: yellow.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
   const currentYellow = Boolean(lookSelected && !locked && !searchHitBlue);
+  const rowClass = locked
+    ? undefined
+    : currentYellow
+      ? MENU_ROW_CURRENT_CLASS
+      : searchHitBlue
+        ? undefined
+        : MENU_ROW_IDLE_CLASS;
+  // Hard RGB via forceBgcolor (last in SliderControlButton merge) + GlobalStyles class.
+  // Never selected={true} (theme-secondary). Never aria-pressed for color.
+  const forceBg = searchHitBlue
+    ? RECORD_VAULT_SEARCH_HIT_BLUE
+    : currentYellow
+      ? MENU_ROW_CURRENT_YELLOW
+      : !locked
+        ? MENU_ROW_IDLE_GREY
+        : undefined;
+  const forceFg = searchHitBlue ? '#ffffff' : '#000000';
   return (
     <SliderControlButton
-      // Do not pass selected={true} — that forces theme-secondary. Use yellow/gray via variant + sx.
-      variant={currentYellow || searchHitBlue ? 'yellow' : 'green'}
-      aria-pressed={lookSelected}
+      {...rest}
+      variant={currentYellow ? 'yellow' : 'green'}
+      selected={undefined}
+      aria-pressed={undefined}
+      forceBgcolor={forceBg}
+      forceColor={forceFg}
+      data-rv-current={currentYellow ? 'true' : undefined}
+      className={[className, rowClass].filter(Boolean).join(' ') || undefined}
       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
       disableSelectedTranslate
+      disableHoverScale={currentYellow || searchHitBlue}
       {...(useDivDragSurface ? { component: 'div', role: 'button', tabIndex: 0 } : { type: 'button' })}
       onClick={onClick}
       onKeyDown={(event) => {
@@ -1082,29 +1128,18 @@ function MenuRowButton({
         onKeyDown?.(event);
       }}
       draggable={draggable}
-      sx={{
-        ...menuButtonSx,
-        justifyContent: 'center',
-        ...(searchHitBlue
-          ? {
-              bgcolor: `${RECORD_VAULT_SEARCH_HIT_BLUE} !important`,
-              color: '#ffffff !important',
-              WebkitTextFillColor: '#ffffff !important',
-              border: '4px double #ffffff !important'
-            }
-          : currentYellow
-            ? {
-                ...menuRowSelectedSx,
-                ...(multiSelected && !selected ? { border: '3px solid #000000 !important' } : null)
-              }
-            : !locked
-              ? menuRowUnselectedSx
-              : null),
-        ...(locked ? recordVaultInnerLockedMenuSx : null),
-        ...(useDivDragSurface ? { cursor: 'grab', userSelect: 'none' } : null),
-        ...sx
-      }}
-      {...rest}
+      sx={[
+        menuButtonSx,
+        { justifyContent: 'center' },
+        searchHitBlue
+          ? { border: '4px double #ffffff !important' }
+          : currentYellow && multiSelected && !selected
+            ? { border: '3px solid #000000 !important' }
+            : null,
+        locked ? recordVaultInnerLockedMenuSx : null,
+        useDivDragSurface ? { cursor: 'grab', userSelect: 'none' } : null,
+        sx
+      ]}
     >
       {children}
     </SliderControlButton>
@@ -6199,6 +6234,7 @@ export default function RecordVaultWorkspacePane({
 
   return (
     <RecordVaultSliderControlButtonProvider fontRem={menuButtonFontRem}>
+    <GlobalStyles styles={menuRowCurrentYellowGlobalStyles} />
     <Box
       data-record-vault-pane
       data-record-vault-storage={paneStorageType}

@@ -257,7 +257,16 @@ function ColorTemplate15ApplicationFrameFooterRight({ showMusicControls = true, 
           </UnSelectedButtonTemplate>
         ) : null}
         {showMusicControls ? (
-          <Box {...guestDemoAllowProps()} sx={{ display: 'inline-flex' }}>
+          <Box
+            {...guestDemoAllowProps()}
+            sx={{
+              display: 'flex',
+              minWidth: 0,
+              maxWidth: '100%',
+              flex: '1 1 auto',
+              justifyContent: 'flex-end'
+            }}
+          >
             <MusicTrack variant="footer" />
           </Box>
         ) : null}

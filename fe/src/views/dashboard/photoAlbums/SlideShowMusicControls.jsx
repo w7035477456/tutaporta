@@ -23,10 +23,11 @@ export default function SlideShowMusicControls({
       data-no-click-sound
       sx={{
         position: 'fixed',
-        bottom: 16,
-        right: 16,
+        bottom: { xs: 12, sm: 16 },
+        right: { xs: 12, sm: 16 },
         zIndex,
-        maxWidth: { xs: 'min(100vw - 20px, 420px)', sm: 520 },
+        maxWidth: { xs: 'calc(100vw - 24px)', sm: 'min(520px, calc(100vw - 32px))' },
+        boxSizing: 'border-box',
         bgcolor: 'var(--theme-daynight-color)',
         border: '1px solid var(--theme-primary-color)',
         borderRadius: 1,
