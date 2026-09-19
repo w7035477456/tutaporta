@@ -8382,7 +8382,7 @@ export default function PhotoAlbumsWorkspacePane({
                 flex: '2 1 0',
                 minWidth: 0,
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'stretch',
                 flexWrap: { xs: 'wrap', md: 'nowrap' },
                 gap: 0.75,
                 pl: 0.5,
@@ -8390,7 +8390,8 @@ export default function PhotoAlbumsWorkspacePane({
                 py: 0.25,
                 boxSizing: 'border-box',
                 borderLeft: '2px solid rgba(255,255,255,0.35)',
-                overflow: 'visible'
+                overflow: 'visible',
+                bgcolor: 'var(--theme-primary-color)'
               }}
             >
               {!compareMode &&
@@ -8528,10 +8529,11 @@ export default function PhotoAlbumsWorkspacePane({
                     flex: '1 1 auto',
                     minWidth: 0,
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: 'stretch',
                     flexWrap: { xs: 'wrap', lg: 'nowrap' },
                     gap: 0,
-                    justifyContent: 'flex-start'
+                    justifyContent: 'flex-start',
+                    bgcolor: 'var(--theme-primary-color)'
                   }}
                 >
                   <PhotoAlbumsSearchBar

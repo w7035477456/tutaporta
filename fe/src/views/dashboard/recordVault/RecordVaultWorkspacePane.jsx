@@ -6737,7 +6737,7 @@ export default function RecordVaultWorkspacePane({
               zIndex: 3,
               pt: '2vh',
               alignItems: 'stretch',
-              bgcolor: paneStripColor
+              bgcolor: 'var(--theme-primary-color)'
             }}
           >
             <Box
@@ -7108,7 +7108,7 @@ export default function RecordVaultWorkspacePane({
               onClear={handleClearSearch}
               searchBusy={searchBusy}
               clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
-              bgcolor={paneStripColor}
+              bgcolor="var(--theme-primary-color)"
               sx={{
                 // Clear of Exit / left chrome — search zone starts after the button rail.
                 ml: { xs: 0.75, sm: 1 },
@@ -7118,7 +7118,7 @@ export default function RecordVaultWorkspacePane({
               }}
             />
             ) : (
-              <Box sx={{ flex: 1, minWidth: 0, bgcolor: paneStripColor }} aria-hidden />
+              <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'var(--theme-primary-color)' }} aria-hidden />
             )}
           </Box>
 
