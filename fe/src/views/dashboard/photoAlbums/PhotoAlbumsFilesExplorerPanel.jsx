@@ -709,7 +709,15 @@ export default function PhotoAlbumsFilesExplorerPanel({
     bgcolor: 'var(--theme-secondary-color) !important',
     color: '#000 !important',
     WebkitTextFillColor: '#000 !important',
-    border: '2px solid #000'
+    border: '2px solid #000',
+    // Always theme secondary — beats SliderControlButton's grey disabled fill.
+    '&.Mui-disabled': {
+      bgcolor: 'var(--theme-secondary-color) !important',
+      color: '#000 !important',
+      WebkitTextFillColor: '#000 !important',
+      border: '2px solid #000',
+      opacity: 1
+    }
   };
 
   const totalBytes = entries.reduce(
@@ -749,7 +757,13 @@ export default function PhotoAlbumsFilesExplorerPanel({
             py: 0.25,
             bgcolor: 'var(--theme-secondary-color) !important',
             color: '#000 !important',
-            WebkitTextFillColor: '#000 !important'
+            WebkitTextFillColor: '#000 !important',
+            '&.Mui-disabled': {
+              bgcolor: 'var(--theme-secondary-color) !important',
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important',
+              opacity: 1
+            }
           }}
         >
           {hasFolder || rootHandle ? 'Reopen folder' : 'Open folder…'}
@@ -768,7 +782,13 @@ export default function PhotoAlbumsFilesExplorerPanel({
             py: 0.25,
             bgcolor: 'var(--theme-secondary-color) !important',
             color: '#000 !important',
-            WebkitTextFillColor: '#000 !important'
+            WebkitTextFillColor: '#000 !important',
+            '&.Mui-disabled': {
+              bgcolor: 'var(--theme-secondary-color) !important',
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important',
+              opacity: 1
+            }
           }}
         >
           Change…

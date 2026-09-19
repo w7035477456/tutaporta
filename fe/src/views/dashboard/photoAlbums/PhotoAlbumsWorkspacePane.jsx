@@ -605,6 +605,24 @@ const sidebarAlbumDatesLineSx = {
 const PHOTO_ALBUMS_SEARCH_HIT_BLUE = '#1e88e5';
 
 /**
+ * Header toolbar = 3 equal sections (menus / search / invite). Each section keeps
+ * its own third as the window resizes and centers its content inside that third.
+ */
+const headerThirdSectionSx = {
+  flex: '1 1 0',
+  minWidth: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexWrap: 'wrap',
+  gap: 0.5,
+  py: 0.25,
+  boxSizing: 'border-box',
+  overflow: 'visible',
+  bgcolor: 'var(--theme-primary-color)'
+};
+
+/**
  * Split a note title around the active search terms so matching substrings can
  * blink (same yellow `.rv-search-hit` treatment used for body matches). Returns
  * plain text when there is nothing to highlight, or an array of React nodes with
@@ -8194,16 +8212,13 @@ export default function PhotoAlbumsWorkspacePane({
               boxSizing: 'border-box'
             }}
           >
-            {/* Section 1 — File / menus (row 1) + Backup/Restore / Mobile Upload (row 2) */}
+            {/* Section 1 of 3 — File / menus (row 1) + Backup/Restore / Mobile Upload (row 2) */}
             <Box
               sx={{
-                flex: '1 1 0',
-                minWidth: 0,
-                display: 'flex',
+                ...headerThirdSectionSx,
                 flexDirection: 'column',
-                alignItems: 'stretch',
-                gap: 0.35,
-                py: 0.25
+                flexWrap: 'nowrap',
+                gap: 0.35
               }}
             >
               <Box
@@ -8211,6 +8226,7 @@ export default function PhotoAlbumsWorkspacePane({
                   display: 'flex',
                   flexWrap: 'wrap',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 0.5,
                   minWidth: 0
                 }}
@@ -8295,6 +8311,7 @@ export default function PhotoAlbumsWorkspacePane({
                   display: 'flex',
                   flexWrap: 'wrap',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 0.5,
                   minWidth: 0
                 }}
@@ -8376,195 +8393,42 @@ export default function PhotoAlbumsWorkspacePane({
               ) : null}
             </Box>
 
-            {/* Section 2 — Album Title + Search + Invite */}
-            <Box
-              sx={{
-                flex: '2 1 0',
-                minWidth: 0,
-                display: 'flex',
-                alignItems: 'stretch',
-                flexWrap: { xs: 'wrap', md: 'nowrap' },
-                gap: 0.75,
-                pl: 0.5,
-                pr: { xs: 0.75, sm: 1 },
-                py: 0.25,
-                boxSizing: 'border-box',
-                borderLeft: '2px solid rgba(255,255,255,0.35)',
-                overflow: 'visible',
-                bgcolor: 'var(--theme-primary-color)'
-              }}
-            >
-              {!compareMode &&
-              selectedNote &&
-              !(
-                noteRequiresInnerPinToView(selectedNote) &&
-                !isInnerNoteUnlocked(selectedNote.note_id)
-              ) ? (
-                <>
-                  <Box
-                    component="label"
-                    htmlFor="rv-note-title-input"
-                    sx={{
-                      fontWeight: 800,
-                      color: '#fff',
-                      WebkitTextFillColor: '#fff',
-                      fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                      flex: '0 0 auto',
-                      bgcolor: 'transparent',
-                      border: 'none',
-                      px: 0,
-                      py: 0,
-                      whiteSpace: 'nowrap',
-                      lineHeight: 1.15
-                    }}
-                  >
-                    Album:
-                  </Box>
-                  {searchActive &&
-                  !titleEditing &&
-                  titleMatchesSearchTerms(openNoteTitlePlain, activeSearchTerms) ? (
-                    <Box
-                      role="textbox"
-                      tabIndex={0}
-                      title="Click to edit album title"
-                      onClick={() => {
-                        setTitleEditing(true);
-                        setTimeout(() => {
-                          const el = document.getElementById('rv-note-title-input');
-                          if (el) {
-                            el.focus();
-                            el.select?.();
-                          }
-                        }, 0);
-                      }}
-                      sx={{
-                        flex: '1 1 8rem',
-                        minWidth: '6rem',
-                        maxWidth: { xs: '100%', md: '14rem' },
-                        fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                        fontWeight: 600,
-                        color: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                        WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                        cursor: 'text',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
-                        border: '3px solid #000',
-                        borderRadius: 0.5,
-                        px: 0.85,
-                        py: 0.45
-                      }}
-                    >
-                      {renderTitleWithSearchHighlight(openNoteTitlePlain, activeSearchTerms)}
-                    </Box>
-                  ) : (
-                    <TextField
-                      id="rv-note-title-input"
-                      variant="standard"
-                      fullWidth
-                      value={openNoteTitlePlain}
-                      onChange={(e) => handleNoteTitleBoxChange(e.target.value)}
-                      onFocus={() => {
-                        noteTitleBoxSnapshotRef.current = String(
-                          draftRef.current.openNoteTitlePlain ?? ''
-                        );
-                        const noteId = Number(selectedNoteId);
-                        const ownerNotebook =
-                          notebooks.find((nb) =>
-                            (nb.notes || []).some((n) => Number(n.note_id) === noteId)
-                          ) || selectedNotebook;
-                        const row = (ownerNotebook?.notes || []).find(
-                          (n) => Number(n.note_id) === noteId
-                        );
-                        noteTitleBoxPersistedNameRef.current = String(
-                          row?.note_name ?? ''
-                        ).trim();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          void commitNoteTitleBox();
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          setOpenNoteTitlePlain(noteTitleBoxSnapshotRef.current);
-                          draftRef.current = {
-                            ...draftRef.current,
-                            openNoteTitlePlain: noteTitleBoxSnapshotRef.current
-                          };
-                          setTitleEditing(false);
-                          e.currentTarget.blur();
-                        }
-                      }}
-                      onBlur={() => {
-                        void commitNoteTitleBox();
-                      }}
-                      placeholder="Untitled"
-                      InputProps={{ disableUnderline: true }}
-                      inputProps={{ 'aria-label': 'Album title', maxLength: 200 }}
-                      sx={{
-                        flex: '1 1 8rem',
-                        minWidth: '6rem',
-                        maxWidth: { xs: '100%', md: '14rem' },
-                        ...photoAlbumsThemeDaynightSurfaceSx,
-                        border: '3px solid #000',
-                        borderRadius: 0.5,
-                        px: 0.85,
-                        py: 0.3,
-                        '& .MuiInputBase-input': {
-                          fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                          fontWeight: 600,
-                          color: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                          WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                          p: 0
-                        }
-                      }}
-                    />
-                  )}
-                </>
-              ) : null}
+            {/* Section 2 of 3 — Search / Clear (header album title box removed;
+                rename an album from the sidebar row instead). */}
+            <Box sx={headerThirdSectionSx}>
               {!compareMode ? (
-                <Box
-                  sx={{
-                    flex: '1 1 auto',
-                    minWidth: 0,
-                    display: 'flex',
-                    alignItems: 'stretch',
-                    flexWrap: { xs: 'wrap', lg: 'nowrap' },
-                    gap: 0,
-                    justifyContent: 'flex-start',
-                    bgcolor: 'var(--theme-primary-color)'
+                <PhotoAlbumsSearchBar
+                  term1={searchTerm1}
+                  onTerm1Change={setSearchTerm1}
+                  onSubmit={() => void runSearch()}
+                  onClear={handleClearSearch}
+                  searchBusy={searchBusy}
+                  clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
+                  bgcolor="var(--theme-primary-color)"
+                  fillWidth={false}
+                  headerFlush
+                />
+              ) : null}
+            </Box>
+
+            {/* Section 3 of 3 — Invite / Review + Tutorial */}
+            <Box sx={headerThirdSectionSx}>
+              {!compareMode ? (
+                <PhotoAlbumsInviteBar
+                  disabled={busy}
+                  noteId={selectedNote ? Number(selectedNote.note_id) : null}
+                  notebookId={selectedNotebookId ? Number(selectedNotebookId) : null}
+                  storageType={paneStorageType}
+                  albumSetName={activeAlbumSetName}
+                  albumName={activeAlbumName}
+                  videoTutorialUrl={videoTutorialUrl}
+                  onInvited={() => void refreshSharedAlbums()}
+                  onOpenReview={(sendResult) => {
+                    setInviteReviewSendResult(sendResult || null);
+                    setInviteReviewOpen(true);
                   }}
-                >
-                  <PhotoAlbumsSearchBar
-                    term1={searchTerm1}
-                    onTerm1Change={setSearchTerm1}
-                    onSubmit={() => void runSearch()}
-                    onClear={handleClearSearch}
-                    searchBusy={searchBusy}
-                    clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
-                    bgcolor="var(--theme-primary-color)"
-                    fillWidth={false}
-                    headerFlush
-                  />
-                  <PhotoAlbumsInviteBar
-                    disabled={busy}
-                    noteId={selectedNote ? Number(selectedNote.note_id) : null}
-                    notebookId={selectedNotebookId ? Number(selectedNotebookId) : null}
-                    storageType={paneStorageType}
-                    albumSetName={activeAlbumSetName}
-                    albumName={activeAlbumName}
-                    videoTutorialUrl={videoTutorialUrl}
-                    onInvited={() => void refreshSharedAlbums()}
-                    onOpenReview={(sendResult) => {
-                      setInviteReviewSendResult(sendResult || null);
-                      setInviteReviewOpen(true);
-                    }}
-                  />
-                </Box>
-              ) : (
-                <Box sx={{ flex: '1 1 auto', minWidth: 0 }} aria-hidden />
-              )}
+                />
+              ) : null}
             </Box>
           </Box>
           ) : null}

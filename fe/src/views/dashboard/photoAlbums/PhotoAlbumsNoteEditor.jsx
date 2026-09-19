@@ -6960,7 +6960,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 px: '8px',
                 bgcolor: '#000000'
               }
-            : null)
+            : // Album viewing area around the fitted page — theme daylight.
+              { bgcolor: 'var(--theme-daylight-color)' })
         }}
       >
         {!albumChromeHidden && !presentationMode ? (

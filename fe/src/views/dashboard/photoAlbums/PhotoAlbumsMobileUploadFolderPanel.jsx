@@ -87,7 +87,15 @@ const trayButtonSx = {
   bgcolor: 'var(--theme-secondary-color) !important',
   color: '#000 !important',
   WebkitTextFillColor: '#000 !important',
-  border: '2px solid #000'
+  border: '2px solid #000',
+  // Always theme secondary — beats SliderControlButton's grey disabled fill.
+  '&.Mui-disabled': {
+    bgcolor: 'var(--theme-secondary-color) !important',
+    color: '#000 !important',
+    WebkitTextFillColor: '#000 !important',
+    border: '2px solid #000',
+    opacity: 1
+  }
 };
 
 function isVideoContentType(contentType, name) {

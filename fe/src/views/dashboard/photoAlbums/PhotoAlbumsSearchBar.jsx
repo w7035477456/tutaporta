@@ -7,18 +7,19 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 
 /**
- * Surround behind Search / Clear / search input — always theme primary.
+ * Surround behind Search / Clear / search input — always theme secondary.
  * Document-level rule so the daylight (#F0F0F0) panel surface never shows through.
  */
 const SEARCH_SURROUND_ATTR = 'data-vault-search-surround';
+const SEARCH_SURROUND_VAR = '--vault-search-surround';
 const searchSurroundGlobalStyles = {
   [`[${SEARCH_SURROUND_ATTR}], [${SEARCH_SURROUND_ATTR}] > div:not(.MuiFormControl-root)`]: {
-    backgroundColor: 'var(--theme-primary-color) !important',
+    backgroundColor: `var(${SEARCH_SURROUND_VAR}) !important`,
     backgroundImage: 'none !important'
   }
 };
 
-/** White typing field only — surround is the primary-colored flex wrapper. */
+/** White typing field only — surround is the secondary-colored flex wrapper. */
 const searchInputFieldSx = {
   flex: '0 1 auto',
   width: { xs: '100%', sm: 320 },
@@ -42,8 +43,11 @@ const searchInputFieldSx = {
 };
 
 const headerFlushSearchInputFieldSx = {
-  flex: '0 1 auto',
-  width: { xs: '100%', sm: '14rem' },
+  // Fluid: grows/shrinks with its header third. No rem floor, or the section
+  // cannot shrink and the bar overlaps the Invite section on narrow windows.
+  flex: '1 1 0',
+  width: '100%',
+  minWidth: 0,
   maxWidth: '100%',
   m: 0,
   '& .MuiInputBase-root': {
@@ -80,7 +84,7 @@ export default function PhotoAlbumsSearchBar({
   onClear,
   searchBusy = false,
   clearDisabled = false,
-  bgcolor = 'var(--theme-primary-color)',
+  bgcolor = 'var(--theme-secondary-color)',
   /** When false, bar sits on the right of the strip instead of filling remaining width. */
   fillWidth = true,
   /** Header row: sit flush against Invite bar (no trailing padding/gap). */
@@ -97,8 +101,7 @@ export default function PhotoAlbumsSearchBar({
   const inputWrapSx = headerFlush
     ? {
         flex: '1 1 0',
-        minWidth: { xs: '6rem', sm: '8rem' },
-        maxWidth: { xs: '100%', md: '14rem' }
+        minWidth: 0
       }
     : {
         flex: '1 1 0',
@@ -111,12 +114,16 @@ export default function PhotoAlbumsSearchBar({
     <Box
       {...{ [SEARCH_SURROUND_ATTR]: 'true' }}
       sx={{
-        flex: headerFlush ? '0 1 auto' : fillWidth ? 1 : '0 1 auto',
-        minWidth: headerFlush ? { xs: '100%', md: '12rem' } : fillWidth ? 0 : { xs: 200, sm: 280 },
-        maxWidth: headerFlush ? { xs: '100%', md: '20rem' } : fillWidth ? 'none' : { xs: '100%', sm: 320, md: 380 },
+        [SEARCH_SURROUND_VAR]: bgcolor,
+        flex: headerFlush ? '1 1 0' : fillWidth ? 1 : '0 1 auto',
+        width: headerFlush ? '100%' : undefined,
+        minWidth: headerFlush ? 0 : fillWidth ? 0 : { xs: 200, sm: 280 },
+        maxWidth: headerFlush ? '100%' : fillWidth ? 'none' : { xs: '100%', sm: 320, md: 380 },
         alignSelf: 'stretch',
         display: 'flex',
         alignItems: 'stretch',
+        // Wrap so Search/Clear + input never overflow into the next header section.
+        flexWrap: headerFlush ? 'wrap' : 'nowrap',
         gap: headerFlush ? 0 : { xs: 0.35, sm: 0.5 },
         pl: headerFlush ? 0 : { xs: 0.5, sm: 0.75 },
         pr: headerFlush ? 0 : { xs: 0.5, sm: 0.75 },

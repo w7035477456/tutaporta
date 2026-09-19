@@ -22,10 +22,12 @@ function isValidEmailFormat(raw) {
 }
 
 const inviteFieldSx = {
-  flex: { xs: '1 1 100%', md: '0 0 30rem' },
-  width: { xs: '100%', md: '30rem' },
-  maxWidth: { xs: '100%', md: '30rem' },
+  // Fluid so the bar always fits inside its third of the header (was a fixed 30rem).
+  // No rem floor, or the section cannot shrink and this input overlaps its neighbor.
+  flex: '1 1 0',
+  width: '100%',
   minWidth: 0,
+  maxWidth: '100%',
   '& .MuiInputBase-root': {
     bgcolor: '#fff',
     borderRadius: 1,
@@ -134,12 +136,14 @@ export default function PhotoAlbumsInviteBar({
         flexDirection: 'column',
         gap: 0.25,
         minWidth: 0,
-        flex: { xs: '1 1 100%', md: '0 0 auto' },
-        flexShrink: 0,
+        flex: '1 1 auto',
+        width: '100%',
         boxSizing: 'border-box'
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0, minWidth: 0, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
+      {/* Wrap (not nowrap) at every width — the Invite/Review + tutorial icons cannot
+          shrink, so wrapping is what keeps this bar from overflowing into its neighbor. */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0, minWidth: 0, width: '100%', flexWrap: 'wrap' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35, flexShrink: 0 }}>
           <SliderControlButton
             type="button"

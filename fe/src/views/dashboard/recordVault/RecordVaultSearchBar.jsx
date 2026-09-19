@@ -7,18 +7,19 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 
 /**
- * Surround behind Search / Clear / Term 1 — always theme primary.
+ * Surround behind Search / Clear / Term 1 — always theme secondary.
  * Document-level rule so the daylight (#F0F0F0) panel surface never shows through.
  */
 const SEARCH_SURROUND_ATTR = 'data-vault-search-surround';
+const SEARCH_SURROUND_VAR = '--vault-search-surround';
 const searchSurroundGlobalStyles = {
   [`[${SEARCH_SURROUND_ATTR}], [${SEARCH_SURROUND_ATTR}] > div:not(.MuiFormControl-root)`]: {
-    backgroundColor: 'var(--theme-primary-color) !important',
+    backgroundColor: `var(${SEARCH_SURROUND_VAR}) !important`,
     backgroundImage: 'none !important'
   }
 };
 
-/** White typing field only — surround is the primary-colored flex wrapper. */
+/** White typing field only — surround is the secondary-colored flex wrapper. */
 const searchInputFieldSx = {
   flex: '0 1 auto',
   width: { xs: '100%', sm: 320 },
@@ -58,7 +59,7 @@ export default function RecordVaultSearchBar({
   onClear,
   searchBusy = false,
   clearDisabled = false,
-  bgcolor = 'var(--theme-primary-color)',
+  bgcolor = 'var(--theme-secondary-color)',
   sx
 }) {
   const handleKeyDown = (event) => {
@@ -74,6 +75,7 @@ export default function RecordVaultSearchBar({
     <Box
       {...{ [SEARCH_SURROUND_ATTR]: 'true' }}
       sx={{
+        [SEARCH_SURROUND_VAR]: bgcolor,
         flex: 1,
         minWidth: 0,
         alignSelf: 'stretch',
@@ -121,7 +123,7 @@ export default function RecordVaultSearchBar({
       <Box
         sx={{
           // Grow to fill the strip, but keep the white field bounded so the
-          // theme-primary surround stays visible to the right of it.
+          // theme-secondary surround stays visible to the right of it.
           flex: '1 1 0',
           minWidth: 0,
           alignSelf: 'stretch',
