@@ -272,15 +272,15 @@ export default function BackgroundMusicFooterControls({
                   minWidth: { xs: 72, sm: 96 }
                 }
               }
-            : isFooterBar
+              : isFooterBar
               ? {
                   maxWidth: '100%',
                   minWidth: 0,
                   width: '100%',
                   flex: '1 1 auto',
                   '& .MuiSlider-root': {
-                    // Allow slider to collapse so Track stays visible on narrow VW.
-                    minWidth: 0
+                    // Keep a real horizontal bar — never collapse to a dot.
+                    minWidth: { xs: 84, sm: 140, md: 180 }
                   }
                 }
               : isVsinglesToolbar
@@ -418,7 +418,8 @@ export default function BackgroundMusicFooterControls({
             valueLabelDisplay="off"
             sx={{
               flex: '1 1 auto',
-              minWidth: 0,
+              minWidth: { xs: 84, sm: 140, md: 180 },
+              mx: 0.5,
               color: accent,
               '& .MuiSlider-track': { border: 'none', backgroundColor: accent },
               '& .MuiSlider-rail': { opacity: 0.35, backgroundColor: isFooterMuted ? '#bdbdbd' : accent },

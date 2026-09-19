@@ -267,8 +267,9 @@ export function colorTemplate15ApplicationFrameFooterRightSx(overrides = {}) {
     justifyContent: 'flex-end',
     gap: { xs: 0.5, sm: 0.75 },
     minWidth: 0,
-    // Cap to viewport so Track never clips past the right edge on narrow VW.
-    maxWidth: { xs: 'min(100%, 72vw)', sm: 'min(560px, 55vw)' },
+    // Wide enough that the volume slider reads as a horizontal bar — Support / Mute
+    // shift left to make room. Still capped so Track never clips past the right edge.
+    maxWidth: { xs: 'min(100%, 80vw)', sm: 'min(760px, 68vw)' },
     flexWrap: 'nowrap',
     overflow: 'hidden',
     ...overrides
