@@ -98,6 +98,11 @@ import ProfilesRecordsPage from 'views/utilities/ProfilesRecordsPage';
 import { PROFILES_RECORDS_PAYMENT_TABS } from 'constants/profilesRecordsRoute';
 import PhotoAlbumsMobileUploadDialog from './PhotoAlbumsMobileUploadDialog';
 import RecordVaultMobileDirectUploadDialog from '../recordVault/RecordVaultMobileDirectUploadDialog';
+import RecordVaultMobileUploadTray, {
+  isRecordVaultMobileUploadDrag,
+  materializeRecordVaultMobileUploadFile,
+  readRecordVaultMobileUploadDragFileName
+} from '../recordVault/RecordVaultMobileUploadTray';
 import { consumeMobileTutaPhotoUploadPending, peekMobileTutaPhotoUploadPending } from 'utils/mobilePostLoginChoice';
 import PhotoAlbumsMobileUploadFolderPanel from './PhotoAlbumsMobileUploadFolderPanel';
 import PhotoAlbumsCrossPaneTransferDialog from './PhotoAlbumsCrossPaneTransferDialog';
@@ -4557,7 +4562,7 @@ export default function PhotoAlbumsWorkspacePane({
     ) {
       return;
     }
-    if (types.includes('Files')) {
+    if (types.includes('Files') || isRecordVaultMobileUploadDrag(event.dataTransfer)) {
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
     }
@@ -5148,8 +5153,11 @@ export default function PhotoAlbumsWorkspacePane({
       ) {
         return;
       }
+      const mobileUploadName = isRecordVaultMobileUploadDrag(event.dataTransfer)
+        ? readRecordVaultMobileUploadDragFileName(event.dataTransfer)
+        : '';
       const isFileDrag = types.includes('Files');
-      if (!isFileDrag) return;
+      if (!isFileDrag && !mobileUploadName) return;
       event.preventDefault();
       event.stopPropagation();
       if (noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)) {
@@ -5159,6 +5167,18 @@ export default function PhotoAlbumsWorkspacePane({
         setError('Vault is busy — try dropping again in a moment.');
         return;
       }
+
+      // Mobile Upload strip → Thumbnail Tray. The staged copy stays until its X is clicked.
+      if (mobileUploadName) {
+        try {
+          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName);
+          await uploadNoteVaultFileToStaging(file);
+        } catch (err) {
+          setError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
+        }
+        return;
+      }
+
       const files = Array.from(event.dataTransfer?.files || []);
       if (!files.length) return;
 
@@ -7777,6 +7797,7 @@ export default function PhotoAlbumsWorkspacePane({
         title="Upload photo to TutaPhoto"
         noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
         onPickFile={handleMobileDirectPhotoUploadFile}
+        onStaged={() => setMobileUploadFolderRefreshToken((n) => n + 1)}
       />
 
       <PhotoAlbumsInviteReviewDialog
@@ -8431,6 +8452,23 @@ export default function PhotoAlbumsWorkspacePane({
               ) : null}
             </Box>
           </Box>
+          ) : null}
+
+          {!hideWorkspaceChrome && !compareMode ? (
+            <RecordVaultMobileUploadTray
+              active={unlocked}
+              disabled={
+                busy ||
+                !selectedNote ||
+                Boolean(batchUploadProgress) ||
+                (selectedNote &&
+                  noteRequiresInnerPinToView(selectedNote) &&
+                  !isInnerNoteUnlocked(selectedNote.note_id))
+              }
+              refreshToken={mobileUploadFolderRefreshToken}
+              emptyHint="Take a photo on your phone or scan Mobile Upload QR — photos appear here. Drag a thumbnail onto the album."
+              onError={(msg) => setError(String(msg || ''))}
+            />
           ) : null}
 
           {!hideWorkspaceChrome && !compareMode ? (

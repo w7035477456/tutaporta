@@ -1,4 +1,14 @@
-import { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
+import {
+  Fragment,
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useMemo,
+  forwardRef,
+  useImperativeHandle
+} from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -83,6 +93,11 @@ import {
 } from 'constants/albumUploadFormats';
 import { useMyAlbumVideos, updateMyVideoType, deleteMyVideo } from 'api/myAlbumVideosFe';
 import RecordVaultMobileDirectUploadDialog from 'views/dashboard/recordVault/RecordVaultMobileDirectUploadDialog';
+import RecordVaultMobileUploadTray, {
+  isRecordVaultMobileUploadDrag,
+  materializeRecordVaultMobileUploadFile,
+  readRecordVaultMobileUploadDragFileName
+} from 'views/dashboard/recordVault/RecordVaultMobileUploadTray';
 import {
   consumeMobileTutaDatesUploadPending,
   peekMobileTutaDatesUploadPending
@@ -1164,6 +1179,8 @@ export default function MyStory() {
   const [uploadError, setUploadError] = useState('');
   const [selectedPhotoId, setSelectedPhotoId] = useState(null);
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
+  /** Bumped after a phone pick is staged so the Mobile Upload strip reloads at once. */
+  const [mobileUploadTrayRefreshToken, setMobileUploadTrayRefreshToken] = useState(0);
   const [deletingId, setDeletingId] = useState(null);
   const [deletingVideoId, setDeletingVideoId] = useState(null);
   const [draggingPhotoId, setDraggingPhotoId] = useState(null);
@@ -2363,7 +2380,7 @@ export default function MyStory() {
     }
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer?.types?.includes('Files')) {
+    if (e.dataTransfer?.types?.includes('Files') || isRecordVaultMobileUploadDrag(e.dataTransfer)) {
       e.dataTransfer.dropEffect = 'copy';
     } else {
       e.dataTransfer.dropEffect = 'move';
@@ -2382,6 +2399,21 @@ export default function MyStory() {
         draggingPhotoIdsRef.current = [];
         setDraggingPhotoId(null);
         await handleFiles(externalFiles, { targetAlbumType: albumType });
+        return;
+      }
+
+      // Mobile Upload strip → album. The staged copy stays until its X is clicked.
+      if (isRecordVaultMobileUploadDrag(e.dataTransfer)) {
+        const stagedName = readRecordVaultMobileUploadDragFileName(e.dataTransfer);
+        draggingPhotoIdsRef.current = [];
+        setDraggingPhotoId(null);
+        if (!stagedName) return;
+        try {
+          const file = await materializeRecordVaultMobileUploadFile(stagedName);
+          await handleFiles([file], { targetAlbumType: albumType });
+        } catch (err) {
+          setUploadError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
+        }
         return;
       }
 
@@ -3293,6 +3325,7 @@ export default function MyStory() {
         title="Upload photo to TutaDates"
         noteTitle="TutaDates album"
         onPickFile={handleMobileDirectDatesUpload}
+        onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
       />
       <input
         ref={fileInputRef}
@@ -4291,8 +4324,8 @@ export default function MyStory() {
                 const albumPhotoCount = albumPhotos.length;
                 const isDragOver = dragOverAlbumType === albumType;
                 return (
+                  <Fragment key={albumType}>
                   <Box
-                    key={albumType}
                     onDragOver={(e) => handleAlbumDragOver(e, albumType)}
                     onDragLeave={(e) => {
                       const rel = e.relatedTarget;
@@ -4567,6 +4600,15 @@ export default function MyStory() {
                       </Box>
                     </Box>
                   </Box>
+                  {albumType === ALBUM_TYPES.uploaded ? (
+                    <RecordVaultMobileUploadTray
+                      disabled={uploading}
+                      refreshToken={mobileUploadTrayRefreshToken}
+                      emptyHint="Take a photo on your phone — photos appear here. Drag a thumbnail onto an album."
+                      onError={(msg) => setUploadError(String(msg || ''))}
+                    />
+                  ) : null}
+                  </Fragment>
                 );
               })}
               <Box>
