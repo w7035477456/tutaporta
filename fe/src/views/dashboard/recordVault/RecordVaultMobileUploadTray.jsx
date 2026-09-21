@@ -9,6 +9,7 @@ import {
   fetchMobileUploadFileBlob,
   listMobileUploadFiles
 } from 'api/photoAlbumsMobileUploadFolderFe';
+import { getScanForPhoneUploadMs } from 'config/phoneUploadScanEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
@@ -53,14 +54,117 @@ function displayName(name) {
   return raw.replace(/^\d+_/, '') || raw;
 }
 
+function ThumbTile({ entry, thumb, disabled, onRemove }) {
+  const name = entry.name;
+  const video = isVideoContentType(entry.contentType, name);
+  return (
+    <Box
+      role="listitem"
+      draggable={!disabled}
+      title={`${displayName(name)} — drag onto a note`}
+      onDragStart={(e) => {
+        if (disabled) {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData(RV_MOBILE_UPLOAD_DRAG_MIME, name);
+        e.dataTransfer.setData('text/plain', displayName(name));
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
+      sx={{
+        position: 'relative',
+        flex: '0 0 auto',
+        width: 72,
+        height: 72,
+        border: '2px solid #000',
+        borderRadius: 0.75,
+        bgcolor: '#fff',
+        overflow: 'hidden',
+        cursor: disabled ? 'default' : 'grab',
+        userSelect: 'none',
+        '&:active': { cursor: disabled ? 'default' : 'grabbing' }
+      }}
+    >
+      {thumb ? (
+        <Box
+          component="img"
+          src={thumb}
+          alt={displayName(name)}
+          draggable={false}
+          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <Box
+          sx={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: '#eee'
+          }}
+        >
+          {video ? <VideocamOutlinedIcon sx={{ color: '#333' }} /> : <ImageOutlinedIcon sx={{ color: '#333' }} />}
+        </Box>
+      )}
+      <Box
+        component="button"
+        type="button"
+        aria-label={`Remove ${displayName(name)}`}
+        {...guestDemoBlockProps()}
+        onClick={(e) => onRemove(name, e)}
+        disabled={disabled}
+        sx={{
+          position: 'absolute',
+          top: 2,
+          right: 2,
+          width: 18,
+          height: 18,
+          p: 0,
+          m: 0,
+          border: '1px solid #000',
+          borderRadius: '50%',
+          bgcolor: '#e53935',
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: 800,
+          lineHeight: 1,
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        ×
+      </Box>
+    </Box>
+  );
+}
+
+ThumbTile.propTypes = {
+  entry: PropTypes.shape({
+    name: PropTypes.string.isRequired,
+    contentType: PropTypes.string
+  }).isRequired,
+  thumb: PropTypes.string,
+  disabled: PropTypes.bool,
+  onRemove: PropTypes.func.isRequired
+};
+
 /**
- * Full-width strip under the TutaNotes menu: Mobile Upload thumbnails from
- * UPLOAD_FOLDER. Drag a thumb onto the open note to attach it.
+ * TutaNotes mobile-upload thumbnails (UPLOAD_FOLDER). Desktop: strip under menu.
+ * Mobile upload session: grid + “TutaNotes Mobile Upload:” label.
+ * `plain` — white background, no frame, no label (mobile upload sheet under the popup).
  */
 export default function RecordVaultMobileUploadTray({
   active = true,
   disabled = false,
   refreshToken = 0,
+  pollIntervalMs = 0,
+  titleLabel = 'Mobile Upload:',
+  layout = 'horizontal',
+  plain = false,
+  emptyHint,
   onError
 }) {
   const [files, setFiles] = useState([]);
@@ -119,6 +223,15 @@ export default function RecordVaultMobileUploadTray({
     };
   }, [active, refreshToken, loadFiles, revokeThumbs]);
 
+  useEffect(() => {
+    if (!active) return undefined;
+    const ms = pollIntervalMs > 0 ? pollIntervalMs : getScanForPhoneUploadMs();
+    const id = window.setInterval(() => {
+      void loadFiles();
+    }, ms);
+    return () => window.clearInterval(id);
+  }, [active, pollIntervalMs, loadFiles]);
+
   const handleRemove = useCallback(
     async (fileName, event) => {
       event?.preventDefault?.();
@@ -134,11 +247,22 @@ export default function RecordVaultMobileUploadTray({
     [disabled, loadFiles, onError]
   );
 
-  return (
-    <Box
-      data-rv-mobile-upload-tray=""
-      aria-label="Mobile Upload thumbnails"
-      sx={{
+  const isGrid = layout === 'grid';
+  const shellSx = isGrid
+    ? {
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: plain ? 0 : 1,
+        px: plain ? 0.5 : 1.5,
+        py: plain ? 0.5 : 1.25,
+        bgcolor: plain ? '#ffffff' : '#fff59d',
+        border: plain ? 'none' : '3px dashed #c62828',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
+      }
+    : {
         flexShrink: 0,
         display: 'flex',
         alignItems: 'stretch',
@@ -150,162 +274,114 @@ export default function RecordVaultMobileUploadTray({
         borderBottom: '2px solid #000',
         boxSizing: 'border-box',
         overflow: 'hidden'
-      }}
+      };
+
+  const thumbsArea = (
+    <Box
+      sx={
+        isGrid
+          ? {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignContent: 'flex-start',
+              gap: 1,
+              overflowY: 'auto',
+              p: 0.5
+            }
+          : {
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 1,
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              py: 0.25,
+              scrollbarWidth: 'thin'
+            }
+      }
     >
-      <Box
-        sx={{
-          flexShrink: 0,
-          alignSelf: 'center',
-          display: 'inline-flex',
-          alignItems: 'center',
-          border: '3px solid #000',
-          borderRadius: 0.5,
-          bgcolor: '#ffeb3b',
-          px: 1,
-          py: 0.5,
-          boxSizing: 'border-box'
-        }}
-      >
+      {loading && !files.length ? (
+        <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#333' }}>Loading…</Typography>
+      ) : null}
+      {!loading && !files.length ? (
         <Typography
-          component="span"
           sx={{
-            fontFamily: MAIN_FONT_FAMILY,
-            fontWeight: 800,
-            fontSize: { xs: '0.85rem', sm: '1rem' },
-            lineHeight: 1.15,
-            color: '#000',
-            WebkitTextFillColor: '#000',
-            whiteSpace: 'nowrap'
+            fontWeight: 700,
+            fontSize: { xs: '0.75rem', sm: '0.85rem' },
+            color: '#555',
+            WebkitTextFillColor: '#555'
           }}
         >
-          Mobile Upload:
+          {emptyHint ||
+            (isGrid
+              ? 'Take a photo or choose from gallery — thumbnails appear here.'
+              : 'Scan Mobile Upload QR — photos appear here. Drag a thumbnail onto a note.')}
         </Typography>
-      </Box>
+      ) : null}
+      {files.map((entry) => (
+        <ThumbTile
+          key={entry.name}
+          entry={entry}
+          thumb={thumbUrls[entry.name]}
+          disabled={disabled}
+          onRemove={handleRemove}
+        />
+      ))}
+    </Box>
+  );
 
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 1,
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          py: 0.25,
-          scrollbarWidth: 'thin'
-        }}
-      >
-        {loading && !files.length ? (
-          <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#333' }}>
-            Loading…
-          </Typography>
-        ) : null}
-        {!loading && !files.length ? (
-          <Typography
-            sx={{
-              fontWeight: 700,
-              fontSize: { xs: '0.75rem', sm: '0.85rem' },
-              color: '#555',
-              WebkitTextFillColor: '#555'
-            }}
-          >
-            Scan Mobile Upload QR — photos appear here. Drag a thumbnail onto a note.
-          </Typography>
-        ) : null}
-        {files.map((entry) => {
-          const name = entry.name;
-          const video = isVideoContentType(entry.contentType, name);
-          const thumb = thumbUrls[name];
-          return (
-            <Box
-              key={name}
-              role="listitem"
-              draggable={!disabled}
-              title={`${displayName(name)} — drag onto a note`}
-              onDragStart={(e) => {
-                if (disabled) {
-                  e.preventDefault();
-                  return;
-                }
-                e.dataTransfer.setData(RV_MOBILE_UPLOAD_DRAG_MIME, name);
-                e.dataTransfer.setData('text/plain', displayName(name));
-                e.dataTransfer.effectAllowed = 'copy';
-              }}
-              sx={{
-                position: 'relative',
-                flex: '0 0 auto',
-                width: 72,
-                height: 72,
-                border: '2px solid #000',
-                borderRadius: 0.75,
-                bgcolor: '#fff',
-                overflow: 'hidden',
-                cursor: disabled ? 'default' : 'grab',
-                userSelect: 'none',
-                '&:active': { cursor: disabled ? 'default' : 'grabbing' }
-              }}
-            >
-              {thumb ? (
-                <Box
-                  component="img"
-                  src={thumb}
-                  alt={displayName(name)}
-                  draggable={false}
-                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                />
-              ) : (
-                <Box
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: '#eee'
-                  }}
-                >
-                  {video ? (
-                    <VideocamOutlinedIcon sx={{ color: '#333' }} />
-                  ) : (
-                    <ImageOutlinedIcon sx={{ color: '#333' }} />
-                  )}
-                </Box>
-              )}
-              <Box
-                component="button"
-                type="button"
-                aria-label={`Remove ${displayName(name)}`}
-                {...guestDemoBlockProps()}
-                onClick={(e) => void handleRemove(name, e)}
-                disabled={disabled}
-                sx={{
-                  position: 'absolute',
-                  top: 2,
-                  right: 2,
-                  width: 18,
-                  height: 18,
-                  p: 0,
-                  m: 0,
-                  border: '1px solid #000',
-                  borderRadius: '50%',
-                  bgcolor: '#e53935',
-                  color: '#fff',
-                  fontSize: 11,
-                  fontWeight: 800,
-                  lineHeight: 1,
-                  cursor: 'pointer',
+  return (
+    <Box data-rv-mobile-upload-tray="" aria-label="Mobile Upload thumbnails" sx={shellSx}>
+      {plain ? null : (
+        <Box
+          sx={
+            isGrid
+              ? {
+                  flexShrink: 0,
                   display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                ×
-              </Box>
-            </Box>
-          );
-        })}
-      </Box>
+                  alignSelf: 'flex-start',
+                  border: '3px solid #000',
+                  borderRadius: 0.5,
+                  bgcolor: '#ffeb3b',
+                  px: 1,
+                  py: 0.5
+                }
+              : {
+                  flexShrink: 0,
+                  alignSelf: 'center',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  border: '3px solid #000',
+                  borderRadius: 0.5,
+                  bgcolor: '#ffeb3b',
+                  px: 1,
+                  py: 0.5,
+                  boxSizing: 'border-box'
+                }
+          }
+        >
+          <Typography
+            component="span"
+            sx={{
+              fontFamily: MAIN_FONT_FAMILY,
+              fontWeight: 800,
+              fontSize: { xs: '0.85rem', sm: '1rem' },
+              lineHeight: 1.15,
+              color: '#000',
+              WebkitTextFillColor: '#000',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {titleLabel}
+          </Typography>
+        </Box>
+      )}
+      {thumbsArea}
     </Box>
   );
 }
@@ -314,5 +390,10 @@ RecordVaultMobileUploadTray.propTypes = {
   active: PropTypes.bool,
   disabled: PropTypes.bool,
   refreshToken: PropTypes.number,
+  pollIntervalMs: PropTypes.number,
+  titleLabel: PropTypes.string,
+  layout: PropTypes.oneOf(['horizontal', 'grid']),
+  plain: PropTypes.bool,
+  emptyHint: PropTypes.string,
   onError: PropTypes.func
 };

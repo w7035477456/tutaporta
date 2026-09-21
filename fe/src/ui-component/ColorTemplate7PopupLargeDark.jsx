@@ -389,6 +389,11 @@ export default function ColorTemplate7PopupLargeDark({
   closeButtonSx,
   panelShellSx: panelShellSxOverride,
   overlaySx: overlaySxOverride,
+  /**
+   * Rendered inside the overlay, below the panel (not inside it) — e.g. mobile upload
+   * thumbnails stacked under the popup. Pair with an `overlaySx` column layout.
+   */
+  overlayFooter,
   contentSx,
   /** Merged into the scrollable AuthCardWrapper (e.g. hide scrollbar). */
   cardSx,
@@ -576,6 +581,14 @@ export default function ColorTemplate7PopupLargeDark({
           />
         ) : null}
       </Box>
+      {overlayFooter ? (
+        <Box
+          onClick={(event) => event.stopPropagation()}
+          sx={{ width: '100%', minWidth: 0, flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column' }}
+        >
+          {overlayFooter}
+        </Box>
+      ) : null}
     </Box>,
     document.body
   );
@@ -615,6 +628,7 @@ ColorTemplate7PopupLargeDark.propTypes = {
   closeButtonSx: PropTypes.object,
   panelShellSx: PropTypes.object,
   overlaySx: PropTypes.object,
+  overlayFooter: PropTypes.node,
   contentSx: PropTypes.object,
   cardSx: PropTypes.object,
   panelBg: PropTypes.string,

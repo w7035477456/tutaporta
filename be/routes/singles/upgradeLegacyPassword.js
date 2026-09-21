@@ -6,6 +6,7 @@ import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
 import { wrapEmailHtml } from '../../lib/emailHtml.js';
 import { sendOutboundMail } from '../../lib/outboundMail.js';
 import { getAuthJwtExpiresInSeconds, setAuthCookie } from '../../utils/authCookie.js';
+import { resolveLoginSessionDeviceClassFromJwt, resolveLoginSessionDeviceClassFromReq } from '../../utils/loginSessionDeviceClass.js';
 import { startSingleLoginSession } from '../../utils/singleLoginSession.js';
 import { resolveCustomLogoutMinutes } from '../../utils/customLogoutDuration.js';
 import { PASSWORD_ATTEMPT_EPOCH } from '../../utils/passwordAttemptTracking.js';
@@ -129,13 +130,15 @@ export async function upgradeLegacyPassword(req, res) {
     }
 
     const logoutMins = await resolveCustomLogoutMinutes(singlesId);
-    const sessionId = await startSingleLoginSession(singlesId, logoutMins);
+    const deviceClass =
+      resolveLoginSessionDeviceClassFromJwt(req.auth) || resolveLoginSessionDeviceClassFromReq(req);
+    const sessionId = await startSingleLoginSession(singlesId, logoutMins, deviceClass);
     const token = jwt.sign(
       {
         singles_id: singlesId,
         email: emailNorm || req.auth?.email || null,
         custom_logout_duration: logoutMins,
-        ...(sessionId ? { session_id: sessionId } : {})
+        ...(sessionId ? { session_id: sessionId, session_device_class: deviceClass } : {})
       },
       getPrivateKey(),
       {

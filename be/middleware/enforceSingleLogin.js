@@ -27,7 +27,7 @@ function sessionErrorBody(result) {
   };
 }
 
-/** After JWT auth: ensure JWT session_id matches Redis (one device per account).
+/** After JWT auth: ensure JWT session_id matches Redis (one mobile + one desktop per account).
  * Skips guest_demo_login (demo/demo, guest/guest) so multiple demos can stay signed in. */
 export async function enforceSingleLoginSession(req, res, decoded) {
   if (shouldSkipSingleLogin(req.auth, decoded)) {
@@ -37,7 +37,8 @@ export async function enforceSingleLoginSession(req, res, decoded) {
   const singlesId = Number(req.auth.singles_id);
   const result = await validateSingleLoginSession(singlesId, decoded?.session_id, {
     cachedLogoutMinutes: req.auth?.custom_logout_duration,
-    logoutMinutes: req.auth?.custom_logout_duration
+    logoutMinutes: req.auth?.custom_logout_duration,
+    deviceClass: decoded?.session_device_class
   });
   if (!result.ok) {
     // Idle / Redis session expiry — same as logout: drop remembered MyNote icons.

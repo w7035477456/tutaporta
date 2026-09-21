@@ -69,7 +69,9 @@ export async function requireAuth(req, res, next) {
     }
     req.auth = {
       ...authUser,
-      requiresPasswordUpgrade: decoded.requiresPasswordUpgrade === true
+      requiresPasswordUpgrade: decoded.requiresPasswordUpgrade === true,
+      session_id: decoded.session_id,
+      session_device_class: decoded.session_device_class
     };
 
     const gate = await enforceSingleLoginSession(req, res, decoded);

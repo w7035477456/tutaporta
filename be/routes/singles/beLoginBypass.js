@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { getMallDepartmentMode } from '../../mallDepartmentMode.js';
 import { getPrivateKey } from '../../jwtKeys.js';
 import { getAuthJwtExpiresInSeconds, setAuthCookie } from '../../utils/authCookie.js';
+import { resolveLoginSessionDeviceClassFromReq } from '../../utils/loginSessionDeviceClass.js';
 import { startSingleLoginSession } from '../../utils/singleLoginSession.js';
 import { resolveCustomLogoutMinutes } from '../../utils/customLogoutDuration.js';
 import { ensureSeededDemoBuddiesOnLogin } from '../../utils/ensureSeededDemoBuddiesOnLogin.js';
@@ -40,7 +41,8 @@ export async function beLoginBypass(req, res) {
         console.error('[beLoginBypass] ensureSeededDemoBuddiesOnLogin:', seedErr?.message ?? seedErr);
       }
       const logoutMins = await resolveCustomLogoutMinutes(user.singles_id);
-      const sessionId = await startSingleLoginSession(user.singles_id, logoutMins);
+      const deviceClass = resolveLoginSessionDeviceClassFromReq(req);
+      const sessionId = await startSingleLoginSession(user.singles_id, logoutMins, deviceClass);
       const tokenPayload = {
         singles_id: user.singles_id,
         email: user.email,
@@ -48,6 +50,7 @@ export async function beLoginBypass(req, res) {
       };
       if (sessionId) {
         tokenPayload.session_id = sessionId;
+        tokenPayload.session_device_class = deviceClass;
       }
       const token = jwt.sign(tokenPayload, getPrivateKey(), {
         algorithm: 'RS256',

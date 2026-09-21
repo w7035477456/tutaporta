@@ -79,12 +79,42 @@ export function consumeMobileTutaNotesUploadPending() {
     const v = sessionStorage.getItem(MOBILE_TUTANOTES_UPLOAD_KEY);
     if (v === '1') {
       sessionStorage.removeItem(MOBILE_TUTANOTES_UPLOAD_KEY);
+      markMobileTutaNotesUploadSession();
       return true;
     }
   } catch {
     // ignore
   }
   return false;
+}
+
+/** Active mobile TutaNotes upload UI (compact: popup + thumbnail grid only). */
+export const MOBILE_TUTANOTES_UPLOAD_SESSION_KEY = 'mobileTutaNotesUploadSession';
+
+export function markMobileTutaNotesUploadSession() {
+  try {
+    sessionStorage.setItem(MOBILE_TUTANOTES_UPLOAD_SESSION_KEY, '1');
+    window.dispatchEvent(new CustomEvent('vsingles-mobile-tutanotes-upload-session'));
+  } catch {
+    // ignore
+  }
+}
+
+export function peekMobileTutaNotesUploadSession() {
+  try {
+    return sessionStorage.getItem(MOBILE_TUTANOTES_UPLOAD_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function clearMobileTutaNotesUploadSession() {
+  try {
+    sessionStorage.removeItem(MOBILE_TUTANOTES_UPLOAD_SESSION_KEY);
+    window.dispatchEvent(new CustomEvent('vsingles-mobile-tutanotes-upload-session'));
+  } catch {
+    // ignore
+  }
 }
 
 export function markMobileTutaPhotoUploadPending() {

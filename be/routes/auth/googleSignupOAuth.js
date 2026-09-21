@@ -454,6 +454,7 @@ export async function googleSignupCallback(req, res) {
 
       await issueUserLoginSession(res, existing, {
         rememberMe: false,
+        req,
         log: (msg, data) => console.log('[googleSignupOAuth]', msg, data || '')
       });
       console.log('[googleSignupOAuth] login — existing account:', email);

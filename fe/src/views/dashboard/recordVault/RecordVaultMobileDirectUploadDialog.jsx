@@ -6,18 +6,34 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
+import RecordVaultMobileUploadTray from 'views/dashboard/recordVault/RecordVaultMobileUploadTray';
 import { recordVaultPopupCloseSx } from 'views/dashboard/recordVault/recordVaultPopupCloseSx';
+import { stageMobileUploadFile } from 'api/photoAlbumsMobileUploadFolderFe';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 
 const ACCEPT =
   'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff';
 
+/** Compact: opaque white sheet — popup on top, uploaded thumbnails stacked below, nothing else. */
+const mobileSheetOverlaySx = {
+  bgcolor: '#ffffff',
+  flexDirection: 'column',
+  alignItems: 'stretch',
+  justifyContent: 'flex-start',
+  overflowY: 'auto',
+  px: 0.75,
+  py: 0.75
+};
+
 /**
- * Phone-as-client upload into the open TutaNotes note (camera / gallery — not QR).
+ * Phone-as-client upload (camera / gallery — not QR) for TutaNotes, TutaDates and TutaPhoto.
+ * Every pick is also staged into UPLOAD_FOLDER so its thumbnail shows under the popup.
  */
 export default function RecordVaultMobileDirectUploadDialog({
   open,
   onClose,
   onPickFile,
+  onStaged,
   disabled = false,
   noteTitle = '',
   title = 'Upload to current note'
@@ -26,6 +42,8 @@ export default function RecordVaultMobileDirectUploadDialog({
   const galleryInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [thumbsRefreshToken, setThumbsRefreshToken] = useState(0);
+  const isCompact = useCompactLoginViewport();
 
   const handleFile = useCallback(
     async (e) => {
@@ -37,13 +55,21 @@ export default function RecordVaultMobileDirectUploadDialog({
       setError('');
       try {
         await onPickFile(file);
+        // Thumbnail strip / sheet reads UPLOAD_FOLDER — a failed copy must not fail the upload.
+        try {
+          await stageMobileUploadFile(file);
+          setThumbsRefreshToken((n) => n + 1);
+          onStaged?.();
+        } catch (stageErr) {
+          console.warn('[RecordVaultMobileDirectUploadDialog] stageMobileUploadFile', stageErr?.message ?? stageErr);
+        }
       } catch (err) {
         setError(err?.message || 'Upload failed. Please try again.');
       } finally {
         setBusy(false);
       }
     },
-    [onPickFile]
+    [onPickFile, onStaged]
   );
 
   return (
@@ -53,11 +79,24 @@ export default function RecordVaultMobileDirectUploadDialog({
         if (busy) return;
         onClose?.();
       }}
-      closeOnBackdrop={!busy}
+      closeOnBackdrop={!busy && !isCompact}
       closeButtonAriaLabel="Close upload photo"
       maxWidth="min(96vw, 420px)"
       centerInWindow
       closeButtonSx={recordVaultPopupCloseSx}
+      overlaySx={isCompact ? mobileSheetOverlaySx : undefined}
+      overlayFooter={
+        isCompact ? (
+          <RecordVaultMobileUploadTray
+            active={open}
+            disabled={busy}
+            layout="grid"
+            plain
+            refreshToken={thumbsRefreshToken}
+            emptyHint="Take a photo or choose from gallery — thumbnails appear here."
+          />
+        ) : null
+      }
     >
       <ColorTemplate7PopupLargeDark.Title>{title}</ColorTemplate7PopupLargeDark.Title>
       <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
@@ -121,6 +160,8 @@ RecordVaultMobileDirectUploadDialog.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
   onPickFile: PropTypes.func,
+  /** Fired after the picked file is copied into UPLOAD_FOLDER (refresh a pane-level tray). */
+  onStaged: PropTypes.func,
   disabled: PropTypes.bool,
   noteTitle: PropTypes.string,
   title: PropTypes.string

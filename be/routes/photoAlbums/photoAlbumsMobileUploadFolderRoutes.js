@@ -5,8 +5,23 @@ import fs from 'fs';
 import {
   deleteMobileUploadFile,
   listMobileUploadFiles,
-  readMobileUploadFile
+  readMobileUploadFile,
+  writeMobileUploadFile
 } from '../../utils/mobileUploadFolder.js';
+
+function decodeUploadDataUrl(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') {
+    throw new Error('Missing file (data URL or base64)');
+  }
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  const contentType = match ? match[1].trim().toLowerCase() : 'image/jpeg';
+  const base64 = match ? match[2] : dataUrl;
+  const buffer = Buffer.from(base64, 'base64');
+  if (!buffer.length) {
+    throw new Error('Empty file payload');
+  }
+  return { buffer, contentType };
+}
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -15,6 +30,30 @@ function requireSinglesId(req, res) {
     return null;
   }
   return singlesId;
+}
+
+/** POST /api/photoAlbums/mobile-upload/files — stage a copy for desktop Mobile Upload tray (TutaNotes phone upload). */
+export async function postPhotoAlbumsMobileUploadFile(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    const { buffer, contentType } = decodeUploadDataUrl(req.body?.file);
+    const originalName =
+      typeof req.body?.file_name === 'string' && req.body.file_name.trim()
+        ? req.body.file_name.trim()
+        : 'photo.jpg';
+    const { fileName, size } = await writeMobileUploadFile(singlesId, {
+      buffer,
+      originalName,
+      contentType
+    });
+    return res.json({ success: true, fileName, size });
+  } catch (err) {
+    console.error('[postPhotoAlbumsMobileUploadFile]', err?.message || err);
+    const msg = err?.message || 'Failed to stage mobile upload file';
+    const code = /not allowed|Missing|Empty|Invalid/i.test(msg) ? 400 : 500;
+    return res.status(code).json({ error: msg });
+  }
 }
 
 /** GET /api/photoAlbums/mobile-upload/files */

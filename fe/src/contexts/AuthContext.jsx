@@ -9,6 +9,7 @@ import { clearSignupIdentificationVerificationRequired } from '../utils/signupId
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from '../config/firstLoginAutoPopupsEnv';
 import { normalizeOver18Verified } from '../utils/over18Verified';
 import { resetMainFontToEnvDefault } from '../config/mainFontEnv';
+import { compactLoginMatches } from '../config/compactLoginViewport';
 import useConfig from '../hooks/useConfig';
 
 function clearSwrCacheForNewSession() {
@@ -224,7 +225,8 @@ export const AuthProvider = ({ children }) => {
     const response = await api.post('/api/verifyPassword', {
       email,
       password,
-      rememberMe: Boolean(rememberMe)
+      rememberMe: Boolean(rememberMe),
+      clientSessionDevice: compactLoginMatches() ? 'mobile' : 'desktop'
     });
     if (response.data.success) {
       let nextUser = mergeAuthUser(response.data.user, response.data);

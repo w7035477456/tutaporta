@@ -3,7 +3,7 @@ import { parseLogoutAutoMinutes, resolveCustomLogoutMinutes } from './customLogo
 /**
  * FE idle logout: header main countdown = custom_logout_duration (minutes → seconds),
  * then LOGOUT_WARN_MIN / LOGOUT_WARN_SEC modal before sign-out.
- * Backend single-login: Redis session_id check only (see singleLoginSession.js).
+ * Backend login slots: Redis session_id per device class (mobile + desktop); see singleLoginSession.js.
  */
 
 /** Warning popup duration in seconds — LOGOUT_WARN_MIN (minutes) or LOGOUT_WARN_SEC fallback. */

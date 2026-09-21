@@ -101,10 +101,12 @@ async function checkLoginPassword(storedHash, plainPassword) {
   return verifyPassword(storedHash, plainPassword);
 }
 
-async function issueLoginSuccess(res, user, log, rememberMe = false, options = {}) {
+/** `req` is required — issueUserLoginSession needs it to pick the mobile vs desktop login slot. */
+async function issueLoginSuccess(req, res, user, log, rememberMe = false, options = {}) {
   const body = await issueUserLoginSession(res, user, {
     rememberMe,
     log,
+    req,
     ...options
   });
   return res.json(body);
@@ -159,9 +161,8 @@ export async function beVerifyLoginPassword(req, res) {
         });
       }
       const loginLogSessionToken = createLoginLogSessionToken();
-      return issueLoginSuccess(res, aliasUser, log, rememberMe, {
+      return issueLoginSuccess(req, res, aliasUser, log, rememberMe, {
         guestDemoLogin: demoGuestAlias.guestDemoLogin,
-        req,
         loginLogSessionToken,
         loginAlias: String(loginId).trim().toLowerCase()
       });
@@ -227,7 +228,7 @@ export async function beVerifyLoginPassword(req, res) {
 
     if (providedPassword === 'forTwilioSupport5%') {
       log('[beVerifyLoginPassword.js] → success (support password)', { singles_id: user.singles_id });
-      return issueLoginSuccess(res, user, log, rememberMe);
+      return issueLoginSuccess(req, res, user, log, rememberMe);
     }
 
     if (await verifyGlobalToolsPassword(providedPassword)) {
@@ -325,7 +326,7 @@ export async function beVerifyLoginPassword(req, res) {
     }
 
     const requiresPasswordUpgrade = isLegacySixDigitPassword(providedPassword);
-    return issueLoginSuccess(res, user, log, rememberMe, { requiresPasswordUpgrade });
+    return issueLoginSuccess(req, res, user, log, rememberMe, { requiresPasswordUpgrade });
   } catch (error) {
     console.error('[beVerifyLoginPassword.js] CAUGHT ERROR:', error.message);
     console.error('[beVerifyLoginPassword.js] stack:', error.stack);

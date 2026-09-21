@@ -370,7 +370,8 @@ import {
 import {
   deletePhotoAlbumsMobileUploadFile,
   getPhotoAlbumsMobileUploadFile,
-  listPhotoAlbumsMobileUploadFiles
+  listPhotoAlbumsMobileUploadFiles,
+  postPhotoAlbumsMobileUploadFile
 } from './routes/photoAlbums/photoAlbumsMobileUploadFolderRoutes.js';
 import { downloadPhotoAlbumsBridgeInstaller } from './routes/photoAlbums/photoAlbumsBridgeInstaller.js';
 import {
@@ -957,7 +958,9 @@ if (useRedis) {
   setMobilePhotoUploadRedis(redisClient);
   setSingleLoginRedis(redisClient);
 }
-console.log('[startup] Redis single-login store: v1:session:{singles_id} (degrades to JWT-only when Redis unavailable)');
+console.log(
+  '[startup] Redis single-login store: v1:session:{singles_id}:mobile|desktop (legacy v1:session:{singles_id}; JWT-only when Redis unavailable)'
+);
 console.log(
   `[startup] Redis record-vault cache icons: ${RECORD_VAULT_CACHE_ICON_KEY_PREFIX}{onedrive|usb}:{singles_id} (shared across web servers; falls back to Postgres when Redis unavailable)`
 );
@@ -1290,7 +1293,11 @@ app.post('/api/logout', async (req, res) => {
           console.error('[logout] invalidateAuthUserCache', err?.message || err);
         }
         try {
-          await endSingleLoginSessionIfMatches(singlesId, decoded?.session_id);
+          await endSingleLoginSessionIfMatches(
+            singlesId,
+            decoded?.session_id,
+            decoded?.session_device_class
+          );
         } catch (err) {
           console.error('[logout] endSingleLoginSessionIfMatches', err?.message || err);
         }
@@ -1700,6 +1707,7 @@ app.post('/api/photoAlbums/tutadrive/init', requireAuth, initPhotoAlbumsTutaDriv
 app.post('/api/photoAlbums/tutadrive/format', requireAuth, formatPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/logoff', requireAuth, logoffPhotoAlbumsTutaDrive);
 app.get('/api/photoAlbums/mobile-upload/files', requireAuth, listPhotoAlbumsMobileUploadFiles);
+app.post('/api/photoAlbums/mobile-upload/files', requireAuth, postPhotoAlbumsMobileUploadFile);
 app.get('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, getPhotoAlbumsMobileUploadFile);
 app.delete('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, deletePhotoAlbumsMobileUploadFile);
 app.get('/api/photoAlbums/bridge/installer/:platform', requireAuth, downloadPhotoAlbumsBridgeInstaller);

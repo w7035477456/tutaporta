@@ -40,6 +40,8 @@ import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMo
 import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { isRecordVaultRagUiEnabled } from 'config/recordVaultRagUiEnv';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { peekMobileTutaNotesUploadSession } from 'utils/mobilePostLoginChoice';
 import {
   TUTANOTES_CLOUD_LOGO,
   TUTANOTES_CLOUD_PANE_TOOLTIP,
@@ -330,6 +332,16 @@ export default function MyRecordVault() {
   const [profilesRecordsOpen, setProfilesRecordsOpen] = useState(false);
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
   const [ragUiEnabled, setRagUiEnabled] = useState(() => isRecordVaultRagUiEnabled());
+  const isCompactViewport = useCompactLoginViewport();
+  const [mobileTutaNotesUploadSession, setMobileTutaNotesUploadSession] = useState(() =>
+    peekMobileTutaNotesUploadSession()
+  );
+  useEffect(() => {
+    const sync = () => setMobileTutaNotesUploadSession(peekMobileTutaNotesUploadSession());
+    window.addEventListener('vsingles-mobile-tutanotes-upload-session', sync);
+    return () => window.removeEventListener('vsingles-mobile-tutanotes-upload-session', sync);
+  }, []);
+  const hideMyNoteShellForMobileUpload = isCompactViewport && mobileTutaNotesUploadSession;
 
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myNote visit.
@@ -874,7 +886,7 @@ export default function MyRecordVault() {
       <Box sx={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {showWorkspace ? (
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          {showTabBar && !showCompare && !showDual ? (
+          {showTabBar && !showCompare && !showDual && !hideMyNoteShellForMobileUpload ? (
             <Box role="tablist" aria-label="TutaNotes storage" {...guestDemoAllowProps()} sx={storageTabBarSx}>
               <Box sx={storageTabStripSx(cloudTabColor)}>
                 <GreenButton
@@ -942,7 +954,7 @@ export default function MyRecordVault() {
                 }}
               >
                 {/* Yellow title row when only one storage mode is offered, or per-pane titles in compare. */}
-                {!showTabBar || showCompare ? (
+                {(!showTabBar || showCompare) && !hideMyNoteShellForMobileUpload ? (
                   <PaneHeader
                     title={cloudTabLabel}
                     logoSrc={TUTANOTES_CLOUD_LOGO}
@@ -978,7 +990,7 @@ export default function MyRecordVault() {
                   bgcolor: showDual || !usbUnlocked ? USB_TAB_COLOR : TUTANOTES_WORKSPACE_PANEL_BG
                 }}
               >
-                {!showTabBar || showCompare ? (
+                {(!showTabBar || showCompare) && !hideMyNoteShellForMobileUpload ? (
                   <PaneHeader
                     title={usbTabLabel}
                     logoSrc={TUTANOTES_USB_LOGO}

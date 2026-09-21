@@ -3,6 +3,10 @@ import pool from '../db/connection.js';
 import { getPrivateKey } from '../jwtKeys.js';
 import { getMallDepartmentMode } from '../mallDepartmentMode.js';
 import { getAuthJwtExpiresInSeconds, setAuthCookie } from './authCookie.js';
+import {
+  LOGIN_SESSION_DEVICE_DESKTOP,
+  resolveLoginSessionDeviceClassFromReq
+} from './loginSessionDeviceClass.js';
 import { startSingleLoginSession } from './singleLoginSession.js';
 import { resolveCustomLogoutMinutes } from './customLogoutDuration.js';
 import { ensureDemoRegularInitialSetupDone } from './ensureDemoRegularInitialSetupDone.js';
@@ -74,9 +78,13 @@ export async function issueUserLoginSession(res, user, options = {}) {
   } else if (guestDemoLogin) {
     // Concurrent demo/guest alias sessions — skip Redis session_id.
   } else {
-    const sessionId = await startSingleLoginSession(user.singles_id, logoutMins);
+    const deviceClass = req
+      ? resolveLoginSessionDeviceClassFromReq(req)
+      : LOGIN_SESSION_DEVICE_DESKTOP;
+    const sessionId = await startSingleLoginSession(user.singles_id, logoutMins, deviceClass);
     if (sessionId) {
       tokenPayload.session_id = sessionId;
+      tokenPayload.session_device_class = deviceClass;
     }
   }
 

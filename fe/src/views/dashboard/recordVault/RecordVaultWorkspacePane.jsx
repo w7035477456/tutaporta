@@ -35,7 +35,13 @@ import {
   isAllowedRecordVaultFile,
   recordVaultUploadFileName
 } from 'utils/recordVaultFileFormats';
-import { consumeMobileTutaNotesUploadPending, peekMobileTutaNotesUploadPending } from 'utils/mobilePostLoginChoice';
+import {
+  consumeMobileTutaNotesUploadPending,
+  markMobileTutaNotesUploadSession,
+  clearMobileTutaNotesUploadSession,
+  peekMobileTutaNotesUploadPending
+} from 'utils/mobilePostLoginChoice';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import RecordVaultSearchBar from './RecordVaultSearchBar';
 import {
   recordVaultMenuButtonFontRemFromTenths,
@@ -1724,6 +1730,10 @@ export default function RecordVaultWorkspacePane({
   const [mobileUploadTrayRefreshToken, setMobileUploadTrayRefreshToken] = useState(0);
   /** Phone post-login: direct camera/gallery into the open note (not desktop QR). */
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
+  /** Compact viewport: hide vault chrome — only upload popup + thumbnail grid (Tasks 1–2). */
+  const [mobileTutaNotesUploadUi, setMobileTutaNotesUploadUi] = useState(false);
+  const isCompactViewport = useCompactLoginViewport();
+  const hideWorkspaceForMobileTutaNotesUpload = isCompactViewport && mobileTutaNotesUploadUi;
   /** Highlight the notes-list column while dragging an importable file over it. */
   const [noteLaneFileDragActive, setNoteLaneFileDragActive] = useState(false);
   /** Bumped when the TipTap instance is created, so hydration effects can run. */
@@ -3361,6 +3371,9 @@ export default function RecordVaultWorkspacePane({
       setVaultLeavingProgressPercent(0);
       setVaultLeavingProgressLabel('');
     }
+    clearMobileTutaNotesUploadSession();
+    setMobileTutaNotesUploadUi(false);
+    setMobileDirectUploadOpen(false);
     navigate('/mall');
   }, [busy, unlocked, navigate, performVaultStorageLogoff, paneStorageType]);
 
@@ -3666,6 +3679,13 @@ export default function RecordVaultWorkspacePane({
 
   /** Mobile post-login chooser → open direct upload once a real note is selected. */
   useEffect(() => {
+    if (searchParams.get('mobileUpload') === '1' || peekMobileTutaNotesUploadPending()) {
+      setMobileTutaNotesUploadUi(true);
+      markMobileTutaNotesUploadSession();
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (!unlocked || loading || busy || mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaNotesUploadPending();
@@ -3682,6 +3702,7 @@ export default function RecordVaultWorkspacePane({
       setSearchParams(next, { replace: true });
     }
     setMobileDirectUploadOpen(true);
+    setMobileTutaNotesUploadUi(true);
     return undefined;
   }, [
     unlocked,
@@ -6342,6 +6363,7 @@ export default function RecordVaultWorkspacePane({
         }
         noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
         onPickFile={handleMobileDirectUploadFile}
+        onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
       />
 
       <RecordVaultCrossPaneTransferDialog
@@ -6724,6 +6746,26 @@ export default function RecordVaultWorkspacePane({
             ...myNoteBackgroundPanelSx
           }}
         />
+      ) : hideWorkspaceForMobileTutaNotesUpload ? (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            bgcolor: '#ffffff'
+          }}
+        >
+          <RecordVaultMobileUploadTray
+            active={unlocked}
+            disabled={false}
+            layout="grid"
+            plain
+            refreshToken={mobileUploadTrayRefreshToken}
+            onError={(msg) => setError(String(msg || ''))}
+          />
+        </Box>
       ) : (
         <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
           <RecordVaultUsageBar
