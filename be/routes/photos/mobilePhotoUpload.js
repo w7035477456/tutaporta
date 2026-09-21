@@ -5,9 +5,11 @@ import {
   markMobilePhotoUploadInProgress,
   clearMobilePhotoUploadInProgress,
   isMobilePhotoUploadInProgress,
+  isStagingFolderUploadPurpose,
   normalizeMobilePhotoUploadPurpose,
   readMobilePhotoUploadTokenFromRequest,
-  sessionExpired
+  sessionExpired,
+  stagingProductForUploadPurpose
 } from '../../utils/mobilePhotoUploadSession.js';
 import { setProfileImageForSingles } from '../../utils/setProfileImageForSingles.js';
 import {
@@ -292,7 +294,12 @@ async function handleBillReceiptMobileUpload(req, res, token, singlesId, paidRec
   }
 }
 
-async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
+async function handleStagingFolderMobileUpload(req, res, token, singlesId, purpose) {
+  const product = stagingProductForUploadPurpose(purpose);
+  if (!product) {
+    await clearMobilePhotoUploadInProgress(token);
+    return res.status(400).json({ error: 'Upload link is missing a staging product' });
+  }
   let buffer;
   let contentType;
   if (Buffer.isBuffer(req._mobilePhotoBuffer) && req._mobilePhotoBuffer.length) {
@@ -313,30 +320,34 @@ async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
     const { fileName, size } = await writeMobileUploadFile(singlesId, {
       buffer,
       originalName,
-      contentType
+      contentType,
+      product
     });
     await markMobilePhotoUploadCompleted(token, null, { storedFileName: fileName });
-    infoMobilePhotoUpload('POST photo albums OK', {
+    infoMobilePhotoUpload('POST staging folder OK', {
       token: maskMobileUploadToken(token),
       singlesId,
+      purpose,
+      product,
       fileName,
       size
     });
     return res.status(200).json({
       success: true,
       fileName,
-      purpose: 'photo_albums',
+      purpose,
+      product,
       size
     });
   } catch (err) {
     await clearMobilePhotoUploadInProgress(token);
     if (/UPLOAD_FOLDER is not set/i.test(String(err?.message || ''))) {
-      errorMobilePhotoUpload('albums write FAIL — UPLOAD_FOLDER missing', err, { singlesId });
+      errorMobilePhotoUpload('staging write FAIL — UPLOAD_FOLDER missing', err, { singlesId, product });
       return res.status(500).json({ error: 'UPLOAD_FOLDER is not set in .env' });
     }
     if (isStoragePermissionError(err)) {
       logStoragePermissionFailure(err, {
-        route: 'mobilePhotoUpload (photo albums QR)',
+        route: `mobilePhotoUpload (${product} QR)`,
         envKey: 'UPLOAD_FOLDER',
         folder: process.env.UPLOAD_FOLDER,
         singlesId
@@ -346,9 +357,10 @@ async function handlePhotoAlbumsMobileUpload(req, res, token, singlesId) {
         error: STORAGE_PERMISSION_USER_MESSAGE
       });
     }
-    errorMobilePhotoUpload('albums write FAIL', err, {
+    errorMobilePhotoUpload('staging write FAIL', err, {
       token: maskMobileUploadToken(token),
       singlesId,
+      product,
       bufferBytes: buffer?.length,
       bufferSize: formatMobileUploadBytes(buffer?.length)
     });
@@ -423,12 +435,14 @@ async function handleMobilePhotoUploadPost(req, res, token) {
     const singlesId = Number(row.singles_id);
     const purpose = normalizeMobilePhotoUploadPurpose(row.purpose);
 
-    if (purpose === 'photo_albums') {
-      debugMobilePhotoUpload('POST photo albums path', {
+    if (isStagingFolderUploadPurpose(purpose)) {
+      debugMobilePhotoUpload('POST staging folder path', {
         token: maskMobileUploadToken(token),
-        singlesId
+        singlesId,
+        purpose,
+        product: stagingProductForUploadPurpose(purpose)
       });
-      return handlePhotoAlbumsMobileUpload(req, res, token, singlesId);
+      return handleStagingFolderMobileUpload(req, res, token, singlesId, purpose);
     }
 
     if (purpose === 'bill_receipt') {

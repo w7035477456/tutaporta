@@ -12,6 +12,7 @@ import {
   fetchMobileUploadFileBlob,
   listMobileUploadFiles
 } from 'api/photoAlbumsMobileUploadFolderFe';
+import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import {
   PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   PHOTO_ALBUMS_THEME_INVERSE_FG,
@@ -157,7 +158,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
     setLoading(true);
     setError('');
     try {
-      const listed = await listMobileUploadFiles();
+      const listed = await listMobileUploadFiles(MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
       setFiles(listed);
       clearSelection();
       revokeThumbs();
@@ -168,7 +169,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
           if (!name) return;
           if (isVideoContentType(entry.contentType, name)) return;
           try {
-            const blob = await fetchMobileUploadFileBlob(name);
+            const blob = await fetchMobileUploadFileBlob(name, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
             const url = URL.createObjectURL(blob);
             nextThumbs[name] = url;
           } catch {
@@ -225,7 +226,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
   );
 
   const blobToFile = useCallback(async (entry) => {
-    const blob = await fetchMobileUploadFileBlob(entry.name);
+    const blob = await fetchMobileUploadFileBlob(entry.name, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
     const type = entry.contentType || blob.type || 'application/octet-stream';
     return new File([blob], displayName(entry.name), { type, lastModified: entry.mtimeMs || Date.now() });
   }, []);
@@ -291,7 +292,7 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
     try {
       for (const entry of selected) {
         // eslint-disable-next-line no-await-in-loop
-        await deleteMobileUploadFile(entry.name);
+        await deleteMobileUploadFile(entry.name, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
       }
       await loadFiles();
     } catch (err) {

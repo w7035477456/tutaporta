@@ -12,6 +12,10 @@ import {
 import { getScanForPhoneUploadMs } from 'config/phoneUploadScanEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
+import {
+  MOBILE_UPLOAD_PRODUCT_TUTANOTES,
+  requireMobileUploadProduct
+} from 'constants/mobileUploadProduct';
 
 /** HTML5 drag payload: file name under UPLOAD_FOLDER. */
 export const RV_MOBILE_UPLOAD_DRAG_MIME = 'application/x-rv-mobile-upload';
@@ -26,12 +30,19 @@ export function readRecordVaultMobileUploadDragFileName(dataTransfer) {
   return raw || '';
 }
 
+function stripMobileUploadNamePrefix(name) {
+  const raw = String(name || '');
+  return (
+    raw.replace(/^\d+_(?:tutaphoto|tutanotes|tutadates)_/, '').replace(/^\d+_/, '') || raw
+  );
+}
+
 /** Build a File from a staged mobile-upload name (for vault attach). */
-export async function materializeRecordVaultMobileUploadFile(fileName) {
+export async function materializeRecordVaultMobileUploadFile(fileName, product) {
   const name = String(fileName || '').trim();
   if (!name) throw new Error('Missing mobile upload file name');
-  const blob = await fetchMobileUploadFileBlob(name);
-  const display = name.replace(/^\d+_/, '') || name;
+  const blob = await fetchMobileUploadFileBlob(name, product);
+  const display = stripMobileUploadNamePrefix(name);
   const type = blob.type || 'application/octet-stream';
   return new File([blob], display, { type, lastModified: Date.now() });
 }
@@ -50,8 +61,7 @@ function isVideoContentType(contentType, name) {
 }
 
 function displayName(name) {
-  const raw = String(name || '');
-  return raw.replace(/^\d+_/, '') || raw;
+  return stripMobileUploadNamePrefix(name);
 }
 
 function ThumbTile({ entry, thumb, disabled, onRemove }) {
@@ -152,11 +162,12 @@ ThumbTile.propTypes = {
 };
 
 /**
- * TutaNotes mobile-upload thumbnails (UPLOAD_FOLDER). Desktop: strip under menu.
- * Mobile upload session: grid + “TutaNotes Mobile Upload:” label.
- * `plain` — white background, no frame, no label (mobile upload sheet under the popup).
+ * Product-scoped mobile-upload thumbnails (UPLOAD_FOLDER).
+ * Desktop: strip under menu. Mobile upload session: grid under the popup.
+ * `plain` — white background, no frame, no label.
  */
 export default function RecordVaultMobileUploadTray({
+  product = MOBILE_UPLOAD_PRODUCT_TUTANOTES,
   active = true,
   disabled = false,
   refreshToken = 0,
@@ -167,6 +178,7 @@ export default function RecordVaultMobileUploadTray({
   emptyHint,
   onError
 }) {
+  const stagingProduct = requireMobileUploadProduct(product);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [thumbUrls, setThumbUrls] = useState(() => ({}));
@@ -187,7 +199,7 @@ export default function RecordVaultMobileUploadTray({
   const loadFiles = useCallback(async () => {
     setLoading(true);
     try {
-      const listed = await listMobileUploadFiles();
+      const listed = await listMobileUploadFiles(stagingProduct);
       setFiles(listed);
       revokeThumbs();
       const nextThumbs = {};
@@ -197,7 +209,7 @@ export default function RecordVaultMobileUploadTray({
           if (!name) return;
           if (isVideoContentType(entry.contentType, name)) return;
           try {
-            const blob = await fetchMobileUploadFileBlob(name);
+            const blob = await fetchMobileUploadFileBlob(name, stagingProduct);
             nextThumbs[name] = URL.createObjectURL(blob);
           } catch {
             // skip thumb
@@ -213,7 +225,7 @@ export default function RecordVaultMobileUploadTray({
     } finally {
       setLoading(false);
     }
-  }, [onError, revokeThumbs]);
+  }, [onError, revokeThumbs, stagingProduct]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -238,13 +250,13 @@ export default function RecordVaultMobileUploadTray({
       event?.stopPropagation?.();
       if (disabled) return;
       try {
-        await deleteMobileUploadFile(fileName);
+        await deleteMobileUploadFile(fileName, stagingProduct);
         await loadFiles();
       } catch (err) {
         onError?.(err?.response?.data?.error || err?.message || 'Failed to delete mobile upload');
       }
     },
-    [disabled, loadFiles, onError]
+    [disabled, loadFiles, onError, stagingProduct]
   );
 
   const isGrid = layout === 'grid';
@@ -387,6 +399,7 @@ export default function RecordVaultMobileUploadTray({
 }
 
 RecordVaultMobileUploadTray.propTypes = {
+  product: PropTypes.oneOf(['tutaphoto', 'tutanotes', 'tutadates']),
   active: PropTypes.bool,
   disabled: PropTypes.bool,
   refreshToken: PropTypes.number,

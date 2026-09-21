@@ -98,6 +98,7 @@ import RecordVaultMobileUploadTray, {
   materializeRecordVaultMobileUploadFile,
   readRecordVaultMobileUploadDragFileName
 } from 'views/dashboard/recordVault/RecordVaultMobileUploadTray';
+import { MOBILE_UPLOAD_PRODUCT_TUTADATES } from 'constants/mobileUploadProduct';
 import {
   clearMobileTutaDatesUploadSession,
   consumeMobileTutaDatesUploadPending,
@@ -2445,7 +2446,7 @@ export default function MyStory() {
         setDraggingPhotoId(null);
         if (!stagedName) return;
         try {
-          const file = await materializeRecordVaultMobileUploadFile(stagedName);
+          const file = await materializeRecordVaultMobileUploadFile(stagedName, MOBILE_UPLOAD_PRODUCT_TUTADATES);
           await handleFiles([file], { targetAlbumType: albumType });
         } catch (err) {
           setUploadError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
@@ -3365,6 +3366,7 @@ export default function MyStory() {
           onPickFile={handleMobileDirectDatesUpload}
           onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
           onExitToMall={handleExitMobileDatesUploadToMall}
+          product={MOBILE_UPLOAD_PRODUCT_TUTADATES}
         />
       </Box>
     );
@@ -3393,6 +3395,7 @@ export default function MyStory() {
         onPickFile={handleMobileDirectDatesUpload}
         onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
         onExitToMall={handleExitMobileDatesUploadToMall}
+          product={MOBILE_UPLOAD_PRODUCT_TUTADATES}
       />
       <input
         ref={fileInputRef}
@@ -4669,6 +4672,7 @@ export default function MyStory() {
                   </Box>
                   {albumType === ALBUM_TYPES.uploaded ? (
                     <RecordVaultMobileUploadTray
+                      product={MOBILE_UPLOAD_PRODUCT_TUTADATES}
                       disabled={uploading}
                       refreshToken={mobileUploadTrayRefreshToken}
                       emptyHint="Take a photo on your phone — photos appear here. Drag a thumbnail onto an album."

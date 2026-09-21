@@ -1,7 +1,7 @@
 /**
- * Phone → desktop staging folder for Photo Albums QR (purpose photo_albums).
+ * Phone → desktop staging folder (UPLOAD_FOLDER).
  * Files live under UPLOAD_FOLDER (~/.ssh/be/.env, typically ${FAST_STORAGE_FOLDER}/mobile_upload).
- * Namespaced as `{singlesId}_*` so shared storage stays per-user.
+ * Namespaced as `{singlesId}_{product}_*` so each product gallery only sees its own uploads.
  */
 import fs from 'fs/promises';
 import path from 'path';
@@ -12,6 +12,16 @@ import {
   isAllowedAlbumPhotoContentType,
   normalizePhotoExtension
 } from './albumUploadFormats.js';
+
+export const MOBILE_UPLOAD_PRODUCT_TUTAPHOTO = 'tutaphoto';
+export const MOBILE_UPLOAD_PRODUCT_TUTANOTES = 'tutanotes';
+export const MOBILE_UPLOAD_PRODUCT_TUTADATES = 'tutadates';
+
+export const MOBILE_UPLOAD_PRODUCTS = [
+  MOBILE_UPLOAD_PRODUCT_TUTAPHOTO,
+  MOBILE_UPLOAD_PRODUCT_TUTANOTES,
+  MOBILE_UPLOAD_PRODUCT_TUTADATES
+];
 
 const MOBILE_UPLOAD_VIDEO_EXTENSIONS = new Set(['mp4', 'mov']);
 const MOBILE_UPLOAD_VIDEO_MIME = new Set([
@@ -31,6 +41,43 @@ const MOBILE_UPLOAD_IMAGE_EXTENSIONS = new Set([
   'heic',
   'heif'
 ]);
+
+export function normalizeMobileUploadProduct(raw) {
+  const p = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (
+    p === MOBILE_UPLOAD_PRODUCT_TUTAPHOTO ||
+    p === 'photo_albums' ||
+    p === 'photoalbums' ||
+    p === 'photos' ||
+    p === 'albums'
+  ) {
+    return MOBILE_UPLOAD_PRODUCT_TUTAPHOTO;
+  }
+  if (
+    p === MOBILE_UPLOAD_PRODUCT_TUTANOTES ||
+    p === 'notes' ||
+    p === 'record_vault' ||
+    p === 'recordvault'
+  ) {
+    return MOBILE_UPLOAD_PRODUCT_TUTANOTES;
+  }
+  if (p === MOBILE_UPLOAD_PRODUCT_TUTADATES || p === 'dates' || p === 'mystory' || p === 'my_story') {
+    return MOBILE_UPLOAD_PRODUCT_TUTADATES;
+  }
+  return '';
+}
+
+export function requireMobileUploadProduct(raw) {
+  const product = normalizeMobileUploadProduct(raw);
+  if (!product) {
+    throw new Error(
+      `Invalid mobile upload product. Use one of: ${MOBILE_UPLOAD_PRODUCTS.join(', ')}`
+    );
+  }
+  return product;
+}
 
 function expandTilde(folder) {
   const t = String(folder || '').trim().replace(/\/+$/, '');
@@ -117,6 +164,20 @@ function singlesPrefix(singlesId) {
   return `${id}_`;
 }
 
+function productPrefix(singlesId, product) {
+  const safeProduct = requireMobileUploadProduct(product);
+  return `${singlesPrefix(singlesId)}${safeProduct}_`;
+}
+
+function fileProductFromName(singlesId, fileName) {
+  const prefix = singlesPrefix(singlesId);
+  const name = String(fileName || '');
+  if (!name.startsWith(prefix)) return '';
+  const rest = name.slice(prefix.length);
+  const productToken = rest.split('_')[0] || '';
+  return normalizeMobileUploadProduct(productToken);
+}
+
 function sanitizeOriginalBaseName(originalName, contentType) {
   const raw = path.basename(String(originalName || '').trim() || 'photo');
   const cleaned = raw.replace(/[^\w.\-()+ ]+/g, '_').replace(/\s+/g, '_').slice(0, 120);
@@ -129,9 +190,15 @@ function sanitizeOriginalBaseName(originalName, contentType) {
   return `${stem}.${ext === 'jpeg' ? 'jpg' : ext}`;
 }
 
-export async function listMobileUploadFiles(singlesId) {
+/**
+ * @param {number} singlesId
+ * @param {string} [product] — when set, only that product's files; omit to list all products (backup).
+ */
+export async function listMobileUploadFiles(singlesId, product) {
   const folder = await ensureMobileUploadFolder();
-  const prefix = singlesPrefix(singlesId);
+  const userPrefix = singlesPrefix(singlesId);
+  const filterProduct = product ? requireMobileUploadProduct(product) : '';
+  const productPref = filterProduct ? productPrefix(singlesId, filterProduct) : '';
   let names;
   try {
     names = await fs.readdir(folder);
@@ -141,8 +208,18 @@ export async function listMobileUploadFiles(singlesId) {
   }
   const out = [];
   for (const name of names) {
-    if (!name.startsWith(prefix)) continue;
+    if (!name.startsWith(userPrefix)) continue;
     if (!isAllowedMobileUploadExtension(extensionOf(name))) continue;
+    if (filterProduct) {
+      // Strict: only `{id}_{product}_*` — legacy unscoped `{id}_*` files are excluded.
+      if (!name.startsWith(productPref)) continue;
+    } else {
+      // Backup: include product-scoped files and legacy unscoped files for this user.
+      const scoped = fileProductFromName(singlesId, name);
+      if (!scoped) {
+        // Legacy `{id}_{timestamp}_…` — keep for backup only.
+      }
+    }
     try {
       // eslint-disable-next-line no-await-in-loop
       const st = await fs.stat(path.join(folder, name));
@@ -151,7 +228,8 @@ export async function listMobileUploadFiles(singlesId) {
         name,
         size: st.size,
         mtimeMs: st.mtimeMs,
-        contentType: contentTypeForFileName(name)
+        contentType: contentTypeForFileName(name),
+        product: fileProductFromName(singlesId, name) || null
       });
     } catch {
       // skip unreadable
@@ -161,10 +239,11 @@ export async function listMobileUploadFiles(singlesId) {
   return out;
 }
 
-export async function writeMobileUploadFile(singlesId, { buffer, originalName, contentType } = {}) {
+export async function writeMobileUploadFile(singlesId, { buffer, originalName, contentType, product } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 1) {
     throw new Error('Missing file buffer');
   }
+  const safeProduct = requireMobileUploadProduct(product);
   const ct = String(contentType || 'image/jpeg')
     .split(';')[0]
     .trim()
@@ -176,20 +255,25 @@ export async function writeMobileUploadFile(singlesId, { buffer, originalName, c
     );
   }
   const folder = await ensureMobileUploadFolder();
-  const prefix = singlesPrefix(singlesId);
-  const fileName = `${prefix}${Date.now()}_${safeOriginal}`;
+  const fileName = `${productPrefix(singlesId, safeProduct)}${Date.now()}_${safeOriginal}`;
   assertSafeMobileUploadFileName(fileName);
   const absolutePath = path.join(folder, fileName);
   await fs.writeFile(absolutePath, buffer);
-  return { fileName, size: buffer.length };
+  return { fileName, size: buffer.length, product: safeProduct };
 }
 
-export function resolveMobileUploadFilePath(singlesId, fileName) {
+export function resolveMobileUploadFilePath(singlesId, fileName, product) {
   const folder = getMobileUploadFolder();
   const safeName = assertSafeMobileUploadFileName(fileName);
-  const prefix = singlesPrefix(singlesId);
-  if (!safeName.startsWith(prefix)) {
+  const userPrefix = singlesPrefix(singlesId);
+  if (!safeName.startsWith(userPrefix)) {
     throw new Error('File not found');
+  }
+  if (product) {
+    const productPref = productPrefix(singlesId, product);
+    if (!safeName.startsWith(productPref)) {
+      throw new Error('File not found');
+    }
   }
   const absolutePath = path.resolve(folder, safeName);
   const folderResolved = path.resolve(folder);
@@ -199,8 +283,8 @@ export function resolveMobileUploadFilePath(singlesId, fileName) {
   return absolutePath;
 }
 
-export async function readMobileUploadFile(singlesId, fileName) {
-  const absolutePath = resolveMobileUploadFilePath(singlesId, fileName);
+export async function readMobileUploadFile(singlesId, fileName, product) {
+  const absolutePath = resolveMobileUploadFilePath(singlesId, fileName, product);
   const st = await fs.stat(absolutePath);
   if (!st.isFile()) {
     throw new Error('File not found');
@@ -208,11 +292,12 @@ export async function readMobileUploadFile(singlesId, fileName) {
   return {
     absolutePath,
     contentType: contentTypeForFileName(fileName),
-    size: st.size
+    size: st.size,
+    product: fileProductFromName(singlesId, fileName) || null
   };
 }
 
-export async function deleteMobileUploadFile(singlesId, fileName) {
-  const absolutePath = resolveMobileUploadFilePath(singlesId, fileName);
+export async function deleteMobileUploadFile(singlesId, fileName, product) {
+  const absolutePath = resolveMobileUploadFilePath(singlesId, fileName, product);
   await fs.unlink(absolutePath);
 }

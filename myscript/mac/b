@@ -1,0 +1,4049 @@
+#>>>>> 2) You should not see this statement if SuperRestore work.
+#!/bin/bash
+# Load backend env into this shell (exports all KEY=VAL from the file)
+
+unalias -a
+
+#------DB -------------
+alias saveCursorConfig='sudo cp ~/Library/Application\ Support/Cursor/User/keybindings.json ~/.ssh/'
+alias restoreCursorConfig='sudo cp ~/.ssh/keybindings.json ~/Library/Application\ Support/Cursor/User/keybindings.json'
+
+#------DB -------------
+alias fixdb='sudo rm -rf brew services restart postgresql@16 && brew services restart postgresql@16'
+
+#----- AI LLM: OLLAMA or QWEN--------------
+alias testModel='curl -s -X POST http://127.0.0.1:8765/keep-model -H "Content-Type: application/json" -d "{\"enabled\": true}" | python3 -m json.tool'
+alias startLLM='kill -9 $(lsof -t -i :8765) ; lsof -i :8765 ; cd ~/code/main;  ./scripts/start-rag-service.sh'
+alias curlLLM='curl -s http://127.0.0.1:8765/health | python3 -m json.tool'
+#-------------------
+backupUserAll() {
+    local email
+
+    # Prompt the user for an email address
+    read -p "Enter email address: " email
+
+    # Check if email is empty
+    if [[ -z "$email" ]]; then
+        echo "Error: Email cannot be empty." >&2
+        return 1
+    fi
+
+    echo "Backing up user data for $email..."
+    (cd ~/code/main && node be/scripts/backupUserAll.js --email="$email")
+}
+
+restoreUserAll() {
+    local email
+
+    # Prompt the user for an email address
+    read -p "Enter email address: " email
+
+    # Check if email is empty
+    if [[ -z "$email" ]]; then
+        echo "Error: Email cannot be empty." >&2
+        return 1
+    fi
+
+    echo "Restoring user data for $email..."
+    (cd ~/code/main && node be/scripts/restoreUserAll.js --email="$email" --yes)
+}
+
+alias showdbfolder='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SHOW data_directory;"'
+
+
+setbasestorage() {
+    case "$(uname -s)" in
+        Darwin)
+            export BASE_STORAGE="/Users/a/mac_storage"
+            ;;
+        Linux)
+            export BASE_STORAGE="/mnt/pgdata16"
+            ;;
+        *)
+            echo "Unsupported OS" >&2
+            return 1
+            ;;
+    esac
+}
+
+setbasestorage
+#------ compare two schema----
+alias addTestColumn='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -c "ALTER TABLE helloworldjunktest.singles ADD COLUMN IF NOT EXISTS test boolean NOT NULL DEFAULT false;"'
+alias dropTestColumn='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -c "ALTER TABLE helloworldjunktest.singles DROP COLUMN IF EXISTS test;"'
+
+alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
+alias listNewUbuntuUsers='$HOME/code/main/scripts/list-new-ubuntu-users.sh'
+#-----------------------
+alias createnewmember='bash /Users/a/code/main/CreateNewMember.sh'
+alias createnewposting='bash /Users/a/code/main/CreatePosting.sh'
+#-----------------------
+
+
+bigfiles() {
+  local n="${1:-}"
+
+  if [[ -z "$n" ]]; then
+    read -rp "How many biggest files? " n
+  fi
+
+  if ! [[ "$n" =~ ^[0-9]+$ ]] || (( n < 1 )); then
+    echo "bigfiles: need a positive number (e.g. bigfiles 10)" >&2
+    return 1
+  fi
+
+  local root
+  root="$(pwd)"
+
+  find "$root" -type f -print0 2>/dev/null \
+    | while IFS= read -r -d '' f; do
+        if stat --version >/dev/null 2>&1; then
+          stat -c '%s %n' "$f"          # Ubuntu / GNU
+        else
+          stat -f '%z %N' "$f"          # macOS / BSD
+        fi
+      done \
+    | sort -t' ' -k1,1nr \
+    | head -n "$n" \
+    | awk '{
+        bytes = $1
+        $1 = ""
+        sub(/^ /, "")
+        path = $0
+        s = bytes
+        split("B KB MB GB TB PB", u, " ")
+        i = 1
+        while (s >= 1024 && i < 6) { s /= 1024; i++ }
+        printf "%10.1f %-4s  %s\n", s, u[i], path
+      }'
+}
+
+
+alias goalbum='cd ${BASE_STORAGE}/onlinemallwebsite_largecheapstorage/users/M237112/photoalbums/TutaPhotoAlbums/files/;ls -latr'
+
+fix_mac_perms() {
+  local root_dir
+  root_dir=$(grep -E '^LARGE_CHEAP_STORAGE_FOLDER=' ~/.ssh/be/.env 2>/dev/null | cut -d= -f2- | tr -d '\r')
+
+  # Safety checks
+  if [[ -z "$root_dir" ]]; then
+    echo "Error: Could not determine LARGE_CHEAP_STORAGE_FOLDER from ~/.ssh/be/.env"
+    return 1
+  fi
+
+  if [[ ! -d "$root_dir" ]]; then
+    echo "Error: Directory '$root_dir' does not exist."
+    return 1
+  fi
+
+  echo "Applying permissions to: $root_dir"
+  echo "Setting owner to a:staff..."
+  sudo chown -R a:staff "$root_dir"
+
+  echo "Setting directory permissions to 755..."
+  sudo find "$root_dir" -type d -exec chmod 755 {} \;
+
+  echo "Setting file permissions to 644..."
+  sudo find "$root_dir" -type f -exec chmod 644 {} \;
+
+  echo "Restarting backend..."
+  # local Mac BE — restart PM2 or fail gracefully
+  pm2 restart onlinemallwebsite 2>/dev/null || echo "Notice: 'onlinemallwebsite' PM2 process not running."
+  
+  echo "Done."
+}
+
+check_mac_perms() {
+  # Usage: check_vault_perms [member_id] [vault_name] [app_user]
+  local member="${1:-M237112}"
+  local vault="${2:-TutaNotes}"
+  local app_user="${3:-a}"
+
+  local root_dir
+  root_dir=$(grep -E '^LARGE_CHEAP_STORAGE_FOLDER=' ~/.ssh/be/.env 2>/dev/null | cut -d= -f2- | tr -d '\r')
+
+  if [[ -z "$root_dir" ]]; then
+    echo "Error: Could not determine ROOT from ~/.ssh/be/.env"
+    return 1
+  fi
+
+  local member_dir="$root_dir/users/$member"
+  local vault_dir="$member_dir/notes/$vault"
+
+  echo "ROOT=$root_dir"
+  id "$app_user"
+  ps -axo user,pid,command | grep -E '[n]ode' | head -5
+
+  echo "=== Directory Status ==="
+  ls -lad "$root_dir" "$root_dir/users" "$member_dir" "$member_dir/notes" "$member_dir/photos" \
+    "$vault_dir" "$vault_dir/files" "$vault_dir/photos" 2>/dev/null
+
+  echo "=== Vault Contents ==="
+  ls -la "$vault_dir" 2>/dev/null
+
+  echo "=== Path Walk (vault.db) ==="
+  local p="$vault_dir/vault.db"
+  local d="/"
+  for part in $(echo "$p" | tr '/' ' '); do
+    d="${d%/}/$part"
+    ls -lad "$d" 2>/dev/null || echo "MISSING $d"
+  done
+
+  echo "=== Write Probe as $app_user ==="
+  sudo -u "$app_user" bash -lc "touch '$vault_dir/.perm_probe' && echo WRITE_OK && rm -f '$vault_dir/.perm_probe'" || echo "WRITE_FAILED"
+
+  echo "=== Find wrong owner (expect empty) ==="
+  find "$member_dir" ! -user "$app_user" -exec stat -f 'WRONG_OWNER %Su:%Sg %N' {} \; 2>/dev/null
+
+  echo "=== Find wrong dir mode (expect empty) ==="
+  find "$member_dir" -type d ! -perm 755 -exec stat -f 'DIR_MODE_%Mp%Lp %N' {} \; 2>/dev/null
+
+  echo "=== Find wrong file mode (expect empty) ==="
+  find "$member_dir" -type f ! -perm 644 -exec stat -f 'FILE_MODE_%Mp%Lp %N' {} \; 2>/dev/null
+}
+
+
+
+alias gostorage='cd ~/mac_storage;ls -latr'
+alias gt='git fetch --all --tags;git tag --format="%(creatordate:short) | %(refname:short) | %(subject)"'
+#------ barcode upload ------
+alias fixstoragemobileuploadMac='$HOME/code/main/scripts/fix-media-storage.sh'
+alias checkstoragemobileuploadMac='$HOME/code/main/scripts/verify-media-storage.sh'
+alias fixpermissionmobileuploadMac='sudo chown -R "$(id -un):$(id -gn)" "${STORAGE_FOLDER}/mobile_upload" && sudo chmod -R u+rwX "${STORAGE_FOLDER}/mobile_upload"'
+
+alias fixstoragemobileuploadubuntu='$HOME/code/main/scripts/fix-media-storage.sh'
+alias checkstoragemobileuploadubuntu='$HOME/code/main/scripts/verify-media-storage.sh'
+alias fixpermissionmobileuploadubuntu="sudo chown -R lawsen0:lawsen0 '${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload' && sudo chmod -R u+rwX '${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload'"
+#----------------------------
+
+
+# Delete a git branch locally and on origin (prompts for name).
+git_branch_delete_both() {
+  local branch current_repo
+
+  if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    echo "Not inside a git repo." >&2
+    return 1
+  fi
+
+  read -r -p "Branch name to delete: " branch
+  branch="${branch#"${branch%%[![:space:]]*}"}"
+  branch="${branch%"${branch##*[![:space:]]}"}"
+
+  if [[ -z "$branch" ]]; then
+    echo "No branch name entered." >&2
+    return 1
+  fi
+
+  case "$branch" in
+    main|master)
+      echo "Refusing to delete protected branch: $branch" >&2
+      return 1
+      ;;
+  esac
+
+  current_repo="$(git branch --show-current 2>/dev/null)"
+  if [[ "$branch" == "$current_repo" ]]; then
+    echo "You are on '$branch'. Switch branch first, e.g.: git checkout main" >&2
+    return 1
+  fi
+
+  local has_local=0 has_remote=0
+  git show-ref --verify --quiet "refs/heads/$branch" && has_local=1
+  git show-ref --verify --quiet "refs/remotes/origin/$branch" && has_remote=1
+
+  if [[ $has_local -eq 0 && $has_remote -eq 0 ]]; then
+    echo "Branch '$branch' not found locally or on origin." >&2
+    return 1
+  fi
+
+  echo "Will delete:"
+  [[ $has_local -eq 1 ]] && echo "  local:  $branch"
+  [[ $has_remote -eq 1 ]] && echo "  remote: origin/$branch"
+  read -r -p "Type branch name to confirm: " confirm
+  if [[ "$confirm" != "$branch" ]]; then
+    echo "Cancelled (confirmation did not match)." >&2
+    return 1
+  fi
+
+  if [[ $has_local -eq 1 ]]; then
+    if git branch -d "$branch" 2>/dev/null; then
+      echo "Deleted local branch: $branch"
+    elif git branch -D "$branch"; then
+      echo "Force-deleted local branch: $branch"
+    else
+      echo "Failed to delete local branch: $branch" >&2
+      return 1
+    fi
+  fi
+
+  if [[ $has_remote -eq 1 ]]; then
+    if git push origin --delete "$branch"; then
+      echo "Deleted remote branch: origin/$branch"
+    else
+      echo "Failed to delete remote branch: origin/$branch" >&2
+      return 1
+    fi
+  fi
+
+  echo "Done."
+}
+
+alias showbarcodedebug="pm2 logs onlinemallwebsite --lines 200 | grep -E 'mobilePhotoUpload|mobile-barcode'"
+
+alias speaker='SwitchAudioSource -s "iMac Speakers" -t output'
+alias headphone='SwitchAudioSource -s "External Headphones" -t output'
+
+
+
+testalarm() {
+sudo bash ~/code/main/scripts/install-site-uptime-monitor.sh
+sudo -u lawsen0 ~/bin/site-uptime-monitor.sh --list-audio
+sudo -u lawsen0 ~/bin/site-uptime-monitor.sh --test-alarm
+}
+
+replace_audio() {
+    local video_file audio_file output_file
+
+    read -p "Enter video file name (e.g., input.mp4): " video_file
+    read -p "Enter sound file name (e.g., output.mp3): " audio_file
+    read -p "Enter output file name (e.g., final_video.mp4): " output_file
+
+    # Check if files exist before running
+    if [[ ! -f "$video_file" ]]; then
+        echo "Error: Video file '$video_file' not found."
+        return 1
+    fi
+
+    if [[ ! -f "$audio_file" ]]; then
+        echo "Error: Sound file '$audio_file' not found."
+        return 1
+    fi
+
+    echo "Processing..."
+    ffmpeg -i "$video_file" -i "$audio_file" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "$output_file"
+    
+    echo "Done! Saved as '$output_file'."
+}
+
+seedFemaleDemoFriend() {
+  local email
+
+  # Prompt the user for an email address
+  read -p "Enter email address: " email
+
+  # Check if email is empty
+  if [[ -z "$email" ]]; then
+    echo "Error: Email cannot be empty." >&2
+    return 1
+  fi
+
+  # --email and --singles-id are alternate targets (not both). Do not hardcode id.
+  echo "Seeding female demo friend for $email..."
+  (cd /Users/a/code/main && node be/scripts/seedFemaleDemoFriends.js --email="$email")
+}
+
+
+seedMaleDemoFriend() {
+  local email
+
+  # Prompt the user for an email address
+  read -p "Enter email address: " email
+
+  # Check if email is empty
+  if [[ -z "$email" ]]; then
+    echo "Error: Email cannot be empty." >&2
+    return 1
+  fi
+
+  # --email and --singles-id are alternate targets (not both). Do not hardcode id 36.
+  echo "Seeding male demo friend for $email..."
+  (cd /Users/a/code/main && node be/scripts/seedMaleDemoFriends.js --email="$email")
+}
+
+alias lsphotos='cd  ${STORAGE_FOLDER}; ls -latr  ${STORAGE_FOLDER}/photoalbums_onedrive/photos'
+
+alias testpm2='pm2 status;pm2 logs onlinemallwebsite --lines 100 --err'
+alias testredis='redis-cli ping;sudo systemctl status redis-server ; sudo systemctl start redis-server'
+alias testcloud='curl -sS http://127.0.0.1:40000/health; curl -sS http://127.0.0.1:40000/api/health'
+alias testdb='pg_isready -h 127.0.0.1 -p 50010'
+alias testproxy='curl -sS -o /dev /null -w "%{http_code}\n" http://127.0.0.1/health; sudo systemctl status haproxy'
+alias testbrowser='curl -sS -o /dev/null -w "%{http_code}\n" https://onlinemall.website/health'
+
+alias testwrite='touch ${STORAGE_FOLDER}/photos/.wtest && rm ${STORAGE_FOLDER}/photos/.wtest && echo WRITE_OK'
+alias fixwrite='ls -ld ${STORAGE_FOLDER}/photos; sudo chown -R "$(whoami):staff" ${STORAGE_FOLDER}/photos; sudo chmod u+rwx ${STORAGE_FOLDER}/photos;'
+alias provewrite='sudo -u a touch ${STORAGE_FOLDER}/photos/.wtest \
+  && sudo -u a rm ${STORAGE_FOLDER}/photos/.wtest \
+  && echo WRITE_OK'
+
+testall() {
+    echo "####### testpm2 #########"
+    testpm2
+    
+    echo "####### testredis #########"
+    testredis
+    
+    echo "####### testcloud #########"
+    testcloud
+    
+    echo "####### testdb #########"
+    testdb
+    
+    echo "####### testproxy #########"
+    testproxy
+    
+    echo "####### testbrowser #########"
+    testbrowser
+}
+
+
+alias redisping="redis-cli -a 'w2332w2332' ping"
+alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-server; pm2 restart onlinemallwebsite'
+
+
+alias lsphotos='cd  ${STORAGE_FOLDER}; ls -latr  ${STORAGE_FOLDER}/photoalbums_onedrive/photos'
+
+# USB bridge zips: Mac storage → Ubuntu customer download dir
+scpzip() {
+  local key="/Volumes/MSWORD2010/.coredump/corruptedKey_march2024"
+  local host="lawsen0@192.168.222.202"
+  local port=59221
+  local src="o${BASE_STORAGE}/nlinemallwebsite_storage/USB_DMG_EXE"
+  local dest="o${BASE_STORAGE}/nlinemallwebsite_storage/USB_DMG_EXE"
+  local -a files=()
+
+  shopt -s nullglob
+  files=("$src"/usbBridgeV3-*.zip)
+  shopt -u nullglob
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "scpzip: no usbBridgeV3-*.zip in $src" >&2
+    echo "  Run usball first, or copy zips into that folder." >&2
+    return 1
+  fi
+  if [[ ! -r "$key" ]]; then
+    echo "scpzip: SSH key not readable: $key" >&2
+    return 1
+  fi
+
+  echo "scpzip: local:"
+  ls -lh "${files[@]}"
+  ssh -o IdentitiesOnly=yes -o BatchMode=yes -i "$key" -p "$port" "$host" "mkdir -p $(printf '%q' "$dest")" || return 1
+  scp -o IdentitiesOnly=yes -i "$key" -P "$port" "${files[@]}" "$host:$dest/" || return 1
+  echo "scpzip: remote $dest:"
+  ssh -o IdentitiesOnly=yes -o BatchMode=yes -i "$key" -p "$port" "$host" "ls -lh $(printf '%q' "$dest")/usbBridgeV3-*.zip"
+}
+
+alias lszip='ls -lah ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE/usbBridgeV3-*.zip 2>/dev/null; ls -lah ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE'
+alias clearzip='rm -f ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE/usbBridgeV3-*.zip; lszip'
+
+scptargz() {
+    local key="$HOME/.ssh/corruptedKey_march2024"
+    local port="59221"
+    local dest="lawsen0@192.168.222.202:~/dbFolder/"
+    local src_dir="$HOME/dbFolder"
+
+    # Find the most recently modified .tar.gz file (macOS & Linux compatible)
+    local latest_file
+    latest_file=$(ls -t "$src_dir"/*.tar.gz 2>/dev/null | head -n 1)
+
+    if [ -z "$latest_file" ]; then
+        echo "Error: No .tar.gz file found in $src_dir" >&2
+        return 1
+    fi
+
+    echo "Transferring latest archive: $(basename "$latest_file")"
+    scp -i "$key" -P "$port" "$latest_file" "$dest"
+}
+
+scpsql() {
+    local key="$HOME/.ssh/corruptedKey_march2024"
+    local port="59221"
+    local dest="lawsen0@192.168.222.202:~/dbFolder/"
+    local src_dir="$HOME/dbFolder"
+
+    # Find the most recently modified .sql file (macOS & Linux compatible)
+    local latest_file
+    latest_file=$(ls -t "$src_dir"/*.sql 2>/dev/null | head -n 1)
+
+    if [ -z "$latest_file" ]; then
+        echo "Error: No .sql file found in $src_dir" >&2
+        return 1
+    fi
+
+    echo "Transferring latest SQL dump: $(basename "$latest_file")"
+    scp -i "$key" -P "$port" "$latest_file" "$dest"
+}
+
+scpDB() {
+# Navigate to the folder first, with a safety check
+    cd ~/dbFolder || { echo "Error: Could not navigate to ~/dbFolder"; return 1; }
+    
+    # Find the most recently modified .sql file
+    local latest_file=$(ls -t *.sql 2>/dev/null | head -n 1)
+    local filename=""
+
+    # If a .sql file was found, prompt the user
+    if [ -n "$latest_file" ]; then
+        read -p "Transfer $latest_file (Y/n) ? " choice
+        
+        # Default to 'Y' if the user simply presses Enter
+        choice=${choice:-Y}
+        
+        if [[ "$choice" == [Yy]* ]]; then
+            filename="$latest_file"
+        elif [[ "$choice" == [Nn]* ]]; then
+            read -p "Enter the file name to transfer: " filename
+        else
+            echo "Invalid choice. Transfer cancelled."
+            return 1
+        fi
+    else
+        # Fallback in case there are no .sql files in the directory
+        read -p "No .sql files found. Enter the file name to transfer: " filename
+    fi
+
+    # Execute the scp command if a filename was successfully captured
+    if [ -n "$filename" ]; then
+        scp "$filename" xbox2:~/dbFolder/
+    else
+        echo "No file provided. Transfer cancelled."
+    fi
+}
+
+
+#cd be 
+#node scripts/generateSelfReportBiographyInstructionTutorialGemini.js --voice=Jessica --voice=Michael --force
+#node scripts/generateReceivedBioRequestsInstructionTutorialGemini.js --voice=Jessica --force
+#node scripts/generateReceivedBioRequestsInstructionTutorialGemini.js --voice=Michael --force
+#cd be && node scripts/generateProfilesRecordsInstructionTutorialGemini.js --all-voices --force
+
+alias generatemember='~/code/main/myscript/cloneSinglesFrom16.sh'
+
+generate_voice_tutorials() {
+  local sound_dir="/Users/a/code/main/fe/src/assets/sound"
+
+  echo "Generate for 1)All 2)Sora 3)Jessica 4)Michael"
+  read -p "Select an option (1-4): " choice
+
+  case "$choice" in
+    1)
+      echo "Cleaning up all .m4a files..."
+      find "$sound_dir" -type f -name "*.m4a" -delete
+      cd ~/code/main/be && node scripts/generatePhotoAlbumsContextTutorialGemini.js --all-voices
+      ;;
+    2)
+      echo "Cleaning up Sora .m4a files..."
+      find "$sound_dir" -type f -iname "*sora*.m4a" -delete
+      cd ~/code/main/be && node scripts/generatePhotoAlbumsContextTutorialGemini.js --voice=Sora
+      ;;
+    3)
+      echo "Cleaning up Jessica .m4a files..."
+      find "$sound_dir" -type f -iname "*jessica*.m4a" -delete
+      cd ~/code/main/be && node scripts/generatePhotoAlbumsContextTutorialGemini.js --voice=Jessica
+      ;;
+    4)
+      echo "Cleaning up Michael .m4a files..."
+      find "$sound_dir" -type f -iname "*michael*.m4a" -delete
+      cd ~/code/main/be && node scripts/generatePhotoAlbumsContextTutorialGemini.js --voice=Michael
+      ;;
+    *)
+      echo "Invalid selection. Exiting."
+      return 1
+      ;;
+  esac
+}
+
+
+function tt() {
+  osascript <<'EOF'
+  tell application "Terminal"
+    activate
+    
+    -- Define the exact order of the profiles
+    set profileList to {"Pro", "Basic", "Man Page", "Homebrew", "Red Sands"}
+    
+    repeat with profileName in profileList
+      -- Simulate Cmd+T to open a new tab
+      tell application "System Events" to keystroke "t" using command down
+      delay 0.2
+      
+      -- Apply the specific profile to the newly opened tab
+      set current settings of selected tab of front window to settings set profileName
+    end repeat
+  end tell
+EOF
+}
+
+
+# Add this line to your ~/.zshrc
+alias fixdock="defaults write com.apple.dock orientation -string bottom && killall Dock"
+
+fixdisplayarrangement() {
+displayplacer "id:7AC4A2C1-280A-51F6-4B71-DE58D7889E87 res:3840x2160 hz:60 color_depth:8 enabled:true scaling:off origin:(0,0) degree:0" "id:6FACC72E-E4BE-1E09-5874-CD049A02177E res:3200x1800 color_depth:8 enabled:true scaling:on origin:(3840,588) degree:0" "id:55D1223E-BE7F-DA6C-31BE-000BD305799D res:3840x2160 hz:60 color_depth:8 enabled:true scaling:off origin:(-3840,75) degree:0"
+}
+
+usbapp() {
+ cd ~/code/main/be/recordVaultBridge/desktop
+ npm install
+ npm run pack
+ xattr -cr dist/mac/usbBridgeV3.app
+ open dist/mac/usbBridgeV3.app
+}
+
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+if [ -f "$HOME/.ssh/be/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$HOME/.ssh/be/.env"
+  set +a
+fi
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+alias gitclone='cd ~;rm -rf ~/code/main; cd ~/code && gitclonemain3 && sudo mv tutaporta main && cd main && realenv;gba'
+alias gitclonehellow='git clone git@github.com:w7035477456/hellowworldTest_crashed.git'
+alias gitclonemain2='git clone git@github.com:w7035477456/main2.git'
+alias gitclonemain3='git clone git@github.com:w7035477456/tutaporta.git'
+
+#----------------------------
+clone_and_push_repo() {
+    local src_repo="git@github.com:w7035477456/main2.git"
+    local dest_repo="git@github.com:w7035477456/main3_e2e.git"
+    local tmp_dir=$(mktemp -d)
+
+    echo "Cloning source repository..."
+    git clone "$src_repo" "$tmp_dir"
+    
+    cd "$tmp_dir" || return 1
+
+    echo "Configuring destination remote and force pushing..."
+    git remote set-url origin "$dest_repo"
+    git push -u origin --all --force
+    git push origin --tags --force
+
+    cd - > /dev/null
+    rm -rf "$tmp_dir"
+    echo "Done! Destination repo completely overwritten with source code."
+}
+
+
+alias usbrunmac='npm run record-vault-bridge:dist:mac'
+alias usbopen='open "/Users/a/code/main/be/recordVaultBridge/desktop/dist/mac/usbBridgeV3.app"'
+
+#--- checksum build----
+alias showbuild='node fe/scripts/print-build-info.mjs'
+alias showartifact='cd ~/code/main && node scripts/deployIntegrity.mjs show'
+#----------------------------------
+
+deployall2() {
+    checkVpn || return 1
+    deployall "$@"
+}
+
+deployall() {
+    cd ~/code/main || return 1
+    pwd
+    git fetch
+    echo "--------------------------------"
+    git branch
+    echo "--------------------------------"
+
+    local latestBranchName
+    latestBranchName=$(git for-each-ref --sort=-committerdate refs/heads/ refs/remotes/origin/ \
+        --format='%(refname:short)' | sed 's/origin\///' | grep -v 'HEAD' | head -n 1)
+
+    echo -n "Please input branch name [default: $latestBranchName]: "
+    read -r branch_name
+
+    if [ -z "$branch_name" ]; then
+        branch_name="$latestBranchName"
+    fi
+
+    if [ -z "$branch_name" ]; then
+        echo "Error: No branch found to deploy."
+        return 1
+    fi
+
+    echo -e "\n____BRANCH COMMENT:_________________"
+    git log -1 "origin/${branch_name}" --pretty=%s 2>/dev/null || git log -1 "$branch_name" --pretty=%s 2>/dev/null || true
+    echo -e "_______________________________________\n"
+    read -p "Deploy this branch to all hosts in scripts/deploy-hosts.txt ? [Y/n]: " CONFIRM
+    CONFIRM_LOWER="$(printf '%s' "$CONFIRM" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$CONFIRM_LOWER" == "n" ]]; then
+        echo "Deploy cancelled."
+        return 1
+    fi
+
+    local host
+    host="$(awk '!/^[[:space:]]*#/ && NF {print; exit}' scripts/deploy-hosts.txt)"
+    if [[ -z "$host" ]]; then
+        echo "No host in scripts/deploy-hosts.txt" >&2
+        return 1
+    fi
+
+    if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
+        bash scripts/deploy-all.sh --hosts-file scripts/deploy-hosts.txt --target "$branch_name"
+        return $?
+    fi
+
+    # Mac → Ubuntu: run remote script (same git key + febeprod as interactive work2).
+    # -t = TTY so corruptedKey_march2023 passphrase works (work2 is interactive too).
+    local qbranch
+    qbranch="$(printf '%q' "$branch_name")"
+
+    echo "Deploy target : $branch_name"
+    echo "Remote host   : $host"
+    echo "Remote repo   : \$HOME/code/main"
+    echo "GitHub key    : Ubuntu ~/.ssh/corruptedKey_march2023 (same as work2)"
+    echo
+
+    if ! sudo ssh -t \
+        -o IdentitiesOnly=yes \
+        -i /Volumes/MSWORD2010/.coredump/corruptedKey_march2024 \
+        -p 59221 \
+        "$host" \
+        "BRANCH=${qbranch} REPO=\$HOME/code/main bash --noprofile --norc \$HOME/code/main/scripts/remote-deploy-work2.sh"
+    then
+        echo "===== [$host] deploy FAILED =====" >&2
+        return 1
+    fi
+    echo "===== [$host] deploy OK ====="
+}
+
+
+#--- Generate new key for vault ----
+alias rotateVaultKey='node ./be/scripts/rotateRecordVaultIconKeysMasterKey.js'
+#----------------------------------
+
+
+# Reset OMNotes Tx/Rx usage tally + refill balance for all singles (Mac local Primary)
+vault-transfer-reset1() {
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -c "
+    UPDATE helloworldjunktest.singles
+    SET vault_total_transfer_mb = 0,
+        refill_remain_mb = 10240;
+  "
+}
+
+vault-transfer-reset2() {
+  set -a
+  # shellcheck disable=SC1091
+  source "$HOME/.ssh/be/.env"
+  set +a
+  psql -h "${DB_HOST:-localhost}" -p "${DB_PORT:-50010}" -U "${DB_USER:-test_user1}" -d "${DB_NAME:-onlinemallwebsite}" \
+    -v ON_ERROR_STOP=1 -c "
+      UPDATE helloworldjunktest.singles
+      SET vault_total_transfer_mb = 0,
+          refill_remain_mb = 10240;
+    "
+}
+
+alias usbagent='cd /Users/a/code/main/be;npm run record-vault-bridge'
+
+alias restartdb='rm -rf /usr/local/var/postgresql@16/postmaster.pid;brew services restart postgresql@16'
+
+reset_single_matches() {
+  local s_id
+  # printf is used here for cross-compatibility between Bash and macOS's default Zsh
+  printf "Enter singles_id: "
+  read s_id
+
+  # Validate that the input is an integer
+  if ! [[ "$s_id" =~ ^[0-9]+$ ]]; then
+    echo "Error: singles_id must be a valid number."
+    return 1
+  fi
+
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+  UPDATE helloworldjunktest.singles
+  SET dl_profile_percent_match = 0,
+      pp_profile_percent_match = 0,
+      live_scan_percent_match = 0
+  WHERE singles_id = ${s_id};
+  "
+  
+  echo "Match percentages reset for singles_id = ${s_id}"
+}
+
+
+test_twilio_verify() {
+    # Load from ~/.ssh/be/.env — never hardcode Account SID / Service SID in git.
+    local env_file="${HOME}/.ssh/be/.env"
+    local account_sid="" service_sid=""
+    if [[ -f "$env_file" ]]; then
+        # shellcheck disable=SC1090
+        set -a
+        # shellcheck disable=SC1090
+        source <(grep -E '^(TWILIO_ACCOUNT_SID|TWILIO_ServiceSID|TWILIO_SERVICE_SID)=' "$env_file" 2>/dev/null || true)
+        set +a
+        account_sid="${TWILIO_ACCOUNT_SID:-}"
+        service_sid="${TWILIO_ServiceSID:-${TWILIO_SERVICE_SID:-}}"
+    fi
+    if [[ -z "$account_sid" || -z "$service_sid" ]]; then
+        echo "ERROR: set TWILIO_ACCOUNT_SID and TWILIO_ServiceSID in ${env_file}" >&2
+        return 1
+    fi
+    local test_number="+12345678900"
+    local auth_token
+
+    # Prompt for the token securely (-s hides the input)
+    printf "Enter your Twilio Auth Token: "
+    read -s auth_token
+    echo "" # Print a newline after the hidden input
+
+    echo "Testing Twilio Verify Service..."
+
+    # Execute curl, capturing both the response body and the HTTP status code
+    local response
+    response=$(curl -s -w "\n%{http_code}" -X POST "https://verify.twilio.com/v2/Services/${service_sid}/Verifications" \
+        --data-urlencode "To=${test_number}" \
+        --data-urlencode "Channel=sms" \
+        -u "${account_sid}:${auth_token}")
+
+    # Extract the body and the HTTP status code from the response
+    local body=$(echo "$response" | sed -e '$ d')
+    local status=$(echo "$response" | tail -n 1)
+
+    # Evaluate the result
+    if [[ "$status" == "201" || "$status" == "200" ]]; then
+        echo "✅ SUCCESS: The Verify Service is active and working perfectly."
+    elif [[ "$status" == "401" ]]; then
+        echo "❌ ERROR (401): Authentication failed. Your Auth Token is incorrect or has been rotated."
+    elif [[ "$status" == "404" ]]; then
+        echo "❌ ERROR (404): The Verify Service SID was not found. It may have been deleted."
+    else
+        echo "❌ ERROR ($status): An unexpected error occurred."
+        echo "Details: $body"
+    fi
+}
+
+
+alias govideos='cd ${BASE_STORAGE}/onlinemallwebsite_storage/videos;ls -latr'
+alias gophotos='cd ${BASE_STORAGE}/onlinemallwebsite_storage/photos;ls -latr'
+alias lsphoto='cd ${BASE_STORAGE}/onlinemallwebsite_storage;pwd'
+clean_photos() {
+    echo "⚠️  This will truncate the 'photos' table and delete ALL local photo files."
+    read -p "Are you absolutely sure you want to proceed? (y/N): " confirm
+    
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        echo "🔄 Truncating PostgreSQL table..."
+        PGPASSWORD="your_password_here" psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "TRUNCATE TABLE photos;"
+        
+        echo "🗑️  Clearing local storage directory..."
+        sudo rm -rf ${BASE_STORAGE}/onlinemallwebsite_storage/photos/*
+        
+        echo "✅ Done!"
+    else
+        echo "❌ Operation cancelled."
+    fi
+    lsphoto;
+}
+
+
+#------- Redis-------------
+alias redisclean='redis-cli DEL v1:gatekeeper:last_active v1:gatekeeper:sweep:lock'
+alias pingredis='redis-cli -h 127.0.0.1 -p 6379 ping'
+
+#-------asn------------
+alias curlforasn='curl -s https://onlinemall.website/api/client-asn-debug | python3 -m json.tool'
+alias watchasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color -F "[blocked-asn]"'
+alias tailblockasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color "BLOCKED AS"'
+
+
+killport() {
+    if [ -z "$1" ]; then
+        echo "Usage: killport <port_number>"
+    else
+        kill -9 $(lsof -t -i:"$1") 2>/dev/null && echo "Port $1 cleared." || echo "No process running on port $1."
+    fi
+}
+
+#time machine
+#---to exclude one drive
+#sudo tmutil addexclusion -p /Users/a/Library/CloudStorage/OneDrive-Personal
+#---to check if it's been [exclude]
+#tmutil isexcluded /Users/a/Library/CloudStorage/OneDrive-Personal
+
+# ####### DB DUMP #######
+# Function to restore the onlinemallwebsite database on macOS
+dbRestore() {
+    DUMP_DIR="$HOME/dbFolder"
+    # Note: %d/%m/%Y vs %m%d%Y - adjusted to match your screenshot's pattern
+    TODAY=$(date +"%m%d%Y")
+
+    # Step 1: Clear and list files
+    clear
+    echo "--- Current files in $DUMP_DIR ---"
+    # Ensure directory exists before listing
+    if [ -d "$DUMP_DIR" ]; then
+        ls -latr "$DUMP_DIR"
+    else
+        echo "Directory $DUMP_DIR not found."
+    fi
+    echo "-----------------------------------"
+
+    # Step 2: Wormhole receive
+    # macOS/zsh cross-compatible read prompt
+    printf "Wormhole postfix only? [default: skip]: "
+    read WORM_POSTFIX
+
+    if [ -n "$WORM_POSTFIX" ]; then
+        # Check if dir exists before cd
+        cd "$DUMP_DIR" || return 1
+
+        echo "Attempting wormhole receive..."
+        local RECV_OUT="$DUMP_DIR/wormhole_recv_${TODAY}_$(date +%H%M%S).sql"
+        # Unique -o avoids "refusing to overwrite existing" when same-day file already exists.
+        if ! wormhole receive --accept-file -o "$RECV_OUT" "$WORM_POSTFIX"; then
+            echo "Warning: wormhole receive failed."
+            if [ -z "$ALL_RESTORE" ]; then
+                echo "You can still restore from an existing .sql in $DUMP_DIR."
+            fi
+        fi
+    fi
+
+    # Step 3: Determine Default File
+    # Using 'head -n 1' to find the most recent .sql file
+    LATEST_FILE=$(ls -t "$DUMP_DIR"/*.sql 2>/dev/null | head -n 1)
+    DEFAULT_VAL=$(basename "$LATEST_FILE" 2>/dev/null)
+
+    if [ -z "$DEFAULT_VAL" ]; then
+        PROMPT_TEXT="Enter file to restore: "
+    else
+        PROMPT_TEXT="Enter file to restore [default: $DEFAULT_VAL]: "
+    fi
+
+    printf "%s" "$PROMPT_TEXT"
+    read USER_INPUT
+
+    # Step 4: Logic for Input vs Default
+    if [ -z "$USER_INPUT" ]; then
+        if [ -z "$DEFAULT_VAL" ]; then
+            echo "Error: No default file found and no input provided."
+            return 1
+        fi
+        RESTORE_FILE="$DEFAULT_VAL"
+    else
+        # Bash/Zsh string matching
+        if [[ "$USER_INPUT" != *.sql ]]; then
+            RESTORE_FILE="${USER_INPUT}${TODAY}.sql"
+        else
+            RESTORE_FILE="$USER_INPUT"
+        fi
+    fi
+
+    FULL_PATH="$DUMP_DIR/$RESTORE_FILE"
+
+    if [ ! -f "$FULL_PATH" ]; then
+        echo "Error: File $FULL_PATH not found."
+        return 1
+    fi
+
+    # MODIFIED: Default to 'y' on Enter. Compatible with macOS bash 3.2 and zsh.
+    if [ -n "$ALL_RESTORE" ]; then
+        echo "allRestore: restoring $RESTORE_FILE (auto-confirmed)."
+    else
+        printf "Confirm restore file %s? [Y/n]: " "$RESTORE_FILE"
+        read CONFIRM
+        if [[ "$CONFIRM" == "n" || "$CONFIRM" == "N" ]]; then
+            echo "Restore cancelled."
+            return 1
+        fi
+    fi
+
+    # 4. Clean Database
+    # Using the credentials for your onlinemallwebsite database
+    echo "Dropping existing schema..."
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS helloworldjunktest CASCADE;"
+
+    # 5. Import
+    echo "Importing $FULL_PATH..."
+    # -v ON_ERROR_STOP=1 ensures we don't keep running if a query fails
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite \
+        -v ON_ERROR_STOP=1 \
+        --set=search_path=helloworldjunktest,public \
+        -f "$FULL_PATH"
+
+    # 6. Verification
+    echo "--- Verification: Tables in onlinemallwebsite ---"
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt helloworldjunktest.*"
+
+    echo "Restore process completed."
+}
+
+
+
+
+alias dd='displayplacer "id:6FACC72E-E4BE-1E09-5874-CD049A02177E res:3200x1800 hz:60 color_depth:8 scaling:on origin:(0,0) degree:0"'
+
+#-------- remove all posting for user ------------
+delete_user_postings() {
+    local singles_id="$1"
+
+    # If no ID was passed as an argument, prompt for it
+    if [ -z "$singles_id" ]; then
+        read -p "Remove Posting for which single_id ? " singles_id
+    fi
+
+    # Guard check in case the prompt was left blank
+    if [ -z "$singles_id" ]; then
+        echo "Error: No single_id provided. Operation aborted." >&2
+        return 1
+    fi
+
+    psql -h localhost -p 50010 -U test_user1 -d onlinemallwebsite -v singles_id="$singles_id" <<'SQL'
+BEGIN;
+DELETE FROM helloworldjunktest.posting_comments pc
+USING helloworldjunktest.posting_photos pp, helloworldjunktest.postings p
+WHERE pc.photo_id = pp.photo_id AND pp.post_id = p.post_id AND p.singles_id = :singles_id;
+
+DELETE FROM helloworldjunktest.comments c
+USING helloworldjunktest.postings p
+WHERE c.post_id = p.post_id AND p.singles_id = :singles_id;
+
+DELETE FROM helloworldjunktest.user_post_notification_dismissed d
+USING helloworldjunktest.postings p
+WHERE d.post_id = p.post_id AND p.singles_id = :singles_id;
+
+DELETE FROM helloworldjunktest.posting_photos pp
+USING helloworldjunktest.postings p
+WHERE pp.post_id = p.post_id AND p.singles_id = :singles_id;
+
+DELETE FROM helloworldjunktest.postings WHERE singles_id = :singles_id;
+COMMIT;
+SQL
+}
+
+
+
+alias disablescreensave='defaults -currentHost write com.apple.screensaver idleTime 0'
+alias stayawake='caffeinate -di'
+
+#------------------------------------------
+git-delete-branch() {
+    # 1. Ask for the branch name
+    read -p "Enter the branch name to delete: " branch_name
+
+    # Strip any accidental whitespace
+    branch_name=$(echo "$branch_name" | xargs)
+
+    # Exit if no input was provided
+    if [ -z "$branch_name" ]; then
+        echo "❌ Error: Branch name cannot be empty."
+        return 1
+    fi
+
+    # 2. Safety check: Ensure we aren't trying to delete the current branch
+    current_branch=$(git branch --show-current)
+    if [ "$branch_name" = "$current_branch" ]; then
+        echo "❌ Error: You cannot delete the branch you are currently on ('$current_branch')."
+        echo "Please switch to another branch (e.g., git checkout main) and try again."
+        return 1
+    fi
+
+    echo "----------------------------------------"
+    echo "Preparing to delete branch: '$branch_name'"
+    echo "----------------------------------------"
+
+    # 3. Delete Local Branch
+    echo "⏳ Deleting local branch..."
+    if git branch -d "$branch_name" 2>/dev/null; then
+        echo "✅ Successfully deleted local branch."
+    else
+        # If safe delete fails (unmerged changes), ask for a force-delete confirmation
+        read -p "⚠️  Branch has unmerged changes. Force delete locally? (y/N): " confirm_force
+        if [[ "$confirm_force" =~ ^[Yy]$ ]]; then
+            git branch -D "$branch_name"
+            echo "🔥 Force deleted local branch."
+        else
+            echo "❌ Local deletion aborted."
+            return 1
+        fi
+    fi
+
+    # 4. Delete Remote Branch
+    read -p "🌐 Delete from remote 'origin' as well? (y/N): " confirm_remote
+    if [[ "$confirm_remote" =~ ^[Yy]$ ]]; then
+        echo "⏳ Deleting remote branch..."
+        if git push origin --delete "$branch_name"; then
+            echo "✅ Successfully deleted remote branch."
+            # Clean up local tracking references
+            git fetch origin --prune
+        else
+            echo "❌ Failed to delete remote branch (it may not exist on origin)."
+        fi
+    fi
+
+    echo "✨ Done."
+}
+#------------------------------------------
+
+#------------------------------------------
+logRestore() {
+    local BASE_RESTORE_DIR="$HOME/dbFolder"
+    # Generate timestamp for the target subfolder name
+    local TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    local TARGET_DIR="$BASE_RESTORE_DIR/$TIMESTAMP"
+    local RECEIVED_ZIP="$BASE_RESTORE_DIR/received_logs_$TIMESTAMP.zip"
+
+    # 1. Ensure the base destination directory exists
+    if [ ! -d "$BASE_RESTORE_DIR" ]; then
+        echo "Directory $BASE_RESTORE_DIR does not exist. Creating it now..."
+        mkdir -p "$BASE_RESTORE_DIR"
+    fi
+
+    # 2. Prompt user for the Magic Wormhole code
+    read -p "Enter Magic Wormhole code: " WORMHOLE_CODE
+
+    if [ -z "$WORMHOLE_CODE" ]; then
+        echo "Error: Wormhole code cannot be empty."
+        return 1
+    fi
+
+    # 3. Receive the zip archive directly into ~/dbFolder
+    echo "Receiving archive file via Magic Wormhole..."
+    wormhole receive -o "$RECEIVED_ZIP" "$WORMHOLE_CODE"
+
+    if [ ! -f "$RECEIVED_ZIP" ]; then
+        echo "Error: Failed to receive file or transfer was canceled."
+        return 1
+    fi
+
+    # 4. Create the timestamped subfolder
+    echo "Creating target directory: $TARGET_DIR"
+    mkdir -p "$TARGET_DIR"
+
+    # 5. Unzip into the newly created timestamped directory
+    echo "Unzipping logs into $TARGET_DIR..."
+    unzip -o "$RECEIVED_ZIP" -d "$TARGET_DIR"
+
+    # 6. Cleanup the zip file from ~/dbFolder
+    rm -f "$RECEIVED_ZIP"
+    echo "Restore complete. Logs extracted to: $TARGET_DIR"
+}
+#------------------------------------------
+
+
+
+
+alias showfiles="defaults write com.apple.finder AppleShowAllFiles -bool true && killall Finder"
+alias hidefiles="defaults write com.apple.finder AppleShowAllFiles -bool false && killall Finder"
+
+
+#============ zap over 1 week old git branches
+zap_old_branches() {
+    # Define branches you absolutely want to keep safe
+    local protected="^(main|master|dev|development)$"
+    
+    # Get the timestamp for 1 week ago (macOS compatible)
+    local cutoff=$(date -v-7d +%s)
+    
+    echo "Fetching latest remote status..."
+    git fetch --prune origin > /dev/null 2>&1
+
+    # Loop through remote branches tracking 'origin'
+    # Fixed: added -e to explicitly treat '->' as a pattern match string
+    git branch -r | grep 'origin/' | grep -v -e '->' | while read -r remote_branch; do
+        # Strip 'origin/' prefix to get the clean branch name
+        local branch=${remote_branch#origin/}
+        
+        # Skip protected branches
+        if [[ "$branch" =~ $protected ]]; then
+            continue
+        fi
+        
+        # Get last commit timestamp for this remote branch
+        local commit_time=$(git log -1 --format="%ct" "origin/$branch" 2>/dev/null)
+        
+        if [ -n "$commit_time" ] && [ "$commit_time" -lt "$cutoff" ]; then
+            echo "❌ Deleting remote branch: origin/$branch"
+            git push origin --delete "$branch"
+        fi
+    done
+    
+    echo "✨ Cleanup complete."
+}
+#===============================================
+
+
+#============= hash_password "your-plain-text" [rounds]==========
+# rounds default 10 (member login upgrades use 6 in app code; 10 is stronger for admin)
+hash_password() {
+  local plain="${1:?Usage: hash_password \"password\" [rounds]}"
+  local rounds="${2:-10}"
+  local be_dir="${BE_ROOT:-$HOME/code/main/be}"
+
+  if [[ ! -f "$be_dir/scripts/hash-password.js" ]]; then
+    echo "Not found: $be_dir/scripts/hash-password.js" >&2
+    return 1
+  fi
+
+  (cd "$be_dir" && node scripts/hash-password.js "$plain" "$rounds")
+}
+#--------reset attempt password -----
+# Reset password-change attempt lockout for one member (OnlineMall / onlinemallwebsite).
+reset_password_attempts() {
+  local singles_id="$1"
+  local env_file="${HOME}/.ssh/be/.env"
+
+  if [[ -z "$singles_id" ]]; then
+    echo "Usage: reset_password_attempts SINGLES_ID" >&2
+    return 1
+  fi
+  if ! [[ "$singles_id" =~ ^[0-9]+$ ]]; then
+    echo "singles_id must be a positive integer" >&2
+    return 1
+  fi
+
+  if [[ -f "$env_file" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$env_file"
+    set +a
+  fi
+
+  local schema="${DB_SCHEMA:-helloworldjunktest}"
+  local pg_host="${DB_HOST:-localhost}"
+  local pg_port="${DB_PORT:-50010}"
+  local pg_db="${DB_NAME:?Set DB_NAME in ~/.ssh/be/.env}"
+  local pg_user="${DB_USER:?Set DB_USER in ~/.ssh/be/.env}"
+
+  PGPASSWORD="${DB_PASSWORD}" psql \
+    -h "$pg_host" \
+    -p "$pg_port" \
+    -U "$pg_user" \
+    -d "$pg_db" \
+    -v ON_ERROR_STOP=1 \
+    -c "UPDATE \"${schema}\".singles
+        SET password_attempt_count = 1,
+            password_attempt_datetime = CURRENT_TIMESTAMP
+        WHERE singles_id = ${singles_id};"
+}
+
+############## reset rate limit, redis #######
+
+rlreset_host() {
+  local win="${1:-${RATE_LIMIT_WINDOW_MINUTES:-3}}"
+  local max="${2:-${RATE_LIMIT_MAX:-100}}"
+  local ip="${3:-${RL_CLIENT_IP:-::1}}"
+  local host="${REDIS_HOST:-127.0.0.1}"
+  local port="${REDIS_PORT:-6379}"
+  redis-cli -h "$host" -p "$port" DEL \
+    "rl:w${win}m:n${max}:${ip}" \
+    "rlhud:w${win}m:n${max}:${ip}"
+}
+
+# Reset Redis-backed rate-limit keys by REDIS_URL.
+# Usage: rlreset_url [window_minutes] [max] [client_ip]
+# Example: rlreset_url 3 100 ::1
+rlreset_url() {
+  local win="${1:-${RATE_LIMIT_WINDOW_MINUTES:-3}}"
+  local max="${2:-${RATE_LIMIT_MAX:-100}}"
+  local ip="${3:-${RL_CLIENT_IP:-::1}}"
+  local url="${REDIS_URL:-}"
+  if [ -z "$url" ]; then
+    echo "REDIS_URL is empty. Use rlreset_host instead or export REDIS_URL."
+    return 1
+  fi
+  case "$url" in
+    redis://*|rediss://*) ;;
+    *) url="redis://$url" ;;
+  esac
+  redis-cli -u "$url" DEL \
+    "rl:w${win}m:n${max}:${ip}" \
+    "rlhud:w${win}m:n${max}:${ip}"
+}
+
+# Default shortcut: host/port mode.
+alias rlreset='rlreset_host'
+
+###############
+mp42mp3() {
+    # Ensure a file argument was provided
+    if [ -z "$1" ]; then
+        echo "Error: Please provide an mp4 file."
+        echo "Usage: to_mp3 filename.mp4"
+        return 1
+    fi
+
+    # Ensure the file actually exists
+    if [ ! -f "$1" ]; then
+        echo "Error: File '$1' not found."
+        return 1
+    fi
+
+    # Strip the .mp4 extension to get the base name
+    local base_name="${1%.mp4}"
+
+    # Run ffmpeg using the base name for the output
+    ffmpeg -i "$1" -vn -c:a libmp3lame -q:a 2 "${base_name}.mp3"
+}
+
+url2mp3() {
+    mkdir ~/music; cd ~/music
+    local url="$1"
+
+    # If no URL was passed as an argument, prompt the user for it
+    if [ -z "$url" ]; then
+        read -p "Enter YouTube URL: " url
+    fi
+
+    # Exit if the user provided an empty string in the prompt
+    if [ -z "$url" ]; then
+        echo "Error: No URL provided."
+        return 1
+    fi
+
+    # Execute yt-dlp with your precise flags
+    yt-dlp -x --audio-format mp3 --audio-quality 0 --embed-metadata \
+           --ffmpeg-location /usr/local/bin/ \
+           -o "%(title)s.%(ext)s" "$url"
+}
+
+
+cascaded() {
+    # 1. Prompt the user for the ID
+    read -p "Enter the singles_id you want to delete: " singles_id
+
+    # 2. Validate that the input is actually a number
+    if [[ ! "$singles_id" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid ID. Please enter a valid numeric ID."
+        return 1
+    fi
+
+# 3. Double-check with the user before destructive action
+read -p "Are you absolutely sure you want to cascade delete singles_id=$singles_id? (Y/n): " confirm
+# Default to 'Y' if the user just hits Enter (empty string)
+confirm="${confirm:-Y}"
+
+if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo "Operation cancelled."
+    return 0
+fi
+
+    echo "Executing cascade delete for singles_id $singles_id..."
+
+    # 4. Define connection parameters matching your working getusers() reference
+    DB_HOST="127.0.0.1"
+    DB_PORT="50010"
+    DB_USER="test_user1"
+    DB_NAME="onlinemallwebsite"
+
+    # 5. Run the psql transaction block with the correct connection flags
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v target_id="$singles_id" << 'EOF'
+BEGIN;
+
+-- Delete comments associated with the postings of target_id
+\echo -n 'comments (via postings): '
+DELETE FROM comments WHERE post_id IN (SELECT post_id FROM postings WHERE singles_id = :target_id);
+
+-- Delete comments left directly by target_id
+\echo -n 'comments (direct):       '
+DELETE FROM comments WHERE singles_id = :target_id;
+
+-- Delete from child tables linked directly to singles_id
+\echo -n 'postings:                '
+DELETE FROM postings WHERE singles_id = :target_id;
+
+\echo -n 'payment:                 '
+DELETE FROM payment WHERE singles_id = :target_id;
+
+\echo -n 'user_customization:      '
+DELETE FROM user_customization WHERE singles_id = :target_id;
+
+\echo -n 'singles_checkr:          '
+DELETE FROM singles_checkr WHERE singles_id = :target_id;
+
+\echo -n 'photos:                  '
+DELETE FROM photos WHERE singles_id = :target_id;
+
+-- Finally, delete the parent record
+\echo -n 'singles (parent):        '
+DELETE FROM singles WHERE singles_id = :target_id;
+
+COMMIT;
+EOF
+
+    if [ $? -eq 0 ]; then
+        echo "Successfully deleted singles_id $singles_id and all related records."
+    else
+        echo "Error: Failed to delete singles_id $singles_id."
+    fi
+}
+
+lockdownenv() {
+    echo "🍎 Starting macOS SSH & Env Lockdown..."
+
+    # 1. Set Ownership
+    # $(whoami) automatically gets your current Mac username
+    sudo chown -R $(whoami):staff ~/.ssh/be
+
+    # 2. Lockdown Directories
+    # 700: rwx------ (Only you can enter)
+    chmod 700 ~/.ssh
+    chmod 700 ~/.ssh/be
+    echo "📂 Directories secured."
+
+    # 3. Lockdown Private Keys and .env
+    # 600: rw------- (Only you can read/write)
+    [ -f ~/.ssh/be/private_key.pem ] && chmod 600 ~/.ssh/be/private_key.pem
+    [ -f ~/.ssh/be/.env ] && chmod 600 ~/.ssh/be/.env*
+    echo "🔑 Secrets locked (600)."
+
+    # 4. Set Public Keys
+    # 644: rw-r--r-- (Standard for public keys)
+    [ -f ~/.ssh/be/public_key.pem ] && chmod 644 ~/.ssh/be/public_key.pem
+    echo "📋 Public keys set (644)."
+
+    echo "🎯 MAC LOCKDOWN is now secured. Your R-series servers thank you."
+}
+#######################
+alias tailcron='tail -F /Users/a/backups/backup-ubuntu.log'
+alias backupnightly='clear;/Users/a/backups/scripts/backup-nightly.sh /Users/a/backups/.backup-secrets-mac.env'
+alias cleanupdump='sudo rm -rf ~/backups/restore-mac-*;sudo rm -rf ~/backups/pgdump-mac;ls -atr ~/backups'
+alias restorenightly='/Users/a/backups/scripts/restore-latest.sh /Users/a/backups/.backup-secrets-mac.env'
+
+alias securenightly='sudo chown -R a:staff ~/backups ~/TERRAMASTER; chmod -R u=rwX,go= ~/backups ~/TERRAMASTER;chmod 700 ~/backups ~/TERRAMASTER'
+alias fixrestic='sudo chown -R lawsen0:lawsen0 /home/lawsen0/TERRAMASTER /home/lawsen0/backups; chmod -R u=rwX,go= /home/lawsen0/TERRAMASTER /home/lawsen0/backups;chmod 700 /home/lawsen0/TERRAMASTER /home/lawsen0/backups'
+
+alias testnightly='clear;~/backups/scripts/restore-into-test-db.sh'
+alias droptestnightly='source ~/backups/.backup-secrets-mac.env; TEST_DB_NAME=${TEST_DB_NAME:-vsingles_restore_test}; PGHOST=${PGHOST:-127.0.0.1}; PGPORT=${PGPORT:-50010}; PGUSER=${PGUSER:-test_user1}; dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists "$TEST_DB_NAME"'
+alias showdump='ls -lht /Users/a/backups/pgdump-mac'
+resticdiff() {
+  echo -e "\n\n---------- Total size ----------"
+  restic stats --mode raw-data
+  echo -e "\n\n---------- Snapshots -------"
+  restic snapshots --json | jq -r '.[-2].id, .[-1].id'
+  echo -e "\n\n---------- Diff of latest 2 snapshots --------"
+  restic diff "$(restic snapshots --json | jq -r '.[-2].id')" "$(restic snapshots --json | jq -r '.[-1].id')"
+}
+alias gobackup='cd ~/backups; ls -latr'
+
+alias showrestic='clear;sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"'
+
+alias wipebackuponly='clear;sudo rm -rf ~/TERRAMASTER/restic-mac && showrestic'
+alias wipetestbackup='clear;sudo rm -rf ~/TERRAMASTER/restic-mac && source ~/backups/.backup-secrets-mac.env && restic init --repo $RESTIC_REPOSITORY && bash ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-mac.env && backupnightly && showrestic'
+#######################
+
+update_singles_pass() {
+    # 1. Prompt for password (Bash syntax uses -p)
+    read -rs -p "Enter new password for singles table: " plain_pass
+    echo 
+
+    # 2. Generate bcrypt hash
+    local hashed_pass=$(python3 -c "import bcrypt; print(bcrypt.hashpw(b'$plain_pass', bcrypt.gensalt(6)).decode())")
+
+    # 3. Update database
+    # Note: Using 127.0.0.1 assumes you are SSH'd into the server 
+    # or have a tunnel open to 50010.
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET password_hash = '$hashed_pass';"
+
+    # 4. Cleanup
+    unset plain_pass
+    unset hashed_pass
+    
+    echo "Update complete."
+}
+
+update_psql() {
+    local table sel_col sel_val tar_col tar_val
+    
+    # Connection details from your alias
+    local DB_HOST="127.0.0.1"
+    local DB_PORT="50010"
+    local DB_USER="test_user1"
+    local DB_NAME="onlinemallwebsite"
+
+    # 1. Table Name
+    read -p "Enter table name:[singles] " table
+    table=${table:-singles}
+
+    # 2. Select Column
+    read -p "Enter select column name: [email] " sel_col
+    sel_col=${sel_col:-email}
+
+    # 3. Select Value (Required)
+    while [[ -z "$sel_val" ]]; do
+        read -p "Enter select column value: " sel_val
+        [[ -z "$sel_val" ]] && echo "Error: Value required."
+    done
+
+    # 4. Target Column (Required)
+    while [[ -z "$tar_col" ]]; do
+        read -p "Enter target column name: " tar_col
+        [[ -z "$tar_col" ]] && echo "Error: Value required."
+    done
+
+    # --- VERIFICATION SELECT (Input 2, Input 4 from Input 1) ---
+    echo -e "\n--- Current Values ---"
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT $sel_col, $tar_col FROM $table WHERE $sel_col = '$sel_val';"
+    echo ""
+
+    # 5. Target Value (Required)
+    while [[ -z "$tar_val" ]]; do
+        read -p "Enter target value to update: " tar_val
+        [[ -z "$tar_val" ]] && echo "Error: Value required."
+    done
+
+    # SQL Construction
+    sql_update="UPDATE $table SET $tar_col = '$tar_val' WHERE $sel_col = '$sel_val';"
+    # Final Select to show the specific updated row
+    sql_final="SELECT $tar_col, $sel_col FROM $table WHERE $sel_col = '$sel_val' OR $tar_col = '$tar_val';"
+
+    echo -e "\n--- Executing Update ---"
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "$sql_update"
+    
+    echo -e "\n--- Final Result ---"
+    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "$sql_final"
+}
+
+alias smsstep0='aws pinpoint-sms-voice-v2 create-verified-destination-number --destination-phone-number "+17035477456"'
+
+alias smsstep1='aws pinpoint-sms-voice-v2 send-destination-number-verification-code --verified-destination-number-id vdn-8e62f729ccbd4740bdea12db02fe9de1 --verification-channel TEXT --region us-east-1 --origination-identity phone-785b378d0a964c4a8252f3162c88fac7'
+
+smsstep2() {
+    echo -n "Enter the 6-digit code from your phone: "
+    read code
+    aws pinpoint-sms-voice-v2 verify-destination-number \
+        --verified-destination-number-id vdn-8e62f729ccbd4740bdea12db02fe9de1 \
+        --verification-code "$code" \
+        --region us-east-1
+}
+
+
+alias vipathdbsearch='sudo vi /usr/local/var/postgresql@16/postgresql.conf; sudo systemctl reload postgresql'
+
+
+
+alias check4000='lsof -i :40000'
+
+
+ff() {
+    read -p "Input pattern: " pattern
+    # List function names, filter by pattern, and sort for readability
+    declare -F | awk '{print $3}' | grep -i "$pattern" | sort
+}
+##############
+alias showarchive="echo '/Volumes/1T_CLIP/____VSINGLES/__ARCHIVE'; ls -latr /Volumes/1T_CLIP/____VSINGLES/__ARCHIVE"
+
+archivecodemain() {
+    # 1. Ask for user input
+    echo -n "Please enter description for folder name: "
+    read -r DESCRIPTION
+
+    # Clean the description (replaces spaces with underscores for better CLI navigation)
+    CLEAN_DESC=$(echo "$DESCRIPTION" | tr ' ' '_')
+
+    # 2. Define the base archive path and date
+    local ARCHIVE_BASE="/Volumes/1T_CLIP/____VSINGLES/__ARCHIVE"
+    local TODAY=$(date +%m%d%Y)
+    
+    # Create the folder name: mmddyyyy_description
+    local DEST="$ARCHIVE_BASE/${TODAY}_${CLEAN_DESC}"
+    
+    mkdir -p "$DEST"
+    echo "Created archive directory: $DEST"
+
+    # 3. Go to code directory and run zapnm
+    cd ~/code/main/ || { echo "Directory ~/code/main/ not found"; return 1; }
+    
+    # Handle alias expansion for zapnm
+    shopt -s expand_aliases
+    if [ -n "$(type -t zapnm)" ]; then
+        zapnm
+    else
+        echo "Warning: zapnm command or alias not found."
+    fi
+
+    # 4. Copy everything to the archive
+    echo "Archiving code to $DEST..."
+    cp -R ~/code/main/* "$DEST/"
+
+    # 5. List contents and show current directory
+    echo "--- Contents of $DEST ---"
+    ls -latr "$DEST"
+    echo "--- Current Location ---"
+    pwd
+}
+
+archiveDBPhoto() {
+    # 1. Ask for user input
+    echo -n "Please enter description for folder name: "
+    read -r DESCRIPTION
+
+    # Clean the description (replaces spaces with underscores)
+    CLEAN_DESC=$(echo "$DESCRIPTION" | tr ' ' '_')
+
+    # 2. Define the base archive path and date
+    # Using mmddyyyy format as requested
+    local ARCHIVE_BASE="/Volumes/1T_CLIP/____VSINGLES/__ARCHIVE"
+    local TODAY=$(date +%m%d%Y)
+
+    # Create the folder name: mmddyyyy_description
+    local DEST="$ARCHIVE_BASE/${TODAY}_${CLEAN_DESC}"
+
+    mkdir -p "$DEST"
+    echo "Created archive directory: $DEST"
+
+    # 3. Define source and copy files
+    # Target files in ~/dbFolder/ that contain the mmddyyyy string
+    echo "Archiving database photos for $TODAY to $DEST..."
+    
+    # We use a glob pattern to find files containing the date string
+    cp -R ~/dbFolder/*"$TODAY"*.* "$DEST/" 2>/dev/null || echo "No files found matching $TODAY"
+
+    # 4. List contents and show current directory
+    echo "--- Contents of $DEST ---"
+    ls -latr "$DEST"
+    echo "--- Current Location ---"
+    pwd
+}
+
+###############
+alias startagent='eval "$(ssh-agent -s)"'
+alias addkeyagent='ssh-add /home/lawsen0/.ssh/github_onlinemallwebsite'
+##### REDIS ####
+alias checkredis='brew services info redis; redis-cli ping'
+alias setupredis='brew services start redis'
+
+alias test='sudo cat /etc/sudoers.d/coredump'
+####### frontend MAC #########
+alias dobe='cd ~/code/main/fe && npm run build'
+alias fe0='cd ~/code/main/fe && rm -rf node_modules'
+alias fe1='cd ~/code/main/fe && npm i -verbose'
+alias fe2='killport 3000 && pkill -f vite; cd ~/code/main/fe && (npm start &)'
+alias feall='cd ~/code/main/fe && (fe1 && fe2); '
+###### backend mac ####
+alias be0='cd ~/code/main/be && rm -rf node_modules'
+alias be1='cd ~/code/main/be && npm i -verbose;ll'
+alias be2='cd ~/code/main/be && fkill 40000; npm run dev'
+alias be3='cd ~/code/main/be && npm run dev'
+
+alias be2pm2='cd ~/code/main/be && pm2 start ecosystem.config.cjs'
+alias beall='cd ~/code/main/be && (be1 && be2 && be3) && feall'
+
+
+# Build USB Bridge → $USB_DMG_EXE + repo usbzip/ (commit usbzip for Ubuntu work2).
+usball() {
+  go
+  set -a
+  # shellcheck disable=SC1091
+  source "$HOME/.ssh/be/.env"
+  set +a
+  local dest="${USB_DMG_EXE:?Set USB_DMG_EXE in ~/.ssh/be/.env}"
+  if [[ -n "${STORAGE_FOLDER:-}" ]]; then
+    dest="${dest//\$\{STORAGE_FOLDER\}/$STORAGE_FOLDER}"
+    dest="${dest//\$STORAGE_FOLDER/$STORAGE_FOLDER}"
+  fi
+  dest="${dest%/}"
+  mkdir -p "$dest"
+  cd be/recordVaultBridge/desktop || return 1
+  npm install
+  rm -rf dist
+  npm run dist:mac    # → usbBridgeV3-mac.zip into USB_DMG_EXE + usbzip/
+  npm run dist:win    # → usbBridgeV3-win.zip into USB_DMG_EXE + usbzip/
+  for f in usbBridgeV3-mac.zip usbBridgeV3-win.zip; do
+    if [[ -f "$dest/$f" ]]; then
+      echo "[usball] ok: $dest/$f ($(ls -lh "$dest/$f" | awk '{print $5}'))"
+    else
+      echo "[usball] missing $f — check dist:mac / dist:win + copy-installers-to-usb" >&2
+    fi
+  done
+  local usbzip="$HOME/code/main/usbzip"
+  ls -lh "$usbzip"/usbBridgeV3-*.zip 2>/dev/null || true
+  echo "[usball] commit usbzip/*.zip on Mac so Ubuntu work2 can publish to STORAGE"
+}
+
+alias belog='be1 && be2 && cd ~/code/main/be && mkdir -p logs && npm i -g pm2 && npm run pm2:start && tail -f logs/app-out.log'
+
+alias reloadbe='cd ~/code/main/be && npm run pm2:start'
+alias febeall='beall && feall'
+
+alias behere='cd ./be && ls -latr && npm i -verbose && fkill 40000 && npm run dev'
+alias fehere='cd ./fe && npm i -verbose && pkill -f vite && npm start &'
+
+alias showkill='fkill 40000 ; pkill -f vite'
+
+work1() {
+    cd ~/code/main
+    ls -latr
+    pwd
+    # Get the current branch name for the default value
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+    git branch -a
+
+    # Prompt with the default value in brackets
+    echo -n "Please enter new branch name [default: $current_branch]: "
+    read branch_name
+
+    # If user just presses enter, use the current branch and SKIP creation/initial push
+    if [ -z "$branch_name" ]; then
+        branch_name="$current_branch"
+        echo "Continuing with existing branch: $branch_name"
+    else
+        # If a new name is provided, create and push it
+        git checkout -b "$branch_name" && \
+        git push --set-upstream origin "$branch_name"
+    fi
+
+    # --- Standard Workflow ---
+
+    # 1) Stage all changes
+    git add .
+
+    # 2) Handle commit message logic
+    echo "Current branch: [$branch_name]"
+    read -p "Please enter commit comment [default=$branch_name]: " commit_msg
+
+    # If user just presses enter, use branch_name
+    if [ -z "$commit_msg" ]; then
+        commit_msg="$branch_name"
+    fi
+
+    git commit -m "$commit_msg"
+
+    # 3) Push the commit
+    git push
+    # 4) Ensure local USB_DMG_EXE has real zips from repo usbzip/ (customer download path)
+    git status
+    git branch
+}
+
+alias resetaudio='sudo killall coreaudiod'
+
+settag() {
+    git tag -n
+    local version
+    local comment
+    local force=""
+
+    echo -n "Enter tag version (e.g., 2.5): "
+    read -r version
+
+    # Check if tag already exists locally
+    if git rev-parse "v$version" >/dev/null 2>&1; then
+        echo -n "Tag v$version already exists. Overwrite? (y/n): "
+        read -r response
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            force="-f"
+        else
+            echo "Operation cancelled."
+            return 1
+        fi
+    fi
+
+    echo -n "Enter tag description: "
+    read -r comment
+
+    # Added $force variable to the command
+    git tag $force -a "v$version" -m "$comment"
+
+    if [ $? -eq 0 ]; then
+        echo "Successfully created tag v$version"
+        # If we forced an update, remind you to force push
+        if [ "$force" == "-f" ]; then
+            echo "Note: Use 'git push origin v$version --force' to update remote."
+        fi
+    else
+        echo "Failed to create tag."
+    fi
+
+    git tag -n
+}
+
+alias rmusers="psql -h 127.0.0.1 -U postgres -p 50010 -d onlinemallwebsite -c \"DELETE FROM singles WHERE email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com');\""
+getveri(){
+  psql -h 127.0.0.1 -p 50010 -U postgres -d onlinemallwebsite -c "select * from verifications;"
+}
+    
+rmveri(){
+  psql -h 127.0.0.1 -p 50010 -U postgres -d onlinemallwebsite -c "delete from verifications where email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com');\""
+}
+
+alias setupverify=" \
+sudo sed -i '' '1i\\
+#>>>>> 1) You should not see this statement if SuperRestore work.' /usr/local/var/postgres/postgresql.conf; \
+sudo sed -i '' '1i\\
+#>>>>> 2) You should not see this statement if SuperRestore work.' ~/b; \
+sudo sed -i '' '1i\\
+#>>>>> 3) You should not see this statement if SuperRestore work.' ~/.ssh/config; \
+sudo sed -i '' '1i\\
+#>>>>> 4) You should not see this statement if SuperRestore work.' ~/.bash_profile; \
+sudo sed -i '' '1i\\
+#>>>>> 5) You should not see this statement if SuperRestore work.' /etc/ssh/sshd_config"
+
+alias verifyrestore="echo '--- Postgres ---'; sudo head -n 10 /usr/local/var/postgres/postgresql.conf; \
+echo '--- File b ---'; sudo head -n 10 ~/b; \
+echo '--- SSH Config ---'; sudo head -n 10 ~/.ssh/config; \
+echo '--- Profile ---'; sudo head -n 10 ~/.bash_profile; \
+echo '--- SSHD Config ---'; sudo head -n 10 /etc/ssh/sshd_config"
+
+alias viverify="\
+vi /usr/local/var/postgres/postgresql.conf; \
+vi ~/b; \
+vi ~/.ssh/config; \
+vi ~/.bash_profile; \
+vi /etc/ssh/sshd_config"
+
+########################
+alias gitfix='git pull --no-rebase'
+alias cdv='cd  ~/code/onlinemallwebsite;ls -latr'
+#alias fakeenv='sudo cp ~/.ssh/be/.env.4git ./be/.env;cat ./be/.env'
+#alias realenv='sudo cp ~/.ssh/be/.env ./be/.env;cat ./be/.env'
+alias vienv='sudo vi ~/.ssh/be/.env'
+alias vifeenv='sudo vi ./fe/.env'
+alias catenv='sudo cat ~/.ssh/be/.env'
+alias showenv='echo "***** ssh ******";sudo cat ~/.ssh/be/.env; echo "***** code ./be/.env******"; sudo cat ./be/.env'
+
+
+merge2main ()
+{
+    echo "Make sure you check in your branch first, then run this script";
+    read -p "Please enter branch name: " branch_name;
+    echo "Merging $branch_name into main...";
+    git fetch origin
+    git checkout main && git pull origin main && git merge "$branch_name";
+    git push;
+    git log -2
+}
+
+
+merge2mainold() {
+    # 1) Display the warning message
+    echo "Make sure you check in your branch first, then run this script"
+
+    # 2) Prompt the user for the branch name
+    read -p "Please enter branch name: " branch_name
+
+    # 3) Execute the git sequence
+    echo "Merging $branch_name into main..."
+    
+    git checkout main && \
+    git pull origin main && \
+    git merge "$branch_name" 
+    git push
+    git log -2
+}
+merge2mainpush() {
+    # 1) Display the warning message
+    echo "Make sure you check in your branch first, then run this script"
+
+    # 2) Prompt the user for the branch name
+    read -p "Please enter branch name: " branch_name
+
+    # 3) Execute the git sequence
+    echo "Merging $branch_name into main..."
+
+    git checkout main && \
+    git pull origin main && \
+    git merge "$branch_name" && \
+    git push origin main
+}
+
+alias cdsource='cd ~/ramsource/code;ls -latr'
+alias cdram='cd /Volumes/RAMDisk/code;ls -latr'
+
+ramcode() {
+    SSD_PATH="$HOME/RAMSource/code"
+    RAM_PATH="/Volumes/RAMDisk/code"
+
+    if [ "$1" = "start" ]; then
+        # 1. Create RAM Disk if not exists
+        if [ ! -d "/Volumes/RAMDisk" ]; then
+            echo "Creating RAM Disk..."
+            diskutil erasevolume HFS+ "RAMDisk" `hdiutil attach -nomount ram://8388608`
+        fi
+        # 2. Sync SSD to RAM
+        mkdir -p "$RAM_PATH"
+        rsync -av --delete "$SSD_PATH/" "$RAM_PATH/"
+        echo "🚀 Ready! Files synced to $RAM_PATH"
+        cd "$RAM_PATH"
+
+    elif [ "$1" = "save" ]; then
+        # 3. Sync RAM back to SSD
+        rsync -av "$RAM_PATH/" "$SSD_PATH/"
+        echo "💾 Changes synced back to SSD ($SSD_PATH)"
+
+    elif [ "$1" = "stop" ]; then
+        # 4. Final Sync and Eject
+        echo "Finalizing..."
+        rsync -av "$RAM_PATH/" "$SSD_PATH/"
+        cd ~
+        diskutil eject /Volumes/RAMDisk
+        echo "🛑 Work saved and RAM Disk ejected. Safe to shut down."
+
+    else
+        echo "Usage: ramcode {start|save|stop}"
+    fi
+}
+
+######## MISC STORAGE (photos / videos / USB_DMG_EXE / recordvault-onedrive) ########
+
+_misc_fix_ownership() {
+    local base="$1"
+    [[ "$OSTYPE" == "linux-gnu"* ]] || return 0
+    if [ -d "$base/photos" ]; then
+        sudo chown -R www-data:www-data "$base/photos"
+    fi
+    if [ -d "$base/videos" ]; then
+        sudo chown -R www-data:www-data "$base/videos"
+    fi
+    if [ -d "$base/USB_DMG_EXE" ]; then
+        sudo chown -R "$(whoami):$(id -gn)" "$base/USB_DMG_EXE"
+    fi
+    if [ -d "$base/recordvault-onedrive" ]; then
+        sudo chown -R "$(whoami):$(id -gn)" "$base/recordvault-onedrive"
+    fi
+    if [ -d "$base/users" ]; then
+        sudo chown -R "$(whoami):$(id -gn)" "$base/users"
+    fi
+    sudo chmod -R u+rwX,g+rX,o+rX "$base/USB_DMG_EXE" "$base/recordvault-onedrive" "$base/users" 2>/dev/null || true
+    if [ -d "$base/vidoes" ] && [ ! -d "$base/videos" ]; then
+        sudo mv "$base/vidoes" "$base/videos"
+        sudo chown -R www-data:www-data "$base/videos"
+    fi
+}
+
+miscBackup() {
+    mkdir -p "$HOME/dbFolder"
+
+    (
+        cd "$HOME/dbFolder" || return 1
+
+        local BASE_DIR DATE_STR FILENAME PREFIX
+        BASE_DIR="${BASE_STORAGE}/onlinemallwebsite_storage"
+        DATE_STR=$(date +%m%d%Y)
+        PREFIX="${1:-miscBackup}"
+        FILENAME="${PREFIX}${DATE_STR}.tar.gz"
+
+        if [ ! -d "$BASE_DIR" ]; then
+            echo "Error: $BASE_DIR not found."
+            return 1
+        fi
+
+        # users/ = per-member tutadates/photos (current layout); legacy flat photos/ is fallback only.
+        local -a storage_dirs=(photos videos users USB_DMG_EXE recordvault-onedrive)
+        local -a present=()
+        local d
+        for d in "${storage_dirs[@]}"; do
+            if [ -d "$BASE_DIR/$d" ]; then
+                present+=("$d")
+            else
+                echo "Skip (missing): $BASE_DIR/$d"
+            fi
+        done
+
+        if [ ${#present[@]} -eq 0 ]; then
+            echo "Error: none of ${storage_dirs[*]} found under $BASE_DIR"
+            return 1
+        fi
+
+        echo "Archiving under $BASE_DIR: ${present[*]}..."
+        if COPYFILE_DISABLE=1 tar -czvf "$FILENAME" -C "$BASE_DIR" --exclude='._*' --exclude='.DS_Store' "${present[@]}"; then
+            echo "Starting wormhole send..."
+            wormhole send "$FILENAME"
+        else
+            echo "Compression failed."
+            return 1
+        fi
+    )
+}
+
+# Correct mappings:
+# Legacy names
+
+alias showbusyport='lsof -ti:3005'
+
+alias doit='npm ci;npm start'
+#### FOR MAC ONLY #### #### FOR MAC ONLY #### #### FOR MAC ONLY ####
+#### FOR MAC ONLY #### #### FOR MAC ONLY #### #### FOR MAC ONLY ####
+
+alias showusblog='log show --last 5m | grep -i usb'
+######## PG ###########
+
+alias macpgstatus='brew services list'
+alias macpgrestart='brew services restart postgresql@16;macpgstatus'
+alias macpgstart='brew services start postgresql@16; psql -U postgres -c "SHOW port;"'
+alias macvipgfile='sudo vi /usr/local/var/postgresql@16/postgresql.conf'
+alias macpgstopall='brew services stop --all; macpgstatus'
+
+#---- change shell to bash ---
+alias myshell="cat /etc/shells; chsh -s /bin/bash;echo $SHELL;echo 'You must open new terminal NOW!'"
+
+# Function to check VPN status
+check_vpn() {
+  # Checks if NordVPN process is running
+  if pgrep -x "NordVPN" > /dev/null; then
+    echo -e "\033[0;31m⚠️  WARNING: VPN is ON (NordVPN Process Detected)\033[0m"
+  else
+    echo -e "\033[0;32m✅ VPN is OFF\033[0m"
+  fi
+}
+
+# Alias to check status quickly
+alias vpn='check_vpn'
+
+
+alias sc='source /Volumes/MSWORD2010/.coredump/c'
+alias sccat='source /Volumes/MSWORD2010/.coredump/c;sudo ls -latr /Volumes/MSWORD2010/.coredump;clear; sudo cat /Volumes/MSWORD2010/.coredump/c'
+
+alias killusb='sudo kill -9 $(lsof | grep -i A99YBCPV | awk "{print \$2}" | head -n 1)'
+alias picocom='picocom -b 9600 -d 8 -p n -f n /dev/tty.usbserial-A99YBCPV'
+
+#### FOR MAC ONLY #### #### FOR MAC ONLY #### #### FOR MAC ONLY ####
+#### FOR MAC ONLY #### #### FOR MAC ONLY #### #### FOR MAC ONLY ####
+
+
+
+alias showpgmain="clear;echo '===ls /mnt/pgdata16/main ===';sudo ls -ls /mnt/pgdata16/main;echo '===ls /var/lib/postgresql/16/main ===';sudo ls /var/lib/postgresql/16/main;echo '===ls /var/lib/postgresql/16/main_NOTUSE===';sudo ls /var/lib/postgresql/16/main_NOTUSE"
+##################
+alias getuuid='clear;sudo blkid /dev/nvme0n1;echo '========';lsblk;echo '=======/etc/fstab file====';cat /etc/fstab;echo '=======';verifymount'
+alias verifymount='df -h | grep pgdata16;mount | grep pgdata16'
+#####################################
+alias lsoldmain='sudo ls -latr /var/lib/postgresql/16/main*;sudo ls -latr /var/lib/postgresql/16';
+alias lsnewmain='sudo ls -latr /mnt/pgdata16/main'
+######################################
+memcheck() {
+  sudo dmidecode -t memory |
+  awk '
+    /^Memory Device$/ { in_device=1; locator=""; size="" }
+    in_device && /^[[:space:]]*Locator:/ && $0 !~ /Bank Locator/ { locator=$0 }
+    in_device && /^[[:space:]]*Size:/ { size=$0 }
+    in_device && /^$/ {
+      if (size !~ /No Module Installed/ && locator != "") {
+        print locator
+        print size
+        print ""
+      }
+      in_device=0
+    }
+  '
+  sudo edac-util -v
+}
+
+######################################
+showmem () {
+  clear
+  echo '=== Below memory type by sticks==='
+  sudo dmidecode -t memory | grep -i "Type Detail";
+  echo '=== Below memory size by sticks==='
+  sudo dmidecode -t memory | awk '
+  /Memory Device/ {slot=""; size=""}
+  /Locator:/ {slot=$2}
+  /Size:/ {size=$2" "$3}
+  /Type Detail:/ {print slot, size, $0}
+  ' 
+}
+###############################
+
+
+alias testprogress='sudo tail -f /root/one.log'
+alias showtesterror='sudo grep -i -E "error|fail|bad|io error" /root/one.log'
+alias sudokillbadblock='pid=$(ps aux | grep "badblocks -wsv" | grep -v grep | awk "{print \$2}"); if [ -n "$pid" ]; then echo "Killing badblocks PID: $pid"; sudo kill $pid; else echo "No badblocks -wsv process found."; fi; testprogress'
+alias testwriteentiredisk="sudo bash -c 'badblocks -wsv /dev/nvme0n1 > /root/one.log 2>&1 &'"
+####################
+alias mountnvme='sudo mount -a;mount | grep nvme;df -h | grep pgdata'
+
+alias showweartear='sudo nvme smart-log /dev/nvme0;sudo nvme smart-log-add /dev/nvme0'
+
+mygrep() {
+    local search_string
+    local file_ext
+
+    # 1) Ask for the string to grep
+    read -p "Please enter string to grep: " search_string
+
+    # 2) Ask for the extension with a default
+    read -p "Please enter file extension to grep [default: *.js, *.jsx]: " file_ext
+
+    # If the user presses enter (string is empty), set the default
+    if [ -z "$file_ext" ]; then
+        # We use a brace expansion for multiple extensions in grep
+        # Using --include multiple times or a glob pattern
+        grep -rn "$search_string" --include="*.js" --include="*.jsx" .
+    else
+        grep -rn "$search_string" --include="$file_ext" .
+    fi
+}
+
+#-D /var/lib/postgresql/16/main \
+
+alias showmount="clear;lsblk; echo '############ /prod/mdstat #########';sudo cat /proc/mdstat;echo '########### /etc/fstab #########';sudo cat /etc/fstab"
+alias vifstab='sudo vi /etc/fstab; sudo mount -a;sudo systemctl daemon-reload'
+newpgpassword() {
+    read -s -p "Enter new postgres password: " NEWPW
+    echo
+    sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '$NEWPW';"
+}
+
+###### backup #####################
+alias dodo='read -p "git pass ? " poopoo; export PGPASSWORD="$poopoo";echo $PGPASSWORD;read -p "clear";clear'
+alias vibackup='sudo vi /usr/local/bin/pg_backup.sh'
+###########################
+raidhealth() {
+sudo nvme smart-log /dev/nvme0
+sudo nvme smart-log /dev/nvme1
+sudo dmesg | grep md127
+sudo mdadm --detail /dev/md127
+cat /proc/mdstat
+}
+###########################
+alias watchraid='watch -n 2 cat /proc/mdstat'
+###########################
+#alias clearlog2='clear;sudo journalctl -u postgresql --rotate;sudo journalctl -u postgresql --vacuum-time=1s'
+#alias taillog2='clearlog;sudo journalctl -u postgresql -f'
+#alias showlog2='clear;sudo journalctl -u postgresql -n 10'
+
+# make sure postgresql.conf has "logging_collector = off" to use below
+clearlog() {
+  #sudo rm -rf /var/log/postgresql/postgresql-16-main.log
+  sudo truncate -s 0 /var/log/postgresql/postgresql-16-main.log
+  sudo touch /var/log/postgresql/postgresql-16-main.log
+  sudo chown postgres:adm /var/log/postgresql/postgresql-16-main.log
+  sudo chmod 640 /var/log/postgresql/postgresql-16-main.log
+}
+alias taillog='clear;clearlog;sudo tail -f /var/log/postgresql/postgresql-16-main.log'
+alias showlog='clear;sudo tail -n 10 /var/log/postgresql/postgresql-16-main.log'
+############################
+
+alias testrep201='psql "host=192.168.222.201 port=50010 user=replicator dbname=replication"'
+alias testrep203='psql "host=192.168.222.203 port=50010 user=replicator dbname=replication"'
+alias testprim='sudo -u postgres psql -c "SELECT pid, usesysid, usename, application_name, client_addr FROM pg_stat_replication;"'
+
+cleanuptxtfile() {
+    local file="$1"
+
+    if [ -z "$file" ]; then
+        read -p "Enter the filename to clean up: " file
+    fi
+
+    # Check if the file exists
+    if [ ! -f "$file" ]; then
+        echo "Error: File '$file' not found."
+        return 1
+    fi
+
+    # Fix: Use -i '' to work on macOS without creating a backup file
+    sudo sed -i '' \
+        -e '/^[[:space:]]*#/d' \
+        -e '/^[[:space:]]*$/d' \
+        -e 's/@18/@16/g' \
+        -e 's/\/17\//\/18\//g' \
+        -e 's/-18-/-16-/g' \
+        "$file"
+
+    sudo cat "$file"
+}
+
+alias dreload='sudo systemctl daemon-reload'
+alias checkpassword='sudo -u postgres psql -p 50010 -d postgres -c "SHOW password_encryption;"'
+
+alias mustverify201='psql -h 192.168.222.201 -p 50010 -U postgres -d postgres -c "select 1;"'
+alias mustverify203='psql -h 192.168.222.203 -p 50010 -U postgres -d postgres -c "select 1;"'
+
+verifyid() {
+        sudo -u postgres psql -c "SELECT rolpassword FROM pg_authid WHERE rolname = 'replicator';"
+}
+
+verifysync() {
+
+
+  echo "=== show port ==="
+  sudo -u postgres psql -c "SHOW listen_addresses; SHOW port;"
+  echo
+
+  echo "=== show slots ==="
+  sudo -u postgres psql -c "SELECT slot_name, slot_type, active FROM pg_replication_slots;"
+  echo
+
+  echo "=== PostgreSQL config_file ==="
+  sudo -u postgres psql -c "SHOW config_file;"
+  echo
+
+  echo "=== wal_level ==="
+  sudo -u postgres psql -c "SHOW wal_level;"
+  echo
+
+  echo "=== pg_stat_replication ==="
+  sudo -u postgres psql -c "SELECT client_addr, client_port, state, sync_state FROM pg_stat_replication;"
+  echo
+
+  echo "=== password_encryption ==="
+  sudo -u postgres psql -c "SHOW password_encryption;"
+  echo
+
+  echo "***** replicator role ***"
+  sudo -u postgres psql -c "SELECT rolname, rolreplication, rolconnlimit FROM pg_roles WHERE rolname='replicator';"
+  echo
+
+
+  echo "=== Primary/Replica Sync Status: f if primary, t if replica ===="
+  sudo -u postgres psql -c "select now(), pg_is_in_recovery(), pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn(), pg_last_xact_replay_timestamp();"
+  echo
+}
+################################################################
+updatepassword() {
+  read -p "Enter new password: " newpassword
+  psql -h 127.0.0.1 -p 50010 -U postgres -d onlinemallwebsite \
+    -c "UPDATE users SET password = '${newpassword}' WHERE last_name='CEO';"
+}
+################################################################
+################################################################
+######### test pg #######################################################
+updatepassword() {
+  read -p "Enter new password: " newpassword
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite \
+    -c "UPDATE users SET password = '${newpassword}' WHERE last_name='CEO';"
+}
+
+
+export DATABASE_URL="postgresql://test_user1@127.0.0.1:50010/onlinemallwebsite"
+alias testConnect="psql '$DATABASE_URL' -c 'select now()'"
+
+getusers(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, firstname, lastname, vetted_basic_status, vetted_detail_status, email, profile_image_fk, initial_setup_done, profile_image_fk  FROM singles;"
+}
+
+getvettingenum(){
+  env PAGER=cat psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "\dT+ vetting_status"
+}
+
+getrequests() {
+  export PGPASSFILE='~/.ssh/test_user1_pass'
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select requests_id, singles_id_from, singles_id_to, interested from requests;"
+}
+
+
+getbrief(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * FROM singles_brief;"
+}
+
+getusersetup(){
+  # Using the limited app user now
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, email, initial_setup_done from singles;"
+}
+
+
+getphotos(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, photos_id, photo_id_index, file_path, file_extension FROM vsingles_photos;"
+}
+
+purgephotos() {
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "TRUNCATE TABLE vsingles_photos RESTART IDENTITY;"
+}
+
+alias chownphoto='sudo chown -R www-data:www-data /mnt/pgdata16/onlinemallwebsite_storage/photos;sudo ls -latr /mnt/pgdata16/onlinemallwebsite_storage/photos'
+
+alias showphotos='sudo ls -latr  ~/onlinemallwebsite_storage/photos'
+
+clonepassword(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET password_hash = (SELECT password_hash FROM singles WHERE email = 'a7038700246@gmail.com') WHERE email LIKE 'bill7035477456@gmail.com';"
+}
+
+inspect_func() {
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "\df+ $1"
+}
+
+# Usage: inspect_vetted
+inspect_vetted(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "\sf+ helloworldjunktest.update_vetted_basic_status"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "\sf+ helloworldjunktest.update_vetted_detail_status"
+}
+
+delete_func() {
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "DROP FUNCTION helloworldjunktest.update_vetted_basic_status() CASCADE;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "DROP FUNCTION helloworldjunktest.update_vetted_detail_status() CASCADE;"
+}
+
+
+getveri(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from verifications;"
+}
+
+mmveri(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from verifications where email='bill7035477456@gmail.com';"
+}
+
+getemail(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from registration_codes;"
+}
+rmemail(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from registration_codes where email='bill7035477456@gmail.com';"
+}
+getphone(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from pending_phone_verifications;"
+}
+rmphone(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from pending_phone_verifications where phone='+17035477456';"
+}
+getimages(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, profile_image_url FROM singles;"
+}
+
+getActive(){
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c 'SELECT formatted_address, zip_code, price, status, mls_number FROM helloworldjunktest.rentcast;'
+}
+
+getRequestsByEmail() {
+    read -p "Enter email of user to requests: " user_email
+
+    # 1. Get the singles_id - Note the quoted schema helloworldjunktest 
+    current_singles_id=$(psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -t -A -c "SELECT singles_id FROM helloworldjunktest.singles WHERE email = '$user_email';")
+
+    if [ -z "$current_singles_id" ]; then
+        echo "Error: No user found with email $user_email"
+        return 1
+    fi
+
+    echo "Found singles_id: $current_singles_id"
+    echo "-----------------------------------"
+
+    # 2. Query the requests table using separate quotes for schema and table
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SELECT * FROM helloworldjunktest.requests WHERE singles_id_from = $current_singles_id;"
+}
+
+resetUserByEmail() {
+    # 1. Ask for the email
+    read -p "What email of user to wipe? " user_email
+
+    if [ -z "$user_email" ]; then
+        echo "Error: No email entered."
+        return 1
+    fi
+
+    # Connection variables based on your screenshot
+    DB_HOST="127.0.0.1"
+    DB_PORT="50010"
+    DB_USER="test_user1"
+    DB_NAME="onlinemallwebsite"
+    SCHEMA="helloworldjunktest"
+
+    echo "Processing reset for: $user_email..."
+
+    # 2. Get the singles_id and perform updates/deletes in one transaction block
+    # We use -t (tuples only) and -A (unaligned) to make it easier to handle output if needed,
+    # but here we execute a multi-statement command.
+    psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -c "
+        DO \$\$ 
+        DECLARE 
+            current_singles_id bigint;
+        BEGIN
+            -- 0. Find the singles_id
+            SELECT singles_id INTO current_singles_id 
+            FROM \"$SCHEMA\".singles 
+            WHERE email = '$user_email';
+
+            IF NOT FOUND THEN
+                RAISE NOTICE 'User with email % not found.', '$user_email';
+            ELSE
+                -- 1. Set initial_setup_done = false
+                UPDATE \"$SCHEMA\".singles 
+                SET initial_setup_done = false 
+                WHERE singles_id = current_singles_id;
+
+                -- 2. Remove all rows from vsingles_photos
+                DELETE FROM \"$SCHEMA\".vsingles_photos 
+                WHERE singles_id = current_singles_id;
+
+                RAISE NOTICE 'User % (ID: %) has been reset and photos cleared.', '$user_email', current_singles_id;
+            END IF;
+        END \$\$;
+    "
+    
+    # Run your follow-up command
+    getusersetup
+}
+
+######## veirfy PG ########################################################
+
+alias dbtest1='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite'
+alias dbrestoretest='psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles_restore_test'
+alias dbpostgres='psql -h 127.0.0.1 -p 50010 -U postgres -d onlinemallwebsite'
+
+alias restoreconfig='sudo cp pg_hba.conf /etc/postgresql/16/main/pg_hba.conf;vifile1;sudo cp postgresql.conf /etc/postgresql/16/main/postgresql.conf;vifile2;sudo cp postgresql.auto.conf /var/lib/postgresql/16/main/postgresql.auto.conf;vifile3;sudo cp standby.signal /var/lib/postgresql/16/main/standby.signal;vifile4'
+
+alias synclog='clear;sudo tail -n 50 /var/log/postgresql/postgresql-16-main.log'
+
+####### CLUSTER ALIAS #####
+
+alias ufwrebootenable='systemctl is-enabled ufw'
+
+######### PG built for MAC Begin#############
+######### PG built for MAC Begin#############
+# General Connection
+alias pg='sudo -u test_user1 psql'
+
+# Networking: Replaces 'ss' with 'lsof' (standard on Mac)
+alias pglisten='sudo lsof -iTCP:50010 -sTCP:LISTEN'
+
+# Status/Process Management: Replaces 'systemctl' with 'brew services'
+alias pgstatus='brew services info postgresql@16; pglisten'
+alias pgstart='brew services start postgresql@16; pgstatus'
+alias pgstop='brew services stop postgresql@16; pgstatus'
+alias pgrestart='brew services restart postgresql@16; pgstatus'
+
+# Cluster Management: macOS doesn't use pg_lsclusters (Debian/Ubuntu specific)
+# This lists the Homebrew services instead
+alias pgclusters='brew services list | grep postgres'
+
+# Logging: Path typically changes to the Homebrew var directory
+alias pglog='tail -f /opt/homebrew/var/log/postgresql@16.log'
+
+# Configuration: Uses 'vi' as requested; paths updated for Homebrew
+alias pgconf='vi /opt/homebrew/etc/postgresql@16/postgresql.conf'
+
+##### for mac is on /usr/loca/var ####
+alias pghba='vi /usr/local/var/postgresql@16/pg_hba.conf'
+alias visecurity='vi /usr/local/var/postgresql@16/pg_hba.conf;pg_ctl reload -D /usr/local/var/postgresql@16'
+
+# Reload: Uses the direct pg_ctl binary
+alias pgreload='pg_ctl -D /opt/homebrew/var/postgresql@16 reload'
+######### PG built for MAC END #############
+
+
+
+
+##################################################################
+####################### POSTGRES END #############################
+##################################################################
+alias clusterstart='sudo pg_ctlcluster 16 main start;clusterstatus'
+alias clusterstatus='sudo pg_ctlcluster 16 main status'
+alias clusterstop='sudo pg_ctlcluster 16 main stop;clusterstatus'
+
+##### NVME #####
+######
+alias gittagdate='git tag --sort=creatordate --format="%(creatordate:short)  %(refname:strip=2)"'
+
+alias setmtu9000='sudo ip link set dev enp130s0 mtu 9000 && ip link show enp130s0'
+
+alias watchlink='watch -n 1 ip -br link show'
+alias showmylink='ip -br link show enp130s0'
+################
+alias chooseeditor='sudo update-alternatives --config editor'
+
+alias showscript='echo "----.profile----"; cat ~/.profile; \
+echo "----.bash_profile----"; cat ~/.bash_profile; \
+echo "----.bashrc----"; cat ~/.bashrc'
+####################
+alias hitdb='echo "nc x.x.230.x now" ; \
+nc -zv 192.168.230.204 50010 ; \
+echo "nc x.x.222.x now" ; \
+nc -zv 192.168.222.204 50010'
+
+alias resetpm2='pm2 stop all; pm2 delete all'
+
+alias fixnpm='
+echo "🔍 Checking ownership..." && \
+ls -ld ~/.npm ~/.npm/_cacache ~/code/latestgreatest/fe && \
+echo "🧹 Fixing ownership..." && \
+sudo chown -R "$USER":staff ~/.npm && \
+sudo chown -R "$USER":staff ~/code/latestgreatest/fe && \
+echo "🗑️    Clearing npm cache..." && \
+rm -rf ~/.npm/_cacache/* && \
+npm cache verify || true && \
+npm cache clean --force && \
+echo "✅ Done. Now run: npm ci"
+'
+
+##### tuning ######
+##### tuning #####
+alias removealltuning="\
+sudo rm -f /etc/systemd/system/40g-tuning@*.service && \
+sudo rm -f /etc/systemd/system/multi-user.target.wants/40g-tuning@*.service && \
+sudo rm -rf /etc/systemd/system/40g-tuning@*.service.d/ && \
+sudo systemctl daemon-reload && \
+systemctl list-units '40g-tuning@*.service' && \
+systemctl list-unit-files '40g-tuning@*.service'"
+
+alias mymtu='ip link show dev enp130s0'
+
+alias edit1500service='EDITOR=vi sudo systemctl edit 40g-tuning@mtu1500.service'
+alias edit8954service='EDITOR=vi sudo systemctl edit 40g-tuning@mtu8954.service'
+
+alias listservice='systemctl list-unit-files "40g-tuning@*.service"'
+alias showtune="cat /sys/class/net/enp130s0/mtu && ip -d link show dev enp130s0 | grep -o 'mtu [0-9]\+'"
+alias showrunningtune='echo "=== Active (now) ==="; systemctl list-units "40g-tuning@*.service" --no-pager; \
+echo; echo "=== Enabled (boot) ==="; systemctl list-unit-files "40g-tuning@*.service" --no-pager; \
+echo; echo "=== MTU ==="; echo "enp130s0 mtu $(cat /sys/class/net/enp130s0/mtu)"'
+
+
+# pick the boot profile (always enables the target profile; harmless if the other isn't enabled)
+alias tune1500='sudo systemctl disable 40g-tuning@mtu8954.service >/dev/null 2>&1 || true; sudo systemctl enable 40g-tuning@mtu1500.service'
+alias tune8954='sudo systemctl disable 40g-tuning@mtu1500.service >/dev/null 2>&1 || true; sudo systemctl enable 40g-tuning@mtu8954.service'
+
+# show which profile(s) are enabled
+#alias showtune="systemctl list-unit-files '40g-tuning@*.service'"
+
+# apply immediately (no reboot)
+alias tunestart1500='sudo systemctl start 40g-tuning@mtu1500.service'
+alias tunestart8954='sudo systemctl start 40g-tuning@mtu8954.service'
+
+# one-shot: set as boot profile AND start now
+alias mumbojumbo='sudo systemctl daemon-reexec && \
+sudo systemctl daemon-reload'
+
+alias tune1500now='mumbojumbo && tune1500; sudo systemctl start 40g-tuning@mtu1500.service'
+alias tune8954now='mumbojumbo && tune8954; sudo systemctl start 40g-tuning@mtu8954.service'
+
+alias enable1500='sudo systemctl disable 40g-tuning@mtu8954.service && \
+sudo systemctl enable 40g-tuning@mtu1500.service && \
+sudo systemctl daemon-reload'
+
+alias enable8954='sudo systemctl disable 40g-tuning@mtu1500.service && \
+sudo systemctl enable 40g-tuning@mtu8954.service && \
+sudo systemctl daemon-reload'
+
+# verification as a function so you can pass the peer IP
+verifytune () {
+  local IFACES="enp130s0"
+  local PEER_IP="${1:?usage: verifytune <peer-ip>}"
+  echo "Interfaces:"
+  ip -br link show $IFACES || return 1
+
+  echo; echo "Ring sizes (first iface):"
+  sudo ethtool -g enp130s0 || return 1
+
+  echo; echo "Offloads (first iface):"
+  sudo ethtool -k enp130s0 | egrep 'tx-checksumming|scatter-gather|tso|gso|lro|gro' || true
+
+  echo; echo "Ping tests:"
+  # Jumbo ping (MTU 8954 → payload 8926), will fail if MTU=1500
+  ping -M do -s 8926 "$PEER_IP" -c 3 || true
+
+  # Standard ping (MTU 1500 → payload 1472)
+  ping -M do -s 1472 "$PEER_IP" -c 3
+}
+
+
+alias vitune1='sudo vi /home/lawsen0/tuning/tuning.sh'
+alias vitune2='sudo vi /etc/systemd/system/40g-tuning@.service'
+alias tuneservicelog='sudo journalctl -u 40g-tuning.service -b --no-pager'
+alias findoldtune="sudo find /etc/systemd/system -name '40g-tuning*'"
+
+#################
+#################
+
+alias testpayloadall='testpayloaddb;testpayloadws;testpayloadinner'
+alias testpayloaddb='ping -M do -s 8926 -c 2 192.168.222.204'
+alias testpayloadws='ping -M do -s 8926 -c 2 192.168.222.204'
+alias testpayloadinner='ping -M do -s 8926 -c 2 192.168.222.220'
+
+alias setpayload9k='sudo ip link set dev enp130s0 mtu 8954'
+alias showpayload9k='ip -br link show | grep -E "enp|eth"'
+##################
+
+alias showraidcontroller='sudo lspci | grep -i raid'
+###################
+
+
+alias checkiperf='ps aux | grep iperf3'
+alias killiperf='sudo pkill -9 iperf3 && checkiperf'
+alias tailupgrade='sudo tail -f /var/log/unattended-upgrades/unattended-upgrades.log'
+
+#### UFW ########
+alias ufwapply='sudo /usr/local/bin/setupufw'
+alias ufwvi='sudo vi /usr/local/bin/setupufw && sudo chmod +x /usr/local/bin/setupufw && ufwenable'
+alias ufwls='sudo ls -latr /usr/local/bin/setupufw'
+alias ufwrm='sudo rm /usr/local/bin/setupufw'
+alias ufwdisable="sudo ufw disable;ufwstatus"
+alias ufwenable="sudo /usr/local/bin/setupufw;sudo ufw enable;ufwstatus"
+alias ufwstatus="sudo ufw status verbose"
+alias ufwarchive="myarchive /usr/local/bin/setupufw"
+myarchive() {
+  for src in "$@"; do
+    if [ ! -e "$src" ]; then
+      echo "archive: $src: not found" >&2
+      continue
+    fi
+    dest="${src}.$(date +%Y%m%d_%H%M%S)"
+    sudo mv -- "$src" "$dest" && printf 'archived: %s → %s\n' "$src" "$dest"
+  done
+}
+
+###############################
+alias cleaniperf='rm -rf ~/iperf3.log'
+alias tailiperf='clear ; tail -f ~/iperf3*5204.log'
+###############################
+
+alias cpuutil='mpstat -P ALL 1'
+
+# run for 6 hour, use 6 rx stream with live and record.  At end 'grep -E "lost|Retr" iperf3_204to204.log' to see errors
+alias killperf='sudo pkill iperf3'
+alias startcomplexperf='iperf3 -c 192.168.40.204 -P 8 -t 21600 -B 192.168.40.204 | tee iperf3_204to204.log'
+alias showroute40g='ip route | grep 192.168'
+
+alias netserverstart='sudo pkill -x netserver && net_tune && sudo netserver -4 -L 192.168.40.204 -p 60000 -D' 
+
+alias net_tune='sudo sysctl -w net.core.rmem_max=67108864 \
+&& sudo sysctl -w net.core.wmem_max=67108864 \
+&& sudo sysctl -w net.ipv4.tcp_rmem="4096 87380 67108864" \
+&& sudo sysctl -w net.ipv4.tcp_wmem="4096 65536 67108864"'
+
+#
+#
+#
+alias optimizeperf='sudo ip link set enp130s0 mtu 8954;ip -details link show enp130s0 | grep mtu'
+alias assignip40g='sudo ip addr add 10.10.40.4/24 dev enp130s0'
+alias addroute40g='sudo ip route add 10.10.40.0/24 dev enp130s0'
+
+###############################
+alias 40gshow='40gshow0;40gshow2;40gshow3'
+alias 40gshow0='ip link show'
+
+alias 40gshow1='40gshow1a; 40gshow1b'
+alias 40gshow1a='sudo ethtool enp130s0'
+alias 40gshow1b='sudo ethtool enp130s0d1'
+
+alias 40gshow2='40gshow2a;40gshow2b'
+alias 40gshow2a='echo "enp130s0" ; sudo ip link set enp130s0 up && sudo ethtool enp130s0 | egrep "Speed|Link detected"'
+alias 40gshow2b='echo "enp130s0d1" ; sudo ip link set enp130s0d1 up && sudo ethtool enp130s0d1 | egrep "Speed|Link detected"'
+
+alias 40gshow3='40gshow3a;40gshow3b'
+alias 40gshow3a='echo "enp130s0" ; sudo ip link set enp130s0 up && sudo ethtool enp130s0 | egrep "Speed|Link detected"'
+alias 40gshow3b='echo "enp130s0d1" ; sudo ip link set enp130s0d1 up && sudo ethtool enp130s0d1 | egrep "Speed|Link detected"'
+
+alias setpayload9k='sudo ip link set dev enp130s0 mtu 8954'
+###############################
+
+
+###### DEBUG #######
+alias testsimple='pm2 reload vsinglesclubweb;
+sudo ss -ltnp | grep 40000;
+curl -i http://127.0.0.1:40000/;
+curl -i http://192.168.230.204:40000/;'
+
+alias listport='pm2 jlist | jq -r ".[] | .pm_id, .name, .pm2_env.PORT"'
+########## SIMPLE project ######
+alias nukepm2='pm2 delete * && pm2 delete 0 && pm2 save --force && rm -f ~/.pm2/dump.pm2 && pm2 list'
+alias buildsimplefe='cd ~/UBUNTU-PRODUCTION/simple/fe && npm ci && npm run build-app-dev'
+alias buildsimplebe='cd ~/UBUNTU-PRODUCTION/simple/be && npm ci'
+alias pm2start='nukepm2 ; nproc ; pm2 start ecosystem.config.cjs --only vsinglesclubweb --update-env'
+alias doallsimple='buildsimplefe && buildsimplebe && pm2start && pm2 status'
+###############################
+
+alias ll='ls -latr'
+alias lll='ls -ltr'
+alias off='sudo shutdown -h now'
+#alias vbp='sudo rm -rf ~/.b.swp;unalias -a;vi ~/b;source ~/b'
+alias vbp='rm -f ~/.b.swp; unalias -a; vi ~/b; source ~/b'
+alias rbp='sudo rm ~/.b.swp'
+alias sbp='source ~/b' 
+
+########## latestgreatest project #############
+
+alias cdlg='cd ~/UBUNTU-PRODUCTION/latestgreatest;ls -latr'
+
+
+alias cdmyapi='cd ~/UBUNTU-PRODUCTION/latestgreatest/be'
+######## DEVELOPMENT ??? #####
+alias pm2devcluster='cdmyapi;pm2deleteall;sudo npm run start-dev-hotcluster;pm2list'
+alias pm2devclusterbuild='cdmyapi;pushd ../fe;npm ci && npm run build-app-dev && popd && npm ci && pm2devcluster'
+
+####### SOLO ###########
+alias solo='cdmyapi;pm2deleteall;sudo npm run start-dev-solo;pm2list'
+alias solobuild='cdmyapi;pushd ../fe;npm ci && npm run build-app-dev && ls -latr ./dist && popd && npm ci;solo'
+
+######## PRODUCTION #####
+alias pm2prodcluster='cdmyapi;pm2deleteall;sudo npm run start-production-hotcluster;pm2list'
+alias pm2prodclusterbuild='cdmyapi;pushd ../fe;npm ci && npm run build-app-prod && popd && npm ci && pm2prodcluster;'
+
+####### MISC ##########
+alias pm2deleteall='sudo pm2 delete all;sudo pm2 delete www'
+alias pm2restart='sudo pm2 restart vsinglesclubweb'
+
+#alias pm2log='pm2 flush;pm2 logs | sed "s/\x1b\[[0-9;]*m//g"'
+alias pm2up='cd /Users/a/code/main/be && pm2 start server_be.js --name be-local || pm2 restart be-local'
+alias pm2log='pm2 logs be-local --lines 200'
+alias pm2do='pm2up && pm2log'
+
+alias pm2stop='cdmyapi;sudo pm2 stop vsinglesclubweb'
+alias pm2monit='sudo pm2 monit'
+
+alias pm2list='clear;sudo pm2 list'
+alias pm2show='clear;sudo pm2 show vsinglesclubweb'
+alias pm2reload='clear;sudo pm2 reload vsinglesclubweb'
+alias pm2delete='clear;sudo pm2 delete vsinglesclubweb'
+alias pm2flush='clear;sudo pm2 flush'
+alias pm2reset='clear;sudo pm2 reset vsinglesclubweb'
+alias pm2info='clear;sudo pm2 info vsinglesclubweb'
+alias pm2describe='clear;sudo pm2 describe vsinglesclubweb'
+alias pm2save='sudo pm2 save'
+alias pm2resurrect='sudo pm2 resurrect'
+alias pm2descuptime='clear;sudo pm2 describe vsinglesclubweb | grep uptime'
+alias pm2descrestart='clear;sudo pm2 describe vsinglesclubweb | grep restart'
+alias pm2descmemory='clear;sudo pm2 describe vsinglesclubweb | grep memory'
+
+
+alias h='history'
+
+
+####################
+####################
+####################
+####################
+
+alias visetpasswordssh='sudo vi /etc/ssh/sshd_config; sudo systemctl reload sshd'
+alias viit='sudo vi /etc/ssh/sshd_config; sudo systemctl reload sshd'
+###### PM2 ##########
+alias pm2unstartup='pm2 unstartup systemd'
+alias pm2save='pm2 save'
+
+#### UFW ########
+alias setupufw='sudo /usr/local/bin/setupufw'
+alias ufwdisable="sudo ufw disable;ufwstatus"
+alias ufwstatus="sudo ufw status verbose"
+#################
+alias showfejs='ls -la ../fe/public/static/js/'
+alias showbejs='ls -la ../be/public/static/js/'
+alias killport5000='sudo kill -9 $(sudo lsof -t -i :5000)'
+
+##### git ########
+alias fetchpush='git fetch origin;git merge origin/main'
+alias pushallf='cp ~/b .;sudo git add . -f && git commit -m "update" && git push'
+alias revertgit='git reset --hard HEAD~1 && git push origin +HEAD'
+
+githardrevert() {
+    # Prompt the user for the hash
+    echo -n "Enter the commit hash to reset to: "
+    read -r target_hash
+
+    # Validate that the input is a valid git hash (hexadecimal, between 7 and 40 characters)
+    if [[ ! "$target_hash" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+        echo "Error: '$target_hash' is not a valid Git hash format." >&2
+        return 1
+    fi
+
+    # Optional: Verify if the hash actually exists in the local repository
+    if ! git rev-parse --verify --quiet "${target_hash}^{commit}" > /dev/null; then
+        echo "Error: Commit '$target_hash' could not be found in this repository." >&2
+        return 1
+    fi
+
+    # Confirmation warning because reset --hard is destructive
+    echo -n "WARNING: This will discard all uncommitted changes. Proceed with reset to $target_hash? (y/N): "
+    read -r confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        git reset --hard "$target_hash"
+        echo "Successfully reset repository to $target_hash."
+    else
+        echo "Operation cancelled."
+        return 0
+    fi
+}
+
+
+
+alias vip='vi package.json'
+
+alias gitclone2009='git clone git@github.com:w7035477456/2009_corruptLogFiles.git'
+alias go='cd ~/code/main;ls -latr;gl;gb'
+alias gb='git branch'
+alias ga='git add .'
+alias gr='git remote -v'
+alias gba='git branch -a'
+alias gs='git status'
+alias gp='git push'
+alias gfp='git fetch;git pull;gba;gb'
+#alias gc='git commit -m "whatever"'
+gc() {
+    read -p "Please enter commit comment: " commit_msg
+    git commit -m "$commit_msg"
+}
+alias gst='git stash'
+alias gl='clear;git log -2'
+
+######## PGCheck #########
+alias pgcheck='~/2009_corruptLogFiles/xbox3/pgverify_primary.sh'
+alias pgcheckh='TRY_IDENTIFY=1 ~/2009_corruptLogFiles/xbox3/pgverify_primary.sh'
+######## FAN BEGIN##########
+# Dell R630 fan control aliases
+alias fq='nohup sudo /usr/local/sbin/r630-fan-quiet.sh >/tmp/fanquiet.log 2>&1 & disown'
+alias fa='sudo pkill -f r630-fan-quiet.sh; sudo ipmitool raw 0x30 0x30 0x01 0x01'
+alias checkfan='sensors -f; systemctl status r630-fan-quiet.service'
+######## FAN END##########
+
+###### ha ##################
+alias wherepghbaconf='sudo -u postgres psql -p 50010 -c "SHOW hba_file;"'
+alias hareload='sudo systemctl reload ssh'
+
+alias vifile0='sudo -u postgres vi /var/lib/postgresql/.pgpass;sudo -u postgres chmod 600 /var/lib/postgresql/.pgpass'
+
+alias vireload='sudo systemctl reload ssh; sudo systemctl restart postgresql;sudo pg_ctlcluster 16 main reload;pgstatus'
+
+alias oldlsdata='sudo ls -latr /var/lib/postgresql/16/main'
+alias lsdata='sudo ls -latr /mnt/nvme/pgdata16/'
+
+alias oldvifile1='sudo vi /etc/postgresql/16/main/postgresql.conf;vireload'
+alias vifile1='sudo vi    /etc/postgresql/16/main/postgresql.conf;vireload'
+
+alias oldvifile2='sudo vi /var/lib/postgresql/16/main/pg_hba.conf;vireload'
+
+alias vifile2mac='sudo vi /usr/local/var/postgresql@16/pg_hba.conf;brew services restart postgresql@16'
+alias visecurity2='sudo vi /usr/local/var/postgresql@16/pg_hba.conf;pg_ctl reload -D /usr/local/var/postgresql@16;brew services restart postgresql@16'
+
+#alias vifile2='sudo vi    /mnt/nvme/pgdata16/pg_hba.conf;vireload'
+
+alias oldvifile3='sudo vi /var/lib/postgresql/16/main/postgresql.auto.conf;vireload'
+alias vifile3='sudo vi    /mnt/nvme/pgdata16/postgresql.auto.conf;vireload'
+
+alias oldvifile4='sudo vi /var/lib/postgresql/16/main/standby.signal;vireload'
+alias vifile4='sudo vi    /mnt/nvme/pgdata16/standby.signal;vireload'
+  
+alias oldvifile5='sudo vi /var/lib/postgresql/16/main/pg_ident.conf'
+alias vifile5='sudo vi    /mnt/nvme/pgdata16/pg_ident.conf'
+
+alias oldvifile6='sudo vi /etc/systemd/system/postgresql@16-main.service'
+alias vifile6='sudo vi /etc/systemd/system/postgresql@16-main.service'
+
+
+alias securefile3='sudo chmod 600 /var/lib/postgresql/16/main/postgresql.auto.conf;sudo chown postgres:postgres /var/lib/postgresql/16/main/postgresql.auto.conf'
+alias securedatadir='sudo chmod 700 /var/lib/postgresql/16/main;sudo chown postgres:postgres /var/lib/postgresql/16/main'
+###### postres ############
+alias restartpostgres='sudo systemctl restart postgresql@16-main'
+alias vipostgres='sudo vi /etc/postgresql/16/main/postgresql.conf;restartpostgres'
+
+##################################################
+alias vistandby='sudo vi /var/lib/postgresql/16/main/standby.signal'
+##################################################
+
+##################################################
+alias visshdconfig='sudo vi /etc/ssh/sshd_config'
+alias vioverride='sudo vi /etc/systemd/system/haproxy.service.d/override.conf;systemctl daemon-reload;'
+alias vihaservice='sudo vi /etc/systemd/system/haproxy.service;systemctl daemon-reload;'
+##################################################
+alias testconnectdb='psql -U demouser -d demo -p 50010 -h 127.0.0.1'
+
+alias restartssh='systemctl reload ssh;systemctl restart sshd;sudo systemctl restart ssh;sudo ss -tlnp | grep sshd'
+
+alias gitpullpush='git pull origin main --rebase;git push origin main'
+
+###### git clone ############################################
+alias clone2009='git clone git@github.com:w7035477456/2009_corruptLogFiles.git'
+
+alias mystart='clear;killport4;cd ~/chat;source sourceme.sh;node chat.js &'
+alias mykill="lsof -ti :40000 | xargs -r kill -9"
+
+##################################################
+alias pastefix="printf '\e[?2004l'"
+alias startreplicademo='clear;killport4;cd ~/replicademo;source sourceme.sh;node server.js &'
+alias killport4="lsof -ti :40000 | xargs -r kill -9"
+
+alias killnode="ps aux | grep '[n]ode'| awk '{print \$2}' | xargs -r kill -9"
+alias portlisten='sudo ss -tulnp | grep 40000'
+alias startserver='clear;cd ~/app;node app.js &'
+alias startpm2='cd ~/app;pm2 start app.js -i max --name app'
+alias appkill="pkill -f 'node app\.js'"
+
+##################################################
+
+alias validatehaconfig='sudo /usr/sbin/sshd -t '
+alias hareload='sudo systemctl reload ssh'
+
+alias securessh='
+  mkdir -p ~/.ssh &&
+  chown -R "$USER":"$(id -gn)" ~/.ssh &&
+  chmod 700 ~/.ssh &&
+  chmod 600 ~/.ssh/id_* ~/.ssh/*key* ~/.ssh/config ~/.ssh/authorized_keys 2>/dev/null || true &&
+  chmod 644 ~/.ssh/*.pub 2>/dev/null || true
+'
+
+alias vioverridepme='sudo vi /etc/systemd/system/pm2-lawsen0.service.d/override.conf'
+
+alias dopm2='pm2 flush;pm2 restart app;pm2 logs app --lines 20'
+alias dolog='pm2 logs app --lines 20'
+
+alias logdblisten='sudo cat /var/log/postgresql/postgresql-15-main.log | tail -20'
+alias remotedbtest='nc -vz 192.168.230.204 50005'
+
+alias portlisten='sudo ss -tulnp | grep 40000'
+alias startserver='clear;cd ~/app;node app.js &'
+alias startpm2='cd ~/app;pm2 start app.js -i max --name app'
+alias appkill="pkill -f 'node app\.js'"
+
+alias 10gupdown='10gup;10gdown;10gshow'
+alias 10gup='sudo ip link set enp130s0f0 up'
+alias 10gdown='sudo ip link set enp130s0f0 down'
+alias 10gshow='ip a'
+
+
+alias vinetplan='sudo vi /etc/netplan/50-cloud-init.yaml;sudo netplan apply'
+
+
+alias myreload='sudo systemctl restart route-10g.service'
+alias myiproute='ip route get 72.83.247.73'
+alias mytcpdump='sudo tcpdump -ni enp4s0f0 port 80'
+alias mylisten='sudo ss -tnlp | grep :80'
+
+alias shownicup="ip a show | grep 'state UP'"
+alias shownicdown="ip a show | grep 'state DOWN'"
+######## test #########
+alias testgit='ssh -T git@github.com'
+alias testinternet='curl http://example.com'
+alias pingdns='ping -c 4 8.8.8.8'
+
+####### vi ########
+alias vi1='sudo vi /etc/default/ufw'
+alias vi2='sudo vi /etc/ufw/sysctl.conf'
+####### database #########
+alias testpsql='psql -h 192.168.193.53 -p 49155 -U xbox3 -d myappdb'
+
+alias status='showport;showlisten;showlisten2'
+
+alias sshstart='sudo systemctl start ssh'
+alias sshenable='sudo systemctl enable ssh'
+alias sshstatus='sudo systemctl status ssh'
+alias sshready='sshenable;sshstart;sshstatus'
+
+alias showlisten="sudo ss -tuln | grep  -E ':(80|443)'"
+alias showlisten2="sudo lsof -i -P -n | grep listen"
+
+alias showport='sudo ufw status verbose;sudo ufw status numbered;echo "to remove: sudo ufw delete [number]"'
+
+alias listenserver="sudo ss -tuln | grep ':80'"
+
+alias initsys='clear;startssh;acceptdenysequence;sudo ufw enable;status'
+
+
+#alias initsysOFF='clear;startssh;acceptdenysequence;sudo ufw disable;status'
+
+#alias acceptdenysequence='initWebUFW;acceptcloudflares80443;allowmacssh;denyallincomming;allowoutgoing'
+
+initWebUFW() {
+  sudo ufw --force reset
+
+  sudo ufw default deny incoming
+  sudo ufw default deny outgoing
+
+  # Inbound rules
+  sudo ufw allow in from 192.168.46.104 to any port 59221 proto tcp comment 'Allow SSH from MAC'
+  sudo ufw allow in to any port 80,443 proto tcp comment 'Allow web'
+
+  # Outbound rules
+  sudo ufw allow out to any port 53 proto udp comment 'Allow DNS'
+  sudo ufw allow out to any port 80,443 proto tcp comment 'Allow HTTP/HTTPS'
+  #sudo ufw allow out to 192.168.193.53 port 49155 proto tcp comment 'Allow DB access'
+
+  sudo ufw enable
+  sudo ufw status verbose
+}
+
+#alias acceptcloudflare80443='sudo ufw allow from 192.158.0.0/15 to any port 80,443 proto tcp' comment 'Cloudflare web access'
+
+
+#alias accept80443='sudo ufw allow in to any port 80,443 proto tcp' comment 'direct ip from cell/internet test'
+
+#alias denyallincomming='sudo ufw default deny incoming'
+alias allowoutgoing='sudo ufw default deny outgoing'
+
+export TZ=America/New_York
+
+###alias go='cd ~/2009_corruptLogFiles/windows11coredump;ls -latr'
+
+initreplica() {
+  HOSTNAME=$(hostname)
+  if [ "$HOSTNAME" = "xbox3" ]; then
+    echo "❌ ERROR: This is the PRIMARY ($HOSTNAME). Aborting init_replica to protect your data."
+    return 1
+  fi
+  echo "Step 1: Stop Postgres"
+  read -p "Press Enter to continue..."
+  sudo systemctl stop postgresql
+
+  echo "Step 2: Remove old data directory"
+  read -p "Press Enter to continue..."
+  sudo rm -rf /var/lib/postgresql/16/main
+  sudo ls -latr /var/lib/postgresql/16/main
+
+  echo "*** you must/madatory see 'No such file or directory' (been zap) ***"
+  echo "Step 3: Recreate data directory"
+  read -p "Press Enter to continue..."
+  sudo mkdir -p /var/lib/postgresql/16/main
+
+  echo "Step 4: Set ownership to postgres user"
+  read -p "Press Enter to continue..."
+  sudo chown postgres:postgres /var/lib/postgresql/16/main
+
+  echo "Step 5: Run pg_basebackup (you will be prompted for password)"
+  read -p "Press Enter to continue..."
+  sudo -u postgres pg_basebackup -h 192.168.230.204 -p 50010 -U replicator \
+    -D /var/lib/postgresql/16/main -Fp -Xs -P
+}
+
+# run below once only
+#sudo env PATH=$PATH:/usr/bin /usr/local/lib/node_modules/pm2/bin/pm2 startup systemd -u lawsen0 --hp /home/lawsen0
+
+
+ufw_lockdown() {
+  echo "Applying UFW lockdown rules..."
+
+  sudo ufw --force reset
+
+  # Default policies
+  sudo ufw default deny incoming
+  sudo ufw default allow outgoing
+
+  # Allow HTTP and HTTPS for your web services
+  sudo ufw allow 4000/tcp
+
+  # Allow SSH ONLY from your IP on port 59221
+  sudo ufw allow from 192.168.46.104 to any port 59221 proto tcp
+
+  # Deny SSH for everybody else
+  sudo ufw deny 59221/tcp
+
+  # Explicitly block all Telnet
+  sudo ufw deny 23/tcp
+  sudo ufw deny 23/udp
+
+  # (Optional but recommended) Block old remote shells
+  sudo ufw deny 513/tcp   # rlogin
+  sudo ufw deny 514/tcp   # rsh
+  sudo ufw deny 515/tcp   # lpd (printer service)
+  sudo ufw deny 21/tcp    # FTP control
+  sudo ufw deny 20/tcp    # FTP data
+  sudo ufw deny 69/udp    # TFTP
+
+  # Enable UFW
+  sudo ufw --force enable
+
+  echo "UFW lockdown is now active."
+}
+
+######### zap ##########
+alias zap1="find . -name 'node_modules' -type d -exec rm -rf {} +"
+alias zap2="find . -name 'package-lock.json' -type f -exec rm -rf {} +"
+alias zap3="find . -name 'build' -type d -exec rm -rf {} +"
+alias zapdist="find . -name 'dist' -type d -exec rm -rf {} +"
+alias zapnm="rm -rf node_modules/.cache; zap1 && zap2 && zap3 && zapdist"
+#######################
+
+####### BUILD UBUNTU and MAC ###########################################################################################
+####### BUILD UBUNTU and MAC ###########################################################################################
+####### BUILD UBUNTU and MAC ###########################################################################################
+savedir() {
+    export LAST_CD_INPUT="$PWD"
+    echo "Saved: $LAST_CD_INPUT"
+    echo -n "(2)Press Enter to go here, or type a new folder name: "
+    read input
+    if [ -z "$input" ]; then
+        cd "$LAST_CD_INPUT"
+        pwd
+    else
+        # Save the custom input for later use
+        export LAST_CD_INPUT="$input"
+        echo "Saved: $LAST_CD_INPUT"
+        cd "$LAST_CD_INPUT"
+        pwd
+    fi  
+}       
+            
+cdsavedir() {
+    # Check if the variable is set before trying to cd
+    if [ -z "$LAST_CD_INPUT" ]; then
+        echo "Error: No path has been saved yet. Run cdcurrent first."
+    else
+        cd "$LAST_CD_INPUT"
+    fi  
+}       
+    
+#-------- fe common---------
+alias feclean='cdsavedir;cd ./fe;sudo rm -rf ./node_modules;sudo rm -rfv ./dist;sudo rm -rfv package-lock.json'
+        
+#-------- be common---------
+alias resetpm2='clear;pm2 stop all; pm2 delete all'
+alias beclean='cdsavedir; cd ./be  ; rm -rf node_modules ; rm -rf package-lock.json'
+        
+#========= DEV ============
+alias cleancompilebuildfedev='feclean;cdsavedir && cd ./fe && npm ci && npm run builddev'
+alias cleancompileresetrunbedev='beclean;cdsavedir && cd ./be && npm ci && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save' 
+
+#========= PROD ============
+alias cleancompilebuildfeprod='feclean;cdsavedir && cd ./fe && npm ci && npm run buildprod'
+alias cleancompileresetrunbeprod='beclean;cdsavedir && cd ./be && npm ci && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save'
+
+#========= MAC ============
+alias cleancompilebuildfemac='feclean;cdsavedir && cd ./fe && npm ci && npm run build:mac'
+alias cleancompileresetrunbemac='beclean;cdsavedir && cd ./be && npm ci && runmac'
+
+alias cleancompilebuildfemac2='feclean;cdsavedir && cd ./fe && rm -rf package-lock.json && npm i && npm run build:mac'
+alias cleancompileresetrunbemac2='beclean;cdsavedir && cd ./be && rm -rf package-lock.json && npm i && runmac'
+#----- USE THIS----
+alias testpg='netstat -an | grep LISTEN | grep 50010'
+
+check_pg() {
+    if testpg > /dev/null 2>&1; then
+        echo "✅ Postgres is active. Proceeding..."
+        return 0
+    else
+        echo "❌ Postgres is NOT active. Operation aborted."
+        return 1
+    fi
+}
+
+# Refactored febedev
+alias febedev='check_pg && (savedir; pm2 flush; cleancompilebuildfedev; cleancompileresetrunbedev)'
+alias bedev='check_pg && (savedir; pm2 flush; cleancompileresetrunbedev)'
+febeprod() {
+    check_pg || return 1
+    savedir
+    pm2 flush
+    echo "=== febeprod 1/6: cleancompilebuildfeprod (must create fe/dist) ==="
+    if ! cleancompilebuildfeprod; then
+        echo "ERROR: febeprod aborted — FE dist/build failed; refusing BE/PM2 deploy" >&2
+        return 1
+    fi
+    echo "=== febeprod 2/6: cleancompileresetrunbeprod ==="
+    if ! cleancompileresetrunbeprod; then
+        echo "ERROR: febeprod aborted — BE/PM2 start failed" >&2
+        return 1
+    fi
+    echo "=== febeprod 3/6: deployartifactwrite ==="
+    deployartifactwrite || { echo "ERROR: deployartifactwrite failed" >&2; return 1; }
+    echo "=== febeprod 4/6: deployartifactverify ==="
+    deployartifactverify || { echo "ERROR: deployartifactverify failed" >&2; return 1; }
+    echo "=== febeprod 5/6: pm2restart ==="
+    pm2restart || { echo "ERROR: pm2restart failed" >&2; return 1; }
+    echo "=== febeprod OK ==="
+    return 0
+}
+
+alias runprod='check_pg && (savedir; pm2 flush; pm2 kill && rm -rf ~/.pm2 && pm2 list && cd ./be && npm run pm2:start && pm2 save && pm2log)'
+
+alias febemac='check_pg && (savedir; pm2 flush; cleancompilebuildfemac && cleancompileresetrunbemac)'
+alias febemac2='check_pg && (savedir; pm2 flush; cleancompilebuildfemac2 && cleancompileresetrunbemac2)'
+
+alias runmac='cdsavedir && cd ./be && pm2 kill && rm -rf ~/.pm2 && pm2 list && npm run pm2:start && pm2 save && openurl'
+
+######## BUILD THE END ###########################################################################################
+######## BUILD THE END ###########################################################################################
+######## BUILD THE END ###########################################################################################
+
+
+
+####### superarchive/superrestore ##########
+x_restore() {
+    #local archive_file="$HOME/x_backup/x_backup.tar.gz.enc"
+    local archive_file="./x_backup.tar.gz.enc"
+    
+    # Use $HOME instead of ~ so tar can resolve the path cleanly
+    local restore_dir="$HOME/x_backup/restore" 
+
+    if [ ! -f "$archive_file" ]; then
+        echo "Error: Backup file not found at $archive_file"
+        return 1
+    fi
+
+    # Ensure the target directory physically exists before tar tries to cd into it
+    mkdir -p "$restore_dir"
+
+    # Prompt for the decryption password
+    read -rs -p "Enter decryption password: " RESTORE_PASS
+    echo ""
+
+    echo "Decrypting and restoring to $restore_dir..."
+
+    # Stream, decrypt, and extract straight into your dedicated target folder
+    cat "$archive_file" | \
+    openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass pass:"$RESTORE_PASS" 2>/dev/null | \
+    tar -xzvf - -C "$restore_dir"
+
+    if [ $? -eq 0 ]; then
+        echo "Success! Backup has been safely restored to $restore_dir"
+        
+        # Correct ownership and tighten standard security flags for testing
+        chown -R "$USER:staff" "$restore_dir"
+        chmod 700 "$restore_dir"
+    else
+        echo "Restore failed. Incorrect password or corrupted archive."
+    fi
+
+    # Clear password from memory
+    unset RESTORE_PASS
+}
+
+x_backup() {
+    local staging_file="/tmp/x_backup.tar.gz.enc"
+    local final_dir="$HOME/x_backup"
+    local output_file="$final_dir/x_backup.tar.gz.enc"
+
+    # Clean out any old files in the backup directory if it exists
+    if [ -d "$final_dir" ]; then
+        echo "Cleaning up old files in $final_dir..."
+        rm -rf "${final_dir:?}"/*
+    fi
+
+    # Ensure the target directory exists before running
+    mkdir -p "$final_dir"
+
+    # Prompt for password safely without echoing characters
+    read -rs -p "Enter encryption password: " ARCHIVE_PASS
+    echo ""
+    read -rs -p "Confirm encryption password: " ARCHIVE_PASS_CONFIRM
+    echo ""
+
+    if [ "$ARCHIVE_PASS" != "$ARCHIVE_PASS_CONFIRM" ]; then
+        echo "Error: Passwords do not match."
+        return 1
+    fi
+
+    echo "Archiving and encrypting ~/.ssh securely..."
+
+    # 1. Run tar with sudo to read all restricted files.
+    # 2. OpenSSL encrypts and saves cleanly to /tmp, preventing terminal pipeline hangs.
+    sudo tar -czf - --exclude='*agent*' -C "$HOME" .ssh 2>/dev/null | \
+    openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 -pass pass:"$ARCHIVE_PASS" > "$staging_file"
+
+    if [ $? -ne 0 ] || [ ! -s "$staging_file" ]; then
+        echo "Encryption step failed."
+        rm -f "$staging_file"
+        unset ARCHIVE_PASS ARCHIVE_PASS_CONFIRM
+        return 1
+    fi
+
+    # 3. Move the final file right into your git repository folder.
+    echo "Moving archive to $final_dir..."
+    mv "$staging_file" "$output_file"
+
+    # 4. Correct ownership back to your user account so git can modify it without sudo.
+    chown "$USER:staff" "$output_file"
+
+    if [ $? -eq 0 ]; then
+        echo "Success! Secure backup created at: $output_file"
+    else
+        echo "Failed to move file to your repository directory."
+        rm -f "$staging_file"
+    fi
+
+    # Clear variables from memory
+    unset ARCHIVE_PASS ARCHIVE_PASS_CONFIRM
+}
+
+#-----------------
+#---Below singles_use_unencrypt() is for extract x_backup.tar.gz.enc stand alone into your current folder
+single_use_unencrypt() {
+    local archive_file="./x_backup.tar.gz.enc"
+    local restore_dir="."
+
+    if [ ! -f "$archive_file" ]; then
+        echo "Error: Backup file not found at $archive_file"
+        return 1
+    fi
+
+    # Securely prompt for the decryption password
+    read -rs -p "Enter decryption password: " RESTORE_PASS
+    echo ""
+
+    echo "Decrypting and extracting to current folder..."
+
+    # Read archive, decrypt with openssl, and pipe directly to tar
+    cat "$archive_file" | \
+    openssl enc -d -aes-256-cbc -md sha256 -salt -pbkdf2 -iter 100000 -pass pass:"$RESTORE_PASS" 2>/dev/null | \
+    tar -xzvf - -C "$restore_dir"
+
+    # Check if the pipeline executed successfully
+    if [ $? -eq 0 ]; then
+        echo "Success! Archive extracted to current directory."
+    else
+        echo "Extraction failed. Incorrect password or corrupted archive."
+    fi
+
+    # Ensure the password variable is cleared from memory
+    unset RESTORE_PASS
+}
+#-------------------
+
+archive() {
+    local target="$1"
+    if [ -z "$target" ]; then
+        echo " [!] ERROR: No target directory specified."
+        return 1
+    fi
+
+    # Ensure target is an absolute path for rsync stability
+    mkdir -p "$target"
+    local abs_target=$(cd "$target"; pwd)
+    
+    echo " [+] Starting Mac Archive..."
+    echo " [+] Destination: $abs_target"
+    x_backup
+    local items=(
+"$HOME/.bash_profile"
+"$HOME/.bashrc"
+"$HOME/.pm2/dump.pm2"
+"$HOME/.profile"
+"$HOME/b"
+"$HOME/x_backup/x_backup.tar.gz.enc"
+"$HOME/buildnvme"
+"$HOME/tuning/tuning.sh"
+"/etc/fstab"
+"/etc/haproxy/certs/site.pem"
+"/etc/haproxy/cloudflare-allowlist.md"
+"/etc/haproxy/cloudflare-ips-v4.txt"
+"/etc/haproxy/cloudflare-ips-v6.txt"
+"/etc/haproxy/haproxy.cfg"
+"/etc/netplan/50-cloud-init.yaml"
+"/etc/nginx/nginx.conf"
+"/etc/nginx/sites-available/protected"
+"/etc/postgresql/16/main/postgresql.conf"
+"/etc/security/limits.conf"
+"/etc/ssh/sshd_config"
+"/etc/sudoers.d/coredump"
+"/etc/sysctl.conf"
+"/etc/systemd/system/40g-tuning.service"
+"/etc/systemd/system/haproxy.service"
+"/etc/systemd/system/haproxy.service.d/override.conf"
+"/etc/systemd/system/postgresql@16-main.service"
+"/etc/ufw/before.rules"
+"/etc/ufw/user.rules"
+"/etc/ufw/user6.rules"
+"/mnt/nvme/pgdata16/pg_hba.conf"
+"/mnt/nvme/pgdata16/pg_ident.conf"
+"/mnt/nvme/pgdata16/postgresql.auto.conf"
+"/mnt/nvme/pgdata16/standby.signal"
+"/usr/local/bin/setupufw"
+"/usr/local/coredump"
+"/usr/local/var/postgresql@16/pg_hba.conf"
+"/usr/local/var/postgresql@16/postgresql.conf"
+"/var/lib/postgresql/16/main/postgresql.auto.conf"
+"/var/lib/postgresql/16/main/standby.signal"
+    )
+
+for item in "${items[@]}"; do
+        if [ -e "$item" ]; then
+            echo "  -> Backing up: $item"
+            # -R (relative) recreates the path inside the target
+            # -a (archive) preserves permissions/timestamps
+            sudo rsync -Ra "$item" "$abs_target/"
+        else
+            echo "  [?] Path not found, skipping: $item"
+        fi
+    done
+
+    echo " [+] Fixing ownership for: $USER"
+    sudo chown -R "$USER" "$abs_target"
+    echo " [✓] Completed. Files are in: $abs_target"
+}
+
+# mac version 2
+superarchive() {
+    local today
+    # macOS compatible date string
+    today=$(date +'%b%d_%I%p' | tr '[:upper:]' '[:lower:]')
+
+    local base_dir="$HOME/2009_corruptLogFiles"
+    local sub_dir="$base_dir/windows11coredump"
+
+    echo " [1/6] Cleaning environment: $base_dir"
+    sudo rm -rf "$base_dir"
+
+    echo " [2/6] Re-cloning repository..."
+    cd "$HOME" || return
+    gitclone2009
+
+    if [ ! -d "$base_dir" ]; then
+        echo " [!] ERROR: Directory $base_dir was not created by gitclone."
+        return 1
+    fi
+
+    echo " [3/6] Entering workspace..."
+    mkdir -p "$sub_dir"
+    cd "$sub_dir" || return 1
+
+    echo " [4/6] Executing archive sub-routine for: $today"
+    # This creates the folder $today inside xbox0/
+    archive "$today"
+
+    echo " [5/6] Pushing changes to Git..."
+    cd "$base_dir" || return 1
+
+    # Verbose git tracking
+    git add -A -f
+    if git commit -m "Mac Backup: $today"; then
+        git push
+        echo " [✓] Git push successful."
+    else
+        echo " [!] Nothing to commit or git error."
+    fi
+
+    echo " [6/6] Current status of $sub_dir:"
+    ls -F "$sub_dir/$today"
+
+    echo " [✓] All operations finished. Target: $sub_dir/$today"
+}
+
+alias showsub='clear;ls -latr -R'
+
+# Mirror per-member media (users/M*/tutadates/{photos,videos}) Mac -> Ubuntu.
+# Uses the same hardened SSH as f2 / deployall2: USB key + port 59221, sudo when
+# the key is only root-readable. Plain `ssh host` does not work on this box.
+# Prints file counts on both sides so a partial transfer is obvious.
+# Overrides: SYNC_SRC  SYNC_REMOTE  SYNC_DEST  SYNC_KEY  SYNC_PORT
+# Extra rsync args pass through, e.g.  syncStorage --dry-run
+syncStorage() {
+    local SRC REMOTE DEST KEY PORT RC
+    local -a SSH_CMD
+    SRC="${SYNC_SRC:-${BASE_STORAGE}/onlinemallwebsite_storage/users/}"
+    REMOTE="${SYNC_REMOTE:-lawsen0@192.168.222.202}"
+    DEST="${SYNC_DEST:-/mnt/pgdata16/onlinemallwebsite_storage/users/}"
+    KEY="${SYNC_KEY:-/Volumes/MSWORD2010/.coredump/corruptedKey_march2024}"
+    PORT="${SYNC_PORT:-59221}"
+
+    SSH_CMD=(ssh -o IdentitiesOnly=yes -o ConnectTimeout=10 -i "$KEY" -p "$PORT")
+    # f2 needs sudo because the key lives on the USB volume; only add it when required.
+    if [ ! -r "$KEY" ]; then
+        SSH_CMD=(sudo "${SSH_CMD[@]}")
+    fi
+
+    echo "======================================"
+    echo " syncStorage: member media mirror"
+    echo "======================================"
+    echo "  source : $SRC"
+    echo "  target : ${REMOTE}:${DEST}"
+    echo "  ssh    : ${SSH_CMD[*]}"
+    echo
+
+    if [ ! -d "$SRC" ]; then
+        echo "Error: source not found: $SRC"
+        return 1
+    fi
+    if [ ! -e "$KEY" ]; then
+        echo "Error: SSH key not found: $KEY"
+        echo "  Is the MSWORD2010 USB volume mounted?"
+        return 1
+    fi
+
+    echo "--- LOCAL (before) ---"
+    echo -n "  member folders    : "; ls "$SRC" 2>/dev/null | wc -l
+    echo -n "  photo files       : "; find "$SRC" -path '*/tutadates/photos/*' -type f 2>/dev/null | wc -l
+    echo -n "  video files       : "; find "$SRC" -path '*/tutadates/videos/*' -type f 2>/dev/null | wc -l
+    echo -n "  total size        : "; du -sh "$SRC" 2>/dev/null | awk '{print $1}'
+    echo
+
+    local REMOTE_COUNT_CMD
+    REMOTE_COUNT_CMD="printf '  photo files       : '; find '$DEST' -path '*/tutadates/photos/*' -type f 2>/dev/null | wc -l; \
+                      printf '  total size        : '; du -sh '$DEST' 2>/dev/null | awk '{print \$1}'"
+
+    # A dead tunnel is the usual reason this "runs" but copies nothing.
+    echo "--- REMOTE (before) ---"
+    if ! "${SSH_CMD[@]}" "$REMOTE" "$REMOTE_COUNT_CMD"; then
+        echo "  unreachable: SSH to $REMOTE failed"
+        echo
+        echo "Aborting: check VPN, USB key, and port $PORT."
+        echo "  test with: f2"
+        return 1
+    fi
+    echo
+
+    echo "--- RSYNC ---"
+    rsync -av --human-readable --itemize-changes --progress --stats \
+        -e "${SSH_CMD[*]}" "$@" "$SRC" "${REMOTE}:${DEST}"
+    RC=$?
+    echo
+
+    if [ "$RC" -ne 0 ]; then
+        echo "Error: rsync exited $RC — nothing verified. Check VPN / SSH to $REMOTE."
+        return "$RC"
+    fi
+
+    echo "--- REMOTE (after) ---"
+    "${SSH_CMD[@]}" "$REMOTE" "$REMOTE_COUNT_CMD"
+    echo
+    echo "Remote photo count should match LOCAL above."
+
+    echo "======================================"
+    echo " syncStorage complete"
+    echo "======================================"
+    echo "IMPORTANT: Next on Ubuntu:  fixstorage && pm2 restart onlinemallwebsite"
+    echo "IMPORTANT: Next on Ubuntu:  fixstorage && pm2 restart onlinemallwebsite"
+    echo "IMPORTANT: Next on Ubuntu:  fixstorage && pm2 restart onlinemallwebsite"
+}
+
+
+allBackup() {
+    echo "======================================"
+    echo " Starting Full Backup (DB + Photos)  "
+    echo "======================================"
+
+    echo -e "\n>>> STEP 1: Database Backup <<<"
+    ALL_BACKUP=1 dbBackup "$@"
+
+    # Check if DB backup was successful before moving on
+    if [ $? -ne 0 ]; then
+        echo "Error: dbBackup encountered an issue. Aborting full backup."
+        return 1
+    fi
+
+    echo -e "\n>>> STEP 2: Photo Backup <<<"
+    # Own prefix on purpose: sharing dbBackup's prefix made both wormhole sends
+    # announce nearly the same file name, which is easy to mix up on the receiver.
+    photoBackup photoBackup
+
+    if [ $? -ne 0 ]; then
+        echo "Error: photoBackup encountered an issue."
+        return 1
+    fi
+
+    local TODAY_STAMP
+    TODAY_STAMP=$(date +%m%d%Y)
+    echo -e "\n======================================"
+    echo "       Full Backup Complete!         "
+    echo "======================================"
+    echo "Two SEPARATE wormhole codes were issued — use each one once:"
+    echo "  1) DB    : ${HOME}/dbFolder/${BACKUP_PREFIX:-dbBackup}${TODAY_STAMP}.sql   -> dbRestore"
+    echo "  2) Photos: ${HOME}/dbFolder/photoBackup${TODAY_STAMP}.tar.gz -> photoRestore"
+    ls -l "${HOME}/dbFolder/${BACKUP_PREFIX:-dbBackup}${TODAY_STAMP}.sql" \
+          "${HOME}/dbFolder/photoBackup${TODAY_STAMP}.tar.gz" 2>/dev/null
+}
+
+dbBackup() {
+    cd ~/
+    if [ ! -d ~/dbFolder ]; then
+        echo "Error: ~/dbFolder/ needs to exist. Please create it first."
+        return 1
+    fi
+
+    if [ -n "$ALL_BACKUP" ]; then
+        FILENAME="${1:-${BACKUP_PREFIX:-dbBackup}}"
+    else
+        read -p "Enter filename (prefix only) [default='dbBackup']: " FILENAME
+        [ -z "$FILENAME" ] && FILENAME="dbBackup"
+    fi
+    # Shared with miscBackup/photoBackup when run via allBackup.
+    BACKUP_PREFIX="$FILENAME"
+
+    TODAY=$(date +"%m%d%Y")
+    FULL_PATH="$HOME/dbFolder/${FILENAME}${TODAY}.sql"
+
+    echo "Exporting onlinemallwebsite (schema: helloworldjunktest) to ${FULL_PATH}..."
+
+    # Removed the escaped quotes to fix the "no matching schemas" error
+    pg_dump -U test_user1 -h 127.0.0.1 -p 50010 \
+            --no-owner --no-privileges \
+            -n helloworldjunktest \
+            -f "$FULL_PATH" onlinemallwebsite
+
+    if [ -f "$FULL_PATH" ]; then
+        ls -latr ~/dbFolder
+        echo "Backup complete. Starting wormhole transfer..."
+        if wormhole send "$FULL_PATH"; then
+            :
+        elif [ -n "$ALL_BACKUP" ]; then
+            echo "Warning: wormhole send failed (receiver may have rejected or timed out)."
+            echo "Local SQL backup exists at $FULL_PATH — continuing to photo backup."
+        else
+            echo "Error: wormhole send failed."
+            return 1
+        fi
+    else
+        echo "Error: pg_dump failed to create the backup file."
+        return 1
+    fi
+}
+
+photoBackup() {
+    mkdir -p "$HOME/dbFolder"
+
+    (
+        cd "$HOME/dbFolder" || return 1
+
+        local BASE_DIR DATE_STR FILENAME PREFIX
+        BASE_DIR="${BASE_STORAGE}/onlinemallwebsite_storage"
+        DATE_STR=$(date +%m%d%Y)
+        PREFIX="${1:-photoBackup}"
+        FILENAME="${PREFIX}${DATE_STR}.tar.gz"
+
+        if [ ! -d "$BASE_DIR" ]; then
+            echo "Error: $BASE_DIR not found."
+            return 1
+        fi
+
+        # users/ = per-member tutadates/photos (current layout); legacy flat photos/ is fallback only.
+        local -a storage_dirs=(photos videos users USB_DMG_EXE recordvault-onedrive)
+        local -a present=()
+        local d
+        for d in "${storage_dirs[@]}"; do
+            if [ -d "$BASE_DIR/$d" ]; then
+                present+=("$d")
+            else
+                echo "Skip (missing): $BASE_DIR/$d"
+            fi
+        done
+
+        if [ ${#present[@]} -eq 0 ]; then
+            echo "Error: none of ${storage_dirs[*]} found under $BASE_DIR"
+            return 1
+        fi
+
+        echo "Archiving under $BASE_DIR: ${present[*]}..."
+        if COPYFILE_DISABLE=1 tar -czvf "$FILENAME" -C "$BASE_DIR" --exclude='._*' --exclude='.DS_Store' "${present[@]}"; then
+            # Profile photos live in users/M*/tutadates/photos; a tar without them
+            # restores a working DB with blank avatars, so say so before sending.
+            local MEMBER_PHOTOS
+            MEMBER_PHOTOS=$(tar -tzf "$FILENAME" 2>/dev/null | grep -c 'users/.*/tutadates/photos/[^/]')
+            echo "Archive $FILENAME contains $MEMBER_PHOTOS member photo files (users/M*/tutadates/photos)."
+            if [ "$MEMBER_PHOTOS" -eq 0 ]; then
+                echo "WARNING: no users/ photos in this archive — run 'source ~/b' and redo photoBackup."
+            fi
+            ls -lh "$FILENAME"
+            echo "Starting wormhole send..."
+            wormhole send "$FILENAME"
+        else
+            echo "Compression failed."
+            return 1
+        fi
+    )
+}
+
+allRestore() {
+    echo "======================================"
+    echo " Starting Full Restore (DB + Photos)  "
+    echo "======================================"
+
+    echo -e "\n>>> STEP 1: Database Restore <<<"
+    ALL_RESTORE=1 dbRestore
+
+    if [ $? -ne 0 ]; then
+        echo "Error: dbRestore encountered an issue. Aborting full restore."
+        return 1
+    fi
+
+    echo -e "\n>>> STEP 2: Photo Restore <<<"
+    ALL_RESTORE=1 photoRestore "$@"
+
+    if [ $? -ne 0 ]; then
+        echo "Error: photoRestore encountered an issue."
+        return 1
+    fi
+
+    echo -e "\n======================================"
+    echo "       Full Restore Complete!         "
+    echo "======================================"
+}
+
+# Merge restore (Ubuntu): keep everything already there; only ADD missing DB rows / files.
+# Does NOT drop schema, does NOT wipe photo dirs, does NOT overwrite existing files.
+# Mac: allBackup as usual. Ubuntu: allMergeRestore instead of allRestore.
+allMergeRestore() {
+    echo "======================================"
+    echo " Starting MERGE Restore (keep Ubuntu) "
+    echo "======================================"
+    echo "Existing DB rows + files stay. Only missing ones from Mac are added."
+
+    echo -e "\n>>> STEP 1: Database MERGE Restore <<<"
+    ALL_RESTORE=1 dbMergeRestore
+    if [ $? -ne 0 ]; then
+        echo "Error: dbMergeRestore encountered an issue. Aborting."
+        return 1
+    fi
+
+    echo -e "\n>>> STEP 2: Photo MERGE Restore <<<"
+    ALL_RESTORE=1 photoMergeRestore "$@"
+    if [ $? -ne 0 ]; then
+        echo "Error: photoMergeRestore encountered an issue."
+        return 1
+    fi
+
+    if command -v fixstorage >/dev/null 2>&1; then fixstorage; fi
+    if command -v checkstorage >/dev/null 2>&1; then checkstorage; fi
+    echo -e "\n======================================"
+    echo "       MERGE Restore Complete!        "
+    echo "======================================"
+}
+
+dbMergeRestore() {
+    DUMP_DIR="$HOME/dbFolder"
+    TODAY=$(date +"%m%d%Y")
+    LIVE_SCHEMA="helloworldjunktest"
+    TMP_SCHEMA="helloworldjunktest_merge_tmp"
+
+    clear
+    echo "--- MERGE DB restore (preserve existing) ---"
+    echo "--- Current files in $DUMP_DIR ---"
+    if [ -d "$DUMP_DIR" ]; then
+        ls -latr "$DUMP_DIR"
+    else
+        echo "Directory $DUMP_DIR not found."
+    fi
+    echo "-----------------------------------"
+
+    printf "Wormhole postfix only? [default: skip]: "
+    read WORM_POSTFIX
+    if [ -n "$WORM_POSTFIX" ]; then
+        cd "$DUMP_DIR" || return 1
+        echo "Attempting wormhole receive..."
+        local RECV_OUT="$DUMP_DIR/wormhole_recv_${TODAY}_$(date +%H%M%S).sql"
+        if ! wormhole receive --accept-file -o "$RECV_OUT" "$WORM_POSTFIX"; then
+            echo "Warning: wormhole receive failed."
+            if [ -z "$ALL_RESTORE" ]; then
+                echo "You can still merge from an existing .sql in $DUMP_DIR."
+            fi
+        fi
+    fi
+
+    LATEST_FILE=$(ls -t "$DUMP_DIR"/*.sql 2>/dev/null | head -n 1)
+    DEFAULT_VAL=$(basename "$LATEST_FILE" 2>/dev/null)
+
+    if [ -z "$DEFAULT_VAL" ]; then
+        PROMPT_TEXT="Enter file to merge-restore: "
+    else
+        PROMPT_TEXT="Enter file to merge-restore [default: $DEFAULT_VAL]: "
+    fi
+    printf "%s" "$PROMPT_TEXT"
+    read USER_INPUT
+
+    if [ -z "$USER_INPUT" ]; then
+        if [ -z "$DEFAULT_VAL" ]; then
+            echo "Error: No default file found and no input provided."
+            return 1
+        fi
+        RESTORE_FILE="$DEFAULT_VAL"
+    else
+        if [[ "$USER_INPUT" != *.sql ]]; then
+            RESTORE_FILE="${USER_INPUT}${TODAY}.sql"
+        else
+            RESTORE_FILE="$USER_INPUT"
+        fi
+    fi
+
+    FULL_PATH="$DUMP_DIR/$RESTORE_FILE"
+    if [ ! -f "$FULL_PATH" ]; then
+        echo "Error: File $FULL_PATH not found."
+        return 1
+    fi
+
+    if [ -n "$ALL_RESTORE" ]; then
+        echo "allMergeRestore: merging $RESTORE_FILE (auto-confirmed)."
+    else
+        printf "Confirm MERGE (keep existing, add missing) from %s? [Y/n]: " "$RESTORE_FILE"
+        read CONFIRM
+        if [[ "$CONFIRM" == "n" || "$CONFIRM" == "N" ]]; then
+            echo "Merge restore cancelled."
+            return 1
+        fi
+    fi
+
+    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite)
+    local REWRITE_SQL="$DUMP_DIR/.merge_rewrite_$$.sql"
+
+    echo "Loading dump into temp schema $TMP_SCHEMA (live schema untouched)..."
+    "${PSQL[@]}" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS ${TMP_SCHEMA} CASCADE;"
+    sed "s/${LIVE_SCHEMA}/${TMP_SCHEMA}/g" "$FULL_PATH" > "$REWRITE_SQL"
+    if ! "${PSQL[@]}" -v ON_ERROR_STOP=1 -f "$REWRITE_SQL"; then
+        echo "Error: failed importing dump into temp schema."
+        rm -f "$REWRITE_SQL"
+        return 1
+    fi
+    rm -f "$REWRITE_SQL"
+
+    echo "Merging rows into ${LIVE_SCHEMA} (ON CONFLICT DO NOTHING — existing wins)..."
+    "${PSQL[@]}" -v ON_ERROR_STOP=1 <<SQL
+SET session_replication_role = replica;
+DO \$\$
+DECLARE
+  r RECORD;
+  n bigint;
+  live_reg regclass;
+BEGIN
+  FOR r IN
+    SELECT c.relname AS tbl
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = '${TMP_SCHEMA}'
+      AND c.relkind IN ('r', 'p')
+      AND NOT c.relispartition
+    ORDER BY c.relname
+  LOOP
+    live_reg := to_regclass(format('%I.%I', '${LIVE_SCHEMA}', r.tbl));
+    IF live_reg IS NULL THEN
+      EXECUTE format(
+        'CREATE TABLE %I.%I (LIKE %I.%I INCLUDING ALL)',
+        '${LIVE_SCHEMA}', r.tbl, '${TMP_SCHEMA}', r.tbl
+      );
+      RAISE NOTICE 'created missing table %.%', '${LIVE_SCHEMA}', r.tbl;
+    END IF;
+    BEGIN
+      EXECUTE format(
+        'INSERT INTO %I.%I SELECT * FROM %I.%I ON CONFLICT DO NOTHING',
+        '${LIVE_SCHEMA}', r.tbl, '${TMP_SCHEMA}', r.tbl
+      );
+      GET DIAGNOSTICS n = ROW_COUNT;
+      RAISE NOTICE 'merged %: % new row(s)', r.tbl, n;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'skip table %: %', r.tbl, SQLERRM;
+    END;
+  END LOOP;
+END \$\$;
+SET session_replication_role = DEFAULT;
+
+DO \$\$
+DECLARE
+  r RECORD;
+  live_last bigint;
+  tmp_last bigint;
+BEGIN
+  FOR r IN
+    SELECT sequencename
+    FROM pg_sequences
+    WHERE schemaname = '${LIVE_SCHEMA}'
+  LOOP
+    IF to_regclass(format('%I.%I', '${TMP_SCHEMA}', r.sequencename)) IS NULL THEN
+      CONTINUE;
+    END IF;
+    EXECUTE format('SELECT last_value FROM %I.%I', '${LIVE_SCHEMA}', r.sequencename) INTO live_last;
+    EXECUTE format('SELECT last_value FROM %I.%I', '${TMP_SCHEMA}', r.sequencename) INTO tmp_last;
+    IF tmp_last IS NOT NULL AND (live_last IS NULL OR tmp_last > live_last) THEN
+      EXECUTE format(
+        'SELECT setval(%L, %s, true)',
+        format('%I.%I', '${LIVE_SCHEMA}', r.sequencename),
+        tmp_last
+      );
+      RAISE NOTICE 'sequence % advanced to %', r.sequencename, tmp_last;
+    END IF;
+  END LOOP;
+END \$\$;
+SQL
+
+    echo "Dropping temp schema ${TMP_SCHEMA}..."
+    "${PSQL[@]}" -c "DROP SCHEMA IF EXISTS ${TMP_SCHEMA} CASCADE;"
+    echo "--- Verification: Tables ---"
+    "${PSQL[@]}" -c "\dt ${LIVE_SCHEMA}.*"
+    echo "DB merge restore completed (existing data preserved)."
+}
+
+photoMergeRestore() {
+    cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
+
+    local DEST_BASE
+    DEST_BASE="${BASE_STORAGE}/onlinemallwebsite_storage"
+
+    local RESTORE_FILE=""
+    local EXISTING
+    EXISTING=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+
+    if [ -n "$EXISTING" ]; then
+        if [ -n "$ALL_RESTORE" ]; then
+            echo "allMergeRestore: skipping reuse of existing $EXISTING (same as answering n)."
+        else
+            printf "Reuse existing %s without wormhole? (Y/n) " "$EXISTING"
+            read -r REUSE
+            if [[ "$REUSE" != "n" && "$REUSE" != "N" ]]; then
+                RESTORE_FILE="$EXISTING"
+            fi
+        fi
+    fi
+
+    if [ -z "$RESTORE_FILE" ]; then
+        printf "Input wormhole string: "
+        read -r WORMHOLE_CODE
+        wormhole receive "$WORMHOLE_CODE"
+        RESTORE_FILE=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+    fi
+
+    if [ -z "$RESTORE_FILE" ] || [ ! -f "$RESTORE_FILE" ]; then
+        echo "Error: File not received (no photoBackup*/miscBackup* .tar.gz in $(pwd))."
+        return 1
+    fi
+
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        sudo mkdir -p "$DEST_BASE"
+    else
+        mkdir -p "$DEST_BASE"
+    fi
+
+    # User-owned staging so we can list after sudo tar extract.
+    local STAGE ABS_TAR
+    STAGE=$(mktemp -d /tmp/photoMergeRestore.XXXXXX)
+    ABS_TAR="$(pwd)/$RESTORE_FILE"
+
+    echo "Extracting $RESTORE_FILE to staging (no wipe of $DEST_BASE)..."
+    local -a TAR_OPTS=(--no-same-owner)
+    if tar --version 2>&1 | grep -qi 'GNU tar'; then
+        TAR_OPTS+=(--warning=no-unknown-keyword)
+    fi
+
+    local extract_cmd="tar ${TAR_OPTS[*]} -xzvf \"$ABS_TAR\" -C \"$STAGE\""
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        if ! sudo bash -c "$extract_cmd"; then
+            echo "Error: Extraction failed."
+            sudo rm -rf "$STAGE"
+            return 1
+        fi
+    else
+        if ! eval "$extract_cmd"; then
+            echo "Error: Extraction failed."
+            rm -rf "$STAGE"
+            return 1
+        fi
+    fi
+
+    echo "Merging into $DEST_BASE (rsync --ignore-existing: existing files win)..."
+    local d name
+    local list_cmd=(find "$STAGE" -mindepth 1 -maxdepth 1 -print0)
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        list_cmd=(sudo find "$STAGE" -mindepth 1 -maxdepth 1 -print0)
+    fi
+    while IFS= read -r -d '' d; do
+        name=$(basename "$d")
+        if [ -d "$d" ]; then
+            if [[ "$(uname -s)" == "Linux" ]]; then
+                sudo mkdir -p "$DEST_BASE/$name"
+                sudo rsync -a --ignore-existing --human-readable --info=stats2 "$d/" "$DEST_BASE/$name/"
+            else
+                mkdir -p "$DEST_BASE/$name"
+                rsync -a --ignore-existing --human-readable "$d/" "$DEST_BASE/$name/"
+            fi
+        elif [ -f "$d" ]; then
+            if [ ! -e "$DEST_BASE/$name" ]; then
+                if [[ "$(uname -s)" == "Linux" ]]; then
+                    sudo cp -a "$d" "$DEST_BASE/$name"
+                else
+                    cp -a "$d" "$DEST_BASE/$name"
+                fi
+                echo "Added file: $name"
+            else
+                echo "Keep existing file: $name"
+            fi
+        fi
+    done < <("${list_cmd[@]}")
+
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        sudo rm -rf "$STAGE"
+        if [ -d "$DEST_BASE/photos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/photos"; fi
+        if [ -d "$DEST_BASE/videos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/videos"; fi
+        if [ -d "$DEST_BASE/USB_DMG_EXE" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/USB_DMG_EXE"; fi
+        if [ -d "$DEST_BASE/recordvault-onedrive" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/recordvault-onedrive"; fi
+        if [ -d "$DEST_BASE/users" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/users"; fi
+        sudo chmod -R u+rwX,g+rX,o+rX "$DEST_BASE/USB_DMG_EXE" "$DEST_BASE/recordvault-onedrive" "$DEST_BASE/users" 2>/dev/null || true
+    else
+        rm -rf "$STAGE"
+    fi
+
+    echo "Photo/storage MERGE complete under $DEST_BASE (existing files preserved)."
+}
+
+photoRestore() {
+    cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
+
+    local DEST_BASE
+    DEST_BASE="${BASE_STORAGE}/onlinemallwebsite_storage"
+
+    local RESTORE_FILE=""
+    local EXISTING
+    EXISTING=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+
+    if [ -n "$EXISTING" ]; then
+        if [ -n "$ALL_RESTORE" ]; then
+            echo "allRestore: skipping reuse of existing $EXISTING (same as answering n)."
+        else
+            printf "Reuse existing %s without wormhole? (Y/n) " "$EXISTING"
+            read -r REUSE
+            if [[ "$REUSE" != "n" && "$REUSE" != "N" ]]; then
+                RESTORE_FILE="$EXISTING"
+            fi
+        fi
+    fi
+
+    if [ -z "$RESTORE_FILE" ]; then
+        printf "Input wormhole string: "
+        read -r WORMHOLE_CODE
+        wormhole receive "$WORMHOLE_CODE"
+        RESTORE_FILE=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+    fi
+
+    if [ -z "$RESTORE_FILE" ] || [ ! -f "$RESTORE_FILE" ]; then
+        echo "Error: File not received (no photoBackup*/miscBackup* .tar.gz in $(pwd))."
+        return 1
+    fi
+
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        sudo mkdir -p "$DEST_BASE"
+    else
+        mkdir -p "$DEST_BASE"
+    fi
+
+    # users/ = per-member tutadates/photos (current layout); legacy flat photos/ is fallback only.
+    local -a storage_dirs=(photos videos users USB_DMG_EXE recordvault-onedrive)
+    local d
+    for d in "${storage_dirs[@]}"; do
+        echo "Wiping $DEST_BASE/$d..."
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            sudo rm -rf "$DEST_BASE/$d"
+            sudo mkdir -p "$DEST_BASE/$d"
+        else
+            rm -rf "$DEST_BASE/$d"
+            mkdir -p "$DEST_BASE/$d"
+        fi
+    done
+
+    if [ -d "$DEST_BASE/vidoes" ]; then
+        echo "Removing typo folder $DEST_BASE/vidoes..."
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            sudo rm -rf "$DEST_BASE/vidoes"
+        else
+            rm -rf "$DEST_BASE/vidoes"
+        fi
+    fi
+
+    echo "Extracting $RESTORE_FILE to $DEST_BASE..."
+    local ABS_TAR
+    ABS_TAR="$(pwd)/$RESTORE_FILE"
+
+    local -a TAR_OPTS=(--no-same-owner)
+    if tar --version 2>&1 | grep -qi 'GNU tar'; then
+        TAR_OPTS+=(--warning=no-unknown-keyword)
+    fi
+
+    local extract_cmd="tar ${TAR_OPTS[*]} -xzvf \"$ABS_TAR\" -C \"$DEST_BASE\""
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        if sudo bash -c "$extract_cmd"; then
+            if [ -d "$DEST_BASE/photos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/photos"; fi
+            if [ -d "$DEST_BASE/videos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/videos"; fi
+            if [ -d "$DEST_BASE/USB_DMG_EXE" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/USB_DMG_EXE"; fi
+            if [ -d "$DEST_BASE/recordvault-onedrive" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/recordvault-onedrive"; fi
+            if [ -d "$DEST_BASE/users" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/users"; fi
+            sudo chmod -R u+rwX,g+rX,o+rX "$DEST_BASE/USB_DMG_EXE" "$DEST_BASE/recordvault-onedrive" "$DEST_BASE/users" 2>/dev/null || true
+            echo "Restore complete under $DEST_BASE"
+        else
+            echo "Error: Extraction failed."
+            return 1
+        fi
+    else
+        if eval "$extract_cmd"; then
+            echo "Restore complete under $DEST_BASE"
+        else
+            echo "Error: Extraction failed."
+            return 1
+        fi
+    fi
+}
+
+
+
+alias l='/usr/local/coredump/coredumplogs1.sh'
+alias ul='/usr/local/coredump/coredumplogs2.sh'
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+  
+export PATH="/usr/local/opt/openjdk/bin:$PATH"
+#export JAVA_HOME=$(/usr/libexec/java_home)
+if command -v /usr/libexec/java_home >/dev/null 2>&1; then
+  JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null)
+  if [ -n "$JAVA_HOME" ]; then
+    export JAVA_HOME
+    export PATH="$JAVA_HOME/bin:$PATH"
+  fi
+fi
+
+  
+eval "$(/usr/local/bin/brew shellenv)"
+export PATH="/usr/local/opt/postgresql@17/bin:$PATH"
+
+# ~/.bash_profile   (or ~/.bashrc)
+export PS1="######\[\e[32m\]\u\[\e[0m\]@\[\e[34m\]\$(ipconfig getifaddr en0)\[\e[0m\]\[\e[43;30m\]-iMAC-\[\e[0m\]:\[\e[36m\]\w\[\e[0m\]####"
+
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+

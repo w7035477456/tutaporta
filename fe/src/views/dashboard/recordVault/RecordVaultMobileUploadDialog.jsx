@@ -37,7 +37,7 @@ export default function RecordVaultMobileUploadDialog({
         >
           <ProfilePhotoUploadQrPanel
             variant="inline"
-            purpose="photo_albums"
+            purpose="tutanotes"
             disabled={disabled}
             qrSize={MOBILE_UPLOAD_QR_SIZE}
             onPhoneUploadComplete={onPhoneUploadComplete}

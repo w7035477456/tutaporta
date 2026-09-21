@@ -103,6 +103,7 @@ import RecordVaultMobileUploadTray, {
   materializeRecordVaultMobileUploadFile,
   readRecordVaultMobileUploadDragFileName
 } from './RecordVaultMobileUploadTray';
+import { MOBILE_UPLOAD_PRODUCT_TUTANOTES } from 'constants/mobileUploadProduct';
 import RecordVaultCrossPaneTransferDialog from './RecordVaultCrossPaneTransferDialog';
 import {
   clearActiveCrossPaneDrag,
@@ -3674,7 +3675,7 @@ export default function RecordVaultWorkspacePane({
     // (drag onto note) instead of auto-inserting into the open note.
     setMobileUploadOpen(false);
     setMobileUploadTrayRefreshToken((n) => n + 1);
-    if (meta?.purpose === 'photo_albums' || meta?.fileName) {
+    if (meta?.purpose === 'photo_albums' || meta?.purpose === 'tutanotes' || meta?.fileName) {
       setError('');
     }
   }, []);
@@ -4139,7 +4140,7 @@ export default function RecordVaultWorkspacePane({
 
       if (mobileUploadName) {
         try {
-          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName);
+          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName, MOBILE_UPLOAD_PRODUCT_TUTANOTES);
           const ok = await uploadNoteVaultFile(file, coords);
           if (ok) setMobileUploadTrayRefreshToken((n) => n + 1);
         } catch (err) {
@@ -6367,6 +6368,7 @@ export default function RecordVaultWorkspacePane({
         onPickFile={handleMobileDirectUploadFile}
         onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
         onExitToMall={handleExitToMall}
+        product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
       />
 
       <RecordVaultCrossPaneTransferDialog
@@ -6761,6 +6763,7 @@ export default function RecordVaultWorkspacePane({
           }}
         >
           <RecordVaultMobileUploadTray
+            product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
             active={unlocked}
             disabled={false}
             layout="grid"
@@ -7328,6 +7331,7 @@ export default function RecordVaultWorkspacePane({
 
           {!compareMode ? (
             <RecordVaultMobileUploadTray
+            product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
               active={unlocked}
               disabled={
                 busy ||

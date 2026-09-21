@@ -16,14 +16,28 @@ export const MOBILE_PHOTO_UPLOAD_PATH = '/mobilePhotoUpload';
 
 const PURPOSE_PROFILE = 'profile';
 const PURPOSE_PHOTO_ALBUMS = 'photo_albums';
+const PURPOSE_TUTANOTES = 'tutanotes';
+const PURPOSE_TUTADATES = 'tutadates';
 const PURPOSE_BILL_RECEIPT = 'bill_receipt';
 
 export function normalizeMobilePhotoUploadPurpose(raw) {
   const p = String(raw ?? '')
     .trim()
     .toLowerCase();
-  if (p === PURPOSE_PHOTO_ALBUMS || p === 'photoalbums' || p === 'albums') {
+  if (
+    p === PURPOSE_PHOTO_ALBUMS ||
+    p === 'photoalbums' ||
+    p === 'albums' ||
+    p === 'tutaphoto' ||
+    p === 'photos'
+  ) {
     return PURPOSE_PHOTO_ALBUMS;
+  }
+  if (p === PURPOSE_TUTANOTES || p === 'notes' || p === 'record_vault' || p === 'recordvault') {
+    return PURPOSE_TUTANOTES;
+  }
+  if (p === PURPOSE_TUTADATES || p === 'dates' || p === 'mystory' || p === 'my_story') {
+    return PURPOSE_TUTADATES;
   }
   if (p === PURPOSE_BILL_RECEIPT || p === 'bill' || p === 'bill_receipts' || p === 'receipt') {
     return PURPOSE_BILL_RECEIPT;
@@ -33,6 +47,21 @@ export function normalizeMobilePhotoUploadPurpose(raw) {
 
 export function isBillReceiptUploadPurpose(purpose) {
   return normalizeMobilePhotoUploadPurpose(purpose) === PURPOSE_BILL_RECEIPT;
+}
+
+/** QR/session purposes that stage into UPLOAD_FOLDER (product-scoped trays). */
+export function isStagingFolderUploadPurpose(purpose) {
+  const p = normalizeMobilePhotoUploadPurpose(purpose);
+  return p === PURPOSE_PHOTO_ALBUMS || p === PURPOSE_TUTANOTES || p === PURPOSE_TUTADATES;
+}
+
+/** Map session purpose → UPLOAD_FOLDER product bucket. */
+export function stagingProductForUploadPurpose(purpose) {
+  const p = normalizeMobilePhotoUploadPurpose(purpose);
+  if (p === PURPOSE_TUTANOTES) return 'tutanotes';
+  if (p === PURPOSE_TUTADATES) return 'tutadates';
+  if (p === PURPOSE_PHOTO_ALBUMS) return 'tutaphoto';
+  return '';
 }
 
 let redisClient = null;

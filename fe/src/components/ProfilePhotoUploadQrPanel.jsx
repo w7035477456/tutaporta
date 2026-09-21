@@ -66,7 +66,11 @@ export default function ProfilePhotoUploadQrPanel({
   const qrSize = qrSizeProp ?? (inline ? 156 : 168);
   const message = messageOverride || PROFILE_PHOTO_UPLOAD_QR_MESSAGE;
   const uploadPurpose = String(purpose || 'profile').trim().toLowerCase() || 'profile';
-  const isPhotoAlbumsPurpose = uploadPurpose === 'photo_albums';
+  const isStagingFolderPurpose =
+    uploadPurpose === 'photo_albums' ||
+    uploadPurpose === 'tutaphoto' ||
+    uploadPurpose === 'tutanotes' ||
+    uploadPurpose === 'tutadates';
   const isBillReceiptPurpose = uploadPurpose === 'bill_receipt';
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +92,7 @@ export default function ProfilePhotoUploadQrPanel({
     if (resetDelivery) lastDeliveredKeyRef.current = null;
     try {
       const data = await createMobilePhotoUploadSession({
-        ...(isPhotoAlbumsPurpose ? { purpose: 'photo_albums' } : {}),
+        ...(isStagingFolderPurpose ? { purpose: uploadPurpose } : {}),
         ...(isBillReceiptPurpose
           ? { purpose: 'bill_receipt', paidRecordId: Number(paidRecordId) }
           : {})
@@ -114,7 +118,7 @@ export default function ProfilePhotoUploadQrPanel({
     } finally {
       setLoading(false);
     }
-  }, [isPhotoAlbumsPurpose, isBillReceiptPurpose, paidRecordId]);
+  }, [isStagingFolderPurpose, isBillReceiptPurpose, paidRecordId, uploadPurpose]);
 
   useEffect(() => {
     if (disabled) return;
@@ -156,19 +160,24 @@ export default function ProfilePhotoUploadQrPanel({
       }
 
       const statusPurpose = String(status?.purpose || uploadPurpose).trim().toLowerCase();
-      const albumsFlow = isPhotoAlbumsPurpose || statusPurpose === 'photo_albums';
+      const stagingFlow =
+        isStagingFolderPurpose ||
+        statusPurpose === 'photo_albums' ||
+        statusPurpose === 'tutaphoto' ||
+        statusPurpose === 'tutanotes' ||
+        statusPurpose === 'tutadates';
       const billFlow = isBillReceiptPurpose || statusPurpose === 'bill_receipt';
 
-      if (albumsFlow || billFlow) {
+      if (stagingFlow || billFlow) {
         if (status?.completed) {
-          const deliveryKey = `${billFlow ? 'bill' : 'albums'}:${status?.fileName || status?.completedAt || 'done'}`;
+          const deliveryKey = `${billFlow ? 'bill' : 'staging'}:${status?.fileName || status?.completedAt || 'done'}`;
           if (lastDeliveredKeyRef.current !== deliveryKey) {
             lastDeliveredKeyRef.current = deliveryKey;
             setCheckMessage(
               billFlow ? 'Receipt received from your phone.' : 'Photo received from your phone.'
             );
             await onPhoneUploadComplete?.(status?.fileName || status?.photosId, {
-              purpose: billFlow ? 'bill_receipt' : 'photo_albums',
+              purpose: billFlow ? 'bill_receipt' : statusPurpose || uploadPurpose || 'photo_albums',
               fileName: status?.fileName || null,
               photosId: status?.photosId ?? null,
               paidRecordId: status?.paidRecordId ?? null,
@@ -218,7 +227,7 @@ export default function ProfilePhotoUploadQrPanel({
       }
       return 'pending';
     },
-    [isPhotoAlbumsPurpose, isBillReceiptPurpose, loadSession, onPhoneUploadComplete, uploadPurpose]
+    [isStagingFolderPurpose, isBillReceiptPurpose, loadSession, onPhoneUploadComplete, uploadPurpose]
   );
 
   const checkUploadStatus = useCallback(async () => {

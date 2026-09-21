@@ -1,11 +1,13 @@
 /**
- * Auth routes for Photo Albums mobile staging folder (UPLOAD_FOLDER).
+ * Auth routes for product-scoped mobile staging folder (UPLOAD_FOLDER).
+ * Query/body `product`: tutaphoto | tutanotes | tutadates
  */
 import fs from 'fs';
 import {
   deleteMobileUploadFile,
   listMobileUploadFiles,
   readMobileUploadFile,
+  requireMobileUploadProduct,
   writeMobileUploadFile
 } from '../../utils/mobileUploadFolder.js';
 
@@ -32,11 +34,16 @@ function requireSinglesId(req, res) {
   return singlesId;
 }
 
-/** POST /api/photoAlbums/mobile-upload/files — stage a copy for desktop Mobile Upload tray (TutaNotes phone upload). */
+function readProductFromRequest(req) {
+  return requireMobileUploadProduct(req.body?.product ?? req.query?.product);
+}
+
+/** POST /api/photoAlbums/mobile-upload/files — stage a copy for one product's Mobile Upload tray. */
 export async function postPhotoAlbumsMobileUploadFile(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
+    const product = readProductFromRequest(req);
     const { buffer, contentType } = decodeUploadDataUrl(req.body?.file);
     const originalName =
       typeof req.body?.file_name === 'string' && req.body.file_name.trim()
@@ -45,9 +52,10 @@ export async function postPhotoAlbumsMobileUploadFile(req, res) {
     const { fileName, size } = await writeMobileUploadFile(singlesId, {
       buffer,
       originalName,
-      contentType
+      contentType,
+      product
     });
-    return res.json({ success: true, fileName, size });
+    return res.json({ success: true, fileName, size, product });
   } catch (err) {
     console.error('[postPhotoAlbumsMobileUploadFile]', err?.message || err);
     const msg = err?.message || 'Failed to stage mobile upload file';
@@ -56,28 +64,34 @@ export async function postPhotoAlbumsMobileUploadFile(req, res) {
   }
 }
 
-/** GET /api/photoAlbums/mobile-upload/files */
+/** GET /api/photoAlbums/mobile-upload/files?product=… */
 export async function listPhotoAlbumsMobileUploadFiles(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
-    const files = await listMobileUploadFiles(singlesId);
-    return res.json({ files });
+    const product = readProductFromRequest(req);
+    const files = await listMobileUploadFiles(singlesId, product);
+    return res.json({ files, product });
   } catch (err) {
     console.error('[listPhotoAlbumsMobileUploadFiles]', err?.message || err);
-    return res.status(500).json({
-      error: err?.message || 'Failed to list mobile upload files'
-    });
+    const msg = err?.message || 'Failed to list mobile upload files';
+    const code = /Invalid mobile upload product/i.test(msg) ? 400 : 500;
+    return res.status(code).json({ error: msg });
   }
 }
 
-/** GET /api/photoAlbums/mobile-upload/files/:fileName */
+/** GET /api/photoAlbums/mobile-upload/files/:fileName?product=… */
 export async function getPhotoAlbumsMobileUploadFile(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   const fileName = decodeURIComponent(String(req.params?.fileName || '').trim());
   try {
-    const { absolutePath, contentType, size } = await readMobileUploadFile(singlesId, fileName);
+    const product = req.query?.product ? readProductFromRequest(req) : undefined;
+    const { absolutePath, contentType, size } = await readMobileUploadFile(
+      singlesId,
+      fileName,
+      product
+    );
     res.setHeader('Content-Type', contentType || 'application/octet-stream');
     res.setHeader('Content-Length', String(size));
     const disposition = String(req.query?.download || '') === '1' ? 'attachment' : 'inline';
@@ -102,14 +116,15 @@ export async function getPhotoAlbumsMobileUploadFile(req, res) {
   }
 }
 
-/** DELETE /api/photoAlbums/mobile-upload/files/:fileName */
+/** DELETE /api/photoAlbums/mobile-upload/files/:fileName?product=… */
 export async function deletePhotoAlbumsMobileUploadFile(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   const fileName = decodeURIComponent(String(req.params?.fileName || '').trim());
   try {
-    await deleteMobileUploadFile(singlesId, fileName);
-    return res.json({ success: true, fileName });
+    const product = readProductFromRequest(req);
+    await deleteMobileUploadFile(singlesId, fileName, product);
+    return res.json({ success: true, fileName, product });
   } catch (err) {
     const msg = err?.message || 'Failed to delete file';
     const code = /not found|Invalid/i.test(msg) ? 404 : 500;

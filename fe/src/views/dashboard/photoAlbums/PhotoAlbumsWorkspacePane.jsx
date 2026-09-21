@@ -103,6 +103,7 @@ import RecordVaultMobileUploadTray, {
   materializeRecordVaultMobileUploadFile,
   readRecordVaultMobileUploadDragFileName
 } from '../recordVault/RecordVaultMobileUploadTray';
+import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import {
   clearMobileTutaPhotoUploadSession,
   consumeMobileTutaPhotoUploadPending,
@@ -5192,7 +5193,7 @@ export default function PhotoAlbumsWorkspacePane({
       // Mobile Upload strip → Thumbnail Tray. The staged copy stays until its X is clicked.
       if (mobileUploadName) {
         try {
-          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName);
+          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
           await uploadNoteVaultFileToStaging(file);
         } catch (err) {
           setError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
@@ -7820,6 +7821,7 @@ export default function PhotoAlbumsWorkspacePane({
         onPickFile={handleMobileDirectPhotoUploadFile}
         onStaged={() => setMobileUploadFolderRefreshToken((n) => n + 1)}
         onExitToMall={handleExitToMall}
+        product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
       />
 
       <PhotoAlbumsInviteReviewDialog
@@ -8235,6 +8237,7 @@ export default function PhotoAlbumsWorkspacePane({
           }}
         >
           <RecordVaultMobileUploadTray
+            product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
             active={unlocked}
             disabled={false}
             layout="grid"
@@ -8498,6 +8501,7 @@ export default function PhotoAlbumsWorkspacePane({
 
           {!hideWorkspaceChrome && !compareMode ? (
             <RecordVaultMobileUploadTray
+            product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
               active={unlocked}
               disabled={
                 busy ||

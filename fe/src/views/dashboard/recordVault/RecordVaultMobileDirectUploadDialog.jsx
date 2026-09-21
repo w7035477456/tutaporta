@@ -11,6 +11,10 @@ import RecordVaultMobileUploadTray from 'views/dashboard/recordVault/RecordVault
 import { recordVaultPopupCloseSx } from 'views/dashboard/recordVault/recordVaultPopupCloseSx';
 import { stageMobileUploadFile } from 'api/photoAlbumsMobileUploadFolderFe';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import {
+  MOBILE_UPLOAD_PRODUCT_TUTANOTES,
+  requireMobileUploadProduct
+} from 'constants/mobileUploadProduct';
 
 const ACCEPT =
   'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff';
@@ -28,7 +32,7 @@ const mobileSheetOverlaySx = {
 
 /**
  * Phone-as-client upload (camera / gallery — not QR) for TutaNotes, TutaDates and TutaPhoto.
- * Every pick is also staged into UPLOAD_FOLDER so its thumbnail shows under the popup.
+ * Every pick is staged into that product's UPLOAD_FOLDER bucket so its thumbnail shows under the popup.
  * Compact: the popup is the whole page, so closing it leaves for /mall.
  */
 export default function RecordVaultMobileDirectUploadDialog({
@@ -39,7 +43,8 @@ export default function RecordVaultMobileDirectUploadDialog({
   onExitToMall,
   disabled = false,
   noteTitle = '',
-  title = 'Upload to current note'
+  title = 'Upload to current note',
+  product = MOBILE_UPLOAD_PRODUCT_TUTANOTES
 }) {
   const navigate = useNavigate();
   const cameraInputRef = useRef(null);
@@ -48,6 +53,7 @@ export default function RecordVaultMobileDirectUploadDialog({
   const [error, setError] = useState('');
   const [thumbsRefreshToken, setThumbsRefreshToken] = useState(0);
   const isCompact = useCompactLoginViewport();
+  const stagingProduct = requireMobileUploadProduct(product);
 
   /**
    * Mobile: X closes the whole upload page → back to the mall (vault panes log off first).
@@ -80,7 +86,7 @@ export default function RecordVaultMobileDirectUploadDialog({
         await onPickFile(file);
         // Thumbnail strip / sheet reads UPLOAD_FOLDER — a failed copy must not fail the upload.
         try {
-          await stageMobileUploadFile(file);
+          await stageMobileUploadFile(file, stagingProduct);
           setThumbsRefreshToken((n) => n + 1);
           onStaged?.();
         } catch (stageErr) {
@@ -92,7 +98,7 @@ export default function RecordVaultMobileDirectUploadDialog({
         setBusy(false);
       }
     },
-    [onPickFile, onStaged]
+    [onPickFile, onStaged, stagingProduct]
   );
 
   return (
@@ -108,6 +114,7 @@ export default function RecordVaultMobileDirectUploadDialog({
       overlayFooter={
         isCompact ? (
           <RecordVaultMobileUploadTray
+            product={stagingProduct}
             active={open}
             disabled={busy}
             layout="grid"
@@ -186,5 +193,6 @@ RecordVaultMobileDirectUploadDialog.propTypes = {
   onExitToMall: PropTypes.func,
   disabled: PropTypes.bool,
   noteTitle: PropTypes.string,
-  title: PropTypes.string
+  title: PropTypes.string,
+  product: PropTypes.oneOf(['tutaphoto', 'tutanotes', 'tutadates'])
 };
