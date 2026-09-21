@@ -103,7 +103,13 @@ import RecordVaultMobileUploadTray, {
   materializeRecordVaultMobileUploadFile,
   readRecordVaultMobileUploadDragFileName
 } from '../recordVault/RecordVaultMobileUploadTray';
-import { consumeMobileTutaPhotoUploadPending, peekMobileTutaPhotoUploadPending } from 'utils/mobilePostLoginChoice';
+import {
+  clearMobileTutaPhotoUploadSession,
+  consumeMobileTutaPhotoUploadPending,
+  markMobileTutaPhotoUploadSession,
+  peekMobileTutaPhotoUploadPending
+} from 'utils/mobilePostLoginChoice';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import PhotoAlbumsMobileUploadFolderPanel from './PhotoAlbumsMobileUploadFolderPanel';
 import PhotoAlbumsCrossPaneTransferDialog from './PhotoAlbumsCrossPaneTransferDialog';
 import PhotoAlbumsOrderAlbumDialog from './PhotoAlbumsOrderAlbumDialog';
@@ -1938,6 +1944,10 @@ export default function PhotoAlbumsWorkspacePane({
   const noteEditorApiRef = useRef(null);
   const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
+  /** Compact viewport: hide album chrome — only upload popup + thumbnail grid. */
+  const [mobileTutaPhotoUploadUi, setMobileTutaPhotoUploadUi] = useState(false);
+  const isCompactViewport = useCompactLoginViewport();
+  const hideWorkspaceForMobileTutaPhotoUpload = isCompactViewport && mobileTutaPhotoUploadUi;
   const [inviteReviewOpen, setInviteReviewOpen] = useState(false);
   const [inviteReviewSendResult, setInviteReviewSendResult] = useState(null);
   const [sharedAlbums, setSharedAlbums] = useState([]);
@@ -3791,6 +3801,9 @@ export default function PhotoAlbumsWorkspacePane({
 
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
+    clearMobileTutaPhotoUploadSession();
+    setMobileTutaPhotoUploadUi(false);
+    setMobileDirectUploadOpen(false);
     if (unlocked) {
       setBusy(true);
       setVaultLeaving(true);
@@ -4569,7 +4582,14 @@ export default function PhotoAlbumsWorkspacePane({
   }, []);
 
 
-  /** Mobile post-login chooser → direct camera/gallery into open album note. */
+  /** Mobile post-login / mall tile → direct camera/gallery into open album note. */
+  useEffect(() => {
+    if (searchParams.get('mobileUpload') === '1' || peekMobileTutaPhotoUploadPending()) {
+      setMobileTutaPhotoUploadUi(true);
+      markMobileTutaPhotoUploadSession();
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (!unlocked || loading || busy || mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
@@ -4583,6 +4603,7 @@ export default function PhotoAlbumsWorkspacePane({
       setSearchParams(next, { replace: true });
     }
     setMobileDirectUploadOpen(true);
+    setMobileTutaPhotoUploadUi(true);
     return undefined;
   }, [
     unlocked,
@@ -8202,6 +8223,26 @@ export default function PhotoAlbumsWorkspacePane({
             ...myPhotoAlbumsBackgroundPanelSx
           }}
         />
+      ) : hideWorkspaceForMobileTutaPhotoUpload ? (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            bgcolor: '#ffffff'
+          }}
+        >
+          <RecordVaultMobileUploadTray
+            active={unlocked}
+            disabled={false}
+            layout="grid"
+            plain
+            refreshToken={mobileUploadFolderRefreshToken}
+            onError={(msg) => setError(String(msg || ''))}
+          />
+        </Box>
       ) : (
         <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
           <PhotoAlbumsTrafficWaitHost />

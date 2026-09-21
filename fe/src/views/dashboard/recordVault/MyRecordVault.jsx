@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -41,7 +42,10 @@ import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv'
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { isRecordVaultRagUiEnabled } from 'config/recordVaultRagUiEnv';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
-import { peekMobileTutaNotesUploadSession } from 'utils/mobilePostLoginChoice';
+import {
+  peekMobileTutaNotesUploadPending,
+  peekMobileTutaNotesUploadSession
+} from 'utils/mobilePostLoginChoice';
 import {
   TUTANOTES_CLOUD_LOGO,
   TUTANOTES_CLOUD_PANE_TOOLTIP,
@@ -333,6 +337,8 @@ export default function MyRecordVault() {
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
   const [ragUiEnabled, setRagUiEnabled] = useState(() => isRecordVaultRagUiEnabled());
   const isCompactViewport = useCompactLoginViewport();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [mobileTutaNotesUploadSession, setMobileTutaNotesUploadSession] = useState(() =>
     peekMobileTutaNotesUploadSession()
   );
@@ -342,6 +348,18 @@ export default function MyRecordVault() {
     return () => window.removeEventListener('vsingles-mobile-tutanotes-upload-session', sync);
   }, []);
   const hideMyNoteShellForMobileUpload = isCompactViewport && mobileTutaNotesUploadSession;
+
+  /** Phone: only mall ↔ upload popup — never the desktop TutaNotes workspace. */
+  useEffect(() => {
+    if (!isCompactViewport) return;
+    const uploadIntent =
+      searchParams.get('mobileUpload') === '1' ||
+      peekMobileTutaNotesUploadPending() ||
+      peekMobileTutaNotesUploadSession();
+    if (!uploadIntent) {
+      navigate('/mall', { replace: true });
+    }
+  }, [isCompactViewport, searchParams, navigate]);
 
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myNote visit.

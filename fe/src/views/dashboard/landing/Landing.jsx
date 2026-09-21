@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -7,7 +7,11 @@ import Typography from '@mui/material/Typography';
 import { useAuth } from 'contexts/AuthContext';
 import { useSiteAudio } from 'contexts/SiteAudioContext';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
-import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
+import {
+  markMobileTutaDatesUploadPending,
+  markMobileTutaNotesUploadPending,
+  markMobileTutaPhotoUploadPending
+} from 'utils/mobilePostLoginChoice';
 
 import onlinemall from 'assets/images/onlineMallInside.png';
 import eMarketPlaceImg from 'assets/images/onlineMarketPlace.png';
@@ -27,7 +31,7 @@ import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUp
 
 const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
 
-/** Compact/mobile: these mall tiles reopen Mobile upload instead of entering the apps. */
+/** Compact/mobile: these mall tiles open that product's upload popup only (never the desktop app). */
 const MOBILE_UPLOAD_REDIRECT_TILE_IDS = new Set(['vsingles', 'photoAlbums', 'recordVault']);
 
 const departments = [
@@ -83,6 +87,7 @@ function getMallStageSize(cols, rows) {
 
 export default function Landing() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { mediaVolume } = useSiteAudio();
   const isCompact = useCompactLoginViewport();
   const audioContextRef = useRef(null);
@@ -108,11 +113,28 @@ export default function Landing() {
     setUpgradePopupOpen(true);
   }, []);
 
-  const openMobileUploadChooser = useCallback((event) => {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    requestMobilePostLoginChooser();
-  }, []);
+  /** Phone mall: each tile opens that product's upload popup only — never the desktop workspace. */
+  const openMobileProductUpload = useCallback(
+    (tileId, event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      if (tileId === 'recordVault') {
+        markMobileTutaNotesUploadPending();
+        navigate(`${MY_RECORD_VAULT_PATH}?mobileUpload=1`);
+        return;
+      }
+      if (tileId === 'photoAlbums') {
+        markMobileTutaPhotoUploadPending();
+        navigate(`${MY_PHOTO_ALBUMS_PATH}?mobileUpload=1`);
+        return;
+      }
+      if (tileId === 'vsingles') {
+        markMobileTutaDatesUploadPending();
+        navigate('/myStory?mobileUpload=1');
+      }
+    },
+    [navigate]
+  );
 
   const visibleDepartments = useMemo(() => {
     const memberKeys = [user?.member_id, user?.member_category]
@@ -284,7 +306,7 @@ export default function Landing() {
               const onTileActivate = gateUpgrade
                 ? openUpgradePopup
                 : gateMobileUpload
-                  ? openMobileUploadChooser
+                  ? (event) => openMobileProductUpload(d.id, event)
                   : undefined;
 
               return (

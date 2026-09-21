@@ -97,6 +97,11 @@ export default function MobilePostLoginChooserDialog() {
     setDesktopRecommendOpen(true);
   }, [closeChooser]);
 
+  const closeDesktopRecommend = useCallback(() => {
+    setDesktopRecommendOpen(false);
+    navigate('/mall', { replace: true });
+  }, [navigate]);
+
   if (!user) return null;
 
   return (
@@ -133,7 +138,7 @@ export default function MobilePostLoginChooserDialog() {
 
       <ColorTemplate7PopupLargeDark
         open={desktopRecommendOpen}
-        onClose={() => setDesktopRecommendOpen(false)}
+        onClose={closeDesktopRecommend}
         closeOnBackdrop
         closeButtonAriaLabel="Close desktop recommendation"
         maxWidth="min(96vw, 420px)"
@@ -144,7 +149,7 @@ export default function MobilePostLoginChooserDialog() {
           <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', textAlign: 'center' }}>
             {DESKTOP_RECOMMEND_MESSAGE}
           </Typography>
-          <GreenButton type="button" onClick={() => setDesktopRecommendOpen(false)} sx={{ ...choiceButtonSx, mt: 1 }}>
+          <GreenButton type="button" onClick={closeDesktopRecommend} sx={{ ...choiceButtonSx, mt: 1 }}>
             OK
           </GreenButton>
         </ColorTemplate7PopupLargeDark.Body>

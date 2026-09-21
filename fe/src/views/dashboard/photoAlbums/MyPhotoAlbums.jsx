@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -26,6 +27,11 @@ import { readPhotoAlbumsLastUsbLocation } from 'utils/photoAlbumsUsbPreference';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
 import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import {
+  peekMobileTutaPhotoUploadPending,
+  peekMobileTutaPhotoUploadSession
+} from 'utils/mobilePostLoginChoice';
 import PhotoAlbumsAccessGate from './PhotoAlbumsAccessGate';
 import PhotoAlbumsOneDriveGate from './PhotoAlbumsOneDriveGate';
 import PhotoAlbumsTutaDriveGate from './PhotoAlbumsTutaDriveGate';
@@ -347,6 +353,31 @@ export default function MyPhotoAlbums() {
   /** Header Profile & Records — full page overlay (no dating sidebar). */
   const [profilesRecordsOpen, setProfilesRecordsOpen] = useState(false);
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isCompactViewport = useCompactLoginViewport();
+  const [mobileTutaPhotoUploadSession, setMobileTutaPhotoUploadSession] = useState(() =>
+    peekMobileTutaPhotoUploadSession()
+  );
+  useEffect(() => {
+    const sync = () => setMobileTutaPhotoUploadSession(peekMobileTutaPhotoUploadSession());
+    window.addEventListener('vsingles-mobile-tutaphoto-upload-session', sync);
+    return () => window.removeEventListener('vsingles-mobile-tutaphoto-upload-session', sync);
+  }, []);
+  const hideMyPhotoShellForMobileUpload = isCompactViewport && mobileTutaPhotoUploadSession;
+
+  /** Phone: only mall ↔ upload popup — never the desktop TutaPhoto workspace. */
+  useEffect(() => {
+    if (!isCompactViewport) return;
+    const uploadIntent =
+      searchParams.get('mobileUpload') === '1' ||
+      peekMobileTutaPhotoUploadPending() ||
+      peekMobileTutaPhotoUploadSession();
+    if (!uploadIntent) {
+      navigate('/mall', { replace: true });
+    }
+  }, [isCompactViewport, searchParams, navigate]);
+
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myPhotoAlbums visit.
     clearPhotoAlbumsE2eSession();
@@ -951,7 +982,7 @@ export default function MyPhotoAlbums() {
       <Box sx={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {showWorkspace ? (
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          {showTabBar && !showCompare && !showDual ? (
+          {showTabBar && !showCompare && !showDual && !hideMyPhotoShellForMobileUpload ? (
             <Box role="tablist" aria-label="TutaPhotoAlbums storage" sx={storageTabBarSx}>
               <Box sx={storageTabStripSx(cloudTabColor)}>
                 <GreenButton
@@ -1020,12 +1051,14 @@ export default function MyPhotoAlbums() {
               >
                 {/* Yellow title row when only one storage mode is offered, or per-pane titles in compare. */}
                 {!showTabBar || showCompare ? (
-                  <PaneHeader
-                    title={cloudTabLabel}
-                    logoSrc={TUTAPHOTOALBUMS_CLOUD_LOGO}
-                    titleTooltip={TUTAPHOTOALBUMS_CLOUD_PANE_TOOLTIP}
-                    stripColor={showCompare ? cloudTabColor : undefined}
-                  />
+                  hideMyPhotoShellForMobileUpload ? null : (
+                    <PaneHeader
+                      title={cloudTabLabel}
+                      logoSrc={TUTAPHOTOALBUMS_CLOUD_LOGO}
+                      titleTooltip={TUTAPHOTOALBUMS_CLOUD_PANE_TOOLTIP}
+                      stripColor={showCompare ? cloudTabColor : undefined}
+                    />
+                  )
                 ) : null}
                 <Box
                   sx={{
@@ -1056,13 +1089,15 @@ export default function MyPhotoAlbums() {
                 }}
               >
                 {!showTabBar || showCompare ? (
-                  <PaneHeader
-                    title={usbTabLabel}
-                    logoSrc={TUTAPHOTOALBUMS_USB_LOGO}
-                    titleTooltip={TUTAPHOTOALBUMS_USB_PANE_TOOLTIP}
-                    stripColor={showCompare ? USB_TAB_COLOR : undefined}
-                    titleColor={showCompare ? USB_TAB_LABEL_COLOR : undefined}
-                  />
+                  hideMyPhotoShellForMobileUpload ? null : (
+                    <PaneHeader
+                      title={usbTabLabel}
+                      logoSrc={TUTAPHOTOALBUMS_USB_LOGO}
+                      titleTooltip={TUTAPHOTOALBUMS_USB_PANE_TOOLTIP}
+                      stripColor={showCompare ? USB_TAB_COLOR : undefined}
+                      titleColor={showCompare ? USB_TAB_LABEL_COLOR : undefined}
+                    />
+                  )
                 ) : null}
                 <Box
                   sx={{

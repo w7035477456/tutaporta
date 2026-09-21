@@ -99,9 +99,13 @@ import RecordVaultMobileUploadTray, {
   readRecordVaultMobileUploadDragFileName
 } from 'views/dashboard/recordVault/RecordVaultMobileUploadTray';
 import {
+  clearMobileTutaDatesUploadSession,
   consumeMobileTutaDatesUploadPending,
-  peekMobileTutaDatesUploadPending
+  markMobileTutaDatesUploadSession,
+  peekMobileTutaDatesUploadPending,
+  peekMobileTutaDatesUploadSession
 } from 'utils/mobilePostLoginChoice';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { bumpPhotosAlbumCacheBust } from 'api/photoCacheBust';
 import {
   invalidateMyPicksFeedCache,
@@ -1181,6 +1185,11 @@ export default function MyStory() {
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
   /** Bumped after a phone pick is staged so the Mobile Upload strip reloads at once. */
   const [mobileUploadTrayRefreshToken, setMobileUploadTrayRefreshToken] = useState(0);
+  const isCompactViewport = useCompactLoginViewport();
+  const [mobileTutaDatesUploadUi, setMobileTutaDatesUploadUi] = useState(
+    () => peekMobileTutaDatesUploadSession() || peekMobileTutaDatesUploadPending()
+  );
+  const hideWorkspaceForMobileTutaDatesUpload = isCompactViewport && mobileTutaDatesUploadUi;
   const [deletingId, setDeletingId] = useState(null);
   const [deletingVideoId, setDeletingVideoId] = useState(null);
   const [draggingPhotoId, setDraggingPhotoId] = useState(null);
@@ -1731,7 +1740,27 @@ export default function MyStory() {
     [refetchMyPhotos, updateSessionProfilePhoto, refreshAuthProfilePhoto, bumpProfilePhotoCache, bumpPhotoVersion, bumpAlbumPhotoCache, profilePhotoId]
   );
 
-  /** Mobile post-login → Upload photo to TutaDates. */
+  /** Mobile post-login / mall tile → Upload photo to TutaDates. */
+  useEffect(() => {
+    if (searchParams.get('mobileUpload') === '1' || peekMobileTutaDatesUploadPending()) {
+      setMobileTutaDatesUploadUi(true);
+      markMobileTutaDatesUploadSession();
+    }
+  }, [searchParams]);
+
+  /** Phone: only mall ↔ upload popup — never the desktop My Album workspace. */
+  useEffect(() => {
+    if (!isCompactViewport) return;
+    const uploadIntent =
+      searchParams.get('mobileUpload') === '1' ||
+      peekMobileTutaDatesUploadPending() ||
+      peekMobileTutaDatesUploadSession() ||
+      mobileTutaDatesUploadUi;
+    if (!uploadIntent) {
+      navigate('/mall', { replace: true });
+    }
+  }, [isCompactViewport, searchParams, navigate, mobileTutaDatesUploadUi]);
+
   useEffect(() => {
     if (mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
@@ -1744,8 +1773,15 @@ export default function MyStory() {
       setSearchParams(next, { replace: true });
     }
     setMobileDirectUploadOpen(true);
+    setMobileTutaDatesUploadUi(true);
     return undefined;
   }, [mobileDirectUploadOpen, searchParams, setSearchParams]);
+
+  const handleExitMobileDatesUploadToMall = useCallback(() => {
+    clearMobileTutaDatesUploadSession();
+    setMobileTutaDatesUploadUi(false);
+    setMobileDirectUploadOpen(false);
+  }, []);
 
   const handleMobileDirectDatesUpload = useCallback(
     async (file) => {
@@ -3304,6 +3340,36 @@ export default function MyStory() {
     </ColorTemplate7PopupLargeDark>
   );
 
+  if (hideWorkspaceForMobileTutaDatesUpload) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0,
+          width: '100%',
+          bgcolor: '#ffffff',
+          ...myStoryPageShellSx(myStoryPhoneLayout)
+        }}
+      >
+        {wrongFormatDialog}
+        {fileTooLargeDialog}
+        {duplicateUploadDialog}
+        <RecordVaultMobileDirectUploadDialog
+          open={mobileDirectUploadOpen}
+          onClose={() => setMobileDirectUploadOpen(false)}
+          disabled={uploading}
+          title="Upload photo to TutaDates"
+          noteTitle="TutaDates album"
+          onPickFile={handleMobileDirectDatesUpload}
+          onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
+          onExitToMall={handleExitMobileDatesUploadToMall}
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -3326,6 +3392,7 @@ export default function MyStory() {
         noteTitle="TutaDates album"
         onPickFile={handleMobileDirectDatesUpload}
         onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
+        onExitToMall={handleExitMobileDatesUploadToMall}
       />
       <input
         ref={fileInputRef}

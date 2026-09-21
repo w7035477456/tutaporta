@@ -138,12 +138,42 @@ export function consumeMobileTutaPhotoUploadPending() {
     const v = sessionStorage.getItem(MOBILE_TUTAPHOTO_UPLOAD_KEY);
     if (v === '1') {
       sessionStorage.removeItem(MOBILE_TUTAPHOTO_UPLOAD_KEY);
+      markMobileTutaPhotoUploadSession();
       return true;
     }
   } catch {
     // ignore
   }
   return false;
+}
+
+/** Active mobile TutaPhoto upload UI (compact: popup + thumbnail grid only). */
+export const MOBILE_TUTAPHOTO_UPLOAD_SESSION_KEY = 'mobileTutaPhotoUploadSession';
+
+export function markMobileTutaPhotoUploadSession() {
+  try {
+    sessionStorage.setItem(MOBILE_TUTAPHOTO_UPLOAD_SESSION_KEY, '1');
+    window.dispatchEvent(new CustomEvent('vsingles-mobile-tutaphoto-upload-session'));
+  } catch {
+    // ignore
+  }
+}
+
+export function peekMobileTutaPhotoUploadSession() {
+  try {
+    return sessionStorage.getItem(MOBILE_TUTAPHOTO_UPLOAD_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function clearMobileTutaPhotoUploadSession() {
+  try {
+    sessionStorage.removeItem(MOBILE_TUTAPHOTO_UPLOAD_SESSION_KEY);
+    window.dispatchEvent(new CustomEvent('vsingles-mobile-tutaphoto-upload-session'));
+  } catch {
+    // ignore
+  }
 }
 
 export function markMobileTutaDatesUploadPending() {
@@ -167,10 +197,40 @@ export function consumeMobileTutaDatesUploadPending() {
     const v = sessionStorage.getItem(MOBILE_TUTADATES_UPLOAD_KEY);
     if (v === '1') {
       sessionStorage.removeItem(MOBILE_TUTADATES_UPLOAD_KEY);
+      markMobileTutaDatesUploadSession();
       return true;
     }
   } catch {
     // ignore
   }
   return false;
+}
+
+/** Active mobile TutaDates upload UI (compact: popup + thumbnail grid only). */
+export const MOBILE_TUTADATES_UPLOAD_SESSION_KEY = 'mobileTutaDatesUploadSession';
+
+export function markMobileTutaDatesUploadSession() {
+  try {
+    sessionStorage.setItem(MOBILE_TUTADATES_UPLOAD_SESSION_KEY, '1');
+    window.dispatchEvent(new CustomEvent('vsingles-mobile-tutadates-upload-session'));
+  } catch {
+    // ignore
+  }
+}
+
+export function peekMobileTutaDatesUploadSession() {
+  try {
+    return sessionStorage.getItem(MOBILE_TUTADATES_UPLOAD_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function clearMobileTutaDatesUploadSession() {
+  try {
+    sessionStorage.removeItem(MOBILE_TUTADATES_UPLOAD_SESSION_KEY);
+    window.dispatchEvent(new CustomEvent('vsingles-mobile-tutadates-upload-session'));
+  } catch {
+    // ignore
+  }
 }
