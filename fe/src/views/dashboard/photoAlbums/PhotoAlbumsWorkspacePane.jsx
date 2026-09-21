@@ -7798,6 +7798,7 @@ export default function PhotoAlbumsWorkspacePane({
         noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
         onPickFile={handleMobileDirectPhotoUploadFile}
         onStaged={() => setMobileUploadFolderRefreshToken((n) => n + 1)}
+        onExitToMall={handleExitToMall}
       />
 
       <PhotoAlbumsInviteReviewDialog

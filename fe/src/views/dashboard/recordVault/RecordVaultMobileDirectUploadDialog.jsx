@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -28,22 +29,44 @@ const mobileSheetOverlaySx = {
 /**
  * Phone-as-client upload (camera / gallery — not QR) for TutaNotes, TutaDates and TutaPhoto.
  * Every pick is also staged into UPLOAD_FOLDER so its thumbnail shows under the popup.
+ * Compact: the popup is the whole page, so closing it leaves for /mall.
  */
 export default function RecordVaultMobileDirectUploadDialog({
   open,
   onClose,
   onPickFile,
   onStaged,
+  onExitToMall,
   disabled = false,
   noteTitle = '',
   title = 'Upload to current note'
 }) {
+  const navigate = useNavigate();
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [thumbsRefreshToken, setThumbsRefreshToken] = useState(0);
   const isCompact = useCompactLoginViewport();
+
+  /**
+   * Mobile: X closes the whole upload page → back to the mall (vault panes log off first).
+   * The mall navigation is unconditional: a pane that is busy or whose logoff fails must
+   * not leave the phone stranded on the workspace behind the sheet.
+   */
+  const handleRequestClose = useCallback(() => {
+    if (busy) return;
+    onClose?.();
+    if (!isCompact) return;
+    void (async () => {
+      try {
+        await onExitToMall?.();
+      } catch (err) {
+        console.warn('[RecordVaultMobileDirectUploadDialog] exit to mall', err?.message ?? err);
+      }
+      navigate('/mall');
+    })();
+  }, [busy, isCompact, navigate, onClose, onExitToMall]);
 
   const handleFile = useCallback(
     async (e) => {
@@ -75,10 +98,7 @@ export default function RecordVaultMobileDirectUploadDialog({
   return (
     <ColorTemplate7PopupLargeDark
       open={open}
-      onClose={() => {
-        if (busy) return;
-        onClose?.();
-      }}
+      onClose={handleRequestClose}
       closeOnBackdrop={!busy && !isCompact}
       closeButtonAriaLabel="Close upload photo"
       maxWidth="min(96vw, 420px)"
@@ -162,6 +182,8 @@ RecordVaultMobileDirectUploadDialog.propTypes = {
   onPickFile: PropTypes.func,
   /** Fired after the picked file is copied into UPLOAD_FOLDER (refresh a pane-level tray). */
   onStaged: PropTypes.func,
+  /** Compact X target — vault panes pass their Exit to Mall (logoff) handler. */
+  onExitToMall: PropTypes.func,
   disabled: PropTypes.bool,
   noteTitle: PropTypes.string,
   title: PropTypes.string

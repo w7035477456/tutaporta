@@ -3348,6 +3348,11 @@ export default function RecordVaultWorkspacePane({
 
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
+    // Drop the phone upload-page flags first — a failed logoff must not strand the
+    // next visit on the white upload sheet.
+    clearMobileTutaNotesUploadSession();
+    setMobileTutaNotesUploadUi(false);
+    setMobileDirectUploadOpen(false);
     if (unlocked) {
       setBusy(true);
       setVaultLeaving(true);
@@ -3371,9 +3376,6 @@ export default function RecordVaultWorkspacePane({
       setVaultLeavingProgressPercent(0);
       setVaultLeavingProgressLabel('');
     }
-    clearMobileTutaNotesUploadSession();
-    setMobileTutaNotesUploadUi(false);
-    setMobileDirectUploadOpen(false);
     navigate('/mall');
   }, [busy, unlocked, navigate, performVaultStorageLogoff, paneStorageType]);
 
@@ -6364,6 +6366,7 @@ export default function RecordVaultWorkspacePane({
         noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
         onPickFile={handleMobileDirectUploadFile}
         onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
+        onExitToMall={handleExitToMall}
       />
 
       <RecordVaultCrossPaneTransferDialog
