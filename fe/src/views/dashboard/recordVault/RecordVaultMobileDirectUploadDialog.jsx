@@ -51,6 +51,7 @@ export default function RecordVaultMobileDirectUploadDialog({
   const galleryInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState('');
   const [thumbsRefreshToken, setThumbsRefreshToken] = useState(0);
   const isCompact = useCompactLoginViewport();
   const stagingProduct = requireMobileUploadProduct(product);
@@ -75,26 +76,49 @@ export default function RecordVaultMobileDirectUploadDialog({
   }, [busy, isCompact, navigate, onClose, onExitToMall]);
 
   const handleFile = useCallback(
-    async (e) => {
+    async (e, { multiple = false } = {}) => {
       const input = e.target;
-      const file = input.files?.[0];
+      const list = input.files ? Array.from(input.files) : [];
       input.value = '';
-      if (!file || !onPickFile) return;
+      const files = multiple ? list.filter(Boolean) : list[0] ? [list[0]] : [];
+      if (!files.length || !onPickFile) return;
       setBusy(true);
       setError('');
+      const failures = [];
       try {
-        await onPickFile(file);
-        // Thumbnail strip / sheet reads UPLOAD_FOLDER — a failed copy must not fail the upload.
-        try {
-          await stageMobileUploadFile(file, stagingProduct);
-          setThumbsRefreshToken((n) => n + 1);
-          onStaged?.();
-        } catch (stageErr) {
-          console.warn('[RecordVaultMobileDirectUploadDialog] stageMobileUploadFile', stageErr?.message ?? stageErr);
+        for (let i = 0; i < files.length; i += 1) {
+          const file = files[i];
+          setUploadProgress(
+            files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : 'Uploading…'
+          );
+          try {
+            await onPickFile(file);
+          } catch (err) {
+            failures.push(err?.message || file?.name || 'Upload failed');
+            continue;
+          }
+          // Thumbnail strip / sheet reads UPLOAD_FOLDER — a failed copy must not fail the upload.
+          try {
+            await stageMobileUploadFile(file, stagingProduct);
+            setThumbsRefreshToken((n) => n + 1);
+            onStaged?.();
+          } catch (stageErr) {
+            console.warn(
+              '[RecordVaultMobileDirectUploadDialog] stageMobileUploadFile',
+              stageErr?.message ?? stageErr
+            );
+          }
         }
-      } catch (err) {
-        setError(err?.message || 'Upload failed. Please try again.');
+        if (failures.length) {
+          const ok = files.length - failures.length;
+          setError(
+            ok > 0
+              ? `${ok} uploaded; ${failures.length} failed. ${failures[0]}`
+              : failures[0] || 'Upload failed. Please try again.'
+          );
+        }
       } finally {
+        setUploadProgress('');
         setBusy(false);
       }
     },
@@ -158,7 +182,7 @@ export default function RecordVaultMobileDirectUploadDialog({
         {busy ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, py: 1 }}>
             <CircularProgress size={22} />
-            <Typography variant="body2">Uploading…</Typography>
+            <Typography variant="body2">{uploadProgress || 'Uploading…'}</Typography>
           </Box>
         ) : null}
         <Box
@@ -167,7 +191,7 @@ export default function RecordVaultMobileDirectUploadDialog({
           type="file"
           accept={ACCEPT}
           capture="environment"
-          onChange={(e) => void handleFile(e)}
+          onChange={(e) => void handleFile(e, { multiple: false })}
           sx={{ display: 'none' }}
         />
         <Box
@@ -175,7 +199,8 @@ export default function RecordVaultMobileDirectUploadDialog({
           ref={galleryInputRef}
           type="file"
           accept={ACCEPT}
-          onChange={(e) => void handleFile(e)}
+          multiple
+          onChange={(e) => void handleFile(e, { multiple: true })}
           sx={{ display: 'none' }}
         />
       </ColorTemplate7PopupLargeDark.Body>

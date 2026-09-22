@@ -31,12 +31,13 @@ import { useAuth } from 'contexts/AuthContext';
 import RecordVaultZeroKnowledgeNotice from './RecordVaultZeroKnowledgeNotice';
 import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import { closeErrorPopup } from 'ui-component/ErrorPopup';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 
 const MIN_VAULT_PASSWORD_LEN = 8;
 
-/** Hint/password fields + buttons — 50vw column; inputs and buttons stay inside. */
+/** Hint/password fields + buttons — full width on phone; 50vw on desktop. */
 const vaultFormControlsColumnSx = {
-  width: '50vw',
+  width: { xs: '100%', sm: '50vw' },
   maxWidth: '100%',
   alignSelf: 'flex-start',
   boxSizing: 'border-box',
@@ -80,6 +81,33 @@ const vaultHintInputSx = {
   '& .MuiInputBase-input': {
     color: '#000 !important',
     WebkitTextFillColor: '#000 !important'
+  }
+};
+
+/** Mobile: taller password field + larger typed text. */
+const vaultPasswordInputMobileSx = {
+  '@media (max-width: 599.95px)': {
+    '& .MuiInputBase-root': {
+      minHeight: '52px !important',
+      height: '52px !important'
+    },
+    '& .MuiInputBase-input': {
+      fontSize: '1.15rem !important',
+      lineHeight: 1.35,
+      py: '12px !important'
+    }
+  }
+};
+
+/** Mobile: shrink long FDE action labels so they fit the button width. */
+const vaultFdeActionButtonSx = {
+  maxWidth: '100%',
+  '@media (max-width: 599.95px)': {
+    fontSize: 'clamp(0.65rem, 3.2vw, 0.9rem) !important',
+    px: 1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
   }
 };
 
@@ -127,6 +155,7 @@ export default function RecordVaultAccessGate({
 }) {
   const { user } = useAuth();
   const guestDemo = isGuestDemoLogin(user);
+  const isCompact = useCompactLoginViewport();
   const side = normalizeStorageType(storageType);
   const [configured, setConfigured] = useState(false);
   const [vaultRow, setVaultRow] = useState(null);
@@ -539,6 +568,7 @@ export default function RecordVaultAccessGate({
           type="password"
           autoComplete="new-password"
           disabled={inputsLocked}
+          sx={vaultPasswordInputMobileSx}
         />
       </ColorTemplate16PopupCenterWide.FormRow>
       <ColorTemplate16PopupCenterWide.FormRow label="Password again:">
@@ -551,6 +581,7 @@ export default function RecordVaultAccessGate({
           type="password"
           autoComplete="new-password"
           disabled={inputsLocked}
+          sx={vaultPasswordInputMobileSx}
         />
       </ColorTemplate16PopupCenterWide.FormRow>
     </>
@@ -696,7 +727,7 @@ export default function RecordVaultAccessGate({
         <ColorTemplate16PopupCenterWide.Title>Full Disk Encryption</ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body>
           <Stack spacing={2}>
-            <RecordVaultZeroKnowledgeNotice />
+            {isCompact ? null : <RecordVaultZeroKnowledgeNotice />}
 
             {checking ? (
               <Typography>Checking vault access…</Typography>
@@ -705,10 +736,12 @@ export default function RecordVaultAccessGate({
               <Typography sx={{ lineHeight: 1.5, fontWeight: 700 }}>
                 Enter your current password and verify to continue.
               </Typography>
-              <Typography sx={{ lineHeight: 1.5, fontWeight: 700 }}>
-                Due to our maximum secure architecture, it is impossible to recover lost password. Creating
-                new password will require erase/format TutaNotes folder on OneDrive or USB.
-              </Typography>
+              {isCompact ? null : (
+                <Typography sx={{ lineHeight: 1.5, fontWeight: 700 }}>
+                  Due to our maximum secure architecture, it is impossible to recover lost password. Creating
+                  new password will require erase/format TutaNotes folder on OneDrive or USB.
+                </Typography>
+              )}
 
               <Box sx={vaultFormControlsColumnSx}>
                 <ColorTemplate16PopupCenterWide.FormRows sx={vaultFormRowsSx}>
@@ -725,11 +758,13 @@ export default function RecordVaultAccessGate({
                       type="password"
                       autoComplete="current-password"
                       disabled={busy || verifyLocked}
+                      sx={vaultPasswordInputMobileSx}
                     />
                     <ColorTemplate16PopupCenterWide.ActionButton
                       type="button"
                       onClick={() => void handleVerifyVaultPassword()}
                       disabled={busy || verifyLocked || !currentPassword.trim()}
+                      sx={vaultFdeActionButtonSx}
                     >
                       Verify Encrypt Password
                     </ColorTemplate16PopupCenterWide.ActionButton>
@@ -754,6 +789,7 @@ export default function RecordVaultAccessGate({
                       type="button"
                       disabled={inputsLocked || !setPasswordReady}
                       onClick={() => void handleSetVaultPassword()}
+                      sx={vaultFdeActionButtonSx}
                     >
                       Set Encrypt Password
                     </ColorTemplate16PopupCenterWide.ActionButton>

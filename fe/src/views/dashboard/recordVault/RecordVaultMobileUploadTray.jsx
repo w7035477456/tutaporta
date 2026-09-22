@@ -197,27 +197,45 @@ export default function RecordVaultMobileUploadTray({
   }, []);
 
   const loadFiles = useCallback(async () => {
-    setLoading(true);
+    const hadFiles = (thumbUrlsRef.current && Object.keys(thumbUrlsRef.current).length > 0) || false;
+    // Only show "Loading…" on the first empty pass — avoid blanking thumbs every poll.
+    if (!hadFiles) setLoading(true);
     try {
       const listed = await listMobileUploadFiles(stagingProduct);
       setFiles(listed);
-      revokeThumbs();
-      const nextThumbs = {};
+
+      const nextNames = new Set(listed.map((e) => e?.name).filter(Boolean));
+      const prev = thumbUrlsRef.current || {};
+
+      // Drop thumbs for files that left the folder (revoke only those).
+      Object.keys(prev).forEach((name) => {
+        if (!nextNames.has(name)) {
+          try {
+            URL.revokeObjectURL(prev[name]);
+          } catch {
+            // ignore
+          }
+          delete prev[name];
+        }
+      });
+
+      // Fetch blobs only for new image files — keep existing object URLs so tiles do not blink.
       await Promise.all(
         listed.map(async (entry) => {
           const name = entry?.name;
-          if (!name) return;
+          if (!name || prev[name]) return;
           if (isVideoContentType(entry.contentType, name)) return;
           try {
             const blob = await fetchMobileUploadFileBlob(name, stagingProduct);
-            nextThumbs[name] = URL.createObjectURL(blob);
+            prev[name] = URL.createObjectURL(blob);
           } catch {
             // skip thumb
           }
         })
       );
-      thumbUrlsRef.current = nextThumbs;
-      setThumbUrls(nextThumbs);
+
+      thumbUrlsRef.current = { ...prev };
+      setThumbUrls({ ...prev });
     } catch (err) {
       setFiles([]);
       revokeThumbs();

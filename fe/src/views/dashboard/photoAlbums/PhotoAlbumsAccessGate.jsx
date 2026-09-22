@@ -31,6 +31,7 @@ import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import { closeErrorPopup } from 'ui-component/ErrorPopup';
 import { COLOR_TEMPLATE7_POPUP_ACTION_GREEN } from 'config/colorTemplate7PopupLargeDark';
 import { formatRecordVaultUnlockCountdown } from 'utils/recordVaultUnlockCountdown';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 
 const MIN_VAULT_PASSWORD_LEN = 8;
 
@@ -110,6 +111,15 @@ const vaultChoiceButtonRowSx = {
 const vaultFdeActionButtonSx = {
   minWidth: { xs: '100%', sm: 320 },
   maxWidth: '100%',
+  // Mobile: shrink label so “Skip Photo Encryption” / “Set Encrypt Password” fit the button.
+  // GreenButton sets MOBILE_FONT_SIZE_BUTTON with !important — override only under 600px.
+  '@media (max-width: 599.95px)': {
+    fontSize: 'clamp(0.65rem, 3.2vw, 0.9rem) !important',
+    px: 1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+  },
   bgcolor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
   backgroundColor: `${COLOR_TEMPLATE7_POPUP_ACTION_GREEN} !important`,
   color: '#000000 !important',
@@ -166,6 +176,7 @@ export default function PhotoAlbumsAccessGate({
   usbMountPath = '',
   onVaultFormatted: _onVaultFormatted
 }) {
+  const isCompact = useCompactLoginViewport();
   const side = normalizeStorageType(storageType);
   const [configured, setConfigured] = useState(false);
   const [vaultRow, setVaultRow] = useState(null);
@@ -758,7 +769,7 @@ export default function PhotoAlbumsAccessGate({
         <ColorTemplate16PopupCenterWide.Title>Full Disk Encryption</ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body>
           <Stack spacing={2}>
-            <PhotoAlbumsZeroKnowledgeNotice />
+            {isCompact ? null : <PhotoAlbumsZeroKnowledgeNotice />}
 
             {checking ? (
               <Typography>Checking vault access…</Typography>

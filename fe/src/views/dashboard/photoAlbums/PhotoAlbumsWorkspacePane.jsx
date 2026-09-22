@@ -108,7 +108,8 @@ import {
   clearMobileTutaPhotoUploadSession,
   consumeMobileTutaPhotoUploadPending,
   markMobileTutaPhotoUploadSession,
-  peekMobileTutaPhotoUploadPending
+  peekMobileTutaPhotoUploadPending,
+  peekMobileTutaPhotoUploadSession
 } from 'utils/mobilePostLoginChoice';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import PhotoAlbumsMobileUploadFolderPanel from './PhotoAlbumsMobileUploadFolderPanel';
@@ -1945,8 +1946,15 @@ export default function PhotoAlbumsWorkspacePane({
   const noteEditorApiRef = useRef(null);
   const [mobileUploadOpen, setMobileUploadOpen] = useState(false);
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
-  /** Compact viewport: hide album chrome — only upload popup + thumbnail grid. */
-  const [mobileTutaPhotoUploadUi, setMobileTutaPhotoUploadUi] = useState(false);
+  /** Compact viewport: hide album chrome — only upload popup + Mobile Upload thumbnails. */
+  const [mobileTutaPhotoUploadUi, setMobileTutaPhotoUploadUi] = useState(() =>
+    Boolean(
+      peekMobileTutaPhotoUploadPending() ||
+        peekMobileTutaPhotoUploadSession() ||
+        (typeof window !== 'undefined' &&
+          new URLSearchParams(window.location.search).get('mobileUpload') === '1')
+    )
+  );
   const isCompactViewport = useCompactLoginViewport();
   const hideWorkspaceForMobileTutaPhotoUpload = isCompactViewport && mobileTutaPhotoUploadUi;
   const [inviteReviewOpen, setInviteReviewOpen] = useState(false);
@@ -3404,16 +3412,32 @@ export default function PhotoAlbumsWorkspacePane({
       setVaultUiReady(true);
       return undefined;
     }
+    // Mobile upload session: do not load album tree / note photos — only Mobile Upload staging thumbs.
+    if (mobileTutaPhotoUploadUi) {
+      setLoading(false);
+      setVaultUiReady(true);
+      setNoteContentLoading(false);
+      setNoteContentLoadProgressPercent(null);
+      setNoteContentLoadProgressLabel('');
+      return undefined;
+    }
     setPhotoAlbumsBridgeStorageType(paneStorageType);
     const pending = pendingMynoteRestoreRef.current;
     void loadTree({
       preferNotebookId: pending?.notebookId ?? undefined,
       preferNoteId: pending?.noteId ?? undefined
     });
-  }, [unlocked, paneStorageType, loadTree]);
+  }, [unlocked, paneStorageType, loadTree, mobileTutaPhotoUploadUi]);
 
   useEffect(() => {
     if (!unlocked || !selectedNoteId) return undefined;
+    // Mobile upload: never prefetch album page photos under the Take photo / gallery popup.
+    if (mobileTutaPhotoUploadUi) {
+      setNoteContentLoading(false);
+      setNoteContentLoadProgressPercent(null);
+      setNoteContentLoadProgressLabel('');
+      return undefined;
+    }
     const id = Number(selectedNoteId);
     let cancelled = false;
     void (async () => {
@@ -3499,7 +3523,14 @@ export default function PhotoAlbumsWorkspacePane({
     return () => {
       cancelled = true;
     };
-  }, [unlocked, selectedNoteId, loadNoteContent, leaveUnlockedWorkspace, paneStorageType]);
+  }, [
+    unlocked,
+    selectedNoteId,
+    loadNoteContent,
+    leaveUnlockedWorkspace,
+    paneStorageType,
+    mobileTutaPhotoUploadUi
+  ]);
 
   // Push the resolved note body into the TipTap editor once per note/lock-state.
   // Guarded by a hydration key so autosave (which updates body_text in the tree)
@@ -4583,7 +4614,7 @@ export default function PhotoAlbumsWorkspacePane({
   }, []);
 
 
-  /** Mobile post-login / mall tile → direct camera/gallery into open album note. */
+  /** Mobile post-login / mall tile → camera/gallery; stage into Mobile Upload only (no album load). */
   useEffect(() => {
     if (searchParams.get('mobileUpload') === '1' || peekMobileTutaPhotoUploadPending()) {
       setMobileTutaPhotoUploadUi(true);
@@ -4592,36 +4623,36 @@ export default function PhotoAlbumsWorkspacePane({
   }, [searchParams]);
 
   useEffect(() => {
-    if (!unlocked || loading || busy || mobileDirectUploadOpen) return undefined;
+    if (!unlocked || mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaPhotoUploadPending();
-    if (!fromQuery && !fromFlag) return undefined;
-    if (!selectedNote) return undefined;
+    const mobileUpload =
+      mobileTutaPhotoUploadUi || fromQuery || fromFlag || peekMobileTutaPhotoUploadSession();
+    if (!mobileUpload) return undefined;
+    // Do not wait for album note / photo load — open staging popup as soon as vault is unlocked.
+    if (busy && !mobileTutaPhotoUploadUi) return undefined;
     consumeMobileTutaPhotoUploadPending();
     if (fromQuery) {
       const next = new URLSearchParams(searchParams);
       next.delete('mobileUpload');
       setSearchParams(next, { replace: true });
     }
-    setMobileDirectUploadOpen(true);
     setMobileTutaPhotoUploadUi(true);
+    setMobileDirectUploadOpen(true);
     return undefined;
   }, [
     unlocked,
-    loading,
     busy,
     mobileDirectUploadOpen,
+    mobileTutaPhotoUploadUi,
     searchParams,
-    setSearchParams,
-    selectedNote
+    setSearchParams
   ]);
 
-  const handleMobileDirectPhotoUploadFile = useCallback(
-    async (file) => {
-      await uploadNoteVaultFile(file, null);
-    },
-    [uploadNoteVaultFile]
-  );
+  const handleMobileDirectPhotoUploadFile = useCallback(async () => {
+    // Mobile TutaPhoto upload session: only stage into UPLOAD_FOLDER (dialog does that).
+    // Do not attach into album notes — desktop Mobile Upload tray is the destination.
+  }, []);
 
   /** Phone QR upload (photo_albums) → UPLOAD_FOLDER; switch to Mobile Upload tab (no note insert). */
   const handleMobilePhoneUploadComplete = useCallback(async (_fileNameOrId, meta = {}) => {
@@ -7767,7 +7798,7 @@ export default function PhotoAlbumsWorkspacePane({
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
       <BusyHourglassOverlay
-        open={Boolean(noteContentLoading)}
+        open={Boolean(noteContentLoading) && !hideWorkspaceForMobileTutaPhotoUpload}
         label="Loading album photos"
         progressPercent={noteContentLoadProgressPercent}
         progressLabel={noteContentLoadProgressLabel}
@@ -7815,9 +7846,13 @@ export default function PhotoAlbumsWorkspacePane({
       <RecordVaultMobileDirectUploadDialog
         open={mobileDirectUploadOpen}
         onClose={() => setMobileDirectUploadOpen(false)}
-        disabled={busy || !selectedNote}
+        disabled={busy && !mobileTutaPhotoUploadUi}
         title="Upload photo to TutaPhoto"
-        noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
+        noteTitle={
+          mobileTutaPhotoUploadUi
+            ? 'Mobile Upload'
+            : selectedNote?.note_name || selectedNote?.title || ''
+        }
         onPickFile={handleMobileDirectPhotoUploadFile}
         onStaged={() => setMobileUploadFolderRefreshToken((n) => n + 1)}
         onExitToMall={handleExitToMall}
@@ -8206,7 +8241,7 @@ export default function PhotoAlbumsWorkspacePane({
       ) : null}
 
       <BusyHourglassOverlay
-        open={!vaultUiReady && loading && unlocked}
+        open={!vaultUiReady && loading && unlocked && !hideWorkspaceForMobileTutaPhotoUpload}
         label="Loading vault"
         progressPercent={vaultLoadProgressPercent}
         progressLabel={vaultLoadProgressLabel}
