@@ -39,7 +39,8 @@ import {
   consumeMobileTutaNotesUploadPending,
   markMobileTutaNotesUploadSession,
   clearMobileTutaNotesUploadSession,
-  peekMobileTutaNotesUploadPending
+  peekMobileTutaNotesUploadPending,
+  peekMobileTutaNotesUploadSession
 } from 'utils/mobilePostLoginChoice';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import RecordVaultSearchBar from './RecordVaultSearchBar';
@@ -3680,7 +3681,7 @@ export default function RecordVaultWorkspacePane({
     }
   }, []);
 
-  /** Mobile post-login chooser → open direct upload once a real note is selected. */
+  /** Mobile post-login chooser → open direct upload once vault is unlocked (staging only). */
   useEffect(() => {
     if (searchParams.get('mobileUpload') === '1' || peekMobileTutaNotesUploadPending()) {
       setMobileTutaNotesUploadUi(true);
@@ -3689,15 +3690,14 @@ export default function RecordVaultWorkspacePane({
   }, [searchParams]);
 
   useEffect(() => {
-    if (!unlocked || loading || busy || mobileDirectUploadOpen) return undefined;
+    if (!unlocked || mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaNotesUploadPending();
-    if (!fromQuery && !fromFlag) return undefined;
-    if (!selectedNote || isBillScheduleSystemId(selectedNote.note_id)) return undefined;
-    if (noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)) {
-      setError('Unlock this note before uploading a photo from your phone');
-      return undefined;
-    }
+    const mobileUpload =
+      mobileTutaNotesUploadUi || fromQuery || fromFlag || peekMobileTutaNotesUploadSession();
+    if (!mobileUpload) return undefined;
+    // Do not wait for a selected note — open staging popup as soon as vault is unlocked.
+    if (busy && !mobileTutaNotesUploadUi) return undefined;
     consumeMobileTutaNotesUploadPending();
     if (fromQuery) {
       const next = new URLSearchParams(searchParams);
@@ -3709,25 +3709,18 @@ export default function RecordVaultWorkspacePane({
     return undefined;
   }, [
     unlocked,
-    loading,
     busy,
     mobileDirectUploadOpen,
+    mobileTutaNotesUploadUi,
     searchParams,
-    setSearchParams,
-    selectedNote,
-    noteHasInnerEncryption,
-    isInnerNoteUnlocked
+    setSearchParams
   ]);
 
-  const handleMobileDirectUploadFile = useCallback(
-    async (file) => {
-      const ok = await uploadNoteVaultFile(file, null);
-      if (!ok) {
-        throw new Error('Upload failed. Check the note is unlocked and try again.');
-      }
-    },
-    [uploadNoteVaultFile]
-  );
+  const handleMobileDirectUploadFile = useCallback(async () => {
+    // Mobile TutaNotes upload session: only stage into UPLOAD_FOLDER (dialog does that).
+    // Do not attach into notes — desktop Mobile Upload tray is the destination.
+    return true;
+  }, []);
 
   const scheduleSave = useCallback(() => {
     if (skipSaveRef.current || !selectedNote || noteContentLoading) return;
@@ -6357,14 +6350,12 @@ export default function RecordVaultWorkspacePane({
       <RecordVaultMobileDirectUploadDialog
         open={mobileDirectUploadOpen}
         onClose={() => setMobileDirectUploadOpen(false)}
-        disabled={
-          busy ||
-          !selectedNote ||
-          (selectedNote &&
-            noteHasInnerEncryption(selectedNote) &&
-            !isInnerNoteUnlocked(selectedNote.note_id))
+        disabled={busy && !mobileTutaNotesUploadUi}
+        noteTitle={
+          mobileTutaNotesUploadUi
+            ? 'Mobile Upload'
+            : selectedNote?.note_name || selectedNote?.title || ''
         }
-        noteTitle={selectedNote?.note_name || selectedNote?.title || ''}
         onPickFile={handleMobileDirectUploadFile}
         onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
         onExitToMall={handleExitToMall}

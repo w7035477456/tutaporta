@@ -43,6 +43,7 @@ import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { isRecordVaultRagUiEnabled } from 'config/recordVaultRagUiEnv';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import {
+  markMobileTutaNotesUploadSession,
   peekMobileTutaNotesUploadPending,
   peekMobileTutaNotesUploadSession
 } from 'utils/mobilePostLoginChoice';
@@ -349,6 +350,13 @@ export default function MyRecordVault() {
   }, []);
   const hideMyNoteShellForMobileUpload = isCompactViewport && mobileTutaNotesUploadSession;
 
+  const isMobileUploadOnly =
+    isCompactViewport &&
+    (searchParams.get('mobileUpload') === '1' ||
+      peekMobileTutaNotesUploadPending() ||
+      peekMobileTutaNotesUploadSession() ||
+      mobileTutaNotesUploadSession);
+
   /** Phone: only mall ↔ upload popup — never the desktop TutaNotes workspace. */
   useEffect(() => {
     if (!isCompactViewport) return;
@@ -366,6 +374,8 @@ export default function MyRecordVault() {
     clearRecordVaultE2eSession();
     accessUnlockedRef.current = false;
   }, []);
+
+  const mobileAutoOpenTriedRef = useRef(false);
 
   useEffect(() => {
     return registerVaultProfilesRecordsOpener((options = {}) => {
@@ -616,24 +626,42 @@ export default function MyRecordVault() {
   }, []);
 
   // Open TutaNotes Cloud / USB share one vault-password popup (Step 1), then resume icon unlock.
+  // Mobile upload-only: skip FDE entirely — go straight to Take photo / Choose from gallery.
   const handleOneDriveOpenClicked = useCallback(() => {
     if (accessUnlockedRef.current) return false;
     pendingOpenRef.current = { storageType: 'onedrive' };
+    if (isMobileUploadOnly) {
+      accessUnlockedRef.current = true;
+      clearRecordVaultE2eSession();
+      setAccessGateOpen(false);
+      setOneDriveProceedOpenToken((n) => n + 1);
+      return true;
+    }
     setAccessGateStorageType('onedrive');
     setAccessGateUsbMountPath('');
     setAccessGateOpen(true);
     return true;
-  }, []);
+  }, [isMobileUploadOnly]);
 
-  const handleUsbOpenClicked = useCallback((opts = {}) => {
-    if (accessUnlockedRef.current) return false;
-    const mountPath = String(opts?.mountPath ?? '').trim();
-    pendingOpenRef.current = { storageType: 'usb', mountPath };
-    setAccessGateStorageType('usb');
-    setAccessGateUsbMountPath(mountPath);
-    setAccessGateOpen(true);
-    return true;
-  }, []);
+  const handleUsbOpenClicked = useCallback(
+    (opts = {}) => {
+      if (accessUnlockedRef.current) return false;
+      const mountPath = String(opts?.mountPath ?? '').trim();
+      pendingOpenRef.current = { storageType: 'usb', mountPath };
+      if (isMobileUploadOnly) {
+        accessUnlockedRef.current = true;
+        clearRecordVaultE2eSession();
+        setAccessGateOpen(false);
+        setUsbProceedOpenToken((n) => n + 1);
+        return true;
+      }
+      setAccessGateStorageType('usb');
+      setAccessGateUsbMountPath(mountPath);
+      setAccessGateOpen(true);
+      return true;
+    },
+    [isMobileUploadOnly]
+  );
 
   const handleAccessUnlocked = useCallback(() => {
     accessUnlockedRef.current = true;
@@ -661,6 +689,38 @@ export default function MyRecordVault() {
   }, []);
 
   const showWorkspace = storageConfigLoaded && !sessionChecking;
+
+  /** Mobile mall tile: auto-open cloud (or USB) without showing Encrypt Password UI. */
+  useEffect(() => {
+    if (!isMobileUploadOnly || !showWorkspace) return;
+    if (oneDriveUnlocked || usbUnlocked) return;
+    if (mobileAutoOpenTriedRef.current) return;
+    mobileAutoOpenTriedRef.current = true;
+    markMobileTutaNotesUploadSession();
+    setMobileTutaNotesUploadSession(true);
+    accessUnlockedRef.current = true;
+    if (oneDriveOffered) {
+      setPaneFocus('onedrive');
+      pendingOpenRef.current = { storageType: 'onedrive' };
+      clearRecordVaultE2eSession();
+      setAccessGateOpen(false);
+      setOneDriveProceedOpenToken((n) => n + 1);
+    } else if (localUsbOffered) {
+      setPaneFocus('usb');
+      pendingOpenRef.current = { storageType: 'usb', mountPath: '' };
+      clearRecordVaultE2eSession();
+      setAccessGateOpen(false);
+      setUsbProceedOpenToken((n) => n + 1);
+    }
+  }, [
+    isMobileUploadOnly,
+    showWorkspace,
+    oneDriveUnlocked,
+    usbUnlocked,
+    oneDriveOffered,
+    localUsbOffered
+  ]);
+
   const showTabBar = oneDriveOffered && localUsbOffered;
   const showDual = showTabBar && paneFocus === 'both';
   const showCompare = showTabBar && paneFocus === 'compare';
@@ -753,7 +813,9 @@ export default function MyRecordVault() {
                 onOpenClicked={handleOneDriveOpenClicked}
                 proceedOpenToken={oneDriveProceedOpenToken}
                 accessFormatRefreshToken={oneDriveGateRefreshToken}
-                {...(tutaDriveMode && !localUsbOffered ? { autoOpenOnMount: true } : {})}
+                {...(tutaDriveMode && (isMobileUploadOnly || !localUsbOffered)
+                  ? { autoOpenOnMount: true }
+                  : {})}
               />
             </Box>
           ) : (
@@ -764,7 +826,9 @@ export default function MyRecordVault() {
               onOpenClicked={handleOneDriveOpenClicked}
               proceedOpenToken={oneDriveProceedOpenToken}
               accessFormatRefreshToken={oneDriveGateRefreshToken}
-              {...(tutaDriveMode && !localUsbOffered ? { autoOpenOnMount: true } : {})}
+              {...(tutaDriveMode && (isMobileUploadOnly || !localUsbOffered)
+                ? { autoOpenOnMount: true }
+                : {})}
             />
           )}
         </LoginScrollArea>
@@ -876,7 +940,7 @@ export default function MyRecordVault() {
       }}
     >
       <RecordVaultAccessGate
-        open={accessGateOpen}
+        open={accessGateOpen && !isMobileUploadOnly}
         onUnlocked={handleAccessUnlocked}
         onClose={handleAccessGateClose}
         storageType={accessGateStorageType}

@@ -29,6 +29,7 @@ import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv'
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import {
+  markMobileTutaPhotoUploadSession,
   peekMobileTutaPhotoUploadPending,
   peekMobileTutaPhotoUploadSession
 } from 'utils/mobilePostLoginChoice';
@@ -366,6 +367,13 @@ export default function MyPhotoAlbums() {
   }, []);
   const hideMyPhotoShellForMobileUpload = isCompactViewport && mobileTutaPhotoUploadSession;
 
+  const isMobileUploadOnly =
+    isCompactViewport &&
+    (searchParams.get('mobileUpload') === '1' ||
+      peekMobileTutaPhotoUploadPending() ||
+      peekMobileTutaPhotoUploadSession() ||
+      mobileTutaPhotoUploadSession);
+
   /** Phone: only mall ↔ upload popup — never the desktop TutaPhoto workspace. */
   useEffect(() => {
     if (!isCompactViewport) return;
@@ -382,6 +390,8 @@ export default function MyPhotoAlbums() {
     // Yellow E2E: DEK lives only in this tab — clear on each /myPhotoAlbums visit.
     clearPhotoAlbumsE2eSession();
   }, []);
+
+  const mobileAutoOpenTriedRef = useRef(false);
 
   useEffect(() => {
     return registerVaultProfilesRecordsOpener((options = {}) => {
@@ -677,26 +687,42 @@ export default function MyPhotoAlbums() {
   }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded, tutaDriveMode]);
 
   // Always show Full Disk Encryption before Open Cloud/USB (user may set password or Skip).
+  // Mobile upload-only: skip FDE entirely — go straight to Take photo / Choose from gallery.
   const handleOneDriveOpenClicked = useCallback(() => {
     pendingOpenRef.current = { storageType: 'onedrive' };
+    if (isMobileUploadOnly) {
+      clearPhotoAlbumsE2eSession();
+      setAccessGateOpen(false);
+      setOneDriveProceedOpenToken((n) => n + 1);
+      return true;
+    }
     setAccessGateStorageType('onedrive');
     setAccessGateUsbMountPath('');
     setAccessGateOpen(true);
     return true;
-  }, []);
+  }, [isMobileUploadOnly]);
 
   const handleUsbLocationChange = useCallback((label) => {
     setUsbVolumeLabel(String(label || '').trim());
   }, []);
 
-  const handleUsbOpenClicked = useCallback((opts = {}) => {
-    const mountPath = String(opts?.mountPath ?? '').trim();
-    pendingOpenRef.current = { storageType: 'usb', mountPath };
-    setAccessGateStorageType('usb');
-    setAccessGateUsbMountPath(mountPath);
-    setAccessGateOpen(true);
-    return true;
-  }, []);
+  const handleUsbOpenClicked = useCallback(
+    (opts = {}) => {
+      const mountPath = String(opts?.mountPath ?? '').trim();
+      pendingOpenRef.current = { storageType: 'usb', mountPath };
+      if (isMobileUploadOnly) {
+        clearPhotoAlbumsE2eSession();
+        setAccessGateOpen(false);
+        setUsbProceedOpenToken((n) => n + 1);
+        return true;
+      }
+      setAccessGateStorageType('usb');
+      setAccessGateUsbMountPath(mountPath);
+      setAccessGateOpen(true);
+      return true;
+    },
+    [isMobileUploadOnly]
+  );
 
   const handleAccessUnlocked = useCallback(() => {
     setAccessGateOpen(false);
@@ -723,6 +749,37 @@ export default function MyPhotoAlbums() {
   }, []);
 
   const showWorkspace = storageConfigLoaded && !sessionChecking;
+
+  /** Mobile mall tile: auto-open cloud (or USB) without showing Encrypt Password UI. */
+  useEffect(() => {
+    if (!isMobileUploadOnly || !showWorkspace) return;
+    if (oneDriveUnlocked || usbUnlocked) return;
+    if (mobileAutoOpenTriedRef.current) return;
+    mobileAutoOpenTriedRef.current = true;
+    markMobileTutaPhotoUploadSession();
+    setMobileTutaPhotoUploadSession(true);
+    if (oneDriveOffered) {
+      setPaneFocus('onedrive');
+      pendingOpenRef.current = { storageType: 'onedrive' };
+      clearPhotoAlbumsE2eSession();
+      setAccessGateOpen(false);
+      setOneDriveProceedOpenToken((n) => n + 1);
+    } else if (localUsbOffered) {
+      setPaneFocus('usb');
+      pendingOpenRef.current = { storageType: 'usb', mountPath: '' };
+      clearPhotoAlbumsE2eSession();
+      setAccessGateOpen(false);
+      setUsbProceedOpenToken((n) => n + 1);
+    }
+  }, [
+    isMobileUploadOnly,
+    showWorkspace,
+    oneDriveUnlocked,
+    usbUnlocked,
+    oneDriveOffered,
+    localUsbOffered
+  ]);
+
   const showTabBar = oneDriveOffered && localUsbOffered;
   const showDual = showTabBar && paneFocus === 'both';
   const showCompare = showTabBar && paneFocus === 'compare';
@@ -816,7 +873,7 @@ export default function MyPhotoAlbums() {
                 proceedOpenToken={oneDriveProceedOpenToken}
                 accessFormatRefreshToken={oneDriveGateRefreshToken}
                 {...(tutaDriveMode
-                  ? { autoOpenOnMount: !localUsbOffered }
+                  ? { autoOpenOnMount: isMobileUploadOnly || !localUsbOffered }
                   : { sessionNotice: oneDriveSessionNotice })}
               />
             </Box>
@@ -829,7 +886,7 @@ export default function MyPhotoAlbums() {
               proceedOpenToken={oneDriveProceedOpenToken}
               accessFormatRefreshToken={oneDriveGateRefreshToken}
               {...(tutaDriveMode
-                ? { autoOpenOnMount: !localUsbOffered }
+                ? { autoOpenOnMount: isMobileUploadOnly || !localUsbOffered }
                 : { sessionNotice: oneDriveSessionNotice })}
             />
           )}
@@ -944,7 +1001,7 @@ export default function MyPhotoAlbums() {
       }}
     >
       <PhotoAlbumsAccessGate
-        open={accessGateOpen}
+        open={accessGateOpen && !isMobileUploadOnly}
         onUnlocked={handleAccessUnlocked}
         onClose={handleAccessGateClose}
         storageType={accessGateStorageType}
