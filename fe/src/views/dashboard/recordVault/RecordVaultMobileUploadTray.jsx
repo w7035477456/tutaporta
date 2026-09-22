@@ -183,6 +183,7 @@ export default function RecordVaultMobileUploadTray({
   const [loading, setLoading] = useState(false);
   const [thumbUrls, setThumbUrls] = useState(() => ({}));
   const thumbUrlsRef = useRef({});
+  const filesRef = useRef([]);
 
   const revokeThumbs = useCallback(() => {
     Object.values(thumbUrlsRef.current).forEach((url) => {
@@ -197,19 +198,27 @@ export default function RecordVaultMobileUploadTray({
   }, []);
 
   const loadFiles = useCallback(async () => {
-    const hadFiles = (thumbUrlsRef.current && Object.keys(thumbUrlsRef.current).length > 0) || false;
+    const hadFiles =
+      filesRef.current.length > 0 || Object.keys(thumbUrlsRef.current || {}).length > 0;
     // Only show "Loading…" on the first empty pass — avoid blanking thumbs every poll.
     if (!hadFiles) setLoading(true);
     try {
       const listed = await listMobileUploadFiles(stagingProduct);
-      setFiles(listed);
+      const prevNames = filesRef.current.map((e) => e?.name).join('\0');
+      const nextNames = listed.map((e) => e?.name).join('\0');
+      const sameList = prevNames === nextNames;
 
-      const nextNames = new Set(listed.map((e) => e?.name).filter(Boolean));
-      const prev = thumbUrlsRef.current || {};
+      filesRef.current = listed;
+      if (!sameList) setFiles(listed);
+
+      const prev = { ...thumbUrlsRef.current };
+      let fetchedNewThumb = false;
+      let removedThumb = false;
 
       // Drop thumbs for files that left the folder (revoke only those).
       Object.keys(prev).forEach((name) => {
-        if (!nextNames.has(name)) {
+        if (!nameSet.has(name)) {
+          removedThumb = true;
           try {
             URL.revokeObjectURL(prev[name]);
           } catch {
@@ -228,16 +237,20 @@ export default function RecordVaultMobileUploadTray({
           try {
             const blob = await fetchMobileUploadFileBlob(name, stagingProduct);
             prev[name] = URL.createObjectURL(blob);
+            fetchedNewThumb = true;
           } catch {
             // skip thumb
           }
         })
       );
 
-      thumbUrlsRef.current = { ...prev };
-      setThumbUrls({ ...prev });
+      thumbUrlsRef.current = prev;
+      if (!sameList || fetchedNewThumb || removedThumb) {
+        setThumbUrls({ ...prev });
+      }
     } catch (err) {
       setFiles([]);
+      filesRef.current = [];
       revokeThumbs();
       onError?.(err?.response?.data?.error || err?.message || 'Failed to list mobile uploads');
     } finally {
@@ -248,10 +261,18 @@ export default function RecordVaultMobileUploadTray({
   useEffect(() => {
     if (!active) return undefined;
     void loadFiles();
-    return () => {
-      revokeThumbs();
-    };
-  }, [active, refreshToken, loadFiles, revokeThumbs]);
+    return undefined;
+  }, [active, refreshToken, loadFiles]);
+
+  useEffect(() => {
+    if (active) return undefined;
+    revokeThumbs();
+    filesRef.current = [];
+    setFiles([]);
+    return undefined;
+  }, [active, revokeThumbs]);
+
+  useEffect(() => () => revokeThumbs(), [revokeThumbs]);
 
   useEffect(() => {
     if (!active) return undefined;
