@@ -184,6 +184,8 @@ export default function RecordVaultMobileUploadTray({
   const [thumbUrls, setThumbUrls] = useState(() => ({}));
   const thumbUrlsRef = useRef({});
   const filesRef = useRef([]);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   const revokeThumbs = useCallback(() => {
     Object.values(thumbUrlsRef.current).forEach((url) => {
@@ -207,9 +209,23 @@ export default function RecordVaultMobileUploadTray({
       const prevNames = filesRef.current.map((e) => e?.name).join('\0');
       const nextNames = listed.map((e) => e?.name).join('\0');
       const sameList = prevNames === nextNames;
+      const nameSet = new Set(listed.map((e) => e?.name).filter(Boolean));
 
       filesRef.current = listed;
       if (!sameList) setFiles(listed);
+
+      // Unchanged folder + thumbs already cached → skip blob work (stops poll blink).
+      if (
+        sameList &&
+        listed.every(
+          (e) =>
+            !e?.name ||
+            thumbUrlsRef.current[e.name] ||
+            isVideoContentType(e.contentType, e.name)
+        )
+      ) {
+        return;
+      }
 
       const prev = { ...thumbUrlsRef.current };
       let fetchedNewThumb = false;
@@ -249,14 +265,14 @@ export default function RecordVaultMobileUploadTray({
         setThumbUrls({ ...prev });
       }
     } catch (err) {
-      setFiles([]);
-      filesRef.current = [];
-      revokeThumbs();
-      onError?.(err?.response?.data?.error || err?.message || 'Failed to list mobile uploads');
+      // Keep existing thumbs on transient poll errors — clearing them caused the blink.
+      onErrorRef.current?.(
+        err?.response?.data?.error || err?.message || 'Failed to list mobile uploads'
+      );
     } finally {
       setLoading(false);
     }
-  }, [onError, revokeThumbs, stagingProduct]);
+  }, [stagingProduct]);
 
   useEffect(() => {
     if (!active) return undefined;
