@@ -29,10 +29,14 @@ import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv'
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import {
+  clearMobileTutaPhotoUploadSession,
+  consumeMobileTutaPhotoUploadPending,
   markMobileTutaPhotoUploadSession,
   peekMobileTutaPhotoUploadPending,
   peekMobileTutaPhotoUploadSession
 } from 'utils/mobilePostLoginChoice';
+import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
+import RecordVaultMobileDirectUploadDialog from '../recordVault/RecordVaultMobileDirectUploadDialog';
 import PhotoAlbumsAccessGate from './PhotoAlbumsAccessGate';
 import PhotoAlbumsOneDriveGate from './PhotoAlbumsOneDriveGate';
 import PhotoAlbumsTutaDriveGate from './PhotoAlbumsTutaDriveGate';
@@ -367,12 +371,38 @@ export default function MyPhotoAlbums() {
   }, []);
   const hideMyPhotoShellForMobileUpload = isCompactViewport && mobileTutaPhotoUploadSession;
 
+  /** Compact + upload intent only — never treat desktop as mobile-upload. */
   const isMobileUploadOnly =
     isCompactViewport &&
     (searchParams.get('mobileUpload') === '1' ||
       peekMobileTutaPhotoUploadPending() ||
       peekMobileTutaPhotoUploadSession() ||
       mobileTutaPhotoUploadSession);
+
+  /** Desktop must never inherit a phone upload session (or unlock) from an earlier mobile visit. */
+  useEffect(() => {
+    if (isCompactViewport) return;
+    const hadMobileSession =
+      peekMobileTutaPhotoUploadSession() || mobileTutaPhotoUploadSession;
+    clearMobileTutaPhotoUploadSession();
+    setMobileTutaPhotoUploadSession(false);
+    if (!hadMobileSession) return;
+    // Prior mobile path unlocked vault without FDE — force logoff so desktop asks for password again.
+    void (async () => {
+      try {
+        if (oneDriveOffered) await logoffPhotoAlbumsStorage({ storageType: 'onedrive' });
+      } catch {
+        // ignore
+      }
+      try {
+        if (localUsbOffered) await logoffPhotoAlbumsStorage({ storageType: 'usb' });
+      } catch {
+        // ignore
+      }
+      setOneDriveUnlocked(false);
+      setUsbUnlocked(false);
+    })();
+  }, [isCompactViewport, mobileTutaPhotoUploadSession, oneDriveOffered, localUsbOffered]);
 
   /** Phone: only mall ↔ upload popup — never the desktop TutaPhoto workspace. */
   useEffect(() => {
@@ -391,7 +421,19 @@ export default function MyPhotoAlbums() {
     clearPhotoAlbumsE2eSession();
   }, []);
 
-  const mobileAutoOpenTriedRef = useRef(false);
+  /** Mobile mall tile: stage-only upload sheet — do not unlock vault (desktop must still ask FDE). */
+  useEffect(() => {
+    if (!isMobileUploadOnly) return;
+    markMobileTutaPhotoUploadSession();
+    setMobileTutaPhotoUploadSession(true);
+    consumeMobileTutaPhotoUploadPending();
+    if (searchParams.get('mobileUpload') === '1') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('mobileUpload');
+      // replace query without remounting
+      window.history.replaceState(null, '', `${window.location.pathname}${next.toString() ? `?${next}` : ''}`);
+    }
+  }, [isMobileUploadOnly, searchParams]);
 
   useEffect(() => {
     return registerVaultProfilesRecordsOpener((options = {}) => {
@@ -687,42 +729,27 @@ export default function MyPhotoAlbums() {
   }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded, tutaDriveMode]);
 
   // Always show Full Disk Encryption before Open Cloud/USB (user may set password or Skip).
-  // Mobile upload-only: skip FDE entirely — go straight to Take photo / Choose from gallery.
+  // Mobile upload uses a separate sheet and never reaches these handlers.
   const handleOneDriveOpenClicked = useCallback(() => {
     pendingOpenRef.current = { storageType: 'onedrive' };
-    if (isMobileUploadOnly) {
-      clearPhotoAlbumsE2eSession();
-      setAccessGateOpen(false);
-      setOneDriveProceedOpenToken((n) => n + 1);
-      return true;
-    }
     setAccessGateStorageType('onedrive');
     setAccessGateUsbMountPath('');
     setAccessGateOpen(true);
     return true;
-  }, [isMobileUploadOnly]);
+  }, []);
 
   const handleUsbLocationChange = useCallback((label) => {
     setUsbVolumeLabel(String(label || '').trim());
   }, []);
 
-  const handleUsbOpenClicked = useCallback(
-    (opts = {}) => {
-      const mountPath = String(opts?.mountPath ?? '').trim();
-      pendingOpenRef.current = { storageType: 'usb', mountPath };
-      if (isMobileUploadOnly) {
-        clearPhotoAlbumsE2eSession();
-        setAccessGateOpen(false);
-        setUsbProceedOpenToken((n) => n + 1);
-        return true;
-      }
-      setAccessGateStorageType('usb');
-      setAccessGateUsbMountPath(mountPath);
-      setAccessGateOpen(true);
-      return true;
-    },
-    [isMobileUploadOnly]
-  );
+  const handleUsbOpenClicked = useCallback((opts = {}) => {
+    const mountPath = String(opts?.mountPath ?? '').trim();
+    pendingOpenRef.current = { storageType: 'usb', mountPath };
+    setAccessGateStorageType('usb');
+    setAccessGateUsbMountPath(mountPath);
+    setAccessGateOpen(true);
+    return true;
+  }, []);
 
   const handleAccessUnlocked = useCallback(() => {
     setAccessGateOpen(false);
@@ -749,37 +776,6 @@ export default function MyPhotoAlbums() {
   }, []);
 
   const showWorkspace = storageConfigLoaded && !sessionChecking;
-
-  /** Mobile mall tile: auto-open cloud (or USB) without showing Encrypt Password UI. */
-  useEffect(() => {
-    if (!isMobileUploadOnly || !showWorkspace) return;
-    if (oneDriveUnlocked || usbUnlocked) return;
-    if (mobileAutoOpenTriedRef.current) return;
-    mobileAutoOpenTriedRef.current = true;
-    markMobileTutaPhotoUploadSession();
-    setMobileTutaPhotoUploadSession(true);
-    if (oneDriveOffered) {
-      setPaneFocus('onedrive');
-      pendingOpenRef.current = { storageType: 'onedrive' };
-      clearPhotoAlbumsE2eSession();
-      setAccessGateOpen(false);
-      setOneDriveProceedOpenToken((n) => n + 1);
-    } else if (localUsbOffered) {
-      setPaneFocus('usb');
-      pendingOpenRef.current = { storageType: 'usb', mountPath: '' };
-      clearPhotoAlbumsE2eSession();
-      setAccessGateOpen(false);
-      setUsbProceedOpenToken((n) => n + 1);
-    }
-  }, [
-    isMobileUploadOnly,
-    showWorkspace,
-    oneDriveUnlocked,
-    usbUnlocked,
-    oneDriveOffered,
-    localUsbOffered
-  ]);
-
   const showTabBar = oneDriveOffered && localUsbOffered;
   const showDual = showTabBar && paneFocus === 'both';
   const showCompare = showTabBar && paneFocus === 'compare';
@@ -873,7 +869,7 @@ export default function MyPhotoAlbums() {
                 proceedOpenToken={oneDriveProceedOpenToken}
                 accessFormatRefreshToken={oneDriveGateRefreshToken}
                 {...(tutaDriveMode
-                  ? { autoOpenOnMount: isMobileUploadOnly || !localUsbOffered }
+                  ? { autoOpenOnMount: !localUsbOffered }
                   : { sessionNotice: oneDriveSessionNotice })}
               />
             </Box>
@@ -886,7 +882,7 @@ export default function MyPhotoAlbums() {
               proceedOpenToken={oneDriveProceedOpenToken}
               accessFormatRefreshToken={oneDriveGateRefreshToken}
               {...(tutaDriveMode
-                ? { autoOpenOnMount: isMobileUploadOnly || !localUsbOffered }
+                ? { autoOpenOnMount: !localUsbOffered }
                 : { sessionNotice: oneDriveSessionNotice })}
             />
           )}
@@ -1001,7 +997,7 @@ export default function MyPhotoAlbums() {
       }}
     >
       <PhotoAlbumsAccessGate
-        open={accessGateOpen && !isMobileUploadOnly}
+        open={accessGateOpen}
         onUnlocked={handleAccessUnlocked}
         onClose={handleAccessGateClose}
         storageType={accessGateStorageType}
@@ -1009,6 +1005,24 @@ export default function MyPhotoAlbums() {
         onVaultFormatted={handleAccessVaultFormatted}
       />
 
+      {isMobileUploadOnly ? (
+        <RecordVaultMobileDirectUploadDialog
+          open
+          onClose={() => {}}
+          disabled={false}
+          title="Upload photo to TutaPhoto"
+          noteTitle="Mobile Upload"
+          onPickFile={async () => true}
+          onExitToMall={async () => {
+            clearMobileTutaPhotoUploadSession();
+            setMobileTutaPhotoUploadSession(false);
+          }}
+          product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
+        />
+      ) : null}
+
+      {isMobileUploadOnly ? null : (
+      <>
       <BusyHourglassOverlay
         open={!storageConfigLoaded || sessionChecking}
         label="Loading vault"
@@ -1176,6 +1190,9 @@ export default function MyPhotoAlbums() {
           </Box>
         </Box>
       ) : null}
+      </Box>
+      </>
+      )}
 
       {profilesRecordsOpen ? (
         <Box
@@ -1197,7 +1214,6 @@ export default function MyPhotoAlbums() {
           />
         </Box>
       ) : null}
-      </Box>
     </Box>
   );
 }

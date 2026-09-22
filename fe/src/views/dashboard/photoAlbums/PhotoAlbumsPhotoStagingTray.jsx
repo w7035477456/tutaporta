@@ -13,6 +13,12 @@ import {
   isFilesExplorerDrag,
   takeFilesExplorerDragFilesAsync
 } from './photoAlbumsFilesExplorerDrag';
+import {
+  isRecordVaultMobileUploadDrag,
+  materializeRecordVaultMobileUploadFile,
+  readRecordVaultMobileUploadDragFileName
+} from '../recordVault/RecordVaultMobileUploadTray';
+import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { getStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
 import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
@@ -430,6 +436,7 @@ export default function PhotoAlbumsPhotoStagingTray({
 
   const isOsFileDrag = (dataTransfer) => {
     if (isFilesExplorerDrag(dataTransfer)) return true;
+    if (isRecordVaultMobileUploadDrag(dataTransfer)) return true;
     const types = dataTransfer?.types ? Array.from(dataTransfer.types) : [];
     return types.includes('Files') && !isStagedAttachmentDrag(dataTransfer);
   };
@@ -469,6 +476,27 @@ export default function PhotoAlbumsPhotoStagingTray({
         const pageReturnId = e.dataTransfer.getData('application/x-pa-page-attachment');
         if (pageReturnId) {
           onReturnFromPage?.(Number(pageReturnId));
+          return;
+        }
+
+        // Yellow Mobile Upload strip → green Thumbnail Tray (stage into album vault).
+        if (isRecordVaultMobileUploadDrag(e.dataTransfer)) {
+          const stagedName = readRecordVaultMobileUploadDragFileName(e.dataTransfer);
+          if (!stagedName) return;
+          void (async () => {
+            try {
+              const file = await materializeRecordVaultMobileUploadFile(
+                stagedName,
+                MOBILE_UPLOAD_PRODUCT_TUTAPHOTO
+              );
+              onOsFiles?.([file]);
+            } catch (err) {
+              console.warn(
+                '[PhotoAlbumsPhotoStagingTray] mobile upload drop failed',
+                err?.message ?? err
+              );
+            }
+          })();
           return;
         }
 

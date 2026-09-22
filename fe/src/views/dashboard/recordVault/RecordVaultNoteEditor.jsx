@@ -17,6 +17,10 @@ import {
   shouldHandleRecordVaultPaste
 } from './recordVaultPasteFromClipboard';
 import {
+  isRecordVaultMobileUploadDrag,
+  RV_MOBILE_UPLOAD_DRAG_MIME
+} from './RecordVaultMobileUploadTray';
+import {
   RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
   recordVaultThemeDaynightShellSx
 } from './recordVaultNoteFontTokens';
@@ -24,6 +28,16 @@ import RecordVaultEditorToolbar from './RecordVaultEditorToolbar';
 import './recordVaultEditor.scss';
 
 const EMPTY_DOC = '<p></p>';
+
+/** Filenames TipTap must not insert as body text (workspace handles the real drop). */
+function isRecordVaultDragJunkPlain(plain) {
+  const t = String(plain || '').trim();
+  if (!t || t.length > 240) return false;
+  if (/\s/.test(t)) return false;
+  return /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?|mp4|mov|webm|mkv|avi|pdf|docx?|xlsx?|pptx?|txt|html?|md)$/i.test(
+    t
+  );
+}
 
 /** Scroll the currently active (bold-blinking) search hit into the middle of view. */
 function scrollActiveHitIntoView(editor) {
@@ -137,6 +151,33 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
             lastPasteAtRef.current = Date.now();
           });
         return true;
+      },
+      /**
+       * OS / Mobile Upload / vault-list drags are handled by the workspace pane.
+       * TipTap must not insert the filename as body text (that races autosave and
+       * can surface a false "Note not found" after a successful attach).
+       */
+      handleDrop: (_view, event, _slice, moved) => {
+        if (moved) return false;
+        const dt = event?.dataTransfer;
+        if (!dt) return false;
+        if (isRecordVaultMobileUploadDrag(dt)) return true;
+        const types = dt.types ? Array.from(dt.types) : [];
+        if (
+          types.includes('Files') ||
+          types.includes('DownloadURL') ||
+          types.includes(RV_MOBILE_UPLOAD_DRAG_MIME) ||
+          types.includes('application/x-record-vault-note-id') ||
+          types.includes('application/x-record-vault-note-ids') ||
+          types.includes('application/x-record-vault-notebook-id') ||
+          types.includes('application/x-record-vault-shortcut-id') ||
+          types.includes('application/x-record-vault-cross-pane')
+        ) {
+          return true;
+        }
+        const plain = String(dt.getData?.('text/plain') || '').trim();
+        if (isRecordVaultDragJunkPlain(plain)) return true;
+        return false;
       }
     },
     onUpdate: ({ editor: e }) => {

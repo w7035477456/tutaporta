@@ -1826,6 +1826,9 @@ export default function RecordVaultWorkspacePane({
   const loadedNoteIdRef = useRef(null);
   const persistNoteRef = useRef(null);
   const persistNoteInFlightRef = useRef(false);
+  /** Suppress false "Note not found" popup right after a successful mobile/OS attach. */
+  const recentAttachOkAtRef = useRef(0);
+  const attachPersistRetryRef = useRef(false);
   const draftRef = useRef({ openNoteTitlePlain: '' });
   // Snapshot of the note title when the editor title box gains focus, so a
   // duplicate name entered there can be reverted to the last good value.
@@ -3504,7 +3507,26 @@ export default function RecordVaultWorkspacePane({
       patchNoteRowInTree(noteId, { body_text: html, content_loaded: true });
       indexNoteSearchText(noteId, stripRecordVaultHtml(html), noteName);
     } catch (err) {
-      setError(readRecordVaultApiError(err, 'Failed to save note'));
+      const message = readRecordVaultApiError(err, 'Failed to save note');
+      const recentAttach = Date.now() - recentAttachOkAtRef.current < 8000;
+      if (recentAttach && /note not found/i.test(String(message || ''))) {
+        // Attach already succeeded and is visible; a transient 404 on body save
+        // must not scare the user. Retry once, then stay quiet if still failing.
+        if (!attachPersistRetryRef.current) {
+          attachPersistRetryRef.current = true;
+          window.setTimeout(() => {
+            void (async () => {
+              try {
+                await persistNoteRef.current?.();
+              } finally {
+                attachPersistRetryRef.current = false;
+              }
+            })();
+          }, 500);
+        }
+        return;
+      }
+      setError(message);
     } finally {
       persistNoteInFlightRef.current = false;
       bumpVaultUsage();
@@ -3578,6 +3600,7 @@ export default function RecordVaultWorkspacePane({
               clearTimeout(saveTimerRef.current);
               saveTimerRef.current = null;
             }
+            recentAttachOkAtRef.current = Date.now();
             void persistNoteRef.current?.();
           }
         }
@@ -3691,6 +3714,7 @@ export default function RecordVaultWorkspacePane({
 
   useEffect(() => {
     if (!unlocked || mobileDirectUploadOpen) return undefined;
+    if (!isCompactViewport) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaNotesUploadPending();
     const mobileUpload =
@@ -3712,6 +3736,7 @@ export default function RecordVaultWorkspacePane({
     busy,
     mobileDirectUploadOpen,
     mobileTutaNotesUploadUi,
+    isCompactViewport,
     searchParams,
     setSearchParams
   ]);

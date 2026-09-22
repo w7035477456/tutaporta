@@ -1,33 +1,100 @@
 import PropTypes from 'prop-types';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
-import GreenButton from 'ui-component/GreenButton';
 import RecordVaultMobileUploadTray from 'views/dashboard/recordVault/RecordVaultMobileUploadTray';
 import { recordVaultPopupCloseSx } from 'views/dashboard/recordVault/recordVaultPopupCloseSx';
 import { stageMobileUploadFile } from 'api/photoAlbumsMobileUploadFolderFe';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import {
+  GREEN_BUTTON_BORDER,
+  GREEN_BUTTON_DISABLED_BG,
+  GREEN_BUTTON_ENABLED_BG,
+  GREEN_BUTTON_TEXT,
+  greenButtonSx
+} from 'config/greenButton';
+import {
+  MOBILE_UPLOAD_PRODUCT_TUTADATES,
   MOBILE_UPLOAD_PRODUCT_TUTANOTES,
+  MOBILE_UPLOAD_PRODUCT_TUTAPHOTO,
   requireMobileUploadProduct
 } from 'constants/mobileUploadProduct';
+import tutaAlbumsImg from 'assets/images/tutaalbums.png';
+import tutaDatesImg from 'assets/images/tutaDates.png';
+import tutaNotesImg from 'assets/images/tutaNotes.png';
 
 const ACCEPT =
   'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff';
 
-/** Compact: opaque white sheet — popup on top, uploaded thumbnails stacked below, nothing else. */
+/** Compact: full-page sheet behind the red popup — theme secondary (not white). */
 const mobileSheetOverlaySx = {
-  bgcolor: '#ffffff',
+  bgcolor: 'var(--theme-secondary-color)',
   flexDirection: 'column',
   alignItems: 'stretch',
   justifyContent: 'flex-start',
   overflowY: 'auto',
   px: 0.75,
   py: 0.75
+};
+
+/** Force green even when ColorTemplate7 / AuthCard restyles nested MuiButtons. */
+const mobileGreenActionButtonSx = {
+  ...greenButtonSx(),
+  width: '100%',
+  bgcolor: `${GREEN_BUTTON_ENABLED_BG} !important`,
+  backgroundColor: `${GREEN_BUTTON_ENABLED_BG} !important`,
+  backgroundImage: 'none !important',
+  color: `${GREEN_BUTTON_TEXT} !important`,
+  WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+  border: `${GREEN_BUTTON_BORDER} !important`,
+  '&.MuiButton-root': {
+    bgcolor: `${GREEN_BUTTON_ENABLED_BG} !important`,
+    backgroundColor: `${GREEN_BUTTON_ENABLED_BG} !important`,
+    backgroundImage: 'none !important',
+    color: `${GREEN_BUTTON_TEXT} !important`,
+    WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+    border: `${GREEN_BUTTON_BORDER} !important`
+  },
+  '@media (hover: hover)': {
+    '&:hover:not(.Mui-disabled)': {
+      bgcolor: `${GREEN_BUTTON_ENABLED_BG} !important`,
+      backgroundColor: `${GREEN_BUTTON_ENABLED_BG} !important`,
+      backgroundImage: 'none !important',
+      color: `${GREEN_BUTTON_TEXT} !important`,
+      WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+      border: `${GREEN_BUTTON_BORDER} !important`
+    }
+  },
+  '&.Mui-disabled': {
+    bgcolor: `${GREEN_BUTTON_DISABLED_BG} !important`,
+    backgroundColor: `${GREEN_BUTTON_DISABLED_BG} !important`,
+    backgroundImage: 'none !important',
+    color: `${GREEN_BUTTON_TEXT} !important`,
+    WebkitTextFillColor: `${GREEN_BUTTON_TEXT} !important`,
+    border: `${GREEN_BUTTON_BORDER} !important`
+  }
+};
+
+const PRODUCT_MOBILE_UI = {
+  [MOBILE_UPLOAD_PRODUCT_TUTANOTES]: {
+    logo: tutaNotesImg,
+    logoAlt: 'Tuta Notes',
+    defaultTitle: 'Upload photo to TutaNotes'
+  },
+  [MOBILE_UPLOAD_PRODUCT_TUTAPHOTO]: {
+    logo: tutaAlbumsImg,
+    logoAlt: 'Tuta Albums',
+    defaultTitle: 'Upload photo to TutaPhoto'
+  },
+  [MOBILE_UPLOAD_PRODUCT_TUTADATES]: {
+    logo: tutaDatesImg,
+    logoAlt: 'Tuta Dates',
+    defaultTitle: 'Upload photo to TutaDates'
+  }
 };
 
 /**
@@ -43,7 +110,7 @@ export default function RecordVaultMobileDirectUploadDialog({
   onExitToMall,
   disabled = false,
   noteTitle = '',
-  title = 'Upload to current note',
+  title = '',
   product = MOBILE_UPLOAD_PRODUCT_TUTANOTES
 }) {
   const navigate = useNavigate();
@@ -55,6 +122,11 @@ export default function RecordVaultMobileDirectUploadDialog({
   const [thumbsRefreshToken, setThumbsRefreshToken] = useState(0);
   const isCompact = useCompactLoginViewport();
   const stagingProduct = requireMobileUploadProduct(product);
+  const productUi = useMemo(
+    () => PRODUCT_MOBILE_UI[stagingProduct] || PRODUCT_MOBILE_UI[MOBILE_UPLOAD_PRODUCT_TUTANOTES],
+    [stagingProduct]
+  );
+  const dialogTitle = String(title || '').trim() || productUi.defaultTitle;
 
   /**
    * Mobile: X closes the whole upload page → back to the mall (vault panes log off first).
@@ -149,7 +221,33 @@ export default function RecordVaultMobileDirectUploadDialog({
         ) : null
       }
     >
-      <ColorTemplate7PopupLargeDark.Title>{title}</ColorTemplate7PopupLargeDark.Title>
+      {isCompact ? (
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: '100%',
+            pt: 0.5,
+            pb: 0.25
+          }}
+        >
+          <Box
+            component="img"
+            src={productUi.logo}
+            alt={productUi.logoAlt}
+            sx={{
+              maxWidth: 'min(72vw, 220px)',
+              maxHeight: 88,
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block'
+            }}
+          />
+        </Box>
+      ) : null}
+      <ColorTemplate7PopupLargeDark.Title>{dialogTitle}</ColorTemplate7PopupLargeDark.Title>
       <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
         <Typography variant="body2" sx={{ textAlign: 'center' }}>
           {noteTitle
@@ -162,22 +260,22 @@ export default function RecordVaultMobileDirectUploadDialog({
           </Typography>
         ) : null}
         <Stack spacing={1.25} sx={{ width: '100%', alignItems: 'stretch' }}>
-          <GreenButton
+          <ColorTemplate7PopupLargeDark.ActionButton
             type="button"
             disabled={disabled || busy}
             onClick={() => cameraInputRef.current?.click()}
-            sx={{ width: '100%' }}
+            sx={isCompact ? mobileGreenActionButtonSx : { width: '100%' }}
           >
             Take photo
-          </GreenButton>
-          <GreenButton
+          </ColorTemplate7PopupLargeDark.ActionButton>
+          <ColorTemplate7PopupLargeDark.ActionButton
             type="button"
             disabled={disabled || busy}
             onClick={() => galleryInputRef.current?.click()}
-            sx={{ width: '100%' }}
+            sx={isCompact ? mobileGreenActionButtonSx : { width: '100%' }}
           >
             Choose from gallery
-          </GreenButton>
+          </ColorTemplate7PopupLargeDark.ActionButton>
         </Stack>
         {busy ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, py: 1 }}>
