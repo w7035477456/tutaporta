@@ -1241,6 +1241,18 @@ export async function putUserCustomization(req, res) {
       }
     }
     const refreshed = await selectCustomizationRow(me);
+    const enrollmentFromDb = mallAppEnrollmentFromDbRow(refreshed);
+    const enrollmentPayload = {
+      tutaDatesEnabled: Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaDatesEnabled')
+        ? Boolean(mallEnrollmentPatch.tutaDatesEnabled)
+        : enrollmentFromDb.tutaDatesEnabled,
+      tutaNotesEnabled: Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaNotesEnabled')
+        ? Boolean(mallEnrollmentPatch.tutaNotesEnabled)
+        : enrollmentFromDb.tutaNotesEnabled,
+      tutaAlbumsEnabled: Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaAlbumsEnabled')
+        ? Boolean(mallEnrollmentPatch.tutaAlbumsEnabled)
+        : enrollmentFromDb.tutaAlbumsEnabled
+    };
     return res.status(200).json(rowToPayload({
       chat_font_size: nextChatFontSize,
       mynote_font_size: nextMynoteFontSize,
@@ -1271,11 +1283,9 @@ export async function putUserCustomization(req, res) {
         first_visit_acquaintbuddies: firstVisitPatch.firstVisitAcquaintBuddies,
         first_visit_rec_biorequest: firstVisitPatch.firstVisitRecBioRequest
       }),
-      ...mallAppEnrollmentFromDbRow(refreshed ?? {
-        tuta_dates_enabled: mallEnrollmentPatch.tutaDatesEnabled,
-        tuta_notes_enabled: mallEnrollmentPatch.tutaNotesEnabled,
-        tuta_albums_enabled: mallEnrollmentPatch.tutaAlbumsEnabled
-      })
+      tuta_dates_enabled: enrollmentPayload.tutaDatesEnabled,
+      tuta_notes_enabled: enrollmentPayload.tutaNotesEnabled,
+      tuta_albums_enabled: enrollmentPayload.tutaAlbumsEnabled
     }));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {

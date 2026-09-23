@@ -76,6 +76,56 @@ const optionTextSx = {
   minWidth: 0
 };
 
+/** Checked = green check (not red X — X looked like the close button and felt “stuck”). */
+function EnrollmentCheckedIcon() {
+  return (
+    <Box
+      sx={{
+        width: { xs: '5vw', sm: '2vw' },
+        height: { xs: '5vw', sm: '2vw' },
+        minWidth: 22,
+        minHeight: 22,
+        maxWidth: 36,
+        maxHeight: 36,
+        boxSizing: 'border-box',
+        bgcolor: '#fff',
+        border: '3px solid #c62828',
+        borderRadius: 0.5,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#2e7d32',
+        WebkitTextFillColor: '#2e7d32',
+        fontWeight: 900,
+        fontSize: '1.1em',
+        lineHeight: 1
+      }}
+    >
+      ✓
+    </Box>
+  );
+}
+
+function EnrollmentUncheckedIcon() {
+  return (
+    <Box
+      sx={{
+        width: { xs: '5vw', sm: '2vw' },
+        height: { xs: '5vw', sm: '2vw' },
+        minWidth: 22,
+        minHeight: 22,
+        maxWidth: 36,
+        maxHeight: 36,
+        boxSizing: 'border-box',
+        bgcolor: '#fff',
+        border: '3px solid #c62828',
+        borderRadius: 0.5,
+        flexShrink: 0
+      }}
+    />
+  );
+}
+
 /**
  * After each login: enroll in TutaDates / TutaNotes / TutaAlbums.
  * X closes and leaves the user on /mall. Choices persist on user_customization.
@@ -148,28 +198,46 @@ export default function MallAppEnrollmentDialog({
   };
 
   const setValue = useCallback((key, checked) => {
-    if (key === 'tutaDatesEnabled') setDates(checked);
-    else if (key === 'tutaNotesEnabled') setNotes(checked);
-    else if (key === 'tutaAlbumsEnabled') setAlbums(checked);
+    if (key === 'tutaDatesEnabled') setDates(Boolean(checked));
+    else if (key === 'tutaNotesEnabled') setNotes(Boolean(checked));
+    else if (key === 'tutaAlbumsEnabled') setAlbums(Boolean(checked));
   }, []);
 
   const persist = useCallback(
     async (patch) => {
-      try {
-        const prefs = await saveUserCustomization(patch);
+      // Always keep the values we just wrote — PUT responses can omit/mis-map false
+      // and `x !== false` would snap the box back to checked while DB is unchecked.
+      const applyPatchLocally = () => {
         if (Object.prototype.hasOwnProperty.call(patch, 'tutaDatesEnabled')) {
-          setDates(prefs.tutaDatesEnabled !== false);
+          setDates(Boolean(patch.tutaDatesEnabled));
         }
         if (Object.prototype.hasOwnProperty.call(patch, 'tutaNotesEnabled')) {
-          setNotes(prefs.tutaNotesEnabled !== false);
+          setNotes(Boolean(patch.tutaNotesEnabled));
         }
         if (Object.prototype.hasOwnProperty.call(patch, 'tutaAlbumsEnabled')) {
-          setAlbums(prefs.tutaAlbumsEnabled !== false);
+          setAlbums(Boolean(patch.tutaAlbumsEnabled));
         }
-        onEnrollmentChange?.(prefs);
-        return prefs;
+      };
+      applyPatchLocally();
+      try {
+        const prefs = await saveUserCustomization(patch);
+        applyPatchLocally();
+        const merged = {
+          ...prefs,
+          tutaDatesEnabled: Object.prototype.hasOwnProperty.call(patch, 'tutaDatesEnabled')
+            ? Boolean(patch.tutaDatesEnabled)
+            : prefs.tutaDatesEnabled !== false,
+          tutaNotesEnabled: Object.prototype.hasOwnProperty.call(patch, 'tutaNotesEnabled')
+            ? Boolean(patch.tutaNotesEnabled)
+            : prefs.tutaNotesEnabled !== false,
+          tutaAlbumsEnabled: Object.prototype.hasOwnProperty.call(patch, 'tutaAlbumsEnabled')
+            ? Boolean(patch.tutaAlbumsEnabled)
+            : prefs.tutaAlbumsEnabled !== false
+        };
+        onEnrollmentChange?.(merged);
+        return merged;
       } catch {
-        // Keep optimistic local values so a failed save does not snap boxes back on.
+        applyPatchLocally();
         onEnrollmentChange?.({
           tutaDatesEnabled: Object.prototype.hasOwnProperty.call(patch, 'tutaDatesEnabled')
             ? Boolean(patch.tutaDatesEnabled)
@@ -189,8 +257,9 @@ export default function MallAppEnrollmentDialog({
 
   const handleToggle = useCallback(
     (key, checked) => {
-      setValue(key, checked);
-      void persist({ [key]: checked });
+      const next = Boolean(checked);
+      setValue(key, next);
+      void persist({ [key]: next });
     },
     [persist, setValue]
   );
@@ -229,23 +298,29 @@ export default function MallAppEnrollmentDialog({
             return (
               <Box
                 key={opt.key}
-                component="label"
+                role="checkbox"
+                aria-checked={checked}
+                aria-label={opt.label}
+                tabIndex={0}
                 sx={optionRowSx}
                 {...guestDemoAllowProps()}
-                onClick={(event) => {
-                  // Prefer explicit toggle — works even if the native input click is swallowed.
-                  event.preventDefault();
-                  handleToggle(opt.key, !checked);
+                onClick={() => handleToggle(opt.key, !checked)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleToggle(opt.key, !checked);
+                  }
                 }}
               >
+                {/* Visual only — row click is the single toggle (no label+input double-fire). */}
                 <ColorTemplate7PopupLargeDark.Checkbox
                   checked={checked}
                   tabIndex={-1}
-                  inputProps={{ 'aria-label': opt.label }}
-                  onChange={(e) => handleToggle(opt.key, e.target.checked)}
-                  onClick={(event) => event.stopPropagation()}
-                  sx={{ pointerEvents: 'auto' }}
-                  {...guestDemoAllowProps()}
+                  icon={<EnrollmentUncheckedIcon />}
+                  checkedIcon={<EnrollmentCheckedIcon />}
+                  inputProps={{ 'aria-hidden': true, readOnly: true, tabIndex: -1 }}
+                  onChange={() => {}}
+                  sx={{ pointerEvents: 'none' }}
                 />
                 <Typography component="span" sx={optionTextSx}>
                   {opt.label} {opt.detail}
