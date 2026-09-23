@@ -141,6 +141,13 @@ function parseSendTuttanoteFlag(data, key) {
   return false;
 }
 
+/** Mall app enrollment — default true when missing. */
+function parseMallAppEnrollmentFlag(data, key) {
+  if (data?.[key] === true || data?.[key] === 'true') return true;
+  if (data?.[key] === false || data?.[key] === 'false') return false;
+  return true;
+}
+
 function parseNullableFirstVisitFlag(data, key) {
   if (!data || !Object.prototype.hasOwnProperty.call(data, key)) return null;
   const value = data[key];
@@ -167,6 +174,9 @@ function mapCustomizationResponse(data) {
     firstVisitPicksPosts: parseNullableFirstVisitFlag(data, 'firstVisitPicksPosts'),
     firstVisitAcquaintBuddies: parseNullableFirstVisitFlag(data, 'firstVisitAcquaintBuddies'),
     firstVisitRecBioRequest: parseNullableFirstVisitFlag(data, 'firstVisitRecBioRequest'),
+    tutaDatesEnabled: parseMallAppEnrollmentFlag(data, 'tutaDatesEnabled'),
+    tutaNotesEnabled: parseMallAppEnrollmentFlag(data, 'tutaNotesEnabled'),
+    tutaAlbumsEnabled: parseMallAppEnrollmentFlag(data, 'tutaAlbumsEnabled'),
     mainFont: String(data?.mainFont || '').trim() || 'Algerian, fantasy',
     ...parseMynoteEditorPrefs(data)
   };
@@ -220,6 +230,15 @@ export async function saveUserCustomization(patch) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'firstVisitRecBioRequest')) {
     body.firstVisitRecBioRequest = patch.firstVisitRecBioRequest;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'tutaDatesEnabled')) {
+    body.tutaDatesEnabled = Boolean(patch.tutaDatesEnabled);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'tutaNotesEnabled')) {
+    body.tutaNotesEnabled = Boolean(patch.tutaNotesEnabled);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'tutaAlbumsEnabled')) {
+    body.tutaAlbumsEnabled = Boolean(patch.tutaAlbumsEnabled);
   }
   if (Object.prototype.hasOwnProperty.call(patch, 'mainFont')) {
     body.mainFont = patch.mainFont;

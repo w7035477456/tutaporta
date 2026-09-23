@@ -36,6 +36,7 @@ import {
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
+import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
 
@@ -157,6 +158,7 @@ export default function AuthRegister() {
     if (isMobileViewport) {
       requestMobilePostLoginChooser();
     }
+    requestMallAppEnrollmentPopup();
     navigate(resolvePostLoginPath(location.state?.from), { replace: true });
   }, [refreshSessionAfterExternalLogin, location.state, navigate, isMobileViewport]);
 

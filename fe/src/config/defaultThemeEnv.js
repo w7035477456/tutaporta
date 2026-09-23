@@ -1,11 +1,11 @@
 /**
  * Default theme display name from fe/.env DEFAULT_THEME (logged-out users + fallbacks).
  * Must match a theme row name in themeConfig (case-insensitive via findThemeByName).
- * Example: DEFAULT_THEME=Ocean light
+ * Example: DEFAULT_THEME=Ocean Dark
  * Requires vite envPrefix DEFAULT_ (see vite.config.mjs).
  */
 
-const HARDCODED_FALLBACK = 'Coffey Dark';
+const HARDCODED_FALLBACK = 'Ocean Dark';
 
 /** @returns {string} */
 export function getDefaultThemeName() {

@@ -47,6 +47,32 @@ function firstVisitFlagsFromDbRow(row) {
   };
 }
 
+function parseMallAppEnrollmentFlag(value, fallback = true) {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return fallback;
+}
+
+function mallAppEnrollmentFromDbRow(row) {
+  return {
+    tutaDatesEnabled: parseMallAppEnrollmentFlag(row?.tuta_dates_enabled, true),
+    tutaNotesEnabled: parseMallAppEnrollmentFlag(row?.tuta_notes_enabled, true),
+    tutaAlbumsEnabled: parseMallAppEnrollmentFlag(row?.tuta_albums_enabled, true)
+  };
+}
+
+const MALL_APP_ENROLLMENT_API_KEYS = ['tutaDatesEnabled', 'tutaNotesEnabled', 'tutaAlbumsEnabled'];
+
+const MALL_APP_ENROLLMENT_API_TO_DB = {
+  tutaDatesEnabled: 'tuta_dates_enabled',
+  tutaNotesEnabled: 'tuta_notes_enabled',
+  tutaAlbumsEnabled: 'tuta_albums_enabled'
+};
+
+function bodyHasAnyMallAppEnrollmentPref(body) {
+  return MALL_APP_ENROLLMENT_API_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+}
+
 function hasAnyFirstVisitPagePref(body) {
   return FIRST_VISIT_PAGE_PREF_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
 }
@@ -200,7 +226,10 @@ function defaultCustomizationDbRow() {
     volume: DEFAULT_NEW_USER_VOLUME,
     custom_music_url: customMusicUrlSlotsToDb(defaultCustomMusicUrlSlots()),
     all_singles_welcome_expanded: true,
-    main_font: DEFAULT_MAIN_FONT
+    main_font: DEFAULT_MAIN_FONT,
+    tuta_dates_enabled: true,
+    tuta_notes_enabled: true,
+    tuta_albums_enabled: true
   };
 }
 
@@ -223,6 +252,9 @@ function rowToPayload(row) {
       firstVisitPicksPosts: null,
       firstVisitAcquaintBuddies: null,
       firstVisitRecBioRequest: null,
+      tutaDatesEnabled: true,
+      tutaNotesEnabled: true,
+      tutaAlbumsEnabled: true,
       ...mynotePrefsFromDbRow(null)
     };
   }
@@ -268,6 +300,7 @@ function rowToPayload(row) {
       row.send_tuttanote_1dayahead != null ? parseBooleanEnumRaw(row.send_tuttanote_1dayahead) : false,
     mainFont: normalizeMainFont(row.main_font),
     ...firstVisitFlagsFromDbRow(row),
+    ...mallAppEnrollmentFromDbRow(row),
     ...mynotePrefsFromDbRow(row)
   };
 }
@@ -375,6 +408,9 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS first_visit_acquaintbuddies boolean NULL,
       ADD COLUMN IF NOT EXISTS first_visit_rec_biorequest boolean NULL,
       ADD COLUMN IF NOT EXISTS main_font text NOT NULL DEFAULT 'Algerian, fantasy',
+      ADD COLUMN IF NOT EXISTS tuta_dates_enabled boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS tuta_notes_enabled boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS tuta_albums_enabled boolean NOT NULL DEFAULT true,
       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW()
   `);
   // Existing rows keep true (no one-time overwrite); new inserts default false until first Track Load Default.
@@ -587,12 +623,33 @@ async function selectCustomizationRow(me) {
              , all_singles_welcome_expanded
              , send_tuttanote_overdue, send_tuttanote_1dayahead
              , first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
+             , tuta_dates_enabled, tuta_notes_enabled, tuta_albums_enabled
        FROM helloworldjunktest.user_customization
        WHERE singles_id = $1`,
       [me]
     );
     return rows[0] ?? null;
   } catch (err) {
+    if (
+      isMissingColumn(err, 'tuta_dates_enabled') ||
+      isMissingColumn(err, 'tuta_notes_enabled') ||
+      isMissingColumn(err, 'tuta_albums_enabled')
+    ) {
+      const { rows } = await pool.query(
+        `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
+               , custom_music_url, load_default
+               , mynote_last_notebook_id, mynote_last_note_id
+               , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
+               , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
+               , all_singles_welcome_expanded
+               , send_tuttanote_overdue, send_tuttanote_1dayahead
+               , first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
+         FROM helloworldjunktest.user_customization
+         WHERE singles_id = $1`,
+        [me]
+      );
+      return rows[0] ?? null;
+    }
     if (isMissingColumn(err, 'send_tuttanote_overdue') || isMissingColumn(err, 'send_tuttanote_1dayahead')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume
@@ -909,6 +966,7 @@ export async function putUserCustomization(req, res) {
   const hasSendTuttanote1dayahead = Object.prototype.hasOwnProperty.call(body, 'sendTuttanote1dayahead');
   const hasMainFont = Object.prototype.hasOwnProperty.call(body, 'mainFont');
   const hasAnyFirstVisitPref = hasAnyFirstVisitPagePref(body);
+  const hasAnyMallAppEnrollmentPref = bodyHasAnyMallAppEnrollmentPref(body);
   const hasAnyMynotePref = MYNOTE_PREFS_API_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key));
 
   if (
@@ -925,7 +983,8 @@ export async function putUserCustomization(req, res) {
     !hasSendTuttanoteOverdue &&
     !hasSendTuttanote1dayahead &&
     !hasMainFont &&
-    !hasAnyFirstVisitPref
+    !hasAnyFirstVisitPref &&
+    !hasAnyMallAppEnrollmentPref
   ) {
     return res.status(400).json({ error: 'No customization fields provided' });
   }
@@ -1044,6 +1103,18 @@ export async function putUserCustomization(req, res) {
     }
   }
 
+  const mallEnrollmentPatch = {};
+  if (hasAnyMallAppEnrollmentPref) {
+    for (const apiKey of MALL_APP_ENROLLMENT_API_KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(body, apiKey)) continue;
+      const raw = body[apiKey];
+      if (raw !== true && raw !== false && raw !== 'true' && raw !== 'false') {
+        return res.status(400).json({ error: `Invalid ${apiKey}` });
+      }
+      mallEnrollmentPatch[apiKey] = raw === true || raw === 'true';
+    }
+  }
+
   try {
     await ensureCustomizationSchema();
     const prev = await selectCustomizationRow(me);
@@ -1154,6 +1225,21 @@ export async function putUserCustomization(req, res) {
         if (!isMissingColumn(flagErr, 'send_tuttanote_1dayahead')) throw flagErr;
       }
     }
+    if (hasAnyMallAppEnrollmentPref) {
+      for (const [apiKey, dbCol] of Object.entries(MALL_APP_ENROLLMENT_API_TO_DB)) {
+        if (!Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, apiKey)) continue;
+        try {
+          await pool.query(
+            `UPDATE helloworldjunktest.user_customization
+             SET ${dbCol} = $1, updated_at = NOW()
+             WHERE singles_id = $2`,
+            [mallEnrollmentPatch[apiKey], me]
+          );
+        } catch (enrollErr) {
+          if (!isMissingColumn(enrollErr, dbCol)) throw enrollErr;
+        }
+      }
+    }
     const refreshed = await selectCustomizationRow(me);
     return res.status(200).json(rowToPayload({
       chat_font_size: nextChatFontSize,
@@ -1184,6 +1270,11 @@ export async function putUserCustomization(req, res) {
         first_visit_picksposts: firstVisitPatch.firstVisitPicksPosts,
         first_visit_acquaintbuddies: firstVisitPatch.firstVisitAcquaintBuddies,
         first_visit_rec_biorequest: firstVisitPatch.firstVisitRecBioRequest
+      }),
+      ...mallAppEnrollmentFromDbRow(refreshed ?? {
+        tuta_dates_enabled: mallEnrollmentPatch.tutaDatesEnabled,
+        tuta_notes_enabled: mallEnrollmentPatch.tutaNotesEnabled,
+        tuta_albums_enabled: mallEnrollmentPatch.tutaAlbumsEnabled
       })
     }));
   } catch (err) {

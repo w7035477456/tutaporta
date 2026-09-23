@@ -31,6 +31,7 @@ import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupTok
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
+import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 
 // assets
 import Visibility from '@mui/icons-material/Visibility';
@@ -204,6 +205,7 @@ export default function AuthLogin() {
         if (isMobileViewport) {
           requestMobilePostLoginChooser();
         }
+        requestMallAppEnrollmentPopup();
         const from = location.state?.from;
         navigate(resolvePostLoginPath(from), { replace: true });
       }

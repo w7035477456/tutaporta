@@ -60,6 +60,8 @@ export function needsIdentificationVerificationFirstLogin(user) {
 
 export function isPathAllowedDuringFirstLoginPhase(pathname, phase) {
   const path = String(pathname ?? '');
+  // Post-login mall hub + enrollment popup — do not yank to My Album until user opens TutaDates.
+  if (path === '/mall' || path === '/' || path === '/landing') return true;
   if (phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret') {
     return path === MY_STORY_PATH;
   }

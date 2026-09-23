@@ -28,14 +28,14 @@ Mac dev snapshot below from committed `fe/.env`.
 ## Theme and navigation
 
 ```bash
-DEFAULT_THEME=Ocean light
+DEFAULT_THEME=Ocean Dark
 DISABLE_NAVIGATION_COLLAPSE=false
 MAIN_FONT=Algerian, fantasy
 ```
 
 | Variable | Value | Behavior |
-|----------|-------|----------|
-| `DEFAULT_THEME` | `Ocean light` | Initial theme (`fe/src/config/defaultThemeEnv.js`). |
+|----|----|----|
+| `DEFAULT_THEME` | `Ocean Dark` | Initial theme for logged-out + new-account fallbacks (`fe/src/config/defaultThemeEnv.js`). |
 | `DISABLE_NAVIGATION_COLLAPSE` | `false` | `true` → sidebar stays expanded (`fe/src/config/navigationCollapseEnv.js`). |
 | `MAIN_FONT` | Algerian, fantasy | Site font family (`fe/src/config/mainFontEnv.js`). Profile menu can override per browser / `user_customization.main_font`. |
 

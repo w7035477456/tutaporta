@@ -12,6 +12,8 @@ import {
   markMobileTutaNotesUploadPending,
   markMobileTutaPhotoUploadPending
 } from 'utils/mobilePostLoginChoice';
+import { fetchUserCustomization } from 'api/userCustomizationFe';
+import MallAppEnrollmentDialog from 'ui-component/MallAppEnrollmentDialog';
 
 import onlinemall from 'assets/images/onlineMallInside.png';
 import eMarketPlaceImg from 'assets/images/onlineMarketPlace.png';
@@ -33,6 +35,13 @@ const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
 
 /** Compact/mobile: these mall tiles open that product's upload popup only (never the desktop app). */
 const MOBILE_UPLOAD_REDIRECT_TILE_IDS = new Set(['vsingles', 'photoAlbums', 'recordVault']);
+
+/** Mall tiles gated by user_customization enrollment flags. */
+const ENROLLMENT_TILE_TO_FLAG = {
+  vsingles: 'tutaDatesEnabled',
+  recordVault: 'tutaNotesEnabled',
+  photoAlbums: 'tutaAlbumsEnabled'
+};
 
 const departments = [
   { id: 'vsingles', title: 'Tuta Dates', url: TUTADATES_PATH, image: tutaDatesImg },
@@ -96,6 +105,12 @@ export default function Landing() {
   const [mallGrid, setMallGrid] = useState(() => getMallStageSize(3, 2));
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
+  const [enrollmentForcedOpen, setEnrollmentForcedOpen] = useState(false);
+  const [enrollment, setEnrollment] = useState({
+    tutaDatesEnabled: true,
+    tutaNotesEnabled: true,
+    tutaAlbumsEnabled: true
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -107,10 +122,55 @@ export default function Landing() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) return undefined;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const prefs = await fetchUserCustomization();
+        if (cancelled) return;
+        setEnrollment({
+          tutaDatesEnabled: prefs.tutaDatesEnabled !== false,
+          tutaNotesEnabled: prefs.tutaNotesEnabled !== false,
+          tutaAlbumsEnabled: prefs.tutaAlbumsEnabled !== false
+        });
+      } catch {
+        // keep defaults (all enrolled)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const applyEnrollmentPrefs = useCallback((prefs) => {
+    if (!prefs) return;
+    setEnrollment({
+      tutaDatesEnabled: prefs.tutaDatesEnabled !== false,
+      tutaNotesEnabled: prefs.tutaNotesEnabled !== false,
+      tutaAlbumsEnabled: prefs.tutaAlbumsEnabled !== false
+    });
+  }, []);
+
+  const isTileEnrolled = useCallback(
+    (tileId) => {
+      const flag = ENROLLMENT_TILE_TO_FLAG[tileId];
+      if (!flag) return true;
+      return enrollment[flag] !== false;
+    },
+    [enrollment]
+  );
+
   const openUpgradePopup = useCallback((event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setUpgradePopupOpen(true);
+  }, []);
+
+  const openEnrollmentToEnableApp = useCallback((event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setEnrollmentForcedOpen(true);
   }, []);
 
   /** Phone mall: each tile opens that product's upload popup only — never the desktop workspace. */
@@ -118,6 +178,10 @@ export default function Landing() {
     (tileId, event) => {
       event?.preventDefault?.();
       event?.stopPropagation?.();
+      if (!isTileEnrolled(tileId)) {
+        setEnrollmentForcedOpen(true);
+        return;
+      }
       if (tileId === 'recordVault') {
         markMobileTutaNotesUploadPending();
         navigate(`${MY_RECORD_VAULT_PATH}?mobileUpload=1`);
@@ -133,7 +197,7 @@ export default function Landing() {
         navigate('/myStory?mobileUpload=1');
       }
     },
-    [navigate]
+    [isTileEnrolled, navigate]
   );
 
   const visibleDepartments = useMemo(() => {
@@ -299,15 +363,18 @@ export default function Landing() {
           >
             {rowDepts.map((d) => {
               const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
+              const gateEnrollment = !gateUpgrade && !isTileEnrolled(d.id);
               const gateMobileUpload =
-                !gateUpgrade && isCompact && MOBILE_UPLOAD_REDIRECT_TILE_IDS.has(d.id);
-              const isLink = Boolean(d.url) && !gateUpgrade && !gateMobileUpload;
-              const tileActivatesPopup = gateUpgrade || gateMobileUpload;
+                !gateUpgrade && !gateEnrollment && isCompact && MOBILE_UPLOAD_REDIRECT_TILE_IDS.has(d.id);
+              const isLink = Boolean(d.url) && !gateUpgrade && !gateEnrollment && !gateMobileUpload;
+              const tileActivatesPopup = gateUpgrade || gateEnrollment || gateMobileUpload;
               const onTileActivate = gateUpgrade
                 ? openUpgradePopup
-                : gateMobileUpload
-                  ? (event) => openMobileProductUpload(d.id, event)
-                  : undefined;
+                : gateEnrollment
+                  ? openEnrollmentToEnableApp
+                  : gateMobileUpload
+                    ? (event) => openMobileProductUpload(d.id, event)
+                    : undefined;
 
               return (
                 <Box
@@ -350,7 +417,8 @@ export default function Landing() {
                     boxSizing: 'border-box',
                     boxShadow: 'none',
                     zIndex: 1,
-                    transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+                    opacity: gateEnrollment ? 0.55 : 1,
+                    transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
                     '&:hover': {
                       zIndex: 2,
                       transform: 'scale(1.08)',
@@ -405,6 +473,16 @@ export default function Landing() {
         ))}
       </Box>
       <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
+      <MallAppEnrollmentDialog
+        {...(enrollmentForcedOpen
+          ? {
+              open: true,
+              onClose: () => setEnrollmentForcedOpen(false),
+              showEnableHint: true
+            }
+          : {})}
+        onEnrollmentChange={applyEnrollmentPrefs}
+      />
     </Box>
   );
 }
