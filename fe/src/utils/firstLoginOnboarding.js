@@ -1,5 +1,13 @@
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { LIVE_FACE_SCAN_POPUP_PATH } from 'constants/liveFaceScanPopupRoute';
+import {
+  MY_PHOTO_ALBUMS_LEGACY_PATH,
+  MY_PHOTO_ALBUMS_PATH
+} from 'constants/myPhotoAlbumsRoute';
+import {
+  MY_RECORD_VAULT_LEGACY_PATH,
+  MY_RECORD_VAULT_PATH
+} from 'constants/myRecordVaultRoute';
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
 import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
@@ -7,6 +15,16 @@ import { isOver18VerificationPending } from 'utils/over18Verified';
 
 const MY_STORY_PATH = '/myStory';
 const CONGRATS_PENDING_KEY = 'firstLoginOnboardingCongratsPending';
+
+/** TutaNotes / TutaPhotos — never gated by dating profile photo, nickname, or secret icon. */
+export function isMallNotesOrPhotosPath(pathname) {
+  const p = String(pathname ?? '');
+  if (p === MY_PHOTO_ALBUMS_PATH || p.startsWith(`${MY_PHOTO_ALBUMS_PATH}/`)) return true;
+  if (p === MY_PHOTO_ALBUMS_LEGACY_PATH || p.startsWith(`${MY_PHOTO_ALBUMS_LEGACY_PATH}/`)) return true;
+  if (p === MY_RECORD_VAULT_PATH || p.startsWith(`${MY_RECORD_VAULT_PATH}/`)) return true;
+  if (p === MY_RECORD_VAULT_LEGACY_PATH || p.startsWith(`${MY_RECORD_VAULT_LEGACY_PATH}/`)) return true;
+  return false;
+}
 
 /** Demo login + admin tools/impersonation skip mandatory first-login onboarding. */
 export function isFirstLoginOnboardingExempt(user) {
@@ -62,6 +80,8 @@ export function isPathAllowedDuringFirstLoginPhase(pathname, phase) {
   const path = String(pathname ?? '');
   // Post-login mall hub + enrollment popup — do not yank to My Album until user opens TutaDates.
   if (path === '/mall' || path === '/' || path === '/landing') return true;
+  // Notes / Photos are independent of dating first-login (photo, nickname, secret icon).
+  if (isMallNotesOrPhotosPath(path)) return true;
   if (phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret') {
     return path === MY_STORY_PATH;
   }

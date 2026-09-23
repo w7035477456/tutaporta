@@ -703,7 +703,8 @@ export default function MyRecordVault() {
   const handleAccessGateClose = useCallback(() => {
     setAccessGateOpen(false);
     pendingOpenRef.current = null;
-  }, []);
+    navigate('/mall', { replace: true });
+  }, [navigate]);
 
   const handleAccessVaultFormatted = useCallback((formattedSide) => {
     if (formattedSide === 'usb') {

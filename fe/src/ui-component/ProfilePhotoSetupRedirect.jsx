@@ -8,10 +8,13 @@ import {
   isPathAllowedDuringFirstLoginPhase,
   needsMyStoryFirstLoginSetup
 } from 'utils/firstLoginOnboarding';
-import { MY_STORY_PATH } from 'utils/profilePhotoSetup';
+import { isPathRequiringProfilePhoto, MY_STORY_PATH } from 'utils/profilePhotoSetup';
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
 
-/** Sends members who still need photo / alias / secret to My Album & Postings. */
+/**
+ * Dating-only first-login gate: photo / nickname / secret icon are required when entering
+ * TutaDates routes — not when opening TutaNotes or TutaPhotos from the mall.
+ */
 export default function ProfilePhotoSetupRedirect() {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
@@ -25,6 +28,8 @@ export default function ProfilePhotoSetupRedirect() {
     if (!needsMyStoryFirstLoginSetup(user)) return;
     const phase = getFirstLoginOnboardingPhase(user);
     if (isPathAllowedDuringFirstLoginPhase(pathname, phase)) return;
+    // Only yank to MyStory when the user opens a dating path (e.g. TutaDates tile).
+    if (!isPathRequiringProfilePhoto(pathname)) return;
     navigate(MY_STORY_PATH, { replace: true });
   }, [loading, user, pathname, navigate]);
 
