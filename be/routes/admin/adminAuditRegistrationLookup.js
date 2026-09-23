@@ -56,9 +56,13 @@ const SINGLES_LOOKUP_SELECT = `SELECT s.singles_id,
             s.refer_by_code,
             s.profile_image_fk,
             s.over_18_verified,
+            s.created_at,
             ref.singles_id AS refer_by_singles_id,
             COALESCE(bal.account_balance_token, 0) AS account_balance_token
      ${SINGLES_LOOKUP_FROM_JOIN}`;
+
+/** Default Admin Tools singles order: newest account first. */
+const SINGLES_LOOKUP_ORDER_BY = `ORDER BY s.created_at DESC NULLS LAST, s.singles_id DESC`;
 
 function parseSinglesIdInput(raw) {
   const parsed = parseSinglesIdLookup(raw);
@@ -171,6 +175,7 @@ function mapSinglesLookupRow(row, videosBySinglesId = new Map()) {
     email: String(row.email ?? ''),
     phone: String(row.phone ?? ''),
     alias: String(row.alias ?? ''),
+    createdAt: row.created_at ?? null,
     profileImageFk: Number.isFinite(profileImageFk) && profileImageFk > 0 ? profileImageFk : null,
     accountBalanceToken: Number.isFinite(rawTokenBalance) ? Math.trunc(rawTokenBalance) : 0,
     passwordAttemptCount:
@@ -218,23 +223,23 @@ export async function searchSinglesForLookup(db, body) {
   const { rows } = await db.query(
     `${SINGLES_LOOKUP_SELECT}
      WHERE ${conditions.join(' OR ')}
-     ORDER BY s.singles_id DESC${limitClause}`,
+     ${SINGLES_LOOKUP_ORDER_BY}${limitClause}`,
     params
   );
 
   return rows;
 }
 
-/** All singles rows for Admin Tools → Lookup All (most recent singles_id first). */
+/** All singles rows for Admin Tools → Lookup All (newest created_at first). */
 export async function searchAllSinglesForLookup(db) {
   const { rows } = await db.query(`${SINGLES_LOOKUP_SELECT}
-     ORDER BY s.singles_id DESC`);
+     ${SINGLES_LOOKUP_ORDER_BY}`);
   return rows;
 }
 
 /**
  * POST /api/admin/singles/lookup-all
- * Returns all helloworldjunktest.singles rows sorted by singles_id descending.
+ * Returns all helloworldjunktest.singles rows sorted by created_at descending.
  */
 export async function postAdminSinglesLookupAll(req, res) {
   try {

@@ -164,6 +164,7 @@ import {
 } from 'utils/signupReferralCode';
 import { MyAlbumPostingsInstructionPopup } from 'views/utilities/MyAlbumPostingsInstruction';
 import ProfilePhotoUploadQrPanel from 'components/ProfilePhotoUploadQrPanel';
+import MyStoryUploadQrPair from 'components/MyStoryUploadQrPair';
 import StoragePermissionFailDialog from 'ui-component/StoragePermissionFailDialog';
 import {
   isStoragePermissionUploadError,
@@ -3564,52 +3565,21 @@ export default function MyStory() {
               <ColorTemplate7PopupLargeDark.BodyText>Tap camera or gallery to upload your image.</ColorTemplate7PopupLargeDark.BodyText>
             </Box>
           ) : (
-            <Box
-              className={dragOver ? undefined : LIGHT_SURFACE_CLASS}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-              onClick={() => triggerFilePicker(firstPhotoFileInputRef, { bypassAlbumFull: allowFirstProfilePhotoUpload })}
-              sx={{
-                border: '3px solid var(--theme-primary-color)',
-                borderRadius: 2,
-                bgcolor: dragOver ? 'var(--theme-daynight-color)' : 'var(--theme-green-color)',
-                minHeight: 200,
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: { xs: 1.25, sm: 2 },
-                flexWrap: 'wrap',
-                cursor: maxPhotosReached ? 'not-allowed' : 'pointer',
-                opacity: maxPhotosReached ? 0.6 : 1,
-                transition: 'background-color 0.2s, border-color 0.2s',
-                px: 1.75,
-                py: 1.75,
-                mb: 1
+            <MyStoryUploadQrPair
+              onFiles={(fileList) => {
+                const files = fileListToArray(fileList);
+                if (!files.length) return;
+                void handleFiles(files);
               }}
-            >
-              <Box
-                component="img"
-                src={dragDropPhotoImg}
-                alt=""
-                sx={{
-                  maxWidth: 'min(100%, clamp(100px, 16vw, 180px))',
-                  width: 'auto',
-                  height: 'auto',
-                  display: 'block',
-                  userSelect: 'none',
-                  pointerEvents: 'none'
-                }}
-              />
-              <Typography className="my-story-upload-caption" sx={myStoryPostingDropCaptionSx}>
-                Drag &amp; Drop photo here
-              </Typography>
-            </Box>
+              uploading={uploading}
+              disabled={false}
+              accept={ACCEPT}
+              multiple={false}
+              onPhoneUploadComplete={handlePhoneUploadComplete}
+              qrMessageSx={comicStyle}
+              sx={{ mb: 1 }}
+            />
           )}
-          {!isMobileUpload ? (
-            <ProfilePhotoUploadQrPanel messageSx={comicStyle} onPhoneUploadComplete={handlePhoneUploadComplete} />
-          ) : null}
           {uploading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
               <CircularProgress size={40} sx={{ color: 'var(--theme-primary-color)' }} />

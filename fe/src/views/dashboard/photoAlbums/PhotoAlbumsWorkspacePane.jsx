@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
@@ -12,6 +13,10 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import {
+  MOBILE_UPLOAD_HOVER_TOOLTIP,
+  mobileUploadHoverTooltipSlotProps
+} from 'config/mobileUploadHoverTooltip';
 import { themedAlert, themedConfirm } from 'utils/themedDialog';
 import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDownsizeMedia';
 import {
@@ -8455,20 +8460,29 @@ export default function PhotoAlbumsWorkspacePane({
               ) : null}
               {row2ShowsMobileUpload ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                  <SliderControlButton
-                    type="button"
-                    variant="yellow"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    onClick={() => {
-                      setMobileUploadOpen(true);
-                    }}
-                    disabled={mobileUploadDisabled}
-                    aria-label="Mobile Upload"
-                    title="Mobile Upload"
-                    sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
+                  <Tooltip
+                    title={MOBILE_UPLOAD_HOVER_TOOLTIP}
+                    arrow
+                    placement="right"
+                    enterDelay={200}
+                    slotProps={mobileUploadHoverTooltipSlotProps()}
                   >
-                    {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
-                  </SliderControlButton>
+                    <Box component="span" sx={{ display: 'inline-flex', width: '100%' }}>
+                      <SliderControlButton
+                        type="button"
+                        variant="yellow"
+                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                        onClick={() => {
+                          setMobileUploadOpen(true);
+                        }}
+                        disabled={mobileUploadDisabled}
+                        aria-label="Mobile Upload"
+                        sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
+                      >
+                        {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
+                      </SliderControlButton>
+                    </Box>
+                  </Tooltip>
                 </Box>
               ) : null}
               {canEnterCompare ? (

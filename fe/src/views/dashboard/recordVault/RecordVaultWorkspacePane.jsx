@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import SliderControlButton, {
@@ -12,6 +13,10 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import {
+  MOBILE_UPLOAD_HOVER_TOOLTIP,
+  mobileUploadHoverTooltipSlotProps
+} from 'config/mobileUploadHoverTooltip';
 import {
   isRecordVaultUsbRequiredError,
   fetchRecordVaultStorageConfig,
@@ -7048,20 +7053,29 @@ export default function RecordVaultWorkspacePane({
                       overflow: 'visible'
                     }}
                   >
-                    <SliderControlButton
-                      type="button"
-                      variant="yellow"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      fullWidth
-                      data-guest-demo-allow="true"
-                      onClick={() => setMobileUploadOpen(true)}
-                      disabled={busy || innerEncryptBusy}
-                      aria-label="Mobile Upload"
-                      title="Mobile Upload — scan QR; drag thumbnails from the Mobile Upload row onto a note"
-                      sx={headerFullWidthButtonSx}
+                    <Tooltip
+                      title={MOBILE_UPLOAD_HOVER_TOOLTIP}
+                      arrow
+                      placement="right"
+                      enterDelay={200}
+                      slotProps={mobileUploadHoverTooltipSlotProps()}
                     >
-                      {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
-                    </SliderControlButton>
+                      <Box component="span" sx={{ display: 'block', width: '100%' }}>
+                        <SliderControlButton
+                          type="button"
+                          variant="yellow"
+                          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                          fullWidth
+                          data-guest-demo-allow="true"
+                          onClick={() => setMobileUploadOpen(true)}
+                          disabled={busy || innerEncryptBusy}
+                          aria-label="Mobile Upload"
+                          sx={headerFullWidthButtonSx}
+                        >
+                          {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
+                        </SliderControlButton>
+                      </Box>
+                    </Tooltip>
                   </Box>
                   {canEnterCompare ? (
                     <Box

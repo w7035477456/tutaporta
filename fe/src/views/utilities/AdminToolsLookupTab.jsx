@@ -241,6 +241,71 @@ const lookupAgeSortHeaderSx = {
   }
 };
 
+/** Alias / singles_id / member_id / Email — same clickable header treatment as Age. */
+const lookupColumnSortHeaderSx = lookupAgeSortHeaderSx;
+
+const DEFAULT_SINGLES_TABLE_SORT = { key: 'createdAt', dir: 'desc' };
+
+function compareNullableNumber(aVal, bVal, directionMul) {
+  const aOk = Number.isFinite(aVal);
+  const bOk = Number.isFinite(bVal);
+  if (!aOk && !bOk) return 0;
+  if (!aOk) return 1;
+  if (!bOk) return -1;
+  return directionMul * (aVal - bVal);
+}
+
+function compareNullableDateMs(aMs, bMs, directionMul, tieBreak) {
+  const aOk = Number.isFinite(aMs);
+  const bOk = Number.isFinite(bMs);
+  if (!aOk && !bOk) return tieBreak();
+  if (!aOk) return 1;
+  if (!bOk) return -1;
+  const diff = directionMul * (aMs - bMs);
+  return diff !== 0 ? diff : tieBreak();
+}
+
+/** Client sort for Admin Tools singles grid (column headers + Age + created_at default). */
+function sortSinglesLookupRows(rows, sort) {
+  if (!Array.isArray(rows) || !rows.length) return rows;
+  const key = sort?.key ?? DEFAULT_SINGLES_TABLE_SORT.key;
+  const dir = sort?.dir ?? DEFAULT_SINGLES_TABLE_SORT.dir;
+  if (key === 'videoAge') return sortSinglesRowsByVideoAge(rows, dir);
+
+  const directionMul = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    if (key === 'createdAt') {
+      const aMs = a?.createdAt != null ? new Date(a.createdAt).getTime() : NaN;
+      const bMs = b?.createdAt != null ? new Date(b.createdAt).getTime() : NaN;
+      return compareNullableDateMs(aMs, bMs, directionMul, () =>
+        compareNullableNumber(Number(b?.singlesId), Number(a?.singlesId), 1)
+      );
+    }
+    if (key === 'singlesId') {
+      return compareNullableNumber(Number(a?.singlesId), Number(b?.singlesId), directionMul);
+    }
+    if (key === 'memberId') {
+      return compareNullableNumber(Number(a?.memberId), Number(b?.memberId), directionMul);
+    }
+    const field = key === 'alias' ? 'alias' : 'email';
+    const aS = String(a?.[field] ?? '').toLowerCase();
+    const bS = String(b?.[field] ?? '').toLowerCase();
+    const cmp = aS.localeCompare(bS);
+    if (cmp !== 0) return directionMul * cmp;
+    return compareNullableNumber(Number(b?.singlesId), Number(a?.singlesId), 1);
+  });
+}
+
+function columnSortAria(sort, key) {
+  if (sort?.key !== key) return 'none';
+  return sort.dir === 'asc' ? 'ascending' : 'descending';
+}
+
+function columnSortHeaderLabel(label, sort, key) {
+  if (sort?.key !== key) return label;
+  return `${label} ${sort.dir === 'asc' ? '↑' : '↓'}`;
+}
+
 const lookupPhotoAvatarSx = {
   width: 40,
   height: 40,
@@ -492,7 +557,7 @@ export default function AdminToolsLookupTab({ onError }) {
   const [playerVideoLabel, setPlayerVideoLabel] = useState('');
   const [playerVideoLoading, setPlayerVideoLoading] = useState(false);
   const [playerVideoError, setPlayerVideoError] = useState('');
-  const [videoAgeSortDir, setVideoAgeSortDir] = useState('asc');
+  const [tableSort, setTableSort] = useState(DEFAULT_SINGLES_TABLE_SORT);
   const playerVideoBlobRef = useRef('');
 
   const revokePlayerVideoBlob = useCallback(() => {
@@ -529,13 +594,25 @@ export default function AdminToolsLookupTab({ onError }) {
   const singlesColumnTexts = useMemo(() => buildSinglesLookupColumnTexts(singlesRows), [singlesRows]);
   const singlesColumnButtons = useMemo(() => buildSinglesLookupColumnButtons(), []);
   const displaySinglesRows = useMemo(
-    () => sortSinglesRowsByVideoAge(singlesRows, videoAgeSortDir),
-    [singlesRows, videoAgeSortDir]
+    () => sortSinglesLookupRows(singlesRows, tableSort),
+    [singlesRows, tableSort]
   );
   const auditColumnTexts = useMemo(() => buildAuditLookupColumnTexts(auditRows), [auditRows]);
 
+  /** Alias / singles_id / member_id / Email: asc → desc → created_at default. */
+  const handleCycleColumnSort = useCallback((key) => {
+    setTableSort((prev) => {
+      if (prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return DEFAULT_SINGLES_TABLE_SORT;
+    });
+  }, []);
+
   const handleToggleVideoAgeSort = useCallback(() => {
-    setVideoAgeSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    setTableSort((prev) => {
+      if (prev.key !== 'videoAge') return { key: 'videoAge', dir: 'asc' };
+      return { key: 'videoAge', dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+    });
   }, []);
 
   const { gridTemplateColumns: singlesTableGridSx, minTableWidthPx: singlesTableMinWidthPx } =
@@ -1031,27 +1108,39 @@ export default function AdminToolsLookupTab({ onError }) {
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.ALIAS}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupColumnSortHeaderSx }}
+                    onClick={() => handleCycleColumnSort('alias')}
+                    role="columnheader"
+                    aria-sort={columnSortAria(tableSort, 'alias')}
                   >
-                    Alias
+                    {columnSortHeaderLabel('Alias', tableSort, 'alias')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.SINGLES_ID}
-                    sx={{ ...lookupCenterColumnCellSx, ...lookupScrollHeaderCellSx }}
+                    sx={{ ...lookupCenterColumnCellSx, ...lookupColumnSortHeaderSx }}
+                    onClick={() => handleCycleColumnSort('singlesId')}
+                    role="columnheader"
+                    aria-sort={columnSortAria(tableSort, 'singlesId')}
                   >
-                    singles_id
+                    {columnSortHeaderLabel('singles_id', tableSort, 'singlesId')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.MEMBER_ID}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupColumnSortHeaderSx }}
+                    onClick={() => handleCycleColumnSort('memberId')}
+                    role="columnheader"
+                    aria-sort={columnSortAria(tableSort, 'memberId')}
                   >
-                    member_id
+                    {columnSortHeaderLabel('member_id', tableSort, 'memberId')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.EMAIL}
-                    sx={lookupScrollHeaderCellSx}
+                    sx={lookupColumnSortHeaderSx}
+                    onClick={() => handleCycleColumnSort('email')}
+                    role="columnheader"
+                    aria-sort={columnSortAria(tableSort, 'email')}
                   >
-                    Email
+                    {columnSortHeaderLabel('Email', tableSort, 'email')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.IMPERSONATE}
@@ -1108,9 +1197,11 @@ export default function AdminToolsLookupTab({ onError }) {
                     sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupAgeSortHeaderSx }}
                     onClick={handleToggleVideoAgeSort}
                     role="columnheader"
-                    aria-sort={videoAgeSortDir === 'asc' ? 'ascending' : 'descending'}
+                    aria-sort={columnSortAria(tableSort, 'videoAge')}
                   >
-                    Age {videoAgeSortDir === 'asc' ? '↑' : '↓'}
+                    {tableSort.key === 'videoAge'
+                      ? `Age ${tableSort.dir === 'asc' ? '↑' : '↓'}`
+                      : 'Age'}
                   </ColorTemplate9TableData.HeaderCell>
                 </ColorTemplate9TableData.HeaderRow>
 

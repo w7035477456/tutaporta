@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
@@ -10,6 +11,10 @@ import {
   listMobileUploadFiles
 } from 'api/photoAlbumsMobileUploadFolderFe';
 import { getScanForPhoneUploadMs } from 'config/phoneUploadScanEnv';
+import {
+  MOBILE_UPLOAD_HOVER_TOOLTIP,
+  mobileUploadHoverTooltipSlotProps
+} from 'config/mobileUploadHoverTooltip';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import {
@@ -404,49 +409,59 @@ export default function RecordVaultMobileUploadTray({
   return (
     <Box data-rv-mobile-upload-tray="" aria-label="Mobile Upload thumbnails" sx={shellSx}>
       {plain ? null : (
-        <Box
-          sx={
-            isGrid
-              ? {
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  alignSelf: 'flex-start',
-                  border: '3px solid #000',
-                  borderRadius: 0.5,
-                  bgcolor: '#ffeb3b',
-                  px: 1,
-                  py: 0.5
-                }
-              : {
-                  flexShrink: 0,
-                  alignSelf: 'center',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  border: '3px solid #000',
-                  borderRadius: 0.5,
-                  bgcolor: '#ffeb3b',
-                  px: 1,
-                  py: 0.5,
-                  boxSizing: 'border-box'
-                }
-          }
+        <Tooltip
+          title={MOBILE_UPLOAD_HOVER_TOOLTIP}
+          arrow
+          placement="top"
+          enterDelay={200}
+          slotProps={mobileUploadHoverTooltipSlotProps()}
         >
-          <Typography
-            component="span"
-            sx={{
-              fontFamily: MAIN_FONT_FAMILY,
-              fontWeight: 800,
-              fontSize: { xs: '0.85rem', sm: '1rem' },
-              lineHeight: 1.15,
-              color: '#000',
-              WebkitTextFillColor: '#000',
-              whiteSpace: 'nowrap'
-            }}
+          <Box
+            sx={
+              isGrid
+                ? {
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    alignSelf: 'flex-start',
+                    border: '3px solid #000',
+                    borderRadius: 0.5,
+                    bgcolor: '#ffeb3b',
+                    px: 1,
+                    py: 0.5,
+                    cursor: 'help'
+                  }
+                : {
+                    flexShrink: 0,
+                    alignSelf: 'center',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    border: '3px solid #000',
+                    borderRadius: 0.5,
+                    bgcolor: '#ffeb3b',
+                    px: 1,
+                    py: 0.5,
+                    boxSizing: 'border-box',
+                    cursor: 'help'
+                  }
+            }
           >
-            {titleLabel}
-          </Typography>
-        </Box>
+            <Typography
+              component="span"
+              sx={{
+                fontFamily: MAIN_FONT_FAMILY,
+                fontWeight: 800,
+                fontSize: { xs: '0.85rem', sm: '1rem' },
+                lineHeight: 1.15,
+                color: '#000',
+                WebkitTextFillColor: '#000',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {titleLabel}
+            </Typography>
+          </Box>
+        </Tooltip>
       )}
       {thumbsArea}
     </Box>
