@@ -28,6 +28,7 @@ const ConfirmEmailChangePage = Loadable(lazy(() => import('views/pages/authentic
 const MobilePhotoUploadPage = Loadable(lazy(() => import('views/pages/MobilePhotoUploadPage')));
 const GoogleOAuthBridgePage = Loadable(lazy(() => import('views/pages/authentication/GoogleOAuthBridge')));
 const LiveFaceScanPopupPage = Loadable(lazy(() => import('views/utilities/LiveFaceScanPopupPage')));
+const ResumePage = Loadable(lazy(() => import('views/pages/ResumePage')));
 
 // ==============================|| AUTHENTICATION ROUTING ||============================== //
 
@@ -117,6 +118,10 @@ const authenticationChildren = [
     {
       path: '/pages/privacyPolicy',
       element: <PrivacyPolicyPage />
+    },
+    {
+      path: '/resume',
+      element: <ResumePage />
     },
     {
       path: '/mobilePhotoUpload',

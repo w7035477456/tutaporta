@@ -1941,6 +1941,18 @@ if (!feBuilt) {
 }
 if (feBuilt) {
   // On Ubuntu: ensure both OnlineMall.Website and www.OnlineMall.Website route to this app so /assets/* (e.g. Login-*.js) are served.
+  // Public resume PDF (fe/public/resume.pdf → dist/resume.pdf).
+  // Same path on tutamall.com and onlinemall.website (one FE build behind HAProxy).
+  app.get(['/resume', '/resume/'], (req, res) => {
+    const pdfPath = path.join(feDistPath, 'resume.pdf');
+    if (!fs.existsSync(pdfPath)) {
+      return res.status(404).type('text/plain').send('Resume PDF not found. Rebuild frontend (fe build includes public/resume.pdf).');
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="AndrewHungTonV1.pdf"');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(pdfPath);
+  });
   app.use(express.static(feDistPath, { index: false }));
 
   // SPA: all other GET routes serve index.html (no-cache so registration/auth get fresh code)
