@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
@@ -144,6 +144,11 @@ export default function MallAppEnrollmentDialog({
   const [notes, setNotes] = useState(true);
   const [albums, setAlbums] = useState(true);
   const [ready, setReady] = useState(false);
+  /** First-login: GET / auth user refresh must not wipe toggles the user already made. */
+  const userEditedRef = useRef(false);
+  const loadGenRef = useRef(0);
+  /** Load prefs once per open; do not re-GET when AuthContext refreshes `user` after signup. */
+  const loadedForOpenRef = useRef(false);
 
   const open = controlled ? Boolean(openProp) : sessionOpen;
 
@@ -166,28 +171,52 @@ export default function MallAppEnrollmentDialog({
   }, [controlled, tryOpenFromSession]);
 
   useEffect(() => {
-    if (!open || skipUser) return undefined;
+    if (!open) {
+      loadedForOpenRef.current = false;
+      userEditedRef.current = false;
+      setReady(false);
+      return undefined;
+    }
+    if (skipUser) return undefined;
+    // AuthContext often refreshes `user` right after first login; claim this open
+    // immediately so a second effect run cannot restart GET and snap all-true.
+    if (loadedForOpenRef.current) return undefined;
+    loadedForOpenRef.current = true;
+
     let cancelled = false;
+    let finished = false;
+    userEditedRef.current = false;
+    const loadGen = ++loadGenRef.current;
     setReady(false);
     void (async () => {
       try {
         const prefs = await fetchUserCustomization();
-        if (cancelled) return;
+        if (cancelled || loadGen !== loadGenRef.current) return;
+        if (userEditedRef.current) {
+          finished = true;
+          setReady(true);
+          return;
+        }
         setDates(prefs.tutaDatesEnabled !== false);
         setNotes(prefs.tutaNotesEnabled !== false);
         setAlbums(prefs.tutaAlbumsEnabled !== false);
+        finished = true;
       } catch {
-        if (!cancelled) {
+        if (cancelled || loadGen !== loadGenRef.current) return;
+        if (!userEditedRef.current) {
           setDates(true);
           setNotes(true);
           setAlbums(true);
         }
+        finished = true;
       } finally {
-        if (!cancelled) setReady(true);
+        if (!cancelled && loadGen === loadGenRef.current) setReady(true);
       }
     })();
     return () => {
       cancelled = true;
+      // Strict Mode remount: release claim only if this load never finished.
+      if (!finished) loadedForOpenRef.current = false;
     };
   }, [open, skipUser]);
 
@@ -205,6 +234,9 @@ export default function MallAppEnrollmentDialog({
 
   const persist = useCallback(
     async (patch) => {
+      userEditedRef.current = true;
+      // Bump gen so any in-flight initial GET cannot overwrite this toggle.
+      loadGenRef.current += 1;
       // Always keep the values we just wrote — PUT responses can omit/mis-map false
       // and `x !== false` would snap the box back to checked while DB is unchecked.
       const applyPatchLocally = () => {
@@ -257,6 +289,9 @@ export default function MallAppEnrollmentDialog({
 
   const handleToggle = useCallback(
     (key, checked) => {
+      userEditedRef.current = true;
+      loadGenRef.current += 1;
+      loadedForOpenRef.current = true;
       const next = Boolean(checked);
       setValue(key, next);
       void persist({ [key]: next });
