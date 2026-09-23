@@ -3,7 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from 'contexts/AuthContext';
 import { useLoginDemoMode } from 'contexts/LoginDemoModeContext';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
-import { DEMO_LOGIN_PASSWORD_HINT, guestDemoAllowProps, isDemoLoginAliasId } from 'utils/guestDemoLogin';
+import {
+  DEMO_LOGIN_PASSWORD_HINT,
+  DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE,
+  guestDemoAllowProps,
+  isDemoLoginAliasId
+} from 'utils/guestDemoLogin';
 
 // material-ui
 import Divider from '@mui/material/Divider';
@@ -15,6 +20,7 @@ import Box from '@mui/material/Box';
 // project imports
 import api from 'api/axios';
 import GreenButton from 'ui-component/GreenButton';
+import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
 import { getDesktopIconSizeVw, getDesktopTextFontSizeHalfVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
@@ -113,6 +119,7 @@ export default function AuthLogin() {
   const [errorSecondary, setErrorSecondary] = useState('');
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [demoMobileBlockedOpen, setDemoMobileBlockedOpen] = useState(false);
   const isMobileViewport = useCompactLoginViewport();
   const isDemoAliasLogin = isDemoLoginAliasId(email);
   const passwordVisible = showPassword || isDemoAliasLogin;
@@ -239,6 +246,12 @@ export default function AuthLogin() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (signInDisabled) return;
+
+    if (isMobileViewport && isDemoLoginAliasId(email)) {
+      setDemoMobileBlockedOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     setError('');
     setErrorSecondary('');
@@ -274,7 +287,8 @@ export default function AuthLogin() {
   );
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', ...authFormContentSx }}>
+    <>
+      <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%', ...authFormContentSx }}>
       {googleSignupEnabled ? (
         <>
           <GoogleSignupButton
@@ -391,6 +405,26 @@ export default function AuthLogin() {
           {signInButton}
         </Box>
       ) : null}
-    </Box>
+      </Box>
+
+      <ColorTemplate7PopupLargeDark
+        open={demoMobileBlockedOpen}
+        onClose={() => setDemoMobileBlockedOpen(false)}
+        closeOnBackdrop
+        closeButtonAriaLabel="Close demo mobile notice"
+        maxWidth="min(96vw, 420px)"
+        centerInWindow
+      >
+        <ColorTemplate7PopupLargeDark.Title>Demo mode</ColorTemplate7PopupLargeDark.Title>
+        <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', textAlign: 'center' }}>
+            {DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE}
+          </Typography>
+          <GreenButton type="button" onClick={() => setDemoMobileBlockedOpen(false)} sx={{ width: '100%' }}>
+            OK
+          </GreenButton>
+        </ColorTemplate7PopupLargeDark.Body>
+      </ColorTemplate7PopupLargeDark>
+    </>
   );
 }

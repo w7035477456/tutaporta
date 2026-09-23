@@ -8,6 +8,10 @@ export const GUEST_DEMO_LOGIN_MESSAGE =
 /** Shown in the password field as soon as login id is "demo". */
 export const DEMO_LOGIN_PASSWORD_HINT = '(not required for demo)';
 
+/** Compact/mobile viewport: "demo" alias login is desktop-only. */
+export const DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE =
+  'Please use only Desktop/Laptop/Tablet for demo mode ("demo" login). Only full registered accounts can use mobile to upload photos.';
+
 /**
  * TutaNotes Full Disk Encryption password used for guest demo auto-unlock
  * (login alias `demo` / `guest` → skip Encrypt Password popup).

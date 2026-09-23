@@ -7,6 +7,7 @@ import GreenButton from 'ui-component/GreenButton';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { useAuth } from 'contexts/AuthContext';
 import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
+import { DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import {
   clearMobilePostLoginChooserPending,
   markMobileTutaDatesUploadPending,
@@ -47,19 +48,28 @@ const useAppsButtonSx = {
 /**
  * After mobile/compact login: pick upload destination or see desktop recommendation.
  * Mall taps on Tuta Dates / Albums / Notes reopen this chooser on compact viewports.
+ * Guest demo ("demo" / guest) never gets mobile upload — desktop-only notice instead.
  */
 export default function MobilePostLoginChooserDialog() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isCompact = useCompactLoginViewport();
+  const guestDemo = isGuestDemoLogin(user);
   const [open, setOpen] = useState(false);
   const [desktopRecommendOpen, setDesktopRecommendOpen] = useState(false);
+  const [demoMobileBlockedOpen, setDemoMobileBlockedOpen] = useState(false);
 
   const tryOpenChooser = useCallback(() => {
     if (!user || !isCompact) return;
     if (!peekMobilePostLoginChooserPending()) return;
+    if (guestDemo) {
+      clearMobilePostLoginChooserPending();
+      setOpen(false);
+      setDemoMobileBlockedOpen(true);
+      return;
+    }
     setOpen(true);
-  }, [user, isCompact]);
+  }, [user, isCompact, guestDemo]);
 
   useEffect(() => {
     tryOpenChooser();
@@ -75,22 +85,37 @@ export default function MobilePostLoginChooserDialog() {
   }, []);
 
   const goTutaNotesUpload = useCallback(() => {
+    if (guestDemo) {
+      closeChooser();
+      setDemoMobileBlockedOpen(true);
+      return;
+    }
     markMobileTutaNotesUploadPending();
     closeChooser();
     navigate(`${MY_RECORD_VAULT_PATH}?mobileUpload=1`, { replace: true });
-  }, [closeChooser, navigate]);
+  }, [closeChooser, guestDemo, navigate]);
 
   const goTutaPhotoUpload = useCallback(() => {
+    if (guestDemo) {
+      closeChooser();
+      setDemoMobileBlockedOpen(true);
+      return;
+    }
     markMobileTutaPhotoUploadPending();
     closeChooser();
     navigate('/myPhotoAlbums?mobileUpload=1', { replace: true });
-  }, [closeChooser, navigate]);
+  }, [closeChooser, guestDemo, navigate]);
 
   const goTutaDatesUpload = useCallback(() => {
+    if (guestDemo) {
+      closeChooser();
+      setDemoMobileBlockedOpen(true);
+      return;
+    }
     markMobileTutaDatesUploadPending();
     closeChooser();
     navigate('/myStory?mobileUpload=1', { replace: true });
-  }, [closeChooser, navigate]);
+  }, [closeChooser, guestDemo, navigate]);
 
   const goUseApps = useCallback(() => {
     closeChooser();
@@ -99,6 +124,11 @@ export default function MobilePostLoginChooserDialog() {
 
   const closeDesktopRecommend = useCallback(() => {
     setDesktopRecommendOpen(false);
+    navigate('/mall', { replace: true });
+  }, [navigate]);
+
+  const closeDemoMobileBlocked = useCallback(() => {
+    setDemoMobileBlockedOpen(false);
     navigate('/mall', { replace: true });
   }, [navigate]);
 
@@ -150,6 +180,25 @@ export default function MobilePostLoginChooserDialog() {
             {DESKTOP_RECOMMEND_MESSAGE}
           </Typography>
           <GreenButton type="button" onClick={closeDesktopRecommend} sx={{ ...choiceButtonSx, mt: 1 }}>
+            OK
+          </GreenButton>
+        </ColorTemplate7PopupLargeDark.Body>
+      </ColorTemplate7PopupLargeDark>
+
+      <ColorTemplate7PopupLargeDark
+        open={demoMobileBlockedOpen}
+        onClose={closeDemoMobileBlocked}
+        closeOnBackdrop
+        closeButtonAriaLabel="Close demo mobile notice"
+        maxWidth="min(96vw, 420px)"
+        centerInWindow
+      >
+        <ColorTemplate7PopupLargeDark.Title>Demo mode</ColorTemplate7PopupLargeDark.Title>
+        <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
+          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', textAlign: 'center' }}>
+            {DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE}
+          </Typography>
+          <GreenButton type="button" onClick={closeDemoMobileBlocked} sx={{ ...choiceButtonSx, mt: 1 }}>
             OK
           </GreenButton>
         </ColorTemplate7PopupLargeDark.Body>
