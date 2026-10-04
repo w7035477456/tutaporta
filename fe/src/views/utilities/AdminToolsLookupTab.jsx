@@ -941,7 +941,7 @@ export default function AdminToolsLookupTab({ onError }) {
 
       if (
         !(await themedConfirm(
-          `Factory Reset ${parts.join(', ')}?\n\nDeletes user photos, postings, bios, bill rows, and requests, then re-applies new-member defaults.\nEncrypted TutaNotes / TutaPhotoAlbums vault files are not auto-wiped.`
+          `Factory Reset ${parts.join(', ')}?\n\nDeletes user photos, postings, bios, bill rows, and requests, then re-applies new-member defaults.\nAlso removes this member's mobile uploads from storage: mobile_upload, Tuta Dates photos/videos, OneDrive staging, notes, and that member's TutaNotes / TutaPhotoAlbums folders.`
         ))
       ) {
         return;

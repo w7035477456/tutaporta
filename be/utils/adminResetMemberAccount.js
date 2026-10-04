@@ -10,6 +10,7 @@ import {
   fetchPhotoRowsForSinglesId
 } from './deletePhotoFromFolder.js';
 import { deleteVideosFromFolder, fetchVideoRowsForSinglesId } from './deleteVideoFromFolder.js';
+import { deleteMemberMobileUploadsOnFactoryReset } from './deleteMemberMobileUploads.js';
 import { ensureSeededDemoBuddiesOnLogin } from './ensureSeededDemoBuddiesOnLogin.js';
 import { isProtectedSystemToolsAdminSinglesId } from './systemToolsAdmin.js';
 
@@ -28,7 +29,7 @@ function toSinglesId(raw) {
 
 async function loadSinglesRow(client, singlesId) {
   const { rows } = await client.query(
-    `SELECT singles_id, email, alias, member_category, gender_self_report, seeded_demo_buddies_boolean
+    `SELECT singles_id, email, alias, member_id, member_category, gender_self_report, seeded_demo_buddies_boolean
      FROM ${Q}.singles
      WHERE singles_id = $1
      LIMIT 1`,
@@ -125,7 +126,8 @@ async function cascadeWipeUserContent(client, singlesId) {
     requestsDeleted: 0,
     monthlyBillsDeleted: 0,
     yearlyBillsDeleted: 0,
-    photoFolderFilesRemoved: 0
+    photoFolderFilesRemoved: 0,
+    mobileUploadSessionsDeleted: 0
   };
 
   await client.query(
@@ -177,6 +179,18 @@ async function cascadeWipeUserContent(client, singlesId) {
   const yearlyResult = await client.query(`DELETE FROM ${Q}.yearly_bill WHERE singles_id = $1`, [id]);
   summary.yearlyBillsDeleted = Number(yearlyResult.rowCount) || 0;
 
+  const sessionTable = await client.query(
+    `SELECT to_regclass($1) AS rel`,
+    [`${SCHEMA}.mobile_photo_upload_sessions`]
+  );
+  if (sessionTable.rows[0]?.rel) {
+    const sessionsResult = await client.query(
+      `DELETE FROM ${Q}.mobile_photo_upload_sessions WHERE singles_id = $1`,
+      [id]
+    );
+    summary.mobileUploadSessionsDeleted = Number(sessionsResult.rowCount) || 0;
+  }
+
   // Disk cleanup after DB deletes succeed (caller commits first).
   summary._photoRows = photoRows;
   summary._videoRows = videoRows;
@@ -216,6 +230,13 @@ export async function hardResetMemberAccount(singlesId) {
     wipeSummary.photoFolderFilesRemoved = Array.isArray(folderCleanup?.removed)
       ? folderCleanup.removed.length
       : 0;
+    const mobileUploadCleanup = await deleteMemberMobileUploadsOnFactoryReset({
+      singlesId: id,
+      memberId: row.member_id
+    });
+    wipeSummary.mobileUploadFilesRemoved = mobileUploadCleanup.mobileUploadFilesRemoved.length;
+    wipeSummary.memberDirectoriesRemoved = mobileUploadCleanup.directoriesRemoved.length;
+    wipeSummary.legacyUploadFilesRemoved = mobileUploadCleanup.legacyFilesRemoved.length;
     delete wipeSummary._photoRows;
     delete wipeSummary._videoRows;
 
@@ -232,9 +253,11 @@ export async function hardResetMemberAccount(singlesId) {
         demoBuddies,
         billSchedule: bill,
         vaultNotes:
-          'Custom TutaNotes vault data is not auto-wiped while encrypted on disk/USB. Format/re-open vault or wipe USB from the vault UI if a clean SAMPLE NOTEBOOK is required.',
+          'This member TutaNotes folder under LARGE_CHEAP_STORAGE_FOLDER and notes OneDrive staging were removed.',
         vaultAlbums:
-          'Custom TutaPhotoAlbums vault data is not auto-wiped while encrypted on disk/USB. Format/re-open vault or wipe USB from the vault UI if a clean SAMPLE SET is required.'
+          'This member TutaPhotoAlbums folder under LARGE_CHEAP_STORAGE_FOLDER and photo-album OneDrive staging were removed.',
+        mobileUploads:
+          'Phone uploads were removed from mobile_upload, Tuta Dates photo/video folders, OneDrive staging, and this member storage folders.'
       }
     };
   } catch (err) {
