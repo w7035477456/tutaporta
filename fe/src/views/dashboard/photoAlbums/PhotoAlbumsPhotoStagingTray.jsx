@@ -16,7 +16,7 @@ import {
 import {
   isRecordVaultMobileUploadDrag,
   materializeRecordVaultMobileUploadFile,
-  readRecordVaultMobileUploadDragFileName
+  readRecordVaultMobileUploadDragFileNames
 } from '../recordVault/RecordVaultMobileUploadTray';
 import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
@@ -481,21 +481,25 @@ export default function PhotoAlbumsPhotoStagingTray({
 
         // Yellow Mobile Upload strip → green Thumbnail Tray (stage into album vault).
         if (isRecordVaultMobileUploadDrag(e.dataTransfer)) {
-          const stagedName = readRecordVaultMobileUploadDragFileName(e.dataTransfer);
-          if (!stagedName) return;
+          const stagedNames = readRecordVaultMobileUploadDragFileNames(e.dataTransfer);
+          if (!stagedNames.length) return;
           void (async () => {
-            try {
-              const file = await materializeRecordVaultMobileUploadFile(
-                stagedName,
-                MOBILE_UPLOAD_PRODUCT_TUTAPHOTO
-              );
-              onOsFiles?.([file]);
-            } catch (err) {
-              console.warn(
-                '[PhotoAlbumsPhotoStagingTray] mobile upload drop failed',
-                err?.message ?? err
-              );
+            const files = [];
+            for (const stagedName of stagedNames) {
+              try {
+                // eslint-disable-next-line no-await-in-loop
+                files.push(
+                  await materializeRecordVaultMobileUploadFile(stagedName, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO)
+                );
+              } catch (err) {
+                console.warn(
+                  '[PhotoAlbumsPhotoStagingTray] mobile upload drop failed',
+                  stagedName,
+                  err?.message ?? err
+                );
+              }
             }
+            if (files.length) onOsFiles?.(files);
           })();
           return;
         }

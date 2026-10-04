@@ -106,7 +106,7 @@ import RecordVaultMobileDirectUploadDialog from '../recordVault/RecordVaultMobil
 import RecordVaultMobileUploadTray, {
   isRecordVaultMobileUploadDrag,
   materializeRecordVaultMobileUploadFile,
-  readRecordVaultMobileUploadDragFileName
+  readRecordVaultMobileUploadDragFileNames
 } from '../recordVault/RecordVaultMobileUploadTray';
 import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import {
@@ -5211,11 +5211,11 @@ export default function PhotoAlbumsWorkspacePane({
       ) {
         return;
       }
-      const mobileUploadName = isRecordVaultMobileUploadDrag(event.dataTransfer)
-        ? readRecordVaultMobileUploadDragFileName(event.dataTransfer)
-        : '';
+      const mobileUploadNames = isRecordVaultMobileUploadDrag(event.dataTransfer)
+        ? readRecordVaultMobileUploadDragFileNames(event.dataTransfer)
+        : [];
       const isFileDrag = types.includes('Files');
-      if (!isFileDrag && !mobileUploadName) return;
+      if (!isFileDrag && !mobileUploadNames.length) return;
       event.preventDefault();
       event.stopPropagation();
       if (noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)) {
@@ -5227,12 +5227,16 @@ export default function PhotoAlbumsWorkspacePane({
       }
 
       // Mobile Upload strip → Thumbnail Tray. The staged copy stays until its X is clicked.
-      if (mobileUploadName) {
-        try {
-          const file = await materializeRecordVaultMobileUploadFile(mobileUploadName, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
-          await uploadNoteVaultFileToStaging(file);
-        } catch (err) {
-          setError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
+      if (mobileUploadNames.length) {
+        for (const mobileUploadName of mobileUploadNames) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const file = await materializeRecordVaultMobileUploadFile(mobileUploadName, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
+            // eslint-disable-next-line no-await-in-loop
+            await uploadNoteVaultFileToStaging(file);
+          } catch (err) {
+            setError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
+          }
         }
         return;
       }
@@ -8561,6 +8565,7 @@ export default function PhotoAlbumsWorkspacePane({
                   !isInnerNoteUnlocked(selectedNote.note_id))
               }
               refreshToken={mobileUploadFolderRefreshToken}
+              selectable
               emptyHint="Take a photo on your phone or scan Mobile Upload QR — photos appear here. Drag a thumbnail onto the album."
               onError={(msg) => setError(String(msg || ''))}
             />

@@ -83,6 +83,35 @@ const loginVisibilityIconButtonSx = {
   }
 };
 
+const googlePasswordHintSx = {
+  mt: 1,
+  px: 1,
+  fontSize: { xs: '0.75rem', sm: getDesktopTextFontSizeHalfVw() },
+  lineHeight: 1.35,
+  fontWeight: 700,
+  textAlign: 'center',
+  color: 'var(--theme-inverse-daynight-color)'
+};
+
+const googlePasswordHintLinkSx = {
+  p: 0,
+  border: 'none',
+  background: 'none',
+  font: 'inherit',
+  fontWeight: 800,
+  color: 'inherit',
+  textDecoration: 'underline',
+  textUnderlineOffset: '0.15em',
+  cursor: 'pointer',
+  ...authLinkHoverScaleSx
+};
+
+const googlePasswordHelpListSx = {
+  m: 0,
+  pl: 3,
+  '& li': { mb: 0.5 }
+};
+
 const loginErrorPrimarySx = {
   fontSize: { xs: '0.9rem', sm: getDesktopTextFontSizeVw() },
   fontWeight: 700,
@@ -121,6 +150,7 @@ export default function AuthLogin() {
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [demoMobileBlockedOpen, setDemoMobileBlockedOpen] = useState(false);
+  const [googlePasswordHelpOpen, setGooglePasswordHelpOpen] = useState(false);
   const isMobileViewport = useCompactLoginViewport();
   const isDemoAliasLogin = isDemoLoginAliasId(email);
   const passwordVisible = showPassword || isDemoAliasLogin;
@@ -299,6 +329,18 @@ export default function AuthLogin() {
             busy={googleBusy}
             onClick={() => void handleGoogleSignIn()}
           />
+          <Typography component="div" sx={googlePasswordHintSx}>
+            If you signed up with Google, but now prefer login with password,{' '}
+            <Box
+              component="button"
+              type="button"
+              onClick={() => setGooglePasswordHelpOpen(true)}
+              {...guestDemoAllowProps()}
+              sx={googlePasswordHintLinkSx}
+            >
+              click here
+            </Box>
+          </Typography>
           <Divider
             sx={{
               my: 2,
@@ -425,6 +467,50 @@ export default function AuthLogin() {
           <GreenButton type="button" onClick={() => setDemoMobileBlockedOpen(false)} sx={{ width: '100%' }}>
             OK
           </GreenButton>
+        </ColorTemplate7PopupLargeDark.Body>
+      </ColorTemplate7PopupLargeDark>
+
+      <ColorTemplate7PopupLargeDark
+        open={googlePasswordHelpOpen}
+        onClose={() => setGooglePasswordHelpOpen(false)}
+        closeOnBackdrop
+        closeButtonAriaLabel="Close Google password help"
+        maxWidth="min(96vw, 560px)"
+        centerInWindow
+        bodyTextAlignLeft
+        centeredLeadLines={1}
+      >
+        <ColorTemplate7PopupLargeDark.Title>Use a password with your Google account</ColorTemplate7PopupLargeDark.Title>
+        <ColorTemplate7PopupLargeDark.Body spacing={1.25}>
+          <ColorTemplate7PopupLargeDark.SectionTitle>While logged in (through Google):</ColorTemplate7PopupLargeDark.SectionTitle>
+          <Box component="ol" sx={googlePasswordHelpListSx}>
+            <li>
+              Open <strong>Profile &amp; Records</strong>.
+            </li>
+            <li>
+              Click <strong>Change password</strong>.
+            </li>
+            <li>Get the SMS code sent to the phone you verified at signup, and enter it.</li>
+            <li>Type your new password twice.</li>
+          </Box>
+          <ColorTemplate7PopupLargeDark.BodyText>
+            It doesn&apos;t ask for your current password, which is why it works for Google accounts.
+          </ColorTemplate7PopupLargeDark.BodyText>
+          <ColorTemplate7PopupLargeDark.SectionTitle>While logged out:</ColorTemplate7PopupLargeDark.SectionTitle>
+          <Box component="ol" sx={googlePasswordHelpListSx}>
+            <li>
+              On the login page, click <strong>Forgot Password?</strong> and enter your Gmail address.
+            </li>
+            <li>Open the reset email and set a new password.</li>
+          </Box>
+          <ColorTemplate7PopupLargeDark.BodyText>
+            The reset flow looks the account up by email only, so Google-created accounts get the email too.
+          </ColorTemplate7PopupLargeDark.BodyText>
+          <ColorTemplate7PopupLargeDark.BodyText>
+            After either one, you can sign in with <strong>Email or Phone + Password</strong>, and{' '}
+            <strong>Sign in with Google</strong> still works on the same account. Both methods end up in the same
+            member record.
+          </ColorTemplate7PopupLargeDark.BodyText>
         </ColorTemplate7PopupLargeDark.Body>
       </ColorTemplate7PopupLargeDark>
     </>

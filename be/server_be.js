@@ -1033,7 +1033,8 @@ const healthErrorE5 = {
 const REDIS_HEALTH_PING_KEY = 'health:ping_count';
 
 async function logAndIncrementHealthPingCount(req) {
-  if (!redisClient) return;
+  // Outages are already reported (throttled) by the redisClient 'error' handler.
+  if (!redisClient || redisClient.status !== 'ready') return;
   try {
     const current = await redisClient.get(REDIS_HEALTH_PING_KEY);
     const value = current == null ? 0 : parseInt(current, 10) || 0;

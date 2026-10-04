@@ -17,6 +17,7 @@ import {
 } from 'config/mobileUploadHoverTooltip';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
+import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import {
   MOBILE_UPLOAD_PRODUCT_TUTANOTES,
   requireMobileUploadProduct
@@ -24,6 +25,8 @@ import {
 
 /** HTML5 drag payload: file name under UPLOAD_FOLDER. */
 export const RV_MOBILE_UPLOAD_DRAG_MIME = 'application/x-rv-mobile-upload';
+/** HTML5 drag payload: JSON array of file names (multi-select drag). */
+export const RV_MOBILE_UPLOAD_DRAG_LIST_MIME = 'application/x-rv-mobile-upload-list';
 
 export function isRecordVaultMobileUploadDrag(dataTransfer) {
   const types = dataTransfer?.types ? Array.from(dataTransfer.types) : [];
@@ -33,6 +36,21 @@ export function isRecordVaultMobileUploadDrag(dataTransfer) {
 export function readRecordVaultMobileUploadDragFileName(dataTransfer) {
   const raw = String(dataTransfer?.getData?.(RV_MOBILE_UPLOAD_DRAG_MIME) || '').trim();
   return raw || '';
+}
+
+/** All dragged mobile-upload names (multi-select), falling back to the single name. */
+export function readRecordVaultMobileUploadDragFileNames(dataTransfer) {
+  try {
+    const parsed = JSON.parse(dataTransfer?.getData?.(RV_MOBILE_UPLOAD_DRAG_LIST_MIME) || '[]');
+    if (Array.isArray(parsed)) {
+      const names = parsed.map((n) => String(n || '').trim()).filter(Boolean);
+      if (names.length) return names;
+    }
+  } catch {
+    // fall back to single name
+  }
+  const single = readRecordVaultMobileUploadDragFileName(dataTransfer);
+  return single ? [single] : [];
 }
 
 function stripMobileUploadNamePrefix(name) {
@@ -69,37 +87,88 @@ function displayName(name) {
   return stripMobileUploadNamePrefix(name);
 }
 
-function ThumbTile({ entry, thumb, disabled, onRemove }) {
+function ThumbTile({
+  entry,
+  thumb,
+  disabled,
+  onRemove,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  getDragNames,
+  onDragDone
+}) {
   const name = entry.name;
   const video = isVideoContentType(entry.contentType, name);
   return (
     <Box
       role="listitem"
+      aria-selected={selectable ? selected : undefined}
       draggable={!disabled}
-      title={`${displayName(name)} — drag onto a note`}
+      title={
+        selectable
+          ? `${displayName(name)} — click to select, drag onto a note or the Thumbnail Tray`
+          : `${displayName(name)} — drag onto a note`
+      }
+      onClick={() => {
+        if (selectable && !disabled) onToggleSelect?.(name);
+      }}
       onDragStart={(e) => {
         if (disabled) {
           e.preventDefault();
           return;
         }
-        e.dataTransfer.setData(RV_MOBILE_UPLOAD_DRAG_MIME, name);
-        e.dataTransfer.setData('text/plain', displayName(name));
+        const names = getDragNames ? getDragNames(name) : [name];
+        e.dataTransfer.setData(RV_MOBILE_UPLOAD_DRAG_MIME, names[0] || name);
+        e.dataTransfer.setData(RV_MOBILE_UPLOAD_DRAG_LIST_MIME, JSON.stringify(names));
+        e.dataTransfer.setData('text/plain', names.map(displayName).join('\n'));
         e.dataTransfer.effectAllowed = 'copy';
+      }}
+      onDragEnd={(e) => {
+        if (e.dataTransfer?.dropEffect && e.dataTransfer.dropEffect !== 'none') onDragDone?.();
       }}
       sx={{
         position: 'relative',
         flex: '0 0 auto',
         width: 72,
         height: 72,
-        border: '2px solid #000',
+        border: selected ? '4px solid #1565c0' : '2px solid #000',
         borderRadius: 0.75,
         bgcolor: '#fff',
         overflow: 'hidden',
-        cursor: disabled ? 'default' : 'grab',
+        boxSizing: 'border-box',
+        boxShadow: selected ? '0 0 0 2px #fff, 0 0 8px 2px rgba(21, 101, 192, 0.8)' : 'none',
+        cursor: disabled ? 'default' : selectable ? 'pointer' : 'grab',
         userSelect: 'none',
         '&:active': { cursor: disabled ? 'default' : 'grabbing' }
       }}
     >
+      {selected ? (
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            top: 2,
+            left: 2,
+            zIndex: 2,
+            width: 18,
+            height: 18,
+            borderRadius: '50%',
+            bgcolor: '#1565c0',
+            color: '#fff',
+            border: '1px solid #fff',
+            fontSize: 12,
+            fontWeight: 900,
+            lineHeight: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none'
+          }}
+        >
+          ✓
+        </Box>
+      ) : null}
       {thumb ? (
         <Box
           component="img"
@@ -163,7 +232,12 @@ ThumbTile.propTypes = {
   }).isRequired,
   thumb: PropTypes.string,
   disabled: PropTypes.bool,
-  onRemove: PropTypes.func.isRequired
+  onRemove: PropTypes.func.isRequired,
+  selectable: PropTypes.bool,
+  selected: PropTypes.bool,
+  onToggleSelect: PropTypes.func,
+  getDragNames: PropTypes.func,
+  onDragDone: PropTypes.func
 };
 
 /**
@@ -180,11 +254,13 @@ export default function RecordVaultMobileUploadTray({
   titleLabel = 'Mobile Upload:',
   layout = 'horizontal',
   plain = false,
+  selectable = false,
   emptyHint,
   onError
 }) {
   const stagingProduct = requireMobileUploadProduct(product);
   const [files, setFiles] = useState([]);
+  const [selectedNames, setSelectedNames] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [thumbUrls, setThumbUrls] = useState(() => ({}));
   const thumbUrlsRef = useRef({});
@@ -319,6 +395,41 @@ export default function RecordVaultMobileUploadTray({
     [disabled, loadFiles, onError, stagingProduct]
   );
 
+  useEffect(() => {
+    setSelectedNames((prev) => {
+      if (!prev.size) return prev;
+      const present = new Set(files.map((e) => e?.name).filter(Boolean));
+      const next = new Set([...prev].filter((n) => present.has(n)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [files]);
+
+  const toggleSelect = useCallback((fileName) => {
+    setSelectedNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(fileName)) next.delete(fileName);
+      else next.add(fileName);
+      return next;
+    });
+  }, []);
+
+  const allSelected = files.length > 0 && files.every((e) => selectedNames.has(e.name));
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedNames(allSelected ? new Set() : new Set(files.map((e) => e.name)));
+  }, [allSelected, files]);
+
+  const clearSelection = useCallback(() => setSelectedNames(new Set()), []);
+
+  /** Dragging a selected tile carries every selected tile (tray order); otherwise just that one. */
+  const getDragNames = useCallback(
+    (fileName) => {
+      if (!selectedNames.has(fileName)) return [fileName];
+      return files.map((e) => e.name).filter((n) => selectedNames.has(n));
+    },
+    [files, selectedNames]
+  );
+
   const isGrid = layout === 'grid';
   const shellSx = isGrid
     ? {
@@ -401,6 +512,11 @@ export default function RecordVaultMobileUploadTray({
           thumb={thumbUrls[entry.name]}
           disabled={disabled}
           onRemove={handleRemove}
+          selectable={selectable}
+          selected={selectable && selectedNames.has(entry.name)}
+          onToggleSelect={toggleSelect}
+          getDragNames={selectable ? getDragNames : undefined}
+          onDragDone={selectable ? clearSelection : undefined}
         />
       ))}
     </Box>
@@ -463,6 +579,22 @@ export default function RecordVaultMobileUploadTray({
           </Box>
         </Tooltip>
       )}
+      {selectable ? (
+        <ColorTemplate13DisableGreenButton
+          type="button"
+          disabled={disabled || !files.length}
+          aria-label={allSelected ? 'Unselect all mobile upload thumbnails' : 'Select all mobile upload thumbnails'}
+          title={
+            allSelected
+              ? 'Unselect all thumbnails'
+              : 'Select all thumbnails, then drag any selected one onto the Thumbnail Tray'
+          }
+          onClick={toggleSelectAll}
+          sx={{ flexShrink: 0, alignSelf: 'center', whiteSpace: 'nowrap' }}
+        >
+          {allSelected ? 'Unselect All' : 'Select All'}
+        </ColorTemplate13DisableGreenButton>
+      ) : null}
       {thumbsArea}
     </Box>
   );
@@ -477,6 +609,7 @@ RecordVaultMobileUploadTray.propTypes = {
   titleLabel: PropTypes.string,
   layout: PropTypes.oneOf(['horizontal', 'grid']),
   plain: PropTypes.bool,
+  selectable: PropTypes.bool,
   emptyHint: PropTypes.string,
   onError: PropTypes.func
 };
