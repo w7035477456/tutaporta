@@ -3,6 +3,8 @@ import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import ColorTemplate9TableData, { useColorTemplate9AutoFitColumnWidths } from 'ui-component/ColorTemplate9TableData';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import { formatMemberCategoryLabel, isAdminMemberCategory } from 'utils/memberCategory';
@@ -15,6 +17,7 @@ import {
   fetchAdminSinglesLookupAll,
   softResetAdminMemberAccount,
   hardResetAdminMemberAccount,
+  resetAdminPasswordAttemptCount,
   cascadeDeleteAdminTableRow,
   clearAdminLockTutaNotes,
   fetchAdminVideoObjectUrl
@@ -37,6 +40,7 @@ import { formatVideoFileAge, sortSinglesRowsByVideoAge } from 'utils/formatVideo
 const CASCADE_DELETE_LABEL = 'Cascd Del';
 const SOFT_RESET_LABEL = 'Default Reset';
 const HARD_RESET_LABEL = 'Factory Reset';
+const LOGIN_RESET_LABEL = 'Login # Reset';
 /** Size / display columns from the first N characters of header + cell text. */
 const LOOKUP_COLUMN_DISPLAY_CHARS = 30;
 
@@ -317,9 +321,9 @@ const lookupPhotoAvatarSx = {
 const SINGLES_COL = {
   PHOTO: 0,
   ALIAS: 1,
-  SINGLES_ID: 2,
-  MEMBER_ID: 3,
-  EMAIL: 4,
+  EMAIL: 2,
+  SINGLES_ID: 3,
+  MEMBER_ID: 4,
   IMPERSONATE: 5,
   STATUS: 6,
   TOKEN_BALANCE: 7,
@@ -327,11 +331,15 @@ const SINGLES_COL = {
   CASCADE_DELETE: 9,
   RESET: 10,
   HARD_RESET: 11,
-  MY_REFER_CODE: 12,
-  REFER_BY: 13,
-  VIEW_VIDEO: 14,
-  VIDEO_AGE: 15
+  LOGIN_RESET: 12,
+  MY_REFER_CODE: 13,
+  REFER_BY: 14,
+  VIEW_VIDEO: 15,
+  VIDEO_AGE: 16
 };
+
+/** Photo, Alias, Email stay pinned left while the rest of the grid scrolls horizontally. */
+const SINGLES_FROZEN_COLUMN_COUNT = 3;
 
 const AUDIT_COL = {
   SPACER: 0,
@@ -438,6 +446,10 @@ function buildSinglesLookupColumnButtons() {
       labels: [HARD_RESET_LABEL, '…'],
       variant: 'selected'
     },
+    {
+      labels: [LOGIN_RESET_LABEL, '…'],
+      variant: 'selected'
+    },
     null,
     null,
     null,
@@ -474,9 +486,9 @@ function buildSinglesLookupColumnTexts(rows) {
   return [
     ['Photo', ...rows.map(() => 'Photo')],
     ['Alias', ...rows.map((row) => truncateLookupDisplay(row.alias || '—'))],
+    ['Email', ...rows.map((row) => truncateLookupDisplay(row.email || '—'))],
     ['singles_id', ...rows.map((row) => truncateLookupDisplay(row.singlesId ?? '—'))],
     ['member_id', ...rows.map((row) => truncateLookupDisplay(row.memberId ?? '—'))],
-    ['Email', ...rows.map((row) => truncateLookupDisplay(row.email || '—'))],
     ['Impersonate', ...rows.map(() => 'Impersonate')],
     [
       'status',
@@ -496,6 +508,10 @@ function buildSinglesLookupColumnTexts(rows) {
     [
       HARD_RESET_LABEL,
       ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : HARD_RESET_LABEL))
+    ],
+    [
+      LOGIN_RESET_LABEL,
+      ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : LOGIN_RESET_LABEL))
     ],
     ['My Refer Code', ...rows.map((row) => truncateLookupDisplay(row.myReferCode || '—'))],
     ['I refer by', ...rows.map((row) => truncateLookupDisplay(formatReferByDisplay(row)))],
@@ -533,6 +549,8 @@ function LookupField({ label, value, onChange, inputMode, pattern }) {
 }
 
 export default function AdminToolsLookupTab({ onError }) {
+  const theme = useTheme();
+  const isSmUp = useMediaQuery(theme.breakpoints.up('sm'));
   const [singlesIdInput, setSinglesIdInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [aliasInput, setAliasInput] = useState('');
@@ -551,6 +569,7 @@ export default function AdminToolsLookupTab({ onError }) {
   const [saveResultPopup, setSaveResultPopup] = useState(null);
   const [softResetBusyById, setSoftResetBusyById] = useState({});
   const [hardResetBusyById, setHardResetBusyById] = useState({});
+  const [pwdRetryResetBusyById, setPwdRetryResetBusyById] = useState({});
   const [cascadeDeleteBusyById, setCascadeDeleteBusyById] = useState({});
   const [lockTutaNotesBusyById, setLockTutaNotesBusyById] = useState({});
   const [playerVideoUrl, setPlayerVideoUrl] = useState('');
@@ -615,8 +634,11 @@ export default function AdminToolsLookupTab({ onError }) {
     });
   }, []);
 
-  const { gridTemplateColumns: singlesTableGridSx, minTableWidthPx: singlesTableMinWidthPx } =
-    useColorTemplate9AutoFitColumnWidths({
+  const {
+    columnWidthsPx: singlesTableColumnWidthsPx,
+    gridTemplateColumns: singlesTableGridSx,
+    minTableWidthPx: singlesTableMinWidthPx
+  } = useColorTemplate9AutoFitColumnWidths({
       columnTexts: singlesColumnTexts,
       columnButtons: singlesColumnButtons,
       minWidthsPx: MIN_SINGLES_COLUMN_WIDTHS_PX,
@@ -971,6 +993,52 @@ export default function AdminToolsLookupTab({ onError }) {
     [hardResetBusyById, listBusy, onError, runLookup, saveBusy, softResetBusyById]
   );
 
+  const handleResetLoginAttempts = useCallback(
+    async (row) => {
+      if (isAdminSinglesLookupRow(row)) return;
+      const id = Number(row?.singlesId);
+      if (!Number.isFinite(id) || id < 1 || pwdRetryResetBusyById[id] || saveBusy || listBusy) return;
+
+      const parts = [`singles_id ${id}`];
+      if (row?.alias) parts.push(`alias ${row.alias}`);
+      if (row?.email) parts.push(`email ${row.email}`);
+      const currentCount = Number(row?.passwordAttemptCount ?? 0);
+
+      if (
+        !(await themedConfirm(
+          `Login # Reset ${parts.join(', ')}?\n\nCurrent login attempt count: ${currentCount}.\nResets it to 0 so the member can try logging in again (max 3 attempts per 24 hours).`
+        ))
+      ) {
+        return;
+      }
+
+      setPwdRetryResetBusyById((prev) => ({ ...prev, [id]: true }));
+      onError?.('');
+      try {
+        const result = await resetAdminPasswordAttemptCount({ singlesId: id });
+        const nextCount = Number(result?.passwordAttemptCount ?? 0);
+        setSinglesRows((prev) =>
+          prev.map((entry) => (entry.singlesId === id ? { ...entry, passwordAttemptCount: nextCount } : entry))
+        );
+        setSaveResultPopup({
+          kind: 'ok',
+          message: `Login # Reset complete for singles_id ${id}. Login attempt count is now ${nextCount}.`
+        });
+      } catch (err) {
+        const message = err?.response?.data?.error || err?.message || 'Failed to reset login attempt count';
+        onError?.(message);
+        setSaveResultPopup({ kind: 'error', message });
+      } finally {
+        setPwdRetryResetBusyById((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    },
+    [listBusy, onError, pwdRetryResetBusyById, saveBusy]
+  );
+
   const handleCascadeDeleteSingles = useCallback(
     async (row) => {
       if (isAdminSinglesLookupRow(row)) return;
@@ -1095,6 +1163,8 @@ export default function AdminToolsLookupTab({ onError }) {
                 topHorizontalScrollbar
                 autoFitColumns
                 minTableWidth={singlesTableMinWidthPx}
+                frozenColumnCount={isSmUp ? SINGLES_FROZEN_COLUMN_COUNT : 0}
+                frozenColumnWidthsPx={singlesTableColumnWidthsPx}
               >
                 <ColorTemplate9TableData.HeaderRow
                   gridTemplateColumns={singlesTableGridSx}
@@ -1116,6 +1186,15 @@ export default function AdminToolsLookupTab({ onError }) {
                     {columnSortHeaderLabel('Alias', tableSort, 'alias')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
+                    columnIndex={SINGLES_COL.EMAIL}
+                    sx={lookupColumnSortHeaderSx}
+                    onClick={() => handleCycleColumnSort('email')}
+                    role="columnheader"
+                    aria-sort={columnSortAria(tableSort, 'email')}
+                  >
+                    {columnSortHeaderLabel('Email', tableSort, 'email')}
+                  </ColorTemplate9TableData.HeaderCell>
+                  <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.SINGLES_ID}
                     sx={{ ...lookupCenterColumnCellSx, ...lookupColumnSortHeaderSx }}
                     onClick={() => handleCycleColumnSort('singlesId')}
@@ -1132,15 +1211,6 @@ export default function AdminToolsLookupTab({ onError }) {
                     aria-sort={columnSortAria(tableSort, 'memberId')}
                   >
                     {columnSortHeaderLabel('member_id', tableSort, 'memberId')}
-                  </ColorTemplate9TableData.HeaderCell>
-                  <ColorTemplate9TableData.HeaderCell
-                    columnIndex={SINGLES_COL.EMAIL}
-                    sx={lookupColumnSortHeaderSx}
-                    onClick={() => handleCycleColumnSort('email')}
-                    role="columnheader"
-                    aria-sort={columnSortAria(tableSort, 'email')}
-                  >
-                    {columnSortHeaderLabel('Email', tableSort, 'email')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.IMPERSONATE}
@@ -1184,6 +1254,13 @@ export default function AdminToolsLookupTab({ onError }) {
                   >
                     {HARD_RESET_LABEL}
                   </ColorTemplate9TableData.HeaderCell>
+                  <ColorTemplate9TableData.HeaderCell
+                    columnIndex={SINGLES_COL.LOGIN_RESET}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    title="Reset login attempt count to 0 (max 3 per 24 hours)"
+                  >
+                    {LOGIN_RESET_LABEL}
+                  </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}>
                     My Refer Code
                   </ColorTemplate9TableData.HeaderCell>
@@ -1211,6 +1288,7 @@ export default function AdminToolsLookupTab({ onError }) {
                   const cascadeDeleteBusy = Boolean(cascadeDeleteBusyById[row.singlesId]);
                   const lockTutaNotesBusy = Boolean(lockTutaNotesBusyById[row.singlesId]);
                   const pwdRetryCount = Number(row.passwordAttemptCount ?? 0);
+                  const pwdRetryResetBusy = Boolean(pwdRetryResetBusyById[row.singlesId]);
                   return (
                   <ColorTemplate9TableData.BodyRow
                     key={`singles-${row.singlesId}-${index}`}
@@ -1236,19 +1314,6 @@ export default function AdminToolsLookupTab({ onError }) {
                         {truncateLookupDisplay(row.alias || '—')}
                       </ColorTemplate9TableData.BodyText>
                     </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell columnIndex={SINGLES_COL.SINGLES_ID} sx={lookupCenterColumnCellSx}>
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
-                        {row.singlesId ?? '—'}
-                      </ColorTemplate9TableData.BodyText>
-                    </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell
-                      columnIndex={SINGLES_COL.MEMBER_ID}
-                      sx={{ display: { xs: 'none', sm: 'flex' } }}
-                    >
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
-                        {row.memberId ?? '—'}
-                      </ColorTemplate9TableData.BodyText>
-                    </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell columnIndex={SINGLES_COL.EMAIL}>
                       <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx} title={row.email || undefined}>
                         {truncateLookupDisplay(row.email || '—')}
@@ -1266,6 +1331,19 @@ export default function AdminToolsLookupTab({ onError }) {
                         {row.lockTutaNotes ? ' · TutaNotes LOCKED' : ''}
                         {row.myReferCode ? ` · my refer ${row.myReferCode}` : ''}
                         {row.referByCode ? ` · refer by ${formatReferByDisplay(row)}` : ''}
+                      </ColorTemplate9TableData.BodyText>
+                    </ColorTemplate9TableData.BodyCell>
+                    <ColorTemplate9TableData.BodyCell columnIndex={SINGLES_COL.SINGLES_ID} sx={lookupCenterColumnCellSx}>
+                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
+                        {row.singlesId ?? '—'}
+                      </ColorTemplate9TableData.BodyText>
+                    </ColorTemplate9TableData.BodyCell>
+                    <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.MEMBER_ID}
+                      sx={{ display: { xs: 'none', sm: 'flex' } }}
+                    >
+                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
+                        {row.memberId ?? '—'}
                       </ColorTemplate9TableData.BodyText>
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell
@@ -1385,6 +1463,22 @@ export default function AdminToolsLookupTab({ onError }) {
                           sx={{ whiteSpace: 'nowrap' }}
                         >
                           {hardResetBusy ? '…' : HARD_RESET_LABEL}
+                        </SelectedButtonTemplate>
+                      )}
+                    </ColorTemplate9TableData.BodyCell>
+                    <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.LOGIN_RESET}
+                      sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center' }}
+                    >
+                      {isAdminSinglesLookupRow(row) ? null : (
+                        <SelectedButtonTemplate
+                          type="button"
+                          disabled={pwdRetryResetBusy || hardResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          onClick={() => void handleResetLoginAttempts(row)}
+                          title={`Current login attempt count: ${pwdRetryCount}`}
+                          sx={{ whiteSpace: 'nowrap' }}
+                        >
+                          {pwdRetryResetBusy ? '…' : LOGIN_RESET_LABEL}
                         </SelectedButtonTemplate>
                       )}
                     </ColorTemplate9TableData.BodyCell>

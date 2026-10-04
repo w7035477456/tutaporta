@@ -72,6 +72,7 @@ alias addTestColumn='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsi
 alias dropTestColumn='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -c "ALTER TABLE helloworldjunktest.singles DROP COLUMN IF EXISTS test;"'
 
 alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
+alias syncdbmacubuntu='$HOME/code/main/scripts/sync-pg-schema-mac-to-ubuntu.sh'
 alias listNewUbuntuUsers='$HOME/code/main/scripts/list-new-ubuntu-users.sh'
 #-----------------------
 alias createnewmember='bash /Users/a/code/main/CreateNewMember.sh'

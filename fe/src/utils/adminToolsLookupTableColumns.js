@@ -1,14 +1,14 @@
-const SINGLES_STORAGE_KEY = 'adminToolsLookupSinglesColWidths_v9';
+const SINGLES_STORAGE_KEY = 'adminToolsLookupSinglesColWidths_v10';
 const AUDIT_STORAGE_KEY = 'adminToolsLookupAuditColWidths_v1';
 
-/** Desktop column widths (px); Photo, Alias…Cascd Del, Default Reset, Factory Reset, … Age. */
+/** Desktop column widths (px); Photo, Alias…Cascd Del, Default Reset, Factory Reset, Login # Reset, … Age. */
 export const DEFAULT_SINGLES_COLUMN_WIDTHS_PX = Object.freeze([
-  56, 128, 92, 112, 240, 128, 124, 88, 168, 48, 132, 128, 100, 140, 220, 108
+  56, 128, 92, 112, 240, 128, 124, 88, 168, 48, 132, 128, 132, 100, 140, 220, 108
 ]);
 export const DEFAULT_AUDIT_COLUMN_WIDTHS_PX = Object.freeze([48, 92, 96, 260, 240, 168]);
 
 export const MIN_SINGLES_COLUMN_WIDTHS_PX = Object.freeze([
-  52, 96, 100, 100, 160, 120, 100, 80, 120, 96, 90, 110, 110, 130, 110, 100
+  52, 96, 160, 100, 100, 120, 100, 80, 120, 96, 90, 110, 120, 110, 130, 110, 100
 ]);
 export const MIN_AUDIT_COLUMN_WIDTHS_PX = Object.freeze([48, 64, 72, 140, 120, 100]);
 

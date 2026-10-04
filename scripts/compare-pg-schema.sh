@@ -1,15 +1,18 @@
 #!/bin/bash
 # Compare helloworldjunktest schema: Mac (~/.ssh/be/.env) vs Ubuntu (SSH + remote .env).
 #
-# Prints exactly one line: "same" or "difference"
+# First stdout line is always "same" or "difference". On "difference" an object-level report
+# follows (only on Mac / only on Ubuntu / changed with -Ubuntu +Mac lines). --quiet = first line only.
 #
 # Uses the same SSH as Mac f2 alias (port 59221 + corruptedKey_march2024 via deploy-ssh-mac.sh).
 #
-#   comparepgschema
-#   comparepgschema --verbose
+#   isdbsame
+#   isdbsame --quiet
+#   isdbsame --verbose
 #
 # Mac ~/b:
-#   alias comparepgschema='$HOME/code/main/scripts/compare-pg-schema.sh'
+#   alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
+#   alias syncdbmacubuntu='$HOME/code/main/scripts/sync-pg-schema-mac-to-ubuntu.sh'
 #
 # Exit codes: 0 = same, 1 = difference, 2 = error
 set -uo pipefail
@@ -21,15 +24,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UBUNTU_HOST="${COMPARE_SCHEMA_UBUNTU_HOST:-lawsen0@192.168.222.202}"
 SSH_BIN="${COMPARE_SCHEMA_SSH_BIN:-${SCRIPT_DIR}/deploy-ssh-mac.sh}"
 VERBOSE=0
+QUIET=0
 SAVE_DUMPS=""
 
 usage() {
   cat <<'EOF'
-compare-pg-schema.sh [--ubuntu-host user@host] [--verbose] [--save-dumps dir]
+compare-pg-schema.sh [--ubuntu-host user@host] [--quiet] [--verbose] [--save-dumps dir]
 
 Compares PostgreSQL schema (default: helloworldjunktest) on Mac vs Ubuntu.
-Stdout: one line — "same" or "difference".
---verbose: stderr summary always (hosts, line counts); diff snippet only when different.
+Stdout: first line "same" or "difference"; on difference, an object-level report follows.
+--quiet: print only the first line.
+--verbose: stderr summary always (hosts, line counts); raw diff snippet only when different.
+--save-dumps dir: keep mac_/ubuntu_ normalized + raw dumps (used by syncdbmacubuntu).
 
 SSH defaults (same as f2 alias): port 59221, IdentitiesOnly, corruptedKey_march2024.
 Override: COMPARE_SCHEMA_SSH_BIN, DEPLOY_SSH_KEY, DEPLOY_SSH_PORT (see deploy-ssh-mac.sh).
@@ -45,6 +51,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --ubuntu-host) UBUNTU_HOST="${2:-}"; shift 2 ;;
     --verbose|-v) VERBOSE=1; shift ;;
+    --quiet|-q) QUIET=1; shift ;;
     --save-dumps) SAVE_DUMPS="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "ERROR: unknown arg: $1" >&2; echo "difference"; exit 2 ;;
@@ -80,31 +87,37 @@ run_ssh() {
 
 DUMP_SH="${SCRIPT_DIR}/pg-schema-dump.sh"
 [[ -x "$DUMP_SH" || -f "$DUMP_SH" ]] || fail "missing $DUMP_SH"
+DIFF_MJS="${SCRIPT_DIR}/pg-schema-diff.mjs"
 
 pg_load_connection_defaults || fail "cannot read Mac DB env from $PG_ENV_FILE"
 SCHEMA="$PGSCHEMA"
 
 TMPDIR="${TMPDIR:-/tmp}"
+MAC_RAW="$(mktemp "${TMPDIR}/pgschema_mac_raw.XXXXXX")"
+UBUNTU_RAW="$(mktemp "${TMPDIR}/pgschema_ubuntu_raw.XXXXXX")"
 MAC_DUMP="$(mktemp "${TMPDIR}/pgschema_mac.XXXXXX")"
 UBUNTU_DUMP="$(mktemp "${TMPDIR}/pgschema_ubuntu.XXXXXX")"
 MAC_ERR="$(mktemp "${TMPDIR}/pgschema_mac_err.XXXXXX")"
 UBUNTU_ERR="$(mktemp "${TMPDIR}/pgschema_ubuntu_err.XXXXXX")"
-cleanup() { rm -f "$MAC_DUMP" "$UBUNTU_DUMP" "$MAC_ERR" "$UBUNTU_ERR"; }
+cleanup() { rm -f "$MAC_RAW" "$UBUNTU_RAW" "$MAC_DUMP" "$UBUNTU_DUMP" "$MAC_ERR" "$UBUNTU_ERR"; }
 trap cleanup EXIT
 
+normalize_dump() { PG_SCHEMA_DUMP_NORMALIZE_STDIN=1 bash "$DUMP_SH"; }
+
 # --- Mac dump ---
-if ! bash "$DUMP_SH" >"$MAC_DUMP" 2>"$MAC_ERR"; then
+if ! PG_SCHEMA_DUMP_RAW=1 bash "$DUMP_SH" >"$MAC_RAW" 2>"$MAC_ERR"; then
   echo "ERROR: Mac pg_dump failed ($(pg_connection_label))" >&2
   [[ -s "$MAC_ERR" ]] && cat "$MAC_ERR" >&2
   echo "difference"
   exit 2
 fi
+normalize_dump <"$MAC_RAW" >"$MAC_DUMP"
 [[ -s "$MAC_DUMP" ]] || fail "Mac schema dump empty (schema $SCHEMA missing on Mac?)"
 
 # --- Ubuntu dump via SSH (same path as f2: port 59221 + key) ---
 if ! run_ssh \
-  'PG_SCHEMA_SCRIPT_DIR=$HOME/code/main/scripts BE_ENV_FILE=$HOME/.ssh/be/.env bash -s' \
-  <"$DUMP_SH" >"$UBUNTU_DUMP" 2>"$UBUNTU_ERR"; then
+  'PG_SCHEMA_DUMP_RAW=1 PG_SCHEMA_SCRIPT_DIR=$HOME/code/main/scripts BE_ENV_FILE=$HOME/.ssh/be/.env bash -s' \
+  <"$DUMP_SH" >"$UBUNTU_RAW" 2>"$UBUNTU_ERR"; then
   echo "ERROR: Ubuntu dump failed via ssh $UBUNTU_HOST (port ${DEPLOY_SSH_PORT:-59221})" >&2
   [[ -s "$UBUNTU_ERR" ]] && cat "$UBUNTU_ERR" >&2
   if [[ "$VERBOSE" -eq 1 ]]; then
@@ -116,6 +129,7 @@ if ! run_ssh \
   echo "difference"
   exit 2
 fi
+normalize_dump <"$UBUNTU_RAW" >"$UBUNTU_DUMP"
 [[ -s "$UBUNTU_DUMP" ]] || {
   echo "ERROR: Ubuntu schema dump empty (schema $SCHEMA missing on Ubuntu?)" >&2
   [[ -s "$UBUNTU_ERR" ]] && cat "$UBUNTU_ERR" >&2
@@ -127,6 +141,8 @@ if [[ -n "$SAVE_DUMPS" ]]; then
   mkdir -p "$SAVE_DUMPS"
   cp "$MAC_DUMP" "$SAVE_DUMPS/mac_${SCHEMA}.sql"
   cp "$UBUNTU_DUMP" "$SAVE_DUMPS/ubuntu_${SCHEMA}.sql"
+  cp "$MAC_RAW" "$SAVE_DUMPS/mac_${SCHEMA}_raw.sql"
+  cp "$UBUNTU_RAW" "$SAVE_DUMPS/ubuntu_${SCHEMA}_raw.sql"
 fi
 
 mac_lines="$(wc -l <"$MAC_DUMP" | tr -d ' ')"
@@ -152,6 +168,14 @@ fi
 
 print_verbose_summary "difference"
 echo "difference"
+if [[ "$QUIET" -eq 0 ]]; then
+  echo
+  if command -v node >/dev/null 2>&1 && [[ -f "$DIFF_MJS" ]]; then
+    node "$DIFF_MJS" report "$MAC_RAW" "$UBUNTU_RAW" || diff -u "$MAC_DUMP" "$UBUNTU_DUMP" | head -200
+  else
+    diff -u --label "mac/$SCHEMA" --label "ubuntu/$SCHEMA" "$MAC_DUMP" "$UBUNTU_DUMP" | head -200
+  fi
+fi
 if [[ "$VERBOSE" -eq 1 ]]; then
   echo "--- diff (first 120 lines) ---" >&2
   diff -u "$MAC_DUMP" "$UBUNTU_DUMP" | head -120 >&2 || true

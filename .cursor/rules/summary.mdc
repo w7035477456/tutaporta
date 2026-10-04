@@ -20,6 +20,20 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 - DB user: **`test_user1`** (superuser on Mac dev)
 - Qualify tables in SQL and migrations: `helloworldjunktest.singles`, etc.
 
+### Mac ↔ Ubuntu schema parity (required)
+
+1. **Every Mac Postgres schema change must also be applied to Ubuntu Postgres** on `192.168.222.202` (DDL, new tables/columns/indexes/enums/functions, migrations in `be/db/*.sql`, etc.). Either:
+   - **Cursor applies it automatically** over SSH using the `ssh.mdc` path (`scripts/deploy-ssh-mac.sh lawsen0@192.168.222.202 '…'` — port `59221`, `IdentitiesOnly`, corruptedKey; never plain `ssh`), **or**
+   - **Cursor gives Andrew the exact `psql` to run on Ubuntu**, wrapped in this marker:
+
+```
+######## DO THIS ON UBUNTU BEGIN ########
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "…"
+####### END DO THIS ON UBUNTU #####
+```
+
+2. **If Cursor applied the Ubuntu change itself**, it must then run the Mac alias **`isdbsame`** (`scripts/compare-pg-schema.sh`, after `source ~/b`). The result must be **`same`**, not **`difference`**. If it prints `difference` (or errors), run `isdbsame --verbose`, fix the drift on whichever side is behind, and re-run until it prints `same`. Report the final `isdbsame` result in the reply.
+
 ## 3) FE + BE on same web server (CORS)
 
 **Frontend and backend always run on the same web server** — intentional same-origin model to avoid CORS issues.
@@ -76,6 +90,7 @@ Bash init: **`source ~/b`** (repo copy: **`myscript/mac/b`**)
 | **`beall`** | Backend with hot reload |
 | **`deployall2`** | Mac → Ubuntu remote deploy (VPN + SSH) |
 | **`showbuild`** | Print FE build stamp / checksum |
+| **`isdbsame`** | Compare Mac vs Ubuntu `helloworldjunktest` schema → prints `same` or `difference` |
 
 Env: `~/.ssh/be/.env` (BE), `fe/.env` (FE). Restart after env changes.
 
@@ -143,3 +158,5 @@ When the reply is **explanation only** and Andrew does **not** need to take any 
 ```
 
 Use **one** of these markers per reply (not both). Do not use them for steps Cursor already completed itself.
+
+Ubuntu-only Postgres steps (see section 2, schema parity) use their own marker, **`######## DO THIS ON UBUNTU BEGIN ########` … `####### END DO THIS ON UBUNTU #####`**, which may appear alongside the markers above.

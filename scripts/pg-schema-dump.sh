@@ -3,6 +3,8 @@
 # Run on Mac or Ubuntu; reads ~/.ssh/be/.env (or BE_ENV_FILE).
 #
 #   bash scripts/pg-schema-dump.sh > /tmp/schema.sql
+#   PG_SCHEMA_DUMP_RAW=1 bash scripts/pg-schema-dump.sh > /tmp/raw.sql     # keep pg_dump "-- Name:" headers
+#   PG_SCHEMA_DUMP_NORMALIZE_STDIN=1 bash scripts/pg-schema-dump.sh < raw.sql  # normalize only (no DB)
 set -uo pipefail
 
 SCRIPT_DIR="${PG_SCHEMA_SCRIPT_DIR:-}"
@@ -42,6 +44,22 @@ else
   }
 fi
 
+normalize_schema_dump() {
+  sed -E \
+    -e '/^--/d' \
+    -e '/^SET /d' \
+    -e '/^SELECT pg_catalog\./d' \
+    -e '/^\\restrict/d' \
+    -e '/^\\unrestrict/d' \
+    -e 's/[[:space:]]+$//' \
+    | awk 'NF { print }'
+}
+
+if [[ "${PG_SCHEMA_DUMP_NORMALIZE_STDIN:-0}" == "1" ]]; then
+  normalize_schema_dump
+  exit 0
+fi
+
 pg_load_connection_defaults || exit 2
 
 find_pg_dump() {
@@ -58,17 +76,6 @@ find_pg_dump() {
   done
   echo "ERROR: pg_dump not found on $(hostname)" >&2
   return 1
-}
-
-normalize_schema_dump() {
-  sed -E \
-    -e '/^--/d' \
-    -e '/^SET /d' \
-    -e '/^SELECT pg_catalog\./d' \
-    -e '/^\\restrict/d' \
-    -e '/^\\unrestrict/d' \
-    -e 's/[[:space:]]+$//' \
-    | awk 'NF { print }'
 }
 
 [[ -n "${PGHOST:-}" && -n "${PGPORT:-}" && -n "${PGDATABASE:-}" && -n "${PGUSER:-}" ]] || {
@@ -106,4 +113,8 @@ if [[ ! -s "$out_file" ]]; then
   exit 1
 fi
 
-normalize_schema_dump <"$out_file"
+if [[ "${PG_SCHEMA_DUMP_RAW:-0}" == "1" ]]; then
+  cat "$out_file"
+else
+  normalize_schema_dump <"$out_file"
+fi

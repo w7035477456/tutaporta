@@ -98,6 +98,9 @@ export function colorTemplate16InputSx(overrides = {}) {
       WebkitTextFillColor: COLOR_TEMPLATE16_TEXT,
       bgcolor: COLOR_TEMPLATE16_SURFACE_BG
     },
+    '& .MuiInputAdornment-root .MuiIconButton-root': {
+      color: COLOR_TEMPLATE16_TEXT
+    },
     '& .MuiInputBase-input:-webkit-autofill': {
       ...colorTemplate16InputFontSx,
       WebkitTextFillColor: `${COLOR_TEMPLATE16_TEXT} !important`,
