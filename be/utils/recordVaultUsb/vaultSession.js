@@ -154,6 +154,17 @@ import {
   snapshotVaultSessionFileCountsToLast
 } from '../vaultSessionFileCounts.js';
 import { rvCloudWarn } from '../recordVaultCloudDebugLog.js';
+import {
+  VAULT_PRODUCT_RECORD_VAULT,
+  closeVaultDbLater,
+  commitVaultSessionWithClusterLock,
+  isVaultClusterCoherenceEnabled,
+  isVaultClusterLockHeld,
+  markVaultSessionClusterState,
+  scheduleVaultSessionClusterCommit
+} from '../vaultClusterCoherence.js';
+
+const VAULT_PRODUCT = VAULT_PRODUCT_RECORD_VAULT;
 
 let sqlJsPromise = null;
 
@@ -200,6 +211,13 @@ class VaultSession {
     this.driveFolderId = null;
     /** FE/BE: tree open already counted toward session ui/usb tx/rx. */
     this.sessionFileCountsTreeReported = false;
+    /** vault_cluster_state unlock_generation / db_version this in-memory copy matches. */
+    this.clusterGeneration = null;
+    this.clusterDbVersion = null;
+    /** vault.db written to disk since the last db_version publish. */
+    this.clusterFlushedSinceCommit = false;
+    /** Initial unlock may write vault.db before the cluster lock/registry exist. */
+    this.allowDirectFlush = false;
   }
 }
 
@@ -333,24 +351,53 @@ function writeVaultDbToMirror(session, plainBuffer) {
   });
 }
 
+/**
+ * vault.db may only be written while this process holds the member's cluster lock
+ * (or during the initial unlock); otherwise another worker's newer copy would be clobbered.
+ */
+function canWriteVaultDbNow(session) {
+  if (!isVaultClusterCoherenceEnabled()) return true;
+  return Boolean(
+    session.allowDirectFlush ||
+      isVaultClusterLockHeld(VAULT_PRODUCT, session.singlesId, session.storageType)
+  );
+}
+
+function writeSessionDbToDisk(session) {
+  const plain = exportDb(session.db);
+  writeVaultDbToMirror(session, plain);
+  session.dirty = false;
+  session.clusterFlushedSinceCommit = true;
+}
+
 /** Export in-memory DB to staging disk when dirty (logoff / pre-cloud-sync). */
 export function forcePersistVaultDb(session) {
   cancelScheduledFlushDbToUsb(session);
   if (!session?.db || session.locked || !session.dirty) return;
-  const plain = exportDb(session.db);
-  writeVaultDbToMirror(session, plain);
-  session.dirty = false;
+  if (!canWriteVaultDbNow(session)) {
+    scheduleVaultSessionClusterCommit(VAULT_PRODUCT, vaultClusterHooks, session);
+    return;
+  }
+  writeSessionDbToDisk(session);
+}
+
+function persistSessionDbNow(session) {
+  cancelScheduledFlushDbToUsb(session);
+  if (!session?.db || session.locked) return;
+  writeSessionDbToDisk(session);
+  if (session.storageType === 'onedrive') {
+    scheduleCloudRelativeSync(session, getVaultDbFileName(session.meta));
+  }
 }
 
 export function flushDbToUsb(session) {
   if (!session || session.locked) return;
   if (!session.dirty) return;
-  const plain = exportDb(session.db);
-  writeVaultDbToMirror(session, plain);
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(session, getVaultDbFileName(session.meta));
+  if (!canWriteVaultDbNow(session)) {
+    scheduleVaultSessionClusterCommit(VAULT_PRODUCT, vaultClusterHooks, session);
+    return;
   }
-  session.dirty = false;
+  persistSessionDbNow(session);
 }
 
 /**
@@ -589,6 +636,52 @@ export function listVaultSessions(singlesId) {
   return out;
 }
 
+/** Forget this worker's copy without saving (logged off / re-unlocked on another worker). */
+function dropLocalVaultSession(singlesId, storageType) {
+  const key = vaultSessionKey(singlesId, storageType);
+  const session = sessionsByKey.get(key);
+  if (!session) return;
+  sessionsByKey.delete(key);
+  cancelScheduledFlushDbToUsb(session);
+  session.locked = true;
+  session.dirty = false;
+  closeVaultDbLater(session.db);
+}
+
+/** Re-read vault.db after another worker committed a newer db_version. */
+async function reloadVaultSessionDbFromDisk(session) {
+  if (!session || session.locked) return;
+  const vaultRoot = vaultRootOnMount(session.mountPath);
+  const candidates = [resolveVaultDbPath(session.mountPath)];
+  for (const name of listVaultDbFileNamesForRead(session.meta)) {
+    const abs = path.join(vaultRoot, name);
+    if (!candidates.includes(abs)) candidates.push(abs);
+  }
+  for (const dbPath of candidates) {
+    if (!dbPath || !fs.existsSync(dbPath)) continue;
+    const plain = openVaultBuffer(fs.readFileSync(dbPath), session.key);
+    if (!isSqliteVaultDbBuffer(plain)) continue;
+    const next = await openDbFromBuffer(plain);
+    const prev = session.db;
+    cancelScheduledFlushDbToUsb(session);
+    session.db = next;
+    session.dirty = false;
+    closeVaultDbLater(prev);
+    return;
+  }
+  throw new Error('Vault database is missing or unreadable');
+}
+
+/** Hooks for be/utils/vaultClusterCoherence.js (multi-worker / multi-server coherence). */
+export const vaultClusterHooks = {
+  readRequestedStorageType: readRequestedVaultStorageType,
+  getLocalSession: (singlesId, storageType) => getVaultSession(singlesId, storageType),
+  dropLocalSession: dropLocalVaultSession,
+  rehydrateSession: (singlesId, storageType) => tryRehydrateVaultSession(singlesId, storageType),
+  reloadSessionDb: reloadVaultSessionDbFromDisk,
+  persistSessionNow: persistSessionDbNow
+};
+
 let resolveVaultAccessSession = async (req, res) => requireVaultAccessSession(req, res);
 
 /** Override access gate for local Record Vault bridge (header-based singles id). */
@@ -741,7 +834,22 @@ async function migrateSessionIconVaultToArgon2id(session, iconName) {
   return true;
 }
 
-async function tryRehydrateVaultSession(singlesId, storageType) {
+/** In-flight rehydrates per session key — parallel requests must not open the vault twice. */
+const rehydrateInFlight = new Map();
+
+function tryRehydrateVaultSession(singlesId, storageType) {
+  const key = vaultSessionKey(singlesId, storageType);
+  let pending = rehydrateInFlight.get(key);
+  if (!pending) {
+    pending = rehydrateVaultSessionOnce(singlesId, storageType).finally(() => {
+      rehydrateInFlight.delete(key);
+    });
+    rehydrateInFlight.set(key, pending);
+  }
+  return pending;
+}
+
+async function rehydrateVaultSessionOnce(singlesId, storageType) {
   const id = Number(singlesId);
   const normalizedType = normalizeVaultStorageType(storageType);
   if (!Number.isFinite(id) || id < 1) return null;
@@ -789,6 +897,8 @@ async function tryRehydrateVaultSession(singlesId, storageType) {
   }
 
   const session = getVaultSession(id, normalizedType);
+  // Registry was read before vault.db, so the copy is at least this version.
+  if (session) markVaultSessionClusterState(session, cluster);
   if (session && normalizedType === 'onedrive') {
     // TutaDrive borrows this slot. Tagging it with driveSinglesId would turn a
     // local-folder vault into a Microsoft-synced one on any rehydrate.
@@ -864,6 +974,17 @@ export async function unlockVaultUsb(singlesId, mountPath, iconName, options = {
 }
 
 export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options = {}) {
+  try {
+    return await unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options);
+  } finally {
+    const opened = sessionsByKey.get(
+      vaultSessionKey(singlesId, normalizeVaultStorageType(options?.storageType, 'usb'))
+    );
+    if (opened) opened.allowDirectFlush = false;
+  }
+}
+
+async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}) {
   const targetStorageType = normalizeVaultStorageType(options?.storageType, 'usb');
   ensureVaultLayoutDirs(mountPath);
   let templateApplied = false;
@@ -974,7 +1095,12 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
 
   const existing = getVaultSession(singlesId, targetStorageType);
   if (existing) {
-    await logoffVaultUsb(singlesId, targetStorageType);
+    if (options?.skipClusterRegister) {
+      // Rehydrate must never log the member off cluster-wide.
+      dropLocalVaultSession(singlesId, targetStorageType);
+    } else {
+      await logoffVaultUsb(singlesId, targetStorageType);
+    }
   }
 
   const session = new VaultSession({
@@ -986,6 +1112,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     meta: clearedMeta
   });
   session.storageType = targetStorageType;
+  session.allowDirectFlush = !options?.skipClusterRegister;
   sessionsByKey.set(vaultSessionKey(singlesId, targetStorageType), session);
   if (sampleSeedStatus !== 'template') {
     try {
@@ -1004,13 +1131,14 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     flushDbToUsb(session);
   }
   if (!options?.skipClusterRegister) {
-    await registerVaultClusterUnlock({
+    const clusterState = await registerVaultClusterUnlock({
       singlesId,
       storageType: targetStorageType,
       mountPath: session.mountPath,
       backupMountPath: session.backupMountPath,
       driveFolderId: session.driveFolderId || null
     });
+    if (clusterState) markVaultSessionClusterState(session, clusterState);
   }
   if (ensureNoteExtraImagesTable(session.db)) {
     markDirty(session);
@@ -1125,7 +1253,11 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
       if (onProgress && normalizedType !== 'onedrive') {
         await onProgress({ percent: 25, label: 'Saving USB vault' });
       }
-      forcePersistVaultDb(session);
+      if (canWriteVaultDbNow(session)) {
+        forcePersistVaultDb(session);
+      } else {
+        await commitVaultSessionWithClusterLock(VAULT_PRODUCT, vaultClusterHooks, session);
+      }
       if (normalizedType === 'usb') {
         await addVaultSessionFileCounts(id, { usbDelta: 1 });
       }

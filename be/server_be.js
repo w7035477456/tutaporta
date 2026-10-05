@@ -401,10 +401,18 @@ import {
   photoAlbumsOneDriveOAuthStart
 } from './routes/photoAlbums/photoAlbumsOneDriveOAuth.js';
 import { clearPhotoAlbumsCacheIcon } from './utils/photoAlbumsCacheIcon.js';
-import { logoffVaultUsb as logoffPhotoAlbumsUsbSession } from './utils/photoAlbumsUsb/vaultSession.js';
+import {
+  logoffVaultUsb as logoffPhotoAlbumsUsbSession,
+  vaultClusterHooks as photoAlbumsVaultClusterHooks
+} from './utils/photoAlbumsUsb/vaultSession.js';
 import { updateMyVideoType } from './routes/videos/updateMyVideoType.js';
 import { clearRecordVaultCacheIcon, RECORD_VAULT_CACHE_ICON_KEY_PREFIX } from './utils/recordVaultCacheIcon.js';
-import { logoffVaultUsb } from './utils/recordVaultUsb/vaultSession.js';
+import { logoffVaultUsb, vaultClusterHooks as recordVaultVaultClusterHooks } from './utils/recordVaultUsb/vaultSession.js';
+import {
+  createVaultClusterCoherenceMiddleware,
+  VAULT_PRODUCT_PHOTO_ALBUMS,
+  VAULT_PRODUCT_RECORD_VAULT
+} from './utils/vaultClusterCoherence.js';
 import { validateMediaStorage } from './utils/sharedMediaStorage.js';
 import { getOneDriveStagingRootStatus } from './utils/recordVaultOneDriveStagingRoot.js';
 import { deleteMyVideo } from './routes/videos/deleteMyVideo.js';
@@ -996,19 +1004,6 @@ console.log(
     );
   }
 }
-{
-  // TutaPhoto / TutaNote keep the member's SQLite vault open in process memory, so a
-  // second round-robin worker would serve a stale copy ("Note not found") and clobber
-  // vault.db on flush. ecosystem.config.cjs pins instances to 1; a plain
-  // `pm2 restart` keeps whatever cluster size PM2 already had.
-  const workerIndex = Number(process.env.NODE_APP_INSTANCE);
-  if (Number.isFinite(workerIndex) && workerIndex > 0) {
-    console.error(
-      `[startup] CLUSTER WORKER ${workerIndex} DETECTED — TutaPhoto/TutaNote vaults need a single worker. ` +
-        'Run: pm2 delete onlinemallwebsite && pm2 start ecosystem.config.cjs --env production'
-    );
-  }
-}
 console.log(
   `[startup] PhotoCache: every GET /api/photo/:id logs [PhotoCache] HIT|MISS to console/PM2 (window=${PHOTO_CACHE_WINDOW_MINUTES}m; totals need Redis)`
 );
@@ -1532,213 +1527,222 @@ app.get('/api/video/:id/thumbnail', requireAuth, getVideoThumbnail);
 app.get('/api/myAlbumVideos', requireAuth, getMyAlbumVideos);
 app.patch('/api/myVideos/:id/type', requireAuth, updateMyVideoType);
 app.delete('/api/myVideos/:id', requireAuth, deleteMyVideo);
-app.get('/api/recordVault', requireAuth, getRecordVaultTree);
-app.get('/api/recordVault/search', requireAuth, searchRecordVaultNotes);
-app.get('/api/recordVault/rag/status', requireAuth, getRecordVaultRagStatus);
+// Vault routes keep each member's in-memory vault coherent across PM2 workers / web servers.
+const recordVaultVaultAuth = [
+  requireAuth,
+  createVaultClusterCoherenceMiddleware({ product: VAULT_PRODUCT_RECORD_VAULT, hooks: recordVaultVaultClusterHooks })
+];
+const photoAlbumsVaultAuth = [
+  requireAuth,
+  createVaultClusterCoherenceMiddleware({ product: VAULT_PRODUCT_PHOTO_ALBUMS, hooks: photoAlbumsVaultClusterHooks })
+];
+app.get('/api/recordVault', ...recordVaultVaultAuth, getRecordVaultTree);
+app.get('/api/recordVault/search', ...recordVaultVaultAuth, searchRecordVaultNotes);
+app.get('/api/recordVault/rag/status', ...recordVaultVaultAuth, getRecordVaultRagStatus);
 app.post('/api/recordVault/rag/keep-model', requireAuth, postRecordVaultRagKeepModel);
-app.post('/api/recordVault/rag/query', requireAuth, postRecordVaultRagQuery);
-app.post('/api/recordVault/notebooks', requireAuth, createRecordVaultNotebook);
-app.put('/api/recordVault/notebooks/reorder', requireAuth, reorderRecordVaultNotebooks);
-app.patch('/api/recordVault/notebooks/:notebookId', requireAuth, updateRecordVaultNotebook);
-app.delete('/api/recordVault/notebooks/:notebookId', requireAuth, deleteRecordVaultNotebook);
-app.post('/api/recordVault/notebooks/:notebookId/notes', requireAuth, createRecordVaultNote);
-app.put('/api/recordVault/notebooks/:notebookId/notes/reorder', requireAuth, reorderRecordVaultNotes);
-app.get('/api/recordVault/notes/:noteId', requireAuth, getRecordVaultNote);
-app.patch('/api/recordVault/notes/:noteId', requireAuth, updateRecordVaultNote);
-app.post('/api/recordVault/notes/move-image', requireAuth, moveRecordVaultNoteImage);
-app.delete('/api/recordVault/notes/:noteId', requireAuth, deleteRecordVaultNote);
-app.get('/api/recordVault/notes/:noteId/image/top', requireAuth, getRecordVaultNoteImage);
-app.get('/api/recordVault/notes/:noteId/image/bottom', requireAuth, getRecordVaultNoteImage);
-app.get('/api/recordVault/notes/:noteId/image', requireAuth, getRecordVaultNoteImage);
-app.get('/api/recordVault/notes/:noteId/extra-images/:imageId', requireAuth, getRecordVaultNoteExtraImage);
-app.post('/api/recordVault/notes/:noteId/extra-images', requireAuth, uploadRecordVaultNoteExtraImage);
-app.delete('/api/recordVault/notes/:noteId/extra-images/:imageId', requireAuth, deleteRecordVaultNoteExtraImage);
-app.get('/api/recordVault/notes/:noteId/attachments/:attachmentId', requireAuth, getRecordVaultNoteAttachment);
+app.post('/api/recordVault/rag/query', ...recordVaultVaultAuth, postRecordVaultRagQuery);
+app.post('/api/recordVault/notebooks', ...recordVaultVaultAuth, createRecordVaultNotebook);
+app.put('/api/recordVault/notebooks/reorder', ...recordVaultVaultAuth, reorderRecordVaultNotebooks);
+app.patch('/api/recordVault/notebooks/:notebookId', ...recordVaultVaultAuth, updateRecordVaultNotebook);
+app.delete('/api/recordVault/notebooks/:notebookId', ...recordVaultVaultAuth, deleteRecordVaultNotebook);
+app.post('/api/recordVault/notebooks/:notebookId/notes', ...recordVaultVaultAuth, createRecordVaultNote);
+app.put('/api/recordVault/notebooks/:notebookId/notes/reorder', ...recordVaultVaultAuth, reorderRecordVaultNotes);
+app.get('/api/recordVault/notes/:noteId', ...recordVaultVaultAuth, getRecordVaultNote);
+app.patch('/api/recordVault/notes/:noteId', ...recordVaultVaultAuth, updateRecordVaultNote);
+app.post('/api/recordVault/notes/move-image', ...recordVaultVaultAuth, moveRecordVaultNoteImage);
+app.delete('/api/recordVault/notes/:noteId', ...recordVaultVaultAuth, deleteRecordVaultNote);
+app.get('/api/recordVault/notes/:noteId/image/top', ...recordVaultVaultAuth, getRecordVaultNoteImage);
+app.get('/api/recordVault/notes/:noteId/image/bottom', ...recordVaultVaultAuth, getRecordVaultNoteImage);
+app.get('/api/recordVault/notes/:noteId/image', ...recordVaultVaultAuth, getRecordVaultNoteImage);
+app.get('/api/recordVault/notes/:noteId/extra-images/:imageId', ...recordVaultVaultAuth, getRecordVaultNoteExtraImage);
+app.post('/api/recordVault/notes/:noteId/extra-images', ...recordVaultVaultAuth, uploadRecordVaultNoteExtraImage);
+app.delete('/api/recordVault/notes/:noteId/extra-images/:imageId', ...recordVaultVaultAuth, deleteRecordVaultNoteExtraImage);
+app.get('/api/recordVault/notes/:noteId/attachments/:attachmentId', ...recordVaultVaultAuth, getRecordVaultNoteAttachment);
 app.post(
   '/api/recordVault/notes/:noteId/attachments/:attachmentId/open-native',
-  requireAuth,
+  ...recordVaultVaultAuth,
   openRecordVaultNoteAttachmentNative
 );
-app.post('/api/recordVault/notes/:noteId/attachments', requireAuth, uploadRecordVaultNoteAttachment);
-app.delete('/api/recordVault/notes/:noteId/attachments/:attachmentId', requireAuth, deleteRecordVaultNoteAttachment);
-app.post('/api/recordVault/shortcuts', requireAuth, createRecordVaultShortcut);
-app.put('/api/recordVault/shortcuts/reorder', requireAuth, reorderRecordVaultShortcuts);
-app.delete('/api/recordVault/shortcuts/:shortcutId', requireAuth, deleteRecordVaultShortcut);
-app.get('/api/recordVault/access/status', requireAuth, getRecordVaultAccessStatus);
+app.post('/api/recordVault/notes/:noteId/attachments', ...recordVaultVaultAuth, uploadRecordVaultNoteAttachment);
+app.delete('/api/recordVault/notes/:noteId/attachments/:attachmentId', ...recordVaultVaultAuth, deleteRecordVaultNoteAttachment);
+app.post('/api/recordVault/shortcuts', ...recordVaultVaultAuth, createRecordVaultShortcut);
+app.put('/api/recordVault/shortcuts/reorder', ...recordVaultVaultAuth, reorderRecordVaultShortcuts);
+app.delete('/api/recordVault/shortcuts/:shortcutId', ...recordVaultVaultAuth, deleteRecordVaultShortcut);
+app.get('/api/recordVault/access/status', ...recordVaultVaultAuth, getRecordVaultAccessStatus);
 app.get('/api/recordVault/access/fail-status', requireAuth, getRecordVaultAccessFailStatus);
 app.post('/api/recordVault/access/fail', requireAuth, postRecordVaultAccessFail);
 app.post('/api/recordVault/access/fail/clear', requireAuth, clearRecordVaultAccessFail);
-app.post('/api/recordVault/access/verify', requireAuth, verifyRecordVaultAccess);
-app.post('/api/recordVault/access/set', requireAuth, setRecordVaultAccessPassword);
-app.post('/api/recordVault/access/change', requireAuth, changeRecordVaultAccessPassword);
-app.post('/api/recordVault/access/logoff', requireAuth, logoffRecordVaultAccess);
-app.post('/api/recordVault/access/enabled', requireAuth, setRecordVaultAccessPasswordEnabled);
+app.post('/api/recordVault/access/verify', ...recordVaultVaultAuth, verifyRecordVaultAccess);
+app.post('/api/recordVault/access/set', ...recordVaultVaultAuth, setRecordVaultAccessPassword);
+app.post('/api/recordVault/access/change', ...recordVaultVaultAuth, changeRecordVaultAccessPassword);
+app.post('/api/recordVault/access/logoff', ...recordVaultVaultAuth, logoffRecordVaultAccess);
+app.post('/api/recordVault/access/enabled', ...recordVaultVaultAuth, setRecordVaultAccessPasswordEnabled);
 app.post('/api/recordVault/access/hint', requireAuth, setRecordVaultAccessPasswordHint);
 app.get('/api/recordVault/e2e/keys', requireAuth, getRecordVaultE2eKeys);
 app.post('/api/recordVault/e2e/keys', requireAuth, putRecordVaultE2eKeys);
 app.put('/api/recordVault/e2e/keys', requireAuth, updateRecordVaultE2eKeys);
-app.get('/api/recordVault/usb/unlock-guard', requireAuth, getRecordVaultUsbUnlockGuard);
-app.get('/api/recordVault/usb/icons', requireAuth, listRecordVaultUsbIcons);
-app.get('/api/recordVault/usb/scan', requireAuth, scanRecordVaultUsb);
-app.get('/api/recordVault/usb/locations', requireAuth, listRecordVaultUsbLocations);
-app.get('/api/recordVault/usb/browse', requireAuth, browseRecordVaultUsbPath);
-app.get('/api/recordVault/usb/vault-tree', requireAuth, getRecordVaultUsbVaultTree);
-app.get('/api/recordVault/usb/backup-zip', requireAuth, downloadRecordVaultUsbBackupZip);
-app.post('/api/recordVault/usb/restore-zip', requireAuth, restoreRecordVaultUsbBackupZip);
-app.get('/api/recordVault/usb/status', requireAuth, getRecordVaultUsbStatus);
-app.post('/api/recordVault/usb/unlock', requireAuth, unlockRecordVaultUsb);
-app.post('/api/recordVault/usb/icon-derived-key', requireAuth, getRecordVaultUsbIconDerivedKey);
-app.post('/api/recordVault/usb/logoff', requireAuth, logoffRecordVaultUsb);
-app.post('/api/recordVault/usb/init', requireAuth, initRecordVaultUsb);
-app.post('/api/recordVault/usb/format', requireAuth, formatRecordVaultUsb);
-app.get('/api/recordVault/storage/config', requireAuth, getRecordVaultStorageConfig);
+app.get('/api/recordVault/usb/unlock-guard', ...recordVaultVaultAuth, getRecordVaultUsbUnlockGuard);
+app.get('/api/recordVault/usb/icons', ...recordVaultVaultAuth, listRecordVaultUsbIcons);
+app.get('/api/recordVault/usb/scan', ...recordVaultVaultAuth, scanRecordVaultUsb);
+app.get('/api/recordVault/usb/locations', ...recordVaultVaultAuth, listRecordVaultUsbLocations);
+app.get('/api/recordVault/usb/browse', ...recordVaultVaultAuth, browseRecordVaultUsbPath);
+app.get('/api/recordVault/usb/vault-tree', ...recordVaultVaultAuth, getRecordVaultUsbVaultTree);
+app.get('/api/recordVault/usb/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultUsbBackupZip);
+app.post('/api/recordVault/usb/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultUsbBackupZip);
+app.get('/api/recordVault/usb/status', ...recordVaultVaultAuth, getRecordVaultUsbStatus);
+app.post('/api/recordVault/usb/unlock', ...recordVaultVaultAuth, unlockRecordVaultUsb);
+app.post('/api/recordVault/usb/icon-derived-key', ...recordVaultVaultAuth, getRecordVaultUsbIconDerivedKey);
+app.post('/api/recordVault/usb/logoff', ...recordVaultVaultAuth, logoffRecordVaultUsb);
+app.post('/api/recordVault/usb/init', ...recordVaultVaultAuth, initRecordVaultUsb);
+app.post('/api/recordVault/usb/format', ...recordVaultVaultAuth, formatRecordVaultUsb);
+app.get('/api/recordVault/storage/config', ...recordVaultVaultAuth, getRecordVaultStorageConfig);
 app.get('/api/recordVault/bridge/installer/:platform', requireAuth, downloadRecordVaultBridgeInstaller);
-app.post('/api/recordVault/storage/logoff', requireAuth, logoffRecordVaultStorage);
-app.get('/api/recordVault/usage', requireAuth, getRecordVaultUsage);
+app.post('/api/recordVault/storage/logoff', ...recordVaultVaultAuth, logoffRecordVaultStorage);
+app.get('/api/recordVault/usage', ...recordVaultVaultAuth, getRecordVaultUsage);
 app.get('/api/recordVault/session-file-counts', requireAuth, getRecordVaultSessionFileCounts);
 app.post('/api/recordVault/session-file-counts', requireAuth, postRecordVaultSessionFileCounts);
-app.get('/api/recordVault/onedrive/config', requireAuth, getRecordVaultOneDriveConfig);
-app.get('/api/recordVault/onedrive/status', requireAuth, getRecordVaultOneDriveStatus);
-app.get('/api/recordVault/onedrive/vault-tree', requireAuth, getRecordVaultOneDriveVaultTree);
-app.get('/api/recordVault/onedrive/backup-zip', requireAuth, downloadRecordVaultOneDriveBackupZip);
+app.get('/api/recordVault/onedrive/config', ...recordVaultVaultAuth, getRecordVaultOneDriveConfig);
+app.get('/api/recordVault/onedrive/status', ...recordVaultVaultAuth, getRecordVaultOneDriveStatus);
+app.get('/api/recordVault/onedrive/vault-tree', ...recordVaultVaultAuth, getRecordVaultOneDriveVaultTree);
+app.get('/api/recordVault/onedrive/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultOneDriveBackupZip);
 app.get('/api/recordVault/onedrive/emails', requireAuth, getRecordVaultOneDriveEmails);
 app.post('/api/recordVault/onedrive/emails', requireAuth, rememberRecordVaultOneDriveEmail);
 app.get('/api/recordVault/onedrive/oauth/start', requireAuth, recordVaultOneDriveOAuthStart);
 app.get('/api/recordVault/onedrive/oauth/callback', recordVaultOneDriveOAuthCallback);
-app.post('/api/recordVault/onedrive/disconnect', requireAuth, disconnectRecordVaultOneDrive);
-app.get('/api/recordVault/onedrive/unlock-guard', requireAuth, getRecordVaultOneDriveUnlockGuard);
-app.post('/api/recordVault/onedrive/unlock', requireAuth, unlockRecordVaultOneDrive);
-app.get('/api/recordVault/onedrive/open-progress', requireAuth, getRecordVaultOneDriveOpenProgress);
-app.get('/api/recordVault/onedrive/sync-progress', requireAuth, getRecordVaultOneDriveSyncProgress);
-app.post('/api/recordVault/onedrive/logoff', requireAuth, logoffRecordVaultOneDrive);
-app.get('/api/recordVault/onedrive/logoff-progress', requireAuth, getRecordVaultOneDriveLogoffProgress);
-app.post('/api/recordVault/onedrive/sync', requireAuth, syncRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/init', requireAuth, initRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/format', requireAuth, formatRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/test-write', requireAuth, testWriteRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/restore-zip', requireAuth, restoreRecordVaultOneDriveBackupZip);
+app.post('/api/recordVault/onedrive/disconnect', ...recordVaultVaultAuth, disconnectRecordVaultOneDrive);
+app.get('/api/recordVault/onedrive/unlock-guard', ...recordVaultVaultAuth, getRecordVaultOneDriveUnlockGuard);
+app.post('/api/recordVault/onedrive/unlock', ...recordVaultVaultAuth, unlockRecordVaultOneDrive);
+app.get('/api/recordVault/onedrive/open-progress', ...recordVaultVaultAuth, getRecordVaultOneDriveOpenProgress);
+app.get('/api/recordVault/onedrive/sync-progress', ...recordVaultVaultAuth, getRecordVaultOneDriveSyncProgress);
+app.post('/api/recordVault/onedrive/logoff', ...recordVaultVaultAuth, logoffRecordVaultOneDrive);
+app.get('/api/recordVault/onedrive/logoff-progress', ...recordVaultVaultAuth, getRecordVaultOneDriveLogoffProgress);
+app.post('/api/recordVault/onedrive/sync', ...recordVaultVaultAuth, syncRecordVaultOneDrive);
+app.post('/api/recordVault/onedrive/init', ...recordVaultVaultAuth, initRecordVaultOneDrive);
+app.post('/api/recordVault/onedrive/format', ...recordVaultVaultAuth, formatRecordVaultOneDrive);
+app.post('/api/recordVault/onedrive/test-write', ...recordVaultVaultAuth, testWriteRecordVaultOneDrive);
+app.post('/api/recordVault/onedrive/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultOneDriveBackupZip);
 
-app.get('/api/recordVault/tutadrive/status', requireAuth, getRecordVaultTutaDriveStatus);
-app.post('/api/recordVault/tutadrive/unlock', requireAuth, unlockRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/init', requireAuth, initRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/format', requireAuth, formatRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/logoff', requireAuth, logoffRecordVaultTutaDrive);
-app.get('/api/recordVault/tutadrive/backup-zip', requireAuth, downloadRecordVaultTutaDriveBackupZip);
-app.post('/api/recordVault/tutadrive/backup', requireAuth, storeRecordVaultTutaDriveBackup);
-app.put('/api/recordVault/tutadrive/backup/:fileName', requireAuth, replaceRecordVaultTutaDriveBackup);
-app.get('/api/recordVault/tutadrive/backup', requireAuth, downloadRecordVaultTutaDriveStoredBackup);
-app.get('/api/recordVault/tutadrive/backup/status', requireAuth, getRecordVaultTutaDriveBackupStatus);
-app.delete('/api/recordVault/tutadrive/backup/:fileName', requireAuth, deleteRecordVaultTutaDriveBackupByName);
-app.post('/api/recordVault/tutadrive/restore-zip', requireAuth, restoreRecordVaultTutaDriveBackupZip);
-app.post('/api/recordVault/tutadrive/backup-tree', requireAuth, listRecordVaultTutaDriveBackupTree);
-app.post('/api/recordVault/tutadrive/merge/preview', requireAuth, previewRecordVaultTutaDriveMerge);
-app.post('/api/recordVault/tutadrive/merge/apply', requireAuth, applyRecordVaultTutaDriveMerge);
+app.get('/api/recordVault/tutadrive/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveStatus);
+app.post('/api/recordVault/tutadrive/unlock', ...recordVaultVaultAuth, unlockRecordVaultTutaDrive);
+app.post('/api/recordVault/tutadrive/init', ...recordVaultVaultAuth, initRecordVaultTutaDrive);
+app.post('/api/recordVault/tutadrive/format', ...recordVaultVaultAuth, formatRecordVaultTutaDrive);
+app.post('/api/recordVault/tutadrive/logoff', ...recordVaultVaultAuth, logoffRecordVaultTutaDrive);
+app.get('/api/recordVault/tutadrive/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutadrive/backup', ...recordVaultVaultAuth, storeRecordVaultTutaDriveBackup);
+app.put('/api/recordVault/tutadrive/backup/:fileName', ...recordVaultVaultAuth, replaceRecordVaultTutaDriveBackup);
+app.get('/api/recordVault/tutadrive/backup', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveStoredBackup);
+app.get('/api/recordVault/tutadrive/backup/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveBackupStatus);
+app.delete('/api/recordVault/tutadrive/backup/:fileName', ...recordVaultVaultAuth, deleteRecordVaultTutaDriveBackupByName);
+app.post('/api/recordVault/tutadrive/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutadrive/backup-tree', ...recordVaultVaultAuth, listRecordVaultTutaDriveBackupTree);
+app.post('/api/recordVault/tutadrive/merge/preview', ...recordVaultVaultAuth, previewRecordVaultTutaDriveMerge);
+app.post('/api/recordVault/tutadrive/merge/apply', ...recordVaultVaultAuth, applyRecordVaultTutaDriveMerge);
 
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----
 app.use('/api/photoAlbums', ...photoAlbumsTransferMeterStack);
-app.get('/api/photoAlbums', requireAuth, getPhotoAlbumsTree);
-app.get('/api/photoAlbums/search', requireAuth, searchPhotoAlbumsNotes);
-app.post('/api/photoAlbums/notebooks', requireAuth, createPhotoAlbumsNotebook);
-app.put('/api/photoAlbums/notebooks/reorder', requireAuth, reorderPhotoAlbumsNotebooks);
-app.patch('/api/photoAlbums/notebooks/:notebookId', requireAuth, updatePhotoAlbumsNotebook);
-app.delete('/api/photoAlbums/notebooks/:notebookId', requireAuth, deletePhotoAlbumsNotebook);
-app.post('/api/photoAlbums/notebooks/:notebookId/notes', requireAuth, createPhotoAlbumsNote);
-app.put('/api/photoAlbums/notebooks/:notebookId/notes/reorder', requireAuth, reorderPhotoAlbumsNotes);
-app.get('/api/photoAlbums/notes/:noteId', requireAuth, getPhotoAlbumsNote);
-app.patch('/api/photoAlbums/notes/:noteId', requireAuth, updatePhotoAlbumsNote);
-app.post('/api/photoAlbums/notes/move-image', requireAuth, movePhotoAlbumsNoteImage);
-app.delete('/api/photoAlbums/notes/:noteId', requireAuth, deletePhotoAlbumsNote);
-app.get('/api/photoAlbums/notes/:noteId/image/top', requireAuth, getPhotoAlbumsNoteImage);
-app.get('/api/photoAlbums/notes/:noteId/image/bottom', requireAuth, getPhotoAlbumsNoteImage);
-app.get('/api/photoAlbums/notes/:noteId/image', requireAuth, getPhotoAlbumsNoteImage);
-app.get('/api/photoAlbums/notes/:noteId/extra-images/:imageId', requireAuth, getPhotoAlbumsNoteExtraImage);
-app.post('/api/photoAlbums/notes/:noteId/extra-images', requireAuth, uploadPhotoAlbumsNoteExtraImage);
-app.delete('/api/photoAlbums/notes/:noteId/extra-images/:imageId', requireAuth, deletePhotoAlbumsNoteExtraImage);
-app.get('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', requireAuth, getPhotoAlbumsNoteAttachment);
+app.get('/api/photoAlbums', ...photoAlbumsVaultAuth, getPhotoAlbumsTree);
+app.get('/api/photoAlbums/search', ...photoAlbumsVaultAuth, searchPhotoAlbumsNotes);
+app.post('/api/photoAlbums/notebooks', ...photoAlbumsVaultAuth, createPhotoAlbumsNotebook);
+app.put('/api/photoAlbums/notebooks/reorder', ...photoAlbumsVaultAuth, reorderPhotoAlbumsNotebooks);
+app.patch('/api/photoAlbums/notebooks/:notebookId', ...photoAlbumsVaultAuth, updatePhotoAlbumsNotebook);
+app.delete('/api/photoAlbums/notebooks/:notebookId', ...photoAlbumsVaultAuth, deletePhotoAlbumsNotebook);
+app.post('/api/photoAlbums/notebooks/:notebookId/notes', ...photoAlbumsVaultAuth, createPhotoAlbumsNote);
+app.put('/api/photoAlbums/notebooks/:notebookId/notes/reorder', ...photoAlbumsVaultAuth, reorderPhotoAlbumsNotes);
+app.get('/api/photoAlbums/notes/:noteId', ...photoAlbumsVaultAuth, getPhotoAlbumsNote);
+app.patch('/api/photoAlbums/notes/:noteId', ...photoAlbumsVaultAuth, updatePhotoAlbumsNote);
+app.post('/api/photoAlbums/notes/move-image', ...photoAlbumsVaultAuth, movePhotoAlbumsNoteImage);
+app.delete('/api/photoAlbums/notes/:noteId', ...photoAlbumsVaultAuth, deletePhotoAlbumsNote);
+app.get('/api/photoAlbums/notes/:noteId/image/top', ...photoAlbumsVaultAuth, getPhotoAlbumsNoteImage);
+app.get('/api/photoAlbums/notes/:noteId/image/bottom', ...photoAlbumsVaultAuth, getPhotoAlbumsNoteImage);
+app.get('/api/photoAlbums/notes/:noteId/image', ...photoAlbumsVaultAuth, getPhotoAlbumsNoteImage);
+app.get('/api/photoAlbums/notes/:noteId/extra-images/:imageId', ...photoAlbumsVaultAuth, getPhotoAlbumsNoteExtraImage);
+app.post('/api/photoAlbums/notes/:noteId/extra-images', ...photoAlbumsVaultAuth, uploadPhotoAlbumsNoteExtraImage);
+app.delete('/api/photoAlbums/notes/:noteId/extra-images/:imageId', ...photoAlbumsVaultAuth, deletePhotoAlbumsNoteExtraImage);
+app.get('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', ...photoAlbumsVaultAuth, getPhotoAlbumsNoteAttachment);
 app.post(
   '/api/photoAlbums/notes/:noteId/attachments/:attachmentId/open-native',
-  requireAuth,
+  ...photoAlbumsVaultAuth,
   openPhotoAlbumsNoteAttachmentNative
 );
-app.get('/api/photoAlbums/mediaQuota', requireAuth, getPhotoAlbumsMediaQuota);
-app.post('/api/photoAlbums/notes/:noteId/attachments', requireAuth, uploadPhotoAlbumsNoteAttachment);
+app.get('/api/photoAlbums/mediaQuota', ...photoAlbumsVaultAuth, getPhotoAlbumsMediaQuota);
+app.post('/api/photoAlbums/notes/:noteId/attachments', ...photoAlbumsVaultAuth, uploadPhotoAlbumsNoteAttachment);
 app.post(
   '/api/photoAlbums/notes/:noteId/attachments/reconcile-album-seq',
-  requireAuth,
+  ...photoAlbumsVaultAuth,
   reconcilePhotoAlbumsAlbumPhotoSeq
 );
-app.delete('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', requireAuth, deletePhotoAlbumsNoteAttachment);
-app.post('/api/photoAlbums/shortcuts', requireAuth, createPhotoAlbumsShortcut);
-app.put('/api/photoAlbums/shortcuts/reorder', requireAuth, reorderPhotoAlbumsShortcuts);
-app.delete('/api/photoAlbums/shortcuts/:shortcutId', requireAuth, deletePhotoAlbumsShortcut);
-app.get('/api/photoAlbums/access/status', requireAuth, getPhotoAlbumsAccessStatus);
+app.delete('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', ...photoAlbumsVaultAuth, deletePhotoAlbumsNoteAttachment);
+app.post('/api/photoAlbums/shortcuts', ...photoAlbumsVaultAuth, createPhotoAlbumsShortcut);
+app.put('/api/photoAlbums/shortcuts/reorder', ...photoAlbumsVaultAuth, reorderPhotoAlbumsShortcuts);
+app.delete('/api/photoAlbums/shortcuts/:shortcutId', ...photoAlbumsVaultAuth, deletePhotoAlbumsShortcut);
+app.get('/api/photoAlbums/access/status', ...photoAlbumsVaultAuth, getPhotoAlbumsAccessStatus);
 app.get('/api/photoAlbums/access/fail-status', requireAuth, getPhotoAlbumsAccessFailStatus);
 app.post('/api/photoAlbums/access/fail', requireAuth, postPhotoAlbumsAccessFail);
 app.post('/api/photoAlbums/access/fail/clear', requireAuth, clearPhotoAlbumsAccessFail);
-app.post('/api/photoAlbums/access/verify', requireAuth, verifyPhotoAlbumsAccess);
-app.post('/api/photoAlbums/access/set', requireAuth, setPhotoAlbumsAccessPassword);
-app.post('/api/photoAlbums/access/change', requireAuth, changePhotoAlbumsAccessPassword);
-app.post('/api/photoAlbums/access/logoff', requireAuth, logoffPhotoAlbumsAccess);
-app.post('/api/photoAlbums/access/enabled', requireAuth, setPhotoAlbumsAccessPasswordEnabled);
+app.post('/api/photoAlbums/access/verify', ...photoAlbumsVaultAuth, verifyPhotoAlbumsAccess);
+app.post('/api/photoAlbums/access/set', ...photoAlbumsVaultAuth, setPhotoAlbumsAccessPassword);
+app.post('/api/photoAlbums/access/change', ...photoAlbumsVaultAuth, changePhotoAlbumsAccessPassword);
+app.post('/api/photoAlbums/access/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsAccess);
+app.post('/api/photoAlbums/access/enabled', ...photoAlbumsVaultAuth, setPhotoAlbumsAccessPasswordEnabled);
 app.post('/api/photoAlbums/access/hint', requireAuth, setPhotoAlbumsAccessPasswordHint);
 app.get('/api/photoAlbums/e2e/keys', requireAuth, getPhotoAlbumsE2eKeys);
 app.post('/api/photoAlbums/e2e/keys', requireAuth, putPhotoAlbumsE2eKeys);
 app.put('/api/photoAlbums/e2e/keys', requireAuth, updatePhotoAlbumsE2eKeys);
-app.get('/api/photoAlbums/usb/unlock-guard', requireAuth, getPhotoAlbumsUsbUnlockGuard);
-app.get('/api/photoAlbums/usb/icons', requireAuth, listPhotoAlbumsUsbIcons);
-app.get('/api/photoAlbums/usb/scan', requireAuth, scanPhotoAlbumsUsb);
-app.get('/api/photoAlbums/usb/locations', requireAuth, listPhotoAlbumsUsbLocations);
-app.get('/api/photoAlbums/usb/browse', requireAuth, browsePhotoAlbumsUsbPath);
-app.get('/api/photoAlbums/usb/vault-tree', requireAuth, getPhotoAlbumsUsbVaultTree);
-app.get('/api/photoAlbums/usb/album-backup-progress', requireAuth, getPhotoAlbumsUsbAlbumBackupProgress);
-app.get('/api/photoAlbums/usb/album-backup-zip', requireAuth, downloadPhotoAlbumsUsbAlbumBackupZip);
-app.get('/api/photoAlbums/usb/backup-zip', requireAuth, downloadPhotoAlbumsUsbBackupZip);
-app.post('/api/photoAlbums/usb/restore-zip', requireAuth, restorePhotoAlbumsUsbBackupZip);
-app.get('/api/photoAlbums/usb/status', requireAuth, getPhotoAlbumsUsbStatus);
-app.post('/api/photoAlbums/usb/unlock', requireAuth, unlockPhotoAlbumsUsb);
-app.post('/api/photoAlbums/usb/icon-derived-key', requireAuth, getPhotoAlbumsUsbIconDerivedKey);
-app.post('/api/photoAlbums/usb/logoff', requireAuth, logoffPhotoAlbumsUsb);
-app.post('/api/photoAlbums/usb/init', requireAuth, initPhotoAlbumsUsb);
-app.post('/api/photoAlbums/usb/format', requireAuth, formatPhotoAlbumsUsb);
-app.get('/api/photoAlbums/storage/config', requireAuth, getPhotoAlbumsStorageConfig);
-app.get('/api/photoAlbums/tutadrive/status', requireAuth, getPhotoAlbumsTutaDriveStatus);
-app.get('/api/photoAlbums/tutadrive/open-progress', requireAuth, getPhotoAlbumsTutaDriveOpenProgress);
-app.post('/api/photoAlbums/tutadrive/unlock', requireAuth, unlockPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/init', requireAuth, initPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/format', requireAuth, formatPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/logoff', requireAuth, logoffPhotoAlbumsTutaDrive);
+app.get('/api/photoAlbums/usb/unlock-guard', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbUnlockGuard);
+app.get('/api/photoAlbums/usb/icons', ...photoAlbumsVaultAuth, listPhotoAlbumsUsbIcons);
+app.get('/api/photoAlbums/usb/scan', ...photoAlbumsVaultAuth, scanPhotoAlbumsUsb);
+app.get('/api/photoAlbums/usb/locations', ...photoAlbumsVaultAuth, listPhotoAlbumsUsbLocations);
+app.get('/api/photoAlbums/usb/browse', ...photoAlbumsVaultAuth, browsePhotoAlbumsUsbPath);
+app.get('/api/photoAlbums/usb/vault-tree', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbVaultTree);
+app.get('/api/photoAlbums/usb/album-backup-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbAlbumBackupProgress);
+app.get('/api/photoAlbums/usb/album-backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsUsbAlbumBackupZip);
+app.get('/api/photoAlbums/usb/backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsUsbBackupZip);
+app.post('/api/photoAlbums/usb/restore-zip', ...photoAlbumsVaultAuth, restorePhotoAlbumsUsbBackupZip);
+app.get('/api/photoAlbums/usb/status', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbStatus);
+app.post('/api/photoAlbums/usb/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsUsb);
+app.post('/api/photoAlbums/usb/icon-derived-key', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbIconDerivedKey);
+app.post('/api/photoAlbums/usb/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsUsb);
+app.post('/api/photoAlbums/usb/init', ...photoAlbumsVaultAuth, initPhotoAlbumsUsb);
+app.post('/api/photoAlbums/usb/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsUsb);
+app.get('/api/photoAlbums/storage/config', ...photoAlbumsVaultAuth, getPhotoAlbumsStorageConfig);
+app.get('/api/photoAlbums/tutadrive/status', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveStatus);
+app.get('/api/photoAlbums/tutadrive/open-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveOpenProgress);
+app.post('/api/photoAlbums/tutadrive/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/init', ...photoAlbumsVaultAuth, initPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
 app.get('/api/photoAlbums/mobile-upload/files', requireAuth, listPhotoAlbumsMobileUploadFiles);
 app.post('/api/photoAlbums/mobile-upload/files', requireAuth, postPhotoAlbumsMobileUploadFile);
 app.get('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, getPhotoAlbumsMobileUploadFile);
 app.delete('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, deletePhotoAlbumsMobileUploadFile);
 app.get('/api/photoAlbums/bridge/installer/:platform', requireAuth, downloadPhotoAlbumsBridgeInstaller);
-app.post('/api/photoAlbums/storage/logoff', requireAuth, logoffPhotoAlbumsStorage);
-app.get('/api/photoAlbums/usage', requireAuth, getPhotoAlbumsUsage);
+app.post('/api/photoAlbums/storage/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsStorage);
+app.get('/api/photoAlbums/usage', ...photoAlbumsVaultAuth, getPhotoAlbumsUsage);
 app.post('/api/photoAlbums/transfer-bytes', requireAuth, postPhotoAlbumsTransferBytes);
 app.get('/api/photoAlbums/session-file-counts', requireAuth, getPhotoAlbumsSessionFileCounts);
 app.post('/api/photoAlbums/session-file-counts', requireAuth, postPhotoAlbumsSessionFileCounts);
-app.get('/api/photoAlbums/onedrive/config', requireAuth, getPhotoAlbumsOneDriveConfig);
-app.get('/api/photoAlbums/onedrive/status', requireAuth, getPhotoAlbumsOneDriveStatus);
-app.get('/api/photoAlbums/onedrive/vault-tree', requireAuth, getPhotoAlbumsOneDriveVaultTree);
-app.get('/api/photoAlbums/onedrive/album-backup-progress', requireAuth, getPhotoAlbumsOneDriveAlbumBackupProgress);
-app.get('/api/photoAlbums/onedrive/album-backup-zip', requireAuth, downloadPhotoAlbumsOneDriveAlbumBackupZip);
-app.get('/api/photoAlbums/onedrive/backup-zip', requireAuth, downloadPhotoAlbumsOneDriveBackupZip);
+app.get('/api/photoAlbums/onedrive/config', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveConfig);
+app.get('/api/photoAlbums/onedrive/status', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveStatus);
+app.get('/api/photoAlbums/onedrive/vault-tree', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveVaultTree);
+app.get('/api/photoAlbums/onedrive/album-backup-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveAlbumBackupProgress);
+app.get('/api/photoAlbums/onedrive/album-backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsOneDriveAlbumBackupZip);
+app.get('/api/photoAlbums/onedrive/backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsOneDriveBackupZip);
 app.get('/api/photoAlbums/onedrive/emails', requireAuth, getPhotoAlbumsOneDriveEmails);
 app.post('/api/photoAlbums/onedrive/emails', requireAuth, rememberPhotoAlbumsOneDriveEmail);
 app.get('/api/photoAlbums/onedrive/oauth/start', requireAuth, photoAlbumsOneDriveOAuthStart);
 app.get('/api/photoAlbums/onedrive/oauth/callback', photoAlbumsOneDriveOAuthCallback);
-app.post('/api/photoAlbums/onedrive/disconnect', requireAuth, disconnectPhotoAlbumsOneDrive);
-app.get('/api/photoAlbums/onedrive/unlock-guard', requireAuth, getPhotoAlbumsOneDriveUnlockGuard);
-app.post('/api/photoAlbums/onedrive/unlock', requireAuth, unlockPhotoAlbumsOneDrive);
-app.get('/api/photoAlbums/onedrive/open-progress', requireAuth, getPhotoAlbumsOneDriveOpenProgress);
-app.get('/api/photoAlbums/onedrive/sync-progress', requireAuth, getPhotoAlbumsOneDriveSyncProgress);
-app.post('/api/photoAlbums/onedrive/logoff', requireAuth, logoffPhotoAlbumsOneDrive);
-app.get('/api/photoAlbums/onedrive/logoff-progress', requireAuth, getPhotoAlbumsOneDriveLogoffProgress);
-app.post('/api/photoAlbums/onedrive/sync', requireAuth, syncPhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/init', requireAuth, initPhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/format', requireAuth, formatPhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/test-write', requireAuth, testWritePhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/restore-zip', requireAuth, restorePhotoAlbumsOneDriveBackupZip);
+app.post('/api/photoAlbums/onedrive/disconnect', ...photoAlbumsVaultAuth, disconnectPhotoAlbumsOneDrive);
+app.get('/api/photoAlbums/onedrive/unlock-guard', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveUnlockGuard);
+app.post('/api/photoAlbums/onedrive/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsOneDrive);
+app.get('/api/photoAlbums/onedrive/open-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveOpenProgress);
+app.get('/api/photoAlbums/onedrive/sync-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveSyncProgress);
+app.post('/api/photoAlbums/onedrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsOneDrive);
+app.get('/api/photoAlbums/onedrive/logoff-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveLogoffProgress);
+app.post('/api/photoAlbums/onedrive/sync', ...photoAlbumsVaultAuth, syncPhotoAlbumsOneDrive);
+app.post('/api/photoAlbums/onedrive/init', ...photoAlbumsVaultAuth, initPhotoAlbumsOneDrive);
+app.post('/api/photoAlbums/onedrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsOneDrive);
+app.post('/api/photoAlbums/onedrive/test-write', ...photoAlbumsVaultAuth, testWritePhotoAlbumsOneDrive);
+app.post('/api/photoAlbums/onedrive/restore-zip', ...photoAlbumsVaultAuth, restorePhotoAlbumsOneDriveBackupZip);
 
 app.get('/api/publicPrivateAlbum/:targetSinglesId', requireAuth, getPublicPrivateAlbum);
 app.get('/api/profile-photo/:singlesId', requireAuth, getProfilePhoto);
@@ -1802,19 +1806,19 @@ app.post('/api/settings/payment/paypal/orders', requireAuth, createSettingsPaypa
 app.post('/api/settings/payment/paypal/orders/:orderID/capture', requireAuth, captureSettingsPaypalOrder);
 app.post('/api/recordVault/refill', requireAuth, purchaseRecordVaultRefill);
 app.post('/api/photoAlbums/refill', requireAuth, purchasePhotoAlbumsRefill);
-app.get('/api/photoAlbums/invites', requireAuth, listPhotoAlbumsInvites);
-app.post('/api/photoAlbums/invites', requireAuth, createPhotoAlbumsInvite);
-app.post('/api/photoAlbums/invites/:inviteId/revoke', requireAuth, revokePhotoAlbumsInvite);
+app.get('/api/photoAlbums/invites', ...photoAlbumsVaultAuth, listPhotoAlbumsInvites);
+app.post('/api/photoAlbums/invites', ...photoAlbumsVaultAuth, createPhotoAlbumsInvite);
+app.post('/api/photoAlbums/invites/:inviteId/revoke', ...photoAlbumsVaultAuth, revokePhotoAlbumsInvite);
 app.get('/api/photoAlbums/invites/preview', previewPhotoAlbumsInvite);
-app.post('/api/photoAlbums/invites/accept', requireAuth, acceptPhotoAlbumsInvite);
-app.get('/api/photoAlbums/shared-albums', requireAuth, listPhotoAlbumsSharedAlbums);
-app.get('/api/photoAlbums/shared-albums/:sharedAlbumId/content', requireAuth, getPhotoAlbumsSharedAlbumContent);
+app.post('/api/photoAlbums/invites/accept', ...photoAlbumsVaultAuth, acceptPhotoAlbumsInvite);
+app.get('/api/photoAlbums/shared-albums', ...photoAlbumsVaultAuth, listPhotoAlbumsSharedAlbums);
+app.get('/api/photoAlbums/shared-albums/:sharedAlbumId/content', ...photoAlbumsVaultAuth, getPhotoAlbumsSharedAlbumContent);
 app.get(
   '/api/photoAlbums/shared-albums/:sharedAlbumId/attachments/:attachmentId',
-  requireAuth,
+  ...photoAlbumsVaultAuth,
   getPhotoAlbumsSharedAlbumAttachment
 );
-app.delete('/api/photoAlbums/shared-albums/:sharedAlbumId', requireAuth, removePhotoAlbumsSharedAlbum);
+app.delete('/api/photoAlbums/shared-albums/:sharedAlbumId', ...photoAlbumsVaultAuth, removePhotoAlbumsSharedAlbum);
 app.get('/api/settings/payment/history', requireAuth, getSettingsPaymentHistory);
 app.put('/api/admin/payment/token-balance', requireAuth, requireAdminRole, putAdminImpersonatedTokenBalance);
 app.put('/api/admin/vault/refill-quota', requireAuth, requireAdminRole, putAdminImpersonatedVaultRefillQuota);

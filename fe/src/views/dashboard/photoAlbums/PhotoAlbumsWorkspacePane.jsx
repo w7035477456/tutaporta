@@ -2089,6 +2089,8 @@ export default function PhotoAlbumsWorkspacePane({
   const loadedNoteIdRef = useRef(null);
   const persistNoteRef = useRef(null);
   const persistNoteInFlightRef = useRef(false);
+  /** Albums deleted in this tab — the leave-album flush / late autosave must not PATCH them (404). */
+  const deletedNoteIdsRef = useRef(new Set());
   const draftRef = useRef({ openNoteTitlePlain: '' });
   // Snapshot of the note title when the editor title box gains focus, so a
   // duplicate name entered there can be reverted to the last good value.
@@ -4418,6 +4420,7 @@ export default function PhotoAlbumsWorkspacePane({
   const persistNote = useCallback(async () => {
     if (!selectedNote || persistNoteInFlightRef.current) return;
     const noteId = Number(selectedNote.note_id);
+    if (deletedNoteIdsRef.current.has(noteId)) return;
     // The note NAME is deliberately NOT written here. Names are saved only by the
     // explicit, uniqueness-checked commit paths (title box blur/Enter and sidebar
     // rename). Writing the name from this debounced body autosave used the shared
@@ -7489,10 +7492,19 @@ export default function PhotoAlbumsWorkspacePane({
     if (!(await themedConfirm(`Delete "${label}" and all its notes? You can restore within 7 days (undelete coming later).`))) return;
     setBusy(true);
     setError('');
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const doomedNoteIds = (
+      notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId))?.notes || []
+    ).map((n) => Number(n.note_id));
+    doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.add(id));
     try {
       await vaultApi.deletePhotoAlbumsNotebook(notebookId);
       await loadTree({ silent: true });
     } catch (err) {
+      doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.delete(id));
       setError(readPhotoAlbumsApiError(err, 'Failed to delete notebook'));
     } finally {
       setBusy(false);
@@ -7513,6 +7525,11 @@ export default function PhotoAlbumsWorkspacePane({
     if (!confirmed) return;
     setBusy(true);
     setError('');
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    deletedNoteIdsRef.current.add(Number(noteId));
     try {
       await vaultApi.deletePhotoAlbumsNote(noteId);
       clearInnerUnlockForNote(noteId);
@@ -7536,6 +7553,7 @@ export default function PhotoAlbumsWorkspacePane({
         else setSelectedNoteId(null);
       }
     } catch (err) {
+      deletedNoteIdsRef.current.delete(Number(noteId));
       setError(readPhotoAlbumsApiError(err, 'Failed to delete note'));
     } finally {
       setBusy(false);

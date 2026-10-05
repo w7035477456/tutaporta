@@ -4,9 +4,16 @@ import {
   clusterRedisGetJson,
   clusterRedisSetJson
 } from './clusterRedisState.js';
+import {
+  VAULT_PRODUCT_PHOTO_ALBUMS,
+  clearVaultClusterUnlockState,
+  getVaultClusterUnlockState,
+  isVaultClusterCoherenceEnabled,
+  registerVaultClusterUnlockState
+} from './vaultClusterCoherence.js';
 
 const UNLOCK_PREFIX = 'v1:photo_albums:unlock:';
-/** Match typical idle session; unlock re-established on next API call if expired. */
+/** Standalone bridge only (website uses Postgres vault_cluster_state). */
 const UNLOCK_TTL_SEC = 24 * 60 * 60;
 
 export function vaultClusterUnlockKey(singlesId, storageType) {
@@ -15,6 +22,7 @@ export function vaultClusterUnlockKey(singlesId, storageType) {
   return `${UNLOCK_PREFIX}${id}:${type}`;
 }
 
+/** @returns {Promise<{ dbVersion: number, unlockGeneration: number } | null>} */
 export async function registerVaultClusterUnlock({
   singlesId,
   storageType,
@@ -23,9 +31,18 @@ export async function registerVaultClusterUnlock({
   driveFolderId = null
 }) {
   const id = Math.trunc(Number(singlesId));
-  if (!Number.isFinite(id) || id < 1) return;
+  if (!Number.isFinite(id) || id < 1) return null;
   const mount = String(mountPath || '').trim();
-  if (!mount) return;
+  if (!mount) return null;
+  if (isVaultClusterCoherenceEnabled()) {
+    return registerVaultClusterUnlockState(VAULT_PRODUCT_PHOTO_ALBUMS, {
+      singlesId: id,
+      storageType,
+      mountPath: mount,
+      backupMountPath,
+      driveFolderId
+    });
+  }
   await clusterRedisSetJson(
     vaultClusterUnlockKey(id, storageType),
     {
@@ -38,11 +55,16 @@ export async function registerVaultClusterUnlock({
     },
     UNLOCK_TTL_SEC
   );
+  return null;
 }
 
 export async function clearVaultClusterUnlock(singlesId, storageType) {
   const id = Math.trunc(Number(singlesId));
   if (!Number.isFinite(id) || id < 1) return;
+  if (isVaultClusterCoherenceEnabled()) {
+    await clearVaultClusterUnlockState(VAULT_PRODUCT_PHOTO_ALBUMS, id, storageType || null);
+    return;
+  }
   if (!storageType) {
     await clusterRedisDel(vaultClusterUnlockKey(id, 'usb'), vaultClusterUnlockKey(id, 'onedrive'));
     return;
@@ -53,6 +75,9 @@ export async function clearVaultClusterUnlock(singlesId, storageType) {
 export async function getVaultClusterUnlock(singlesId, storageType) {
   const id = Math.trunc(Number(singlesId));
   if (!Number.isFinite(id) || id < 1) return null;
+  if (isVaultClusterCoherenceEnabled()) {
+    return getVaultClusterUnlockState(VAULT_PRODUCT_PHOTO_ALBUMS, id, storageType);
+  }
   return clusterRedisGetJson(vaultClusterUnlockKey(id, storageType));
 }
 

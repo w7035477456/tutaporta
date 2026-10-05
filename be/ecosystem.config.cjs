@@ -16,10 +16,8 @@ module.exports = {
     name: 'onlinemallwebsite',
     script: './server_be.js',
     cwd: path.join(__dirname),
-    // Single worker: TutaPhoto / TutaNote hold the member's SQLite vault open in
-    // process memory. With 2+ round-robin workers each one gets its own copy of
-    // vault.db, so notes created on one worker are "Note not found" on the other
-    // and whichever flushes last overwrites the rest.
+    // Any worker count is safe: TutaPhoto / TutaNote vault copies are kept coherent
+    // across workers via helloworldjunktest.vault_cluster_state (vaultClusterCoherence.js).
     instances: 2,
     exec_mode: 'cluster',
     max_memory_restart: '12G',

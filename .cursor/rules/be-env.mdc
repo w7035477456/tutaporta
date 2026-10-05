@@ -3,18 +3,6 @@ description: Backend environment reference (~/.ssh/be/.env) — Mac dev snapshot
 alwaysApply: true
 ---
 
-## Agent — AI autonomy
-
-**AI Autonomy Rule:** Never stop to present multiple-choice questions or ask for permission on routine implementation steps. Always automatically select the recommended path (Choice A) and execute directly unless a critical, blocking ambiguity arises.
-
-Do not ask clarifying multiple-choice questions when intent is clear.
-
-## Agent — Cursor model (Auto only)
-
-- Use **Auto** mode only. Do not use Grok, Composer, or any other named model.
-- Grok, Composer, and all other models are disabled. Do not select, request, switch to, or launch them.
-- When spawning subagents, use model `inherit` only (Auto). Never pass `composer-2.5-fast`, Grok, or any other model slug.
-
 # Backend environment (`~/.ssh/be/.env`)
 
 Runtime config for the Node backend is loaded from **`~/.ssh/be/.env`** (not committed to git). After changes, restart PM2: `pm2 restart onlinemallwebsite`.
@@ -22,12 +10,6 @@ Runtime config for the Node backend is loaded from **`~/.ssh/be/.env`** (not com
 Relevant loader: `be/loadEnv.js` (imported first in `be/server_be.js`).
 
 Mac dev snapshot below. **Secrets are redacted in this doc** — keep real values only in `~/.ssh/be/.env`.
-
-## Hosts
-
-| Name | Address | Notes |
-|------|---------|-------|
-| **YOUR_UBUNTU_HOST** | `192.168.222.202` | Primary Ubuntu app server (SSH / `scp` / deploy target). Example: `scp … lawsen0@192.168.222.202:~/code/main/be/usb/` |
 
 ## Speed dating (1:1 WebRTC)
 
@@ -537,8 +519,6 @@ DB_SCHEMA=helloworldjunktest
 VSINGLES_SCHEMA=helloworldjunktest
 PORT=3005
 ```
-
-Mac `psql`: see `mac-psql-local.mdc`. **Writes** go to Primary; reads use local replica in production (`postgres-primary-replica.mdc`).
 
 ## SMTP
 

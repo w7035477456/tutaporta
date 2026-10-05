@@ -3,18 +3,6 @@ description: Frontend environment reference (fe/.env) — Mac dev snapshot and v
 alwaysApply: true
 ---
 
-## Agent — AI autonomy
-
-**AI Autonomy Rule:** Never stop to present multiple-choice questions or ask for permission on routine implementation steps. Always automatically select the recommended path (Choice A) and execute directly unless a critical, blocking ambiguity arises.
-
-Do not ask clarifying multiple-choice questions when intent is clear.
-
-## Agent — Cursor model (Auto only)
-
-- Use **Auto** mode only. Do not use Grok, Composer, or any other named model.
-- Grok, Composer, and all other models are disabled. Do not select, request, switch to, or launch them.
-- When spawning subagents, use model `inherit` only (Auto). Never pass `composer-2.5-fast`, Grok, or any other model slug.
-
 # Frontend environment (`fe/.env`)
 
 Vite loads **`fe/.env`** at build/dev time. Client-visible keys use `import.meta.env` via `fe/vite.config.mjs` **`envPrefix`** (`VITE_`, `FE_`, `API_`, `MOBILE_`, `DESKTOP_`, `DIALOG_`, `HOVER_`, `RECORD_`, `YELLOW_`, etc.).
@@ -72,30 +60,6 @@ YELLOW_TEXT_BANNER_TO_VH_RATIO=0.25
 |----------|-------|----------|
 | `RECORD_VIDEO_TO_VW_RATIO` | `0.5` | Record / replay / video frame width as fraction of popup content width (`fe/src/config/liveFaceScanManualVideoEnv.js`). |
 | `YELLOW_TEXT_BANNER_TO_VH_RATIO` | `0.25` | Instruction banner height as fraction of popup vh (`liveFaceScanManualVideoEnv.js`). Width is always 100%. |
-
-## Browser API rate limit (client-only)
-
-**Set in `~/.ssh/be/.env`** — mirrored into the FE bundle at Vite dev/build via `fe/vite.config.mjs` (not `fe/.env`).
-
-```bash
-FE_RATE_LIMIT_ENABLE=true
-FE_RATE_CLIENT_API_ACCESS_LIMIT=100
-FE_RATE_CLIENT_API_TIMESLICE_SECONDS=60
-FE_RATE_CLIENT_API_COOLDOWN_SECONDS=30
-FE_RATE_CLIENT_API_COOLDOWN_ENABLED=true
-FE_RATE_CLIENT_API_CONSOLE_LOG=false
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `FE_RATE_LIMIT_ENABLE` | `true` | Master switch (`fe/src/config/clientApiRateLimitEnv.js`). `false` = no browser cooldown. |
-| `FE_RATE_CLIENT_API_ACCESS_LIMIT` | `100` | Max API calls per timeslice per tab. |
-| `FE_RATE_CLIENT_API_TIMESLICE_SECONDS` | `60` | Rolling window length. |
-| `FE_RATE_CLIENT_API_COOLDOWN_SECONDS` | `30` | Cooldown after limit hit. |
-| `FE_RATE_CLIENT_API_COOLDOWN_ENABLED` | `true` | Sub-switch; `false` = same as master off for gating. |
-| `FE_RATE_CLIENT_API_CONSOLE_LOG` | `false` | DevTools logging when master enabled. |
-
-After changes: restart **Vite** (`feall`). No PM2 restart unless you only changed backend-only keys.
 
 ## Debug and sockets
 

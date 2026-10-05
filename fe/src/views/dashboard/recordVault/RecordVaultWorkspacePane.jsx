@@ -1831,6 +1831,8 @@ export default function RecordVaultWorkspacePane({
   const loadedNoteIdRef = useRef(null);
   const persistNoteRef = useRef(null);
   const persistNoteInFlightRef = useRef(false);
+  /** Notes deleted in this tab — the leave-note flush / late autosave must not PATCH them (404). */
+  const deletedNoteIdsRef = useRef(new Set());
   /** Suppress false "Note not found" popup right after a successful mobile/OS attach. */
   const recentAttachOkAtRef = useRef(0);
   const attachPersistRetryRef = useRef(false);
@@ -3481,6 +3483,7 @@ export default function RecordVaultWorkspacePane({
   const persistNote = useCallback(async () => {
     if (!selectedNote || persistNoteInFlightRef.current) return;
     const noteId = Number(selectedNote.note_id);
+    if (deletedNoteIdsRef.current.has(noteId)) return;
     // The note NAME is deliberately NOT written here. Names are saved only by the
     // explicit, uniqueness-checked commit paths (title box blur/Enter and sidebar
     // rename). Writing the name from this debounced body autosave used the shared
@@ -6018,10 +6021,19 @@ export default function RecordVaultWorkspacePane({
     setBusyLabel('Deleting notebook');
     setBusy(true);
     setError('');
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const doomedNoteIds = (
+      notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId))?.notes || []
+    ).map((n) => Number(n.note_id));
+    doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.add(id));
     try {
       await vaultApi.deleteRecordVaultNotebook(notebookId);
       await loadTree({ silent: true });
     } catch (err) {
+      doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.delete(id));
       setError(readRecordVaultApiError(err, 'Failed to delete notebook'));
     } finally {
       setBusy(false);
@@ -6045,6 +6057,11 @@ export default function RecordVaultWorkspacePane({
     setBusyLabel('Deleting note');
     setBusy(true);
     setError('');
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    deletedNoteIdsRef.current.add(Number(noteId));
     try {
       await vaultApi.deleteRecordVaultNote(noteId);
       clearInnerUnlockForNote(noteId);
@@ -6068,6 +6085,7 @@ export default function RecordVaultWorkspacePane({
         else setSelectedNoteId(null);
       }
     } catch (err) {
+      deletedNoteIdsRef.current.delete(Number(noteId));
       setError(readRecordVaultApiError(err, 'Failed to delete note'));
     } finally {
       setBusy(false);

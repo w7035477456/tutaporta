@@ -50,16 +50,12 @@ psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "…"
 - Do **not** use in-process `Map`, module-level session caches, or `express-session` in-memory stores for data that must be consistent across servers.
 - Load user/profile state from DB on each request; write through Primary.
 
-See `multi-server-stateless.mdc`.
-
 ## 5) Redis — centralized cache
 
 Redis exists for **centralized cache** of a few shared, read-heavy items (rate limits when enabled, health, photo cache stats, etc.).
 
 - Use **`REDIS_URL`** — not per-process memory — when cross-server fairness matters.
 - Always TTL; fall back to DB if Redis is down.
-
-See `cluster-architecture-redis.mdc`.
 
 ## 6) Postgres Primary + Replica
 
@@ -70,15 +66,13 @@ See `cluster-architecture-redis.mdc`.
 
 After a write in the same request, use Primary or tolerate replication lag for read-your-writes.
 
-See `postgres-primary-replica.mdc`.
+**Exception — cluster coordination reads go to Primary:** `helloworldjunktest.vault_cluster_state` (vault unlock state, `db_version`, write lease lock; `be/utils/vaultClusterCoherence.js`) must be read **and** written on Primary. Replica lag there would serve stale vault copies ("Note not found").
 
 ## 7) Deployment topology (current vs future)
 
 **Current (single box):** one server hosts HAProxy, Postgres Primary, Postgres Replica, and one web server (FE + BE).
 
 **Future (multi-server):** ~5 servers splitting HAProxy, Primary, replicas, and web servers. Andrew will say when to target multi-server deploy — **until then, code must still follow cluster rules above** (stateless app servers, Primary writes, replica reads, Redis when shared).
-
-See `cross-environment-deploy.mdc`.
 
 ## 8) Mac dev workflow
 
@@ -136,10 +130,8 @@ Andrew uses **`vi`** at the command line.
 Quick singles query (Mac tunnel):
 
 ```bash
-psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -c "SELECT * FROM helloworldjunktest.singles;"
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SELECT * FROM helloworldjunktest.singles;"
 ```
-
-See also `mac-psql-local.mdc` for migrations and one-liners.
 
 ## 12) Agent — user action markers
 

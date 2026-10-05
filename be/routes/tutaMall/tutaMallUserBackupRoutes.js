@@ -9,6 +9,11 @@ import {
   sectionBackupExists,
   sectionCreatedAt
 } from '../../utils/tutaMallUserBackup.js';
+import {
+  VAULT_PRODUCT_PHOTO_ALBUMS,
+  VAULT_PRODUCT_RECORD_VAULT,
+  invalidateVaultClusterSessions
+} from '../../utils/vaultClusterCoherence.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -96,6 +101,8 @@ export async function postTutaMallRestoreAll(req, res) {
 
   try {
     const result = await restoreUserAll(pool, { singlesId });
+    await invalidateVaultClusterSessions(VAULT_PRODUCT_RECORD_VAULT, singlesId);
+    await invalidateVaultClusterSessions(VAULT_PRODUCT_PHOTO_ALBUMS, singlesId);
     return res.json({
       ok: true,
       email: result.email,
@@ -131,6 +138,8 @@ export async function postTutaMallRestoreApp(req, res) {
 
   try {
     const result = await restoreUserSection(pool, { singlesId, app });
+    if (app === 'tutanotes') await invalidateVaultClusterSessions(VAULT_PRODUCT_RECORD_VAULT, singlesId);
+    if (app === 'tutaphoto') await invalidateVaultClusterSessions(VAULT_PRODUCT_PHOTO_ALBUMS, singlesId);
     return res.json({
       ok: true,
       app: result.section,
