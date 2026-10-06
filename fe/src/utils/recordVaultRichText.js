@@ -20,6 +20,7 @@ const ALLOWED_TAGS = new Set([
   'h1',
   'h2',
   'h3',
+  'h4',
   'table',
   'tbody',
   'thead',
@@ -45,9 +46,12 @@ const ALLOWED_SPAN_STYLE_PROPS = new Set([
   'font-size',
   'background-color',
   'font-family',
+  'font-style',
+  'text-decoration',
   'line-height'
 ]);
 const ALLOWED_BLOCK_STYLE_PROPS = new Set(['text-align']);
+const ALLOWED_CELL_STYLE_PROPS = new Set(['background-color']);
 
 const CLIPBOARD_HEADING_PT = {
   h1: 32,
@@ -367,7 +371,7 @@ export function sanitizeRecordVaultHtml(html) {
         continue;
       }
 
-      if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'blockquote' || tag === 'hr' || tag === 'code' || tag === 'pre') {
+      if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'blockquote' || tag === 'hr' || tag === 'code' || tag === 'pre') {
         walk(child);
         continue;
       }
@@ -394,6 +398,14 @@ export function sanitizeRecordVaultHtml(html) {
         const alt = String(child.getAttribute('alt') ?? '').slice(0, 500);
         if (alt) child.setAttribute('alt', alt);
         else child.removeAttribute('alt');
+        const width = parseInt(child.getAttribute('width') || child.style?.width || '', 10);
+        child.removeAttribute('style');
+        if (Number.isFinite(width) && width > 0) {
+          child.setAttribute('width', String(width));
+          child.setAttribute('style', `width: ${width}px; height: auto;`);
+        } else {
+          child.removeAttribute('width');
+        }
         continue;
       }
 
@@ -409,6 +421,9 @@ export function sanitizeRecordVaultHtml(html) {
         else child.removeAttribute('colspan');
         if (rowspan && Number(rowspan) > 1) child.setAttribute('rowspan', rowspan);
         else child.removeAttribute('rowspan');
+        const cellStyle = readAllowedStyle(child.getAttribute('style'), ALLOWED_CELL_STYLE_PROPS);
+        if (cellStyle) child.setAttribute('style', cellStyle);
+        else child.removeAttribute('style');
         walk(child);
         continue;
       }

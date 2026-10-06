@@ -33,7 +33,8 @@ import {
   createRecordVaultPaneApi
 } from 'api/recordVaultFe';
 import { useAuth } from 'contexts/AuthContext';
-import { themedConfirm } from 'utils/themedDialog';
+import { themedAlert, themedConfirm } from 'utils/themedDialog';
+import { emptyEnexStats, enexImportSummaryMessage } from './recordVaultEnexImport';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { fetchUploadLimits } from 'api/myPhotosFe';
 import {
@@ -5778,6 +5779,127 @@ export default function RecordVaultWorkspacePane({
 
   importFoldersAsNotebooksRef.current = importFoldersAsNotebooksFromDataTransfer;
 
+  /**
+   * File → Import → Evernote (.enex) with many notes (a whole exported notebook):
+   * new notebook, one note per Evernote note, created one after another.
+   */
+  const importEnexNotesAsNotebook = useCallback(
+    async ({ notebookName: requestedName, notes }) => {
+      if (busy || folderImportBusy || crossPaneBusy) {
+        setError('Vault is busy — try again in a moment.');
+        return;
+      }
+      const enexNotes = Array.isArray(notes) ? notes : [];
+      if (!enexNotes.length) return;
+
+      setFolderImportBusy(true);
+      setFolderImportProgressPercent(0);
+      setFolderImportProgressLabel('Preparing Evernote import…');
+      setError('');
+      const stats = emptyEnexStats();
+      const failures = [];
+      let notebookId = null;
+      try {
+        const notebookName = uniqueNotebookNameFromFolder(requestedName);
+        setFolderImportProgressLabel(`Creating notebook “${notebookName}”…`);
+        const createdNb = await vaultApi.createRecordVaultNotebook(notebookName);
+        notebookId = Number(createdNb?.notebook_id);
+        if (!Number.isFinite(notebookId) || notebookId < 1) {
+          throw new Error(`Failed to create notebook “${notebookName}”`);
+        }
+        const createdNotebookName = createdNb.notebook_name || notebookName;
+        setNotebooks((prev) => [
+          { ...createdNb, notebook_id: notebookId, notebook_name: createdNotebookName, notes: [] },
+          ...prev
+        ]);
+
+        const claimedTitles = new Set();
+        const importedNoteNames = [];
+        let lastNoteId = null;
+        for (let i = 0; i < enexNotes.length; i += 1) {
+          const enexNote = enexNotes[i];
+          const label = enexNote.title || `Note ${i + 1}`;
+          setFolderImportProgressPercent(Math.max(1, Math.round((i / enexNotes.length) * 100)));
+          setFolderImportProgressLabel(`Importing ${i + 1} of ${enexNotes.length}: ${label}`);
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            const rawBody = await enexNote.toHtml(stats);
+            const noteName = uniqueImportedNoteTitle(enexNote.title || 'EVERNOTE NOTE', claimedTitles);
+            claimedTitles.add(noteName);
+            const bodyHtml = cleanRecordVaultNoteBodyHtml(rawBody || '<p></p>', noteName);
+            // eslint-disable-next-line no-await-in-loop
+            const created = await vaultApi.createRecordVaultNote(notebookId, {
+              note_name: noteName,
+              body_text: bodyHtml || '<p></p>'
+            });
+            if (!created?.note_id) throw new Error('Failed to create note');
+            const createdRow = {
+              ...created,
+              note_name: created.note_name || noteName,
+              body_text: created.body_text != null ? created.body_text : bodyHtml,
+              notebook_id: notebookId,
+              content_loaded: true
+            };
+            setNotebooks((prev) =>
+              prev.map((nb) =>
+                Number(nb.notebook_id) === notebookId ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb
+              )
+            );
+            importedNoteNames.push(noteName);
+            lastNoteId = created.note_id;
+          } catch (err) {
+            failures.push(`${label}: ${readRecordVaultApiError(err, 'import failed')}`);
+          }
+        }
+
+        setFolderImportProgressPercent(100);
+        setFolderImportProgressLabel('Finishing…');
+        bumpVaultUsage();
+        setSelectedNotebookId(notebookId);
+        if (lastNoteId != null) selectNoteId(lastNoteId);
+        await loadTree({ preferNotebookId: notebookId, preferNoteId: lastNoteId || undefined, silent: true }).catch(
+          () => {}
+        );
+
+        if (importedNoteNames.length) {
+          setFolderImportSuccess({
+            sourceLabel: `Evernote export (${enexNotes.length} notes)`,
+            notebookName: createdNotebookName,
+            notebookPathLabel: createdNotebookName,
+            notebookId,
+            noteId: lastNoteId,
+            noteNames: importedNoteNames
+          });
+        }
+        if (failures.length) {
+          setError(
+            `Imported ${importedNoteNames.length} of ${enexNotes.length} notes; ${failures.length} failed. ${failures[0]}`
+          );
+        }
+        const summary = enexImportSummaryMessage(stats);
+        if (summary) await themedAlert(summary);
+      } catch (err) {
+        setError(readRecordVaultApiError(err, 'Evernote import failed'));
+        await loadTree({ silent: true }).catch(() => {});
+      } finally {
+        setFolderImportBusy(false);
+        setFolderImportProgressPercent(0);
+        setFolderImportProgressLabel('');
+      }
+    },
+    [
+      busy,
+      folderImportBusy,
+      crossPaneBusy,
+      uniqueNotebookNameFromFolder,
+      uniqueImportedNoteTitle,
+      vaultApi,
+      selectNoteId,
+      bumpVaultUsage,
+      loadTree
+    ]
+  );
+
   const commitNotebookRename = async () => {
     const notebookId = editingNotebookId;
     const trimmed = String(editNameDraft ?? '').trim().toUpperCase();
@@ -6443,7 +6565,7 @@ export default function RecordVaultWorkspacePane({
       />
       <BusyHourglassOverlay
         open={folderImportBusy}
-        label="Importing folder as notebook"
+        label="Importing notebook"
         progressPercent={folderImportProgressPercent}
         progressLabel={folderImportProgressLabel}
         backdropSx={vaultLeavingBackdropSx}
@@ -6472,10 +6594,12 @@ export default function RecordVaultWorkspacePane({
         closeButtonAriaLabel="Close folder import success"
       >
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Folder import complete</ColorTemplate16PopupCenterWide.Title>
+          <ColorTemplate16PopupCenterWide.Title>
+            {folderImportSuccess?.sourceLabel ? 'Import complete' : 'Folder import complete'}
+          </ColorTemplate16PopupCenterWide.Title>
           <ColorTemplate16PopupCenterWide.BodyText>
             {folderImportSuccess
-              ? `Success: Folder ${folderImportSuccess.folderName} been IMPORT to new Notebook ${folderImportSuccess.notebookPathLabel} along with these import Notes: ${(folderImportSuccess.noteNames || []).join(', ') || '(none)'}.`
+              ? `Success: ${folderImportSuccess.sourceLabel || `Folder ${folderImportSuccess.folderName}`} been IMPORT to new Notebook ${folderImportSuccess.notebookPathLabel} along with these import Notes: ${(folderImportSuccess.noteNames || []).join(', ') || '(none)'}.`
               : ''}
           </ColorTemplate16PopupCenterWide.BodyText>
           <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
@@ -6881,6 +7005,7 @@ export default function RecordVaultWorkspacePane({
                       getMarkdown={getEditorMarkdown}
                       onImportHtml={handleImportHtml}
                       onImportMarkdown={handleImportMarkdown}
+                      onImportEnexNotebook={importEnexNotesAsNotebook}
                       paymentActive={fileWorkspaceView === 'payment'}
                       onSelectPayment={openPaymentWorkspace}
                       onSelectNotes={() => setFileWorkspaceView('notes')}

@@ -65,6 +65,28 @@ const RecordVaultLineHeight = LineHeight.extend({
   }
 });
 
+/** Cell fill from pasted web / Word tables (`<td style="background-color: …">`). */
+const cellBackgroundColorAttribute = {
+  backgroundColor: {
+    default: null,
+    parseHTML: (element) => element.style?.backgroundColor || null,
+    renderHTML: (attributes) =>
+      attributes.backgroundColor ? { style: `background-color: ${attributes.backgroundColor}` } : {}
+  }
+};
+
+const RecordVaultTableCell = TableCell.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...cellBackgroundColorAttribute };
+  }
+});
+
+const RecordVaultTableHeader = TableHeader.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...cellBackgroundColorAttribute };
+  }
+});
+
 /**
  * Default mention directory. Replace with real vault members when wiring a
  * backend data source — the suggestion UI stays the same.
@@ -109,8 +131,8 @@ export function buildRecordVaultEditorExtensions() {
     RecordVaultAttachmentNode,
     Table.configure({ resizable: true }),
     TableRow,
-    TableHeader,
-    TableCell,
+    RecordVaultTableHeader,
+    RecordVaultTableCell,
     Details.configure({ persist: true }),
     DetailsSummary,
     DetailsContent,

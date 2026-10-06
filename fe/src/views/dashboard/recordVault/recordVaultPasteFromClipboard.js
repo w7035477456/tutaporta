@@ -359,6 +359,323 @@ export function plainTextToHtml(plain) {
   return paragraphs || '<p></p>';
 }
 
+/*
+ * Web-page paste (amazon.com etc.): Chrome/Safari serialize the copied DOM with
+ * the page's matched CSS inlined on every element (font-size, color, background,
+ * display:flex/grid, widths). The editor can't keep arbitrary CSS, so we:
+ *  - resolve inherited text styling and put it on each text run (TextStyle marks),
+ *  - turn side-by-side image cards (flex rows / grids) into a table,
+ *  - keep pixel image widths and centered/right alignment.
+ */
+const FLAT_STYLE_ATTR = 'data-rv-flat';
+const ALIGN_ATTR = 'data-rv-align';
+export const PASTE_IMG_HEIGHT_ATTR = 'data-rv-img-h';
+export const PASTE_IMG_MAX_W_ATTR = 'data-rv-img-maxw';
+export const PASTE_IMG_MAX_H_ATTR = 'data-rv-img-maxh';
+
+const MAX_LAYOUT_COLUMNS = 6;
+const DEFAULT_LAYOUT_COLUMNS = 4;
+const INLINE_FLEX_MAX_TEXT = 200;
+const MIN_FONT_PX = 6;
+const MAX_FONT_PX = 96;
+const MAX_PASTED_IMAGE_WIDTH = 1600;
+const CSS_WIDE_KEYWORD = /^(inherit|initial|unset|revert|revert-layer)$/i;
+const ALIGNABLE_BLOCK_TAGS = new Set(['DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'TD', 'TH', 'BLOCKQUOTE']);
+const SAFE_HREF = /^(https?:|mailto:|tel:)/i;
+const FONT_SIZE_KEYWORDS = {
+  'xx-small': 9,
+  'x-small': 10,
+  small: 13,
+  medium: 16,
+  large: 18,
+  'x-large': 24,
+  'xx-large': 32
+};
+
+function cssValue(el, prop) {
+  return String(el?.style?.getPropertyValue?.(prop) || '').trim();
+}
+
+function pxValue(raw) {
+  const m = String(raw || '').trim().match(/^(\d*\.?\d+)px$/i);
+  return m ? parseFloat(m[1]) : null;
+}
+
+function pixelAttr(el, name) {
+  const m = String(el?.getAttribute?.(name) || '').trim().match(/^(\d+)(px)?$/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function isVisibleColor(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v || CSS_WIDE_KEYWORD.test(v)) return false;
+  if (v === 'transparent' || v === 'none' || v === 'currentcolor') return false;
+  if (/^rgba\(.*,\s*0(\.0+)?\s*\)$/.test(v)) return false;
+  return true;
+}
+
+/** `background: none 0% 0% / auto repeat … rgb(240, 242, 242)` → `rgb(240, 242, 242)`. */
+function backgroundColorOf(el) {
+  const direct = cssValue(el, 'background-color');
+  if (isVisibleColor(direct)) return direct;
+  const shorthand = cssValue(el, 'background');
+  const colors = shorthand.match(/(rgba?\([^)]*\)|hsla?\([^)]*\)|#[0-9a-f]{3,8}\b)/gi);
+  const last = colors?.[colors.length - 1];
+  return isVisibleColor(last) ? last : null;
+}
+
+function resolveFontSizePx(raw, parentPx) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (!v || CSS_WIDE_KEYWORD.test(v)) return null;
+  if (FONT_SIZE_KEYWORDS[v]) return FONT_SIZE_KEYWORDS[v];
+  const m = v.match(/^(\d*\.?\d+)(px|pt|rem|em|%)$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  const base = parentPx || 16;
+  if (m[2] === 'px') return n;
+  if (m[2] === 'pt') return (n * 4) / 3;
+  if (m[2] === 'rem') return n * 16;
+  if (m[2] === 'em') return n * base;
+  return (n / 100) * base;
+}
+
+function isBoldWeight(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (v === 'bold' || v === 'bolder') return true;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 600;
+}
+
+function normalizeAlign(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (v === 'center' || v === '-webkit-center') return 'center';
+  if (v === 'right' || v === 'end' || v === '-webkit-right') return 'right';
+  if (v === 'justify') return 'justify';
+  if (v === 'left' || v === 'start' || v === '-webkit-left') return 'left';
+  return null;
+}
+
+function flatTextStyle(ctx) {
+  const parts = [];
+  if (ctx.color) parts.push(`color: ${ctx.color}`);
+  if (ctx.background) parts.push(`background-color: ${ctx.background}`);
+  if (ctx.fontSize) {
+    const px = Math.min(MAX_FONT_PX, Math.max(MIN_FONT_PX, ctx.fontSize));
+    parts.push(`font-size: ${Math.round(px * 10) / 10}px`);
+  }
+  if (ctx.fontFamily) parts.push(`font-family: ${ctx.fontFamily}`);
+  if (ctx.bold) parts.push('font-weight: 700');
+  if (ctx.italic) parts.push('font-style: italic');
+  const deco = [ctx.underline && 'underline', ctx.strike && 'line-through'].filter(Boolean);
+  if (deco.length) parts.push(`text-decoration: ${deco.join(' ')}`);
+  return parts.join('; ');
+}
+
+/**
+ * Resolve CSS inheritance down the pasted tree and wrap every text run in a
+ * <span style> carrying its effective color / size / family / weight / background.
+ * Block alignment is recorded on ALIGN_ATTR for the paragraph pass.
+ */
+function flattenInheritedTextStyles(doc, root) {
+  const visit = (el, ctx) => {
+    const next = { ...ctx };
+
+    const color = cssValue(el, 'color') || (el.tagName === 'FONT' ? el.getAttribute('color') : '');
+    if (isVisibleColor(color)) next.color = color;
+
+    const fontSize = resolveFontSizePx(cssValue(el, 'font-size'), ctx.fontSize);
+    if (fontSize) next.fontSize = fontSize;
+
+    const family = cssValue(el, 'font-family') || (el.tagName === 'FONT' ? el.getAttribute('face') : '');
+    if (family && !CSS_WIDE_KEYWORD.test(family)) next.fontFamily = family;
+
+    const weight = cssValue(el, 'font-weight');
+    if (weight && !CSS_WIDE_KEYWORD.test(weight)) next.bold = isBoldWeight(weight);
+
+    const fontStyle = cssValue(el, 'font-style');
+    if (fontStyle && !CSS_WIDE_KEYWORD.test(fontStyle)) next.italic = /italic|oblique/i.test(fontStyle);
+
+    const deco = `${cssValue(el, 'text-decoration-line')} ${cssValue(el, 'text-decoration')}`;
+    if (/underline/i.test(deco)) next.underline = true;
+    if (/line-through/i.test(deco)) next.strike = true;
+
+    const bg = backgroundColorOf(el);
+    if (bg) next.background = bg;
+
+    const align = normalizeAlign(cssValue(el, 'text-align') || el.getAttribute('align'));
+    if (align) next.align = align;
+    if (ALIGNABLE_BLOCK_TAGS.has(el.tagName) && next.align && next.align !== 'left') {
+      el.setAttribute(ALIGN_ATTR, next.align);
+    }
+
+    for (const child of [...el.childNodes]) {
+      if (child.nodeType === 1) {
+        visit(child, next);
+      } else if (child.nodeType === 3 && child.nodeValue.trim()) {
+        const style = flatTextStyle(next);
+        if (!style) continue;
+        const span = doc.createElement('span');
+        span.setAttribute('style', style);
+        span.setAttribute(FLAT_STYLE_ATTR, '');
+        child.replaceWith(span);
+        span.appendChild(child);
+      }
+    }
+  };
+
+  for (const child of [...root.children]) visit(child, {});
+}
+
+function hasVisibleContent(el) {
+  return el.tagName === 'IMG' || Boolean(el.querySelector('img')) || Boolean(el.textContent?.trim());
+}
+
+function countGridTracks(value) {
+  const v = String(value || '').replace(/\[[^\]]*\]/g, ' ').trim();
+  if (!v || v === 'none' || CSS_WIDE_KEYWORD.test(v)) return 0;
+  const repeat = v.match(/^repeat\(\s*(\d+)\s*,/i);
+  if (repeat) return parseInt(repeat[1], 10);
+  let depth = 0;
+  let tracks = 0;
+  let inToken = false;
+  for (const ch of v) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth -= 1;
+    if (/\s/.test(ch) && depth === 0) {
+      inToken = false;
+    } else if (!inToken) {
+      inToken = true;
+      tracks += 1;
+    }
+  }
+  return tracks;
+}
+
+function layoutColumnCount(el, isGrid, kids) {
+  let cols = 0;
+  if (isGrid) {
+    cols = countGridTracks(cssValue(el, 'grid-template-columns'));
+  } else if (/wrap/i.test(cssValue(el, 'flex-wrap'))) {
+    const containerW = pxValue(cssValue(el, 'width'));
+    const kidW = pxValue(cssValue(kids[0], 'width'));
+    if (containerW && kidW) cols = Math.floor((containerW + 1) / kidW);
+  }
+  if (!cols) cols = kids.length <= MAX_LAYOUT_COLUMNS ? kids.length : DEFAULT_LAYOUT_COLUMNS;
+  return Math.max(1, Math.min(cols, MAX_LAYOUT_COLUMNS, kids.length));
+}
+
+function buildLayoutTable(doc, container, kids, cols) {
+  const table = doc.createElement('table');
+  const tbody = doc.createElement('tbody');
+  for (let i = 0; i < kids.length; i += cols) {
+    const tr = doc.createElement('tr');
+    for (let c = 0; c < cols; c += 1) {
+      const td = doc.createElement('td');
+      const kid = kids[i + c];
+      if (kid) {
+        const bg = backgroundColorOf(kid);
+        if (bg) td.setAttribute('style', `background-color: ${bg}`);
+        td.appendChild(kid);
+      } else {
+        td.innerHTML = '<p></p>';
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  container.replaceChildren(table);
+}
+
+function renameElement(doc, el, tagName) {
+  const next = doc.createElement(tagName);
+  for (const attr of [...el.attributes]) next.setAttribute(attr.name, attr.value);
+  while (el.firstChild) next.appendChild(el.firstChild);
+  el.replaceWith(next);
+  return next;
+}
+
+/** Short text-only flex row (badge + label, price parts) → one inline line. */
+function inlineFlexRow(doc, kids) {
+  kids.forEach((kid, index) => {
+    [...kid.querySelectorAll('div, p')].reverse().forEach((blk) => renameElement(doc, blk, 'span'));
+    const inlineKid = /^(DIV|P|LI)$/.test(kid.tagName) ? renameElement(doc, kid, 'span') : kid;
+    if (index > 0) inlineKid.before(doc.createTextNode(' '));
+  });
+}
+
+/**
+ * Flex rows and CSS grids of image cards (product carousels, 2×2 deal tiles)
+ * become a table so they stay side by side; everything else stacks as blocks.
+ */
+function convertLayoutContainers(doc, root) {
+  const containers = [...root.querySelectorAll('*')]
+    .filter((el) => /^(inline-)?(flex|grid)$/i.test(cssValue(el, 'display')))
+    .reverse();
+
+  for (const el of containers) {
+    if (!root.contains(el)) continue;
+    const isGrid = /grid$/i.test(cssValue(el, 'display'));
+    if (!isGrid && /^column/i.test(cssValue(el, 'flex-direction'))) continue;
+
+    const kids = [...el.children].filter(hasVisibleContent);
+    if (kids.length < 2) continue;
+
+    const imageKids = kids.filter((k) => k.tagName === 'IMG' || k.querySelector('img'));
+    if (imageKids.length >= 2) {
+      const cols = layoutColumnCount(el, isGrid, kids);
+      if (cols >= 2) buildLayoutTable(doc, el, kids, cols);
+      continue;
+    }
+
+    const textOnly =
+      !imageKids.length && !kids.some((k) => k.querySelector('table, ul, ol, pre, blockquote, h1, h2, h3, h4'));
+    if (!isGrid && textOnly && (el.textContent || '').trim().length <= INLINE_FLEX_MAX_TEXT) {
+      inlineFlexRow(doc, kids);
+    }
+  }
+}
+
+/** Keep the rendered pixel size of pasted <img>; height-only / max-size hints resolve after load. */
+function recordPastedImageSize(img) {
+  const width = pxValue(cssValue(img, 'width')) || pixelAttr(img, 'width');
+  if (width) {
+    img.setAttribute('width', String(Math.min(MAX_PASTED_IMAGE_WIDTH, Math.round(width))));
+    return;
+  }
+  img.removeAttribute('width');
+  const height = pxValue(cssValue(img, 'height')) || pixelAttr(img, 'height');
+  const maxW = pxValue(cssValue(img, 'max-width'));
+  const maxH = pxValue(cssValue(img, 'max-height'));
+  if (height) img.setAttribute(PASTE_IMG_HEIGHT_ATTR, String(Math.round(height)));
+  if (maxW) img.setAttribute(PASTE_IMG_MAX_W_ATTR, String(Math.round(maxW)));
+  if (maxH) img.setAttribute(PASTE_IMG_MAX_H_ATTR, String(Math.round(maxH)));
+}
+
+/** Evernote app clipboard: images are `en-cache://` refs into Evernote's private cache. */
+export function isEvernoteClipboardHtml(html) {
+  return /en-cache:\/\//i.test(String(html || '')) || /data-en-clipboard/i.test(String(html || ''));
+}
+
+/** Evernote renders file attachments as <img data-type="text/plain"> cards; not pictures. */
+function replaceEvernoteAttachmentCards(doc, root) {
+  root.querySelectorAll('img[data-type]').forEach((img) => {
+    const type = String(img.getAttribute('data-type') || '').toLowerCase();
+    if (!type || type.startsWith('image/')) return;
+    const p = doc.createElement('p');
+    p.textContent = `[Evernote attachment (${type}) — not included when copying]`;
+    img.replaceWith(p);
+  });
+}
+
+function isHiddenElement(el) {
+  return (
+    el.hasAttribute('hidden') ||
+    /^none$/i.test(cssValue(el, 'display')) ||
+    /^hidden$/i.test(cssValue(el, 'visibility'))
+  );
+}
+
 /**
  * Strip Apple / Office junk and keep TipTap-friendly markup.
  */
@@ -375,22 +692,20 @@ export function normalizePastedHtml(html) {
   const root = doc.getElementById('rv-paste-root') || doc.body;
   if (!root) return plainTextToHtml('');
 
-  root.querySelectorAll('script, style, meta, link, title, xml, head').forEach((el) => el.remove());
+  root.querySelectorAll('script, style, meta, link, title, xml, head, noscript, template').forEach((el) => el.remove());
+  root.querySelectorAll('*').forEach((el) => {
+    if (isHiddenElement(el)) el.remove();
+  });
+
+  replaceEvernoteAttachmentCards(doc, root);
+  root.querySelectorAll('img').forEach(recordPastedImageSize);
+  flattenInheritedTextStyles(doc, root);
+  convertLayoutContainers(doc, root);
 
   root.querySelectorAll('[style]').forEach((el) => {
-    const style = el.getAttribute('style') || '';
-    const keep = [];
-    const color = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
-    const bg = style.match(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/i);
-    const fw = style.match(/(?:^|;)\s*font-weight\s*:\s*([^;]+)/i);
-    const fs = style.match(/(?:^|;)\s*font-style\s*:\s*([^;]+)/i);
-    const td = style.match(/(?:^|;)\s*text-decoration\s*:\s*([^;]+)/i);
-    if (color) keep.push(`color:${color[1].trim()}`);
-    if (bg) keep.push(`background-color:${bg[1].trim()}`);
-    if (fw) keep.push(`font-weight:${fw[1].trim()}`);
-    if (fs) keep.push(`font-style:${fs[1].trim()}`);
-    if (td) keep.push(`text-decoration:${td[1].trim()}`);
-    if (keep.length) el.setAttribute('style', keep.join(';'));
+    if (el.hasAttribute(FLAT_STYLE_ATTR)) return;
+    const bg = el.tagName === 'TD' || el.tagName === 'TH' ? backgroundColorOf(el) : null;
+    if (bg) el.setAttribute('style', `background-color: ${bg}`);
     else el.removeAttribute('style');
   });
 
@@ -424,7 +739,11 @@ export function normalizePastedHtml(html) {
   root.querySelectorAll('*').forEach((el) => {
     [...el.attributes].forEach((attr) => {
       const name = attr.name.toLowerCase();
-      if (name === 'href' && el.tagName === 'A') return;
+      if (name === 'href' && el.tagName === 'A') {
+        if (!SAFE_HREF.test(attr.value.trim())) el.removeAttribute(attr.name);
+        return;
+      }
+      if (name.startsWith('data-rv-')) return;
       if (name === 'src' && el.tagName === 'IMG') return;
       if (name === 'alt' && el.tagName === 'IMG') return;
       if (name === 'width' && (el.tagName === 'IMG' || el.tagName === 'TD' || el.tagName === 'TH')) return;
@@ -437,31 +756,35 @@ export function normalizePastedHtml(html) {
     });
   });
 
+  const divToParagraph = (div, fallbackHtml = '') => {
+    const p = doc.createElement('p');
+    p.innerHTML = div.innerHTML || fallbackHtml;
+    if (div.hasAttribute(ALIGN_ATTR)) p.setAttribute(ALIGN_ATTR, div.getAttribute(ALIGN_ATTR));
+    div.replaceWith(p);
+  };
+
   root.querySelectorAll('div').forEach((div) => {
     if (div.querySelector('img')) {
       const hasBlock = div.querySelector('p,div,ul,ol,table,h1,h2,h3,h4,blockquote,pre');
-      if (!hasBlock) {
-        const p = doc.createElement('p');
-        p.innerHTML = div.innerHTML;
-        div.replaceWith(p);
-      }
+      if (!hasBlock) divToParagraph(div);
       return;
     }
 
     const onlyBreak = div.childNodes.length === 1 && div.firstChild.nodeName === 'BR';
     if (onlyBreak || !div.textContent?.trim()) {
-      const p = doc.createElement('p');
-      p.innerHTML = div.innerHTML || '<br>';
-      div.replaceWith(p);
+      divToParagraph(div, '<br>');
       return;
     }
     const hasBlock = div.querySelector('p,div,ul,ol,table,h1,h2,h3,h4,blockquote,pre');
-    if (!hasBlock) {
-      const p = doc.createElement('p');
-      p.innerHTML = div.innerHTML;
-      div.replaceWith(p);
-    }
+    if (!hasBlock) divToParagraph(div);
   });
+
+  root.querySelectorAll(`[${ALIGN_ATTR}]`).forEach((el) => {
+    const align = el.getAttribute(ALIGN_ATTR);
+    el.removeAttribute(ALIGN_ATTR);
+    if (/^(P|H[1-6])$/.test(el.tagName)) el.setAttribute('style', `text-align: ${align}`);
+  });
+  root.querySelectorAll(`[${FLAT_STYLE_ATTR}]`).forEach((el) => el.removeAttribute(FLAT_STYLE_ATTR));
 
   return dedupeMirroredPasteHtml(root.innerHTML.trim() || '<p></p>');
 }
@@ -516,7 +839,56 @@ export async function materializePastedHtmlImages(html, imageFiles = []) {
 
   unusedFiles.push(...fileQueue);
 
+  await resolvePastedImageSizeHints(root);
+
   return { html: root?.innerHTML?.trim() || '<p></p>', unusedFiles, droppedImages };
+}
+
+const IMAGE_SIZE_PROBE_TIMEOUT_MS = 2500;
+
+function loadNaturalImageSize(src) {
+  if (typeof Image === 'undefined' || !src) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const probe = new Image();
+    const finish = (size) => {
+      clearTimeout(timer);
+      probe.onload = null;
+      probe.onerror = null;
+      resolve(size);
+    };
+    const timer = setTimeout(() => finish(null), IMAGE_SIZE_PROBE_TIMEOUT_MS);
+    probe.onload = () =>
+      finish(probe.naturalWidth && probe.naturalHeight ? { w: probe.naturalWidth, h: probe.naturalHeight } : null);
+    probe.onerror = () => finish(null);
+    probe.src = src;
+  });
+}
+
+/** Web pages often size images by height / max-* only; turn that into the node's pixel width. */
+async function resolvePastedImageSizeHints(root) {
+  const hintAttrs = [PASTE_IMG_HEIGHT_ATTR, PASTE_IMG_MAX_W_ATTR, PASTE_IMG_MAX_H_ATTR];
+  const imgs = [...(root?.querySelectorAll('img') || [])].filter((img) =>
+    hintAttrs.some((a) => img.hasAttribute(a))
+  );
+
+  await Promise.all(
+    imgs.map(async (img) => {
+      const height = Number(img.getAttribute(PASTE_IMG_HEIGHT_ATTR)) || null;
+      const maxW = Number(img.getAttribute(PASTE_IMG_MAX_W_ATTR)) || null;
+      const maxH = Number(img.getAttribute(PASTE_IMG_MAX_H_ATTR)) || null;
+      hintAttrs.forEach((a) => img.removeAttribute(a));
+      if (img.getAttribute('width')) return;
+
+      const natural = await loadNaturalImageSize(img.getAttribute('src'));
+      if (!natural) return;
+      const aspect = natural.w / natural.h;
+      let width = height ? height * aspect : natural.w;
+      if (maxW && width > maxW) width = maxW;
+      if (maxH && width / aspect > maxH) width = maxH * aspect;
+      width = Math.min(MAX_PASTED_IMAGE_WIDTH, Math.round(width));
+      if (width > 0) img.setAttribute('width', String(width));
+    })
+  );
 }
 
 function imagesToHtml(dataUrls) {
@@ -603,7 +975,12 @@ export async function buildRecordVaultPasteResult(clipboardData) {
     });
   }
 
-  return { html: trimmed, expectedImages: placeholdersBefore, insertedImages };
+  return {
+    html: trimmed,
+    expectedImages: placeholdersBefore,
+    insertedImages,
+    source: isEvernoteClipboardHtml(htmlRaw) ? 'evernote' : ''
+  };
 }
 
 export async function buildRecordVaultPasteHtml(clipboardData) {
@@ -611,9 +988,18 @@ export async function buildRecordVaultPasteHtml(clipboardData) {
   return html;
 }
 
-export function recordVaultMissingPasteImagesMessage(missingCount) {
+export function recordVaultMissingPasteImagesMessage(missingCount, source = '') {
   const n = Math.max(1, Math.trunc(Number(missingCount) || 1));
   const noun = n === 1 ? 'image was' : 'images were';
+  if (source === 'evernote') {
+    return (
+      `Text pasted, but Evernote keeps its pictures in its own private storage and never hands them to the browser when you copy, so ${n} ${noun} skipped.\n\n` +
+      'To bring the whole note in WITH pictures:\n' +
+      '1. In Evernote, open the note → ••• (More actions) → Export → ENEX (.enex) → Save.\n' +
+      '2. Here: File → Import → Evernote (.enex) → pick that file.\n\n' +
+      'Or for one picture: in Evernote right-click the image → Copy Image, then paste it here.'
+    );
+  }
   return (
     `Text pasted, but ${n} ${noun} not handed to the browser by the app you copied from, so ${n === 1 ? 'it was' : 'they were'} skipped.\n\n` +
     'To bring images in:\n' +

@@ -41,6 +41,18 @@ function isRecordVaultDragJunkPlain(plain) {
   );
 }
 
+/**
+ * setContent / insertContent run HTML strings through markdown-it (tiptap-markdown),
+ * which ends an HTML block at the first blank line — a <pre> with blank lines got
+ * split into stray paragraphs. Character references keep the block intact; the
+ * DOM parser turns them back into real newlines.
+ */
+function protectPreNewlines(html) {
+  return String(html || '').replace(/<pre\b[^>]*>[\s\S]*?<\/pre>/gi, (block) =>
+    block.replace(/\r?\n/g, '&#10;')
+  );
+}
+
 /** Scroll the currently active (bold-blinking) search hit into the middle of view. */
 function scrollActiveHitIntoView(editor) {
   const dom = editor?.view?.dom;
@@ -124,15 +136,15 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         event.stopPropagation();
 
         void buildRecordVaultPasteResult(cd)
-          .then(({ html, expectedImages, insertedImages }) => {
+          .then(({ html, expectedImages, insertedImages, source }) => {
             const ed = editorRef.current;
             if (!ed) return;
             if (lastInsertedSigRef.current === sig) return;
             if (html) {
               lastInsertedSigRef.current = sig;
-              ed.chain().focus().insertContent(html).run();
+              ed.chain().focus().insertContent(protectPreNewlines(html)).run();
               if (expectedImages > insertedImages) {
-                void themedAlert(recordVaultMissingPasteImagesMessage(expectedImages - insertedImages));
+                void themedAlert(recordVaultMissingPasteImagesMessage(expectedImages - insertedImages, source));
               }
               return;
             }
@@ -236,7 +248,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
       /** Replace the whole document without triggering the autosave onChange. */
       setContent: (html, nextEditable) => {
         if (!editor) return;
-        editor.commands.setContent(html || EMPTY_DOC, { emitUpdate: false });
+        editor.commands.setContent(protectPreNewlines(html) || EMPTY_DOC, { emitUpdate: false });
         if (typeof nextEditable === 'boolean') editor.setEditable(nextEditable);
       },
       /**

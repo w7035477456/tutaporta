@@ -9,6 +9,7 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { themedAlert, themedConfirm, themedPrompt } from 'utils/themedDialog';
+import { emptyEnexStats, enexImportSummaryMessage, readEnexNotes } from './recordVaultEnexImport';
 
 /**
  * "File" dropdown for the Record Vault editor toolbar.
@@ -16,7 +17,7 @@ import { themedAlert, themedConfirm, themedPrompt } from 'utils/themedDialog';
  * Wires Import / Export for the currently open note using the TipTap editor's
  * imperative ref (exposed by RecordVaultNoteEditor):
  *   - Export → Markdown (.md) / HTML (.html) / PDF (.pdf)
- *   - Import → Markdown (.md / Joplin folder + photos) / HTML (.html) / PDF (.pdf)
+ *   - Import → Markdown (.md / Joplin folder + photos) / HTML (.html) / Evernote (.enex) / PDF (.pdf)
  *
  * PDF export: direct one-click .pdf download (isolated iframe → html2canvas →
  * jsPDF), with a native print → "Save as PDF" fallback for notes too large for
@@ -348,6 +349,23 @@ export function prepareImportedHtml(raw) {
   } catch {
     return String(raw ?? '') || '<p></p>';
   }
+}
+
+/** Prompt for a single file and resolve the File (or null if cancelled). */
+function pickFile(accept) {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.style.display = 'none';
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      resolve(file || null);
+    };
+    document.body.appendChild(input);
+    input.click();
+  });
 }
 
 /** Prompt for a single file and resolve its text contents (or null if cancelled). */
@@ -780,6 +798,7 @@ export default function RecordVaultFileMenu({
   getMarkdown,
   onImportHtml,
   onImportMarkdown,
+  onImportEnexNotebook,
   paymentActive = false,
   onSelectPayment,
   onSelectNotes,
@@ -814,8 +833,49 @@ export default function RecordVaultFileMenu({
     exportPdf(noteTitle, getHtml?.() ?? '');
   };
 
+  /** One-note export → replaces the open note; notebook export → new notebook, one note each. */
+  const handleImportEnex = async () => {
+    try {
+      const file = await pickFile('.enex,application/enex+xml,application/xml,text/xml');
+      if (!file) return;
+      const notes = readEnexNotes(await file.text());
+
+      if (notes.length > 1 && onImportEnexNotebook) {
+        const defaultName = String(file.name || 'EVERNOTE')
+          .replace(/\.enex$/i, '')
+          .trim()
+          .toUpperCase();
+        const notebookName = await themedPrompt(
+          `This Evernote export has ${notes.length} notes.\n\nThey will be imported into a NEW notebook (one TutaNote per Evernote note). Notebook name:`,
+          defaultName,
+          { title: 'Import Evernote notebook', okLabel: 'Import' }
+        );
+        if (notebookName == null) return;
+        await onImportEnexNotebook({ notebookName: String(notebookName).trim() || defaultName, notes });
+        return;
+      }
+
+      if (!(await themedConfirm('Import will replace the current note content. Continue?'))) return;
+      const stats = emptyEnexStats();
+      const parts = [];
+      for (const note of notes) {
+        // eslint-disable-next-line no-await-in-loop
+        parts.push(await note.toHtml(stats));
+      }
+      onImportHtml?.(parts.join('<hr>') || '<p></p>');
+      const summary = enexImportSummaryMessage(stats);
+      if (summary) await themedAlert(summary);
+    } catch (err) {
+      await themedAlert(err?.message || 'Failed to import the Evernote export.');
+    }
+  };
+
   const handleImport = async (kind) => {
     closeAll();
+    if (kind === 'enex') {
+      await handleImportEnex();
+      return;
+    }
     // Importing replaces the whole note body — confirm to avoid accidental loss.
     if (!(await themedConfirm('Import will replace the current note content. Continue?'))) return;
     if (kind === 'md') {
@@ -922,6 +982,9 @@ export default function RecordVaultFileMenu({
         <MenuItem sx={MENU_ITEM_SX} onClick={() => handleImport('html')}>
           <ListItemText slotProps={{ primary: { sx: MENU_TEXT_SX } }}>HTML (.html)</ListItemText>
         </MenuItem>
+        <MenuItem sx={MENU_ITEM_SX} onClick={() => handleImport('enex')}>
+          <ListItemText slotProps={{ primary: { sx: MENU_TEXT_SX } }}>Evernote (.enex)</ListItemText>
+        </MenuItem>
         <Divider sx={{ borderColor: '#000', opacity: 0.4 }} />
         <MenuItem sx={MENU_ITEM_SX} onClick={() => handleImport('pdf')}>
           <ListItemText slotProps={{ primary: { sx: MENU_TEXT_SX } }}>PDF (.pdf)</ListItemText>
@@ -960,6 +1023,7 @@ RecordVaultFileMenu.propTypes = {
   getMarkdown: PropTypes.func,
   onImportHtml: PropTypes.func,
   onImportMarkdown: PropTypes.func,
+  onImportEnexNotebook: PropTypes.func,
   paymentActive: PropTypes.bool,
   onSelectPayment: PropTypes.func,
   onSelectNotes: PropTypes.func,
