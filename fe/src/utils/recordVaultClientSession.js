@@ -5,6 +5,18 @@
 let dekCryptoKey = null;
 let dekRawBytes = null;
 let vaultMeta = null;
+/** Encrypt Password typed in the backup Decrypt prompt — consumed by the next backup unseal only. */
+let pendingBackupDecryptPassword = null;
+
+export function setRecordVaultBackupDecryptPassword(password) {
+  pendingBackupDecryptPassword = password ? String(password) : null;
+}
+
+export function takeRecordVaultBackupDecryptPassword() {
+  const value = pendingBackupDecryptPassword;
+  pendingBackupDecryptPassword = null;
+  return value;
+}
 
 export function getRecordVaultE2eDek() {
   return dekCryptoKey;
@@ -38,4 +50,5 @@ export function clearRecordVaultE2eSession() {
   dekCryptoKey = null;
   dekRawBytes = null;
   vaultMeta = null;
+  pendingBackupDecryptPassword = null;
 }

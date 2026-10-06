@@ -15,6 +15,8 @@ Thumbs.db
 .env.*
 !.env.example
 !fe/.env
+# Ubuntu prod copy of ~/.ssh/be/.env (secrets)
+myscript/ubuntu/be.env
 
 # Logs/temp at repo root
 *.log

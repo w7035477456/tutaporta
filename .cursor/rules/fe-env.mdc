@@ -1,17 +1,34 @@
 ---
-description: Frontend environment reference (fe/.env) — Mac dev snapshot and variable behavior
+description: Frontend environment reference (fe/.env) — committed snapshot, keys mirrored from ~/.ssh/be/.env, and variable behavior
 alwaysApply: true
 ---
 
 # Frontend environment (`fe/.env`)
 
-Vite loads **`fe/.env`** at build/dev time. Client-visible keys use `import.meta.env` via `fe/vite.config.mjs` **`envPrefix`** (`VITE_`, `FE_`, `API_`, `MOBILE_`, `DESKTOP_`, `DIALOG_`, `HOVER_`, `RECORD_`, `YELLOW_`, etc.).
+Vite loads **`fe/.env`** at build/dev time (same committed file on Mac and Ubuntu). Client-visible keys reach `import.meta.env` only if they match an **`envPrefix`** in `fe/vite.config.mjs`: `VITE_`, `FE_`, `API_`, `VERTICAL_`, `HORIZONTAL_`, `DEBUG_`, `GLOBAL_`, `TOP_`, `RIGHT_`, `DIALOG_`, `FOOTER_`, `FOOTERPAGES_`, `MOBILE_`, `DESKTOP_`, `PRESS_`, `HOVER_`, `MY_PICKS_`, `VSINGLES_`, `RATE_`, `MAIN_`, `DEFAULT_`, `NEW_`, `THEME_`, `NOTIFICATION_`, `SPECIAL_`, `DISABLE_`, `PRICE_`, `SCAN_`, `RECORD_`, `SELF_`, `YELLOW_`, `NOTES_`, `PHOTOALBUMS_`, `ONENOTE_`, `ALBUM_`, `ALL_SINGLES_`, `PICKS_`, `ACQUAINTS_`, `ACQUAINT_`, `MYALBUM_`, `MYSELFREPORTBIO_`, `RECEIVED_`, `PROFILE_`, `TOPRIGHT_`, `SPEEDDATING`, `RAG_`, `LEFT_`, `SKIP_`, `BSIZE`. A new key without a matching prefix is **invisible** to the FE.
 
-After changes: **restart Vite** (`feall` or stop/start dev server). No PM2 on Mac FE.
+After changes: **restart Vite** on Mac (`feall`); on Ubuntu re-run the PM2 FE build (`work2` / `febeprod`). Backend-only keys live in **`~/.ssh/be/.env`** — see `be-env.mdc`.
 
-Some keys are **mirrored from `~/.ssh/be/.env`** at Vite startup (`SPECIAL_*`, `PRICE_PER_TOKEN`, `FE_RATE_*`, `SELF_INTRO_VIDEO_MAX_LENGTH`, `*_VIDEO_TUTORIAL` via `fe/vite.config.mjs`). Backend-only keys stay in **`~/.ssh/be/.env`** — see `be-env.mdc`.
+## Keys mirrored from `~/.ssh/be/.env` (be.env wins)
 
-Mac dev snapshot below from committed `fe/.env`.
+`fe/vite.config.mjs` (`BE_ENV_KEYS_FROM_HOME_FILE`) reads these from `~/.ssh/be/.env` before bundling. **When set there, they override `fe/.env`** — so prod values come from Ubuntu `be.env` (`myscript/ubuntu/be.env`, refresh with `syncbenv`).
+
+| Key | Prod `be.env` value | FE usage |
+|---|---|---|
+| `MAIN_FONT` | `Algerian` (overrides `fe/.env` `Algerian, fantasy`) | Site font (`mainFontEnv.js`). |
+| `SPECIAL_LINK` / `SPECIAL_ID` / `SPECIAL_P` | set (password redacted) | Dev login prefill (`specialLoginEnv.js`). |
+| `PRICE_PER_TOKEN` | `10` | Token pricing (`pricePerTokenEnv.js`). |
+| `FE_RATE_LIMIT_ENABLE` | `false` (Mac `true`) | Browser API rate-limit master switch (`clientApiRateLimitEnv.js`). |
+| `FE_RATE_CLIENT_API_*` | `100` / `60` s / `30` s / cooldown `true` / console `false` | Per-tab limit, window, cooldown, sub-switch, DevTools log. |
+| `SELF_INTRO_VIDEO_MAX_LENGTH` | `60` (Mac `30`) | Self intro recorder max seconds (`selfIntroVideoMaxLengthEnv.js`). |
+| `NOTES_DEFAULT_BUTTON_FONT_SIZE_REM` / `PHOTOALBUMS_DEFAULT_BUTTON_FONT_SIZE_REM` | `2` / `2` | Default vault button font size. |
+| `ONENOTE_USB_UPGRADE` | `false` | `true` → mall TutaNotes / TutaPhotoAlbums tiles show upgrade popup (`onenoteUsbUpgradeEnv.js`). Also in `fe/.env` (`false`). |
+| `*_VIDEO_TUTORIAL` (8 keys + alias `ACQUAINT_BUDDIES_VIDEO_TUTORIAL`) | `https://youtu.be/dMiwcH027fM` | Per-page **VIDEO TUTORIALS** header button (`pageVideoTutorialEnv.js`). |
+| `SPEEDDATING` | `false` | `true` → Speed Dating sidebar item (`speedDatingEnv.js`). |
+| `RAG_UI_ENABLED` | `true` | TutaNotes RAG assistant UI (`recordVaultRagUiEnv.js`). |
+| `LEFT_SIDE` / `RIGHT_SIDE` | `TUTADRIVE` / `NONE` (Mac `TutaDrive` / `USB`) | `/myNote` panels (`rightSideEnv.js`; `RIGHT_SIDE` unset → `NOTES_LOCAL_USB`). |
+
+Also exposed via prefix from `be.env` only when present in the Vite process env: `ALBUM_BINDER_WIDTH_PCT` (`albumBinderWidthEnv.js`, prod `15`), `SCAN_FOR_PHONE_UPLOAD_SEC` (`phoneUploadScanEnv.js`). Other FE-relevant BE config (`VITE_GOOGLE_MAPS_API_KEY`, `NEW_ACCOUNT_SIGNUP`, `ONENOTE_USB_UPGRADE` runtime) comes through `/api` config endpoints, not the bundle.
 
 ## Theme and navigation
 
@@ -21,11 +38,11 @@ DISABLE_NAVIGATION_COLLAPSE=false
 MAIN_FONT=Algerian, fantasy
 ```
 
-| Variable | Value | Behavior |
-|----|----|----|
-| `DEFAULT_THEME` | `Ocean Dark` | Initial theme for logged-out + new-account fallbacks (`fe/src/config/defaultThemeEnv.js`). |
-| `DISABLE_NAVIGATION_COLLAPSE` | `false` | `true` → sidebar stays expanded (`fe/src/config/navigationCollapseEnv.js`). |
-| `MAIN_FONT` | Algerian, fantasy | Site font family (`fe/src/config/mainFontEnv.js`). Profile menu can override per browser / `user_customization.main_font`. |
+| Variable | Behavior |
+|---|---|
+| `DEFAULT_THEME` | Initial theme for logged-out + new-account fallbacks (`defaultThemeEnv.js`). |
+| `DISABLE_NAVIGATION_COLLAPSE` | `true` → sidebar stays expanded (`navigationCollapseEnv.js`). |
+| `MAIN_FONT` | Fallback site font; **overridden by `~/.ssh/be/.env` `MAIN_FONT`** when set. Profile menu can override per browser / `user_customization.main_font`. |
 
 ## Build, API proxy, dev chrome
 
@@ -37,17 +54,18 @@ API_PORT=40000
 SHOW_ZOOM=true
 VITE_SHOW_VIEWPORT_SIZE=true
 #VITE_API_BASE_URL=http://localhost:40000
+#VITE_API_BASE_URL=https://vsingles.club
 ```
 
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `VITE_APP_VERSION` | `v5.1.0` | App version string in bundle. |
-| `GENERATE_SOURCEMAP` | `false` | Vite production source maps. |
-| `VITE_APP_BASE_NAME` | `/` | React Router basename. |
-| `API_PORT` | `40000` | Vite `/api` proxy target; also copied to BE via `be/loadEnv.js`. Must match `~/.ssh/be/.env`. |
-| `SHOW_ZOOM` | `true` | Page zoom UI in `MainLayout` / `MinimalLayout`. |
-| `VITE_SHOW_VIEWPORT_SIZE` | `true` | Lower-left viewport size overlay (`ViewportSizeReadout.jsx`). |
-| `VITE_API_BASE_URL` | (optional) | When set, overrides same-origin proxy (`fe/src/config/apiBaseUrl.js`). |
+| Variable | Behavior |
+|---|---|
+| `VITE_APP_VERSION` | App version string in bundle. |
+| `GENERATE_SOURCEMAP` | Production source maps. |
+| `VITE_APP_BASE_NAME` | React Router basename. |
+| `API_PORT` | Vite `/api` proxy target (`127.0.0.1:API_PORT`); `be/loadEnv.js` copies it to BE `PORT`. Must match `~/.ssh/be/.env`. |
+| `SHOW_ZOOM` | Page zoom UI in `MainLayout` / `MinimalLayout`. |
+| `VITE_SHOW_VIEWPORT_SIZE` | Lower-left viewport size overlay (`ViewportSizeReadout.jsx`). |
+| `VITE_API_BASE_URL` | Optional full API origin overriding same-origin proxy (`apiBaseUrl.js`). Keep **unset** in production (FE + BE same origin). |
 
 ## Live face scan — manual video UI (Step 7B)
 
@@ -56,24 +74,23 @@ RECORD_VIDEO_TO_VW_RATIO=0.5
 YELLOW_TEXT_BANNER_TO_VH_RATIO=0.25
 ```
 
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `RECORD_VIDEO_TO_VW_RATIO` | `0.5` | Record / replay / video frame width as fraction of popup content width (`fe/src/config/liveFaceScanManualVideoEnv.js`). |
-| `YELLOW_TEXT_BANNER_TO_VH_RATIO` | `0.25` | Instruction banner height as fraction of popup vh (`liveFaceScanManualVideoEnv.js`). Width is always 100%. |
+`RECORD_VIDEO_TO_VW_RATIO` = record/replay frame width as fraction of popup content width; `YELLOW_TEXT_BANNER_TO_VH_RATIO` = instruction banner height as fraction of popup vh (width always 100%) (`liveFaceScanManualVideoEnv.js`).
 
-## Debug and sockets
+## Debug
 
 ```bash
-FE_CHAT_SOCKET=false
 FE_DEBUG=false
 #RATE_LIMIT_DEBUG=false
+DEBUG_DOTTED_BORDERS=false
+GLOBAL_ERROR_POPUP=false
 ```
 
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `FE_CHAT_SOCKET` | `false` | Chat socket feature flag (reserved / wiring). |
-| `FE_DEBUG` | `false` | Extra debug UI on Interested Singles when `true`. |
-| `RATE_LIMIT_DEBUG` | (commented) | Rate-limit debug HUD when enabled. |
+| Variable | Behavior |
+|---|---|
+| `FE_DEBUG` | Extra debug UI on Interested Singles. `false` in production. |
+| `RATE_LIMIT_DEBUG` | Bottom-left rate-limit HUD when `true` (commented out). |
+| `DEBUG_DOTTED_BORDERS` | Green/purple outlines on MainCard / AuthInnerStack (`debugEnv.js`). |
+| `GLOBAL_ERROR_POPUP` | Red modal on `console.error` when `true` (`globalErrorPopupEnv.js`). |
 
 ## Typography — mobile (xs)
 
@@ -81,10 +98,10 @@ FE_DEBUG=false
 MOBILE_FONT_SIZE_TEXT=4
 MOBILE_FONT_SIZE_TITLE=3
 MOBILE_FONT_SIZE_BUTTON=6
-MOBILE_FONT_SIZE_MENU=4
+MOBILE_FONT_SIZE_MENU=8
 ```
 
-Numeric **N** → **Nvw** (`fe/src/config/singlesMemberCardFontEnv.js`, `buttonFontEnv.js`). Used on All Singles / Interested cards and mobile auth.
+Numeric **N** → **Nvw** (`singlesMemberCardFontEnv.js`, `buttonFontEnv.js`, `menuNavFontEnv.js`). Sidebar menu labels render at 90% of `*_FONT_SIZE_MENU` (`SIDEBAR_MENU_TEXT_SCALE`). `MOBILE_FONT_SIZE_BUTTON` also sets xs popup input height (ColorTemplate7).
 
 ## Typography — desktop (sm+)
 
@@ -92,36 +109,43 @@ Numeric **N** → **Nvw** (`fe/src/config/singlesMemberCardFontEnv.js`, `buttonF
 DESKTOP_FONT_SIZE_TEXT=1.5
 DESKTOP_FONT_SIZE_TITLE=2
 DESKTOP_FONT_SIZE_BUTTON=2
+BSIZE=2
 DESKTOP_FONT_SIZE_ICON=2
-DESKTOP_FONT_SIZE_MENU=2
+DESKTOP_FONT_SIZE_MENU=4
 DESKTOP_ICON_SIZE=3
 ```
 
-Numeric **N** → **Nvw** (`fe/src/config/desktopFontEnv.js`, ColorTemplate popups, menus).
+| Variable | Behavior |
+|---|---|
+| `DESKTOP_FONT_SIZE_*` | Numeric **N** → **Nvw** (`desktopFontEnv.js`, `menuNavFontEnv.js`, ColorTemplate popups, menus). |
+| `BSIZE` | Desktop (sm+) input-field height for `ColorTemplate7PopupLargeDark` text inputs (`colorTemplate7PopupLargeDark.js`); xs uses `MOBILE_FONT_SIZE_BUTTON`. |
+| `DESKTOP_ICON_SIZE` | Base icon size (vw); My Picks remove-X scales from half of it. |
 
-## Hover / button magnify
+## Header icons (rem)
+
+```bash
+THEME_ICON_SIZE=4
+NOTIFICATION_ICON_SIZE=4
+```
+
+| Variable | Behavior |
+|---|---|
+| `THEME_ICON_SIZE` | Header profile chip — avatar + settings gear size in rem (`headerProfileChipEnv.js`; default `6`, max `20`). |
+| `NOTIFICATION_ICON_SIZE` | Notification bell + count badge size in rem (`notificationIconSizeEnv.js`; default `6`, max `20`). |
+
+## Hover / sidebar zoom
 
 ```bash
 HOVER_MAGNIFY_FACTOR=1.30
-HOVER_ENLARGE_FACTOR=1.15
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `HOVER_MAGNIFY_FACTOR` | `1.30` | Label text growth on hover/selected (`fe/src/config/hoverMagnifyEnv.js`). `1.25` = +25%. |
-| `HOVER_ENLARGE_FACTOR` | `1.15` | Legacy name in `.env`; runtime uses **`HOVER_MAGNIFY_FACTOR`** (`hoverEnlargeEnv.js` re-exports magnify helpers). |
-
-## Sidebar zoom gesture
-
-```bash
 PRESS_HOLD_TO_ZOOM=false
 ```
 
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `PRESS_HOLD_TO_ZOOM` | `false` | `true` → long-press keeps zoom; `false` → long-press suppresses zoom (`pressHoldZoomEnv.js`). |
+| Variable | Behavior |
+|---|---|
+| `HOVER_MAGNIFY_FACTOR` | Button label growth on hover/selected (`hoverMagnifyEnv.js`; `1.25` = +25%, button box unchanged). |
+| `PRESS_HOLD_TO_ZOOM` | `true` → sidebar long-press keeps zoom; `false` → long-press suppresses zoom, quick tap still zooms (`pressHoldZoomEnv.js`). |
 
-## My Picks layout
+## My Picks layout / refresh
 
 ```bash
 MY_PICKS_COLUMN_VW=21
@@ -130,15 +154,17 @@ MY_PICKS_AVATAR_VW=9.2
 MY_PICKS_AVATAR_VH=12
 MY_PICKS_AVATAR_MOBILE_VW=28
 MY_PICKS_REMOVE_X_SCALE=0.75
+#VITE_MY_PICKS_LEGACY_REFRESH=true
 ```
 
-| Variable | Notes |
-|----------|-------|
-| `MY_PICKS_COLUMN_*` | Left column card size `min(Nvw, Nvh)` (`myPicksCardEnv.js`). |
-| `MY_PICKS_AVATAR_*` | Avatar square on My Picks / photo gallery. |
-| `MY_PICKS_REMOVE_X_SCALE` | Remove-X icon scale vs half `DESKTOP_ICON_SIZE`. |
+| Variable | Behavior |
+|---|---|
+| `MY_PICKS_COLUMN_*` | Left-column card size `min(Nvw, Nvh)` (`myPicksCardEnv.js`). |
+| `MY_PICKS_AVATAR_*` | Avatar square on My Picks / photo gallery (mobile uses `_MOBILE_VW`). |
+| `MY_PICKS_REMOVE_X_SCALE` | Remove-X size as fraction of half `DESKTOP_ICON_SIZE` (`0.75` = 25% smaller). |
+| `VITE_MY_PICKS_LEGACY_REFRESH` | Unset/`false` = dedupe refresh on `/myPicks` visit (default); `true` = old extra refresh (`myPicksRefreshEnv.js`). |
 
-## Auth dialogs
+## Auth dialogs / footer / legal pages
 
 ```bash
 VERTICAL_SCROLLBAR=false
@@ -148,71 +174,43 @@ DIALOG_WIDTH_DESKTOP=50
 DIALOG_MARGIN_TOP=2
 DIALOG_MARGIN_BOT=4
 FOOTER_HEIGHT=4
-```
-
-| Variable | Behavior |
-|----------|----------|
-| `VERTICAL_SCROLLBAR` / `HORIZONTAL_SCROLLBAR` | Mobile auth dialog scrollbars (`authDialogEnv.js`). |
-| `DIALOG_WIDTH_*` | Auth dialog width % of vw (`standardAuthDialogEnv.js`). |
-| `DIALOG_MARGIN_*` | Top/bottom margin % of vh. |
-| `FOOTER_HEIGHT` | Black auth footer bar height % of vh (`authFooterEnv.js`). |
-
-## Legal pages (About / Terms / Privacy)
-
-```bash
 FOOTERPAGES_TOP_MARGIN=2
 FOOTERPAGES_BOT_MARGIN=4
 FOOTERPAGES_RIGHT_LEFT_MARGIN=2
 ```
 
-Scroll column margins % vh/vw (`legalDialogEnv.js`). Not the site footer bar (`FOOTER_HEIGHT`).
-
-## Debug overlays
-
-```bash
-DEBUG_DOTTED_BORDERS=false
-GLOBAL_ERROR_POPUP=false
-```
-
 | Variable | Behavior |
-|----------|----------|
-| `DEBUG_DOTTED_BORDERS` | Green/purple outlines on MainCard / AuthInnerStack (`debugEnv.js`). |
-| `GLOBAL_ERROR_POPUP` | Red modal on `console.error` when `true` (`globalErrorPopupEnv.js`). |
+|---|---|
+| `VERTICAL_SCROLLBAR` / `HORIZONTAL_SCROLLBAR` | Mobile auth dialog scrollbars only when `true` (`authDialogEnv.js`). |
+| `DIALOG_WIDTH_MOBILE` / `_DESKTOP` | Standard auth dialog width % of vw (xs–sm / md+) (`standardAuthDialogEnv.js`). |
+| `DIALOG_MARGIN_TOP` / `_BOT` | Top/bottom margin % of vh; dialog scrolls if content exceeds `100dvh` minus margins. |
+| `FOOTER_HEIGHT` | Site-wide black fixed footer bar height % of vh (`authFooterEnv.js`). |
+| `FOOTERPAGES_*` | About / Terms / Privacy scroll-column margins % vh/vw (`legalDialogEnv.js`) — not the footer bar. |
 
-## My Picks refresh
+`DIALOG_ZOOM` / `DIALOG_HEIGHT_OFFSET` / `DIALOG_WIDGHT_OFFSET` live in `~/.ssh/be/.env` (both `100%` / `0%` / `0%`).
 
-```bash
-#VITE_MY_PICKS_LEGACY_REFRESH=true
-```
-
-Default: dedupe refresh on `/myPicks` visit (`myPicksRefreshEnv.js`). `true` = old double-fetch behavior.
-
-## Media
+## Mall upgrade gate
 
 ```bash
-VSINGLES_SONG=song2.mp3
+ONENOTE_USB_UPGRADE=false
 ```
 
-Background / mall audio asset name (site static media).
+Fallback only — **`~/.ssh/be/.env` value wins** when set (see mirrored table). Runtime value is also served by `GET /api/publicConfig` → `onenoteUsbUpgrade` (`onenoteUsbUpgradeFe.js`).
 
-## Keys in `~/.ssh/be/.env` used by FE (not in `fe/.env`)
+## Dead keys in `fe/.env` (no reader in code)
 
-Set on the backend env file; some are injected into the Vite bundle or exposed via `/api` config:
+| Key | Note |
+|---|---|
+| `FE_CHAT_SOCKET` | Reserved; nothing reads it. |
+| `HOVER_ENLARGE_FACTOR` | Legacy name; runtime uses `HOVER_MAGNIFY_FACTOR`. |
+| `TOOLTIP_DIALGO_WIDTH` | Empty, misspelled, no `TOOLTIP_` envPrefix, no reader. |
+| `VSINGLES_SONG` | Exposed via `VSINGLES_` prefix but no code reads it. |
 
-| Variable | FE usage |
-|----------|----------|
-| `SPECIAL_LINK` / `SPECIAL_ID` / `SPECIAL_P` | Dev login prefill (`specialLoginEnv.js`). |
-| `PRICE_PER_TOKEN` | Token pricing display (`pricePerTokenEnv.js`). |
-| `FE_RATE_*` | Browser API rate limit (`clientApiRateLimitEnv.js`). |
-| `SELF_INTRO_VIDEO_MAX_LENGTH` | Self intro recorder max seconds (`selfIntroVideoMaxLengthEnv.js`). |
-| `SPEEDDATING` | `true` → show Speed Dating in the sidebar (`speedDatingEnv.js`). Else hide. |
-| `ALL_SINGLES_VIDEO_TUTORIAL` / `PICKS_POSTS_VIDEO_TUTORIAL` / `ACQUAINTS_BUDDIES_VIDEO_TUTORIAL` / `MYALBUM_VIDEO_TUTORIAL` / `MYSELFREPORTBIO_VIDEO_TUTORIAL` / `RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL` / `PROFILE_RECORDS_VIDEO_TUTORIAL` / `TOPRIGHT_VIDEO_TUTORIAL` | Per-menu **VIDEO TUTORIALS** header button (`pageVideoTutorialEnv.js`). |
-| `SCAN_FOR_PHONE_UPLOAD_SEC` | Also set in **`fe/.env`** when tuning desktop QR poll — `phoneUploadScanEnv.js`. |
-| `DIALOG_ZOOM`, `DIALOG_*_OFFSET` | Auth dialog tuning — prefer **`fe/.env`** `DIALOG_*` for width/margins. |
-| Rekognition / IDV | `SKIP_DL_PASSPORT_CHECK`, `SKIP_LIVE_FACE_SCAN`, etc. — BE only (`be-env.mdc`). |
+Safe to delete these lines (or wire them up) — changing them has no effect today.
 
 ## When changing these
 
-1. Edit **`fe/.env`** (and **`~/.ssh/be/.env`** when `API_PORT`, `FE_RATE_*`, or other mirrored keys must stay aligned).
-2. Restart **Vite** on Mac (required after **`FE_RATE_*`** or other mirrored key changes).
-3. Restart **PM2** (`pm2 restart onlinemallwebsite`) when backend-only **`~/.ssh/be/.env`** keys change; re-run FE build/deploy when mirrored keys change on prod.
+1. Edit **`fe/.env`** for FE-only knobs; edit **`~/.ssh/be/.env`** for mirrored keys (it overrides `fe/.env`). Keep `API_PORT` identical in both.
+2. Add any new client key with a prefix listed in `envPrefix` (or extend `envPrefix` / `BE_ENV_KEYS_FROM_HOME_FILE` in `fe/vite.config.mjs`).
+3. Mac: restart **Vite** (`feall`). Ubuntu: re-run the PM2 FE build (`work2` / `febeprod`) so the bundle picks up new values.
+4. Backend-only `~/.ssh/be/.env` changes: `pm2 restart onlinemallwebsite`.

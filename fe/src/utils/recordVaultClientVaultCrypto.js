@@ -118,55 +118,152 @@ export async function decryptBytesWithKey(payloadB64, key) {
   return aesGcmDecryptBytes(payloadB64, key);
 }
 
-/** Magic for TutaDrive member backups sealed with Encrypt Password (DEK). */
-export const TUTADRIVE_BACKUP_MAGIC = new TextEncoder().encode('TNBAK1');
+/**
+ * TutaDrive member backup magics.
+ * TNBAK1 (legacy): sealed with the vault DEK only — opens only where that same vault row lives.
+ * TNBAK2: also embeds the KDF salt + wrapped DEK, so the Encrypt Password alone opens it on any server.
+ */
+export const TUTADRIVE_BACKUP_MAGIC_V1 = new TextEncoder().encode('TNBAK1');
+export const TUTADRIVE_BACKUP_MAGIC = new TextEncoder().encode('TNBAK2');
+const BACKUP_MAGIC_LEN = TUTADRIVE_BACKUP_MAGIC.length;
+const BACKUP_HEADER_LEN_BYTES = 4;
+const BACKUP_HEADER_MAX = 64 * 1024;
+
+function startsWithMagic(bytes, magic) {
+  if (!bytes || bytes.length < magic.length) return false;
+  for (let i = 0; i < magic.length; i += 1) {
+    if (bytes[i] !== magic[i]) return false;
+  }
+  return true;
+}
+
+/** True for TNBAK1 or TNBAK2 sealed backup bytes. */
+export function isTutaDriveSealedBackupBytes(bytes) {
+  return startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC) || startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V1);
+}
+
+async function aesGcmDecryptRaw(iv, data, key, additionalData) {
+  const params = { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8 };
+  if (additionalData) params.additionalData = additionalData;
+  return new Uint8Array(await crypto.subtle.decrypt(params, key, data));
+}
 
 /**
  * Seal a vault zip with the in-tab Encrypt Password DEK (zero-knowledge — password never leaves browser).
- * Output: TNBAK1 | version(1) | iv(12) | ciphertext+tag
+ * `vaultKeys` = vault row from /api/recordVault/e2e/keys (kdfSaltB64, wrappedDekB64, kdf params) — the
+ * same opaque material the server already stores, embedded so restore works on another server.
+ * Output: TNBAK2 | version(1) | headerLen(u32 BE) | header JSON | iv(12) | ciphertext+tag
+ * (everything before iv is AES-GCM additional data).
  */
-export async function sealTutaDriveBackupZipWithDek(plainZipBytes, dek) {
+export async function sealTutaDriveBackupZipWithDek(plainZipBytes, dek, vaultKeys) {
   if (!dek) throw new Error('Encrypt Password session required to seal backup');
+  if (!vaultKeys?.kdfSaltB64 || !vaultKeys?.wrappedDekB64) {
+    throw new Error('Encrypt Password key material missing — reopen TutaNotes Cloud and try again');
+  }
   const bytes = plainZipBytes instanceof Uint8Array ? plainZipBytes : new Uint8Array(plainZipBytes);
-  const iv = randomBytes(IV_LEN);
-  const cipherBuf = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8 },
-    dek,
-    bytes
+  const header = new TextEncoder().encode(
+    JSON.stringify({
+      kdfAlgo: vaultKeys.kdfAlgo || VAULT_E2E_KDF.type,
+      kdfSaltB64: String(vaultKeys.kdfSaltB64),
+      kdfMemKib: Number(vaultKeys.kdfMemKib) || VAULT_E2E_KDF.memorySize,
+      kdfTime: Number(vaultKeys.kdfTime) || VAULT_E2E_KDF.iterations,
+      kdfParallelism: Number(vaultKeys.kdfParallelism) || VAULT_E2E_KDF.parallelism,
+      wrappedDekB64: String(vaultKeys.wrappedDekB64)
+    })
   );
-  const cipher = new Uint8Array(cipherBuf);
-  const out = new Uint8Array(TUTADRIVE_BACKUP_MAGIC.length + 1 + IV_LEN + cipher.length);
-  out.set(TUTADRIVE_BACKUP_MAGIC, 0);
-  out[TUTADRIVE_BACKUP_MAGIC.length] = VAULT_E2E_CRYPTO_VERSION;
-  out.set(iv, TUTADRIVE_BACKUP_MAGIC.length + 1);
-  out.set(cipher, TUTADRIVE_BACKUP_MAGIC.length + 1 + IV_LEN);
+  const prefixLen = BACKUP_MAGIC_LEN + 1 + BACKUP_HEADER_LEN_BYTES + header.length;
+  const prefix = new Uint8Array(prefixLen);
+  prefix.set(TUTADRIVE_BACKUP_MAGIC, 0);
+  prefix[BACKUP_MAGIC_LEN] = VAULT_E2E_CRYPTO_VERSION;
+  new DataView(prefix.buffer).setUint32(BACKUP_MAGIC_LEN + 1, header.length, false);
+  prefix.set(header, BACKUP_MAGIC_LEN + 1 + BACKUP_HEADER_LEN_BYTES);
+
+  const iv = randomBytes(IV_LEN);
+  const cipher = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8, additionalData: prefix },
+      dek,
+      bytes
+    )
+  );
+  const out = new Uint8Array(prefixLen + IV_LEN + cipher.length);
+  out.set(prefix, 0);
+  out.set(iv, prefixLen);
+  out.set(cipher, prefixLen + IV_LEN);
   return out;
 }
 
-/** Unseal TNBAK1 backup with Encrypt Password DEK → plaintext zip bytes. */
-export async function unsealTutaDriveBackupZipWithDek(sealedBytes, dek) {
-  if (!dek) throw new Error('Encrypt Password session required to open backup');
+const WRONG_PASSWORD_MSG = 'Unable to decrypt backup — wrong Encrypt Password or corrupt file';
+
+/**
+ * Unseal a TutaDrive backup → plaintext zip bytes.
+ * Tries the in-tab vault DEK first; for TNBAK2, falls back to `password` + the embedded salt/wrapped DEK
+ * (backup made on another server, or before an Encrypt Password change).
+ */
+export async function unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password } = {}) {
   const bytes = sealedBytes instanceof Uint8Array ? sealedBytes : new Uint8Array(sealedBytes);
-  const magicLen = TUTADRIVE_BACKUP_MAGIC.length;
-  if (bytes.length < magicLen + 1 + IV_LEN + TAG_LEN) {
-    throw new Error('Backup file is corrupt or not an Encrypt Password sealed backup');
-  }
-  for (let i = 0; i < magicLen; i += 1) {
-    if (bytes[i] !== TUTADRIVE_BACKUP_MAGIC[i]) {
-      throw new Error('Backup file is not sealed with Encrypt Password (missing TNBAK1 header)');
+
+  if (startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V1)) {
+    if (!dek) throw new Error('Encrypt Password session required to open backup');
+    if (bytes.length < BACKUP_MAGIC_LEN + 1 + IV_LEN + TAG_LEN) {
+      throw new Error('Backup file is corrupt or not an Encrypt Password sealed backup');
+    }
+    const iv = bytes.subarray(BACKUP_MAGIC_LEN + 1, BACKUP_MAGIC_LEN + 1 + IV_LEN);
+    const data = bytes.subarray(BACKUP_MAGIC_LEN + 1 + IV_LEN);
+    try {
+      return await aesGcmDecryptRaw(iv, data, dek);
+    } catch {
+      throw new Error(
+        'Unable to decrypt backup — wrong Encrypt Password, or this older-format backup was made on a ' +
+          'different server. Create a new Backup on the original server, then download/upload it again.'
+      );
     }
   }
-  const iv = bytes.subarray(magicLen + 1, magicLen + 1 + IV_LEN);
-  const data = bytes.subarray(magicLen + 1 + IV_LEN);
+
+  if (!startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC)) {
+    throw new Error('Backup file is not sealed with Encrypt Password (missing TNBAK header)');
+  }
+  const headerLenAt = BACKUP_MAGIC_LEN + 1;
+  if (bytes.length < headerLenAt + BACKUP_HEADER_LEN_BYTES) {
+    throw new Error('Backup file is corrupt or not an Encrypt Password sealed backup');
+  }
+  const headerLen = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(headerLenAt, false);
+  const prefixLen = headerLenAt + BACKUP_HEADER_LEN_BYTES + headerLen;
+  if (headerLen > BACKUP_HEADER_MAX || bytes.length < prefixLen + IV_LEN + TAG_LEN) {
+    throw new Error('Backup file is corrupt or not an Encrypt Password sealed backup');
+  }
+  const prefix = bytes.subarray(0, prefixLen);
+  const iv = bytes.subarray(prefixLen, prefixLen + IV_LEN);
+  const data = bytes.subarray(prefixLen + IV_LEN);
+
+  if (dek) {
+    try {
+      return await aesGcmDecryptRaw(iv, data, dek, prefix);
+    } catch {
+      // different vault DEK (other server / re-created vault) — try embedded key material below
+    }
+  }
+  if (!password) {
+    throw new Error(dek ? WRONG_PASSWORD_MSG : 'Encrypt Password session required to open backup');
+  }
+
+  let header;
   try {
-    const plainBuf = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv, tagLength: TAG_LEN * 8 },
-      dek,
-      data
-    );
-    return new Uint8Array(plainBuf);
+    header = JSON.parse(new TextDecoder().decode(bytes.subarray(headerLenAt + BACKUP_HEADER_LEN_BYTES, prefixLen)));
   } catch {
-    throw new Error('Unable to decrypt backup — wrong Encrypt Password or corrupt file');
+    throw new Error('Backup file is corrupt or not an Encrypt Password sealed backup');
+  }
+  try {
+    const kek = await deriveKekFromPassword(password, header.kdfSaltB64, {
+      iterations: header.kdfTime,
+      memorySize: header.kdfMemKib,
+      parallelism: header.kdfParallelism,
+      hashLength: VAULT_E2E_KDF.hashLength
+    });
+    const { key: backupDek } = await unwrapDek(header.wrappedDekB64, kek);
+    return await aesGcmDecryptRaw(iv, data, backupDek, prefix);
+  } catch {
+    throw new Error(WRONG_PASSWORD_MSG);
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRecordVaultPasteHtml,
+  buildRecordVaultPasteResult,
   collectClipboardImageFiles,
   countUnmaterializedImages,
   dedupeImageFiles,
@@ -131,6 +132,57 @@ describe('recordVaultPasteFromClipboard', () => {
     );
     expect(html).toMatch(/parts list/);
     expect((html.match(/Power station parts/g) || []).length).toBe(1);
+  });
+
+  it('treats Apple RTFD relative image names and file: paths as unusable', () => {
+    expect(isUnusableImageSrc('Pasted Graphic.png')).toBe(true);
+    expect(isUnusableImageSrc('image.tiff')).toBe(true);
+    expect(isUnusableImageSrc('file:///Users/a/x.png')).toBe(true);
+    expect(isUnusableImageSrc('blob:http://localhost:3000/abc')).toBe(false);
+    expect(isUnusableImageSrc('https://example.com/a.png')).toBe(false);
+    expect(isUnusableImageSrc('/api/photo/1')).toBe(false);
+  });
+
+  it('maps a clipboard image onto an Apple attachment marker (U+FFFC) in HTML', async () => {
+    const result = await buildRecordVaultPasteResult(
+      mockClipboardData({
+        html: '<p>Sept 1st rent</p><p>\uFFFC</p><p>Aug 1st rent</p>',
+        plain: 'Sept 1st rent\n\uFFFC\nAug 1st rent',
+        files: [pngFile('util.png')]
+      })
+    );
+    if (typeof DOMParser === 'undefined') return;
+    expect(result.expectedImages).toBe(1);
+    expect(result.insertedImages).toBe(1);
+    expect(result.html).toMatch(/Sept 1st rent/);
+    expect(result.html).toMatch(/src="data:image\/png;base64,/);
+    expect(result.html.indexOf('Sept 1st')).toBeLessThan(result.html.indexOf('<img'));
+    expect(result.html.indexOf('<img')).toBeLessThan(result.html.indexOf('Aug 1st'));
+  });
+
+  it('reports images the clipboard did not expose', async () => {
+    const result = await buildRecordVaultPasteResult(
+      mockClipboardData({
+        html: '<p>Tenant rent</p><img src="webkit-fake-url://a"><img src="Pasted Graphic.png">',
+        plain: 'Tenant rent'
+      })
+    );
+    expect(result.html).toMatch(/Tenant rent/);
+    if (typeof DOMParser === 'undefined') return;
+    expect(result.expectedImages).toBe(2);
+    expect(result.insertedImages).toBe(0);
+    expect(result.html).not.toMatch(/<img\b/i);
+  });
+
+  it('plain-text paste with U+FFFC slots inserts clipboard images in place', async () => {
+    const result = await buildRecordVaultPasteResult(
+      mockClipboardData({ plain: 'line one\n\uFFFC\nline two', files: [pngFile('p.png')] })
+    );
+    if (typeof DOMParser === 'undefined') return;
+    expect(result.insertedImages).toBe(1);
+    expect(result.html).toMatch(/line one/);
+    expect(result.html).toMatch(/line two/);
+    expect(result.html).not.toMatch(/\uFFFC/);
   });
 
   it('paste signature matches identical clipboard payloads', () => {

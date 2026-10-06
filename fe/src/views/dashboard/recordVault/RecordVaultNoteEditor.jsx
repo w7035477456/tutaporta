@@ -10,9 +10,11 @@ import {
 } from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
 import { scoreRecordVaultLabelForAttachment } from 'utils/recordVaultRichText';
+import { themedAlert } from 'utils/themedDialog';
 import {
-  buildRecordVaultPasteHtml,
+  buildRecordVaultPasteResult,
   plainTextToHtml,
+  recordVaultMissingPasteImagesMessage,
   recordVaultPasteSignature,
   shouldHandleRecordVaultPaste
 } from './recordVaultPasteFromClipboard';
@@ -121,14 +123,17 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         event.preventDefault();
         event.stopPropagation();
 
-        void buildRecordVaultPasteHtml(cd)
-          .then((html) => {
+        void buildRecordVaultPasteResult(cd)
+          .then(({ html, expectedImages, insertedImages }) => {
             const ed = editorRef.current;
             if (!ed) return;
             if (lastInsertedSigRef.current === sig) return;
             if (html) {
               lastInsertedSigRef.current = sig;
               ed.chain().focus().insertContent(html).run();
+              if (expectedImages > insertedImages) {
+                void themedAlert(recordVaultMissingPasteImagesMessage(expectedImages - insertedImages));
+              }
               return;
             }
             const plain = String(cd.getData('text/plain') || '');

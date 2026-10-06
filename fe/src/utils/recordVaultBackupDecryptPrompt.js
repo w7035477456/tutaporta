@@ -1,7 +1,10 @@
 import { themedPrompt } from 'utils/themedDialog';
 import { fetchRecordVaultE2eKeys, unlockRecordVaultTutaDrive } from 'api/recordVaultFe';
 import { unlockVaultWithPassword } from 'utils/recordVaultClientVaultCrypto';
-import { setRecordVaultE2eSession } from 'utils/recordVaultClientSession';
+import {
+  setRecordVaultBackupDecryptPassword,
+  setRecordVaultE2eSession
+} from 'utils/recordVaultClientSession';
 
 /**
  * Prompt for Encrypt Password, unlock DEK in-tab (zero-knowledge), then allow
@@ -39,6 +42,8 @@ export async function promptEncryptPasswordForBackupDecrypt(purpose = 'restore')
 
   const { dek, dekRaw } = await unlockVaultWithPassword(e2e.vault, value);
   setRecordVaultE2eSession({ dek, dekRaw, vault: e2e.vault });
+  // Backups sealed on another server carry their own wrapped DEK — unwrapped with this password.
+  setRecordVaultBackupDecryptPassword(value);
 
   // Merge writes into the live vault — open server session after password verify.
   if (purpose === 'merge') {

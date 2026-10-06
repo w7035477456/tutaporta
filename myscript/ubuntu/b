@@ -3,6 +3,96 @@
 # Load ~/.ssh/be/.env without running invalid lines as shell commands.
 # (Plain "source .env" breaks on commas, spaces in values, KEY:val typos, etc.)
 
+unalias -a
+
+#------- Olama RAG----
+alias testModel='curl -sS -X POST http://127.0.0.1:8765/keep-model -H "Content-Type: application/json" -d "{\"enabled\": true}" | python3 -m json.tool'
+alias testRagHealth='curl -sS http://127.0.0.1:8765/health | python3 -m json.tool'
+alias startOlama='cd ~/code/main && ./scripts/start-rag-service.sh'
+alias checkOlama='curl -sS http://127.0.0.1:8765/health;curl -sS http://127.0.0.1:11434/api/tags'
+#----------------------
+
+backupUserAll() {
+    local email
+
+    # Prompt the user for an email address
+    read -p "Enter email address: " email
+
+    # Check if email is empty
+    if [[ -z "$email" ]]; then
+        echo "Error: Email cannot be empty." >&2
+        return 1
+    fi
+
+    echo "Backing up user data for $email..."
+    (cd ~/code/main && node be/scripts/backupUserAll.js --email="$email")
+}
+
+restoreUserAll() {
+    local email
+
+    # Prompt the user for an email address
+    read -p "Enter email address: " email
+
+    # Check if email is empty
+    if [[ -z "$email" ]]; then
+        echo "Error: Email cannot be empty." >&2
+        return 1
+    fi
+
+    echo "Restoring user data for $email..."
+    (cd ~/code/main && node be/scripts/restoreUserAll.js --email="$email" --yes)
+}
+
+
+prompt_continue() {
+    echo ""
+    read -p "Continue? (y/n): " choice
+    case "$choice" in
+        y|Y ) echo "" ;;
+        * ) echo "Exiting function."; return 1 ;;
+    esac
+}
+
+debugStartup() {
+    source ~/b
+    cd ~/code/main || { echo "Failed to cd to ~/code/main"; return 1; }
+
+    # 1) Postgres up?
+    echo "========================================"
+    echo "# 1) Postgres up?"
+    echo "========================================"
+    testpg
+    pg_isready -h 127.0.0.1 -p 50010
+    prompt_continue || return 1
+
+    # 2) FE built?
+    echo "========================================"
+    echo "# 2) FE built?"
+    echo "========================================"
+    ls -la fe/dist/index.html
+    prompt_continue || return 1
+
+    # 3) Start PM2 manually (see the error)
+    echo "========================================"
+    echo "# 3) Start PM2 manually (see the error)"
+    echo "========================================"
+    cd be || { echo "Failed to cd to be"; return 1; }
+    npm run pm2:start
+    pm2 status
+    pm2 logs onlinemallwebsite --lines 50 --nostream
+    cd ..
+    prompt_continue || return 1
+
+    # 4) API up?
+    echo "========================================"
+    echo "# 4) API up?"
+    echo "========================================"
+    curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:40000/api/publicConfig
+    prompt_continue
+}
+
+alias showdbfolder='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SHOW data_directory;"'
 
 setbasestorage() {
     case "$(uname -s)" in
@@ -20,6 +110,12 @@ setbasestorage() {
 }
 
 setbasestorage
+alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
+#-----------------------
+alias createnewmember='bash ${HOME}/code/main/CreateNewMember.sh'
+alias createnewposting='bash ${HOME}/code/main/CreatePosting.sh'
+#-----------------------
+
 
 govideos() {
     cd "${BASE_STORAGE}/onlinemallwebsite_storage/videos" && ls -latr
@@ -102,39 +198,9 @@ if [ -f "$HOME/.ssh/be/.env" ]; then
 fi
 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-unalias -a
 #-----------------for TutaDates--------------
 alias fixstorage='$HOME/code/main/scripts/fix-media-storage.sh'
 alias checkstorage='$HOME/code/main/scripts/verify-media-storage.sh'
-
-backupUserAll() {
-  local email
-
-  read -p "Enter email address: " email
-
-  if [[ -z "$email" ]]; then
-    echo "Error: Email cannot be empty." >&2
-    return 1
-  fi
-
-  echo "Backing up TutaNotes + TutaPhoto + TutaDates for $email..."
-  (cd "$HOME/code/main" && node be/scripts/backupUserAll.js --email="$email")
-}
-
-restoreUserAll() {
-  local email
-
-  read -p "Enter email address: " email
-
-  if [[ -z "$email" ]]; then
-    echo "Error: Email cannot be empty." >&2
-    return 1
-  fi
-
-  echo "Restoring TutaNotes + TutaPhoto + TutaDates for $email from ~/tutamallBackup/{prefix}/..."
-  (cd "$HOME/code/main" && node be/scripts/restoreUserAll.js --email="$email" --yes)
-}
-
 #----------------for TutatNotes/TutaPhotos---
 alias fixlargecheap='$HOME/code/main/scripts/fix-large-cheap-storage.sh'
 alias checklargecheap='$HOME/code/main/scripts/verify-large-cheap-storage.sh'
@@ -157,8 +223,15 @@ screw_permission_fortest(){
     sudo -u lawsen0 touch "$photo_dir/.perm_probe" && echo WRITE_OK || echo WRITE_DENIED
 }
 
-alias gostorage='cd /mnt/pgdata16/;ls -latr'
-alias showsize='sudo du -sh ${BASE_STORAGE}/onlinemallwebsite_storage/{photos,videos,USB_DMG_EXE,recordvault-onedrive};sudo du -ah ${BASE_STORAGE}/onlinemallwebsite_storage/videos | sort -h | tail -30'
+gostorage() {
+    cd "${BASE_STORAGE}" && ls -latr
+}
+
+showsize() {
+    sudo du -sh "${BASE_STORAGE}/onlinemallwebsite_storage/"{photos,videos,USB_DMG_EXE,recordvault-onedrive}
+    sudo du -ah "${BASE_STORAGE}/onlinemallwebsite_storage/videos" | sort -h | tail -30
+}
+
 #------ barcode upload ------
 alias fixstoragemobileuploadMac='$HOME/code/main/scripts/fix-media-storage.sh'
 alias checkstoragemobileuploadMac='$HOME/code/main/scripts/verify-media-storage.sh'
@@ -166,7 +239,11 @@ alias fixpermissionmobileuploadMac='sudo chown -R "$(id -un):$(id -gn)" "${STORA
 
 alias fixstoragemobileuploadubuntu='$HOME/code/main/scripts/fix-media-storage.sh'
 alias checkstoragemobileuploadubuntu='$HOME/code/main/scripts/verify-media-storage.sh'
-alias fixpermissionmobileuploadubuntu="sudo chown -R lawsen0:lawsen0 '${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload' && sudo chmod -R u+rwX '${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload'"
+
+fixpermissionmobileuploadubuntu() {
+    sudo chown -R lawsen0:lawsen0 "${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload" && \
+    sudo chmod -R u+rwX "${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload"
+}
 
 alias showbarcodedebug="pm2 logs onlinemallwebsite --lines 200 | grep -E 'mobilePhotoUpload|mobile-barcode'"
 #----------------------------
@@ -217,7 +294,11 @@ alias sitemonitorstatusf='sudo systemctl status site-uptime-monitor; tail -f ~/l
 
 
 
-alias testBuguploadPhoto='touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test && rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test && echo WRITE_OK'
+testBuguploadPhoto() {
+    touch "${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test" && \
+    rm "${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test" && \
+    echo "WRITE_OK"
+}
 
 fixBugUploadPhoto() {
     # Confirm env points here
@@ -235,7 +316,9 @@ fixBugUploadPhoto() {
 }
 
 
-alias lsphotos='cd  ${STORAGE_FOLDER}; ls -latr  ${STORAGE_FOLDER}/photoalbums_onedrive/photos'
+lsphotos() {
+    cd "${STORAGE_FOLDER}" && ls -latr "${STORAGE_FOLDER}/photoalbums_onedrive/photos"
+}
 
 fixstartup() {
   cd ~/code/main/be   # or /home/lawsen0/code/main/be if that’s the PM2 cwd
@@ -253,18 +336,23 @@ alias testdb='pg_isready -h 127.0.0.1 -p 50010'
 alias testproxy='curl -sS -o /dev /null -w "%{http_code}\n" http://127.0.0.1/health; sudo systemctl status haproxy'
 alias testbrowser='curl -sS -o /dev/null -w "%{http_code}\n" https://onlinemall.website/health'
 
-alias testwrite='touch ${STORAGE_FOLDER}/photos/.wtest && rm ${STORAGE_FOLDER}/photos/.wtest && echo WRITE_OK'
-alias fixwrite='ls -ld ${STORAGE_FOLDER}/photos; sudo chown -R lawsen0:lawsen0 ${STORAGE_FOLDER}/photos; sudo chmod u+rwx ${STORAGE_FOLDER}/photos;'
-alias provewrite='sudo -u lawsen0 touch ${STORAGE_FOLDER}/photos/.wtest \
-  && sudo -u lawsen0 rm ${STORAGE_FOLDER}/photos/.wtest \
-  && echo WRITE_OK'
+testwrite() {
+    touch "${STORAGE_FOLDER}/photos/.wtest" && \
+    rm "${STORAGE_FOLDER}/photos/.wtest" && \
+    echo "WRITE_OK"
+}
 
+fixwrite() {
+    ls -ld "${STORAGE_FOLDER}/photos"
+    sudo chown -R lawsen0:lawsen0 "${STORAGE_FOLDER}/photos"
+    sudo chmod u+rwx "${STORAGE_FOLDER}/photos"
+}
 
-#alias testwrite='touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest && rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest && echo WRITE_OK'
-#alias fixwrite='ls -ld ${BASE_STORAGE}/onlinemallwebsite_storage/photos; sudo chown -R lawsen0:lawsen0 ${BASE_STORAGE}/onlinemallwebsite_storage/photos; sudo chmod u+rwx ${BASE_STORAGE}/onlinemallwebsite_storage/photos;'
-#alias provewrite='sudo -u lawsen0 touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest \
-#  && sudo -u lawsen0 rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.wtest \
-#  && echo WRITE_OK'
+provewrite() {
+    sudo -u lawsen0 touch "${STORAGE_FOLDER}/photos/.wtest" && \
+    sudo -u lawsen0 rm "${STORAGE_FOLDER}/photos/.wtest" && \
+    echo "WRITE_OK"
+}
 
 
 testall() {
@@ -296,7 +384,14 @@ alias redisping="redis-cli -a 'w2332w2332' ping"
 alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-server; pm2 restart onlinemallwebsite'
 
 
-alias lsusbbridge='ls -lah ${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE'
+lszip() {
+    ls "${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE"
+}
+
+clearzip() {
+    rm -rf "${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE/"*
+    lsusb
+}
 
 alias updateubuntu='sudo apt update && sudo apt upgrade -y'
 
@@ -333,11 +428,7 @@ alias fe1='cd ~/code/main/fe && npm i -verbose'
 alias fe2='fkill 3000; pkill -f "[v]ite" 2>/dev/null; cd ~/code/main/fe && npm start'
 alias feall='cd ~/code/main/fe && fe1 && fe2'
 
-# TutaNotes RAG — Ollama runtime + Qwen model (see rag_service/README.md)
-alias pullqwen='ollama pull "${OLLAMA_MODEL:-qwen2.5:7b}"'
-alias verifyollama='$HOME/code/main/scripts/verify-ollama.sh'
-alias startrag='$HOME/code/main/scripts/start-rag-service.sh'
-alias verifyrag='$HOME/code/main/scripts/verify-rag-demo.sh'
+
 
 redishealth() {
   echo '=== systemd ==='
@@ -508,7 +599,7 @@ tailtest() {
 }
 
 
-alias boom='cd ~/code;rm -rf main;gitclone'
+alias boom='cd ~/code;rm -rf tutamall;rmm -rf main;gitclone'
 
 #########################
 cascaded() {
@@ -744,7 +835,10 @@ purgephotos() {
   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "TRUNCATE TABLE vsingles_photos RESTART IDENTITY;"
 }
 
-alias chownphoto='sudo chown -R www-data:www-data ${BASE_STORAGE}/onlinemallwebsite_storage/photos;sudo ls -latr ${BASE_STORAGE}/onlinemallwebsite_storage/photos'
+chownphoto() {
+    sudo chown -R www-data:www-data "${BASE_STORAGE}/onlinemallwebsite_storage/photos" && \
+    sudo ls -latr "${BASE_STORAGE}/onlinemallwebsite_storage/photos"
+}
 
 resestusersetup(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
@@ -753,7 +847,9 @@ resestusersetup(){
   getusersetup
 }
 
-alias showphotos='sudo ls -latr  ${BASE_STORAGE}/onlinemallwebsite_storage/photos'
+showphotos() {
+    sudo ls -latr "${BASE_STORAGE}/onlinemallwebsite_storage/photos"
+}
 
 clonepassword(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
@@ -1009,65 +1105,75 @@ dbBackup(){
     fi
 }
 
+
+
 # ####### DB DUMP #######
 # Function to restore the onlinemallwebsite database on Ubuntu
 # ####### DB DUMP #######
 # Function to restore the onlinemallwebsite database on Ubuntu
+######## DO THIS BEGIN ########
+
 dbRestore() {
     DUMP_DIR="$HOME/dbFolder"
-    # Note: %d/%m/%Y vs %m%d%Y - adjusted to match your screenshot's pattern
     TODAY=$(date +"%m%d%Y")
 
-    # Step 1: Clear and list files
     clear
     echo "--- Current files in $DUMP_DIR ---"
-    # Ensure directory exists before listing
     if [ -d "$DUMP_DIR" ]; then
         ls -latr "$DUMP_DIR"
     else
         echo "Directory $DUMP_DIR not found."
     fi
-    echo "-------------------------------------"
+    echo "-----------------------------------"
 
-    # Step 2: Wormhole receive
-    # Ubuntu bash 'read' syntax: read -p "Prompt: " VARIABLE
-    read -p "Wormhole postfix only? [default: skip]: " WORM_POSTFIX
+    printf "Wormhole postfix only? [default: skip]: "
+    read WORM_POSTFIX
 
     if [ -n "$WORM_POSTFIX" ]; then
-        # Check if dir exists before cd
         cd "$DUMP_DIR" || return 1
 
         echo "Attempting wormhole receive..."
-        # We use --accept-file to automate
-        wormhole receive --accept-file "$WORM_POSTFIX"
+        local RECV_OUT="$DUMP_DIR/wormhole_recv_${TODAY}_$(date +%H%M%S).sql"
+        if ! wormhole receive --accept-file -o "$RECV_OUT" "$WORM_POSTFIX"; then
+            echo "Warning: wormhole receive failed."
+            if [ -z "$ALL_RESTORE" ]; then
+                echo "You can still restore from an existing .sql in $DUMP_DIR."
+            fi
+        fi
     fi
 
-    # Step 3: Determine Default File
-    # Using 'head -n 1' to find the most recent .sql file
     LATEST_FILE=$(ls -t "$DUMP_DIR"/*.sql 2>/dev/null | head -n 1)
     DEFAULT_VAL=$(basename "$LATEST_FILE" 2>/dev/null)
 
-    if [ -z "$DEFAULT_VAL" ]; then
-        PROMPT_TEXT="Enter file to restore: "
-    else
-        PROMPT_TEXT="Enter file to restore [default: $DEFAULT_VAL]: "
-    fi
-
-    read -p "$PROMPT_TEXT" USER_INPUT
-
-    # Step 4: Logic for Input vs Default
-    if [ -z "$USER_INPUT" ]; then
+    if [ -n "$ALL_RESTORE" ]; then
         if [ -z "$DEFAULT_VAL" ]; then
-            echo "Error: No default file found and no input provided."
+            echo "Error: No .sql file found in $DUMP_DIR."
             return 1
         fi
         RESTORE_FILE="$DEFAULT_VAL"
+        echo "allRestore: using latest $RESTORE_FILE"
     else
-        # Bash string matching
-        if [[ "$USER_INPUT" != *.sql ]]; then
-            RESTORE_FILE="${USER_INPUT}${TODAY}.sql"
+        if [ -z "$DEFAULT_VAL" ]; then
+            PROMPT_TEXT="Enter file to restore: "
         else
-            RESTORE_FILE="$USER_INPUT"
+            PROMPT_TEXT="Enter file to restore [default: $DEFAULT_VAL]: "
+        fi
+
+        printf "%s" "$PROMPT_TEXT"
+        read USER_INPUT
+
+        if [ -z "$USER_INPUT" ]; then
+            if [ -z "$DEFAULT_VAL" ]; then
+                echo "Error: No default file found and no input provided."
+                return 1
+            fi
+            RESTORE_FILE="$DEFAULT_VAL"
+        else
+            if [[ "$USER_INPUT" != *.sql ]]; then
+                RESTORE_FILE="${USER_INPUT}${TODAY}.sql"
+            else
+                RESTORE_FILE="$USER_INPUT"
+            fi
         fi
     fi
 
@@ -1078,41 +1184,122 @@ dbRestore() {
         return 1
     fi
 
-    # MODIFIED: Default to 'y' on Enter
-    read -p "Confirm restore file $RESTORE_FILE? [Y/n]: " CONFIRM
-    if [[ "${CONFIRM,,}" == "n" ]]; then
-        echo "Restore cancelled."
-        return 1
+    if [ -n "$ALL_RESTORE" ]; then
+        echo "allRestore: restoring $RESTORE_FILE (auto-confirmed)."
+    else
+        printf "Confirm restore file %s? [Y/n]: " "$RESTORE_FILE"
+        read CONFIRM
+        if [[ "$CONFIRM" == "n" || "$CONFIRM" == "N" ]]; then
+            echo "Restore cancelled."
+            return 1
+        fi
     fi
 
-    # --- PASSWORD HANDLING ---
-    # Prompt for the database password once, silently (-s)
-    read -s -p "Enter password for test_user1: " PGPASSWORD
-    echo "" # Newline for clean output formatting
+    read -rs -p "Enter password for test_user1: " PGPASSWORD
+    echo
     export PGPASSWORD
 
-    # 4. Clean Database
-    # Using the credentials for your onlinemallwebsite database
     echo "Dropping existing schema..."
     psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS helloworldjunktest CASCADE;"
 
-    # 5. Import
-    echo "Importing ${FULL_PATH}..."
-    # -v ON_ERROR_STOP=1 ensures we don't keep running if a query fails
+    echo "Importing $FULL_PATH..."
     psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite \
         -v ON_ERROR_STOP=1 \
         --set=search_path=helloworldjunktest,public \
         -f "$FULL_PATH"
 
-    # 6. Verification
     echo "--- Verification: Tables in onlinemallwebsite ---"
     psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt helloworldjunktest.*"
 
-    # --- CLEANUP ---
-    # Unset to prevent the password from lingering in your terminal session
     unset PGPASSWORD
-
     echo "Restore process completed."
+}
+
+
+photoRestore() {
+    cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
+
+    local DEST_BASE
+    DEST_BASE="${BASE_STORAGE}/onlinemallwebsite_storage"
+
+    local RESTORE_FILE=""
+    local EXISTING
+    EXISTING=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+
+    if [ -n "$EXISTING" ]; then
+      REUSE="N"
+    fi
+
+    if [ -z "$RESTORE_FILE" ]; then
+        printf "Input wormhole string: "
+        read -r WORMHOLE_CODE
+        wormhole receive "$WORMHOLE_CODE"
+        RESTORE_FILE=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+    fi
+
+    if [ -z "$RESTORE_FILE" ] || [ ! -f "$RESTORE_FILE" ]; then
+        echo "Error: File not received (no photoBackup*/miscBackup* .tar.gz in $(pwd))."
+        return 1
+    fi
+
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        sudo mkdir -p "$DEST_BASE"
+    else
+        mkdir -p "$DEST_BASE"
+    fi
+
+    local -a storage_dirs=(photos videos USB_DMG_EXE recordvault-onedrive)
+    local d
+    for d in "${storage_dirs[@]}"; do
+        echo "Wiping $DEST_BASE/$d..."
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            sudo rm -rf "$DEST_BASE/$d"
+            sudo mkdir -p "$DEST_BASE/$d"
+        else
+            rm -rf "$DEST_BASE/$d"
+            mkdir -p "$DEST_BASE/$d"
+        fi
+    done
+
+    if [ -d "$DEST_BASE/vidoes" ]; then
+        echo "Removing typo folder $DEST_BASE/vidoes..."
+        if [[ "$(uname -s)" == "Linux" ]]; then
+            sudo rm -rf "$DEST_BASE/vidoes"
+        else
+            rm -rf "$DEST_BASE/vidoes"
+        fi
+    fi
+
+    echo "Extracting $RESTORE_FILE to $DEST_BASE..."
+    local ABS_TAR
+    ABS_TAR="$(pwd)/$RESTORE_FILE"
+
+    local -a TAR_OPTS=(--no-same-owner)
+    if tar --version 2>&1 | grep -qi 'GNU tar'; then
+        TAR_OPTS+=(--warning=no-unknown-keyword)
+    fi
+
+    local extract_cmd="tar ${TAR_OPTS[*]} -xzvf \"$ABS_TAR\" -C \"$DEST_BASE\""
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        if sudo bash -c "$extract_cmd"; then
+            if [ -d "$DEST_BASE/photos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/photos"; fi
+            if [ -d "$DEST_BASE/videos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/videos"; fi
+            if [ -d "$DEST_BASE/USB_DMG_EXE" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/USB_DMG_EXE"; fi
+            if [ -d "$DEST_BASE/recordvault-onedrive" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/recordvault-onedrive"; fi
+            sudo chmod -R u+rwX,g+rX,o+rX "$DEST_BASE/USB_DMG_EXE" "$DEST_BASE/recordvault-onedrive" 2>/dev/null || true
+            echo "Restore complete under $DEST_BASE"
+        else
+            echo "Error: Extraction failed."
+            return 1
+        fi
+    else
+        if eval "$extract_cmd"; then
+            echo "Restore complete under $DEST_BASE"
+        else
+            echo "Error: Extraction failed."
+            return 1
+        fi
+    fi
 }
 
 allRestore() {
@@ -1121,28 +1308,37 @@ allRestore() {
     echo "======================================"
 
     echo -e "\n>>> STEP 1: Database Restore <<<"
-    dbRestore
+    ALL_RESTORE=1 dbRestore
 
-    # Check if DB restore was successful before moving on
     if [ $? -ne 0 ]; then
         echo "Error: dbRestore encountered an issue. Aborting full restore."
         return 1
     fi
 
     echo -e "\n>>> STEP 2: Photo Restore <<<"
-    # Passes any arguments you might use
-    photoRestore "$@"
+    ALL_RESTORE=1 photoRestore "$@"
+
+    if [ $? -ne 0 ]; then
+        echo "Error: photoRestore encountered an issue."
+        return 1
+    fi
 
     fixstorage
     checkstorage
+
     echo -e "\n======================================"
     echo "       Full Restore Complete!         "
     echo "======================================"
 }
 
-# Merge restore: keep everything already on Ubuntu; only ADD rows/files that are missing.
+
+
+
+
+# >>> BEGIN allMergeRestore (merge-only; does not overwrite rest of ~/b) >>>
+# Merge restore (Ubuntu): keep everything already there; only ADD missing DB rows / files.
 # Does NOT drop schema, does NOT wipe photo dirs, does NOT overwrite existing files.
-# Mac workflow unchanged: allBackup → wormhole. On Ubuntu use allMergeRestore instead of allRestore.
+# Mac: allBackup as usual. Ubuntu: allMergeRestore instead of allRestore.
 allMergeRestore() {
     echo "======================================"
     echo " Starting MERGE Restore (keep Ubuntu) "
@@ -1150,28 +1346,26 @@ allMergeRestore() {
     echo "Existing DB rows + files stay. Only missing ones from Mac are added."
 
     echo -e "\n>>> STEP 1: Database MERGE Restore <<<"
-    dbMergeRestore
+    ALL_RESTORE=1 dbMergeRestore
     if [ $? -ne 0 ]; then
         echo "Error: dbMergeRestore encountered an issue. Aborting."
         return 1
     fi
 
     echo -e "\n>>> STEP 2: Photo MERGE Restore <<<"
-    photoMergeRestore "$@"
+    ALL_RESTORE=1 photoMergeRestore "$@"
     if [ $? -ne 0 ]; then
         echo "Error: photoMergeRestore encountered an issue."
         return 1
     fi
 
-    fixstorage
-    checkstorage
+    if command -v fixstorage >/dev/null 2>&1; then fixstorage; fi
+    if command -v checkstorage >/dev/null 2>&1; then checkstorage; fi
     echo -e "\n======================================"
     echo "       MERGE Restore Complete!        "
     echo "======================================"
 }
 
-# Same wormhole / file pick as dbRestore, but never DROP SCHEMA.
-# Loads dump into a temp schema, then INSERT ... ON CONFLICT DO NOTHING into live.
 dbMergeRestore() {
     DUMP_DIR="$HOME/dbFolder"
     TODAY=$(date +"%m%d%Y")
@@ -1186,13 +1380,20 @@ dbMergeRestore() {
     else
         echo "Directory $DUMP_DIR not found."
     fi
-    echo "-------------------------------------"
+    echo "-----------------------------------"
 
-    read -p "Wormhole postfix only? [default: skip]: " WORM_POSTFIX
+    printf "Wormhole postfix only? [default: skip]: "
+    read WORM_POSTFIX
     if [ -n "$WORM_POSTFIX" ]; then
         cd "$DUMP_DIR" || return 1
         echo "Attempting wormhole receive..."
-        wormhole receive --accept-file "$WORM_POSTFIX"
+        local RECV_OUT="$DUMP_DIR/wormhole_recv_${TODAY}_$(date +%H%M%S).sql"
+        if ! wormhole receive --accept-file -o "$RECV_OUT" "$WORM_POSTFIX"; then
+            echo "Warning: wormhole receive failed."
+            if [ -z "$ALL_RESTORE" ]; then
+                echo "You can still merge from an existing .sql in $DUMP_DIR."
+            fi
+        fi
     fi
 
     LATEST_FILE=$(ls -t "$DUMP_DIR"/*.sql 2>/dev/null | head -n 1)
@@ -1203,7 +1404,8 @@ dbMergeRestore() {
     else
         PROMPT_TEXT="Enter file to merge-restore [default: $DEFAULT_VAL]: "
     fi
-    read -p "$PROMPT_TEXT" USER_INPUT
+    printf "%s" "$PROMPT_TEXT"
+    read USER_INPUT
 
     if [ -z "$USER_INPUT" ]; then
         if [ -z "$DEFAULT_VAL" ]; then
@@ -1225,32 +1427,31 @@ dbMergeRestore() {
         return 1
     fi
 
-    read -p "Confirm MERGE (keep Ubuntu, add missing) from $RESTORE_FILE? [Y/n]: " CONFIRM
-    if [[ "${CONFIRM,,}" == "n" ]]; then
-        echo "Merge restore cancelled."
-        return 1
+    if [ -n "$ALL_RESTORE" ]; then
+        echo "allMergeRestore: merging $RESTORE_FILE (auto-confirmed)."
+    else
+        printf "Confirm MERGE (keep existing, add missing) from %s? [Y/n]: " "$RESTORE_FILE"
+        read CONFIRM
+        if [[ "$CONFIRM" == "n" || "$CONFIRM" == "N" ]]; then
+            echo "Merge restore cancelled."
+            return 1
+        fi
     fi
-
-    read -s -p "Enter password for test_user1: " PGPASSWORD
-    echo ""
-    export PGPASSWORD
 
     local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite)
     local REWRITE_SQL="$DUMP_DIR/.merge_rewrite_$$.sql"
 
     echo "Loading dump into temp schema $TMP_SCHEMA (live schema untouched)..."
     "${PSQL[@]}" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS ${TMP_SCHEMA} CASCADE;"
-    # Rewrite schema name so CREATE/COPY land in temp schema, not live.
     sed "s/${LIVE_SCHEMA}/${TMP_SCHEMA}/g" "$FULL_PATH" > "$REWRITE_SQL"
     if ! "${PSQL[@]}" -v ON_ERROR_STOP=1 -f "$REWRITE_SQL"; then
         echo "Error: failed importing dump into temp schema."
         rm -f "$REWRITE_SQL"
-        unset PGPASSWORD
         return 1
     fi
     rm -f "$REWRITE_SQL"
 
-    echo "Merging rows into ${LIVE_SCHEMA} (ON CONFLICT DO NOTHING — Ubuntu wins)..."
+    echo "Merging rows into ${LIVE_SCHEMA} (ON CONFLICT DO NOTHING — existing wins)..."
     "${PSQL[@]}" -v ON_ERROR_STOP=1 <<SQL
 SET session_replication_role = replica;
 DO \$\$
@@ -1290,7 +1491,6 @@ BEGIN
 END \$\$;
 SET session_replication_role = DEFAULT;
 
--- Prefer higher sequence value so new inserts do not collide with merged Mac ids
 DO \$\$
 DECLARE
   r RECORD;
@@ -1321,32 +1521,30 @@ SQL
 
     echo "Dropping temp schema ${TMP_SCHEMA}..."
     "${PSQL[@]}" -c "DROP SCHEMA IF EXISTS ${TMP_SCHEMA} CASCADE;"
-
-    echo "--- Verification: sample table counts ---"
+    echo "--- Verification: Tables ---"
     "${PSQL[@]}" -c "\dt ${LIVE_SCHEMA}.*"
-
-    unset PGPASSWORD
-    echo "DB merge restore completed (Ubuntu data preserved)."
+    echo "DB merge restore completed (existing data preserved)."
 }
 
-# Same wormhole receive as miscRestore, but never rm -rf storage dirs.
-# Extract to staging, then rsync --ignore-existing (keep Ubuntu files; add Mac-only).
-miscMergeRestore() {
-    mkdir -p "$HOME/dbFolder"
+photoMergeRestore() {
     cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
 
     local DEST_BASE
-    DEST_BASE="$(_misc_storage_base)"
+    DEST_BASE="${BASE_STORAGE}/onlinemallwebsite_storage"
 
     local RESTORE_FILE=""
     local EXISTING
-    EXISTING=$(ls -t miscBackup*.tar.gz photoBackup*.tar.gz 2>/dev/null | head -n 1)
+    EXISTING=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
 
     if [ -n "$EXISTING" ]; then
-        printf "Reuse existing %s without wormhole? (Y/n) " "$EXISTING"
-        read -r REUSE
-        if [[ "$REUSE" != "n" && "$REUSE" != "N" ]]; then
-            RESTORE_FILE="$EXISTING"
+        if [ -n "$ALL_RESTORE" ]; then
+            echo "allMergeRestore: skipping reuse of existing $EXISTING (same as answering n)."
+        else
+            printf "Reuse existing %s without wormhole? (Y/n) " "$EXISTING"
+            read -r REUSE
+            if [[ "$REUSE" != "n" && "$REUSE" != "N" ]]; then
+                RESTORE_FILE="$EXISTING"
+            fi
         fi
     fi
 
@@ -1354,52 +1552,91 @@ miscMergeRestore() {
         printf "Input wormhole string: "
         read -r WORMHOLE_CODE
         wormhole receive "$WORMHOLE_CODE"
-        RESTORE_FILE=$(ls -t miscBackup*.tar.gz photoBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
+        RESTORE_FILE=$(ls -t photoBackup*.tar.gz miscBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
     fi
 
     if [ -z "$RESTORE_FILE" ] || [ ! -f "$RESTORE_FILE" ]; then
-        echo "Error: File not received (no miscBackup*/photoBackup* .tar.gz in $(pwd))."
+        echo "Error: File not received (no photoBackup*/miscBackup* .tar.gz in $(pwd))."
         return 1
     fi
 
-    _misc_run mkdir -p "$DEST_BASE"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        sudo mkdir -p "$DEST_BASE"
+    else
+        mkdir -p "$DEST_BASE"
+    fi
 
-    # User-owned staging so the shell can list entries after sudo tar extract.
+    # User-owned staging so we can list after sudo tar extract.
     local STAGE ABS_TAR
-    STAGE=$(mktemp -d /tmp/miscMergeRestore.XXXXXX)
+    STAGE=$(mktemp -d /tmp/photoMergeRestore.XXXXXX)
     ABS_TAR="$(pwd)/$RESTORE_FILE"
 
-    echo "Extracting $RESTORE_FILE to staging $STAGE (no wipe of $DEST_BASE)..."
-    if ! _misc_run tar --no-same-owner --warning=no-unknown-keyword -xzvf "$ABS_TAR" -C "$STAGE"; then
-        echo "Error: Extraction failed."
-        _misc_run rm -rf "$STAGE"
-        return 1
+    echo "Extracting $RESTORE_FILE to staging (no wipe of $DEST_BASE)..."
+    local -a TAR_OPTS=(--no-same-owner)
+    if tar --version 2>&1 | grep -qi 'GNU tar'; then
+        TAR_OPTS+=(--warning=no-unknown-keyword)
     fi
 
-    echo "Merging into $DEST_BASE (rsync --ignore-existing: Ubuntu files win)..."
+    local extract_cmd="tar ${TAR_OPTS[*]} -xzvf \"$ABS_TAR\" -C \"$STAGE\""
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        if ! sudo bash -c "$extract_cmd"; then
+            echo "Error: Extraction failed."
+            sudo rm -rf "$STAGE"
+            return 1
+        fi
+    else
+        if ! eval "$extract_cmd"; then
+            echo "Error: Extraction failed."
+            rm -rf "$STAGE"
+            return 1
+        fi
+    fi
+
+    echo "Merging into $DEST_BASE (rsync --ignore-existing: existing files win)..."
     local d name
-    # Root-owned extract under user-owned STAGE — list via find/sudo
+    local list_cmd=(find "$STAGE" -mindepth 1 -maxdepth 1 -print0)
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        list_cmd=(sudo find "$STAGE" -mindepth 1 -maxdepth 1 -print0)
+    fi
     while IFS= read -r -d '' d; do
         name=$(basename "$d")
         if [ -d "$d" ]; then
-            _misc_run mkdir -p "$DEST_BASE/$name"
-            _misc_run rsync -a --ignore-existing --human-readable --info=stats2 "$d/" "$DEST_BASE/$name/"
+            if [[ "$(uname -s)" == "Linux" ]]; then
+                sudo mkdir -p "$DEST_BASE/$name"
+                sudo rsync -a --ignore-existing --human-readable --info=stats2 "$d/" "$DEST_BASE/$name/"
+            else
+                mkdir -p "$DEST_BASE/$name"
+                rsync -a --ignore-existing --human-readable "$d/" "$DEST_BASE/$name/"
+            fi
         elif [ -f "$d" ]; then
             if [ ! -e "$DEST_BASE/$name" ]; then
-                _misc_run cp -a "$d" "$DEST_BASE/$name"
+                if [[ "$(uname -s)" == "Linux" ]]; then
+                    sudo cp -a "$d" "$DEST_BASE/$name"
+                else
+                    cp -a "$d" "$DEST_BASE/$name"
+                fi
                 echo "Added file: $name"
             else
                 echo "Keep existing file: $name"
             fi
         fi
-    done < <(_misc_run find "$STAGE" -mindepth 1 -maxdepth 1 -print0)
+    done < <("${list_cmd[@]}")
 
-    _misc_run rm -rf "$STAGE"
-    _misc_fix_ownership "$DEST_BASE"
+    if [[ "$(uname -s)" == "Linux" ]]; then
+        sudo rm -rf "$STAGE"
+        if [ -d "$DEST_BASE/photos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/photos"; fi
+        if [ -d "$DEST_BASE/videos" ]; then sudo chown -R www-data:www-data "$DEST_BASE/videos"; fi
+        if [ -d "$DEST_BASE/USB_DMG_EXE" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/USB_DMG_EXE"; fi
+        if [ -d "$DEST_BASE/recordvault-onedrive" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/recordvault-onedrive"; fi
+        if [ -d "$DEST_BASE/users" ]; then sudo chown -R "$(whoami):$(id -gn)" "$DEST_BASE/users"; fi
+        sudo chmod -R u+rwX,g+rX,o+rX "$DEST_BASE/USB_DMG_EXE" "$DEST_BASE/recordvault-onedrive" "$DEST_BASE/users" 2>/dev/null || true
+    else
+        rm -rf "$STAGE"
+    fi
+
     echo "Photo/storage MERGE complete under $DEST_BASE (existing files preserved)."
 }
-
-photoMergeRestore() { miscMergeRestore "$@"; }
+# <<< END allMergeRestore <<<
 
 ######## MISC STORAGE (photos / videos / USB_DMG_EXE / recordvault-onedrive) ########
 _misc_storage_base() {
@@ -1410,8 +1647,7 @@ _misc_storage_base() {
     fi
 }
 
-# users/ = per-member tutadates/photos (current layout); legacy flat photos/ is fallback only.
-_misc_storage_dirs=(photos videos users USB_DMG_EXE recordvault-onedrive)
+_misc_storage_dirs=(photos videos USB_DMG_EXE recordvault-onedrive)
 
 # On Ubuntu, /mnt/pgdata16/... is usually root-owned — use sudo for wipe/extract/chown.
 _misc_run() {
@@ -1438,11 +1674,8 @@ _misc_fix_ownership() {
     if [ -d "$base/recordvault-onedrive" ]; then
         sudo chown -R "$(whoami):$(id -gn)" "$base/recordvault-onedrive"
     fi
-    if [ -d "$base/users" ]; then
-        sudo chown -R "$(whoami):$(id -gn)" "$base/users"
-    fi
     # Parent must stay writable for future mkdir by sudo restore; keep root or grant user traverse.
-    sudo chmod -R u+rwX,g+rX,o+rX "$base/USB_DMG_EXE" "$base/recordvault-onedrive" "$base/users" 2>/dev/null || true
+    sudo chmod -R u+rwX,g+rX,o+rX "$base/USB_DMG_EXE" "$base/recordvault-onedrive" 2>/dev/null || true
     # Fix common typo folder name if present
     if [ -d "$base/vidoes" ] && [ ! -d "$base/videos" ]; then
         sudo mv "$base/vidoes" "$base/videos"
@@ -1493,71 +1726,49 @@ miscBackup() {
     )
 }
 
-miscRestore() {
+photoBackup() {
     mkdir -p "$HOME/dbFolder"
-    cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
 
-    local DEST_BASE
-    DEST_BASE="$(_misc_storage_base)"
+    (
+        cd "$HOME/dbFolder" || return 1
 
-    local RESTORE_FILE=""
-    local EXISTING
-    EXISTING=$(ls -t miscBackup*.tar.gz photoBackup*.tar.gz 2>/dev/null | head -n 1)
+        local BASE_DIR DATE_STR FILENAME PREFIX
+        BASE_DIR="${BASE_STORAGE}/onlinemallwebsite_storage"
+        DATE_STR=$(date +%m%d%Y)
+        PREFIX="${1:-photoBackup}"
+        FILENAME="${PREFIX}${DATE_STR}.tar.gz"
 
-    if [ -n "$EXISTING" ]; then
-        printf "Reuse existing %s without wormhole? (Y/n) " "$EXISTING"
-        read -r REUSE
-        if [[ "$REUSE" != "n" && "$REUSE" != "N" ]]; then
-            RESTORE_FILE="$EXISTING"
+        if [ ! -d "$BASE_DIR" ]; then
+            echo "Error: $BASE_DIR not found."
+            return 1
         fi
-    fi
 
-    if [ -z "$RESTORE_FILE" ]; then
-        printf "Input wormhole string: "
-        read -r WORMHOLE_CODE
-        wormhole receive "$WORMHOLE_CODE"
-        RESTORE_FILE=$(ls -t miscBackup*.tar.gz photoBackup*.tar.gz *.tar.gz 2>/dev/null | head -n 1)
-    fi
+        local -a storage_dirs=(photos videos USB_DMG_EXE recordvault-onedrive)
+        local -a present=()
+        local d
+        for d in "${storage_dirs[@]}"; do
+            if [ -d "$BASE_DIR/$d" ]; then
+                present+=("$d")
+            else
+                echo "Skip (missing): $BASE_DIR/$d"
+            fi
+        done
 
-    if [ -z "$RESTORE_FILE" ] || [ ! -f "$RESTORE_FILE" ]; then
-        echo "Error: File not received (no miscBackup*/photoBackup* .tar.gz in $(pwd))."
-        return 1
-    fi
+        if [ ${#present[@]} -eq 0 ]; then
+            echo "Error: none of ${storage_dirs[*]} found under $BASE_DIR"
+            return 1
+        fi
 
-    _misc_run mkdir -p "$DEST_BASE"
-
-    local d
-    for d in "${_misc_storage_dirs[@]}"; do
-        echo "Wiping $DEST_BASE/$d..."
-        _misc_run rm -rf "$DEST_BASE/$d"
-        _misc_run mkdir -p "$DEST_BASE/$d"
-    done
-    # Drop typo dir so restore can create correct videos/
-    if [ -d "$DEST_BASE/vidoes" ]; then
-        echo "Removing typo folder $DEST_BASE/vidoes..."
-        _misc_run rm -rf "$DEST_BASE/vidoes"
-    fi
-
-    echo "Extracting $RESTORE_FILE to $DEST_BASE (may need sudo password)..."
-    local ABS_TAR
-    ABS_TAR="$(pwd)/$RESTORE_FILE"
-    # --no-same-owner: after sudo extract, don't keep Mac UIDs; we chown next
-    if _misc_run tar --no-same-owner --warning=no-unknown-keyword -xzvf "$ABS_TAR" -C "$DEST_BASE"; then
-        _misc_fix_ownership "$DEST_BASE"
-        echo "Restore complete under $DEST_BASE (${_misc_storage_dirs[*]})"
-        # Keep archive for retry; delete only if user wants — leave file (was rm before)
-    else
-        echo "Error: Extraction failed."
-        return 1
-    fi
+        echo "Archiving under $BASE_DIR: ${present[*]}..."
+        if COPYFILE_DISABLE=1 tar -czvf "$FILENAME" -C "$BASE_DIR" --exclude='._*' --exclude='.DS_Store' "${present[@]}"; then
+            echo "Starting wormhole send..."
+            wormhole send "$FILENAME"
+        else
+            echo "Compression failed."
+            return 1
+        fi
+    )
 }
-
-# Legacy names
-photoBackup() { miscBackup "$@"; }
-photoRestore() { miscRestore "$@"; }
-
-###############
-
 
 
 hashpw() {
@@ -1587,7 +1798,10 @@ alias pm2log='pm2 logs onlinemallwebsite --lines 80 --nostream | sed "s/\x1b\[[0
 alias pm2logtail='pm2 logs onlinemallwebsite --lines 80 | sed -u "s/\x1b\[[0-9;]*m//g"'
 alias pm2logf='pm2 logs onlinemallwebsite | sed "s/\x1b\[[0-9;]*m//g"'
 
-alias cdv='cd  ${BASE_STORAGE}/onlinemallwebsite;ls -latr'
+cdv() {
+    cd "${BASE_STORAGE}/onlinemallwebsite" && ls -latr
+}
+
 alias dbconnect='psql -h 127.0.0.1 -U test_user1 -p 50010'
 
 alias rmusers="psql -h 127.0.0.1 -U test_user1 -p 50010 -d onlinemallwebsite -c \"DELETE FROM singles WHERE email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com');\""
@@ -1742,7 +1956,8 @@ alias wherepghbaconf='sudo -u test_user1 psql -p 50010 -c "SHOW hba_file;"'
 alias hareload='sudo systemctl reload ssh'
 
 
-alias vifile0='sudo -u test_user1 vi /var/lib/postgresql/.pgpass;sudo -u test_user1 chmod 600 /var/lib/postgresql/.pgpass'
+#alias vifile0='sudo -u test_user1 vi /var/lib/postgresql/.pgpass;sudo -u test_user1 chmod 600 /var/lib/postgresql/.pgpass'
+alias vifile0='sudo vi /etc/haproxy/haproxy.cfg && hacheck && hareload'
 
 alias vireload='sudo systemctl reload ssh; sudo systemctl restart postgresql;sudo pg_ctlcluster 16 main reload;pgstatus'
 
@@ -2179,7 +2394,7 @@ gitrevert() {
 
 ##### git ########
 alias fetchpush='git fetch origin;git merge origin/main'
-alias pushallf='cp ~/b .;sudo git add . -f && git commit -m "update" && git push'
+alias pushallf='cp ~/b .;sudo git add . -f && sudo git commit -m "update" && git push'
 alias revertgit='git reset --hard HEAD~1 && git push origin +HEAD'
 
 alias vip='vi package.json'
@@ -2382,6 +2597,8 @@ deployartifactverify() {
 #alias febedev='check_pg && (savedir; pm2 flush; cleancompilebuildfedev; cleancompileresetrunbedev)'
 #alias bedev='check_pg && (savedir; pm2 flush; cleancompileresetrunbedev)'
 
+# Copy repo usbzip/*.zip → $USB_DMG_EXE ($STORAGE_FOLDER/USB_DMG_EXE). Customer downloads.
+
 # Verbose fail-fast deploy: stop before BE if FE dist missing (used by work2 / work2_deploy).
 febeprod() {
 	go
@@ -2397,23 +2614,22 @@ febeprod() {
     check_pg || return 1
     savedir
     pm2 flush
-    echo "=== febeprod 1/5: cleancompilebuildfeprod (must create fe/dist) ==="
+    echo "=== febeprod 1/6: cleancompilebuildfeprod (must create fe/dist) ==="
     if ! cleancompilebuildfeprod; then
         echo "ERROR: febeprod aborted — FE dist/build failed; refusing BE/PM2 deploy" >&2
         return 1
     fi
-    echo "=== febeprod 2/5: cleancompileresetrunbeprod ==="
+    echo "=== febeprod 2/6: cleancompileresetrunbeprod ==="
     if ! cleancompileresetrunbeprod; then
         echo "ERROR: febeprod aborted — BE/PM2 start failed" >&2
         return 1
     fi
-    echo "=== febeprod 3/5: deployartifactwrite ==="
+    echo "=== febeprod 3/6: deployartifactwrite ==="
     deployartifactwrite || { echo "ERROR: deployartifactwrite failed" >&2; return 1; }
-    echo "=== febeprod 4/5: deployartifactverify ==="
+    echo "=== febeprod 4/6: deployartifactverify ==="
     deployartifactverify || { echo "ERROR: deployartifactverify failed" >&2; return 1; }
-    echo "=== febeprod 5/5: pm2restart ==="
+    echo "=== febeprod 5/6: pm2restart ==="
     pm2restart || { echo "ERROR: pm2restart failed" >&2; return 1; }
-    echo "=== febeprod OK ==="
     return 0
 }
 alias beprod='check_pg && (savedir; pm2 flush; cleancompileresetrunbeprod && deployartifactwrite && deployartifactverify && pm2restart)'
@@ -2442,77 +2658,12 @@ mylatestbranch() {
 }
 
 latestbranch() {
-    # Newest tip among local + origin refs. Prefer work_*mobile* deploy branches
-    # (work_202_mobile over older work_204_* / main), then any work_*, then anything.
-    # Dedupes origin/foo vs foo so a stale remote tip cannot shadow a newer local.
-    local pick=""
-    local all_refs
-    all_refs=$(
-        git for-each-ref --sort=-committerdate refs/heads/ refs/remotes/origin/ \
-            --format='%(refname:short)' \
-            | sed 's|^origin/||' \
-            | grep -vE '^(HEAD|origin)$' \
-            | awk '!seen[$0]++'
-    )
-    pick=$(printf '%s\n' "$all_refs" | grep -E 'work_[0-9]+.*mobile' | head -n 1)
-    if [ -z "$pick" ]; then
-        pick=$(printf '%s\n' "$all_refs" | grep -E '^work_[0-9]+' | head -n 1)
-    fi
-    if [ -z "$pick" ]; then
-        pick=$(printf '%s\n' "$all_refs" | head -n 1)
-    fi
-    echo "$pick"
+    # Sorts all branches (local and remote) by committer date, descending
+    # We filter out HEAD and then take the very top one
+    git for-each-ref --sort=-committerdate refs/heads/ refs/remotes/origin/ \
+        --format='%(refname:short)' | sed 's/origin\///' | grep -v 'HEAD' | head -n 1
 }
 alias makeSound='for i in {1..20}; do echo -e "\a"; sleep 0.02; done'
-
-# Interactive: unlock corruptedKey_march2023 and git fetch until passphrase is correct.
-# Wrong passphrase → Permission denied → re-ask; does not proceed until git fetch works.
-work2_git_fetch_until_ok() {
-    local github_key="${UBUNTU_GIT_KEY:-$HOME/.ssh/corruptedKey_march2023}"
-    if [[ ! -f "$github_key" ]]; then
-        echo "ERROR: missing GitHub SSH key: $github_key" >&2
-        return 1
-    fi
-    export GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes -i ${github_key}"
-
-    # Ensure ssh-agent so a correct passphrase is cached for later pull / lfs.
-    if [[ -z "${SSH_AUTH_SOCK:-}" ]]; then
-        eval "$(ssh-agent -s)" >/dev/null
-    fi
-
-    # Fast path: key already unlocked in agent and GitHub accepts it.
-    if GIT_SSH_COMMAND="ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ${github_key}" \
-        git fetch 2>/dev/null; then
-        git pull || true
-        return 0
-    fi
-
-    while true; do
-        # Drop any bad/partial agent entry so ssh always re-prompts.
-        ssh-add -d "$github_key" 2>/dev/null || true
-
-        echo ""
-        echo "=== Enter passphrase for ${github_key} ==="
-        echo "Wrong passphrase will re-ask — will not proceed until git fetch succeeds (Ctrl-C to abort)."
-        if ! ssh-add "$github_key"; then
-            echo ""
-            echo "Wrong passphrase (ssh-add failed). Try again."
-            continue
-        fi
-
-        echo "=== git fetch (verifying GitHub access) ==="
-        if git fetch; then
-            echo "=== GitHub SSH OK ==="
-            git pull || true
-            return 0
-        fi
-
-        echo ""
-        echo "ERROR: git fetch failed (Permission denied / publickey)."
-        echo "Removing key from agent and asking again."
-        ssh-add -d "$github_key" 2>/dev/null || true
-    done
-}
 
 work2() {
     # Stale interactive shells keep old febeprod (alias expanded into function body).
@@ -2529,11 +2680,10 @@ work2() {
     cd ~/code/main
     ls -latr
     pwd
-    # 1) Update remote — loop until SSH passphrase is correct (no proceed on Permission denied)
-    if ! work2_git_fetch_until_ok; then
-        echo "ERROR: work2 aborted — GitHub SSH auth failed" >&2
-        return 1
-    fi
+    # 1) Update remote and show branch status
+    git fetch
+    # Note: git pull only works if your current local branch has an upstream
+    git pull 
     echo "--------------------------------"
     git branch
     echo "--------------------------------"
@@ -2566,6 +2716,9 @@ work2() {
         echo "Restore cancelled."
         return 1
     fi
+
+    echo "=== work2: git lfs pull usbzip (real installer zips) ==="
+    git lfs pull --include="usbzip/**" 2>/dev/null || git lfs pull 2>/dev/null || true
 
     # Obfuscate? Y/enter → buildprod; n → buildprodnoobfuscate
     read -p "Do you want Obfuscate (Y/n)? " OBFUSCATE_CHOICE
@@ -2665,7 +2818,9 @@ work2_deploy() {
     echo -e "_______________________________________\n"
     savedir 2>/dev/null || export LAST_CD_INPUT="$HOME/code/main"
     echo "=== work2_deploy: febeprod (FE build must produce fe/dist before BE) ==="
-    if ! febeprod; then
+        echo "=== work2_deploy: git lfs pull usbzip ==="
+    git lfs pull --include="usbzip/**" 2>/dev/null || git lfs pull 2>/dev/null || true
+if ! febeprod; then
         echo "ERROR: work2_deploy aborted — febeprod failed (see FE dist / build errors above)" >&2
         return 1
     fi

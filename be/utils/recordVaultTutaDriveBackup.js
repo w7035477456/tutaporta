@@ -2,7 +2,7 @@
  * TutaDrive member backup — encrypted backup files under users/M{id}/.
  * Plain vault zip is produced server-side; Encrypt Password sealing happens in the browser (DEK).
  *
- * Stored name: EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip  (payload = TNBAK1 sealed bytes from client)
+ * Stored name: EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip  (payload = TNBAK2 — or legacy TNBAK1 — sealed bytes from client)
  * Legacy names backup_YYYY-MM-DD[_HH-MM-SS].zip are still listed / restorable / deletable.
  */
 import fs from 'fs';

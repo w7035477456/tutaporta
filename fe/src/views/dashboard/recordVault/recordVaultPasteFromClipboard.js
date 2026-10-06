@@ -14,8 +14,12 @@
  * in clipboardData during the paste event. We merge both sources.
  */
 
-const UNUSABLE_IMG_SRC =
-  /^(webkit-fake-url:|x-apple-|cid:|file:|about:|chrome-extension:)/i;
+/** Only these img srcs render in the editor; everything else is a placeholder to fill or drop. */
+const USABLE_IMG_SRC = /^(data:image\/|blob:|https?:|\/\/|\/(?!\/))/i;
+
+/** Apple NSAttributedString attachment marker — where an image sat in the copied note. */
+const OBJECT_REPLACEMENT_CHAR_RE = /\uFFFC/g;
+const PASTE_IMAGE_SLOT_HTML = '<img src="#">';
 
 const ALLOWED_TAGS = new Set([
   'P',
@@ -59,13 +63,22 @@ const ALLOWED_TAGS = new Set([
   'MARK'
 ]);
 
+/**
+ * webkit-fake-url:, file:, cid:, "#", and bare relative names like
+ * "Pasted Graphic.png" (Apple RTFD → HTML) are unreachable from the browser.
+ */
 export function isUnusableImageSrc(src) {
   const s = String(src || '').trim();
   if (!s) return true;
-  if (UNUSABLE_IMG_SRC.test(s)) return true;
-  // Empty / placeholder Apple Notes media
-  if (s === '#' || s.startsWith('#')) return true;
-  return false;
+  return !USABLE_IMG_SRC.test(s);
+}
+
+export function countObjectReplacementChars(text) {
+  return (String(text || '').match(OBJECT_REPLACEMENT_CHAR_RE) || []).length;
+}
+
+function objectReplacementCharsToImageSlots(html) {
+  return String(html || '').replace(OBJECT_REPLACEMENT_CHAR_RE, PASTE_IMAGE_SLOT_HTML);
 }
 
 function fileDedupeKey(file) {
@@ -262,6 +275,7 @@ export function htmlHintsImages(html) {
   if (!s) return false;
   return (
     /<img\b/i.test(s) ||
+    /\uFFFC/.test(s) ||
     /webkit-fake-url:/i.test(s) ||
     /\bx-apple-/i.test(s) ||
     /AppleAttachment/i.test(s) ||
@@ -279,16 +293,22 @@ export function countUnmaterializedImages(html) {
   let count = 0;
   for (const img of root?.querySelectorAll('img') || []) {
     const src = img.getAttribute('src') || '';
-    if (!/^data:/i.test(src)) count += 1;
+    if (/^blob:/i.test(src) || isUnusableImageSrc(src)) count += 1;
   }
   return count;
 }
 
-async function resolveImageFilesForPaste(clipboardData, _htmlRaw, normalizedHtml) {
+/**
+ * Chrome on Mac often drops Apple Notes images from the paste-event HTML entirely
+ * (no <img>, no placeholder), so rich pastes with no image files also ask the
+ * async clipboard — the only place those bytes may still be exposed.
+ */
+async function resolveImageFilesForPaste(clipboardData, htmlRaw, normalizedHtml) {
   let files = collectClipboardImageFiles(clipboardData);
   const placeholders = countUnmaterializedImages(normalizedHtml);
+  const richPasteWithoutFiles = Boolean(String(htmlRaw || '').trim()) && files.length === 0;
 
-  const needsAsync = placeholders > 0 && placeholders > files.length;
+  const needsAsync = (placeholders > 0 && placeholders > files.length) || richPasteWithoutFiles;
 
   if (needsAsync) {
     const asyncFiles = await readClipboardImageFilesAsync();
@@ -344,10 +364,10 @@ export function plainTextToHtml(plain) {
  */
 export function normalizePastedHtml(html) {
   if (typeof DOMParser === 'undefined') {
-    return unwrapAppleFragment(html);
+    return objectReplacementCharsToImageSlots(unwrapAppleFragment(html));
   }
 
-  const raw = unwrapAppleFragment(html);
+  const raw = objectReplacementCharsToImageSlots(unwrapAppleFragment(html));
   const doc = new DOMParser().parseFromString(
     `<div id="rv-paste-root">${raw}</div>`,
     'text/html'
@@ -451,7 +471,9 @@ export function normalizePastedHtml(html) {
  * and resolve blob: URLs to durable data: URLs so autosave keeps the pixels.
  */
 export async function materializePastedHtmlImages(html, imageFiles = []) {
-  if (typeof DOMParser === 'undefined') return { html: String(html || ''), unusedFiles: imageFiles };
+  if (typeof DOMParser === 'undefined') {
+    return { html: String(html || ''), unusedFiles: imageFiles, droppedImages: 0 };
+  }
 
   const doc = new DOMParser().parseFromString(
     `<div id="rv-paste-root">${String(html || '')}</div>`,
@@ -461,6 +483,7 @@ export async function materializePastedHtmlImages(html, imageFiles = []) {
   const imgs = [...(root?.querySelectorAll('img') || [])];
   const fileQueue = [...imageFiles];
   const unusedFiles = [];
+  let droppedImages = 0;
 
   for (const img of imgs) {
     const src = img.getAttribute('src') || '';
@@ -482,16 +505,18 @@ export async function materializePastedHtmlImages(html, imageFiles = []) {
           img.setAttribute('src', await fileToDataUrl(next));
         } catch {
           img.remove();
+          droppedImages += 1;
         }
       } else {
         img.remove();
+        droppedImages += 1;
       }
     }
   }
 
   unusedFiles.push(...fileQueue);
 
-  return { html: root?.innerHTML?.trim() || '<p></p>', unusedFiles };
+  return { html: root?.innerHTML?.trim() || '<p></p>', unusedFiles, droppedImages };
 }
 
 function imagesToHtml(dataUrls) {
@@ -502,26 +527,31 @@ function imagesToHtml(dataUrls) {
 }
 
 /**
- * Build HTML TipTap can insert from a paste event.
- * Returns null when the paste should fall through to TipTap's default handler.
+ * Build HTML TipTap can insert from a paste event, plus how many images the
+ * source had (`expectedImages`) vs how many made it in (`insertedImages`).
+ * `html` is null when the paste should fall through to TipTap's default handler.
  */
-export async function buildRecordVaultPasteHtml(clipboardData) {
-  if (!clipboardData) return null;
+export async function buildRecordVaultPasteResult(clipboardData) {
+  const empty = { html: null, expectedImages: 0, insertedImages: 0 };
+  if (!clipboardData) return empty;
 
   const htmlRaw = String(clipboardData.getData('text/html') || '');
   const plain = String(clipboardData.getData('text/plain') || '');
   const syncFiles = collectClipboardImageFiles(clipboardData);
 
-  if (!htmlRaw && !plain && !syncFiles.length) return null;
+  if (!htmlRaw && !plain && !syncFiles.length) return empty;
+
+  const plainImageSlots = countObjectReplacementChars(plain);
 
   // Tiny plain-only paste (e.g. a few characters) — let TipTap handle it.
-  if (!htmlRaw && !syncFiles.length && !htmlHintsImages(htmlRaw)) {
-    if (!plain || (plain.length < 8 && !/\n/.test(plain))) return null;
+  if (!htmlRaw && !syncFiles.length && !plainImageSlots) {
+    if (!plain || (plain.length < 8 && !/\n/.test(plain))) return empty;
   }
 
   let html = '';
   let unusedFiles = [];
   let placeholdersBefore = 0;
+  let droppedImages = 0;
 
   if (htmlRaw) {
     const normalized = normalizePastedHtml(htmlRaw);
@@ -530,9 +560,15 @@ export async function buildRecordVaultPasteHtml(clipboardData) {
     const materialized = await materializePastedHtmlImages(normalized, imageFiles);
     html = materialized.html;
     unusedFiles = materialized.unusedFiles;
+    droppedImages = materialized.droppedImages;
   } else if (plain) {
-    html = plainTextToHtml(plain);
-    unusedFiles = await resolveImageFilesForPaste(clipboardData, '', '');
+    const withSlots = objectReplacementCharsToImageSlots(plainTextToHtml(plain));
+    placeholdersBefore = plainImageSlots;
+    const imageFiles = await resolveImageFilesForPaste(clipboardData, '', withSlots);
+    const materialized = await materializePastedHtmlImages(withSlots, imageFiles);
+    html = materialized.html;
+    unusedFiles = materialized.unusedFiles;
+    droppedImages = materialized.droppedImages;
   } else {
     unusedFiles = await resolveImageFilesForPaste(clipboardData, htmlRaw, '');
   }
@@ -557,16 +593,33 @@ export async function buildRecordVaultPasteHtml(clipboardData) {
 
   let trimmed = String(html || '').trim();
   trimmed = dedupeMirroredPasteHtml(trimmed);
-  if (!trimmed || trimmed === '<p></p>') return null;
+  if (!trimmed || trimmed === '<p></p>') return empty;
 
-  if (htmlRaw && placeholdersBefore > 0 && !/<img\b/i.test(trimmed)) {
-    console.warn(
-      '[RecordVault paste] Apple Notes images were not exposed to the browser clipboard. ' +
-        'Try pasting again, or copy fewer images at once.'
-    );
+  const insertedImages = Math.max(0, placeholdersBefore - droppedImages);
+  if (droppedImages > 0) {
+    console.warn('[RecordVault paste] images not exposed to the browser clipboard', {
+      expected: placeholdersBefore,
+      inserted: insertedImages
+    });
   }
 
-  return trimmed;
+  return { html: trimmed, expectedImages: placeholdersBefore, insertedImages };
+}
+
+export async function buildRecordVaultPasteHtml(clipboardData) {
+  const { html } = await buildRecordVaultPasteResult(clipboardData);
+  return html;
+}
+
+export function recordVaultMissingPasteImagesMessage(missingCount) {
+  const n = Math.max(1, Math.trunc(Number(missingCount) || 1));
+  const noun = n === 1 ? 'image was' : 'images were';
+  return (
+    `Text pasted, but ${n} ${noun} not handed to the browser by the app you copied from, so ${n === 1 ? 'it was' : 'they were'} skipped.\n\n` +
+    'To bring images in:\n' +
+    '• Copy each image on its own (click the image → Ctrl/Cmd-C) and paste it here, or drag the image file onto the note.\n' +
+    '• Or copy/paste the note using Safari, which passes Apple Notes images through more often than Chrome.'
+  );
 }
 
 /**
@@ -579,7 +632,7 @@ export function shouldHandleRecordVaultPaste(clipboardData) {
   const files = collectClipboardImageFiles(clipboardData);
   if (files.length) return true;
   if (html) return true;
-  if (htmlHintsImages(html)) return true;
+  if (countObjectReplacementChars(plain)) return true;
   if (plain.length >= 8 || /\n/.test(plain)) return true;
   return false;
 }

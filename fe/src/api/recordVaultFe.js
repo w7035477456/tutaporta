@@ -999,9 +999,10 @@ export async function createRecordVaultTutaDriveEncryptedBackup(note = '') {
     throw new Error('Unlock with your Encrypt Password first, then run Backup again');
   }
   const dek = getRecordVaultE2eDek();
+  const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
   const zipResponse = await api.get('/api/recordVault/tutadrive/backup-zip', { responseType: 'blob' });
   const zipBuf = new Uint8Array(await zipResponse.data.arrayBuffer());
-  const sealed = await sealTutaDriveBackupZipWithDek(zipBuf, dek);
+  const sealed = await sealTutaDriveBackupZipWithDek(zipBuf, dek, vaultKeys);
   const formData = new FormData();
   formData.append(
     'backup',
@@ -1043,15 +1044,6 @@ export async function downloadRecordVaultTutaDriveStoredBackup(fileName) {
   }
 }
 
-function isTutaDriveSealedBackupBytes(bytes) {
-  const magic = new TextEncoder().encode('TNBAK1');
-  if (!bytes || bytes.length < magic.length) return false;
-  for (let i = 0; i < magic.length; i += 1) {
-    if (bytes[i] !== magic[i]) return false;
-  }
-  return true;
-}
-
 /**
  * Upload a sealed EncryptedBackup_*.zip into the member folder.
  * - With replaceFileName: PUT replace that slot in place.
@@ -1060,14 +1052,17 @@ function isTutaDriveSealedBackupBytes(bytes) {
 export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileName) {
   if (!file) throw new Error('Choose a backup zip file first');
   const rawBytes = new Uint8Array(await file.arrayBuffer());
+  const { isTutaDriveSealedBackupBytes, sealTutaDriveBackupZipWithDek } = await import(
+    'utils/recordVaultClientVaultCrypto'
+  );
   let sealed = rawBytes;
   if (!isTutaDriveSealedBackupBytes(rawBytes)) {
     const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
-    const { sealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
     if (!isRecordVaultE2eUnlocked()) {
       throw new Error('Unlock with your Encrypt Password first, then upload again');
     }
-    sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek());
+    const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
+    sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek(), vaultKeys);
   }
   const formData = new FormData();
   const uploadName = replaceFileName ? String(replaceFileName) : 'EncryptedBackup.zip';
@@ -1095,8 +1090,11 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
 
 /** Download sealed backup, unseal with Encrypt Password DEK, restore vault on server. */
 export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName) {
-  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked, takeRecordVaultBackupDecryptPassword } = await import(
+    'utils/recordVaultClientSession'
+  );
   const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  const password = takeRecordVaultBackupDecryptPassword();
   if (!isRecordVaultE2eUnlocked()) {
     throw new Error('Unlock with your Encrypt Password first, then run Restore again');
   }
@@ -1109,7 +1107,7 @@ export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName)
     const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
     sealedBytes = new Uint8Array(await response.data.arrayBuffer());
   }
-  const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek);
+  const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
   const formData = new FormData();
   formData.append(
     'backup',
@@ -1125,8 +1123,11 @@ export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName)
 }
 
 async function unsealRecordVaultTutaDriveStoredBackupBytes(file, fileName) {
-  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked, takeRecordVaultBackupDecryptPassword } = await import(
+    'utils/recordVaultClientSession'
+  );
   const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  const password = takeRecordVaultBackupDecryptPassword();
   if (!isRecordVaultE2eUnlocked()) {
     throw new Error('Unlock with your Encrypt Password first, then try again');
   }
@@ -1139,7 +1140,7 @@ async function unsealRecordVaultTutaDriveStoredBackupBytes(file, fileName) {
     const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
     sealedBytes = new Uint8Array(await response.data.arrayBuffer());
   }
-  return unsealTutaDriveBackupZipWithDek(sealedBytes, dek);
+  return unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
 }
 
 /** Preview merge from a stored sealed backup (requires TutaNotes Cloud open/unlocked on server). */

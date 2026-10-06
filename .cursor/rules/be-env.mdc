@@ -1,5 +1,5 @@
 ---
-description: Backend environment reference (~/.ssh/be/.env) — Mac dev snapshot and variable behavior
+description: Backend environment reference (~/.ssh/be/.env) — Ubuntu production snapshot, Mac dev differences, and variable behavior
 alwaysApply: true
 ---
 
@@ -7,211 +7,135 @@ alwaysApply: true
 
 Runtime config for the Node backend is loaded from **`~/.ssh/be/.env`** (not committed to git). After changes, restart PM2: `pm2 restart onlinemallwebsite`.
 
-Relevant loader: `be/loadEnv.js` (imported first in `be/server_be.js`).
+Relevant loader: `be/loadEnv.js` (imported first in `be/server_be.js`) → `be/utils/expandHomeEnv.js` (dotenv + dotenv-expand, `override: true`).
 
-Mac dev snapshot below. **Secrets are redacted in this doc** — keep real values only in `~/.ssh/be/.env`.
+**Source of this doc:** Ubuntu production copy **`myscript/ubuntu/be.env`** (gitignored — real secrets). Refresh it from xbox2 with the Mac function **`syncbenv`** (`source ~/b`). Values below are **production** unless marked **Mac**. **Secrets are redacted** (`****`) — real values only in `~/.ssh/be/.env` / `myscript/ubuntu/be.env`, never in git or rules.
 
-## Speed dating (1:1 WebRTC)
+## Parsing rules (dotenv)
 
-Video goes **browser-to-browser**, not through the R630 web servers. App servers only persist pairing + SDP/ICE in Postgres.
+- **Duplicate keys → last one wins.** Prod file repeats `ROOT_FOLDER` (`/home/lawsen0` then `/mnt/pgdata16` → **`/mnt/pgdata16`**), `AI_VOICE` (`Sora` then **`Sulafat`**), `GEMINI_API_KEY`, `FE_RATE_LIMIT_ENABLE`, `USB_ICON_ENCRYPTTON`, `ENABLE_LOGIN_BYPASS`.
+- **Must be `KEY=value`.** `KEY:value` (no space after `:`) is **silently ignored**.
+- Inline comments after whitespace are stripped (`REFRESH_ASN_VPN_AT=24   # default` → `24`).
+- `${VAR}` expansion works (`FAST_STORAGE_FOLDER=${ROOT_FOLDER}/…`).
+- Keys are **case-sensitive** on Linux.
+- Mac: `loadEnv.js` replaces unwritable `/mnt/…` storage paths with `~/onlinemallwebsite_storage` / `~/onlinemallwebsite_largecheapstorage`.
 
-```bash
-SPEEDDATING=false
-# SPEED_DATE_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
-# SPEED_DATE_TURN_URLS=turn:192.168.222.202:3478?transport=udp
-# SPEED_DATE_TURN_USERNAME=speeddate
-# SPEED_DATE_TURN_CREDENTIAL=****
-```
+## Known problems in current prod `be.env`
 
-| Variable | Notes |
-|----------|-------|
-| `SPEEDDATING` | `true` → show the Speed Dating sidebar item (`fe/src/config/speedDatingEnv.js`). Any other value (or unset) hides it. Mirrored into the Vite FE bundle. Restart Vite / re-run FE build after changing. |
-| `SPEED_DATE_STUN_URLS` | Comma-separated STUN URLs. Default is Google public STUN. |
-| `SPEED_DATE_TURN_URLS` | Optional coturn relay on one R630 for guests behind strict NAT. Leave unset until coturn is running. |
-| `SPEED_DATE_TURN_USERNAME` / `SPEED_DATE_TURN_CREDENTIAL` | Required with TURN URLs. Do not commit secrets. |
+| Line in prod | Effect | Fix |
+|---|---|---|
+| `FLORISTONE_API_Key:292711`, `FLORISTONE_PASSWORD:****` | Colon syntax → **not loaded**; send-flowers has no credentials on prod. | Use `FLORISTONE_API_Key=…` / `FLORISTONE_PASSWORD=…`. |
+| `Admin=` / `DemoUser=` / `PilotUser=` / `Public=` | `be/mallDepartmentMode.js` reads **uppercase** keys only → ignored → every category gets `show_all` (PUBLIC not restricted). | Rename to `ADMIN=`, `DEMOUSER=`, `PILOTUSER=`, `PUBLIC=`. |
+| `AUTO_UI_POST_UPDATET=false` | Typo → ignored → post auto-update stays **on** (default `true`). | `AUTO_UI_POST_UPDATE=false`. |
+| `LINKEDIN_REDIRECT_URI=http://localhost:3000/…` | Prod LinkedIn OAuth would redirect to localhost. | `https://onlinemall.website/api/auth/linkedin/callback` (and add it in LinkedIn app). |
+| `DEBUG_PHOTO_INFO=true`, `MOBILE_PHOTO_UPLOAD_DEBUG=true` | Debug UI / logging on in production. | `false` unless actively debugging. |
 
-## New account signup
+**Keys in prod with no code reader (dead config):** `DISABLE_USEDRIVE`, `ALBUM_BUTTON_FONT_SIZE`, `USB_ICON_ENCRYPTTON`, `NOTES_/PHOTOALBUMS_TOTAL_{FREE,LEVEL1,LEVEL2}_TRANSFER_MB`, `RECORD_NOTES_MAX_IMAGE_SIZE_MB`, `RECORD_NOTES_MAX_IMAGE_PER_ACCOUNT`, `NOTES_/PHOTOALBUMS_POSTGRES`, `NOTES_/PHOTOALBUMS_GOOGLE_DRIVE`, `NOTES_/PHOTOALBUMS_DROPBOX`, `DROPBOX_OAUTH_CLIENT_ID/SECRET`, `DROPBOX_VAULT_REDIRECT_URI`, `RECORD_NOTES_USB_MODE`, `RECORD_PHOTOALBUMS_USB_MODE`, `PHOTOALBUMS_BACKUP_USB_DISABLE`.
 
-```bash
-NEW_ACCOUNT_SIGNUP=true
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `NEW_ACCOUNT_SIGNUP` | `true` | Exposed via server config API; controls whether new account signup is allowed (`be/server_be.js`, `fe/src/views/pages/authentication/Login.jsx`). |
-
-## LinkedIn OAuth
+## Security / platform (Mac vs Ubuntu differ)
 
 ```bash
-
-LINKEDIN_REDIRECT_URI=http://localhost:3000/api/auth/linkedin/callback
-LINKEDIN_PARTNER_POSITIONS=true
-```
-
-| Variable | Notes |
-|----------|-------|
-| `ClientId` | Alias for `LINKEDIN_CLIENT_ID` (`be/routes/singles/linkedinOAuth.js`). |
-| `PrimaryClientSecret` | Alias for `LINKEDIN_CLIENT_SECRET`. |
-| `LINKEDIN_REDIRECT_URI` | OAuth callback; Mac dev uses Vite `:3000` proxy path. |
-| `LINKEDIN_PARTNER_POSITIONS` | `true` → request positions scope for job/company auto-verify (requires LinkedIn Partner Program approval). |
-
-## Google signup OAuth
-
-```bash
-GOOGLE_OAUTH_CLIENT_ID=….apps.googleusercontent.com
-GOOGLE_OAUTH_CLIENT_SECRET=****
-GOOGLE_OAUTH_REDIRECT_URI=http://localhost:3000/api/auth/google/signup/callback
-```
-
-| Variable | Notes |
-|----------|-------|
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Web OAuth client (`be/routes/auth/googleSignupOAuth.js`). Same pair can power Record Vault Drive. |
-| `GOOGLE_OAUTH_REDIRECT_URI` | Must **exactly** match an Authorized redirect URI in Google Cloud Console → Credentials → that OAuth client. Mac: Vite `:3000` proxy path. Prod: `https://onlinemall.website/api/auth/google/signup/callback` (add both URIs on the same client). Missing match → `Error 400: redirect_uri_mismatch`. |
-
-## Live face scan
-
-```bash
-SKIP_LIVE_FACE_SCAN=false
-LIVE_SCAN_COOLDOWN=1
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `SKIP_LIVE_FACE_SCAN` | `false` | When `true`, skips Rekognition liveness (`be/lib/rekognitionClient.js`). |
-| `LIVE_SCAN_COOLDOWN` | `1` | Minutes before user can retry after failed liveness scan. |
-
-## Lockout / access control
-
-```bash
-PUBLIC_LOCKOUT=false
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `PUBLIC_LOCKOUT` | `false` | Intended: when `true`, lock out `member_type=PUBLIC`. **Runtime login lockout today uses `LOCK_OUT`** (checks `member_category` PilotUser/Admin only) in `be/routes/singles/beVerifyLoginPassword.js`. Align env name with code before enabling. |
-
-## Critical production config
-
-```bash
-BY_PASS_SMS_PHONE_VERIFICATION=false
-DUPLICATE_PHONE_ALLOW=true
-ENABLE_LOGIN_BYPASS=false
-BLOCK_MOBILE=false
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `BY_PASS_SMS_PHONE_VERIFICATION` | `false` | When `true`, skips SMS phone verification on signup (`be/utils/bypassSmsPhoneVerification.js`). |
-| `DUPLICATE_PHONE_ALLOW` | `true` | `true` → skip duplicate-phone check (Mac/staging Twilio test mode; `be/utils/duplicatePhonePolicy.js`). |
-| `ENABLE_LOGIN_BYPASS` | `false` | `true` → passwordless login as `SPECIAL_ID` (`be/routes/singles/beLoginBypass.js`). **Keep `false` on real production.** |
-| `BLOCK_MOBILE` | `false` | When `true` (default), login blocks compact/mobile viewports (`be/utils/blockMobileConfig.js`). |
-
-## Member visibility (listings)
-
-```bash
-SHOW_MEMBER_CATEGORY=REGULARMEMBER,DEMOUSER,ALLMEMBER
-```
-
-Filters All Singles–style listings to active users whose `member_category` is in this comma list (`be/routes/singles/memberVisibility.js`). Values are uppercase and match DB enum labels (`PUBLIC`, `ADMIN`, `DEMOUSER`, `PILOTUSER`, `REGULARMEMBER`, `ANYMEMBER`). `ALLMEMBER` is accepted as an alias for `ANYMEMBER`. `REGULARMEMBER` and `ANYMEMBER` are always included when the env list is non-empty.
-
-## Dev login shortcut
-
-```bash
-SPECIAL_LINK=/bamboom62895
-SPECIAL_ID=a2@b.com
-SPECIAL_P=****
-```
-
-| Variable | Notes |
-|----------|-------|
-| `SPECIAL_LINK` | FE opens login with prefilled id/password (`fe/src/config/specialLoginEnv.js`, `LoginBypass.jsx`). |
-| `SPECIAL_ID` / `SPECIAL_P` | BE bypass credentials (`be/routes/singles/beLoginBypass.js`). **Never commit real passwords.** |
-
-## Security — Mac dev (keep as-is)
-
-```bash
-NODE_ENV=development
+# Ubuntu production
+NODE_ENV=production
 AUTH_COOKIE_SAMESITE=strict
-AUTH_COOKIE_SECURE=false
-PUBLIC_APP_URL=http://localhost:3000
-DEV_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:40000
-
-JWT_PRIVATE_KEY_PATH=/Users/a/.ssh/be/private_key.pem
-JWT_PUBLIC_KEY_PATH=/Users/a/.ssh/be/public_key.pem
+AUTH_COOKIE_SECURE=true
+PUBLIC_APP_URL=https://onlinemall.website
+JWT_PRIVATE_KEY_PATH=${HOME}/.ssh/be/private_key.pem
+JWT_PUBLIC_KEY_PATH=${HOME}/.ssh/be/public_key.pem
+CLUSTER_MULTI_SERVER=true
+REDIS_URL=redis://:****@127.0.0.1:6379
 ```
 
-| Variable | Notes |
-|----------|-------|
-| `NODE_ENV` | `development` on Mac; `production` behind HTTPS in prod. |
-| `AUTH_COOKIE_SAMESITE` | `strict` when FE+BE same site; `none` only if cross-site cookies required (+ Secure). |
-| `AUTH_COOKIE_SECURE` | `false` on Mac HTTP; `true` behind HAProxy HTTPS in prod. |
-| `PUBLIC_APP_URL` | Mac: `http://localhost:3000`. Prod: HAProxy public hostname. |
-| `DEV_ALLOWED_ORIGINS` | **Mac dev only** — comma-separated CORS origins (`be/server_be.js`). Do not use in production. |
-| `JWT_*_KEY_PATH` | RS256 key pair paths; not in repo. |
+| Variable | Prod | Mac dev | Notes |
+|---|---|---|---|
+| `NODE_ENV` | `production` | `development` | |
+| `AUTH_COOKIE_SECURE` | `true` | `false` | `true` behind HAProxy HTTPS. |
+| `PUBLIC_APP_URL` | `https://onlinemall.website` | `http://localhost:3000` | |
+| `DEV_ALLOWED_ORIGINS` | unset | `http://localhost:3000,http://localhost:40000` | **Mac only** CORS list (`be/server_be.js`). |
+| `JWT_*_KEY_PATH` | `${HOME}/.ssh/be/*.pem` | `/Users/a/.ssh/be/*.pem` | RS256 pair; not in repo. |
+| `CLUSTER_MULTI_SERVER` | `true` | unset | Strict startup checks that media / OneDrive staging use shared storage (`be/utils/sharedMediaStorage.js`, `*OneDriveStagingRoot.js`). |
+| `REDIS_URL` | password-protected localhost | `redis://localhost:6379` | Shared Redis for all web hosts. Always TTL; fall back to DB if down. |
 
-## Photos / videos
+## Storage folders
 
 ```bash
-# Tuta Dates media: per-member under FAST_STORAGE_FOLDER (legacy flat folders optional for old reads)
+ROOT_FOLDER=/mnt/pgdata16
+FAST_STORAGE_FOLDER=${ROOT_FOLDER}/onlinemallwebsite_storage
+UPLOAD_FOLDER=${FAST_STORAGE_FOLDER}/mobile_upload
 TUTADATES_PHOTO_FOLDER=${FAST_STORAGE_FOLDER}/photos/
-TUTADATES_VIDEO_FOLDER=${FAST_STORAGE_FOLDER}/videos/  # optional
-MAX_SIZE_UPLOAD_MB=9
-JSON_LIMIT_MB=400
+TUTADATES_VIDEO_FOLDER=${FAST_STORAGE_FOLDER}/videos/
+RECORD_NOTES_FOLDER=${FAST_STORAGE_FOLDER}/notes/
+LARGE_CHEAP_STORAGE_FOLDER=${ROOT_FOLDER}/onlinemallwebsite_largecheapstorage
+INCLUDE_USB_DMG_EXE=false
+USB_DMG_EXE=${FAST_STORAGE_FOLDER}/USB_DMG_EXE
 ```
 
 | Variable | Notes |
-|----------|-------|
-| `TUTADATES_PHOTO_FOLDER` | **Legacy** flat photo root (`…/onlinemallwebsite_storage/photos/`). Used for read fallback only. **New uploads** go to `{FAST_STORAGE_FOLDER}/users/M{member_id}/tutadates/photos/`. |
-| `TUTADATES_VIDEO_FOLDER` | **Legacy** flat video root. **New uploads** go to `{FAST_STORAGE_FOLDER}/users/M{member_id}/tutadates/videos/`. Defaults to `{parent of legacy photos}/videos/` if unset. |
-| `MAX_SIZE_UPLOAD_MB` | Upload cap per photo (`be/routes/photos/uploadPhoto.js`). |
-| `JSON_LIMIT_MB` | Express JSON body limit (base64 uploads). Align nginx `client_max_body_size` if used. |
+|---|---|
+| `ROOT_FOLDER` | Base for expansions. Mac: `FAST_STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage`, `LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_largecheapstorage`. |
+| `FAST_STORAGE_FOLDER` | General app storage and **Tuta Dates media**: `{root}/users/M{member_id}/tutadates/{photos,videos}`. |
+| `UPLOAD_FOLDER` | Phone/mobile upload staging (`photoAlbumsMobileUploadFolderRoutes.js`). |
+| `TUTADATES_PHOTO_FOLDER` / `TUTADATES_VIDEO_FOLDER` | **Legacy** flat roots, read fallback only. New uploads → per-member folders above. |
+| `RECORD_NOTES_FOLDER` | Legacy notes root (`deleteMemberMobileUploads.js`, `tutaMallUserBackup.js`). |
+| `LARGE_CHEAP_STORAGE_FOLDER` | TutaDrive / TutaNotes / TutaPhoto vaults: `{root}/users/M{member_id}/notes` and `…/photoalbums`. **Multi-server: every web host must see the same path** (vault coherence, `vaultClusterCoherence.js`). Migration helper: `node be/scripts/migrateTutaDatesMediaToMemberFolders.js --dry-run`. |
+| `INCLUDE_USB_DMG_EXE` / `USB_DMG_EXE` | USB bridge installer bundling + download dir (`includeUsbDmgExeConfig.js`, `photoAlbumsBridgeInstaller.js`). Prod `false`. |
 
-## TutaDrive / large cheap storage
+## TutaNotes / TutaPhoto vault switches
 
 ```bash
-LEFT_SIDE=TutaDrive
-RIGHT_SIDE=USB
-FAST_STORAGE_FOLDER=/Users/a/onlinemallwebsite_storage
-LARGE_CHEAP_STORAGE_FOLDER=/Users/a/onlinemallwebsite_largecheapstorage
+LEFT_SIDE=TUTADRIVE
+RIGHT_SIDE=NONE
+ONENOTE_USB_UPGRADE=false
+NOTES_LOCAL_USB=true
+PHOTOALBUMS_LOCAL_USB=true
+NOTES_BACKUP_USB_DISABLE=true
+NOTES_E2E_YELLOW=true
+PHOTOALBUMS_E2E_YELLOW=true
+NOTES_ICON_ENCRYPTION=false
+PHOTOALBUMS_ICON_ENCRYPTION=false
+NOTES_ENCRYPT_PHOTO_AND_DB=true
+PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB=true
+NOTES_ICON_RETRY_DELAY_SEC=10
+PHOTOALBUMS_ICON_RETRY_DELAY_SEC=10
+PHOTO_ALBUMS_ACCESS_RETRY_DELAY_SEC=180
+NOTES_DEFAULT_BUTTON_FONT_SIZE_REM=2
+PHOTOALBUMS_DEFAULT_BUTTON_FONT_SIZE_REM=2
+RECORD_NOTES_ICON_KEYS_MASTER_KEY=****
+RECORD_PHOTOALBUMS_ICON_KEYS_MASTER_KEY=****
+TEMPKEY_USB=****
+NOTES_MAX_SIZE_UPLOAD_MB=20
 ```
 
 | Variable | Notes |
-|----------|-------|
-| `LEFT_SIDE` | Left panel on `/myNote`: `OneDrive` (default Microsoft OneDrive) \| `TutaDrive` (vault under `LARGE_CHEAP_STORAGE_FOLDER`) \| `None` (hide left panel). |
-| `RIGHT_SIDE` | Right panel on `/myNote`: `USB` (show USB bridge) \| `None` (hide USB). When unset, falls back to `NOTES_LOCAL_USB`. |
-| `FAST_STORAGE_FOLDER` | General app storage (photos installers, etc.) and **Tuta Dates media**: `{root}/users/M{member_id}/tutadates/{photos,videos}`. |
-| `LARGE_CHEAP_STORAGE_FOLDER` | TutaDrive / TutaNotes / TutaPhoto vaults: `{root}/users/M{member_id}/notes` and `…/photoalbums`. Tuta Dates media no longer lives here. Migrate from largecheap to storage: `node be/scripts/migrateTutaDatesMediaToMemberFolders.js` (`--dry-run` first). |
+|---|---|
+| `LEFT_SIDE` | Left panel on `/myNote`: `OneDrive` (default) \| `TutaDrive` (vault under `LARGE_CHEAP_STORAGE_FOLDER`) \| `None`. Prod `TUTADRIVE`; Mac `TutaDrive`. |
+| `RIGHT_SIDE` | Right panel: `USB` \| `None`. Prod `NONE` (USB hidden); Mac `USB`. Unset → falls back to `NOTES_LOCAL_USB` (`fe/src/config/rightSideEnv.js`). |
+| `ONENOTE_USB_UPGRADE` | `true` → TutaPhotoAlbums / TutaNotes mall tiles show the system-notification popup instead of navigating. Exposed via `GET /api/publicConfig` → `onenoteUsbUpgrade`. |
+| `*_LOCAL_USB` | Storage flags (`recordVaultStorageFlags.js`, `photoAlbumsStorageFlags.js`). |
+| `*_E2E_YELLOW` | Yellow E2E path (`vaultE2eYellowConfig.js`, `photoAlbumsE2eYellowConfig.js`). Default `true`. |
+| `*_ICON_ENCRYPTION` / `*_ENCRYPT_PHOTO_AND_DB` | Security-icon key mode / encrypt vault.db + media at rest (`*Usb/vaultCrypto.js`, `vaultPaths.js`). |
+| `*_ICON_RETRY_DELAY_SEC` | Wrong-icon unlock retry delay (`unlockGuard.js`). |
+| `PHOTO_ALBUMS_ACCESS_RETRY_DELAY_SEC` | Access-password fail cooldown (`photoAlbumsAccessFailGuard.js`). |
+| `*_ICON_KEYS_MASTER_KEY` | Encrypts cached icon keys / drive tokens (`photoAlbumsMasterKey.js`, `driveTokenCrypto.js`). Rotate: `node ./be/scripts/rotateRecordVaultIconKeysMasterKey.js`. **Secret.** |
+| `TEMPKEY_USB` | Temp icon key material (`recordVaultIconKeys.js`, `photoAlbumsIconKeys.js`). **Secret.** |
+| `NOTES_MAX_SIZE_UPLOAD_MB` | Note upload cap (`getUploadLimits.js`, `uploadPhoto.js`). |
 
-## ASN / VPN block list
+**TutaPhoto Full Disk Encryption skip** is per-user (UI **Skip Photo Encryption**), stored in `helloworldjunktest.singles.photoalbums_access_password_enabled = false` — not an env flag. **TutaNotes always requires Encrypt Password.**
+
+## Transfer throttle / tokens
 
 ```bash
-BLOCK_VPN_ASN=true
-BLOCKED_ASN_GITHUB_URL=https://raw.githubusercontent.com/X4BNet/lists_vpn/main/input/vpn/ASN.txt
-REFRESH_ASN_VPN_AT=24
+NOTES_OVERLIMIT_THROTTLE_MULTIPLE=30
+PHOTOALBUMS_OVERLIMIT_THROTTLE_MULTIPLE=30
+GB_PER_TOKEN=10
+PRICE_PER_TOKEN=10
 ```
 
 | Variable | Notes |
-|----------|-------|
-| `BLOCK_VPN_ASN` | Enable VPN ASN blocking (admin sync + request filtering). |
-| `BLOCKED_ASN_GITHUB_URL` | Source list for ASN sync (`be/utils/blockedAsnConfig.js`). |
-| `REFRESH_ASN_VPN_AT` | Daily refresh hour; `24` or `0` = midnight local (`be/utils/blockedAsnRefresh.js`). |
-
-## Partition retention
-
-```bash
-KEEP_USER_ACTIVITIES_SESSION=3
-KEEP_CHAT_LOG=3
-```
-
-Months of user-activities / chat partitions to keep; drop older partitions (see `be/db/migratePostingsMonthlyPartitions.sql` and related chat partition work).
-
-## Album limits
-
-```bash
-MAX_PHOTO_PER_ALBUM=10
-```
-
-Maximum photos per album.
+|---|---|
+| `*_OVERLIMIT_THROTTLE_MULTIPLE` | Over-quota transfer slowdown factor (`30` ≈ 30× slower) (`vaultTransferTracking.js`, `photoAlbumsTransferTracking.js`). |
+| `GB_PER_TOKEN` | GB of vault transfer per token (`*TransferTracking.js`, `settingsProfile.js`). |
+| `PRICE_PER_TOKEN` | Token price; mirrored into FE bundle (`pricePerTokenEnv.js`). |
 
 ## TutaPhoto free-tier quotas
 
@@ -222,126 +146,97 @@ TUTAPHOTO_MAX_IMAGE_PER_ACCOUNT=1000
 TUTAPHOTO_MAX_VIDEO_PER_ACCOUNT=100
 ```
 
-| Variable | Value | Behavior |
-|----|----|----|
-| `TUTAPHOTO_MAX_SIZE_IMAGE_UPLOAD_MB` | `20` | Per-image cap. Oversized images are auto-downsized in the browser (JPEG re-encode) with a popup; if that fails the user is told to resize externally. |
-| `TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB` | `100` | Per-video cap. Browsers cannot transcode video, so an oversized video is refused with the "Auto downsize failed" popup. |
-| `TUTAPHOTO_MAX_IMAGE_PER_ACCOUNT` | `1000` | Total live images per account across all albums. |
-| `TUTAPHOTO_MAX_VIDEO_PER_ACCOUNT` | `100` | Total live videos per account across all albums. |
+| Variable | Behavior |
+|---|---|
+| `TUTAPHOTO_MAX_SIZE_IMAGE_UPLOAD_MB` | Per-image cap. Oversized images auto-downsized in the browser (JPEG re-encode) with a popup; if that fails, user is told to resize externally. |
+| `TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB` | Per-video cap. Browsers cannot transcode → oversized video refused ("Auto downsize failed"). |
+| `TUTAPHOTO_MAX_IMAGE_PER_ACCOUNT` / `…_VIDEO_…` | Total live images / videos per account across all albums. |
 
-Read by `be/utils/tutaPhotoQuotaConfig.js`. Counts come from the member vault
-(`note_attachments`), so deleting media frees quota — no `singles` column needed.
-Exposed to the FE at `GET /api/photoAlbums/mediaQuota` and enforced again in
-`POST /api/photoAlbums/notes/:noteId/attachments`.
+Read by `be/utils/tutaPhotoQuotaConfig.js`; counts come from the member vault (`note_attachments`). Exposed at `GET /api/photoAlbums/mediaQuota`, enforced again in `POST /api/photoAlbums/notes/:noteId/attachments`. `be/server_be.js` raises the JSON body ceiling to `ceil(largest cap × 4/3) + 8` MiB (142 MiB at these values).
 
-**`JSON_LIMIT_MB` interaction:** base64 inflates request bodies by 4/3, so
-`be/server_be.js` raises its own ceiling to `ceil(largest cap × 4/3) + 8` MiB
-(142 MiB at the values above). Raising `TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB`
-raises that ceiling automatically; watch Node memory when doing so.
-
-## Auto logout (idle warning)
+## RAG / Ollama (TutaNotes search assistant)
 
 ```bash
-LOGOUT_AUTO_SEC=30
-LOGOUT_WARN_SEC=10
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `LOGOUT_AUTO_SEC` | `30` | After per-user idle minutes (`custom_logout_duration`), header countdown length in seconds (`IdleWarningCountdownBadge.jsx`). |
-| `LOGOUT_WARN_SEC` | `10` | Within that final countdown, seconds remaining when the modal popup appears (`SessionTimeoutWarning.jsx`). Must be ≤ `LOGOUT_AUTO_SEC`. At 0 with no activity → logout. |
-
-Per-user idle minutes: Profiles dashboard → `custom_logout_duration` (default 60 min).
-
-## Cloudflare WAF ASN sync
-
-```bash
-CLOUDFLARE_ASN_SYNC=true
-CLOUDFLARE_API_TOKEN=cfut_################################dbd9
-CLOUDFLARE_ZONE_ID=e7a44d07f94d2d583fb5c65dbeed0e7b
-CLOUDFLARE_ASN_RULE_NAME=RULE2
-CLOUDFLARE_RULESET_ID=a548139ba21e4b5797940e4c5a78f58b
-CLOUDFLARE_RULE_ID=6238ceedcbae416182f53680578fbc19
-CLOUDFLARE_ASN_BLOCK_NON_NA=true
-```
-
-Sync VPN ASN list to Cloudflare custom WAF rule via API (`be/utils/cloudflareAsnRuleSync.js`). `CLOUDFLARE_ASN_BLOCK_NON_NA=true` keeps the “non–North America” block in the rule.
-
-## Keep me logged in / session age
-
-```bash
-KEEP_ME_LOGIN=7
-AUTH_SESSION_MAX_AGE_MS=86400000
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `KEEP_ME_LOGIN` | `7` | Days for “Keep me logged in” checkbox (`be/utils/authCookie.js`). |
-| `AUTH_SESSION_MAX_AGE_MS` | `86400000` (1 day) | JWT + auth cookie max age when checkbox unchecked. `604800000` = 7 days; `2592000000` = 30 days. |
-
-## Barcode / phone upload QR
-
-```bash
-BARCODE_RENEW_MINUTES=30
-SCAN_FOR_PHONE_UPLOAD_SEC=10
+RAG_UI_ENABLED=true
+RAG_ENABLED=true
+RAG_SERVICE_URL=http://127.0.0.1:8765
+OLLAMA_MODEL=qwen2.5:7b
 ```
 
 | Variable | Notes |
-|----------|-------|
-| `BARCODE_RENEW_MINUTES` | Phone QR session lifetime (`be/utils/mobilePhotoUploadSession.js`). |
-| `SCAN_FOR_PHONE_UPLOAD_SEC` | Desktop poll interval for phone upload status — also set in **`fe/.env`** (`fe/src/config/phoneUploadScanEnv.js`). |
+|---|---|
+| `RAG_ENABLED` | Backend RAG routes (`recordVaultRagConfig.js`, `recordVaultRagRoutes.js`). Default `true`. |
+| `RAG_UI_ENABLED` | Mirrored into FE bundle (`fe/src/config/recordVaultRagUiEnv.js`). |
+| `RAG_SERVICE_URL` | Local RAG service (`scripts/start-rag-service.sh`, Mac alias `startllm`). |
+| `OLLAMA_MODEL` | Model for the RAG service (`scripts/rag-default-model.sh`). |
 
-## Bio approved viewing
+## Album binder (FE bundle)
 
 ```bash
-BIO_APPROVED_VIEW_DURATION=12
+ALBUM_BINDER_WIDTH_PCT=15
 ```
 
-Minimum approved bio viewing period in months (`be/utils/approvedViewingDurationConfig.js`).
+Mirrored into FE bundle (`fe/src/config/albumBinderWidthEnv.js`). Restart Vite / rebuild FE after changing.
 
-## Postgres logging
+## Gemini tutorial voice (scripts only)
 
 ```bash
-DB_DISPLAY_PERFORMANCE=delay
-PG_QUERY_LOG=true
-PG_CONNECT_LOG=true
-SHOW_PG_PERFORMANCE_LOG=true
+GEMINI_API_KEY=****
+AI_VOICE=Sulafat          # Sulafat warm, Achernar soft, Enceladus breathy
 ```
 
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `DB_DISPLAY_PERFORMANCE` | `delay` | PM2 SQL lines show `[p N milsec]`; `percentage` shows busy estimate. |
-| `PG_QUERY_LOG` / `PG_CONNECT_LOG` | `true` | Extra Postgres pool/checkout logging. |
-| `SHOW_PG_PERFORMANCE_LOG` | `true` | Master switch for pool/query logging (`be/db/connection.js`). |
+Used by `be/scripts/generate*TutorialGemini.js` (tutorial narration). Prod lists `AI_VOICE` twice — last (`Sulafat`) wins.
 
-## Amazon Rekognition
+## New account signup / speed dating
 
 ```bash
+NEW_ACCOUNT_SIGNUP=true
+SPEEDDATING=false
+# SPEED_DATE_STUN_URLS=stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
+# SPEED_DATE_TURN_URLS=turn:192.168.222.202:3478?transport=udp
+# SPEED_DATE_TURN_USERNAME=speeddate
+# SPEED_DATE_TURN_CREDENTIAL=****
+```
+
+| Variable | Notes |
+|---|---|
+| `NEW_ACCOUNT_SIGNUP` | Server config API → whether signup is allowed (`server_be.js`, `Login.jsx`). |
+| `SPEEDDATING` | `true` → Speed Dating sidebar item (`fe/src/config/speedDatingEnv.js`, mirrored into FE bundle). Video is browser-to-browser; servers only persist pairing + SDP/ICE in Postgres. |
+| `SPEED_DATE_*` | Optional STUN/TURN (not set on prod). TURN needs username + credential; never commit secrets. |
+
+## OAuth (Google / LinkedIn)
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=578541143589-….apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=****
+GOOGLE_OAUTH_REDIRECT_URI=https://onlinemall.website/api/auth/google/signup/callback
+
+ClientId=****
+PrimaryClientSecret=****
+LINKEDIN_REDIRECT_URI=http://localhost:3000/api/auth/linkedin/callback   # ⚠ prod still localhost
+LINKEDIN_PARTNER_POSITIONS=true
+```
+
+| Variable | Notes |
+|---|---|
+| `GOOGLE_OAUTH_*` | Web OAuth client (`be/routes/auth/googleSignupOAuth.js`). Redirect URI must **exactly** match an Authorized redirect URI in Google Cloud Console (add both prod and Mac `http://localhost:3000/api/auth/google/signup/callback`). Mismatch → `Error 400: redirect_uri_mismatch`. |
+| `ClientId` / `PrimaryClientSecret` | Aliases for `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` (`be/routes/singles/linkedinOAuth.js`). |
+| `LINKEDIN_PARTNER_POSITIONS` | `true` → request positions scope (needs LinkedIn Partner Program approval). |
+
+## Identity verification (live scan / Rekognition / AWS / MeasureOne)
+
+```bash
+SKIP_DL_PASSPORT_CHECK=false
+SKIP_LIVE_FACE_SCAN=false
+LIVE_SCAN_COOLDOWN=1
 REKOGNITION_ENABLED=true
 REKOGNITION_FACE_MATCH_THRESHOLD=80
 REKOGNITION_LIVENESS_MIN_CONFIDENCE=80
 REKOGNITION_REQUIRE_LIVENESS=true
 REKOGNITION_COGNITO_IDENTITY_POOL_ID=us-east-1:dbdcac5b-ff58-42f2-9436-09d0315725f8
-```
-
-| Variable | Notes |
-|----------|-------|
-| `REKOGNITION_REQUIRE_LIVENESS` | `true` in prod; Mac/local dev often `false` to skip liveness. |
-| `REKOGNITION_*` | See `be/README.md` for debug UI and Cognito pool. |
-
-## AWS (driver license / Rekognition)
-
-```bash
 AWS_ACCESS_KEY_ID=AKIA##############WHW4
-AWS_SECRET_ACCESS_KEY=********************************
+AWS_SECRET_ACCESS_KEY=****
 AWS_REGION=us-east-1
-```
-
-**Secrets only in `~/.ssh/be/.env`**, never in git or rules.
-
-## MeasureOne (education verification)
-
-```bash
 MEASUREONE_MOCK=true
 M1_PLATFORM=api-stg.measureone.com
 MEASUREONE_CLIENT_ID=your_client_id
@@ -351,76 +246,215 @@ MEASUREONE_HOST_NAME=api-stg.measureone.com
 MEASUREONE_LINK_SCRIPT_URL=https://api-stg.measureone.com/v3/js/m1-link-2021042000.js
 ```
 
-`MEASUREONE_MOCK=true` → mock flow without live API (`be/routes/singles/measureoneEducation.js`).
+| Variable | Notes |
+|---|---|
+| `SKIP_DL_PASSPORT_CHECK` / `SKIP_LIVE_FACE_SCAN` | `true` skips DL/passport check / Rekognition liveness (`be/lib/rekognitionClient.js`). |
+| `LIVE_SCAN_COOLDOWN` | Minutes before retry after failed liveness scan. |
+| `REKOGNITION_REQUIRE_LIVENESS` | `true` on prod; Mac often `false`. See `be/README.md`. |
+| `MEASUREONE_MOCK` | `true` → mock education verification (`measureoneEducation.js`). |
 
-## Twilio (SMS / Verify)
+## Critical production config
 
 ```bash
-TWILIO_ACCOUNT_SID=AC5327ca################41d0f7517
-TWILIO_AUTH_TOKEN=********************************
-TWILIO_ServiceSID=VA81a163569##################e3f60
-TWILIO_PHONE_NUMBER=+18888378479
+BY_PASS_SMS_PHONE_VERIFICATION=false
+DUPLICATE_PHONE_ALLOW=false
+ENABLE_LOGIN_BYPASS=false
+BLOCK_MOBILE=true
+PUBLIC_LOCKOUT=false
+SHOW_MEMBER_CATEGORY=REGULARMEMBER,DEMOUSER,ALLMEMBER
+ADMIN_IP=192.168.44.104,127.0.0.1,<home public IP>
 ```
 
-Code accepts `TWILIO_ServiceSID` or `TWILIO_SERVICE_SID` (`be/lib/twilioVerifySms.js`).
+| Variable | Prod | Mac dev | Behavior |
+|---|---|---|---|
+| `BY_PASS_SMS_PHONE_VERIFICATION` | `false` | `false` | `true` skips SMS verification on signup (`bypassSmsPhoneVerification.js`). |
+| `DUPLICATE_PHONE_ALLOW` | `false` | `true` | `true` skips duplicate-phone check (Twilio test mode; `duplicatePhonePolicy.js`). |
+| `ENABLE_LOGIN_BYPASS` | `false` | `false` | `true` → passwordless login as `SPECIAL_ID` (`beLoginBypass.js`). **Keep `false` on prod.** |
+| `BLOCK_MOBILE` | `true` | `false` | `true` blocks compact/mobile viewports at login (`blockMobileConfig.js`). |
+| `PUBLIC_LOCKOUT` | `false` | `false` | Intended PUBLIC lockout; runtime login lockout actually uses `LOCK_OUT` (`beVerifyLoginPassword.js`). Align before enabling. |
+| `SHOW_MEMBER_CATEGORY` | — | — | All Singles listing filter (`memberVisibility.js`). Uppercase enum labels; `ALLMEMBER` = alias of `ANYMEMBER`; `REGULARMEMBER` + `ANYMEMBER` always included when list non-empty. |
+| `ADMIN_IP` | — | — | Comma list of IPs allowed admin login / impersonation (`adminIpConfig.js`, `adminImpersonate.js`, `beVerifyLoginPassword.js`). Find public IP: `curl -4 ifconfig.me`. |
 
-## Mall — Tuta Albums / Tuta Notes upgrade gate
+## Dev login shortcut
 
 ```bash
-ONENOTE_USB_UPGRADE=false
+SPECIAL_LINK=/bamboom62895
+SPECIAL_ID=a2@b.com
+SPECIAL_P=****
 ```
 
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `ONENOTE_USB_UPGRADE` | `false` | Mall tiles **TutaPhotoAlbums** and **TutaNotes** navigate normally. |
-| `ONENOTE_USB_UPGRADE` | `true` | Those tiles show the system-notification popup (no navigate). |
+`SPECIAL_LINK` opens login prefilled (`specialLoginEnv.js`, `LoginBypass.jsx`); `SPECIAL_ID` / `SPECIAL_P` are the bypass credentials (`beLoginBypass.js`). Mirrored into FE bundle. **Never commit real passwords.**
 
-**TutaPhoto Full Disk Encryption skip** is per-user in the UI (**Skip Photo Encryption** on the FDE popup), persisted as `helloworldjunktest.singles.photoalbums_access_password_enabled = false` — not an env flag. **TutaNotes always requires Encrypt Password.**
-
-Exposed at runtime via `GET /api/publicConfig` → `onenoteUsbUpgrade`. After changing on prod: **`pm2 restart onlinemallwebsite`**; restart Vite / redeploy FE when needed.
-
-## Production checklist
+## Auto logout (idle warning)
 
 ```bash
-MAIN_FONT=Algerian, fantasy
+LOGOUT_AUTO_MIN=1
+LOGOUT_WARN_MIN=1
+```
 
-PHOTO_BROWSER_CACHE_FOREVER=true
-PHOTO_BROWSER_CACHE_MAX_AGE_SEC=300
+| Variable | Behavior |
+|---|---|
+| `LOGOUT_AUTO_MIN` | First preset minutes on the Profiles logout-duration list (`customLogoutDuration.js`, default 15). |
+| `LOGOUT_WARN_MIN` | Warning popup length in **minutes** before sign-out (`sessionTimeoutConfig.js`). Takes precedence over `LOGOUT_WARN_SEC` (seconds fallback, default 10). |
 
-DEBUG_PHOTO_INFO=false
+Main idle countdown = per-user `custom_logout_duration` (Profiles dashboard, default 60 min).
 
-AUTO_UI_CHAT_UPDATE=false
-AUTO_UI_POST_UPDATE=false
+## Keep me logged in / session age
 
-NOTIFICATION_CHAT=false
-NOTIFICATION_POST=false
+```bash
+KEEP_ME_LOGIN=7
+AUTH_SESSION_MAX_AGE_MS=86400000
+```
+
+`KEEP_ME_LOGIN` = days for the checkbox (`authCookie.js`). `AUTH_SESSION_MAX_AGE_MS` = JWT + cookie age when unchecked (`86400000` = 1 day; `604800000` = 7 days; `2592000000` = 30 days).
+
+## ASN / VPN block list + Cloudflare WAF sync
+
+```bash
+BLOCK_VPN_ASN=true
+BLOCKED_ASN_GITHUB_URL=https://raw.githubusercontent.com/X4BNet/lists_vpn/main/input/vpn/ASN.txt
+REFRESH_ASN_VPN_AT=24
+CLOUDFLARE_ASN_SYNC=true
+CLOUDFLARE_API_TOKEN=cfut_****
+CLOUDFLARE_ZONE_ID=e7a44d07f94d2d583fb5c65dbeed0e7b
+CLOUDFLARE_ASN_RULE_NAME=RULE2
+CLOUDFLARE_RULESET_ID=a548139ba21e4b5797940e4c5a78f58b
+CLOUDFLARE_RULE_ID=6238ceedcbae416182f53680578fbc19
+CLOUDFLARE_ASN_BLOCK_NON_NA=true
+```
+
+ASN sync source + daily refresh hour (`24`/`0` = midnight) (`blockedAsnConfig.js`, `blockedAsnRefresh.js`). Cloudflare custom WAF rule sync via API (`cloudflareAsnRuleSync.js`); `CLOUDFLARE_ASN_BLOCK_NON_NA=true` keeps the non–North America block.
+
+## Retention / limits / misc
+
+```bash
+KEEP_USER_ACTIVITIES_SESSION=3
+KEEP_CHAT_LOG=3
+MAX_PHOTO_PER_ALBUM=10
+BARCODE_RENEW_MINUTES=30
+SCAN_FOR_PHONE_UPLOAD_SEC=10
+BIO_APPROVED_VIEW_DURATION=12
+SELF_INTRO_VIDEO_MAX_LENGTH=60
+BILL_OVERDUE_EMAIL=true
+BILL_OVERDUE_EMAIL_AT=8
+MOBILE_PHOTO_UPLOAD_DEBUG=true
 ```
 
 | Variable | Notes |
-|----------|-------|
-| `MAIN_FONT` | Site font — also set in **`fe/.env`** (`fe/src/config/mainFontEnv.js`). |
-| `PHOTO_BROWSER_CACHE_*` | Cache-Control for `GET /api/photo/:id`. |
-| `DEBUG_PHOTO_INFO` | Extra upload/debug UI when `true`. |
-| `AUTO_UI_CHAT_UPDATE` / `AUTO_UI_POST_UPDATE` | Default `true` if unset; `false` disables background auto-sync. **Env key is `AUTO_UI_POST_UPDATE`** (not `AUTO_UI_POST_UPDATET`). |
-| `NOTIFICATION_CHAT` / `NOTIFICATION_POST` | Notification feature flags. |
+|---|---|
+| `KEEP_USER_ACTIVITIES_SESSION` / `KEEP_CHAT_LOG` | Months of partitions to keep; older dropped. |
+| `MAX_PHOTO_PER_ALBUM` | Tuta Dates album photo cap. |
+| `BARCODE_RENEW_MINUTES` | Phone QR session lifetime (`mobilePhotoUploadSession.js`). |
+| `SCAN_FOR_PHONE_UPLOAD_SEC` | Desktop poll interval — also in **`fe/.env`** (`phoneUploadScanEnv.js`). |
+| `BIO_APPROVED_VIEW_DURATION` | Months of approved bio viewing (`approvedViewingDurationConfig.js`). |
+| `SELF_INTRO_VIDEO_MAX_LENGTH` | Seconds; prod `60` (Mac `30`). Mirrored into FE bundle (`selfIntroVideoMaxLengthEnv.js`). |
+| `BILL_OVERDUE_EMAIL` / `BILL_OVERDUE_EMAIL_AT` | Daily overdue-bill email + hour (`billOverdueEmail.js`). |
+| `MOBILE_PHOTO_UPLOAD_DEBUG` | Verbose phone upload logging (`mobilePhotoUploadLog.js`). |
 
-## Rate limiting (optional)
+## Logging / Postgres
+
+```bash
+PM2_LOG_LEVEL=ERROR
+DB_DISPLAY_PERFORMANCE=delay
+SHOW_PG_PERFORMANCE_LOG=false
+PG_QUERY_LOG=true
+PG_CONNECT_LOG=true
+```
+
+| Variable | Prod | Mac dev | Notes |
+|---|---|---|---|
+| `PM2_LOG_LEVEL` | `ERROR` | `DEBUG` | `TRACE` … `FATAL` filter for `be/logger.js`. |
+| `DB_DISPLAY_PERFORMANCE` | `delay` | `delay` | `[p N milsec]` vs `percentage`. |
+| `SHOW_PG_PERFORMANCE_LOG` | `false` | `true` | Master switch for pool/query logging (`be/db/connection.js`); with `false`, `PG_*_LOG` are effectively off. |
+
+## Database
+
+**Database:** `onlinemallwebsite` (formerly `vsingles`); schema **`helloworldjunktest`** only (never `public`).
+
+```bash
+DB_HOST=localhost
+DB_PORT=50010
+DB_NAME=onlinemallwebsite
+DB_USER=test_user1
+DB_PASSWORD=****
+DB_SCHEMA=helloworldjunktest
+VSINGLES_SCHEMA=helloworldjunktest
+API_PORT=40000
+PORT=40000
+```
+
+`DB_HOST` is the **Primary** (single pool today). `API_PORT` must match **`fe/.env`**; `loadEnv.js` copies it to `PORT` (Mac doc previously showed `PORT=3005`, overridden by `API_PORT`). Mac `psql`: `-h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite`.
+
+## SMTP / Twilio / uptime monitor
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=****@gmail.com
+SMTP_PASS=****
+TWILIO_ACCOUNT_SID=AC5327ca################41d0f7517
+TWILIO_AUTH_TOKEN=****
+TWILIO_ServiceSID=VA81a163569##################e3f60
+TWILIO_PHONE_NUMBER=+18888378479
+SITE_UPTIME_SMS_TO=+1703*******
+SERVERDOWN_TEXT=1
+ALARM_USB_VOL=50
+```
+
+| Variable | Notes |
+|---|---|
+| `SMTP_*` | Referral invites, password upgrade, support, live-scan support email. Prod sends from a Gmail account (Mac doc listed `support@onlinemall.website`). |
+| `TWILIO_*` | Verify + SMS; code accepts `TWILIO_ServiceSID` or `TWILIO_SERVICE_SID` (`be/lib/twilioVerifySms.js`). |
+| `SITE_UPTIME_SMS_TO` | Phone that receives outage texts (`scripts/site-uptime-monitor.sh`). |
+| `SERVERDOWN_TEXT` | `ALL` (default) → 3 texts every 10 min, then 3 hourly, then daily. `1` → **one** text per outage (prod). |
+| `ALARM_USB_VOL` | USB speaker volume **percent** when down (`0`–`100`, default `100`; prod `50`). |
+
+Uptime monitor reads `~/.ssh/be/.env` directly (not PM2): after changing, `sudo systemctl restart site-uptime-monitor`.
+
+## Production checklist / UI flags
+
+```bash
+MAIN_FONT=Algerian
+PHOTO_BROWSER_CACHE_FOREVER=true
+PHOTO_BROWSER_CACHE_MAX_AGE_SEC=300
+DEBUG_PHOTO_INFO=true            # ⚠ should be false on prod
+AUTO_UI_CHAT_UPDATE=false
+AUTO_UI_POST_UPDATET=false       # ⚠ typo — ignored
+NOTIFICATION_CHAT=false
+NOTIFICATION_POST=false
+DIALOG_ZOOM=100%
+DIALOG_HEIGHT_OFFSET=0%
+DIALOG_WIDGHT_OFFSET=0%
+```
+
+| Variable | Notes |
+|---|---|
+| `MAIN_FONT` | Site font — also in **`fe/.env`** (`mainFontEnv.js`). Mac: `Algerian, fantasy`. |
+| `PHOTO_BROWSER_CACHE_*` | Cache-Control for `GET /api/photo/:id`; max-age used only when `FOREVER=false`. |
+| `DEBUG_PHOTO_INFO` | Extra upload/debug UI. |
+| `AUTO_UI_CHAT_UPDATE` / `AUTO_UI_POST_UPDATE` | Default `true`; `false` disables background auto-sync. Correct key is **`AUTO_UI_POST_UPDATE`**. |
+| `NOTIFICATION_CHAT` / `NOTIFICATION_POST` | Notification feature flags. |
+| `DIALOG_*` | Auth dialog tuning; width/margins via `DIALOG_WIDTH_*` / `DIALOG_MARGIN_*` in **`fe/.env`**. |
+
+## Menu visibility by member category
+
+```bash
+# Correct (uppercase — what be/mallDepartmentMode.js reads):
+ADMIN=show_all
+DEMOUSER=show_all
+PILOTUSER=show_all
+PUBLIC=show_vsingles, show_eMarketPlace
+```
+
+Keys must match DB **`singles.member_category`** enum labels in **uppercase**. Prod currently has `Admin=`/`DemoUser=`/`PilotUser=`/`Public=` → ignored (see Known problems).
+
+## Rate limiting
 
 ```bash
 #BACKEND_RATE_LIMIT_ENABLE=false
 #BACKEND_RATE_LIMIT_MAX=150
 #BACKEND_RATE_LIMIT_WINDOW_MINUTES=1
-REDIS_URL=redis://localhost:6379
-```
-
-Express rate-limit middleware is currently **removed** (`server_be.js` — `/api/rateLimitStatus` is a stub). When re-enabled, prefer **`REDIS_URL`** so all PM2 workers / web servers share one counter.
-
-## Browser API rate limit (FE bundle)
-
-Mirrored from here into the Vite client bundle (`fe/vite.config.mjs` → `fe/src/config/clientApiRateLimitEnv.js`). **Not in `fe/.env`.**
-
-```bash
-FE_RATE_LIMIT_ENABLE=true
+FE_RATE_LIMIT_ENABLE=false
 FE_RATE_CLIENT_API_ACCESS_LIMIT=100
 FE_RATE_CLIENT_API_TIMESLICE_SECONDS=60
 FE_RATE_CLIENT_API_COOLDOWN_SECONDS=30
@@ -428,23 +462,11 @@ FE_RATE_CLIENT_API_COOLDOWN_ENABLED=true
 FE_RATE_CLIENT_API_CONSOLE_LOG=false
 ```
 
-| Variable | Behavior |
-|----------|----------|
-| `FE_RATE_LIMIT_ENABLE` | Master switch; `false` = no per-tab browser API cooldown. |
-| `FE_RATE_CLIENT_API_ACCESS_LIMIT` | Max API calls per rolling window per tab. |
-| `FE_RATE_CLIENT_API_TIMESLICE_SECONDS` | Window length (seconds). |
-| `FE_RATE_CLIENT_API_COOLDOWN_SECONDS` | Cooldown after limit hit. |
-| `FE_RATE_CLIENT_API_COOLDOWN_ENABLED` | Sub-switch; `false` = same as master off for gating. |
-| `FE_RATE_CLIENT_API_CONSOLE_LOG` | DevTools logging when master enabled. |
-
-After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod so the bundle picks up new values.
+Backend Express rate-limit is **removed** (`/api/rateLimitStatus` is a stub); if re-enabled use `REDIS_URL` so all workers share one counter. `FE_RATE_*` are mirrored into the Vite bundle (`fe/vite.config.mjs` → `clientApiRateLimitEnv.js`, **not** `fe/.env`): master `FE_RATE_LIMIT_ENABLE` (prod `false`, Mac `true`), per-tab call limit / window / cooldown / sub-switch / console log. After changes: restart Vite (`feall`) on Mac or rebuild FE on prod.
 
 ## Menu page Video Tutorials (FE bundle)
 
-Mirrored from here into the Vite client bundle (`fe/vite.config.mjs` → `fe/src/config/pageVideoTutorialEnv.js`). **Not in `fe/.env`.**
-
 ```bash
-#-----Video Tutorial-----
 TOPRIGHT_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
 ALL_SINGLES_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
 PICKS_POSTS_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
@@ -455,144 +477,35 @@ RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
 PROFILE_RECORDS_VIDEO_TUTORIAL=https://youtu.be/dMiwcH027fM
 ```
 
-| Variable | Menu page |
-|----------|-----------|
-| `TOPRIGHT_VIDEO_TUTORIAL` | Header profile/settings menu (top-right account chip) |
-| `ALL_SINGLES_VIDEO_TUTORIAL` | All Singles |
-| `PICKS_POSTS_VIDEO_TUTORIAL` | Picks & Posts |
-| `ACQUAINTS_BUDDIES_VIDEO_TUTORIAL` | Acquaint. & Buddies (alias `ACQUAINT_BUDDIES_VIDEO_TUTORIAL` also accepted) |
-| `MYALBUM_VIDEO_TUTORIAL` | My Album&Posts |
-| `MYSELFREPORTBIO_VIDEO_TUTORIAL` | My Self-Report-Bio |
-| `RECEIVED_BIO_REQUEST_VIDEO_TUTORIAL` | Received Bio Req |
-| `PROFILE_RECORDS_VIDEO_TUTORIAL` | Profile & Records |
+Mirrored into the Vite bundle (`pageVideoTutorialEnv.js`, not `fe/.env`). Pages: top-right account menu, All Singles, Picks & Posts, Acquaint. & Buddies (alias `ACQUAINT_BUDDIES_VIDEO_TUTORIAL`), My Album&Posts, My Self-Report-Bio, Received Bio Req, Profile & Records. `PageVideoTutorialsButton` opens the URL in a new tab.
 
-Centered **VIDEO TUTORIALS** header control (`PageVideoTutorialsButton`) opens the URL in a new tab. After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod.
-
-## Self intro video recorder (FE bundle)
-
-Mirrored from here into the Vite client bundle (`fe/vite.config.mjs` → `fe/src/config/selfIntroVideoMaxLengthEnv.js`). **Not in `fe/.env`.**
+## Third-party keys (all secret)
 
 ```bash
-SELF_INTRO_VIDEO_MAX_LENGTH=30
-```
-
-| Variable | Behavior |
-|----------|----------|
-| `SELF_INTRO_VIDEO_MAX_LENGTH` | Max self intro recording duration in seconds (`SelfIntroVideoRecordPopup` countdown). Default `30` if unset or invalid. |
-
-After changes: restart **Vite** on Mac (`feall`) or re-run **PM2 FE build** on prod.
-
-## Menu visibility by member category
-
-```bash
-ADMIN=show_all
-DEMOUSER=show_all
-PILOTUSER=show_all
-PUBLIC=show_vsingles, show_eMarketPlace
-```
-
-Loaded by `be/mallDepartmentMode.js` → `mallDepartmentMode` on user. Keys must match DB **`singles.member_category`** (uppercase enum labels).
-
-## API port and logging
-
-```bash
-API_PORT=40000
-PM2_LOG_LEVEL=DEBUG
+VITE_RENTCAST_API_KEY=****
+RENTCAST_API_KEY=****
+VITE_GOOGLE_MAPS_API_KEY=****
+PAYPAL_CLIENT_ID=****
+PAYPAL_CLIENT_SECRET=****
+PAYPAL_ENV=live
+FLORISTONE_API_Key=****           # ⚠ prod uses ':' — not loaded
+FLORISTONE_PASSWORD=****          # ⚠ prod uses ':' — not loaded
 ```
 
 | Variable | Notes |
-|----------|-------|
-| `API_PORT` | Also set in **`fe/.env`** — `be/loadEnv.js` copies to `PORT`; Vite proxy uses same port. |
-| `PM2_LOG_LEVEL` | `TRACE` … `FATAL` — filters `be/logger.js` app logs. |
-
-## Database (Mac dev)
-
-**Database name:** `onlinemallwebsite` (formerly `vsingles`). Use `-d onlinemallwebsite` in `psql`; env key remains `DB_NAME`.
-
-```bash
-DB_HOST=localhost
-DB_PORT=50010
-DB_NAME=onlinemallwebsite
-DB_USER=test_user1
-DB_PASSWORD=****
-DB_SCHEMA=helloworldjunktest
-VSINGLES_SCHEMA=helloworldjunktest
-PORT=3005
-```
-
-## SMTP
-
-```bash
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=support@onlinemall.website
-SMTP_PASS=****
-```
-
-Used by referral invites, password upgrade, support messages, live-scan support email, etc.
-
-## Dialog layout (FE — also in `fe/.env`)
-
-```bash
-DIALOG_ZOOM=100%
-DIALOG_HEIGHT_OFFSET=0%
-DIALOG_WIDGHT_OFFSET=0%
-```
-
-Auth dialog tuning; standard width/margins use `DIALOG_WIDTH_*` and `DIALOG_MARGIN_*` in **`fe/.env`** (`fe/src/config/standardAuthDialogEnv.js`).
-
-## RentCast / Google Maps
-
-```bash
-VITE_RENTCAST_API_KEY=********************************
-RENTCAST_API_KEY=********************************
-VITE_GOOGLE_MAPS_API_KEY=********************************
-```
-
-`VITE_GOOGLE_MAPS_API_KEY` is exposed to FE via server config (`be/server_be.js` → `fe/src/api/googleMapsKeyFe.js`). RentCast keys used by eHomes test views.
-
-## PayPal
-
-```bash
-PAYPAL_CLIENT_ID=********************************
-PAYPAL_CLIENT_SECRET=********************************
-PAYPAL_ENV=live
-PRICE_PER_TOKEN=10
-```
-
-`PAYPAL_ENV=live` or `sandbox` (`be/routes/singles/settingsProfile.js`).
-
-## FloristOne
-
-```bash
-FLORISTONE_API_Key=292711
-FLORISTONE_PASSWORD=****
-```
-
-Send-flowers integration (`be/routes/singles/sendFlower.js`). Accepts aliases `FLORISTONE_API_KEY`, `FLORISTONE_APIKEY`, etc.
-
-## Site uptime monitor (curl + SMS)
-
-Read by `scripts/site-uptime-monitor.sh` from **`~/.ssh/be/.env`** (not PM2). After changing, restart systemd: `sudo systemctl restart site-uptime-monitor`.
-
-```bash
-SERVERDOWN_TEXT=ALL
-ALARM_USB_VOL=100
-```
-
-| Variable | Value | Behavior |
-|----------|-------|----------|
-| `SERVERDOWN_TEXT` | `ALL` (default if unset) | While curl is down: 3 texts every 10 min, then 3 hourly, then once a day. |
-| `SERVERDOWN_TEXT` | `1` | Send **one** text on outage; no further SMS until the site recovers. |
-| `ALARM_USB_VOL` | `0`–`100` (default `100`) | USB speaker volume **percent** when curl is down (`50` = 50%). Not a 1–10 scale. |
+|---|---|
+| `VITE_GOOGLE_MAPS_API_KEY` | Exposed to FE via server config (`server_be.js` → `googleMapsKeyFe.js`). |
+| `RENTCAST_*` | eHomes test views. |
+| `PAYPAL_ENV` | `live` or `sandbox` (`settingsProfile.js`). |
+| `FLORISTONE_*` | Send-flowers (`sendFlower.js`); aliases `FLORISTONE_API_KEY`, `FLORISTONE_APIKEY`, `FLORISTONE_PASS`. |
 
 ## When changing these
 
-1. Edit `~/.ssh/be/.env` on the target machine (Mac vs server copy may differ).
-2. `pm2 restart onlinemallwebsite` on servers.
-3. Mac local BE: restart Node process after env change.
-4. Restart Vite if you change keys mirrored in **`fe/.env`**.
-5. After changing **`SERVERDOWN_TEXT`** or **`ALARM_USB_VOL`**: `sudo systemctl restart site-uptime-monitor` on the Ubuntu monitor host (not PM2). Re-copy/install the monitor script if the Ubuntu host does not yet have `ALARM_USB_VOL` support.
+1. Edit `~/.ssh/be/.env` on the target machine (Mac and Ubuntu copies differ — see tables above).
+2. Ubuntu: `pm2 restart onlinemallwebsite`. Mac: restart the Node process (`beall`).
+3. Keys mirrored into the FE bundle (`FE_RATE_*`, `SPECIAL_*`, `PRICE_PER_TOKEN`, `SELF_INTRO_VIDEO_MAX_LENGTH`, `*_VIDEO_TUTORIAL`, `SPEEDDATING`, `RAG_UI_ENABLED`, `ALBUM_BINDER_WIDTH_PCT`, …): restart Vite on Mac / rebuild FE on prod.
+4. `SERVERDOWN_TEXT` / `ALARM_USB_VOL` / `SITE_UPTIME_SMS_TO`: `sudo systemctl restart site-uptime-monitor` on Ubuntu.
+5. After editing prod, run **`syncbenv`** on Mac to refresh `myscript/ubuntu/be.env`, then update this doc.
 
 ## Agent — end of each task
 

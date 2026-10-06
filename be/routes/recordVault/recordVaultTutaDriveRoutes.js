@@ -338,7 +338,7 @@ export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
 
 /**
  * POST /api/recordVault/tutadrive/backup
- * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
+ * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK2, or legacy TNBAK1).
  * Stores as users/M{id}/EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 zips).
  */
 export async function storeRecordVaultTutaDriveBackup(req, res) {
@@ -381,7 +381,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
 
 /**
  * PUT /api/recordVault/tutadrive/backup/:fileName
- * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK1).
+ * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK2, or legacy TNBAK1).
  * Replaces that specific EncryptedBackup_* / legacy backup_* zip in the member folder.
  */
 export async function replaceRecordVaultTutaDriveBackup(req, res) {
