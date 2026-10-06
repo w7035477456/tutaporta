@@ -216,14 +216,14 @@ const amazonRowHtml =
 const describeDom = typeof DOMParser === 'undefined' ? describe.skip : describe;
 
 describeDom('web page paste (amazon.com)', () => {
-  it('lays side-by-side product cards out as a table row with card background', () => {
+  it('lays side-by-side product cards out as a table row (neutral card background follows the theme)', () => {
     const html = normalizePastedHtml(amazonRowHtml);
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const rows = doc.querySelectorAll('table tr');
     expect(rows).toHaveLength(1);
     const cells = rows[0].querySelectorAll('td');
     expect(cells).toHaveLength(3);
-    expect(cells[0].getAttribute('style')).toMatch(/background-color:\s*rgb\(255, 255, 255\)/);
+    expect(cells[0].getAttribute('style')).toBeNull();
     expect(cells[1].querySelector('img')?.getAttribute('src')).toMatch(/p2\._AC_SY200_\.jpg$/);
   });
 
@@ -232,21 +232,23 @@ describeDom('web page paste (amazon.com)', () => {
     expect(html).toMatch(/<img[^>]*\swidth="160"/);
   });
 
-  it('puts inherited font, size, color and background on each text run', () => {
+  it('puts inherited font, size, chromatic background on each text run; drops neutral colors', () => {
     const html = normalizePastedHtml(amazonRowHtml);
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const styledRun = (text) =>
       [...doc.querySelectorAll('span[style]')].find((s) => s.textContent === text);
     const badge = styledRun('21% off');
     const style = badge?.getAttribute('style') || '';
-    expect(style).toMatch(/color:\s*rgb\(255, 255, 255\)/);
+    expect(style).not.toMatch(/(^|;\s*)color:/);
     expect(style).toMatch(/background-color:\s*rgb\(204, 12, 57\)/);
+    expect(styledRun('Limited time deal')?.getAttribute('style')).toMatch(/(^|;\s*)color:\s*rgb\(204, 12, 57\)/);
     expect(style).toMatch(/font-size:\s*12px/);
     expect(style).toMatch(/font-weight:\s*700/);
     expect(style).toMatch(/Amazon Ember/);
 
     const price = styledRun('$119');
     expect(price?.getAttribute('style')).toMatch(/font-size:\s*21px/);
+    expect(price?.getAttribute('style')).not.toMatch(/(^|;\s*)(background-)?color:/);
   });
 
   it('keeps short text flex rows on one line', () => {

@@ -27,6 +27,7 @@ import {
   recordVaultThemeDaynightShellSx
 } from './recordVaultNoteFontTokens';
 import RecordVaultEditorToolbar from './RecordVaultEditorToolbar';
+import { stripNeutralColorsFromHtml } from './recordVaultNeutralColors';
 import './recordVaultEditor.scss';
 
 const EMPTY_DOC = '<p></p>';
@@ -51,6 +52,11 @@ function protectPreNewlines(html) {
   return String(html || '').replace(/<pre\b[^>]*>[\s\S]*?<\/pre>/gi, (block) =>
     block.replace(/\r?\n/g, '&#10;')
   );
+}
+
+/** HTML about to enter the editor: theme-following text colors, intact code blocks. */
+function prepareEditorHtml(html) {
+  return protectPreNewlines(stripNeutralColorsFromHtml(html));
 }
 
 /** Scroll the currently active (bold-blinking) search hit into the middle of view. */
@@ -142,7 +148,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
             if (lastInsertedSigRef.current === sig) return;
             if (html) {
               lastInsertedSigRef.current = sig;
-              ed.chain().focus().insertContent(protectPreNewlines(html)).run();
+              ed.chain().focus().insertContent(prepareEditorHtml(html)).run();
               if (expectedImages > insertedImages) {
                 void themedAlert(recordVaultMissingPasteImagesMessage(expectedImages - insertedImages, source));
               }
@@ -248,7 +254,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
       /** Replace the whole document without triggering the autosave onChange. */
       setContent: (html, nextEditable) => {
         if (!editor) return;
-        editor.commands.setContent(protectPreNewlines(html) || EMPTY_DOC, { emitUpdate: false });
+        editor.commands.setContent(prepareEditorHtml(html) || EMPTY_DOC, { emitUpdate: false });
         if (typeof nextEditable === 'boolean') editor.setEditable(nextEditable);
       },
       /**

@@ -13,6 +13,7 @@
  * while the real image bytes are only on navigator.clipboard.read() — not always
  * in clipboardData during the paste event. We merge both sources.
  */
+import { isNeutralCssColor } from './recordVaultNeutralColors';
 
 /** Only these img srcs render in the editor; everything else is a placeholder to fill or drop. */
 const USABLE_IMG_SRC = /^(data:image\/|blob:|https?:|\/\/|\/(?!\/))/i;
@@ -480,8 +481,9 @@ function flattenInheritedTextStyles(doc, root) {
   const visit = (el, ctx) => {
     const next = { ...ctx };
 
+    // Neutral colors reset to the note theme (see recordVaultNeutralColors).
     const color = cssValue(el, 'color') || (el.tagName === 'FONT' ? el.getAttribute('color') : '');
-    if (isVisibleColor(color)) next.color = color;
+    if (isVisibleColor(color)) next.color = isNeutralCssColor(color) ? null : color;
 
     const fontSize = resolveFontSizePx(cssValue(el, 'font-size'), ctx.fontSize);
     if (fontSize) next.fontSize = fontSize;
@@ -500,7 +502,7 @@ function flattenInheritedTextStyles(doc, root) {
     if (/line-through/i.test(deco)) next.strike = true;
 
     const bg = backgroundColorOf(el);
-    if (bg) next.background = bg;
+    if (bg) next.background = isNeutralCssColor(bg) ? null : bg;
 
     const align = normalizeAlign(cssValue(el, 'text-align') || el.getAttribute('align'));
     if (align) next.align = align;
@@ -574,7 +576,7 @@ function buildLayoutTable(doc, container, kids, cols) {
       const kid = kids[i + c];
       if (kid) {
         const bg = backgroundColorOf(kid);
-        if (bg) td.setAttribute('style', `background-color: ${bg}`);
+        if (bg && !isNeutralCssColor(bg)) td.setAttribute('style', `background-color: ${bg}`);
         td.appendChild(kid);
       } else {
         td.innerHTML = '<p></p>';
@@ -705,7 +707,7 @@ export function normalizePastedHtml(html) {
   root.querySelectorAll('[style]').forEach((el) => {
     if (el.hasAttribute(FLAT_STYLE_ATTR)) return;
     const bg = el.tagName === 'TD' || el.tagName === 'TH' ? backgroundColorOf(el) : null;
-    if (bg) el.setAttribute('style', `background-color: ${bg}`);
+    if (bg && !isNeutralCssColor(bg)) el.setAttribute('style', `background-color: ${bg}`);
     else el.removeAttribute('style');
   });
 
