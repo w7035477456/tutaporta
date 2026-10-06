@@ -2,9 +2,51 @@ import { themedPrompt } from 'utils/themedDialog';
 import { fetchRecordVaultE2eKeys, unlockRecordVaultTutaDrive } from 'api/recordVaultFe';
 import { unlockVaultWithPassword } from 'utils/recordVaultClientVaultCrypto';
 import {
+  isRecordVaultE2eUnlocked,
   setRecordVaultBackupDecryptPassword,
   setRecordVaultE2eSession
 } from 'utils/recordVaultClientSession';
+
+/**
+ * Backup / Upload seal with the in-tab DEK. If this tab has not unlocked it yet
+ * (e.g. after a page reload), ask for the Encrypt Password instead of failing.
+ * @param {'backup'|'upload'} purpose
+ * @returns {Promise<boolean>} true if unlocked; false if user cancelled
+ */
+export async function ensureEncryptPasswordForBackupSeal(purpose = 'backup') {
+  if (isRecordVaultE2eUnlocked()) return true;
+  const password = await themedPrompt(
+    purpose === 'upload'
+      ? 'Enter your Encrypt Password to encrypt this backup before upload.'
+      : 'Enter your Encrypt Password to encrypt this backup.',
+    '',
+    {
+      title: 'Encrypt Password',
+      okLabel: purpose === 'upload' ? 'Upload' : 'Backup',
+      cancelLabel: 'Cancel',
+      inputType: 'password'
+    }
+  );
+  if (password === null) return false;
+  const value = String(password || '').trim();
+  if (!value) {
+    throw new Error('Encrypt Password is required to encrypt the backup');
+  }
+
+  const e2e = await fetchRecordVaultE2eKeys();
+  if (!e2e?.configured || !e2e?.vault?.kdfSaltB64 || !e2e?.vault?.wrappedDekB64) {
+    throw new Error('Encrypt Password is not set up yet. Open TutaNotes Cloud first to create one.');
+  }
+
+  let unlocked;
+  try {
+    unlocked = await unlockVaultWithPassword(e2e.vault, value);
+  } catch {
+    throw new Error('Wrong Encrypt Password — backup was not created');
+  }
+  setRecordVaultE2eSession({ dek: unlocked.dek, dekRaw: unlocked.dekRaw, vault: e2e.vault });
+  return true;
+}
 
 /**
  * Prompt for Encrypt Password, unlock DEK in-tab (zero-knowledge), then allow

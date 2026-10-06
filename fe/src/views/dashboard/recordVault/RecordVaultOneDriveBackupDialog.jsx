@@ -31,7 +31,10 @@ import {
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { themedConfirm, themedOverwriteSkip, themedPrompt } from 'utils/themedDialog';
-import { promptEncryptPasswordForBackupDecrypt } from 'utils/recordVaultBackupDecryptPrompt';
+import {
+  ensureEncryptPasswordForBackupSeal,
+  promptEncryptPasswordForBackupDecrypt
+} from 'utils/recordVaultBackupDecryptPrompt';
 import Typography from '@mui/material/Typography';
 
 const actionRowSx = {
@@ -354,6 +357,13 @@ export default function RecordVaultOneDriveBackupDialog({
       });
       if (entered === null) return;
       backupNote = String(entered || '').trim();
+      try {
+        const unlocked = await ensureEncryptPasswordForBackupSeal('backup');
+        if (!unlocked) return;
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
+        return;
+      }
     }
     setBusy(true);
     try {
@@ -558,6 +568,17 @@ export default function RecordVaultOneDriveBackupDialog({
     if (!file || (mode === 'replace' && !targetFileName)) return;
 
     resetMessages();
+    try {
+      const { isTutaDriveSealedBackupBytes } = await import('utils/recordVaultClientVaultCrypto');
+      const head = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+      if (!isTutaDriveSealedBackupBytes(head)) {
+        const unlocked = await ensureEncryptPasswordForBackupSeal('upload');
+        if (!unlocked) return;
+      }
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
+      return;
+    }
     setBusy(true);
     setActioningFile(targetFileName || 'new-upload');
     try {
