@@ -1052,14 +1052,120 @@ export async function downloadRecordVaultTutaDriveStoredBackup(fileName) {
  * - With replaceFileName: PUT replace that slot in place.
  * - Without replaceFileName: POST as a new EncryptedBackup_*.zip (server keeps up to 3, oldest pruned).
  */
-export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileName) {
+/** Read a File into bytes, reporting FileReader progress as (loadedBytes, totalBytes). */
+function readFileBytesWithProgress(file, onReadProgress) {
+  if (typeof FileReader === 'undefined' || typeof onReadProgress !== 'function') {
+    return file.arrayBuffer().then((buf) => new Uint8Array(buf));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) onReadProgress(event.loaded, event.total);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Unable to read the selected zip file'));
+    reader.onload = () => resolve(new Uint8Array(reader.result));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/** `report(stage, percent, details)` wrapper around an optional `onProgress({ stage, percent, ...details })`. */
+function makeBackupProgressReporter(onProgress) {
+  return (stage, percent, details = {}) => {
+    if (typeof onProgress === 'function') onProgress({ stage, percent, ...details });
+  };
+}
+
+/** Map loaded/total bytes onto [fromPct, toPct] with transfer speed + ETA. */
+function transferProgressDetails(startedAt, loaded, total, fromPct, toPct) {
+  const elapsedSec = Math.max((Date.now() - startedAt) / 1000, 0.001);
+  const bytesPerSec = loaded / elapsedSec;
+  const etaSec = total > 0 && bytesPerSec > 0 ? (total - loaded) / bytesPerSec : null;
+  const percent = total > 0 ? fromPct + (Math.min(loaded, total) / total) * (toPct - fromPct) : fromPct;
+  return { percent, details: { loadedBytes: loaded, totalBytes: total, bytesPerSec, etaSec } };
+}
+
+/** Read a local zip (stage `read`) within [fromPct, toPct]. */
+async function readBackupFileWithProgress(file, report, fromPct, toPct) {
+  const startedAt = Date.now();
+  report('read', fromPct, { loadedBytes: 0, totalBytes: file.size });
+  const bytes = await readFileBytesWithProgress(file, (loaded, total) => {
+    const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+    report('read', percent, details);
+  });
+  report('read', toPct, { loadedBytes: bytes.length, totalBytes: bytes.length, done: true });
+  return bytes;
+}
+
+/** Download a stored sealed backup (stage `download`) within [fromPct, toPct]. */
+async function downloadStoredBackupWithProgress(fileName, report, fromPct, toPct) {
+  const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
+  const startedAt = Date.now();
+  report('download', fromPct, { loadedBytes: 0, totalBytes: 0 });
+  const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, {
+    responseType: 'blob',
+    timeout: 0,
+    onDownloadProgress: (event) => {
+      const loaded = Number(event?.loaded) || 0;
+      const total = Number(event?.total) || 0;
+      const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+      report('download', percent, details);
+    }
+  });
+  const bytes = new Uint8Array(await response.data.arrayBuffer());
+  report('download', toPct, { loadedBytes: bytes.length, totalBytes: bytes.length, done: true });
+  return bytes;
+}
+
+/**
+ * Send multipart form (stage `send`) within [fromPct, toPct]; once every byte is sent,
+ * report stage `server` at toPct while the server processes the request.
+ */
+async function sendBackupFormWithProgress(method, url, formData, totalBytes, report, fromPct, toPct) {
+  const startedAt = Date.now();
+  let serverStageReported = false;
+  report('send', fromPct, { loadedBytes: 0, totalBytes });
+  const { data } = await api.request({
+    method,
+    url,
+    data: formData,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0,
+    onUploadProgress: (event) => {
+      const total = Number(event?.total) || totalBytes;
+      const loaded = Math.min(Number(event?.loaded) || 0, total);
+      const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+      report('send', percent, details);
+      if (loaded >= total && !serverStageReported) {
+        serverStageReported = true;
+        report('server', toPct, { totalBytes: total });
+      }
+    }
+  });
+  return data;
+}
+
+/**
+ * Progress stages reported to `onProgress({ stage, percent, ...details })`:
+ *   read   (0–10%)   loadedBytes / totalBytes
+ *   seal   (10–15%)  alreadySealed
+ *   send   (15–95%)  loadedBytes / totalBytes / bytesPerSec / etaSec
+ *   server (95%)     waiting for server to save the zip
+ *   saved  (98%)     server response received
+ */
+export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileName, { onProgress } = {}) {
   if (!file) throw new Error('Choose a backup zip file first');
-  const rawBytes = new Uint8Array(await file.arrayBuffer());
+  const report = makeBackupProgressReporter(onProgress);
+
+  const rawBytes = await readBackupFileWithProgress(file, report, 0, 10);
+
   const { isTutaDriveSealedBackupBytes, sealTutaDriveBackupZipWithDek } = await import(
     'utils/recordVaultClientVaultCrypto'
   );
   let sealed = rawBytes;
-  if (!isTutaDriveSealedBackupBytes(rawBytes)) {
+  const alreadySealed = isTutaDriveSealedBackupBytes(rawBytes);
+  report('seal', 10, { alreadySealed, totalBytes: rawBytes.length });
+  if (!alreadySealed) {
     const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
     if (!isRecordVaultE2eUnlocked()) {
       throw new Error('Unlock with your Encrypt Password first, then upload again');
@@ -1067,6 +1173,8 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
     const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
     sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek(), vaultKeys);
   }
+  report('seal', 15, { alreadySealed, totalBytes: sealed.length, done: true });
+
   const formData = new FormData();
   const uploadName = replaceFileName ? String(replaceFileName) : 'EncryptedBackup.zip';
   formData.append(
@@ -1074,89 +1182,107 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
     new Blob([sealed], { type: 'application/octet-stream' }),
     uploadName
   );
-  if (replaceFileName) {
-    const enc = encodeURIComponent(String(replaceFileName));
-    const { data } = await api.put(`/api/recordVault/tutadrive/backup/${enc}`, formData, {
-      maxBodyLength: Infinity,
-      maxContentLength: Infinity,
-      timeout: 0
-    });
-    return data;
-  }
-  const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-    timeout: 0
-  });
+
+  const data = replaceFileName
+    ? await sendBackupFormWithProgress(
+        'put',
+        `/api/recordVault/tutadrive/backup/${encodeURIComponent(String(replaceFileName))}`,
+        formData,
+        sealed.length,
+        report,
+        15,
+        95
+      )
+    : await sendBackupFormWithProgress('post', '/api/recordVault/tutadrive/backup', formData, sealed.length, report, 15, 95);
+  report('saved', 98, { totalBytes: sealed.length, fileName: data?.fileName });
   return data;
 }
 
 /** Download sealed backup, unseal (zip password, or Encrypt Password DEK for older backups), restore vault on server. */
-export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName) {
-  const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked, takeRecordVaultBackupDecryptPassword } = await import(
-    'utils/recordVaultClientSession'
-  );
-  const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
-  const password = takeRecordVaultBackupDecryptPassword();
-  if (!password && !isRecordVaultE2eUnlocked()) {
-    throw new Error('Enter the backup password first, then run Restore again');
-  }
-  const dek = getRecordVaultE2eDek();
-  let sealedBytes;
-  if (file) {
-    sealedBytes = new Uint8Array(await file.arrayBuffer());
-  } else {
-    const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
-    const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
-    sealedBytes = new Uint8Array(await response.data.arrayBuffer());
-  }
-  const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
+/**
+ * Progress stages (onProgress): read|download (0–40%), decrypt (40–50%), send (50–90%),
+ * server (90%) while the server unpacks the zip into TutaDrive.
+ */
+export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName, { onProgress } = {}) {
+  const report = makeBackupProgressReporter(onProgress);
+  const plainZip = await unsealRecordVaultTutaDriveStoredBackupBytes(file, fileName, {
+    report,
+    fetchRange: [0, 40],
+    decryptRange: [40, 50],
+    missingPasswordMessage: 'Enter the backup password first, then run Restore again'
+  });
   const formData = new FormData();
   formData.append(
     'backup',
     new Blob([plainZip], { type: 'application/zip' }),
     'TutaNotes-restore.zip'
   );
-  const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', formData, {
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-    timeout: 0
-  });
-  return data;
+  return sendBackupFormWithProgress(
+    'post',
+    '/api/recordVault/tutadrive/restore-zip',
+    formData,
+    plainZip.length,
+    report,
+    50,
+    90
+  );
 }
 
-async function unsealRecordVaultTutaDriveStoredBackupBytes(file, fileName) {
+async function unsealRecordVaultTutaDriveStoredBackupBytes(
+  file,
+  fileName,
+  {
+    report = makeBackupProgressReporter(null),
+    fetchRange = [0, 0],
+    decryptRange = [0, 0],
+    missingPasswordMessage = 'Enter the backup password first, then try again'
+  } = {}
+) {
   const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked, takeRecordVaultBackupDecryptPassword } = await import(
     'utils/recordVaultClientSession'
   );
   const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
   const password = takeRecordVaultBackupDecryptPassword();
   if (!password && !isRecordVaultE2eUnlocked()) {
-    throw new Error('Enter the backup password first, then try again');
+    throw new Error(missingPasswordMessage);
   }
   const dek = getRecordVaultE2eDek();
-  let sealedBytes;
-  if (file) {
-    sealedBytes = new Uint8Array(await file.arrayBuffer());
-  } else {
-    const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
-    const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob' });
-    sealedBytes = new Uint8Array(await response.data.arrayBuffer());
-  }
-  return unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
+  const sealedBytes = file
+    ? await readBackupFileWithProgress(file, report, fetchRange[0], fetchRange[1])
+    : await downloadStoredBackupWithProgress(fileName, report, fetchRange[0], fetchRange[1]);
+  report('decrypt', decryptRange[0], { totalBytes: sealedBytes.length, withZipPassword: Boolean(password) });
+  const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
+  report('decrypt', decryptRange[1], {
+    totalBytes: plainZip.length,
+    withZipPassword: Boolean(password),
+    done: true
+  });
+  return plainZip;
 }
 
-/** Preview merge from a stored sealed backup (requires TutaNotes Cloud open/unlocked on server). */
-export async function previewRecordVaultTutaDriveMergeFromStoredBackup(fileName) {
-  const plainZip = await unsealRecordVaultTutaDriveStoredBackupBytes(undefined, fileName);
+/**
+ * Preview merge from a stored sealed backup (requires TutaNotes Cloud open/unlocked on server).
+ * Progress stages (onProgress): download (0–35%), decrypt (35–45%), send (45–75%),
+ * server (75%) while the server compares backup notes with the live vault.
+ */
+export async function previewRecordVaultTutaDriveMergeFromStoredBackup(fileName, { onProgress } = {}) {
+  const report = makeBackupProgressReporter(onProgress);
+  const plainZip = await unsealRecordVaultTutaDriveStoredBackupBytes(undefined, fileName, {
+    report,
+    fetchRange: [0, 35],
+    decryptRange: [35, 45]
+  });
   const formData = new FormData();
   formData.append('backup', new Blob([plainZip], { type: 'application/zip' }), 'TutaNotes-merge.zip');
-  const { data } = await api.post('/api/recordVault/tutadrive/merge/preview', formData, {
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-    timeout: 0
-  });
-  return data;
+  return sendBackupFormWithProgress(
+    'post',
+    '/api/recordVault/tutadrive/merge/preview',
+    formData,
+    plainZip.length,
+    report,
+    45,
+    75
+  );
 }
 
 /**

@@ -113,6 +113,158 @@ function formatBackupZipSizeLabel(sizeBytes) {
   return `${mb.toFixed(1)}mb`;
 }
 
+function formatProgressMb(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n <= 0) return '0.0 MB';
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDurationSec(sec) {
+  const n = Math.max(0, Math.round(Number(sec) || 0));
+  const m = Math.floor(n / 60);
+  const s = n % 60;
+  return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
+}
+
+/** Ordered steps + labels per backup operation shown in the busy overlay. */
+const BACKUP_OPERATION_STEPS = {
+  upload: {
+    title: 'Uploading backup zip',
+    steps: [
+      ['read', 'Reading zip from your computer'],
+      ['seal', 'Encrypting in your browser'],
+      ['send', 'Uploading to TutaCloud'],
+      ['server', 'Server saving zip to your member folder'],
+      ['saved', 'Refreshing backup list']
+    ],
+    serverWaitText: 'waiting for server to write the file'
+  },
+  restore: {
+    title: 'Restoring TutaDrive vault',
+    steps: [
+      ['download', 'Downloading sealed zip from TutaCloud'],
+      ['decrypt', 'Checking password and decrypting in your browser'],
+      ['send', 'Sending decrypted vault to TutaDrive'],
+      ['server', 'Server replacing your TutaDrive vault (unpacking files)'],
+      ['refresh', 'Refreshing TutaDrive file list']
+    ],
+    serverWaitText: 'server is unpacking notes and attachments into your vault'
+  },
+  restoreLocal: {
+    title: 'Restoring TutaDrive vault',
+    steps: [
+      ['read', 'Reading zip from your computer'],
+      ['decrypt', 'Checking password and decrypting in your browser'],
+      ['send', 'Sending decrypted vault to TutaDrive'],
+      ['server', 'Server replacing your TutaDrive vault (unpacking files)'],
+      ['refresh', 'Refreshing TutaDrive file list']
+    ],
+    serverWaitText: 'server is unpacking notes and attachments into your vault'
+  },
+  merge: {
+    title: 'Merging backup into TutaDrive',
+    steps: [
+      ['download', 'Downloading sealed zip from TutaCloud'],
+      ['decrypt', 'Checking password and decrypting in your browser'],
+      ['send', 'Sending decrypted zip for comparison'],
+      ['server', 'Server comparing backup notes with your current notes'],
+      ['apply', 'Merging notes into your vault'],
+      ['refresh', 'Refreshing TutaDrive file list']
+    ],
+    serverWaitText: 'server is comparing every note in the backup with your vault'
+  }
+};
+
+function formatTransferLine(verb, progress) {
+  const total = Number(progress.totalBytes) || 0;
+  const lines = [
+    total > 0
+      ? `${verb} ${formatProgressMb(progress.loadedBytes)} of ${formatProgressMb(total)}`
+      : `${verb} ${formatProgressMb(progress.loadedBytes)}`
+  ];
+  if (!progress.done && Number(progress.bytesPerSec) > 0) {
+    const eta = Number.isFinite(progress.etaSec) ? ` — about ${formatDurationSec(progress.etaSec)} left` : '';
+    lines.push(`Speed: ${formatProgressMb(progress.bytesPerSec)}/s${eta}`);
+  }
+  return lines;
+}
+
+/** Multi-line status for BusyHourglassOverlay while a backup Upload / Restore / Merge runs. */
+function buildBackupProgressLabel(progress, nowMs) {
+  if (!progress) return '';
+  const op = BACKUP_OPERATION_STEPS[progress.operation] || BACKUP_OPERATION_STEPS.upload;
+  const lines = [];
+  if (progress.sourceName) {
+    const size = Number(progress.sourceBytes) > 0 ? ` (${formatProgressMb(progress.sourceBytes)})` : '';
+    lines.push(`${progress.operation === 'upload' ? 'File' : 'Backup'}: ${progress.sourceName}${size}`);
+  }
+  if (progress.operation === 'upload') {
+    lines.push(progress.targetName ? `Slot: overwrite ${progress.targetName}` : 'Slot: new backup slot');
+  }
+
+  if (progress.stage === 'done') {
+    lines.push(`${op.title} — complete`);
+  } else {
+    const index = op.steps.findIndex(([key]) => key === progress.stage);
+    const stepLabel = index >= 0 ? op.steps[index][1] : 'Working';
+    lines.push(index >= 0 ? `Step ${index + 1} of ${op.steps.length}: ${stepLabel}` : stepLabel);
+  }
+
+  switch (progress.stage) {
+    case 'read':
+      lines.push(...formatTransferLine('Read', progress));
+      break;
+    case 'download':
+      lines.push(...formatTransferLine('Downloaded', progress));
+      break;
+    case 'seal':
+      lines.push(
+        progress.alreadySealed
+          ? 'Zip is already sealed — no re-encryption needed'
+          : progress.done
+            ? `Sealed with your Encrypt Password (${formatProgressMb(progress.totalBytes)})`
+            : 'Sealing with your Encrypt Password (AES-256-GCM)…'
+      );
+      break;
+    case 'decrypt':
+      lines.push(
+        progress.done
+          ? `Decrypted — vault zip is ${formatProgressMb(progress.totalBytes)}`
+          : progress.withZipPassword
+            ? `Verifying zip password (Argon2id) and decrypting ${formatProgressMb(progress.totalBytes)} (AES-256-GCM)…`
+            : `Decrypting ${formatProgressMb(progress.totalBytes)} with your Encrypt Password (AES-256-GCM)…`
+      );
+      break;
+    case 'send':
+      lines.push(...formatTransferLine('Sent', progress));
+      break;
+    case 'server':
+      lines.push(`All ${formatProgressMb(progress.totalBytes)} sent — ${op.serverWaitText}`);
+      break;
+    case 'saved':
+      if (progress.fileName) lines.push(`Saved as ${progress.fileName}`);
+      break;
+    case 'apply':
+      lines.push(
+        `${progress.addCount || 0} to add, ${progress.overwriteCount || 0} to overwrite, ${progress.skipCount || 0} to skip`
+      );
+      break;
+    default:
+      break;
+  }
+
+  if (Number(progress.noteCount) > 0 && progress.stage !== 'apply') {
+    lines.push(`Backup contains ${progress.noteCount} notes (${progress.conflictCount || 0} already exist)`);
+  }
+  if (Number.isFinite(progress.restoredFiles)) {
+    lines.push(`Restored ${progress.restoredFiles} files`);
+  }
+  if (progress.startedAt) {
+    lines.push(`Elapsed: ${formatDurationSec((nowMs - progress.startedAt) / 1000)}`);
+  }
+  return lines.join('\n');
+}
+
 const backupSuccessMessageSx = {
   mb: 0,
   textAlign: 'center',
@@ -131,12 +283,25 @@ const generalSuccessMessageSx = {
   lineHeight: 1.45
 };
 
+const backupRowLabelSx = {
+  flex: 1,
+  minWidth: { xs: '100%', sm: 220 },
+  color: '#fff',
+  fontWeight: 700,
+  lineHeight: 1.3,
+  overflowWrap: 'anywhere',
+  fontSize: getMobileSinglesTextFontSizeVw(),
+  '@media (min-width: 600px)': {
+    fontSize: getDesktopTextFontSizeVw()
+  }
+};
+
 const backupRowNoteSx = {
   color: 'rgba(255, 255, 255, 0.82)',
   fontWeight: 500,
   fontStyle: 'italic',
   lineHeight: 1.35,
-  mt: 0.35,
+  ml: 1,
   fontSize: getMobileSinglesTextFontSizeVw(),
   '@media (min-width: 600px)': {
     fontSize: getDesktopTextFontSizeVw()
@@ -272,6 +437,41 @@ export default function RecordVaultOneDriveBackupDialog({
   const [openBackupNotebooks, setOpenBackupNotebooks] = useState([]);
   /** Backup password screen: { mode, fileName, note, hint, passwordCheck, warning, resolve }. */
   const [passwordDialog, setPasswordDialog] = useState(null);
+  /** Upload / Restore / Merge progress: { operation, stage, percent, sourceName, startedAt, ... }. */
+  const [backupProgress, setBackupProgress] = useState(null);
+  const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
+
+  const backupProgressActive = Boolean(backupProgress);
+
+  useEffect(() => {
+    if (!backupProgressActive) return undefined;
+    setProgressNowMs(Date.now());
+    const timer = setInterval(() => setProgressNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [backupProgressActive]);
+
+  /**
+   * Start tracking an operation. `update(event)` replaces the per-step details;
+   * `addInfo(info)` adds facts (note counts, restored files) kept for later steps.
+   */
+  const startBackupProgress = (operation, sourceName, sourceBytes, extra = {}) => {
+    const base = { operation, sourceName, sourceBytes, startedAt: Date.now(), ...extra };
+    let info = {};
+    let latest = { ...base, stage: '', percent: 0 };
+    setBackupProgress(latest);
+    return {
+      base,
+      update: (event) => {
+        latest = { ...base, ...info, ...event };
+        setBackupProgress(latest);
+      },
+      addInfo: (nextInfo) => {
+        info = { ...info, ...nextInfo };
+        latest = { ...latest, ...nextInfo };
+        setBackupProgress(latest);
+      }
+    };
+  };
 
   const backupSlots = buildBackupSlots(backupList, maxBackups);
 
@@ -467,8 +667,12 @@ export default function RecordVaultOneDriveBackupDialog({
     }
     setBusy(true);
     setActioningFile(fileName);
+    const slot = backupSlots.find((s) => s.fileName === fileName);
+    const progress = startBackupProgress('merge', fileName, Number(slot?.sizeBytes) || 0);
     try {
-      const preview = await previewRecordVaultTutaDriveMergeFromStoredBackup(fileName);
+      const preview = await previewRecordVaultTutaDriveMergeFromStoredBackup(fileName, {
+        onProgress: progress.update
+      });
       const mergeId = preview?.mergeId;
       const notes = Array.isArray(preview?.notes) ? preview.notes : [];
       if (!mergeId || !notes.length) {
@@ -476,6 +680,8 @@ export default function RecordVaultOneDriveBackupDialog({
         setSuccessTone('general');
         return;
       }
+      const conflictCount = notes.filter((row) => row.conflict).length;
+      progress.addInfo({ noteCount: notes.length, conflictCount });
 
       setBusy(false);
       const decisions = {};
@@ -491,23 +697,35 @@ export default function RecordVaultOneDriveBackupDialog({
           decisions[backupNoteId] = 'add';
         }
       }
+      const choices = Object.values(decisions);
+      progress.update({
+        stage: 'apply',
+        percent: 85,
+        addCount: choices.filter((c) => c === 'add').length,
+        overwriteCount: choices.filter((c) => c === 'overwrite').length,
+        skipCount: choices.filter((c) => c === 'skip').length
+      });
 
       setBusy(true);
       const result = await applyRecordVaultTutaDriveMerge(mergeId, decisions);
       const added = Number(result?.added) || 0;
       const overwritten = Number(result?.overwritten) || 0;
       const skipped = Number(result?.skipped) || 0;
-      setSuccess(
-        `Merge complete: ${added} note${added === 1 ? '' : 's'} added, ${overwritten} overwritten, ${skipped} skipped.`
-      );
-      setSuccessTone('general');
+      progress.update({ stage: 'refresh', percent: 95 });
       refreshVaultTree();
       await onRestored?.(result);
+      progress.update({ stage: 'done', percent: 100 });
+      const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
+      setSuccess(
+        `Merge complete in ${elapsedText}: ${added} note${added === 1 ? '' : 's'} added, ${overwritten} overwritten, ${skipped} skipped.`
+      );
+      setSuccessTone('general');
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Merge failed');
     } finally {
       setBusy(false);
       setActioningFile('');
+      setBackupProgress(null);
     }
   };
 
@@ -526,20 +744,29 @@ export default function RecordVaultOneDriveBackupDialog({
     }
     setBusy(true);
     setActioningFile(fileName);
+    const slot = backupSlots.find((s) => s.fileName === fileName);
+    const progress = startBackupProgress('restore', fileName, Number(slot?.sizeBytes) || 0);
     try {
-      const result = await restoreRecordVaultTutaDriveEncryptedBackup(undefined, fileName);
+      const result = await restoreRecordVaultTutaDriveEncryptedBackup(undefined, fileName, {
+        onProgress: progress.update
+      });
       const count = Number(result?.restoredFiles) || 0;
-      setSuccess(
-        `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
-      );
-      setSuccessTone('general');
+      progress.addInfo({ restoredFiles: count });
+      progress.update({ stage: 'refresh', percent: 95 });
       refreshVaultTree();
       await onRestored?.(result);
+      progress.update({ stage: 'done', percent: 100 });
+      const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
+      setSuccess(
+        `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive in ${elapsedText} (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
+      );
+      setSuccessTone('general');
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Restore failed');
     } finally {
       setBusy(false);
       setActioningFile('');
+      setBackupProgress(null);
     }
   };
 
@@ -615,22 +842,28 @@ export default function RecordVaultOneDriveBackupDialog({
     }
     setBusy(true);
     setActioningFile(targetFileName || 'new-upload');
+    const progress = startBackupProgress('upload', file.name, file.size, {
+      targetName: mode === 'replace' ? targetFileName : ''
+    });
     try {
       const result =
         mode === 'replace'
-          ? await uploadRecordVaultTutaDriveStoredBackup(file, targetFileName)
-          : await uploadRecordVaultTutaDriveStoredBackup(file);
+          ? await uploadRecordVaultTutaDriveStoredBackup(file, targetFileName, { onProgress: progress.update })
+          : await uploadRecordVaultTutaDriveStoredBackup(file, undefined, { onProgress: progress.update });
       const uploadedName = result?.fileName || targetFileName || 'EncryptedBackup.zip';
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
-      setSuccess(`Uploaded and saved ${uploadedName}${sizeText}.`);
-      setSuccessTone('general');
       await loadBackupList();
+      progress.update({ stage: 'done', percent: 100, fileName: uploadedName });
+      const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
+      setSuccess(`Uploaded and saved ${uploadedName}${sizeText} in ${elapsedText}.`);
+      setSuccessTone('general');
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Upload failed');
     } finally {
       setBusy(false);
       setActioningFile('');
+      setBackupProgress(null);
     }
   };
 
@@ -689,14 +922,20 @@ export default function RecordVaultOneDriveBackupDialog({
     setBusy(true);
     try {
       if (tutaDriveActive) {
-        const result = await restoreRecordVaultTutaDriveEncryptedBackup(file);
+        const progress = startBackupProgress('restoreLocal', file.name, file.size);
+        const result = await restoreRecordVaultTutaDriveEncryptedBackup(file, undefined, {
+          onProgress: progress.update
+        });
         const count = Number(result?.restoredFiles) || 0;
-        setSuccess(
-          `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
-        );
-        setSuccessTone('general');
+        progress.addInfo({ restoredFiles: count });
+        progress.update({ stage: 'refresh', percent: 95 });
         refreshVaultTree();
         await onRestored?.(result);
+        const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
+        setSuccess(
+          `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive in ${elapsedText} (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
+        );
+        setSuccessTone('general');
       } else {
         const result = await restoreRecordVaultOneDriveBackupZip(file);
         const count = Number(result?.restoredFiles) || 0;
@@ -711,6 +950,7 @@ export default function RecordVaultOneDriveBackupDialog({
       setError(err?.response?.data?.error || err?.message || 'Restore failed');
     } finally {
       setBusy(false);
+      setBackupProgress(null);
     }
   };
 
@@ -859,7 +1099,15 @@ export default function RecordVaultOneDriveBackupDialog({
     <>
       <BusyHourglassOverlay
         open={open && busy}
-        label={tutaDriveActive ? 'Working on TutaDrive backup' : 'Working on OneDrive backup'}
+        label={
+          backupProgress
+            ? (BACKUP_OPERATION_STEPS[backupProgress.operation] || BACKUP_OPERATION_STEPS.upload).title
+            : tutaDriveActive
+              ? 'Working on TutaDrive backup'
+              : 'Working on OneDrive backup'
+        }
+        progressPercent={backupProgress ? backupProgress.percent : null}
+        progressLabel={buildBackupProgressLabel(backupProgress, progressNowMs)}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <input
@@ -938,31 +1186,33 @@ export default function RecordVaultOneDriveBackupDialog({
                   : mb
                     ? `${slot.fileName} (${mb}mb)`
                     : slot.fileName;
+                const labelBox = (
+                  <Box sx={slot.empty ? backupRowLabelSx : { ...backupRowLabelSx, flex: 'none', minWidth: 0 }}>
+                    <Box component="span">
+                      {slot.rowNumber}) {label}
+                    </Box>
+                    {!slot.empty && slot.note ? (
+                      <Box component="span" sx={backupRowNoteSx}>
+                        (Note: {slot.note})
+                      </Box>
+                    ) : null}
+                  </Box>
+                );
                 return (
                   <Box key={`backup-slot-${slot.rowNumber}`} sx={backupRowOuterSx}>
-                    <Box sx={backupRowControlsSx}>
-                      <Box
-                        sx={{
-                          flex: 1,
-                          minWidth: { xs: '100%', sm: 220 },
-                          color: '#fff',
-                          fontWeight: 700,
-                          lineHeight: 1.3,
-                          fontSize: getMobileSinglesTextFontSizeVw(),
-                          '@media (min-width: 600px)': {
-                            fontSize: getDesktopTextFontSizeVw()
-                          }
-                        }}
-                      >
-                        <Box>
-                          {slot.rowNumber}) {label}
-                        </Box>
-                        {!slot.empty && slot.note ? (
-                          <Box sx={backupRowNoteSx}>(Note: {slot.note})</Box>
-                        ) : null}
+                    {slot.empty ? (
+                      <Box sx={backupRowControlsSx}>
+                        {labelBox}
+                        {renderBackupRowActionButtons(slot)}
                       </Box>
-                      {renderBackupRowActionButtons(slot)}
-                    </Box>
+                    ) : (
+                      <>
+                        {labelBox}
+                        <Box sx={{ ...backupRowControlsSx, mt: 0.75 }}>
+                          {renderBackupRowActionButtons(slot)}
+                        </Box>
+                      </>
+                    )}
                     {!slot.empty ? renderOpenBackupTree(slot.fileName) : null}
                   </Box>
                 );

@@ -39,6 +39,8 @@ export default function RecordVaultBackupPasswordDialog({
   onConfirm
 }) {
   const isBackup = mode === 'backup';
+  /** Restore / Merge verify on the confirm button; only Open keeps a separate Verify button. */
+  const showVerifyButton = !isBackup && mode !== 'restore' && mode !== 'merge';
   const zipHasOwnPassword = Boolean(passwordCheck?.verifierB64);
   const [noteValue, setNoteValue] = useState('');
   const [hintValue, setHintValue] = useState('');
@@ -182,7 +184,7 @@ export default function RecordVaultBackupPasswordDialog({
                 }}
                 inputProps={{ autoComplete: isBackup ? 'new-password' : 'current-password' }}
               />
-              {!isBackup ? (
+              {showVerifyButton ? (
                 <ColorTemplate16PopupCenterWide.ActionButton
                   type="button"
                   disabled={!password || verifying || verified}
@@ -222,7 +224,7 @@ export default function RecordVaultBackupPasswordDialog({
             Cancel
           </ColorTemplate16PopupCenterWide.ActionButton>
           <ColorTemplate16PopupCenterWide.ActionButton type="button" disabled={verifying || !password} onClick={() => void confirm()}>
-            {MODE_CONFIRM_LABEL[mode] || MODE_CONFIRM_LABEL.backup}
+            {verifying && !showVerifyButton ? 'Verifying…' : MODE_CONFIRM_LABEL[mode] || MODE_CONFIRM_LABEL.backup}
           </ColorTemplate16PopupCenterWide.ActionButton>
         </Stack>
       </ColorTemplate16PopupCenterWide.Body>

@@ -4,6 +4,7 @@ import { normalizeYoutubeMusicUrl } from '../../utils/normalizeYoutubeMusicUrl.j
 import { loadGlobalDefaultMusicUrls, persistGlobalDefaultMusicUrls } from '../../utils/globalDefaultMusicUrl.js';
 import { DEFAULT_GLOBAL_MUSIC_URLS } from '../../constants/defaultMusicUrls.js';
 import { parseMynoteFontSizeTenths } from '../../utils/vaultDefaultButtonFontSizeConfig.js';
+import { syncSinglesStatusWithTutaDates } from '../../utils/syncSinglesStatusWithTutaDates.js';
 import {
   MYNOTE_PREFS_API_KEYS,
   MYNOTE_DEFAULT_CONTENT_BG_INDEX,
@@ -1237,6 +1238,13 @@ export async function putUserCustomization(req, res) {
           );
         } catch (enrollErr) {
           if (!isMissingColumn(enrollErr, dbCol)) throw enrollErr;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaDatesEnabled')) {
+        try {
+          await syncSinglesStatusWithTutaDates(pool, me, mallEnrollmentPatch.tutaDatesEnabled);
+        } catch (statusErr) {
+          console.error('[userCustomization] TutaDates singles.status sync failed:', statusErr);
         }
       }
     }
