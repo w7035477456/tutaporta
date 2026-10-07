@@ -27,6 +27,7 @@ import VaultOverageThrottleNotice from 'ui-component/VaultOverageThrottleNotice'
  * Optional actionLabel + onAction (e.g. Skip OneDrive) for long waits.
  * When TutaNotes / TutaPhotoAlbums data-limit throttle is active, appends a REFILL notice (once —
  * backend progress labels may already include the same line).
+ * yellowPanel: hourglass + % + status sit on a rounded yellow panel with dark text.
  */
 export default function BusyHourglassOverlay({
   open = false,
@@ -37,6 +38,7 @@ export default function BusyHourglassOverlay({
   onAction,
   backdropSx,
   fontSize = BUSY_HOURGLASS_SIZE,
+  yellowPanel = false,
   sx
 }) {
   const notesOverageThrottled = useSyncExternalStore(
@@ -87,12 +89,15 @@ export default function BusyHourglassOverlay({
       sm: '1.15rem'
     },
     lineHeight: 1.25,
-    color: '#fff',
+    color: yellowPanel ? '#000' : '#fff',
+    WebkitTextFillColor: yellowPanel ? '#000' : undefined,
     textAlign: 'left',
-    textShadow: '0 1px 0 #000',
+    textShadow: yellowPanel ? 'none' : '0 1px 0 #000',
     maxWidth: { xs: '70vw', sm: '36rem' },
     whiteSpace: 'pre-line'
   };
+  const percentColor = yellowPanel ? '#000' : 'var(--theme-yellow-color)';
+  const throttleColor = yellowPanel ? '#b00020' : 'var(--theme-yellow-color)';
 
   const statusColumn = showSideText ? (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5, minWidth: 0 }}>
@@ -108,9 +113,10 @@ export default function BusyHourglassOverlay({
               sm: getDesktopTitleFontSizeVw()
             },
             lineHeight: 1.2,
-            color: 'var(--theme-yellow-color)',
+            color: percentColor,
+            WebkitTextFillColor: percentColor,
             textAlign: 'left',
-            textShadow: '0 1px 0 #000',
+            textShadow: yellowPanel ? 'none' : '0 1px 0 #000',
             whiteSpace: 'nowrap'
           }}
         >
@@ -127,8 +133,8 @@ export default function BusyHourglassOverlay({
           component="p"
           sx={{
             ...statusParagraphSx,
-            color: 'var(--theme-yellow-color)',
-            WebkitTextFillColor: 'var(--theme-yellow-color)',
+            color: throttleColor,
+            WebkitTextFillColor: throttleColor,
             fontWeight: 800
           }}
         />
@@ -189,7 +195,19 @@ export default function BusyHourglassOverlay({
           display: 'flex',
           flexDirection: showSideText ? 'row' : 'column',
           alignItems: 'center',
-          gap: showSideText ? 2 : 1.5
+          gap: showSideText ? 2 : 1.5,
+          ...(yellowPanel
+            ? {
+                bgcolor: '#ffeb3b',
+                border: '3px solid #000',
+                borderRadius: '28px',
+                boxShadow: '0 6px 24px rgba(0, 0, 0, 0.55)',
+                px: { xs: 2, sm: 3 },
+                py: { xs: 1.5, sm: 2 },
+                maxWidth: '92vw',
+                boxSizing: 'border-box'
+              }
+            : null)
         }}
       >
         <BusyHourglass fontSize={fontSize} />
@@ -210,5 +228,6 @@ BusyHourglassOverlay.propTypes = {
   onAction: PropTypes.func,
   backdropSx: PropTypes.object,
   fontSize: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.object]),
+  yellowPanel: PropTypes.bool,
   sx: PropTypes.object
 };

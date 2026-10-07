@@ -738,8 +738,8 @@ export default function RecordVaultAccessGate({
               </Typography>
               {isCompact ? null : (
                 <Typography sx={{ lineHeight: 1.5, fontWeight: 700 }}>
-                  Due to our maximum secure architecture, it is impossible to recover lost password. Creating
-                  new password will require erase/format TutaNotes folder on OneDrive or USB.
+                  Due to our maximum secure architecture, it is impossible to recover lost TutaNotes Cloud Encryption password. Creating
+                  new password will require erase/format TutaNotes Cloud folder.
                 </Typography>
               )}
 

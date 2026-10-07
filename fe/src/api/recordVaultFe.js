@@ -993,17 +993,26 @@ export async function downloadRecordVaultOneDriveBackupZip() {
  * store as users/M{id}/EncryptedTutaNotesZip_YYYY_MM_DD[_note].zip (keeps up to 3).
  * Server keeps the salt + verifier + hint from the header so Restore / Merge can check the password.
  */
+/**
+ * Progress stages (onProgress): build (0–35%) while the server streams the vault zip —
+ * the stream has no Content-Length, so percent uses `estimatedTotalBytes` when given;
+ * seal (35–50%), send (50–95%), server (95%), saved (98%).
+ */
 export async function createRecordVaultTutaDriveEncryptedBackup(
   note = '',
-  { hint = '', dateStamp = '', password = '' } = {}
+  { hint = '', dateStamp = '', password = '', onProgress, estimatedTotalBytes = 0 } = {}
 ) {
   const { sealTutaDriveBackupZipWithPassword } = await import('utils/recordVaultClientVaultCrypto');
   if (!String(password || '')) {
     throw new Error('Enter a password for this backup zip');
   }
-  const zipResponse = await api.get('/api/recordVault/tutadrive/backup-zip', { responseType: 'blob' });
-  const zipBuf = new Uint8Array(await zipResponse.data.arrayBuffer());
+  const report = makeBackupProgressReporter(onProgress);
+  const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutadrive/backup-zip', report, 'build', 0, 35, {
+    estimatedTotalBytes
+  });
+  report('seal', 35, { totalBytes: zipBuf.length, withZipPassword: true });
   const sealed = await sealTutaDriveBackupZipWithPassword(zipBuf, password, { hint, note });
+  report('seal', 50, { totalBytes: sealed.length, withZipPassword: true, done: true });
   const formData = new FormData();
   formData.append(
     'backup',
@@ -1013,11 +1022,16 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
   formData.append('note', String(note || '').trim());
   formData.append('hint', String(hint || '').trim());
   if (dateStamp) formData.append('dateStamp', String(dateStamp));
-  const { data } = await api.post('/api/recordVault/tutadrive/backup', formData, {
-    maxBodyLength: Infinity,
-    maxContentLength: Infinity,
-    timeout: 0
-  });
+  const data = await sendBackupFormWithProgress(
+    'post',
+    '/api/recordVault/tutadrive/backup',
+    formData,
+    sealed.length,
+    report,
+    50,
+    95
+  );
+  report('saved', 98, { totalBytes: sealed.length, fileName: data?.fileName });
   return data;
 }
 
@@ -1096,24 +1110,43 @@ async function readBackupFileWithProgress(file, report, fromPct, toPct) {
   return bytes;
 }
 
-/** Download a stored sealed backup (stage `download`) within [fromPct, toPct]. */
-async function downloadStoredBackupWithProgress(fileName, report, fromPct, toPct) {
-  const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
+/**
+ * GET a blob (stage `stage`) within [fromPct, toPct]. When the response has no Content-Length,
+ * `estimatedTotalBytes` drives the percent (capped just below toPct) and is reported as `estimatedBytes`.
+ */
+async function downloadBlobWithProgress(url, report, stage, fromPct, toPct, { estimatedTotalBytes = 0 } = {}) {
   const startedAt = Date.now();
-  report('download', fromPct, { loadedBytes: 0, totalBytes: 0 });
-  const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, {
+  const estimate = Number(estimatedTotalBytes) > 0 ? Number(estimatedTotalBytes) : 0;
+  report(stage, fromPct, { loadedBytes: 0, totalBytes: 0, estimatedBytes: estimate });
+  const response = await api.get(url, {
     responseType: 'blob',
     timeout: 0,
     onDownloadProgress: (event) => {
       const loaded = Number(event?.loaded) || 0;
       const total = Number(event?.total) || 0;
-      const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
-      report('download', percent, details);
+      if (total > 0 || !estimate) {
+        const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+        report(stage, percent, details);
+        return;
+      }
+      const { percent, details } = transferProgressDetails(startedAt, loaded, estimate, fromPct, toPct);
+      report(stage, Math.min(percent, toPct - 1), {
+        ...details,
+        totalBytes: 0,
+        estimatedBytes: estimate,
+        etaSec: loaded < estimate ? details.etaSec : null
+      });
     }
   });
   const bytes = new Uint8Array(await response.data.arrayBuffer());
-  report('download', toPct, { loadedBytes: bytes.length, totalBytes: bytes.length, done: true });
+  report(stage, toPct, { loadedBytes: bytes.length, totalBytes: bytes.length, done: true });
   return bytes;
+}
+
+/** Download a stored sealed backup (stage `download`) within [fromPct, toPct]. */
+async function downloadStoredBackupWithProgress(fileName, report, fromPct, toPct) {
+  const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
+  return downloadBlobWithProgress(`/api/recordVault/tutadrive/backup${q}`, report, 'download', fromPct, toPct);
 }
 
 /**

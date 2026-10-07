@@ -36,6 +36,7 @@ import {
   prepareBackupDecryptWithPassword
 } from 'utils/recordVaultBackupDecryptPrompt';
 import RecordVaultBackupPasswordDialog from './RecordVaultBackupPasswordDialog';
+import { tutaDriveBackupFileNamePreview } from 'utils/recordVaultBackupFileName';
 import Typography from '@mui/material/Typography';
 
 const actionRowSx = {
@@ -128,6 +129,17 @@ function formatDurationSec(sec) {
 
 /** Ordered steps + labels per backup operation shown in the busy overlay. */
 const BACKUP_OPERATION_STEPS = {
+  backup: {
+    title: 'Backing up TutaNotes to Cloud',
+    steps: [
+      ['build', 'Server zipping your TutaDrive vault'],
+      ['seal', 'Encrypting with the password for this zip'],
+      ['send', 'Uploading sealed zip to TutaCloud'],
+      ['server', 'Server saving zip to your member folder'],
+      ['saved', 'Refreshing backup list']
+    ],
+    serverWaitText: 'waiting for server to write the file'
+  },
   upload: {
     title: 'Uploading backup zip',
     steps: [
@@ -196,9 +208,10 @@ function buildBackupProgressLabel(progress, nowMs) {
   const lines = [];
   if (progress.sourceName) {
     const size = Number(progress.sourceBytes) > 0 ? ` (${formatProgressMb(progress.sourceBytes)})` : '';
-    lines.push(`${progress.operation === 'upload' ? 'File' : 'Backup'}: ${progress.sourceName}${size}`);
+    const sourceLabel = { upload: 'File', backup: 'Zip' }[progress.operation] || 'Backup';
+    lines.push(`${sourceLabel}: ${progress.sourceName}${size}`);
   }
-  if (progress.operation === 'upload') {
+  if (progress.operation === 'upload' || progress.operation === 'backup') {
     lines.push(progress.targetName ? `Slot: overwrite ${progress.targetName}` : 'Slot: new backup slot');
   }
 
@@ -217,15 +230,25 @@ function buildBackupProgressLabel(progress, nowMs) {
     case 'download':
       lines.push(...formatTransferLine('Downloaded', progress));
       break;
-    case 'seal':
+    case 'build':
+      lines.push(...formatTransferLine('Received', progress));
+      if (!progress.done && !(Number(progress.totalBytes) > 0) && Number(progress.estimatedBytes) > 0) {
+        lines.push(`Expected about ${formatProgressMb(progress.estimatedBytes)} (based on your newest backup)`);
+      }
+      break;
+    case 'seal': {
+      const secret = progress.withZipPassword ? 'the password for this zip' : 'your Encrypt Password';
       lines.push(
         progress.alreadySealed
           ? 'Zip is already sealed — no re-encryption needed'
           : progress.done
-            ? `Sealed with your Encrypt Password (${formatProgressMb(progress.totalBytes)})`
-            : 'Sealing with your Encrypt Password (AES-256-GCM)…'
+            ? `Sealed with ${secret} (${formatProgressMb(progress.totalBytes)})`
+            : `Sealing ${formatProgressMb(progress.totalBytes)} with ${secret} (${
+                progress.withZipPassword ? 'Argon2id + ' : ''
+              }AES-256-GCM)…`
       );
       break;
+    }
     case 'decrypt':
       lines.push(
         progress.done
@@ -598,21 +621,34 @@ export default function RecordVaultOneDriveBackupDialog({
     setBusy(true);
     try {
       if (tutaDriveActive) {
+        const newestBackupBytes = backupSlots
+          .filter((s) => !s.empty && Number(s.sizeBytes) > 0)
+          .sort((a, b) => (Number(b.mtimeMs) || 0) - (Number(a.mtimeMs) || 0))[0]?.sizeBytes;
+        const progress = startBackupProgress(
+          'backup',
+          tutaDriveBackupFileNamePreview(backupInput.note, backupInput.dateStamp),
+          0,
+          { targetName: slotsFull && oldestSlot ? oldestSlot.fileName : '' }
+        );
         const result = await createRecordVaultTutaDriveEncryptedBackup(backupInput.note, {
           hint: backupInput.hint,
           dateStamp: backupInput.dateStamp,
-          password: backupInput.password
+          password: backupInput.password,
+          onProgress: progress.update,
+          estimatedTotalBytes: Number(newestBackupBytes) || 0
         });
         const fileName = result?.fileName || 'EncryptedTutaNotesZip.zip';
         const rel = result?.relativePath || fileName;
         const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
         const noteText = result?.note ? ` Note: ${result.note}.` : '';
+        await loadBackupList();
+        progress.update({ stage: 'done', percent: 100 });
+        const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
         setSuccess(
-          `Backup sealed with the password you chose for this zip and saved as ${rel}${sizeText}.${noteText}`
+          `Backup sealed with the password you chose for this zip and saved as ${rel}${sizeText} in ${elapsedText}.${noteText}`
         );
         setSuccessTone('backup');
-        await loadBackupList();
       } else {
         const result = await downloadRecordVaultOneDriveBackupZip();
         const fileName = result?.fileName || 'onlinemallwebsitevault-backup.zip';
@@ -628,6 +664,7 @@ export default function RecordVaultOneDriveBackupDialog({
       setError(err?.response?.data?.error || err?.message || 'Backup failed');
     } finally {
       setBusy(false);
+      setBackupProgress(null);
     }
   };
 
@@ -1108,6 +1145,7 @@ export default function RecordVaultOneDriveBackupDialog({
         }
         progressPercent={backupProgress ? backupProgress.percent : null}
         progressLabel={buildBackupProgressLabel(backupProgress, progressNowMs)}
+        yellowPanel={Boolean(backupProgress)}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <input
