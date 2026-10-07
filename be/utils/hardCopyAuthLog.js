@@ -5,6 +5,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { normalizeLogIp, shouldSkipIpLog } from './ipLogSkipList.js';
 
 const BE_DIR = path.join(os.homedir(), '.ssh', 'be');
 export const DEMO_HARD_COPY_LOG_PATH = path.join(BE_DIR, 'demolog.log');
@@ -28,16 +29,9 @@ function formatLogDate(date = new Date()) {
   return `${y}-${m}-${d} ${hh}:${mm}:${ss} ${sign}${oh}${om}`;
 }
 
-/** Privacy: only the last decimal digit, as x.x.x.# — never a full address. */
-function maskedIp(raw) {
-  let ip = String(raw ?? '').trim();
-  if (ip.startsWith('::ffff:')) ip = ip.slice('::ffff:'.length);
-  if (/^x\.x\.x\.[0-9]$/.test(ip)) return ip;
-  if (!ip || ip === 'unknown') return 'x.x.x.?';
-  const lastOctet = ip.includes('.') ? ip.split('.').pop() : ip;
-  const digits = String(lastOctet ?? '').replace(/\D/g, '');
-  if (!digits) return 'x.x.x.?';
-  return `x.x.x.${digits.slice(-1)}`;
+/** Full client IP for the log line (`-` when unknown). */
+function logIp(raw) {
+  return logField(normalizeLogIp(raw));
 }
 
 /** Append one line. Never replaces the file. Login/signup must not fail if this throws. */
@@ -51,20 +45,34 @@ function appendOnly(filePath, line) {
   }
 }
 
-/** Login with the "demo" alias (not guest). IP stored as x.x.x.# only. */
-export function appendDemoLoginHardCopy({ clientIp, at } = {}) {
-  const when = formatLogDate(at instanceof Date ? at : new Date());
-  const ip = maskedIp(clientIp);
-  appendOnly(DEMO_HARD_COPY_LOG_PATH, `${when}\tlogin=demo\tip=${ip}`);
+/** `device=… browser=… os=…` from clientDeviceInfo.parseClientDevice (`-` when unknown). */
+function deviceFields(device) {
+  return [
+    `device=${logField(device?.deviceType)}`,
+    `browser=${logField(device?.browser)}`,
+    `os=${logField(device?.os)}`
+  ].join('\t');
 }
 
-/** Registration: email, phone, masked IP, date/time. */
-export function appendRegisterHardCopy({ clientIp, email, phone, at } = {}) {
+/** Login with the "demo" alias (not guest). Full IP; local / home IPs are not logged. */
+export function appendDemoLoginHardCopy({ clientIp, device, at } = {}) {
+  if (shouldSkipIpLog(clientIp)) return;
   const when = formatLogDate(at instanceof Date ? at : new Date());
-  const ip = maskedIp(clientIp);
+  const ip = logIp(clientIp);
+  appendOnly(DEMO_HARD_COPY_LOG_PATH, `${when}\tlogin=demo\tip=${ip}\t${deviceFields(device)}`);
+}
+
+/** Registration: email, phone, full IP, device, date/time. Local / home IPs are not logged. */
+export function appendRegisterHardCopy({ clientIp, email, phone, device, at } = {}) {
+  if (shouldSkipIpLog(clientIp)) return;
+  const when = formatLogDate(at instanceof Date ? at : new Date());
+  const ip = logIp(clientIp);
   const em = String(email ?? '').trim() || '-';
   const ph = String(phone ?? '').trim() || '-';
-  appendOnly(REGISTER_HARD_COPY_LOG_PATH, `${when}\tip=${ip}\temail=${em}\tphone=${ph}`);
+  appendOnly(
+    REGISTER_HARD_COPY_LOG_PATH,
+    `${when}\tip=${ip}\temail=${em}\tphone=${ph}\t${deviceFields(device)}`
+  );
 }
 
 function logField(value) {
@@ -83,7 +91,7 @@ function partyFields(prefix, party = {}) {
   ].join('\t');
 }
 
-/** Brief/full bio request. IP is x.x.x.# only. */
+/** Brief/full bio request. Full client IP. */
 export function appendBioRequestHardCopy({
   clientIp,
   bioKind,
@@ -92,7 +100,7 @@ export function appendBioRequestHardCopy({
   at
 } = {}) {
   const when = formatLogDate(at instanceof Date ? at : new Date());
-  const ip = maskedIp(clientIp);
+  const ip = logIp(clientIp);
   const bio = String(bioKind ?? '').trim().toLowerCase() === 'full' ? 'full' : 'brief';
   appendOnly(
     REQUEST_HARD_COPY_LOG_PATH,
@@ -100,7 +108,7 @@ export function appendBioRequestHardCopy({
   );
 }
 
-/** Brief/full bio approval. IP is x.x.x.# only. */
+/** Brief/full bio approval. Full client IP. */
 export function appendBioApproveHardCopy({
   clientIp,
   bioKind,
@@ -110,7 +118,7 @@ export function appendBioApproveHardCopy({
   at
 } = {}) {
   const when = formatLogDate(at instanceof Date ? at : new Date());
-  const ip = maskedIp(clientIp);
+  const ip = logIp(clientIp);
   const bio = String(bioKind ?? '').trim().toLowerCase() === 'full' ? 'full' : 'brief';
   appendOnly(
     APPROVE_HARD_COPY_LOG_PATH,

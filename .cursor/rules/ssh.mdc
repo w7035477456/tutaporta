@@ -38,7 +38,23 @@ Do **not** invent a different SSH command. Match `f2`:
 scripts/deploy-ssh-mac.sh lawsen0@192.168.222.202 'hostname'
 ```
 
-Overrides: `DEPLOY_SSH_KEY`, `DEPLOY_SSH_PORT` (default `59221`).
+Overrides: `DEPLOY_SSH_KEY`, `DEPLOY_SSH_PORT` (default `59221`), `DEPLOY_SSH_SECRETS`.
+
+## Passwords (two prompts)
+
+`f2` asks for **two** secrets, in this order:
+
+1. `Password:` — the **Mac sudo password** (from `sudo ssh`).
+2. `Enter passphrase for key '…corruptedKey_march2024':` — the **SSH key passphrase**.
+
+Real values live **only** in the Mac backend env file **`~/.ssh/be/.env`** (outside git):
+
+```bash
+MAC_SUDO_PASSWORD=****
+SSH_KEY_PASSPHRASE=****
+```
+
+When `MAC_SUDO_PASSWORD` is set there, `scripts/deploy-ssh-mac.sh` answers both prompts non-interactively via `scripts/deploy-ssh-askpass.sh` (`sudo -A` + `SSH_ASKPASS_REQUIRE=force`). **Never** paste the values into this rule, any repo file, or command lines — this repo is pushed to GitHub.
 
 ## Rules for agents
 

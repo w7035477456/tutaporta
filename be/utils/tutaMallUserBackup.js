@@ -38,6 +38,35 @@ const BACKUP_VERSION = 1;
 /** Per-app backup keys (profile menu shows one app at a time). */
 export const TUTA_MALL_BACKUP_APPS = ['tutadates', 'tutanotes', 'tutaphoto'];
 
+/** IP / audit logs that backup and restore must never delete or overwrite. */
+export const PROTECTED_LOG_TABLES = new Set(['login_log']);
+export const PROTECTED_LOG_DIR = path.join(os.homedir(), '.ssh', 'be');
+
+function isSameOrInside(parent, child) {
+  const rel = path.relative(parent, child);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+/** Throws when wiping / writing `target` could touch ~/.ssh/be (demolog.log, registerlog.log, …). */
+export function assertNotProtectedLogPath(target) {
+  const resolved = path.resolve(String(target || ''));
+  if (isSameOrInside(resolved, PROTECTED_LOG_DIR) || isSameOrInside(PROTECTED_LOG_DIR, resolved)) {
+    throw new Error(`Refusing to modify protected log location: ${resolved}`);
+  }
+}
+
+/** Throws when backup / restore would delete rows from an IP / audit log table. */
+export function assertNotProtectedLogTable(tableName) {
+  if (PROTECTED_LOG_TABLES.has(String(tableName || '').trim().toLowerCase())) {
+    throw new Error(`Refusing to delete rows from protected log table: ${tableName}`);
+  }
+}
+
+function removeTree(target) {
+  assertNotProtectedLogPath(target);
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
 export function normalizeBackupApp(app) {
   const section = String(app || '').trim().toLowerCase();
   if (!TUTA_MALL_BACKUP_APPS.includes(section)) {
@@ -179,7 +208,7 @@ function copyTreeIfExists(src, dest, summary, label) {
   // absolute symlink to sibling users/M{id}/photos. Node fs.cpSync then errors with
   // "Cannot copy …/photos to a subdirectory of self …/photos".
   if (fs.existsSync(resolvedDest)) {
-    fs.rmSync(resolvedDest, { recursive: true, force: true });
+    removeTree(resolvedDest);
   }
   fs.mkdirSync(path.dirname(resolvedDest), { recursive: true });
   fs.cpSync(resolved, resolvedDest, {
@@ -267,7 +296,7 @@ function countFilesInDir(dir) {
 function wipeDirContents(dir, summary, label) {
   const resolved = path.resolve(String(dir || ''));
   if (resolved && fs.existsSync(resolved)) {
-    fs.rmSync(resolved, { recursive: true, force: true });
+    removeTree(resolved);
   }
   fs.mkdirSync(resolved, { recursive: true });
   summary.restored.push({ label: `${label}-wiped`, dest: resolved });
@@ -593,8 +622,9 @@ async function restoreTree(src, dest, summary, label, { wipeDest = true } = {}) 
     summary.skipped.push({ label, reason: 'backup missing', src: resolvedSrc });
     return;
   }
+  assertNotProtectedLogPath(dest);
   if (wipeDest && fs.existsSync(dest)) {
-    fs.rmSync(dest, { recursive: true, force: true });
+    removeTree(dest);
   }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.cpSync(resolvedSrc, dest, { recursive: true, force: true, dereference: false });
@@ -606,6 +636,7 @@ async function restoreFilesFromDir(srcDir, destDir, summary, label) {
     summary.skipped.push({ label, reason: 'backup missing', src: srcDir });
     return;
   }
+  assertNotProtectedLogPath(destDir);
   fs.mkdirSync(destDir, { recursive: true });
   for (const name of fs.readdirSync(srcDir)) {
     const src = path.join(srcDir, name);
@@ -648,6 +679,7 @@ async function restoreSinglesColumns(client, singlesId, columns, data) {
 }
 
 async function deleteRows(client, tableName, whereSql, params) {
+  assertNotProtectedLogTable(tableName);
   if (!(await tableExists(client, tableName))) return;
   await client.query(`DELETE FROM ${SCHEMA}.${tableName} WHERE ${whereSql}`, params);
 }
@@ -993,7 +1025,7 @@ export async function backupUserSection(pool, opts = {}) {
 
   const sectionDir = path.join(backupDir, section);
   if (fs.existsSync(sectionDir)) {
-    fs.rmSync(sectionDir, { recursive: true, force: true });
+    removeTree(sectionDir);
   }
 
   const summary = { copied: [], skipped: [], backupDir, errors: [] };
@@ -1069,7 +1101,7 @@ export async function backupUserAll(pool, opts = {}) {
   const summary = { copied: [], skipped: [], backupDir, errors: [] };
 
   if (fs.existsSync(backupDir)) {
-    fs.rmSync(backupDir, { recursive: true, force: true });
+    removeTree(backupDir);
   }
   fs.mkdirSync(backupDir, { recursive: true });
 

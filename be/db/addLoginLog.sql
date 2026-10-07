@@ -1,4 +1,4 @@
--- helloworldjunktest.login_log — demo logins + new-account signups, with last-digit IP and online duration.
+-- helloworldjunktest.login_log — demo logins + new-account signups, with full client IP and online duration.
 -- Run on Primary only. Safe to re-run.
 --
 -- Mac:
@@ -7,11 +7,12 @@
 -- Tracks:
 --   1) demo/demo (and guest/guest) logins  → event_type = 'demo_login', is_demo = true
 --   2) new account signup                 → event_type = 'signup', email + phone
---   For either: client_ip (privacy: only last digit, stored as 0.0.0.N, shown as x.x.x.N),
+--   For either: client_ip (full address; 127.0.0.1 and 72.83.247.73 are never logged),
 --     login_at, logout_at, online_seconds, logout_reason
 --     (explicit logout, idle/system auto-logout, or browser close / session end)
 --
--- Existing DBs: also run be/db/maskLoginLogClientIpLastDigit.sql so old full IPs are scrubbed.
+-- Existing DBs: also run be/db/loginLogFullClientIp.sql (drops the old last-digit-only CHECK)
+-- and be/db/loginLogDevice.sql (device_type / browser / os columns + backfill).
 
 DO $$
 BEGIN
@@ -72,9 +73,13 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.login_log (
   email text,
   phone text,
 
-  -- client / session — privacy: only last IP digit as inet 0.0.0.N (Tools shows x.x.x.N)
+  -- client / session — full client IP
   client_ip inet,
   user_agent text,
+  -- parsed from user_agent (be/utils/clientDeviceInfo.js): Desktop|Mobile, Chrome|Safari|…, Mac|Windows|…
+  device_type text,
+  browser text,
+  os text,
   -- correlates JWT/Redis session_id when present (logout close-out)
   session_token text,
 
@@ -134,9 +139,9 @@ CREATE INDEX IF NOT EXISTS login_log_open_sessions_idx
   WHERE logout_at IS NULL;
 
 COMMENT ON TABLE helloworldjunktest.login_log IS
-  'Demo logins and new signups: last-digit IP (shown as x.x.x.#) + online duration until logout / auto-logout / browser close.';
+  'Demo logins and new signups: full client IP + online duration until logout / auto-logout / browser close. 127.0.0.1 and 72.83.247.73 are not logged.';
 COMMENT ON COLUMN helloworldjunktest.login_log.client_ip IS
-  'Privacy: only the final IP digit, stored as 0.0.0.N (e.g. 0.0.0.5) and shown in Tools as x.x.x.N. Never a full client address.';
+  'Full client IP. Rows written before full-IP logging hold 0.0.0.N (last digit only), shown in Tools as x.x.x.N.';
 COMMENT ON COLUMN helloworldjunktest.login_log.is_demo IS
   'True when login used demo/demo or guest/guest alias (guest_demo_login).';
 COMMENT ON COLUMN helloworldjunktest.login_log.online_seconds IS

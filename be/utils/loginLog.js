@@ -1,56 +1,32 @@
 import crypto from 'crypto';
+import net from 'net';
 import pool from '../db/connection.js';
 import { getRequestClientIp } from './adminIpConfig.js';
+import { parseClientDevice } from './clientDeviceInfo.js';
 import { appendDemoLoginHardCopy, appendRegisterHardCopy } from './hardCopyAuthLog.js';
+import { normalizeLogIp, shouldSkipIpLog } from './ipLogSkipList.js';
 
 const SCHEMA = 'helloworldjunktest';
 
-/** Never write login_log for these client IPs (local / home). */
-const LOGIN_LOG_SKIP_IPS = new Set(['127.0.0.1', '72.83.247.73']);
+/** Rows written before full-IP logging stored only the last digit as 0.0.0.N. */
+const LEGACY_LAST_DIGIT_IP_RE = /^0\.0\.0\.([0-9])$/;
 
-/** Stored/displayed form: x.x.x.# where # is a single decimal digit. */
-const MASKED_LOGIN_LOG_IP_RE = /^x\.x\.x\.[0-9]$/;
-
-function normalizeInet(raw) {
-  let ip = String(raw ?? '').trim();
-  if (!ip || ip === 'unknown') return null;
-  if (ip.startsWith('::ffff:')) ip = ip.slice('::ffff:'.length);
-  const slash = ip.indexOf('/');
-  if (slash > 0) ip = ip.slice(0, slash);
-  return ip;
-}
-
-/** Last decimal digit of an IP (IPv4 last octet, or last digit in the string). */
-export function lastDigitOfIp(raw) {
-  const ip = normalizeInet(raw);
-  if (!ip) return null;
-  if (MASKED_LOGIN_LOG_IP_RE.test(ip)) return ip.slice(-1);
-  const lastOctet = ip.includes('.') ? ip.split('.').pop() : ip;
-  const digits = String(lastOctet ?? '').replace(/\D/g, '');
-  if (!digits) return null;
-  return digits.slice(-1);
-}
-
-/**
- * Privacy mask for Postgres inet: only the final digit, as 0.0.0.N
- * (Admin Tools shows this as x.x.x.N). Never a full client address.
- */
-export function privacyMaskLoginLogIpForStorage(raw) {
-  const digit = lastDigitOfIp(raw);
-  return digit ? `0.0.0.${digit}` : null;
-}
-
-/** Admin Tools display: always x.x.x.#, including leftover full-IP rows. */
+/** Admin Tools display: full client IP; legacy last-digit rows show as x.x.x.N. */
 export function formatLoginLogIpForDisplay(raw) {
-  const digit = lastDigitOfIp(raw);
-  return digit ? `x.x.x.${digit}` : '';
+  const ip = normalizeLogIp(raw);
+  if (!ip) return '';
+  const legacy = LEGACY_LAST_DIGIT_IP_RE.exec(ip);
+  return legacy ? `x.x.x.${legacy[1]}` : ip;
+}
+
+/** Value for the inet column: full client IP, or null when it is not a valid address. */
+function loginLogInetValue(ip) {
+  return ip && net.isIP(ip) ? ip : null;
 }
 
 /** True when this IP must not be recorded in login_log at all. */
 export function shouldSkipLoginLogIp(rawIp) {
-  const ip = normalizeInet(rawIp);
-  if (!ip) return false;
-  return LOGIN_LOG_SKIP_IPS.has(ip);
+  return shouldSkipIpLog(rawIp);
 }
 
 function userAgentFromReq(req) {
@@ -86,24 +62,35 @@ export async function insertDemoLoginLog(req, fields = {}) {
     const phone = String(fields.phone ?? '').trim() || null;
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
     const loginAlias = String(fields.loginAlias ?? '').trim().toLowerCase();
-    const rawClientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
-    if (loginAlias === 'demo') {
-      appendDemoLoginHardCopy({ clientIp: rawClientIp });
-    }
-    if (shouldSkipLoginLogIp(rawClientIp)) return null;
-    const clientIp = privacyMaskLoginLogIpForStorage(rawClientIp);
+    const clientIp = normalizeLogIp(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (shouldSkipLoginLogIp(clientIp)) return null;
     const userAgent = userAgentFromReq(req);
+    const device = parseClientDevice(userAgent);
+    if (loginAlias === 'demo') {
+      appendDemoLoginHardCopy({ clientIp, device });
+    }
 
     const { rows } = await pool.query(
       `INSERT INTO ${SCHEMA}.login_log (
-         event_type, is_demo, singles_id, email, phone, client_ip, user_agent, session_token
+         event_type, is_demo, singles_id, email, phone, client_ip, user_agent, session_token,
+         device_type, browser, os
        ) VALUES (
          'demo_login'::${SCHEMA}.login_log_event_type,
          true,
-         $1, $2, $3, $4::inet, $5, $6
+         $1, $2, $3, $4::inet, $5, $6, $7, $8, $9
        )
        RETURNING login_log_id`,
-      [singlesId, email, phone, clientIp, userAgent, sessionToken]
+      [
+        singlesId,
+        email,
+        phone,
+        loginLogInetValue(clientIp),
+        userAgent,
+        sessionToken,
+        device?.deviceType ?? null,
+        device?.browser ?? null,
+        device?.os ?? null
+      ]
     );
     return rows[0]?.login_log_id != null ? Number(rows[0].login_log_id) : null;
   } catch (err) {
@@ -128,22 +115,33 @@ export async function insertSignupLoginLog(req, fields = {}) {
       return null;
     }
     const sessionToken = String(fields.sessionToken ?? '').trim() || null;
-    const rawClientIp = normalizeInet(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
-    appendRegisterHardCopy({ clientIp: rawClientIp, email, phone });
-    if (shouldSkipLoginLogIp(rawClientIp)) return null;
-    const clientIp = privacyMaskLoginLogIpForStorage(rawClientIp);
+    const clientIp = normalizeLogIp(fields.clientIp ?? (req ? getRequestClientIp(req) : null));
+    if (shouldSkipLoginLogIp(clientIp)) return null;
     const userAgent = userAgentFromReq(req);
+    const device = parseClientDevice(userAgent);
+    appendRegisterHardCopy({ clientIp, email, phone, device });
 
     const { rows } = await pool.query(
       `INSERT INTO ${SCHEMA}.login_log (
-         event_type, is_demo, singles_id, email, phone, client_ip, user_agent, session_token
+         event_type, is_demo, singles_id, email, phone, client_ip, user_agent, session_token,
+         device_type, browser, os
        ) VALUES (
          'signup'::${SCHEMA}.login_log_event_type,
          false,
-         $1, $2, $3, $4::inet, $5, $6
+         $1, $2, $3, $4::inet, $5, $6, $7, $8, $9
        )
        RETURNING login_log_id`,
-      [singlesId, email, phone, clientIp, userAgent, sessionToken]
+      [
+        singlesId,
+        email,
+        phone,
+        loginLogInetValue(clientIp),
+        userAgent,
+        sessionToken,
+        device?.deviceType ?? null,
+        device?.browser ?? null,
+        device?.os ?? null
+      ]
     );
     return rows[0]?.login_log_id != null ? Number(rows[0].login_log_id) : null;
   } catch (err) {

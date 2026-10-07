@@ -510,6 +510,14 @@ pm2restart() {
 }
 alias pm2logonedrive='pm2 logs onlinemallwebsite --lines 50 | grep RecordVaultCloud:OneDrive'
 
+unalias pm2cron 2>/dev/null || true
+pm2cron() {
+    echo "=== pm2 describe: cron / restarts ==="
+    pm2 describe onlinemallwebsite | grep -iE "cron|restarts"
+    echo "=== pm2 logs (last 500): 03:00-03:01 ==="
+    pm2 logs onlinemallwebsite --lines 500 --nostream | grep -iE "03:0[0-1]"
+}
+
 alias curlforasn='curl -s https://onlinemall.website/api/client-asn-debug | python3 -m json.tool'
 alias watchasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color -F "[blocked-asn]"'
 alias tailblockasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color "BLOCKED AS"'

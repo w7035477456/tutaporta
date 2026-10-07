@@ -10,7 +10,7 @@ import { truncateColorTemplate9AutoFitText } from 'utils/colorTemplate9AutoFitCo
 
 const LOOKUP_COLUMN_DISPLAY_CHARS = 36;
 
-const MIN_LOGIN_LOG_COLUMN_WIDTHS_PX = Object.freeze([72, 160, 88, 88, 180, 120]);
+const MIN_LOGIN_LOG_COLUMN_WIDTHS_PX = Object.freeze([72, 160, 88, 88, 180, 120, 88, 88, 88]);
 
 const labelSx = {
   fontFamily: MAIN_FONT_FAMILY,
@@ -92,15 +92,9 @@ function formatLoginAt(value) {
   }
 }
 
-/** Privacy: show only last IP digit as x.x.x.# (e.g. x.x.x.5). */
+/** Full client IP from the API (older rows written before full-IP logging show as x.x.x.#). */
 function formatLoginLogIp(value) {
-  const text = String(value ?? '').trim();
-  if (!text) return '';
-  if (/^x\.x\.x\.[0-9]$/i.test(text)) return text.toLowerCase();
-  const lastOctet = text.includes('.') ? text.split('.').pop() : text;
-  const digits = String(lastOctet ?? '').replace(/\D/g, '');
-  if (!digits) return '';
-  return `x.x.x.${digits.slice(-1)}`;
+  return String(value ?? '').trim();
 }
 
 function hasLoginLogInput({ typeInput, singlesIdInput, emailInput, phoneInput, ipInput }) {
@@ -137,9 +131,18 @@ function buildLoginLogColumnTexts(rows) {
     ['singles_id', ...rows.map((row) => truncateLookupDisplay(row.singlesId ?? '—'))],
     ['member_id', ...rows.map((row) => truncateLookupDisplay(row.memberId ?? '—'))],
     ['Email', ...rows.map((row) => truncateLookupDisplay(row.email || '—'))],
-    ['IP (x.x.x.#)', ...rows.map((row) => truncateLookupDisplay(formatLoginLogIp(row.clientIp) || '—'))]
+    ['IP', ...rows.map((row) => truncateLookupDisplay(formatLoginLogIp(row.clientIp) || '—'))],
+    ['Mode', ...rows.map((row) => truncateLookupDisplay(row.deviceType || '—'))],
+    ['Browser', ...rows.map((row) => truncateLookupDisplay(row.browser || '—'))],
+    ['OS', ...rows.map((row) => truncateLookupDisplay(row.os || '—'))]
   ];
 }
+
+const DEVICE_COLUMNS = Object.freeze([
+  ['Mode', 'deviceType'],
+  ['Browser', 'browser'],
+  ['OS', 'os']
+]);
 
 export default function AdminToolsLoginLogTab({ onError }) {
   const [typeInput, setTypeInput] = useState('');
@@ -311,8 +314,13 @@ export default function AdminToolsLoginLogTab({ onError }) {
                     Email
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                    IP (x.x.x.#)
+                    IP
                   </ColorTemplate9TableData.HeaderCell>
+                  {DEVICE_COLUMNS.map(([label]) => (
+                    <ColorTemplate9TableData.HeaderCell key={label} sx={{ display: { xs: 'none', sm: 'flex' } }}>
+                      {label}
+                    </ColorTemplate9TableData.HeaderCell>
+                  ))}
                 </ColorTemplate9TableData.HeaderRow>
                 {rows.map((row, index) => (
                   <ColorTemplate9TableData.BodyRow
@@ -327,7 +335,8 @@ export default function AdminToolsLoginLogTab({ onError }) {
                       <ColorTemplate9TableData.BodyText
                         sx={{ display: { xs: 'block', sm: 'none' }, opacity: 0.85, mt: 0.25 }}
                       >
-                        {formatLoginAt(row.loginAt)} · {row.email || '—'} · {formatLoginLogIp(row.clientIp) || '—'}
+                        {formatLoginAt(row.loginAt)} · {row.email || '—'} · {formatLoginLogIp(row.clientIp) || '—'} ·{' '}
+                        {[row.deviceType, row.browser, row.os].filter(Boolean).join(' / ') || '—'}
                       </ColorTemplate9TableData.BodyText>
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell sx={lookupCenterColumnCellSx}>
@@ -355,6 +364,13 @@ export default function AdminToolsLoginLogTab({ onError }) {
                         {truncateLookupDisplay(formatLoginLogIp(row.clientIp) || '—')}
                       </ColorTemplate9TableData.BodyText>
                     </ColorTemplate9TableData.BodyCell>
+                    {DEVICE_COLUMNS.map(([label, field]) => (
+                      <ColorTemplate9TableData.BodyCell key={label} sx={lookupCenterColumnCellSx}>
+                        <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
+                          {truncateLookupDisplay(row[field] || '—')}
+                        </ColorTemplate9TableData.BodyText>
+                      </ColorTemplate9TableData.BodyCell>
+                    ))}
                   </ColorTemplate9TableData.BodyRow>
                 ))}
               </ColorTemplate9TableData.Table>

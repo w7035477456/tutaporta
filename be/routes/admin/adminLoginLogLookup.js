@@ -8,10 +8,14 @@ import {
   parseSinglesIdLookup,
   wildcardToLikePattern
 } from '../../utils/adminLookupWildcard.js';
-import { formatLoginLogIpForDisplay, lastDigitOfIp } from '../../utils/loginLog.js';
+import { parseClientDevice } from '../../utils/clientDeviceInfo.js';
+import { normalizeLogIp } from '../../utils/ipLogSkipList.js';
+import { formatLoginLogIpForDisplay } from '../../utils/loginLog.js';
 
 const LOGIN_LOG_LIMIT = 2000;
 const LIKE_ESCAPE = ` ESCAPE '\\'`;
+const MISSING_DEVICE_COLUMNS_ERROR =
+  'login_log device columns are missing. Run be/db/loginLogDevice.sql on Primary.';
 
 /**
  * Map UI / free-text Type filter → SQL predicates.
@@ -63,6 +67,7 @@ function displayTypeLabel(row) {
 }
 
 function mapLoginLogRow(row) {
+  const parsed = row.device_type ? null : parseClientDevice(row.user_agent);
   return {
     loginLogId: Number(row.login_log_id),
     eventType: String(row.event_type ?? ''),
@@ -73,6 +78,9 @@ function mapLoginLogRow(row) {
     email: String(row.email ?? ''),
     phone: String(row.phone ?? ''),
     clientIp: formatLoginLogIpForDisplay(row.client_ip),
+    deviceType: String(row.device_type ?? parsed?.deviceType ?? ''),
+    browser: String(row.browser ?? parsed?.browser ?? ''),
+    os: String(row.os ?? parsed?.os ?? ''),
     loginAt: row.login_at,
     logoutAt: row.logout_at,
     onlineSeconds:
@@ -128,18 +136,12 @@ function buildLoginLogWhere(body, { requireInput }) {
   paramIndex = appendPhoneCondition(conditions, params, phoneLookup, paramIndex, 'll.phone');
 
   if (ipLookup?.mode === 'exact') {
-    const digit = lastDigitOfIp(ipLookup.value);
-    if (digit) {
-      conditions.push(`right(regexp_replace(ll.client_ip::text, '[^0-9]', '', 'g'), 1) = $${paramIndex}`);
-      params.push(digit);
-      paramIndex += 1;
-    } else {
-      conditions.push(`ll.client_ip::text = $${paramIndex}`);
-      params.push(ipLookup.value);
-      paramIndex += 1;
-    }
+    const legacyMasked = /^x\.x\.x\.([0-9])$/i.exec(ipLookup.value);
+    conditions.push(`host(ll.client_ip) = $${paramIndex}`);
+    params.push(legacyMasked ? `0.0.0.${legacyMasked[1]}` : normalizeLogIp(ipLookup.value) || ipLookup.value);
+    paramIndex += 1;
   } else if (ipLookup?.mode === 'like') {
-    conditions.push(`ll.client_ip::text LIKE $${paramIndex}${LIKE_ESCAPE}`);
+    conditions.push(`host(ll.client_ip) LIKE $${paramIndex}${LIKE_ESCAPE}`);
     params.push(ipLookup.pattern);
     paramIndex += 1;
   }
@@ -159,6 +161,10 @@ async function queryLoginLog({ conditions, params, limit }) {
             ll.email,
             ll.phone,
             ll.client_ip,
+            ll.user_agent,
+            ll.device_type,
+            ll.browser,
+            ll.os,
             ll.login_at,
             ll.logout_at,
             ll.online_seconds,
@@ -195,6 +201,9 @@ export async function postAdminLoginLogLookup(req, res) {
         error: 'login_log table is missing. Run be/db/addLoginLog.sql on Primary.'
       });
     }
+    if (err?.code === '42703') {
+      return res.status(500).json({ error: MISSING_DEVICE_COLUMNS_ERROR });
+    }
     return res.status(500).json({ error: 'Failed to lookup login log.' });
   }
 }
@@ -217,6 +226,9 @@ export async function postAdminLoginLogLookupAll(req, res) {
       return res.status(500).json({
         error: 'login_log table is missing. Run be/db/addLoginLog.sql on Primary.'
       });
+    }
+    if (err?.code === '42703') {
+      return res.status(500).json({ error: MISSING_DEVICE_COLUMNS_ERROR });
     }
     return res.status(500).json({ error: 'Failed to lookup all login log rows.' });
   }
