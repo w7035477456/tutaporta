@@ -2097,3 +2097,17 @@ httpServer.listen(PORT, () => {
   }
 });
 
+/** Keep below PM2 kill_timeout (ecosystem.config.cjs) so in-flight requests finish before SIGKILL. */
+const GRACEFUL_SHUTDOWN_MS = process.env.NODE_ENV === 'production' ? 25000 : 2000;
+let shuttingDown = false;
+function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.error(`[shutdown] ${signal} — no new connections; finishing in-flight requests (max ${GRACEFUL_SHUTDOWN_MS}ms)`);
+  httpServer.close(() => process.exit(0));
+  httpServer.closeIdleConnections?.();
+  setTimeout(() => process.exit(0), GRACEFUL_SHUTDOWN_MS).unref();
+}
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+

@@ -39,8 +39,10 @@ module.exports = {
     autorestart: true,
     watch: false,
     max_restarts: 10,
-    restart_delay: 60000,
-    kill_timeout: 3000,
+    // Crash restarts back off 100ms → 15s (reset after 30s up) instead of a fixed 60s outage per worker.
+    exp_backoff_restart_delay: 100,
+    // Must exceed GRACEFUL_SHUTDOWN_MS in server_be.js so in-flight uploads can finish on reload.
+    kill_timeout: 30000,
     wait_ready: false,
     listen_timeout: 50000,
     cron_restart: '0 3 * * *',

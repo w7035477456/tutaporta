@@ -504,7 +504,9 @@ alias restartdb='rm -rf /usr/local/var/postgresql@16/postmaster.pid;brew service
 
 unalias pm2restart 2>/dev/null || true
 pm2restart() {
-    pm2 restart onlinemallwebsite
+    # Rolling reload: cluster workers restart one at a time so HAProxy web_pool / be_nginx
+    # always has a live backend ("pm2 restart" stops both workers at once → no server available).
+    pm2 reload onlinemallwebsite || pm2 restart onlinemallwebsite
 }
 alias pm2logonedrive='pm2 logs onlinemallwebsite --lines 50 | grep RecordVaultCloud:OneDrive'
 
