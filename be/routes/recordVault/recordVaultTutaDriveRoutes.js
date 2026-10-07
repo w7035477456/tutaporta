@@ -339,7 +339,8 @@ export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
 /**
  * POST /api/recordVault/tutadrive/backup
  * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK2, or legacy TNBAK1).
- * Stores as users/M{id}/EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip (keeps up to 3 zips).
+ * Optional fields: `note` (<20 chars, appended to the zip name), `hint` (password hint), `dateStamp` (YYYY_MM_DD).
+ * Stores as users/M{id}/EncryptedTutaNotesZip_YYYY_MM_DD[_note].zip (keeps up to 3 zips).
  */
 export async function storeRecordVaultTutaDriveBackup(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -355,11 +356,15 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
     }
     upload = await parseOneDriveBackupZipUpload(req);
     const encrypted = fs.readFileSync(upload.zipPath);
-    const stored = storeTutaDriveEncryptedBackup(memberId, encrypted, upload.note);
+    const stored = storeTutaDriveEncryptedBackup(memberId, encrypted, {
+      note: upload.note,
+      hint: upload.hint,
+      dateStamp: upload.dateStamp
+    });
     return res.json({
       success: true,
       ...stored,
-      message: `Backup saved (Encrypt Password sealed). Up to ${TUTADRIVE_BACKUP_MAX} EncryptedBackup_*.zip files are kept in your member folder.`
+      message: `Backup saved (Encrypt Password sealed). Up to ${TUTADRIVE_BACKUP_MAX} backup zip files are kept in your member folder.`
     });
   } catch (err) {
     console.error('[storeRecordVaultTutaDriveBackup]', err?.message || err);
@@ -486,12 +491,16 @@ export async function getRecordVaultTutaDriveBackupStatus(req, res) {
       // Listing zip files must still work if photos/ layout mkdir fails (EEXIST).
       console.warn('[getRecordVaultTutaDriveBackupStatus] layout skipped:', layoutErr?.message || layoutErr);
     }
-    const backups = listTutaDriveBackups(memberId).map(({ fileName, sizeBytes, mtimeMs, note }) => ({
-      fileName,
-      sizeBytes,
-      mtimeMs,
-      note: note || ''
-    }));
+    const backups = listTutaDriveBackups(memberId).map(
+      ({ fileName, sizeBytes, mtimeMs, note, hint, passwordCheck }) => ({
+        fileName,
+        sizeBytes,
+        mtimeMs,
+        note: note || '',
+        hint: hint || '',
+        passwordCheck: passwordCheck || null
+      })
+    );
     return res.json({ enabled: true, memberId, backups, maxBackups: TUTADRIVE_BACKUP_MAX });
   } catch (err) {
     console.error('[getRecordVaultTutaDriveBackupStatus]', err?.message || err);

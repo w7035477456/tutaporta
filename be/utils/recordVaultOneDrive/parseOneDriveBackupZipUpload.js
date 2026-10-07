@@ -38,6 +38,8 @@ export function parseOneDriveBackupZipUpload(req) {
     let writeError = null;
     let bytesWritten = 0;
     let note = '';
+    let hint = '';
+    let dateStamp = '';
 
     const busboy = Busboy({
       headers: req.headers,
@@ -46,6 +48,10 @@ export function parseOneDriveBackupZipUpload(req) {
     busboy.on('field', (fieldname, value) => {
       if (fieldname === 'note') {
         note = String(value || '');
+      } else if (fieldname === 'hint') {
+        hint = String(value || '');
+      } else if (fieldname === 'dateStamp') {
+        dateStamp = String(value || '');
       }
     });
     busboy.on('file', (fieldname, stream) => {
@@ -87,7 +93,15 @@ export function parseOneDriveBackupZipUpload(req) {
         reject(new Error(formatUploadHint(contentLength)));
         return;
       }
-      resolve({ tmpDir, zipPath, sizeBytes: st.size, bytesWritten, note: note.trim() });
+      resolve({
+        tmpDir,
+        zipPath,
+        sizeBytes: st.size,
+        bytesWritten,
+        note: note.trim(),
+        hint: hint.trim(),
+        dateStamp: dateStamp.trim()
+      });
     });
     req.pipe(busboy);
   });

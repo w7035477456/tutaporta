@@ -30,11 +30,12 @@ import {
 } from './tutaNotesPostLoginActionButtonSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
-import { themedConfirm, themedOverwriteSkip, themedPrompt } from 'utils/themedDialog';
+import { themedConfirm, themedOverwriteSkip } from 'utils/themedDialog';
 import {
   ensureEncryptPasswordForBackupSeal,
-  promptEncryptPasswordForBackupDecrypt
+  prepareBackupDecryptWithPassword
 } from 'utils/recordVaultBackupDecryptPrompt';
+import RecordVaultBackupPasswordDialog from './RecordVaultBackupPasswordDialog';
 import Typography from '@mui/material/Typography';
 
 const actionRowSx = {
@@ -221,7 +222,9 @@ function buildBackupSlots(backups, maxSlots) {
       fileName: bk?.fileName || '',
       sizeBytes: Number(bk?.sizeBytes) || 0,
       mtimeMs: Number(bk?.mtimeMs) || 0,
-      note: String(bk?.note || '').trim()
+      note: String(bk?.note || '').trim(),
+      hint: String(bk?.hint || '').trim(),
+      passwordCheck: bk?.passwordCheck || null
     });
   }
   return slots;
@@ -267,8 +270,47 @@ export default function RecordVaultOneDriveBackupDialog({
   const [uploadMode, setUploadMode] = useState(''); // 'replace' | 'new'
   const [openBackupFileName, setOpenBackupFileName] = useState('');
   const [openBackupNotebooks, setOpenBackupNotebooks] = useState([]);
+  /** Backup password screen: { mode, fileName, note, hint, passwordCheck, warning, resolve }. */
+  const [passwordDialog, setPasswordDialog] = useState(null);
 
   const backupSlots = buildBackupSlots(backupList, maxBackups);
+
+  /** @returns {Promise<{ note, hint, password, dateStamp } | null>} null when cancelled */
+  const askBackupPassword = (opts) =>
+    new Promise((resolve) => {
+      setPasswordDialog({
+        mode: 'backup',
+        fileName: '',
+        note: '',
+        hint: '',
+        passwordCheck: null,
+        warning: '',
+        ...opts,
+        resolve
+      });
+    });
+
+  const closePasswordDialog = (value) => {
+    const resolve = passwordDialog?.resolve;
+    setPasswordDialog(null);
+    if (typeof resolve === 'function') resolve(value);
+  };
+
+  /** Password screen for a stored backup (shows its note + hint), then prepares the decrypt. */
+  const askStoredBackupPassword = async (purpose, fileName, warning = '') => {
+    const slot = backupSlots.find((s) => s.fileName === fileName);
+    const result = await askBackupPassword({
+      mode: purpose,
+      fileName,
+      note: slot?.note || '',
+      hint: slot?.hint || '',
+      passwordCheck: slot?.passwordCheck || null,
+      warning
+    });
+    if (!result) return false;
+    await prepareBackupDecryptWithPassword(result.password, purpose);
+    return true;
+  };
   const slotsFull = backupSlots.every((s) => !s.empty);
   const oldestSlot = findOldestBackupSlot(backupSlots);
 
@@ -348,34 +390,26 @@ export default function RecordVaultOneDriveBackupDialog({
       );
       if (!ok) return;
     }
-    let backupNote = '';
+    let backupInput = null;
     if (tutaDriveActive) {
-      const entered = await themedPrompt('You can add note of this backup:', '', {
-        title: 'Backup note',
-        okLabel: 'Backup',
-        cancelLabel: 'Cancel'
-      });
-      if (entered === null) return;
-      backupNote = String(entered || '').trim();
-      try {
-        const unlocked = await ensureEncryptPasswordForBackupSeal('backup');
-        if (!unlocked) return;
-      } catch (err) {
-        setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
-        return;
-      }
+      backupInput = await askBackupPassword({ mode: 'backup' });
+      if (!backupInput) return;
     }
     setBusy(true);
     try {
       if (tutaDriveActive) {
-        const result = await createRecordVaultTutaDriveEncryptedBackup(backupNote);
-        const fileName = result?.fileName || 'EncryptedBackup.zip';
+        const result = await createRecordVaultTutaDriveEncryptedBackup(backupInput.note, {
+          hint: backupInput.hint,
+          dateStamp: backupInput.dateStamp,
+          password: backupInput.password
+        });
+        const fileName = result?.fileName || 'EncryptedTutaNotesZip.zip';
         const rel = result?.relativePath || fileName;
         const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
         const noteText = result?.note ? ` Note: ${result.note}.` : '';
         setSuccess(
-          `Backup sealed with your Encrypt Password and saved as ${rel}${sizeText}.${noteText}`
+          `Backup sealed with the password you chose for this zip and saved as ${rel}${sizeText}.${noteText}`
         );
         setSuccessTone('backup');
         await loadBackupList();
@@ -400,7 +434,7 @@ export default function RecordVaultOneDriveBackupDialog({
   const handleOpenBackupTree = async (fileName) => {
     resetMessages();
     try {
-      const unlocked = await promptEncryptPasswordForBackupDecrypt('open');
+      const unlocked = await askStoredBackupPassword('open', fileName);
       if (!unlocked) return;
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
@@ -425,7 +459,7 @@ export default function RecordVaultOneDriveBackupDialog({
   const handleMergeBackup = async (fileName) => {
     resetMessages();
     try {
-      const unlocked = await promptEncryptPasswordForBackupDecrypt('merge');
+      const unlocked = await askStoredBackupPassword('merge', fileName);
       if (!unlocked) return;
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
@@ -478,13 +512,13 @@ export default function RecordVaultOneDriveBackupDialog({
   };
 
   const handleTutaDriveRestoreFromStored = async (fileName) => {
-    const ok = await themedConfirm(
-      `Restore backup "${fileName}" from your member folder?\n\nThis replaces your current TutaDrive vault. You will need to open TutaNotes again afterward.`
-    );
-    if (!ok) return;
     resetMessages();
     try {
-      const unlocked = await promptEncryptPasswordForBackupDecrypt('restore');
+      const unlocked = await askStoredBackupPassword(
+        'restore',
+        fileName,
+        'Restore replaces your current TutaDrive vault. You will need to open TutaNotes again afterward.'
+      );
       if (!unlocked) return;
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
@@ -631,8 +665,22 @@ export default function RecordVaultOneDriveBackupDialog({
     resetMessages();
     if (tutaDriveActive) {
       try {
-        const unlocked = await promptEncryptPasswordForBackupDecrypt('restore');
-        if (!unlocked) return;
+        const { readTutaDriveBackupHeader, tutaDriveBackupPasswordCheckFromHeader } = await import(
+          'utils/recordVaultClientVaultCrypto'
+        );
+        const head = new Uint8Array(await file.slice(0, 64 * 1024 + 16).arrayBuffer());
+        const parsed = readTutaDriveBackupHeader(head);
+        const header = parsed?.format === 'TNBAK3' ? parsed.header : null;
+        const result = await askBackupPassword({
+          mode: 'restore',
+          fileName: file.name,
+          note: String(header?.note || ''),
+          hint: String(header?.hint || ''),
+          passwordCheck: tutaDriveBackupPasswordCheckFromHeader(header),
+          warning: 'Restore replaces your current TutaDrive vault. You will need to open TutaNotes again afterward.'
+        });
+        if (!result) return;
+        await prepareBackupDecryptWithPassword(result.password, 'restore');
       } catch (err) {
         setError(err?.response?.data?.error || err?.message || 'Unable to unlock Encrypt Password');
         return;
@@ -835,13 +883,13 @@ export default function RecordVaultOneDriveBackupDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
             {tutaDriveActive
-              ? 'Backup seals your TutaDrive vault with your Encrypt Password (zero-knowledge) and stores one file under your member folder: users/M####/EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip. You can save up to 3 zip files. When all 3 slots are full, Backup or Upload overwrites the oldest slot (after you confirm).'
+              ? 'Backup seals your TutaDrive vault with a password you choose for that zip (zero-knowledge) and stores one file under your member folder: users/M####/EncryptedTutaNotesZip_YYYY_MM_DD_<note>.zip. You can save up to 3 zip files. When all 3 slots are full, Backup or Upload overwrites the oldest slot (after you confirm).'
               : 'You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You can also Restore from it back to OneDrive (overwrite OneDrive).'}
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
-              ? 'Backup Encryption uses the same Encrypt Password from Full Disk Encryption — the password never leaves your browser. Up to 3 EncryptedBackup_*.zip files are kept. Before Format, run Backup first if you need to keep your notes.'
+              ? 'Each backup zip can have its own password — it never leaves your browser. Only a password check and your hint are stored with the zip, so Restore / Merge can verify it. If you forget a zip password, that backup cannot be opened. Up to 3 backup zip files are kept. Before Format, run Backup first if you need to keep your notes.'
               : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore below.'}
           </Box>
 
@@ -943,6 +991,17 @@ export default function RecordVaultOneDriveBackupDialog({
           ) : null}
         </ColorTemplate16PopupCenterWide.Body>
       </ColorTemplate16PopupCenterWide>
+      <RecordVaultBackupPasswordDialog
+        open={Boolean(passwordDialog)}
+        mode={passwordDialog?.mode || 'backup'}
+        fileName={passwordDialog?.fileName || ''}
+        note={passwordDialog?.note || ''}
+        hint={passwordDialog?.hint || ''}
+        passwordCheck={passwordDialog?.passwordCheck || null}
+        warning={passwordDialog?.warning || ''}
+        onCancel={() => closePasswordDialog(null)}
+        onConfirm={(result) => closePasswordDialog(result)}
+      />
     </>
   );
 }

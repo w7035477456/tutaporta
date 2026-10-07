@@ -30,6 +30,7 @@ import { fetchVideoRowsForSinglesId } from './deleteVideoFromFolder.js';
 import { listMemberPhotoFilesOnDisk, listPhotoFolderFilesForMemberId } from './photoFilePath.js';
 import { resolveVideoFilePath } from './videoFilePath.js';
 import { listMobileUploadFiles, getMobileUploadFolder } from './mobileUploadFolder.js';
+import { isTutaDriveBackupFileName } from './tutaDriveBackupNames.js';
 
 const SCHEMA = 'helloworldjunktest';
 const BACKUP_VERSION = 1;
@@ -276,7 +277,7 @@ function copyMemberBackupZips(memberRoot, destDir, summary) {
   if (!memberRoot || !fs.existsSync(memberRoot)) return;
   fs.mkdirSync(destDir, { recursive: true });
   for (const name of fs.readdirSync(memberRoot)) {
-    if (!/^(?:EncryptedBackup|backup)_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i.test(name)) continue;
+    if (!isTutaDriveBackupFileName(name)) continue;
     const src = path.join(memberRoot, name);
     try {
       if (!fs.statSync(src).isFile()) continue;

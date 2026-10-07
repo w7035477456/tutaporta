@@ -2,8 +2,9 @@
  * TutaDrive member backup — encrypted backup files under users/M{id}/.
  * Plain vault zip is produced server-side; Encrypt Password sealing happens in the browser (DEK).
  *
- * Stored name: EncryptedBackup_YYYY-MM-DD_HH-MM-SS.zip  (payload = TNBAK2 — or legacy TNBAK1 — sealed bytes from client)
- * Legacy names backup_YYYY-MM-DD[_HH-MM-SS].zip are still listed / restorable / deletable.
+ * Stored name: EncryptedTutaNotesZip_YYYY_MM_DD[_<note>][_N].zip  (payload = TNBAK2 — or legacy TNBAK1 — sealed bytes from client)
+ * Legacy names EncryptedBackup_* / backup_YYYY-MM-DD[_HH-MM-SS].zip are still listed / restorable / deletable.
+ * Per-file note + password hint live in backup_notes.json (hint is shown when Restore / Merge asks for the password).
  */
 import fs from 'fs';
 import os from 'os';
@@ -22,33 +23,91 @@ import {
   VAULT_DIR_NAME,
   VAULT_META_FILE
 } from './recordVaultUsb/vaultPaths.js';
+import {
+  resolveTutaDriveBackupDateStamp,
+  TUTADRIVE_BACKUP_HINT_MAX_LEN,
+  TUTADRIVE_BACKUP_NAME_RE,
+  TUTADRIVE_BACKUP_NOTE_MAX_LEN,
+  tutaDriveBackupFileName
+} from './tutaDriveBackupNames.js';
 
-/** EncryptedBackup_* (current) or legacy backup_* — date-only or date+time stamp. */
-export const TUTADRIVE_BACKUP_NAME_RE =
-  /^(?:EncryptedBackup|backup)_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?\.zip$/i;
+export { TUTADRIVE_BACKUP_NAME_RE };
 const BACKUP_NAME_RE = TUTADRIVE_BACKUP_NAME_RE;
 const BACKUP_NOTES_FILE = 'backup_notes.json';
-const BACKUP_NOTE_MAX_LEN = 500;
+/** Legacy notes (before the <20 char rule) may be longer; keep them readable. */
+const BACKUP_NOTE_STORED_MAX_LEN = 500;
 
 function sanitizeBackupNote(note) {
-  return String(note || '').trim().slice(0, BACKUP_NOTE_MAX_LEN);
+  return String(note || '').trim().slice(0, BACKUP_NOTE_STORED_MAX_LEN);
+}
+
+function sanitizeBackupHint(hint) {
+  return String(hint || '').trim().slice(0, TUTADRIVE_BACKUP_HINT_MAX_LEN);
 }
 
 function backupNotesAbsPath(memberId) {
   return path.join(tutaDriveMemberRoot(memberId), BACKUP_NOTES_FILE);
 }
 
-function readBackupNotesMap(memberId) {
+const B64_RE = /^[A-Za-z0-9+/=]{8,200}$/;
+
+function boundedInt(value, min, max) {
+  const n = Math.trunc(Number(value));
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
+}
+
+/**
+ * Per-backup password check (TNBAK3 header): Argon2id salt + params + SHA-256 verifier.
+ * Lets Restore / Merge verify the typed password before decrypting. Params are bounded so a
+ * crafted file cannot make the browser run an enormous KDF.
+ */
+function sanitizePasswordCheck(check) {
+  if (!check || typeof check !== 'object') return null;
+  const kdfSaltB64 = String(check.kdfSaltB64 || '');
+  const verifierB64 = String(check.verifierB64 || '');
+  if (!B64_RE.test(kdfSaltB64) || !B64_RE.test(verifierB64)) return null;
+  const kdfMemKib = boundedInt(check.kdfMemKib, 8192, 262144);
+  const kdfTime = boundedInt(check.kdfTime, 1, 10);
+  const kdfParallelism = boundedInt(check.kdfParallelism, 1, 4);
+  if (kdfMemKib == null || kdfTime == null || kdfParallelism == null) return null;
+  return { kdfAlgo: 'argon2id', kdfSaltB64, kdfMemKib, kdfTime, kdfParallelism, verifierB64 };
+}
+
+/** Plaintext header of a TNBAK3 (per-backup password) sealed zip, or null for other formats. */
+export function readTutaDriveBackupPasswordHeader(buf) {
+  const bytes = Buffer.isBuffer(buf) ? buf : Buffer.from(buf || []);
+  const MAGIC = 'TNBAK3';
+  if (bytes.length < MAGIC.length + 5 || bytes.toString('latin1', 0, MAGIC.length) !== MAGIC) return null;
+  const headerLen = bytes.readUInt32BE(MAGIC.length + 1);
+  const start = MAGIC.length + 5;
+  if (headerLen > 64 * 1024 || bytes.length < start + headerLen) return null;
+  try {
+    const header = JSON.parse(bytes.toString('utf8', start, start + headerLen));
+    return {
+      passwordCheck: sanitizePasswordCheck(header),
+      hint: sanitizeBackupHint(header?.hint),
+      note: sanitizeBackupNote(header?.note)
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** fileName → { note, hint, passwordCheck }. Legacy entries store the note as a plain string. */
+function readBackupMetaMap(memberId) {
   const abs = backupNotesAbsPath(memberId);
   if (!fs.existsSync(abs)) return {};
   try {
     const parsed = JSON.parse(fs.readFileSync(abs, 'utf8'));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     const out = {};
-    for (const [fileName, note] of Object.entries(parsed)) {
+    for (const [fileName, value] of Object.entries(parsed)) {
       if (!BACKUP_NAME_RE.test(fileName)) continue;
-      const trimmed = sanitizeBackupNote(note);
-      if (trimmed) out[fileName] = trimmed;
+      const raw = value && typeof value === 'object' ? value : { note: value };
+      const note = sanitizeBackupNote(raw.note);
+      const hint = sanitizeBackupHint(raw.hint);
+      const passwordCheck = sanitizePasswordCheck(raw.passwordCheck);
+      if (note || hint || passwordCheck) out[fileName] = { note, hint, passwordCheck };
     }
     return out;
   } catch {
@@ -56,14 +115,21 @@ function readBackupNotesMap(memberId) {
   }
 }
 
-function writeBackupNotesMap(memberId, map) {
+function writeBackupMetaMap(memberId, map) {
   ensureTutaDriveMemberLayout(memberId);
   const abs = backupNotesAbsPath(memberId);
   const cleaned = {};
-  for (const [fileName, note] of Object.entries(map || {})) {
+  for (const [fileName, value] of Object.entries(map || {})) {
     if (!BACKUP_NAME_RE.test(fileName)) continue;
-    const trimmed = sanitizeBackupNote(note);
-    if (trimmed) cleaned[fileName] = trimmed;
+    const note = sanitizeBackupNote(value?.note);
+    const hint = sanitizeBackupHint(value?.hint);
+    const passwordCheck = sanitizePasswordCheck(value?.passwordCheck);
+    if (!note && !hint && !passwordCheck) continue;
+    cleaned[fileName] = {
+      ...(note ? { note } : {}),
+      ...(hint ? { hint } : {}),
+      ...(passwordCheck ? { passwordCheck } : {})
+    };
   }
   if (!Object.keys(cleaned).length) {
     if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
@@ -72,26 +138,35 @@ function writeBackupNotesMap(memberId, map) {
   fs.writeFileSync(abs, `${JSON.stringify(cleaned, null, 2)}\n`, 'utf8');
 }
 
-export function setTutaDriveBackupNote(memberId, fileName, note) {
+/**
+ * Update note / hint / passwordCheck for one backup file. `undefined` keeps the current value.
+ * @returns {{ note: string, hint: string, passwordCheck: object|null }}
+ */
+export function setTutaDriveBackupMeta(memberId, fileName, { note, hint, passwordCheck } = {}) {
   const wanted = String(fileName || '').trim();
-  if (!BACKUP_NAME_RE.test(wanted)) return '';
-  const trimmed = sanitizeBackupNote(note);
-  const map = readBackupNotesMap(memberId);
-  if (trimmed) {
-    map[wanted] = trimmed;
+  if (!BACKUP_NAME_RE.test(wanted)) return { note: '', hint: '', passwordCheck: null };
+  const map = readBackupMetaMap(memberId);
+  const current = map[wanted] || { note: '', hint: '', passwordCheck: null };
+  const next = {
+    note: note === undefined ? current.note : sanitizeBackupNote(note),
+    hint: hint === undefined ? current.hint : sanitizeBackupHint(hint),
+    passwordCheck: passwordCheck === undefined ? current.passwordCheck : sanitizePasswordCheck(passwordCheck)
+  };
+  if (next.note || next.hint || next.passwordCheck) {
+    map[wanted] = next;
   } else {
     delete map[wanted];
   }
-  writeBackupNotesMap(memberId, map);
-  return trimmed;
+  writeBackupMetaMap(memberId, map);
+  return next;
 }
 
 function deleteTutaDriveBackupNote(memberId, fileName) {
-  setTutaDriveBackupNote(memberId, fileName, '');
+  setTutaDriveBackupMeta(memberId, fileName, { note: '', hint: '', passwordCheck: null });
 }
 
 function pruneTutaDriveBackupNotes(memberId) {
-  const map = readBackupNotesMap(memberId);
+  const map = readBackupMetaMap(memberId);
   const existing = new Set(listTutaDriveBackupFileNames(memberId));
   let changed = false;
   for (const fileName of Object.keys(map)) {
@@ -100,7 +175,7 @@ function pruneTutaDriveBackupNotes(memberId) {
       changed = true;
     }
   }
-  if (changed) writeBackupNotesMap(memberId, map);
+  if (changed) writeBackupMetaMap(memberId, map);
 }
 
 function listTutaDriveBackupFileNames(memberId) {
@@ -120,12 +195,15 @@ function todayBackupStamp() {
   return `${y}-${m}-${day}_${hh}-${mm}-${ss}`;
 }
 
-export function tutaDriveBackupFileName(dateStamp = todayBackupStamp()) {
-  return `EncryptedBackup_${dateStamp}.zip`;
-}
-
-export function tutaDriveBackupAbsPath(memberId, dateStamp = todayBackupStamp()) {
-  return path.join(tutaDriveMemberRoot(memberId), tutaDriveBackupFileName(dateStamp));
+/** Next free EncryptedTutaNotesZip_<date>[_note][_N].zip in the member folder (never overwrites). */
+export function tutaDriveBackupAbsPath(memberId, { dateStamp, note = '' } = {}) {
+  const root = tutaDriveMemberRoot(memberId);
+  const stamp = resolveTutaDriveBackupDateStamp(dateStamp);
+  for (let suffix = 1; suffix < 1000; suffix += 1) {
+    const abs = path.join(root, tutaDriveBackupFileName({ dateStamp: stamp, note, suffix }));
+    if (!fs.existsSync(abs)) return abs;
+  }
+  throw new Error('Too many backups with the same date and note');
 }
 
 export const TUTADRIVE_BACKUP_MAX = 3;
@@ -177,7 +255,7 @@ export function deleteTutaDriveBackupByName(memberId, fileName) {
 export function listTutaDriveBackups(memberId) {
   const root = tutaDriveMemberRoot(memberId);
   if (!fs.existsSync(root)) return [];
-  const notesMap = readBackupNotesMap(memberId);
+  const metaMap = readBackupMetaMap(memberId);
   return fs
     .readdirSync(root)
     .filter((name) => BACKUP_NAME_RE.test(name))
@@ -189,7 +267,9 @@ export function listTutaDriveBackups(memberId) {
         absPath: abs,
         sizeBytes: st.size,
         mtimeMs: st.mtimeMs,
-        note: notesMap[name] || ''
+        note: metaMap[name]?.note || '',
+        hint: metaMap[name]?.hint || '',
+        passwordCheck: metaMap[name]?.passwordCheck || null
       };
     })
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
@@ -298,30 +378,43 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
 }
 
 /**
- * Store the client-sealed backup (Encrypt Password / DEK). Keeps up to TUTADRIVE_BACKUP_MAX zips.
+ * Store the client-sealed backup. Keeps up to TUTADRIVE_BACKUP_MAX zips.
+ * The note (<20 chars) is appended to the file name; dateStamp (YYYY_MM_DD) is the browser's local date.
+ * For per-backup-password zips (TNBAK3) the hint + password check come from the file header,
+ * so a downloaded zip uploaded again keeps them.
  */
-export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes, note = '') {
+export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes, { note = '', hint = '', dateStamp = '' } = {}) {
   const buf = Buffer.isBuffer(encryptedBytes) ? encryptedBytes : Buffer.from(encryptedBytes || []);
   if (!buf.length) throw new Error('Encrypted backup is empty');
 
+  const header = readTutaDriveBackupPasswordHeader(buf);
+  const shortNote = String(note || header?.note || '')
+    .trim()
+    .slice(0, TUTADRIVE_BACKUP_NOTE_MAX_LEN);
   ensureTutaDriveMemberLayout(memberId);
-  const dest = tutaDriveBackupAbsPath(memberId);
+  const dest = tutaDriveBackupAbsPath(memberId, { dateStamp, note: shortNote });
   clearPreviousTutaDriveBackups(memberId, dest);
   fs.writeFileSync(dest, buf);
   const st = fs.statSync(dest);
   const fileName = path.basename(dest);
-  const savedNote = setTutaDriveBackupNote(memberId, fileName, note);
+  const saved = setTutaDriveBackupMeta(memberId, fileName, {
+    note: shortNote,
+    hint: header ? header.hint : hint,
+    passwordCheck: header?.passwordCheck || null
+  });
   return {
     fileName,
     absPath: dest,
     sizeBytes: st.size,
     memberFolder: path.basename(tutaDriveMemberRoot(memberId)),
     relativePath: path.join(path.basename(tutaDriveMemberRoot(memberId)), fileName),
-    note: savedNote
+    note: saved.note,
+    hint: saved.hint,
+    passwordCheck: saved.passwordCheck
   };
 }
 
-/** Replace an existing EncryptedBackup_* / legacy backup_* zip in place (same file name, new sealed bytes). */
+/** Replace an existing backup zip in place (same file name, new sealed bytes). */
 export function replaceTutaDriveEncryptedBackup(memberId, fileName, encryptedBytes, note = undefined) {
   const wanted = String(fileName || '').trim();
   if (!BACKUP_NAME_RE.test(wanted)) {
@@ -337,17 +430,22 @@ export function replaceTutaDriveEncryptedBackup(memberId, fileName, encryptedByt
   }
   fs.writeFileSync(dest, buf);
   const st = fs.statSync(dest);
-  const savedNote =
-    note === undefined
-      ? readBackupNotesMap(memberId)[wanted] || ''
-      : setTutaDriveBackupNote(memberId, wanted, note);
+  // New bytes → the old hint / password check no longer apply; take them from the new file (if any).
+  const header = readTutaDriveBackupPasswordHeader(buf);
+  const saved = setTutaDriveBackupMeta(memberId, wanted, {
+    note: note === undefined ? header?.note || undefined : note,
+    hint: header ? header.hint : '',
+    passwordCheck: header?.passwordCheck || null
+  });
   return {
     fileName: path.basename(dest),
     absPath: dest,
     sizeBytes: st.size,
     memberFolder: path.basename(tutaDriveMemberRoot(memberId)),
     relativePath: path.join(path.basename(tutaDriveMemberRoot(memberId)), path.basename(dest)),
-    note: savedNote
+    note: saved.note,
+    hint: saved.hint,
+    passwordCheck: saved.passwordCheck
   };
 }
 

@@ -122,9 +122,12 @@ export async function decryptBytesWithKey(payloadB64, key) {
  * TutaDrive member backup magics.
  * TNBAK1 (legacy): sealed with the vault DEK only — opens only where that same vault row lives.
  * TNBAK2: also embeds the KDF salt + wrapped DEK, so the Encrypt Password alone opens it on any server.
+ * TNBAK3: sealed with a per-backup password chosen in the Backup popup (independent of the Encrypt Password).
+ *         Header (plaintext, authenticated) carries the Argon2id salt/params, a password verifier and the hint.
  */
 export const TUTADRIVE_BACKUP_MAGIC_V1 = new TextEncoder().encode('TNBAK1');
 export const TUTADRIVE_BACKUP_MAGIC = new TextEncoder().encode('TNBAK2');
+export const TUTADRIVE_BACKUP_MAGIC_V3 = new TextEncoder().encode('TNBAK3');
 const BACKUP_MAGIC_LEN = TUTADRIVE_BACKUP_MAGIC.length;
 const BACKUP_HEADER_LEN_BYTES = 4;
 const BACKUP_HEADER_MAX = 64 * 1024;
@@ -137,9 +140,156 @@ function startsWithMagic(bytes, magic) {
   return true;
 }
 
-/** True for TNBAK1 or TNBAK2 sealed backup bytes. */
+/** True for TNBAK1 / TNBAK2 / TNBAK3 sealed backup bytes. */
 export function isTutaDriveSealedBackupBytes(bytes) {
-  return startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC) || startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V1);
+  return (
+    startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V3) ||
+    startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC) ||
+    startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V1)
+  );
+}
+
+/** Argon2id output split: first 32 bytes = AES key, last 32 bytes → SHA-256 = stored verifier. */
+const BACKUP_PASSWORD_KDF_OUTPUT_LEN = 64;
+const WRONG_BACKUP_PASSWORD_MSG = 'Wrong password for this backup zip';
+
+async function deriveBackupPasswordKeys(password, check) {
+  const pwd = String(password ?? '');
+  if (!pwd) throw new Error('Enter the password for this backup zip');
+  const salt = base64ToBytes(check?.kdfSaltB64);
+  if (!salt.length) throw new Error('Backup password check is missing its salt');
+  const iterations = Number(check.kdfTime) || VAULT_E2E_KDF.iterations;
+  const memorySize = Number(check.kdfMemKib) || VAULT_E2E_KDF.memorySize;
+  const parallelism = Number(check.kdfParallelism) || VAULT_E2E_KDF.parallelism;
+  if (iterations > 10 || memorySize > 262144 || parallelism > 4) {
+    throw new Error('Backup file has unsupported password settings');
+  }
+  const out = await argon2id({
+    password: pwd,
+    salt,
+    iterations,
+    memorySize,
+    parallelism,
+    hashLength: BACKUP_PASSWORD_KDF_OUTPUT_LEN,
+    outputType: 'binary'
+  });
+  const aesKey = await importAesKey(out.slice(0, 32), false);
+  const verifier = new Uint8Array(await crypto.subtle.digest('SHA-256', out.slice(32)));
+  return { aesKey, verifierB64: bytesToBase64(verifier) };
+}
+
+function sameBase64(a, b) {
+  const x = String(a || '');
+  const y = String(b || '');
+  if (!x || x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i += 1) diff |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return diff === 0;
+}
+
+/**
+ * Check a typed password against a backup's stored verifier (from the list or the file header)
+ * without downloading / decrypting the zip. Throws "Wrong password for this backup zip".
+ */
+export async function verifyTutaDriveBackupPassword(password, passwordCheck) {
+  const { aesKey, verifierB64 } = await deriveBackupPasswordKeys(password, passwordCheck);
+  if (!sameBase64(verifierB64, passwordCheck?.verifierB64)) {
+    throw new Error(WRONG_BACKUP_PASSWORD_MSG);
+  }
+  return aesKey;
+}
+
+function writeBackupPrefix(magic, headerObj) {
+  const header = new TextEncoder().encode(JSON.stringify(headerObj));
+  const prefixLen = BACKUP_MAGIC_LEN + 1 + BACKUP_HEADER_LEN_BYTES + header.length;
+  const prefix = new Uint8Array(prefixLen);
+  prefix.set(magic, 0);
+  prefix[BACKUP_MAGIC_LEN] = VAULT_E2E_CRYPTO_VERSION;
+  new DataView(prefix.buffer).setUint32(BACKUP_MAGIC_LEN + 1, header.length, false);
+  prefix.set(header, BACKUP_MAGIC_LEN + 1 + BACKUP_HEADER_LEN_BYTES);
+  return prefix;
+}
+
+/**
+ * Seal a vault zip with a per-backup password (TNBAK3). The password never leaves the browser;
+ * the header stores only salt + KDF params + verifier + hint (+ note).
+ * Output: TNBAK3 | version(1) | headerLen(u32 BE) | header JSON | iv(12) | ciphertext+tag
+ */
+export async function sealTutaDriveBackupZipWithPassword(plainZipBytes, password, { hint = '', note = '' } = {}) {
+  const bytes = plainZipBytes instanceof Uint8Array ? plainZipBytes : new Uint8Array(plainZipBytes);
+  const passwordCheck = {
+    kdfAlgo: VAULT_E2E_KDF.type,
+    kdfSaltB64: bytesToBase64(randomBytes(16)),
+    kdfMemKib: VAULT_E2E_KDF.memorySize,
+    kdfTime: VAULT_E2E_KDF.iterations,
+    kdfParallelism: VAULT_E2E_KDF.parallelism
+  };
+  const { aesKey, verifierB64 } = await deriveBackupPasswordKeys(password, passwordCheck);
+  const prefix = writeBackupPrefix(TUTADRIVE_BACKUP_MAGIC_V3, {
+    ...passwordCheck,
+    verifierB64,
+    hint: String(hint || ''),
+    note: String(note || '')
+  });
+  const iv = randomBytes(IV_LEN);
+  const cipher = new Uint8Array(
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv, tagLength: TAG_LEN * 8, additionalData: prefix }, aesKey, bytes)
+  );
+  const out = new Uint8Array(prefix.length + IV_LEN + cipher.length);
+  out.set(prefix, 0);
+  out.set(iv, prefix.length);
+  out.set(cipher, prefix.length + IV_LEN);
+  return out;
+}
+
+/**
+ * Read the plaintext header of a TNBAK2 / TNBAK3 sealed backup.
+ * @returns {{ format: 'TNBAK2'|'TNBAK3', header: object, prefixLen: number } | null}
+ */
+export function readTutaDriveBackupHeader(bytes) {
+  const isV3 = startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V3);
+  if (!isV3 && !startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC)) return null;
+  const headerLenAt = BACKUP_MAGIC_LEN + 1;
+  if (bytes.length < headerLenAt + BACKUP_HEADER_LEN_BYTES) return null;
+  const headerLen = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(headerLenAt, false);
+  const prefixLen = headerLenAt + BACKUP_HEADER_LEN_BYTES + headerLen;
+  if (headerLen > BACKUP_HEADER_MAX || bytes.length < prefixLen) return null;
+  try {
+    const header = JSON.parse(new TextDecoder().decode(bytes.subarray(headerLenAt + BACKUP_HEADER_LEN_BYTES, prefixLen)));
+    return { format: isV3 ? 'TNBAK3' : 'TNBAK2', header, prefixLen };
+  } catch {
+    return null;
+  }
+}
+
+/** Password check fields from a TNBAK3 header (what the server lists as `passwordCheck`). */
+export function tutaDriveBackupPasswordCheckFromHeader(header) {
+  if (!header?.kdfSaltB64 || !header?.verifierB64) return null;
+  return {
+    kdfAlgo: header.kdfAlgo || VAULT_E2E_KDF.type,
+    kdfSaltB64: header.kdfSaltB64,
+    kdfMemKib: header.kdfMemKib,
+    kdfTime: header.kdfTime,
+    kdfParallelism: header.kdfParallelism,
+    verifierB64: header.verifierB64
+  };
+}
+
+async function unsealTutaDriveBackupV3(bytes, password) {
+  const parsed = readTutaDriveBackupHeader(bytes);
+  if (!parsed || parsed.format !== 'TNBAK3' || bytes.length < parsed.prefixLen + IV_LEN + TAG_LEN) {
+    throw new Error('Backup file is corrupt or not a password sealed backup');
+  }
+  if (!password) throw new Error('Enter the password for this backup zip');
+  const aesKey = await verifyTutaDriveBackupPassword(password, tutaDriveBackupPasswordCheckFromHeader(parsed.header));
+  const prefix = bytes.subarray(0, parsed.prefixLen);
+  const iv = bytes.subarray(parsed.prefixLen, parsed.prefixLen + IV_LEN);
+  const data = bytes.subarray(parsed.prefixLen + IV_LEN);
+  try {
+    return await aesGcmDecryptRaw(iv, data, aesKey, prefix);
+  } catch {
+    throw new Error('Unable to decrypt backup — the file is corrupt');
+  }
 }
 
 async function aesGcmDecryptRaw(iv, data, key, additionalData) {
@@ -202,6 +352,10 @@ const WRONG_PASSWORD_MSG = 'Unable to decrypt backup — wrong Encrypt Password 
  */
 export async function unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password } = {}) {
   const bytes = sealedBytes instanceof Uint8Array ? sealedBytes : new Uint8Array(sealedBytes);
+
+  if (startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V3)) {
+    return unsealTutaDriveBackupV3(bytes, password);
+  }
 
   if (startsWithMagic(bytes, TUTADRIVE_BACKUP_MAGIC_V1)) {
     if (!dek) throw new Error('Encrypt Password session required to open backup');
