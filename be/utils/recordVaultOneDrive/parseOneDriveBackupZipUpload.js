@@ -35,11 +35,22 @@ export function parseOneDriveBackupZipUpload(req) {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-restore-upload-'));
     const zipPath = path.join(tmpDir, 'backup.zip');
     let fileReceived = false;
-    let writeError = null;
+    let fileTruncated = false;
     let bytesWritten = 0;
     let note = '';
     let hint = '';
     let dateStamp = '';
+    let settled = false;
+    /** Resolves once the temp zip is fully flushed to disk (busboy `finish` can fire earlier). */
+    let fileWritten = Promise.resolve();
+
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      req.unpipe(busboy);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      reject(err);
+    };
 
     const busboy = Busboy({
       headers: req.headers,
@@ -61,48 +72,50 @@ export function parseOneDriveBackupZipUpload(req) {
       }
       fileReceived = true;
       const writeStream = fs.createWriteStream(zipPath);
+      fileWritten = new Promise((resolveWrite, rejectWrite) => {
+        writeStream.on('close', resolveWrite);
+        writeStream.on('error', rejectWrite);
+        stream.on('error', rejectWrite);
+      });
+      fileWritten.catch(() => {});
       stream.on('data', (chunk) => {
         bytesWritten += chunk?.length || 0;
       });
-      stream.pipe(writeStream);
-      writeStream.on('error', (err) => {
-        writeError = err;
+      stream.on('limit', () => {
+        fileTruncated = true;
       });
+      stream.pipe(writeStream);
     });
-    busboy.on('error', (err) => {
-      if (err?.code === 'LIMIT_FILE_SIZE') {
-        reject(new Error(`Backup zip exceeds ${MAX_BACKUP_ZIP_BYTES / (1024 * 1024)} MiB limit`));
+    busboy.on('error', fail);
+    busboy.on('finish', async () => {
+      try {
+        await fileWritten;
+      } catch (err) {
+        fail(err);
         return;
       }
-      reject(err);
-    });
-    busboy.on('finish', () => {
-      if (writeError) {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-        reject(writeError);
+      if (settled) return;
+      if (fileTruncated) {
+        fail(new Error(`Backup zip exceeds ${MAX_BACKUP_ZIP_BYTES / (1024 * 1024)} MiB limit`));
         return;
       }
-      if (!fileReceived || !fs.existsSync(zipPath)) {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-        reject(new Error(formatUploadHint(contentLength)));
+      if (!fileReceived || !fs.existsSync(zipPath) || !fs.statSync(zipPath).size) {
+        fail(new Error(formatUploadHint(contentLength)));
         return;
       }
-      const st = fs.statSync(zipPath);
-      if (!st.size) {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-        reject(new Error(formatUploadHint(contentLength)));
-        return;
-      }
+      settled = true;
       resolve({
         tmpDir,
         zipPath,
-        sizeBytes: st.size,
+        sizeBytes: fs.statSync(zipPath).size,
         bytesWritten,
         note: note.trim(),
         hint: hint.trim(),
         dateStamp: dateStamp.trim()
       });
     });
+    req.on('error', fail);
+    req.on('aborted', () => fail(new Error('Upload was interrupted before the backup zip finished arriving')));
     req.pipe(busboy);
   });
 }

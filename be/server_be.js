@@ -1,5 +1,6 @@
 import './loadEnv.js'; // load ~/.ssh/be/.env first so DB_* etc. are set regardless of cwd
 import { isDuplicatePhoneAllowed } from './utils/duplicatePhonePolicy.js';
+import { drainUploadBodyBeforeResponse } from './utils/drainUploadBodyBeforeResponse.js';
 import { tutaPhotoRequiredJsonLimitMb } from './utils/tutaPhotoQuotaConfig.js';
 import { isBlockMobileEnabled } from './utils/blockMobileConfig.js';
 import { isBypassSmsPhoneVerificationEnabled } from './utils/bypassSmsPhoneVerification.js';
@@ -898,6 +899,24 @@ app.use((req, res, next) => {
     });
   }
   next();
+});
+
+const LARGE_MULTIPART_UPLOAD_POST_PATHS = new Set([
+  '/api/recordVault/tutadrive/backup',
+  '/api/recordVault/tutadrive/restore-zip',
+  '/api/recordVault/tutadrive/backup-tree',
+  '/api/recordVault/tutadrive/merge/preview',
+  '/api/recordVault/onedrive/restore-zip',
+  '/api/recordVault/usb/restore-zip',
+  '/api/photoAlbums/onedrive/restore-zip',
+  '/api/photoAlbums/usb/restore-zip'
+]);
+app.use((req, res, next) => {
+  const isLargeUpload =
+    (req.method === 'POST' && LARGE_MULTIPART_UPLOAD_POST_PATHS.has(req.path)) ||
+    (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutadrive/backup/'));
+  if (!isLargeUpload) return next();
+  return drainUploadBodyBeforeResponse(req, res, next);
 });
 
 app.use(express.json({ limit: jsonLimitBytes }));

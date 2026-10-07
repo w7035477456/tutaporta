@@ -114,6 +114,23 @@ function formatBackupZipSizeLabel(sizeBytes) {
   return `${mb.toFixed(1)}mb`;
 }
 
+/** User-facing text for backup/restore request failures (gateway errors carry HTML, not JSON). */
+function describeBackupRequestError(err, fallback) {
+  const apiError = err?.response?.data?.error;
+  if (apiError) return apiError;
+  const status = Number(err?.response?.status) || 0;
+  if (status === 413) {
+    return 'Server error 413: the backup zip is larger than the web server upload limit.';
+  }
+  if (status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 524)) {
+    return (
+      `Server error ${status}: the web server dropped or timed out the request while processing the backup zip. ` +
+      'Please try again. If it keeps happening, the server log (pm2 logs onlinemallwebsite) shows the reason.'
+    );
+  }
+  return err?.message || fallback;
+}
+
 function formatProgressMb(bytes) {
   const n = Number(bytes);
   if (!Number.isFinite(n) || n <= 0) return '0.0 MB';
@@ -661,7 +678,7 @@ export default function RecordVaultOneDriveBackupDialog({
       }
       refreshVaultTree();
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Backup failed');
+      setError(describeBackupRequestError(err, 'Backup failed'));
     } finally {
       setBusy(false);
       setBackupProgress(null);
@@ -686,7 +703,7 @@ export default function RecordVaultOneDriveBackupDialog({
     } catch (err) {
       setOpenBackupFileName('');
       setOpenBackupNotebooks([]);
-      setError(err?.response?.data?.error || err?.message || 'Unable to open backup');
+      setError(describeBackupRequestError(err, 'Unable to open backup'));
     } finally {
       setBusy(false);
       setActioningFile('');
@@ -758,7 +775,7 @@ export default function RecordVaultOneDriveBackupDialog({
       );
       setSuccessTone('general');
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Merge failed');
+      setError(describeBackupRequestError(err, 'Merge failed'));
     } finally {
       setBusy(false);
       setActioningFile('');
@@ -799,7 +816,7 @@ export default function RecordVaultOneDriveBackupDialog({
       );
       setSuccessTone('general');
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Restore failed');
+      setError(describeBackupRequestError(err, 'Restore failed'));
     } finally {
       setBusy(false);
       setActioningFile('');
@@ -818,7 +835,7 @@ export default function RecordVaultOneDriveBackupDialog({
       setSuccess(`Downloaded ${result?.fileName || fileName}${sizeText} to your browser download folder.`);
       setSuccessTone('backup');
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Download failed');
+      setError(describeBackupRequestError(err, 'Download failed'));
     } finally {
       setBusy(false);
       setActioningFile('');
@@ -896,7 +913,7 @@ export default function RecordVaultOneDriveBackupDialog({
       setSuccess(`Uploaded and saved ${uploadedName}${sizeText} in ${elapsedText}.`);
       setSuccessTone('general');
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Upload failed');
+      setError(describeBackupRequestError(err, 'Upload failed'));
     } finally {
       setBusy(false);
       setActioningFile('');
@@ -984,7 +1001,7 @@ export default function RecordVaultOneDriveBackupDialog({
         await onRestored?.(result);
       }
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Restore failed');
+      setError(describeBackupRequestError(err, 'Restore failed'));
     } finally {
       setBusy(false);
       setBackupProgress(null);
@@ -1169,8 +1186,8 @@ export default function RecordVaultOneDriveBackupDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
             {tutaDriveActive
-              ? 'Backup seals your TutaDrive vault with a password you choose for that zip (zero-knowledge) and stores one file under your member folder: users/M####/EncryptedTutaNotesZip_YYYY_MM_DD_<note>.zip. You can save up to 3 zip files. When all 3 slots are full, Backup or Upload overwrites the oldest slot (after you confirm).'
-              : 'You can backup entire TutaNotes Cloud folder from OneDrive to a zip file in your browser download folder. You can also Restore from it back to OneDrive (overwrite OneDrive).'}
+              ? 'Backup encrypts your TutaNote to cloud with any password you choose for each zip and stores the TutaCloud. You can save up to 3 zip file in TutaClouds. When all 3 slots are full, Backup or Upload overwrites the oldest slot (after you confirm).'
+              : 'You can also download zip file to your local desktop download folder. You can also Restore or Upload & Restore (or Merge) to TutaNotes.'}
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           <Box sx={formatWarningBoxSx}>
