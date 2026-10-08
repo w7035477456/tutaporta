@@ -23,7 +23,7 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 ### Mac ↔ Ubuntu schema parity (required)
 
 1. **Every Mac Postgres schema change must also be applied to Ubuntu Postgres** on `192.168.222.202` (DDL, new tables/columns/indexes/enums/functions, migrations in `be/db/*.sql`, etc.). Either:
-   - **Cursor applies it automatically** over SSH using the `ssh.mdc` path (`scripts/deploy-ssh-mac.sh lawsen0@192.168.222.202 '…'` — port `59221`, `IdentitiesOnly`, corruptedKey; never plain `ssh`), **or**
+   - **Cursor applies it automatically** with **`scripts/ubuntu-psql.sh -f be/db/<migration>.sql`** (or `-c "…"`). It runs `psql` on Ubuntu over the `ssh.mdc` SSH path (`deploy-ssh-mac.sh`: port `59221`, `IdentitiesOnly`, corruptedKey; never plain `ssh`) and gets the Ubuntu `test_user1` password from `UBUNTU_POSTGRES_PASSWORD` in the Mac `~/.ssh/be/.env`, **or**
    - **Cursor gives Andrew the exact `psql` to run on Ubuntu**, wrapped in this marker:
 
 ```

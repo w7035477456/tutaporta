@@ -518,6 +518,22 @@ pm2cron() {
     pm2 logs onlinemallwebsite --lines 500 --nostream | grep -iE "03:0[0-1]"
 }
 
+# Recent demo logins from login_log (device / browser / OS). Usage: demolog [limit]  (default 50)
+unalias demolog 2>/dev/null || true
+demolog() {
+    local limit="${1:-50}"
+    [[ "$limit" =~ ^[0-9]+$ ]] || { echo "Usage: demolog [limit]" >&2; return 1; }
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+SELECT login_log_id, login_at, logout_at,
+       round(online_seconds/60.0,1) AS online_min,
+       logout_reason, host(client_ip) AS ip,
+       device_type, browser, os
+FROM helloworldjunktest.login_log
+WHERE is_demo = true
+ORDER BY login_at DESC
+LIMIT $limit;"
+}
+
 alias curlforasn='curl -s https://onlinemall.website/api/client-asn-debug | python3 -m json.tool'
 alias watchasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color -F "[blocked-asn]"'
 alias tailblockasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color "BLOCKED AS"'
@@ -1123,6 +1139,61 @@ dbBackup(){
 # Function to restore the onlinemallwebsite database on Ubuntu
 ######## DO THIS BEGIN ########
 
+# login_log holds the demo / signup IP log. dbRestore drops the whole schema, so the live rows are
+# saved to ~/dbFolder/loginLogKeep_<timestamp>.csv first and put back after the import
+# (the dump's own login_log rows are discarded). The CSV is kept as an extra copy.
+# Callers set PGPASSWORD; LOGIN_LOG_KEEP / LOGIN_LOG_COLS are shared with loginLogPutBackAfterRestore.
+loginLogSaveBeforeRestore() {
+    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -v ON_ERROR_STOP=1)
+    LOGIN_LOG_KEEP=""
+    LOGIN_LOG_COLS=""
+    local exists
+    exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('helloworldjunktest.login_log') IS NOT NULL") || return 1
+    if [ "$exists" != "t" ]; then
+        echo "login_log: no live table — nothing to keep."
+        return 0
+    fi
+    LOGIN_LOG_COLS=$("${PSQL[@]}" -tAc "SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'helloworldjunktest' AND table_name = 'login_log'") || return 1
+    local rows
+    rows=$("${PSQL[@]}" -tAc "SELECT count(*) FROM helloworldjunktest.login_log") || return 1
+    mkdir -p "$HOME/dbFolder"
+    LOGIN_LOG_KEEP="$HOME/dbFolder/loginLogKeep_$(date +%Y%m%d_%H%M%S).csv"
+    if ! "${PSQL[@]}" -c "\copy helloworldjunktest.login_log (${LOGIN_LOG_COLS}) TO '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)"; then
+        echo "Error: could not save login_log to $LOGIN_LOG_KEEP"
+        LOGIN_LOG_KEEP=""
+        return 1
+    fi
+    chmod 600 "$LOGIN_LOG_KEEP"
+    echo "login_log: saved ${rows} live row(s) to $LOGIN_LOG_KEEP"
+}
+
+loginLogPutBackAfterRestore() {
+    [ -n "$LOGIN_LOG_KEEP" ] || return 0
+    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -v ON_ERROR_STOP=1)
+    local exists
+    exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('helloworldjunktest.login_log') IS NOT NULL")
+    if [ "$exists" != "t" ]; then
+        local ddl="${LAST_CD_INPUT:-$HOME/code/main}/be/db/addLoginLog.sql"
+        echo "login_log: missing after import — creating it from $ddl"
+        "${PSQL[@]}" -f "$ddl" >/dev/null
+    fi
+    if ! "${PSQL[@]}" <<SQL
+BEGIN;
+ALTER TABLE helloworldjunktest.login_log DROP CONSTRAINT IF EXISTS login_log_client_ip_last_digit_only;
+DELETE FROM helloworldjunktest.login_log;
+\copy helloworldjunktest.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)
+SELECT setval('helloworldjunktest.login_log_id_seq',
+              COALESCE((SELECT MAX(login_log_id) FROM helloworldjunktest.login_log), 0) + 1, false);
+COMMIT;
+SQL
+    then
+        echo "Error: could not put login_log back. Live rows are safe in: $LOGIN_LOG_KEEP"
+        echo "  Retry: psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c \"\\copy helloworldjunktest.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)\""
+        return 1
+    fi
+    echo "login_log: live rows put back ($("${PSQL[@]}" -tAc "SELECT count(*) FROM helloworldjunktest.login_log") row(s)); dump's login_log ignored."
+}
+
 dbRestore() {
     DUMP_DIR="$HOME/dbFolder"
     TODAY=$(date +"%m%d%Y")
@@ -1209,6 +1280,14 @@ dbRestore() {
     echo
     export PGPASSWORD
 
+    # login_log (demo / signup IP log) is never replaced by the dump: save live rows, put them back after import.
+    local LOGIN_LOG_KEEP="" LOGIN_LOG_COLS=""
+    if ! loginLogSaveBeforeRestore; then
+        unset PGPASSWORD
+        echo "Restore cancelled (login_log could not be saved)."
+        return 1
+    fi
+
     echo "Dropping existing schema..."
     psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS helloworldjunktest CASCADE;"
 
@@ -1217,6 +1296,15 @@ dbRestore() {
         -v ON_ERROR_STOP=1 \
         --set=search_path=helloworldjunktest,public \
         -f "$FULL_PATH"
+    local IMPORT_RC=$?
+    if [ $IMPORT_RC -ne 0 ]; then
+        echo "Error: import failed (rc=$IMPORT_RC)."
+    fi
+
+    if ! loginLogPutBackAfterRestore; then
+        unset PGPASSWORD
+        return 1
+    fi
 
     echo "--- Verification: Tables in onlinemallwebsite ---"
     psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt helloworldjunktest.*"
@@ -1477,6 +1565,8 @@ BEGIN
     WHERE n.nspname = '${TMP_SCHEMA}'
       AND c.relkind IN ('r', 'p')
       AND NOT c.relispartition
+      -- live demo / signup IP log stays exactly as-is (no rows from the other machine)
+      AND c.relname <> 'login_log'
     ORDER BY c.relname
   LOOP
     live_reg := to_regclass(format('%I.%I', '${LIVE_SCHEMA}', r.tbl));
@@ -1511,6 +1601,7 @@ BEGIN
     SELECT sequencename
     FROM pg_sequences
     WHERE schemaname = '${LIVE_SCHEMA}'
+      AND sequencename <> 'login_log_id_seq'
   LOOP
     IF to_regclass(format('%I.%I', '${TMP_SCHEMA}', r.sequencename)) IS NULL THEN
       CONTINUE;

@@ -52,13 +52,32 @@ Real values live **only** in the Mac backend env file **`~/.ssh/be/.env`** (outs
 ```bash
 MAC_SUDO_PASSWORD=****
 SSH_KEY_PASSPHRASE=****
+UBUNTU_POSTGRES_PASSWORD=****   # Ubuntu test_user1 — used by scripts/ubuntu-psql.sh (below)
 ```
 
 When `MAC_SUDO_PASSWORD` is set there, `scripts/deploy-ssh-mac.sh` answers both prompts non-interactively via `scripts/deploy-ssh-askpass.sh` (`sudo -A` + `SSH_ASKPASS_REQUIRE=force`). **Never** paste the values into this rule, any repo file, or command lines — this repo is pushed to GitHub.
+
+## Ubuntu Postgres from the Mac (`scripts/ubuntu-psql.sh`)
+
+Ubuntu Postgres listens on `127.0.0.1:50010` (TCP needs a password; `test_user1` peer auth only works for an OS user named `test_user1`). From the Mac, **always** use:
+
+```bash
+scripts/ubuntu-psql.sh -c "SELECT pg_size_pretty(pg_database_size(current_database()));"
+scripts/ubuntu-psql.sh -f be/db/someMigration.sql          # apply a migration on Ubuntu Primary
+echo "SELECT count(*) FROM helloworldjunktest.singles;" | scripts/ubuntu-psql.sh
+scripts/ubuntu-psql.sh -At -c "SELECT …"                   # extra psql flags pass through
+```
+
+- Password: **`UBUNTU_POSTGRES_PASSWORD=****`** in the Mac `~/.ssh/be/.env` (same file as the SSH secrets above). The script sends it as the first line of the SSH stdin and the remote side reads it into `PGPASSWORD`, so it never appears in argv, `ps`, shell history, or Cursor tool output.
+- Connects as `test_user1` to `onlinemallwebsite` on `127.0.0.1:50010` via `deploy-ssh-mac.sh` (same port / key / IdentitiesOnly as `f2`). Overrides: `UBUNTU_PG_HOST`, `UBUNTU_PG_PORT`, `UBUNTU_PG_USER`, `UBUNTU_PG_DB`, `UBUNTU_SSH_HOST`.
+- Runs with `ON_ERROR_STOP=1`; exit code is non-zero if any statement fails.
+- Writes / DDL go here (single-box Primary). After DDL, run **`isdbsame`** (`scripts/compare-pg-schema.sh`) and report the result (see `summary.mdc` §2).
+- **Never** `cat`/`grep`/`sed` the secrets in `~/.ssh/be/.env` (Mac or Ubuntu) yourself, pass `PGPASSWORD=…` on a command line, or print the password — let the script read it.
 
 ## Rules for agents
 
 - **Never** `ssh lawsen0@192.168.222.202` without `-p 59221`, `IdentitiesOnly=yes`, and the corruptedKey path (or `deploy-ssh-mac.sh`).
 - **Never** use agent keys / `githubkey` for this host — IdentitiesOnly + explicit `-i` only.
 - `scp` / `rsync` over SSH must use the **same** port, key, and IdentitiesOnly options.
+- Ubuntu Postgres queries / migrations from the Mac → `scripts/ubuntu-psql.sh` (above); don't hand-roll `ssh … psql` with a password.
 - On Ubuntu itself, `f2` is a no-op reminder (already on the box) — see `myscript/ubuntu/b`.

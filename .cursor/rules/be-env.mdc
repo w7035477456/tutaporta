@@ -499,6 +499,16 @@ FLORISTONE_PASSWORD=****          # ⚠ prod uses ':' — not loaded
 | `PAYPAL_ENV` | `live` or `sandbox` (`settingsProfile.js`). |
 | `FLORISTONE_*` | Send-flowers (`sendFlower.js`); aliases `FLORISTONE_API_KEY`, `FLORISTONE_APIKEY`, `FLORISTONE_PASS`. |
 
+## Mac-only remote-access secrets (not in prod `be.env`)
+
+```bash
+MAC_SUDO_PASSWORD=****          # sudo prompt for scripts/deploy-ssh-mac.sh
+SSH_KEY_PASSPHRASE=****         # corruptedKey_march2024 passphrase
+UBUNTU_POSTGRES_PASSWORD=****   # Ubuntu test_user1 — scripts/ubuntu-psql.sh
+```
+
+Only in the **Mac** `~/.ssh/be/.env`. Used by the SSH / remote-psql helpers (see `ssh.mdc`), not by app code. The Node backend loads them into its environment, but the `MAC_` / `SSH_` / `UBUNTU_` prefixes are not on the Vite `envPrefix` list, so they never reach the FE bundle.
+
 ## When changing these
 
 1. Edit `~/.ssh/be/.env` on the target machine (Mac and Ubuntu copies differ — see tables above).
