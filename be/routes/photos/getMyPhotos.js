@@ -9,7 +9,7 @@ import {
 } from '../../utils/photoFilePath.js';
 
 const VALID_ALBUM_TYPES = new Set(['uploaded', 'public', 'private']);
-const PHOTOS_TABLE = 'helloworldjunktest.photos';
+const PHOTOS_TABLE = 'outdateddbsnapshotoct2024.photos';
 
 function logPhotoDirStats(label) {
   const folder = getPhotoFolder();
@@ -86,7 +86,7 @@ export async function getMyPhotos(req, res) {
 
     const singlesResult = await client.query(
       `SELECT member_id, profile_image_fk
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]

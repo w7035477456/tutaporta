@@ -7,19 +7,19 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'singles'
       AND column_name = 'dl_year'
   ) AND NOT EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'singles'
       AND column_name = 'dl_dob'
   ) THEN
-    ALTER TABLE helloworldjunktest.singles RENAME COLUMN dl_year TO dl_dob;
+    ALTER TABLE outdateddbsnapshotoct2024.singles RENAME COLUMN dl_year TO dl_dob;
   END IF;
 END $$;
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_dob IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_dob IS
   'Date of birth from driver license OCR (MM/DD/YYYY next to DOB label), or None Found.';

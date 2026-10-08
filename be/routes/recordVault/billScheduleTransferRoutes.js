@@ -28,7 +28,7 @@ function requireSinglesId(req) {
 async function countMonthly(client, singlesId, storageBackend) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.monthly_bill
+       FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, storageBackend]
   );
@@ -38,7 +38,7 @@ async function countMonthly(client, singlesId, storageBackend) {
 async function countYearly(client, singlesId, storageBackend) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.yearly_bill
+       FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, storageBackend]
   );
@@ -47,14 +47,14 @@ async function countYearly(client, singlesId, storageBackend) {
 
 async function copyMonthly(client, singlesId, source, target) {
   await client.query(
-    `INSERT INTO helloworldjunktest.monthly_bill (
+    `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type, action, paid_record_id
      )
      SELECT
        singles_id, $3, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type, action, paid_record_id
-       FROM helloworldjunktest.monthly_bill
+       FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, source, target]
   );
@@ -62,14 +62,14 @@ async function copyMonthly(client, singlesId, source, target) {
 
 async function copyYearly(client, singlesId, source, target) {
   await client.query(
-    `INSERT INTO helloworldjunktest.yearly_bill (
+    `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_month_day, amount, bill_type, action, paid_record_id
      )
      SELECT
        singles_id, $3, bill_year, bill_month, row_index,
        bill_description, due_month_day, amount, bill_type, action, paid_record_id
-       FROM helloworldjunktest.yearly_bill
+       FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, source, target]
   );
@@ -77,7 +77,7 @@ async function copyYearly(client, singlesId, source, target) {
 
 async function deleteMonthly(client, singlesId, storageBackend) {
   await client.query(
-    `DELETE FROM helloworldjunktest.monthly_bill
+    `DELETE FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, storageBackend]
   );
@@ -85,7 +85,7 @@ async function deleteMonthly(client, singlesId, storageBackend) {
 
 async function deleteYearly(client, singlesId, storageBackend) {
   await client.query(
-    `DELETE FROM helloworldjunktest.yearly_bill
+    `DELETE FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, storageBackend]
   );

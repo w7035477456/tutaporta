@@ -5,7 +5,7 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS photoalbums_access_password_hash text,
   ADD COLUMN IF NOT EXISTS photoalbums_access_password_updated_at timestamp with time zone,
   ADD COLUMN IF NOT EXISTS photoalbums_access_password_hint text,
@@ -27,16 +27,16 @@ ALTER TABLE helloworldjunktest.singles
   ADD COLUMN IF NOT EXISTS photoalbums_last_session_usb_tx_rx_count integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS photoalbums_last_session_ui_tx_rx_count integer NOT NULL DEFAULT 0;
 
-COMMENT ON COLUMN helloworldjunktest.singles.photoalbums_access_password_hash IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.photoalbums_access_password_hash IS
   'bcrypt hash for Photo Albums Encrypt Password (independent from Notes).';
 
-COMMENT ON COLUMN helloworldjunktest.singles.photoalbums_total_transfer_mb IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.photoalbums_total_transfer_mb IS
   'Lifetime Photo Albums Tx/Rx MB. Independent from notes_total_transfer_mb.';
 
 -- Deduct shared refill_remain_mb (same pool as Notes for now) and tally photoalbums_total_transfer_mb.
-DROP FUNCTION IF EXISTS helloworldjunktest.add_photoalbums_transfer_mb(bigint, bigint);
+DROP FUNCTION IF EXISTS outdateddbsnapshotoct2024.add_photoalbums_transfer_mb(bigint, bigint);
 
-CREATE FUNCTION helloworldjunktest.add_photoalbums_transfer_mb(
+CREATE FUNCTION outdateddbsnapshotoct2024.add_photoalbums_transfer_mb(
   p_singles_id bigint,
   p_bytes bigint
 )
@@ -49,13 +49,13 @@ DECLARE
 BEGIN
   IF p_bytes IS NULL OR p_bytes <= 0 THEN
     SELECT refill_remain_mb INTO v_remain
-    FROM helloworldjunktest.singles WHERE singles_id = p_singles_id;
+    FROM outdateddbsnapshotoct2024.singles WHERE singles_id = p_singles_id;
     RETURN COALESCE(v_remain, 0);
   END IF;
 
   v_add_mb := GREATEST(1, CEIL(p_bytes::numeric / (1024 * 1024))::integer);
 
-  UPDATE helloworldjunktest.singles
+  UPDATE outdateddbsnapshotoct2024.singles
   SET
     photoalbums_total_transfer_mb = photoalbums_total_transfer_mb + v_add_mb,
     refill_remain_mb = refill_remain_mb - v_add_mb

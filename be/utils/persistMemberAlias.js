@@ -10,13 +10,13 @@ import {
   formatAliasTakenMessage
 } from './aliasValidation.js';
 
-/** Case-insensitive: another member already has this alias in helloworldjunktest.singles.alias. */
+/** Case-insensitive: another member already has this alias in outdateddbsnapshotoct2024.singles.alias. */
 async function isSinglesAliasTakenByOther(client, alias, excludeSinglesId) {
   const trimmed = cleanAlias(alias);
   if (!trimmed) return false;
   const { rows } = await client.query(
     `SELECT 1
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE alias IS NOT NULL
        AND btrim(alias) <> ''
        AND lower(btrim(alias)) = lower($1)
@@ -34,8 +34,8 @@ async function loadLegalFirstName(client, singlesId) {
        NULLIF(BTRIM(s.dl_firstname), ''),
        NULLIF(BTRIM(v.firstname), '')
      ) AS first_name
-     FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio v ON v.singles_id = s.singles_id
+     FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio v ON v.singles_id = s.singles_id
      WHERE s.singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -44,7 +44,7 @@ async function loadLegalFirstName(client, singlesId) {
 }
 
 /**
- * Save or clear helloworldjunktest.singles.alias.
+ * Save or clear outdateddbsnapshotoct2024.singles.alias.
  * Uniqueness: SELECT from singles.alias (case-insensitive), excluding the current member.
  * @returns {{ ok: true, alias: string, message: string } | { ok: false, status: number, error: string }}
  */
@@ -53,7 +53,7 @@ export async function persistMemberAlias(client, singlesId, rawAlias) {
 
   const currentResult = await client.query(
     `SELECT alias
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -64,7 +64,7 @@ export async function persistMemberAlias(client, singlesId, rawAlias) {
 
   if (!nickname) {
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET alias = NULL,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $1`,
@@ -95,7 +95,7 @@ export async function persistMemberAlias(client, singlesId, rawAlias) {
   }
 
   await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET alias = $1,
          updated_at = CURRENT_TIMESTAMP
      WHERE singles_id = $2`,

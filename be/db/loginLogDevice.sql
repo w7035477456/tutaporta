@@ -5,12 +5,12 @@
 -- Mac:
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/loginLogDevice.sql
 
-ALTER TABLE helloworldjunktest.login_log
+ALTER TABLE outdateddbsnapshotoct2024.login_log
   ADD COLUMN IF NOT EXISTS device_type text,
   ADD COLUMN IF NOT EXISTS browser text,
   ADD COLUMN IF NOT EXISTS os text;
 
-UPDATE helloworldjunktest.login_log
+UPDATE outdateddbsnapshotoct2024.login_log
 SET device_type = CASE
       WHEN user_agent ~* '(Mobile|Android|iPhone|iPod|IEMobile|Opera Mini|webOS|BlackBerry|Windows Phone|iPad|Tablet|PlayBook|Silk)'
         THEN 'Mobile'
@@ -39,9 +39,9 @@ WHERE device_type IS NULL
   AND user_agent IS NOT NULL
   AND length(trim(user_agent)) > 0;
 
-COMMENT ON COLUMN helloworldjunktest.login_log.device_type IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.login_log.device_type IS
   'Desktop | Mobile (phone or tablet) from User-Agent. iPadOS Safari reports as Mac → Desktop.';
-COMMENT ON COLUMN helloworldjunktest.login_log.browser IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.login_log.browser IS
   'Edge | Opera | Samsung | Firefox | Chrome | Safari | Other (from User-Agent).';
-COMMENT ON COLUMN helloworldjunktest.login_log.os IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.login_log.os IS
   'iOS | Android | Windows | ChromeOS | Mac | Ubuntu | Linux | Other (from User-Agent).';

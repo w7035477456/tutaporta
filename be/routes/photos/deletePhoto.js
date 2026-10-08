@@ -47,7 +47,7 @@ export async function deletePhoto(req, res) {
       await client.query('BEGIN');
       const row = await client.query(
         `SELECT photo_file_name, file_extension, photo_thumbnail, file_path
-         FROM helloworldjunktest.photos
+         FROM outdateddbsnapshotoct2024.photos
          WHERE photos_id = $1 AND singles_id = $2`,
         [photosId, singlesId]
       );
@@ -66,13 +66,13 @@ export async function deletePhoto(req, res) {
       deletedPostingPhotos = postingDelete.deletedPostingPhotos ?? 0;
 
       await client.query(
-        `UPDATE helloworldjunktest.singles
+        `UPDATE outdateddbsnapshotoct2024.singles
          SET profile_image_fk = NULL
          WHERE singles_id = $1 AND profile_image_fk = $2`,
         [singlesId, photosId]
       );
 
-      await client.query('DELETE FROM helloworldjunktest.photos WHERE photos_id = $1 AND singles_id = $2', [
+      await client.query('DELETE FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1 AND singles_id = $2', [
         photosId,
         singlesId
       ]);

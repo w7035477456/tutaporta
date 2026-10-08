@@ -4,7 +4,7 @@
 
 DO $$
 DECLARE
-  schema_name text := 'helloworldjunktest';
+  schema_name text := 'outdateddbsnapshotoct2024';
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns

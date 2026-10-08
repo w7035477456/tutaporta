@@ -122,7 +122,7 @@ async function resolveAlbumTypeColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name IN ('type', 'photo_type', 'album_type')
      ORDER BY CASE column_name
@@ -139,7 +139,7 @@ async function resolvePhotoFileNameColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name = 'photo_file_name'
      LIMIT 1`
@@ -151,7 +151,7 @@ async function resolveChecksumColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name = 'checksum'
      LIMIT 1`
@@ -167,7 +167,7 @@ async function findDuplicatePhotoRows(client, singlesId, uploadedChecksum, check
   if (!checksumColumnName) return [];
   const { rows } = await client.query(
     `SELECT photos_id, photo_file_name, file_extension
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE singles_id = $1
        AND checksum IS NOT NULL
        AND btrim(checksum::text) <> ''
@@ -182,12 +182,12 @@ async function deleteDuplicatePhotosForSingles(client, singlesId, duplicateRows,
     const photosId = Number(row.photos_id);
     if (!Number.isFinite(photosId) || photosId < 1) continue;
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET profile_image_fk = NULL
        WHERE singles_id = $1 AND profile_image_fk = $2`,
       [singlesId, photosId]
     );
-    await client.query('DELETE FROM helloworldjunktest.photos WHERE photos_id = $1 AND singles_id = $2', [
+    await client.query('DELETE FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1 AND singles_id = $2', [
       photosId,
       singlesId
     ]);
@@ -203,7 +203,7 @@ async function deleteDuplicatePhotosForSingles(client, singlesId, duplicateRows,
 async function resolveMemberIdForSingles(client, singlesId) {
   const result = await client.query(
     `SELECT member_id
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -222,7 +222,7 @@ async function generateUniquePhotoFileNameBase(client, singlesId) {
   while (index < 20) {
     const check = await client.query(
       `SELECT 1
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photo_file_name = $1
        LIMIT 1`,
       [candidate]
@@ -363,7 +363,7 @@ export async function resizeToFit(buffer, contentType, targetBytes) {
 /**
  * POST /api/myPhotos
  * Body (JSON): { image: "data:image/jpeg;base64,..." }
- * Auth required. Writes file to STORAGE_PHOTOS_PATH, inserts into helloworldjunktest.photos (join with singles via singles_id).
+ * Auth required. Writes file to STORAGE_PHOTOS_PATH, inserts into outdateddbsnapshotoct2024.photos (join with singles via singles_id).
  * photos_id is the PK (nextval sequence); file_path + photos_id + '.' + file_extension is the on-disk path.
  */
 export async function uploadPhoto(req, res) {
@@ -552,14 +552,14 @@ export async function uploadPhoto(req, res) {
       req._replacedDuplicate = replacedDuplicate;
       let nextId;
       try {
-        const seqResult = await client.query("SELECT nextval('helloworldjunktest.photos_id_seq') AS id");
+        const seqResult = await client.query("SELECT nextval('outdateddbsnapshotoct2024.photos_id_seq') AS id");
         nextId = Number(seqResult.rows[0]?.id ?? 0);
       } catch (_) {
-        const maxResult = await client.query('SELECT COALESCE(MAX(photos_id), 0) + 1 AS id FROM helloworldjunktest.photos');
+        const maxResult = await client.query('SELECT COALESCE(MAX(photos_id), 0) + 1 AS id FROM outdateddbsnapshotoct2024.photos');
         nextId = Number(maxResult.rows[0]?.id ?? 1);
       }
       if (!nextId || nextId < 1) {
-        const maxResult = await client.query('SELECT COALESCE(MAX(photos_id), 0) + 1 AS id FROM helloworldjunktest.photos');
+        const maxResult = await client.query('SELECT COALESCE(MAX(photos_id), 0) + 1 AS id FROM outdateddbsnapshotoct2024.photos');
         nextId = Number(maxResult.rows[0]?.id ?? 1);
       }
       photosId = nextId; // files are 1.jpg, 2.jpg, 3.jpg by photos_id
@@ -602,7 +602,7 @@ export async function uploadPhoto(req, res) {
       }));
       const insertColumns = ['photos_id', 'singles_id', 'display_order', 'file_path', 'file_extension', ...optionalColumns];
       const insertValues = [photosId, singlesId, photoFolder, ext, ...optionalValues];
-      const valuePlaceholders = ['$1', '$2', '(SELECT COALESCE(MAX(display_order), -1) + 1 FROM helloworldjunktest.photos WHERE singles_id = $2)', '$3', '$4'];
+      const valuePlaceholders = ['$1', '$2', '(SELECT COALESCE(MAX(display_order), -1) + 1 FROM outdateddbsnapshotoct2024.photos WHERE singles_id = $2)', '$3', '$4'];
       for (let idx = 0; idx < optionalValues.length; idx += 1) {
         const paramRef = `$${5 + idx}`;
         const columnName = optionalColumns[idx];
@@ -611,7 +611,7 @@ export async function uploadPhoto(req, res) {
         );
       }
       const insertSql = `
-        INSERT INTO helloworldjunktest.photos (${insertColumns.join(', ')})
+        INSERT INTO outdateddbsnapshotoct2024.photos (${insertColumns.join(', ')})
         VALUES (${valuePlaceholders.join(', ')})
       `;
       console.log('[uploadPhoto] inserting photos row', {

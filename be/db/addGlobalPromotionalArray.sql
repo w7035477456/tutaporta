@@ -1,11 +1,11 @@
 -- global.promotional_array — referral Post FB / Refer Email message bodies (text[]).
 -- Run against Primary. Safe to re-run: replaces array on global row id=1.
--- Schema: helloworldjunktest (adjust if needed).
+-- Schema: outdateddbsnapshotoct2024 (adjust if needed).
 
-ALTER TABLE helloworldjunktest.global
+ALTER TABLE outdateddbsnapshotoct2024.global
   ADD COLUMN IF NOT EXISTS promotional_array text[] NOT NULL DEFAULT ARRAY[]::text[];
 
-UPDATE helloworldjunktest.global
+UPDATE outdateddbsnapshotoct2024.global
 SET promotional_array = ARRAY[
   $p0$I'm so tired of the endless swiping and fake profiles on standard dating apps. I just found this new community that actually feels safe—everyone is verified by a 3rd party before joining. Plus, it has a social feed where you can post daily stories and pictures just like on here, making it way easier to see someone's real personality. Check it out if you're looking for something genuine!$p0$,
   $p1$Has anyone else tried this site yet? It's basically dating meets social media, but without the creeps. You can browse securely vetted profiles, chat, and you can even send real, physical flowers to someone to surprise them! It's such a cute concept for building actual romance. Definitely worth a look if you're single.$p1$,
@@ -30,4 +30,4 @@ SET promotional_array = ARRAY[
 ]::text[]
 WHERE id = 1;
 
--- Verify: SELECT cardinality(promotional_array), promotional_array[1] FROM helloworldjunktest.global WHERE id = 1;
+-- Verify: SELECT cardinality(promotional_array), promotional_array[1] FROM outdateddbsnapshotoct2024.global WHERE id = 1;

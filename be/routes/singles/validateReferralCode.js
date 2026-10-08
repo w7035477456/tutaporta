@@ -30,7 +30,7 @@ export async function validateReferralCode(req, res) {
 
     const { rows } = await pool.query(
       `SELECT alias, member_id
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE my_refer_code = $1
        LIMIT 1`,
       [code]

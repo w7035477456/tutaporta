@@ -28,7 +28,7 @@ async function loadMemberProfile(singlesId) {
        alias,
        mailing_firstname,
        mailing_lastname
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]

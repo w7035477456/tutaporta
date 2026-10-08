@@ -1,4 +1,4 @@
--- helloworldjunktest.singles.phone — E.164 format check (Primary only).
+-- outdateddbsnapshotoct2024.singles.phone — E.164 format check (Primary only).
 -- Mac dev:
 -- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesValidE164PhoneConstraint.sql
 
@@ -8,7 +8,7 @@ DECLARE
 BEGIN
   FOR invalid IN
     SELECT singles_id, phone
-    FROM helloworldjunktest.singles
+    FROM outdateddbsnapshotoct2024.singles
     WHERE phone IS NULL
        OR btrim(phone) = ''
        OR phone !~ '^\+[1-9]\d{6,14}$'
@@ -17,8 +17,8 @@ BEGIN
   END LOOP;
 END $$;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   DROP CONSTRAINT IF EXISTS valid_e164_phone;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD CONSTRAINT valid_e164_phone CHECK (phone ~ '^\+[1-9]\d{6,14}$');

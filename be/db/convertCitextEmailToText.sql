@@ -3,15 +3,15 @@
 -- Mac dev:
 -- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/convertCitextEmailToText.sql
 
-UPDATE helloworldjunktest.singles
+UPDATE outdateddbsnapshotoct2024.singles
 SET email = LOWER(email::text)
 WHERE email IS NOT NULL
   AND email::text <> LOWER(email::text);
 
 DO $$
 BEGIN
-  IF to_regclass('helloworldjunktest.audit_registrations') IS NOT NULL THEN
-    UPDATE helloworldjunktest.audit_registrations
+  IF to_regclass('outdateddbsnapshotoct2024.audit_registrations') IS NOT NULL THEN
+    UPDATE outdateddbsnapshotoct2024.audit_registrations
     SET email = LOWER(email::text)
     WHERE email IS NOT NULL
       AND email::text <> LOWER(email::text);
@@ -24,7 +24,7 @@ DECLARE
 BEGIN
   FOR dup IN
     SELECT LOWER(email::text) AS email_key, COUNT(*) AS cnt
-    FROM helloworldjunktest.singles
+    FROM outdateddbsnapshotoct2024.singles
     GROUP BY LOWER(email::text)
     HAVING COUNT(*) > 1
   LOOP
@@ -32,46 +32,46 @@ BEGIN
   END LOOP;
 END $$;
 
-DROP VIEW IF EXISTS helloworldjunktest.viewcareer;
-DROP VIEW IF EXISTS helloworldjunktest.viewcountryofbirth;
-DROP VIEW IF EXISTS helloworldjunktest.viewcurrentcity;
-DROP VIEW IF EXISTS helloworldjunktest.vieweducation;
-DROP VIEW IF EXISTS helloworldjunktest.viewhobbies;
-DROP VIEW IF EXISTS helloworldjunktest.viewjob;
-DROP VIEW IF EXISTS helloworldjunktest.viewname;
-DROP VIEW IF EXISTS helloworldjunktest.viewphoto;
-DROP VIEW IF EXISTS helloworldjunktest.viewreligion;
-DROP VIEW IF EXISTS helloworldjunktest.viewvettedstatus;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewcareer;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewcountryofbirth;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewcurrentcity;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.vieweducation;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewhobbies;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewjob;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewname;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewphoto;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewreligion;
+DROP VIEW IF EXISTS outdateddbsnapshotoct2024.viewvettedstatus;
 
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'singles'
       AND column_name = 'email'
       AND udt_name = 'citext'
   ) THEN
-    ALTER TABLE helloworldjunktest.singles
+    ALTER TABLE outdateddbsnapshotoct2024.singles
       ALTER COLUMN email TYPE text USING email::text;
   END IF;
 
-  IF to_regclass('helloworldjunktest.audit_registrations') IS NOT NULL
+  IF to_regclass('outdateddbsnapshotoct2024.audit_registrations') IS NOT NULL
      AND EXISTS (
        SELECT 1
        FROM information_schema.columns
-       WHERE table_schema = 'helloworldjunktest'
+       WHERE table_schema = 'outdateddbsnapshotoct2024'
          AND table_name = 'audit_registrations'
          AND column_name = 'email'
          AND udt_name = 'citext'
      ) THEN
-    ALTER TABLE helloworldjunktest.audit_registrations
+    ALTER TABLE outdateddbsnapshotoct2024.audit_registrations
       ALTER COLUMN email TYPE text USING email::text;
   END IF;
 END $$;
 
-CREATE VIEW helloworldjunktest.viewcareer AS
+CREATE VIEW outdateddbsnapshotoct2024.viewcareer AS
  SELECT s.singles_id,
     s.email,
     vb.current_company,
@@ -81,10 +81,10 @@ CREATE VIEW helloworldjunktest.viewcareer AS
     vb.current_company_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewcountryofbirth AS
+CREATE VIEW outdateddbsnapshotoct2024.viewcountryofbirth AS
  SELECT s.singles_id,
     s.email,
     vb.countryofcitizenship,
@@ -94,10 +94,10 @@ CREATE VIEW helloworldjunktest.viewcountryofbirth AS
     vb.countryofcitizenship_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewcurrentcity AS
+CREATE VIEW outdateddbsnapshotoct2024.viewcurrentcity AS
  SELECT s.singles_id,
     s.email,
     vb.current_city,
@@ -107,10 +107,10 @@ CREATE VIEW helloworldjunktest.viewcurrentcity AS
     vb.current_city_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.vieweducation AS
+CREATE VIEW outdateddbsnapshotoct2024.vieweducation AS
  SELECT s.email,
     vb.college_name,
     vb.college_name_vetted,
@@ -119,23 +119,23 @@ CREATE VIEW helloworldjunktest.vieweducation AS
     vb.college_name_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewhobbies AS
+CREATE VIEW outdateddbsnapshotoct2024.viewhobbies AS
  SELECT s.singles_id,
     s.email,
     mb.favorite_hobbies AS hobbies,
-    NULL::helloworldjunktest.vetting_status AS hobbies_vetted,
+    NULL::outdateddbsnapshotoct2024.vetting_status AS hobbies_vetted,
     NULL::timestamp without time zone AS hobbies_vetted_date,
     NULL::bigint AS hobbies_vetted_by_userid,
     'n/a'::character varying(255) AS hobbies_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.misc_bio mb ON mb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.misc_bio mb ON mb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewjob AS
+CREATE VIEW outdateddbsnapshotoct2024.viewjob AS
  SELECT s.singles_id,
     s.email,
     vb.job_title,
@@ -145,10 +145,10 @@ CREATE VIEW helloworldjunktest.viewjob AS
     vb.job_title_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewname AS
+CREATE VIEW outdateddbsnapshotoct2024.viewname AS
  SELECT s.singles_id,
     s.email,
     s.mailing_firstname AS firstname,
@@ -160,10 +160,10 @@ CREATE VIEW helloworldjunktest.viewname AS
     vb.fullname_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewphoto AS
+CREATE VIEW outdateddbsnapshotoct2024.viewphoto AS
  SELECT s.singles_id,
     s.member_id,
     s.email,
@@ -171,22 +171,22 @@ CREATE VIEW helloworldjunktest.viewphoto AS
     vb.profilephoto_vetted_date,
     vb.profilephoto_vetted_by_userid,
     vb.profilephoto_vetted_note
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id;
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id;
 
-CREATE VIEW helloworldjunktest.viewreligion AS
+CREATE VIEW outdateddbsnapshotoct2024.viewreligion AS
  SELECT s.singles_id,
     s.email,
     NULL::character varying(50) AS religion,
-    NULL::helloworldjunktest.vetting_status AS religion_vetted,
+    NULL::outdateddbsnapshotoct2024.vetting_status AS religion_vetted,
     NULL::timestamp without time zone AS religion_vetted_date,
     NULL::bigint AS religion_vetted_by_userid,
     'n/a'::character varying(255) AS religion_vetted_note,
     s.vetted_basic_status,
     s.vetted_detail_status
-   FROM helloworldjunktest.singles s;
+   FROM outdateddbsnapshotoct2024.singles s;
 
-CREATE VIEW helloworldjunktest.viewvettedstatus AS
+CREATE VIEW outdateddbsnapshotoct2024.viewvettedstatus AS
  SELECT s.singles_id,
     s.email,
     s.vetted_basic_status,
@@ -197,21 +197,21 @@ CREATE VIEW helloworldjunktest.viewvettedstatus AS
     s.vetted_detail_status,
     vb.college_name_vetted,
     vb.current_company_vetted,
-    NULL::helloworldjunktest.vetting_status AS children_info_vetted,
+    NULL::outdateddbsnapshotoct2024.vetting_status AS children_info_vetted,
     vb.homecity_vetted,
-    NULL::helloworldjunktest.vetting_status AS religion_vetted,
-    NULL::helloworldjunktest.vetting_status AS hobbies_vetted
-   FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id
-     LEFT JOIN helloworldjunktest.misc_bio mb ON mb.singles_id = s.singles_id;
+    NULL::outdateddbsnapshotoct2024.vetting_status AS religion_vetted,
+    NULL::outdateddbsnapshotoct2024.vetting_status AS hobbies_vetted
+   FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id
+     LEFT JOIN outdateddbsnapshotoct2024.misc_bio mb ON mb.singles_id = s.singles_id;
 
-COMMENT ON COLUMN helloworldjunktest.singles.email IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.email IS
   'Unique login email (lowercase text). Application code uses normalizeEmailForDb().';
 
 DO $$
 BEGIN
-  IF to_regclass('helloworldjunktest.audit_registrations') IS NOT NULL THEN
-    COMMENT ON COLUMN helloworldjunktest.audit_registrations.email IS
+  IF to_regclass('outdateddbsnapshotoct2024.audit_registrations') IS NOT NULL THEN
+    COMMENT ON COLUMN outdateddbsnapshotoct2024.audit_registrations.email IS
       'Registration audit email (lowercase text). Application code uses normalizeEmailForDb().';
   END IF;
 END $$;

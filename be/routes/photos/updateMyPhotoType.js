@@ -40,7 +40,7 @@ export async function updateMyPhotoType(req, res) {
 
     const ownerRow = await client.query(
       `SELECT photos_id
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photos_id = $1 AND singles_id = $2
        LIMIT 1`,
       [photosId, singlesId]
@@ -57,7 +57,7 @@ export async function updateMyPhotoType(req, res) {
     }
 
     await client.query(
-      `UPDATE helloworldjunktest.photos SET ${albumTypeColumn} = ${sqlPhotoTypeParam('$1')} WHERE photos_id = $2`,
+      `UPDATE outdateddbsnapshotoct2024.photos SET ${albumTypeColumn} = ${sqlPhotoTypeParam('$1')} WHERE photos_id = $2`,
       [targetType, photosId]
     );
     await client.query('COMMIT');

@@ -1,12 +1,12 @@
--- helloworldjunktest.speed_date_* — in-site 1:1 speed dating (WebRTC signaling in Postgres).
+-- outdateddbsnapshotoct2024.speed_date_* — in-site 1:1 speed dating (WebRTC signaling in Postgres).
 -- Video media is peer-to-peer between browsers; app servers only store match/signaling rows.
 -- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSpeedDateTables.sql
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_event (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.speed_date_event (
   event_id bigserial PRIMARY KEY,
-  host_singles_id bigint REFERENCES helloworldjunktest.singles (singles_id) ON DELETE SET NULL,
+  host_singles_id bigint REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE SET NULL,
   title text NOT NULL,
   status text NOT NULL DEFAULT 'draft',
   mix_mode text NOT NULL DEFAULT 'gender',
@@ -34,11 +34,11 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_event (
 );
 
 CREATE INDEX IF NOT EXISTS idx_speed_date_event_status
-  ON helloworldjunktest.speed_date_event (status, starts_at);
+  ON outdateddbsnapshotoct2024.speed_date_event (status, starts_at);
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_rsvp (
-  event_id bigint NOT NULL REFERENCES helloworldjunktest.speed_date_event (event_id) ON DELETE CASCADE,
-  singles_id bigint NOT NULL REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.speed_date_rsvp (
+  event_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.speed_date_event (event_id) ON DELETE CASCADE,
+  singles_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'joined',
   last_seen_at timestamptz NOT NULL DEFAULT NOW(),
   camera_ready boolean NOT NULL DEFAULT false,
@@ -48,12 +48,12 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_rsvp (
 );
 
 CREATE INDEX IF NOT EXISTS idx_speed_date_rsvp_joined
-  ON helloworldjunktest.speed_date_rsvp (event_id)
+  ON outdateddbsnapshotoct2024.speed_date_rsvp (event_id)
   WHERE status = 'joined';
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_round (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.speed_date_round (
   round_id bigserial PRIMARY KEY,
-  event_id bigint NOT NULL REFERENCES helloworldjunktest.speed_date_event (event_id) ON DELETE CASCADE,
+  event_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.speed_date_event (event_id) ON DELETE CASCADE,
   round_no integer NOT NULL,
   status text NOT NULL DEFAULT 'live',
   started_at timestamptz NOT NULL DEFAULT NOW(),
@@ -63,12 +63,12 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_round (
     CHECK (status IN ('live', 'intermission', 'ended'))
 );
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_pair (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.speed_date_pair (
   pair_id bigserial PRIMARY KEY,
-  event_id bigint NOT NULL REFERENCES helloworldjunktest.speed_date_event (event_id) ON DELETE CASCADE,
-  round_id bigint NOT NULL REFERENCES helloworldjunktest.speed_date_round (round_id) ON DELETE CASCADE,
-  singles_low bigint NOT NULL REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
-  singles_high bigint NOT NULL REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+  event_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.speed_date_event (event_id) ON DELETE CASCADE,
+  round_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.speed_date_round (round_id) ON DELETE CASCADE,
+  singles_low bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
+  singles_high bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   low_want_meet boolean,
   high_want_meet boolean,
   created_at timestamptz NOT NULL DEFAULT NOW(),
@@ -77,21 +77,21 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_pair (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_speed_date_pair_event_history
-  ON helloworldjunktest.speed_date_pair (event_id, singles_low, singles_high);
+  ON outdateddbsnapshotoct2024.speed_date_pair (event_id, singles_low, singles_high);
 
 CREATE INDEX IF NOT EXISTS idx_speed_date_pair_round
-  ON helloworldjunktest.speed_date_pair (round_id);
+  ON outdateddbsnapshotoct2024.speed_date_pair (round_id);
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_sitout (
-  round_id bigint NOT NULL REFERENCES helloworldjunktest.speed_date_round (round_id) ON DELETE CASCADE,
-  singles_id bigint NOT NULL REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.speed_date_sitout (
+  round_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.speed_date_round (round_id) ON DELETE CASCADE,
+  singles_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   PRIMARY KEY (round_id, singles_id)
 );
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_signal (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.speed_date_signal (
   signal_id bigserial PRIMARY KEY,
-  pair_id bigint NOT NULL REFERENCES helloworldjunktest.speed_date_pair (pair_id) ON DELETE CASCADE,
-  from_singles_id bigint NOT NULL REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+  pair_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.speed_date_pair (pair_id) ON DELETE CASCADE,
+  from_singles_id bigint NOT NULL REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   kind text NOT NULL,
   payload jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT NOW(),
@@ -99,6 +99,6 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.speed_date_signal (
 );
 
 CREATE INDEX IF NOT EXISTS idx_speed_date_signal_pair
-  ON helloworldjunktest.speed_date_signal (pair_id, signal_id);
+  ON outdateddbsnapshotoct2024.speed_date_signal (pair_id, signal_id);
 
 COMMIT;

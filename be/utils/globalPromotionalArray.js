@@ -8,7 +8,7 @@ const CACHE_TTL_MS = 60_000;
 let cache = { list: null, at: 0 };
 
 function globalTableName() {
-  const schema = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
   return `"${schema}"."global"`;
 }
 
@@ -19,7 +19,7 @@ export function normalizePromotionalArray(raw) {
 }
 
 /**
- * Load helloworldjunktest.global.promotional_array (referral message templates).
+ * Load outdateddbsnapshotoct2024.global.promotional_array (referral message templates).
  * Short in-process TTL; stale data is acceptable for invite copy.
  */
 export async function loadGlobalPromotionalArray({ bypassCache = false } = {}) {

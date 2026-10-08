@@ -1,6 +1,6 @@
 -- TutaPhoto / TutaNotes vault coherence across PM2 workers and web servers
 -- (be/utils/vaultClusterCoherence.js). The backend also creates this lazily on first use.
-CREATE TABLE IF NOT EXISTS helloworldjunktest.vault_cluster_state (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.vault_cluster_state (
   product text NOT NULL,
   singles_id bigint NOT NULL,
   storage_type text NOT NULL,

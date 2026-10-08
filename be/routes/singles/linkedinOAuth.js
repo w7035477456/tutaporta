@@ -423,7 +423,7 @@ async function saveSinglesLinkedInUrl(singlesId, profileUrl) {
   if (!url || !Number.isFinite(singlesId) || singlesId < 1) return;
   try {
     await pool.query(
-      'UPDATE helloworldjunktest.singles SET linkedin_url = $1 WHERE singles_id = $2',
+      'UPDATE outdateddbsnapshotoct2024.singles SET linkedin_url = $1 WHERE singles_id = $2',
       [url, singlesId]
     );
   } catch (err) {

@@ -16,7 +16,7 @@ async function main() {
   try {
     const { rows } = await client.query(
       `SELECT singles_id, member_id, member_category, email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        ORDER BY singles_id`
     );
 
@@ -30,7 +30,7 @@ async function main() {
         singlesId: row.singles_id
       });
       await client.query(
-        `UPDATE helloworldjunktest.singles
+        `UPDATE outdateddbsnapshotoct2024.singles
          SET member_id = $1, updated_at = CURRENT_TIMESTAMP
          WHERE singles_id = $2`,
         [newMemberId, row.singles_id]

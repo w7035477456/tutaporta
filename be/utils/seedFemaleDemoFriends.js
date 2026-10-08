@@ -38,7 +38,7 @@ export { SCHEMA, findSinglesByEmail, findSinglesById };
 /** Template female (RapidRuth) — do not seed this pack onto herself. */
 export const FEMALE_DEMO_TEMPLATE_EMAIL = 'dm8@gmail.com';
 
-/** Fixed demo men for female members (aliases must match helloworldjunktest.singles.alias). */
+/** Fixed demo men for female members (aliases must match outdateddbsnapshotoct2024.singles.alias). */
 export const FEMALE_DEMO_FRIENDS = Object.freeze({
   buddy: { alias: 'JazzyJeff', email: 'dm4@gmail.com', role: 'buddy' },
   acquaint: { alias: 'BrainyBobby', email: 'dm1@gmail.com', role: 'acquaint' },

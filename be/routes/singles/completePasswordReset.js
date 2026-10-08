@@ -23,7 +23,7 @@ export async function completePasswordReset(req, res) {
 
     const result = await pool.query(
       `SELECT id, email
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE code = $1
          AND kind = 'password_reset'
          AND used_at IS NULL
@@ -41,7 +41,7 @@ export async function completePasswordReset(req, res) {
       return res.status(400).json({ error: 'Email does not match the reset link.' });
     }
 
-    const userCheck = await pool.query('SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1', [emailNorm]);
+    const userCheck = await pool.query('SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1', [emailNorm]);
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'No account found for this email.' });
     }
@@ -51,8 +51,8 @@ export async function completePasswordReset(req, res) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [row.id]);
-      await client.query(`UPDATE helloworldjunktest.singles SET password_hash = $1 WHERE email = $2`, [passwordHash, emailNorm]);
+      await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [row.id]);
+      await client.query(`UPDATE outdateddbsnapshotoct2024.singles SET password_hash = $1 WHERE email = $2`, [passwordHash, emailNorm]);
       await client.query('COMMIT');
     } catch (e) {
       await client.query('ROLLBACK');

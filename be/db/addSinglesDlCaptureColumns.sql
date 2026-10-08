@@ -2,7 +2,7 @@
 -- Mac dev (Primary):
 -- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesDlCaptureColumns.sql
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS dl_firstname text,
   ADD COLUMN IF NOT EXISTS dl_middlename text,
   ADD COLUMN IF NOT EXISTS dl_lastname text,
@@ -12,26 +12,26 @@ ALTER TABLE helloworldjunktest.singles
   ADD COLUMN IF NOT EXISTS dl_city text,
   ADD COLUMN IF NOT EXISTS pp_nationality text;
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_firstname IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_firstname IS
   'First name read from government ID OCR during Identification Verification step 3.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_middlename IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_middlename IS
   'Middle name or initial read from government ID OCR during Identification Verification step 3.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_lastname IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_lastname IS
   'Last name read from government ID OCR during Identification Verification step 3.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_dob IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_dob IS
   'Date of birth from driver license OCR (MM/DD/YYYY next to DOB label), or None Found.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_sex IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_sex IS
   'Sex from driver license OCR: M or F (CHAR(1)); NULL when unknown.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_height IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_height IS
   'Height read from driver license OCR during Identification Verification step 3.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_city IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_city IS
   'City read from government ID address OCR during Identification Verification step 3.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.pp_nationality IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.pp_nationality IS
   'Passport nationality ISO3 (e.g. USA, GBR) from passport OCR during Identification Verification.';

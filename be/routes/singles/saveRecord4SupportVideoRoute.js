@@ -79,7 +79,7 @@ export async function getRecord4SupportVideoRoute(req, res) {
   try {
     const { rows } = await pool.query(
       `SELECT video_id, video_file_name, file_extension
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE singles_id = $1
          AND video_file_name LIKE 'record4support_%'
        ORDER BY video_id DESC

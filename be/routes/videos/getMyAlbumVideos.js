@@ -24,7 +24,7 @@ export async function getMyAlbumVideos(req, res) {
     client = await pool.connect();
     const { rows } = await client.query(
       `SELECT video_id, file_path, file_extension, type::text AS album_type_raw, video_file_name, created_at, video_thumbnail
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE singles_id = $1
          AND video_file_name LIKE $2
          AND LOWER(type::text) <> 'deleted'

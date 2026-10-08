@@ -61,7 +61,7 @@ export async function addVaultTransferBytes(singlesId, bytes) {
   if (!Number.isFinite(id) || id < 1 || !Number.isFinite(b) || b <= 0) return 0;
   try {
     const { rows } = await pool.query(
-      'SELECT helloworldjunktest.add_notes_transfer_mb($1, $2) AS refill_remain_mb',
+      'SELECT outdateddbsnapshotoct2024.add_notes_transfer_mb($1, $2) AS refill_remain_mb',
       [id, Math.floor(b)]
     );
     return Number(rows[0]?.refill_remain_mb) || 0;
@@ -78,7 +78,7 @@ export async function addVaultRefillMb(singlesId, addMb) {
   if (!Number.isFinite(id) || id < 1 || n <= 0) return 0;
   try {
     const { rows } = await pool.query(
-      'SELECT helloworldjunktest.add_vault_refill_mb($1, $2) AS refill_remain_mb',
+      'SELECT outdateddbsnapshotoct2024.add_vault_refill_mb($1, $2) AS refill_remain_mb',
       [id, n]
     );
     return Number(rows[0]?.refill_remain_mb) || 0;
@@ -163,7 +163,7 @@ export async function getVaultTransferStats(singlesId) {
   try {
     const { rows } = await pool.query(
       `SELECT notes_total_transfer_mb, refill_remain_mb, refill_bought_mb
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
         WHERE singles_id = $1
         LIMIT 1`,
       [singlesId]

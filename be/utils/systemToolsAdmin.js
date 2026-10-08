@@ -21,7 +21,7 @@ export function clearSystemToolsAdminSinglesIdCache() {
 export async function lookupSystemToolsAdminSingles(db = pool) {
   const { rows } = await db.query(
     `SELECT singles_id, email, alias, member_category
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE lower(email::text) = lower($1::text)
      LIMIT 1`,
     [SYSTEM_TOOLS_ADMIN_EMAIL]
@@ -67,7 +67,7 @@ export async function isProtectedSystemToolsAdminSinglesId(singlesId, db = pool)
 
   const { rows } = await db.query(
     `SELECT member_id
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [id]

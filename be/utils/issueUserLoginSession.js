@@ -47,7 +47,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
       [user.singles_id]
     );

@@ -17,7 +17,7 @@ import { buildStreetAddress, pickWeightedByPercentage } from './usCityPopulation
 const { Client } = pg;
 
 function schemaIdent() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '""');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
 }
 
 function parseArgs(argv) {

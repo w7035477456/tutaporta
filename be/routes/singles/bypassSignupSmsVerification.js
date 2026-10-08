@@ -38,7 +38,7 @@ export async function bypassSignupSmsVerification(req, res) {
     try {
       const result = await pool.query(
         `SELECT id, email
-         FROM helloworldjunktest.verifications
+         FROM outdateddbsnapshotoct2024.verifications
          WHERE code = $1
            AND kind = 'registration_email'
            AND used_at IS NULL
@@ -66,7 +66,7 @@ export async function bypassSignupSmsVerification(req, res) {
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await pool.query(
-      `DELETE FROM helloworldjunktest.verifications
+      `DELETE FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind IN ('phone_verify_session', 'phone_verified_pending_password')
@@ -76,7 +76,7 @@ export async function bypassSignupSmsVerification(req, res) {
 
     const pending = await pool.query(
       `SELECT id
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = 'phone_verified_pending_password'
@@ -88,7 +88,7 @@ export async function bypassSignupSmsVerification(req, res) {
 
     if (!pending.rows[0]) {
       await pool.query(
-        `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+        `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
          VALUES ($1, $2, NULL, 'phone_verified_pending_password', $3)`,
         [emailNorm, formattedPhone, expiresAt]
       );

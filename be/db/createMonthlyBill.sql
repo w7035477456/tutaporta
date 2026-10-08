@@ -6,10 +6,10 @@
 -- Run (Mac tunnel example):
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createMonthlyBill.sql
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.monthly_bill (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.monthly_bill (
   monthly_bill_id bigserial PRIMARY KEY,
   singles_id bigint NOT NULL
-    REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+    REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   storage_backend text NOT NULL DEFAULT 'onedrive'
     CHECK (storage_backend IN ('onedrive', 'usb')),
   bill_year integer NOT NULL
@@ -37,23 +37,23 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.monthly_bill (
 );
 
 CREATE INDEX IF NOT EXISTS idx_monthly_bill_singles_storage_ym
-  ON helloworldjunktest.monthly_bill (singles_id, storage_backend, bill_year DESC, bill_month DESC);
+  ON outdateddbsnapshotoct2024.monthly_bill (singles_id, storage_backend, bill_year DESC, bill_month DESC);
 
-COMMENT ON TABLE helloworldjunktest.monthly_bill IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.monthly_bill IS
   'TutaNotes Bill Schedule Monthly rows; one forever slice per (singles_id, year, month).';
-COMMENT ON COLUMN helloworldjunktest.monthly_bill.bill_year IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.monthly_bill.bill_year IS
   'Calendar year of this history slice (e.g. 2026).';
-COMMENT ON COLUMN helloworldjunktest.monthly_bill.bill_month IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.monthly_bill.bill_month IS
   'Calendar month 1–12 of this history slice.';
-COMMENT ON COLUMN helloworldjunktest.monthly_bill.row_index IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.monthly_bill.row_index IS
   'Display # within the month (1, 2, 3…).';
-COMMENT ON COLUMN helloworldjunktest.monthly_bill.action IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.monthly_bill.action IS
   'Manual only: Not Paid / Paid. NULL for Auto or unset. Not cloned to next month.';
-COMMENT ON COLUMN helloworldjunktest.monthly_bill.paid_record_id IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.monthly_bill.paid_record_id IS
   'Optional FK to future paid_record when Action=Paid is clicked; no constraint yet.';
 
 -- Verify:
 -- SELECT column_name, data_type
 --   FROM information_schema.columns
---  WHERE table_schema = 'helloworldjunktest' AND table_name = 'monthly_bill'
+--  WHERE table_schema = 'outdateddbsnapshotoct2024' AND table_name = 'monthly_bill'
 --  ORDER BY ordinal_position;

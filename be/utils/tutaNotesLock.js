@@ -9,7 +9,7 @@ export const TUTANOTES_LOCKED_MESSAGE =
   'TutaNotes is locked after five failed Encrypt Password attempts. Please contact tech support.';
 
 function schema() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 export async function isTutaNotesLocked(singlesId) {

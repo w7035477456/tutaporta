@@ -1,4 +1,4 @@
-/** Parse / validate myNote prefs stored on helloworldjunktest.user_customization. */
+/** Parse / validate myNote prefs stored on outdateddbsnapshotoct2024.user_customization. */
 
 const COLOR_INDEX_MAX = 6;
 const EDITOR_FONT_PT_MIN = 4;

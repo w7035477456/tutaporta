@@ -115,7 +115,7 @@ export async function getVerifySelfPhotoValue(req, res) {
   try {
     const result = await pool.query(
       `SELECT *
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [authSinglesId]
@@ -228,7 +228,7 @@ export async function saveVerifySelfRows(req, res) {
     const skippedIds = [];
     const shapeResult = await pool.query(
       `SELECT *
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [saveTargetId]
@@ -296,7 +296,7 @@ export async function saveVerifySelfRows(req, res) {
       const previewValues = [...values];
       updates.push('updated_at = CURRENT_TIMESTAMP');
       values.push(saveTargetId);
-      const sql = `UPDATE helloworldjunktest.singles
+      const sql = `UPDATE outdateddbsnapshotoct2024.singles
          SET ${updates.join(', ')}
          WHERE singles_id = $${values.length}
          RETURNING
@@ -322,7 +322,7 @@ export async function saveVerifySelfRows(req, res) {
            ${prefix}_vetted_note AS verify_vetted_note,
            ${prefix}_vetted_date AS verify_vetted_date,
            ${prefix}_vetted_by_userid AS verify_vetted_by_userid
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
          WHERE singles_id = $1
          LIMIT 1`,
         [saveTargetId]

@@ -39,18 +39,18 @@ BEGIN
     IF EXISTS (
       SELECT 1
         FROM information_schema.columns
-       WHERE table_schema = 'helloworldjunktest'
+       WHERE table_schema = 'outdateddbsnapshotoct2024'
          AND table_name = 'singles'
          AND column_name = old_name
     ) AND NOT EXISTS (
       SELECT 1
         FROM information_schema.columns
-       WHERE table_schema = 'helloworldjunktest'
+       WHERE table_schema = 'outdateddbsnapshotoct2024'
          AND table_name = 'singles'
          AND column_name = new_name
     ) THEN
       EXECUTE format(
-        'ALTER TABLE helloworldjunktest.singles RENAME COLUMN %I TO %I',
+        'ALTER TABLE outdateddbsnapshotoct2024.singles RENAME COLUMN %I TO %I',
         old_name,
         new_name
       );
@@ -59,10 +59,10 @@ BEGIN
 END $$;
 
 -- Transfer helper: old name → new name (same body; column is notes_total_transfer_mb after rename).
-DROP FUNCTION IF EXISTS helloworldjunktest.add_vault_transfer_mb(bigint, bigint);
-DROP FUNCTION IF EXISTS helloworldjunktest.add_notes_transfer_mb(bigint, bigint);
+DROP FUNCTION IF EXISTS outdateddbsnapshotoct2024.add_vault_transfer_mb(bigint, bigint);
+DROP FUNCTION IF EXISTS outdateddbsnapshotoct2024.add_notes_transfer_mb(bigint, bigint);
 
-CREATE FUNCTION helloworldjunktest.add_notes_transfer_mb(
+CREATE FUNCTION outdateddbsnapshotoct2024.add_notes_transfer_mb(
   p_singles_id bigint,
   p_bytes bigint
 )
@@ -75,13 +75,13 @@ DECLARE
 BEGIN
   IF p_bytes IS NULL OR p_bytes <= 0 THEN
     SELECT refill_remain_mb INTO v_remain
-    FROM helloworldjunktest.singles WHERE singles_id = p_singles_id;
+    FROM outdateddbsnapshotoct2024.singles WHERE singles_id = p_singles_id;
     RETURN COALESCE(v_remain, 0);
   END IF;
 
   v_add_mb := GREATEST(1, CEIL(p_bytes::numeric / (1024 * 1024))::integer);
 
-  UPDATE helloworldjunktest.singles
+  UPDATE outdateddbsnapshotoct2024.singles
   SET
     notes_total_transfer_mb = notes_total_transfer_mb + v_add_mb,
     refill_remain_mb = refill_remain_mb - v_add_mb

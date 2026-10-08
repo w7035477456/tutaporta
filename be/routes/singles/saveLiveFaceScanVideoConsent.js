@@ -130,7 +130,7 @@ export async function saveLiveFaceScanVideoConsent(req, res) {
 
     const userResult = await client.query(
       `SELECT email, alias, prefix, member_id
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]

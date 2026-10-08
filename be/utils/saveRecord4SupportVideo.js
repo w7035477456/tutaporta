@@ -22,13 +22,13 @@ function videoContentTypeToExt(contentType) {
 
 async function nextVideoId(client) {
   try {
-    const seqResult = await client.query("SELECT nextval('helloworldjunktest.video_id_seq') AS id");
+    const seqResult = await client.query("SELECT nextval('outdateddbsnapshotoct2024.video_id_seq') AS id");
     const nextId = Number(seqResult.rows[0]?.id ?? 0);
     if (Number.isFinite(nextId) && nextId > 0) return nextId;
   } catch {
     // fall through
   }
-  const maxResult = await client.query('SELECT COALESCE(MAX(video_id), 0) + 1 AS id FROM helloworldjunktest.videos');
+  const maxResult = await client.query('SELECT COALESCE(MAX(video_id), 0) + 1 AS id FROM outdateddbsnapshotoct2024.videos');
   return Number(maxResult.rows[0]?.id ?? 1);
 }
 
@@ -39,7 +39,7 @@ async function nextVideoId(client) {
 export async function deletePriorRecord4SupportVideos(client, singlesId) {
   const { rows } = await client.query(
     `SELECT video_id, video_file_name, file_extension, file_path
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE singles_id = $1
        AND video_file_name LIKE $2`,
     [singlesId, `${RECORD4SUPPORT_FILE_PREFIX}%`]
@@ -47,7 +47,7 @@ export async function deletePriorRecord4SupportVideos(client, singlesId) {
 
   for (const row of rows) {
     unlinkMemberVideoFilesFromDisk(row);
-    await client.query('DELETE FROM helloworldjunktest.videos WHERE video_id = $1 AND singles_id = $2', [
+    await client.query('DELETE FROM outdateddbsnapshotoct2024.videos WHERE video_id = $1 AND singles_id = $2', [
       row.video_id,
       singlesId
     ]);
@@ -108,7 +108,7 @@ export async function saveRecord4SupportVideo(
   });
 
   await client.query(
-    `INSERT INTO helloworldjunktest.videos
+    `INSERT INTO outdateddbsnapshotoct2024.videos
        (video_id, singles_id, file_path, file_extension, type, video_file_name, checksum, video_thumbnail)
      VALUES ($1, $2, $3, $4, ${sqlPhotoTypeParam('$5')}, $6, $7, $8)`,
     [videoId, singlesId, videoFolder, ext, 'uploaded', videoFileName, uploadedChecksum, videoThumbnail]

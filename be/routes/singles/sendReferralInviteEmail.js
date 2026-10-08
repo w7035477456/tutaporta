@@ -55,7 +55,7 @@ export async function sendReferralInviteEmail(req, res) {
 
     const { rows } = await pool.query(
       `SELECT singles_id, email, alias, member_id, my_refer_code
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]

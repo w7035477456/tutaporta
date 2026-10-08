@@ -10,7 +10,7 @@ import pool from '../db/connection.js';
 
 /**
  * Require valid auth cookie (JWT). Returns 401 if missing or invalid.
- * Verifies helloworldjunktest.singles row exists on every request (deleted members → sessionInvalid logout).
+ * Verifies outdateddbsnapshotoct2024.singles row exists on every request (deleted members → sessionInvalid logout).
  * On success, sets req.auth = { singles_id, email } for use by route handlers.
  */
 export async function requireAuth(req, res, next) {

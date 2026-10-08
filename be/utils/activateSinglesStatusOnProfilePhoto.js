@@ -12,8 +12,8 @@ export async function activateSinglesStatusOnProfilePhoto(client, singlesId) {
   if (!Number.isFinite(id) || id < 1) return false;
 
   const { rows } = await client.query(
-    `UPDATE helloworldjunktest.singles
-     SET status = 'active'::helloworldjunktest.singles_status,
+    `UPDATE outdateddbsnapshotoct2024.singles
+     SET status = 'active'::outdateddbsnapshotoct2024.singles_status,
          updated_at = CURRENT_TIMESTAMP
      WHERE singles_id = $1
        AND profile_image_fk IS NOT NULL
@@ -23,7 +23,7 @@ export async function activateSinglesStatusOnProfilePhoto(client, singlesId) {
        AND BTRIM(phone) <> ''
        AND password_hash IS NOT NULL
        AND BTRIM(password_hash) <> ''
-       AND status IS DISTINCT FROM 'active'::helloworldjunktest.singles_status
+       AND status IS DISTINCT FROM 'active'::outdateddbsnapshotoct2024.singles_status
      RETURNING singles_id, email, phone, status`,
     [id]
   );

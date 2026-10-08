@@ -23,9 +23,9 @@ async function ensureTablesReady() {
   if (tablesReadyPromise) return tablesReadyPromise;
   tablesReadyPromise = (async () => {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_search_events (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_search_events (
         event_id BIGSERIAL PRIMARY KEY,
-        singles_id BIGINT NOT NULL REFERENCES helloworldjunktest.singles(singles_id) ON DELETE CASCADE,
+        singles_id BIGINT NOT NULL REFERENCES outdateddbsnapshotoct2024.singles(singles_id) ON DELETE CASCADE,
         event_type TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         meta JSONB NOT NULL DEFAULT '{}'::jsonb
@@ -33,11 +33,11 @@ async function ensureTablesReady() {
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_search_events_type_time
-      ON helloworldjunktest.user_search_events (event_type, created_at DESC)
+      ON outdateddbsnapshotoct2024.user_search_events (event_type, created_at DESC)
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_search_events_user_type
-      ON helloworldjunktest.user_search_events (singles_id, event_type, created_at DESC)
+      ON outdateddbsnapshotoct2024.user_search_events (singles_id, event_type, created_at DESC)
     `);
   })().catch((err) => {
     tablesReadyPromise = null;
@@ -53,7 +53,7 @@ export async function trackUserSearchEvent(singlesId, eventType, meta = {}) {
   if (!SEARCH_EVENT_TYPES.has(type)) return;
   await ensureTablesReady();
   await pool.query(
-    `INSERT INTO helloworldjunktest.user_search_events (singles_id, event_type, meta)
+    `INSERT INTO outdateddbsnapshotoct2024.user_search_events (singles_id, event_type, meta)
      VALUES ($1, $2, $3::jsonb)`,
     [userId, type, JSON.stringify(meta && typeof meta === 'object' ? meta : {})]
   );
@@ -67,14 +67,14 @@ export async function getSystemStatisticsSnapshot() {
       WHEN EXISTS (
         SELECT 1
         FROM information_schema.tables
-        WHERE table_schema = 'helloworldjunktest'
+        WHERE table_schema = 'outdateddbsnapshotoct2024'
           AND table_name = 'postings'
-      ) THEN 'helloworldjunktest'
+      ) THEN 'outdateddbsnapshotoct2024'
       ELSE 'public'
     END AS schema_name
   `);
-  const postingsSchema = String(postingsSchemaResult.rows[0]?.schema_name || 'public') === 'helloworldjunktest'
-    ? 'helloworldjunktest'
+  const postingsSchema = String(postingsSchemaResult.rows[0]?.schema_name || 'public') === 'outdateddbsnapshotoct2024'
+    ? 'outdateddbsnapshotoct2024'
     : 'public';
 
   const snapshots = {};
@@ -82,13 +82,13 @@ export async function getSystemStatisticsSnapshot() {
     const cutoffExpr = windowDef.intervalSql ? `NOW() - ${windowDef.intervalSql}` : 'NOW()';
     const result = await pool.query(`
       SELECT
-        (SELECT COUNT(*)::bigint FROM helloworldjunktest.singles WHERE created_at <= ${cutoffExpr}) AS users_count,
-        (SELECT COUNT(*)::bigint FROM helloworldjunktest.photos WHERE created_at <= ${cutoffExpr}) AS photos_count,
-        (SELECT COUNT(*)::bigint FROM helloworldjunktest.chat_log WHERE created_at <= ${cutoffExpr}) AS messages_count,
+        (SELECT COUNT(*)::bigint FROM outdateddbsnapshotoct2024.singles WHERE created_at <= ${cutoffExpr}) AS users_count,
+        (SELECT COUNT(*)::bigint FROM outdateddbsnapshotoct2024.photos WHERE created_at <= ${cutoffExpr}) AS photos_count,
+        (SELECT COUNT(*)::bigint FROM outdateddbsnapshotoct2024.chat_log WHERE created_at <= ${cutoffExpr}) AS messages_count,
         (SELECT COUNT(*)::bigint FROM ${postingsSchema}.postings WHERE created_at <= ${cutoffExpr}) AS postings_count,
-        (SELECT COUNT(*)::bigint FROM helloworldjunktest.user_search_events WHERE event_type = 'identification_search' AND created_at <= ${cutoffExpr}) AS identification_search_count,
-        (SELECT COUNT(*)::bigint FROM helloworldjunktest.user_search_events WHERE event_type = 'work_email_domain_search' AND created_at <= ${cutoffExpr}) AS work_email_domain_search_count,
-        (SELECT COUNT(*)::bigint FROM helloworldjunktest.user_search_events WHERE event_type = 'academic_record_search' AND created_at <= ${cutoffExpr}) AS academic_record_search_count
+        (SELECT COUNT(*)::bigint FROM outdateddbsnapshotoct2024.user_search_events WHERE event_type = 'identification_search' AND created_at <= ${cutoffExpr}) AS identification_search_count,
+        (SELECT COUNT(*)::bigint FROM outdateddbsnapshotoct2024.user_search_events WHERE event_type = 'work_email_domain_search' AND created_at <= ${cutoffExpr}) AS work_email_domain_search_count,
+        (SELECT COUNT(*)::bigint FROM outdateddbsnapshotoct2024.user_search_events WHERE event_type = 'academic_record_search' AND created_at <= ${cutoffExpr}) AS academic_record_search_count
     `);
     snapshots[windowDef.key] = result.rows[0] || {};
   }
@@ -99,8 +99,8 @@ export async function getSystemStatisticsSnapshot() {
       referrer.singles_id,
       COALESCE(referrer.alias, referrer.email, CONCAT('user-', referrer.singles_id::text)) AS user_label,
       COUNT(referee.singles_id)::int AS refer_count
-    FROM helloworldjunktest.singles referrer
-    INNER JOIN helloworldjunktest.singles referee
+    FROM outdateddbsnapshotoct2024.singles referrer
+    INNER JOIN outdateddbsnapshotoct2024.singles referee
       ON btrim(COALESCE(referee.refer_by_code::text, '')) = btrim(COALESCE(referrer.my_refer_code::text, ''))
      AND btrim(COALESCE(referee.refer_by_code::text, '')) <> ''
      AND btrim(COALESCE(referee.refer_by_code::text, '')) <> $1

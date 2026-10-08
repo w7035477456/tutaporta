@@ -31,7 +31,7 @@ const SIGNUP_TOKEN_MAX_AGE_MS = 30 * 60 * 1000;
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
                 seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
                 (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
-         FROM helloworldjunktest.singles s`;
+         FROM outdateddbsnapshotoct2024.singles s`;
 
 function normalizeOrigin(value) {
   try {
@@ -538,7 +538,7 @@ export async function googleSignupComplete(req, res) {
     if (!smsBypassed) {
       const pending = await pool.query(
         `SELECT id
-         FROM helloworldjunktest.verifications
+         FROM outdateddbsnapshotoct2024.verifications
          WHERE email = $1
            AND phone = $2
            AND kind = 'phone_verified_pending_password'
@@ -589,7 +589,7 @@ export async function googleSignupComplete(req, res) {
     });
 
     try {
-      await pool.query(`DELETE FROM helloworldjunktest.verifications WHERE email = $1`, [emailNorm]);
+      await pool.query(`DELETE FROM outdateddbsnapshotoct2024.verifications WHERE email = $1`, [emailNorm]);
     } catch (cleanupErr) {
       console.warn('[googleSignupOAuth] verification cleanup:', cleanupErr?.message || cleanupErr);
     }

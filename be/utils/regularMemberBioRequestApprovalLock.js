@@ -50,7 +50,7 @@ export async function enforceRegularMemberBioRequestApprovalsInDb(db, schemaName
   const id = Number(singlesIdTo);
   if (!Number.isFinite(id) || id < 1) return 0;
 
-  const schema = String(schemaName || 'helloworldjunktest').replace(/"/g, '""');
+  const schema = String(schemaName || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
   const quotedSchema = `"${schema}"`;
   const cols = await db.query(
     `SELECT column_name

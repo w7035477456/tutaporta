@@ -13,7 +13,7 @@ import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
 import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
 async function cleanupVerificationRowsByEmail(emailNorm) {
-  const result = await pool.query(`DELETE FROM helloworldjunktest.verifications WHERE email = $1`, [emailNorm]);
+  const result = await pool.query(`DELETE FROM outdateddbsnapshotoct2024.verifications WHERE email = $1`, [emailNorm]);
   return result.rowCount || 0;
 }
 
@@ -74,7 +74,7 @@ export async function verifyPhone(req, res) {
     {
       const sessionResult_AAAAA = await pool.query(
         `SELECT id, password_hash
-         FROM helloworldjunktest.verifications
+         FROM outdateddbsnapshotoct2024.verifications
          WHERE email = $1
            AND phone = $2
            AND kind = 'phone_verify_session'
@@ -91,7 +91,7 @@ export async function verifyPhone(req, res) {
       try {
         const legacyResult_AAAAA = await pool.query(
           `SELECT id, password_hash
-           FROM helloworldjunktest.pending_phone_verifications
+           FROM outdateddbsnapshotoct2024.pending_phone_verifications
            WHERE email = $1
              AND phone = $2
              AND used_at IS NULL
@@ -132,7 +132,7 @@ export async function verifyPhone(req, res) {
     if (!storedRow_AAAAA.password_hash) {
       if (phoneSessionTable === 'verifications') {
         await pool.query(
-          `UPDATE helloworldjunktest.verifications SET kind = 'phone_verified_pending_password' WHERE id = $1`,
+          `UPDATE outdateddbsnapshotoct2024.verifications SET kind = 'phone_verified_pending_password' WHERE id = $1`,
           [storedRow_AAAAA.id]
         );
       }
@@ -145,15 +145,15 @@ export async function verifyPhone(req, res) {
     }
 
     if (phoneSessionTable === 'verifications') {
-      await pool.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [storedRow_AAAAA.id]);
+      await pool.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [storedRow_AAAAA.id]);
     } else if (phoneSessionTable === 'pending_phone_verifications') {
-      await pool.query(`UPDATE helloworldjunktest.pending_phone_verifications SET used_at = now() WHERE id = $1`, [storedRow_AAAAA.id]);
+      await pool.query(`UPDATE outdateddbsnapshotoct2024.pending_phone_verifications SET used_at = now() WHERE id = $1`, [storedRow_AAAAA.id]);
     }
 
     try {
       const passwordHash_AAAAA = storedRow_AAAAA.password_hash;
       const existingUser = await pool.query(
-        'SELECT singles_id, member_id FROM helloworldjunktest.singles WHERE email = $1',
+        'SELECT singles_id, member_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1',
         [emailNorm]
       );
 
@@ -161,10 +161,10 @@ export async function verifyPhone(req, res) {
         const memberId = existingUser.rows[0]?.member_id;
         const existingSinglesId = existingUser.rows[0]?.singles_id;
         await pool.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
-               status = 'active'::helloworldjunktest.singles_status,
+               status = 'active'::outdateddbsnapshotoct2024.singles_status,
                my_refer_code = COALESCE(my_refer_code, $4),
                refer_by_code = COALESCE(refer_by_code, $5),
                updated_at = CURRENT_TIMESTAMP

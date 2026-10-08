@@ -179,7 +179,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
 
   const existing = await client.query(
     `SELECT ${transactionIdSql} AS transaction_id
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE ${paymentIdSql} = $1
      LIMIT 1`,
     [pid]
@@ -193,7 +193,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
   const nextId = makePaymentTransactionIdBigInt(pid);
   if (!nextId) return null;
   await client.query(
-    `UPDATE helloworldjunktest.payment
+    `UPDATE outdateddbsnapshotoct2024.payment
      SET ${transactionIdSql} = $1
      WHERE ${paymentIdSql} = $2`,
     [nextId, pid]
@@ -623,7 +623,7 @@ async function getSinglesAddressPair(client, senderSinglesId, recipientSinglesId
        mailing_city,
        mailing_zip,
        mailing_country
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id IN ($1, $2)`,
     [senderSinglesId, recipientSinglesId]
   );
@@ -647,7 +647,7 @@ async function getSinglesById(client, singlesId) {
        mailing_city,
        mailing_zip,
        mailing_country
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -962,7 +962,7 @@ async function createGiftPaymentHistoryRow(client, { singlesId, recipient, produ
 
   const latestPaymentResult = await client.query(
     `SELECT payment_id, account_balance_token, paid_total_dollar, token_add_or_debit
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE singles_id = $1
      ORDER BY payment_id DESC
      LIMIT 1`,
@@ -1026,7 +1026,7 @@ async function createGiftPaymentHistoryRow(client, { singlesId, recipient, produ
   });
 
   const inserted = await client.query(
-    `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+    `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
      VALUES (${placeholders.join(', ')})
      RETURNING payment_id`,
     insertValues
@@ -1039,7 +1039,7 @@ async function createGiftPaymentHistoryRow(client, { singlesId, recipient, produ
     const updates = ['payment_id_fk = $1'];
     if (singlesColumns.has('updated_at')) updates.push('updated_at = CURRENT_TIMESTAMP');
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $2`,
       [paymentId, singlesId]

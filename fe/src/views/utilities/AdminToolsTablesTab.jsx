@@ -102,7 +102,7 @@ export default function AdminToolsTablesTab({ onError }) {
     const label = row.label || row.table;
     if (
       !(await themedConfirm(
-        `Truncate all rows in ${label}?\n\nOnly helloworldjunktest.${row.table} — no CASCADE and no other tables are modified. If Postgres blocks it (foreign key), you will see an error instead.`
+        `Truncate all rows in ${label}?\n\nOnly outdateddbsnapshotoct2024.${row.table} — no CASCADE and no other tables are modified. If Postgres blocks it (foreign key), you will see an error instead.`
       ))
     ) {
       return;

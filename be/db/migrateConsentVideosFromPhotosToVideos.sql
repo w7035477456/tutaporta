@@ -1,4 +1,4 @@
--- Move consent / live-scan videos from helloworldjunktest.photos → helloworldjunktest.videos.
+-- Move consent / live-scan videos from outdateddbsnapshotoct2024.photos → outdateddbsnapshotoct2024.videos.
 -- Updates consent_record.consent_signature_video_fk; clears consent_signature_image_fk for those rows.
 -- On-disk filenames are preserved (video_file_name = photos.photo_file_name base).
 --
@@ -29,7 +29,7 @@ BEGIN
       p.type,
       p.photo_file_name,
       p.checksum
-    FROM helloworldjunktest.photos p
+    FROM outdateddbsnapshotoct2024.photos p
     WHERE lower(regexp_replace(coalesce(p.file_extension, ''), '^\.', '')) IN ('webm', 'mp4', 'mp3')
        OR lower(coalesce(p.photo_file_name, '')) LIKE 'consent_live_scan_video_%'
        OR (
@@ -48,7 +48,7 @@ BEGIN
       file_base := format('video_%s_%s', r.singles_id, (extract(epoch FROM coalesce(r.created_at, now())) * 1000)::bigint);
     END IF;
 
-    INSERT INTO helloworldjunktest.videos (
+    INSERT INTO outdateddbsnapshotoct2024.videos (
       singles_id,
       created_at,
       file_path,
@@ -62,7 +62,7 @@ BEGIN
       coalesce(r.created_at, CURRENT_TIMESTAMP),
       r.file_path,
       ext_normalized,
-      coalesce(r.type, 'deleted'::helloworldjunktest.photo_type_enum),
+      coalesce(r.type, 'deleted'::outdateddbsnapshotoct2024.photo_type_enum),
       file_base,
       coalesce(r.checksum, '')
     )
@@ -72,19 +72,19 @@ BEGIN
   END LOOP;
 END $$;
 
-UPDATE helloworldjunktest.consent_record cr
+UPDATE outdateddbsnapshotoct2024.consent_record cr
 SET
   consent_signature_video_fk = m.video_id,
   consent_signature_image_fk = NULL
 FROM _photo_video_migrate m
 WHERE cr.consent_signature_image_fk = m.photos_id;
 
-UPDATE helloworldjunktest.singles s
+UPDATE outdateddbsnapshotoct2024.singles s
 SET profile_image_fk = NULL
 FROM _photo_video_migrate m
 WHERE s.profile_image_fk = m.photos_id;
 
-DELETE FROM helloworldjunktest.photos p
+DELETE FROM outdateddbsnapshotoct2024.photos p
 USING _photo_video_migrate m
 WHERE p.photos_id = m.photos_id;
 

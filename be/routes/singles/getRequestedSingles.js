@@ -78,7 +78,7 @@ export async function getRequestedSingles(req, res) {
 
   try {
     const resolvedSchema = await resolveRequestsAppSchema();
-    const schemaCandidates = [...new Set([resolvedSchema, 'helloworldjunktest', getDBSchema(), 'public'].filter(Boolean))];
+    const schemaCandidates = [...new Set([resolvedSchema, 'outdateddbsnapshotoct2024', getDBSchema(), 'public'].filter(Boolean))];
     let bestRows = [];
 
     for (const schemaName of schemaCandidates) {

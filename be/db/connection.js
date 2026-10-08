@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const pkg = STANDALONE ? { Pool: class Pool {}, Client: { prototype: {} } } : require('pg');
 const { Pool } = pkg;
 
-const TARGET_APP_SCHEMA = 'helloworldjunktest';
+const TARGET_APP_SCHEMA = 'outdateddbsnapshotoct2024';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const BE_ROOT = path.resolve(__dirname, '..');

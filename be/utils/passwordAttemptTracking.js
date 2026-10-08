@@ -66,7 +66,7 @@ export async function verifyPasswordWithAttemptTracking(
 ) {
   const userResult = await client.query(
     `SELECT password_hash, password_attempt_count, password_attempt_datetime, email, phone, member_category
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1
      FOR UPDATE`,
@@ -88,7 +88,7 @@ export async function verifyPasswordWithAttemptTracking(
   }
 
   const resetResult = await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET password_attempt_count = 1,
          password_attempt_datetime = NOW()
      WHERE singles_id = $1
@@ -119,7 +119,7 @@ export async function verifyPasswordWithAttemptTracking(
   if (!passwordValid) {
     const displayAttemptCount = attemptCount;
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET password_attempt_count = password_attempt_count + 1,
            password_attempt_datetime = CASE
              WHEN password_attempt_datetime IS NULL
@@ -151,7 +151,7 @@ export async function verifyCurrentPasswordWithAttemptTracking(client, singlesId
 
 export async function resetPasswordAttemptsOnSuccess(client, singlesId) {
   await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET password_attempt_count = 1,
          password_attempt_datetime = $2::timestamptz
      WHERE singles_id = $1`,

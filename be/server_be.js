@@ -1216,7 +1216,7 @@ app.get('/api/me', async (req, res) => {
         gender_self_report,
         over_18_verified,
         (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
-       FROM helloworldjunktest.singles 
+       FROM outdateddbsnapshotoct2024.singles 
        WHERE singles_id = $1`,
       [decoded.singles_id]
     );
@@ -1240,7 +1240,7 @@ app.get('/api/me', async (req, res) => {
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
       [row.singles_id]
     );

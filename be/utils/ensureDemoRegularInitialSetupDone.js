@@ -37,7 +37,7 @@ export async function ensureDemoRegularInitialSetupDone(db, singlesId, memberCat
   if (category === undefined) {
     const { rows } = await db.query(
       `SELECT member_category::text AS member_category
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [id]
@@ -51,7 +51,7 @@ export async function ensureDemoRegularInitialSetupDone(db, singlesId, memberCat
     udt === 'boolean_enum' ? sqlBooleanEnumLiteral(true) : 'true';
 
   await db.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET initial_setup_done = ${trueLiteral},
          updated_at = CURRENT_TIMESTAMP
      WHERE singles_id = $1

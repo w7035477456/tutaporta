@@ -134,7 +134,7 @@ function readStandaloneConfig() {
       database: '',
       user: '',
       password: '',
-      schema: 'helloworldjunktest'
+      schema: 'outdateddbsnapshotoct2024'
     },
     jwt: {
       privateKeyPath: '',
@@ -167,7 +167,7 @@ function readConfig() {
     process.exit(1);
   }
   if (schema === 'public') {
-    console.error('Error: DB_SCHEMA must not be "public". Use a non-public schema (e.g. helloworldjunktest).');
+    console.error('Error: DB_SCHEMA must not be "public". Use a non-public schema (e.g. outdateddbsnapshotoct2024).');
     process.exit(1);
   }
 

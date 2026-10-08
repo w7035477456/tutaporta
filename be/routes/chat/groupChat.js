@@ -37,8 +37,8 @@ async function assertMutualBuddy(me, other) {
     SELECT
       r_out.full_bio_request_approval AS out_approval,
       r_in.full_bio_request_approval AS in_approval
-    FROM helloworldjunktest.requests r_out
-    JOIN helloworldjunktest.requests r_in
+    FROM outdateddbsnapshotoct2024.requests r_out
+    JOIN outdateddbsnapshotoct2024.requests r_in
       ON r_in.singles_id_from = r_out.singles_id_to
      AND r_in.singles_id_to = r_out.singles_id_from
     WHERE r_out.singles_id_from = $1
@@ -71,8 +71,8 @@ async function assertGroupChatBioViewPaid(me, inviteeId) {
       r.full_paid,
       (${sqlBooleanEnumIsTrue('r', 'brief_paid')}) AS brief_paid_bool,
       (${sqlBooleanEnumIsTrue('r', 'full_paid')}) AS full_paid_bool
-    FROM helloworldjunktest.singles s
-    LEFT JOIN helloworldjunktest.requests r
+    FROM outdateddbsnapshotoct2024.singles s
+    LEFT JOIN outdateddbsnapshotoct2024.requests r
       ON r.singles_id_from = $1
      AND r.singles_id_to = s.singles_id
     WHERE s.singles_id = $2
@@ -109,7 +109,7 @@ async function getOrCreateHostGroup(me) {
   const existing = await pool.query(
     `
     SELECT group_id, created_by, title, status, created_at, updated_at
-    FROM helloworldjunktest.group_chat
+    FROM outdateddbsnapshotoct2024.group_chat
     WHERE created_by = $1 AND status = 'active'
     LIMIT 1
     `,
@@ -121,7 +121,7 @@ async function getOrCreateHostGroup(me) {
 
   const inserted = await pool.query(
     `
-    INSERT INTO helloworldjunktest.group_chat (created_by, title, status)
+    INSERT INTO outdateddbsnapshotoct2024.group_chat (created_by, title, status)
     VALUES ($1, 'Group Chat', 'active')
     RETURNING group_id, created_by, title, status, created_at, updated_at
     `,
@@ -130,7 +130,7 @@ async function getOrCreateHostGroup(me) {
   const group = inserted.rows[0];
   await pool.query(
     `
-    INSERT INTO helloworldjunktest.group_chat_member (group_id, singles_id, role, status)
+    INSERT INTO outdateddbsnapshotoct2024.group_chat_member (group_id, singles_id, role, status)
     VALUES ($1, $2, 'host', 'active')
     ON CONFLICT (group_id, singles_id)
     DO UPDATE SET role = 'host', status = 'active', left_at = NULL, joined_at = NOW()
@@ -144,7 +144,7 @@ async function assertActiveMember(groupId, singlesId) {
   const result = await pool.query(
     `
     SELECT 1
-    FROM helloworldjunktest.group_chat_member
+    FROM outdateddbsnapshotoct2024.group_chat_member
     WHERE group_id = $1 AND singles_id = $2 AND status = 'active'
     LIMIT 1
     `,
@@ -189,8 +189,8 @@ export async function getMyGroupChat(req, res) {
         s.prefix,
         s.member_id,
         s.profile_image_fk
-      FROM helloworldjunktest.group_chat_member m
-      JOIN helloworldjunktest.singles s ON s.singles_id = m.singles_id
+      FROM outdateddbsnapshotoct2024.group_chat_member m
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = m.singles_id
       WHERE m.group_id = $1 AND m.status = 'active'
       ORDER BY CASE WHEN m.role = 'host' THEN 0 ELSE 1 END, m.joined_at ASC
       `,
@@ -207,8 +207,8 @@ export async function getMyGroupChat(req, res) {
         s.prefix,
         s.member_id,
         s.profile_image_fk
-      FROM helloworldjunktest.group_chat_invite i
-      JOIN helloworldjunktest.singles s ON s.singles_id = i.invitee_id
+      FROM outdateddbsnapshotoct2024.group_chat_invite i
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = i.invitee_id
       WHERE i.group_id = $1 AND i.status = 'pending'
       ORDER BY i.created_at DESC
       `,
@@ -264,20 +264,20 @@ export async function getGroupChatInviteCandidates(req, res) {
         s.prefix,
         s.member_id,
         s.profile_image_fk
-      FROM helloworldjunktest.requests r_out
-      JOIN helloworldjunktest.requests r_in
+      FROM outdateddbsnapshotoct2024.requests r_out
+      JOIN outdateddbsnapshotoct2024.requests r_in
         ON r_in.singles_id_from = r_out.singles_id_to
        AND r_in.singles_id_to = r_out.singles_id_from
-      JOIN helloworldjunktest.singles s ON s.singles_id = r_out.singles_id_to
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = r_out.singles_id_to
       WHERE r_out.singles_id_from = $1
         AND LOWER(BTRIM(COALESCE(r_out.full_bio_request_approval::text, ''))) IN ('approve', 'approved', 'true', 'yes', '1')
         AND LOWER(BTRIM(COALESCE(r_in.full_bio_request_approval::text, ''))) IN ('approve', 'approved', 'true', 'yes', '1')
         AND NOT EXISTS (
-          SELECT 1 FROM helloworldjunktest.group_chat_member m
+          SELECT 1 FROM outdateddbsnapshotoct2024.group_chat_member m
           WHERE m.group_id = $2 AND m.singles_id = s.singles_id AND m.status = 'active'
         )
         AND NOT EXISTS (
-          SELECT 1 FROM helloworldjunktest.group_chat_invite i
+          SELECT 1 FROM outdateddbsnapshotoct2024.group_chat_invite i
           WHERE i.group_id = $2 AND i.invitee_id = s.singles_id AND i.status = 'pending'
         )
       ORDER BY LOWER(COALESCE(s.alias, '')), s.singles_id
@@ -315,7 +315,7 @@ export async function postGroupChatInvite(req, res) {
 
     const memberCheck = await pool.query(
       `
-      SELECT status FROM helloworldjunktest.group_chat_member
+      SELECT status FROM outdateddbsnapshotoct2024.group_chat_member
       WHERE group_id = $1 AND singles_id = $2
       LIMIT 1
       `,
@@ -327,7 +327,7 @@ export async function postGroupChatInvite(req, res) {
 
     const inserted = await pool.query(
       `
-      INSERT INTO helloworldjunktest.group_chat_invite (group_id, inviter_id, invitee_id, status)
+      INSERT INTO outdateddbsnapshotoct2024.group_chat_invite (group_id, inviter_id, invitee_id, status)
       VALUES ($1, $2, $3, 'pending')
       ON CONFLICT (group_id, invitee_id) WHERE status = 'pending'
       DO NOTHING
@@ -381,9 +381,9 @@ export async function getPendingGroupChatInvites(req, res) {
         s.member_id,
         s.profile_image_fk,
         g.title
-      FROM helloworldjunktest.group_chat_invite i
-      JOIN helloworldjunktest.group_chat g ON g.group_id = i.group_id
-      JOIN helloworldjunktest.singles s ON s.singles_id = i.inviter_id
+      FROM outdateddbsnapshotoct2024.group_chat_invite i
+      JOIN outdateddbsnapshotoct2024.group_chat g ON g.group_id = i.group_id
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = i.inviter_id
       WHERE i.invitee_id = $1 AND i.status = 'pending'
       ORDER BY i.created_at DESC
       `,
@@ -422,7 +422,7 @@ export async function postAcceptGroupChatInvite(req, res) {
     const inviteResult = await client.query(
       `
       SELECT invite_id, group_id, inviter_id, invitee_id, status
-      FROM helloworldjunktest.group_chat_invite
+      FROM outdateddbsnapshotoct2024.group_chat_invite
       WHERE invite_id = $1
       FOR UPDATE
       `,
@@ -440,7 +440,7 @@ export async function postAcceptGroupChatInvite(req, res) {
 
     await client.query(
       `
-      UPDATE helloworldjunktest.group_chat_invite
+      UPDATE outdateddbsnapshotoct2024.group_chat_invite
       SET status = 'accepted', responded_at = NOW()
       WHERE invite_id = $1
       `,
@@ -448,7 +448,7 @@ export async function postAcceptGroupChatInvite(req, res) {
     );
     await client.query(
       `
-      INSERT INTO helloworldjunktest.group_chat_member (group_id, singles_id, role, status)
+      INSERT INTO outdateddbsnapshotoct2024.group_chat_member (group_id, singles_id, role, status)
       VALUES ($1, $2, 'member', 'active')
       ON CONFLICT (group_id, singles_id)
       DO UPDATE SET status = 'active', left_at = NULL, joined_at = NOW()
@@ -457,7 +457,7 @@ export async function postAcceptGroupChatInvite(req, res) {
     );
     await client.query(
       `
-      UPDATE helloworldjunktest.group_chat
+      UPDATE outdateddbsnapshotoct2024.group_chat
       SET updated_at = NOW()
       WHERE group_id = $1
       `,
@@ -492,7 +492,7 @@ export async function postDeclineGroupChatInvite(req, res) {
   try {
     const result = await pool.query(
       `
-      UPDATE helloworldjunktest.group_chat_invite
+      UPDATE outdateddbsnapshotoct2024.group_chat_invite
       SET status = 'declined', responded_at = NOW()
       WHERE invite_id = $1 AND invitee_id = $2 AND status = 'pending'
       RETURNING invite_id, group_id, status
@@ -525,7 +525,7 @@ export async function getGroupChatOverview(req, res) {
     const groupResult = await pool.query(
       `
       SELECT group_id, created_by, title, status, created_at, updated_at
-      FROM helloworldjunktest.group_chat
+      FROM outdateddbsnapshotoct2024.group_chat
       WHERE group_id = $1
       LIMIT 1
       `,
@@ -545,8 +545,8 @@ export async function getGroupChatOverview(req, res) {
         s.prefix,
         s.member_id,
         s.profile_image_fk
-      FROM helloworldjunktest.group_chat_member m
-      JOIN helloworldjunktest.singles s ON s.singles_id = m.singles_id
+      FROM outdateddbsnapshotoct2024.group_chat_member m
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = m.singles_id
       WHERE m.group_id = $1 AND m.status = 'active'
       ORDER BY CASE WHEN m.role = 'host' THEN 0 ELSE 1 END, m.joined_at ASC
       `,
@@ -603,8 +603,8 @@ export async function getGroupChatMessages(req, res) {
         s.prefix,
         s.member_id,
         s.profile_image_fk
-      FROM helloworldjunktest.group_chat_log l
-      JOIN helloworldjunktest.singles s ON s.singles_id = l.sender_id
+      FROM outdateddbsnapshotoct2024.group_chat_log l
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = l.sender_id
       WHERE l.group_id = $1
       ORDER BY l.created_at DESC, l.msg_id DESC
       LIMIT $2
@@ -639,7 +639,7 @@ export async function postGroupChatMessage(req, res) {
     await ensureGroupChatLogQuarterlyPartitionsBeforeWrite();
     const inserted = await pool.query(
       `
-      INSERT INTO helloworldjunktest.group_chat_log (group_id, sender_id, msg_text, msg_data)
+      INSERT INTO outdateddbsnapshotoct2024.group_chat_log (group_id, sender_id, msg_text, msg_data)
       VALUES ($1, $2, $3, $4::jsonb)
       RETURNING msg_id, sender_id, msg_text, created_at
       `,
@@ -647,7 +647,7 @@ export async function postGroupChatMessage(req, res) {
     );
     await pool.query(
       `
-      UPDATE helloworldjunktest.group_chat
+      UPDATE outdateddbsnapshotoct2024.group_chat
       SET updated_at = NOW()
       WHERE group_id = $1
       `,
@@ -676,7 +676,7 @@ export async function postGroupChatMarkVisited(req, res) {
     await assertActiveMember(groupId, me);
     await pool.query(
       `
-      INSERT INTO helloworldjunktest.group_chat_read_state (singles_id, group_id, last_read_at)
+      INSERT INTO outdateddbsnapshotoct2024.group_chat_read_state (singles_id, group_id, last_read_at)
       VALUES ($1, $2, NOW())
       ON CONFLICT (singles_id, group_id)
       DO UPDATE SET last_read_at = EXCLUDED.last_read_at
@@ -707,8 +707,8 @@ export async function getMyGroupChatMemberships(req, res) {
         g.status,
         g.updated_at,
         m.role
-      FROM helloworldjunktest.group_chat_member m
-      JOIN helloworldjunktest.group_chat g ON g.group_id = m.group_id
+      FROM outdateddbsnapshotoct2024.group_chat_member m
+      JOIN outdateddbsnapshotoct2024.group_chat g ON g.group_id = m.group_id
       WHERE m.singles_id = $1 AND m.status = 'active' AND g.status = 'active'
       ORDER BY g.updated_at DESC
       `,

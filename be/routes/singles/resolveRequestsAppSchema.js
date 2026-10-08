@@ -5,7 +5,7 @@ import { withSchemaCache } from '../../utils/dbSchemaMetadataCache.js';
 /**
  * Pick a PostgreSQL schema whose `requests` table should drive request flows.
  * Prefer DB_SCHEMA when that table includes basic approval columns; otherwise
- * fall back to `helloworldjunktest` so we do not read an older
+ * fall back to `outdateddbsnapshotoct2024` so we do not read an older
  * duplicate requests table with boolean-only defaults while the live
  * varchar approval values live in the app schema (which would look like
  * "Not Responded" on the U-request-others page).
@@ -16,7 +16,7 @@ export async function resolveRequestsAppSchema() {
 }
 
 async function resolveRequestsAppSchemaUncached(preferred) {
-  const candidates = [...new Set([preferred, 'helloworldjunktest'].filter(Boolean))];
+  const candidates = [...new Set([preferred, 'outdateddbsnapshotoct2024'].filter(Boolean))];
 
   const hasRequestsWithBasicApproval = async (schemaName) => {
     const r = await pool.query(

@@ -32,7 +32,7 @@ import { resolveVideoFilePath } from './videoFilePath.js';
 import { listMobileUploadFiles, getMobileUploadFolder } from './mobileUploadFolder.js';
 import { isTutaDriveBackupFileName } from './tutaDriveBackupNames.js';
 
-const SCHEMA = 'helloworldjunktest';
+const SCHEMA = 'outdateddbsnapshotoct2024';
 const BACKUP_VERSION = 1;
 
 /** Per-app backup keys (profile menu shows one app at a time). */

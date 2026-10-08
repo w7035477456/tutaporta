@@ -61,13 +61,13 @@ async function relationExists(schemaName, tableName) {
 }
 
 async function resolvePostingsSchema() {
-  const candidates = ['helloworldjunktest', 'public'];
+  const candidates = ['outdateddbsnapshotoct2024', 'public'];
   for (const schemaName of candidates) {
     const hasPostings = await relationExists(schemaName, 'postings');
     const hasPostingPhotos = await relationExists(schemaName, 'posting_photos');
     if (hasPostings && hasPostingPhotos) return schemaName;
   }
-  return 'helloworldjunktest';
+  return 'outdateddbsnapshotoct2024';
 }
 
 async function resolvePostingVisibilityColumn(postingsSchema) {
@@ -189,7 +189,7 @@ async function resolveAlbumTypeColumn() {
   const result = await pool.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name IN ('type', 'photo_type', 'album_type')
      ORDER BY CASE column_name
@@ -247,7 +247,7 @@ async function canViewPrivatePhoto(viewerSinglesId, ownerSinglesId) {
 async function isProfilePhoto(photoId, ownerSinglesId) {
   const result = await pool.query(
     `SELECT 1
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
        AND profile_image_fk = $2
      LIMIT 1`,
@@ -278,7 +278,7 @@ export async function getPhoto(req, res) {
       `SELECT file_extension, singles_id, photo_file_name, photo_thumbnail, file_path${
         albumTypeColumn ? `, ${albumTypeColumn}::text AS album_type_raw` : ''
       }
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photos_id = $1
        LIMIT 1`,
       [id]

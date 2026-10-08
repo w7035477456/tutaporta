@@ -31,13 +31,13 @@ import { clearVaultAccessFailStatus } from '../../utils/recordVaultAccessFailGua
 
 const SINGLES_LOOKUP_WILDCARD_LIMIT = 500;
 
-const SINGLES_LOOKUP_FROM_JOIN = `FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.singles ref
+const SINGLES_LOOKUP_FROM_JOIN = `FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.singles ref
        ON btrim(COALESCE(ref.my_refer_code::text, '')) = btrim(COALESCE(s.refer_by_code::text, ''))
       AND btrim(COALESCE(s.refer_by_code::text, '')) <> ''
      LEFT JOIN LATERAL (
        SELECT p.account_balance_token
-       FROM helloworldjunktest.payment p
+       FROM outdateddbsnapshotoct2024.payment p
        WHERE p.singles_id = s.singles_id
        ORDER BY p.payment_id DESC
        LIMIT 1
@@ -135,7 +135,7 @@ export async function searchAuditRegistrations(db, body) {
             ar.date_update,
             ar.email,
             ar.phone
-     FROM helloworldjunktest.audit_registrations ar
+     FROM outdateddbsnapshotoct2024.audit_registrations ar
      WHERE ${conditions.join(' OR ')}
      ORDER BY ar.date_update DESC, ar.audit_registration_id DESC
      LIMIT ${lookupUsesWildcard(body) ? SINGLES_LOOKUP_WILDCARD_LIMIT : 1000}`,
@@ -239,7 +239,7 @@ export async function searchAllSinglesForLookup(db) {
 
 /**
  * POST /api/admin/singles/lookup-all
- * Returns all helloworldjunktest.singles rows sorted by created_at descending.
+ * Returns all outdateddbsnapshotoct2024.singles rows sorted by created_at descending.
  */
 export async function postAdminSinglesLookupAll(req, res) {
   try {
@@ -305,11 +305,11 @@ export async function postAdminAuditRegistrationLookup(req, res) {
 
 /**
  * POST /api/admin/singles/cycle-status
- * Body: { singlesId } — cycles helloworldjunktest.singles.status and appends audit row.
+ * Body: { singlesId } — cycles outdateddbsnapshotoct2024.singles.status and appends audit row.
  */
 /**
  * POST /api/admin/singles/set-status
- * Body: { singlesId, status } — sets helloworldjunktest.singles.status and appends audit row when changed.
+ * Body: { singlesId, status } — sets outdateddbsnapshotoct2024.singles.status and appends audit row when changed.
  */
 export async function postAdminSetSinglesStatus(req, res) {
   const singlesId = parseSinglesIdInput(req.body?.singlesId ?? req.body?.singles_id);
@@ -330,7 +330,7 @@ export async function postAdminSetSinglesStatus(req, res) {
 
     const { rows } = await client.query(
       `SELECT singles_id, member_id, member_category, status, email, phone, alias
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1
        FOR UPDATE`,
@@ -345,8 +345,8 @@ export async function postAdminSetSinglesStatus(req, res) {
     const currentStatus = normalizeSinglesStatus(row.status) ?? 'blank';
     if (currentStatus !== nextStatus) {
       await client.query(
-        `UPDATE helloworldjunktest.singles
-         SET status = $1::helloworldjunktest.singles_status,
+        `UPDATE outdateddbsnapshotoct2024.singles
+         SET status = $1::outdateddbsnapshotoct2024.singles_status,
              updated_at = CURRENT_TIMESTAMP
          WHERE singles_id = $2`,
         [nextStatus, singlesId]
@@ -385,7 +385,7 @@ export async function postAdminSetSinglesStatus(req, res) {
 
 /**
  * POST /api/admin/singles/set-member-category
- * Body: { singlesId, memberCategory } — sets helloworldjunktest.singles.member_category.
+ * Body: { singlesId, memberCategory } — sets outdateddbsnapshotoct2024.singles.member_category.
  */
 export async function postAdminSetSinglesMemberCategory(req, res) {
   const singlesId = parseSinglesIdInput(req.body?.singlesId ?? req.body?.singles_id);
@@ -406,7 +406,7 @@ export async function postAdminSetSinglesMemberCategory(req, res) {
 
     const { rows } = await client.query(
       `SELECT singles_id, member_id, member_category, status, email, phone, alias
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1
        FOR UPDATE`,
@@ -421,8 +421,8 @@ export async function postAdminSetSinglesMemberCategory(req, res) {
     const currentCategory = normalizeMemberCategoryEnum(row.member_category) ?? 'PUBLIC';
     if (currentCategory !== nextCategory) {
       await client.query(
-        `UPDATE helloworldjunktest.singles
-         SET member_category = $1::helloworldjunktest.member_category_enum,
+        `UPDATE outdateddbsnapshotoct2024.singles
+         SET member_category = $1::outdateddbsnapshotoct2024.member_category_enum,
              updated_at = CURRENT_TIMESTAMP
          WHERE singles_id = $2`,
         [nextCategory, singlesId]
@@ -465,7 +465,7 @@ export async function postAdminResetPasswordAttemptCount(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET password_attempt_count = 0,
            password_attempt_datetime = $2::timestamptz,
            updated_at = CURRENT_TIMESTAMP
@@ -532,7 +532,7 @@ export async function postAdminCycleSinglesStatus(req, res) {
 
     const { rows } = await client.query(
       `SELECT singles_id, member_id, member_category, status, email, phone, alias
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1
        FOR UPDATE`,
@@ -546,8 +546,8 @@ export async function postAdminCycleSinglesStatus(req, res) {
 
     const nextStatus = nextSinglesStatus(row.status);
     await client.query(
-      `UPDATE helloworldjunktest.singles
-       SET status = $1::helloworldjunktest.singles_status,
+      `UPDATE outdateddbsnapshotoct2024.singles
+       SET status = $1::outdateddbsnapshotoct2024.singles_status,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $2`,
       [nextStatus, singlesId]

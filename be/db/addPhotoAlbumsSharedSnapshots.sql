@@ -3,7 +3,7 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.photo_albums_invites
+ALTER TABLE outdateddbsnapshotoct2024.photo_albums_invites
   ADD COLUMN IF NOT EXISTS snapshot_html TEXT,
   ADD COLUMN IF NOT EXISTS snapshot_attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS snapshot_at TIMESTAMPTZ;

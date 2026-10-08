@@ -2,5 +2,5 @@
 -- Run on Postgres **Primary** only:
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/dropCommentsTable.sql
 
-DROP TABLE IF EXISTS helloworldjunktest.comments;
-DROP SEQUENCE IF EXISTS helloworldjunktest.comments_comment_id_seq;
+DROP TABLE IF EXISTS outdateddbsnapshotoct2024.comments;
+DROP SEQUENCE IF EXISTS outdateddbsnapshotoct2024.comments_comment_id_seq;

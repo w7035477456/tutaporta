@@ -9,7 +9,7 @@
 
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = sch) THEN
     RAISE NOTICE 'Schema % not found — skipped', sch;
@@ -61,7 +61,7 @@ SELECT n.nspname AS schema, t.typname AS enum_name, e.enumlabel AS element
 FROM pg_type t
 JOIN pg_namespace n ON n.oid = t.typnamespace
 JOIN pg_enum e ON e.enumtypid = t.oid
-WHERE n.nspname = 'helloworldjunktest'
+WHERE n.nspname = 'outdateddbsnapshotoct2024'
   AND t.typname IN (
     'approval_status_enum',
     'member_category_enum',

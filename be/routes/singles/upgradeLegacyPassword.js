@@ -94,7 +94,7 @@ export async function upgradeLegacyPassword(req, res) {
 
     const userResult = await client.query(
       `SELECT singles_id, email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        FOR UPDATE`,
       [singlesId]
@@ -110,7 +110,7 @@ export async function upgradeLegacyPassword(req, res) {
     const passwordHash = await hashPassword(plainNew);
 
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET password_hash = $1,
            password_attempt_count = 1,
            password_attempt_datetime = $3::timestamptz,

@@ -9,10 +9,10 @@ BEGIN
     FROM pg_enum e
     JOIN pg_type t ON e.enumtypid = t.oid
     JOIN pg_namespace n ON t.typnamespace = n.oid
-    WHERE n.nspname = 'helloworldjunktest'
+    WHERE n.nspname = 'outdateddbsnapshotoct2024'
       AND t.typname = 'singles_status'
       AND e.enumlabel = 'cencel'
   ) THEN
-    ALTER TYPE helloworldjunktest.singles_status RENAME VALUE 'cencel' TO 'cancel';
+    ALTER TYPE outdateddbsnapshotoct2024.singles_status RENAME VALUE 'cencel' TO 'cancel';
   END IF;
 END $$;

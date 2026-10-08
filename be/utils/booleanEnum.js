@@ -1,10 +1,10 @@
 import { getDBSchema } from '../config/envConfig.js';
 
 export function requestSchemaName(schema) {
-  return String(schema ?? getDBSchema() ?? 'helloworldjunktest').replace(/"/g, '');
+  return String(schema ?? getDBSchema() ?? 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
-/** SQL cast target, e.g. "helloworldjunktest".boolean_enum */
+/** SQL cast target, e.g. "outdateddbsnapshotoct2024".boolean_enum */
 export function booleanEnumCast(schema) {
   return `"${requestSchemaName(schema)}".boolean_enum`;
 }
@@ -72,7 +72,7 @@ export async function loadColumnUdtName(client, schema, table, column) {
   return udtName;
 }
 
-/** Parameter cast, e.g. $3::"helloworldjunktest".boolean_enum */
+/** Parameter cast, e.g. $3::"outdateddbsnapshotoct2024".boolean_enum */
 export function sqlBooleanEnumParam(paramRef, schema) {
   return `${paramRef}::${booleanEnumCast(schema)}`;
 }

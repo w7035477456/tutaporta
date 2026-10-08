@@ -3,10 +3,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_access_password_hint character varying(200);
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_access_password_hint IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_access_password_hint IS
   'Optional user reminder for Encrypt Password (not used for authentication).';
 
 COMMIT;

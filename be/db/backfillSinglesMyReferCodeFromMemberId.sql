@@ -1,10 +1,10 @@
--- helloworldjunktest.singles — set my_refer_code from member_id hash (Primary only)
+-- outdateddbsnapshotoct2024.singles — set my_refer_code from member_id hash (Primary only)
 -- Matches be/utils/referCodeFromMemberId.js (SHA-256 of member_id text, mod 1_000_000).
 -- Replaces phone-based my_refer_code values.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-UPDATE helloworldjunktest.singles
+UPDATE outdateddbsnapshotoct2024.singles
 SET my_refer_code = LPAD(
   (
     (

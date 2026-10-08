@@ -1,6 +1,6 @@
-/** Admin Tools → Tables tab: curated helloworldjunktest tables (see sql/postLinkingSome06182026.sql). */
+/** Admin Tools → Tables tab: curated outdateddbsnapshotoct2024 tables (see sql/postLinkingSome06182026.sql). */
 
-export const ADMIN_TOOLS_DB_SCHEMA = 'helloworldjunktest';
+export const ADMIN_TOOLS_DB_SCHEMA = 'outdateddbsnapshotoct2024';
 
 /**
  * @typedef {'bigint' | 'text'} AdminToolsTableIdType

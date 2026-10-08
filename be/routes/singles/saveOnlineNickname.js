@@ -6,7 +6,7 @@ import { persistMemberAlias } from '../../utils/persistMemberAlias.js';
 /**
  * POST /api/settings/nickname
  * Body: { alias: string }
- * Validates alias uniqueness via helloworldjunktest.singles.alias, then saves singles.alias.
+ * Validates alias uniqueness via outdateddbsnapshotoct2024.singles.alias, then saves singles.alias.
  * Uses session cookie only (no separate "authentication" step in the UI).
  */
 export async function saveOnlineNickname(req, res) {

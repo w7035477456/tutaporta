@@ -53,7 +53,7 @@ export async function verifySecretIconWithAttemptTracking(client, singlesId, can
 
   const userResult = await client.query(
     `SELECT secret_icon, secret_icon_attempt_count, secret_icon_attempt_datetime
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1
      FOR UPDATE`,
@@ -75,7 +75,7 @@ export async function verifySecretIconWithAttemptTracking(client, singlesId, can
   }
 
   const resetResult = await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET secret_icon_attempt_count = 1,
          secret_icon_attempt_datetime = NOW()
      WHERE singles_id = $1
@@ -97,7 +97,7 @@ export async function verifySecretIconWithAttemptTracking(client, singlesId, can
 
   if (stored === candidateHash) {
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET secret_icon_attempt_count = 1,
            secret_icon_attempt_datetime = $2::timestamptz
        WHERE singles_id = $1`,
@@ -108,7 +108,7 @@ export async function verifySecretIconWithAttemptTracking(client, singlesId, can
 
   const displayAttemptCount = attemptCount;
   await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET secret_icon_attempt_count = secret_icon_attempt_count + 1,
          secret_icon_attempt_datetime = CASE
            WHEN secret_icon_attempt_datetime IS NULL

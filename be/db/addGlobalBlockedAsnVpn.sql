@@ -1,15 +1,15 @@
 -- global.blocked_asn_vpn — VPN/Tor ASN numbers blocked via Cloudflare X-Client-ASN.
 -- Run against Primary. Safe to re-run.
--- Schema: helloworldjunktest (adjust if needed).
+-- Schema: outdateddbsnapshotoct2024 (adjust if needed).
 --
 -- Mac dev (from repo root):
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addGlobalBlockedAsnVpn.sql
 
-ALTER TABLE helloworldjunktest.global
+ALTER TABLE outdateddbsnapshotoct2024.global
   ADD COLUMN IF NOT EXISTS blocked_asn_vpn integer[] NOT NULL DEFAULT ARRAY[]::integer[];
 
 -- Seed from X4BNet/lists_vpn (input/vpn/ASN.txt) when column is still empty.
-UPDATE helloworldjunktest.global
+UPDATE outdateddbsnapshotoct2024.global
 SET blocked_asn_vpn = ARRAY[
   9009,
   20448,
@@ -31,4 +31,4 @@ WHERE id = 1
   AND cardinality(blocked_asn_vpn) = 0;
 
 -- Verify:
--- SELECT cardinality(blocked_asn_vpn), blocked_asn_vpn FROM helloworldjunktest.global WHERE id = 1;
+-- SELECT cardinality(blocked_asn_vpn), blocked_asn_vpn FROM outdateddbsnapshotoct2024.global WHERE id = 1;

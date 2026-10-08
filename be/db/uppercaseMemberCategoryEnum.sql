@@ -1,12 +1,12 @@
 -- Run on Primary only.
--- Uppercase helloworldjunktest.member_category_enum labels:
+-- Uppercase outdateddbsnapshotoct2024.member_category_enum labels:
 --   Public → PUBLIC, Admin → ADMIN, DemoUser → DEMOUSER, PilotUser → PILOTUSER,
 --   RegularMember → REGULARMEMBER, AnyMember → ANYMEMBER
 -- Idempotent: skips when enum already uses PUBLIC.
 
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = sch) THEN
     RAISE NOTICE 'Schema % not found — skipped', sch;
@@ -32,7 +32,7 @@ BEGIN
     RETURN;
   END IF;
 
-  CREATE TYPE helloworldjunktest.member_category_enum_new AS ENUM (
+  CREATE TYPE outdateddbsnapshotoct2024.member_category_enum_new AS ENUM (
     'PUBLIC',
     'ADMIN',
     'DEMOUSER',
@@ -41,11 +41,11 @@ BEGIN
     'ANYMEMBER'
   );
 
-  ALTER TABLE helloworldjunktest.singles
+  ALTER TABLE outdateddbsnapshotoct2024.singles
     ALTER COLUMN member_category DROP DEFAULT;
 
-  ALTER TABLE helloworldjunktest.singles
-    ALTER COLUMN member_category TYPE helloworldjunktest.member_category_enum_new
+  ALTER TABLE outdateddbsnapshotoct2024.singles
+    ALTER COLUMN member_category TYPE outdateddbsnapshotoct2024.member_category_enum_new
     USING (
       CASE UPPER(TRIM(member_category::text))
         WHEN 'PUBLIC' THEN 'PUBLIC'
@@ -58,13 +58,13 @@ BEGIN
         WHEN 'PILOTB' THEN 'PUBLIC'
         ELSE 'PUBLIC'
       END
-    )::helloworldjunktest.member_category_enum_new;
+    )::outdateddbsnapshotoct2024.member_category_enum_new;
 
-  ALTER TABLE helloworldjunktest.singles
-    ALTER COLUMN member_category SET DEFAULT 'PUBLIC'::helloworldjunktest.member_category_enum_new;
+  ALTER TABLE outdateddbsnapshotoct2024.singles
+    ALTER COLUMN member_category SET DEFAULT 'PUBLIC'::outdateddbsnapshotoct2024.member_category_enum_new;
 
-  DROP TYPE helloworldjunktest.member_category_enum;
-  ALTER TYPE helloworldjunktest.member_category_enum_new RENAME TO member_category_enum;
+  DROP TYPE outdateddbsnapshotoct2024.member_category_enum;
+  ALTER TYPE outdateddbsnapshotoct2024.member_category_enum_new RENAME TO member_category_enum;
 
   RAISE NOTICE 'Uppercased %.member_category_enum', sch;
 END $$;
@@ -73,6 +73,6 @@ SELECT enumlabel
 FROM pg_enum e
 JOIN pg_type t ON e.enumtypid = t.oid
 JOIN pg_namespace n ON t.typnamespace = n.oid
-WHERE n.nspname = 'helloworldjunktest'
+WHERE n.nspname = 'outdateddbsnapshotoct2024'
   AND t.typname = 'member_category_enum'
 ORDER BY enumsortorder;

@@ -24,7 +24,7 @@ usage() {
   cat <<'EOF'
 list-new-ubuntu-users.sh [--ubuntu-host user@host] [--verbose]
 
-Compares helloworldjunktest.singles on Mac vs Ubuntu (by email).
+Compares outdateddbsnapshotoct2024.singles on Mac vs Ubuntu (by email).
 Prints users that exist on only one side.
 
 SSH defaults (same as f2 / isdbsame): port 59221, IdentitiesOnly, corruptedKey_march2024.

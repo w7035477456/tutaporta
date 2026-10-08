@@ -165,7 +165,7 @@ export async function isMobilePhotoUploadInProgress(token) {
 }
 
 function sessionsTable() {
-  const schema = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
   return `"${schema}"."mobile_photo_upload_sessions"`;
 }
 
@@ -339,7 +339,7 @@ let mobileUploadSchemaPromise = null;
 export async function initMobilePhotoUploadSchema() {
   if (mobileUploadSchemaPromise) return mobileUploadSchemaPromise;
   mobileUploadSchemaPromise = (async () => {
-    const schema = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+    const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS "${schema}"."mobile_photo_upload_sessions" (
         token text PRIMARY KEY,

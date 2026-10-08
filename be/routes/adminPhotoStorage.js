@@ -274,19 +274,19 @@ async function relationExists(schemaName, tableName) {
 }
 
 async function resolvePostingsSchema() {
-  for (const schemaName of ['helloworldjunktest', 'public']) {
+  for (const schemaName of ['outdateddbsnapshotoct2024', 'public']) {
     const hasPostings = await relationExists(schemaName, 'postings');
     const hasPostingPhotos = await relationExists(schemaName, 'posting_photos');
     if (hasPostings && hasPostingPhotos) return schemaName;
   }
-  return 'helloworldjunktest';
+  return 'outdateddbsnapshotoct2024';
 }
 
 async function findPhotosRowsForFileName(client, fileName) {
   const base = fileNameToBase(fileName);
   const byName = await client.query(
     `SELECT photos_id, singles_id, photo_file_name, file_extension
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE photo_file_name = $1`,
     [base]
   );
@@ -295,7 +295,7 @@ async function findPhotosRowsForFileName(client, fileName) {
   if (Number.isFinite(id) && id > 0 && String(id) === base) {
     const byId = await client.query(
       `SELECT photos_id, singles_id, photo_file_name, file_extension
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photos_id = $1`,
       [id]
     );
@@ -308,7 +308,7 @@ async function inferSinglesIdFromFileBase(client, base) {
   const memberPart = String(base).split('_')[0];
   const memberId = Number.parseInt(memberPart, 10);
   if (!Number.isFinite(memberId) || memberId <= 0) return null;
-  const result = await client.query(`SELECT singles_id FROM helloworldjunktest.singles WHERE member_id = $1`, [memberId]);
+  const result = await client.query(`SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE member_id = $1`, [memberId]);
   if (result.rows.length !== 1) return null;
   return Number(result.rows[0].singles_id);
 }
@@ -334,7 +334,7 @@ function unlinkPhotoVariants(photoFolder, fileBase) {
 async function repointPhotoReferences(client, postingsSchema, keeperId, loserIds) {
   if (!loserIds.length) return { profileUpdates: 0, postingUpdates: 0 };
   const profileResult = await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET profile_image_fk = $1
      WHERE profile_image_fk = ANY($2::int[])`,
     [keeperId, loserIds]
@@ -395,7 +395,7 @@ async function mergeDuplicateBucket(client, postingsSchema, photoFolder, singles
 
   if (keeperId && loserIds.length) {
     await repointPhotoReferences(client, postingsSchema, keeperId, loserIds);
-    await client.query(`DELETE FROM helloworldjunktest.photos WHERE photos_id = ANY($1::int[])`, [loserIds]);
+    await client.query(`DELETE FROM outdateddbsnapshotoct2024.photos WHERE photos_id = ANY($1::int[])`, [loserIds]);
   }
 
   const deletedFiles = [];

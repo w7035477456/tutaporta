@@ -4,7 +4,7 @@
  * to FAST_STORAGE_FOLDER/users/M{id}/tutadates for every M###### folder found on disk.
  *
  * Also sweeps legacy flat FAST_STORAGE_FOLDER/photos and /videos for {memberId}_* files.
- * Updates helloworldjunktest.photos.file_path and videos.file_path to the new storage paths.
+ * Updates outdateddbsnapshotoct2024.photos.file_path and videos.file_path to the new storage paths.
  *
  * Usage (from repo root, ~/.ssh/be/.env loaded via loadEnv.js):
  *   node be/scripts/migrateTutaDatesMediaToMemberFolders.js --dry-run
@@ -105,7 +105,7 @@ function collectLegacyPrefixFiles(legacyDir, memberId) {
 async function loadSinglesIdsForMemberId(memberId) {
   const { rows } = await pool.query(
     `SELECT singles_id
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE trim(both from member_id::text) = $1
          OR trim(both from member_id::text) = $2`,
     [memberId, `M${memberId}`]
@@ -117,11 +117,11 @@ async function updateDbPathsForSingles(singlesIds, photosFolder, videosFolder) {
   if (dryRun || !singlesIds.length) return;
   for (const singlesId of singlesIds) {
     await pool.query(
-      `UPDATE helloworldjunktest.photos SET file_path = $2 WHERE singles_id = $1`,
+      `UPDATE outdateddbsnapshotoct2024.photos SET file_path = $2 WHERE singles_id = $1`,
       [singlesId, photosFolder]
     );
     await pool.query(
-      `UPDATE helloworldjunktest.videos SET file_path = $2 WHERE singles_id = $1`,
+      `UPDATE outdateddbsnapshotoct2024.videos SET file_path = $2 WHERE singles_id = $1`,
       [singlesId, videosFolder]
     );
   }
@@ -133,7 +133,7 @@ async function migrateDbReferencedFiles({ singlesId, memberId, layout }) {
 
   const photoRows = await pool.query(
     `SELECT photos_id, photo_file_name, file_extension, file_path
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
       WHERE singles_id = $1`,
     [singlesId]
   );
@@ -146,7 +146,7 @@ async function migrateDbReferencedFiles({ singlesId, memberId, layout }) {
 
   const videoRows = await pool.query(
     `SELECT video_id, video_file_name, file_extension, file_path
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
       WHERE singles_id = $1`,
     [singlesId]
   );
@@ -240,7 +240,7 @@ async function main() {
   // DB members without on-disk folders yet — still point file_path at storage layout.
   const { rows } = await pool.query(
     `SELECT singles_id, member_id
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE member_id IS NOT NULL
       ORDER BY singles_id ASC`
   );

@@ -43,7 +43,7 @@ export async function setProfileImageForSingles(singlesId, photosId) {
   try {
     const photoRow = await client.query(
       `SELECT photos_id
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photos_id = $1 AND singles_id = $2
        LIMIT 1`,
       [photosId, singlesId]
@@ -54,7 +54,7 @@ export async function setProfileImageForSingles(singlesId, photosId) {
 
     const initialSetupDoneSql = await resolveInitialSetupDoneCaseSql(client);
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET profile_image_fk = $1, ${initialSetupDoneSql}
        WHERE singles_id = $2`,
       [photosId, singlesId]

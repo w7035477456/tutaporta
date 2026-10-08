@@ -19,7 +19,7 @@ export const VAULT_ACCESS_MAX_FAILED_ATTEMPTS = 5;
 const DEFAULT_RETRY_DELAY_SEC = 120;
 
 function schema() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 export function getVaultAccessRetryDelaySeconds() {

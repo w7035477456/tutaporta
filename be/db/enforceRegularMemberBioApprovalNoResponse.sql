@@ -15,7 +15,7 @@
 -- Dropped up front so the cleanup below is not filtered by an older version of
 -- this trigger (which may reference columns this database does not have).
 DROP TRIGGER IF EXISTS trg_force_regular_member_bio_approval_noresponse
-  ON helloworldjunktest.requests;
+  ON outdateddbsnapshotoct2024.requests;
 
 DO $migration$
 DECLARE
@@ -27,14 +27,14 @@ DECLARE
 BEGIN
   SELECT EXISTS (
     SELECT 1 FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'requests'
        AND column_name = 'brief_approval_date'
   ) INTO has_brief_date;
 
   SELECT EXISTS (
     SELECT 1 FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'requests'
        AND column_name = 'full_approval_date'
   ) INTO has_full_date;
@@ -53,11 +53,11 @@ BEGIN
 
   -- 1. One-time cleanup of rows that already hold an approval for a RegularMember.
   EXECUTE format($sql$
-    UPDATE helloworldjunktest.requests r
-    SET brief_bio_request_approval = 'noresponse'::helloworldjunktest.approval_status_enum,
-        full_bio_request_approval = 'noresponse'::helloworldjunktest.approval_status_enum%s,
+    UPDATE outdateddbsnapshotoct2024.requests r
+    SET brief_bio_request_approval = 'noresponse'::outdateddbsnapshotoct2024.approval_status_enum,
+        full_bio_request_approval = 'noresponse'::outdateddbsnapshotoct2024.approval_status_enum%s,
         updated_at = CURRENT_TIMESTAMP
-    FROM helloworldjunktest.singles s
+    FROM outdateddbsnapshotoct2024.singles s
     WHERE s.singles_id = r.singles_id_to
       AND UPPER(BTRIM(COALESCE(s.member_category::text, ''))) = 'REGULARMEMBER'
       AND (
@@ -68,7 +68,7 @@ BEGIN
 
   -- 2. Trigger: coerce rather than reject, so bulk seeds and backfills keep working.
   EXECUTE format($sql$
-    CREATE OR REPLACE FUNCTION helloworldjunktest.force_regular_member_bio_approval_noresponse()
+    CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.force_regular_member_bio_approval_noresponse()
     RETURNS trigger
     LANGUAGE plpgsql
     AS $fn$
@@ -77,12 +77,12 @@ BEGIN
     BEGIN
       SELECT UPPER(BTRIM(COALESCE(member_category::text, '')))
         INTO recipient_category
-        FROM helloworldjunktest.singles
+        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = NEW.singles_id_to;
 
       IF recipient_category = 'REGULARMEMBER' THEN
-        NEW.brief_bio_request_approval := 'noresponse'::helloworldjunktest.approval_status_enum;
-        NEW.full_bio_request_approval := 'noresponse'::helloworldjunktest.approval_status_enum;
+        NEW.brief_bio_request_approval := 'noresponse'::outdateddbsnapshotoct2024.approval_status_enum;
+        NEW.full_bio_request_approval := 'noresponse'::outdateddbsnapshotoct2024.approval_status_enum;
     %s  END IF;
 
       RETURN NEW;
@@ -93,6 +93,6 @@ END
 $migration$;
 
 CREATE TRIGGER trg_force_regular_member_bio_approval_noresponse
-BEFORE INSERT OR UPDATE ON helloworldjunktest.requests
+BEFORE INSERT OR UPDATE ON outdateddbsnapshotoct2024.requests
 FOR EACH ROW
-EXECUTE FUNCTION helloworldjunktest.force_regular_member_bio_approval_noresponse();
+EXECUTE FUNCTION outdateddbsnapshotoct2024.force_regular_member_bio_approval_noresponse();

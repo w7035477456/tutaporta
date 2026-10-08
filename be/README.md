@@ -18,8 +18,8 @@ DB_PORT=50010
 DB_NAME=vsingles
 DB_USER=postgres
 DB_PASSWORD=[fix me]
-# DB_SCHEMA: required, must be a non-public schema (e.g. helloworldjunktest)
-DB_SCHEMA=helloworldjunktest
+# DB_SCHEMA: required, must be a non-public schema (e.g. outdateddbsnapshotoct2024)
+DB_SCHEMA=outdateddbsnapshotoct2024
 # PORT: optional here if you set API_PORT in ../fe/.env — loadEnv applies fe/.env API_PORT as the listen port
 PORT=40000
 JWT_SECRET=your-long-random-secret  # Use e.g. openssl rand -base64 32 (required in production)
@@ -137,9 +137,9 @@ OTP codes are generated on the server, stored with the phone session, and sent i
 
 **Database schema (`vsingles` + non-`public` schema)**
 
-- Set **`DB_SCHEMA`** in `~/.ssh/be/.env` to the schema that holds your app tables (e.g. `helloworldjunktest`, matching `\\dt` in psql).
-- Source files use the `helloworldjunktest.*` prefix in SQL strings; **`be/db/connection.js` rewrites `helloworldjunktest.` to `"$DB_SCHEMA".`** at query time, so `verifications`, `singles`, etc. resolve to that schema. You do **not** need to duplicate tables in `public`.
-- For **AWS SMS signup**, `helloworldjunktest.verifications` as you have it is enough: phone OTPs for `kind = 'phone_verify_session'` are stored in the existing **`code`** column (alongside email registration codes, which use a different `kind` and partial unique index).
+- Set **`DB_SCHEMA`** in `~/.ssh/be/.env` to the schema that holds your app tables (e.g. `outdateddbsnapshotoct2024`, matching `\\dt` in psql).
+- Source files use the `outdateddbsnapshotoct2024.*` prefix in SQL strings; **`be/db/connection.js` rewrites `outdateddbsnapshotoct2024.` to `"$DB_SCHEMA".`** at query time, so `verifications`, `singles`, etc. resolve to that schema. You do **not** need to duplicate tables in `public`.
+- For **AWS SMS signup**, `outdateddbsnapshotoct2024.verifications` as you have it is enough: phone OTPs for `kind = 'phone_verify_session'` are stored in the existing **`code`** column (alongside email registration codes, which use a different `kind` and partial unique index).
 - If your schema has **no** `pending_phone_verifications` table (typical for unified `verifications` only), **no DB migration is required** for SMS. Optional SQL under `be/db/addPendingPhoneVerificationsSmsCode.sql` is only for old installs that still use that legacy table.
 
 **Verify SMTP credentials (without changing app code):**

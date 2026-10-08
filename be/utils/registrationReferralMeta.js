@@ -20,7 +20,7 @@ export function referCodeFromRegistrationMeta(passwordHash) {
 export async function referCodeFromActiveRegistrationEmail(pool, emailNorm) {
   const { rows } = await pool.query(
     `SELECT password_hash
-     FROM helloworldjunktest.verifications
+     FROM outdateddbsnapshotoct2024.verifications
      WHERE email = $1
        AND kind = 'registration_email'
        AND used_at IS NULL

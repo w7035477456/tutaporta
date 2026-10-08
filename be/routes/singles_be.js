@@ -146,7 +146,7 @@ export const verifyLoginPassword = async (req, res) => {
         singles_id, 
         profile_image_fk,
         password_hash
-      FROM helloworldjunktest.singles s 
+      FROM outdateddbsnapshotoct2024.singles s 
       WHERE s.email = $1
       ORDER BY COALESCE(s.updated_at, s.created_at) DESC
       LIMIT 1`,
@@ -194,7 +194,7 @@ export const getAllSingles_BBBBBBBB = async (req, res) => {
       `SELECT 
         singles_id, 
         profile_image_fk
-      FROM helloworldjunktest.singles s 
+      FROM outdateddbsnapshotoct2024.singles s 
       ORDER BY s.created_at DESC`
     );
 
@@ -216,8 +216,8 @@ export const getSinglesInterested_DDDDDDD = async (req, res) => {
           s.singles_id,
           s.profile_image_fk,
           s.vetted_basic_status
-        FROM helloworldjunktest.requests r
-               JOIN helloworldjunktest.singles s ON r.singles_id_to = s.singles_id
+        FROM outdateddbsnapshotoct2024.requests r
+               JOIN outdateddbsnapshotoct2024.singles s ON r.singles_id_to = s.singles_id
         WHERE ${sqlInterestedIsTrue('r')}
         ORDER BY s.created_at DESC;
       `);
@@ -401,7 +401,7 @@ export const verifyPhone_HHHHHHHH = async (req, res) => {
 
     try {
       const existingUser = await pool.query(
-        'SELECT singles_id, member_id FROM helloworldjunktest.singles WHERE email = $1',
+        'SELECT singles_id, member_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1',
         [normalizeEmailForDb(email)]
       );
 
@@ -409,10 +409,10 @@ export const verifyPhone_HHHHHHHH = async (req, res) => {
         const memberId = existingUser.rows[0]?.member_id;
         const existingSinglesId = existingUser.rows[0]?.singles_id;
         await pool.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
-               status = 'active'::helloworldjunktest.singles_status,
+               status = 'active'::outdateddbsnapshotoct2024.singles_status,
                my_refer_code = COALESCE(my_refer_code, $4),
                refer_by_code = COALESCE(refer_by_code, $5),
                updated_at = CURRENT_TIMESTAMP
@@ -471,7 +471,7 @@ export const getSinglesPreferences_IIIIIIII = async (req, res) => {
         search_partner_zipcode,
         theme,
         graphic
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]
@@ -484,7 +484,7 @@ export const getSinglesPreferences_IIIIIIII = async (req, res) => {
     let row = result.rows[0];
     if (!String(row.theme ?? '').trim()) {
       const updated = await pool.query(
-        `UPDATE helloworldjunktest.singles
+        `UPDATE outdateddbsnapshotoct2024.singles
          SET theme = $1, updated_at = CURRENT_TIMESTAMP
          WHERE singles_id = $2
          RETURNING
@@ -550,7 +550,7 @@ export const updateSinglesPreferences_JJJJJJJJ = async (req, res) => {
     values.push(singlesId);
 
     const result = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $${values.length}
        RETURNING

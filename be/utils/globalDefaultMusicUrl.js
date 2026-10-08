@@ -8,7 +8,7 @@ const GLOBAL_ROW_ID = 1;
 const SLOT_COUNT = 10;
 
 function globalTableName() {
-  const schema = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
   return `"${schema}"."global"`;
 }
 

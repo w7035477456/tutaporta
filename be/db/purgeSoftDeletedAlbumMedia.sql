@@ -3,28 +3,28 @@
 
 BEGIN;
 
-UPDATE helloworldjunktest.consent_record
+UPDATE outdateddbsnapshotoct2024.consent_record
 SET consent_signature_image_fk = NULL
 WHERE consent_signature_image_fk IN (
-  SELECT photos_id FROM helloworldjunktest.photos WHERE LOWER(COALESCE(type::text, 'uploaded')) = 'deleted'
+  SELECT photos_id FROM outdateddbsnapshotoct2024.photos WHERE LOWER(COALESCE(type::text, 'uploaded')) = 'deleted'
 );
 
-UPDATE helloworldjunktest.consent_record
+UPDATE outdateddbsnapshotoct2024.consent_record
 SET consent_signature_video_fk = NULL
 WHERE consent_signature_video_fk IN (
-  SELECT video_id FROM helloworldjunktest.videos WHERE LOWER(type::text) = 'deleted'
+  SELECT video_id FROM outdateddbsnapshotoct2024.videos WHERE LOWER(type::text) = 'deleted'
 );
 
-UPDATE helloworldjunktest.singles s
+UPDATE outdateddbsnapshotoct2024.singles s
 SET profile_image_fk = NULL
-FROM helloworldjunktest.photos p
+FROM outdateddbsnapshotoct2024.photos p
 WHERE s.profile_image_fk = p.photos_id
   AND LOWER(COALESCE(p.type::text, 'uploaded')) = 'deleted';
 
-DELETE FROM helloworldjunktest.photos
+DELETE FROM outdateddbsnapshotoct2024.photos
 WHERE LOWER(COALESCE(type::text, 'uploaded')) = 'deleted';
 
-DELETE FROM helloworldjunktest.videos
+DELETE FROM outdateddbsnapshotoct2024.videos
 WHERE LOWER(type::text) = 'deleted';
 
 COMMIT;

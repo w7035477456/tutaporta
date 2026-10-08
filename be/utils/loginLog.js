@@ -6,7 +6,7 @@ import { parseClientDevice } from './clientDeviceInfo.js';
 import { appendDemoLoginHardCopy, appendRegisterHardCopy } from './hardCopyAuthLog.js';
 import { normalizeLogIp, shouldSkipIpLog } from './ipLogSkipList.js';
 
-const SCHEMA = 'helloworldjunktest';
+const SCHEMA = 'outdateddbsnapshotoct2024';
 
 /** Rows written before full-IP logging stored only the last digit as 0.0.0.N. */
 const LEGACY_LAST_DIGIT_IP_RE = /^0\.0\.0\.([0-9])$/;

@@ -36,7 +36,7 @@ export function formatPhoneForDuplicateCheck(phoneRaw) {
  */
 export async function findDuplicatePhoneRegistrationError(formattedPhone, memberCategory) {
   if (!formattedPhone || isDuplicatePhoneAllowed(memberCategory)) return null;
-  const existing = await pool.query('SELECT singles_id FROM helloworldjunktest.singles WHERE phone = $1 LIMIT 1', [
+  const existing = await pool.query('SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE phone = $1 LIMIT 1', [
     formattedPhone
   ]);
   if (existing.rows.length > 0) return DUPLICATE_PHONE_ERROR;
@@ -55,7 +55,7 @@ export async function resolvePhoneForNewSinglesAccount(client, formattedPhone, m
   if (!formattedPhone) return formattedPhone;
   if (!isDuplicatePhoneAllowed(memberCategory)) return formattedPhone;
 
-  const taken = await client.query('SELECT 1 FROM helloworldjunktest.singles WHERE phone = $1 LIMIT 1', [
+  const taken = await client.query('SELECT 1 FROM outdateddbsnapshotoct2024.singles WHERE phone = $1 LIMIT 1', [
     formattedPhone
   ]);
   if (!taken.rows.length) return formattedPhone;
@@ -66,7 +66,7 @@ export async function resolvePhoneForNewSinglesAccount(client, formattedPhone, m
   let baseDigits = BigInt(digitStr);
   for (let offset = 1n; offset < 1000n; offset += 1n) {
     const candidate = `+${(baseDigits + offset).toString()}`;
-    const clash = await client.query('SELECT 1 FROM helloworldjunktest.singles WHERE phone = $1 LIMIT 1', [
+    const clash = await client.query('SELECT 1 FROM outdateddbsnapshotoct2024.singles WHERE phone = $1 LIMIT 1', [
       candidate
     ]);
     if (!clash.rows.length) return candidate;

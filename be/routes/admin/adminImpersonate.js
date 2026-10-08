@@ -15,7 +15,7 @@ import { appLog } from '../../logger.js';
 async function loadTargetUser(targetSinglesId) {
   const result = await pool.query(
     `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, member_category
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1`,
     [targetSinglesId]
   );

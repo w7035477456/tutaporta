@@ -5,7 +5,7 @@ import { getDBSchema } from '../config/envConfig.js';
 const GLOBAL_ROW_ID = 1;
 
 function schemaName() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 function globalTableName() {

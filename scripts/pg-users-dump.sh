@@ -1,5 +1,5 @@
 #!/bin/bash
-# Dump helloworldjunktest.singles identity rows to stdout (TSV) for Mac↔Ubuntu compare.
+# Dump outdateddbsnapshotoct2024.singles identity rows to stdout (TSV) for Mac↔Ubuntu compare.
 # Run on Mac or Ubuntu; reads ~/.ssh/be/.env (or BE_ENV_FILE).
 #
 # Columns (tab-separated, one user per line, sorted by lower(email)):
@@ -37,7 +37,7 @@ else
     PGPASSWORD="${PGPASSWORD:-$(pg_read_env DB_PASSWORD)}"
     PGSCHEMA="${PGSCHEMA:-$(pg_read_env DB_SCHEMA)}"
     PGSCHEMA="${PGSCHEMA:-$(pg_read_env VSINGLES_SCHEMA)}"
-    PGSCHEMA="${PGSCHEMA:-helloworldjunktest}"
+    PGSCHEMA="${PGSCHEMA:-outdateddbsnapshotoct2024}"
     export PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD PGSCHEMA
   }
 fi

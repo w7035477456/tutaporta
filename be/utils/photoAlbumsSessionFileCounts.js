@@ -38,7 +38,7 @@ export async function getVaultSessionFileCounts(singlesId) {
   try {
     const { rows } = await pool.query(
       `SELECT photoalbums_session_usb_tx_rx_count, photoalbums_session_ui_tx_rx_count
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
         WHERE singles_id = $1
         LIMIT 1`,
       [id]
@@ -59,7 +59,7 @@ export async function getVaultLastSessionFileCounts(singlesId) {
   try {
     const { rows } = await pool.query(
       `SELECT photoalbums_last_session_usb_tx_rx_count, photoalbums_last_session_ui_tx_rx_count
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
         WHERE singles_id = $1
         LIMIT 1`,
       [id]
@@ -82,7 +82,7 @@ export async function snapshotVaultSessionFileCountsToLast(singlesId) {
   }
   try {
     const { rows } = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
           SET photoalbums_last_session_usb_tx_rx_count = photoalbums_session_usb_tx_rx_count,
               photoalbums_last_session_ui_tx_rx_count = photoalbums_session_ui_tx_rx_count
         WHERE singles_id = $1
@@ -103,7 +103,7 @@ export async function resetVaultSessionFileCounts(singlesId) {
   }
   try {
     const { rows } = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
           SET photoalbums_session_usb_tx_rx_count = 0,
               photoalbums_session_ui_tx_rx_count = 0
         WHERE singles_id = $1
@@ -131,7 +131,7 @@ export async function addVaultSessionFileCounts(singlesId, { usbDelta = 0, uiDel
   }
   try {
     const { rows } = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
           SET photoalbums_session_usb_tx_rx_count = photoalbums_session_usb_tx_rx_count + $2,
               photoalbums_session_ui_tx_rx_count = photoalbums_session_ui_tx_rx_count + $3
         WHERE singles_id = $1

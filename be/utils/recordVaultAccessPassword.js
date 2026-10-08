@@ -22,7 +22,7 @@ async function loadVaultAccessRow(singlesId) {
             notes_access_password_hint,
             notes_access_password_enabled,
             lock_tuta_notes
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [Number(singlesId)]
@@ -114,7 +114,7 @@ export async function setVaultAccessPassword(singlesId, plainPassword, hint = ''
   const passwordHash = await hashPassword(String(plainPassword).trim());
   const hintText = normalizeVaultAccessHint(hint);
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET notes_access_password_hash = $2,
          notes_access_password_hint = $3,
          notes_access_password_enabled = true,
@@ -143,13 +143,13 @@ export async function changeVaultAccessPassword(singlesId, currentPassword, newP
   const hintText = hintProvided ? normalizeVaultAccessHint(hint) : null;
   await pool.query(
     hintProvided
-      ? `UPDATE helloworldjunktest.singles
+      ? `UPDATE outdateddbsnapshotoct2024.singles
          SET notes_access_password_hash = $2,
              notes_access_password_hint = $3,
              notes_access_password_enabled = true,
              notes_access_password_updated_at = CURRENT_TIMESTAMP
          WHERE singles_id = $1`
-      : `UPDATE helloworldjunktest.singles
+      : `UPDATE outdateddbsnapshotoct2024.singles
          SET notes_access_password_hash = $2,
              notes_access_password_enabled = true,
              notes_access_password_updated_at = CURRENT_TIMESTAMP
@@ -166,7 +166,7 @@ export async function changeVaultAccessPassword(singlesId, currentPassword, newP
 export async function setVaultAccessPasswordHint(singlesId, hint) {
   const hintText = normalizeVaultAccessHint(hint);
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET notes_access_password_hint = $2
      WHERE singles_id = $1`,
     [Number(singlesId), hintText || null]
@@ -195,7 +195,7 @@ export async function setVaultAccessPasswordEnabled(singlesId, enabled, options 
   }
 
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET notes_access_password_enabled = $2
      WHERE singles_id = $1`,
     [id, nextEnabled]

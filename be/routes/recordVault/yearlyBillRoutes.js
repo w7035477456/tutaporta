@@ -144,7 +144,7 @@ function mapRow(row, year) {
 async function countYearRows(client, singlesId, year, storageBackend) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.yearly_bill
+       FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3`,
     [singlesId, storageBackend, year]
   );
@@ -154,7 +154,7 @@ async function countYearRows(client, singlesId, year, storageBackend) {
 async function findPriorYearWithRows(client, singlesId, year, storageBackend) {
   const { rows } = await client.query(
     `SELECT bill_year
-       FROM helloworldjunktest.yearly_bill
+       FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2 AND bill_year < $3
       GROUP BY bill_year
       ORDER BY bill_year DESC
@@ -173,7 +173,7 @@ async function ensureYearCloned(client, singlesId, year, storageBackend) {
   if (!priorYear) return { cloned: false, from: null };
 
   await client.query(
-    `INSERT INTO helloworldjunktest.yearly_bill (
+    `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_month_day, amount, bill_type,
        action, paid_record_id
@@ -182,7 +182,7 @@ async function ensureYearCloned(client, singlesId, year, storageBackend) {
        singles_id, storage_backend, $3, bill_month, row_index,
        bill_description, due_month_day, amount, bill_type,
        NULL, NULL
-       FROM helloworldjunktest.yearly_bill
+       FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $4
       ORDER BY row_index ASC`,
     [singlesId, storageBackend, year, priorYear]
@@ -197,12 +197,12 @@ async function listYearRows(client, singlesId, year, storageBackend) {
               COALESCE(LENGTH(TRIM(pr.notes_text)), 0) > 0
               OR EXISTS (
                 SELECT 1
-                  FROM helloworldjunktest.paid_record_attachment a
+                  FROM outdateddbsnapshotoct2024.paid_record_attachment a
                  WHERE a.paid_record_id = pr.paid_record_id
               )
             ) AS has_bill_content
-       FROM helloworldjunktest.yearly_bill yb
-       LEFT JOIN helloworldjunktest.paid_record pr
+       FROM outdateddbsnapshotoct2024.yearly_bill yb
+       LEFT JOIN outdateddbsnapshotoct2024.paid_record pr
          ON pr.paid_record_id = yb.paid_record_id
       WHERE yb.singles_id = $1 AND yb.storage_backend = $2 AND yb.bill_year = $3
       ORDER BY yb.row_index ASC, yb.yearly_bill_id ASC`,
@@ -225,7 +225,7 @@ export async function getYearlyBill(req, res) {
       const peer = storageBackend === 'usb' ? 'onedrive' : 'usb';
       const { rows: peerCountRows } = await client.query(
         `SELECT COUNT(*)::int AS c
-           FROM helloworldjunktest.yearly_bill
+           FROM outdateddbsnapshotoct2024.yearly_bill
           WHERE singles_id = $1 AND storage_backend = $2`,
         [singlesId, peer]
       );
@@ -295,13 +295,13 @@ export async function putYearlyBill(req, res) {
     try {
       await client.query('BEGIN');
       await client.query(
-        `DELETE FROM helloworldjunktest.yearly_bill
+        `DELETE FROM outdateddbsnapshotoct2024.yearly_bill
           WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3`,
         [singlesId, storageBackend, year]
       );
       for (const r of normalized) {
         const { rows: inserted } = await client.query(
-          `INSERT INTO helloworldjunktest.yearly_bill (
+          `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_month_day, amount, bill_type,
              action, paid_record_id
@@ -324,7 +324,7 @@ export async function putYearlyBill(req, res) {
         const newBillId = Number(inserted[0]?.yearly_bill_id);
         if (r.paid_record_id && newBillId) {
           await client.query(
-            `UPDATE helloworldjunktest.paid_record
+            `UPDATE outdateddbsnapshotoct2024.paid_record
                 SET yearly_bill_id = $1, updated_at = now()
               WHERE paid_record_id = $2 AND singles_id = $3`,
             [newBillId, r.paid_record_id, singlesId]

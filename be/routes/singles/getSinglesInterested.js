@@ -8,8 +8,8 @@ async function resolveAppSchema() {
     `SELECT table_schema
      FROM information_schema.tables
      WHERE table_name = 'requests'
-       AND table_schema IN ('helloworldjunktest', 'public')
-     ORDER BY CASE WHEN table_schema = 'helloworldjunktest' THEN 0 ELSE 1 END
+       AND table_schema IN ('outdateddbsnapshotoct2024', 'public')
+     ORDER BY CASE WHEN table_schema = 'outdateddbsnapshotoct2024' THEN 0 ELSE 1 END
      LIMIT 1`
   );
   return result.rows[0]?.table_schema || 'public';

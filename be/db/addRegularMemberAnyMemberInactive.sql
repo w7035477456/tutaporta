@@ -3,7 +3,7 @@
 -- Uses uppercase labels when PUBLIC already exists; otherwise legacy PascalCase.
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
   use_uppercase boolean;
   regular_label text;
   any_label text;
@@ -62,6 +62,6 @@ BEGIN
       AND t.typname = 'singles_status'
       AND e.enumlabel = 'inactive'
   ) THEN
-    ALTER TYPE helloworldjunktest.singles_status ADD VALUE 'inactive';
+    ALTER TYPE outdateddbsnapshotoct2024.singles_status ADD VALUE 'inactive';
   END IF;
 END $$;

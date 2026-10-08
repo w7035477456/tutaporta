@@ -4,10 +4,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.global
+ALTER TABLE outdateddbsnapshotoct2024.global
   ADD COLUMN IF NOT EXISTS default_music_url text[] NOT NULL DEFAULT ARRAY[]::text[];
 
-UPDATE helloworldjunktest.global
+UPDATE outdateddbsnapshotoct2024.global
 SET default_music_url = ARRAY[
   'https://www.youtube.com/watch?v=Hj2AxxazIsg&list=PLID3CMyI1sebj_OxyInLVVagh378EtxcG',
   'https://www.youtube.com/watch?v=qikm4sGMXWI&list=RDqikm4sGMXWI&start_radio=1&t=3253s',
@@ -24,4 +24,4 @@ WHERE id = 1;
 
 COMMIT;
 
--- Verify: SELECT cardinality(default_music_url), default_music_url[1] FROM helloworldjunktest.global WHERE id = 1;
+-- Verify: SELECT cardinality(default_music_url), default_music_url[1] FROM outdateddbsnapshotoct2024.global WHERE id = 1;

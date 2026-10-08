@@ -7,10 +7,10 @@ BEGIN
     SELECT 1
     FROM pg_type t
     JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = 'helloworldjunktest'
+    WHERE n.nspname = 'outdateddbsnapshotoct2024'
       AND t.typname = 'boolean_enum'
   ) THEN
-    CREATE TYPE helloworldjunktest.boolean_enum AS ENUM ('true', 'false');
+    CREATE TYPE outdateddbsnapshotoct2024.boolean_enum AS ENUM ('true', 'false');
   END IF;
 END
 $$;
@@ -20,24 +20,24 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'user_customization'
       AND column_name = 'lyric_mute'
       AND udt_name = 'bool'
   ) THEN
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ALTER COLUMN lyric_mute DROP DEFAULT;
-    ALTER TABLE helloworldjunktest.user_customization
-      ALTER COLUMN lyric_mute TYPE helloworldjunktest.boolean_enum
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
+      ALTER COLUMN lyric_mute TYPE outdateddbsnapshotoct2024.boolean_enum
       USING (
         CASE
-          WHEN lyric_mute IS TRUE THEN 'true'::helloworldjunktest.boolean_enum
-          ELSE 'false'::helloworldjunktest.boolean_enum
+          WHEN lyric_mute IS TRUE THEN 'true'::outdateddbsnapshotoct2024.boolean_enum
+          ELSE 'false'::outdateddbsnapshotoct2024.boolean_enum
         END
       );
-    ALTER TABLE helloworldjunktest.user_customization
-      ALTER COLUMN lyric_mute SET DEFAULT 'false'::helloworldjunktest.boolean_enum;
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
+      ALTER COLUMN lyric_mute SET DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum;
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ALTER COLUMN lyric_mute SET NOT NULL;
   END IF;
 END

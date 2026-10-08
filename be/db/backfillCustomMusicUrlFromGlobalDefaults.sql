@@ -3,12 +3,12 @@
 
 BEGIN;
 
-UPDATE helloworldjunktest.user_customization u
+UPDATE outdateddbsnapshotoct2024.user_customization u
 SET
   custom_music_url = g.default_music_url,
   load_default = true,
   updated_at = NOW()
-FROM helloworldjunktest.global g
+FROM outdateddbsnapshotoct2024.global g
 WHERE g.id = 1
   AND cardinality(g.default_music_url) >= 10
   AND (
@@ -26,5 +26,5 @@ WHERE g.id = 1
 COMMIT;
 
 -- Verify: SELECT email, u.custom_music_url[1], u.custom_music_url[4]
---   FROM helloworldjunktest.user_customization u
---   JOIN helloworldjunktest.singles s USING (singles_id);
+--   FROM outdateddbsnapshotoct2024.user_customization u
+--   JOIN outdateddbsnapshotoct2024.singles s USING (singles_id);

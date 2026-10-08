@@ -8,7 +8,7 @@ import { getDBSchema } from '../../config/envConfig.js';
 const ALLOWED_BACKENDS = new Set(['usb', 'onedrive', 'postgres']);
 
 function schema() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 function b64ToBuf(b64) {

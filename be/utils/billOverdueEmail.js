@@ -124,14 +124,14 @@ async function loadMonthlyOverdueByUser(client, asOfDate) {
       mb.amount,
       mb.bill_type,
       mb.action
-    FROM helloworldjunktest.monthly_bill mb
-    INNER JOIN helloworldjunktest.user_customization uc
+    FROM outdateddbsnapshotoct2024.monthly_bill mb
+    INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = mb.singles_id
     WHERE mb.bill_type = 'Manual'
       AND (mb.action IS DISTINCT FROM 'Paid')
       AND mb.due_day IS NOT NULL
       AND mb.due_day BETWEEN 1 AND 31
-      AND uc.send_tuttanote_overdue = 'true'::helloworldjunktest.boolean_enum
+      AND uc.send_tuttanote_overdue = 'true'::outdateddbsnapshotoct2024.boolean_enum
       AND (
         (make_date(mb.bill_year, mb.bill_month, 1)
           + ((mb.due_day - 1) * interval '1 day'))::date
@@ -161,8 +161,8 @@ async function loadYearlyOverdueByUser(client, asOfDate) {
       yb.amount,
       yb.bill_type,
       yb.action
-    FROM helloworldjunktest.yearly_bill yb
-    INNER JOIN helloworldjunktest.user_customization uc
+    FROM outdateddbsnapshotoct2024.yearly_bill yb
+    INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = yb.singles_id
     WHERE yb.bill_type = 'Manual'
       AND (yb.action IS DISTINCT FROM 'Paid')
@@ -170,7 +170,7 @@ async function loadYearlyOverdueByUser(client, asOfDate) {
       AND yb.due_month_day IS NOT NULL
       AND yb.bill_month BETWEEN 1 AND 12
       AND yb.due_month_day BETWEEN 1 AND 31
-      AND uc.send_tuttanote_overdue = 'true'::helloworldjunktest.boolean_enum
+      AND uc.send_tuttanote_overdue = 'true'::outdateddbsnapshotoct2024.boolean_enum
       AND (
         (make_date(yb.bill_year, yb.bill_month, 1)
           + ((yb.due_month_day - 1) * interval '1 day'))::date
@@ -200,14 +200,14 @@ async function loadMonthlyAheadByUser(client, dueDate) {
       mb.amount,
       mb.bill_type,
       mb.action
-    FROM helloworldjunktest.monthly_bill mb
-    INNER JOIN helloworldjunktest.user_customization uc
+    FROM outdateddbsnapshotoct2024.monthly_bill mb
+    INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = mb.singles_id
     WHERE mb.bill_type = 'Manual'
       AND (mb.action IS DISTINCT FROM 'Paid')
       AND mb.due_day IS NOT NULL
       AND mb.due_day BETWEEN 1 AND 31
-      AND uc.send_tuttanote_1dayahead = 'true'::helloworldjunktest.boolean_enum
+      AND uc.send_tuttanote_1dayahead = 'true'::outdateddbsnapshotoct2024.boolean_enum
       AND (
         (make_date(mb.bill_year, mb.bill_month, 1)
           + ((mb.due_day - 1) * interval '1 day'))::date
@@ -237,8 +237,8 @@ async function loadYearlyAheadByUser(client, dueDate) {
       yb.amount,
       yb.bill_type,
       yb.action
-    FROM helloworldjunktest.yearly_bill yb
-    INNER JOIN helloworldjunktest.user_customization uc
+    FROM outdateddbsnapshotoct2024.yearly_bill yb
+    INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = yb.singles_id
     WHERE yb.bill_type = 'Manual'
       AND (yb.action IS DISTINCT FROM 'Paid')
@@ -246,7 +246,7 @@ async function loadYearlyAheadByUser(client, dueDate) {
       AND yb.due_month_day IS NOT NULL
       AND yb.bill_month BETWEEN 1 AND 12
       AND yb.due_month_day BETWEEN 1 AND 31
-      AND uc.send_tuttanote_1dayahead = 'true'::helloworldjunktest.boolean_enum
+      AND uc.send_tuttanote_1dayahead = 'true'::outdateddbsnapshotoct2024.boolean_enum
       AND (
         (make_date(yb.bill_year, yb.bill_month, 1)
           + ((yb.due_month_day - 1) * interval '1 day'))::date
@@ -450,7 +450,7 @@ async function claimSendSlot(client, singlesId, sentOn, counts) {
   try {
     const { rows } = await client.query(
       `
-      INSERT INTO helloworldjunktest.bill_overdue_email_log
+      INSERT INTO outdateddbsnapshotoct2024.bill_overdue_email_log
         (singles_id, sent_on, monthly_overdue_count, yearly_overdue_count,
          monthly_ahead_count, yearly_ahead_count)
       VALUES ($1, $2::date, $3, $4, $5, $6)
@@ -471,7 +471,7 @@ async function claimSendSlot(client, singlesId, sentOn, counts) {
     if (err?.code === '42703') {
       const { rows } = await client.query(
         `
-        INSERT INTO helloworldjunktest.bill_overdue_email_log
+        INSERT INTO outdateddbsnapshotoct2024.bill_overdue_email_log
           (singles_id, sent_on, monthly_overdue_count, yearly_overdue_count)
         VALUES ($1, $2::date, $3, $4)
         ON CONFLICT (singles_id, sent_on) DO NOTHING
@@ -487,7 +487,7 @@ async function claimSendSlot(client, singlesId, sentOn, counts) {
 
 async function releaseSendSlot(client, singlesId, sentOn) {
   await client.query(
-    `DELETE FROM helloworldjunktest.bill_overdue_email_log
+    `DELETE FROM outdateddbsnapshotoct2024.bill_overdue_email_log
       WHERE singles_id = $1 AND sent_on = $2::date`,
     [singlesId, sentOn]
   );
@@ -496,7 +496,7 @@ async function releaseSendSlot(client, singlesId, sentOn) {
 async function loadUserEmail(client, singlesId) {
   const { rows } = await client.query(
     `SELECT singles_id, email, alias
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [singlesId]

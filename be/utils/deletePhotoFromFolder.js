@@ -2,7 +2,7 @@ import { getPhotoFolder, listMemberPhotoFilesOnDisk, listPhotoFolderFilesForMemb
 import fs from 'fs';
 
 const LOG_PREFIX = '[deletePhotoFromFolder]';
-const PHOTOS_TABLE = 'helloworldjunktest.photos';
+const PHOTOS_TABLE = 'outdateddbsnapshotoct2024.photos';
 
 function photoFolderLabel() {
   const folder = getPhotoFolder();
@@ -23,7 +23,7 @@ export async function fetchPhotoRowsForSinglesId(pool, singlesId) {
 
 export async function fetchSinglesMemberId(pool, singlesId) {
   const { rows } = await pool.query(
-    `SELECT member_id FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+    `SELECT member_id FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
     [singlesId]
   );
   const memberId = rows[0]?.member_id;
@@ -96,7 +96,7 @@ export async function deletePhotoFolderFilesForSinglesId(pool, singlesId) {
 }
 
 /**
- * Remove on-disk files for one helloworldjunktest.photos row from TUTADATES_PHOTO_FOLDER
+ * Remove on-disk files for one outdateddbsnapshotoct2024.photos row from TUTADATES_PHOTO_FOLDER
  * before the photos row is deleted from Postgres.
  * Deletes main image variants and matching {base}orig.jpg.
  *

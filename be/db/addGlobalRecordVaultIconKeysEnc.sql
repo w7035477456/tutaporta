@@ -7,13 +7,13 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.global
+ALTER TABLE outdateddbsnapshotoct2024.global
   ADD COLUMN IF NOT EXISTS record_vault_icon_keys_enc text;
 
-COMMENT ON COLUMN helloworldjunktest.global.record_vault_icon_keys_enc IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.global.record_vault_icon_keys_enc IS
   'AES-256-GCM encrypted JSON map (icon kebab name -> secret). Base64(iv||tag||ciphertext). Decrypt only in BE with RECORD_NOTES_ICON_KEYS_MASTER_KEY.';
 
-COMMENT ON COLUMN helloworldjunktest.global.record_vault_icon_keys IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.global.record_vault_icon_keys IS
   'DEPRECATED — plaintext icon secrets. Cleared after migrateRecordVaultIconKeysToEncrypted.js; use record_vault_icon_keys_enc.';
 
 COMMIT;

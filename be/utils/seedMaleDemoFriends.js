@@ -27,12 +27,12 @@ import {
   restampPostingCreatedAt
 } from './profilePhotoPostingTimestamp.js';
 
-export const SCHEMA = 'helloworldjunktest';
+export const SCHEMA = 'outdateddbsnapshotoct2024';
 
 /** Template male (Gary / JazzyJeff) — do not seed this pack onto himself. */
 export const MALE_DEMO_TEMPLATE_EMAIL = 'dm4@gmail.com';
 
-/** Fixed demo women for male members (aliases must match helloworldjunktest.singles.alias). */
+/** Fixed demo women for male members (aliases must match outdateddbsnapshotoct2024.singles.alias). */
 export const MALE_DEMO_FRIENDS = Object.freeze({
   buddy: { alias: 'RapidRuth', email: 'dm8@gmail.com', role: 'buddy' },
   acquaint: { alias: 'GiddyGail', email: 'dm9@gmail.com', role: 'acquaint' },

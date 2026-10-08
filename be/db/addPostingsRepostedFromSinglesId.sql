@@ -4,7 +4,7 @@
 
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = sch) THEN
     RAISE NOTICE 'Schema % not found — skipped', sch;
@@ -55,5 +55,5 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_postings_reposted_from_singles_id
-  ON helloworldjunktest.postings (reposted_from_singles_id)
+  ON outdateddbsnapshotoct2024.postings (reposted_from_singles_id)
   WHERE reposted_from_singles_id IS NOT NULL;

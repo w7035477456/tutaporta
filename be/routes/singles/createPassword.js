@@ -39,7 +39,7 @@ export async function createPassword(req, res) {
     try {
       const result = await pool.query(
         `SELECT id, email, expires_at, password_hash
-         FROM helloworldjunktest.verifications
+         FROM outdateddbsnapshotoct2024.verifications
          WHERE code = $1
            AND kind = 'registration_email'
            AND used_at IS NULL
@@ -73,7 +73,7 @@ export async function createPassword(req, res) {
     if (formattedPhoneEarly && password && !shouldSendSms) {
       const pendingPhone = await pool.query(
         `SELECT id
-         FROM helloworldjunktest.verifications
+         FROM outdateddbsnapshotoct2024.verifications
          WHERE email = $1
            AND phone = $2
            AND kind = 'phone_verified_pending_password'
@@ -112,7 +112,7 @@ export async function createPassword(req, res) {
     const passwordHash_AAAAA = await hashPassword(password);
     const expiresAt_AAAAA = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     await pool.query(
-      `DELETE FROM helloworldjunktest.verifications
+      `DELETE FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = 'phone_verify_session'
@@ -122,7 +122,7 @@ export async function createPassword(req, res) {
 
     if (!shouldSendSms) {
       await pool.query(
-        `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+        `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
          VALUES ($1, $2, $3, 'phone_verify_session', $4)`,
         [emailNorm, formattedPhone, passwordHash_AAAAA, expiresAt_AAAAA]
       );
@@ -139,7 +139,7 @@ export async function createPassword(req, res) {
     }
 
     await pool.query(
-      `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
        VALUES ($1, $2, $3, 'phone_verify_session', $4)`,
       [emailNorm, formattedPhone, passwordHash_AAAAA, expiresAt_AAAAA]
     );
@@ -179,7 +179,7 @@ async function finishRegistrationAfterPhoneVerified(
   try {
     const result = await pool.query(
       `SELECT id, email
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE code = $1
          AND kind = 'registration_email'
          AND used_at IS NULL
@@ -207,17 +207,17 @@ async function finishRegistrationAfterPhoneVerified(
 
   try {
     const existingUser = await pool.query(
-      'SELECT singles_id, member_id FROM helloworldjunktest.singles WHERE email = $1',
+      'SELECT singles_id, member_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1',
       [emailNorm]
     );
     if (existingUser.rows.length > 0) {
       const memberId = existingUser.rows[0]?.member_id;
       const existingSinglesId = existingUser.rows[0]?.singles_id;
         await pool.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
-               status = 'active'::helloworldjunktest.singles_status,
+               status = 'active'::outdateddbsnapshotoct2024.singles_status,
                my_refer_code = COALESCE(my_refer_code, $4),
                refer_by_code = COALESCE(refer_by_code, $5),
                updated_at = CURRENT_TIMESTAMP
@@ -250,9 +250,9 @@ async function finishRegistrationAfterPhoneVerified(
       });
     }
 
-    await pool.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [row.id]);
-    await pool.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [pendingRowId]);
-    await pool.query(`DELETE FROM helloworldjunktest.verifications WHERE email = $1 AND used_at IS NULL`, [emailNorm]);
+    await pool.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [row.id]);
+    await pool.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [pendingRowId]);
+    await pool.query(`DELETE FROM outdateddbsnapshotoct2024.verifications WHERE email = $1 AND used_at IS NULL`, [emailNorm]);
 
     console.log(LOG_PREFIX, 'registration completed after phone + password', { emailPrefix: `${emailNorm.slice(0, 3)}***` });
     return res.json({ success: true, message: 'Account created successfully.' });

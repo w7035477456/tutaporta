@@ -107,9 +107,9 @@ function buildLoginLogWhere(body, { requireInput }) {
   let paramIndex = 1;
 
   if (typeLookup?.mode === 'demo') {
-    conditions.push(`(ll.is_demo = true OR ll.event_type = 'demo_login'::helloworldjunktest.login_log_event_type)`);
+    conditions.push(`(ll.is_demo = true OR ll.event_type = 'demo_login'::outdateddbsnapshotoct2024.login_log_event_type)`);
   } else if (typeLookup?.mode === 'signup') {
-    conditions.push(`ll.event_type = 'signup'::helloworldjunktest.login_log_event_type`);
+    conditions.push(`ll.event_type = 'signup'::outdateddbsnapshotoct2024.login_log_event_type`);
   } else if (typeLookup?.mode === 'like') {
     conditions.push(
       `(CASE
@@ -169,8 +169,8 @@ async function queryLoginLog({ conditions, params, limit }) {
             ll.logout_at,
             ll.online_seconds,
             ll.logout_reason
-     FROM helloworldjunktest.login_log ll
-     LEFT JOIN helloworldjunktest.singles s ON s.singles_id = ll.singles_id
+     FROM outdateddbsnapshotoct2024.login_log ll
+     LEFT JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = ll.singles_id
      ${whereSql}
      ORDER BY ll.login_at DESC, ll.login_log_id DESC${limitSql}`,
     params

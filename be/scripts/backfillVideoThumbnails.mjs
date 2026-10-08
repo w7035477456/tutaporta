@@ -19,7 +19,7 @@ async function main() {
   try {
     const { rows } = await client.query(
       `SELECT video_id, singles_id, video_file_name, file_extension, file_path, video_thumbnail
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        ORDER BY video_id ASC`
     );
 
@@ -52,7 +52,7 @@ async function main() {
       }
 
       await client.query(
-        `UPDATE helloworldjunktest.videos SET video_thumbnail = $1 WHERE video_id = $2`,
+        `UPDATE outdateddbsnapshotoct2024.videos SET video_thumbnail = $1 WHERE video_id = $2`,
         [thumbFileName, videoId]
       );
       updated += 1;

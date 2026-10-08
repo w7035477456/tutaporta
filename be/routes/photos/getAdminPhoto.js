@@ -15,7 +15,7 @@ function getPhotoCacheControlHeaderValue() {
 }
 
 /**
- * GET /api/admin/photo/:id — admin streams any member photo from helloworldjunktest.photos.
+ * GET /api/admin/photo/:id — admin streams any member photo from outdateddbsnapshotoct2024.photos.
  */
 export async function getAdminPhoto(req, res) {
   try {
@@ -26,7 +26,7 @@ export async function getAdminPhoto(req, res) {
 
     const row = await pool.query(
       `SELECT file_extension, singles_id, photo_file_name
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photos_id = $1
        LIMIT 1`,
       [id]

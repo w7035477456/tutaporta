@@ -28,7 +28,7 @@ function getVideoCacheControlHeaderValue() {
 async function loadVideoThumbnailRow(videoId) {
   const row = await pool.query(
     `SELECT video_thumbnail, singles_id, file_path
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE video_id = $1
      LIMIT 1`,
     [videoId]

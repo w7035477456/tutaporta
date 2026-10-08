@@ -6,7 +6,7 @@ async function ensurePaymentNotificationSchemaReady() {
   if (paymentNotificationSchemaPromise) return paymentNotificationSchemaPromise;
   paymentNotificationSchemaPromise = (async () => {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_payment_notification_dismissed (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_payment_notification_dismissed (
         singles_id bigint NOT NULL,
         payment_id bigint NOT NULL,
         dismissed_at timestamptz NOT NULL DEFAULT NOW(),
@@ -15,10 +15,10 @@ async function ensurePaymentNotificationSchemaReady() {
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_payment_notification_dismissed_singles
-      ON helloworldjunktest.user_payment_notification_dismissed (singles_id, dismissed_at DESC)
+      ON outdateddbsnapshotoct2024.user_payment_notification_dismissed (singles_id, dismissed_at DESC)
     `);
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_payment_notification_read_state (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_payment_notification_read_state (
         singles_id bigint PRIMARY KEY,
         baseline_at timestamptz NOT NULL DEFAULT NOW(),
         last_read_at timestamptz NOT NULL DEFAULT NOW()
@@ -64,7 +64,7 @@ async function getPaymentColumns(client) {
 async function ensurePaymentNotificationBaseline(client, singlesId) {
   const existing = await client.query(
     `SELECT 1
-     FROM helloworldjunktest.user_payment_notification_read_state
+     FROM outdateddbsnapshotoct2024.user_payment_notification_read_state
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -73,7 +73,7 @@ async function ensurePaymentNotificationBaseline(client, singlesId) {
 
   const accountRes = await client.query(
     `SELECT created_at
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -83,7 +83,7 @@ async function ensurePaymentNotificationBaseline(client, singlesId) {
   const baselineAt = ageMs > 24 * 60 * 60 * 1000 ? new Date() : createdAt;
 
   await client.query(
-    `INSERT INTO helloworldjunktest.user_payment_notification_read_state (singles_id, baseline_at, last_read_at)
+    `INSERT INTO outdateddbsnapshotoct2024.user_payment_notification_read_state (singles_id, baseline_at, last_read_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (singles_id) DO NOTHING`,
     [singlesId, baselineAt]
@@ -128,7 +128,7 @@ export async function getPaymentBalanceNotifications(req, res) {
     const dateFilterSql = dateSql
       ? `AND p.${dateSql} >= COALESCE(
            (SELECT rs.baseline_at
-            FROM helloworldjunktest.user_payment_notification_read_state rs
+            FROM outdateddbsnapshotoct2024.user_payment_notification_read_state rs
             WHERE rs.singles_id = $1),
            TIMESTAMPTZ '1970-01-01'
          )`
@@ -136,12 +136,12 @@ export async function getPaymentBalanceNotifications(req, res) {
 
     const { rows } = await client.query(
       `SELECT ${selectParts.join(', ')}
-       FROM helloworldjunktest.payment p
+       FROM outdateddbsnapshotoct2024.payment p
        WHERE p.${singlesIdSql} = $1
          ${dateFilterSql}
          AND NOT EXISTS (
            SELECT 1
-           FROM helloworldjunktest.user_payment_notification_dismissed d
+           FROM outdateddbsnapshotoct2024.user_payment_notification_dismissed d
            WHERE d.singles_id = $1
              AND d.payment_id = p.${paymentIdSql}
          )
@@ -178,7 +178,7 @@ export async function dismissPaymentBalanceNotification(req, res) {
   try {
     await ensurePaymentNotificationSchemaReady();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_payment_notification_dismissed (singles_id, payment_id, dismissed_at)
+      `INSERT INTO outdateddbsnapshotoct2024.user_payment_notification_dismissed (singles_id, payment_id, dismissed_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (singles_id, payment_id)
        DO UPDATE SET dismissed_at = EXCLUDED.dismissed_at`,
@@ -202,7 +202,7 @@ export async function dismissAllPaymentBalanceNotifications(req, res) {
   try {
     await ensurePaymentNotificationSchemaReady();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_payment_notification_read_state (singles_id, baseline_at, last_read_at)
+      `INSERT INTO outdateddbsnapshotoct2024.user_payment_notification_read_state (singles_id, baseline_at, last_read_at)
        VALUES ($1, NOW(), NOW())
        ON CONFLICT (singles_id)
        DO UPDATE SET
@@ -212,7 +212,7 @@ export async function dismissAllPaymentBalanceNotifications(req, res) {
     );
     if (paymentIds.length) {
       await pool.query(
-        `INSERT INTO helloworldjunktest.user_payment_notification_dismissed (singles_id, payment_id, dismissed_at)
+        `INSERT INTO outdateddbsnapshotoct2024.user_payment_notification_dismissed (singles_id, payment_id, dismissed_at)
          SELECT $1::bigint, x::bigint, NOW()
          FROM unnest($2::bigint[]) x
          ON CONFLICT (singles_id, payment_id)

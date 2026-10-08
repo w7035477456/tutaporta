@@ -17,7 +17,7 @@ export async function getAdminPhotoThumbnail(req, res) {
 
     const row = await pool.query(
       `SELECT file_extension, photo_file_name, photo_thumbnail, file_path
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE photos_id = $1
        LIMIT 1`,
       [id]

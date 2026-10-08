@@ -29,13 +29,13 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
   await client.query('BEGIN');
   try {
     await client.query(
-      `INSERT INTO helloworldjunktest.singles (
+      `INSERT INTO outdateddbsnapshotoct2024.singles (
          singles_id, member_id, email, password_hash, phone, status, theme,
          my_refer_code, refer_by_code, member_category, refill_remain_mb, refill_bought_mb,
          created_at, updated_at
        )
        VALUES (
-         $1, $2, $3, $4, $5, 'active'::helloworldjunktest.singles_status, $6,
+         $1, $2, $3, $4, $5, 'active'::outdateddbsnapshotoct2024.singles_status, $6,
          $7, $8, $9, $10, $10,
          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
        )`,

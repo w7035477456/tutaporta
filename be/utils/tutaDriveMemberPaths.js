@@ -89,7 +89,7 @@ export async function loadMemberIdForSingles(singlesId) {
   if (!Number.isFinite(id) || id < 1) return null;
   const { rows } = await pool.query(
     `SELECT member_id
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]

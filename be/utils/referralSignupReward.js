@@ -75,7 +75,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
 
   const existing = await client.query(
     `SELECT ${transactionIdSql} AS transaction_id
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE ${paymentIdSql} = $1
      LIMIT 1`,
     [pid]
@@ -89,7 +89,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
   const nextId = makePaymentTransactionIdBigInt(pid);
   if (!nextId) return null;
   await client.query(
-    `UPDATE helloworldjunktest.payment
+    `UPDATE outdateddbsnapshotoct2024.payment
      SET ${transactionIdSql} = $1
      WHERE ${paymentIdSql} = $2`,
     [nextId, pid]
@@ -149,7 +149,7 @@ async function findReferrerByReferCode(client, referByCode, excludeSinglesId) {
 
   const { rows } = await client.query(
     `SELECT singles_id, member_id, email, alias, mailing_zip, phone, my_refer_code
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE my_refer_code = $1
        AND singles_id <> $2
      LIMIT 1`,
@@ -164,7 +164,7 @@ async function findReferrerByReferCode(client, referByCode, excludeSinglesId) {
 async function loadReferByCodeForSingles(client, singlesId) {
   const { rows } = await client.query(
     `SELECT refer_by_code
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -185,7 +185,7 @@ async function paymentDescriptionExists(client, singlesId, markerPattern) {
   const descriptionSql = sqlIdent(descriptionColumn);
   const { rows } = await client.query(
     `SELECT payment_id
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE singles_id = $1
        AND COALESCE(${descriptionSql}, '') ILIKE $2
      LIMIT 1`,
@@ -212,7 +212,7 @@ async function creditTokenReward(client, { singlesId, description }) {
 
   const latestPaymentResult = await client.query(
     `SELECT payment_id, account_balance_token, paid_total_dollar, token_add_or_debit
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE singles_id = $1
      ORDER BY payment_id DESC
      LIMIT 1`,
@@ -265,7 +265,7 @@ async function creditTokenReward(client, { singlesId, description }) {
   }
 
   const inserted = await client.query(
-    `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+    `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
      VALUES (${placeholders.join(', ')})
      RETURNING payment_id`,
     insertValues
@@ -277,7 +277,7 @@ async function creditTokenReward(client, { singlesId, description }) {
     const updates = ['payment_id_fk = $1'];
     if (singlesColumns.has('updated_at')) updates.push('updated_at = CURRENT_TIMESTAMP');
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $2`,
       [paymentId, singlesId]
@@ -427,7 +427,7 @@ export async function processReferralSignupReward({
     const refereeTimeZoneProfile = await (async () => {
       const { rows } = await client.query(
         `SELECT mailing_zip, phone
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
          WHERE singles_id = $1
          LIMIT 1`,
         [newSinglesIdNum]

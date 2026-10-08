@@ -52,7 +52,7 @@ async function canViewPrivateAlbumVideo(viewerSinglesId, ownerSinglesId) {
 async function canViewAlbumVideo(viewerSinglesId, videoId, videoOwnerSinglesId) {
   const { rows } = await pool.query(
     `SELECT type::text AS album_type_raw, video_file_name
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE video_id = $1
        AND singles_id = $2
      LIMIT 1`,

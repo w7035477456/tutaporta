@@ -4,7 +4,7 @@
 #   scripts/ubuntu-psql.sh -c "SELECT pg_size_pretty(pg_database_size(current_database()));"
 #   scripts/ubuntu-psql.sh -f be/db/loginLogDevice.sql
 #   echo "SELECT 1;" | scripts/ubuntu-psql.sh
-#   scripts/ubuntu-psql.sh -At -c "SELECT count(*) FROM helloworldjunktest.singles;"
+#   scripts/ubuntu-psql.sh -At -c "SELECT count(*) FROM outdateddbsnapshotoct2024.singles;"
 #
 # Password: UBUNTU_POSTGRES_PASSWORD in ~/.ssh/be/.env (Mac, outside git). It is sent as the first
 # line of the SSH stdin and read into PGPASSWORD remotely, so it never appears in argv / ps on

@@ -60,8 +60,8 @@ export async function loadMemberBasicsForRekognitionBypass(db, singlesId) {
             vb.middlename AS vb_middlename,
             vb.lastname AS vb_lastname,
             vb.official_gender
-     FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = s.singles_id
+     FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = s.singles_id
      WHERE s.singles_id = $1
      LIMIT 1`,
     [singlesId]

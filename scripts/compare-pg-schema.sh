@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compare helloworldjunktest schema: Mac (~/.ssh/be/.env) vs Ubuntu (SSH + remote .env).
+# Compare outdateddbsnapshotoct2024 schema: Mac (~/.ssh/be/.env) vs Ubuntu (SSH + remote .env).
 #
 # First stdout line is always "same" or "difference". On "difference" an object-level report
 # follows (only on Mac / only on Ubuntu / changed with -Ubuntu +Mac lines). --quiet = first line only.
@@ -31,7 +31,7 @@ usage() {
   cat <<'EOF'
 compare-pg-schema.sh [--ubuntu-host user@host] [--quiet] [--verbose] [--save-dumps dir]
 
-Compares PostgreSQL schema (default: helloworldjunktest) on Mac vs Ubuntu.
+Compares PostgreSQL schema (default: outdateddbsnapshotoct2024) on Mac vs Ubuntu.
 Stdout: first line "same" or "difference"; on difference, an object-level report follows.
 --quiet: print only the first line.
 --verbose: stderr summary always (hosts, line counts); raw diff snippet only when different.

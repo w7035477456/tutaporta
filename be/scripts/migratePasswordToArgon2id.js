@@ -23,7 +23,7 @@ import {
 } from '../utils/passwordHash.js';
 
 function schemaName() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 async function findSinglesByLogin(loginId) {

@@ -1,6 +1,6 @@
 -- Run on Primary only.
 -- Converts PostgreSQL boolean columns to boolean_enum ('true' | 'false').
--- Matches booleanEnum06092026.sql / live schema in helloworldjunktest.
+-- Matches booleanEnum06092026.sql / live schema in outdateddbsnapshotoct2024.
 --
 -- Tables / columns:
 --   posting_comments.is_liked, is_shared (parent + partitions)
@@ -13,7 +13,7 @@
 DO $$
 DECLARE
   sch text;
-  schemas text[] := ARRAY['helloworldjunktest', 'public'];
+  schemas text[] := ARRAY['outdateddbsnapshotoct2024', 'public'];
   tbl text;
   col text;
   nullable text;
@@ -180,5 +180,5 @@ SELECT table_schema,
        is_nullable
 FROM information_schema.columns
 WHERE udt_name = 'boolean_enum'
-  AND table_schema IN ('helloworldjunktest', 'public')
+  AND table_schema IN ('outdateddbsnapshotoct2024', 'public')
 ORDER BY table_schema, table_name, column_name;

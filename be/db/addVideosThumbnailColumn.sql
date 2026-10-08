@@ -3,10 +3,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.videos
+ALTER TABLE outdateddbsnapshotoct2024.videos
   ADD COLUMN IF NOT EXISTS video_thumbnail character varying(120);
 
-COMMENT ON COLUMN helloworldjunktest.videos.video_thumbnail IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.videos.video_thumbnail IS
   'JPEG filename in the same folder as file_path (includes play-icon overlay). NULL = no thumbnail yet.';
 
 COMMIT;

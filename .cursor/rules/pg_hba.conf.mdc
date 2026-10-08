@@ -38,4 +38,4 @@ host    onlinemallwebsite    test_user2  192.168.44.104/32   scram-sha-256
 **Notes for agents**
 
 - Database name is **`onlinemallwebsite`** (formerly `vsingles`). HBA rules that still say `vsingles` will not match DBeaver/app connections.
-- Schema remains `helloworldjunktest` (see `postgresql.conf.mdc` `search_path`).
+- Schema remains `outdateddbsnapshotoct2024` (see `postgresql.conf.mdc` `search_path`).

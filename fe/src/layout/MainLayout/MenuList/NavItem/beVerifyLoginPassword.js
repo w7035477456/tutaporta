@@ -18,7 +18,7 @@ export async function beVerifyLoginPassword(req, res) {
     try {
       result = await pool.query(
         `SELECT singles_id, profile_image_fk, password_hash
-         FROM helloworldjunktest.singles s
+         FROM outdateddbsnapshotoct2024.singles s
          WHERE s.email = $1
          ORDER BY COALESCE(s.updated_at, s.created_at) DESC
          LIMIT 1`,
@@ -82,7 +82,7 @@ export async function beVerifyLoginPassword(req, res) {
     //     try {
     //       const newHash = await bcrypt.hash(providedPassword, 6);
     //       await pool.query(
-    //         `UPDATE helloworldjunktest.singles SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE singles_id = $2`,
+    //         `UPDATE outdateddbsnapshotoct2024.singles SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE singles_id = $2`,
     //         [newHash, user.singles_id]
     //       );
     //       isPasswordValid = true;

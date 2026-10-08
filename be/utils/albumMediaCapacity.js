@@ -10,7 +10,7 @@ export async function resolvePhotoAlbumTypeColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name IN ('type', 'photo_type', 'album_type')
      ORDER BY CASE column_name
@@ -29,7 +29,7 @@ export async function countAlbumPhotosInType(client, singlesId, albumType, { exc
   if (!photoTypeColumn) return 0;
   const photoResult = await client.query(
     `SELECT COUNT(*)::int AS count
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE singles_id = $1
        AND ($2::bigint IS NULL OR photos_id <> $2)
        AND LOWER(COALESCE(${photoTypeColumn}::text, 'uploaded')) = $3`,
@@ -42,7 +42,7 @@ export async function countAlbumPhotosInType(client, singlesId, albumType, { exc
 export async function countAlbumVideosInType(client, singlesId, albumType, { excludeVideoId = null } = {}) {
   const videoResult = await client.query(
     `SELECT COUNT(*)::int AS count
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE singles_id = $1
        AND ($2::bigint IS NULL OR video_id <> $2)
        AND video_file_name LIKE $3
@@ -64,7 +64,7 @@ export async function countAlbumMediaInType(
   if (photoTypeColumn) {
     const photoResult = await client.query(
       `SELECT COUNT(*)::int AS count
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE singles_id = $1
          AND ($2::bigint IS NULL OR photos_id <> $2)
          AND LOWER(COALESCE(${photoTypeColumn}::text, 'uploaded')) = $3`,
@@ -75,7 +75,7 @@ export async function countAlbumMediaInType(
 
   const videoResult = await client.query(
     `SELECT COUNT(*)::int AS count
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE singles_id = $1
        AND ($2::bigint IS NULL OR video_id <> $2)
        AND video_file_name LIKE $3

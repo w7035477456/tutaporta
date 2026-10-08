@@ -2,7 +2,7 @@
 -- Status blank + non-public email keeps this row out of normal member listings.
 -- DELETE is blocked by trigger (defense in depth; app also rejects mutations).
 
-INSERT INTO helloworldjunktest.singles (
+INSERT INTO outdateddbsnapshotoct2024.singles (
   member_id,
   email,
   phone,
@@ -21,12 +21,12 @@ SELECT
   'tools-admin@vsingles.internal',
   '+19999999999',
   COALESCE(
-    (SELECT g.password_hash FROM helloworldjunktest.global g WHERE g.id = 1 LIMIT 1),
+    (SELECT g.password_hash FROM outdateddbsnapshotoct2024.global g WHERE g.id = 1 LIMIT 1),
     '$2b$12$toolsadminplaceholderhashnotusedforloginxxxxxxxxxxxxxxxxxxxx'
   ),
   'Admin',
-  'ADMIN'::helloworldjunktest.member_category_enum,
-  'blank'::helloworldjunktest.singles_status,
+  'ADMIN'::outdateddbsnapshotoct2024.member_category_enum,
+  'blank'::outdateddbsnapshotoct2024.singles_status,
   'coffey dark',
   '999999',
   NULL,
@@ -34,11 +34,11 @@ SELECT
   CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
   SELECT 1
-  FROM helloworldjunktest.singles s
+  FROM outdateddbsnapshotoct2024.singles s
   WHERE lower(s.email::text) = lower('tools-admin@vsingles.internal')
 );
 
-CREATE OR REPLACE FUNCTION helloworldjunktest.prevent_system_tools_admin_singles_delete()
+CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.prevent_system_tools_admin_singles_delete()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -50,9 +50,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_prevent_system_tools_admin_singles_delete ON helloworldjunktest.singles;
+DROP TRIGGER IF EXISTS trg_prevent_system_tools_admin_singles_delete ON outdateddbsnapshotoct2024.singles;
 
 CREATE TRIGGER trg_prevent_system_tools_admin_singles_delete
-BEFORE DELETE ON helloworldjunktest.singles
+BEFORE DELETE ON outdateddbsnapshotoct2024.singles
 FOR EACH ROW
-EXECUTE FUNCTION helloworldjunktest.prevent_system_tools_admin_singles_delete();
+EXECUTE FUNCTION outdateddbsnapshotoct2024.prevent_system_tools_admin_singles_delete();

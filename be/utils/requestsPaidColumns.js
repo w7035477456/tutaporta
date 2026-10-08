@@ -1,4 +1,4 @@
-/** helloworldjunktest.requests paid columns (see be/db/renameRequestsPaidColumns.sql). */
+/** outdateddbsnapshotoct2024.requests paid columns (see be/db/renameRequestsPaidColumns.sql). */
 
 export const REQUESTS_BRIEF_PAID_COLUMN = 'brief_paid';
 export const REQUESTS_FULL_PAID_COLUMN = 'full_paid';

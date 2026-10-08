@@ -123,7 +123,7 @@ export async function loadOneDriveEmails(singlesId) {
   if (!Number.isFinite(id) || id < 1) return [];
   const { rows } = await pool.query(
     `SELECT DISTINCT btrim(e) AS email
-       FROM helloworldjunktest.singles s
+       FROM outdateddbsnapshotoct2024.singles s
        CROSS JOIN LATERAL unnest(COALESCE(s.onedrive_emails, ARRAY[]::text[])) AS e
       WHERE s.singles_id = $1
         AND btrim(e) <> ''
@@ -137,7 +137,7 @@ export async function loadOneDriveEmails(singlesId) {
 
   const { rows: fallbackRows } = await pool.query(
     `SELECT onedrive_emails::text AS onedrive_emails_text
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]
@@ -153,7 +153,7 @@ async function readOneDriveEmailsForPickerFromDb(singlesId) {
   const { rows } = await pool.query(
     `SELECT onedrive_emails::text AS onedrive_emails_text,
             record_photoalbums_onedrive_email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]
@@ -195,7 +195,7 @@ export async function rememberOneDriveEmail(singlesId, email) {
   }
   const next = dedupeEmailsCaseInsensitive([...existing, String(email).trim()]);
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET onedrive_emails = $2
       WHERE singles_id = $1`,
     [id, next]

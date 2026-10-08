@@ -28,7 +28,7 @@ const FALLBACK_BLOCKED_ASN_NUMBERS = [
 ];
 
 function globalTableName() {
-  const schema = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
   return `"${schema}"."global"`;
 }
 

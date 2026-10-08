@@ -177,7 +177,7 @@ async function applyGlobalDefaultMusicToUser(me, prev) {
   await upsertCustomizationRow(me, nextRow);
   try {
     await pool.query(
-      `UPDATE helloworldjunktest.user_customization
+      `UPDATE outdateddbsnapshotoct2024.user_customization
        SET load_default = true, updated_at = NOW()
        WHERE singles_id = $1`,
       [me]
@@ -376,19 +376,19 @@ async function runCustomizationSchemaDdl() {
         SELECT 1
         FROM pg_type t
         JOIN pg_namespace n ON n.oid = t.typnamespace
-        WHERE n.nspname = 'helloworldjunktest'
+        WHERE n.nspname = 'outdateddbsnapshotoct2024'
           AND t.typname = 'boolean_enum'
       ) THEN
-        CREATE TYPE helloworldjunktest.boolean_enum AS ENUM ('true', 'false');
+        CREATE TYPE outdateddbsnapshotoct2024.boolean_enum AS ENUM ('true', 'false');
       END IF;
     END
     $$;
   `);
   await pool.query(`
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ADD COLUMN IF NOT EXISTS sound_preference sound_preference_enum NOT NULL DEFAULT 'piano',
       ADD COLUMN IF NOT EXISTS vsingles_lyric vsingles_lyric_enum NOT NULL DEFAULT 'lyric',
-      ADD COLUMN IF NOT EXISTS lyric_mute helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
+      ADD COLUMN IF NOT EXISTS lyric_mute outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
       ADD COLUMN IF NOT EXISTS lyric_volume smallint NOT NULL DEFAULT 10,
       ADD COLUMN IF NOT EXISTS volume smallint NOT NULL DEFAULT 10,
       ADD COLUMN IF NOT EXISTS custom_music_url text NULL,
@@ -402,9 +402,9 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS mynote_editor_font_size_pt smallint NULL DEFAULT 20,
       ADD COLUMN IF NOT EXISTS mynote_note_scroll_top integer NULL,
       ADD COLUMN IF NOT EXISTS mynote_editor_caret_pos integer NULL,
-      ADD COLUMN IF NOT EXISTS all_singles_welcome_expanded helloworldjunktest.boolean_enum NOT NULL DEFAULT 'true'::helloworldjunktest.boolean_enum,
-      ADD COLUMN IF NOT EXISTS send_tuttanote_overdue helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      ADD COLUMN IF NOT EXISTS send_tuttanote_1dayahead helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
+      ADD COLUMN IF NOT EXISTS all_singles_welcome_expanded outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'true'::outdateddbsnapshotoct2024.boolean_enum,
+      ADD COLUMN IF NOT EXISTS send_tuttanote_overdue outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      ADD COLUMN IF NOT EXISTS send_tuttanote_1dayahead outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
       ADD COLUMN IF NOT EXISTS first_visit_picksposts boolean NULL,
       ADD COLUMN IF NOT EXISTS first_visit_acquaintbuddies boolean NULL,
       ADD COLUMN IF NOT EXISTS first_visit_rec_biorequest boolean NULL,
@@ -416,22 +416,22 @@ async function runCustomizationSchemaDdl() {
   `);
   // Existing rows keep true (no one-time overwrite); new inserts default false until first Track Load Default.
   await pool.query(`
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ADD COLUMN IF NOT EXISTS load_default boolean NOT NULL DEFAULT true
   `);
   await pool.query(`
-    UPDATE helloworldjunktest.user_customization
+    UPDATE outdateddbsnapshotoct2024.user_customization
     SET main_font = 'Algerian, fantasy'
     WHERE main_font IS NULL
        OR btrim(main_font) = ''
        OR lower(replace(replace(main_font, '"', ''), '''', '')) LIKE 'comic neue%'
   `);
   await pool.query(`
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ALTER COLUMN load_default SET DEFAULT false
   `);
   await pool.query(`
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ALTER COLUMN mynote_font_color_index SET DEFAULT 0,
       ALTER COLUMN mynote_content_bg_index SET DEFAULT 1,
       ALTER COLUMN mynote_text_highlight_index SET DEFAULT NULL,
@@ -445,24 +445,24 @@ async function runCustomizationSchemaDdl() {
       IF EXISTS (
         SELECT 1
         FROM information_schema.columns
-        WHERE table_schema = 'helloworldjunktest'
+        WHERE table_schema = 'outdateddbsnapshotoct2024'
           AND table_name = 'user_customization'
           AND column_name = 'lyric_mute'
           AND udt_name = 'bool'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ALTER COLUMN lyric_mute DROP DEFAULT;
-        ALTER TABLE helloworldjunktest.user_customization
-          ALTER COLUMN lyric_mute TYPE helloworldjunktest.boolean_enum
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
+          ALTER COLUMN lyric_mute TYPE outdateddbsnapshotoct2024.boolean_enum
           USING (
             CASE
-              WHEN lyric_mute IS TRUE THEN 'true'::helloworldjunktest.boolean_enum
-              ELSE 'false'::helloworldjunktest.boolean_enum
+              WHEN lyric_mute IS TRUE THEN 'true'::outdateddbsnapshotoct2024.boolean_enum
+              ELSE 'false'::outdateddbsnapshotoct2024.boolean_enum
             END
           );
-        ALTER TABLE helloworldjunktest.user_customization
-          ALTER COLUMN lyric_mute SET DEFAULT 'false'::helloworldjunktest.boolean_enum;
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
+          ALTER COLUMN lyric_mute SET DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum;
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ALTER COLUMN lyric_mute SET NOT NULL;
       END IF;
     END
@@ -476,7 +476,7 @@ async function runCustomizationSchemaDdl() {
         FROM pg_constraint
         WHERE conname = 'user_customization_volume_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_volume_range_chk CHECK (volume >= 0 AND volume <= 100);
       END IF;
     END
@@ -490,7 +490,7 @@ async function runCustomizationSchemaDdl() {
         FROM pg_constraint
         WHERE conname = 'user_customization_lyric_volume_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_lyric_volume_range_chk CHECK (lyric_volume >= 0 AND lyric_volume <= 100);
       END IF;
     END
@@ -498,7 +498,7 @@ async function runCustomizationSchemaDdl() {
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS user_customization_singles_id_uniq_idx
-      ON helloworldjunktest.user_customization (singles_id)
+      ON outdateddbsnapshotoct2024.user_customization (singles_id)
   `);
   await pool.query(`
     DO $$
@@ -511,26 +511,26 @@ async function runCustomizationSchemaDdl() {
           AND column_name = 'custom_music_url'
           AND udt_name = 'text'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ALTER COLUMN custom_music_url DROP DEFAULT;
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ALTER COLUMN custom_music_url TYPE text[]
           USING CASE
             WHEN custom_music_url IS NULL OR btrim(custom_music_url) = '' THEN ARRAY[]::text[]
             ELSE ARRAY[custom_music_url]::text[]
           END;
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ALTER COLUMN custom_music_url SET DEFAULT ARRAY[]::text[];
       END IF;
     END
     $$;
   `);
   await pool.query(`
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       DROP CONSTRAINT IF EXISTS user_customization_custom_music_url_limit_chk
   `);
   await pool.query(`
-    ALTER TABLE helloworldjunktest.user_customization
+    ALTER TABLE outdateddbsnapshotoct2024.user_customization
       ADD CONSTRAINT user_customization_custom_music_url_limit_chk
       CHECK (
         custom_music_url IS NULL
@@ -548,7 +548,7 @@ async function runCustomizationSchemaDdl() {
         FROM pg_constraint
         WHERE conname = 'user_customization_mynote_font_size_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_mynote_font_size_range_chk
           CHECK (mynote_font_size IS NULL OR (mynote_font_size >= 5 AND mynote_font_size <= 80));
       END IF;
@@ -561,7 +561,7 @@ async function runCustomizationSchemaDdl() {
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'user_customization_mynote_color_index_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_mynote_color_index_range_chk
           CHECK (
             (mynote_content_bg_index IS NULL OR (mynote_content_bg_index >= 0 AND mynote_content_bg_index <= 6))
@@ -578,7 +578,7 @@ async function runCustomizationSchemaDdl() {
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'user_customization_mynote_editor_font_size_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_mynote_editor_font_size_range_chk
           CHECK (mynote_editor_font_size IS NULL OR (mynote_editor_font_size >= 4 AND mynote_editor_font_size <= 128));
       END IF;
@@ -591,7 +591,7 @@ async function runCustomizationSchemaDdl() {
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'user_customization_mynote_note_scroll_top_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_mynote_note_scroll_top_range_chk
           CHECK (mynote_note_scroll_top IS NULL OR mynote_note_scroll_top >= 0);
       END IF;
@@ -604,7 +604,7 @@ async function runCustomizationSchemaDdl() {
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'user_customization_mynote_editor_caret_pos_range_chk'
       ) THEN
-        ALTER TABLE helloworldjunktest.user_customization
+        ALTER TABLE outdateddbsnapshotoct2024.user_customization
           ADD CONSTRAINT user_customization_mynote_editor_caret_pos_range_chk
           CHECK (mynote_editor_caret_pos IS NULL OR mynote_editor_caret_pos >= 0);
       END IF;
@@ -625,7 +625,7 @@ async function selectCustomizationRow(me) {
              , send_tuttanote_overdue, send_tuttanote_1dayahead
              , first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
              , tuta_dates_enabled, tuta_notes_enabled, tuta_albums_enabled
-       FROM helloworldjunktest.user_customization
+       FROM outdateddbsnapshotoct2024.user_customization
        WHERE singles_id = $1`,
       [me]
     );
@@ -645,7 +645,7 @@ async function selectCustomizationRow(me) {
                , all_singles_welcome_expanded
                , send_tuttanote_overdue, send_tuttanote_1dayahead
                , first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -659,7 +659,7 @@ async function selectCustomizationRow(me) {
                , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
                , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
                , all_singles_welcome_expanded, first_visit_picksposts, first_visit_acquaintbuddies, first_visit_rec_biorequest, main_font
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -673,7 +673,7 @@ async function selectCustomizationRow(me) {
                , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
                , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
                , all_singles_welcome_expanded
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -686,7 +686,7 @@ async function selectCustomizationRow(me) {
                , mynote_last_notebook_id, mynote_last_note_id
                , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
                , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -699,7 +699,7 @@ async function selectCustomizationRow(me) {
                , mynote_last_notebook_id, mynote_last_note_id
                , mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index
                , mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -708,7 +708,7 @@ async function selectCustomizationRow(me) {
     if (isMissingColumn(err, 'mynote_last_notebook_id')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -717,7 +717,7 @@ async function selectCustomizationRow(me) {
     if (isMissingColumn(err, 'mynote_font_size')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -726,7 +726,7 @@ async function selectCustomizationRow(me) {
     if (isMissingColumn(err, 'lyric_mute')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, sound_preference, vsingles_lyric, lyric_volume, volume, custom_music_url
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -735,7 +735,7 @@ async function selectCustomizationRow(me) {
     if (isMissingColumn(err, 'lyric_volume')) {
       const { rows } = await pool.query(
         `SELECT chat_font_size, sound_preference, vsingles_lyric, lyric_mute, volume, custom_music_url
-         FROM helloworldjunktest.user_customization
+         FROM outdateddbsnapshotoct2024.user_customization
          WHERE singles_id = $1`,
         [me]
       );
@@ -767,12 +767,12 @@ async function upsertCustomizationRow(me, row) {
     mynoteDb.mynote_editor_caret_pos,
     toBooleanEnumLabel(row.all_singles_welcome_expanded !== false)
   ];
-  const lyricMuteParam = sqlBooleanEnumParam('$6', 'helloworldjunktest');
-  const welcomeExpandedParam = sqlBooleanEnumParam('$18', 'helloworldjunktest');
+  const lyricMuteParam = sqlBooleanEnumParam('$6', 'outdateddbsnapshotoct2024');
+  const welcomeExpandedParam = sqlBooleanEnumParam('$18', 'outdateddbsnapshotoct2024');
   try {
     await pool.query(
       `
-      INSERT INTO helloworldjunktest.user_customization (
+      INSERT INTO outdateddbsnapshotoct2024.user_customization (
         singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url,
         mynote_last_notebook_id, mynote_last_note_id, mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index,
         mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, all_singles_welcome_expanded, updated_at
@@ -805,7 +805,7 @@ async function upsertCustomizationRow(me, row) {
       params.pop();
       await pool.query(
         `
-        INSERT INTO helloworldjunktest.user_customization (
+        INSERT INTO outdateddbsnapshotoct2024.user_customization (
           singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url,
           mynote_last_notebook_id, mynote_last_note_id, mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index,
           mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, updated_at
@@ -848,7 +848,7 @@ async function upsertCustomizationRow(me, row) {
       ];
       await pool.query(
         `
-        INSERT INTO helloworldjunktest.user_customization (singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url, updated_at)
+        INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url, updated_at)
         VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
@@ -868,8 +868,8 @@ async function upsertCustomizationRow(me, row) {
     if (isMissingColumn(err, 'mynote_font_size')) {
       await pool.query(
         `
-        INSERT INTO helloworldjunktest.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url, updated_at)
-        VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, ${sqlBooleanEnumParam('$5', 'helloworldjunktest')}, $6, $7, $8, NOW())
+        INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url, updated_at)
+        VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, ${sqlBooleanEnumParam('$5', 'outdateddbsnapshotoct2024')}, $6, $7, $8, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
           sound_preference = EXCLUDED.sound_preference,
@@ -887,7 +887,7 @@ async function upsertCustomizationRow(me, row) {
     if (isMissingColumn(err, 'lyric_mute')) {
       await pool.query(
         `
-        INSERT INTO helloworldjunktest.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_volume, volume, custom_music_url, updated_at)
+        INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_volume, volume, custom_music_url, updated_at)
         VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, $5, $6, $7, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
@@ -905,7 +905,7 @@ async function upsertCustomizationRow(me, row) {
     if (isMissingColumn(err, 'lyric_volume')) {
       await pool.query(
         `
-        INSERT INTO helloworldjunktest.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_mute, volume, custom_music_url, updated_at)
+        INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_mute, volume, custom_music_url, updated_at)
         VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, ${lyricMuteParam}, $6, $7, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
@@ -1178,7 +1178,7 @@ export async function putUserCustomization(req, res) {
     if (hasMainFont || nextMainFont) {
       try {
         await pool.query(
-          `UPDATE helloworldjunktest.user_customization
+          `UPDATE outdateddbsnapshotoct2024.user_customization
            SET main_font = $1, updated_at = NOW()
            WHERE singles_id = $2`,
           [nextMainFont, me]
@@ -1192,7 +1192,7 @@ export async function putUserCustomization(req, res) {
         if (!Object.prototype.hasOwnProperty.call(firstVisitPatch, apiKey)) continue;
         try {
           await pool.query(
-            `UPDATE helloworldjunktest.user_customization
+            `UPDATE outdateddbsnapshotoct2024.user_customization
              SET ${dbCol} = $1, updated_at = NOW()
              WHERE singles_id = $2`,
             [firstVisitPatch[apiKey], me]
@@ -1205,8 +1205,8 @@ export async function putUserCustomization(req, res) {
     if (hasSendTuttanoteOverdue) {
       try {
         await pool.query(
-          `UPDATE helloworldjunktest.user_customization
-           SET send_tuttanote_overdue = $1::helloworldjunktest.boolean_enum, updated_at = NOW()
+          `UPDATE outdateddbsnapshotoct2024.user_customization
+           SET send_tuttanote_overdue = $1::outdateddbsnapshotoct2024.boolean_enum, updated_at = NOW()
            WHERE singles_id = $2`,
           [toBooleanEnumLabel(sendTuttanoteOverdue), me]
         );
@@ -1217,8 +1217,8 @@ export async function putUserCustomization(req, res) {
     if (hasSendTuttanote1dayahead) {
       try {
         await pool.query(
-          `UPDATE helloworldjunktest.user_customization
-           SET send_tuttanote_1dayahead = $1::helloworldjunktest.boolean_enum, updated_at = NOW()
+          `UPDATE outdateddbsnapshotoct2024.user_customization
+           SET send_tuttanote_1dayahead = $1::outdateddbsnapshotoct2024.boolean_enum, updated_at = NOW()
            WHERE singles_id = $2`,
           [toBooleanEnumLabel(sendTuttanote1dayahead), me]
         );
@@ -1231,7 +1231,7 @@ export async function putUserCustomization(req, res) {
         if (!Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, apiKey)) continue;
         try {
           await pool.query(
-            `UPDATE helloworldjunktest.user_customization
+            `UPDATE outdateddbsnapshotoct2024.user_customization
              SET ${dbCol} = $1, updated_at = NOW()
              WHERE singles_id = $2`,
             [mallEnrollmentPatch[apiKey], me]

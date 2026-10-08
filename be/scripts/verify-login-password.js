@@ -1,5 +1,5 @@
 /**
- * Compare a login + password against helloworldjunktest.singles (same rules as beVerifyLoginPassword.js).
+ * Compare a login + password against outdateddbsnapshotoct2024.singles (same rules as beVerifyLoginPassword.js).
  *
  * Usage (from be/):
  *   node scripts/verify-login-password.js
@@ -24,7 +24,7 @@ import {
 
 const USER_SELECT = `SELECT singles_id, email, alias, member_id, member_category,
        password_hash, password_attempt_count, password_attempt_datetime
-         FROM helloworldjunktest.singles s`;
+         FROM outdateddbsnapshotoct2024.singles s`;
 
 function storedHashFormat(storedHash) {
   const s = String(storedHash ?? '').trim();

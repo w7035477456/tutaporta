@@ -3,10 +3,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.photos
+ALTER TABLE outdateddbsnapshotoct2024.photos
   ADD COLUMN IF NOT EXISTS photo_thumbnail character varying(120);
 
-COMMENT ON COLUMN helloworldjunktest.photos.photo_thumbnail IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.photos.photo_thumbnail IS
   'JPEG filename in TUTADATES_PHOTO_FOLDER ({photo_file_name}_thumb.jpg). NULL = no thumbnail yet; grid views fall back to full image.';
 
 COMMIT;

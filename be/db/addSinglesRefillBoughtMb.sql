@@ -7,19 +7,19 @@
 --
 -- One-liner:
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
---     ALTER TABLE helloworldjunktest.singles
+--     ALTER TABLE outdateddbsnapshotoct2024.singles
 --       ADD COLUMN IF NOT EXISTS refill_bought_mb integer NOT NULL DEFAULT 10240;
 --   "
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS refill_bought_mb integer NOT NULL DEFAULT 10240;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ALTER COLUMN refill_bought_mb SET DEFAULT 10240;
 
-COMMENT ON COLUMN helloworldjunktest.singles.refill_bought_mb IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.refill_bought_mb IS
   'Tx/Rx quota envelope in MB after the latest purchase/grant. On refill: if remain<=0 set to buy size; if remain>0 set to remain+buy. Not reduced by transfers.';
 
 -- Existing members: reconstruct lifetime bought from payment ledger when possible.
@@ -42,10 +42,10 @@ WITH ledger AS (
         ELSE 0
       END
     )::integer AS bought_from_ledger
-  FROM helloworldjunktest.payment p
+  FROM outdateddbsnapshotoct2024.payment p
   GROUP BY p.singles_id
 )
-UPDATE helloworldjunktest.singles s
+UPDATE outdateddbsnapshotoct2024.singles s
 SET refill_bought_mb = GREATEST(
   10240,
   COALESCE(s.refill_bought_mb, 0),
@@ -55,9 +55,9 @@ FROM ledger l
 WHERE l.singles_id = s.singles_id;
 
 -- Purchase/credit path: remain carry/replace + bought from remain snapshot + buy.
-DROP FUNCTION IF EXISTS helloworldjunktest.add_vault_refill_mb(bigint, integer);
+DROP FUNCTION IF EXISTS outdateddbsnapshotoct2024.add_vault_refill_mb(bigint, integer);
 
-CREATE FUNCTION helloworldjunktest.add_vault_refill_mb(
+CREATE FUNCTION outdateddbsnapshotoct2024.add_vault_refill_mb(
   p_singles_id bigint,
   p_add_mb integer
 )
@@ -68,7 +68,7 @@ DECLARE
   v_remain integer;
   v_add integer := GREATEST(0, COALESCE(p_add_mb, 0));
 BEGIN
-  UPDATE helloworldjunktest.singles
+  UPDATE outdateddbsnapshotoct2024.singles
   SET
     refill_bought_mb = CASE
       WHEN refill_remain_mb <= 0 THEN v_add

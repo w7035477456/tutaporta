@@ -22,7 +22,7 @@ export async function resendPhoneCode(req, res) {
 
     let sessionRow_AAAAA = await pool.query(
       `SELECT id, phone, 'verifications' AS src
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND kind = 'phone_verify_session'
          AND used_at IS NULL
@@ -37,7 +37,7 @@ export async function resendPhoneCode(req, res) {
       try {
         sessionRow_AAAAA = await pool.query(
           `SELECT id, phone, 'pending_phone_verifications' AS src
-           FROM helloworldjunktest.pending_phone_verifications
+           FROM outdateddbsnapshotoct2024.pending_phone_verifications
            WHERE email = $1
              AND used_at IS NULL
              AND expires_at > now()

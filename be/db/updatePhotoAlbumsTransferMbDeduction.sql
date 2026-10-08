@@ -4,7 +4,7 @@
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION helloworldjunktest.add_photoalbums_transfer_mb(
+CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.add_photoalbums_transfer_mb(
   p_singles_id bigint,
   p_bytes bigint
 )
@@ -17,13 +17,13 @@ DECLARE
 BEGIN
   IF p_bytes IS NULL OR p_bytes <= 0 THEN
     SELECT refill_remain_mb INTO v_remain
-    FROM helloworldjunktest.singles WHERE singles_id = p_singles_id;
+    FROM outdateddbsnapshotoct2024.singles WHERE singles_id = p_singles_id;
     RETURN COALESCE(v_remain, 0);
   END IF;
 
   v_add_mb := CEIL(p_bytes::numeric / (1024.0 * 1024.0))::integer;
 
-  UPDATE helloworldjunktest.singles
+  UPDATE outdateddbsnapshotoct2024.singles
   SET
     photoalbums_total_transfer_mb = photoalbums_total_transfer_mb + v_add_mb,
     refill_remain_mb = refill_remain_mb - v_add_mb

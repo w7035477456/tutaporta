@@ -172,7 +172,7 @@ export async function getTutaMallBackupStatus(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT email::text AS email FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+      `SELECT email::text AS email FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
       [singlesId]
     );
     const email = String(rows[0]?.email || '').trim();

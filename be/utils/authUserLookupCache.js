@@ -88,7 +88,7 @@ async function fetchAuthUserFromDb(singlesId, fallbackEmail) {
     `SELECT singles_id,
             email,
             notes_access_password_enabled
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1`,
     [singlesId]
   );

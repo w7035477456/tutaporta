@@ -79,7 +79,7 @@ export function formatLastChangeDateForApi(raw) {
 export async function loadAccountChangeDates(db, singlesId) {
   const { rows } = await db.query(
     `SELECT last_password_change_date, last_email_change_date, last_phone_change_date
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]

@@ -74,7 +74,7 @@ function hasBillContentFromParts(notesText, attachmentCount) {
 async function loadPaidRecordOwned(client, paidRecordId, singlesId) {
   const { rows } = await client.query(
     `SELECT *
-       FROM helloworldjunktest.paid_record
+       FROM outdateddbsnapshotoct2024.paid_record
       WHERE paid_record_id = $1 AND singles_id = $2
       LIMIT 1`,
     [paidRecordId, singlesId]
@@ -85,7 +85,7 @@ async function loadPaidRecordOwned(client, paidRecordId, singlesId) {
 async function listAttachments(client, paidRecordId) {
   const { rows } = await client.query(
     `SELECT *
-       FROM helloworldjunktest.paid_record_attachment
+       FROM outdateddbsnapshotoct2024.paid_record_attachment
       WHERE paid_record_id = $1
       ORDER BY created_at ASC, paid_record_attachment_id ASC`,
     [paidRecordId]
@@ -96,7 +96,7 @@ async function listAttachments(client, paidRecordId) {
 async function countAttachments(client, paidRecordId) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.paid_record_attachment
+       FROM outdateddbsnapshotoct2024.paid_record_attachment
       WHERE paid_record_id = $1`,
     [paidRecordId]
   );
@@ -119,7 +119,7 @@ async function findDuplicatePaidRecordAttachment(singlesId, paidRecordId, buffer
 
   const { rows } = await pool.query(
     `SELECT *
-       FROM helloworldjunktest.paid_record_attachment
+       FROM outdateddbsnapshotoct2024.paid_record_attachment
       WHERE paid_record_id = $1
         AND byte_size = $2
       ORDER BY created_at ASC, paid_record_attachment_id ASC`,
@@ -137,7 +137,7 @@ async function findDuplicatePaidRecordAttachment(singlesId, paidRecordId, buffer
         );
         rowChecksum = sha256Hex(existingBuf);
         await pool.query(
-          `UPDATE helloworldjunktest.paid_record_attachment
+          `UPDATE outdateddbsnapshotoct2024.paid_record_attachment
               SET checksum = $1
             WHERE paid_record_attachment_id = $2`,
           [rowChecksum, row.paid_record_attachment_id]
@@ -183,7 +183,7 @@ async function savePaidRecordAttachmentOrSkipDuplicate(
   let rows;
   try {
     ({ rows } = await pool.query(
-      `INSERT INTO helloworldjunktest.paid_record_attachment (
+      `INSERT INTO outdateddbsnapshotoct2024.paid_record_attachment (
          paid_record_id, singles_id, original_file_name, stored_file_name,
          mime_type, byte_size, checksum, relative_path
        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -203,7 +203,7 @@ async function savePaidRecordAttachmentOrSkipDuplicate(
     // Schema without checksum column yet — insert without it, still dedupe via size+disk.
     if (String(err?.code) === '42703') {
       ({ rows } = await pool.query(
-        `INSERT INTO helloworldjunktest.paid_record_attachment (
+        `INSERT INTO outdateddbsnapshotoct2024.paid_record_attachment (
            paid_record_id, singles_id, original_file_name, stored_file_name,
            mime_type, byte_size, relative_path
          ) VALUES ($1,$2,$3,$4,$5,$6,$7)
@@ -224,7 +224,7 @@ async function savePaidRecordAttachmentOrSkipDuplicate(
   }
 
   await pool.query(
-    `UPDATE helloworldjunktest.paid_record SET updated_at = now() WHERE paid_record_id = $1`,
+    `UPDATE outdateddbsnapshotoct2024.paid_record SET updated_at = now() WHERE paid_record_id = $1`,
     [paidRecordId]
   );
   const attachments = await listAttachments(pool, paidRecordId);
@@ -318,7 +318,7 @@ export async function postPaidRecordEnsure(req, res) {
       if (monthlyBillId && monthlyBillId > 0) {
         const { rows } = await client.query(
           `SELECT monthly_bill_id, paid_record_id
-             FROM helloworldjunktest.monthly_bill
+             FROM outdateddbsnapshotoct2024.monthly_bill
             WHERE monthly_bill_id = $1 AND singles_id = $2 AND storage_backend = $3
             LIMIT 1`,
           [monthlyBillId, singlesId, storageBackend]
@@ -329,7 +329,7 @@ export async function postPaidRecordEnsure(req, res) {
       } else {
         const { rows: existing } = await client.query(
           `SELECT monthly_bill_id, paid_record_id
-             FROM helloworldjunktest.monthly_bill
+             FROM outdateddbsnapshotoct2024.monthly_bill
             WHERE singles_id = $1 AND storage_backend = $2
               AND bill_year = $3 AND bill_month = $4 AND row_index = $5
             LIMIT 1`,
@@ -351,7 +351,7 @@ export async function postPaidRecordEnsure(req, res) {
             else if (/^not\s*paid$/i.test(a)) action = 'Not Paid';
           }
           const { rows: inserted } = await client.query(
-            `INSERT INTO helloworldjunktest.monthly_bill (
+            `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
                singles_id, storage_backend, bill_year, bill_month, row_index,
                bill_description, due_day, amount, bill_type, action, paid_record_id
              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL)
@@ -382,7 +382,7 @@ export async function postPaidRecordEnsure(req, res) {
       if (!paidRecordId) {
         const { rows: byBill } = await client.query(
           `SELECT paid_record_id
-             FROM helloworldjunktest.paid_record
+             FROM outdateddbsnapshotoct2024.paid_record
             WHERE singles_id = $1 AND schedule_kind = 'monthly' AND monthly_bill_id = $2
             LIMIT 1`,
           [singlesId, monthlyBillId]
@@ -391,7 +391,7 @@ export async function postPaidRecordEnsure(req, res) {
           paidRecordId = Number(byBill[0].paid_record_id);
         } else {
           const { rows: created } = await client.query(
-            `INSERT INTO helloworldjunktest.paid_record (
+            `INSERT INTO outdateddbsnapshotoct2024.paid_record (
                singles_id, schedule_kind, monthly_bill_id, yearly_bill_id, storage_backend, notes_text
              ) VALUES ($1, 'monthly', $2, NULL, $3, '')
              RETURNING paid_record_id`,
@@ -400,13 +400,13 @@ export async function postPaidRecordEnsure(req, res) {
           paidRecordId = Number(created[0].paid_record_id);
         }
         await client.query(
-          `UPDATE helloworldjunktest.monthly_bill
+          `UPDATE outdateddbsnapshotoct2024.monthly_bill
               SET paid_record_id = $1, updated_at = now()
             WHERE monthly_bill_id = $2 AND singles_id = $3`,
           [paidRecordId, monthlyBillId, singlesId]
         );
         await client.query(
-          `UPDATE helloworldjunktest.paid_record
+          `UPDATE outdateddbsnapshotoct2024.paid_record
               SET monthly_bill_id = $1, updated_at = now()
             WHERE paid_record_id = $2 AND singles_id = $3`,
           [monthlyBillId, paidRecordId, singlesId]
@@ -417,7 +417,7 @@ export async function postPaidRecordEnsure(req, res) {
       if (yearlyBillId && yearlyBillId > 0) {
         const { rows } = await client.query(
           `SELECT yearly_bill_id, paid_record_id
-             FROM helloworldjunktest.yearly_bill
+             FROM outdateddbsnapshotoct2024.yearly_bill
             WHERE yearly_bill_id = $1 AND singles_id = $2 AND storage_backend = $3
             LIMIT 1`,
           [yearlyBillId, singlesId, storageBackend]
@@ -428,7 +428,7 @@ export async function postPaidRecordEnsure(req, res) {
       } else {
         const { rows: existing } = await client.query(
           `SELECT yearly_bill_id, paid_record_id
-             FROM helloworldjunktest.yearly_bill
+             FROM outdateddbsnapshotoct2024.yearly_bill
             WHERE singles_id = $1 AND storage_backend = $2
               AND bill_year = $3 AND row_index = $4
             LIMIT 1`,
@@ -451,7 +451,7 @@ export async function postPaidRecordEnsure(req, res) {
             else if (/^not\s*paid$/i.test(a)) action = 'Not Paid';
           }
           const { rows: inserted } = await client.query(
-            `INSERT INTO helloworldjunktest.yearly_bill (
+            `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
                singles_id, storage_backend, bill_year, bill_month, row_index,
                bill_description, due_month_day, amount, bill_type, action, paid_record_id
              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL)
@@ -482,7 +482,7 @@ export async function postPaidRecordEnsure(req, res) {
       if (!paidRecordId) {
         const { rows: byBill } = await client.query(
           `SELECT paid_record_id
-             FROM helloworldjunktest.paid_record
+             FROM outdateddbsnapshotoct2024.paid_record
             WHERE singles_id = $1 AND schedule_kind = 'yearly' AND yearly_bill_id = $2
             LIMIT 1`,
           [singlesId, yearlyBillId]
@@ -491,7 +491,7 @@ export async function postPaidRecordEnsure(req, res) {
           paidRecordId = Number(byBill[0].paid_record_id);
         } else {
           const { rows: created } = await client.query(
-            `INSERT INTO helloworldjunktest.paid_record (
+            `INSERT INTO outdateddbsnapshotoct2024.paid_record (
                singles_id, schedule_kind, monthly_bill_id, yearly_bill_id, storage_backend, notes_text
              ) VALUES ($1, 'yearly', NULL, $2, $3, '')
              RETURNING paid_record_id`,
@@ -500,13 +500,13 @@ export async function postPaidRecordEnsure(req, res) {
           paidRecordId = Number(created[0].paid_record_id);
         }
         await client.query(
-          `UPDATE helloworldjunktest.yearly_bill
+          `UPDATE outdateddbsnapshotoct2024.yearly_bill
               SET paid_record_id = $1, updated_at = now()
             WHERE yearly_bill_id = $2 AND singles_id = $3`,
           [paidRecordId, yearlyBillId, singlesId]
         );
         await client.query(
-          `UPDATE helloworldjunktest.paid_record
+          `UPDATE outdateddbsnapshotoct2024.paid_record
               SET yearly_bill_id = $1, updated_at = now()
             WHERE paid_record_id = $2 AND singles_id = $3`,
           [yearlyBillId, paidRecordId, singlesId]
@@ -579,7 +579,7 @@ export async function putPaidRecordNotes(req, res) {
     const notesText = String(req.body?.notes_text ?? req.body?.notesText ?? '').slice(0, 20000);
 
     const { rows } = await pool.query(
-      `UPDATE helloworldjunktest.paid_record
+      `UPDATE outdateddbsnapshotoct2024.paid_record
           SET notes_text = $1, updated_at = now()
         WHERE paid_record_id = $2 AND singles_id = $3
         RETURNING *`,
@@ -666,7 +666,7 @@ async function sendAttachment(req, res, { download }) {
 
   const { rows } = await pool.query(
     `SELECT *
-       FROM helloworldjunktest.paid_record_attachment
+       FROM outdateddbsnapshotoct2024.paid_record_attachment
       WHERE paid_record_attachment_id = $1 AND paid_record_id = $2 AND singles_id = $3
       LIMIT 1`,
     [attachmentId, paidRecordId, singlesId]
@@ -726,7 +726,7 @@ export async function deletePaidRecordAttachment(req, res) {
     if (!pr) throw httpError(404, 'Paid record not found');
 
     const { rows } = await pool.query(
-      `DELETE FROM helloworldjunktest.paid_record_attachment
+      `DELETE FROM outdateddbsnapshotoct2024.paid_record_attachment
         WHERE paid_record_attachment_id = $1 AND paid_record_id = $2 AND singles_id = $3
         RETURNING *`,
       [attachmentId, paidRecordId, singlesId]
@@ -735,7 +735,7 @@ export async function deletePaidRecordAttachment(req, res) {
 
     await deletePaidRecordAttachmentFile(singlesId, rows[0].relative_path);
     await pool.query(
-      `UPDATE helloworldjunktest.paid_record SET updated_at = now() WHERE paid_record_id = $1`,
+      `UPDATE outdateddbsnapshotoct2024.paid_record SET updated_at = now() WHERE paid_record_id = $1`,
       [paidRecordId]
     );
 

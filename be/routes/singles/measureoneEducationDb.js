@@ -1,14 +1,14 @@
 import pool from '../../db/connection.js';
 import { parseBooleanEnumRaw, sqlBooleanEnumParam, toBooleanEnumLabel } from '../../utils/booleanEnum.js';
 
-const EDU_SCHEMA = 'helloworldjunktest';
+const EDU_SCHEMA = 'outdateddbsnapshotoct2024';
 
 let tableReady = false;
 
 export async function ensureUserEducationVerificationsTable() {
   if (tableReady) return;
   await pool.query(
-    `CREATE TABLE IF NOT EXISTS helloworldjunktest.user_education_verifications (
+    `CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_education_verifications (
       id SERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL,
       measureone_individual_id VARCHAR(64),
@@ -16,7 +16,7 @@ export async function ensureUserEducationVerificationsTable() {
       raw_academic_record JSONB,
       digest_record JSONB,
       academic_summary_response JSONB,
-      is_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
+      is_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
       created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT user_education_verifications_user_id_key UNIQUE (user_id)
@@ -24,22 +24,22 @@ export async function ensureUserEducationVerificationsTable() {
   );
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_user_edu_measureone_individual
-     ON helloworldjunktest.user_education_verifications (measureone_individual_id)`
+     ON outdateddbsnapshotoct2024.user_education_verifications (measureone_individual_id)`
   );
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_user_edu_measureone_datarequest
-     ON helloworldjunktest.user_education_verifications (measureone_datarequest_id)`
+     ON outdateddbsnapshotoct2024.user_education_verifications (measureone_datarequest_id)`
   );
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_user_edu_gpa
-     ON helloworldjunktest.user_education_verifications ((digest_record->'verification_summary'->>'cumulative_gpa'))`
+     ON outdateddbsnapshotoct2024.user_education_verifications ((digest_record->'verification_summary'->>'cumulative_gpa'))`
   );
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_user_edu_school
-     ON helloworldjunktest.user_education_verifications ((digest_record->'verification_summary'->>'verified_institution_name'))`
+     ON outdateddbsnapshotoct2024.user_education_verifications ((digest_record->'verification_summary'->>'verified_institution_name'))`
   );
   await pool.query(
-    `CREATE OR REPLACE VIEW helloworldjunktest.user_education_verifications_summary AS
+    `CREATE OR REPLACE VIEW outdateddbsnapshotoct2024.user_education_verifications_summary AS
      SELECT
        u.id,
        u.user_id,
@@ -64,7 +64,7 @@ export async function ensureUserEducationVerificationsTable() {
        u.measureone_individual_id,
        u.measureone_datarequest_id,
        u.updated_at
-     FROM helloworldjunktest.user_education_verifications u`
+     FROM outdateddbsnapshotoct2024.user_education_verifications u`
   );
   tableReady = true;
 }
@@ -89,7 +89,7 @@ export async function loadUserEducationVerification(userId) {
   await ensureUserEducationVerificationsTable();
   const result = await pool.query(
     `SELECT *
-     FROM helloworldjunktest.user_education_verifications
+     FROM outdateddbsnapshotoct2024.user_education_verifications
      WHERE user_id = $1
      LIMIT 1`,
     [userId]
@@ -103,7 +103,7 @@ export async function loadUserEducationVerificationByDatarequestId(datarequestId
   await ensureUserEducationVerificationsTable();
   const result = await pool.query(
     `SELECT *
-     FROM helloworldjunktest.user_education_verifications
+     FROM outdateddbsnapshotoct2024.user_education_verifications
      WHERE measureone_datarequest_id = $1
      LIMIT 1`,
     [id]
@@ -142,7 +142,7 @@ export async function upsertUserEducationVerification({
 }) {
   await ensureUserEducationVerificationsTable();
   const result = await pool.query(
-    `INSERT INTO helloworldjunktest.user_education_verifications (
+    `INSERT INTO outdateddbsnapshotoct2024.user_education_verifications (
        user_id,
        measureone_individual_id,
        measureone_datarequest_id,
@@ -154,12 +154,12 @@ export async function upsertUserEducationVerification({
      )
      VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, ${sqlBooleanEnumParam('$7', EDU_SCHEMA)}, CURRENT_TIMESTAMP)
      ON CONFLICT (user_id) DO UPDATE SET
-       measureone_individual_id = COALESCE(EXCLUDED.measureone_individual_id, helloworldjunktest.user_education_verifications.measureone_individual_id),
-       measureone_datarequest_id = COALESCE(EXCLUDED.measureone_datarequest_id, helloworldjunktest.user_education_verifications.measureone_datarequest_id),
-       raw_academic_record = COALESCE(EXCLUDED.raw_academic_record, helloworldjunktest.user_education_verifications.raw_academic_record),
-       digest_record = COALESCE(EXCLUDED.digest_record, helloworldjunktest.user_education_verifications.digest_record),
-       academic_summary_response = COALESCE(EXCLUDED.academic_summary_response, helloworldjunktest.user_education_verifications.academic_summary_response),
-       is_verified = EXCLUDED.is_verified OR helloworldjunktest.user_education_verifications.is_verified,
+       measureone_individual_id = COALESCE(EXCLUDED.measureone_individual_id, outdateddbsnapshotoct2024.user_education_verifications.measureone_individual_id),
+       measureone_datarequest_id = COALESCE(EXCLUDED.measureone_datarequest_id, outdateddbsnapshotoct2024.user_education_verifications.measureone_datarequest_id),
+       raw_academic_record = COALESCE(EXCLUDED.raw_academic_record, outdateddbsnapshotoct2024.user_education_verifications.raw_academic_record),
+       digest_record = COALESCE(EXCLUDED.digest_record, outdateddbsnapshotoct2024.user_education_verifications.digest_record),
+       academic_summary_response = COALESCE(EXCLUDED.academic_summary_response, outdateddbsnapshotoct2024.user_education_verifications.academic_summary_response),
+       is_verified = EXCLUDED.is_verified OR outdateddbsnapshotoct2024.user_education_verifications.is_verified,
        updated_at = CURRENT_TIMESTAMP
      RETURNING *`,
     [

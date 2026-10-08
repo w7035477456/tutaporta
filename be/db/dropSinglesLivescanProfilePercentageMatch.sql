@@ -3,10 +3,10 @@
 -- Mac dev (Primary):
 -- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/dropSinglesLivescanProfilePercentageMatch.sql
 
-UPDATE helloworldjunktest.singles
+UPDATE outdateddbsnapshotoct2024.singles
 SET live_scan_percent_match = livescan_profile_percentage_match
 WHERE live_scan_percent_match IS NULL
   AND livescan_profile_percentage_match IS NOT NULL;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   DROP COLUMN IF EXISTS livescan_profile_percentage_match;

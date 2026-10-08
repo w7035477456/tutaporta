@@ -67,7 +67,7 @@ export async function updateMyPhoto(req, res) {
       return res.status(400).json({ error: 'Invalid photo id' });
     }
 
-    const row = await pool.query(`SELECT photos_id, file_extension, photo_file_name, singles_id FROM helloworldjunktest.photos WHERE photos_id = $1 LIMIT 1`, [
+    const row = await pool.query(`SELECT photos_id, file_extension, photo_file_name, singles_id FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1 LIMIT 1`, [
       id
     ]);
     if (!row.rows.length || Number(row.rows[0].singles_id) !== Number(singlesId)) {
@@ -158,7 +158,7 @@ export async function updateMyPhoto(req, res) {
     }
 
     if (newExt !== oldExt) {
-      await pool.query(`UPDATE helloworldjunktest.photos SET file_extension = $1 WHERE photos_id = $2`, [newExt, id]);
+      await pool.query(`UPDATE outdateddbsnapshotoct2024.photos SET file_extension = $1 WHERE photos_id = $2`, [newExt, id]);
     }
 
     await regeneratePhotoThumbnail(pool, id, buffer);

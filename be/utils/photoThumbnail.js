@@ -92,7 +92,7 @@ export async function resolvePhotoThumbnailColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name = 'photo_thumbnail'
      LIMIT 1`
@@ -135,7 +135,7 @@ export async function regeneratePhotoThumbnail(db, photosId, buffer) {
 
   const { rows } = await db.query(
     `SELECT photo_file_name, file_path, photo_thumbnail
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE photos_id = $1
      LIMIT 1`,
     [id]
@@ -157,7 +157,7 @@ export async function regeneratePhotoThumbnail(db, photosId, buffer) {
   if (!photoThumbnail) return null;
 
   await db.query(
-    `UPDATE helloworldjunktest.photos SET photo_thumbnail = $1 WHERE photos_id = $2`,
+    `UPDATE outdateddbsnapshotoct2024.photos SET photo_thumbnail = $1 WHERE photos_id = $2`,
     [photoThumbnail, id]
   );
   return photoThumbnail;

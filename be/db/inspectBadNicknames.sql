@@ -8,7 +8,7 @@
 SELECT singles_id, member_id, alias,
        COALESCE(NULLIF(BTRIM(gender_self_report::text), ''), NULLIF(BTRIM(dl_sex::text), '')) AS sex,
        mailing_firstname, email
-FROM helloworldjunktest.singles
+FROM outdateddbsnapshotoct2024.singles
 WHERE alias IS NOT NULL AND BTRIM(alias) <> ''
 ORDER BY singles_id;
 
@@ -16,7 +16,7 @@ ORDER BY singles_id;
 -- Female pack: JazzyJeff, BrainyBobby, LuckyLuke
 -- Male pack:   RapidRuth, GiddyGail, SillySue
 SELECT singles_id, alias, email
-FROM helloworldjunktest.singles
+FROM outdateddbsnapshotoct2024.singles
 WHERE LOWER(TRIM(alias)) IN (
   'jazzyjeff', 'brainybobby', 'luckyluke',
   'rapidruth', 'giddygail', 'sillysue'

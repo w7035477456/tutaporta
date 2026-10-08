@@ -10,7 +10,7 @@ export async function loadPhotosBySinglesIds(db, singlesIds) {
 
   const { rows } = await db.query(
     `SELECT photos_id, singles_id, photo_file_name, file_extension, type::text AS photo_type, created_at
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE singles_id = ANY($1::bigint[])
      ORDER BY singles_id ASC, photos_id DESC`,
     [idList]

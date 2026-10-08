@@ -34,7 +34,7 @@ async function main() {
   const encBlob = encryptRecordVaultIconKeyMap(map);
 
   await pool.query(
-    `UPDATE helloworldjunktest.global
+    `UPDATE outdateddbsnapshotoct2024.global
      SET record_vault_icon_keys_enc = $1,
          record_vault_icon_keys = '{}'::jsonb
      WHERE id = 1`,

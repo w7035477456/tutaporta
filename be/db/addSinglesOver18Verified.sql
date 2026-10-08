@@ -1,4 +1,4 @@
--- helloworldjunktest.singles.over_18_verified — age gate from government ID DOB OCR.
+-- outdateddbsnapshotoct2024.singles.over_18_verified — age gate from government ID DOB OCR.
 -- NULL = not yet verified (force Identification Verification).
 -- true = DOB confirms age >= 18.
 -- false = DOB confirms under 18 (pair with status = under18).
@@ -11,18 +11,18 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'singles'
       AND column_name = 'over_18_verified'
   ) THEN
-    ALTER TABLE helloworldjunktest.singles
+    ALTER TABLE outdateddbsnapshotoct2024.singles
       ADD COLUMN over_18_verified boolean DEFAULT NULL;
 
-    UPDATE helloworldjunktest.singles
+    UPDATE outdateddbsnapshotoct2024.singles
     SET over_18_verified = true
     WHERE over_18_verified IS NULL;
   END IF;
 END $$;
 
-COMMENT ON COLUMN helloworldjunktest.singles.over_18_verified IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.over_18_verified IS
   'NULL = pending ID DOB age check; true = verified >= 18; false = under 18 (login blocked via status=under18).';

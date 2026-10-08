@@ -193,7 +193,7 @@ export async function getChatInlineImage(req, res) {
       const relativePath = `/api/chat/image/${raw}`;
       const accessCheck = await pool.query(
         `SELECT 1
-         FROM helloworldjunktest.chat_log
+         FROM outdateddbsnapshotoct2024.chat_log
          WHERE (sender_id = $1 OR receiver_id = $1)
            AND (msg_text = $2 OR msg_text LIKE $3)
          LIMIT 1`,

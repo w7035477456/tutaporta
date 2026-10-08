@@ -17,7 +17,7 @@ import { invalidateRecordVaultIconKeyCache } from '../utils/recordVaultIconKeys.
 async function main() {
   const result = await pool.query(
     `SELECT record_vault_icon_keys, record_vault_icon_keys_enc
-     FROM helloworldjunktest.global
+     FROM outdateddbsnapshotoct2024.global
      WHERE id = 1
      LIMIT 1`
   );
@@ -44,7 +44,7 @@ async function main() {
 
   const encBlob = encryptRecordVaultIconKeyMap(map);
   await pool.query(
-    `UPDATE helloworldjunktest.global
+    `UPDATE outdateddbsnapshotoct2024.global
      SET record_vault_icon_keys_enc = $1,
          record_vault_icon_keys = '{}'::jsonb
      WHERE id = 1`,

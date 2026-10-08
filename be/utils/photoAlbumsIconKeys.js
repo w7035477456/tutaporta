@@ -62,7 +62,7 @@ async function loadIconKeyMap(force = false) {
   }
   const result = await pool.query(
     `SELECT record_vault_icon_keys_enc
-     FROM helloworldjunktest.global
+     FROM outdateddbsnapshotoct2024.global
      WHERE id = 1
      LIMIT 1`
   );

@@ -9,10 +9,10 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.photo_albums_vault (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.photo_albums_vault (
   vault_id         bigserial PRIMARY KEY,
   singles_id       bigint NOT NULL
-                   REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+                   REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   storage_backend  text NOT NULL,
   kdf_algo         text NOT NULL DEFAULT 'argon2id',
   kdf_salt         bytea NOT NULL,
@@ -31,20 +31,20 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.photo_albums_vault (
   CONSTRAINT photo_albums_vault_access_failed_attempts_chk CHECK (access_failed_attempts >= 0)
 );
 
-COMMENT ON TABLE helloworldjunktest.photo_albums_vault IS
-  'TutaPhotoAlbums E2E vault metadata (KDF + wrapped DEK). Independent from helloworldjunktest.notes_vault (TutaNotes).';
-COMMENT ON COLUMN helloworldjunktest.photo_albums_vault.wrapped_dek IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.photo_albums_vault IS
+  'TutaPhotoAlbums E2E vault metadata (KDF + wrapped DEK). Independent from outdateddbsnapshotoct2024.notes_vault (TutaNotes).';
+COMMENT ON COLUMN outdateddbsnapshotoct2024.photo_albums_vault.wrapped_dek IS
   'AES-GCM sealed DEK for Photo Albums only. Opaque to server.';
-COMMENT ON COLUMN helloworldjunktest.photo_albums_vault.kdf_salt IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.photo_albums_vault.kdf_salt IS
   'Argon2id salt for Photo Albums client KEK derivation.';
-COMMENT ON COLUMN helloworldjunktest.photo_albums_vault.access_failed_attempts IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.photo_albums_vault.access_failed_attempts IS
   'Consecutive incorrect Photo Albums vault-password attempts for this storage backend.';
-COMMENT ON COLUMN helloworldjunktest.photo_albums_vault.access_locked_until IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.photo_albums_vault.access_locked_until IS
   'Legacy lock column (Photo Albums no longer enforces cooldown); kept for schema parity.';
 
 -- One-time seed: copy existing Notes keys so current Photo vaults still open.
 -- After this, Notes password changes only touch notes_vault; Photo only photo_albums_vault.
-INSERT INTO helloworldjunktest.photo_albums_vault (
+INSERT INTO outdateddbsnapshotoct2024.photo_albums_vault (
   singles_id, storage_backend, kdf_algo, kdf_salt, kdf_mem_kib, kdf_time, kdf_parallelism,
   wrapped_dek, crypto_version, access_failed_attempts, access_locked_until,
   created_at, updated_at
@@ -53,11 +53,11 @@ SELECT
   singles_id, storage_backend, kdf_algo, kdf_salt, kdf_mem_kib, kdf_time, kdf_parallelism,
   wrapped_dek, crypto_version, 0, NULL,
   created_at, updated_at
-FROM helloworldjunktest.notes_vault nv
+FROM outdateddbsnapshotoct2024.notes_vault nv
 WHERE nv.storage_backend IN ('onedrive', 'usb')
   AND NOT EXISTS (
   SELECT 1
-    FROM helloworldjunktest.photo_albums_vault pav
+    FROM outdateddbsnapshotoct2024.photo_albums_vault pav
    WHERE pav.singles_id = nv.singles_id
      AND pav.storage_backend = nv.storage_backend
 );

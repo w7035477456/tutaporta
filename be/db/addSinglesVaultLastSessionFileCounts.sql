@@ -4,16 +4,16 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_last_session_usb_tx_rx_count integer NOT NULL DEFAULT 0;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_last_session_ui_tx_rx_count integer NOT NULL DEFAULT 0;
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_last_session_usb_tx_rx_count IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_last_session_usb_tx_rx_count IS
   'Usb tx/rx count from the most recent vault logoff — shown on login gate until next session.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_last_session_ui_tx_rx_count IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_last_session_ui_tx_rx_count IS
   'ui tx/rx count from the most recent vault logoff — shown on login gate until next session.';
 
 COMMIT;

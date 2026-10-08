@@ -4,7 +4,7 @@
 -- Run on Primary only:
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/protectSystemToolsAdminSinglesTruncate.sql
 
-CREATE OR REPLACE FUNCTION helloworldjunktest.prevent_system_tools_admin_singles_delete()
+CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.prevent_system_tools_admin_singles_delete()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -17,18 +17,18 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION helloworldjunktest.prevent_singles_truncate()
+CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.prevent_singles_truncate()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  RAISE EXCEPTION 'helloworldjunktest.singles cannot be truncated';
+  RAISE EXCEPTION 'outdateddbsnapshotoct2024.singles cannot be truncated';
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_prevent_singles_truncate ON helloworldjunktest.singles;
+DROP TRIGGER IF EXISTS trg_prevent_singles_truncate ON outdateddbsnapshotoct2024.singles;
 
 CREATE TRIGGER trg_prevent_singles_truncate
-BEFORE TRUNCATE ON helloworldjunktest.singles
+BEFORE TRUNCATE ON outdateddbsnapshotoct2024.singles
 FOR EACH STATEMENT
-EXECUTE FUNCTION helloworldjunktest.prevent_singles_truncate();
+EXECUTE FUNCTION outdateddbsnapshotoct2024.prevent_singles_truncate();

@@ -64,7 +64,7 @@ Ubuntu Postgres listens on `127.0.0.1:50010` (TCP needs a password; `test_user1`
 ```bash
 scripts/ubuntu-psql.sh -c "SELECT pg_size_pretty(pg_database_size(current_database()));"
 scripts/ubuntu-psql.sh -f be/db/someMigration.sql          # apply a migration on Ubuntu Primary
-echo "SELECT count(*) FROM helloworldjunktest.singles;" | scripts/ubuntu-psql.sh
+echo "SELECT count(*) FROM outdateddbsnapshotoct2024.singles;" | scripts/ubuntu-psql.sh
 scripts/ubuntu-psql.sh -At -c "SELECT …"                   # extra psql flags pass through
 ```
 

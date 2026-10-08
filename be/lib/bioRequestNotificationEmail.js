@@ -96,7 +96,7 @@ export function sendBioRequestNotificationEmailFireAndForget({
 
       const { rows } = await pool.query(
         `SELECT singles_id, email, alias, prefix, member_id
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
          WHERE singles_id = ANY($1::bigint[])`,
         [ids]
       );

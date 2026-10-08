@@ -3,14 +3,14 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_access_password_hash text,
   ADD COLUMN IF NOT EXISTS notes_access_password_updated_at timestamp with time zone;
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_access_password_hash IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_access_password_hash IS
   'bcrypt hash for Record Vault page access (separate from login password_hash and USB PIN).';
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_access_password_updated_at IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_access_password_updated_at IS
   'When notes_access_password_hash was last set or changed.';
 
 COMMIT;

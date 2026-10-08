@@ -86,8 +86,8 @@ async function loadJoinedMembers(client, eventId) {
       s.member_id,
       s.profile_image_fk,
       COALESCE(NULLIF(s.gender_self_report, ''), NULLIF(s.dl_sex, '')) AS gender
-    FROM helloworldjunktest.speed_date_rsvp r
-    JOIN helloworldjunktest.singles s ON s.singles_id = r.singles_id
+    FROM outdateddbsnapshotoct2024.speed_date_rsvp r
+    JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = r.singles_id
     WHERE r.event_id = $1
       AND r.status = 'joined'
     ORDER BY r.created_at ASC, r.singles_id ASC
@@ -101,7 +101,7 @@ async function loadPreviousPairKeys(client, eventId) {
   const result = await client.query(
     `
     SELECT singles_low, singles_high
-    FROM helloworldjunktest.speed_date_pair
+    FROM outdateddbsnapshotoct2024.speed_date_pair
     WHERE event_id = $1
     `,
     [eventId]
@@ -120,7 +120,7 @@ async function insertRoundPairs(client, event, members) {
   const roundMinutes = Number(event.round_minutes) || 20;
   const insertedRound = await client.query(
     `
-    INSERT INTO helloworldjunktest.speed_date_round (event_id, round_no, status, started_at, ends_at)
+    INSERT INTO outdateddbsnapshotoct2024.speed_date_round (event_id, round_no, status, started_at, ends_at)
     VALUES ($1, $2, 'live', NOW(), NOW() + ($3::int * INTERVAL '1 minute'))
     RETURNING round_id, event_id, round_no, status, started_at, ends_at
     `,
@@ -131,7 +131,7 @@ async function insertRoundPairs(client, event, members) {
   for (const [low, high] of pairs) {
     await client.query(
       `
-      INSERT INTO helloworldjunktest.speed_date_pair
+      INSERT INTO outdateddbsnapshotoct2024.speed_date_pair
         (event_id, round_id, singles_low, singles_high)
       VALUES ($1, $2, $3, $4)
       `,
@@ -141,7 +141,7 @@ async function insertRoundPairs(client, event, members) {
   for (const sitId of sitOuts) {
     await client.query(
       `
-      INSERT INTO helloworldjunktest.speed_date_sitout (round_id, singles_id)
+      INSERT INTO outdateddbsnapshotoct2024.speed_date_sitout (round_id, singles_id)
       VALUES ($1, $2)
       ON CONFLICT DO NOTHING
       `,
@@ -151,7 +151,7 @@ async function insertRoundPairs(client, event, members) {
 
   await client.query(
     `
-    UPDATE helloworldjunktest.speed_date_event
+    UPDATE outdateddbsnapshotoct2024.speed_date_event
     SET status = 'live',
         current_round_no = $2,
         updated_at = NOW()
@@ -171,7 +171,7 @@ async function maybeAdvanceEvent(client, eventId) {
   if (!locked.rows[0]?.ok) return { advanced: false };
 
   const eventRes = await client.query(
-    `SELECT * FROM helloworldjunktest.speed_date_event WHERE event_id = $1 FOR UPDATE`,
+    `SELECT * FROM outdateddbsnapshotoct2024.speed_date_event WHERE event_id = $1 FOR UPDATE`,
     [eventId]
   );
   const event = eventRes.rows[0];
@@ -180,7 +180,7 @@ async function maybeAdvanceEvent(client, eventId) {
   const current = await client.query(
     `
     SELECT *
-    FROM helloworldjunktest.speed_date_round
+    FROM outdateddbsnapshotoct2024.speed_date_round
     WHERE event_id = $1
     ORDER BY round_no DESC
     LIMIT 1
@@ -199,7 +199,7 @@ async function maybeAdvanceEvent(client, eventId) {
     if (intermission > 0) {
       await client.query(
         `
-        UPDATE helloworldjunktest.speed_date_round
+        UPDATE outdateddbsnapshotoct2024.speed_date_round
         SET status = 'intermission',
             ends_at = NOW() + ($2::int * INTERVAL '1 second')
         WHERE round_id = $1
@@ -209,25 +209,25 @@ async function maybeAdvanceEvent(client, eventId) {
       return { advanced: true, event };
     }
     await client.query(
-      `UPDATE helloworldjunktest.speed_date_round SET status = 'ended' WHERE round_id = $1`,
+      `UPDATE outdateddbsnapshotoct2024.speed_date_round SET status = 'ended' WHERE round_id = $1`,
       [round.round_id]
     );
   }
 
   const refreshedRound = await client.query(
-    `SELECT * FROM helloworldjunktest.speed_date_round WHERE round_id = $1`,
+    `SELECT * FROM outdateddbsnapshotoct2024.speed_date_round WHERE round_id = $1`,
     [round.round_id]
   );
   const liveRound = refreshedRound.rows[0];
   if (liveRound.status === 'intermission' && new Date(liveRound.ends_at).getTime() <= new Date(now).getTime()) {
     await client.query(
-      `UPDATE helloworldjunktest.speed_date_round SET status = 'ended' WHERE round_id = $1`,
+      `UPDATE outdateddbsnapshotoct2024.speed_date_round SET status = 'ended' WHERE round_id = $1`,
       [liveRound.round_id]
     );
   }
 
   const after = await client.query(
-    `SELECT * FROM helloworldjunktest.speed_date_round WHERE round_id = $1`,
+    `SELECT * FROM outdateddbsnapshotoct2024.speed_date_round WHERE round_id = $1`,
     [round.round_id]
   );
   const doneRound = after.rows[0];
@@ -236,7 +236,7 @@ async function maybeAdvanceEvent(client, eventId) {
   if (Number(event.current_round_no) >= Number(event.max_rounds)) {
     await client.query(
       `
-      UPDATE helloworldjunktest.speed_date_event
+      UPDATE outdateddbsnapshotoct2024.speed_date_event
       SET status = 'ended', updated_at = NOW()
       WHERE event_id = $1
       `,
@@ -253,7 +253,7 @@ async function maybeAdvanceEvent(client, eventId) {
     if (error?.statusCode === 400) {
       await client.query(
         `
-        UPDATE helloworldjunktest.speed_date_event
+        UPDATE outdateddbsnapshotoct2024.speed_date_event
         SET status = 'ended', updated_at = NOW()
         WHERE event_id = $1
         `,
@@ -272,15 +272,15 @@ async function loadSessionPayload(me, eventId, isAdmin) {
       e.*,
       (
         SELECT count(*)::int
-        FROM helloworldjunktest.speed_date_rsvp r
+        FROM outdateddbsnapshotoct2024.speed_date_rsvp r
         WHERE r.event_id = e.event_id AND r.status = 'joined'
       ) AS rsvp_count,
       (
         SELECT count(*)::int
-        FROM helloworldjunktest.speed_date_rsvp r
+        FROM outdateddbsnapshotoct2024.speed_date_rsvp r
         WHERE r.event_id = e.event_id AND r.status = 'joined' AND r.camera_ready = true
       ) AS ready_count
-    FROM helloworldjunktest.speed_date_event e
+    FROM outdateddbsnapshotoct2024.speed_date_event e
     WHERE e.event_id = $1
     `,
     [eventId]
@@ -291,7 +291,7 @@ async function loadSessionPayload(me, eventId, isAdmin) {
   const rsvpRes = await pool.query(
     `
     SELECT status, camera_ready, last_seen_at
-    FROM helloworldjunktest.speed_date_rsvp
+    FROM outdateddbsnapshotoct2024.speed_date_rsvp
     WHERE event_id = $1 AND singles_id = $2
     `,
     [eventId, me]
@@ -307,7 +307,7 @@ async function loadSessionPayload(me, eventId, isAdmin) {
   const roundRes = await pool.query(
     `
     SELECT round_id, event_id, round_no, status, started_at, ends_at
-    FROM helloworldjunktest.speed_date_round
+    FROM outdateddbsnapshotoct2024.speed_date_round
     WHERE event_id = $1
     ORDER BY round_no DESC
     LIMIT 1
@@ -331,7 +331,7 @@ async function loadSessionPayload(me, eventId, isAdmin) {
     const pairRes = await pool.query(
       `
       SELECT pair_id, singles_low, singles_high, low_want_meet, high_want_meet
-      FROM helloworldjunktest.speed_date_pair
+      FROM outdateddbsnapshotoct2024.speed_date_pair
       WHERE round_id = $1
         AND (singles_low = $2 OR singles_high = $2)
       LIMIT 1
@@ -347,7 +347,7 @@ async function loadSessionPayload(me, eventId, isAdmin) {
         SELECT
           singles_id, alias, prefix, member_id, profile_image_fk,
           COALESCE(NULLIF(gender_self_report, ''), NULLIF(dl_sex, '')) AS gender
-        FROM helloworldjunktest.singles
+        FROM outdateddbsnapshotoct2024.singles
         WHERE singles_id = $1
         `,
         [partnerId]
@@ -366,7 +366,7 @@ async function loadSessionPayload(me, eventId, isAdmin) {
       const sitRes = await pool.query(
         `
         SELECT 1
-        FROM helloworldjunktest.speed_date_sitout
+        FROM outdateddbsnapshotoct2024.speed_date_sitout
         WHERE round_id = $1 AND singles_id = $2
         `,
         [round.round_id, me]
@@ -403,10 +403,10 @@ export async function listSpeedDateEvents(req, res) {
         e.*,
         (
           SELECT count(*)::int
-          FROM helloworldjunktest.speed_date_rsvp r
+          FROM outdateddbsnapshotoct2024.speed_date_rsvp r
           WHERE r.event_id = e.event_id AND r.status = 'joined'
         ) AS rsvp_count
-      FROM helloworldjunktest.speed_date_event e
+      FROM outdateddbsnapshotoct2024.speed_date_event e
       WHERE e.status IN ('draft', 'open', 'live')
          OR (e.status = 'ended' AND e.updated_at > NOW() - INTERVAL '12 hours')
       ORDER BY
@@ -442,7 +442,7 @@ export async function createSpeedDateEvent(req, res) {
     const zoomLobbyUrl = trimText(req.body?.zoom_lobby_url, 500);
     const inserted = await pool.query(
       `
-      INSERT INTO helloworldjunktest.speed_date_event (
+      INSERT INTO outdateddbsnapshotoct2024.speed_date_event (
         host_singles_id, title, status, mix_mode, round_minutes, intermission_seconds,
         max_participants, max_rounds, starts_at, zoom_lobby_url
       )
@@ -476,7 +476,7 @@ export async function rsvpSpeedDateEvent(req, res) {
   try {
     await ensureSpeedDateSchema();
     const eventRes = await pool.query(
-      `SELECT event_id, status, max_participants FROM helloworldjunktest.speed_date_event WHERE event_id = $1`,
+      `SELECT event_id, status, max_participants FROM outdateddbsnapshotoct2024.speed_date_event WHERE event_id = $1`,
       [eventId]
     );
     const event = eventRes.rows[0];
@@ -484,7 +484,7 @@ export async function rsvpSpeedDateEvent(req, res) {
     if (leave) {
       await pool.query(
         `
-        UPDATE helloworldjunktest.speed_date_rsvp
+        UPDATE outdateddbsnapshotoct2024.speed_date_rsvp
         SET status = 'left', camera_ready = false, last_seen_at = NOW()
         WHERE event_id = $1 AND singles_id = $2
         `,
@@ -498,7 +498,7 @@ export async function rsvpSpeedDateEvent(req, res) {
     const countRes = await pool.query(
       `
       SELECT count(*)::int AS n
-      FROM helloworldjunktest.speed_date_rsvp
+      FROM outdateddbsnapshotoct2024.speed_date_rsvp
       WHERE event_id = $1 AND status = 'joined' AND singles_id <> $2
       `,
       [eventId, me]
@@ -508,7 +508,7 @@ export async function rsvpSpeedDateEvent(req, res) {
     }
     await pool.query(
       `
-      INSERT INTO helloworldjunktest.speed_date_rsvp (event_id, singles_id, status, last_seen_at, camera_ready)
+      INSERT INTO outdateddbsnapshotoct2024.speed_date_rsvp (event_id, singles_id, status, last_seen_at, camera_ready)
       VALUES ($1, $2, 'joined', NOW(), false)
       ON CONFLICT (event_id, singles_id)
       DO UPDATE SET status = 'joined', last_seen_at = NOW()
@@ -530,7 +530,7 @@ export async function heartbeatSpeedDate(req, res) {
     const cameraReady = req.body?.camera_ready === true;
     await pool.query(
       `
-      UPDATE helloworldjunktest.speed_date_rsvp
+      UPDATE outdateddbsnapshotoct2024.speed_date_rsvp
       SET last_seen_at = NOW(), camera_ready = $3
       WHERE event_id = $1 AND singles_id = $2 AND status = 'joined'
       `,
@@ -552,7 +552,7 @@ export async function getSpeedDateSession(req, res) {
       const pick = await pool.query(
         `
         SELECT event_id
-        FROM helloworldjunktest.speed_date_event
+        FROM outdateddbsnapshotoct2024.speed_date_event
         WHERE status IN ('live', 'open')
         ORDER BY CASE status WHEN 'live' THEN 0 ELSE 1 END, event_id DESC
         LIMIT 1
@@ -594,7 +594,7 @@ export async function startSpeedDateEvent(req, res) {
     await ensureSpeedDateSchema();
     await client.query('BEGIN');
     const eventRes = await client.query(
-      `SELECT * FROM helloworldjunktest.speed_date_event WHERE event_id = $1 FOR UPDATE`,
+      `SELECT * FROM outdateddbsnapshotoct2024.speed_date_event WHERE event_id = $1 FOR UPDATE`,
       [eventId]
     );
     const event = eventRes.rows[0];
@@ -631,7 +631,7 @@ export async function nextSpeedDateRound(req, res) {
     await ensureSpeedDateSchema();
     await client.query('BEGIN');
     const eventRes = await client.query(
-      `SELECT * FROM helloworldjunktest.speed_date_event WHERE event_id = $1 FOR UPDATE`,
+      `SELECT * FROM outdateddbsnapshotoct2024.speed_date_event WHERE event_id = $1 FOR UPDATE`,
       [eventId]
     );
     const event = eventRes.rows[0];
@@ -640,7 +640,7 @@ export async function nextSpeedDateRound(req, res) {
 
     await client.query(
       `
-      UPDATE helloworldjunktest.speed_date_round
+      UPDATE outdateddbsnapshotoct2024.speed_date_round
       SET status = 'ended'
       WHERE event_id = $1 AND status IN ('live', 'intermission')
       `,
@@ -649,7 +649,7 @@ export async function nextSpeedDateRound(req, res) {
 
     if (Number(event.current_round_no) >= Number(event.max_rounds)) {
       await client.query(
-        `UPDATE helloworldjunktest.speed_date_event SET status = 'ended', updated_at = NOW() WHERE event_id = $1`,
+        `UPDATE outdateddbsnapshotoct2024.speed_date_event SET status = 'ended', updated_at = NOW() WHERE event_id = $1`,
         [eventId]
       );
       await client.query('COMMIT');
@@ -680,7 +680,7 @@ export async function endSpeedDateEvent(req, res) {
     await ensureSpeedDateSchema();
     await pool.query(
       `
-      UPDATE helloworldjunktest.speed_date_round
+      UPDATE outdateddbsnapshotoct2024.speed_date_round
       SET status = 'ended'
       WHERE event_id = $1 AND status IN ('live', 'intermission')
       `,
@@ -688,7 +688,7 @@ export async function endSpeedDateEvent(req, res) {
     );
     await pool.query(
       `
-      UPDATE helloworldjunktest.speed_date_event
+      UPDATE outdateddbsnapshotoct2024.speed_date_event
       SET status = 'ended', updated_at = NOW()
       WHERE event_id = $1
       `,
@@ -716,8 +716,8 @@ export async function postSpeedDateSignal(req, res) {
     const pairRes = await pool.query(
       `
       SELECT p.pair_id, p.singles_low, p.singles_high, r.status AS round_status
-      FROM helloworldjunktest.speed_date_pair p
-      JOIN helloworldjunktest.speed_date_round r ON r.round_id = p.round_id
+      FROM outdateddbsnapshotoct2024.speed_date_pair p
+      JOIN outdateddbsnapshotoct2024.speed_date_round r ON r.round_id = p.round_id
       WHERE p.pair_id = $1
       `,
       [pairId]
@@ -733,7 +733,7 @@ export async function postSpeedDateSignal(req, res) {
       const countRes = await pool.query(
         `
         SELECT count(*)::int AS n
-        FROM helloworldjunktest.speed_date_signal
+        FROM outdateddbsnapshotoct2024.speed_date_signal
         WHERE pair_id = $1 AND from_singles_id = $2 AND kind = 'ice'
         `,
         [pairId, me]
@@ -743,14 +743,14 @@ export async function postSpeedDateSignal(req, res) {
       }
     } else {
       await pool.query(
-        `DELETE FROM helloworldjunktest.speed_date_signal WHERE pair_id = $1 AND from_singles_id = $2 AND kind IN ('offer', 'answer', 'ice')`,
+        `DELETE FROM outdateddbsnapshotoct2024.speed_date_signal WHERE pair_id = $1 AND from_singles_id = $2 AND kind IN ('offer', 'answer', 'ice')`,
         [pairId, me]
       );
     }
 
     const inserted = await pool.query(
       `
-      INSERT INTO helloworldjunktest.speed_date_signal (pair_id, from_singles_id, kind, payload)
+      INSERT INTO outdateddbsnapshotoct2024.speed_date_signal (pair_id, from_singles_id, kind, payload)
       VALUES ($1, $2, $3, $4::jsonb)
       RETURNING signal_id
       `,
@@ -773,7 +773,7 @@ export async function getSpeedDateSignals(req, res) {
     const pairRes = await pool.query(
       `
       SELECT pair_id, singles_low, singles_high
-      FROM helloworldjunktest.speed_date_pair
+      FROM outdateddbsnapshotoct2024.speed_date_pair
       WHERE pair_id = $1
       `,
       [pairId]
@@ -786,7 +786,7 @@ export async function getSpeedDateSignals(req, res) {
     const result = await pool.query(
       `
       SELECT signal_id, kind, payload, from_singles_id, created_at
-      FROM helloworldjunktest.speed_date_signal
+      FROM outdateddbsnapshotoct2024.speed_date_signal
       WHERE pair_id = $1
         AND from_singles_id <> $2
         AND signal_id > $3
@@ -819,7 +819,7 @@ export async function postSpeedDateInterest(req, res) {
     const pairRes = await pool.query(
       `
       SELECT pair_id, singles_low, singles_high
-      FROM helloworldjunktest.speed_date_pair
+      FROM outdateddbsnapshotoct2024.speed_date_pair
       WHERE pair_id = $1
       `,
       [pairId]
@@ -832,7 +832,7 @@ export async function postSpeedDateInterest(req, res) {
     const column = isLow ? 'low_want_meet' : 'high_want_meet';
     const updated = await pool.query(
       `
-      UPDATE helloworldjunktest.speed_date_pair
+      UPDATE outdateddbsnapshotoct2024.speed_date_pair
       SET ${column} = $2
       WHERE pair_id = $1
       RETURNING low_want_meet, high_want_meet

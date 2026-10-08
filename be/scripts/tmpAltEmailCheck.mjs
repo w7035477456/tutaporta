@@ -12,7 +12,7 @@ function check(name, actual, expected) {
   results.push({ name, ok, actual, expected });
 }
 
-await pool.query('UPDATE helloworldjunktest.singles SET alt_email = $1 WHERE email = $2', [ALT, MAIN]);
+await pool.query('UPDATE outdateddbsnapshotoct2024.singles SET alt_email = $1 WHERE email = $2', [ALT, MAIN]);
 
 check('plain member recipient', (await addAltEmailCopies({ to: MAIN })).cc, [ALT]);
 check('display-name form', (await addAltEmailCopies({ to: `"Sam" <${MAIN}>` })).cc, [ALT]);
@@ -24,7 +24,7 @@ check('no duplicate when already bcc', (await addAltEmailCopies({ to: MAIN, bcc:
 check('non-member untouched', (await addAltEmailCopies({ to: OTHER })).cc, undefined);
 check('subject/html untouched', (await addAltEmailCopies({ to: MAIN, subject: 'x' })).subject, 'x');
 
-await pool.query('UPDATE helloworldjunktest.singles SET alt_email = NULL WHERE email = $1', [MAIN]);
+await pool.query('UPDATE outdateddbsnapshotoct2024.singles SET alt_email = NULL WHERE email = $1', [MAIN]);
 check('cleared alt adds nothing', (await addAltEmailCopies({ to: MAIN })).cc, undefined);
 
 for (const r of results) {

@@ -79,7 +79,7 @@ export async function registerUser(req, res) {
 
     let existing;
     try {
-      existing = await pool.query('SELECT 1 FROM helloworldjunktest.singles WHERE email = $1', [emailTrimmed]);
+      existing = await pool.query('SELECT 1 FROM outdateddbsnapshotoct2024.singles WHERE email = $1', [emailTrimmed]);
     } catch (dbError) {
       console.error('DB error checking existing email:', dbError);
       return res.status(500).json({
@@ -141,12 +141,12 @@ export async function registerUser(req, res) {
 
     try {
       await pool.query(
-        `DELETE FROM helloworldjunktest.verifications
+        `DELETE FROM outdateddbsnapshotoct2024.verifications
          WHERE email = $1 AND kind = 'registration_email' AND used_at IS NULL`,
         [emailTrimmed]
       );
       await pool.query(
-        `INSERT INTO helloworldjunktest.verifications (email, code, password_hash, kind, expires_at)
+        `INSERT INTO outdateddbsnapshotoct2024.verifications (email, code, password_hash, kind, expires_at)
          VALUES ($1, $2, $3, 'registration_email', $4)`,
         [emailTrimmed, code, registrationMetaJson, expiresAt]
       );

@@ -1,4 +1,4 @@
--- Cascade DELETE from helloworldjunktest.singles.singles_id to 9 child tables.
+-- Cascade DELETE from outdateddbsnapshotoct2024.singles.singles_id to 9 child tables.
 -- Already CASCADE (no change): postings, user_activity_sessions, misc_bio, vet_bio.
 -- Adds FK + CASCADE: audit_registrations, mobile_photo_upload_sessions, photos,
 --   requests (singles_id_from + singles_id_to), user_customization.
@@ -9,96 +9,96 @@
 BEGIN;
 
 -- Orphan cleanup (required before FK can be enforced).
-UPDATE helloworldjunktest.audit_registrations ar
+UPDATE outdateddbsnapshotoct2024.audit_registrations ar
 SET singles_id = NULL
 WHERE ar.singles_id IS NOT NULL
   AND NOT EXISTS (
-    SELECT 1 FROM helloworldjunktest.singles s WHERE s.singles_id = ar.singles_id
+    SELECT 1 FROM outdateddbsnapshotoct2024.singles s WHERE s.singles_id = ar.singles_id
   );
 
-DELETE FROM helloworldjunktest.mobile_photo_upload_sessions m
+DELETE FROM outdateddbsnapshotoct2024.mobile_photo_upload_sessions m
 WHERE NOT EXISTS (
-  SELECT 1 FROM helloworldjunktest.singles s WHERE s.singles_id = m.singles_id
+  SELECT 1 FROM outdateddbsnapshotoct2024.singles s WHERE s.singles_id = m.singles_id
 );
 
-DELETE FROM helloworldjunktest.photos p
+DELETE FROM outdateddbsnapshotoct2024.photos p
 WHERE NOT EXISTS (
-  SELECT 1 FROM helloworldjunktest.singles s WHERE s.singles_id = p.singles_id
+  SELECT 1 FROM outdateddbsnapshotoct2024.singles s WHERE s.singles_id = p.singles_id
 );
 
-DELETE FROM helloworldjunktest.requests r
+DELETE FROM outdateddbsnapshotoct2024.requests r
 WHERE NOT EXISTS (
-  SELECT 1 FROM helloworldjunktest.singles s WHERE s.singles_id = r.singles_id_from
+  SELECT 1 FROM outdateddbsnapshotoct2024.singles s WHERE s.singles_id = r.singles_id_from
 )
 OR NOT EXISTS (
-  SELECT 1 FROM helloworldjunktest.singles s WHERE s.singles_id = r.singles_id_to
+  SELECT 1 FROM outdateddbsnapshotoct2024.singles s WHERE s.singles_id = r.singles_id_to
 );
 
-DELETE FROM helloworldjunktest.user_customization uc
+DELETE FROM outdateddbsnapshotoct2024.user_customization uc
 WHERE NOT EXISTS (
-  SELECT 1 FROM helloworldjunktest.singles s WHERE s.singles_id = uc.singles_id
+  SELECT 1 FROM outdateddbsnapshotoct2024.singles s WHERE s.singles_id = uc.singles_id
 );
 
 -- Idempotent: ensure the four existing links stay ON DELETE CASCADE.
-ALTER TABLE helloworldjunktest.postings
+ALTER TABLE outdateddbsnapshotoct2024.postings
   DROP CONSTRAINT IF EXISTS postings_singles_id_fkey;
-ALTER TABLE helloworldjunktest.postings
+ALTER TABLE outdateddbsnapshotoct2024.postings
   ADD CONSTRAINT postings_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.user_activity_sessions
+ALTER TABLE outdateddbsnapshotoct2024.user_activity_sessions
   DROP CONSTRAINT IF EXISTS user_activity_sessions_singles_id_fkey1;
-ALTER TABLE helloworldjunktest.user_activity_sessions
+ALTER TABLE outdateddbsnapshotoct2024.user_activity_sessions
   ADD CONSTRAINT user_activity_sessions_singles_id_fkey1
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.misc_bio
+ALTER TABLE outdateddbsnapshotoct2024.misc_bio
   DROP CONSTRAINT IF EXISTS misc_bio_singles_id_fkey;
-ALTER TABLE helloworldjunktest.misc_bio
+ALTER TABLE outdateddbsnapshotoct2024.misc_bio
   ADD CONSTRAINT misc_bio_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.vet_bio
+ALTER TABLE outdateddbsnapshotoct2024.vet_bio
   DROP CONSTRAINT IF EXISTS vet_bio_singles_id_fkey;
-ALTER TABLE helloworldjunktest.vet_bio
+ALTER TABLE outdateddbsnapshotoct2024.vet_bio
   ADD CONSTRAINT vet_bio_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
 -- New FK links (were missing in beforeCascadeDelete9TableFix06182026.sql).
-ALTER TABLE helloworldjunktest.audit_registrations
+ALTER TABLE outdateddbsnapshotoct2024.audit_registrations
   DROP CONSTRAINT IF EXISTS audit_registrations_singles_id_fkey;
-ALTER TABLE helloworldjunktest.audit_registrations
+ALTER TABLE outdateddbsnapshotoct2024.audit_registrations
   ADD CONSTRAINT audit_registrations_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.mobile_photo_upload_sessions
+ALTER TABLE outdateddbsnapshotoct2024.mobile_photo_upload_sessions
   DROP CONSTRAINT IF EXISTS mobile_photo_upload_sessions_singles_id_fkey;
-ALTER TABLE helloworldjunktest.mobile_photo_upload_sessions
+ALTER TABLE outdateddbsnapshotoct2024.mobile_photo_upload_sessions
   ADD CONSTRAINT mobile_photo_upload_sessions_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.photos
+ALTER TABLE outdateddbsnapshotoct2024.photos
   DROP CONSTRAINT IF EXISTS photos_singles_id_fkey;
-ALTER TABLE helloworldjunktest.photos
+ALTER TABLE outdateddbsnapshotoct2024.photos
   ADD CONSTRAINT photos_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.requests
+ALTER TABLE outdateddbsnapshotoct2024.requests
   DROP CONSTRAINT IF EXISTS requests_singles_id_from_fkey;
-ALTER TABLE helloworldjunktest.requests
+ALTER TABLE outdateddbsnapshotoct2024.requests
   ADD CONSTRAINT requests_singles_id_from_fkey
-  FOREIGN KEY (singles_id_from) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id_from) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.requests
+ALTER TABLE outdateddbsnapshotoct2024.requests
   DROP CONSTRAINT IF EXISTS requests_singles_id_to_fkey;
-ALTER TABLE helloworldjunktest.requests
+ALTER TABLE outdateddbsnapshotoct2024.requests
   ADD CONSTRAINT requests_singles_id_to_fkey
-  FOREIGN KEY (singles_id_to) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id_to) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
-ALTER TABLE helloworldjunktest.user_customization
+ALTER TABLE outdateddbsnapshotoct2024.user_customization
   DROP CONSTRAINT IF EXISTS user_customization_singles_id_fkey;
-ALTER TABLE helloworldjunktest.user_customization
+ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ADD CONSTRAINT user_customization_singles_id_fkey
-  FOREIGN KEY (singles_id) REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE;
+  FOREIGN KEY (singles_id) REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE;
 
 COMMIT;

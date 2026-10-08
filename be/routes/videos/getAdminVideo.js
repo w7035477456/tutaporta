@@ -15,7 +15,7 @@ function getVideoCacheControlHeaderValue() {
 }
 
 /**
- * GET /api/admin/video/:id — admin streams any member video from helloworldjunktest.videos.
+ * GET /api/admin/video/:id — admin streams any member video from outdateddbsnapshotoct2024.videos.
  */
 export async function getAdminVideo(req, res) {
   try {
@@ -26,7 +26,7 @@ export async function getAdminVideo(req, res) {
 
     const row = await pool.query(
       `SELECT file_extension, singles_id, video_file_name, file_path
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE video_id = $1
        LIMIT 1`,
       [id]

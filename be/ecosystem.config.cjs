@@ -17,7 +17,7 @@ module.exports = {
     script: './server_be.js',
     cwd: path.join(__dirname),
     // Any worker count is safe: TutaPhoto / TutaNote vault copies are kept coherent
-    // across workers via helloworldjunktest.vault_cluster_state (vaultClusterCoherence.js).
+    // across workers via outdateddbsnapshotoct2024.vault_cluster_state (vaultClusterCoherence.js).
     instances: 2,
     exec_mode: 'cluster',
     max_memory_restart: '12G',

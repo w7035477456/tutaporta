@@ -1,4 +1,4 @@
-/** Cycle order matches helloworldjunktest.singles_status enum sort order. */
+/** Cycle order matches outdateddbsnapshotoct2024.singles_status enum sort order. */
 export const SINGLES_STATUS_VALUES = Object.freeze([
   'active',
   'cancel',

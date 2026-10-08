@@ -36,7 +36,7 @@ else
     PGPASSWORD="${PGPASSWORD:-$(pg_read_env DB_PASSWORD)}"
     PGSCHEMA="${PGSCHEMA:-$(pg_read_env DB_SCHEMA)}"
     PGSCHEMA="${PGSCHEMA:-$(pg_read_env VSINGLES_SCHEMA)}"
-    PGSCHEMA="${PGSCHEMA:-helloworldjunktest}"
+    PGSCHEMA="${PGSCHEMA:-outdateddbsnapshotoct2024}"
     export PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD PGSCHEMA
   }
   pg_connection_label() {

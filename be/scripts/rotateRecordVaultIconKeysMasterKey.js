@@ -193,7 +193,7 @@ async function rotateKeys(oldKey, newKey) {
       `SELECT record_vault_icon_keys_enc,
               length(record_vault_icon_keys_enc) AS enc_char_len,
               md5(record_vault_icon_keys_enc) AS enc_md5
-       FROM helloworldjunktest.global
+       FROM outdateddbsnapshotoct2024.global
        WHERE id = 1
        LIMIT 1`
     );
@@ -228,7 +228,7 @@ async function rotateKeys(oldKey, newKey) {
 
     const tokenResult = await client.query(
       `SELECT singles_id, record_notes_onedrive_refresh_token_enc
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE record_notes_onedrive_refresh_token_enc IS NOT NULL
          AND btrim(record_notes_onedrive_refresh_token_enc) <> ''`
     );
@@ -273,7 +273,7 @@ async function rotateKeys(oldKey, newKey) {
     inTransaction = true;
 
     await client.query(
-      `UPDATE helloworldjunktest.global
+      `UPDATE outdateddbsnapshotoct2024.global
        SET record_vault_icon_keys_enc = $1
        WHERE id = 1`,
       [newEncBlob]
@@ -281,7 +281,7 @@ async function rotateKeys(oldKey, newKey) {
 
     for (const { singlesId, newEnc } of tokenRows) {
       await client.query(
-        `UPDATE helloworldjunktest.singles
+        `UPDATE outdateddbsnapshotoct2024.singles
          SET record_notes_onedrive_refresh_token_enc = $2
          WHERE singles_id = $1`,
         [singlesId, newEnc]

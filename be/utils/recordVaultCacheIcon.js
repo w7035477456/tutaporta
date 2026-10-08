@@ -40,7 +40,7 @@ async function readCacheIconFromDb(singlesId, kind) {
   const column = columnForKind(kind);
   const result = await pool.query(
     `SELECT ${column} AS cache_icon
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]
@@ -114,7 +114,7 @@ export async function writeRecordVaultCacheIcon(singlesId, kind, iconName) {
   if (!icon) return;
   const column = columnForKind(k);
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET ${column} = $1,
             updated_at = CURRENT_TIMESTAMP
       WHERE singles_id = $2`,
@@ -131,7 +131,7 @@ export async function clearRecordVaultCacheIcon(singlesId, kind = null) {
     const k = assertKind(kind);
     const column = columnForKind(k);
     await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
           SET ${column} = NULL,
               updated_at = CURRENT_TIMESTAMP
         WHERE singles_id = $1`,
@@ -142,7 +142,7 @@ export async function clearRecordVaultCacheIcon(singlesId, kind = null) {
   }
 
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET cache_onedrive_icon = NULL,
             cache_usb_icon = NULL,
             updated_at = CURRENT_TIMESTAMP

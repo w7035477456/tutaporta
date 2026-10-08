@@ -17,7 +17,7 @@ const PHOTO_ALBUMS_WRONG_PASSWORD_ERROR = 'Incorrect Encrypt password, please tr
 const PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR = 'Incorrect current Encrypt password';
 
 function schema() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 export function getVaultAccessRetryDelaySeconds() {

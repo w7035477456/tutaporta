@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CreateNewMember.sh — interactive helper to insert one helloworldjunktest.singles
+# CreateNewMember.sh — interactive helper to insert one outdateddbsnapshotoct2024.singles
 # (+ vet_bio + misc_bio). Run from repo root or anywhere:
 #   bash ~/code/main/CreateNewMember.sh
 #
@@ -12,7 +12,7 @@ PSQL_HOST="${PSQL_HOST:-127.0.0.1}"
 PSQL_PORT="${PSQL_PORT:-50010}"
 PSQL_USER="${PSQL_USER:-test_user1}"
 PSQL_DB="${PSQL_DB:-onlinemallwebsite}"
-SCHEMA="helloworldjunktest"
+SCHEMA="outdateddbsnapshotoct2024"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATION_SQL="${SCRIPT_DIR}/be/db/addRegularMemberAnyMemberInactive.sql"
 NICKNAME_JS="${SCRIPT_DIR}/fe/src/config/nicknameSuggestions.js"

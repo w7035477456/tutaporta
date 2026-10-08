@@ -37,13 +37,13 @@ function videoContentTypeToExt(contentType) {
 
 async function nextVideoId(client) {
   try {
-    const seqResult = await client.query("SELECT nextval('helloworldjunktest.video_id_seq') AS id");
+    const seqResult = await client.query("SELECT nextval('outdateddbsnapshotoct2024.video_id_seq') AS id");
     const nextId = Number(seqResult.rows[0]?.id ?? 0);
     if (Number.isFinite(nextId) && nextId > 0) return nextId;
   } catch {
     // fall through
   }
-  const maxResult = await client.query('SELECT COALESCE(MAX(video_id), 0) + 1 AS id FROM helloworldjunktest.videos');
+  const maxResult = await client.query('SELECT COALESCE(MAX(video_id), 0) + 1 AS id FROM outdateddbsnapshotoct2024.videos');
   return Number(maxResult.rows[0]?.id ?? 1);
 }
 
@@ -117,7 +117,7 @@ export async function saveSelfIntroVideo(
   const activityAt = await resolveRegularMemberActivityTimestamp(client, singlesId, { previousAt });
 
   await client.query(
-    `INSERT INTO helloworldjunktest.videos
+    `INSERT INTO outdateddbsnapshotoct2024.videos
        (video_id, singles_id, file_path, file_extension, type, video_file_name, checksum, video_thumbnail${
          activityAt ? ', created_at' : ''
        })

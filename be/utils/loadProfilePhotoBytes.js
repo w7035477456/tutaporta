@@ -15,8 +15,8 @@ import { loadMemberIdForSinglesOrFallback } from './tutaDatesMemberPaths.js';
 export async function loadProfilePhotoBytes(singlesId) {
   const result = await pool.query(
     `SELECT s.profile_image_fk, s.member_id, p.file_extension, p.photo_file_name, p.file_path, p.singles_id AS photo_owner_id
-     FROM helloworldjunktest.singles s
-     LEFT JOIN helloworldjunktest.photos p ON p.photos_id = s.profile_image_fk
+     FROM outdateddbsnapshotoct2024.singles s
+     LEFT JOIN outdateddbsnapshotoct2024.photos p ON p.photos_id = s.profile_image_fk
      WHERE s.singles_id = $1
      LIMIT 1`,
     [singlesId]

@@ -105,7 +105,7 @@ function toSinglesId(raw) {
 async function countMonthlyRows(client, singlesId) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.monthly_bill
+       FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1`,
     [singlesId]
   );
@@ -115,7 +115,7 @@ async function countMonthlyRows(client, singlesId) {
 async function countYearlyRows(client, singlesId) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.yearly_bill
+       FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1`,
     [singlesId]
   );
@@ -126,7 +126,7 @@ async function insertDefaultMonthlyRows(client, singlesId, year, month) {
   for (const storageBackend of BILL_STORAGE_BACKENDS) {
     for (const row of DEFAULT_MONTHLY_BILL_ROWS) {
       await client.query(
-        `INSERT INTO helloworldjunktest.monthly_bill (
+        `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
            singles_id, storage_backend, bill_year, bill_month, row_index,
            bill_description, due_day, amount, bill_type, action, paid_record_id
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL)`,
@@ -151,7 +151,7 @@ async function insertDefaultYearlyRows(client, singlesId, year) {
   for (const storageBackend of BILL_STORAGE_BACKENDS) {
     for (const row of DEFAULT_YEARLY_BILL_ROWS) {
       await client.query(
-        `INSERT INTO helloworldjunktest.yearly_bill (
+        `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
            singles_id, storage_backend, bill_year, bill_month, row_index,
            bill_description, due_month_day, amount, bill_type, action, paid_record_id
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL)`,

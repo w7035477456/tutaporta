@@ -19,7 +19,7 @@ export async function verifyPasswordResetLink(req, res) {
 
     const result = await pool.query(
       `SELECT id, email
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE code = $1
          AND kind = 'password_reset'
          AND used_at IS NULL

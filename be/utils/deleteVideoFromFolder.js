@@ -1,6 +1,6 @@
 import { unlinkMemberVideoFilesFromDisk } from './videoFilePath.js';
 
-const VIDEOS_TABLE = 'helloworldjunktest.videos';
+const VIDEOS_TABLE = 'outdateddbsnapshotoct2024.videos';
 
 export async function fetchVideoRowsForSinglesId(pool, singlesId) {
   const { rows } = await pool.query(

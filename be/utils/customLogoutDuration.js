@@ -90,7 +90,7 @@ export async function fetchCustomLogoutDuration(singlesId, db = pool) {
   try {
     const { rows } = await db.query(
       `SELECT custom_logout_duration
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [id]
@@ -115,7 +115,7 @@ export async function fetchCustomLogoutDurationsMap(singlesIds, db = pool) {
   try {
     const { rows } = await db.query(
       `SELECT singles_id, custom_logout_duration
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = ANY($1::bigint[])`,
       [ids]
     );
@@ -146,7 +146,7 @@ export async function setCustomLogoutDuration(singlesId, minutes, db = pool) {
     throw new Error('Invalid singles_id or custom_logout_duration');
   }
   await db.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET custom_logout_duration = $1,
          updated_at = CURRENT_TIMESTAMP
      WHERE singles_id = $2`,

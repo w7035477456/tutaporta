@@ -6,14 +6,14 @@
 
 BEGIN;
 
-UPDATE helloworldjunktest.singles
+UPDATE outdateddbsnapshotoct2024.singles
 SET dl_sex = CASE
   WHEN UPPER(BTRIM(COALESCE(dl_sex::text, ''))) IN ('M', 'MALE') THEN 'M'
   WHEN UPPER(BTRIM(COALESCE(dl_sex::text, ''))) IN ('F', 'FEMALE') THEN 'F'
   ELSE NULL
 END;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ALTER COLUMN dl_sex TYPE char(1)
   USING (
     CASE
@@ -23,7 +23,7 @@ ALTER TABLE helloworldjunktest.singles
     END
   );
 
-COMMENT ON COLUMN helloworldjunktest.singles.dl_sex IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.dl_sex IS
   'Sex from driver license OCR: M or F (CHAR(1)); NULL when unknown.';
 
 COMMIT;

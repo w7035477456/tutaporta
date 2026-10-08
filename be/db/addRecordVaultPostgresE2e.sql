@@ -7,10 +7,10 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.notes_vault (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.notes_vault (
   vault_id         bigserial PRIMARY KEY,
   singles_id       bigint NOT NULL
-                   REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+                   REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   storage_backend  text NOT NULL DEFAULT 'postgres',
   -- Password -> KEK derivation params (client-side); safe in plaintext:
   kdf_algo         text NOT NULL DEFAULT 'argon2id',
@@ -31,24 +31,24 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.notes_vault (
   CONSTRAINT notes_vault_access_failed_attempts_chk CHECK (access_failed_attempts >= 0)
 );
 
-COMMENT ON TABLE helloworldjunktest.notes_vault IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.notes_vault IS
   'TutaNotes E2E vault metadata: KDF params + wrapped DEK. Server cannot unwrap DEK.';
-COMMENT ON COLUMN helloworldjunktest.notes_vault.wrapped_dek IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.notes_vault.wrapped_dek IS
   'AES-GCM sealed DEK (12-byte IV || 16-byte tag || ciphertext). Opaque to server.';
-COMMENT ON COLUMN helloworldjunktest.notes_vault.kdf_salt IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.notes_vault.kdf_salt IS
   'Argon2id salt for client KEK derivation. Not secret alone.';
-COMMENT ON COLUMN helloworldjunktest.notes_vault.access_failed_attempts IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.notes_vault.access_failed_attempts IS
   'Consecutive incorrect vault-password attempts for this storage backend.';
-COMMENT ON COLUMN helloworldjunktest.notes_vault.access_locked_until IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.notes_vault.access_locked_until IS
   'Timestamp before which another vault-password attempt is prohibited.';
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.record_vault_item (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.record_vault_item (
   item_id        bigserial PRIMARY KEY,
   vault_id       bigint NOT NULL
-                 REFERENCES helloworldjunktest.notes_vault (vault_id) ON DELETE CASCADE,
+                 REFERENCES outdateddbsnapshotoct2024.notes_vault (vault_id) ON DELETE CASCADE,
   item_type      text NOT NULL,                 -- notebook|note|shortcut
   parent_id      bigint
-                 REFERENCES helloworldjunktest.record_vault_item (item_id) ON DELETE CASCADE,
+                 REFERENCES outdateddbsnapshotoct2024.record_vault_item (item_id) ON DELETE CASCADE,
   display_order  int NOT NULL DEFAULT 0,
   content        bytea NOT NULL,                -- encrypted JSON (name, body_html, keywords, flags…)
   content_bytes  int NOT NULL DEFAULT 0,
@@ -60,23 +60,23 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.record_vault_item (
 );
 
 CREATE INDEX IF NOT EXISTS record_vault_item_vault_type_deleted_idx
-  ON helloworldjunktest.record_vault_item (vault_id, item_type, deleted_at);
+  ON outdateddbsnapshotoct2024.record_vault_item (vault_id, item_type, deleted_at);
 CREATE INDEX IF NOT EXISTS record_vault_item_vault_parent_idx
-  ON helloworldjunktest.record_vault_item (vault_id, parent_id);
+  ON outdateddbsnapshotoct2024.record_vault_item (vault_id, parent_id);
 
-COMMENT ON TABLE helloworldjunktest.record_vault_item IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.record_vault_item IS
   'Notebooks/notes/shortcuts as opaque ciphertext rows. Server never decrypts content.';
-COMMENT ON COLUMN helloworldjunktest.record_vault_item.content IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.record_vault_item.content IS
   'AES-GCM sealed payload (iv|tag|ct). Opaque to server.';
-COMMENT ON COLUMN helloworldjunktest.record_vault_item.rev IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.record_vault_item.rev IS
   'Optimistic concurrency: UPDATE … WHERE rev = base_rev; bump on success.';
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.record_vault_file (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.record_vault_file (
   file_id        bigserial PRIMARY KEY,
   vault_id       bigint NOT NULL
-                 REFERENCES helloworldjunktest.notes_vault (vault_id) ON DELETE CASCADE,
+                 REFERENCES outdateddbsnapshotoct2024.notes_vault (vault_id) ON DELETE CASCADE,
   item_id        bigint NOT NULL
-                 REFERENCES helloworldjunktest.record_vault_item (item_id) ON DELETE CASCADE,
+                 REFERENCES outdateddbsnapshotoct2024.record_vault_item (item_id) ON DELETE CASCADE,
   file_kind      text NOT NULL,                 -- attachment|image
   meta           bytea NOT NULL,                -- encrypted file_name, extension, mime
   content        bytea NOT NULL,                -- encrypted file bytes
@@ -89,9 +89,9 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.record_vault_file (
 );
 
 CREATE INDEX IF NOT EXISTS record_vault_file_vault_item_deleted_idx
-  ON helloworldjunktest.record_vault_file (vault_id, item_id, deleted_at);
+  ON outdateddbsnapshotoct2024.record_vault_file (vault_id, item_id, deleted_at);
 
-COMMENT ON TABLE helloworldjunktest.record_vault_file IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.record_vault_file IS
   'Attachments/images as opaque ciphertext. meta + content encrypted client-side.';
 
 COMMIT;

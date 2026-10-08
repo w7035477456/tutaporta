@@ -8,10 +8,10 @@
 -- Run (Mac tunnel example):
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createYearlyBill.sql
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.yearly_bill (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.yearly_bill (
   yearly_bill_id bigserial PRIMARY KEY,
   singles_id bigint NOT NULL
-    REFERENCES helloworldjunktest.singles (singles_id) ON DELETE CASCADE,
+    REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
   storage_backend text NOT NULL DEFAULT 'onedrive'
     CHECK (storage_backend IN ('onedrive', 'usb')),
   bill_year integer NOT NULL
@@ -38,23 +38,23 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.yearly_bill (
 );
 
 CREATE INDEX IF NOT EXISTS idx_yearly_bill_singles_storage_y
-  ON helloworldjunktest.yearly_bill (singles_id, storage_backend, bill_year DESC);
+  ON outdateddbsnapshotoct2024.yearly_bill (singles_id, storage_backend, bill_year DESC);
 
-COMMENT ON TABLE helloworldjunktest.yearly_bill IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.yearly_bill IS
   'TutaNotes Bill Schedule Yearly rows; one forever slice per (singles_id, bill_year).';
-COMMENT ON COLUMN helloworldjunktest.yearly_bill.bill_year IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.yearly_bill.bill_year IS
   'Calendar year of this history slice (cloned forward without action/paid_record_id).';
-COMMENT ON COLUMN helloworldjunktest.yearly_bill.bill_month IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.yearly_bill.bill_month IS
   'Due month 1–12 within the year.';
-COMMENT ON COLUMN helloworldjunktest.yearly_bill.due_month_day IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.yearly_bill.due_month_day IS
   'Due day 1–31 within bill_month (due_month_day).';
-COMMENT ON COLUMN helloworldjunktest.yearly_bill.action IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.yearly_bill.action IS
   'Manual only: Not Paid / Paid. NULL for Auto or unset. Not cloned to next year.';
-COMMENT ON COLUMN helloworldjunktest.yearly_bill.paid_record_id IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.yearly_bill.paid_record_id IS
   'Optional FK to future paid_record; no constraint yet.';
 
 -- Verify:
 -- SELECT column_name, data_type
 --   FROM information_schema.columns
---  WHERE table_schema = 'helloworldjunktest' AND table_name = 'yearly_bill'
+--  WHERE table_schema = 'outdateddbsnapshotoct2024' AND table_name = 'yearly_bill'
 --  ORDER BY ordinal_position;

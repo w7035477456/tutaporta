@@ -36,7 +36,7 @@ function toArrayField(value) {
 async function lookupAltEmails(mainEmails) {
   const { rows } = await pool.query(
     `SELECT DISTINCT LOWER(BTRIM(alt_email)) AS alt_email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE LOWER(email) = ANY($1::text[])
         AND alt_email IS NOT NULL
         AND BTRIM(alt_email) <> ''`,

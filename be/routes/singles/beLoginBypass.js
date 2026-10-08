@@ -25,7 +25,7 @@ export async function beLoginBypass(req, res) {
     try {
       const result = await pool.query(
         `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, member_category
-         FROM helloworldjunktest.singles s
+         FROM outdateddbsnapshotoct2024.singles s
          WHERE s.email = $1
          ORDER BY COALESCE(s.updated_at, s.created_at) DESC
          LIMIT 1`,

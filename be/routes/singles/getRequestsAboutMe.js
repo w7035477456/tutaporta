@@ -97,7 +97,7 @@ export async function getRequestsAboutMe(req, res) {
   try {
     const memberCategory = await loadMemberCategoryForSinglesId(pool, me);
     const resolvedSchema = await resolveRequestsAppSchema();
-    const schemaCandidates = [...new Set([resolvedSchema, getDBSchema(), 'helloworldjunktest', 'public'].filter(Boolean))];
+    const schemaCandidates = [...new Set([resolvedSchema, getDBSchema(), 'outdateddbsnapshotoct2024', 'public'].filter(Boolean))];
     let fallbackRows = [];
 
     for (const schemaName of schemaCandidates) {

@@ -12,7 +12,7 @@ async function resolvePhotoTypeColumn() {
   const result = await pool.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name IN ('type', 'photo_type', 'album_type')
      ORDER BY CASE column_name
@@ -59,7 +59,7 @@ export async function getPublicPrivateAlbum(req, res) {
     const photoTypeColumn = await resolvePhotoTypeColumn();
     const photosResult = await pool.query(
       `SELECT photos_id, display_order${photoTypeColumn ? `, ${photoTypeColumn}::text AS album_type_raw` : ''}
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE singles_id = $1
        ORDER BY display_order NULLS LAST, photos_id`,
       [targetSinglesId]
@@ -85,7 +85,7 @@ export async function getPublicPrivateAlbum(req, res) {
 
     const videosResult = await pool.query(
       `SELECT video_id, type::text AS album_type_raw
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE singles_id = $1
          AND video_file_name LIKE $2
        ORDER BY video_id`,

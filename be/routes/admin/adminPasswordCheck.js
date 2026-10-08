@@ -25,7 +25,7 @@ function parsePasswordHashFromBody(body) {
 }
 
 function schemaTables() {
-  const schemaName = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  const schemaName = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
   return {
     schemaName,
     singlesTable: `"${schemaName}"."singles"`,

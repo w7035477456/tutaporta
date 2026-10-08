@@ -18,7 +18,7 @@ SELECT
   NULLIF(BTRIM(s.mailing_lastname), '') AS lastname,
   lower(s.email::text) AS email,
   ROW_NUMBER() OVER (ORDER BY s.singles_id)::int AS rn
-FROM helloworldjunktest.singles s
+FROM outdateddbsnapshotoct2024.singles s
 WHERE s.member_category = 'DEMOUSER'
    OR lower(s.email::text) ~ '^dm([1-9]|10)@gmail\.com$'
    OR lower(s.email::text) ~ '^dem([1-9]|10)@gmail\.com$';
@@ -26,7 +26,7 @@ WHERE s.member_category = 'DEMOUSER'
 -- ---------------------------------------------------------------------------
 -- singles: height / gender / citizenship / place of birth / gov id
 -- ---------------------------------------------------------------------------
-UPDATE helloworldjunktest.singles s
+UPDATE outdateddbsnapshotoct2024.singles s
 SET
   dl_height = CASE (t.rn % 5)
     WHEN 1 THEN '5''02"'
@@ -61,7 +61,7 @@ WHERE s.singles_id = t.singles_id;
 -- ---------------------------------------------------------------------------
 -- vet_bio: Brief + Full self-report values + Matching Status = info_matches
 -- ---------------------------------------------------------------------------
-INSERT INTO helloworldjunktest.vet_bio AS vb (
+INSERT INTO outdateddbsnapshotoct2024.vet_bio AS vb (
   singles_id,
   fullname,
   firstname,
@@ -276,65 +276,65 @@ SELECT
     'June 2021',
     'May 2022'
   ])[t.rn],
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'info_matches'::helloworldjunktest.vetting_status,
+  'info_matches'::outdateddbsnapshotoct2024.vetting_status,
   CURRENT_TIMESTAMP,
   'Demo seed',
-  'completed'::helloworldjunktest.verification_status,
+  'completed'::outdateddbsnapshotoct2024.verification_status,
   CURRENT_TIMESTAMP,
-  'completed'::helloworldjunktest.verification_status,
+  'completed'::outdateddbsnapshotoct2024.verification_status,
   CURRENT_TIMESTAMP,
-  'completed'::helloworldjunktest.verification_status,
+  'completed'::outdateddbsnapshotoct2024.verification_status,
   CURRENT_TIMESTAMP,
   'completed',
   CURRENT_TIMESTAMP
@@ -424,7 +424,7 @@ ON CONFLICT (singles_id) DO UPDATE SET
 -- ---------------------------------------------------------------------------
 -- misc_bio: Optional favorites / personal fields
 -- ---------------------------------------------------------------------------
-INSERT INTO helloworldjunktest.misc_bio AS mb (
+INSERT INTO outdateddbsnapshotoct2024.misc_bio AS mb (
   singles_id,
   favorite_hobbies,
   favorite_food,
@@ -662,8 +662,8 @@ SELECT
   vb.id_verification::text AS id_svc,
   mb.favorite_hobbies IS NOT NULL AS has_misc
 FROM demo_self_report_targets t
-JOIN helloworldjunktest.vet_bio vb ON vb.singles_id = t.singles_id
-JOIN helloworldjunktest.misc_bio mb ON mb.singles_id = t.singles_id
+JOIN outdateddbsnapshotoct2024.vet_bio vb ON vb.singles_id = t.singles_id
+JOIN outdateddbsnapshotoct2024.misc_bio mb ON mb.singles_id = t.singles_id
 ORDER BY t.singles_id;
 
 COMMIT;

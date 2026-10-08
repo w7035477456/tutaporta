@@ -27,7 +27,7 @@ async function ensureNotificationDismissSchemaReady() {
   if (notificationDismissSchemaPromise) return notificationDismissSchemaPromise;
   notificationDismissSchemaPromise = (async () => {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_post_notification_dismissed (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_post_notification_dismissed (
         singles_id bigint NOT NULL,
         post_id bigint NOT NULL,
         dismissed_at timestamptz NOT NULL DEFAULT NOW(),
@@ -36,10 +36,10 @@ async function ensureNotificationDismissSchemaReady() {
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_post_notification_dismissed_singles
-      ON helloworldjunktest.user_post_notification_dismissed (singles_id, dismissed_at DESC)
+      ON outdateddbsnapshotoct2024.user_post_notification_dismissed (singles_id, dismissed_at DESC)
     `);
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_post_notification_read_state (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_post_notification_read_state (
         singles_id bigint PRIMARY KEY,
         last_read_at timestamptz NOT NULL DEFAULT NOW()
       )
@@ -214,7 +214,7 @@ async function correctPostingMediaUrlForOwner(client, singlesId, url) {
 
   const videoCheck = await client.query(
     `SELECT 1
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE video_id = $1 AND singles_id = $2
      LIMIT 1`,
     [mediaId, singlesId]
@@ -223,7 +223,7 @@ async function correctPostingMediaUrlForOwner(client, singlesId, url) {
 
   const photoCheck = await client.query(
     `SELECT 1
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE photos_id = $1 AND singles_id = $2
      LIMIT 1`,
     [mediaId, singlesId]
@@ -247,13 +247,13 @@ async function buildPostingMediaUrlCorrections(client, singlesId, urls) {
   const [videoRows, photoRows] = await Promise.all([
     client.query(
       `SELECT video_id
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE singles_id = $1 AND video_id = ANY($2::bigint[])`,
       [singlesId, ids]
     ),
     client.query(
       `SELECT photos_id
-       FROM helloworldjunktest.photos
+       FROM outdateddbsnapshotoct2024.photos
        WHERE singles_id = $1 AND photos_id = ANY($2::bigint[])`,
       [singlesId, ids]
     )
@@ -378,24 +378,24 @@ function anyApprovedExpr(columns) {
 
 export async function resolvePostingsSchema() {
   return withSchemaCache('resolvePostingsSchema:v1', async () => {
-    const candidates = ['helloworldjunktest'];
+    const candidates = ['outdateddbsnapshotoct2024'];
     for (const schemaName of candidates) {
       const hasPostings = await relationExists(schemaName, 'postings');
       const hasPostingPhotos = await relationExists(schemaName, 'posting_photos');
       const hasPostingComments = await relationExists(schemaName, 'posting_comments');
       if (hasPostings && hasPostingPhotos) return schemaName;
     }
-    return 'helloworldjunktest';
+    return 'outdateddbsnapshotoct2024';
   });
 }
 
 async function resolveCheckrSchema() {
   return withSchemaCache('resolveCheckrSchema:v1', async () => {
-    const candidates = ['helloworldjunktest'];
+    const candidates = ['outdateddbsnapshotoct2024'];
     for (const schemaName of candidates) {
       if (await relationExists(schemaName, 'singles_checkr')) return schemaName;
     }
-    return 'helloworldjunktest';
+    return 'outdateddbsnapshotoct2024';
   });
 }
 
@@ -717,7 +717,7 @@ export async function getMyPicksFeed(req, res) {
       const activeCheck = await timedPicksFeed(reqId, 'activeCheck', () =>
         pool.query(
           `SELECT 1
-           FROM helloworldjunktest.singles s
+           FROM outdateddbsnapshotoct2024.singles s
            WHERE s.singles_id = $1
              AND ${buildSinglesActiveStatusWhereSql('s')}
            LIMIT 1`,
@@ -832,7 +832,7 @@ export async function getMyPicksFeed(req, res) {
       ? 'repost_src.prefix'
       : 'NULL::varchar';
     const repostJoinSql = postingRepostColumns.repostedFromSinglesId
-      ? `LEFT JOIN helloworldjunktest.singles repost_src
+      ? `LEFT JOIN outdateddbsnapshotoct2024.singles repost_src
          ON repost_src.singles_id = p.${postingRepostColumns.repostedFromSinglesId}`
       : '';
 
@@ -868,7 +868,7 @@ export async function getMyPicksFeed(req, res) {
                ${isSelfFeed ? 'TRUE' : `pp.photo_url !~ '/api/photo/[0-9]+'
                OR EXISTS (
                  SELECT 1
-                 FROM helloworldjunktest.photos ap
+                 FROM outdateddbsnapshotoct2024.photos ap
                  WHERE ap.singles_id = p.singles_id
                    AND ap.photos_id = (regexp_match(pp.photo_url, '/api/photo/([0-9]+)'))[1]::bigint
                )`}
@@ -1054,12 +1054,12 @@ export async function getMyPicksPostNotifications(req, res) {
          AND ${buildSinglesActiveStatusWhereSql('s')}
          AND p.singles_id <> $1
          AND p.created_at > COALESCE(
-           (SELECT rs.last_read_at FROM helloworldjunktest.user_post_notification_read_state rs WHERE rs.singles_id = $1),
+           (SELECT rs.last_read_at FROM outdateddbsnapshotoct2024.user_post_notification_read_state rs WHERE rs.singles_id = $1),
            TIMESTAMPTZ '1970-01-01'
          )
          AND NOT EXISTS (
            SELECT 1
-           FROM helloworldjunktest.user_post_notification_dismissed d
+           FROM outdateddbsnapshotoct2024.user_post_notification_dismissed d
            WHERE d.singles_id = $1
              AND d.post_id = p.post_id
          )
@@ -1102,7 +1102,7 @@ export async function dismissMyPicksPostNotification(req, res) {
   try {
     await ensureNotificationDismissSchemaReady();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_post_notification_dismissed (singles_id, post_id, dismissed_at)
+      `INSERT INTO outdateddbsnapshotoct2024.user_post_notification_dismissed (singles_id, post_id, dismissed_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (singles_id, post_id)
        DO UPDATE SET dismissed_at = EXCLUDED.dismissed_at`,
@@ -1125,7 +1125,7 @@ export async function dismissAllMyPicksPostNotifications(req, res) {
   try {
     await ensureNotificationDismissSchemaReady();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_post_notification_read_state (singles_id, last_read_at)
+      `INSERT INTO outdateddbsnapshotoct2024.user_post_notification_read_state (singles_id, last_read_at)
        VALUES ($1, NOW())
        ON CONFLICT (singles_id)
        DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
@@ -1133,7 +1133,7 @@ export async function dismissAllMyPicksPostNotifications(req, res) {
     );
     if (postIds.length) {
       await pool.query(
-        `INSERT INTO helloworldjunktest.user_post_notification_dismissed (singles_id, post_id, dismissed_at)
+        `INSERT INTO outdateddbsnapshotoct2024.user_post_notification_dismissed (singles_id, post_id, dismissed_at)
          SELECT $1::bigint, x::bigint, NOW()
          FROM unnest($2::bigint[]) x
          ON CONFLICT (singles_id, post_id)
@@ -1211,7 +1211,7 @@ export async function createMyPosting(req, res) {
       }
       const authorCheck = await pool.query(
         `SELECT 1
-         FROM helloworldjunktest.singles s
+         FROM outdateddbsnapshotoct2024.singles s
          WHERE s.singles_id = $1
            AND ${buildSinglesActiveStatusWhereSql('s')}
          LIMIT 1`,

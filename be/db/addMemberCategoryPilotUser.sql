@@ -2,7 +2,7 @@
 -- Uses uppercase label when PUBLIC already exists; otherwise legacy PilotUser.
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
   use_uppercase boolean;
   pilot_label text;
 BEGIN

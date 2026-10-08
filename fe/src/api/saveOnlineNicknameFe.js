@@ -27,7 +27,7 @@ function mapNicknameSaveError(err) {
 }
 
 /**
- * Save nickname: server checks singles.alias for duplicates, then updates helloworldjunktest.singles.alias.
+ * Save nickname: server checks singles.alias for duplicates, then updates outdateddbsnapshotoct2024.singles.alias.
  * Requires the same login session cookie as the rest of My Story (no extra auth step).
  */
 export async function saveOnlineNickname(aliasValue) {

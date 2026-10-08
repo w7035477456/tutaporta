@@ -3,14 +3,14 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_access_password_enabled boolean NOT NULL DEFAULT false;
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_access_password_enabled IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_access_password_enabled IS
   'When true, Record Vault requires notes_access_password_hash before USB unlock. When false, skip Encrypt Password gate.';
 
 -- Keep existing users who already set a Encrypt Password on the gated flow.
-UPDATE helloworldjunktest.singles
+UPDATE outdateddbsnapshotoct2024.singles
 SET notes_access_password_enabled = true
 WHERE notes_access_password_hash IS NOT NULL
   AND notes_access_password_enabled = false;

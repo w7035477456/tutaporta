@@ -23225,7 +23225,7 @@ function readStandaloneConfig() {
       database: "",
       user: "",
       password: "",
-      schema: "helloworldjunktest"
+      schema: "outdateddbsnapshotoct2024"
     },
     jwt: {
       privateKeyPath: "",
@@ -23255,7 +23255,7 @@ function readConfig() {
     process.exit(1);
   }
   if (schema === "public") {
-    console.error('Error: DB_SCHEMA must not be "public". Use a non-public schema (e.g. helloworldjunktest).');
+    console.error('Error: DB_SCHEMA must not be "public". Use a non-public schema (e.g. outdateddbsnapshotoct2024).');
     process.exit(1);
   }
   if (!process.env.JWT_PRIVATE_KEY_PATH || !process.env.JWT_PUBLIC_KEY_PATH) {
@@ -23534,7 +23534,7 @@ var init_connection = __esm({
     pkg = STANDALONE2 ? { Pool: class Pool {
     }, Client: { prototype: {} } } : require2("pg");
     ({ Pool: Pool2 } = pkg);
-    TARGET_APP_SCHEMA = "helloworldjunktest";
+    TARGET_APP_SCHEMA = "outdateddbsnapshotoct2024";
     __filename = fileURLToPath2(import.meta.url);
     __dirname = path2.dirname(__filename);
     BE_ROOT = path2.resolve(__dirname, "..");
@@ -24990,7 +24990,7 @@ async function addVaultTransferBytes(singlesId, bytes) {
   if (!Number.isFinite(id) || id < 1 || !Number.isFinite(b) || b <= 0) return 0;
   try {
     const { rows } = await connection_default.query(
-      "SELECT helloworldjunktest.add_notes_transfer_mb($1, $2) AS total_mb",
+      "SELECT outdateddbsnapshotoct2024.add_notes_transfer_mb($1, $2) AS total_mb",
       [id, Math.floor(b)]
     );
     return Number(rows[0]?.total_mb) || 0;
@@ -25548,7 +25548,7 @@ async function readOneDriveConnectionFromDb(singlesId) {
     `SELECT record_notes_onedrive_refresh_token_enc,
             record_notes_onedrive_folder_id,
             record_notes_onedrive_email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]
@@ -25580,7 +25580,7 @@ async function saveOneDriveConnection(singlesId, { refreshToken, folderId = null
   }
   const enc = encryptDriveRefreshToken(refreshToken);
   await connection_default.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET record_notes_onedrive_refresh_token_enc = $2,
             record_notes_onedrive_folder_id = COALESCE($3, record_notes_onedrive_folder_id),
             record_notes_onedrive_email = COALESCE($4, record_notes_onedrive_email)
@@ -27608,7 +27608,7 @@ async function readCacheIconFromDb(singlesId, kind) {
   const column = columnForKind(kind);
   const result = await connection_default.query(
     `SELECT ${column} AS cache_icon
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]
@@ -27670,7 +27670,7 @@ async function writeRecordVaultCacheIcon(singlesId, kind, iconName) {
   if (!icon) return;
   const column = columnForKind(k);
   await connection_default.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET ${column} = $1,
             updated_at = CURRENT_TIMESTAMP
       WHERE singles_id = $2`,
@@ -27685,7 +27685,7 @@ async function clearRecordVaultCacheIcon(singlesId, kind = null) {
     const k = assertKind(kind);
     const column = columnForKind(k);
     await connection_default.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
           SET ${column} = NULL,
               updated_at = CURRENT_TIMESTAMP
         WHERE singles_id = $1`,
@@ -27695,7 +27695,7 @@ async function clearRecordVaultCacheIcon(singlesId, kind = null) {
     return;
   }
   await connection_default.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET cache_onedrive_icon = NULL,
             cache_usb_icon = NULL,
             updated_at = CURRENT_TIMESTAMP

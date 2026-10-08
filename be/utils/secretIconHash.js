@@ -50,7 +50,7 @@ export async function verifyAccountSecretIcon(db, singlesId, rawIconName) {
     return { ok: false, statusCode: 400, body: { error: 'Please choose a valid security icon.' } };
   }
   const { rows } = await db.query(
-    `SELECT secret_icon FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+    `SELECT secret_icon FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
     [singlesId]
   );
   const stored = String(rows[0]?.secret_icon ?? '').trim().toLowerCase();

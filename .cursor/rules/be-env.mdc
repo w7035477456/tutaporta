@@ -120,7 +120,7 @@ NOTES_MAX_SIZE_UPLOAD_MB=20
 | `TEMPKEY_USB` | Temp icon key material (`recordVaultIconKeys.js`, `photoAlbumsIconKeys.js`). **Secret.** |
 | `NOTES_MAX_SIZE_UPLOAD_MB` | Note upload cap (`getUploadLimits.js`, `uploadPhoto.js`). |
 
-**TutaPhoto Full Disk Encryption skip** is per-user (UI **Skip Photo Encryption**), stored in `helloworldjunktest.singles.photoalbums_access_password_enabled = false` — not an env flag. **TutaNotes always requires Encrypt Password.**
+**TutaPhoto Full Disk Encryption skip** is per-user (UI **Skip Photo Encryption**), stored in `outdateddbsnapshotoct2024.singles.photoalbums_access_password_enabled = false` — not an env flag. **TutaNotes always requires Encrypt Password.**
 
 ## Transfer throttle / tokens
 
@@ -369,7 +369,7 @@ PG_CONNECT_LOG=true
 
 ## Database
 
-**Database:** `onlinemallwebsite` (formerly `vsingles`); schema **`helloworldjunktest`** only (never `public`).
+**Database:** `onlinemallwebsite` (formerly `vsingles`); schema **`outdateddbsnapshotoct2024`** only (never `public`).
 
 ```bash
 DB_HOST=localhost
@@ -377,8 +377,8 @@ DB_PORT=50010
 DB_NAME=onlinemallwebsite
 DB_USER=test_user1
 DB_PASSWORD=****
-DB_SCHEMA=helloworldjunktest
-VSINGLES_SCHEMA=helloworldjunktest
+DB_SCHEMA=outdateddbsnapshotoct2024
+VSINGLES_SCHEMA=outdateddbsnapshotoct2024
 API_PORT=40000
 PORT=40000
 ```

@@ -40,7 +40,7 @@ async function main() {
   try {
     const { rows } = await client.query(
       `SELECT singles_id, member_id, email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE member_id IS NOT NULL
        ORDER BY singles_id`
     );

@@ -5,10 +5,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.user_customization
+ALTER TABLE outdateddbsnapshotoct2024.user_customization
   DROP CONSTRAINT IF EXISTS user_customization_custom_music_url_limit_chk;
 
-ALTER TABLE helloworldjunktest.user_customization
+ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ADD CONSTRAINT user_customization_custom_music_url_limit_chk
   CHECK (
     custom_music_url IS NULL
@@ -18,7 +18,7 @@ ALTER TABLE helloworldjunktest.user_customization
     )
   );
 
-UPDATE helloworldjunktest.global
+UPDATE outdateddbsnapshotoct2024.global
 SET default_music_url = ARRAY[
   'https://www.youtube.com/watch?v=Hj2AxxazIsg&list=PLID3CMyI1sebj_OxyInLVVagh378EtxcG',
   'https://www.youtube.com/watch?v=qikm4sGMXWI&list=RDqikm4sGMXWI&start_radio=1&t=3253s',

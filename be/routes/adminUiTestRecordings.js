@@ -3,7 +3,7 @@ import { appendFile, mkdir, readdir, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SCHEMA = 'helloworldjunktest';
+const SCHEMA = 'outdateddbsnapshotoct2024';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const HOME_DIR = String(process.env.HOME ?? '').trim();

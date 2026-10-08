@@ -162,7 +162,7 @@ export async function postIdVerificationManualSupportEmail(req, res) {
   try {
     const { rows } = await pool.query(
       `SELECT email, phone, alias, prefix, member_id, profile_image_fk
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]

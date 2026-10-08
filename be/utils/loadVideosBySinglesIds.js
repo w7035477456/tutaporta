@@ -15,7 +15,7 @@ export async function loadVideosBySinglesIds(db, singlesIds, options = {}) {
 
   const { rows } = await db.query(
     `SELECT video_id, singles_id, video_file_name, file_extension, created_at, video_thumbnail
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE singles_id = ANY($1::bigint[])${prefixFilterSql}
      ORDER BY singles_id ASC, video_id DESC`,
     params

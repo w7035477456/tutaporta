@@ -471,7 +471,7 @@ async function handleMobilePhotoUploadPost(req, res, token) {
         replacedDuplicate: Boolean(req._replacedDuplicate)
       });
       const profile = await pool.query(
-        `SELECT profile_image_fk FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+        `SELECT profile_image_fk FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
         [singlesId]
       );
       const currentProfileId = Number(profile.rows[0]?.profile_image_fk);

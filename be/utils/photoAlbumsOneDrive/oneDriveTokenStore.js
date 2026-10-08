@@ -110,7 +110,7 @@ async function readOneDriveConnectionFromDb(singlesId) {
     `SELECT record_photoalbums_onedrive_refresh_token_enc,
             record_photoalbums_onedrive_folder_id,
             record_photoalbums_onedrive_email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1
       LIMIT 1`,
     [id]
@@ -146,7 +146,7 @@ export async function saveOneDriveConnection(singlesId, { refreshToken, folderId
   }
   const enc = encryptDriveRefreshToken(refreshToken);
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET record_photoalbums_onedrive_refresh_token_enc = $2,
             record_photoalbums_onedrive_folder_id = COALESCE($3, record_photoalbums_onedrive_folder_id),
             record_photoalbums_onedrive_email = COALESCE($4, record_photoalbums_onedrive_email)
@@ -163,7 +163,7 @@ export async function clearOneDriveConnection(singlesId) {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return;
   await pool.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
         SET record_photoalbums_onedrive_refresh_token_enc = NULL,
             record_photoalbums_onedrive_folder_id = NULL,
             record_photoalbums_onedrive_email = NULL

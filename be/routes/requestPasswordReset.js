@@ -44,7 +44,7 @@ export async function requestPasswordReset(req, res) {
 
     const emailNorm = normalizeEmailForDb(emailRaw);
 
-    const userResult = await pool.query('SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1', [emailNorm]);
+    const userResult = await pool.query('SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1', [emailNorm]);
     if (userResult.rows.length === 0) {
       return res.json({ success: true, message: GENERIC_SUCCESS_MESSAGE });
     }
@@ -73,12 +73,12 @@ export async function requestPasswordReset(req, res) {
 
     try {
       await pool.query(
-        `DELETE FROM helloworldjunktest.verifications
+        `DELETE FROM outdateddbsnapshotoct2024.verifications
          WHERE email = $1 AND kind = 'password_reset' AND used_at IS NULL`,
         [emailNorm]
       );
       await pool.query(
-        `INSERT INTO helloworldjunktest.verifications (email, code, kind, expires_at)
+        `INSERT INTO outdateddbsnapshotoct2024.verifications (email, code, kind, expires_at)
          VALUES ($1, $2, 'password_reset', $3)`,
         [emailNorm, code, expiresAt]
       );

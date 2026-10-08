@@ -1,5 +1,5 @@
 /**
- * Normalize email before writing to or comparing with helloworldjunktest.singles.email (text).
+ * Normalize email before writing to or comparing with outdateddbsnapshotoct2024.singles.email (text).
  * Store and compare lowercase in application code.
  * @param {unknown} raw
  * @returns {string}

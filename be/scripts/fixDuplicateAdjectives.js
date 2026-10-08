@@ -37,8 +37,8 @@ async function main() {
            NULLIF(BTRIM(s.dl_firstname), ''),
            NULLIF(BTRIM(v.firstname), '')
          ) AS first_name
-       FROM helloworldjunktest.singles s
-       LEFT JOIN helloworldjunktest.vet_bio v ON v.singles_id = s.singles_id
+       FROM outdateddbsnapshotoct2024.singles s
+       LEFT JOIN outdateddbsnapshotoct2024.vet_bio v ON v.singles_id = s.singles_id
        WHERE s.alias IS NOT NULL
          AND BTRIM(s.alias) <> ''
        ORDER BY s.singles_id`
@@ -96,7 +96,7 @@ async function main() {
       });
       if (APPLY) {
         await client.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET alias = $1, updated_at = CURRENT_TIMESTAMP
            WHERE singles_id = $2`,
           [allocated.alias, row.singles_id]

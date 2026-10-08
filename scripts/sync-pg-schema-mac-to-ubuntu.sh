@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generate SQL that makes the Ubuntu helloworldjunktest schema match Mac (Mac = source of truth).
+# Generate SQL that makes the Ubuntu outdateddbsnapshotoct2024 schema match Mac (Mac = source of truth).
 # Does NOT change any database: prints the SQL, saves it, copies it to Ubuntu ~/syncdb/, and
 # prints the psql command to run on Ubuntu.
 #
@@ -86,7 +86,7 @@ cat <<EOF
 
 ######## RUN ON UBUNTU (after f2) ########
 # 1) schema backup first
-pg_dump -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite --schema-only --schema=helloworldjunktest -f ~/syncdb/before_${SQL_NAME}
+pg_dump -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite --schema-only --schema=outdateddbsnapshotoct2024 -f ~/syncdb/before_${SQL_NAME}
 # 2) apply (single transaction; stops on first error)
 psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -f ${REMOTE_FILE}
 # 3) back on Mac:  isdbsame

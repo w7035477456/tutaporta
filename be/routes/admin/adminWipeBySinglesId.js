@@ -55,7 +55,7 @@ async function tableExists(tableName) {
     `SELECT EXISTS (
        SELECT 1
        FROM information_schema.tables
-       WHERE table_schema = 'helloworldjunktest'
+       WHERE table_schema = 'outdateddbsnapshotoct2024'
          AND table_name = $1
      ) AS ok`,
     [tableName]
@@ -228,7 +228,7 @@ export async function postAdminWipeBySinglesIdCascadeDelete(req, res) {
       const beforeCount = (await countPhotoFolderFilesForSinglesId(pool, singlesId)).fileCount ?? 0;
       const diskCleanup = await deletePhotoFolderFilesForSinglesId(pool, singlesId);
       const photoResult = await pool.query(
-        `DELETE FROM helloworldjunktest.photos WHERE singles_id = $1`,
+        `DELETE FROM outdateddbsnapshotoct2024.photos WHERE singles_id = $1`,
         [singlesId]
       );
       deletedCount = Math.max(diskCleanup.removed.length, photoResult.rowCount ?? 0, beforeCount);
@@ -258,9 +258,9 @@ export async function postAdminWipeBySinglesIdCascadeDelete(req, res) {
 
       const sql =
         def.key === 'photos'
-          ? `DELETE FROM helloworldjunktest.photos WHERE singles_id = $1`
+          ? `DELETE FROM outdateddbsnapshotoct2024.photos WHERE singles_id = $1`
           : def.key === 'videos'
-            ? `DELETE FROM helloworldjunktest.videos WHERE singles_id = $1`
+            ? `DELETE FROM outdateddbsnapshotoct2024.videos WHERE singles_id = $1`
             : (def.cascadeDeleteSql?.(singlesId) ?? def.deleteSql(singlesId));
       const result = await pool.query(sql, [singlesId]);
       deletedCount = Number.isFinite(result.rowCount) ? result.rowCount : beforeCount;

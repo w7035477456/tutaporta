@@ -3,10 +3,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS test boolean NOT NULL DEFAULT false;
 
-COMMENT ON COLUMN helloworldjunktest.singles.test IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.test IS
   'Scratch / test boolean column.';
 
 COMMIT;

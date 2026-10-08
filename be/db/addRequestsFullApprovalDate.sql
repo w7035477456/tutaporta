@@ -1,5 +1,5 @@
--- helloworldjunktest.requests full_approval_date (run on Primary only)
+-- outdateddbsnapshotoct2024.requests full_approval_date (run on Primary only)
 -- Set when user submits Full Bio consent and approval is recorded as approve.
 
-ALTER TABLE helloworldjunktest.requests
+ALTER TABLE outdateddbsnapshotoct2024.requests
   ADD COLUMN IF NOT EXISTS full_approval_date date;

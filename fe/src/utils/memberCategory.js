@@ -1,4 +1,4 @@
-/** Cycle order matches helloworldjunktest.member_category_enum sort order. */
+/** Cycle order matches outdateddbsnapshotoct2024.member_category_enum sort order. */
 export const MEMBER_CATEGORY_VALUES = Object.freeze([
   'PUBLIC',
   'ADMIN',

@@ -8,10 +8,10 @@
 
 BEGIN;
 
-COMMENT ON COLUMN helloworldjunktest.singles.refill_bought_mb IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.refill_bought_mb IS
   'Tx/Rx quota envelope in MB after the latest purchase/grant. On refill: if remain<=0 set to buy size; if remain>0 set to remain+buy. Not reduced by transfers.';
 
-CREATE OR REPLACE FUNCTION helloworldjunktest.add_vault_refill_mb(
+CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.add_vault_refill_mb(
   p_singles_id bigint,
   p_add_mb integer
 )
@@ -24,7 +24,7 @@ DECLARE
 BEGIN
   -- Remain: depleted/negative balances are replaced by the buy; positive remain carries forward.
   -- Bought: same remain snapshot — buy only when over-quota; remain+buy when still positive.
-  UPDATE helloworldjunktest.singles
+  UPDATE outdateddbsnapshotoct2024.singles
   SET
     refill_bought_mb = CASE
       WHEN refill_remain_mb <= 0 THEN v_add

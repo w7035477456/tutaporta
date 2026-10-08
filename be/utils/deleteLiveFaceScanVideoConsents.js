@@ -12,7 +12,7 @@ export async function deleteLiveFaceScanVideoConsentsForMember(client, schemaSql
     `SELECT cr.consent_record_id, cr.consent_signature_video_fk,
             v.video_file_name, v.file_extension
      FROM ${schemaSqlIdent}.consent_record cr
-     LEFT JOIN helloworldjunktest.videos v ON v.video_id = cr.consent_signature_video_fk
+     LEFT JOIN outdateddbsnapshotoct2024.videos v ON v.video_id = cr.consent_signature_video_fk
      WHERE cr.member_id = $1
        AND cr.description = $2`,
     [singlesId, CONSENT_DESCRIPTION_LIVE_FACE_SCAN_VIDEO]
@@ -25,7 +25,7 @@ export async function deleteLiveFaceScanVideoConsentsForMember(client, schemaSql
         fileExtension: row.file_extension,
         videoId: row.consent_signature_video_fk
       });
-      await client.query('DELETE FROM helloworldjunktest.videos WHERE video_id = $1 AND singles_id = $2', [
+      await client.query('DELETE FROM outdateddbsnapshotoct2024.videos WHERE video_id = $1 AND singles_id = $2', [
         row.consent_signature_video_fk,
         singlesId
       ]);

@@ -1,7 +1,7 @@
 import { getDBSchema } from '../config/envConfig.js';
 
 export function requestSchemaName(schema) {
-  return String(schema ?? getDBSchema() ?? 'helloworldjunktest').replace(/"/g, '');
+  return String(schema ?? getDBSchema() ?? 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 /** PostgreSQL enum type names (schema-qualified SQL cast targets). */
@@ -27,7 +27,7 @@ export function photoTypeEnumCast(schema) {
   return `"${requestSchemaName(schema)}".${PG_ENUM_TYPE_NAMES.photoType}`;
 }
 
-/** e.g. $3::"helloworldjunktest".photo_type_enum */
+/** e.g. $3::"outdateddbsnapshotoct2024".photo_type_enum */
 export function sqlEnumParamCast(paramRef, enumCast) {
   return `${paramRef}::${enumCast}`;
 }

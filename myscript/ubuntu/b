@@ -528,7 +528,7 @@ SELECT login_log_id, login_at, logout_at,
        round(online_seconds/60.0,1) AS online_min,
        logout_reason, host(client_ip) AS ip,
        device_type, browser, os
-FROM helloworldjunktest.login_log
+FROM outdateddbsnapshotoct2024.login_log
 WHERE is_demo = true
 ORDER BY login_at DESC
 LIMIT $limit;"
@@ -1119,7 +1119,7 @@ dbBackup(){
     echo "Exporting onlinemallwebsite to ${FULL_PATH}..."
     
     # CRITICAL FIX: Schema name MUST be in escaped double quotes \" for case-sensitivity
-    pg_dump -U test_user2 -h 127.0.0.1 -p 50010 --no-owner --no-privileges -n 'helloWorldJunkTest' -f "$FULL_PATH" onlinemallwebsite
+    pg_dump -U test_user2 -h 127.0.0.1 -p 50010 --no-owner --no-privileges -n 'outdateddbsnapshotoct2024' -f "$FULL_PATH" onlinemallwebsite
     # Check if the dump actually produced a file
     if [ -f "$FULL_PATH" ]; then
         ls -latr ~/dbFolder
@@ -1148,17 +1148,17 @@ loginLogSaveBeforeRestore() {
     LOGIN_LOG_KEEP=""
     LOGIN_LOG_COLS=""
     local exists
-    exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('helloworldjunktest.login_log') IS NOT NULL") || return 1
+    exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('outdateddbsnapshotoct2024.login_log') IS NOT NULL") || return 1
     if [ "$exists" != "t" ]; then
         echo "login_log: no live table — nothing to keep."
         return 0
     fi
-    LOGIN_LOG_COLS=$("${PSQL[@]}" -tAc "SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'helloworldjunktest' AND table_name = 'login_log'") || return 1
+    LOGIN_LOG_COLS=$("${PSQL[@]}" -tAc "SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'outdateddbsnapshotoct2024' AND table_name = 'login_log'") || return 1
     local rows
-    rows=$("${PSQL[@]}" -tAc "SELECT count(*) FROM helloworldjunktest.login_log") || return 1
+    rows=$("${PSQL[@]}" -tAc "SELECT count(*) FROM outdateddbsnapshotoct2024.login_log") || return 1
     mkdir -p "$HOME/dbFolder"
     LOGIN_LOG_KEEP="$HOME/dbFolder/loginLogKeep_$(date +%Y%m%d_%H%M%S).csv"
-    if ! "${PSQL[@]}" -c "\copy helloworldjunktest.login_log (${LOGIN_LOG_COLS}) TO '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)"; then
+    if ! "${PSQL[@]}" -c "\copy outdateddbsnapshotoct2024.login_log (${LOGIN_LOG_COLS}) TO '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)"; then
         echo "Error: could not save login_log to $LOGIN_LOG_KEEP"
         LOGIN_LOG_KEEP=""
         return 1
@@ -1171,7 +1171,7 @@ loginLogPutBackAfterRestore() {
     [ -n "$LOGIN_LOG_KEEP" ] || return 0
     local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -v ON_ERROR_STOP=1)
     local exists
-    exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('helloworldjunktest.login_log') IS NOT NULL")
+    exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('outdateddbsnapshotoct2024.login_log') IS NOT NULL")
     if [ "$exists" != "t" ]; then
         local ddl="${LAST_CD_INPUT:-$HOME/code/main}/be/db/addLoginLog.sql"
         echo "login_log: missing after import — creating it from $ddl"
@@ -1179,19 +1179,19 @@ loginLogPutBackAfterRestore() {
     fi
     if ! "${PSQL[@]}" <<SQL
 BEGIN;
-ALTER TABLE helloworldjunktest.login_log DROP CONSTRAINT IF EXISTS login_log_client_ip_last_digit_only;
-DELETE FROM helloworldjunktest.login_log;
-\copy helloworldjunktest.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)
-SELECT setval('helloworldjunktest.login_log_id_seq',
-              COALESCE((SELECT MAX(login_log_id) FROM helloworldjunktest.login_log), 0) + 1, false);
+ALTER TABLE outdateddbsnapshotoct2024.login_log DROP CONSTRAINT IF EXISTS login_log_client_ip_last_digit_only;
+DELETE FROM outdateddbsnapshotoct2024.login_log;
+\copy outdateddbsnapshotoct2024.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)
+SELECT setval('outdateddbsnapshotoct2024.login_log_id_seq',
+              COALESCE((SELECT MAX(login_log_id) FROM outdateddbsnapshotoct2024.login_log), 0) + 1, false);
 COMMIT;
 SQL
     then
         echo "Error: could not put login_log back. Live rows are safe in: $LOGIN_LOG_KEEP"
-        echo "  Retry: psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c \"\\copy helloworldjunktest.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)\""
+        echo "  Retry: psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c \"\\copy outdateddbsnapshotoct2024.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)\""
         return 1
     fi
-    echo "login_log: live rows put back ($("${PSQL[@]}" -tAc "SELECT count(*) FROM helloworldjunktest.login_log") row(s)); dump's login_log ignored."
+    echo "login_log: live rows put back ($("${PSQL[@]}" -tAc "SELECT count(*) FROM outdateddbsnapshotoct2024.login_log") row(s)); dump's login_log ignored."
 }
 
 dbRestore() {
@@ -1289,12 +1289,12 @@ dbRestore() {
     fi
 
     echo "Dropping existing schema..."
-    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS helloworldjunktest CASCADE;"
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS outdateddbsnapshotoct2024 CASCADE;"
 
     echo "Importing $FULL_PATH..."
     psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite \
         -v ON_ERROR_STOP=1 \
-        --set=search_path=helloworldjunktest,public \
+        --set=search_path=outdateddbsnapshotoct2024,public \
         -f "$FULL_PATH"
     local IMPORT_RC=$?
     if [ $IMPORT_RC -ne 0 ]; then
@@ -1307,7 +1307,7 @@ dbRestore() {
     fi
 
     echo "--- Verification: Tables in onlinemallwebsite ---"
-    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt helloworldjunktest.*"
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt outdateddbsnapshotoct2024.*"
 
     unset PGPASSWORD
     echo "Restore process completed."
@@ -1467,8 +1467,8 @@ allMergeRestore() {
 dbMergeRestore() {
     DUMP_DIR="$HOME/dbFolder"
     TODAY=$(date +"%m%d%Y")
-    LIVE_SCHEMA="helloworldjunktest"
-    TMP_SCHEMA="helloworldjunktest_merge_tmp"
+    LIVE_SCHEMA="outdateddbsnapshotoct2024"
+    TMP_SCHEMA="outdateddbsnapshotoct2024_merge_tmp"
 
     clear
     echo "--- MERGE DB restore (preserve existing) ---"

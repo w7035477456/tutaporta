@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Build helloworldjunktest.us_population_by_city from Census Vintage 2025
+ * Build outdateddbsnapshotoct2024.us_population_by_city from Census Vintage 2025
  * incorporated places (SUMLEV 162) + a representative ZIP.
  *
  * percentage_of_total = city population / total US population * 100.
@@ -28,7 +28,7 @@ import {
 const { Client } = pg;
 
 function schemaIdent() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '""');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
 }
 
 function unzipGeonames(zipPath) {

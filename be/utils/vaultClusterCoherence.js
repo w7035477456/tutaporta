@@ -6,7 +6,7 @@
  * a note created on worker A was "Note not found" on worker B, and whichever worker flushed
  * vault.db last overwrote the others.
  *
- * Postgres (`helloworldjunktest.vault_cluster_state`) is the single source of truth for:
+ * Postgres (`outdateddbsnapshotoct2024.vault_cluster_state`) is the single source of truth for:
  *   - unlock registry (mount path, generation, expiry) — replaces the Redis-only registry
  *   - db_version — bumped after every committed vault.db write
  *   - a lease lock — serializes vault writes for one member across all workers/servers
@@ -43,7 +43,7 @@ const LOCK_WAIT_MAX_MS = 120_000;
 const OLD_DB_CLOSE_DELAY_MS = 60_000;
 
 const STATE_DDL = `
-  CREATE TABLE IF NOT EXISTS helloworldjunktest.vault_cluster_state (
+  CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.vault_cluster_state (
     product text NOT NULL,
     singles_id bigint NOT NULL,
     storage_type text NOT NULL,
@@ -91,7 +91,7 @@ export function ensureVaultClusterStateSchema() {
       } catch (err) {
         // Two workers racing CREATE TABLE IF NOT EXISTS can collide on pg_type.
         const { rows } = await pool.query(
-          `SELECT to_regclass('helloworldjunktest.vault_cluster_state') AS t`
+          `SELECT to_regclass('outdateddbsnapshotoct2024.vault_cluster_state') AS t`
         );
         if (!rows[0]?.t) throw err;
       }
@@ -152,7 +152,7 @@ export async function registerVaultClusterUnlockState(
   const mount = String(mountPath || '').trim();
   if (!id || !mount) return null;
   const { rows } = await stateQuery(
-    `INSERT INTO helloworldjunktest.vault_cluster_state AS s
+    `INSERT INTO outdateddbsnapshotoct2024.vault_cluster_state AS s
        (product, singles_id, storage_type, unlocked, unlock_generation, mount_path, backup_mount_path,
         drive_folder_id, unlocked_at, unlock_expires_at, db_version, updated_at)
      VALUES ($1, $2, $3, true, 1, $4, $5, $6, NOW(), NOW() + make_interval(secs => $7), 1, NOW())
@@ -193,7 +193,7 @@ export async function clearVaultClusterUnlockState(product, singlesId, storageTy
     typeClause = 'AND storage_type = $3';
   }
   await stateQuery(
-    `UPDATE helloworldjunktest.vault_cluster_state
+    `UPDATE outdateddbsnapshotoct2024.vault_cluster_state
         SET unlocked = false, unlock_expires_at = NULL, updated_at = NOW()
       WHERE product = $1 AND singles_id = $2 ${typeClause}`,
     params
@@ -206,7 +206,7 @@ export async function getVaultClusterUnlockState(product, singlesId, storageType
   if (!id) return null;
   const { rows } = await stateQuery(
     `SELECT ${STATE_COLUMNS}
-       FROM helloworldjunktest.vault_cluster_state
+       FROM outdateddbsnapshotoct2024.vault_cluster_state
       WHERE product = $1 AND singles_id = $2 AND storage_type = $3`,
     [normalizeProduct(product), id, normalizeType(storageType)]
   );
@@ -233,7 +233,7 @@ export async function invalidateVaultClusterSessions(product, singlesId) {
   const id = normalizeId(singlesId);
   if (!id) return;
   await stateQuery(
-    `UPDATE helloworldjunktest.vault_cluster_state
+    `UPDATE outdateddbsnapshotoct2024.vault_cluster_state
         SET unlock_generation = unlock_generation + 1,
             db_version = db_version + 1,
             updated_at = NOW()
@@ -245,7 +245,7 @@ export async function invalidateVaultClusterSessions(product, singlesId) {
 async function readVaultClusterStates(product, singlesId) {
   const { rows } = await stateQuery(
     `SELECT ${STATE_COLUMNS}
-       FROM helloworldjunktest.vault_cluster_state
+       FROM outdateddbsnapshotoct2024.vault_cluster_state
       WHERE product = $1 AND singles_id = $2`,
     [product, singlesId]
   );
@@ -259,7 +259,7 @@ async function readVaultClusterStates(product, singlesId) {
   if (renew.length) {
     // Active sessions keep their unlock alive (the old Redis entry silently expired after 24h).
     await stateQuery(
-      `UPDATE helloworldjunktest.vault_cluster_state
+      `UPDATE outdateddbsnapshotoct2024.vault_cluster_state
           SET unlock_expires_at = NOW() + make_interval(secs => $4)
         WHERE product = $1 AND singles_id = $2 AND storage_type = ANY($3::text[])
           AND unlocked AND unlock_expires_at > NOW()`,
@@ -298,7 +298,7 @@ async function acquireVaultClusterLock(product, singlesId, storageType) {
   let delayMs = 20;
   for (;;) {
     const { rows } = await stateQuery(
-      `INSERT INTO helloworldjunktest.vault_cluster_state AS s
+      `INSERT INTO outdateddbsnapshotoct2024.vault_cluster_state AS s
          (product, singles_id, storage_type, lock_token, lock_expires_at, updated_at)
        VALUES ($1, $2, $3, $4, NOW() + make_interval(secs => $5), NOW())
        ON CONFLICT (product, singles_id, storage_type) DO UPDATE
@@ -316,7 +316,7 @@ async function acquireVaultClusterLock(product, singlesId, storageType) {
           return;
         }
         stateQuery(
-          `UPDATE helloworldjunktest.vault_cluster_state
+          `UPDATE outdateddbsnapshotoct2024.vault_cluster_state
               SET lock_expires_at = NOW() + make_interval(secs => $5)
             WHERE product = $1 AND singles_id = $2 AND storage_type = $3 AND lock_token = $4`,
           [product, singlesId, type, token, LOCK_LEASE_SEC]
@@ -342,7 +342,7 @@ async function releaseVaultClusterLock(product, singlesId, storageType, token) {
   }
   try {
     await stateQuery(
-      `UPDATE helloworldjunktest.vault_cluster_state
+      `UPDATE outdateddbsnapshotoct2024.vault_cluster_state
           SET lock_token = NULL, lock_expires_at = NULL
         WHERE product = $1 AND singles_id = $2 AND storage_type = $3 AND lock_token = $4`,
       [product, singlesId, type, token]
@@ -355,7 +355,7 @@ async function releaseVaultClusterLock(product, singlesId, storageType, token) {
 
 async function publishVaultDbVersion(product, singlesId, storageType, token) {
   const { rows } = await stateQuery(
-    `UPDATE helloworldjunktest.vault_cluster_state
+    `UPDATE outdateddbsnapshotoct2024.vault_cluster_state
         SET db_version = db_version + 1, updated_at = NOW()
       WHERE product = $1 AND singles_id = $2 AND storage_type = $3 AND lock_token = $4
       RETURNING db_version, unlock_generation`,

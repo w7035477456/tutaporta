@@ -2,7 +2,7 @@ import { isRegularMemberCategory } from './memberCategory.js';
 
 /** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive' | 'under18'} SinglesStatus */
 
-/** Cycle order matches helloworldjunktest.singles_status enum sort order. */
+/** Cycle order matches outdateddbsnapshotoct2024.singles_status enum sort order. */
 export const SINGLES_STATUS_VALUES = Object.freeze([
   'active',
   'cancel',

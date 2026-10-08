@@ -1,6 +1,6 @@
 /**
  * Allocate Adj + real first name nicknames that “rhyme” (same first letter).
- * Prefer adjectives not already used in helloworldjunktest.singles.alias;
+ * Prefer adjectives not already used in outdateddbsnapshotoct2024.singles.alias;
  * if none left for that letter, try other first names; reuse an adjective only as last resort.
  */
 import {
@@ -44,7 +44,7 @@ export async function loadUsedAdjectives(client, { excludeSinglesId = null, extr
   const adjectives = listNicknameAdjectives();
   const { rows } = await client.query(
     `SELECT alias
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE alias IS NOT NULL
        AND BTRIM(alias) <> ''
        AND ($1::bigint IS NULL OR singles_id <> $1)`,
@@ -60,7 +60,7 @@ export async function loadUsedAdjectives(client, { excludeSinglesId = null, extr
 async function aliasTaken(client, alias, excludeSinglesId) {
   const { rows } = await client.query(
     `SELECT 1
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE LOWER(TRIM(alias)) = LOWER(TRIM($1))
        AND singles_id <> $2
      LIMIT 1`,

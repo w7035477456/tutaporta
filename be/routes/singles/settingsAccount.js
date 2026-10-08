@@ -143,7 +143,7 @@ function parseSettingsEmailChangePendingMeta(passwordHashField) {
 async function clearSettingsEmailChangePendingForSingles(singlesId, client = pool) {
   const pending = await client.query(
     `SELECT id, password_hash
-     FROM helloworldjunktest.verifications
+     FROM outdateddbsnapshotoct2024.verifications
      WHERE kind = $1
        AND used_at IS NULL`,
     [SETTINGS_EMAIL_CHANGE_PENDING_KIND]
@@ -151,7 +151,7 @@ async function clearSettingsEmailChangePendingForSingles(singlesId, client = poo
   for (const row of pending.rows) {
     const meta = parseSettingsEmailChangePendingMeta(row.password_hash);
     if (meta?.singles_id === singlesId) {
-      await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [row.id]);
+      await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [row.id]);
     }
   }
 }
@@ -205,7 +205,7 @@ export async function changeSettingsPassword(req, res) {
 
     const passwordHash = await hashPassword(plainNew);
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET password_hash = $1,
            password_attempt_count = 1,
            password_attempt_datetime = $3::timestamptz,
@@ -278,7 +278,7 @@ export async function changeSettingsEmail(req, res) {
     }
 
     const taken = await client.query(
-      `SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1 AND singles_id <> $2 LIMIT 1`,
+      `SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1 AND singles_id <> $2 LIMIT 1`,
       [newEmailNorm, singlesId]
     );
     if (taken.rows.length > 0) {
@@ -287,7 +287,7 @@ export async function changeSettingsEmail(req, res) {
     }
 
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET email = $1,
            password_attempt_count = 1,
            password_attempt_datetime = $3::timestamptz,
@@ -375,7 +375,7 @@ export async function changeSettingsPhone(req, res) {
     }
 
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET phone = $1,
            last_phone_change_date = CURRENT_DATE,
            password_attempt_count = 1,
@@ -422,7 +422,7 @@ export async function requestSettingsEmailChange(req, res) {
   const client = await pool.connect();
   try {
     const userResult = await client.query(
-      `SELECT singles_id, email FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+      `SELECT singles_id, email FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
       [singlesId]
     );
     if (!userResult.rows.length) {
@@ -436,7 +436,7 @@ export async function requestSettingsEmailChange(req, res) {
       return res.status(400).json({ error: 'That is already your current email address.' });
     }
 
-    const taken = await client.query(`SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1 LIMIT 1`, [newEmailNorm]);
+    const taken = await client.query(`SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1 LIMIT 1`, [newEmailNorm]);
     if (taken.rows.length > 0) {
       return res.status(400).json({ error: 'That email address is already in use.' });
     }
@@ -449,14 +449,14 @@ export async function requestSettingsEmailChange(req, res) {
     }
 
     const pending = await client.query(
-      `SELECT id, password_hash FROM helloworldjunktest.verifications
+      `SELECT id, password_hash FROM outdateddbsnapshotoct2024.verifications
        WHERE kind = $1 AND used_at IS NULL AND expires_at > now()`,
       [EMAIL_CHANGE_KIND]
     );
     for (const row of pending.rows) {
       const meta = parseEmailChangeMeta(row.password_hash);
       if (meta?.singles_id === singlesId) {
-        await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [row.id]);
+        await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [row.id]);
       }
     }
 
@@ -465,7 +465,7 @@ export async function requestSettingsEmailChange(req, res) {
     const metaJson = JSON.stringify({ singles_id: singlesId, old_email: oldEmail });
 
     await client.query(
-      `INSERT INTO helloworldjunktest.verifications (email, code, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, code, password_hash, kind, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [newEmailNorm, code, metaJson, EMAIL_CHANGE_KIND, expiresAt]
     );
@@ -516,7 +516,7 @@ export async function verifyEmailChangeLink(req, res) {
 
     const result = await pool.query(
       `SELECT id, email, password_hash
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE code = $1
          AND kind = $2
          AND used_at IS NULL
@@ -553,7 +553,7 @@ export async function completeEmailChange(req, res) {
       await client.query('BEGIN');
       const result = await client.query(
         `SELECT id, email, password_hash
-         FROM helloworldjunktest.verifications
+         FROM outdateddbsnapshotoct2024.verifications
          WHERE code = $1
            AND kind = $2
            AND used_at IS NULL
@@ -575,21 +575,21 @@ export async function completeEmailChange(req, res) {
         return res.status(400).json({ error: 'Invalid email change request.' });
       }
 
-      const taken = await client.query(`SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1 LIMIT 1`, [emailNorm]);
+      const taken = await client.query(`SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1 LIMIT 1`, [emailNorm]);
       if (taken.rows.length > 0 && Number(taken.rows[0].singles_id) !== meta.singles_id) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'That email address is already in use.' });
       }
 
       const contactResult = await client.query(
-        `SELECT phone FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+        `SELECT phone FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
         [meta.singles_id]
       );
       const currentPhone = String(contactResult.rows[0]?.phone ?? '').trim();
 
-      await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [row.id]);
+      await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [row.id]);
       await client.query(
-        `UPDATE helloworldjunktest.singles SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE singles_id = $2`,
+        `UPDATE outdateddbsnapshotoct2024.singles SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE singles_id = $2`,
         [emailNorm, meta.singles_id]
       );
       await recordAuditRegistrationChange(client, {
@@ -615,7 +615,7 @@ export async function completeEmailChange(req, res) {
 async function loadSinglesContactForSettings(singlesId) {
   const { rows } = await pool.query(
     `SELECT singles_id, email, phone
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -625,7 +625,7 @@ async function loadSinglesContactForSettings(singlesId) {
 
 async function clearSettingsAccountSmsSessions(emailNorm, formattedPhone, sessionKind, verifiedKind) {
   await pool.query(
-    `DELETE FROM helloworldjunktest.verifications
+    `DELETE FROM outdateddbsnapshotoct2024.verifications
      WHERE email = $1
        AND phone = $2
        AND kind IN ('${sessionKind}', '${verifiedKind}')
@@ -678,7 +678,7 @@ export async function sendSettingsChangePasswordSms(req, res) {
       SETTINGS_PASSWORD_CHANGE_VERIFIED_KIND
     );
     await pool.query(
-      `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
        VALUES ($1, $2, NULL, $3, $4)`,
       [emailNorm, formattedPhone, SETTINGS_PASSWORD_CHANGE_SESSION_KIND, expiresAt]
     );
@@ -726,7 +726,7 @@ export async function verifySettingsChangePasswordSms(req, res) {
 
     const sessionResult = await pool.query(
       `SELECT id
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = $3
@@ -758,7 +758,7 @@ export async function verifySettingsChangePasswordSms(req, res) {
     }
 
     await pool.query(
-      `UPDATE helloworldjunktest.verifications
+      `UPDATE outdateddbsnapshotoct2024.verifications
        SET kind = $1
        WHERE id = $2`,
       [SETTINGS_PASSWORD_CHANGE_VERIFIED_KIND, sessionResult.rows[0].id]
@@ -818,7 +818,7 @@ export async function completeSettingsChangePassword(req, res) {
 
     const verified = await client.query(
       `SELECT id
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = $3
@@ -836,7 +836,7 @@ export async function completeSettingsChangePassword(req, res) {
 
     const passwordHash = await hashPassword(plainNew);
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET password_hash = $1,
            last_password_change_date = CURRENT_DATE,
            password_attempt_count = 1,
@@ -845,7 +845,7 @@ export async function completeSettingsChangePassword(req, res) {
        WHERE singles_id = $2`,
       [passwordHash, singlesId, PASSWORD_ATTEMPT_EPOCH]
     );
-    await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [
+    await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [
       verified.rows[0].id
     ]);
     await client.query('COMMIT');
@@ -908,7 +908,7 @@ export async function sendSettingsChangeEmailSms(req, res) {
       SETTINGS_EMAIL_CHANGE_VERIFIED_KIND
     );
     await pool.query(
-      `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
        VALUES ($1, $2, NULL, $3, $4)`,
       [emailNorm, formattedPhone, SETTINGS_EMAIL_CHANGE_SESSION_KIND, expiresAt]
     );
@@ -956,7 +956,7 @@ export async function verifySettingsChangeEmailSms(req, res) {
 
     const sessionResult = await pool.query(
       `SELECT id
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = $3
@@ -988,7 +988,7 @@ export async function verifySettingsChangeEmailSms(req, res) {
     }
 
     await pool.query(
-      `UPDATE helloworldjunktest.verifications
+      `UPDATE outdateddbsnapshotoct2024.verifications
        SET kind = $1
        WHERE id = $2`,
       [SETTINGS_EMAIL_CHANGE_VERIFIED_KIND, sessionResult.rows[0].id]
@@ -1058,7 +1058,7 @@ export async function submitSettingsChangeEmail(req, res) {
 
     const smsVerified = await client.query(
       `SELECT id
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = $3
@@ -1087,7 +1087,7 @@ export async function submitSettingsChangeEmail(req, res) {
     }
 
     const taken = await client.query(
-      `SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1 AND singles_id <> $2 LIMIT 1`,
+      `SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1 AND singles_id <> $2 LIMIT 1`,
       [newEmailNorm, singlesId]
     );
     if (taken.rows.length > 0) {
@@ -1106,7 +1106,7 @@ export async function submitSettingsChangeEmail(req, res) {
     });
 
     await client.query(
-      `INSERT INTO helloworldjunktest.verifications (email, code, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, code, password_hash, kind, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [newEmailNorm, code, metaJson, SETTINGS_EMAIL_CHANGE_PENDING_KIND, expiresAt]
     );
@@ -1181,7 +1181,7 @@ export async function completeSettingsChangeEmail(req, res) {
 
     const pending = await client.query(
       `SELECT id, email, code, password_hash
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE kind = $1
          AND used_at IS NULL
          AND expires_at > now()
@@ -1216,7 +1216,7 @@ export async function completeSettingsChangeEmail(req, res) {
 
     const smsVerified = await client.query(
       `SELECT id
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind = $3
@@ -1233,7 +1233,7 @@ export async function completeSettingsChangeEmail(req, res) {
     }
 
     const taken = await client.query(
-      `SELECT singles_id FROM helloworldjunktest.singles WHERE email = $1 AND singles_id <> $2 LIMIT 1`,
+      `SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE email = $1 AND singles_id <> $2 LIMIT 1`,
       [newEmailNorm, singlesId]
     );
     if (taken.rows.length > 0) {
@@ -1243,7 +1243,7 @@ export async function completeSettingsChangeEmail(req, res) {
 
     const oldEmailHistoryEntry = oldEmailNorm ? buildHistoryArrayEntry(oldEmailNorm) : null;
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET email = $1,
            old_email_array = CASE
              WHEN $3::text IS NULL THEN old_email_array
@@ -1259,8 +1259,8 @@ export async function completeSettingsChangeEmail(req, res) {
       email: newEmailNorm,
       phone: formattedPhone
     });
-    await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [pendingRow.id]);
-    await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [
+    await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [pendingRow.id]);
+    await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [
       smsVerified.rows[0].id
     ]);
     await client.query('COMMIT');
@@ -1301,7 +1301,7 @@ async function clearSettingsPhoneChangeForSingles(singlesId, client = pool) {
   ];
   const pending = await client.query(
     `SELECT id, password_hash
-     FROM helloworldjunktest.verifications
+     FROM outdateddbsnapshotoct2024.verifications
      WHERE kind = ANY($1::text[])
        AND used_at IS NULL`,
     [kinds]
@@ -1309,7 +1309,7 @@ async function clearSettingsPhoneChangeForSingles(singlesId, client = pool) {
   for (const row of pending.rows) {
     const meta = parseSettingsPhoneChangePendingMeta(row.password_hash);
     if (meta?.singles_id === singlesId) {
-      await client.query(`UPDATE helloworldjunktest.verifications SET used_at = now() WHERE id = $1`, [row.id]);
+      await client.query(`UPDATE outdateddbsnapshotoct2024.verifications SET used_at = now() WHERE id = $1`, [row.id]);
     }
   }
 }
@@ -1317,7 +1317,7 @@ async function clearSettingsPhoneChangeForSingles(singlesId, client = pool) {
 async function findPhoneChangeVerificationForSingles(client, singlesId, kinds) {
   const result = await client.query(
     `SELECT id, email, phone, code, password_hash, kind
-     FROM helloworldjunktest.verifications
+     FROM outdateddbsnapshotoct2024.verifications
      WHERE kind = ANY($1::text[])
        AND used_at IS NULL
        AND expires_at > now()
@@ -1430,7 +1430,7 @@ export async function submitSettingsChangePhone(req, res) {
 
     if (!isDuplicatePhoneAllowed(gate.row.member_category)) {
       const taken = await client.query(
-        `SELECT singles_id FROM helloworldjunktest.singles WHERE phone = $1 AND singles_id <> $2 LIMIT 1`,
+        `SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE phone = $1 AND singles_id <> $2 LIMIT 1`,
         [newPhoneStored, singlesId]
       );
       if (taken.rows.length > 0) {
@@ -1451,7 +1451,7 @@ export async function submitSettingsChangePhone(req, res) {
     });
 
     await client.query(
-      `INSERT INTO helloworldjunktest.verifications (email, code, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, code, password_hash, kind, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [accountEmailNorm, code, metaJson, SETTINGS_PHONE_CHANGE_PENDING_KIND, expiresAt]
     );
@@ -1522,7 +1522,7 @@ export async function verifySettingsChangePhoneEmailCode(req, res) {
     }
 
     await client.query(
-      `UPDATE helloworldjunktest.verifications
+      `UPDATE outdateddbsnapshotoct2024.verifications
        SET kind = $1
        WHERE id = $2`,
       [SETTINGS_PHONE_CHANGE_EMAIL_VERIFIED_KIND, found.row.id]
@@ -1579,7 +1579,7 @@ export async function sendSettingsChangePhoneSms(req, res) {
     }
 
     await pool.query(
-      `UPDATE helloworldjunktest.verifications
+      `UPDATE outdateddbsnapshotoct2024.verifications
        SET used_at = now()
        WHERE kind = $1
          AND used_at IS NULL
@@ -1590,7 +1590,7 @@ export async function sendSettingsChangePhoneSms(req, res) {
 
     const expiresAt = new Date(Date.now() + SETTINGS_ACCOUNT_SMS_SESSION_MS);
     await pool.query(
-      `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
        VALUES ($1, $2, $3, $4, $5)`,
       [currentEmailNorm, newPhoneStored, found.row.password_hash, SETTINGS_PHONE_CHANGE_SMS_SESSION_KIND, expiresAt]
     );
@@ -1662,7 +1662,7 @@ export async function verifySettingsChangePhoneSms(req, res) {
 
     const oldPhoneHistoryEntry = oldPhoneStored ? buildHistoryArrayEntry(oldPhoneStored) : null;
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET phone = $1,
            old_phone_array = CASE
              WHEN $3::text IS NULL THEN old_phone_array
@@ -1722,7 +1722,7 @@ export async function updateSettingsAltEmail(req, res) {
 
   try {
     const { rows } = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
           SET alt_email = $1,
               updated_at = CURRENT_TIMESTAMP
         WHERE singles_id = $2

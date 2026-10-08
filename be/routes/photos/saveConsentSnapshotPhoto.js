@@ -26,7 +26,7 @@ async function resolveAlbumTypeColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name IN ('type', 'photo_type', 'album_type')
      ORDER BY CASE column_name
@@ -43,7 +43,7 @@ async function resolvePhotoFileNameColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name = 'photo_file_name'
      LIMIT 1`
@@ -55,7 +55,7 @@ async function resolveChecksumColumn(client) {
   const result = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'photos'
        AND column_name = 'checksum'
      LIMIT 1`
@@ -66,7 +66,7 @@ async function resolveChecksumColumn(client) {
 async function resolveMemberIdForSingles(client, singlesId) {
   const result = await client.query(
     `SELECT member_id
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -79,18 +79,18 @@ async function resolveMemberIdForSingles(client, singlesId) {
 
 async function nextPhotosId(client) {
   try {
-    const seqResult = await client.query("SELECT nextval('helloworldjunktest.photos_id_seq') AS id");
+    const seqResult = await client.query("SELECT nextval('outdateddbsnapshotoct2024.photos_id_seq') AS id");
     const nextId = Number(seqResult.rows[0]?.id ?? 0);
     if (Number.isFinite(nextId) && nextId > 0) return nextId;
   } catch {
     // fall through
   }
-  const maxResult = await client.query('SELECT COALESCE(MAX(photos_id), 0) + 1 AS id FROM helloworldjunktest.photos');
+  const maxResult = await client.query('SELECT COALESCE(MAX(photos_id), 0) + 1 AS id FROM outdateddbsnapshotoct2024.photos');
   return Number(maxResult.rows[0]?.id ?? 1);
 }
 
 /**
- * Saves a consent snapshot PNG to TUTADATES_PHOTO_FOLDER and inserts helloworldjunktest.photos row.
+ * Saves a consent snapshot PNG to TUTADATES_PHOTO_FOLDER and inserts outdateddbsnapshotoct2024.photos row.
  * Returns photos_id for linking from consent_record image FK columns.
  */
 export async function saveConsentSnapshotPhoto(
@@ -171,7 +171,7 @@ export async function saveConsentSnapshotPhoto(
   const valuePlaceholders = [
     '$1',
     '$2',
-    '(SELECT COALESCE(MAX(display_order), -1) + 1 FROM helloworldjunktest.photos WHERE singles_id = $2)',
+    '(SELECT COALESCE(MAX(display_order), -1) + 1 FROM outdateddbsnapshotoct2024.photos WHERE singles_id = $2)',
     '$3',
     '$4'
   ];
@@ -184,7 +184,7 @@ export async function saveConsentSnapshotPhoto(
   }
 
   await client.query(
-    `INSERT INTO helloworldjunktest.photos (${insertColumns.join(', ')})
+    `INSERT INTO outdateddbsnapshotoct2024.photos (${insertColumns.join(', ')})
      VALUES (${valuePlaceholders.join(', ')})`,
     insertValues
   );

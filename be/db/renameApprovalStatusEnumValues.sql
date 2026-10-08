@@ -8,7 +8,7 @@
 
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
 BEGIN
   IF EXISTS (
     SELECT 1

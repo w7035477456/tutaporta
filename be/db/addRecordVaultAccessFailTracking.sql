@@ -10,8 +10,8 @@ BEGIN;
 DO $$
 DECLARE
   t regclass := COALESCE(
-    to_regclass('helloworldjunktest.notes_vault'),
-    to_regclass('helloworldjunktest.record_vault')
+    to_regclass('outdateddbsnapshotoct2024.notes_vault'),
+    to_regclass('outdateddbsnapshotoct2024.record_vault')
   );
 BEGIN
   IF t IS NULL THEN

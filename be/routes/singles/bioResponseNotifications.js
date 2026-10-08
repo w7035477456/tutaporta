@@ -9,7 +9,7 @@ async function ensureBioResponseNotificationSchemaReady() {
   if (bioResponseNotificationSchemaPromise) return bioResponseNotificationSchemaPromise;
   bioResponseNotificationSchemaPromise = (async () => {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_bio_response_notification_dismissed (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_bio_response_notification_dismissed (
         requester_singles_id bigint NOT NULL,
         recipient_singles_id bigint NOT NULL,
         bio_kind text NOT NULL CHECK (bio_kind IN ('brief', 'full')),
@@ -19,7 +19,7 @@ async function ensureBioResponseNotificationSchemaReady() {
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_bio_response_notification_dismissed_requester
-      ON helloworldjunktest.user_bio_response_notification_dismissed (requester_singles_id, dismissed_at DESC)
+      ON outdateddbsnapshotoct2024.user_bio_response_notification_dismissed (requester_singles_id, dismissed_at DESC)
     `);
   })().catch((err) => {
     bioResponseNotificationSchemaPromise = null;
@@ -41,7 +41,7 @@ export async function clearBioResponseNotificationDismissed(requesterSinglesId, 
   if (kind !== 'brief' && kind !== 'full') return;
   await ensureBioResponseNotificationSchemaReady();
   await pool.query(
-    `DELETE FROM helloworldjunktest.user_bio_response_notification_dismissed
+    `DELETE FROM outdateddbsnapshotoct2024.user_bio_response_notification_dismissed
      WHERE requester_singles_id = $1
        AND recipient_singles_id = $2
        AND bio_kind = $3`,
@@ -75,7 +75,7 @@ export async function getVettedFriendsBioResponsePendingCount(req, res) {
             WHEN ${RESPONDED_BRIEF_SQL}
              AND NOT EXISTS (
                SELECT 1
-               FROM helloworldjunktest.user_bio_response_notification_dismissed d
+               FROM outdateddbsnapshotoct2024.user_bio_response_notification_dismissed d
                WHERE d.requester_singles_id = $1
                  AND d.recipient_singles_id = r.singles_id_to
                  AND d.bio_kind = 'brief'
@@ -86,7 +86,7 @@ export async function getVettedFriendsBioResponsePendingCount(req, res) {
             WHEN ${RESPONDED_FULL_SQL}
              AND NOT EXISTS (
                SELECT 1
-               FROM helloworldjunktest.user_bio_response_notification_dismissed d
+               FROM outdateddbsnapshotoct2024.user_bio_response_notification_dismissed d
                WHERE d.requester_singles_id = $1
                  AND d.recipient_singles_id = r.singles_id_to
                  AND d.bio_kind = 'full'
@@ -130,7 +130,7 @@ export async function dismissBioResponseNotification(req, res) {
   try {
     await ensureBioResponseNotificationSchemaReady();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_bio_response_notification_dismissed
+      `INSERT INTO outdateddbsnapshotoct2024.user_bio_response_notification_dismissed
          (requester_singles_id, recipient_singles_id, bio_kind, dismissed_at)
        SELECT $1, $2, unnest($3::text[]), NOW()
        ON CONFLICT (requester_singles_id, recipient_singles_id, bio_kind)
@@ -155,7 +155,7 @@ export async function dismissAllBioResponseNotifications(req, res) {
     await ensureBioResponseNotificationSchemaReady();
     const schemaName = await resolveRequestsAppSchema();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_bio_response_notification_dismissed
+      `INSERT INTO outdateddbsnapshotoct2024.user_bio_response_notification_dismissed
          (requester_singles_id, recipient_singles_id, bio_kind, dismissed_at)
        SELECT $1, r.singles_id_to, 'brief', NOW()
        FROM ${schemaName}.requests r
@@ -168,7 +168,7 @@ export async function dismissAllBioResponseNotifications(req, res) {
       [me]
     );
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_bio_response_notification_dismissed
+      `INSERT INTO outdateddbsnapshotoct2024.user_bio_response_notification_dismissed
          (requester_singles_id, recipient_singles_id, bio_kind, dismissed_at)
        SELECT $1, r.singles_id_to, 'full', NOW()
        FROM ${schemaName}.requests r

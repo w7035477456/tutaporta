@@ -38,7 +38,7 @@ export function firstEmptySelfIntroVideoSlotColumn(row) {
 export async function loadSelfIntroVideoSlotRow(client, singlesId) {
   const { rows } = await client.query(
     `SELECT video1_fk, video2_fk, video3_fk
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -62,7 +62,7 @@ export async function loadSelfIntroVideoSlots(client, singlesId) {
   if (videoIds.length) {
     const { rows } = await client.query(
       `SELECT video_id, video_file_name, file_extension, created_at, video_thumbnail
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE video_id = ANY($1::bigint[])
          AND singles_id = $2`,
       [videoIds, singlesId]
@@ -101,7 +101,7 @@ export async function assignSelfIntroVideoToFirstEmptySlot(client, singlesId, vi
     throw new Error('All three self intro video slots are full. Remove one before saving a new video.');
   }
 
-  await client.query(`UPDATE helloworldjunktest.singles SET ${column} = $1 WHERE singles_id = $2`, [videoId, singlesId]);
+  await client.query(`UPDATE outdateddbsnapshotoct2024.singles SET ${column} = $1 WHERE singles_id = $2`, [videoId, singlesId]);
 
   return { slot: SELF_INTRO_VIDEO_SLOT_COLUMNS.indexOf(column) + 1, column };
 }
@@ -116,6 +116,6 @@ export async function clearSelfIntroVideoSlot(client, singlesId, slotNumber) {
   if (!column) {
     throw new Error('Invalid self intro video slot');
   }
-  await client.query(`UPDATE helloworldjunktest.singles SET ${column} = NULL WHERE singles_id = $1`, [singlesId]);
+  await client.query(`UPDATE outdateddbsnapshotoct2024.singles SET ${column} = NULL WHERE singles_id = $1`, [singlesId]);
   return { slot: slotNumber, column };
 }

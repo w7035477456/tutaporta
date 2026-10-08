@@ -15,7 +15,7 @@ export async function allocateNextSinglesId(client = pool) {
     const id = nextFromSeq.rows[0]?.singles_id;
     if (id != null) return id;
   }
-  const nextFromMax = await client.query(`SELECT COALESCE(MAX(singles_id) + 1, 1) AS singles_id FROM helloworldjunktest.singles`);
+  const nextFromMax = await client.query(`SELECT COALESCE(MAX(singles_id) + 1, 1) AS singles_id FROM outdateddbsnapshotoct2024.singles`);
   const id = nextFromMax.rows[0]?.singles_id;
   if (id == null) throw new Error('Unable to generate singles_id for new account.');
   return id;
@@ -34,7 +34,7 @@ export function buildDemoUserMemberId(singlesId, twoDigitSuffix) {
 
 async function memberIdExists(client, memberId, { excludeSinglesId } = {}) {
   const params = [memberId];
-  let sql = 'SELECT 1 FROM helloworldjunktest.singles WHERE member_id = $1';
+  let sql = 'SELECT 1 FROM outdateddbsnapshotoct2024.singles WHERE member_id = $1';
   if (excludeSinglesId != null) {
     sql += ' AND singles_id <> $2';
     params.push(excludeSinglesId);

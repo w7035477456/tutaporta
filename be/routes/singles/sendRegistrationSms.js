@@ -37,7 +37,7 @@ export async function sendRegistrationSms(req, res) {
       try {
         const result = await pool.query(
           `SELECT id, email
-           FROM helloworldjunktest.verifications
+           FROM outdateddbsnapshotoct2024.verifications
            WHERE code = $1
              AND kind = 'registration_email'
              AND used_at IS NULL
@@ -81,7 +81,7 @@ export async function sendRegistrationSms(req, res) {
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await pool.query(
-      `DELETE FROM helloworldjunktest.verifications
+      `DELETE FROM outdateddbsnapshotoct2024.verifications
        WHERE email = $1
          AND phone = $2
          AND kind IN ('phone_verify_session', 'phone_verified_pending_password')
@@ -89,7 +89,7 @@ export async function sendRegistrationSms(req, res) {
       [emailNorm, formattedPhone]
     );
     await pool.query(
-      `INSERT INTO helloworldjunktest.verifications (email, phone, password_hash, kind, expires_at)
+      `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
        VALUES ($1, $2, NULL, 'phone_verify_session', $3)`,
       [emailNorm, formattedPhone, expiresAt]
     );

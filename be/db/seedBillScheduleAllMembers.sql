@@ -10,7 +10,7 @@ BEGIN;
 
 CREATE TEMP TABLE bill_schedule_source ON COMMIT DROP AS
 SELECT s.singles_id
-  FROM helloworldjunktest.singles s
+  FROM outdateddbsnapshotoct2024.singles s
  WHERE lower(s.email::text) = 'dm2@gmail.com'
  LIMIT 1;
 
@@ -28,7 +28,7 @@ WITH source AS (
 ),
 best_month AS (
   SELECT m.bill_year, m.bill_month
-    FROM helloworldjunktest.monthly_bill m
+    FROM outdateddbsnapshotoct2024.monthly_bill m
     JOIN source s ON m.singles_id = s.singles_id
    WHERE m.storage_backend = 'onedrive'
    GROUP BY m.bill_year, m.bill_month
@@ -42,7 +42,7 @@ SELECT
   m.amount,
   m.bill_type,
   m.action
-  FROM helloworldjunktest.monthly_bill m
+  FROM outdateddbsnapshotoct2024.monthly_bill m
   JOIN source s ON m.singles_id = s.singles_id
   JOIN best_month b ON b.bill_year = m.bill_year AND b.bill_month = m.bill_month
  WHERE m.storage_backend = 'onedrive'
@@ -62,7 +62,7 @@ WITH source AS (
 ),
 best_year AS (
   SELECT m.bill_year
-    FROM helloworldjunktest.yearly_bill m
+    FROM outdateddbsnapshotoct2024.yearly_bill m
     JOIN source s ON m.singles_id = s.singles_id
    WHERE m.storage_backend = 'onedrive'
    GROUP BY m.bill_year
@@ -77,7 +77,7 @@ SELECT
   m.amount,
   m.bill_type,
   m.action
-  FROM helloworldjunktest.yearly_bill m
+  FROM outdateddbsnapshotoct2024.yearly_bill m
   JOIN source s ON m.singles_id = s.singles_id
   JOIN best_year b ON b.bill_year = m.bill_year
  WHERE m.storage_backend = 'onedrive'
@@ -90,7 +90,7 @@ BEGIN
   END IF;
 END $$;
 
-INSERT INTO helloworldjunktest.monthly_bill (
+INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
   singles_id,
   storage_backend,
   bill_year,
@@ -115,17 +115,17 @@ SELECT
   t.bill_type,
   t.action,
   NULL
-  FROM helloworldjunktest.singles tgt
+  FROM outdateddbsnapshotoct2024.singles tgt
  CROSS JOIN (VALUES ('onedrive'), ('usb')) AS sb(storage_backend)
  CROSS JOIN monthly_template t
  WHERE NOT EXISTS (
          SELECT 1
-           FROM helloworldjunktest.monthly_bill m
+           FROM outdateddbsnapshotoct2024.monthly_bill m
           WHERE m.singles_id = tgt.singles_id
        )
 ON CONFLICT (singles_id, storage_backend, bill_year, bill_month, row_index) DO NOTHING;
 
-INSERT INTO helloworldjunktest.yearly_bill (
+INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
   singles_id,
   storage_backend,
   bill_year,
@@ -150,12 +150,12 @@ SELECT
   t.bill_type,
   t.action,
   NULL
-  FROM helloworldjunktest.singles tgt
+  FROM outdateddbsnapshotoct2024.singles tgt
  CROSS JOIN (VALUES ('onedrive'), ('usb')) AS sb(storage_backend)
  CROSS JOIN yearly_template t
  WHERE NOT EXISTS (
          SELECT 1
-           FROM helloworldjunktest.yearly_bill y
+           FROM outdateddbsnapshotoct2024.yearly_bill y
           WHERE y.singles_id = tgt.singles_id
        )
 ON CONFLICT (singles_id, storage_backend, bill_year, row_index) DO NOTHING;
@@ -164,8 +164,8 @@ COMMIT;
 
 -- Verify:
 -- SELECT s.email, COUNT(m.*) AS monthly_rows, COUNT(y.*) AS yearly_rows
---   FROM helloworldjunktest.singles s
---   LEFT JOIN helloworldjunktest.monthly_bill m ON m.singles_id = s.singles_id
---   LEFT JOIN helloworldjunktest.yearly_bill y ON y.singles_id = s.singles_id
+--   FROM outdateddbsnapshotoct2024.singles s
+--   LEFT JOIN outdateddbsnapshotoct2024.monthly_bill m ON m.singles_id = s.singles_id
+--   LEFT JOIN outdateddbsnapshotoct2024.yearly_bill y ON y.singles_id = s.singles_id
 --  GROUP BY s.singles_id, s.email
 --  ORDER BY monthly_rows DESC, yearly_rows DESC;

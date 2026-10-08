@@ -3,8 +3,8 @@ import { SELF_INTRO_VIDEO_SLOT_COLUMNS, loadSelfIntroVideoSlotRow } from './self
 import { deletePostingPhotosReferencingAlbumVideoId } from './deletePostingPhotosForAlbumVideo.js';
 import { unlinkMemberVideoFilesFromDisk } from './videoFilePath.js';
 
-const VIDEOS_TABLE = 'helloworldjunktest.videos';
-const SINGLES_TABLE = 'helloworldjunktest.singles';
+const VIDEOS_TABLE = 'outdateddbsnapshotoct2024.videos';
+const SINGLES_TABLE = 'outdateddbsnapshotoct2024.singles';
 
 /**
  * Hard-delete one self-intro video inside an open transaction (DB only).

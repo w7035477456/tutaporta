@@ -10,7 +10,7 @@
 BEGIN;
 
 -- Ensure purchase path still accumulates bought (idempotent with addSinglesRefillBoughtMb.sql).
-CREATE OR REPLACE FUNCTION helloworldjunktest.add_vault_refill_mb(
+CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.add_vault_refill_mb(
   p_singles_id bigint,
   p_add_mb integer
 )
@@ -21,7 +21,7 @@ DECLARE
   v_remain integer;
   v_add integer := GREATEST(0, COALESCE(p_add_mb, 0));
 BEGIN
-  UPDATE helloworldjunktest.singles
+  UPDATE outdateddbsnapshotoct2024.singles
   SET
     refill_bought_mb = CASE
       WHEN refill_remain_mb <= 0 THEN v_add
@@ -56,10 +56,10 @@ WITH ledger AS (
         ELSE 0
       END
     )::integer AS bought_from_ledger
-  FROM helloworldjunktest.payment p
+  FROM outdateddbsnapshotoct2024.payment p
   GROUP BY p.singles_id
 )
-UPDATE helloworldjunktest.singles s
+UPDATE outdateddbsnapshotoct2024.singles s
 SET refill_bought_mb = GREATEST(
   COALESCE(s.refill_bought_mb, 0),
   COALESCE(l.bought_from_ledger, 0),

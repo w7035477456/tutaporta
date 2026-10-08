@@ -1,11 +1,11 @@
 -- Run on Primary only.
--- Converts helloworldjunktest.requests.interested, brief_paid, full_paid
+-- Converts outdateddbsnapshotoct2024.requests.interested, brief_paid, full_paid
 -- to boolean_enum ('true' | 'false') with DEFAULT 'false'.
 -- Requires be/db/renameRequestsPaidColumns.sql (brief_paid / full_paid column names).
 
 DO $$
 DECLARE
-  sch text := 'helloworldjunktest';
+  sch text := 'outdateddbsnapshotoct2024';
   col text;
   req_cols text[] := ARRAY['interested', 'brief_paid', 'full_paid'];
 BEGIN
@@ -84,7 +84,7 @@ END $$;
 -- Verify
 SELECT column_name, udt_name, column_default, is_nullable
 FROM information_schema.columns
-WHERE table_schema = 'helloworldjunktest'
+WHERE table_schema = 'outdateddbsnapshotoct2024'
   AND table_name = 'requests'
   AND column_name IN ('interested', 'brief_paid', 'full_paid')
 ORDER BY column_name;

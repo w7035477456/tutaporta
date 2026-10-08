@@ -2,7 +2,7 @@ import pool from '../../db/connection.js';
 import { getDBSchema } from '../../config/envConfig.js';
 
 export async function resolveBioSchema() {
-  const candidates = [...new Set([getDBSchema(), 'helloworldjunktest', 'public'].filter(Boolean))];
+  const candidates = [...new Set([getDBSchema(), 'outdateddbsnapshotoct2024', 'public'].filter(Boolean))];
   for (const schemaName of candidates) {
     const r = await pool.query(
       `SELECT 1
@@ -16,7 +16,7 @@ export async function resolveBioSchema() {
     );
     if (r.rows.length) return schemaName;
   }
-  return 'helloworldjunktest';
+  return 'outdateddbsnapshotoct2024';
 }
 
 export function sqlIdent(name) {
@@ -69,7 +69,7 @@ export const MISC_BIO_FIELD_KEYS = new Set([
   'country_of_birth'
 ]);
 
-/** FK column on vet_bio / misc_bio → helloworldjunktest.singles.singles_id */
+/** FK column on vet_bio / misc_bio → outdateddbsnapshotoct2024.singles.singles_id */
 export const BIO_SINGLES_FK_COLUMN = 'singles_id';
 
 /**

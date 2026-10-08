@@ -11,12 +11,12 @@
 
 BEGIN;
 
-TRUNCATE TABLE helloworldjunktest.photos;
+TRUNCATE TABLE outdateddbsnapshotoct2024.photos;
 
-TRUNCATE TABLE helloworldjunktest.chat_log;
-TRUNCATE TABLE helloworldjunktest.postings;
-TRUNCATE TABLE helloworldjunktest.posting_photos;
-TRUNCATE TABLE helloworldjunktest.posting_comments;
+TRUNCATE TABLE outdateddbsnapshotoct2024.chat_log;
+TRUNCATE TABLE outdateddbsnapshotoct2024.postings;
+TRUNCATE TABLE outdateddbsnapshotoct2024.posting_photos;
+TRUNCATE TABLE outdateddbsnapshotoct2024.posting_comments;
 
 DO $$
 DECLARE
@@ -28,11 +28,11 @@ BEGIN
     JOIN pg_namespace n ON n.oid = c.relnamespace
     JOIN pg_inherits i ON i.inhrelid = c.oid
     JOIN pg_class parent ON parent.oid = i.inhparent
-    WHERE n.nspname = 'helloworldjunktest'
+    WHERE n.nspname = 'outdateddbsnapshotoct2024'
       AND parent.relname IN ('chat_log', 'postings', 'posting_photos', 'posting_comments')
       AND c.relispartition
   LOOP
-    EXECUTE format('DROP TABLE IF EXISTS helloworldjunktest.%I', r.part_name);
+    EXECUTE format('DROP TABLE IF EXISTS outdateddbsnapshotoct2024.%I', r.part_name);
   END LOOP;
 END $$;
 
@@ -59,11 +59,11 @@ BEGIN
   FOREACH parent_table IN ARRAY ARRAY['chat_log', 'postings', 'posting_photos', 'posting_comments']
   LOOP
     EXECUTE format(
-      'CREATE TABLE helloworldjunktest.%I_%s_quarter%s PARTITION OF helloworldjunktest.%I FOR VALUES FROM (%L) TO (%L)',
+      'CREATE TABLE outdateddbsnapshotoct2024.%I_%s_quarter%s PARTITION OF outdateddbsnapshotoct2024.%I FOR VALUES FROM (%L) TO (%L)',
       parent_table, y, q, parent_table, cur_start, next_start
     );
     EXECUTE format(
-      'CREATE TABLE helloworldjunktest.%I_%s_quarter%s PARTITION OF helloworldjunktest.%I FOR VALUES FROM (%L) TO (%L)',
+      'CREATE TABLE outdateddbsnapshotoct2024.%I_%s_quarter%s PARTITION OF outdateddbsnapshotoct2024.%I FOR VALUES FROM (%L) TO (%L)',
       parent_table, ny, nq, parent_table, next_start, next_end
     );
   END LOOP;

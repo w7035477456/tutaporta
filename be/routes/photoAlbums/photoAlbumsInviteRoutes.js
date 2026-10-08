@@ -17,7 +17,7 @@ import { photoAlbumsInlinePreviewPayload } from '../../utils/photoAlbumsInlinePr
 const LOG_PREFIX = '[photoAlbumsInvites]';
 
 function schemaTable(name) {
-  const schema = String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
   return `"${schema}"."${name}"`;
 }
 

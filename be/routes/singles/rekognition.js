@@ -36,7 +36,7 @@ import {
   loadMemberBasicsForRekognitionBypass
 } from '../../utils/adminImpersonationRekognitionBypass.js';
 
-const CHECKR_SCHEMA = 'helloworldjunktest';
+const CHECKR_SCHEMA = 'outdateddbsnapshotoct2024';
 
 /** Product copy when government ID OCR age is under 18. */
 export const UNDER18_ID_VERIFY_MESSAGE = 'Sorry you must be over 18 years of age';
@@ -53,8 +53,8 @@ async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
   const over18 = Number.isFinite(age) && age >= 18;
   if (underage) {
     await client.query(
-      `UPDATE helloworldjunktest.singles
-       SET status = 'under18'::helloworldjunktest.singles_status,
+      `UPDATE outdateddbsnapshotoct2024.singles
+       SET status = 'under18'::outdateddbsnapshotoct2024.singles_status,
            over_18_verified = false,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $1`,
@@ -69,7 +69,7 @@ async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
   }
   if (over18) {
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET over_18_verified = true,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $1`,
@@ -90,22 +90,22 @@ let checkrTableReady = false;
 async function ensureCheckrTable(client) {
   if (checkrTableReady) return;
   await client.query(
-    `CREATE TABLE IF NOT EXISTS helloworldjunktest.singles_checkr (
+    `CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.singles_checkr (
       singles_checkr_id BIGSERIAL PRIMARY KEY,
       singles_id BIGINT NOT NULL,
       checkr_candidate_id TEXT,
       checkr_report_id TEXT,
       vetting_status TEXT NOT NULL DEFAULT 'unverified',
-      education_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      employment_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      identity_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      credit_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      license_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
+      education_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      employment_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      identity_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      credit_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      license_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
       created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       last_vetted_at TIMESTAMPTZ
     )`
   );
-  await client.query('CREATE UNIQUE INDEX IF NOT EXISTS ux_singles_checkr_singles_id ON helloworldjunktest.singles_checkr (singles_id)');
+  await client.query('CREATE UNIQUE INDEX IF NOT EXISTS ux_singles_checkr_singles_id ON outdateddbsnapshotoct2024.singles_checkr (singles_id)');
   checkrTableReady = true;
 }
 
@@ -279,7 +279,7 @@ async function updateSinglesLiveScanProfileMatch(client, singlesId, capture) {
   const colRes = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'singles'`
   );
   const columnSet = new Set(colRes.rows.map((row) => row.column_name));
@@ -293,7 +293,7 @@ async function updateSinglesLiveScanProfileMatch(client, singlesId, capture) {
   updates.push('updated_at = CURRENT_TIMESTAMP');
   values.push(singlesId);
   await client.query(
-    `UPDATE helloworldjunktest.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
+    `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
     values
   );
   return capture;
@@ -303,7 +303,7 @@ async function updateSinglesDlProfileMatch(client, singlesId, capture) {
   const colRes = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'singles'`
   );
   const columnSet = new Set(colRes.rows.map((row) => row.column_name));
@@ -321,7 +321,7 @@ async function updateSinglesDlProfileMatch(client, singlesId, capture) {
   updates.push('updated_at = CURRENT_TIMESTAMP');
   values.push(singlesId);
   await client.query(
-    `UPDATE helloworldjunktest.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
+    `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
     values
   );
   return capture;
@@ -331,7 +331,7 @@ async function updateSinglesPpProfileMatch(client, singlesId, capture) {
   const colRes = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'singles'`
   );
   const columnSet = new Set(colRes.rows.map((row) => row.column_name));
@@ -349,7 +349,7 @@ async function updateSinglesPpProfileMatch(client, singlesId, capture) {
   updates.push('updated_at = CURRENT_TIMESTAMP');
   values.push(singlesId);
   await client.query(
-    `UPDATE helloworldjunktest.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
+    `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
     values
   );
   return capture;
@@ -480,7 +480,7 @@ async function updateSinglesMailingFromId(client, singlesId, parsed) {
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(singlesId);
     await client.query(
-      `UPDATE helloworldjunktest.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
+      `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
       values
     );
   }
@@ -544,7 +544,7 @@ async function appendGovIdDocumentType(client, singlesId, documentType, columnSe
   });
   if (!label) return;
   await client.query(
-    `UPDATE helloworldjunktest.singles
+    `UPDATE outdateddbsnapshotoct2024.singles
      SET gov_id_array = CASE
        WHEN gov_id_array IS NULL THEN ARRAY[$2]::text[]
        WHEN NOT ($2 = ANY(gov_id_array)) THEN array_append(gov_id_array, $2)
@@ -560,7 +560,7 @@ async function updateSinglesDlCaptureFromId(client, singlesId, parsed, slotDocum
   const colRes = await client.query(
     `SELECT column_name
      FROM information_schema.columns
-     WHERE table_schema = 'helloworldjunktest'
+     WHERE table_schema = 'outdateddbsnapshotoct2024'
        AND table_name = 'singles'`
   );
   const columnSet = new Set(colRes.rows.map((row) => row.column_name));
@@ -578,7 +578,7 @@ async function updateSinglesDlCaptureFromId(client, singlesId, parsed, slotDocum
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(singlesId);
     await client.query(
-      `UPDATE helloworldjunktest.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
+      `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
       values
     );
   }
@@ -595,13 +595,13 @@ async function markIdentityVerified(client, singlesId) {
   const identityVerifiedUdt = await loadColumnUdtName(client, CHECKR_SCHEMA, 'singles_checkr', 'identity_verified');
   const identityVerifiedTrue = sqlBooleanColumnLiteral(true, identityVerifiedUdt, CHECKR_SCHEMA);
   await client.query(
-    `INSERT INTO helloworldjunktest.singles_checkr
+    `INSERT INTO outdateddbsnapshotoct2024.singles_checkr
      (singles_id, vetting_status, identity_verified, last_vetted_at)
      VALUES ($1, 'verified', ${identityVerifiedTrue}, CURRENT_TIMESTAMP)
      ON CONFLICT (singles_id) DO UPDATE SET
        identity_verified = ${identityVerifiedTrue},
        vetting_status = CASE
-         WHEN helloworldjunktest.singles_checkr.vetting_status IN ('verified', 'pending') THEN helloworldjunktest.singles_checkr.vetting_status
+         WHEN outdateddbsnapshotoct2024.singles_checkr.vetting_status IN ('verified', 'pending') THEN outdateddbsnapshotoct2024.singles_checkr.vetting_status
          ELSE 'verified'
        END,
        last_vetted_at = CURRENT_TIMESTAMP`,
@@ -611,7 +611,7 @@ async function markIdentityVerified(client, singlesId) {
 
 async function memberHasProfilePhoto(singlesId) {
   const { rows } = await pool.query(
-    `SELECT profile_image_fk FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`,
+    `SELECT profile_image_fk FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`,
     [singlesId]
   );
   const fk = Number(rows[0]?.profile_image_fk);
@@ -1514,7 +1514,7 @@ export async function postMarkOver18Verified(req, res) {
   }
   try {
     await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET over_18_verified = true,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $1`,

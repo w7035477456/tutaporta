@@ -19,11 +19,11 @@ export async function syncSinglesStatusWithTutaDates(client, singlesId, tutaDate
   const toStatus = tutaDatesEnabled ? 'active' : 'inactive';
 
   const { rows } = await client.query(
-    `UPDATE helloworldjunktest.singles
-     SET status = $2::helloworldjunktest.singles_status,
+    `UPDATE outdateddbsnapshotoct2024.singles
+     SET status = $2::outdateddbsnapshotoct2024.singles_status,
          updated_at = CURRENT_TIMESTAMP
      WHERE singles_id = $1
-       AND status = $3::helloworldjunktest.singles_status
+       AND status = $3::outdateddbsnapshotoct2024.singles_status
      RETURNING singles_id, email, phone, status`,
     [id, toStatus, fromStatus]
   );

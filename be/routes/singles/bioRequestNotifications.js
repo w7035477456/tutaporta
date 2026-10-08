@@ -10,7 +10,7 @@ async function ensureBioRequestNotificationSchemaReady() {
   if (bioRequestNotificationSchemaPromise) return bioRequestNotificationSchemaPromise;
   bioRequestNotificationSchemaPromise = (async () => {
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS helloworldjunktest.user_bio_request_notification_dismissed (
+      CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.user_bio_request_notification_dismissed (
         singles_id bigint NOT NULL,
         requester_singles_id bigint NOT NULL,
         dismissed_at timestamptz NOT NULL DEFAULT NOW(),
@@ -19,7 +19,7 @@ async function ensureBioRequestNotificationSchemaReady() {
     `);
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_user_bio_request_notification_dismissed_singles
-      ON helloworldjunktest.user_bio_request_notification_dismissed (singles_id, dismissed_at DESC)
+      ON outdateddbsnapshotoct2024.user_bio_request_notification_dismissed (singles_id, dismissed_at DESC)
     `);
   })().catch((err) => {
     bioRequestNotificationSchemaPromise = null;
@@ -50,7 +50,7 @@ export async function clearBioRequestNotificationDismissed(recipientSinglesId, r
   if (!Number.isFinite(recipient) || recipient < 1 || !Number.isFinite(requester) || requester < 1) return;
   await ensureBioRequestNotificationSchemaReady();
   await pool.query(
-    `DELETE FROM helloworldjunktest.user_bio_request_notification_dismissed
+    `DELETE FROM outdateddbsnapshotoct2024.user_bio_request_notification_dismissed
      WHERE singles_id = $1 AND requester_singles_id = $2`,
     [recipient, requester]
   );
@@ -88,7 +88,7 @@ export async function getBioRequestNotifications(req, res) {
          AND ${buildSinglesActiveStatusWhereSql('s_from')}
          AND NOT EXISTS (
            SELECT 1
-           FROM helloworldjunktest.user_bio_request_notification_dismissed d
+           FROM outdateddbsnapshotoct2024.user_bio_request_notification_dismissed d
            WHERE d.singles_id = $1
              AND d.requester_singles_id = r.singles_id_from
          )
@@ -182,7 +182,7 @@ export async function dismissBioRequestNotification(req, res) {
   try {
     await ensureBioRequestNotificationSchemaReady();
     await pool.query(
-      `INSERT INTO helloworldjunktest.user_bio_request_notification_dismissed
+      `INSERT INTO outdateddbsnapshotoct2024.user_bio_request_notification_dismissed
          (singles_id, requester_singles_id, dismissed_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (singles_id, requester_singles_id)
@@ -207,7 +207,7 @@ export async function dismissAllBioRequestNotifications(req, res) {
     await ensureBioRequestNotificationSchemaReady();
     if (requesterIds.length) {
       await pool.query(
-        `INSERT INTO helloworldjunktest.user_bio_request_notification_dismissed
+        `INSERT INTO outdateddbsnapshotoct2024.user_bio_request_notification_dismissed
            (singles_id, requester_singles_id, dismissed_at)
          SELECT $1, unnest($2::bigint[]), NOW()
          ON CONFLICT (singles_id, requester_singles_id)

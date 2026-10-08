@@ -73,7 +73,7 @@ export function randomTimestampWithinLastMonths(months = PROFILE_PHOTO_POST_LOOK
 export async function loadOldestOtherPostingCreatedAt(db, postingsSchema, singlesId, options = {}) {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return null;
-  const schema = String(postingsSchema || 'helloworldjunktest').replace(/"/g, '""');
+  const schema = String(postingsSchema || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
   const excludePostId = Number(options?.excludePostId);
   const params = [id, PROFILE_PHOTO_CHANGE_POST_CONTENT];
   let excludeSql = '';
@@ -131,7 +131,7 @@ export function profilePhotoPostingNeedsEarlierTimestamp(profilePhotoCreatedAt, 
  * @param {{ disableFkTriggers?: boolean }} [options]
  */
 export async function restampPostingCreatedAt(client, postingsSchema, postId, createdAt, options = {}) {
-  const schema = String(postingsSchema || 'helloworldjunktest').replace(/"/g, '""');
+  const schema = String(postingsSchema || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
   const id = Number(postId);
   const stamp = coerceDate(createdAt);
   if (!Number.isFinite(id) || id < 1 || !stamp) {

@@ -34,7 +34,7 @@ export async function saveSecretIcon(req, res) {
 
   try {
     const result = await pool.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET secret_icon = $1,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $2

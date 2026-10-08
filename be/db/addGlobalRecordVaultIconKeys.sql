@@ -6,10 +6,10 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.global
+ALTER TABLE outdateddbsnapshotoct2024.global
   ADD COLUMN IF NOT EXISTS record_vault_icon_keys jsonb NOT NULL DEFAULT '{}'::jsonb;
 
-COMMENT ON COLUMN helloworldjunktest.global.record_vault_icon_keys IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.global.record_vault_icon_keys IS
   'Map of FA5 object icon kebab name -> long random encryption secret for Record Vault USB (never sent to client).';
 
 COMMIT;

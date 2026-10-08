@@ -67,7 +67,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
 
   const existing = await client.query(
     `SELECT ${transactionIdSql} AS transaction_id
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE ${paymentIdSql} = $1
      LIMIT 1`,
     [pid]
@@ -81,7 +81,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
   const generated = makePaymentTransactionIdBigInt(pid);
   if (generated == null) return null;
   await client.query(
-    `UPDATE helloworldjunktest.payment
+    `UPDATE outdateddbsnapshotoct2024.payment
      SET ${transactionIdSql} = $1
      WHERE ${paymentIdSql} = $2`,
     [generated, pid]
@@ -115,7 +115,7 @@ export async function grantComplimentaryNewMemberVaultData(client, singlesId) {
   const descriptionSql = sqlIdent(descriptionColumn);
   const already = await client.query(
     `SELECT payment_id
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE singles_id = $1
        AND COALESCE(${descriptionSql}, '') = $2
      LIMIT 1`,
@@ -132,7 +132,7 @@ export async function grantComplimentaryNewMemberVaultData(client, singlesId) {
       ? ', refill_bought_mb = $1'
       : '';
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET refill_remain_mb = $1 - COALESCE(photoalbums_total_transfer_mb, 0)${setBought}
        WHERE singles_id = $2`,
       [courtesyMb, id]
@@ -176,7 +176,7 @@ export async function grantComplimentaryNewMemberVaultData(client, singlesId) {
   }
 
   const inserted = await client.query(
-    `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+    `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
      VALUES (${placeholders.join(', ')})
      RETURNING payment_id`,
     insertValues
@@ -188,7 +188,7 @@ export async function grantComplimentaryNewMemberVaultData(client, singlesId) {
     const updates = ['payment_id_fk = $1'];
     if (singlesColumns.has('updated_at')) updates.push('updated_at = CURRENT_TIMESTAMP');
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $2`,
       [paymentId, id]

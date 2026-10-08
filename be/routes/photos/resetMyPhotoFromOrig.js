@@ -22,7 +22,7 @@ export async function resetMyPhotoFromOrig(req, res) {
       return res.status(400).json({ error: 'Invalid photo id' });
     }
 
-    const row = await pool.query(`SELECT photos_id, singles_id, file_extension, photo_file_name FROM helloworldjunktest.photos WHERE photos_id = $1 LIMIT 1`, [id]);
+    const row = await pool.query(`SELECT photos_id, singles_id, file_extension, photo_file_name FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1 LIMIT 1`, [id]);
     if (!row.rows.length || Number(row.rows[0].singles_id) !== Number(singlesId)) {
       return res.status(404).json({ error: 'Photo not found' });
     }
@@ -59,7 +59,7 @@ export async function resetMyPhotoFromOrig(req, res) {
 
     const mainJpg = path.join(filePathDir, `${fileBase}.jpg`);
     fs.writeFileSync(mainJpg, backupBuf);
-    await pool.query(`UPDATE helloworldjunktest.photos SET file_extension = $1 WHERE photos_id = $2`, ['jpg', id]);
+    await pool.query(`UPDATE outdateddbsnapshotoct2024.photos SET file_extension = $1 WHERE photos_id = $2`, ['jpg', id]);
     await regeneratePhotoThumbnail(pool, id, backupBuf);
 
     console.log('[resetMyPhotoFromOrig] restored', id, 'from', backupPath);

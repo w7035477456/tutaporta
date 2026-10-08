@@ -19,7 +19,7 @@ import { issueUserLoginSession } from '../../utils/issueUserLoginSession.js';
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
                 seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
                 (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
-         FROM helloworldjunktest.singles s`;
+         FROM outdateddbsnapshotoct2024.singles s`;
 
 function parseRememberMe(raw) {
   if (raw === true || raw === 1) return true;
@@ -291,7 +291,7 @@ export async function beVerifyLoginPassword(req, res) {
       if (passwordNeedsRehash(storedHash)) {
         const newHash = await hashPassword(providedPassword);
         await client.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                updated_at = CURRENT_TIMESTAMP
            WHERE singles_id = $2`,

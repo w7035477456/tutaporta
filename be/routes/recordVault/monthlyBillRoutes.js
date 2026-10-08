@@ -144,7 +144,7 @@ function mapRow(row, year, month) {
 async function countMonthRows(client, singlesId, year, month, storageBackend) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
-       FROM helloworldjunktest.monthly_bill
+       FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
         AND bill_year = $3 AND bill_month = $4`,
     [singlesId, storageBackend, year, month]
@@ -155,7 +155,7 @@ async function countMonthRows(client, singlesId, year, month, storageBackend) {
 async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend) {
   const { rows } = await client.query(
     `SELECT bill_year, bill_month
-       FROM helloworldjunktest.monthly_bill
+       FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1
         AND storage_backend = $2
         AND (bill_year < $3 OR (bill_year = $3 AND bill_month < $4))
@@ -180,7 +180,7 @@ async function ensureMonthCloned(client, singlesId, year, month, storageBackend)
   if (!prior) return { cloned: false, from: null };
 
   await client.query(
-    `INSERT INTO helloworldjunktest.monthly_bill (
+    `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type,
        action, paid_record_id
@@ -189,7 +189,7 @@ async function ensureMonthCloned(client, singlesId, year, month, storageBackend)
        singles_id, storage_backend, $3, $4, row_index,
        bill_description, due_day, amount, bill_type,
        NULL, NULL
-       FROM helloworldjunktest.monthly_bill
+       FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
         AND bill_year = $5 AND bill_month = $6
       ORDER BY row_index ASC`,
@@ -205,12 +205,12 @@ async function listMonthRows(client, singlesId, year, month, storageBackend) {
               COALESCE(LENGTH(TRIM(pr.notes_text)), 0) > 0
               OR EXISTS (
                 SELECT 1
-                  FROM helloworldjunktest.paid_record_attachment a
+                  FROM outdateddbsnapshotoct2024.paid_record_attachment a
                  WHERE a.paid_record_id = pr.paid_record_id
               )
             ) AS has_bill_content
-       FROM helloworldjunktest.monthly_bill mb
-       LEFT JOIN helloworldjunktest.paid_record pr
+       FROM outdateddbsnapshotoct2024.monthly_bill mb
+       LEFT JOIN outdateddbsnapshotoct2024.paid_record pr
          ON pr.paid_record_id = mb.paid_record_id
       WHERE mb.singles_id = $1 AND mb.storage_backend = $2
         AND mb.bill_year = $3 AND mb.bill_month = $4
@@ -234,7 +234,7 @@ export async function getMonthlyBill(req, res) {
       const peer = storageBackend === 'usb' ? 'onedrive' : 'usb';
       const { rows: peerCountRows } = await client.query(
         `SELECT COUNT(*)::int AS c
-           FROM helloworldjunktest.monthly_bill
+           FROM outdateddbsnapshotoct2024.monthly_bill
           WHERE singles_id = $1 AND storage_backend = $2`,
         [singlesId, peer]
       );
@@ -307,14 +307,14 @@ export async function putMonthlyBill(req, res) {
     try {
       await client.query('BEGIN');
       await client.query(
-        `DELETE FROM helloworldjunktest.monthly_bill
+        `DELETE FROM outdateddbsnapshotoct2024.monthly_bill
           WHERE singles_id = $1 AND storage_backend = $2
             AND bill_year = $3 AND bill_month = $4`,
         [singlesId, storageBackend, year, month]
       );
       for (const r of normalized) {
         const { rows: inserted } = await client.query(
-          `INSERT INTO helloworldjunktest.monthly_bill (
+          `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
              action, paid_record_id
@@ -337,7 +337,7 @@ export async function putMonthlyBill(req, res) {
         const newBillId = Number(inserted[0]?.monthly_bill_id);
         if (r.paid_record_id && newBillId) {
           await client.query(
-            `UPDATE helloworldjunktest.paid_record
+            `UPDATE outdateddbsnapshotoct2024.paid_record
                 SET monthly_bill_id = $1, updated_at = now()
               WHERE paid_record_id = $2 AND singles_id = $3`,
             [newBillId, r.paid_record_id, singlesId]

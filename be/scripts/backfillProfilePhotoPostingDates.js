@@ -24,7 +24,7 @@ function parseArgs(argv) {
 }
 
 function schemaIdent() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '""');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
 }
 
 async function main() {

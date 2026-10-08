@@ -17,7 +17,7 @@ async function resolveAdminCustomAllowed(singlesId, auth) {
   try {
     const { rows } = await pool.query(
       `SELECT member_category
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [id]

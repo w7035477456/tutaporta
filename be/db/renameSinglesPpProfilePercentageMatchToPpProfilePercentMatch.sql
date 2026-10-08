@@ -1,4 +1,4 @@
--- Rename helloworldjunktest.singles.pp_profile_percentage_match → pp_profile_percent_match (Primary only).
+-- Rename outdateddbsnapshotoct2024.singles.pp_profile_percentage_match → pp_profile_percent_match (Primary only).
 -- Mac dev (Primary):
 -- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/renameSinglesPpProfilePercentageMatchToPpProfilePercentMatch.sql
 
@@ -7,20 +7,20 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'singles'
       AND column_name = 'pp_profile_percentage_match'
   ) AND NOT EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'helloworldjunktest'
+    WHERE table_schema = 'outdateddbsnapshotoct2024'
       AND table_name = 'singles'
       AND column_name = 'pp_profile_percent_match'
   ) THEN
-    ALTER TABLE helloworldjunktest.singles
+    ALTER TABLE outdateddbsnapshotoct2024.singles
       RENAME COLUMN pp_profile_percentage_match TO pp_profile_percent_match;
   END IF;
 END $$;
 
-COMMENT ON COLUMN helloworldjunktest.singles.pp_profile_percent_match IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.pp_profile_percent_match IS
   'Profile photo to passport face match percent during Identification Verification.';

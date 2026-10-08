@@ -61,7 +61,7 @@ function logPhotoDirStats(label) {
 
 /**
  * POST /api/profilePhoto
- * Body: { photos_id: number } where photos_id is helloworldjunktest.photos.photos_id.
+ * Body: { photos_id: number } where photos_id is outdateddbsnapshotoct2024.photos.photos_id.
  * Sets singles.profile_image_fk for the authenticated single, only if the photo belongs to them.
  */
 export async function setProfileImage(req, res) {
@@ -82,7 +82,7 @@ export async function setProfileImage(req, res) {
     try {
       const photoRow = await client.query(
         `SELECT photos_id
-         FROM helloworldjunktest.photos
+         FROM outdateddbsnapshotoct2024.photos
          WHERE photos_id = $1 AND singles_id = $2`,
         [photosId, singlesId]
       );

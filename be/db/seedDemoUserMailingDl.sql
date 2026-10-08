@@ -4,7 +4,7 @@
 
 BEGIN;
 
-UPDATE helloworldjunktest.singles
+UPDATE outdateddbsnapshotoct2024.singles
 SET
   mailing_middlename = CHR(65 + ((singles_id * 7 + 3) % 26)::int),
   dl_firstname = NULLIF(BTRIM(mailing_firstname), ''),
@@ -17,7 +17,7 @@ WITH ranked AS (
   SELECT
     s.singles_id,
     ROW_NUMBER() OVER (ORDER BY s.singles_id)::int AS rn
-  FROM helloworldjunktest.singles s
+  FROM outdateddbsnapshotoct2024.singles s
   WHERE s.member_category = 'DEMOUSER'
 ),
 addrs(rn, mailing_street, mailing_city, mailing_zip, mailing_country) AS (
@@ -33,7 +33,7 @@ addrs(rn, mailing_street, mailing_city, mailing_zip, mailing_country) AS (
     (9,  '655 15th St NW, Washington, DC 20005',         'Washington', '20005', 'USA'),
     (10, '2500 Wisconsin Ave NW, Washington, DC 20007',  'Washington', '20007', 'USA')
 )
-UPDATE helloworldjunktest.singles s
+UPDATE outdateddbsnapshotoct2024.singles s
 SET
   mailing_street = a.mailing_street,
   mailing_city = a.mailing_city,
@@ -47,7 +47,7 @@ WHERE s.singles_id = r.singles_id;
 SELECT singles_id, email, mailing_firstname, mailing_lastname,
   dl_firstname, dl_middlename, dl_lastname,
   mailing_street, mailing_city, mailing_zip, mailing_country
-FROM helloworldjunktest.singles
+FROM outdateddbsnapshotoct2024.singles
 WHERE member_category = 'DEMOUSER'
 ORDER BY singles_id;
 

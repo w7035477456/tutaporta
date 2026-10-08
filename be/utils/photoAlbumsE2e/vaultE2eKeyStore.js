@@ -1,6 +1,6 @@
 /**
  * Yellow E2E (TutaPhotoAlbums): store only KDF params + wrapped DEK per storage backend.
- * Uses helloworldjunktest.photo_albums_vault — independent from TutaNotes notes_vault.
+ * Uses outdateddbsnapshotoct2024.photo_albums_vault — independent from TutaNotes notes_vault.
  * Never sees Encrypt Password, KEK, or plaintext DEK.
  */
 import pool from '../../db/connection.js';
@@ -9,7 +9,7 @@ import { getDBSchema } from '../../config/envConfig.js';
 const ALLOWED_BACKENDS = new Set(['usb', 'onedrive', 'postgres']);
 
 function schema() {
-  return String(getDBSchema() || 'helloworldjunktest').replace(/"/g, '');
+  return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
 }
 
 function b64ToBuf(b64) {

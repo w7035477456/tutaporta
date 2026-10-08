@@ -14,7 +14,7 @@ import { deleteMemberMobileUploadsOnFactoryReset } from './deleteMemberMobileUpl
 import { ensureSeededDemoBuddiesOnLogin } from './ensureSeededDemoBuddiesOnLogin.js';
 import { isProtectedSystemToolsAdminSinglesId } from './systemToolsAdmin.js';
 
-const SCHEMA = 'helloworldjunktest';
+const SCHEMA = 'outdateddbsnapshotoct2024';
 const Q = `"${SCHEMA}"`;
 
 function toSinglesId(raw) {

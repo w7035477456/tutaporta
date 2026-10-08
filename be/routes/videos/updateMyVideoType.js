@@ -40,7 +40,7 @@ export async function updateMyVideoType(req, res) {
 
     const ownerRow = await client.query(
       `SELECT video_id, type::text AS album_type_raw, video_file_name
-       FROM helloworldjunktest.videos
+       FROM outdateddbsnapshotoct2024.videos
        WHERE video_id = $1 AND singles_id = $2
        LIMIT 1`,
       [videoId, singlesId]
@@ -70,7 +70,7 @@ export async function updateMyVideoType(req, res) {
       return res.status(409).json({ error: DEFAULT_FULL_ERROR });
     }
 
-    await client.query(`UPDATE helloworldjunktest.videos SET type = ${sqlPhotoTypeParam('$1')} WHERE video_id = $2`, [
+    await client.query(`UPDATE outdateddbsnapshotoct2024.videos SET type = ${sqlPhotoTypeParam('$1')} WHERE video_id = $2`, [
       targetType,
       videoId
     ]);

@@ -39,7 +39,7 @@ default_text_search_config = 'pg_catalog.english'
 include_dir = 'conf.d'                  # include files ending in '.conf' from
 
 #andrewton 03/31/2026
-search_path = 'helloworldjunktest, public'
+search_path = 'outdateddbsnapshotoct2024, public'
 
 #below is need for MAC to DBeaver to ubuntu DB
 listen_addresses = '*'

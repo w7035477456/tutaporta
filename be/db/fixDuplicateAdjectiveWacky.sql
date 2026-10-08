@@ -8,7 +8,7 @@
 
 -- 1) List current Wacky* (example collision from UI)
 SELECT singles_id, member_id, alias
-FROM helloworldjunktest.singles
+FROM outdateddbsnapshotoct2024.singles
 WHERE alias IS NOT NULL
   AND BTRIM(alias) <> ''
   AND LOWER(alias) LIKE 'wacky%'
@@ -18,7 +18,7 @@ ORDER BY singles_id;
 --    (Only needed if you are not using the node script.)
 -- Example was: singles_id 39 WackyWanda kept, singles_id 42 WackyWillie -> DashDanny via script.
 -- Alternate manual example:
--- UPDATE helloworldjunktest.singles
+-- UPDATE outdateddbsnapshotoct2024.singles
 -- SET alias = 'WittyWillie', updated_at = CURRENT_TIMESTAMP
 -- WHERE singles_id = 42
 --   AND LOWER(TRIM(alias)) = 'wackywillie';

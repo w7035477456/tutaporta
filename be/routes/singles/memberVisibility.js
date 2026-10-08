@@ -14,7 +14,7 @@ function parseAllowedMemberCategories() {
 }
 
 /**
- * SQL fragment: singles.status must be active (helloworldjunktest.singles_status enum).
+ * SQL fragment: singles.status must be active (outdateddbsnapshotoct2024.singles_status enum).
  * Inactive / blank / suspend / pause / etc. must not appear on
  * All Singles, Picks & Posts, or Acquaint. & Buddies listings.
  */

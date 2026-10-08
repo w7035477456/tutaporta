@@ -1,7 +1,7 @@
 /**
- * Insert a photo into helloworldjunktest.photos by PK and image URL.
- * Prompts for: helloworldjunktest.photos PK number, then image URL.
- * Downloads the image as blob and inserts into helloworldjunktest.photos.
+ * Insert a photo into outdateddbsnapshotoct2024.photos by PK and image URL.
+ * Prompts for: outdateddbsnapshotoct2024.photos PK number, then image URL.
+ * Downloads the image as blob and inserts into outdateddbsnapshotoct2024.photos.
  *
  * Usage (from project root): node be/scripts/insertPhotoFromUrl.js
  * Or from be/: node scripts/insertPhotoFromUrl.js
@@ -27,7 +27,7 @@ function toContentType_AAAAA(header_AAAAA) {
 
 async function main_AAAAA() {
   // Prompt for both inputs first so connection logs don't overwrite the prompts
-  const pkInput_AAAAA = await ask_AAAAA('helloworldjunktest.photos table PK number input: ');
+  const pkInput_AAAAA = await ask_AAAAA('outdateddbsnapshotoct2024.photos table PK number input: ');
   const photosId_AAAAA = parseInt(pkInput_AAAAA, 10);
   if (Number.isNaN(photosId_AAAAA) || photosId_AAAAA < 1) {
     console.error('Invalid PK: must be a positive integer.');
@@ -64,12 +64,12 @@ async function main_AAAAA() {
 
   try {
     await pool.query(
-      `INSERT INTO helloworldjunktest.photos (photos_id, image_data, content_type)
+      `INSERT INTO outdateddbsnapshotoct2024.photos (photos_id, image_data, content_type)
        VALUES ($1, $2, $3)
        ON CONFLICT (photos_id) DO UPDATE SET image_data = EXCLUDED.image_data, content_type = EXCLUDED.content_type`,
       [photosId_AAAAA, buffer_AAAAA, contentType_AAAAA]
     );
-    console.log('Inserted/updated helloworldjunktest.photos row with photos_id =', photosId_AAAAA);
+    console.log('Inserted/updated outdateddbsnapshotoct2024.photos row with photos_id =', photosId_AAAAA);
   } catch (err_AAAAA) {
     console.error('DB insert failed:', err_AAAAA.message);
     process.exit(1);

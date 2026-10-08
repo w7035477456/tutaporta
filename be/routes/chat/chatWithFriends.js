@@ -27,7 +27,7 @@ async function ensureChatLogPartitionsBeforeWrite() {
 async function enforceChatMessagingPrefixRule(senderId, targetUserId) {
   const prefixResult = await pool.query(
     `SELECT singles_id, prefix
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id IN ($1, $2)`,
     [senderId, targetUserId]
   );
@@ -126,9 +126,9 @@ export async function getUnreadChatSenders(userId) {
       s.member_id,
       s.alias,
       MAX(l.created_at) AS latest_message_at
-    FROM helloworldjunktest.chat_log l
-    JOIN helloworldjunktest.singles s ON s.singles_id = l.sender_id
-    LEFT JOIN helloworldjunktest.chat_read_state r
+    FROM outdateddbsnapshotoct2024.chat_log l
+    JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = l.sender_id
+    LEFT JOIN outdateddbsnapshotoct2024.chat_read_state r
       ON r.user_id = $1 AND r.partner_id = l.sender_id
     WHERE l.receiver_id = $1
       AND l.sender_id <> $1
@@ -159,8 +159,8 @@ export async function getUnreadChatMessageCount(userId) {
   const result = await pool.query(
     `
     SELECT COUNT(*)::int AS n
-    FROM helloworldjunktest.chat_log l
-    LEFT JOIN helloworldjunktest.chat_read_state r
+    FROM outdateddbsnapshotoct2024.chat_log l
+    LEFT JOIN outdateddbsnapshotoct2024.chat_read_state r
       ON r.user_id = $1 AND r.partner_id = l.sender_id
     WHERE l.receiver_id = $1
       AND l.sender_id <> $1
@@ -181,7 +181,7 @@ export async function markChatVisited(userId, partnerId) {
   await ensureChatSchemaReady();
   await pool.query(
     `
-    INSERT INTO helloworldjunktest.chat_read_state (user_id, partner_id, last_read_at)
+    INSERT INTO outdateddbsnapshotoct2024.chat_read_state (user_id, partner_id, last_read_at)
     VALUES ($1, $2, NOW())
     ON CONFLICT (user_id, partner_id)
     DO UPDATE SET last_read_at = EXCLUDED.last_read_at
@@ -212,7 +212,7 @@ export async function sendMessage({ senderId, targetUserId, text }) {
 
   await pool.query(
     `
-    INSERT INTO helloworldjunktest.chat_conversation (conversation_id, user_low, user_high, updated_at)
+    INSERT INTO outdateddbsnapshotoct2024.chat_conversation (conversation_id, user_low, user_high, updated_at)
     VALUES ($1, $2, $3, NOW())
     ON CONFLICT (conversation_id)
     DO UPDATE SET updated_at = EXCLUDED.updated_at
@@ -222,7 +222,7 @@ export async function sendMessage({ senderId, targetUserId, text }) {
 
   const inserted = await pool.query(
     `
-    INSERT INTO helloworldjunktest.chat_log (conv_id, user1_id, user2_id, sender_id, receiver_id, msg_text, msg_data)
+    INSERT INTO outdateddbsnapshotoct2024.chat_log (conv_id, user1_id, user2_id, sender_id, receiver_id, msg_text, msg_data)
     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
     RETURNING msg_id, sender_id, msg_text, created_at
     `,
@@ -276,7 +276,7 @@ export async function getChatHistory(req, res) {
     const result = await pool.query(
       `
       SELECT msg_id, sender_id, msg_text, created_at
-      FROM helloworldjunktest.chat_log
+      FROM outdateddbsnapshotoct2024.chat_log
       WHERE conv_id = $1
         AND (
           $3::timestamptz IS NULL
@@ -332,7 +332,7 @@ export async function getChatHistoryBatch(req, res) {
           l.msg_text,
           l.created_at,
           ROW_NUMBER() OVER (PARTITION BY l.conv_id ORDER BY l.created_at DESC, l.msg_id DESC) AS rn
-        FROM helloworldjunktest.chat_log l
+        FROM outdateddbsnapshotoct2024.chat_log l
         WHERE l.conv_id = ANY($1::text[])
       ) ranked
       WHERE rn <= $2
@@ -398,9 +398,9 @@ export async function getUnreadChatMessagesHandler(req, res) {
         s.prefix,
         s.member_id,
         s.alias
-      FROM helloworldjunktest.chat_log l
-      JOIN helloworldjunktest.singles s ON s.singles_id = l.sender_id
-      LEFT JOIN helloworldjunktest.chat_read_state r
+      FROM outdateddbsnapshotoct2024.chat_log l
+      JOIN outdateddbsnapshotoct2024.singles s ON s.singles_id = l.sender_id
+      LEFT JOIN outdateddbsnapshotoct2024.chat_read_state r
         ON r.user_id = $1 AND r.partner_id = l.sender_id
       WHERE l.receiver_id = $1
         AND l.sender_id <> $1
@@ -458,8 +458,8 @@ export async function getChatFriends(req, res) {
         s.profile_image_fk,
         s.alias,
         c.updated_at
-      FROM helloworldjunktest.chat_conversation c
-      JOIN helloworldjunktest.singles s
+      FROM outdateddbsnapshotoct2024.chat_conversation c
+      JOIN outdateddbsnapshotoct2024.singles s
         ON s.singles_id = CASE WHEN c.user_low = $1 THEN c.user_high ELSE c.user_low END
       WHERE c.user_low = $1 OR c.user_high = $1
       ORDER BY c.updated_at DESC

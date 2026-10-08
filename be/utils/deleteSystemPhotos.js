@@ -13,7 +13,7 @@ export async function deletePriorSystemPhotosByPrefix(client, singlesId, fileNam
 
   const { rows } = await client.query(
     `SELECT photos_id, photo_file_name, file_extension
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE singles_id = $1
        AND photo_file_name LIKE $2`,
     [singlesId, `${prefix}%`]
@@ -23,12 +23,12 @@ export async function deletePriorSystemPhotosByPrefix(client, singlesId, fileNam
   for (const row of rows) {
     const photosId = Number(row.photos_id);
     await client.query(
-      `UPDATE helloworldjunktest.consent_record
+      `UPDATE outdateddbsnapshotoct2024.consent_record
        SET consent_signature_image_fk = NULL
        WHERE consent_signature_image_fk = $1`,
       [photosId]
     );
-    await client.query(`DELETE FROM helloworldjunktest.photos WHERE photos_id = $1 AND singles_id = $2`, [
+    await client.query(`DELETE FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1 AND singles_id = $2`, [
       photosId,
       singlesId
     ]);
@@ -52,22 +52,22 @@ export async function hardDeletePhotoRow(client, row) {
   if (!Number.isFinite(photosId) || photosId < 1) return false;
 
   await client.query(
-    `UPDATE helloworldjunktest.consent_record
+    `UPDATE outdateddbsnapshotoct2024.consent_record
      SET consent_signature_image_fk = NULL
      WHERE consent_signature_image_fk = $1`,
     [photosId]
   );
   if (Number.isFinite(singlesId) && singlesId > 0) {
     await client.query(
-      `UPDATE helloworldjunktest.singles SET profile_image_fk = NULL WHERE singles_id = $1 AND profile_image_fk = $2`,
+      `UPDATE outdateddbsnapshotoct2024.singles SET profile_image_fk = NULL WHERE singles_id = $1 AND profile_image_fk = $2`,
       [singlesId, photosId]
     );
-    await client.query(`DELETE FROM helloworldjunktest.photos WHERE photos_id = $1 AND singles_id = $2`, [
+    await client.query(`DELETE FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1 AND singles_id = $2`, [
       photosId,
       singlesId
     ]);
   } else {
-    await client.query(`DELETE FROM helloworldjunktest.photos WHERE photos_id = $1`, [photosId]);
+    await client.query(`DELETE FROM outdateddbsnapshotoct2024.photos WHERE photos_id = $1`, [photosId]);
   }
 
   unlinkMemberPhotoFilesFromDisk({
@@ -87,7 +87,7 @@ export async function purgeAllDeletedTypeMedia(client) {
 
   const photoRows = await client.query(
     `SELECT photos_id, singles_id, photo_file_name, file_extension
-     FROM helloworldjunktest.photos
+     FROM outdateddbsnapshotoct2024.photos
      WHERE LOWER(COALESCE(type::text, 'uploaded')) = 'deleted'`
   );
 
@@ -97,7 +97,7 @@ export async function purgeAllDeletedTypeMedia(client) {
 
   const videoRows = await client.query(
     `SELECT video_id, singles_id, video_file_name, file_extension, file_path, video_thumbnail
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE LOWER(type::text) = 'deleted'`
   );
 
@@ -105,12 +105,12 @@ export async function purgeAllDeletedTypeMedia(client) {
     const videoId = Number(row.video_id);
     const singlesId = Number(row.singles_id);
     await client.query(
-      `UPDATE helloworldjunktest.consent_record
+      `UPDATE outdateddbsnapshotoct2024.consent_record
        SET consent_signature_video_fk = NULL
        WHERE consent_signature_video_fk = $1`,
       [videoId]
     );
-    await client.query(`DELETE FROM helloworldjunktest.videos WHERE video_id = $1 AND singles_id = $2`, [
+    await client.query(`DELETE FROM outdateddbsnapshotoct2024.videos WHERE video_id = $1 AND singles_id = $2`, [
       videoId,
       singlesId
     ]);

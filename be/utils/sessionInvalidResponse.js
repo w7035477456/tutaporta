@@ -1,4 +1,4 @@
-/** Session cookie/JWT present but member row missing from helloworldjunktest.singles. */
+/** Session cookie/JWT present but member row missing from outdateddbsnapshotoct2024.singles. */
 export const SESSION_INVALID_ERROR =
   'Login User Identity Error detected, please login again. If login fail, please contact admin.';
 

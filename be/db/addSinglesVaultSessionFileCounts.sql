@@ -5,16 +5,16 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_session_usb_tx_rx_count integer NOT NULL DEFAULT 0;
 
-ALTER TABLE helloworldjunktest.singles
+ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS notes_session_ui_tx_rx_count integer NOT NULL DEFAULT 0;
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_session_usb_tx_rx_count IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_session_usb_tx_rx_count IS
   'Running COUNT of notebooks/notes/files transferred between USB and the website app this vault session. Resets on unlock.';
 
-COMMENT ON COLUMN helloworldjunktest.singles.notes_session_ui_tx_rx_count IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.singles.notes_session_ui_tx_rx_count IS
   'Running COUNT of notebooks/notes/files transferred between backend (or USB bridge) and the user browser this vault session. Resets on unlock.';
 
 COMMIT;

@@ -11,7 +11,7 @@ export async function findSameUserVaultVideoWithByteSize(client, singlesId, byte
 
   const { rows } = await client.query(
     `SELECT video_id, file_path, file_extension, video_file_name
-     FROM helloworldjunktest.videos
+     FROM outdateddbsnapshotoct2024.videos
      WHERE singles_id = $1
        AND video_file_name LIKE $2
        AND LOWER(type::text) <> 'deleted'

@@ -7,7 +7,7 @@
 
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS helloworldjunktest.us_population_by_city (
+CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.us_population_by_city (
   us_population_by_city_id serial PRIMARY KEY,
   city_name text NOT NULL,
   population bigint NOT NULL CHECK (population > 0),
@@ -17,25 +17,25 @@ CREATE TABLE IF NOT EXISTS helloworldjunktest.us_population_by_city (
   UNIQUE (city_name, state_name)
 );
 
-COMMENT ON TABLE helloworldjunktest.us_population_by_city IS
+COMMENT ON TABLE outdateddbsnapshotoct2024.us_population_by_city IS
   'Census Vintage 2025 incorporated places (SUMLEV 162). percentage_of_total = population / US total * 100.';
 
-COMMENT ON COLUMN helloworldjunktest.us_population_by_city.city_name IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.us_population_by_city.city_name IS
   'City / place display name (Census legal suffix stripped).';
 
-COMMENT ON COLUMN helloworldjunktest.us_population_by_city.population IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.us_population_by_city.population IS
   'July 1, 2025 resident population estimate (POPESTIMATE2025).';
 
-COMMENT ON COLUMN helloworldjunktest.us_population_by_city.state_name IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.us_population_by_city.state_name IS
   'Full US state or District of Columbia name.';
 
-COMMENT ON COLUMN helloworldjunktest.us_population_by_city.zipcode IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.us_population_by_city.zipcode IS
   'Representative 5-digit ZIP (largest overlapping 2020 ZCTA, else GeoNames).';
 
-COMMENT ON COLUMN helloworldjunktest.us_population_by_city.percentage_of_total IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.us_population_by_city.percentage_of_total IS
   'City population divided by total US population, as a percent (e.g. 2.51 = 2.51%).';
 
 CREATE INDEX IF NOT EXISTS us_population_by_city_pct_idx
-  ON helloworldjunktest.us_population_by_city (percentage_of_total DESC);
+  ON outdateddbsnapshotoct2024.us_population_by_city (percentage_of_total DESC);
 
 COMMIT;

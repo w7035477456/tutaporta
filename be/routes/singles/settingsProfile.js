@@ -294,7 +294,7 @@ async function resolveMemberDisplayNumber(client, memberCache, { memberIdRaw, si
     if (!memberCache.has(singlesId)) {
       const result = await client.query(
         `SELECT prefix, member_id
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
          WHERE singles_id = $1
          LIMIT 1`,
         [singlesId]
@@ -412,7 +412,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
 
   const existing = await client.query(
     `SELECT ${transactionIdSql} AS transaction_id
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE ${paymentIdSql} = $1
      LIMIT 1`,
     [pid]
@@ -427,7 +427,7 @@ async function ensurePaymentTransactionId(client, paymentColumns, paymentId) {
   if (!nextId) return null;
 
   await client.query(
-    `UPDATE helloworldjunktest.payment
+    `UPDATE outdateddbsnapshotoct2024.payment
      SET ${transactionIdSql} = $1
      WHERE ${paymentIdSql} = $2`,
     [nextId, pid]
@@ -450,7 +450,7 @@ async function applyTokenPurchaseCreditInTxn(
   const singlesColumns = await getSinglesColumns(client);
   const singleExistsResult = await client.query(
     `SELECT singles_id
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -462,7 +462,7 @@ async function applyTokenPurchaseCreditInTxn(
   const totalPriceBuying = tokenCount * unitPrice;
   const latestPaymentResult = await client.query(
     `SELECT payment_id, account_balance_token, paid_total_dollar, token_add_or_debit
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE singles_id = $1
      ORDER BY payment_id DESC
      LIMIT 1`,
@@ -515,7 +515,7 @@ async function applyTokenPurchaseCreditInTxn(
   }
 
   const inserted = await client.query(
-    `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+    `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
      VALUES (${placeholders.join(', ')})
      RETURNING payment_id`,
     insertValues
@@ -529,7 +529,7 @@ async function applyTokenPurchaseCreditInTxn(
       updates.push('updated_at = CURRENT_TIMESTAMP');
     }
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $2`,
       [paymentId, singlesId]
@@ -538,7 +538,7 @@ async function applyTokenPurchaseCreditInTxn(
 
   const persistedBalanceResult = await client.query(
     `SELECT account_balance_token
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE payment_id = $1
      LIMIT 1`,
     [paymentId]
@@ -569,7 +569,7 @@ async function findExistingPaypalPayment(client, singlesId, orderId, captureId =
   if (captureId && captureColumn) {
     const byCapture = await client.query(
       `SELECT payment_id, account_balance_token
-       FROM helloworldjunktest.payment
+       FROM outdateddbsnapshotoct2024.payment
        WHERE ${sqlIdent(singlesIdColumn)} = $1
          AND ${sqlIdent(captureColumn)} = $2
        ORDER BY payment_id DESC
@@ -582,7 +582,7 @@ async function findExistingPaypalPayment(client, singlesId, orderId, captureId =
   if (orderColumn) {
     const byOrder = await client.query(
       `SELECT payment_id, account_balance_token
-       FROM helloworldjunktest.payment
+       FROM outdateddbsnapshotoct2024.payment
        WHERE ${sqlIdent(singlesIdColumn)} = $1
          AND ${sqlIdent(orderColumn)} = $2
        ORDER BY payment_id DESC
@@ -595,7 +595,7 @@ async function findExistingPaypalPayment(client, singlesId, orderId, captureId =
   if (descriptionColumn) {
     const byDescription = await client.query(
       `SELECT payment_id, account_balance_token
-       FROM helloworldjunktest.payment
+       FROM outdateddbsnapshotoct2024.payment
        WHERE ${sqlIdent(singlesIdColumn)} = $1
          AND ${sqlIdent(descriptionColumn)} ILIKE $2
        ORDER BY payment_id DESC
@@ -612,8 +612,8 @@ async function getTokenBalance(client, singlesId) {
   try {
     const tokenResult = await client.query(
       `SELECT p.account_balance_token
-       FROM helloworldjunktest.singles s
-       LEFT JOIN helloworldjunktest.payment p ON p.payment_id = s.payment_id_fk
+       FROM outdateddbsnapshotoct2024.singles s
+       LEFT JOIN outdateddbsnapshotoct2024.payment p ON p.payment_id = s.payment_id_fk
        WHERE s.singles_id = $1
        LIMIT 1`,
       [singlesId]
@@ -733,7 +733,7 @@ async function resolveSinglesTimeZoneProfile(singlesId) {
   try {
     const { rows } = await pool.query(
       `SELECT mailing_zip, phone
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]
@@ -1159,7 +1159,7 @@ export async function purchaseRecordVaultRefill(req, res) {
     await lockTokenBalanceInTxn(client, singlesId);
     const memberResult = await client.query(
       `SELECT singles_id, refill_remain_mb, refill_bought_mb
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        FOR UPDATE`,
       [singlesId]
@@ -1173,7 +1173,7 @@ export async function purchaseRecordVaultRefill(req, res) {
     const singlesColumns = await getSinglesColumns(client);
     const latestPaymentResult = await client.query(
       `SELECT payment_id, account_balance_token, paid_total_dollar, token_add_or_debit
-       FROM helloworldjunktest.payment
+       FROM outdateddbsnapshotoct2024.payment
        WHERE singles_id = $1
        ORDER BY payment_id DESC
        LIMIT 1`,
@@ -1234,7 +1234,7 @@ export async function purchaseRecordVaultRefill(req, res) {
     }
 
     const inserted = await client.query(
-      `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+      `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
        VALUES (${placeholders.join(', ')})
        RETURNING payment_id`,
       insertValues
@@ -1243,13 +1243,13 @@ export async function purchaseRecordVaultRefill(req, res) {
     const transactionId = await ensurePaymentTransactionId(client, paymentColumns, paymentId);
 
     const refillResult = await client.query(
-      'SELECT helloworldjunktest.add_vault_refill_mb($1, $2) AS refill_remain_mb',
+      'SELECT outdateddbsnapshotoct2024.add_vault_refill_mb($1, $2) AS refill_remain_mb',
       [singlesId, refillMb]
     );
     const refillRemainMb = Number(refillResult.rows[0]?.refill_remain_mb);
     const boughtResult = await client.query(
       `SELECT refill_bought_mb
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]
@@ -1260,7 +1260,7 @@ export async function purchaseRecordVaultRefill(req, res) {
       const updates = ['payment_id_fk = $1'];
       if (singlesColumns.has('updated_at')) updates.push('updated_at = CURRENT_TIMESTAMP');
       await client.query(
-        `UPDATE helloworldjunktest.singles
+        `UPDATE outdateddbsnapshotoct2024.singles
          SET ${updates.join(', ')}
          WHERE singles_id = $2`,
         [paymentId, singlesId]
@@ -1332,7 +1332,7 @@ export async function getSettingsPaymentHistory(req, res) {
 
     const historyResult = await client.query(
       `SELECT ${selectParts.join(', ')}
-       FROM helloworldjunktest.payment
+       FROM outdateddbsnapshotoct2024.payment
        WHERE ${singlesIdColumn} = $1
        ORDER BY ${orderByColumn} ASC`,
       [singlesId]
@@ -1419,7 +1419,7 @@ async function insertAdminSetTokenBalanceInTxn(client, singlesId, nextBalance, m
 
   const latestPaymentResult = await client.query(
     `SELECT payment_id, paid_total_dollar, token_add_or_debit
-     FROM helloworldjunktest.payment
+     FROM outdateddbsnapshotoct2024.payment
      WHERE singles_id = $1
      ORDER BY payment_id DESC
      LIMIT 1`,
@@ -1464,7 +1464,7 @@ async function insertAdminSetTokenBalanceInTxn(client, singlesId, nextBalance, m
   }
 
   const inserted = await client.query(
-    `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+    `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
      VALUES (${placeholders.join(', ')})
      RETURNING payment_id`,
     insertValues
@@ -1478,7 +1478,7 @@ async function insertAdminSetTokenBalanceInTxn(client, singlesId, nextBalance, m
       updates.push('updated_at = CURRENT_TIMESTAMP');
     }
     await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $2`,
       [paymentId, singlesId]
@@ -1502,7 +1502,7 @@ async function adminSetTokenBalanceForSinglesId(req, res, singlesId, { logImpers
   try {
     const memberResult = await client.query(
       `SELECT singles_id, email
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]
@@ -1625,7 +1625,7 @@ export async function putAdminImpersonatedVaultRefillQuota(req, res) {
     await client.query('BEGIN');
     const memberResult = await client.query(
       `SELECT singles_id, refill_remain_mb, refill_bought_mb
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        FOR UPDATE`,
       [singlesId]
@@ -1647,7 +1647,7 @@ export async function putAdminImpersonatedVaultRefillQuota(req, res) {
     }
     params.push(singlesId);
     const updated = await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${sets.join(', ')}
        WHERE singles_id = $${params.length}
        RETURNING refill_remain_mb, refill_bought_mb`,
@@ -1707,7 +1707,7 @@ export async function debitRequestedViewToken(req, res) {
     await lockTokenBalanceInTxn(client, singlesId);
     const prefixPairResult = await client.query(
       `SELECT singles_id, prefix
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id IN ($1, $2)`,
       [singlesId, targetSinglesId]
     );
@@ -1722,7 +1722,7 @@ export async function debitRequestedViewToken(req, res) {
     }
 
     const resolvedSchema = await resolveRequestsAppSchema();
-    const schemaCandidates = [...new Set([resolvedSchema, getDBSchema(), 'helloworldjunktest', 'public'].filter(Boolean))];
+    const schemaCandidates = [...new Set([resolvedSchema, getDBSchema(), 'outdateddbsnapshotoct2024', 'public'].filter(Boolean))];
     let pickedSchema = null;
     let requestColumns = null;
     let requestRow = null;
@@ -1800,7 +1800,7 @@ export async function debitRequestedViewToken(req, res) {
       const paymentColumns = await getTableColumns(client, 'payment');
       const latestPaymentResult = await client.query(
         `SELECT payment_id, account_balance_token, paid_total_dollar, token_add_or_debit
-         FROM helloworldjunktest.payment
+         FROM outdateddbsnapshotoct2024.payment
          WHERE singles_id = $1
          ORDER BY payment_id DESC
          LIMIT 1`,
@@ -1820,7 +1820,7 @@ export async function debitRequestedViewToken(req, res) {
 
       const memberRes = await client.query(
         `SELECT singles_id, prefix, member_id, alias
-         FROM helloworldjunktest.singles
+         FROM outdateddbsnapshotoct2024.singles
          WHERE singles_id IN ($1, $2)`,
         [singlesId, targetSinglesId]
       );
@@ -1863,7 +1863,7 @@ export async function debitRequestedViewToken(req, res) {
         throw new Error('payment table has no writable columns');
       }
       const inserted = await client.query(
-        `INSERT INTO helloworldjunktest.payment (${insertColumns.join(', ')})
+        `INSERT INTO outdateddbsnapshotoct2024.payment (${insertColumns.join(', ')})
          VALUES (${placeholders.join(', ')})
          RETURNING payment_id`,
         insertValues
@@ -1876,7 +1876,7 @@ export async function debitRequestedViewToken(req, res) {
         const updates = ['payment_id_fk = $1'];
         if (singlesColumns.has('updated_at')) updates.push('updated_at = CURRENT_TIMESTAMP');
         await client.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET ${updates.join(', ')}
            WHERE singles_id = $2`,
           [paymentId, singlesId]
@@ -1936,7 +1936,7 @@ export async function getSettingsProfile(req, res) {
       .filter(Boolean);
 
     const selectClause = selectedPairs.map((x) => `${x.column} AS ${x.key}`).join(', ');
-    const sql = `SELECT ${selectClause} FROM helloworldjunktest.singles WHERE singles_id = $1 LIMIT 1`;
+    const sql = `SELECT ${selectClause} FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1 LIMIT 1`;
     const profileResult = await client.query(sql, [singlesId]);
     if (!profileResult.rows.length) {
       return respondSessionInvalid(res);
@@ -1948,7 +1948,7 @@ export async function getSettingsProfile(req, res) {
       const referCol = pickColumn(columnSet, PROFILE_COLUMN_CANDIDATES.my_refer_code);
       if (referCol) {
         await client.query(
-          `UPDATE helloworldjunktest.singles
+          `UPDATE outdateddbsnapshotoct2024.singles
            SET ${sqlIdent(referCol)} = $1
            WHERE singles_id = $2
              AND (${sqlIdent(referCol)} IS NULL OR BTRIM(${sqlIdent(referCol)}::text) = '')`,
@@ -2039,7 +2039,7 @@ export async function updateSettingsProfile(req, res) {
 
     values.push(singlesId);
     const result = await client.query(
-      `UPDATE helloworldjunktest.singles
+      `UPDATE outdateddbsnapshotoct2024.singles
        SET ${updates.join(', ')}
        WHERE singles_id = $${values.length}
        RETURNING singles_id`,

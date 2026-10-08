@@ -16,9 +16,9 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 ## 2) Postgres schema — no `public`
 
 - **Do not use schema `public`.**
-- Only schema: **`helloworldjunktest`**
+- Only schema: **`outdateddbsnapshotoct2024`**
 - DB user: **`test_user1`** (superuser on Mac dev)
-- Qualify tables in SQL and migrations: `helloworldjunktest.singles`, etc.
+- Qualify tables in SQL and migrations: `outdateddbsnapshotoct2024.singles`, etc.
 
 ### Mac ↔ Ubuntu schema parity (required)
 
@@ -66,7 +66,7 @@ Redis exists for **centralized cache** of a few shared, read-heavy items (rate l
 
 After a write in the same request, use Primary or tolerate replication lag for read-your-writes.
 
-**Exception — cluster coordination reads go to Primary:** `helloworldjunktest.vault_cluster_state` (vault unlock state, `db_version`, write lease lock; `be/utils/vaultClusterCoherence.js`) must be read **and** written on Primary. Replica lag there would serve stale vault copies ("Note not found").
+**Exception — cluster coordination reads go to Primary:** `outdateddbsnapshotoct2024.vault_cluster_state` (vault unlock state, `db_version`, write lease lock; `be/utils/vaultClusterCoherence.js`) must be read **and** written on Primary. Replica lag there would serve stale vault copies ("Note not found").
 
 ## 7) Deployment topology (current vs future)
 
@@ -84,7 +84,7 @@ Bash init: **`source ~/b`** (repo copy: **`myscript/mac/b`**)
 | **`beall`** | Backend with hot reload |
 | **`deployall2`** | Mac → Ubuntu remote deploy (VPN + SSH) |
 | **`showbuild`** | Print FE build stamp / checksum |
-| **`isdbsame`** | Compare Mac vs Ubuntu `helloworldjunktest` schema → prints `same` or `difference` |
+| **`isdbsame`** | Compare Mac vs Ubuntu `outdateddbsnapshotoct2024` schema → prints `same` or `difference` |
 
 Env: `~/.ssh/be/.env` (BE), `fe/.env` (FE). Restart after env changes.
 
@@ -130,7 +130,7 @@ Andrew uses **`vi`** at the command line.
 Quick singles query (Mac tunnel):
 
 ```bash
-psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SELECT * FROM helloworldjunktest.singles;"
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SELECT * FROM outdateddbsnapshotoct2024.singles;"
 ```
 
 ## 12) Agent — user action markers

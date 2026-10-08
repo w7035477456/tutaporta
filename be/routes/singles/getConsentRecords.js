@@ -27,7 +27,7 @@ export async function getConsentRecords(req, res) {
          vs.member_id AS viewer_member_id,
          vs.alias AS viewer_nickname
        FROM ${schema}.consent_record cr
-       LEFT JOIN helloworldjunktest.singles vs ON vs.singles_id = cr.viewer_approved
+       LEFT JOIN outdateddbsnapshotoct2024.singles vs ON vs.singles_id = cr.viewer_approved
        WHERE cr.member_id = $1
        ORDER BY cr.date_signed DESC, cr.consent_record_id DESC`,
       [singlesId]

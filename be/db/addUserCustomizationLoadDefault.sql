@@ -4,15 +4,15 @@
 
 BEGIN;
 
-ALTER TABLE helloworldjunktest.user_customization
+ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ADD COLUMN IF NOT EXISTS load_default boolean NOT NULL DEFAULT true;
 
-ALTER TABLE helloworldjunktest.user_customization
+ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ALTER COLUMN load_default SET DEFAULT false;
 
-COMMENT ON COLUMN helloworldjunktest.user_customization.load_default IS
+COMMENT ON COLUMN outdateddbsnapshotoct2024.user_customization.load_default IS
   'When false, opening Track auto-applies global.default_music_url once, then sets true.';
 
 COMMIT;
 
--- Verify: SELECT load_default, COUNT(*) FROM helloworldjunktest.user_customization GROUP BY 1;
+-- Verify: SELECT load_default, COUNT(*) FROM outdateddbsnapshotoct2024.user_customization GROUP BY 1;

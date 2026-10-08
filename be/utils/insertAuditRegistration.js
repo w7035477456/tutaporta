@@ -4,7 +4,7 @@ import { mapSinglesStatusToAuditStatus } from './singlesStatus.js';
 /** @typedef {'change' | 'new' | 'cancel' | 'suspend' | 'other'} AuditRegistrationStatus */
 
 /**
- * Append-only audit row for helloworldjunktest.audit_registrations.
+ * Append-only audit row for outdateddbsnapshotoct2024.audit_registrations.
  * Never UPDATE or DELETE audit rows — only INSERT.
  *
  * @param {import('pg').Pool | import('pg').PoolClient} client
@@ -13,8 +13,8 @@ import { mapSinglesStatusToAuditStatus } from './singlesStatus.js';
 export async function insertAuditRegistration(client, { singlesId = null, email, phone, status }) {
   const singlesIdValue = Number(singlesId);
   await client.query(
-    `INSERT INTO helloworldjunktest.audit_registrations (singles_id, email, phone, status, date_update)
-     VALUES ($1, $2, $3, $4::helloworldjunktest.audit_registration_status, now())`,
+    `INSERT INTO outdateddbsnapshotoct2024.audit_registrations (singles_id, email, phone, status, date_update)
+     VALUES ($1, $2, $3, $4::outdateddbsnapshotoct2024.audit_registration_status, now())`,
     [
       Number.isFinite(singlesIdValue) && singlesIdValue >= 1 ? singlesIdValue : null,
       normalizeEmailForDb(email),

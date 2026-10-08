@@ -1,7 +1,7 @@
 import pool from '../../db/connection.js';
 import { parseBooleanEnumRaw, sqlBooleanEnumLiteral, sqlBooleanEnumParam, toBooleanEnumLabel } from '../../utils/booleanEnum.js';
 
-const CHECKR_SCHEMA = 'helloworldjunktest';
+const CHECKR_SCHEMA = 'outdateddbsnapshotoct2024';
 const FALSE_ENUM = sqlBooleanEnumLiteral(false, CHECKR_SCHEMA);
 
 const DEFAULT_SANDBOX_BASE_URL = 'https://api.sandbox.checkr.com/v1';
@@ -32,23 +32,23 @@ function getCheckrConfig() {
 async function ensureCheckrTable(client) {
   if (checkrTableReady) return;
   await client.query(
-    `CREATE TABLE IF NOT EXISTS helloworldjunktest.singles_checkr (
+    `CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.singles_checkr (
       singles_checkr_id BIGSERIAL PRIMARY KEY,
       singles_id BIGINT NOT NULL,
       checkr_candidate_id TEXT,
       checkr_report_id TEXT,
       vetting_status TEXT NOT NULL DEFAULT 'unverified',
-      education_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      employment_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      identity_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      credit_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
-      license_verified helloworldjunktest.boolean_enum NOT NULL DEFAULT 'false'::helloworldjunktest.boolean_enum,
+      education_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      employment_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      identity_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      credit_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
+      license_verified outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
       created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
       last_vetted_at TIMESTAMPTZ
     )`
   );
-  await client.query('CREATE UNIQUE INDEX IF NOT EXISTS ux_singles_checkr_singles_id ON helloworldjunktest.singles_checkr (singles_id)');
-  await client.query('CREATE INDEX IF NOT EXISTS idx_singles_checkr_report_id ON helloworldjunktest.singles_checkr (checkr_report_id)');
+  await client.query('CREATE UNIQUE INDEX IF NOT EXISTS ux_singles_checkr_singles_id ON outdateddbsnapshotoct2024.singles_checkr (singles_id)');
+  await client.query('CREATE INDEX IF NOT EXISTS idx_singles_checkr_report_id ON outdateddbsnapshotoct2024.singles_checkr (checkr_report_id)');
   checkrTableReady = true;
 }
 
@@ -168,7 +168,7 @@ async function getOrCreateCandidate(config, existingCandidateId, userProfile) {
 async function loadSinglesCheckrRow(client, singlesId) {
   const result = await client.query(
     `SELECT *
-     FROM helloworldjunktest.singles_checkr
+     FROM outdateddbsnapshotoct2024.singles_checkr
      WHERE singles_id = $1
      LIMIT 1`,
     [singlesId]
@@ -212,9 +212,9 @@ function toPublicStatusPayload(row) {
 }
 
 async function ensureOptionalInvitationColumns(client) {
-  await client.query('ALTER TABLE helloworldjunktest.singles_checkr ADD COLUMN IF NOT EXISTS invitation_status TEXT');
-  await client.query('ALTER TABLE helloworldjunktest.singles_checkr ADD COLUMN IF NOT EXISTS invitation_expires_at TIMESTAMPTZ');
-  await client.query('ALTER TABLE helloworldjunktest.singles_checkr ADD COLUMN IF NOT EXISTS invitation_url TEXT');
+  await client.query('ALTER TABLE outdateddbsnapshotoct2024.singles_checkr ADD COLUMN IF NOT EXISTS invitation_status TEXT');
+  await client.query('ALTER TABLE outdateddbsnapshotoct2024.singles_checkr ADD COLUMN IF NOT EXISTS invitation_expires_at TIMESTAMPTZ');
+  await client.query('ALTER TABLE outdateddbsnapshotoct2024.singles_checkr ADD COLUMN IF NOT EXISTS invitation_url TEXT');
 }
 
 export async function createCheckrInvitation(req, res) {
@@ -240,7 +240,7 @@ export async function createCheckrInvitation(req, res) {
 
     const profileRes = await client.query(
       `SELECT singles_id, firstname, lastname, email, current_city
-       FROM helloworldjunktest.singles
+       FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1
        LIMIT 1`,
       [singlesId]
@@ -281,7 +281,7 @@ export async function createCheckrInvitation(req, res) {
 
     const invitationStatus = normalizeVettingStatus(invitation?.status || 'pending');
     await client.query(
-      `INSERT INTO helloworldjunktest.singles_checkr
+      `INSERT INTO outdateddbsnapshotoct2024.singles_checkr
        (
          singles_id,
          checkr_candidate_id,
@@ -423,7 +423,7 @@ async function syncCheckrStatusFromRemote(client, config, row) {
   }
 
   const result = await client.query(
-    `UPDATE helloworldjunktest.singles_checkr
+    `UPDATE outdateddbsnapshotoct2024.singles_checkr
      SET
        checkr_report_id = $2,
        vetting_status = $3,

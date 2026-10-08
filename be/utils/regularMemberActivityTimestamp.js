@@ -127,7 +127,7 @@ export async function loadMemberCategoryForSinglesId(db, singlesId) {
   if (!Number.isFinite(id) || id < 1) return null;
   const result = await db.query(
     `SELECT member_category::text AS member_category
-     FROM helloworldjunktest.singles
+     FROM outdateddbsnapshotoct2024.singles
      WHERE singles_id = $1
      LIMIT 1`,
     [id]
@@ -167,7 +167,7 @@ export async function resolveRegularMemberActivityTimestamp(db, singlesId, optio
 export async function loadLatestPostingCreatedAt(db, postingsSchema, singlesId) {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return null;
-  const schema = String(postingsSchema || 'helloworldjunktest').replace(/"/g, '""');
+  const schema = String(postingsSchema || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
   const result = await db.query(
     `SELECT MAX(p.created_at) AS previous_at
      FROM "${schema}".postings p
@@ -191,7 +191,7 @@ export async function loadLatestPostingCreatedAt(db, postingsSchema, singlesId) 
 export async function loadLatestCommentCreatedAt(db, postingsSchema, authorSinglesId, options = {}) {
   const id = Number(authorSinglesId);
   if (!Number.isFinite(id) || id < 1) return null;
-  const schema = String(postingsSchema || 'helloworldjunktest').replace(/"/g, '""');
+  const schema = String(postingsSchema || 'outdateddbsnapshotoct2024').replace(/"/g, '""');
   const photoId = Number(options?.photoId);
   if (Number.isFinite(photoId) && photoId > 0) {
     const onPhoto = await db.query(
@@ -234,7 +234,7 @@ export async function loadLatestPhotoCreatedAt(db, singlesId) {
   if (!Number.isFinite(id) || id < 1) return null;
   const result = await db.query(
     `SELECT MAX(p.created_at) AS previous_at
-     FROM helloworldjunktest.photos p
+     FROM outdateddbsnapshotoct2024.photos p
      WHERE p.singles_id = $1`,
     [id]
   );
@@ -252,7 +252,7 @@ export async function loadLatestVideoCreatedAt(db, singlesId) {
   if (!Number.isFinite(id) || id < 1) return null;
   const result = await db.query(
     `SELECT MAX(v.created_at) AS previous_at
-     FROM helloworldjunktest.videos v
+     FROM outdateddbsnapshotoct2024.videos v
      WHERE v.singles_id = $1`,
     [id]
   );

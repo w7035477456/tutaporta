@@ -27,7 +27,7 @@ export async function verifyRegistrationLink(req, res) {
 
     const result = await pool.query(
       `SELECT id, email
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE code = $1
          AND kind = 'registration_email'
          AND used_at IS NULL
@@ -66,7 +66,7 @@ export async function verifyRegistrationCode(req, res) {
 
     const result = await pool.query(
       `SELECT id, email, password_hash
-       FROM helloworldjunktest.verifications
+       FROM outdateddbsnapshotoct2024.verifications
        WHERE code = $1
          AND kind = 'registration_email'
          AND used_at IS NULL

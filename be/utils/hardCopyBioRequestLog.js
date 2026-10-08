@@ -7,7 +7,7 @@ import { getRequestClientIp } from './adminIpConfig.js';
 import { formatMemberDisplayCode } from './memberDisplayCode.js';
 import { appendBioApproveHardCopy, appendBioRequestHardCopy } from './hardCopyAuthLog.js';
 
-const SCHEMA = 'helloworldjunktest';
+const SCHEMA = 'outdateddbsnapshotoct2024';
 
 async function loadParty(singlesId) {
   const id = Number(singlesId);

@@ -1,8 +1,8 @@
 import { deletePostingPhotosReferencingAlbumPhotoId } from './deletePostingPhotosForAlbumPhoto.js';
 import { unlinkMemberPhotoFilesFromDisk } from './photoFilePath.js';
 
-const PHOTOS_TABLE = 'helloworldjunktest.photos';
-const SINGLES_TABLE = 'helloworldjunktest.singles';
+const PHOTOS_TABLE = 'outdateddbsnapshotoct2024.photos';
+const SINGLES_TABLE = 'outdateddbsnapshotoct2024.singles';
 
 /**
  * Hard-delete one member photo for admin tools (any photo type).
@@ -25,7 +25,7 @@ export async function hardDeleteAdminMemberPhotoInTx(client, singlesId, photosId
   const row = ownerRow.rows[0];
 
   await client.query(
-    `UPDATE helloworldjunktest.consent_record
+    `UPDATE outdateddbsnapshotoct2024.consent_record
      SET consent_signature_image_fk = NULL
      WHERE consent_signature_image_fk = $1`,
     [photosId]
