@@ -57,8 +57,10 @@ export const OPTINOUT_DEFAULT_BITMAP = OPTINOUT_TUTADATES | OPTINOUT_TUTANOTES |
 /** Statuses that may check / uncheck the TutaDates box (`new` goes through the ID-scan screens). */
 const TUTADATES_ALLOWED_STATUSES = ['active', 'new'];
 
-export const UNDER18_TUTADATES_MESSAGE =
-  'You must be over 18 to use TutaDates. You can still use TutaNotes and TutaPhotos.';
+/** Same copy the backend sends when it ends a session / refuses login for a non-active status. */
+export function singlesStatusBlockedMessage(rawStatus) {
+  return `Please contact customer support, since your status is '${normalizeSinglesStatus(rawStatus) ?? 'blank'}' and must be 'active' to Login`;
+}
 
 export function normalizeOptinoutBitmap(raw) {
   const n = Number(raw);
@@ -85,7 +87,9 @@ export function tutaDatesOptInBlockedMessage(rawStatus) {
  * The TutaDates opt-in bit is gated separately by the mall enrollment popup.
  */
 export function tutaDatesStatusBlockMessage(user) {
-  if (isSinglesStatusUnder18(user?.status) || user?.over_18_verified === false) return UNDER18_TUTADATES_MESSAGE;
+  if (isSinglesStatusUnder18(user?.status) || user?.over_18_verified === false) {
+    return singlesStatusBlockedMessage('under18');
+  }
   if (!canChangeTutaDatesOptIn(user?.status)) {
     return `Please contact customer support, since your TutaDate status is '${normalizeSinglesStatus(user?.status) ?? 'blank'}' and must be 'active' to use TutaDates`;
   }

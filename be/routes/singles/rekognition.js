@@ -35,12 +35,13 @@ import {
   isAdminImpersonationRekognitionBypass,
   loadMemberBasicsForRekognitionBypass
 } from '../../utils/adminImpersonationRekognitionBypass.js';
-import { UNDER18_TUTADATES_MESSAGE } from '../../utils/singlesStatus.js';
+import { singlesStatusBlockedMessage } from '../../utils/singlesStatus.js';
+import { invalidateAuthUserCache } from '../../utils/authUserLookupCache.js';
 
 const CHECKR_SCHEMA = 'outdateddbsnapshotoct2024';
 
-/** Product copy when government ID OCR age is under 18. */
-export const UNDER18_ID_VERIFY_MESSAGE = UNDER18_TUTADATES_MESSAGE;
+/** Product copy when government ID OCR age is under 18 (the member is logged out). */
+export const UNDER18_ID_VERIFY_MESSAGE = singlesStatusBlockedMessage('under18');
 
 /** age ≥ 18: only a freshly registered (`new`) member is promoted; admin states (suspend, pause, …) are kept. */
 const SQL_STATUS_NEW_TO_ACTIVE = `status = CASE
@@ -70,6 +71,7 @@ async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
        RETURNING status::text AS status`,
       [singlesId]
     );
+    await invalidateAuthUserCache(singlesId);
     console.log('[rekognition:idCapture] under18 from OCR DOB', {
       singlesId,
       age,
@@ -87,6 +89,7 @@ async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
        RETURNING status::text AS status`,
       [singlesId]
     );
+    await invalidateAuthUserCache(singlesId);
     console.log('[rekognition:idCapture] over_18_verified from OCR DOB', {
       singlesId,
       age,

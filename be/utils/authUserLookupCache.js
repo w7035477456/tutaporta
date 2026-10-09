@@ -2,7 +2,7 @@ import pool from '../db/connection.js';
 import { getSingleLoginRedis } from './singleLoginSession.js';
 
 /** Cluster-wide cache — shared Redis (same REDIS_URL as single-login sessions). */
-export const AUTH_USER_KEY_PREFIX = 'v1:auth_user:';
+export const AUTH_USER_KEY_PREFIX = 'v2:auth_user:';
 
 /** Short TTL safety net; invalidate on vault/email/logout/delete writes. */
 const CACHE_TTL_SEC = 30;
@@ -31,7 +31,8 @@ function buildAuthUserRow(row, jwtClaims) {
     role,
     impersonated_by_admin_id: role === 'Admin' ? impersonatedByAdminId : null,
     custom_logout_duration: customLogoutDuration,
-    notes_access_password_enabled: Boolean(row?.notes_access_password_enabled)
+    notes_access_password_enabled: Boolean(row?.notes_access_password_enabled),
+    status: row?.status ?? null
   };
 }
 
@@ -44,7 +45,8 @@ function parseCachedAuthUserRow(raw) {
     return {
       singles_id: id,
       email: parsed.email ?? null,
-      notes_access_password_enabled: Boolean(parsed.notes_access_password_enabled)
+      notes_access_password_enabled: Boolean(parsed.notes_access_password_enabled),
+      status: parsed.status ?? null
     };
   } catch {
     return null;
@@ -73,7 +75,8 @@ async function setCachedAuthUserRow(singlesId, row) {
       JSON.stringify({
         singles_id: row.singles_id,
         email: row.email ?? null,
-        notes_access_password_enabled: Boolean(row.notes_access_password_enabled)
+        notes_access_password_enabled: Boolean(row.notes_access_password_enabled),
+        status: row.status ?? null
       }),
       'EX',
       CACHE_TTL_SEC
@@ -87,7 +90,8 @@ async function fetchAuthUserFromDb(singlesId, fallbackEmail) {
   const result = await pool.query(
     `SELECT singles_id,
             email,
-            notes_access_password_enabled
+            notes_access_password_enabled,
+            status::text AS status
        FROM outdateddbsnapshotoct2024.singles
       WHERE singles_id = $1`,
     [singlesId]
@@ -101,7 +105,8 @@ async function fetchAuthUserFromDb(singlesId, fallbackEmail) {
   return {
     singles_id: id,
     email: row.email ?? fallbackEmail ?? null,
-    notes_access_password_enabled: row.notes_access_password_enabled
+    notes_access_password_enabled: row.notes_access_password_enabled,
+    status: row.status ?? null
   };
 }
 
@@ -117,7 +122,7 @@ export async function invalidateAuthUserCache(singlesId) {
 }
 
 /**
- * Resolve { singles_id, email, role, notes_access_password_enabled } for a verified JWT payload.
+ * Resolve { singles_id, email, role, notes_access_password_enabled, status } for a verified JWT payload.
  * Cluster-wide Redis cache (30s TTL) — invalidate via invalidateAuthUserCache().
  */
 export async function lookupAuthUserBySinglesId(singlesId, { fallbackEmail, jwtClaims } = {}) {

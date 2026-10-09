@@ -28,6 +28,7 @@ import { RECORD4SUPPORT_FILE_PREFIX } from '../../utils/saveRecord4SupportVideo.
 import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
 import { clearTutaNotesLock } from '../../utils/tutaNotesLock.js';
 import { clearVaultAccessFailStatus } from '../../utils/recordVaultAccessFailGuard.js';
+import { invalidateAuthUserCache } from '../../utils/authUserLookupCache.js';
 
 const SINGLES_LOOKUP_WILDCARD_LIMIT = 500;
 
@@ -361,6 +362,7 @@ export async function postAdminSetSinglesStatus(req, res) {
     }
 
     await client.query('COMMIT');
+    await invalidateAuthUserCache(singlesId);
 
     return res.json({
       success: true,
@@ -561,6 +563,7 @@ export async function postAdminCycleSinglesStatus(req, res) {
     });
 
     await client.query('COMMIT');
+    await invalidateAuthUserCache(singlesId);
 
     return res.json({
       success: true,

@@ -906,6 +906,17 @@ export default function AdminToolsLookupTab({ onError }) {
     singlesRows
   ]);
 
+  /** Rendered above and below the singles table so long lists can be saved without scrolling. */
+  const singlesSaveButton = (
+    <SelectedButtonTemplate
+      type="button"
+      disabled={!hasUnsavedStatusChanges || saveBusy || listBusy}
+      onClick={() => void handleSaveStatus()}
+    >
+      {saveBusy ? 'Saving…' : 'Save'}
+    </SelectedButtonTemplate>
+  );
+
   const handleSoftResetMember = useCallback(
     async (row) => {
       if (isAdminSinglesLookupRow(row)) return;
@@ -1156,6 +1167,9 @@ export default function AdminToolsLookupTab({ onError }) {
         <>
           <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'visible' }}>
             <Typography sx={sectionTitleSx}>All from singles table</Typography>
+            {singlesRows.length > 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5, mb: 1 }}>{singlesSaveButton}</Box>
+            ) : null}
             {singlesRows.length === 0 ? (
               <ColorTemplate9TableData.EmptyText>No matching singles rows found.</ColorTemplate9TableData.EmptyText>
             ) : (
@@ -1537,15 +1551,7 @@ export default function AdminToolsLookupTab({ onError }) {
             )}
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5, mb: 2, pb: 2 }}>
-            <SelectedButtonTemplate
-              type="button"
-              disabled={!hasUnsavedStatusChanges || saveBusy || listBusy}
-              onClick={() => void handleSaveStatus()}
-            >
-              {saveBusy ? 'Saving…' : 'Save'}
-            </SelectedButtonTemplate>
-          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5, mb: 2, pb: 2 }}>{singlesSaveButton}</Box>
 
           <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'visible' }}>
             <Typography sx={sectionTitleSx}>All from audit_registrations</Typography>

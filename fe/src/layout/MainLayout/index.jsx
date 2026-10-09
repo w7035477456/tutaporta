@@ -65,7 +65,7 @@ import { isTutaDatesLandingPath, isTutaDatesPath } from 'constants/tutaDatesRout
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
 import { isTutaDatesOptedIn, tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
 
-const SESSION_STATUS_POLL_MS = 60000;
+const SESSION_STATUS_POLL_MS = 15000;
 
 const TUTADATES_OPTED_OUT_MESSAGE =
   'TutaDates is unchecked. Please check TutaDates in the TutaMall application popup to use TutaDates.';

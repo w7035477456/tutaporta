@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'contexts/AuthContext';
 import { isAdminImpersonationBypassSession } from 'utils/adminSession';
 import { isPilotUserCategory } from 'utils/memberCategory';
-import { UNDER18_TUTADATES_MESSAGE } from 'utils/singlesStatus';
+import { singlesStatusBlockedMessage } from 'utils/singlesStatus';
+import { storeSessionInvalidNotice } from 'utils/sessionEndNotice';
 import { clearSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import { MY_STORY_PATH, needsProfilePhotoSetup } from 'utils/profilePhotoSetup';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -262,7 +263,7 @@ export default function RekognitionVerifyDialog({
   onVerified,
   onFailed
 }) {
-  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionOver18Verified } =
+  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, logout, updateSessionOver18Verified } =
     useAuth();
   const adminImpersonationBypass = isAdminImpersonationBypassSession(user);
   const showPilotSkip = isPilotUserCategory(user?.member_category);
@@ -954,17 +955,19 @@ export default function RekognitionVerifyDialog({
         }
         return false;
       }
-      const msg = String(data?.message || '').trim() || UNDER18_TUTADATES_MESSAGE;
-      appendDebugLog('Under 18 from government ID OCR — back to mall (TutaNotes / TutaPhotos only)', {
-        age,
-        underage: true
-      });
-      await themedAlert(msg);
-      navigate('/mall', { replace: true });
-      updateSessionOver18Verified?.(false, data?.status || 'under18');
+      const msg = String(data?.message || '').trim() || singlesStatusBlockedMessage('under18');
+      appendDebugLog('Under 18 from government ID OCR — logout', { age, underage: true });
+      storeSessionInvalidNotice(msg);
+      sessionStorage.setItem('logoutBlockBack', '1');
+      try {
+        await logout();
+      } catch (logoutErr) {
+        console.warn('[rekognition-verify] logout after under18 failed', logoutErr);
+      }
+      navigate('/pages/login', { replace: true });
       return true;
     },
-    [appendDebugLog, navigate, updateSessionOver18Verified]
+    [appendDebugLog, logout, navigate]
   );
 
   const autoProcessDriverLicense = useCallback(async () => {

@@ -16,11 +16,12 @@ export function shouldForceLoginRedirect(error) {
   if (!Number.isFinite(status) || (status !== 401 && status !== 403)) return false;
 
   const url = requestUrl(error);
+  const data = error?.response?.data || {};
   if (url.includes('/api/verifyPassword')) return false;
-  if (url.includes('/api/me')) return false;
+  // /api/me only forces logout for sessionInvalid (e.g. singles.status suspend); /api/me/session-status always may.
+  if (/\/api\/me$/.test(url) && data.sessionInvalid !== true) return false;
   if (url.includes('/api/clearAuthCookie')) return false;
 
-  const data = error?.response?.data || {};
   if (data.sessionSuperseded === true || data.sessionInvalid === true || data.sessionExpired === true) {
     return true;
   }

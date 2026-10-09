@@ -72,18 +72,39 @@ export function formatSinglesStatusLabel(raw) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+/** `new` may log in so the member can finish onboarding (FE keeps them off TutaDates until the ID scan). */
+export const SINGLES_LOGIN_ALLOWED_STATUSES = Object.freeze(['active', 'pause', 'new']);
+
 /**
- * `new` may log in so the member can finish onboarding (FE keeps them off TutaDates until the ID scan).
- * `under18` may log in for TutaNotes / TutaPhotos only (FE keeps them off TutaDates).
+ * Never logged in, whatever the member category: login is refused and any open session
+ * (TutaDates / TutaNotes / TutaPhotos) is ended on its next request. NULL status counts as blank.
  */
-export const SINGLES_LOGIN_ALLOWED_STATUSES = Object.freeze(['active', 'pause', 'new', 'under18']);
+export const SINGLES_FORCE_LOGOUT_STATUSES = Object.freeze([
+  'suspend',
+  'inactive',
+  'abandon',
+  'blank',
+  'under18',
+  'unknown',
+  'other'
+]);
 
-/** Never log in, whatever the member category. */
-export const SINGLES_LOGIN_BLOCKED_STATUSES = Object.freeze(['suspend', 'inactive', 'abandon']);
+/**
+ * @param {unknown} rawStatus
+ * @returns {boolean}
+ */
+export function isSinglesStatusForceLogout(rawStatus) {
+  return SINGLES_FORCE_LOGOUT_STATUSES.includes(normalizeSinglesStatus(rawStatus) ?? 'blank');
+}
 
-/** Copy when TutaDates is opened by an under18 member (TutaNotes / TutaPhotos still allowed). */
-export const UNDER18_TUTADATES_MESSAGE =
-  'You must be over 18 to use TutaDates. You can still use TutaNotes and TutaPhotos.';
+/**
+ * @param {unknown} rawStatus
+ * @returns {string}
+ */
+export function singlesStatusBlockedMessage(rawStatus) {
+  const status = normalizeSinglesStatus(rawStatus) ?? 'blank';
+  return `Please contact customer support, since your status is '${status}' and must be 'active' to Login`;
+}
 
 /**
  * Listing surfaces (All Singles / Picks & Posts / Acquaint. & Buddies) only show active members.
@@ -113,14 +134,13 @@ export function isSinglesStatusNew(rawStatus) {
 /**
  * @param {unknown} rawStatus
  * @param {unknown} [memberCategory] RegularMember may log in with any status
- *   except suspend / inactive / abandon, which always block.
+ *   except the force-logout statuses, which always block.
  * @returns {boolean}
  */
 export function isSinglesStatusLoginAllowed(rawStatus, memberCategory) {
-  const normalized = normalizeSinglesStatus(rawStatus);
-  if (normalized != null && SINGLES_LOGIN_BLOCKED_STATUSES.includes(normalized)) return false;
+  if (isSinglesStatusForceLogout(rawStatus)) return false;
   if (isRegularMemberCategory(memberCategory)) return true;
-  return normalized != null && SINGLES_LOGIN_ALLOWED_STATUSES.includes(normalized);
+  return SINGLES_LOGIN_ALLOWED_STATUSES.includes(normalizeSinglesStatus(rawStatus));
 }
 
 /**
@@ -130,6 +150,5 @@ export function isSinglesStatusLoginAllowed(rawStatus, memberCategory) {
  */
 export function singlesStatusLoginRejectMessage(rawStatus, memberCategory) {
   if (isSinglesStatusLoginAllowed(rawStatus, memberCategory)) return null;
-  const status = normalizeSinglesStatus(rawStatus) ?? 'blank';
-  return `Your status is '${status}', not 'active', so you can not login. Please contact customer support to correct your status to 'active' first.`;
+  return singlesStatusBlockedMessage(rawStatus);
 }

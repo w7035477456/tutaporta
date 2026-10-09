@@ -3,6 +3,7 @@ import { resolveAuthUserFromJwt } from './adminAuth.js';
 import { getPublicKey } from '../jwtKeys.js';
 import { getAuthTokenFromCookies } from './authCookie.js';
 import { withResolvedCustomLogoutMinutes } from './customLogoutDuration.js';
+import { accountStatusSessionBlockMessage } from './accountStatusSessionGate.js';
 
 /**
  * Resolve logged-in member from JWT cookie (same rules as /api/me + requireAuth).
@@ -14,7 +15,8 @@ export async function resolveSessionAuth(req) {
 
   try {
     const decoded = jwt.verify(token, getPublicKey(), { algorithms: ['RS256'] });
-    return await withResolvedCustomLogoutMinutes(await resolveAuthUserFromJwt(decoded), decoded);
+    const authUser = await withResolvedCustomLogoutMinutes(await resolveAuthUserFromJwt(decoded), decoded);
+    return accountStatusSessionBlockMessage(authUser) ? null : authUser;
   } catch {
     return null;
   }

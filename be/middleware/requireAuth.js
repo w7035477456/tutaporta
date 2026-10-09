@@ -4,6 +4,7 @@ import { enforceSingleLoginSession } from './enforceSingleLogin.js';
 import { getPublicKey } from '../jwtKeys.js';
 import { getAuthTokenFromCookies } from '../utils/authCookie.js';
 import { respondSessionInvalid } from '../utils/sessionInvalidResponse.js';
+import { accountStatusSessionBlockMessage } from '../utils/accountStatusSessionGate.js';
 import { lookupSystemToolsAdminSingles } from '../utils/systemToolsAdmin.js';
 import { withResolvedCustomLogoutMinutes } from '../utils/customLogoutDuration.js';
 import pool from '../db/connection.js';
@@ -66,6 +67,10 @@ export async function requireAuth(req, res, next) {
         singles_id: decoded?.singles_id
       });
       return respondSessionInvalid(res);
+    }
+    const statusBlockMessage = accountStatusSessionBlockMessage(authUser);
+    if (statusBlockMessage) {
+      return respondSessionInvalid(res, statusBlockMessage);
     }
     req.auth = {
       ...authUser,

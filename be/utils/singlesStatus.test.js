@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  isSinglesStatusForceLogout,
   isSinglesStatusLoginAllowed,
   isSinglesStatusNew,
   nextSinglesStatus,
   normalizeSinglesStatus,
+  singlesStatusBlockedMessage,
   singlesStatusLoginRejectMessage
 } from './singlesStatus.js';
+import { accountStatusSessionBlockMessage } from './accountStatusSessionGate.js';
 
-describe('singles.status new / under18', () => {
+describe('singles.status new', () => {
   it('recognizes new', () => {
     assert.equal(normalizeSinglesStatus(' NEW '), 'new');
     assert.equal(isSinglesStatusNew('new'), true);
@@ -20,11 +23,6 @@ describe('singles.status new / under18', () => {
     assert.equal(singlesStatusLoginRejectMessage('new', 'PUBLIC'), null);
   });
 
-  it('lets under18 log in (TutaNotes / TutaPhotos only)', () => {
-    assert.equal(isSinglesStatusLoginAllowed('under18', 'PUBLIC'), true);
-    assert.equal(singlesStatusLoginRejectMessage('under18', 'PUBLIC'), null);
-  });
-
   it('admin status cycle goes active → new → under18 and wraps from blank back to active', () => {
     assert.equal(nextSinglesStatus('active'), 'new');
     assert.equal(nextSinglesStatus('new'), 'under18');
@@ -32,15 +30,37 @@ describe('singles.status new / under18', () => {
   });
 });
 
-describe('singles.status suspend / inactive / abandon', () => {
-  for (const status of ['suspend', 'inactive', 'abandon']) {
+describe('force-logout statuses', () => {
+  for (const status of ['suspend', 'inactive', 'abandon', 'blank', 'under18', 'unknown', 'other']) {
     it(`refuses ${status} for every member category`, () => {
+      assert.equal(isSinglesStatusForceLogout(status), true);
       assert.equal(isSinglesStatusLoginAllowed(status, 'PUBLIC'), false);
       assert.equal(isSinglesStatusLoginAllowed(status, 'REGULARMEMBER'), false);
       assert.equal(
         singlesStatusLoginRejectMessage(status, 'REGULARMEMBER'),
-        `Your status is '${status}', not 'active', so you can not login. Please contact customer support to correct your status to 'active' first.`
+        `Please contact customer support, since your status is '${status}' and must be 'active' to Login`
       );
     });
   }
+
+  it('treats NULL status as blank', () => {
+    assert.equal(isSinglesStatusForceLogout(null), true);
+    assert.equal(singlesStatusBlockedMessage(null).includes("'blank'"), true);
+  });
+
+  it('keeps active / new / pause sessions', () => {
+    for (const status of ['active', 'new', 'pause']) {
+      assert.equal(isSinglesStatusForceLogout(status), false);
+      assert.equal(accountStatusSessionBlockMessage({ status, role: 'user' }), null);
+    }
+  });
+
+  it('ends member sessions but never admin / impersonation sessions', () => {
+    assert.equal(
+      accountStatusSessionBlockMessage({ status: 'suspend', role: 'user' }),
+      "Please contact customer support, since your status is 'suspend' and must be 'active' to Login"
+    );
+    assert.equal(accountStatusSessionBlockMessage({ status: 'suspend', role: 'Admin' }), null);
+    assert.equal(accountStatusSessionBlockMessage({ status: 'blank', tools_only: true }), null);
+  });
 });

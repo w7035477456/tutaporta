@@ -471,6 +471,7 @@ import { normalizeOptinoutBitmap } from './utils/optinoutBitmap.js';
 import { closeLoginLogSession } from './utils/loginLog.js';
 import appLog from './logger.js';
 import { respondSessionInvalid } from './utils/sessionInvalidResponse.js';
+import { accountStatusSessionBlockMessage } from './utils/accountStatusSessionGate.js';
 import { buildSessionConfigResponse } from './utils/sessionTimeoutConfig.js';
 import { withResolvedCustomLogoutMinutes } from './utils/customLogoutDuration.js';
 import { requestPasswordReset } from './routes/requestPasswordReset.js';
@@ -1194,6 +1195,10 @@ app.get('/api/me', async (req, res) => {
     const authUser = await withResolvedCustomLogoutMinutes(await resolveAuthUserFromJwt(decoded), decoded);
     if (!authUser) {
       return respondSessionInvalid(res);
+    }
+    const statusBlockMessage = accountStatusSessionBlockMessage(authUser);
+    if (statusBlockMessage) {
+      return respondSessionInvalid(res, statusBlockMessage);
     }
     req.auth = authUser;
     const gate = await enforceSingleLoginSession(req, res, decoded);
