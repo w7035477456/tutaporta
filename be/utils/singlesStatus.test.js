@@ -25,9 +25,10 @@ describe('singles.status new / under18', () => {
     assert.equal(singlesStatusLoginRejectMessage('under18', 'PUBLIC'), null);
   });
 
-  it('admin status cycle wraps from new back to active', () => {
-    assert.equal(nextSinglesStatus('under18'), 'new');
-    assert.equal(nextSinglesStatus('new'), 'active');
+  it('admin status cycle goes active → new → under18 and wraps from blank back to active', () => {
+    assert.equal(nextSinglesStatus('active'), 'new');
+    assert.equal(nextSinglesStatus('new'), 'under18');
+    assert.equal(nextSinglesStatus('blank'), 'active');
   });
 });
 

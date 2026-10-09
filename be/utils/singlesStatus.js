@@ -2,19 +2,19 @@ import { isRegularMemberCategory } from './memberCategory.js';
 
 /** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive' | 'under18' | 'new'} SinglesStatus */
 
-/** Cycle order matches outdateddbsnapshotoct2024.singles_status enum sort order. */
+/** Admin Tools status-button cycle order (most-used first; not the enum sort order). */
 export const SINGLES_STATUS_VALUES = Object.freeze([
   'active',
-  'cancel',
+  'new',
+  'under18',
+  'inactive',
   'suspend',
-  'pause',
   'abandon',
+  'pause',
+  'cancel',
   'unknown',
   'other',
-  'blank',
-  'inactive',
-  'under18',
-  'new'
+  'blank'
 ]);
 
 /** Status for a freshly registered member until the Driver License / Passport scan sets active or under18. */

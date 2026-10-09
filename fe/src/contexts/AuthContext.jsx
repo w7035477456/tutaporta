@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { mutate as mutateSwrCache } from 'swr';
 import api, { cancelPendingSessionEndRedirect } from '../api/axios';
 import { clearSessionEndNotices } from '../utils/sessionEndNotice';
@@ -26,6 +26,8 @@ if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
   clearSignupIdentificationVerificationRequired();
 }
 const AuthContext = createContext(null);
+
+const SESSION_STATUS_REFRESH_MIN_MS = 5000;
 
 function toNullableInteger(value) {
   const n = Number(value);
@@ -233,6 +235,37 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  /** Re-read singles.status / over_18_verified / optinout_bitmap (admin may change them mid-session). */
+  const lastSessionStatusRefreshRef = useRef(0);
+  const refreshSessionStatus = useCallback(async ({ force = false } = {}) => {
+    const now = Date.now();
+    if (!force && now - lastSessionStatusRefreshRef.current < SESSION_STATUS_REFRESH_MIN_MS) return;
+    lastSessionStatusRefreshRef.current = now;
+    try {
+      const { data } = await api.get('/api/me/session-status');
+      if (!data || data.tools_only) return;
+      setUser((prev) => {
+        if (!prev || prev.tools_only) return prev;
+        const nextOver18 = normalizeOver18Verified(data.over_18_verified);
+        if (
+          prev.status === data.status &&
+          prev.over_18_verified === nextOver18 &&
+          prev.optinout_bitmap === data.optinout_bitmap
+        ) {
+          return prev;
+        }
+        return normalizeUserShape({
+          ...prev,
+          status: data.status ?? null,
+          over_18_verified: nextOver18,
+          optinout_bitmap: data.optinout_bitmap
+        });
+      });
+    } catch {
+      /* transient — next navigation / focus retries */
+    }
+  }, []);
+
   const login = async (email, password, rememberMe = false) => {
     const response = await api.post('/api/verifyPassword', {
       email,
@@ -393,6 +426,7 @@ export const AuthProvider = ({ children }) => {
         impersonateMember,
         returnToAdmin,
         checkAuth,
+        refreshSessionStatus,
         refreshSessionAfterExternalLogin,
         upgradeLegacyPassword,
         profilePhotoCacheBust,

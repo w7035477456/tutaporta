@@ -65,6 +65,8 @@ import { isTutaDatesLandingPath, isTutaDatesPath } from 'constants/tutaDatesRout
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
 import { isTutaDatesOptedIn, tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
 
+const SESSION_STATUS_POLL_MS = 60000;
+
 const TUTADATES_OPTED_OUT_MESSAGE =
   'TutaDates is unchecked. Please check TutaDates in the TutaMall application popup to use TutaDates.';
 import { themedAlert } from 'utils/themedDialog';
@@ -127,7 +129,30 @@ export default function MainLayout() {
   const mobileEdgeToEdge = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, requiresPasswordUpgrade, upgradeLegacyPassword } = useAuth();
+  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, refreshSessionStatus } = useAuth();
+  const hasUser = Boolean(user);
+
+  // Admin Tools may change singles.status (e.g. → new) while this tab is open; re-read it so the
+  // ID-scan lock / TutaDates guard apply without a page reload.
+  useEffect(() => {
+    if (!hasUser) return;
+    void refreshSessionStatus({ force: true });
+  }, [hasUser, location.pathname, refreshSessionStatus]);
+
+  useEffect(() => {
+    if (!hasUser || typeof window === 'undefined') return undefined;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSessionStatus();
+    };
+    const intervalId = window.setInterval(onVisible, SESSION_STATUS_POLL_MS);
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [hasUser, refreshSessionStatus]);
   const adminHeader = getAdminImpersonationHeaderState(user);
   const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
   const idvLockActive = isIdentificationVerificationLockActive(user);

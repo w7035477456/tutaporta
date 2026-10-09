@@ -1,16 +1,16 @@
-/** Cycle order matches outdateddbsnapshotoct2024.singles_status enum sort order. */
+/** Admin Tools status-button cycle order (most-used first; not the enum sort order). */
 export const SINGLES_STATUS_VALUES = Object.freeze([
   'active',
-  'cancel',
+  'new',
+  'under18',
+  'inactive',
   'suspend',
-  'pause',
   'abandon',
+  'pause',
+  'cancel',
   'unknown',
   'other',
-  'blank',
-  'inactive',
-  'under18',
-  'new'
+  'blank'
 ]);
 
 /** Registered member whose Driver License / Passport scan has not set active / under18 yet. */

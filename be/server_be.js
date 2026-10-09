@@ -1294,6 +1294,29 @@ app.get('/api/me', async (req, res) => {
   }
 });
 
+// Cheap re-read of admin-editable gate fields so an open tab sees status changes without a reload.
+app.get('/api/me/session-status', requireAuth, async (req, res) => {
+  if (req.auth?.tools_only) return res.json({ tools_only: true });
+  try {
+    const { rows } = await pool.query(
+      `SELECT status::text AS status, over_18_verified, optinout_bitmap
+       FROM outdateddbsnapshotoct2024.singles
+       WHERE singles_id = $1`,
+      [req.auth.singles_id]
+    );
+    const row = rows[0];
+    if (!row) return respondSessionInvalid(res);
+    return res.json({
+      status: row.status ?? null,
+      over_18_verified: normalizeOver18Verified(row.over_18_verified),
+      optinout_bitmap: normalizeOptinoutBitmap(row.optinout_bitmap)
+    });
+  } catch (err) {
+    console.error('[/api/me/session-status]', err?.message ?? err);
+    return res.status(500).json({ error: 'Failed to load session status' });
+  }
+});
+
 // Logout endpoint — also nulls singles.cache_onedrive_icon / cache_usb_icon
 app.post('/api/logout', async (req, res) => {
   try {
