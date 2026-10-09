@@ -63,7 +63,10 @@ import {
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { isTutaDatesLandingPath, isTutaDatesPath } from 'constants/tutaDatesRoute';
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
-import { normalizeOver18Verified, OVER18_REQUIRED_SITE_MESSAGE } from 'utils/over18Verified';
+import { isTutaDatesOptedIn, tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
+
+const TUTADATES_OPTED_OUT_MESSAGE =
+  'TutaDates is unchecked. Please check TutaDates in the TutaMall application popup to use TutaDates.';
 import { themedAlert } from 'utils/themedDialog';
 import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 
@@ -124,32 +127,11 @@ export default function MainLayout() {
   const mobileEdgeToEdge = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, logout } = useAuth();
+  const { user, requiresPasswordUpgrade, upgradeLegacyPassword } = useAuth();
   const adminHeader = getAdminImpersonationHeaderState(user);
   const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
   const idvLockActive = isIdentificationVerificationLockActive(user);
   useFlowerShopLightThemeOverride();
-
-  // over_18_verified === false → block with OK-only message, then logout (status already under18).
-  useEffect(() => {
-    if (!user || requiresPasswordUpgrade) return;
-    if (isToolsOnlyAdminSession(user) || isImpersonationSession(user) || isGuestDemoLogin(user)) return;
-    if (normalizeOver18Verified(user.over_18_verified) !== false) return;
-    let cancelled = false;
-    (async () => {
-      await themedAlert(OVER18_REQUIRED_SITE_MESSAGE, { okLabel: 'OK' });
-      if (cancelled) return;
-      try {
-        await logout();
-      } catch (err) {
-        console.warn('[MainLayout] logout after over_18_verified=false failed', err);
-      }
-      navigate('/pages/login', { replace: true });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, requiresPasswordUpgrade, logout, navigate]);
 
   const {
     state: { borderRadius, miniDrawer, pageZoom },
@@ -192,6 +174,25 @@ export default function MainLayout() {
     location.pathname === SELF_REPORT_BIOGRAPHY_PATH ||
     location.pathname.startsWith('/request-') ||
     isMenuDatingRoute;
+  /** TutaDates pages (profile + dating menus); Admin Tools and Profiles & Records stay reachable. */
+  const isTutaDatesGuardedRoute =
+    location.pathname === '/myStory' ||
+    (isDatingRoute &&
+      location.pathname !== ADMIN_TOOLS_PATH &&
+      location.pathname !== PROFILES_RECORDS_PATH &&
+      !location.pathname.startsWith('/dashboard'));
+
+  // under18 / non-active status / TutaDates unchecked → back to the mall (TutaNotes / TutaPhotos stay open).
+  useEffect(() => {
+    if (!user || requiresPasswordUpgrade || !isTutaDatesGuardedRoute) return;
+    if (isToolsOnlyAdminSession(user) || isImpersonationSession(user) || isGuestDemoLogin(user)) return;
+    const message =
+      tutaDatesStatusBlockMessage(user) ?? (isTutaDatesOptedIn(user) ? null : TUTADATES_OPTED_OUT_MESSAGE);
+    if (!message) return;
+    navigate('/mall', { replace: true });
+    void themedAlert(message, { okLabel: 'OK' });
+  }, [user, requiresPasswordUpgrade, isTutaDatesGuardedRoute, navigate]);
+
   /** Mobile member-grid pages: shrink-wrap main so document scroll includes whole cards (photo + buttons), not a trapped inner strip */
   const isSinglesMemberListRoute =
     location.pathname.endsWith('/allSingles') || location.pathname.endsWith('/myPicks') || location.pathname.endsWith('/interestedSingles');

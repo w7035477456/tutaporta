@@ -4,7 +4,13 @@ import { normalizeYoutubeMusicUrl } from '../../utils/normalizeYoutubeMusicUrl.j
 import { loadGlobalDefaultMusicUrls, persistGlobalDefaultMusicUrls } from '../../utils/globalDefaultMusicUrl.js';
 import { DEFAULT_GLOBAL_MUSIC_URLS } from '../../constants/defaultMusicUrls.js';
 import { parseMynoteFontSizeTenths } from '../../utils/vaultDefaultButtonFontSizeConfig.js';
-import { syncSinglesStatusWithTutaDates } from '../../utils/syncSinglesStatusWithTutaDates.js';
+import {
+  OPTINOUT_API_KEY_TO_BIT,
+  canChangeTutaDatesOptIn,
+  normalizeOptinoutBitmap,
+  optinoutBitmapToEnrollment,
+  tutaDatesOptInBlockedMessage
+} from '../../utils/optinoutBitmap.js';
 import {
   MYNOTE_PREFS_API_KEYS,
   MYNOTE_DEFAULT_CONTENT_BG_INDEX,
@@ -60,6 +66,48 @@ function mallAppEnrollmentFromDbRow(row) {
     tutaNotesEnabled: parseMallAppEnrollmentFlag(row?.tuta_notes_enabled, true),
     tutaAlbumsEnabled: parseMallAppEnrollmentFlag(row?.tuta_albums_enabled, true)
   };
+}
+
+/** singles.status + singles.optinout_bitmap (source of truth for mall app enrollment). */
+async function selectSinglesOptinout(me) {
+  const { rows } = await pool.query(
+    `SELECT status::text AS status, optinout_bitmap
+     FROM outdateddbsnapshotoct2024.singles
+     WHERE singles_id = $1`,
+    [me]
+  );
+  return rows[0] ?? null;
+}
+
+/** Atomic set/clear of the patched bits; returns the new bitmap. */
+async function updateSinglesOptinoutBitmap(me, patch) {
+  let setMask = 0;
+  let clearMask = 0;
+  for (const [apiKey, bit] of Object.entries(OPTINOUT_API_KEY_TO_BIT)) {
+    if (!Object.prototype.hasOwnProperty.call(patch, apiKey)) continue;
+    if (patch[apiKey]) setMask |= bit;
+    else clearMask |= bit;
+  }
+  const { rows } = await pool.query(
+    `UPDATE outdateddbsnapshotoct2024.singles
+     SET optinout_bitmap = (optinout_bitmap | $2::smallint) & ~$3::smallint,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE singles_id = $1
+     RETURNING optinout_bitmap`,
+    [me, setMask, clearMask]
+  );
+  return normalizeOptinoutBitmap(rows[0]?.optinout_bitmap);
+}
+
+function withSinglesOptinout(payload, optinoutBitmap) {
+  const bitmap = normalizeOptinoutBitmap(optinoutBitmap);
+  return { ...payload, ...optinoutBitmapToEnrollment(bitmap), optinoutBitmap: bitmap };
+}
+
+/** Demo (demo / guest alias) always reports all three mall apps as enrolled. */
+function withGuestDemoEnrollment(req, payload) {
+  if (req.auth?.guest_demo_login !== true) return payload;
+  return { ...payload, tutaDatesEnabled: true, tutaNotesEnabled: true, tutaAlbumsEnabled: true };
 }
 
 const MALL_APP_ENROLLMENT_API_KEYS = ['tutaDatesEnabled', 'tutaNotesEnabled', 'tutaAlbumsEnabled'];
@@ -939,10 +987,13 @@ export async function getUserCustomization(req, res) {
     if (needsAutoLoadDefaultMusic(row)) {
       row = await applyGlobalDefaultMusicToUser(me, row);
     }
-    return res.status(200).json(rowToPayload(row));
+    const singlesOptinout = await selectSinglesOptinout(me);
+    return res
+      .status(200)
+      .json(withGuestDemoEnrollment(req, withSinglesOptinout(rowToPayload(row), singlesOptinout?.optinout_bitmap)));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {
-      return res.status(200).json(rowToPayload(null));
+      return res.status(200).json(withGuestDemoEnrollment(req, rowToPayload(null)));
     }
     console.error('[userCustomization] get failed:', err);
     return res.status(500).json({ error: 'Failed to load customization' });
@@ -1112,11 +1163,30 @@ export async function putUserCustomization(req, res) {
       if (raw !== true && raw !== false && raw !== 'true' && raw !== 'false') {
         return res.status(400).json({ error: `Invalid ${apiKey}` });
       }
-      mallEnrollmentPatch[apiKey] = raw === true || raw === 'true';
+      // Demo (demo / guest alias) is a shared account: always enrolled in all three apps,
+      // so unchecking never hides it from TutaDates.
+      mallEnrollmentPatch[apiKey] = req.auth?.guest_demo_login === true ? true : raw === true || raw === 'true';
     }
   }
 
   try {
+    const singlesOptinout = hasAnyMallAppEnrollmentPref ? await selectSinglesOptinout(me) : null;
+    if (
+      Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaDatesEnabled') &&
+      req.auth?.guest_demo_login !== true
+    ) {
+      const currentDates = optinoutBitmapToEnrollment(singlesOptinout?.optinout_bitmap).tutaDatesEnabled;
+      if (mallEnrollmentPatch.tutaDatesEnabled !== currentDates && !canChangeTutaDatesOptIn(singlesOptinout?.status)) {
+        return res.status(403).json({
+          error: tutaDatesOptInBlockedMessage(singlesOptinout?.status),
+          code: 'TUTADATES_OPTIN_BLOCKED',
+          singlesStatus: singlesOptinout?.status ?? null,
+          ...optinoutBitmapToEnrollment(singlesOptinout?.optinout_bitmap),
+          optinoutBitmap: normalizeOptinoutBitmap(singlesOptinout?.optinout_bitmap)
+        });
+      }
+    }
+
     await ensureCustomizationSchema();
     const prev = await selectCustomizationRow(me);
     const nextChatFontSize = hasChatFontSize ? chatFontSize : prev?.chat_font_size ?? null;
@@ -1240,28 +1310,13 @@ export async function putUserCustomization(req, res) {
           if (!isMissingColumn(enrollErr, dbCol)) throw enrollErr;
         }
       }
-      if (Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaDatesEnabled')) {
-        try {
-          await syncSinglesStatusWithTutaDates(pool, me, mallEnrollmentPatch.tutaDatesEnabled);
-        } catch (statusErr) {
-          console.error('[userCustomization] TutaDates singles.status sync failed:', statusErr);
-        }
-      }
     }
+    const nextOptinoutBitmap = hasAnyMallAppEnrollmentPref
+      ? await updateSinglesOptinoutBitmap(me, mallEnrollmentPatch)
+      : (await selectSinglesOptinout(me))?.optinout_bitmap;
     const refreshed = await selectCustomizationRow(me);
-    const enrollmentFromDb = mallAppEnrollmentFromDbRow(refreshed);
-    const enrollmentPayload = {
-      tutaDatesEnabled: Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaDatesEnabled')
-        ? Boolean(mallEnrollmentPatch.tutaDatesEnabled)
-        : enrollmentFromDb.tutaDatesEnabled,
-      tutaNotesEnabled: Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaNotesEnabled')
-        ? Boolean(mallEnrollmentPatch.tutaNotesEnabled)
-        : enrollmentFromDb.tutaNotesEnabled,
-      tutaAlbumsEnabled: Object.prototype.hasOwnProperty.call(mallEnrollmentPatch, 'tutaAlbumsEnabled')
-        ? Boolean(mallEnrollmentPatch.tutaAlbumsEnabled)
-        : enrollmentFromDb.tutaAlbumsEnabled
-    };
-    return res.status(200).json(rowToPayload({
+    const enrollmentPayload = optinoutBitmapToEnrollment(nextOptinoutBitmap);
+    return res.status(200).json(withGuestDemoEnrollment(req, withSinglesOptinout(rowToPayload({
       chat_font_size: nextChatFontSize,
       mynote_font_size: nextMynoteFontSize,
       sound_preference: nextSoundPreference,
@@ -1294,7 +1349,7 @@ export async function putUserCustomization(req, res) {
       tuta_dates_enabled: enrollmentPayload.tutaDatesEnabled,
       tuta_notes_enabled: enrollmentPayload.tutaNotesEnabled,
       tuta_albums_enabled: enrollmentPayload.tutaAlbumsEnabled
-    }));
+    }), nextOptinoutBitmap)));
   } catch (err) {
     if (err?.code === '42P01' || err?.code === '42703') {
       return res.status(503).json({ error: 'user_customization table is not installed' });

@@ -4,8 +4,10 @@ import Typography from '@mui/material/Typography';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import { useAuth } from 'contexts/AuthContext';
 import { isToolsOnlyAdminSession, isImpersonationSession } from 'utils/adminSession';
-import { guestDemoAllowProps } from 'utils/guestDemoLogin';
+import { guestDemoAllowProps, isGuestDemoLogin, notifyGuestDemoBlocked } from 'utils/guestDemoLogin';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
+import { canChangeTutaDatesOptIn, tutaDatesOptInBlockedMessage } from 'utils/singlesStatus';
+import { themedAlert } from 'utils/themedDialog';
 import {
   clearMallAppEnrollmentPending,
   MALL_APP_ENROLLMENT_EVENT,
@@ -137,7 +139,7 @@ export default function MallAppEnrollmentDialog({
   onEnrollmentChange,
   showEnableHint = false
 } = {}) {
-  const { user } = useAuth();
+  const { user, updateSessionOptinoutBitmap } = useAuth();
   const controlled = openProp !== undefined;
   const [sessionOpen, setSessionOpen] = useState(false);
   const [dates, setDates] = useState(true);
@@ -154,6 +156,8 @@ export default function MallAppEnrollmentDialog({
 
   const skipUser =
     !user || isToolsOnlyAdminSession(user) || isImpersonationSession(user);
+  /** Demo login: all three always checked; unchecking opens the standard demo notice. */
+  const guestDemo = isGuestDemoLogin(user);
 
   const tryOpenFromSession = useCallback(() => {
     if (skipUser) return;
@@ -220,11 +224,13 @@ export default function MallAppEnrollmentDialog({
     };
   }, [open, skipUser]);
 
-  const values = {
-    tutaDatesEnabled: dates,
-    tutaNotesEnabled: notes,
-    tutaAlbumsEnabled: albums
-  };
+  const values = guestDemo
+    ? { tutaDatesEnabled: true, tutaNotesEnabled: true, tutaAlbumsEnabled: true }
+    : {
+        tutaDatesEnabled: dates,
+        tutaNotesEnabled: notes,
+        tutaAlbumsEnabled: albums
+      };
 
   const setValue = useCallback((key, checked) => {
     if (key === 'tutaDatesEnabled') setDates(Boolean(checked));
@@ -266,9 +272,25 @@ export default function MallAppEnrollmentDialog({
             ? Boolean(patch.tutaAlbumsEnabled)
             : prefs.tutaAlbumsEnabled !== false
         };
+        updateSessionOptinoutBitmap?.(prefs.optinoutBitmap);
         onEnrollmentChange?.(merged);
         return merged;
-      } catch {
+      } catch (err) {
+        const blocked = err?.response?.data;
+        if (blocked?.code === 'TUTADATES_OPTIN_BLOCKED') {
+          const serverPrefs = {
+            tutaDatesEnabled: blocked.tutaDatesEnabled !== false,
+            tutaNotesEnabled: blocked.tutaNotesEnabled !== false,
+            tutaAlbumsEnabled: blocked.tutaAlbumsEnabled !== false
+          };
+          setDates(serverPrefs.tutaDatesEnabled);
+          setNotes(serverPrefs.tutaNotesEnabled);
+          setAlbums(serverPrefs.tutaAlbumsEnabled);
+          updateSessionOptinoutBitmap?.(blocked.optinoutBitmap);
+          onEnrollmentChange?.(serverPrefs);
+          void themedAlert(blocked.error);
+          return null;
+        }
         applyPatchLocally();
         onEnrollmentChange?.({
           tutaDatesEnabled: Object.prototype.hasOwnProperty.call(patch, 'tutaDatesEnabled')
@@ -284,11 +306,19 @@ export default function MallAppEnrollmentDialog({
         return null;
       }
     },
-    [albums, dates, notes, onEnrollmentChange]
+    [albums, dates, notes, onEnrollmentChange, updateSessionOptinoutBitmap]
   );
 
   const handleToggle = useCallback(
     (key, checked) => {
+      if (guestDemo) {
+        if (!checked) notifyGuestDemoBlocked();
+        return;
+      }
+      if (key === 'tutaDatesEnabled' && !canChangeTutaDatesOptIn(user?.status)) {
+        void themedAlert(tutaDatesOptInBlockedMessage(user?.status));
+        return;
+      }
       userEditedRef.current = true;
       loadGenRef.current += 1;
       loadedForOpenRef.current = true;
@@ -296,7 +326,7 @@ export default function MallAppEnrollmentDialog({
       setValue(key, next);
       void persist({ [key]: next });
     },
-    [persist, setValue]
+    [guestDemo, persist, setValue, user?.status]
   );
 
   const handleClose = useCallback(() => {
@@ -304,11 +334,11 @@ export default function MallAppEnrollmentDialog({
     if (!controlled) setSessionOpen(false);
     onClose?.();
     void persist({
-      tutaDatesEnabled: dates,
-      tutaNotesEnabled: notes,
-      tutaAlbumsEnabled: albums
+      tutaDatesEnabled: guestDemo || dates,
+      tutaNotesEnabled: guestDemo || notes,
+      tutaAlbumsEnabled: guestDemo || albums
     });
-  }, [albums, controlled, dates, notes, onClose, persist]);
+  }, [albums, controlled, dates, guestDemo, notes, onClose, persist]);
 
   if (skipUser) return null;
 

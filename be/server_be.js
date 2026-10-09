@@ -467,6 +467,7 @@ import { getMallDepartmentMode } from './mallDepartmentMode.js';
 import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
 import { ensureSeededDemoBuddiesOnLogin } from './utils/ensureSeededDemoBuddiesOnLogin.js';
 import { normalizeOver18Verified } from './utils/over18Verified.js';
+import { normalizeOptinoutBitmap } from './utils/optinoutBitmap.js';
 import { closeLoginLogSession } from './utils/loginLog.js';
 import appLog from './logger.js';
 import { respondSessionInvalid } from './utils/sessionInvalidResponse.js';
@@ -1212,6 +1213,7 @@ app.get('/api/me', async (req, res) => {
         profile_image_fk,
         alias,
         member_category,
+        status::text AS status,
         seeded_demo_buddies_boolean,
         gender_self_report,
         over_18_verified,
@@ -1238,7 +1240,7 @@ app.get('/api/me', async (req, res) => {
     }
     // Re-read flags after possible seed on /api/me
     const flagsRes = await pool.query(
-      `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
+      `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
@@ -1258,11 +1260,13 @@ app.get('/api/me', async (req, res) => {
       profile_image_fk: row.profile_image_fk,
       alias: row.alias,
       member_category: row.member_category,
+      status: row.status ?? null,
       seeded_demo_buddies_boolean:
         String(flags.seeded_demo_buddies_boolean ?? '').trim().toLowerCase() === 'true' ||
         flags.seeded_demo_buddies_boolean === true,
       gender_self_report: genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null,
       over_18_verified: normalizeOver18Verified(flags.over_18_verified ?? row.over_18_verified),
+      optinout_bitmap: normalizeOptinoutBitmap(flags.optinout_bitmap),
       has_secret_icon:
         flags.has_secret_icon === true ||
         String(flags.has_secret_icon ?? '').trim().toLowerCase() === 'true' ||

@@ -1,4 +1,5 @@
 import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
+import { buildTutaDatesOptedInWhereSql } from '../../utils/optinoutBitmap.js';
 
 function parseAllowedMemberCategories() {
   const raw = process.env.SHOW_MEMBER_CATEGORY || '';
@@ -14,12 +15,13 @@ function parseAllowedMemberCategories() {
 }
 
 /**
- * SQL fragment: singles.status must be active (outdateddbsnapshotoct2024.singles_status enum).
- * Inactive / blank / suspend / pause / etc. must not appear on
+ * SQL fragment: singles.status must be active (outdateddbsnapshotoct2024.singles_status enum)
+ * AND the TutaDates bit of singles.optinout_bitmap must be set.
+ * Inactive / blank / suspend / pause / TutaDates opted out / etc. must not appear on
  * All Singles, Picks & Posts, or Acquaint. & Buddies listings.
  */
 export function buildSinglesActiveStatusWhereSql(alias = 's') {
-  return `LOWER(COALESCE(TRIM(${alias}.status::text), 'blank')) = 'active'`;
+  return `(LOWER(COALESCE(TRIM(${alias}.status::text), 'blank')) = 'active' AND ${buildTutaDatesOptedInWhereSql(alias)})`;
 }
 
 /** Categories always eligible when status=active (CreateNewMember.sh). */

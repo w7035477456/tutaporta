@@ -3,6 +3,7 @@ import { recordAuditRegistrationSinglesStatusChange } from './insertAuditRegistr
 /**
  * After profile photo is set, mark registration complete users as active.
  * Requires email, phone, password_hash, and profile_image_fk on the row.
+ * Never touches `new` (only the Driver License / Passport scan moves new → active) or `under18`.
  *
  * @param {import('pg').Pool | import('pg').PoolClient} client
  * @param {number} singlesId
@@ -23,7 +24,14 @@ export async function activateSinglesStatusOnProfilePhoto(client, singlesId) {
        AND BTRIM(phone) <> ''
        AND password_hash IS NOT NULL
        AND BTRIM(password_hash) <> ''
-       AND status IS DISTINCT FROM 'active'::outdateddbsnapshotoct2024.singles_status
+       AND (
+         status IS NULL
+         OR status NOT IN (
+           'active'::outdateddbsnapshotoct2024.singles_status,
+           'new'::outdateddbsnapshotoct2024.singles_status,
+           'under18'::outdateddbsnapshotoct2024.singles_status
+         )
+       )
      RETURNING singles_id, email, phone, status`,
     [id]
   );

@@ -1,6 +1,6 @@
 import { isRegularMemberCategory } from './memberCategory.js';
 
-/** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive' | 'under18'} SinglesStatus */
+/** @typedef {'active' | 'cancel' | 'suspend' | 'pause' | 'abandon' | 'unknown' | 'other' | 'blank' | 'inactive' | 'under18' | 'new'} SinglesStatus */
 
 /** Cycle order matches outdateddbsnapshotoct2024.singles_status enum sort order. */
 export const SINGLES_STATUS_VALUES = Object.freeze([
@@ -13,11 +13,15 @@ export const SINGLES_STATUS_VALUES = Object.freeze([
   'other',
   'blank',
   'inactive',
-  'under18'
+  'under18',
+  'new'
 ]);
 
-/** Exact login error when singles.status = under18 (product copy). */
-export const UNDER18_LOGIN_ERROR = 'This site are for over 18 years of age required';
+/** Status for a freshly registered member until the Driver License / Passport scan sets active or under18. */
+export const SINGLES_STATUS_NEW = 'new';
+
+/** Exact under18 copy for the ID-scan popup, open-session logout, and refused login (product copy). */
+export const UNDER18_LOGIN_ERROR = 'You must be over 18 to use this site';
 
 /**
  * @param {unknown} raw
@@ -68,7 +72,18 @@ export function formatSinglesStatusLabel(raw) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-export const SINGLES_LOGIN_ALLOWED_STATUSES = Object.freeze(['active', 'pause']);
+/**
+ * `new` may log in so the member can finish onboarding (FE keeps them off TutaDates until the ID scan).
+ * `under18` may log in for TutaNotes / TutaPhotos only (FE keeps them off TutaDates).
+ */
+export const SINGLES_LOGIN_ALLOWED_STATUSES = Object.freeze(['active', 'pause', 'new', 'under18']);
+
+/** Never log in, whatever the member category. */
+export const SINGLES_LOGIN_BLOCKED_STATUSES = Object.freeze(['suspend', 'inactive', 'abandon']);
+
+/** Copy when TutaDates is opened by an under18 member (TutaNotes / TutaPhotos still allowed). */
+export const UNDER18_TUTADATES_MESSAGE =
+  'You must be over 18 to use TutaDates. You can still use TutaNotes and TutaPhotos.';
 
 /**
  * Listing surfaces (All Singles / Picks & Posts / Acquaint. & Buddies) only show active members.
@@ -89,14 +104,22 @@ export function isSinglesStatusUnder18(rawStatus) {
 
 /**
  * @param {unknown} rawStatus
- * @param {unknown} [memberCategory] RegularMember may log in even when status is inactive / not active
- *   — except under18, which always blocks.
+ * @returns {boolean}
+ */
+export function isSinglesStatusNew(rawStatus) {
+  return normalizeSinglesStatus(rawStatus) === SINGLES_STATUS_NEW;
+}
+
+/**
+ * @param {unknown} rawStatus
+ * @param {unknown} [memberCategory] RegularMember may log in with any status
+ *   except suspend / inactive / abandon, which always block.
  * @returns {boolean}
  */
 export function isSinglesStatusLoginAllowed(rawStatus, memberCategory) {
-  if (isSinglesStatusUnder18(rawStatus)) return false;
-  if (isRegularMemberCategory(memberCategory)) return true;
   const normalized = normalizeSinglesStatus(rawStatus);
+  if (normalized != null && SINGLES_LOGIN_BLOCKED_STATUSES.includes(normalized)) return false;
+  if (isRegularMemberCategory(memberCategory)) return true;
   return normalized != null && SINGLES_LOGIN_ALLOWED_STATUSES.includes(normalized);
 }
 
@@ -106,9 +129,7 @@ export function isSinglesStatusLoginAllowed(rawStatus, memberCategory) {
  * @returns {string | null} Error text when login is blocked; null when allowed.
  */
 export function singlesStatusLoginRejectMessage(rawStatus, memberCategory) {
-  if (isSinglesStatusUnder18(rawStatus)) return UNDER18_LOGIN_ERROR;
-  if (!isSinglesStatusLoginAllowed(rawStatus, memberCategory)) {
-    return 'Your account is not active. Please contact support.';
-  }
-  return null;
+  if (isSinglesStatusLoginAllowed(rawStatus, memberCategory)) return null;
+  const status = normalizeSinglesStatus(rawStatus) ?? 'blank';
+  return `Your status is '${status}', not 'active', so you can not login. Please contact customer support to correct your status to 'active' first.`;
 }

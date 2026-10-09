@@ -1,5 +1,5 @@
 import pool from '../../db/connection.js';
-import { insertNewSinglesAccount } from '../../utils/newSinglesAccount.js';
+import { insertNewSinglesAccount, SQL_SIGNUP_STATUS_FOR_EXISTING_ROW } from '../../utils/newSinglesAccount.js';
 import { referCodeFromMemberId } from '../../utils/referCodeFromMemberId.js';
 import { resolveReferByCodeForSignup } from '../../utils/referByCode.js';
 import { referCodeFromActiveRegistrationEmail } from '../../utils/registrationReferralMeta.js';
@@ -164,7 +164,7 @@ export async function verifyPhone(req, res) {
           `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
-               status = 'active'::outdateddbsnapshotoct2024.singles_status,
+               ${SQL_SIGNUP_STATUS_FOR_EXISTING_ROW},
                my_refer_code = COALESCE(my_refer_code, $4),
                refer_by_code = COALESCE(refer_by_code, $5),
                updated_at = CURRENT_TIMESTAMP

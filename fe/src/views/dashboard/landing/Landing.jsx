@@ -28,6 +28,10 @@ import { TUTADATES_PATH } from 'constants/tutaDatesRoute';
 import { isOnenoteUsbUpgrade } from 'config/onenoteUsbUpgradeEnv';
 import { fetchOnenoteUsbUpgradeBlocked } from 'api/onenoteUsbUpgradeFe';
 import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
+import { tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
+import { themedAlert } from 'utils/themedDialog';
+import { isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 
 // ==============================|| LANDING PAGE ||============================== //
 
@@ -159,6 +163,21 @@ export default function Landing() {
       return enrollment[flag] !== false;
     },
     [enrollment]
+  );
+
+  /** singles.status (under18, pause, …) keeps the member out of TutaDates even when opted in. */
+  const tutaDatesBlockMessage = useMemo(() => {
+    if (!user || isGuestDemoLogin(user) || isToolsOnlyAdminSession(user) || isImpersonationSession(user)) return null;
+    return tutaDatesStatusBlockMessage(user);
+  }, [user]);
+
+  const openTutaDatesStatusBlocked = useCallback(
+    (event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      void themedAlert(tutaDatesBlockMessage);
+    },
+    [tutaDatesBlockMessage]
   );
 
   const openUpgradePopup = useCallback((event) => {
@@ -363,18 +382,25 @@ export default function Landing() {
           >
             {rowDepts.map((d) => {
               const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
-              const gateEnrollment = !gateUpgrade && !isTileEnrolled(d.id);
+              const gateTutaDatesStatus = !gateUpgrade && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
+              const gateEnrollment = !gateUpgrade && !gateTutaDatesStatus && !isTileEnrolled(d.id);
               const gateMobileUpload =
-                !gateUpgrade && !gateEnrollment && isCompact && MOBILE_UPLOAD_REDIRECT_TILE_IDS.has(d.id);
-              const isLink = Boolean(d.url) && !gateUpgrade && !gateEnrollment && !gateMobileUpload;
-              const tileActivatesPopup = gateUpgrade || gateEnrollment || gateMobileUpload;
+                !gateUpgrade &&
+                !gateTutaDatesStatus &&
+                !gateEnrollment &&
+                isCompact &&
+                MOBILE_UPLOAD_REDIRECT_TILE_IDS.has(d.id);
+              const tileActivatesPopup = gateUpgrade || gateTutaDatesStatus || gateEnrollment || gateMobileUpload;
+              const isLink = Boolean(d.url) && !tileActivatesPopup;
               const onTileActivate = gateUpgrade
                 ? openUpgradePopup
-                : gateEnrollment
-                  ? openEnrollmentToEnableApp
-                  : gateMobileUpload
-                    ? (event) => openMobileProductUpload(d.id, event)
-                    : undefined;
+                : gateTutaDatesStatus
+                  ? openTutaDatesStatusBlocked
+                  : gateEnrollment
+                    ? openEnrollmentToEnableApp
+                    : gateMobileUpload
+                      ? (event) => openMobileProductUpload(d.id, event)
+                      : undefined;
 
               return (
                 <Box
@@ -417,7 +443,7 @@ export default function Landing() {
                     boxSizing: 'border-box',
                     boxShadow: 'none',
                     zIndex: 1,
-                    opacity: gateEnrollment ? 0.55 : 1,
+                    opacity: gateEnrollment || gateTutaDatesStatus ? 0.55 : 1,
                     transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
                     '&:hover': {
                       zIndex: 2,

@@ -1,5 +1,5 @@
 /** Product copy when over_18_verified is false while a session is still open. */
-export const OVER18_REQUIRED_SITE_MESSAGE = 'Over 18 is required to use this site';
+export const OVER18_REQUIRED_SITE_MESSAGE = 'You must be over 18 to use this site';
 
 /**
  * Normalize DB / JSON over_18_verified to true | false | null.

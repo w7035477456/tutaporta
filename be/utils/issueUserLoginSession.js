@@ -13,6 +13,7 @@ import { ensureDemoRegularInitialSetupDone } from './ensureDemoRegularInitialSet
 import { ensureSeededDemoBuddiesOnLogin } from './ensureSeededDemoBuddiesOnLogin.js';
 import { insertDemoLoginLog } from './loginLog.js';
 import { normalizeOver18Verified } from './over18Verified.js';
+import { normalizeOptinoutBitmap } from './optinoutBitmap.js';
 
 /**
  * Issue JWT + auth cookie for a singles row (password login, Google OAuth, etc.).
@@ -45,7 +46,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
 
   try {
     const flagsRes = await pool.query(
-      `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
+      `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
@@ -55,6 +56,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
       userWithoutPassword.seeded_demo_buddies_boolean = flagsRes.rows[0].seeded_demo_buddies_boolean;
       userWithoutPassword.gender_self_report = flagsRes.rows[0].gender_self_report;
       userWithoutPassword.over_18_verified = flagsRes.rows[0].over_18_verified;
+      userWithoutPassword.optinout_bitmap = flagsRes.rows[0].optinout_bitmap;
       userWithoutPassword.has_secret_icon = flagsRes.rows[0].has_secret_icon;
     }
   } catch (err) {
@@ -136,6 +138,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
       seeded_demo_buddies_boolean: seededDemoBuddies,
       gender_self_report: genderSelfReport,
       over_18_verified: over18Verified,
+      optinout_bitmap: normalizeOptinoutBitmap(userWithoutPassword.optinout_bitmap),
       has_secret_icon: hasSecretIcon
     },
     requiresPasswordUpgrade: Boolean(requiresPasswordUpgrade)

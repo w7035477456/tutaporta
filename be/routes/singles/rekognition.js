@@ -35,29 +35,39 @@ import {
   isAdminImpersonationRekognitionBypass,
   loadMemberBasicsForRekognitionBypass
 } from '../../utils/adminImpersonationRekognitionBypass.js';
+import { UNDER18_TUTADATES_MESSAGE } from '../../utils/singlesStatus.js';
 
 const CHECKR_SCHEMA = 'outdateddbsnapshotoct2024';
 
 /** Product copy when government ID OCR age is under 18. */
-export const UNDER18_ID_VERIFY_MESSAGE = 'Sorry you must be over 18 years of age';
+export const UNDER18_ID_VERIFY_MESSAGE = UNDER18_TUTADATES_MESSAGE;
+
+/** age ≥ 18: only a freshly registered (`new`) member is promoted; admin states (suspend, pause, …) are kept. */
+const SQL_STATUS_NEW_TO_ACTIVE = `status = CASE
+             WHEN status = 'new'::outdateddbsnapshotoct2024.singles_status
+               THEN 'active'::outdateddbsnapshotoct2024.singles_status
+             ELSE status
+           END`;
 
 /**
  * Persist age gate from OCR DOB:
  * — age &lt; 18 → over_18_verified = false, status = under18
- * — age ≥ 18 → over_18_verified = true
- * @returns {{ age: number | null, underage: boolean, over18Verified: boolean | null }}
+ * — age ≥ 18 → over_18_verified = true, status new → active
+ * — DOB unreadable → unchanged (a `new` member stays on the ID scan screen)
+ * @returns {Promise<{ age: number | null, underage: boolean, over18Verified: boolean | null, status: string | null }>}
  */
 async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
   const age = computeAgeFromDob(dateOfBirth);
   const underage = Number.isFinite(age) && age < 18;
   const over18 = Number.isFinite(age) && age >= 18;
   if (underage) {
-    await client.query(
+    const { rows } = await client.query(
       `UPDATE outdateddbsnapshotoct2024.singles
        SET status = 'under18'::outdateddbsnapshotoct2024.singles_status,
            over_18_verified = false,
            updated_at = CURRENT_TIMESTAMP
-       WHERE singles_id = $1`,
+       WHERE singles_id = $1
+       RETURNING status::text AS status`,
       [singlesId]
     );
     console.log('[rekognition:idCapture] under18 from OCR DOB', {
@@ -65,24 +75,31 @@ async function applyUnder18StatusFromDob(client, singlesId, dateOfBirth) {
       age,
       dob: dateOfBirth
     });
-    return { age, underage: true, over18Verified: false };
+    return { age, underage: true, over18Verified: false, status: rows[0]?.status ?? 'under18' };
   }
   if (over18) {
-    await client.query(
+    const { rows } = await client.query(
       `UPDATE outdateddbsnapshotoct2024.singles
        SET over_18_verified = true,
+           ${SQL_STATUS_NEW_TO_ACTIVE},
            updated_at = CURRENT_TIMESTAMP
-       WHERE singles_id = $1`,
+       WHERE singles_id = $1
+       RETURNING status::text AS status`,
       [singlesId]
     );
     console.log('[rekognition:idCapture] over_18_verified from OCR DOB', {
       singlesId,
       age,
-      dob: dateOfBirth
+      dob: dateOfBirth,
+      status: rows[0]?.status ?? null
     });
-    return { age, underage: false, over18Verified: true };
+    return { age, underage: false, over18Verified: true, status: rows[0]?.status ?? null };
   }
-  return { age, underage: false, over18Verified: null };
+  const { rows } = await client.query(
+    `SELECT status::text AS status FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1`,
+    [singlesId]
+  );
+  return { age, underage: false, over18Verified: null, status: rows[0]?.status ?? null };
 }
 
 let checkrTableReady = false;
@@ -1359,7 +1376,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
         idBytes,
         cfg
       );
-      const { age, underage, over18Verified } = await applyUnder18StatusFromDob(client, singlesId, parsed.dateOfBirth);
+      const { age, underage, over18Verified, status: singlesStatus } = await applyUnder18StatusFromDob(client, singlesId, parsed.dateOfBirth);
       console.log('[rekognition:idCapture] admin impersonation bypass', { singlesId, slotDocumentType, age, underage, over18Verified });
       return res.json({
         success: true,
@@ -1368,6 +1385,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
         age,
         over18Verified,
         over_18_verified: over18Verified,
+        status: singlesStatus,
         message: underage
           ? UNDER18_ID_VERIFY_MESSAGE
           : 'Government ID fields captured (admin impersonation bypass).',
@@ -1420,7 +1438,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
     if (slotDocumentType === 'passport') {
       await updateVetBioPassportFieldsFromCapture(client, singlesId, parsed);
     }
-    const { age, underage, over18Verified } = await applyUnder18StatusFromDob(client, singlesId, parsed.dateOfBirth);
+    const { age, underage, over18Verified, status: singlesStatus } = await applyUnder18StatusFromDob(client, singlesId, parsed.dateOfBirth);
 
     try {
       const profileBytes = await loadNormalizedProfilePhotoBytes(singlesId);
@@ -1457,6 +1475,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
       age,
       over18Verified,
       over_18_verified: over18Verified,
+      status: singlesStatus,
       message: underage ? UNDER18_ID_VERIFY_MESSAGE : 'Government ID fields captured.',
       documentType: slotDocumentType,
       captured,
@@ -1513,15 +1532,18 @@ export async function postMarkOver18Verified(req, res) {
     return res.status(401).json({ error: 'Authentication required' });
   }
   try {
-    await pool.query(
+    const { rows } = await pool.query(
       `UPDATE outdateddbsnapshotoct2024.singles
        SET over_18_verified = true,
+           ${SQL_STATUS_NEW_TO_ACTIVE},
            updated_at = CURRENT_TIMESTAMP
-       WHERE singles_id = $1`,
+       WHERE singles_id = $1
+       RETURNING status::text AS status`,
       [singlesId]
     );
-    console.log('[rekognition:mark-over-18-verified]', { singlesId });
-    return res.json({ success: true, over_18_verified: true });
+    const status = rows[0]?.status ?? null;
+    console.log('[rekognition:mark-over-18-verified]', { singlesId, status });
+    return res.json({ success: true, over_18_verified: true, status });
   } catch (err) {
     console.error('[rekognition:mark-over-18-verified]', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Failed to mark over 18 verified' });

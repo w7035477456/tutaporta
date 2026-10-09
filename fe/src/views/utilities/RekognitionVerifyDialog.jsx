@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from 'contexts/AuthContext';
 import { isAdminImpersonationBypassSession } from 'utils/adminSession';
 import { isPilotUserCategory } from 'utils/memberCategory';
+import { UNDER18_TUTADATES_MESSAGE } from 'utils/singlesStatus';
 import { clearSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import { MY_STORY_PATH, needsProfilePhotoSetup } from 'utils/profilePhotoSetup';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -261,7 +262,7 @@ export default function RekognitionVerifyDialog({
   onVerified,
   onFailed
 }) {
-  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, logout, updateSessionOver18Verified } =
+  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionOver18Verified } =
     useAuth();
   const adminImpersonationBypass = isAdminImpersonationBypassSession(user);
   const showPilotSkip = isPilotUserCategory(user?.member_category);
@@ -949,22 +950,21 @@ export default function RekognitionVerifyDialog({
       if (!underage) {
         const over18Flag = data?.over_18_verified ?? data?.over18Verified ?? (Number.isFinite(age) && age >= 18 ? true : null);
         if (over18Flag === true) {
-          updateSessionOver18Verified?.(true);
+          updateSessionOver18Verified?.(true, data?.status);
         }
         return false;
       }
-      const msg = String(data?.message || '').trim() || 'Sorry you must be over 18 years of age';
-      appendDebugLog('Under 18 from government ID OCR — logout', { age, underage: true });
+      const msg = String(data?.message || '').trim() || UNDER18_TUTADATES_MESSAGE;
+      appendDebugLog('Under 18 from government ID OCR — back to mall (TutaNotes / TutaPhotos only)', {
+        age,
+        underage: true
+      });
       await themedAlert(msg);
-      try {
-        await logout();
-      } catch (logoutErr) {
-        console.warn('[rekognition-verify] logout after under18 failed', logoutErr);
-      }
-      navigate('/pages/login', { replace: true });
+      navigate('/mall', { replace: true });
+      updateSessionOver18Verified?.(false, data?.status || 'under18');
       return true;
     },
-    [appendDebugLog, logout, navigate, updateSessionOver18Verified]
+    [appendDebugLog, navigate, updateSessionOver18Verified]
   );
 
   const autoProcessDriverLicense = useCallback(async () => {
@@ -1525,8 +1525,8 @@ export default function RekognitionVerifyDialog({
     setClosing(true);
     setErrorText('');
     try {
-      await markOver18Verified();
-      updateSessionOver18Verified?.(true);
+      const marked = await markOver18Verified();
+      updateSessionOver18Verified?.(true, marked?.status);
       clearSignupIdentificationVerificationRequired();
       const { markFirstLoginOnboardingCongratsPending } = await import('utils/firstLoginOnboarding');
       markFirstLoginOnboardingCongratsPending();

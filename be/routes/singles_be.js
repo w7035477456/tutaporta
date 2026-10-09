@@ -7,7 +7,7 @@ import { sendOutboundMail } from '../lib/outboundMail.js';
 import { isAwsSmsConfigured, sendTransactionalSms } from '../lib/awsPinpointSms.js';
 import { generateSixDigitOtp, safeEqualOtp } from '../lib/smsOtp.js';
 import { DEFAULT_NEW_USER_THEME } from '../lib/defaultNewUserPreferences.js';
-import { insertNewSinglesAccount } from '../utils/newSinglesAccount.js';
+import { insertNewSinglesAccount, SQL_SIGNUP_STATUS_FOR_EXISTING_ROW } from '../utils/newSinglesAccount.js';
 import { normalizeEmailForDb } from '../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../utils/insertAuditRegistration.js';
 import { attachOrInsertSignupLoginLog } from '../utils/loginLog.js';
@@ -412,7 +412,7 @@ export const verifyPhone_HHHHHHHH = async (req, res) => {
           `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
-               status = 'active'::outdateddbsnapshotoct2024.singles_status,
+               ${SQL_SIGNUP_STATUS_FOR_EXISTING_ROW},
                my_refer_code = COALESCE(my_refer_code, $4),
                refer_by_code = COALESCE(refer_by_code, $5),
                updated_at = CURRENT_TIMESTAMP

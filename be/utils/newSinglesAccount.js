@@ -10,9 +10,24 @@ import {
   grantComplimentaryNewMemberVaultData
 } from './complimentaryNewMemberVaultData.js';
 import { seedDefaultBillScheduleForNewMember } from './defaultBillScheduleForNewMember.js';
+import { OPTINOUT_DEFAULT_BITMAP } from './optinoutBitmap.js';
 
 /**
- * Insert a new singles row after phone/password signup (status = active).
+ * `SET status = …` when signup completes on an existing email row: under18 stays under18,
+ * an already age-verified row is active, everything else restarts as `new` (ID scan required).
+ * Opts the member into all three mall apps (singles.optinout_bitmap).
+ */
+export const SQL_SIGNUP_STATUS_FOR_EXISTING_ROW = `status = CASE
+                 WHEN status = 'under18'::outdateddbsnapshotoct2024.singles_status
+                   THEN status
+                 WHEN over_18_verified IS TRUE
+                   THEN 'active'::outdateddbsnapshotoct2024.singles_status
+                 ELSE 'new'::outdateddbsnapshotoct2024.singles_status
+               END,
+               optinout_bitmap = ${OPTINOUT_DEFAULT_BITMAP}`;
+
+/**
+ * Insert a new singles row after phone/password signup (status = new until the ID scan sets active / under18).
  * emailNorm should be lowercase (see normalizeEmailForDb); stored as text on singles.email.
  * Also grants 10GB complimentary TutaNotes Tx/Rx data + Balance History row,
  * and preloads sample Monthly / Yearly Bill Schedule rows (once per account).
@@ -30,12 +45,12 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
   try {
     await client.query(
       `INSERT INTO outdateddbsnapshotoct2024.singles (
-         singles_id, member_id, email, password_hash, phone, status, theme,
+         singles_id, member_id, email, password_hash, phone, status, optinout_bitmap, theme,
          my_refer_code, refer_by_code, member_category, refill_remain_mb, refill_bought_mb,
          created_at, updated_at
        )
        VALUES (
-         $1, $2, $3, $4, $5, 'active'::outdateddbsnapshotoct2024.singles_status, $6,
+         $1, $2, $3, $4, $5, 'new'::outdateddbsnapshotoct2024.singles_status, ${OPTINOUT_DEFAULT_BITMAP}, $6,
          $7, $8, $9, $10, $10,
          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
        )`,

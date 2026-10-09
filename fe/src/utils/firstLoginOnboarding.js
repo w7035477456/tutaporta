@@ -12,6 +12,7 @@ import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv'
 import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { isOver18VerificationPending } from 'utils/over18Verified';
+import { isSinglesStatusNew } from 'utils/singlesStatus';
 
 const MY_STORY_PATH = '/myStory';
 const CONGRATS_PENDING_KEY = 'firstLoginOnboardingCongratsPending';
@@ -63,7 +64,9 @@ export function getFirstLoginOnboardingPhase(user) {
   if (!hasProfilePhotoFk(user)) return 'profile_photo';
   if (!hasGenderSelfReport(user)) return 'gender';
   if (!hasAliasNickname(user) || !hasSecretIconSet(user)) return 'alias_secret';
-  if (isOver18VerificationPending(user?.over_18_verified)) return 'id_verification';
+  if (isSinglesStatusNew(user?.status) || isOver18VerificationPending(user?.over_18_verified)) {
+    return 'id_verification';
+  }
   return 'done';
 }
 

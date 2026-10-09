@@ -177,6 +177,7 @@ function mapCustomizationResponse(data) {
     tutaDatesEnabled: parseMallAppEnrollmentFlag(data, 'tutaDatesEnabled'),
     tutaNotesEnabled: parseMallAppEnrollmentFlag(data, 'tutaNotesEnabled'),
     tutaAlbumsEnabled: parseMallAppEnrollmentFlag(data, 'tutaAlbumsEnabled'),
+    optinoutBitmap: Number.isInteger(data?.optinoutBitmap) ? data.optinoutBitmap : null,
     mainFont: String(data?.mainFont || '').trim() || 'Algerian, fantasy',
     ...parseMynoteEditorPrefs(data)
   };

@@ -107,13 +107,25 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
-  const updateSessionOver18Verified = useCallback((value) => {
+  /** @param {unknown} value @param {string | null} [singlesStatus] singles.status after the ID scan (new → active / under18). */
+  const updateSessionOver18Verified = useCallback((value, singlesStatus) => {
+    const status = String(singlesStatus ?? '').trim();
     setUser((prev) => {
       if (!prev) return prev;
       return normalizeUserShape({
         ...prev,
-        over_18_verified: normalizeOver18Verified(value)
+        over_18_verified: normalizeOver18Verified(value),
+        ...(status ? { status } : {})
       });
+    });
+  }, []);
+
+  /** @param {number | null | undefined} value singles.optinout_bitmap after a mall enrollment save. */
+  const updateSessionOptinoutBitmap = useCallback((value) => {
+    if (!Number.isInteger(value)) return;
+    setUser((prev) => {
+      if (!prev || prev.optinout_bitmap === value) return prev;
+      return normalizeUserShape({ ...prev, optinout_bitmap: value });
     });
   }, []);
 
@@ -390,6 +402,7 @@ export const AuthProvider = ({ children }) => {
         updateSessionNickname,
         updateSessionDemoBuddyFlags,
         updateSessionOver18Verified,
+        updateSessionOptinoutBitmap,
         updateSessionHasSecretIcon
       }}
     >
