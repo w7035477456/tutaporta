@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "One-click Record Vault USB bridge for Mac and Windows",
-  "author": "OnlineMall Website",
+  "author": "TutaMall.com",
   "main": "main.cjs",
   "scripts": {
     "prepare-staging": "node scripts/prepare-staging.mjs",
@@ -16,9 +16,9 @@
     "dist:win": "npm run prepare-staging && npm run clean-dist && env -u ELECTRON_RUN_AS_NODE electron-builder --win && npm run copy-installers-to-usb"
   },
   "build": {
-    "appId": "website.onlinemall.recordvaultusbbridge",
+    "appId": "com.tutamall.recordvaultusbbridge",
     "productName": "usbBridgeV3",
-    "copyright": "Copyright © OnlineMall Website",
+    "copyright": "Copyright © TutaMall.com",
     "directories": {
       "output": "dist",
       "buildResources": "assets"

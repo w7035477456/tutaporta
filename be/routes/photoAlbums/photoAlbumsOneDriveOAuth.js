@@ -167,7 +167,7 @@ function renderPopupResultHtml({ success, email = '', error = '', errorSecondary
         deliverToMainPage();
         var noOpenerRetryTimer = setInterval(deliverToMainPage, 120);
         setTimeout(function () { clearInterval(noOpenerRetryTimer); }, 10000);
-        var returnUrl = openerOrigin ? (openerOrigin + '/myPhotoAlbums') : '/myPhotoAlbums';
+        var returnUrl = openerOrigin ? (openerOrigin + '/myPhotos') : '/myPhotos';
         setStatus(
           payload.success
             ? 'OneDrive connected. Return to MyPhotoAlbums — if it does not update automatically, close this window or open: ' + returnUrl

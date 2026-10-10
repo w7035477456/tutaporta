@@ -380,7 +380,7 @@ function buildEmailHtml({
 <p>${intro}</p>
 ${parts.join('\n')}
 <p style="margin-top:24px;">Open Bill Schedule: <a href="${escapeHtml(appUrl)}/myNote">${escapeHtml(appUrl)}/myNote</a></p>
-<p style="color:#666;font-size:12px;">OnlineMall.Website — Bill Schedule reminder</p>`;
+<p style="color:#666;font-size:12px;">TutaMall.com — Bill Schedule reminder</p>`;
 }
 
 function buildEmailPlain({
@@ -574,7 +574,7 @@ export async function runBillOverdueEmailDigest() {
     }
 
     const transporter = createTransporter();
-    const appUrl = getPublicAppUrl() || 'https://onlinemall.website';
+    const appUrl = getPublicAppUrl() || 'https://tutamall.com';
     let sent = 0;
     let failed = 0;
 

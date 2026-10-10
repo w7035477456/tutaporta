@@ -24,7 +24,7 @@ FAST_SMS_COUNT="${SITE_UPTIME_FAST_SMS_COUNT:-3}"
 HOURLY_SMS_SEC="${SITE_UPTIME_HOURLY_SMS_SEC:-3600}"
 HOURLY_SMS_COUNT="${SITE_UPTIME_HOURLY_SMS_COUNT:-3}"
 DAILY_SMS_SEC="${SITE_UPTIME_DAILY_SMS_SEC:-86400}"
-BASE_URL="${SITE_UPTIME_BASE_URL:-https://onlinemall.website}"
+BASE_URL="${SITE_UPTIME_BASE_URL:-https://tutamall.com}"
 ALARM_ENABLE="${SITE_UPTIME_ALARM:-1}"
 ALARM_DEVICE="${SITE_UPTIME_ALARM_DEVICE:-auto}"
 ALARM_HZ="${SITE_UPTIME_ALARM_HZ:-880}"
@@ -341,7 +341,7 @@ check_url() {
     curl -sS -L --compressed \
       --max-time "$CURL_MAX_TIME" \
       --connect-timeout 8 \
-      -A 'Mozilla/5.0 (compatible; OnlineMallUptimeMonitor/1.0)' \
+      -A 'Mozilla/5.0 (compatible; TutaMallUptimeMonitor/1.0)' \
       -o "$body_file" \
       -w '%{http_code}' \
       "$url" 2>"${body_file}.err" || true
@@ -419,7 +419,7 @@ maybe_send_failure_sms() {
   fi
   phase="$(sms_phase_label "$SMS_SENT_COUNT")"
   local msg
-  msg="OnlineMall DOWN at ${fail_at} [${phase}]: ${detail}"
+  msg="TutaMall DOWN at ${fail_at} [${phase}]: ${detail}"
   if send_sms "$msg"; then
     write_sms_state $((SMS_SENT_COUNT + 1)) "$(now_epoch)"
     log_monitor "FAIL ${detail} sms=sent phase=${phase} count=$((SMS_SENT_COUNT + 1))"
@@ -447,7 +447,7 @@ fi
 if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   clear_sms_state
   log_monitor "TEST-SMS (Twilio Verify) env=${ENV_FILE} to=${SMS_TO} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} verify_sid_len=${#TWILIO_SERVICE_SID}"
-  send_sms "OnlineMall uptime monitor test at $(ts)"
+  send_sms "TutaMall uptime monitor test at $(ts)"
   exit $?
 fi
 

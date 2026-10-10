@@ -322,9 +322,9 @@ function buildTrayMenu() {
       }
     },
     {
-      label: 'Open onlinemall.website',
+      label: 'Open tutamall.com',
       click: () => {
-        shell.openExternal('https://onlinemall.website');
+        shell.openExternal('https://tutamall.com');
       }
     },
     {

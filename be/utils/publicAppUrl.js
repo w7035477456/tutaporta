@@ -28,7 +28,7 @@ export function getPublicAppUrl() {
     return String(override).trim().replace(/\/$/, '');
   }
   if (process.env.NODE_ENV === 'production') {
-    return 'https://OnlineMall.Website';
+    return 'https://tutamall.com';
   }
   return 'http://localhost:3000';
 }

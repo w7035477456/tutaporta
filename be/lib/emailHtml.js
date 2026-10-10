@@ -33,7 +33,7 @@ export const getRegistrationEmailLogoAttachment = getEmailLogoAttachment;
 export function buildEmailLogoHeaderHtml() {
   if (!getEmailLogoAttachment()) return '';
   return `<p style="margin: 0 0 24px; text-align: center;">
-    <img src="cid:${EMAIL_LOGO_CID}" alt="Welcome to our OnlineMall.website" style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto;" />
+    <img src="cid:${EMAIL_LOGO_CID}" alt="Welcome to our TutaMall.com" style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto;" />
   </p>`;
 }
 

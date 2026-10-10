@@ -88,7 +88,7 @@ function findBlockedInteractive(target) {
  * top-right theme menu, orange help / tour buttons, TutaNotes Cloud/USB login panels,
  * TutaNotes USB tab title (expand / reload USB pane),
  * TutaNotes notebook/note/shortcut chrome + View/Download on attachments,
- * most of /myPhotoAlbums, /myStory, and /receivedBioRequests (path allow);
+ * most of /myPhotos, /myStory, and /receivedBioRequests (path allow);
  * block marked mutating actions (data-guest-demo-block) even on those pages
  * (TutaPhotoAlbums editor/sidebar/tray mutations; Backup/Restore/Format inside
  * backup popups; Files Explorer / Mobile Upload tray actions — header chrome

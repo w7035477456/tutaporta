@@ -6,6 +6,7 @@ import { RECEIVED_BIO_REQUESTS_PATH } from 'constants/receivedBioRequestsRoute';
 import { PROFILES_RECORDS_PATH } from 'constants/profilesRecordsRoute';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 import { TUTADATES_MY_STORE_PATH, TUTADATES_PATH } from 'constants/tutaDatesRoute';
+import { MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
 import { isSpeedDatingEnabled } from 'config/speedDatingEnv';
 
 // project imports
@@ -170,12 +171,16 @@ const MainRoutes = {
       element: <Navigate to="/myNote" replace />
     },
     {
-      path: 'myPhotoAlbums',
+      path: 'myPhotos',
       element: <MyPhotoAlbums />
     },
     {
+      path: 'myPhotoAlbums',
+      element: <RedirectPreservingLocation to={MY_PHOTO_ALBUMS_PATH} />
+    },
+    {
       path: 'myPhotoAlbumsLegacy',
-      element: <Navigate to="/myPhotoAlbums" replace />
+      element: <RedirectPreservingLocation to={MY_PHOTO_ALBUMS_PATH} />
     },
     {
       path: 'default',

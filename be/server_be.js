@@ -663,8 +663,8 @@ if (isProduction) {
   app.set('trust proxy', 1);
 }
 
-// Canonical host is the apex (https://onlinemall.website). Serving the SPA on www looks up
-// VITE_API_BASE_URL=https://onlinemall.website, which is a different origin — CORS then
+// Canonical host is the apex (https://tutamall.com). Serving the SPA on www looks up
+// VITE_API_BASE_URL=https://tutamall.com, which is a different origin — CORS then
 // fails /api/health and the UI shows Service Notice (E3). Redirect www → apex instead
 // of running two live hostnames (auth cookies are __Host- and cannot be shared).
 app.use((req, res, next) => {
@@ -672,8 +672,8 @@ app.use((req, res, next) => {
     .split(':')[0]
     .trim()
     .toLowerCase();
-  if (host !== 'www.onlinemall.website') return next();
-  res.redirect(301, `https://onlinemall.website${req.originalUrl || '/'}`);
+  if (host !== 'www.tutamall.com') return next();
+  res.redirect(301, `https://tutamall.com${req.originalUrl || '/'}`);
 });
 
 function normalizeOrigin(urlLike) {
@@ -1996,9 +1996,8 @@ if (!feBuilt) {
   );
 }
 if (feBuilt) {
-  // On Ubuntu: ensure both OnlineMall.Website and www.OnlineMall.Website route to this app so /assets/* (e.g. Login-*.js) are served.
+  // On Ubuntu: ensure both tutamall.com and www.tutamall.com route to this app so /assets/* (e.g. Login-*.js) are served.
   // Public resume PDF (fe/public/resume.pdf → dist/resume.pdf).
-  // Same path on tutamall.com and onlinemall.website (one FE build behind HAProxy).
   app.get(['/resume', '/resume/'], (req, res) => {
     const pdfPath = path.join(feDistPath, 'resume.pdf');
     if (!fs.existsSync(pdfPath)) {

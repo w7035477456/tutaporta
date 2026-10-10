@@ -27,7 +27,7 @@ export const BUSY_HOURGLASS_MY_NOTE_SIZE = {
   sm: '9rem'
 };
 
-/** /myPhotoAlbums full-page loading — same sizing as Notes hourglass. */
+/** /myPhotos full-page loading — same sizing as Notes hourglass. */
 export const BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE = BUSY_HOURGLASS_MY_NOTE_SIZE;
 
 export const busyHourglassSpinSx = {

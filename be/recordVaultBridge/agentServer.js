@@ -90,8 +90,8 @@ import {
 
 const DEFAULT_PORT = Number(process.env.RECORD_VAULT_BRIDGE_PORT || 49201);
 const DEFAULT_ORIGINS = [
-  'https://onlinemall.website',
-  'https://www.onlinemall.website',
+  'https://tutamall.com',
+  'https://www.tutamall.com',
   'http://localhost:3000',
   'http://127.0.0.1:3000'
 ];
@@ -110,7 +110,7 @@ function isAllowedOrigin(origin, allowedOrigins) {
   if (allowedOrigins.includes(origin)) return true;
   try {
     const host = new URL(origin).hostname.toLowerCase();
-    return host === 'onlinemall.website' || host.endsWith('.onlinemall.website');
+    return host === 'tutamall.com' || host.endsWith('.tutamall.com');
   } catch {
     return false;
   }

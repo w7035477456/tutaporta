@@ -5,11 +5,13 @@ alwaysApply: true
 
 # Ubuntu config files (xbox2, `192.168.222.202`)
 
+Public site: **`https://tutamall.com`** (apps at `/mall`, `/tutadates`, `/myNote`, `/myPhotos`).
+
 | # | File | What it is |
 |---|------|------------|
 | 1 | `/home/lawsen0/.ssh/be/.env` | Main backend / application environment and config file. Also holds IDs and secret keys. |
-| 2 | `/home/lawsen0/main/code/fe/.env` | Main frontend application environment and config file. |
-| 3 | `/etc/haproxy/haproxy.cfg` | HAProxy's main config. HAProxy is the front door for `onlinemall.website`: it accepts every request from Cloudflare on ports 80 and 443, handles HTTPS, and passes the request on to a backend server. |
+| 2 | `/home/lawsen0/code/main/fe/.env` | Main frontend application environment and config file. |
+| 3 | `/etc/haproxy/haproxy.cfg` | HAProxy's main config. HAProxy is the front door for `tutamall.com`: it accepts every request from Cloudflare on ports 80 and 443, handles HTTPS, 301-redirects any other hostname to `https://tutamall.com`, and passes the request on to a backend server. |
 | 4 | `/etc/postgresql/16/main/postgresql.conf` | PostgreSQL's main server config. Controls how the Postgres 16 server on xbox2 runs: where its data lives, which port and network addresses it listens on, how much memory it uses, and its logging, locale and maintenance behavior. |
 | 5 | `/etc/postgresql/16/main/pg_hba.conf` | PostgreSQL client authentication (host-based authentication, HBA) config. Decides who may connect to the Postgres 16 server on xbox2 (port `50010`), from where, to which database, and how they must prove their identity. |
 | 6 | `/etc/nginx/sites-available/default` | Nginx's default site config (default server block). Defines the catch-all website Nginx serves on port 80 when no other site matches the requested hostname. |

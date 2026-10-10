@@ -417,7 +417,7 @@ export default function MyPhotoAlbums() {
   }, [isCompactViewport, searchParams, navigate]);
 
   useEffect(() => {
-    // Yellow E2E: DEK lives only in this tab — clear on each /myPhotoAlbums visit.
+    // Yellow E2E: DEK lives only in this tab — clear on each /myPhotos visit.
     clearPhotoAlbumsE2eSession();
   }, []);
 

@@ -8,7 +8,8 @@ import TooManyRequests from 'views/pages/tooManyRequests/TooManyRequests';
 import Loadable, { lazy } from 'ui-component/Loadable';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
 import ErrorBoundary from './ErrorBoundary';
-import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
+import RedirectPreservingLocation from './RedirectPreservingLocation';
+import { MY_PHOTO_ALBUMS_OLD_VIEW_PATH, MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 
 const PhotoAlbumsFullscreenView = Loadable(lazy(() => import('views/dashboard/photoAlbums/PhotoAlbumsFullscreenView')));
 const PhotoAlbumsAcceptInvite = Loadable(lazy(() => import('views/dashboard/photoAlbums/PhotoAlbumsAcceptInvite')));
@@ -33,6 +34,10 @@ const router = createBrowserRouter(
               <PhotoAlbumsFullscreenView />
             </ProtectedRoute>
           )
+        },
+        {
+          path: MY_PHOTO_ALBUMS_OLD_VIEW_PATH,
+          element: <RedirectPreservingLocation to={MY_PHOTO_ALBUMS_VIEW_PATH} />
         },
         {
           path: '/photoAlbums/accept-invite',

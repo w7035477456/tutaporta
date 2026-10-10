@@ -62,8 +62,8 @@ PDF_CHUNK_SCORE_BOOST = float(os.environ.get("RAG_PDF_CHUNK_SCORE_BOOST", "3"))
 JUNK_TEXT_MARKERS = (
     "Service Update | OnlineMall",
     "We're Fine-Tuning Things",
-    "OnlineMall.Website",
-    "support@onlinemall.website",
+    "TutaMall.com",
+    "support@tutamall.com",
 )
 
 app = FastAPI(title="TutaNotes RAG Service", version="1.0.0")

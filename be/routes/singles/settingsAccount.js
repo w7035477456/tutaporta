@@ -53,7 +53,7 @@ function getPublicAppUrl() {
     return String(override).trim().replace(/\/$/, '');
   }
   if (process.env.NODE_ENV === 'production') {
-    return 'https://OnlineMall.Website';
+    return 'https://tutamall.com';
   }
   return 'http://localhost:3000';
 }
@@ -477,10 +477,10 @@ export async function requestSettingsEmailChange(req, res) {
       from: OUTBOUND_EMAIL_FROM_HEADER,
       to: newEmailNorm,
       cc: oldEmail,
-      subject: 'Confirm your new email - OnlineMall.Website',
+      subject: 'Confirm your new email - TutaMall.com',
       html: wrapEmailHtml(`
           <h2 style="color: #333;">Confirm your new email</h2>
-          <p>We received a request to change the email on your OnlineMall.Website account to <strong>${newEmailNorm}</strong>.</p>
+          <p>We received a request to change the email on your TutaMall.com account to <strong>${newEmailNorm}</strong>.</p>
           <p style="margin: 20px 0;">
             <a href="${confirmUrl}" style="display: inline-block; padding: 12px 24px; background-color: #1976d2; color: white; text-decoration: none; border-radius: 4px;">Click this link to confirm new email</a>
           </p>
@@ -1115,10 +1115,10 @@ export async function submitSettingsChangeEmail(req, res) {
     await sendOutboundMail(transporter, {
       from: OUTBOUND_EMAIL_FROM_HEADER,
       to: newEmailNorm,
-      subject: 'Your email change verification code - OnlineMall.Website',
+      subject: 'Your email change verification code - TutaMall.com',
       html: wrapEmailHtml(`
           <h2 style="color: #333;">Confirm your new email</h2>
-          <p>We received a request to change the email on your OnlineMall.Website account to <strong>${newEmailNorm}</strong>.</p>
+          <p>We received a request to change the email on your TutaMall.com account to <strong>${newEmailNorm}</strong>.</p>
           <p style="margin: 20px 0; font-size: 24px; letter-spacing: 4px;"><strong>${code}</strong></p>
           <p>Enter this 6-digit code in the Change Email popup to finish updating your email address.</p>
           <p style="margin-top: 30px; color: #999; font-size: 12px;">If you did not request this change, you can ignore this email. Your current email remains unchanged.</p>
@@ -1461,10 +1461,10 @@ export async function submitSettingsChangePhone(req, res) {
     await sendOutboundMail(transporter, {
       from: OUTBOUND_EMAIL_FROM_HEADER,
       to: accountEmailNorm,
-      subject: 'Your phone change verification code - OnlineMall.Website',
+      subject: 'Your phone change verification code - TutaMall.com',
       html: wrapEmailHtml(`
           <h2 style="color: #333;">Confirm your phone change</h2>
-          <p>We received a request to change the phone number on your OnlineMall.Website account to <strong>${newPhoneDisplay}</strong>.</p>
+          <p>We received a request to change the phone number on your TutaMall.com account to <strong>${newPhoneDisplay}</strong>.</p>
           <p style="margin: 20px 0; font-size: 24px; letter-spacing: 4px;"><strong>${code}</strong></p>
           <p>Enter this 6-digit code in the Change Phone popup to continue updating your phone number.</p>
           <p style="margin-top: 30px; color: #999; font-size: 12px;">If you did not request this change, you can ignore this email. Your current phone number remains unchanged.</p>

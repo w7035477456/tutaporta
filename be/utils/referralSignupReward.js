@@ -302,7 +302,7 @@ async function sendReferrerRewardEmail({ referrerEmail, description, transaction
         Your updated token balance is <strong>${nextBalance}</strong>.
         ${txnLabel ? ` Transaction ID: <strong>${txnLabel}</strong>.` : ''}
       </p>
-      <p style="margin-top:24px; color:#666; font-size:12px;">Thank you for inviting friends to OnlineMall.Website.</p>
+      <p style="margin-top:24px; color:#666; font-size:12px;">Thank you for inviting friends to TutaMall.com.</p>
     `,
     { maxWidth: '640px' }
   );
@@ -331,7 +331,7 @@ async function sendRefereeRewardEmail({ newMemberEmail, description, transaction
         Your updated token balance is <strong>${nextBalance}</strong>.
         ${txnLabel ? ` Transaction ID: <strong>${txnLabel}</strong>.` : ''}
       </p>
-      <p style="margin-top:24px; color:#666; font-size:12px;">Thank you for joining OnlineMall.Website.</p>
+      <p style="margin-top:24px; color:#666; font-size:12px;">Thank you for joining TutaMall.com.</p>
     `,
     { maxWidth: '640px' }
   );

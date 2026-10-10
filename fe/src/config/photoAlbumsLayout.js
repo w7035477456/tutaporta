@@ -6,19 +6,19 @@ import myPhotoAlbumsBackgroundImage from 'assets/images/myPhotoAlbumsBackground.
 
 export { MY_PHOTO_ALBUMS_PATH };
 
-/** Header logo for /myPhotoAlbums — small OnlineMall.Website mark (left of toolbar). */
+/** Header logo for /myPhotos — small TutaMall.com mark (left of toolbar). */
 export const MY_PHOTO_ALBUMS_HEADER_LOGO_IMAGE = myPhotoAlbumsHeaderLogoImage;
 
-/** Top header strip artwork for /myPhotoAlbums — tiled across full app-bar width. */
+/** Top header strip artwork for /myPhotos — tiled across full app-bar width. */
 export const MY_PHOTO_ALBUMS_BANNER_IMAGE = myPhotoAlbumsBannerImage;
 
-/** Full-page /myPhotoAlbums loading & OneDrive transition backdrop. */
+/** Full-page /myPhotos loading & OneDrive transition backdrop. */
 export const MY_PHOTO_ALBUMS_BACKGROUND_IMAGE = myPhotoAlbumsBackgroundImage;
 
 /** Empty tail below note content — scroll room to add text or photos. */
 export const PHOTO_ALBUMS_NOTE_SCROLL_TAIL_MIN_HEIGHT = { xs: '50vh', sm: '55vh', md: '60vh' };
 
-/** Compact split-pane (/myPhotoAlbums dual halves) — keep note content near the top. */
+/** Compact split-pane (/myPhotos dual halves) — keep note content near the top. */
 export const PHOTO_ALBUMS_NOTE_SCROLL_TAIL_COMPACT_MIN_HEIGHT = { xs: 48, sm: 64, md: 80 };
 
 /** Album / photo slideshow fullscreen shell (PhotoAlbumsNoteEditor, PhotoAlbumsPhotoFullscreenOverlay). */
@@ -64,7 +64,7 @@ export const myPhotoAlbumsHeaderLogoImgSx = {
   objectFit: 'contain'
 };
 
-/** Left header slot on /myPhotoAlbums — stretches with toolbar, stacks above banner art. */
+/** Left header slot on /myPhotos — stretches with toolbar, stacks above banner art. */
 export const myPhotoAlbumsHeaderLogoSlotSx = {
   display: 'flex',
   alignItems: 'stretch',

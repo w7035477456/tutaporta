@@ -1,5 +1,5 @@
 [Unit]
-Description=OnlineMall website uptime monitor (curl + SMS + USB speaker, not PM2)
+Description=TutaMall.com uptime monitor (curl + SMS + USB speaker, not PM2)
 After=network-online.target sound.target
 Wants=network-online.target
 

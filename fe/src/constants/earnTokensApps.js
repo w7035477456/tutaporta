@@ -15,7 +15,7 @@ export const EARN_TOKENS_APPS = [
  */
 export function defaultEarnTokensAppId(pathname = '') {
   const p = String(pathname || '');
-  if (p.startsWith('/myPhotoAlbums')) return EARN_TOKENS_APP_SECURE_PHOTO_ALBUM;
+  if (p.startsWith('/myPhotos') || p.startsWith('/myPhotoAlbums')) return EARN_TOKENS_APP_SECURE_PHOTO_ALBUM;
   if (p.startsWith('/myNote') || p.startsWith('/myRecordVault')) return EARN_TOKENS_APP_SECURE_NOTES;
   return EARN_TOKENS_APP_DATING;
 }

@@ -14,7 +14,7 @@ export function buildRegistrationEmailHtml({ code, createPasswordUrl, verifyEmai
   const href = escapeHtmlAttr(createPasswordUrl);
   const manualVerifyUrl = escapeHtmlAttr(verifyEmailUrl);
   return wrapEmailHtml(`
-      <h2 style="color: #333;">Welcome to OnlineMall.Website and Vetted Singles!</h2>
+      <h2 style="color: #333;">Welcome to TutaMall.com and Vetted Singles!</h2>
       <p>Thank you for registering. Click the button below to verify your email and continue registration with your code already filled in.</p>
       <p style="margin: 20px 0; font-size: 24px; font-weight: bold; letter-spacing: 4px;">${code}</p>
       <p style="margin: 20px 0;">

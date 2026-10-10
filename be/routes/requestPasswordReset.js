@@ -23,7 +23,7 @@ function getPublicAppUrl() {
     return String(override).trim().replace(/\/$/, '');
   }
   if (process.env.NODE_ENV === 'production') {
-    return 'https://OnlineMall.Website';
+    return 'https://tutamall.com';
   }
   return 'http://localhost:3000';
 }
@@ -101,7 +101,7 @@ export async function requestPasswordReset(req, res) {
       await sendOutboundMail(transporter, {
         from: OUTBOUND_EMAIL_FROM_HEADER,
         to: emailNorm,
-        subject: 'Reset Your Password - OnlineMall.Website',
+        subject: 'Reset Your Password - TutaMall.com',
         html: wrapEmailHtml(`
             <h2 style="color: #333;">Password reset</h2>
             <p>We received a request to reset your password. Use the code below and click the button, or open the link.</p>

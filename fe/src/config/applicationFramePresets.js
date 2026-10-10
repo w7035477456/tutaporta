@@ -28,7 +28,7 @@ import { DATING_TOP_BANNER_IMAGE } from 'config/datingTopBanner';
  * }} ApplicationFramePreset
  */
 
-/** Current dating / vsingles shell (OnlineMall.Website). */
+/** Current dating / vsingles shell (TutaMall.com). */
 /** @type {ApplicationFramePreset} */
 export const VSINGLES_APPLICATION_FRAME = {
   id: 'vsingles',

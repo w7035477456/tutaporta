@@ -152,9 +152,6 @@ function Login() {
                   <Box component="span" sx={{ display: 'block' }}>
                     Login TutaMall.com
                   </Box>
-                  <Box component="span" sx={{ display: 'block', fontSize: '0.5em' }}>
-                    (formerly OnlineMall.website)
-                  </Box>
                 </Typography>
                 <Typography
                   variant="caption"

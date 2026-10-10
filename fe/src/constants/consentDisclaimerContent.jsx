@@ -12,7 +12,7 @@ function ThirdPartyLink() {
 }
 
 const CONSENT_CHECKBOX_LABEL =
-  'I have reviewed the volunteered data points above. I certify that I am the owner of this data, and I explicitly authorize and direct Vetted Singles of OnlineMall.Website to evaluate and display my profile verification match status to the specific user I selected.';
+  'I have reviewed the volunteered data points above. I certify that I am the owner of this data, and I explicitly authorize and direct Vetted Singles of TutaMall.com to evaluate and display my profile verification match status to the specific user I selected.';
 
 export function getConsentCheckboxLabel() {
   return CONSENT_CHECKBOX_LABEL;
@@ -27,7 +27,7 @@ export function ConsentDisclaimerBody({ approvedViewingDurationMonths = 12 }) {
     <>
       <Typography variant="body1" paragraph>
         Your bio remains hidden until you grant access. By checking the box below and clicking &quot;Submit Consent&quot;, you explicitly
-        authorize Vetted Singles of OnlineMall.Website to cross-reference your volunteered biographical information with data retrieved
+        authorize Vetted Singles of TutaMall.com to cross-reference your volunteered biographical information with data retrieved
         securely via our third-party verification partner (<ThirdPartyLink />
         ), according to our privacy standards. By doing so, you also authorize your designated peer(s) to view this information.
       </Typography>
@@ -54,7 +54,7 @@ export function ConsentDisclaimerBody({ approvedViewingDurationMonths = 12 }) {
         Legal Acknowledgments &amp; Waiver of Liability:
       </Typography>
       <Typography variant="body1" paragraph>
-        User-Directed Match Disclosure: You acknowledge that Vetted Singles of OnlineMall.Website acts strictly as a technical intermediary
+        User-Directed Match Disclosure: You acknowledge that Vetted Singles of TutaMall.com acts strictly as a technical intermediary
         verifying self-reported profiles at your explicit request for personal social networking trust and safety purposes.
       </Typography>
       <Typography variant="body1" paragraph>
@@ -63,7 +63,7 @@ export function ConsentDisclaimerBody({ approvedViewingDurationMonths = 12 }) {
         not be used for employment screening, tenant evaluation, credit underwriting, or any commercial eligibility assessment.
       </Typography>
       <Typography variant="body1" paragraph>
-        Full Release of Liability: You hereby release, indemnify, and hold harmless Vetted Singles of OnlineMall.Website, its corporate
+        Full Release of Liability: You hereby release, indemnify, and hold harmless Vetted Singles of TutaMall.com, its corporate
         owners, and its technical infrastructure from any and all liability, claims, or damages (including but not limited to defamation,
         data transmission lag, error states, or emotional distress) resulting from data mismatches or how the receiving specific user acts
         upon seeing a &quot;Matches&quot; or &quot;Does Not Match&quot; tag.

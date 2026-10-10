@@ -6,7 +6,7 @@ import myNoteBackgroundImage from 'assets/images/myNoteBackground.png';
 
 export { MY_RECORD_VAULT_PATH };
 
-/** Header logo for /myNote — small OnlineMall.Website mark (left of toolbar). */
+/** Header logo for /myNote — small TutaMall.com mark (left of toolbar). */
 export const MY_NOTE_HEADER_LOGO_IMAGE = myNoteHeaderLogoImage;
 
 /** Top header strip artwork for /myNote — tiled across full app-bar width. */

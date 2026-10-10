@@ -49,10 +49,10 @@ async function sendPasswordUpgradeNotificationEmail(emailNorm) {
   await sendOutboundMail(transporter, {
     from: OUTBOUND_EMAIL_FROM_HEADER,
     to: emailNorm,
-    subject: 'Your password was updated - OnlineMall.Website',
+    subject: 'Your password was updated - TutaMall.com',
     html: wrapEmailHtml(`
         <h2 style="color: #333;">Password updated</h2>
-        <p>Your OnlineMall.Website account password was changed because you signed in with a temporary 6-digit password.</p>
+        <p>Your TutaMall.com account password was changed because you signed in with a temporary 6-digit password.</p>
         <p>If you did not make this change, please contact support immediately.</p>
         <p style="margin-top: 30px; color: #999; font-size: 12px;">This is an automated security notification.</p>
       `)

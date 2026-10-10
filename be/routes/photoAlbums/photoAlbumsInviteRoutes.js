@@ -267,7 +267,7 @@ export async function createPhotoAlbumsInvite(req, res) {
     await sendOutboundMail(transporter, {
       from: OUTBOUND_EMAIL_FROM_HEADER,
       to: inviteeEmail,
-      subject: `${ownerName} shared a photo album with you — OnlineMall.Website`,
+      subject: `${ownerName} shared a photo album with you — TutaMall.com`,
       text: buildPhotoAlbumsInviteEmailPlain({
         ownerDisplayName: ownerName,
         albumSetName,
@@ -431,7 +431,7 @@ export async function acceptPhotoAlbumsInvite(req, res) {
     return res.json({
       success: true,
       displayLabel,
-      redirectPath: '/myPhotoAlbums'
+      redirectPath: '/myPhotos'
     });
   } catch (err) {
     console.error(LOG_PREFIX, 'accept', err?.message || err);

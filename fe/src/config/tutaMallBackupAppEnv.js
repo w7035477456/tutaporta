@@ -10,7 +10,7 @@ export function tutaMallBackupAppFromPathname(pathname) {
     .replace(/\/+$/, '') || '/';
   if (p === '/myStory' || p.startsWith('/myStory/')) return 'tutadates';
   if (p === '/myNote' || p.startsWith('/myNote/')) return 'tutanotes';
-  if (p === '/myPhotoAlbums' || p.startsWith('/myPhotoAlbums/')) return 'tutaphoto';
+  if (p === '/myPhotos' || p.startsWith('/myPhotos/')) return 'tutaphoto';
   return null;
 }
 

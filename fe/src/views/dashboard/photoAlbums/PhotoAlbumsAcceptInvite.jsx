@@ -52,7 +52,7 @@ export default function PhotoAlbumsAcceptInvite() {
       const result = await acceptPhotoAlbumsInvite(token);
       setDone(true);
       window.setTimeout(() => {
-        navigate(result?.redirectPath || '/myPhotoAlbums', { replace: true });
+        navigate(result?.redirectPath || '/myPhotos', { replace: true });
       }, 1200);
     } catch (err) {
       setError(readPhotoAlbumsInviteError(err, 'Failed to accept invitation'));

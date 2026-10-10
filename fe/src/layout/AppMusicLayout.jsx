@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { BackgroundMusicProvider } from 'contexts/BackgroundMusicContext';
+import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 
 /** Site-wide background music context (auth + main app routes). */
 export default function AppMusicLayout() {
@@ -15,8 +16,8 @@ export default function AppMusicLayout() {
       pathname.startsWith('/pages/login/') ||
       pathname === '/pages/mall' ||
       pathname.startsWith('/pages/mall/') ||
-      pathname === '/myPhotoAlbums/view' ||
-      pathname.startsWith('/myPhotoAlbums/view');
+      pathname === MY_PHOTO_ALBUMS_VIEW_PATH ||
+      pathname.startsWith(MY_PHOTO_ALBUMS_VIEW_PATH);
 
     if (shouldForce100Percent) {
       // Note: CSS zoom is non-standard but works in Chromium-based browsers.

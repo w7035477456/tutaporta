@@ -50,7 +50,7 @@ export default function HeaderLeft({ iconsOnly = false }) {
           <Box
             component="img"
             src={MY_PHOTO_ALBUMS_HEADER_LOGO_IMAGE}
-            alt="OnlineMall.Website"
+            alt="TutaMall.com"
             sx={myPhotoAlbumsHeaderLogoImgSx}
           />
         </Box>
@@ -70,7 +70,7 @@ export default function HeaderLeft({ iconsOnly = false }) {
           <Box
             component="img"
             src={MY_NOTE_HEADER_LOGO_IMAGE}
-            alt="OnlineMall.Website"
+            alt="TutaMall.com"
             sx={myNoteHeaderLogoImgSx}
           />
         </Box>

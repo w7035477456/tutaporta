@@ -181,7 +181,7 @@ function expandBriefBioRows(rows) {
   return rows.map((row) => ({ ...row, legendNote: BRIEF_BIO_LEGEND[row.key] ?? null }));
 }
 const LEGEND_BADGE_FONT_SIZE = '2.1rem'; // 3× previous 0.7rem
-const DATA_MATCHED_DISCLAIMER_WEBSITE_NAME = 'OnlineMall.Website';
+const DATA_MATCHED_DISCLAIMER_WEBSITE_NAME = 'TutaMall.com';
 
 const tableTextSx = { fontSize: { xs: '0.85rem', sm: getDesktopTextFontSizeVw() } };
 /** LinkedIn profile URL — 50% of MOBILE_/DESKTOP_FONT_SIZE_BUTTON, single line. */

@@ -103,7 +103,7 @@ export default function MobilePostLoginChooserDialog() {
     }
     markMobileTutaPhotoUploadPending();
     closeChooser();
-    navigate('/myPhotoAlbums?mobileUpload=1', { replace: true });
+    navigate('/myPhotos?mobileUpload=1', { replace: true });
   }, [closeChooser, guestDemo, navigate]);
 
   const goTutaDatesUpload = useCallback(() => {

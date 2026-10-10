@@ -507,7 +507,7 @@ export default function ProfileSection({ clusterTight = false }) {
   };
 
   /**
-   * On /myPhotoAlbums or /myNote: embed Profile & Records in the vault (no dating sidebar).
+   * On /myPhotos or /myNote: embed Profile & Records in the vault (no dating sidebar).
    * Elsewhere: navigate to /profilesRecords (same as the left menu).
    */
   const handleProfilesRecords = () => {
@@ -517,7 +517,7 @@ export default function ProfileSection({ clusterTight = false }) {
   };
 
   const exitLabel = 'Exit to Mall';
-  const logoutLabelRest = 'gout OnlineMall.Website';
+  const logoutLabelRest = 'gout TutaMall.com';
   const [buildLabel, setBuildLabel] = useState('');
   const [showBuildLabel, setShowBuildLabel] = useState(false);
 

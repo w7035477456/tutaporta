@@ -59,7 +59,7 @@ export default function LogoSection() {
         }}
       >
         <Typography variant="h5" sx={{ fontWeight: 700, color: 'secondary.main', whiteSpace: 'nowrap' }}>
-          OnlineMall.website
+          TutaMall.com
         </Typography>
       </Box>
     );

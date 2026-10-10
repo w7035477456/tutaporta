@@ -86,13 +86,13 @@ export default function Typography() {
               <MuiTypography
                 variant="body2"
                 component={Link}
-                href="https://OnlineMall.Website"
+                href="https://tutamall.com"
                 target="_blank"
                 underline="hover"
                 gutterBottom
                 sx={{ display: 'block', color: 'primary.main' }}
               >
-                https://OnlineMall.Website
+                https://tutamall.com
               </MuiTypography>
             </Stack>
           </SubCard>

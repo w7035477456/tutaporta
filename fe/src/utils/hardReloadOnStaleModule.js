@@ -69,8 +69,8 @@ export function isAllowedStaleModuleReloadHost() {
     host === 'localhost' ||
     host === '127.0.0.1' ||
     host === '::1' ||
-    host === 'onlinemall.website' ||
-    host.endsWith('.onlinemall.website')
+    host === 'tutamall.com' ||
+    host.endsWith('.tutamall.com')
   );
 }
 
@@ -199,7 +199,7 @@ export async function importWithStaleChunkRetry(importer) {
 }
 
 /**
- * If this is a stale dynamic-import failure on localhost / onlinemall.website,
+ * If this is a stale dynamic-import failure on localhost / tutamall.com,
  * start one hard reload. Returns true when a reload was started (or is already in flight).
  * Returns false when the caller should show the error (reload already tried and failed).
  */

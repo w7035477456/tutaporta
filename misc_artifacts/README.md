@@ -7,9 +7,11 @@ Two configs — copy the one matching the deployment to `/etc/haproxy/haproxy.cf
 | `haproxy.preprod.cfg` | Pre-production all-in-one **xbox2** (192.168.222.202): HAProxy + Node + Postgres Primary/Replica + Redis on one box | `127.0.0.1:40000` |
 | `haproxy.prod.cfg` | Final production: standalone HAProxy box → web cluster (Node + local replica each) → standalone Postgres Primary | xbox3–xbox9 `:40000` (edit IPs) |
 
-Both: Cloudflare-only on :80/:443, `www` → apex 301, `/health` checks, no sticky sessions, optional Nginx basic-auth gate (`be_nginx_gate` → Nginx :41000 → `fe_web` 127.0.0.1:50000 → `be_app`), stats on :9900 limited to localhost + 192.168.44.104.
+Both: Cloudflare-only on :80/:443, every non-canonical host → `https://tutamall.com` 301, `/health` checks, no sticky sessions, optional Nginx basic-auth gate (`be_nginx_gate` → Nginx :41000 → `fe_web` 127.0.0.1:50000 → `be_app`), stats on :9900 limited to localhost + 192.168.44.104.
 
-**Canonical host:** `https://onlinemall.website`. HAProxy 301s `www.onlinemall.website` to that apex (keep the Cloudflare `www` A record proxied so the name still resolves). Do not run www as a second live site — the production FE bundle calls `https://onlinemall.website/api/*`, so a www origin fails CORS/`/api/health` (Service Notice E3), and `__Host-` auth cookies cannot be shared across hosts. Faster equivalent at Cloudflare: **Rules → Redirect Rules** if hostname equals `www.onlinemall.website` → `https://onlinemall.website${uri}` 301.
+**Canonical host:** `https://tutamall.com`. HAProxy 301s any other Host (`www.tutamall.com`, retired domains still pointed at this box) to that apex (keep the Cloudflare `www` A record proxied so the name still resolves). Do not run www as a second live site — the production FE bundle calls `https://tutamall.com/api/*`, so a www origin fails CORS/`/api/health` (Service Notice E3), and `__Host-` auth cookies cannot be shared across hosts. Faster equivalent at Cloudflare: **Rules → Redirect Rules** if hostname equals `www.tutamall.com` → `https://tutamall.com${uri}` 301.
+
+Public app URLs: `https://tutamall.com/mall`, `/tutadates`, `/myNote`, `/myPhotos`.
 
 ## Deploy
 

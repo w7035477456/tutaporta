@@ -216,7 +216,7 @@ export default function MobilePhotoUploadPage() {
         {!missingToken ? (
           <>
             <Typography sx={{ lineHeight: 1.5, textAlign: 'center' }}>
-              Take a new photo or choose one from your gallery. It will be added to your OnlineMall.Website album on
+              Take a new photo or choose one from your gallery. It will be added to your TutaMall.com album on
               your computer.
             </Typography>
 

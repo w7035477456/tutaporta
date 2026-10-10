@@ -64,7 +64,7 @@ export const registerUser_FFFFFFFF = async (req, res) => {
       const token = crypto.randomBytes(32).toString('hex');
       const expiresAt = Date.now() + TOKEN_EXPIRY_MS;
       await storeCreatePasswordToken(token, email, expiresAt);
-      const createPasswordLink = `https://OnlineMall.Website/pages/createPassword?token=${token}&email=${encodeURIComponent(email)}`;
+      const createPasswordLink = `https://tutamall.com/pages/createPassword?token=${token}&email=${encodeURIComponent(email)}`;
       const mailOptions = {
         from: OUTBOUND_EMAIL_FROM_HEADER,
         to: email,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Compact / phone viewports (same rule as login mobile detect on onlinemall.website).
+ * Compact / phone viewports (same rule as login mobile detect on tutamall.com).
  * - Portrait phones: max-width 600px (stable width).
  * - Landscape phones: short viewports that are still phone-wide, not a shrink-tall desktop window.
  *

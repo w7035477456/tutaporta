@@ -109,7 +109,7 @@ export default function AcademicRecordVerificationPopup({ open, onClose }) {
           <Box component="li">
             Have it sent to{' '}
             <Box component="span" sx={{ fontWeight: 700 }}>
-              transcript@onlinemall.website
+              transcript@tutamall.com
             </Box>
           </Box>
           <Box component="li">We verify and display only your major &amp; graduation year—for life!</Box>

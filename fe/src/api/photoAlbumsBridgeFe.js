@@ -58,7 +58,7 @@ function bridgeFetchOptionSets(extra = {}) {
 }
 
 const BROWSER_BLOCK_HINT =
-  'Chrome blocked access to the bridge on this computer. Click Connect local USB below, then Allow when Chrome asks to connect to devices on your local network. You can also open Chrome site settings for onlinemall.website and enable Local network access.';
+  'Chrome blocked access to the bridge on this computer. Click Connect local USB below, then Allow when Chrome asks to connect to devices on your local network. You can also open Chrome site settings for tutamall.com and enable Local network access.';
 
 export function formatPhotoAlbumsBridgeClientError(err) {
   const message = String(err?.response?.data?.error || err?.message || '').trim();

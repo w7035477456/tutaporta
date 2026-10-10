@@ -126,7 +126,7 @@ Express middleware is weaker than firewall; prefer firewall or HAProxy.
 
 Cellular browsers are often flagged by **Bot Fight Mode**, **OWASP**, or **rate limits** on `POST /api/mobilePhotoUpload/photo` even when `GET` validate/status works. Desktop status polls can still show `RESPONSE OK` in PM2 while the phone POST is blocked.
 
-### Fix in Cloudflare dashboard (zone `onlinemall.website`) — required for cellular 403
+### Fix in Cloudflare dashboard (zone `tutamall.com`) — required for cellular 403
 
 1. **Security → Events** — find the block; note the **Ray ID** and **rule** (often Bot Fight / Managed WAF).
 2. **Security → WAF → Custom rules** — create a **Skip** rule (place it **above** blocking rules):
@@ -154,7 +154,7 @@ A **10s `timeout http-request`** aborts slow phone bodies mid-upload → endless
 
 ### App-side (repo)
 
-QR links use path tokens `https://onlinemall.website/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
+QR links use path tokens `https://tutamall.com/mobilePhotoUpload/u/{hex}` (not `?token=`) and lowercase hostname to reduce false positives. Redeploy FE + BE and scan a **fresh** QR after deploy.
 
 The phone page (`fe/src/views/pages/MobilePhotoUploadPage.jsx`) no longer does a native HTML form POST. It now:
 
@@ -170,4 +170,4 @@ The JSON retry is a fallback, not a substitute — still add the skip rule so th
 
 - **Cloudflare Events:** after a cellular upload attempt, either no block, or the skip rule matched.
 - **PM2:** `[mobilePhotoUpload]` lines for the phone POST (if missing on cellular 403, CF blocked before Ubuntu).
-- **Origin (LAN):** `curl -I https://onlinemall.website/mobilePhotoUpload` → `200`. If only phones fail, it is Cloudflare—not Ubuntu/HAProxy.
+- **Origin (LAN):** `curl -I https://tutamall.com/mobilePhotoUpload` → `200`. If only phones fail, it is Cloudflare—not Ubuntu/HAProxy.

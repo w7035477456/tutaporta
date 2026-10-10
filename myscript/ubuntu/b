@@ -334,7 +334,7 @@ alias testcloud='curl -sS http://127.0.0.1:40000/health; curl -sS http://127.0.0
 alias testlisten="sudo ss -lntp | grep -E 'node|40000|3005|80|443'"
 alias testdb='pg_isready -h 127.0.0.1 -p 50010'
 alias testproxy='curl -sS -o /dev /null -w "%{http_code}\n" http://127.0.0.1/health; sudo systemctl status haproxy'
-alias testbrowser='curl -sS -o /dev/null -w "%{http_code}\n" https://onlinemall.website/health'
+alias testbrowser='curl -sS -o /dev/null -w "%{http_code}\n" https://tutamall.com/health'
 
 testwrite() {
     touch "${STORAGE_FOLDER}/photos/.wtest" && \
@@ -534,7 +534,7 @@ ORDER BY login_at DESC
 LIMIT $limit;"
 }
 
-alias curlforasn='curl -s https://onlinemall.website/api/client-asn-debug | python3 -m json.tool'
+alias curlforasn='curl -s https://tutamall.com/api/client-asn-debug | python3 -m json.tool'
 alias watchasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color -F "[blocked-asn]"'
 alias tailblockasn='tail -F ~/code/main/be/logs/app-out.log | grep --line-buffered --color "BLOCKED AS"'
 

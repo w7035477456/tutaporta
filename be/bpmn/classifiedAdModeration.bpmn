@@ -5,8 +5,8 @@
   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
   xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
   xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
-  id="OnlineMallClassifiedDefs"
-  targetNamespace="http://onlinemall.website/bpmn/classified"
+  id="TutaMallClassifiedDefs"
+  targetNamespace="http://tutamall.com/bpmn/classified"
 >
   <process id="ClassifiedAdModeration" name="Classified Ad Moderation" isExecutable="true">
     <startEvent id="Start" name="Seller submits"/>

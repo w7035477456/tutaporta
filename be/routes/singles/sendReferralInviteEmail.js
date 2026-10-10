@@ -93,7 +93,7 @@ export async function sendReferralInviteEmail(req, res) {
     await sendOutboundMail(transporter, {
       from: REFERRAL_EMAIL_FROM,
       to: toEmail,
-      subject: 'Your friend invitation link - OnlineMall.Website',
+      subject: 'Your friend invitation link - TutaMall.com',
       text: buildReferralInviteEmailPlain({
         memberGreeting,
         referralUrl,

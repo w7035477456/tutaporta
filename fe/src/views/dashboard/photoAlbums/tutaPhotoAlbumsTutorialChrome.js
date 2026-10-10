@@ -1,6 +1,6 @@
 /**
  * Cross-tree chrome for the TutaPhotoAlbums video-tutorial button in the site header
- * (/myPhotoAlbums AppBar). MyPhotoAlbums publishes; HeaderRight subscribes.
+ * (/myPhotos AppBar). MyPhotoAlbums publishes; HeaderRight subscribes.
  * Button stays fixed in HeaderRight (orange) — never relocate into the usage bar.
  */
 
@@ -38,7 +38,7 @@ export function setTutaPhotoAlbumsTutorialChrome(partial) {
   });
 }
 
-/** Clear when leaving /myPhotoAlbums so other routes do not keep a stale button. */
+/** Clear when leaving /myPhotos so other routes do not keep a stale button. */
 export function clearTutaPhotoAlbumsTutorialChrome() {
   setTutaPhotoAlbumsTutorialChrome({
     active: false,

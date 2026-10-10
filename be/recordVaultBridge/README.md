@@ -1,6 +1,6 @@
 # Record Vault USB Bridge
 
-Local agent so [onlinemall.website](https://onlinemall.website) can read and write your **USB Record Vault** from the browser.
+Local agent so [tutamall.com](https://tutamall.com) can read and write your **USB Record Vault** from the browser.
 
 The website backend cannot see USB drives on your laptop. This bridge listens on `127.0.0.1:49201` and handles vault USB + encrypted file I/O on your machine.
 
@@ -11,7 +11,7 @@ The website backend cannot see USB drives on your laptop. This bridge listens on
 1. Download **usbBridgeV3.dmg**
 2. Open the disk image and drag **usbBridgeV3.app** to Applications
 3. Control-click **usbBridgeV3.app** → Open the first time (Gatekeeper)
-4. On onlinemall.website → Record Vault / Photo Albums → USB — the strip turns green when the bridge is up
+4. On tutamall.com → Record Vault / Photo Albums → USB — the strip turns green when the bridge is up
 
 The app starts at login by default. Leave it running while you use USB vault features. Tray → **Show status window** anytime.
 
@@ -20,7 +20,7 @@ The app starts at login by default. Leave it running while you use USB vault fea
 1. Download **Record Vault USB Bridge Setup.exe**
 2. Run the installer (one-click)
 3. The bridge starts and a tray icon appears
-4. On onlinemall.website → Record Vault → **Connect local USB** → Allow in Chrome
+4. On tutamall.com → Record Vault → **Connect local USB** → Allow in Chrome
 
 ### Build installers (developers)
 
@@ -108,7 +108,7 @@ npm run record-vault-bridge:desktop
 ## How it works
 
 1. Bridge starts on `http://127.0.0.1:49201`.
-2. On **onlinemall.website**, open Record Vault USB **or** Photo Albums USB and click **Connect local USB** (Chrome requires a click before it will allow the site to reach your computer).
+2. On **tutamall.com**, open Record Vault USB **or** Photo Albums USB and click **Connect local USB** (Chrome requires a click before it will allow the site to reach your computer).
 3. When Chrome asks, choose **Allow** for local network access.
 4. The site routes USB + vault data API calls to the bridge (`/api/recordVault/*` and `/api/photoAlbums/*`).
 5. When you pick a security icon, the **server** returns a derived key (requires login).
@@ -119,7 +119,7 @@ npm run record-vault-bridge:desktop
 | Variable | Default |
 |----------|---------|
 | `RECORD_VAULT_BRIDGE_PORT` | `49201` |
-| `RECORD_VAULT_BRIDGE_ALLOWED_ORIGINS` | `https://onlinemall.website,http://localhost:3000` |
+| `RECORD_VAULT_BRIDGE_ALLOWED_ORIGINS` | `https://tutamall.com,http://localhost:3000` |
 | `RECORD_VAULT_BRIDGE_INSTALLER_MAC_PATH` | (optional) absolute path to `.dmg` if not in `be/usb/` |
 | `RECORD_VAULT_BRIDGE_INSTALLER_WIN_PATH` | (optional) absolute path to `.exe` if not in `be/usb/` |
 

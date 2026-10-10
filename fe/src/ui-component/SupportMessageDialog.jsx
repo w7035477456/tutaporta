@@ -159,7 +159,7 @@ export default function SupportMessageDialog({ open, onClose }) {
     >
       <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
         <ColorTemplate7PopupLargeDark.Title id="support-message-dialog-title">
-          Leave us a message (To: support@onlinemall.website)
+          Leave us a message (To: support@tutamall.com)
         </ColorTemplate7PopupLargeDark.Title>
 
         <ColorTemplate7PopupLargeDark.FormRows>

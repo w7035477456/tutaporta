@@ -1,5 +1,5 @@
 /**
- * myPhotoAlbums menu / toolbar button font size — yellow slider on /myPhotoAlbums.
+ * myPhotoAlbums menu / toolbar button font size — yellow slider on /myPhotos.
  * Default from PHOTOALBUMS_DEFAULT_BUTTON_FONT_SIZE_REM; user value in user_customization.myphotoalbums_font_size.
  */
 import { getVaultDefaultButtonFontSizeRem } from 'config/photoAlbumsDefaultButtonFontSizeEnv';
