@@ -3,7 +3,7 @@
 -- Encrypt Password for Photo must not share Notes wrapped_dek / kdf_salt.
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addPhotoAlbumsVaultE2e.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addPhotoAlbumsVaultE2e.sql
 --
 -- Run renameRecordVaultToNotesVault.sql first if you still have legacy record_vault.
 

@@ -3,7 +3,7 @@
 -- true = DOB confirms age >= 18.
 -- false = DOB confirms under 18 (pair with status = under18).
 -- On first add: backfill existing rows to true. New signups keep DEFAULT NULL.
--- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesOver18Verified.sql
+-- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesOver18Verified.sql
 -- Prod Primary only.
 
 DO $$

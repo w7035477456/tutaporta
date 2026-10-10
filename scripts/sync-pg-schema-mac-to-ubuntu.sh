@@ -86,9 +86,9 @@ cat <<EOF
 
 ######## RUN ON UBUNTU (after f2) ########
 # 1) schema backup first
-pg_dump -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite --schema-only --schema=outdateddbsnapshotoct2024 -f ~/syncdb/before_${SQL_NAME}
+pg_dump -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 --schema-only --schema=outdateddbsnapshotoct2024 -f ~/syncdb/before_${SQL_NAME}
 # 2) apply (single transaction; stops on first error)
-psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -f ${REMOTE_FILE}
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -v ON_ERROR_STOP=1 -f ${REMOTE_FILE}
 # 3) back on Mac:  isdbsame
 ##########################################
 EOF

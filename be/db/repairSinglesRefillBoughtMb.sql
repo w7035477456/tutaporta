@@ -5,7 +5,7 @@
 -- Does NOT change with usage (refill_remain_mb does).
 --
 -- Run on Primary (Mac tunnel):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/repairSinglesRefillBoughtMb.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/repairSinglesRefillBoughtMb.sql
 
 BEGIN;
 

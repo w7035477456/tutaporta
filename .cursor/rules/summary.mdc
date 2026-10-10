@@ -28,7 +28,7 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 
 ```
 ######## DO THIS ON UBUNTU BEGIN ########
-psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "…"
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "…"
 ####### END DO THIS ON UBUNTU #####
 ```
 
@@ -100,7 +100,7 @@ Bash init: **`source ~/b`** (repo copy: **`myscript/ubuntu/b`**)
 | **`deployall`** | Deploy branch to all hosts in deploy-hosts.txt |
 | **`showbuild`** / **`showartifact`** | Build stamp / deploy artifact checksum |
 
-After BE env changes: `pm2 restart onlinemallwebsite`.
+After BE env changes: `pm2 restart tutamallPM2Process`.
 
 ## 10) Preferred UI components / templates
 
@@ -130,7 +130,7 @@ Andrew uses **`vi`** at the command line.
 Quick singles query (Mac tunnel):
 
 ```bash
-psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SELECT * FROM outdateddbsnapshotoct2024.singles;"
+psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "SELECT * FROM outdateddbsnapshotoct2024.singles;"
 ```
 
 ## 12) Agent — user action markers

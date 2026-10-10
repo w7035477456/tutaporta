@@ -3,10 +3,10 @@
 -- Does not decrease when data is used (see refill_remain_mb for remaining balance).
 --
 -- Run on Primary (Mac tunnel example):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesRefillBoughtMb.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesRefillBoughtMb.sql
 --
 -- One-liner:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "
 --     ALTER TABLE outdateddbsnapshotoct2024.singles
 --       ADD COLUMN IF NOT EXISTS refill_bought_mb integer NOT NULL DEFAULT 10240;
 --   "

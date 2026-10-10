@@ -1,6 +1,6 @@
 -- outdateddbsnapshotoct2024.speed_date_* — in-site 1:1 speed dating (WebRTC signaling in Postgres).
 -- Video media is peer-to-peer between browsers; app servers only store match/signaling rows.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSpeedDateTables.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSpeedDateTables.sql
 
 BEGIN;
 

@@ -2,7 +2,7 @@
 -- (photo_albums_vault stays separate for TutaPhotoAlbums)
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite \
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 \
 --     -f be/db/renameRecordVaultToNotesVault.sql
 --
 -- Safe to re-run: no-op when notes_vault already exists / record_vault is gone.

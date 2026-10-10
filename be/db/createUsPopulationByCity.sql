@@ -1,7 +1,7 @@
 -- US incorporated-place populations (Census Vintage 2025) + a representative ZIP.
 -- Percentage_of_total = city population / total US population (state SUMLEV 040 sum).
 --
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createUsPopulationByCity.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/createUsPopulationByCity.sql
 --   node be/scripts/loadUsPopulationByCity.js
 --   node be/scripts/scatterRegularMemberAddresses.js
 

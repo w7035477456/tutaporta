@@ -29,7 +29,7 @@ usage() {
 fix-media-storage.sh [--dry-run] [--all-hosts] [--hosts-file path] [--no-restart]
   --dry-run      Print the chown/chmod commands without running them
   --all-hosts    Repair every host in scripts/deploy-hosts.txt (round-robin cluster)
-  --no-restart   Skip "pm2 restart onlinemallwebsite"
+  --no-restart   Skip "pm2 restart tutamallPM2Process"
 Target user defaults to $SUDO_USER when run under sudo, else the current user.
 Override with STORAGE_APP_USER=name.
 EOF
@@ -160,7 +160,7 @@ fi
 
 if [[ "$CHANGED" -eq 1 && "$NO_RESTART" -eq 0 ]]; then
   echo "restarting backend so it picks up the repaired folders"
-  run pm2 restart onlinemallwebsite || echo "  (pm2 restart failed — restart manually)"
+  run pm2 restart tutamallPM2Process || echo "  (pm2 restart failed — restart manually)"
   echo
 fi
 

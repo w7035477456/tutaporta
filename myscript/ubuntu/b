@@ -80,7 +80,7 @@ debugStartup() {
     cd be || { echo "Failed to cd to be"; return 1; }
     npm run pm2:start
     pm2 status
-    pm2 logs onlinemallwebsite --lines 50 --nostream
+    pm2 logs tutamallPM2Process --lines 50 --nostream
     cd ..
     prompt_continue || return 1
 
@@ -92,7 +92,7 @@ debugStartup() {
     prompt_continue
 }
 
-alias showdbfolder='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "SHOW data_directory;"'
+alias showdbfolder='psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "SHOW data_directory;"'
 
 setbasestorage() {
     case "$(uname -s)" in
@@ -206,7 +206,7 @@ alias fixlargecheap='$HOME/code/main/scripts/fix-large-cheap-storage.sh'
 alias checklargecheap='$HOME/code/main/scripts/verify-large-cheap-storage.sh'
 #-----------------BOTH----------------------
 alias checkallstorage='clear;checkstorage && checklargecheap'
-alias fixallstorage='clear;fixstorage && fixlargecheap && clear; checkallstorage && pm2 restart onlinemallwebsite'
+alias fixallstorage='clear;fixstorage && fixlargecheap && clear; checkallstorage && pm2 restart tutamallPM2Process'
 
 
 screw_permission_fortest(){
@@ -245,7 +245,7 @@ fixpermissionmobileuploadubuntu() {
     sudo chmod -R u+rwX "${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload"
 }
 
-alias showbarcodedebug="pm2 logs onlinemallwebsite --lines 200 | grep -E 'mobilePhotoUpload|mobile-barcode'"
+alias showbarcodedebug="pm2 logs tutamallPM2Process --lines 200 | grep -E 'mobilePhotoUpload|mobile-barcode'"
 #----------------------------
 
 
@@ -323,12 +323,12 @@ lsphotos() {
 fixstartup() {
   cd ~/code/main/be   # or /home/lawsen0/code/main/be if that’s the PM2 cwd
   npm install
-  pm2 restart onlinemallwebsite
-  pm2 logs onlinemallwebsite --lines 40
+  pm2 restart tutamallPM2Process
+  pm2 logs tutamallPM2Process --lines 40
   curl -sS http://127.0.0.1:40000/api/health   # or whatever PORT is in ~/.ssh/be/.env
 }
 #--------------------------------------------------
-alias testpm2='pm2 status;pm2 logs onlinemallwebsite --lines 100 --err'
+alias testpm2='pm2 status;pm2 logs tutamallPM2Process --lines 100 --err'
 alias testredis='redis-cli ping;sudo systemctl status redis-server ; sudo systemctl start redis-server' 
 alias testcloud='curl -sS http://127.0.0.1:40000/health; curl -sS http://127.0.0.1:40000/api/health'
 alias testlisten="sudo ss -lntp | grep -E 'node|40000|3005|80|443'"
@@ -381,7 +381,7 @@ testall() {
 #--------------------------------------------------
 
 alias redisping="redis-cli -a 'w2332w2332' ping"
-alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-server; pm2 restart onlinemallwebsite'
+alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-server; pm2 restart tutamallPM2Process'
 
 
 lszip() {
@@ -506,16 +506,16 @@ unalias pm2restart 2>/dev/null || true
 pm2restart() {
     # Rolling reload: cluster workers restart one at a time so HAProxy web_pool / be_nginx
     # always has a live backend ("pm2 restart" stops both workers at once → no server available).
-    pm2 reload onlinemallwebsite || pm2 restart onlinemallwebsite
+    pm2 reload tutamallPM2Process || pm2 restart tutamallPM2Process
 }
-alias pm2logonedrive='pm2 logs onlinemallwebsite --lines 50 | grep RecordVaultCloud:OneDrive'
+alias pm2logonedrive='pm2 logs tutamallPM2Process --lines 50 | grep RecordVaultCloud:OneDrive'
 
 unalias pm2cron 2>/dev/null || true
 pm2cron() {
     echo "=== pm2 describe: cron / restarts ==="
-    pm2 describe onlinemallwebsite | grep -iE "cron|restarts"
+    pm2 describe tutamallPM2Process | grep -iE "cron|restarts"
     echo "=== pm2 logs (last 500): 03:00-03:01 ==="
-    pm2 logs onlinemallwebsite --lines 500 --nostream | grep -iE "03:0[0-1]"
+    pm2 logs tutamallPM2Process --lines 500 --nostream | grep -iE "03:0[0-1]"
 }
 
 # Recent demo logins from login_log (device / browser / OS). Usage: demolog [limit]  (default 50)
@@ -523,7 +523,7 @@ unalias demolog 2>/dev/null || true
 demolog() {
     local limit="${1:-50}"
     [[ "$limit" =~ ^[0-9]+$ ]] || { echo "Usage: demolog [limit]" >&2; return 1; }
-    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "
 SELECT login_log_id, login_at, logout_at,
        round(online_seconds/60.0,1) AS online_min,
        logout_reason, host(client_ip) AS ip,
@@ -563,8 +563,8 @@ _redis_cli_auth() {
 
 alias pingredis='_redis_cli_auth ping'
 
-alias pickupenv='pm2 restart onlinemallwebsite --update-env'
-alias pm2logmobile="pm2 logs onlinemallwebsite --lines 30 | grep -E 'Mobile upload|mobile_photo_upload'"
+alias pickupenv='pm2 restart tutamallPM2Process --update-env'
+alias pm2logmobile="pm2 logs tutamallPM2Process --lines 30 | grep -E 'Mobile upload|mobile_photo_upload'"
 alias pm2logmobile2='grep -i mobilePhotoUpload ~/code/main/be/logs/app-out.log | tail -20'
 alias restartredis='sudo systemctl restart redis-server && _redis_cli_auth ping'
 
@@ -654,7 +654,7 @@ fi
     DB_HOST="127.0.0.1"
     DB_PORT="50010"
     DB_USER="test_user1"
-    DB_NAME="onlinemallwebsite"
+    DB_NAME="outdatedDBOct2021"
 
     # 5. Run the psql transaction block with the correct connection flags
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v target_id="$singles_id" << 'EOF'
@@ -776,7 +776,7 @@ update_singles_pass() {
     local hashed_pass=$(python3 -c "import bcrypt; print(bcrypt.hashpw(b'$plain_pass', bcrypt.gensalt(6)).decode())")
 
     # 3. Update database using your specific connection parameters
-    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET password_hash = '$hashed_pass';"
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "UPDATE singles SET password_hash = '$hashed_pass';"
 
     # 4. Cleanup
     unset plain_pass
@@ -822,43 +822,43 @@ mygrep() {
 updatepassword() {
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
   read -p "Enter new password: " newpassword
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite \
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 \
     -c "UPDATE users SET password = '${newpassword}' WHERE last_name='CEO';"
 }
 
-export DATABASE_URL="postgresql://test_user1@127.0.0.1:50010/onlinemallwebsite"
+export DATABASE_URL="postgresql://test_user1@127.0.0.1:50010/outdatedDBOct2021"
 alias testConnect="psql '$DATABASE_URL' -c 'select now()'"
 
 getusers(){
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, mailing_firstname, mailing_lastname, member_category, email, profile_image_fk FROM singles;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select singles_id, mailing_firstname, mailing_lastname, member_category, email, profile_image_fk FROM singles;"
 }
 
 
 getrequests() {
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select requests_id, singles_id_from, singles_id_to, interested from requests;" 
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select requests_id, singles_id_from, singles_id_to, interested from requests;" 
 }  
 
 getbrief(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * FROM singles_brief;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select * FROM singles_brief;"
 }
 
 getusersetup(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
   # Using the limited app user now
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, email, initial_setup_done from singles;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select singles_id, email, initial_setup_done from singles;"
 }
 
 
 getphotos(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, photos_id, photo_id_index, file_path, file_extension FROM vsingles_photos;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select singles_id, photos_id, photo_id_index, file_path, file_extension FROM vsingles_photos;"
 }
 
 purgephotos() {
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "TRUNCATE TABLE vsingles_photos RESTART IDENTITY;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "TRUNCATE TABLE vsingles_photos RESTART IDENTITY;"
 }
 
 chownphoto() {
@@ -869,7 +869,7 @@ chownphoto() {
 resestusersetup(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
   # test_user1 now has UPDATE permissions, so this will work!
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET initial_setup_done = false;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "UPDATE singles SET initial_setup_done = false;"
   getusersetup
 }
 
@@ -879,38 +879,38 @@ showphotos() {
 
 clonepassword(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "UPDATE singles SET password_hash = (SELECT password_hash FROM singles WHERE email = 'a7038700246@gmail.com') WHERE email LIKE 'bill7035477456@gmail.com';"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "UPDATE singles SET password_hash = (SELECT password_hash FROM singles WHERE email = 'a7038700246@gmail.com') WHERE email LIKE 'bill7035477456@gmail.com';"
 }
 
 getveri(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from verifications;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select * from verifications;"
 }
 
 mmveri(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from verifications where email='bill7035477456@gmail.com';"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "delete from verifications where email='bill7035477456@gmail.com';"
 }
 
 getemail(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from registration_codes;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select * from registration_codes;"
 }
 rmemail(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from registration_codes where email='bill7035477456@gmail.com';"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "delete from registration_codes where email='bill7035477456@gmail.com';"
 }
 getphone(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from pending_phone_verifications;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select * from pending_phone_verifications;"
 }
 rmphone(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from pending_phone_verifications where phone='+17035477456';"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "delete from pending_phone_verifications where phone='+17035477456';"
 }
 getimages(){
   export PGPASSFILE="$HOME/.ssh/test_user1_pass"
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select singles_id, profile_image_url FROM singles;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select singles_id, profile_image_url FROM singles;"
 }
 ######## veirfy PG ########################################################
 
@@ -948,7 +948,7 @@ updatetype() {
 
     # Run the update
     # The -v flag safely passes these values to psql
-    psql -d onlinemallwebsite -v email="$user_email" -v type="$new_type" -c \
+    psql -d outdatedDBOct2021 -v email="$user_email" -v type="$new_type" -c \
     "UPDATE singles_brief SET member_type = :type WHERE email = :email;"
     
     echo "Update attempted for $user_email."
@@ -995,7 +995,7 @@ fixredis() {
     echo '[redis] FAILED — check REDIS_URL password vs redis requirepass' >&2
     return 1
   fi
-  pm2 restart onlinemallwebsite
+  pm2 restart tutamallPM2Process
 }
 
 
@@ -1116,10 +1116,10 @@ dbBackup(){
     FULL_PATH="$HOME/dbFolder/${FILENAME}${TODAY}.sql"
 
     # Execute pg_dump using test_user2
-    echo "Exporting onlinemallwebsite to ${FULL_PATH}..."
+    echo "Exporting outdatedDBOct2021 to ${FULL_PATH}..."
     
     # CRITICAL FIX: Schema name MUST be in escaped double quotes \" for case-sensitivity
-    pg_dump -U test_user2 -h 127.0.0.1 -p 50010 --no-owner --no-privileges -n 'outdateddbsnapshotoct2024' -f "$FULL_PATH" onlinemallwebsite
+    pg_dump -U test_user2 -h 127.0.0.1 -p 50010 --no-owner --no-privileges -n 'outdateddbsnapshotoct2024' -f "$FULL_PATH" outdatedDBOct2021
     # Check if the dump actually produced a file
     if [ -f "$FULL_PATH" ]; then
         ls -latr ~/dbFolder
@@ -1134,9 +1134,9 @@ dbBackup(){
 
 
 # ####### DB DUMP #######
-# Function to restore the onlinemallwebsite database on Ubuntu
+# Function to restore the outdatedDBOct2021 database on Ubuntu
 # ####### DB DUMP #######
-# Function to restore the onlinemallwebsite database on Ubuntu
+# Function to restore the outdatedDBOct2021 database on Ubuntu
 ######## DO THIS BEGIN ########
 
 # login_log holds the demo / signup IP log. dbRestore drops the whole schema, so the live rows are
@@ -1144,7 +1144,7 @@ dbBackup(){
 # (the dump's own login_log rows are discarded). The CSV is kept as an extra copy.
 # Callers set PGPASSWORD; LOGIN_LOG_KEEP / LOGIN_LOG_COLS are shared with loginLogPutBackAfterRestore.
 loginLogSaveBeforeRestore() {
-    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -v ON_ERROR_STOP=1)
+    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021 -v ON_ERROR_STOP=1)
     LOGIN_LOG_KEEP=""
     LOGIN_LOG_COLS=""
     local exists
@@ -1169,7 +1169,7 @@ loginLogSaveBeforeRestore() {
 
 loginLogPutBackAfterRestore() {
     [ -n "$LOGIN_LOG_KEEP" ] || return 0
-    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -v ON_ERROR_STOP=1)
+    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021 -v ON_ERROR_STOP=1)
     local exists
     exists=$("${PSQL[@]}" -tAc "SELECT to_regclass('outdateddbsnapshotoct2024.login_log') IS NOT NULL")
     if [ "$exists" != "t" ]; then
@@ -1188,7 +1188,7 @@ COMMIT;
 SQL
     then
         echo "Error: could not put login_log back. Live rows are safe in: $LOGIN_LOG_KEEP"
-        echo "  Retry: psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c \"\\copy outdateddbsnapshotoct2024.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)\""
+        echo "  Retry: psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021 -c \"\\copy outdateddbsnapshotoct2024.login_log (${LOGIN_LOG_COLS}) FROM '${LOGIN_LOG_KEEP}' WITH (FORMAT csv, HEADER true)\""
         return 1
     fi
     echo "login_log: live rows put back ($("${PSQL[@]}" -tAc "SELECT count(*) FROM outdateddbsnapshotoct2024.login_log") row(s)); dump's login_log ignored."
@@ -1289,10 +1289,10 @@ dbRestore() {
     fi
 
     echo "Dropping existing schema..."
-    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "DROP SCHEMA IF EXISTS outdateddbsnapshotoct2024 CASCADE;"
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021 -c "DROP SCHEMA IF EXISTS outdateddbsnapshotoct2024 CASCADE;"
 
     echo "Importing $FULL_PATH..."
-    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite \
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021 \
         -v ON_ERROR_STOP=1 \
         --set=search_path=outdateddbsnapshotoct2024,public \
         -f "$FULL_PATH"
@@ -1306,8 +1306,8 @@ dbRestore() {
         return 1
     fi
 
-    echo "--- Verification: Tables in onlinemallwebsite ---"
-    psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite -c "\dt outdateddbsnapshotoct2024.*"
+    echo "--- Verification: Tables in outdatedDBOct2021 ---"
+    psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021 -c "\dt outdateddbsnapshotoct2024.*"
 
     unset PGPASSWORD
     echo "Restore process completed."
@@ -1536,7 +1536,7 @@ dbMergeRestore() {
         fi
     fi
 
-    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d onlinemallwebsite)
+    local PSQL=(psql -U test_user1 -h 127.0.0.1 -p 50010 -d outdatedDBOct2021)
     local REWRITE_SQL="$DUMP_DIR/.merge_rewrite_$$.sql"
 
     echo "Loading dump into temp schema $TMP_SCHEMA (live schema untouched)..."
@@ -1894,10 +1894,10 @@ alias startagent='eval "$(ssh-agent -s)"'
 alias vifix='vi ./be/routes/singles/createPassword.js'
 
 # Finite dump (does not hang). Use pm2logf to follow forever.
-alias pm2logflush='pm2 flush; pm2 logs onlinemallwebsite --lines 80 --nostream | sed "s/\x1b\[[0-9;]*m//g"'
-alias pm2log='pm2 logs onlinemallwebsite --lines 80 --nostream | sed "s/\x1b\[[0-9;]*m//g"'
-alias pm2logtail='pm2 logs onlinemallwebsite --lines 80 | sed -u "s/\x1b\[[0-9;]*m//g"'
-alias pm2logf='pm2 logs onlinemallwebsite | sed "s/\x1b\[[0-9;]*m//g"'
+alias pm2logflush='pm2 flush; pm2 logs tutamallPM2Process --lines 80 --nostream | sed "s/\x1b\[[0-9;]*m//g"'
+alias pm2log='pm2 logs tutamallPM2Process --lines 80 --nostream | sed "s/\x1b\[[0-9;]*m//g"'
+alias pm2logtail='pm2 logs tutamallPM2Process --lines 80 | sed -u "s/\x1b\[[0-9;]*m//g"'
+alias pm2logf='pm2 logs tutamallPM2Process | sed "s/\x1b\[[0-9;]*m//g"'
 
 cdv() {
     cd "${BASE_STORAGE}/onlinemallwebsite" && ls -latr
@@ -1905,21 +1905,21 @@ cdv() {
 
 alias dbconnect='psql -h 127.0.0.1 -U test_user1 -p 50010'
 
-alias rmusers="psql -h 127.0.0.1 -U test_user1 -p 50010 -d onlinemallwebsite -c \"DELETE FROM singles WHERE email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com');\""
+alias rmusers="psql -h 127.0.0.1 -U test_user1 -p 50010 -d outdatedDBOct2021 -c \"DELETE FROM singles WHERE email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com');\""
 getveri(){
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "select * from verifications;"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "select * from verifications;"
 }
 
 rmveri(){
-  psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "delete from verifications where email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com')"
+  psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "delete from verifications where email IN ('support@onlinemallwebsite.club','bill7035477456@gmail.com', 'a7035477456@gmail.com', 'a7038700246@gmail.com')"
 }
 
 
-alias dbtest1='psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite'
+alias dbtest1='psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021'
 alias dbrestoretest='psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles_restore_test'
-alias dbtest2='psql -h 127.0.0.1 -p 50010 -U test_user2 -d onlinemallwebsite'
-alias dbpostgres='psql -p 50010 -U postgres -d onlinemallwebsite'
-alias dbser='psql -h 127.0.0.1 -p 50010 -U ser -d onlinemallwebsite'
+alias dbtest2='psql -h 127.0.0.1 -p 50010 -U test_user2 -d outdatedDBOct2021'
+alias dbpostgres='psql -p 50010 -U postgres -d outdatedDBOct2021'
+alias dbser='psql -h 127.0.0.1 -p 50010 -U ser -d outdatedDBOct2021'
 
 
 changeit() {
@@ -1932,8 +1932,8 @@ changeit() {
     # 2. Match the flags from your working 'dbconnectfull' alias
     # -h 127.0.0.1 (Force network connection)
     # -p 50010     (Use the specific port)
-    # -d onlinemallwebsite  (Connect to the correct database)
-    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+    # -d outdatedDBOct2021  (Connect to the correct database)
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "
     INSERT INTO singles (singles_id, email, password_hash)
     VALUES ($sid, '$uemail', '$upass')
     ON CONFLICT (singles_id) 
@@ -1957,8 +1957,8 @@ changeimage() {
     # 2. Match the flags from your working 'dbconnectfull' alias
     # -h 127.0.0.1 (Force network connection)
     # -p 50010     (Use the specific port)
-    # -d onlinemallwebsite  (Connect to the correct database)
-    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -c "
+    # -d outdatedDBOct2021  (Connect to the correct database)
+    psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "
     INSERT INTO singles (singles_id, profile_image_url)
     VALUES ($sid, '$imageurl')
     ON CONFLICT (singles_id)

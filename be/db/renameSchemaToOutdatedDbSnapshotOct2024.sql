@@ -1,7 +1,7 @@
 -- Rename app schema helloworldjunktest → outdateddbsnapshotoct2024 (Mac + Ubuntu). Safe to re-run.
 -- Run on Primary only, in the same window as deploying code that uses the new name.
 --
--- Mac:    psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -v ON_ERROR_STOP=1 -f be/db/renameSchemaToOutdatedDbSnapshotOct2024.sql
+-- Mac:    psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -v ON_ERROR_STOP=1 -f be/db/renameSchemaToOutdatedDbSnapshotOct2024.sql
 -- Ubuntu: scripts/ubuntu-psql.sh -f be/db/renameSchemaToOutdatedDbSnapshotOct2024.sql   (from the Mac)
 --
 -- Unquoted lowercase on purpose: Postgres folds unquoted identifiers to lowercase, and the app

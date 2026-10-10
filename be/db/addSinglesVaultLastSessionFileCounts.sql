@@ -1,6 +1,6 @@
 -- Last vault-session Usb/ui tx/rx snapshot (shown on Cloud/USB login after logoff).
 -- Run on Primary (Mac — use DB_* from ~/.ssh/be/.env):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesVaultLastSessionFileCounts.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesVaultLastSessionFileCounts.sql
 
 BEGIN;
 

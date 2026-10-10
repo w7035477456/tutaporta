@@ -2,7 +2,7 @@
 -- Male/M → M, Female/F → F; anything else (incl. "not found", blank) → NULL.
 --
 -- Mac Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/normalizeSinglesDlSexChar1.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/normalizeSinglesDlSexChar1.sql
 
 BEGIN;
 

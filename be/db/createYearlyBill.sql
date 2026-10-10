@@ -6,7 +6,7 @@
 -- due date = bill_month (1–12) + due_month_day (1–31).
 --
 -- Run (Mac tunnel example):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createYearlyBill.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/createYearlyBill.sql
 
 CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.yearly_bill (
   yearly_bill_id bigserial PRIMARY KEY,

@@ -10,7 +10,7 @@
 -- information_schema the same way the Node routes do.
 --
 -- Run on Primary only:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/enforceRegularMemberBioApprovalNoResponse.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/enforceRegularMemberBioApprovalNoResponse.sql
 
 -- Dropped up front so the cleanup below is not filtered by an older version of
 -- this trigger (which may reference columns this database does not have).

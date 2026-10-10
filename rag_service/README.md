@@ -147,7 +147,7 @@ OLLAMA_MODEL=qwen2.5:7b
 ```
 
 ```bash
-pm2 restart onlinemallwebsite
+pm2 restart tutamallPM2Process
 ```
 
 ---

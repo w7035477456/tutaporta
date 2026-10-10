@@ -2,7 +2,7 @@
 -- so Cloud↔USB drag copy/move can keep separate histories.
 --
 -- Run (Mac tunnel):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/alterBillScheduleStorageBackend.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/alterBillScheduleStorageBackend.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.monthly_bill
   ADD COLUMN IF NOT EXISTS storage_backend text NOT NULL DEFAULT 'onedrive';

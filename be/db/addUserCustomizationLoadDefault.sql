@@ -1,6 +1,6 @@
 -- user_customization.load_default — one-time auto "Load Default" for Embedded Youtube Player.
 -- Existing rows: true (do not overwrite their slots). New rows: false until first Track open loads globals.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addUserCustomizationLoadDefault.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addUserCustomizationLoadDefault.sql
 
 BEGIN;
 

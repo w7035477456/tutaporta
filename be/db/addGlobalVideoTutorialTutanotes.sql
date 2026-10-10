@@ -1,5 +1,5 @@
 -- outdateddbsnapshotoct2024.global.video_tutorial_tutanotes — site-wide TutaNotes tutorial YouTube URL.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addGlobalVideoTutorialTutanotes.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addGlobalVideoTutorialTutanotes.sql
 
 BEGIN;
 

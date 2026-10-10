@@ -2,7 +2,7 @@
 -- (Authoritative repair is: node be/scripts/fixBadNicknames.js --apply)
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/inspectBadNicknames.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/inspectBadNicknames.sql
 
 -- 1) List current aliases (quick review)
 SELECT singles_id, member_id, alias,

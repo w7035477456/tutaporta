@@ -2,7 +2,7 @@
 -- Also extends mobile_photo_upload_sessions with paid_record_id for phone QR uploads.
 --
 -- Run (Mac tunnel):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createPaidRecord.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/createPaidRecord.sql
 
 CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.paid_record (
   paid_record_id bigserial PRIMARY KEY,

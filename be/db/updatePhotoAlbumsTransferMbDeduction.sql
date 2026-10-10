@@ -1,6 +1,6 @@
 -- Byte-accurate Photo Albums transfer deduction (no 1 MB minimum per flush).
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/updatePhotoAlbumsTransferMbDeduction.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/updatePhotoAlbumsTransferMbDeduction.sql
 
 BEGIN;
 

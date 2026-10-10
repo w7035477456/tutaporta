@@ -125,7 +125,7 @@ function describeBackupRequestError(err, fallback) {
   if (status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 524)) {
     return (
       `Server error ${status}: the web server dropped or timed out the request while processing the backup zip. ` +
-      'Please try again. If it keeps happening, the server log (pm2 logs onlinemallwebsite) shows the reason.'
+      'Please try again. If it keeps happening, the server log (pm2 logs tutamallPM2Process) shows the reason.'
     );
   }
   return err?.message || fallback;

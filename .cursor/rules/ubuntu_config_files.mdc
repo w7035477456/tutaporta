@@ -22,7 +22,7 @@ Public site: **`https://tutamall.com`** (apps at `/mall`, `/tutadates`, `/myNote
 - Reach these files only over the hardened SSH path in `ssh.mdc` (`scripts/deploy-ssh-mac.sh`); never plain `ssh`.
 - **Never** `cat` / `grep` / `sed` / print the secrets in `/home/lawsen0/.ssh/be/.env` (or the Mac `~/.ssh/be/.env`), and never copy their values into this repo.
 - After editing a config, reload the matching service:
-  - backend `.env` → `pm2 restart onlinemallwebsite`
+  - backend `.env` → `pm2 restart tutamallPM2Process`
   - frontend `.env` → rebuild / deploy (`work2` or `febeprod`)
   - HAProxy → `sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy`
   - Postgres (`postgresql.conf` / `pg_hba.conf`) → `sudo systemctl reload postgresql` (some `postgresql.conf` settings such as `port` need `restart`)

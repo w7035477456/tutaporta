@@ -1,6 +1,6 @@
 -- Bill Schedule email prefs on user_customization (TutaNotes Monthly + Yearly share these).
 -- Run on Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addUserCustomizationSendTuttanoteEmailFlags.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addUserCustomizationSendTuttanoteEmailFlags.sql
 
 DO $$
 BEGIN

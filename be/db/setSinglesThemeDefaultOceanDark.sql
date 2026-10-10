@@ -2,9 +2,9 @@
 -- Does not change existing members' theme preferences.
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/setSinglesThemeDefaultOceanDark.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/setSinglesThemeDefaultOceanDark.sql
 -- Ubuntu:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/setSinglesThemeDefaultOceanDark.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/setSinglesThemeDefaultOceanDark.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.singles
   ALTER COLUMN theme SET DEFAULT 'ocean dark';

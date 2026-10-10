@@ -2016,7 +2016,7 @@ if (feBuilt) {
     if (!fs.existsSync(feIndexPath)) {
       console.error('[server_be] fe/dist/index.html missing for', req.method, req.path);
       return res.status(503).type('text/plain').send(
-        'Frontend not built. On Ubuntu run: cd fe && npm run buildprod && pm2 restart onlinemallwebsite'
+        'Frontend not built. On Ubuntu run: cd fe && npm run buildprod && pm2 restart tutamallPM2Process'
       );
     }
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

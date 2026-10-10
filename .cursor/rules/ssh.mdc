@@ -69,7 +69,7 @@ scripts/ubuntu-psql.sh -At -c "SELECT …"                   # extra psql flags 
 ```
 
 - Password: **`UBUNTU_POSTGRES_PASSWORD=****`** in the Mac `~/.ssh/be/.env` (same file as the SSH secrets above). The script sends it as the first line of the SSH stdin and the remote side reads it into `PGPASSWORD`, so it never appears in argv, `ps`, shell history, or Cursor tool output.
-- Connects as `test_user1` to `onlinemallwebsite` on `127.0.0.1:50010` via `deploy-ssh-mac.sh` (same port / key / IdentitiesOnly as `f2`). Overrides: `UBUNTU_PG_HOST`, `UBUNTU_PG_PORT`, `UBUNTU_PG_USER`, `UBUNTU_PG_DB`, `UBUNTU_SSH_HOST`.
+- Connects as `test_user1` to `outdatedDBOct2021` on `127.0.0.1:50010` via `deploy-ssh-mac.sh` (same port / key / IdentitiesOnly as `f2`). Overrides: `UBUNTU_PG_HOST`, `UBUNTU_PG_PORT`, `UBUNTU_PG_USER`, `UBUNTU_PG_DB`, `UBUNTU_SSH_HOST`.
 - Runs with `ON_ERROR_STOP=1`; exit code is non-zero if any statement fails.
 - Writes / DDL go here (single-box Primary). After DDL, run **`isdbsame`** (`scripts/compare-pg-schema.sh`) and report the result (see `summary.mdc` §2).
 - **Never** `cat`/`grep`/`sed` the secrets in `~/.ssh/be/.env` (Mac or Ubuntu) yourself, pass `PGPASSWORD=…` on a command line, or print the password — let the script read it.

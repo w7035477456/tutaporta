@@ -1,6 +1,6 @@
 -- outdateddbsnapshotoct2024.singles_status: new — registration finished, Driver License / Passport
 -- scan not done yet. The ID scan moves new → active (age ≥ 18) or under18.
--- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesStatusNew.sql
+-- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesStatusNew.sql
 -- Ubuntu: scripts/ubuntu-psql.sh -f be/db/addSinglesStatusNew.sql
 -- Prod Primary only.
 

@@ -4,7 +4,7 @@
 -- Verification Services Status → completed.
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/seedDemoUserSelfReportBio.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/seedDemoUserSelfReportBio.sql
 --
 -- Idempotent: upserts vet_bio / misc_bio and overwrites the listed singles columns.
 

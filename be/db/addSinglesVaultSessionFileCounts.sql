@@ -1,7 +1,7 @@
 -- Session file tx/rx counts for TutaNotes USB / browser transfers.
 -- Resets to 0 on vault unlock (next session). Cluster-safe via Postgres Primary.
 -- Run on Primary (Mac example — use DB_* from ~/.ssh/be/.env):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesVaultSessionFileCounts.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesVaultSessionFileCounts.sql
 
 BEGIN;
 

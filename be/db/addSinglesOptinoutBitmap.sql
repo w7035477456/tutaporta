@@ -2,7 +2,7 @@
 --   bit 0 (1) = TutaDates, bit 1 (2) = TutaNotes, bit 2 (4) = TutaPhotos, bits 3–7 reserved.
 -- New accounts default to 7 (all three opted in). A member appears on /allSingles and the
 -- dating menus only when bit 0 is set AND status = 'active'.
--- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesOptinoutBitmap.sql
+-- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesOptinoutBitmap.sql
 -- Ubuntu: scripts/ubuntu-psql.sh -f be/db/addSinglesOptinoutBitmap.sql
 -- Prod Primary only.
 

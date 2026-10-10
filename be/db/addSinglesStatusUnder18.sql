@@ -1,5 +1,5 @@
 -- outdateddbsnapshotoct2024.singles_status: under18 — blocked after ID OCR age < 18.
--- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addSinglesStatusUnder18.sql
+-- Mac: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesStatusUnder18.sql
 -- Prod Primary only.
 
 DO $$

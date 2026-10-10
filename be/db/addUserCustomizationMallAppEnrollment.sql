@@ -2,11 +2,11 @@
 -- Default true for new rows; backfill sets all existing users to all three checked.
 --
 -- Mac (tunnel):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addUserCustomizationMallAppEnrollment.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addUserCustomizationMallAppEnrollment.sql
 --
 -- Ubuntu (local socket / Primary):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/addUserCustomizationMallAppEnrollment.sql
---   # or: sudo -u postgres psql -d onlinemallwebsite -f ...
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addUserCustomizationMallAppEnrollment.sql
+--   # or: sudo -u postgres psql -d outdatedDBOct2021 -f ...
 
 ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ADD COLUMN IF NOT EXISTS tuta_dates_enabled boolean NOT NULL DEFAULT true,

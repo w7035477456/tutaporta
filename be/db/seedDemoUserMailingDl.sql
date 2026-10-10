@@ -1,6 +1,6 @@
 -- DemoUser: sync DL names from mailing names; assign distinct mailing_street + city/zip/country.
 --
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/seedDemoUserMailingDl.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/seedDemoUserMailingDl.sql
 
 BEGIN;
 

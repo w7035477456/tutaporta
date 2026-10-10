@@ -180,7 +180,7 @@ OTP codes are generated on the server, stored with the phone session, and sent i
    If you see “Missing credentials for PLAIN”, the env file wasn’t loaded (check that `~/.ssh/be/.env` exists and has `SMTP_USER` and `SMTP_PASS`). If this fails with “Username and Password not accepted”, use a Gmail App Password (see [Google BadCredentials](https://support.google.com/mail/?p=BadCredentials)) and set it in `~/.ssh/be/.env` as `SMTP_PASS` (spaces optional; the app strips them).
 
 4. **Gmail 535 / BadCredentials**  
-   If you still get 535 after setting an App Password, ensure 2-Step Verification is on, the App Password is for “Mail”, and there are no typos or extra quotes in `~/.ssh/be/.env`. Restart the backend (e.g. `pm2 restart onlinemallwebsite`) so it reloads the file.
+   If you still get 535 after setting an App Password, ensure 2-Step Verification is on, the App Password is for “Mail”, and there are no typos or extra quotes in `~/.ssh/be/.env`. Restart the backend (e.g. `pm2 restart tutamallPM2Process`) so it reloads the file.
 
 1. Set up the database:
   - Create a PostgreSQL database (if not already created)

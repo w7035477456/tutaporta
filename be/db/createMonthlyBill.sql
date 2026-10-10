@@ -4,7 +4,7 @@
 -- leave action and paid_record_id NULL for the new month.
 --
 -- Run (Mac tunnel example):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createMonthlyBill.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/createMonthlyBill.sql
 
 CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.monthly_bill (
   monthly_bill_id bigserial PRIMARY KEY,

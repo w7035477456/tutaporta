@@ -40,7 +40,7 @@ export function formatMicrosoftOAuthProviderError({
     access_denied: 'You cancelled OneDrive login or declined permissions on the Microsoft consent screen.',
     invalid_client: hintLines([
       'Azure app client ID or client secret is wrong or expired.',
-      'Regenerate the secret under Certificates & secrets, update MICROSOFT_OAUTH_CLIENT_SECRET, pm2 restart onlinemallwebsite.',
+      'Regenerate the secret under Certificates & secrets, update MICROSOFT_OAUTH_CLIENT_SECRET, pm2 restart tutamallPM2Process.',
       clientHint
     ]),
     invalid_request: hintLines([
@@ -109,7 +109,7 @@ export function formatOAuthSaveError(provider, err, { singlesId, columnHint = ''
     ? hintLines([
         `Database error: ${message}.`,
         columnHint ||
-          'Run be/db/addSinglesRecordVaultCloud.sql on Postgres Primary, then pm2 restart onlinemallwebsite.'
+          'Run be/db/addSinglesRecordVaultCloud.sql on Postgres Primary, then pm2 restart tutamallPM2Process.'
       ])
     : hintLines([
         `Server error: ${message}.`,

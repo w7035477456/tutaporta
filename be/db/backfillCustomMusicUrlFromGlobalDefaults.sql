@@ -1,5 +1,5 @@
 -- Replace legacy partial Track URLs (Play 1–3 garbage + blank 4–9) with global.default_music_url.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/backfillCustomMusicUrlFromGlobalDefaults.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/backfillCustomMusicUrlFromGlobalDefaults.sql
 
 BEGIN;
 

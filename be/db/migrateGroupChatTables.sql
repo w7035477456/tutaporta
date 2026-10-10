@@ -1,7 +1,7 @@
 -- Group Chat tables (outdateddbsnapshotoct2024)
 -- Mirrors 1:1 chat pattern: small room/member/invite/read tables + partitioned group_chat_log.
 -- Run on Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/migrateGroupChatTables.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/migrateGroupChatTables.sql
 
 BEGIN;
 

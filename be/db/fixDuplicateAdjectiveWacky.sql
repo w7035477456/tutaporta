@@ -4,7 +4,7 @@
 --   node be/scripts/fixDuplicateAdjectives.js --apply
 --
 -- Mac inspect:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/fixDuplicateAdjectiveWacky.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/fixDuplicateAdjectiveWacky.sql
 
 -- 1) List current Wacky* (example collision from UI)
 SELECT singles_id, member_id, alias

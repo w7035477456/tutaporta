@@ -1,6 +1,6 @@
 -- Durable, per-backend vault-password failure tracking (TutaNotes notes_vault).
 -- Mac:
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite \
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 \
 --   -f be/db/addRecordVaultAccessFailTracking.sql
 --
 -- Supports both legacy record_vault and renamed notes_vault.

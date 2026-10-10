@@ -293,7 +293,7 @@ export async function recordVaultOneDriveOAuthCallback(req, res) {
         success: false,
         error: 'OneDrive is not configured on this server.',
         errorSecondary:
-          'Set MICROSOFT_OAUTH_CLIENT_ID and MICROSOFT_OAUTH_CLIENT_SECRET in ~/.ssh/be/.env, then pm2 restart onlinemallwebsite.',
+          'Set MICROSOFT_OAUTH_CLIENT_ID and MICROSOFT_OAUTH_CLIENT_SECRET in ~/.ssh/be/.env, then pm2 restart tutamallPM2Process.',
         returnOrigin
       })
     );
@@ -426,7 +426,7 @@ export async function recordVaultOneDriveOAuthCallback(req, res) {
       });
       const formatted = formatOAuthSaveError('OneDrive', saveErr, {
         singlesId: verifiedState.singlesId,
-        columnHint: 'Run be/db/addSinglesRecordVaultCloud.sql on Postgres Primary, then pm2 restart onlinemallwebsite.'
+        columnHint: 'Run be/db/addSinglesRecordVaultCloud.sql on Postgres Primary, then pm2 restart tutamallPM2Process.'
       });
       return res.status(200).send(
         renderPopupResultHtml({

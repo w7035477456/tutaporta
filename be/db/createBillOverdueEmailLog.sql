@@ -1,6 +1,6 @@
 -- bill_overdue_email_log — at most one Bill Schedule overdue digest email per user per calendar day.
 -- Run:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/createBillOverdueEmailLog.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/createBillOverdueEmailLog.sql
 
 CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.bill_overdue_email_log (
   singles_id bigint NOT NULL

@@ -4,7 +4,7 @@
 -- Remain credit is unchanged (carry positive remain, else replace with buy).
 --
 -- Run on Primary (Mac tunnel):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/updateAddVaultRefillMbBoughtRules.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/updateAddVaultRefillMbBoughtRules.sql
 
 BEGIN;
 

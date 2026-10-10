@@ -2,7 +2,7 @@
 -- that has none yet (all member_category). Matches the TutaNotes Bill Schedule demo.
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/seedBillScheduleAllMembers.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/seedBillScheduleAllMembers.sql
 --
 -- Idempotent: skips members who already have any monthly_bill / yearly_bill rows.
 

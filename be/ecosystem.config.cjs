@@ -13,7 +13,7 @@
 const path = require('path');
 module.exports = {
   apps: [{
-    name: 'onlinemallwebsite',
+    name: 'tutamallPM2Process',
     script: './server_be.js',
     cwd: path.join(__dirname),
     // Any worker count is safe: TutaPhoto / TutaNote vault copies are kept coherent

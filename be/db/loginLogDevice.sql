@@ -3,7 +3,7 @@
 -- with the same rules. Run on Primary only. Safe to re-run.
 --
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d onlinemallwebsite -f be/db/loginLogDevice.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/loginLogDevice.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.login_log
   ADD COLUMN IF NOT EXISTS device_type text,

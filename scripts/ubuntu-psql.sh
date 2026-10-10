@@ -11,7 +11,7 @@
 # either host. Any other psql flags (-At, -x, --csv, …) are passed through.
 #
 # Overrides: UBUNTU_PG_HOST (127.0.0.1), UBUNTU_PG_PORT (50010), UBUNTU_PG_USER (test_user1),
-#            UBUNTU_PG_DB (onlinemallwebsite), UBUNTU_SSH_HOST (lawsen0@192.168.222.202),
+#            UBUNTU_PG_DB (outdatedDBOct2021), UBUNTU_SSH_HOST (lawsen0@192.168.222.202),
 #            DEPLOY_SSH_SECRETS (~/.ssh/be/.env).
 
 set -euo pipefail
@@ -22,7 +22,7 @@ SSH_HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.202}"
 PG_HOST="${UBUNTU_PG_HOST:-127.0.0.1}"
 PG_PORT="${UBUNTU_PG_PORT:-50010}"
 PG_USER="${UBUNTU_PG_USER:-test_user1}"
-PG_DB="${UBUNTU_PG_DB:-onlinemallwebsite}"
+PG_DB="${UBUNTU_PG_DB:-outdatedDBOct2021}"
 
 sql=""
 sql_set=0

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 24x7 website uptime monitor — independent of PM2 (onlinemallwebsite).
+# 24x7 website uptime monitor — independent of PM2 (tutamallPM2Process).
 # Curls a few public URLs; on failure, SMS +17035477456 and a USB-speaker
 # tone that runs until the site is healthy again.
 #

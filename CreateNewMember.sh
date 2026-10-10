@@ -3,7 +3,7 @@
 # (+ vet_bio + misc_bio). Run from repo root or anywhere:
 #   bash ~/code/main/CreateNewMember.sh
 #
-# Requires: psql, local DB (127.0.0.1:50010 / onlinemallwebsite / test_user1).
+# Requires: psql, local DB (127.0.0.1:50010 / outdatedDBOct2021 / test_user1).
 # Password: PGPASSWORD, else DB_PASSWORD from ~/.ssh/be/.env, else interactive prompt.
 
 set -euo pipefail
@@ -11,7 +11,7 @@ set -euo pipefail
 PSQL_HOST="${PSQL_HOST:-127.0.0.1}"
 PSQL_PORT="${PSQL_PORT:-50010}"
 PSQL_USER="${PSQL_USER:-test_user1}"
-PSQL_DB="${PSQL_DB:-onlinemallwebsite}"
+PSQL_DB="${PSQL_DB:-outdatedDBOct2021}"
 SCHEMA="outdateddbsnapshotoct2024"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATION_SQL="${SCRIPT_DIR}/be/db/addRegularMemberAnyMemberInactive.sql"

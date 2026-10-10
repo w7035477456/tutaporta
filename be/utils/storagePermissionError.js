@@ -142,7 +142,7 @@ export function logStoragePermissionFailure(err, context = {}) {
     `${stamp} HOW TO FIX — run on host "${host}" as a sudoer:`,
     `${stamp}   sudo chown -R ${owner}:${owner} '${fixTarget}'`,
     `${stamp}   sudo chmod -R u+rwX '${fixTarget}'`,
-    `${stamp}   pm2 restart onlinemallwebsite`,
+    `${stamp}   pm2 restart tutamallPM2Process`,
     `${stamp}   # verify:  checkstorage      # fix every host:  fixstorage --all-hosts`,
     '',
     `${stamp} CLUSTER WARNING: web servers are round-robin with no sticky sessions.`,
