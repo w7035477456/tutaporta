@@ -3,22 +3,22 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 /** CID for inline logo in all transactional emails. */
-export const EMAIL_LOGO_CID = 'onlineMallWebsiteLogo';
+export const EMAIL_LOGO_CID = 'tutamallwebsitelogo';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Inline logo from fe/src/assets/images/onlineMallWebsiteLogo.png (or EMAIL_LOGO_PATH). */
+/** Inline logo from fe/src/assets/images/tutamallwebsitelogo.png (or EMAIL_LOGO_PATH). */
 export function getEmailLogoAttachment() {
   const envPath = (process.env.EMAIL_LOGO_PATH || process.env.REGISTRATION_EMAIL_LOGO_PATH)?.trim();
   const candidates = [
     envPath,
-    path.join(__dirname, '../../fe/src/assets/images/onlineMallWebsiteLogo.png')
+    path.join(__dirname, '../../fe/src/assets/images/tutamallwebsitelogo.png')
   ].filter(Boolean);
 
   for (const logoPath of candidates) {
     if (fs.existsSync(logoPath)) {
       return {
-        filename: 'onlineMallWebsiteLogo.png',
+        filename: 'tutamallwebsitelogo.png',
         path: logoPath,
         cid: EMAIL_LOGO_CID
       };

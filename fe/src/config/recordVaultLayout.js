@@ -1,6 +1,6 @@
 import { MY_RECORD_VAULT_LEGACY_PATH, MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { headerBarMinHeightCss } from 'config/headerProfileChipEnv';
-import myNoteHeaderLogoImage from 'assets/images/onlineMallWebsiteLogo.png';
+import myNoteHeaderLogoImage from 'assets/images/tutamallwebsitelogo.png';
 import myNoteBannerImage from 'assets/images/myNote.png';
 import myNoteBackgroundImage from 'assets/images/myNoteBackground.png';
 

@@ -1,6 +1,6 @@
 import { MY_PHOTO_ALBUMS_LEGACY_PATH, MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
 import { headerBarMinHeightCss } from 'config/headerProfileChipEnv';
-import myPhotoAlbumsHeaderLogoImage from 'assets/images/onlineMallWebsiteLogo.png';
+import myPhotoAlbumsHeaderLogoImage from 'assets/images/tutamallwebsitelogo.png';
 import myPhotoAlbumsBannerImage from 'assets/images/myPhotoAlbums.png';
 import myPhotoAlbumsBackgroundImage from 'assets/images/myPhotoAlbumsBackground.png';
 
