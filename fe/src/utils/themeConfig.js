@@ -11,6 +11,12 @@ export const DEFAULT_NEW_USER_THEME_NAME = DEFAULT_THEME_NAME;
  */
 export let COLOR_FULL_PALETE = false;
 
+
+//NOTE:
+// theme-daynight-color is white for light series, and black for dark series
+// theme-inverse-daynight-color is black for black series, and white for dark series
+
+
 const COLOR_FULL_PALETE_LS_KEY = 'vsingles:color-full-palete';
 
 /** Curated subset shown when COLOR_FULL_PALETE is false. */

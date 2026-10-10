@@ -149,7 +149,7 @@ const BACKUP_OPERATION_STEPS = {
   backup: {
     title: 'Backing up TutaNotes to Cloud',
     steps: [
-      ['build', 'Server zipping your TutaDrive vault'],
+      ['build', 'Server zipping your TutaNote Cloud'],
       ['seal', 'Encrypting with the password for this zip'],
       ['send', 'Uploading sealed zip to TutaCloud'],
       ['server', 'Server saving zip to your member folder'],

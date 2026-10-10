@@ -1,0 +1,27 @@
+---
+description: Ubuntu (xbox2) config file locations — backend/frontend .env, HAProxy, Postgres 16, Nginx
+alwaysApply: true
+---
+
+# Ubuntu config files (xbox2, `192.168.222.202`)
+
+| # | File | What it is |
+|---|------|------------|
+| 1 | `/home/lawsen0/.ssh/be/.env` | Main backend / application environment and config file. Also holds IDs and secret keys. |
+| 2 | `/home/lawsen0/main/code/fe/.env` | Main frontend application environment and config file. |
+| 3 | `/etc/haproxy/haproxy.cfg` | HAProxy's main config. HAProxy is the front door for `onlinemall.website`: it accepts every request from Cloudflare on ports 80 and 443, handles HTTPS, and passes the request on to a backend server. |
+| 4 | `/etc/postgresql/16/main/postgresql.conf` | PostgreSQL's main server config. Controls how the Postgres 16 server on xbox2 runs: where its data lives, which port and network addresses it listens on, how much memory it uses, and its logging, locale and maintenance behavior. |
+| 5 | `/etc/postgresql/16/main/pg_hba.conf` | PostgreSQL client authentication (host-based authentication, HBA) config. Decides who may connect to the Postgres 16 server on xbox2 (port `50010`), from where, to which database, and how they must prove their identity. |
+| 6 | `/etc/nginx/sites-available/default` | Nginx's default site config (default server block). Defines the catch-all website Nginx serves on port 80 when no other site matches the requested hostname. |
+| 7 | `/etc/nginx/nginx.conf` | Nginx's main config. Sets global behavior: which OS user Nginx runs as, how many worker processes it uses, logging, SSL and gzip defaults. Also pulls in every other config file, including `sites-enabled/default`. |
+
+## Rules for agents
+
+- Reach these files only over the hardened SSH path in `ssh.mdc` (`scripts/deploy-ssh-mac.sh`); never plain `ssh`.
+- **Never** `cat` / `grep` / `sed` / print the secrets in `/home/lawsen0/.ssh/be/.env` (or the Mac `~/.ssh/be/.env`), and never copy their values into this repo.
+- After editing a config, reload the matching service:
+  - backend `.env` → `pm2 restart onlinemallwebsite`
+  - frontend `.env` → rebuild / deploy (`work2` or `febeprod`)
+  - HAProxy → `sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy`
+  - Postgres (`postgresql.conf` / `pg_hba.conf`) → `sudo systemctl reload postgresql` (some `postgresql.conf` settings such as `port` need `restart`)
+  - Nginx → `sudo nginx -t && sudo systemctl reload nginx`
