@@ -5,7 +5,7 @@
  *
  * Usage (from repo root):
  *   node be/scripts/buildTutaNotesTemplateZip.js \
- *     /Users/a/mac_storage/onlinemallwebsite_largecheapstorage/users/M237112/notes
+ *     /Users/a/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M237112/notes
  */
 import fs from 'fs';
 import path from 'path';

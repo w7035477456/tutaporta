@@ -118,15 +118,15 @@ alias createnewposting='bash ${HOME}/code/main/CreatePosting.sh'
 
 
 govideos() {
-    cd "${BASE_STORAGE}/onlinemallwebsite_storage/videos" && ls -latr
+    cd "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/videos" && ls -latr
 }
 
 gophotos() {
-    cd "${BASE_STORAGE}/onlinemallwebsite_storage/photos" && ls -latr
+    cd "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos" && ls -latr
 }
 
 lsphoto() {
-    cd "${BASE_STORAGE}/onlinemallwebsite_storage" && pwd
+    cd "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021" && pwd
 }
 
 bigfiles() {
@@ -212,7 +212,7 @@ alias fixallstorage='clear;fixstorage && fixlargecheap && clear; checkallstorage
 screw_permission_fortest(){
     load_be_env_file ~/.ssh/be/.env 2>/dev/null || true
     local photo_dir="${TUTADATES_PHOTO_FOLDER:-${STORAGE_FOLDER}/photos/}"
-    photo_dir="${photo_dir//\$\{STORAGE_FOLDER\}/${STORAGE_FOLDER:-${BASE_STORAGE}/onlinemallwebsite_storage}}"
+    photo_dir="${photo_dir//\$\{STORAGE_FOLDER\}/${STORAGE_FOLDER:-${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021}}"
     photo_dir="${photo_dir%/}"
 
     echo "Breaking permissions on: $photo_dir"
@@ -228,8 +228,8 @@ gostorage() {
 }
 
 showsize() {
-    sudo du -sh "${BASE_STORAGE}/onlinemallwebsite_storage/"{photos,videos,USB_DMG_EXE,recordvault-onedrive}
-    sudo du -ah "${BASE_STORAGE}/onlinemallwebsite_storage/videos" | sort -h | tail -30
+    sudo du -sh "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/"{photos,videos,USB_DMG_EXE,recordvault-onedrive}
+    sudo du -ah "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/videos" | sort -h | tail -30
 }
 
 #------ barcode upload ------
@@ -241,8 +241,8 @@ alias fixstoragemobileuploadubuntu='$HOME/code/main/scripts/fix-media-storage.sh
 alias checkstoragemobileuploadubuntu='$HOME/code/main/scripts/verify-media-storage.sh'
 
 fixpermissionmobileuploadubuntu() {
-    sudo chown -R lawsen0:lawsen0 "${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload" && \
-    sudo chmod -R u+rwX "${BASE_STORAGE}/onlinemallwebsite_storage/mobile_upload"
+    sudo chown -R lawsen0:lawsen0 "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/mobile_upload" && \
+    sudo chmod -R u+rwX "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/mobile_upload"
 }
 
 alias showbarcodedebug="pm2 logs tutamallPM2Process --lines 200 | grep -E 'mobilePhotoUpload|mobile-barcode'"
@@ -295,8 +295,8 @@ alias sitemonitorstatusf='sudo systemctl status site-uptime-monitor; tail -f ~/l
 
 
 testBuguploadPhoto() {
-    touch "${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test" && \
-    rm "${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test" && \
+    touch "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos/.write_test" && \
+    rm "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos/.write_test" && \
     echo "WRITE_OK"
 }
 
@@ -305,13 +305,13 @@ fixBugUploadPhoto() {
     grep VSINGLES_PHOTO_FOLDER ~/.ssh/be/.env
 
     # Fix write access for the PM2 user on the REAL folder
-    sudo mkdir -p ${BASE_STORAGE}/onlinemallwebsite_storage/photos
-    sudo chown -R lawsen0:lawsen0 ${BASE_STORAGE}/onlinemallwebsite_storage
-    sudo chmod u+rwx ${BASE_STORAGE}/onlinemallwebsite_storage/photos
+    sudo mkdir -p ${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos
+    sudo chown -R lawsen0:lawsen0 ${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021
+    sudo chmod u+rwx ${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos
 
     # Test the same path the app uses
-    touch ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test \
-      && rm ${BASE_STORAGE}/onlinemallwebsite_storage/photos/.write_test \
+    touch ${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos/.write_test \
+      && rm ${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos/.write_test \
       && echo WRITE_OK_PGDATA16
 }
 
@@ -385,11 +385,11 @@ alias redisfix='sudo systemctl start redis-server;sudo systemctl enable redis-se
 
 
 lszip() {
-    ls "${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE"
+    ls "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/USB_DMG_EXE"
 }
 
 clearzip() {
-    rm -rf "${BASE_STORAGE}/onlinemallwebsite_storage/USB_DMG_EXE/"*
+    rm -rf "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/USB_DMG_EXE/"*
     lsusb
 }
 
@@ -862,8 +862,8 @@ purgephotos() {
 }
 
 chownphoto() {
-    sudo chown -R www-data:www-data "${BASE_STORAGE}/onlinemallwebsite_storage/photos" && \
-    sudo ls -latr "${BASE_STORAGE}/onlinemallwebsite_storage/photos"
+    sudo chown -R www-data:www-data "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos" && \
+    sudo ls -latr "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos"
 }
 
 resestusersetup(){
@@ -874,7 +874,7 @@ resestusersetup(){
 }
 
 showphotos() {
-    sudo ls -latr "${BASE_STORAGE}/onlinemallwebsite_storage/photos"
+    sudo ls -latr "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos"
 }
 
 clonepassword(){
@@ -1318,7 +1318,7 @@ photoRestore() {
     cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
 
     local DEST_BASE
-    DEST_BASE="${BASE_STORAGE}/onlinemallwebsite_storage"
+    DEST_BASE="${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021"
 
     local RESTORE_FILE=""
     local EXISTING
@@ -1631,7 +1631,7 @@ photoMergeRestore() {
     cd ~/dbFolder || { echo "Error: Cannot cd to ~/dbFolder"; return 1; }
 
     local DEST_BASE
-    DEST_BASE="${BASE_STORAGE}/onlinemallwebsite_storage"
+    DEST_BASE="${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021"
 
     local RESTORE_FILE=""
     local EXISTING
@@ -1742,9 +1742,9 @@ photoMergeRestore() {
 ######## MISC STORAGE (photos / videos / USB_DMG_EXE / recordvault-onedrive) ########
 _misc_storage_base() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "${BASE_STORAGE}/onlinemallwebsite_storage"
+        echo "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021"
     else
-        echo "${BASE_STORAGE}/onlinemallwebsite_storage"
+        echo "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021"
     fi
 }
 
@@ -1834,7 +1834,7 @@ photoBackup() {
         cd "$HOME/dbFolder" || return 1
 
         local BASE_DIR DATE_STR FILENAME PREFIX
-        BASE_DIR="${BASE_STORAGE}/onlinemallwebsite_storage"
+        BASE_DIR="${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021"
         DATE_STR=$(date +%m%d%Y)
         PREFIX="${1:-photoBackup}"
         FILENAME="${PREFIX}${DATE_STR}.tar.gz"

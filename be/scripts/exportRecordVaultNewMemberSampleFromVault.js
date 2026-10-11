@@ -5,7 +5,7 @@
  *
  * Usage (from repo root):
  *   node be/scripts/exportRecordVaultNewMemberSampleFromVault.js \
- *     /Users/a/mac_storage/onlinemallwebsite_largecheapstorage/users/M237112/notes
+ *     /Users/a/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M237112/notes
  *
  * After export: bump manifest.json version/seedMarker, then run:
  *   node be/scripts/migrateRecordVaultNewMemberSample.js

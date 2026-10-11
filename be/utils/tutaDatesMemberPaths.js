@@ -15,7 +15,7 @@ function expandRoot(folder) {
   return path.resolve(trimmed.startsWith('~/') ? path.join(os.homedir(), trimmed.slice(2)) : trimmed);
 }
 
-/** Primary Tuta Dates root: FAST_STORAGE_FOLDER (onlinemallwebsite_storage). */
+/** Primary Tuta Dates root: FAST_STORAGE_FOLDER (tutamallStorageFolder_outdatedOct2021). */
 export function getTutaDatesStorageRoot() {
   const storage = expandRoot(process.env.FAST_STORAGE_FOLDER);
   if (!storage) {

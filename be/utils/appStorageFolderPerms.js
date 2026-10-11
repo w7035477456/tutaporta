@@ -1,8 +1,8 @@
 /**
  * Auto-fix permissions on app storage roots (Mac + Ubuntu) when the Node
  * process owns the files. Covers:
- *   - FAST_STORAGE_FOLDER          (e.g. …/onlinemallwebsite_storage)
- *   - LARGE_CHEAP_STORAGE_FOLDER (e.g. …/onlinemallwebsite_largecheapstorage)
+ *   - FAST_STORAGE_FOLDER          (e.g. …/tutamallStorageFolder_outdatedOct2021)
+ *   - LARGE_CHEAP_STORAGE_FOLDER (e.g. …/tutamallStorageFolder_largecheapstorage_outdatedOct2021)
  * and all subfolders/files under them.
  *
  * chown only works as root — as lawsen0 we best-effort chmod (dirs 0755, files 0644)

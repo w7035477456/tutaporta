@@ -20,7 +20,7 @@ function isLikelyLocalOnlyPath(dirPath) {
   const tmp = path.resolve(os.tmpdir());
   if (normalized.startsWith(tmp + path.sep) || normalized === tmp) return true;
   // Shared mounts like /mnt/pgdata16/... are fine; only reject bare home-local storage.
-  const homeStorage = path.join(os.homedir(), 'onlinemallwebsite_storage');
+  const homeStorage = path.join(os.homedir(), 'tutamallStorageFolder_outdatedOct2021');
   if (normalized === homeStorage || normalized.startsWith(homeStorage + path.sep)) return true;
   return false;
 }

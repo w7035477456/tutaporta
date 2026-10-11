@@ -37,8 +37,8 @@ function reconcileStoragePathsForPlatform() {
   const keys = ['FAST_STORAGE_FOLDER', 'LARGE_CHEAP_STORAGE_FOLDER'];
   const home = os.homedir();
   const macDefaults = {
-    FAST_STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_storage'),
-    LARGE_CHEAP_STORAGE_FOLDER: path.join(home, 'onlinemallwebsite_largecheapstorage')
+    FAST_STORAGE_FOLDER: path.join(home, 'tutamallStorageFolder_outdatedOct2021'),
+    LARGE_CHEAP_STORAGE_FOLDER: path.join(home, 'tutamallStorageFolder_largecheapstorage_outdatedOct2021')
   };
   let changed = false;
   for (const key of keys) {
