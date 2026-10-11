@@ -247,6 +247,25 @@ function profileMenuButtonSx(selected, layoutSx = {}, hoverFontBase = buttonFont
   };
 }
 
+/** Exit to Mall / Logout rows — same red hover as sidebar Exit to Mall (exitToMallUnselectedButtonHoverSx). */
+function profileMenuRedHoverButtonSx(layoutSx = {}, extraHoverSx = {}) {
+  const base = profileMenuButtonSx(false, layoutSx);
+  return {
+    ...base,
+    '@media (hover: hover)': {
+      '&:hover': {
+        ...(base['@media (hover: hover)']?.['&:hover'] ?? {}),
+        bgcolor: 'var(--theme-error-color) !important',
+        color: 'var(--theme-white-color) !important',
+        WebkitTextFillColor: 'var(--theme-white-color) !important',
+        '& .MuiButton-startIcon': { color: 'var(--theme-white-color) !important' },
+        '& svg': { color: 'var(--theme-white-color) !important' },
+        ...extraHoverSx
+      }
+    }
+  };
+}
+
 function ProfileMenuExitIcon() {
   return (
     <Box
@@ -1085,13 +1104,8 @@ export default function ProfileSection({ clusterTight = false }) {
                           startIcon={<ProfileMenuExitIcon />}
                           onClick={handleExitOrLogout}
                           sx={{
-                            ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
-                            ...exitToMallYellowDashedBorderSx(),
-                            '@media (hover: hover)': {
-                              '&:hover': {
-                                ...exitToMallYellowDashedBorderSx()
-                              }
-                            }
+                            ...profileMenuRedHoverButtonSx(profileMenuButtonLayoutSx, exitToMallYellowDashedBorderSx()),
+                            ...exitToMallYellowDashedBorderSx()
                           }}
                         >
                           {exitLabel}
@@ -1428,7 +1442,7 @@ export default function ProfileSection({ clusterTight = false }) {
                         onClick={handleLogoutBottom}
                         data-vsingles-tour-logout={tourActive ? '' : undefined}
                         sx={{
-                          ...profileMenuButtonSx(false, profileMenuButtonLayoutSx),
+                          ...profileMenuRedHoverButtonSx(profileMenuButtonLayoutSx),
                           ...(tourActive && {
                             outline: '3px solid #000',
                             outlineOffset: 2

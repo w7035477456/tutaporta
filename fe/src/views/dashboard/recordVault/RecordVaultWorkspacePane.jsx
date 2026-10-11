@@ -7267,8 +7267,8 @@ export default function RecordVaultWorkspacePane({
                         disabled={busy || !unlocked}
                         aria-label={
                           ragModelButtonLabel
-                            ? `RAG question and answer — model ${ragConfiguredModel}`
-                            : 'RAG question and answer'
+                            ? `AI LLM RAG question and answer — model ${ragConfiguredModel}`
+                            : 'AI LLM RAG question and answer'
                         }
                         title={
                           ragConfiguredModel
@@ -7295,7 +7295,7 @@ export default function RecordVaultWorkspacePane({
                           }}
                         >
                           <Box component="span" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
-                            RAG
+                            AI LLM RAG
                           </Box>
                           {ragModelButtonLabel ? (
                             <Box

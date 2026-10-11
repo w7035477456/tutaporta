@@ -195,6 +195,7 @@ function MenuList() {
 
   const isUnderConstructionMallSection =
     pathname === '/eMarketPlace' || pathname === '/onlineProfessionals' || pathname === '/eServices';
+  const isTutaDatesMenu = !toolsOnlyMenu && !isEClassifiedsSection && !isEMarketPlaceSection && !isUnderConstructionMallSection;
 
   const activeMenuItems = useMemo(() => {
     if (toolsOnlyMenu) {
@@ -361,11 +362,12 @@ function MenuList() {
     </Box>
   );
 
-  const datingSocialPhraseBlock = drawerOpen ? (
-    <Box sx={{ mx: '0.5rem', minWidth: 0, flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
-      <ColorTemplate4TitlesPhrase>{datingSocialPhrase}</ColorTemplate4TitlesPhrase>
-    </Box>
-  ) : null;
+  const datingSocialPhraseBlock =
+    drawerOpen && isTutaDatesMenu ? (
+      <Box sx={{ mx: '0.5rem', minWidth: 0, flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+        <ColorTemplate4TitlesPhrase>{datingSocialPhrase}</ColorTemplate4TitlesPhrase>
+      </Box>
+    ) : null;
 
   return (
     <Box
