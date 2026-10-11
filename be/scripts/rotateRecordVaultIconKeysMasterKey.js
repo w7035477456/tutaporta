@@ -344,7 +344,7 @@ main()
     console.log('');
     console.log(`  RECORD_NOTES_ICON_KEYS_MASTER_KEY=${newKey}`);
     console.log('');
-    console.log('Then run: pm2 restart vsingles');
+    console.log('Then run: pm2 restart tutamallPM2Process');
     process.exit(0);
   })
   .catch((err) => {

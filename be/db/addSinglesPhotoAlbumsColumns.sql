@@ -1,7 +1,7 @@
 -- Photo Albums (clone of Notes / Record Vault) — independent singles columns.
 -- Does not rename or touch notes_* / record_notes_* columns.
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesPhotoAlbumsColumns.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesPhotoAlbumsColumns.sql
 
 BEGIN;
 

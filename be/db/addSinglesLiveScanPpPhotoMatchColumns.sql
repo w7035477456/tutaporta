@@ -1,6 +1,6 @@
 -- outdateddbsnapshotoct2024.singles — live scan + passport photo match (Primary only).
 -- Mac dev (Primary):
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesLiveScanPpPhotoMatchColumns.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesLiveScanPpPhotoMatchColumns.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS livescan_profile_percentage_match smallint,

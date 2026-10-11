@@ -1,6 +1,6 @@
 -- TutaNotes Tx/Rx balance: singles.refill_remain_mb (MB). Deducted on transfer; may go negative.
 -- Run on Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesRefillRemainMb.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesRefillRemainMb.sql
 
 BEGIN;
 

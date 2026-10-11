@@ -1,7 +1,7 @@
 -- Point outdateddbsnapshotoct2024.videos.file_path at the video folder (sibling of photos/).
 -- On-disk files may already live under ~/tutamallStorageFolder_outdatedOct2021/videos/ while file_path still says photos/.
 --
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/migrateVideosFilePathToVideoFolder.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/migrateVideosFilePathToVideoFolder.sql
 
 BEGIN;
 

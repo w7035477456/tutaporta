@@ -1,6 +1,6 @@
 -- Set Postgres DEFAULTs for myNote prefs and backfill existing NULL rows.
 -- Run on Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/setUserCustomizationMynoteDefaults.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/setUserCustomizationMynoteDefaults.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ALTER COLUMN mynote_font_color_index SET DEFAULT 0,

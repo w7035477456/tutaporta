@@ -1,6 +1,6 @@
 -- Repost credit: who originally authored a shared/reposted posting (cluster-wide on Primary).
 -- Run on Primary only. Mac dev:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addPostingsRepostedFromSinglesId.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addPostingsRepostedFromSinglesId.sql
 
 DO $$
 DECLARE

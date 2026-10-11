@@ -1,6 +1,6 @@
 -- Store the member-entered "LinkedIn profile & URL" on singles.linkedin_url (text).
 -- Run on Primary (Mac dev):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesLinkedinUrlColumn.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesLinkedinUrlColumn.sql
 
 DO $$
 DECLARE

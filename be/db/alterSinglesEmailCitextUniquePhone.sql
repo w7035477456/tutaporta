@@ -1,6 +1,6 @@
 -- outdateddbsnapshotoct2024.singles — email text + UNIQUE email/phone, phone NOT NULL (Primary only).
 -- Mac dev:
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/alterSinglesEmailCitextUniquePhone.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/alterSinglesEmailCitextUniquePhone.sql
 
 -- Canonical US phone: +1XXXXXXXXXX
 UPDATE outdateddbsnapshotoct2024.singles s

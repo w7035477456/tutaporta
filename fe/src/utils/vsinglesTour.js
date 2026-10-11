@@ -33,7 +33,7 @@ export function getTourStep() {
   return tourStep;
 }
 
-/** Dating / vsingles routes where the sidebar tour button is shown. */
+/** TutaDates routes where the sidebar tour button is shown. */
 export function isVsinglesTourRoute(pathname) {
   return (
     isTutaDatesPath(pathname) ||
@@ -65,7 +65,7 @@ export function startVsinglesTour() {
 }
 
 /**
- * From sidebar tour button: go to /vsingles first when needed, then start theme step.
+ * From sidebar tour button: go to /tutadates first when needed, then start theme step.
  * @param {string} pathname
  * @param {(path: string) => void} navigate
  */

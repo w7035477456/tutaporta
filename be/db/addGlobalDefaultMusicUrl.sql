@@ -1,6 +1,6 @@
 -- global.default_music_url — default Embedded Youtube Player slots (text[], 10 URLs).
 -- Slots 1–9 = tracks; slot 10 = Slide Show Music.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addGlobalDefaultMusicUrl.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addGlobalDefaultMusicUrl.sql
 
 BEGIN;
 

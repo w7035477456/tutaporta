@@ -426,7 +426,7 @@ export default function AuthRegister() {
             >
               Privacy Policy
             </Typography>
-            . By checking this box and providing my number, I also give explicit consent to receive automated one-time identity verification codes and account security alerts from TutaMall.com and Vetted Singles (VSingles). Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. Reply HELP for help or STOP to cancel.
+            . By checking this box and providing my number, I also give explicit consent to receive automated one-time identity verification codes and account security alerts from TutaMall.com and TutaDates. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. Reply HELP for help or STOP to cancel.
           </Typography>
         </Box>
       </Box>

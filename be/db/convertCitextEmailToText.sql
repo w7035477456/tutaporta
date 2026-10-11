@@ -1,7 +1,7 @@
 -- Convert email columns from citext to text (Primary only).
 -- Application code stores lowercase via normalizeEmailForDb(); text + UNIQUE replaces citext.
 -- Mac dev:
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/convertCitextEmailToText.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/convertCitextEmailToText.sql
 
 UPDATE outdateddbsnapshotoct2024.singles
 SET email = LOWER(email::text)

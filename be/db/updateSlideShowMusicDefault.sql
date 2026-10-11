@@ -1,5 +1,5 @@
 -- Slot 10 (Slide Show Music) in global.default_music_url — Load Default + new users.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/updateSlideShowMusicDefault.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/updateSlideShowMusicDefault.sql
 
 BEGIN;
 

@@ -1,5 +1,5 @@
 -- Record Vault USB encryption keys — one long random secret per FA5 object icon (server-only lookup).
--- Run on Primary: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addGlobalRecordVaultIconKeys.sql
+-- Run on Primary: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addGlobalRecordVaultIconKeys.sql
 -- Then set RECORD_NOTES_ICON_KEYS_MASTER_KEY in ~/.ssh/be/.env and seed:
 --   node be/scripts/migrateRecordVaultIconKeysToEncrypted.js  (if plaintext map already exists)
 --   node be/scripts/seedRecordVaultIconKeys.js                 (fresh seed or re-seed)

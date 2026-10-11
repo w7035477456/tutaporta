@@ -28,11 +28,11 @@ import { DATING_TOP_BANNER_IMAGE } from 'config/datingTopBanner';
  * }} ApplicationFramePreset
  */
 
-/** Current dating / vsingles shell (TutaMall.com). */
+/** Current TutaDates dating shell (TutaMall.com). */
 /** @type {ApplicationFramePreset} */
 export const VSINGLES_APPLICATION_FRAME = {
   id: 'vsingles',
-  label: 'vSingles Dating',
+  label: 'TutaDates Dating',
   topBannerImage: DATING_TOP_BANNER_IMAGE,
   sidebarPhrase:
     'From a fun social media feed and trusted 3rd-party safety vetting to playful chatting and flower gifting - we have built the perfect home for love.',

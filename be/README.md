@@ -15,7 +15,7 @@ npm install
 ```
 DB_HOST=localhost
 DB_PORT=50010
-DB_NAME=vsingles
+DB_NAME=outdatedDBOct2021
 DB_USER=postgres
 DB_PASSWORD=[fix me]
 # DB_SCHEMA: required, must be a non-public schema (e.g. outdateddbsnapshotoct2024)
@@ -135,7 +135,7 @@ REKOGNITION_REQUIRE_LIVENESS=true
 
 OTP codes are generated on the server, stored with the phone session, and sent in the message body. If AWS SMS env is incomplete, signup SMS endpoints return **500** until configured.
 
-**Database schema (`vsingles` + non-`public` schema)**
+**Database schema (`outdatedDBOct2021` + non-`public` schema)**
 
 - Set **`DB_SCHEMA`** in `~/.ssh/be/.env` to the schema that holds your app tables (e.g. `outdateddbsnapshotoct2024`, matching `\\dt` in psql).
 - Source files use the `outdateddbsnapshotoct2024.*` prefix in SQL strings; **`be/db/connection.js` rewrites `outdateddbsnapshotoct2024.` to `"$DB_SCHEMA".`** at query time, so `verifications`, `singles`, etc. resolve to that schema. You do **not** need to duplicate tables in `public`.

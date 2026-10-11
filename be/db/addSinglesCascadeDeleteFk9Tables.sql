@@ -4,7 +4,7 @@
 --   requests (singles_id_from + singles_id_to), user_customization.
 --
 -- Run on Primary only:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesCascadeDeleteFk9Tables.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesCascadeDeleteFk9Tables.sql
 
 BEGIN;
 

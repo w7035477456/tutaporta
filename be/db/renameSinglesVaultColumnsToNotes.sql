@@ -1,7 +1,7 @@
 -- Rename singles columns: vault → notes (and record_vault → record_notes).
 -- Safe to re-run: only renames when the old column still exists.
 -- Mac:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/renameSinglesVaultColumnsToNotes.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/renameSinglesVaultColumnsToNotes.sql
 
 BEGIN;
 

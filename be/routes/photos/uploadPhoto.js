@@ -681,7 +681,7 @@ export async function uploadPhoto(req, res) {
     // PostgreSQL undefined column (e.g. file_extension missing) → run migration
     if (err?.code === '42703') {
       return res.status(500).json({
-        error: 'Database schema outdated. Run: psql -U <user> -d vsingles -f sql/migration_vsingles_photos_to_photos.sql',
+        error: 'Database schema outdated. Run: psql -U <user> -d outdatedDBOct2021 -f sql/migration_vsingles_photos_to_photos.sql',
       });
     }
     res.status(500).json({

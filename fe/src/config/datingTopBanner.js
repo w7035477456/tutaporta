@@ -1,6 +1,6 @@
 import datingBackgroundTop from 'assets/images/topBannerNewBlur.png';
 
-/** Same strip used on the vsingles app header (All Singles, etc.). */
+/** Same strip used on the TutaDates app header (All Singles, etc.). */
 export const DATING_TOP_BANNER_IMAGE = datingBackgroundTop;
 
 export const DATING_TOP_BANNER_HEIGHT = { xs: 52, sm: 64 };

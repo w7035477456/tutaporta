@@ -1,5 +1,5 @@
 -- outdateddbsnapshotoct2024.singles — three nullable FK slots for self-intro videos.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesSelfIntroVideoFks.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesSelfIntroVideoFks.sql
 
 BEGIN;
 

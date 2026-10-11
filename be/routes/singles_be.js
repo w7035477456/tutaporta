@@ -70,7 +70,7 @@ export const registerUser_FFFFFFFF = async (req, res) => {
         to: email,
         subject: 'Complete Your Registration - Create Password',
         html: wrapEmailHtml(`
-            <h2 style="color: #333;">Welcome to VSingles!</h2>
+            <h2 style="color: #333;">Welcome to TutaDates!</h2>
             <p>Thank you for registering. To complete your registration, please create your password by clicking the link below:</p>
             <p style="margin: 20px 0;">
               <a href="${createPasswordLink}" 
@@ -140,7 +140,7 @@ export const verifyLoginPassword = async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Query singles table (same DB as in ~/.ssh/be/.env: DB_NAME must match where your data lives, e.g. vsingles)
+    // Query singles table (same DB as in ~/.ssh/be/.env: DB_NAME must match where your data lives, e.g. outdatedDBOct2021)
     const result = await pool.query(
       `SELECT 
         singles_id, 

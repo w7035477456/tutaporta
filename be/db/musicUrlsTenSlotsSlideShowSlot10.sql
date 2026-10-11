@@ -1,6 +1,6 @@
 -- 10 music URL slots: 1–9 tracks, slot 10 = Slide Show Music.
 -- Migrates 11-slot rows: keeps slots 1–9, moves old slot 11 → slot 10 when present.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/musicUrlsTenSlotsSlideShowSlot10.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/musicUrlsTenSlotsSlideShowSlot10.sql
 
 BEGIN;
 

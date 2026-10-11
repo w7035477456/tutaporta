@@ -87,7 +87,7 @@ function postYoutubeCommand(iframeWindow, func, args = []) {
   }
 }
 
-/** Site-wide piano / flute / rain — never on /vsingles (lyric is separate). */
+/** Site-wide piano / flute / rain — never on /tutadates (lyric is separate). */
 function GlobalBackgroundPlayer({ soundPreference, volume, vsinglesMediaPaused, pathname, customMusicUrl }) {
   const audioRef = useRef(null);
   const onVsingles = isVsinglesPath(pathname);
@@ -541,7 +541,7 @@ export function BackgroundMusicProvider({ children }) {
         applySavedCustomization(saved);
         return saved.vsinglesLyric;
       } catch (err) {
-        console.warn('[BackgroundMusic] failed to save vsingles lyric', err);
+        console.warn('[BackgroundMusic] failed to save TutaDates lyric', err);
         return normalized;
       }
     },
@@ -840,7 +840,7 @@ export function BackgroundMusicProvider({ children }) {
     muteFromFooter
   ]);
 
-  /** Right speaker: max volume; on /vsingles sets lyric_volume 100. */
+  /** Right speaker: max volume; on /tutadates sets lyric_volume 100. */
   const maxFromFooter = useCallback(async () => {
     if (useVsinglesLyricAudio) {
       setLyricMute(false);

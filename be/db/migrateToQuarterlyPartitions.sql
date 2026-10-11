@@ -2,7 +2,7 @@
 -- recreate quarterly RANGE partitions for current UTC quarter + next quarter only.
 --
 -- Run on Postgres **Primary** only:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/migrateToQuarterlyPartitions.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/migrateToQuarterlyPartitions.sql
 --
 -- Naming: {table}_{year}_quarter{1-4}  (UTC calendar quarters)
 --   chat_log, postings, posting_comments  → RANGE (created_at)

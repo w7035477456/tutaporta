@@ -10,7 +10,7 @@ export function isRecordVaultCloudColumnMissingError(err) {
 }
 
 export function recordVaultCloudSchemaMigrationHint() {
-  return 'Database migration missing on Postgres Primary. Run: psql -U test_user1 -d vsingles -f be/db/addSinglesRecordVaultCloud.sql then pm2 restart tutamallPM2Process. Verify with be/db/verifyRecordVaultCloudColumns.sql (expect 3 OneDrive columns). DDL must run on Primary, not a replica.';
+  return 'Database migration missing on Postgres Primary. Run: psql -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesRecordVaultCloud.sql then pm2 restart tutamallPM2Process. Verify with be/db/verifyRecordVaultCloudColumns.sql (expect 3 OneDrive columns). DDL must run on Primary, not a replica.';
 }
 
 export function recordVaultCloudSchemaErrorResponse(provider, err) {

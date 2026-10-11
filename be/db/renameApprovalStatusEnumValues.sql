@@ -4,7 +4,7 @@
 -- approve is unchanged.
 --
 -- Mac dev (from repo root):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/renameApprovalStatusEnumValues.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/renameApprovalStatusEnumValues.sql
 
 DO $$
 DECLARE

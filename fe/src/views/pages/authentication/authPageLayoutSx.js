@@ -117,6 +117,14 @@ export const authFixedFooterContentPaddingBottom = { pb: `${getAuthFooterHeightV
  * - FOOTERPAGES_TOP_MARGIN => top % of vh
  * - FOOTERPAGES_BOT_MARGIN => bottom % of vh
  */
+/** Yellow highlight on legal pages; text stays black on light and dark themes. */
+export const legalYellowHighlightSx = {
+  backgroundColor: '#FFF3CD',
+  color: '#000 !important',
+  WebkitTextFillColor: '#000',
+  '& *': { color: '#000 !important', WebkitTextFillColor: '#000' }
+};
+
 const legalRightLeftMarginVw = getLegalRightLeftMarginVw();
 const legalTopMarginVh = getLegalTopMarginVh();
 const legalBottomMarginVh = getLegalBottomMarginVh();

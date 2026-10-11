@@ -2,7 +2,7 @@
 -- user_activity_sessions from monthly to quarterly (current + next only).
 --
 -- Run on Postgres **Primary** only:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/trimQuarterlyPartitionsAndMigrateUserActivity.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/trimQuarterlyPartitionsAndMigrateUserActivity.sql
 
 BEGIN;
 

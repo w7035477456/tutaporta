@@ -1,6 +1,6 @@
 -- Passport nationality ISO3 from government ID OCR (Identification Verification).
 -- Mac dev (Primary):
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesPpNationalityColumn.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesPpNationalityColumn.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS pp_nationality text;

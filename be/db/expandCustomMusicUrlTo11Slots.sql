@@ -1,7 +1,7 @@
 -- DEPRECATED — superseded by musicUrlsTenSlotsSlideShowSlot10.sql (10 slots; slot 10 = Slide Show Music).
 -- Expand user_customization.custom_music_url + global.default_music_url to 11 slots
 -- (slot 11 = Slide Show Music).
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/expandCustomMusicUrlTo11Slots.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/expandCustomMusicUrlTo11Slots.sql
 
 BEGIN;
 

@@ -1,7 +1,7 @@
 -- Remove legacy Record Vault Postgres storage (notebooks/notes/keywords/shortcuts).
 -- Vault content lives only on encrypted USB (.recordvault/vault.db.enc).
 -- Run on Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/dropRecordVaultPostgresVaultData.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/dropRecordVaultPostgresVaultData.sql
 
 BEGIN;
 

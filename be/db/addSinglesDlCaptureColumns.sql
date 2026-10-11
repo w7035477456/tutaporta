@@ -1,6 +1,6 @@
 -- Driver license / government ID OCR capture (Identification Verification step 3).
 -- Mac dev (Primary):
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesDlCaptureColumns.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesDlCaptureColumns.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS dl_firstname text,

@@ -33,7 +33,7 @@ export const PROFILE_MENU_GREETING_PHRASES = [
   "Let's find some smiles today, {name}!"
 ];
 
-export function formatProfileMenuDisplayName({ alias, prefix, memberId, singlesId, fallback = 'VSingles Member' } = {}) {
+export function formatProfileMenuDisplayName({ alias, prefix, memberId, singlesId, fallback = 'TutaDates Member' } = {}) {
   return formatAliasWithMemberCode({ alias, prefix, memberId, singlesId, fallback });
 }
 

@@ -1,6 +1,6 @@
 -- Rename vet_bio.member_id and misc_bio.member_id → singles_id; FK to singles.singles_id.
 -- Run on Primary only:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/renameVetBioMiscBioMemberIdToSinglesId.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/renameVetBioMiscBioMemberIdToSinglesId.sql
 
 BEGIN;
 

@@ -45,7 +45,7 @@ export default function MainCard({
       sx={(theme) => ({
         ...(debugBorder ? { border: '3px dashed green' } : {}), //by ANDREWTON, DO NOT REMOVE THIS CODE
 
-        // Shell cards: follow app CSS vars instead of MUI `background.paper` (fixes page chrome on vsingles, etc.)
+        // Shell cards: follow app CSS vars instead of MUI `background.paper` (fixes page chrome on TutaDates, etc.)
         backgroundColor: 'var(--theme-daynight-color)',
 
         // Extra space at bottom so last lines (e.g. footer links) are not clipped on small viewports only

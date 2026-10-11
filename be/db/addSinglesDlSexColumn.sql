@@ -1,6 +1,6 @@
 -- Sex field from driver license OCR (Identification Verification step 3).
 -- Mac dev (Primary):
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addSinglesDlSexColumn.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesDlSexColumn.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.singles
   ADD COLUMN IF NOT EXISTS dl_sex char(1);

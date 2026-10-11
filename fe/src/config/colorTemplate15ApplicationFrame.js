@@ -19,7 +19,7 @@ export const COLOR_TEMPLATE15_APPLICATION_FRAME_HEADER_HEIGHT_PX = 88;
 /** Region 7 — always leave a small gap above the footer on every page. */
 export const COLOR_TEMPLATE15_APPLICATION_FRAME_MAIN_BOTTOM_PADDING = '1vh';
 
-/** Default top banner asset for vsingles / dating shell. */
+/** Default top banner asset for TutaDates dating shell. */
 export const COLOR_TEMPLATE15_APPLICATION_FRAME_DEFAULT_BANNER = DATING_TOP_BANNER_IMAGE;
 
 export function colorTemplate15ApplicationFrameRootSx(overrides = {}) {

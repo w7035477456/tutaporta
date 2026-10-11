@@ -1,7 +1,7 @@
 import vsinglesLyric1 from 'assets/sound/vsinglesLyric1.mp3';
 import rainBackground from 'assets/sound/rainBackground.mp4';
 
-/** DB `sound_preference_enum` — site-wide beds (not /vsingles lyric). Local MP3 beds removed; prefer Track/YouTube. */
+/** DB `sound_preference_enum` — site-wide beds (not /tutadates lyric). Local MP3 beds removed; prefer Track/YouTube. */
 export const SOUND_PREFERENCES = ['piano', 'harpbirds', 'spasauna', 'musictrance', 'storm', 'wavesseagulls', 'rain', 'violin', 'jazz', 'mute'];
 
 export const SOUND_PREFERENCE_LABELS = {
@@ -17,11 +17,11 @@ export const SOUND_PREFERENCE_LABELS = {
   rain: 'Rain Background'
 };
 
-/** DB `vsingles_lyric_enum` — /vsingles splash vocal only. */
+/** DB `vsingles_lyric_enum` — /tutadates splash vocal only. */
 export const VSINGLES_LYRIC_VALUES = ['lyric', 'mute'];
 
 export const VSINGLES_LYRIC_LABELS = {
-  lyric: 'Vsingles Lyric',
+  lyric: 'TutaDates Lyric',
   mute: 'Mute lyric'
 };
 

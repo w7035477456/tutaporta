@@ -1,5 +1,5 @@
 -- Add stored JPEG thumbnail filename for each videos row (play icon baked in on save).
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addVideosThumbnailColumn.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addVideosThumbnailColumn.sql
 
 BEGIN;
 

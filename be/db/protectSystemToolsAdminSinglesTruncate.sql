@@ -2,7 +2,7 @@
 -- TRUNCATE bypasses row-level DELETE triggers — photos TRUNCATE + CASCADE previously wiped singles.
 --
 -- Run on Primary only:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/protectSystemToolsAdminSinglesTruncate.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/protectSystemToolsAdminSinglesTruncate.sql
 
 CREATE OR REPLACE FUNCTION outdateddbsnapshotoct2024.prevent_system_tools_admin_singles_delete()
 RETURNS trigger

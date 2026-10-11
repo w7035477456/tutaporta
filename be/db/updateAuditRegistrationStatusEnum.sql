@@ -1,6 +1,6 @@
 -- outdateddbsnapshotoct2024.audit_registration_status — replace enum values (Primary only).
 -- Mac dev:
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/updateAuditRegistrationStatusEnum.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/updateAuditRegistrationStatusEnum.sql
 
 DO $$
 BEGIN

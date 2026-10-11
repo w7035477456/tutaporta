@@ -10,7 +10,7 @@ export function isPhotoAlbumsCloudColumnMissingError(err) {
 }
 
 export function photoAlbumsCloudSchemaMigrationHint() {
-  return 'Database migration missing on Postgres Primary. Run: psql -U test_user1 -d vsingles -f be/db/addSinglesPhotoAlbumsCloud.sql then pm2 restart tutamallPM2Process. Verify with be/db/verifyPhotoAlbumsCloudColumns.sql (expect 3 OneDrive columns). DDL must run on Primary, not a replica.';
+  return 'Database migration missing on Postgres Primary. Run: psql -U test_user1 -d outdatedDBOct2021 -f be/db/addSinglesPhotoAlbumsCloud.sql then pm2 restart tutamallPM2Process. Verify with be/db/verifyPhotoAlbumsCloudColumns.sql (expect 3 OneDrive columns). DDL must run on Primary, not a replica.';
 }
 
 export function photoAlbumsCloudSchemaErrorResponse(provider, err) {

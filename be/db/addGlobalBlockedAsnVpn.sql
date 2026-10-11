@@ -3,7 +3,7 @@
 -- Schema: outdateddbsnapshotoct2024 (adjust if needed).
 --
 -- Mac dev (from repo root):
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addGlobalBlockedAsnVpn.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addGlobalBlockedAsnVpn.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.global
   ADD COLUMN IF NOT EXISTS blocked_asn_vpn integer[] NOT NULL DEFAULT ARRAY[]::integer[];

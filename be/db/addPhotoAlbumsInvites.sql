@@ -1,7 +1,7 @@
 -- TutaPhotoAlbums album sharing (Postgres — cross-user invites + accepted shares).
 -- Vault content stays in SQLite (notebooks/notes); these tables store invite metadata only.
 -- Planning names: album_sets → vault notebooks, albums → vault notes, album_invites → photo_albums_invites.
--- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addPhotoAlbumsInvites.sql
+-- Run: psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addPhotoAlbumsInvites.sql
 
 BEGIN;
 

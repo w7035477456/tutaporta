@@ -1,6 +1,6 @@
 -- Encrypt Record Vault icon secrets at rest (AES-256-GCM blob; master key in ~/.ssh/be/.env).
 -- Run on Primary:
---   psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/addGlobalRecordVaultIconKeysEnc.sql
+--   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/addGlobalRecordVaultIconKeysEnc.sql
 -- Set RECORD_NOTES_ICON_KEYS_MASTER_KEY in ~/.ssh/be/.env, then:
 --   node be/scripts/migrateRecordVaultIconKeysToEncrypted.js   (existing plaintext map)
 --   node be/scripts/seedRecordVaultIconKeys.js                  (fresh seed)

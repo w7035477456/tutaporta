@@ -15,7 +15,8 @@ import {
   authShellStackSx,
   authFixedFooterContentPaddingBottom,
   legalInfoDialogScrollSx,
-  authButtonBoldSx
+  authButtonBoldSx,
+  legalYellowHighlightSx
 } from './authPageLayoutSx';
 import { getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv';
@@ -57,7 +58,7 @@ export default function PrivacyPolicy() {
                   </Link>
                 </Box>
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mb: 0.5 }}>
-                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx}>
+                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx} data-guest-demo-allow="true">
                     Return
                   </Button>
                 </Box>
@@ -76,12 +77,12 @@ export default function PrivacyPolicy() {
                   Privacy Policy
                 </Typography>
                 <Typography variant="body1" paragraph>
-                  This policy outlines <strong>TutaMall.com</strong>&apos;s privacy protocols for data gathering, storage, usage, and sharing. It applies to all information collected via Services (including its eMarketing directories, Classified Ads marketplace, its specialized dating subdomain <strong>Vsingles</strong>, mobile applications, and websites managed by <strong>TutaMall.com</strong> and its corporate partners). By using the Services, you agree to the Privacy Policy and Terms and Conditions. The policy may be updated; continued use after updates signifies agreement.
+                  This policy outlines <strong>TutaMall.com</strong>&apos;s privacy protocols for data gathering, storage, usage, and sharing. It applies to all information collected via Services (including its eMarketing directories, Classified Ads marketplace, its specialized dating subdomain <strong>TutaDates</strong>, mobile applications, and websites managed by <strong>TutaMall.com</strong> and its corporate partners). By using the Services, you agree to the Privacy Policy and Terms and Conditions. The policy may be updated; continued use after updates signifies agreement.
                 </Typography>
                 <Typography variant="h6" sx={sectionHeaderSx}>1. Data Collection: What and How</Typography>
                 <Typography variant="body1" component="div" paragraph>
                   <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                    <Box component="li" sx={{ mb: 0.5 }}><strong>Personal Information:</strong> Collected to facilitate marketplace listings, transactions, and dating matchmaking. Includes names, emails, phone numbers, addresses, birth dates, dating/search preferences, and notes. For users utilizing the <strong>Vsingles</strong> service, a Compatibility Quiz generates personality profiles, and uploaded dating photos may be visible to other users.</Box>
+                    <Box component="li" sx={{ mb: 0.5 }}><strong>Personal Information:</strong> Collected to facilitate marketplace listings, transactions, and dating matchmaking. Includes names, emails, phone numbers, addresses, birth dates, dating/search preferences, and notes. For users utilizing the <strong>TutaDates</strong> service, a Compatibility Quiz generates personality profiles, and uploaded dating photos may be visible to other users.</Box>
                     <Box component="li" sx={{ mb: 0.5 }}><strong>Communications:</strong> We store communications with support, marketplace buyers/sellers, or other platform members.</Box>
                     <Box component="li" sx={{ mb: 0.5 }}><strong>Subscriptions:</strong> We process names, addresses, and payment details for premium marketplace listings and premium dating tiers; you can request removal of payment data.</Box>
                     <Box component="li" sx={{ mb: 0.5 }}><strong>Sensitive Information:</strong> You may voluntarily provide sensitive information (e.g., religion, ethnicity, gender identity), which you can update or hide.</Box>
@@ -96,7 +97,7 @@ export default function PrivacyPolicy() {
                 <Typography variant="h6" sx={sectionHeaderSx}>3. Sharing and Disclosure</Typography>
                 <Typography variant="body1" component="div" paragraph>
                   <Box component="ul" sx={{ m: 0, pl: 3 }}>
-                    <Box component="li" sx={{ mb: 0.5 }}><strong>No Sale:</strong> <strong>TutaMall.com</strong> and <strong>Vsingles</strong> do not sell your contact information or personal details to third parties.</Box>
+                    <Box component="li" sx={{ mb: 0.5 }}><strong>No Sale:</strong> <strong>TutaMall.com</strong> and <strong>TutaDates</strong> do not sell your contact information or personal details to third parties.</Box>
                     <Box component="li"><strong>Permitted Sharing:</strong> We may share profile details (login status, compatibility scores, photos, and public classified listings) with potential matches or marketplace browsers; with service providers (hosting, payments, SMS authentication, support); for legal reasons (subpoenas, safety); for abuse prevention; and in connection with business transfers (merger or asset sale).</Box>
                   </Box>
                 </Typography>
@@ -122,12 +123,12 @@ export default function PrivacyPolicy() {
                 <Typography variant="body1" component="div" paragraph>
                   <Box component="ul" sx={{ m: 0, pl: 3 }}>
                     <Box component="li" sx={{ mb: 0.5 }}>
-                      <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>
+                      <Box component="span" sx={legalYellowHighlightSx}>
                         <strong>No Sharing:</strong> Mobile information will not be shared with third parties/affiliates for marketing/promotional purposes.
                       </Box>
                     </Box>
                     <Box component="li">
-                      <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>
+                      <Box component="span" sx={legalYellowHighlightSx}>
                         <strong>Exclusion:</strong> All the above categories exclude text messaging originator opt-in data and consent; this information will not be shared with any third parties.
                       </Box>
                     </Box>
@@ -138,15 +139,15 @@ export default function PrivacyPolicy() {
                   For privacy concerns or to exercise data rights, you can contact <strong>TutaMall.com</strong> at <strong>privacy@tutamall.com</strong>.
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  <Box component="span" sx={{ backgroundColor: '#FFF3CD' }}>
+                  <Box component="span" sx={legalYellowHighlightSx}>
                     Effective Date: May 18, 2025.
                   </Box>
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  © 2026 <strong>TutaMall.com</strong>. All Rights Reserved. (Including <strong>Vsingles</strong> Services)
+                  © 2026 <strong>TutaMall.com</strong>. All Rights Reserved. (Including <strong>TutaDates</strong> Services)
                 </Typography>
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: 1 }}>
-                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx}>
+                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx} data-guest-demo-allow="true">
                     Return
                   </Button>
                 </Box>

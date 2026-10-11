@@ -1,6 +1,6 @@
 -- Rename outdateddbsnapshotoct2024.singles.pp_photo_scan_result → pp_profile_scan_result (Primary only).
 -- Mac dev (Primary):
--- psql -h 127.0.0.1 -p 50010 -U test_user1 -d vsingles -f be/db/renameSinglesPpPhotoScanResultToPpProfileScanResult.sql
+-- psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/renameSinglesPpPhotoScanResultToPpProfileScanResult.sql
 
 DO $$
 BEGIN

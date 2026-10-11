@@ -1,5 +1,5 @@
 -- myNote editor preferences (last note, colors, font size, scroll) — per user in user_customization.
--- Run on Primary: psql -h ... -U test_user1 -d vsingles -f be/db/addUserCustomizationMynotePrefs.sql
+-- Run on Primary: psql -h ... -U test_user1 -d outdatedDBOct2021 -f be/db/addUserCustomizationMynotePrefs.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ADD COLUMN IF NOT EXISTS mynote_last_notebook_id bigint NULL,
