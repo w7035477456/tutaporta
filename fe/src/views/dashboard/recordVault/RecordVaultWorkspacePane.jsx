@@ -495,6 +495,31 @@ const menuButtonSx = {
 /** Blue used to mark the active search-result note (chip + matching sidebar row). */
 const RECORD_VAULT_SEARCH_HIT_BLUE = '#1e88e5';
 
+/** Header AI buttons (Keep model loaded + AI LLM RAG). */
+const RECORD_VAULT_AI_BUTTON_BLUE = '#2196f3';
+const RECORD_VAULT_AI_BUTTON_BLUE_HOVER = '#1e88e5';
+const RECORD_VAULT_AI_BUTTON_BLUE_OFF = '#90caf9';
+const RECORD_VAULT_AI_BUTTON_BLUE_OFF_HOVER = '#7ab8f5';
+
+/** @param {string} bg @param {string} hoverBg */
+function recordVaultAiButtonBlueSx(bg, hoverBg) {
+  return {
+    bgcolor: `${bg} !important`,
+    backgroundColor: `${bg} !important`,
+    backgroundImage: 'none !important',
+    color: '#000 !important',
+    WebkitTextFillColor: '#000 !important',
+    border: '4px solid #000 !important',
+    '@media (hover: hover)': {
+      '&:hover:not(.Mui-disabled)': {
+        bgcolor: `${hoverBg} !important`,
+        backgroundColor: `${hoverBg} !important`,
+        transform: `scale(${SLIDER_CONTROL_BUTTON_HOVER_SCALE_15})`
+      }
+    }
+  };
+}
+
 /**
  * Split a note title around the active search terms so matching substrings can
  * blink (same yellow `.rv-search-hit` treatment used for body matches). Returns
@@ -6806,7 +6831,9 @@ export default function RecordVaultWorkspacePane({
         closeButtonAriaLabel="Close keep model dialog"
       >
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Keep Model ON</ColorTemplate16PopupCenterWide.Title>
+          <ColorTemplate16PopupCenterWide.Title>
+            {`Keep ${ragModelButtonLabel || 'Model'} Loaded`}
+          </ColorTemplate16PopupCenterWide.Title>
           <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
             {ragKeepModelNotice}
           </ColorTemplate16PopupCenterWide.BodyText>
@@ -7069,7 +7096,7 @@ export default function RecordVaultWorkspacePane({
                   <Box
                     sx={{
                       ...menuRailButtonCellSx,
-                      flex: '0 0 auto',
+                      flex: '0 1 auto',
                       width: 'auto',
                       minWidth: 0,
                       overflow: 'visible'
@@ -7082,8 +7109,8 @@ export default function RecordVaultWorkspacePane({
                       aria-pressed={ragKeepModelInMemory}
                       aria-label={
                         ragKeepModelInMemory
-                          ? 'Keep model ON — Ollama stays in memory'
-                          : 'Keep model OFF — Ollama default timeout (~5 min)'
+                          ? `Keep ${ragConfiguredModel || 'model'} loaded ON — Ollama stays in memory`
+                          : `Keep ${ragConfiguredModel || 'model'} loaded OFF — Ollama default timeout (~5 min)`
                       }
                       title={
                         ragKeepModelInMemory
@@ -7094,36 +7121,24 @@ export default function RecordVaultWorkspacePane({
                       onClick={() => void handleToggleRagKeepModel()}
                       sx={{
                         ...headerToggleButtonSx,
+                        width: 'auto',
+                        minWidth: 0,
+                        flexShrink: 1,
+                        whiteSpace: 'normal',
+                        lineHeight: 1.05,
                         ...(ragKeepModelInMemory
-                          ? {
-                              bgcolor: '#60C446 !important',
-                              color: '#000 !important',
-                              WebkitTextFillColor: '#000 !important',
-                              border: '4px solid #000 !important',
-                              '@media (hover: hover)': {
-                                '&:hover:not(.Mui-disabled)': {
-                                  bgcolor: '#55b03d !important'
-                                }
-                              }
-                            }
-                          : {
-                              bgcolor: '#9e9e9e !important',
-                              color: '#000 !important',
-                              WebkitTextFillColor: '#000 !important',
-                              border: '4px solid #000 !important',
-                              '@media (hover: hover)': {
-                                '&:hover:not(.Mui-disabled)': {
-                                  bgcolor: '#8a8a8a !important'
-                                }
-                              }
-                            })
+                          ? recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE, RECORD_VAULT_AI_BUTTON_BLUE_HOVER)
+                          : recordVaultAiButtonBlueSx(
+                              RECORD_VAULT_AI_BUTTON_BLUE_OFF,
+                              RECORD_VAULT_AI_BUTTON_BLUE_OFF_HOVER
+                            ))
                       }}
                     >
                       {ragKeepModelBusy
                         ? 'Loading…'
                         : menuLabelsCompact
                           ? 'Model'
-                          : 'Keep Model ON'}
+                          : `Keep ${ragModelButtonLabel || 'Model'} Loaded`}
                     </SliderControlButton>
                   </Box>
                 ) : null}
@@ -7279,7 +7294,8 @@ export default function RecordVaultWorkspacePane({
                           ...headerFullWidthButtonSx,
                           whiteSpace: 'normal',
                           lineHeight: 1.05,
-                          py: { xs: 0.25, sm: 0.3 }
+                          py: { xs: 0.25, sm: 0.3 },
+                          ...recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE, RECORD_VAULT_AI_BUTTON_BLUE_HOVER)
                         }}
                       >
                         <Box

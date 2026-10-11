@@ -47,10 +47,6 @@ export const TUTANOTES_WELCOME_TUTORIAL_ITEMS = [
   {
     label: '9. Upgrade Speed:',
     body: 'Need faster performance? Click “Click Here” in the top-left corner to add high-priority server bandwidth (GB allocation).'
-  },
-  {
-    label: '10. USB vs OneDrive:',
-    body: 'USB is much faster than OneDrive, but requires USB Bridge — OneDrive is accessible on mobile.'
   }
 ];
 

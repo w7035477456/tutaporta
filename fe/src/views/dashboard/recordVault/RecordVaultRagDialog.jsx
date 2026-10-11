@@ -176,7 +176,7 @@ export default function RecordVaultRagDialog({
     }
     if (serviceStatus.status === 'ok') {
       return keepModelInMemory
-        ? 'RAG ready — model pinned in memory (Keep Model ON).'
+        ? 'RAG ready — model pinned in memory (Keep Model Loaded is ON).'
         : 'RAG ready — model uses default ~5 min keep-alive.';
     }
     return serviceStatus.error || '';
