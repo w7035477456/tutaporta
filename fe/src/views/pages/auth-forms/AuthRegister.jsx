@@ -8,7 +8,9 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
 // project imports
+import Stack from '@mui/material/Stack';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
+import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import { registerUser } from 'api/registerFe';
 import enterEmailImg from 'assets/images/enterEmail.png';
@@ -46,6 +48,10 @@ const EMAIL_EXISTS_MSG = 'This email already exist in out system. Please double 
 const PHONE_EXISTS_MSG =
   'This phone number is already associated with an account. Please use a different number or sign in.';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Shown when ~/.ssh/be/.env SIGNUP_DOWN=true (GET /api/publicConfig.signupDown or 503 from /api/register). */
+const SIGNUP_DOWN_MSG =
+  'Our sign up service is being upgraded. Please check back in a few days. ' +
+  'Meanwhile, log in as "demo" (no password) if you want to check it out in demo mode.';
 
 function isEmailAlreadyRegisteredMessage(msg) {
   const text = String(msg ?? '').toLowerCase();
@@ -135,6 +141,8 @@ export default function AuthRegister() {
   const [googleSignupEnabled, setGoogleSignupEnabled] = useState(false);
   const [googleBound, setGoogleBound] = useState(false);
   const [googleSignupToken, setGoogleSignupToken] = useState('');
+  const [signupDown, setSignupDown] = useState(false);
+  const [signupDownMessage, setSignupDownMessage] = useState('');
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -199,6 +207,7 @@ export default function AuthRegister() {
         if (typeof data.googleSignupEnabled === 'boolean') {
           setGoogleSignupEnabled(data.googleSignupEnabled);
         }
+        setSignupDown(data.signupDown === true);
       })
       .catch(() => {});
     return () => {
@@ -240,6 +249,10 @@ export default function AuthRegister() {
     setError('');
     setEmailError('');
     setPhoneError('');
+    if (signupDown) {
+      setSignupDownMessage(SIGNUP_DOWN_MSG);
+      return;
+    }
     if (!checked) {
       setError('Please agree to the terms and conditions.');
       return;
@@ -285,7 +298,10 @@ export default function AuthRegister() {
     } catch (err) {
       console.error('Registration error:', err);
       const msg = err?.response?.data?.error || err.message || 'Failed to register. Please try again.';
-      if (isPhoneAlreadyRegisteredMessage(msg)) {
+      if (err?.status === 503) {
+        setSignupDown(true);
+        setSignupDownMessage(msg || SIGNUP_DOWN_MSG);
+      } else if (isPhoneAlreadyRegisteredMessage(msg)) {
         setPhoneError(PHONE_EXISTS_MSG);
       } else if (isEmailAlreadyRegisteredMessage(msg)) {
         setEmailError(EMAIL_EXISTS_MSG);
@@ -431,6 +447,23 @@ export default function AuthRegister() {
           {isSubmitting ? (googleBound ? 'Creating account…' : 'Sending...') : 'Sign Up'}
         </SelectedButtonTemplate>
       </Box>
+
+      <ColorTemplate7PopupLargeDark
+        open={Boolean(signupDownMessage)}
+        onClose={() => setSignupDownMessage('')}
+        closeOnBackdrop
+        closeButtonAriaLabel="Close sign up notice"
+      >
+        <ColorTemplate7PopupLargeDark.Body spacing={2}>
+          <ColorTemplate7PopupLargeDark.Title>Sign Up</ColorTemplate7PopupLargeDark.Title>
+          <ColorTemplate7PopupLargeDark.BodyText>{signupDownMessage}</ColorTemplate7PopupLargeDark.BodyText>
+          <Stack direction="row" spacing={1.5} justifyContent="flex-end" flexWrap="wrap" sx={{ width: '100%' }}>
+            <ColorTemplate7PopupLargeDark.ActionButton type="button" onClick={() => setSignupDownMessage('')}>
+              OK
+            </ColorTemplate7PopupLargeDark.ActionButton>
+          </Stack>
+        </ColorTemplate7PopupLargeDark.Body>
+      </ColorTemplate7PopupLargeDark>
     </Box>
   );
 }

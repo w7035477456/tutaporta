@@ -3,6 +3,7 @@ import { isDuplicatePhoneAllowed } from './utils/duplicatePhonePolicy.js';
 import { drainUploadBodyBeforeResponse } from './utils/drainUploadBodyBeforeResponse.js';
 import { tutaPhotoRequiredJsonLimitMb } from './utils/tutaPhotoQuotaConfig.js';
 import { isBlockMobileEnabled } from './utils/blockMobileConfig.js';
+import { isSignupDownEnabled, rejectWhenSignupDown } from './utils/signupDownConfig.js';
 import { isBypassSmsPhoneVerificationEnabled } from './utils/bypassSmsPhoneVerification.js';
 import { startBlockedAsnDailyRefresh } from './utils/blockedAsnRefresh.js';
 import { startBillOverdueEmailDaily } from './utils/billOverdueEmail.js';
@@ -1149,6 +1150,7 @@ app.get('/api/publicConfig', (_req, res) => {
     autoUiChatUpdate: isAutoUiChatUpdateEnabled(),
     autoUiPostUpdate: isAutoUiPostUpdateEnabled(),
     newAccountSignup,
+    signupDown: isSignupDownEnabled(),
     bypassSmsPhoneVerification: isBypassSmsPhoneVerificationEnabled(),
     googleSignupEnabled: isGoogleSignupOAuthConfigured(),
     oneDriveVaultEnabled: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()).enabled,
@@ -1523,7 +1525,7 @@ app.get('/api/auth/linkedin/callback', linkedInOAuthCallback);
 app.get('/api/linkedin/status', requireAuth, getLinkedInStatus);
 app.post('/api/linkedin/save-url', requireAuth, saveLinkedInProfileUrl);
 app.post('/api/linkedin/save-employment', requireAuth, saveSelfReportedEmployment);
-app.post('/api/register', registerUser_FFFFFFFF);
+app.post('/api/register', rejectWhenSignupDown, registerUser_FFFFFFFF);
 app.get('/api/verifyRegistrationLink', verifyRegistrationLink_KKKKKKKK);
 app.post('/api/verifyRegistrationCode', verifyRegistrationCode_VVVVVVVV);
 app.get('/api/verifyPasswordResetLink', verifyPasswordResetLink_LLLLLLLL);
