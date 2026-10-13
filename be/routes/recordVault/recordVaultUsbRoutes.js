@@ -19,11 +19,11 @@ import { clearRecordVaultCacheIcon, readRecordVaultCacheIcon } from '../../utils
 import { isVaultBackupUsbEnabled } from '../../utils/recordVaultStorageFlags.js';
 import fs from 'fs';
 import { streamUsbVaultBackupZip, restoreUsbVaultFromZipFile } from '../../utils/recordVaultUsb/usbVaultBackup.js';
-import { parseOneDriveBackupZipUpload } from '../../utils/recordVaultOneDrive/parseOneDriveBackupZipUpload.js';
+import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
 import {
   clearVaultLogoffProgress,
   setVaultLogoffProgress
-} from '../../utils/recordVaultOneDrive/vaultLogoffProgress.js';
+} from '../../utils/recordVaultVaultLogoffProgress.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -199,7 +199,7 @@ export async function restoreRecordVaultUsbBackupZip(req, res) {
 
   let upload = null;
   try {
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const result = await restoreUsbVaultFromZipFile(singlesId, upload.zipPath);
     return res.json({ success: true, ...result });
   } catch (err) {

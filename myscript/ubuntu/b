@@ -302,7 +302,7 @@ testBuguploadPhoto() {
 
 fixBugUploadPhoto() {
     # Confirm env points here
-    grep VSINGLES_PHOTO_FOLDER ~/.ssh/be/.env
+    grep TUTADATES_PHOTO_FOLDER ~/.ssh/be/.env
 
     # Fix write access for the PM2 user on the REAL folder
     sudo mkdir -p ${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/photos
@@ -750,18 +750,176 @@ alias showrestic='clear;sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu
 alias wipebackuponly='clear;sudo rm -rf ~/TERRAMASTER/restic-ubuntu && showrestic'
 alias wipetestbackup='clear;sudo rm -rf ~/TERRAMASTER/restic-ubuntu && source ~/backups/.backup-secrets-ubuntu.env && restic init --repo $RESTIC_REPOSITORY && bash ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env && backupnightly && showrestic'
 
+RESTIC_ENV_UBUNTU=/home/lawsen0/backups/.backup-secrets-ubuntu.env
+
+resticu() {
+    sudo bash -c 'source "$1"; shift; restic "$@"' _ "$RESTIC_ENV_UBUNTU" "$@"
+}
+
+restichelp() {
+    cat <<'EOF'
+To activate backup manually:         backupnightly
+To back up now with a note:          backupnote <text>
+To show all snapshots:               resticsnapshots
+To add a note to a snapshot:         resticnote <id> <text>
+To restore a specific snapshot:      RestoreSnapshot
+To show latest 2 snapshot changes:   resticdiff
+To show nightly cron backup time:    showCronIncBackup
+EOF
+}
+
+resticsnapshots() {
+    clear
+    {
+        printf 'ID\tTIME\tNOTE\n'
+        resticu snapshots --json | jq -r '.[] | [
+            .short_id,
+            (.time[:19] | sub("T"; " ")),
+            ([.tags[]? | select(startswith("note:")) | ltrimstr("note:")] | join(" | "))
+        ] | @tsv'
+    } | column -t -s $'\t'
+}
+
+# Notes are restic tags ("note:..."), so commas become ";". Adding a note rewrites
+# the snapshot, so it gets a NEW ID. backup-nightly.sh keeps every snapshot (no forget/prune).
+resticnote() {
+    local id="$1"; shift
+    local note="$*"
+    if [ -z "$id" ] || [ -z "$note" ]; then
+        echo "Usage: resticnote <snapshot-id> <note text>"
+        return 1
+    fi
+    resticu tag --add "noted" --add "note:${note//,/;}" "$id" && resticsnapshots
+}
+
+resticunnote() {
+    local id="$1"
+    [ -z "$id" ] && { echo "Usage: resticunnote <snapshot-id>"; return 1; }
+    local tags
+    tags=$(resticu snapshots --json "$id" | jq -r '.[0].tags[]? | select(. == "noted" or startswith("note:"))')
+    [ -z "$tags" ] && { echo "No note on $id."; return 0; }
+    local args=()
+    while IFS= read -r t; do args+=(--remove "$t"); done <<< "$tags"
+    resticu tag "${args[@]}" "$id" && resticsnapshots
+}
+
+backupnote() {
+    [ -z "$*" ] && { echo "Usage: backupnote <note text>"; return 1; }
+    clear
+    sudo /home/lawsen0/backups/scripts/backup-nightly.sh "$RESTIC_ENV_UBUNTU" "$*"
+}
+
 resticdiff() {
-    echo -e "\n\n---------- Total size ----------"
-    # Added sudo -E here
-    sudo -E restic stats --mode raw-data
-    
-    echo -e "\n\n---------- Snapshots ----------"
-    # Added sudo -E here
-    sudo -E restic snapshots --json | jq -r '.[-2].id, .[-1].id'
-    
-    echo -e "\n\n---------- Diff of latest 2 snapshots ----------"
-    # Added sudo -E to both parts of the diff command
-    sudo -E restic diff "$(sudo -E restic snapshots --json | jq -r '.[-2].id')" "$(sudo -E restic snapshots --json | jq -r '.[-1].id')"
+    clear
+    local ids
+    ids=$(resticu snapshots --json | jq -r '.[-2:][].id')
+    if [ "$(wc -w <<< "$ids")" -lt 2 ]; then
+        echo "Need at least 2 snapshots to diff. Run backupnightly first."
+        return 1
+    fi
+
+    echo -e "---------- Total size ----------"
+    resticu stats --mode raw-data
+
+    echo -e "\n---------- Diff of latest 2 snapshots: $(echo $ids) ----------"
+    resticu diff $ids
+}
+
+lastbackup() {
+    clear
+    echo "---------- cron runs today ----------"
+    journalctl -u cron --since today | grep backup-nightly.sh
+
+    echo -e "\n---------- last backup run (log) ----------"
+    tac /home/lawsen0/backups/backup-ubuntu.log | sed '/\] start /q' | tac
+
+    echo -e "\n---------- latest snapshots ----------"
+    resticu snapshots --latest 3
+}
+
+# Restore live DB + storage folders to a restic snapshot (code is NOT restored; use git).
+RestoreSnapshot() {
+    local env="$RESTIC_ENV_UBUNTU"
+    local backups=/home/lawsen0/backups
+    local schema=outdateddbsnapshotoct2024
+    local pgdump16=/usr/lib/postgresql/16/bin/pg_dump
+    local storage=(
+        /mnt/pgdata16/tutamallStorageFolder_outdatedOct2021
+        /mnt/pgdata16/tutamallStorageFolder_largecheapstorage_outdatedOct2021
+    )
+    local id ans stage dump pre d
+
+    resticsnapshots || return 1
+    echo
+    read -r -p "Snapshot ID to restore (e.g. fbb647a0): " id
+    [ -z "$id" ] && { echo "No ID given. Cancelled."; return 1; }
+    if [ "$(resticu snapshots --json "$id" 2>/dev/null | jq 'length' 2>/dev/null)" != "1" ]; then
+        echo "Snapshot '$id' not found. Cancelled."
+        return 1
+    fi
+
+    echo
+    echo "This replaces the LIVE database ($schema) and these folders with snapshot $id:"
+    printf '   %s\n' "${storage[@]}"
+    echo "Anything added or changed since that snapshot will be lost. Code is not touched."
+    read -r -p "Type the snapshot ID again to continue: " ans
+    [ "$ans" != "$id" ] && { echo "Mismatch. Cancelled."; return 1; }
+
+    pre="$backups/pre-restore-$(date +%F-%H%M%S).sql.zst"
+    echo -e "\n[0/5] Saving current DB to $pre (for undo)..."
+    sudo bash -c 'source "$1"; "$2" --no-owner --no-privileges | zstd -q -T0 -19 -o "$3"' _ "$env" "$pgdump16" "$pre" \
+        || { echo "Safety dump failed. Nothing changed."; return 1; }
+    ls -lh "$pre"
+
+    stage="$backups/restore-ubuntu-$id"
+    echo -e "\n[1/5] Unpacking snapshot $id to $stage (live data not touched)..."
+    sudo rm -rf "$stage"
+    resticu restore "$id" --target "$stage" || { echo "restic restore failed. Nothing changed."; return 1; }
+    dump=$(sudo find "$stage$backups/pgdump-ubuntu" -name 'vsingles-ubuntu-*.sql.zst' 2>/dev/null | sort | tail -n 1)
+    [ -z "$dump" ] && { echo "No DB dump found in snapshot. Nothing changed."; return 1; }
+    echo "DB dump: $dump"
+
+    echo -e "\n[2/5] Stopping app..."
+    pm2 stop tutamallPM2Process
+
+    # Drop + load in ONE transaction: on any error the old schema stays. sed strips the
+    # PG17+ setting that newer pg_dump writes and the PG16 server rejects.
+    echo -e "\n[3/5] Restoring database..."
+    if ! sudo bash -c 'source "$1"; { echo "DROP SCHEMA IF EXISTS $3 CASCADE;"; zstd -dc "$2" | sed "/^SET transaction_timeout/d"; } \
+            | psql -q -v ON_ERROR_STOP=1 --single-transaction >/dev/null' _ "$env" "$dump" "$schema"; then
+        echo "DB restore FAILED and was rolled back (live DB unchanged). Restarting app, storage not touched."
+        pm2 start tutamallPM2Process
+        return 1
+    fi
+    sudo bash -c 'source "$1"; psql -Atc "$2"' _ "$env" \
+        "select count(*) || ' tables restored' from information_schema.tables where table_schema = '$schema'"
+
+    echo -e "\n[4/5] Storage preview (* deleting = file added after snapshot, >f = file replaced):"
+    for d in "${storage[@]}"; do
+        echo "=== $d"
+        sudo rsync -a --delete --dry-run --itemize-changes "$stage$d/" "$d/"
+    done
+    read -r -p "Apply these storage changes? [y/N]: " ans
+    if [[ "$ans" =~ ^[Yy]$ ]]; then
+        for d in "${storage[@]}"; do
+            sudo rsync -a --delete "$stage$d/" "$d/"
+        done
+        echo "Storage restored."
+    else
+        echo "Storage NOT restored (DB is restored; files are still current)."
+    fi
+
+    echo -e "\n[5/5] Starting app..."
+    pm2 start tutamallPM2Process
+    pm2 list
+    echo "Check https://tutamall.com. Undo DB: load $pre the same way."
+
+    echo
+    read -r -p "Clean up unpacked snapshot folder $stage? [Y/n]: " ans
+    [[ ! "$ans" =~ ^[Nn]$ ]] && sudo rm -rf "$stage" && echo "Removed $stage"
+    read -r -p "Also delete the undo DB dump $pre? [y/N]: " ans
+    [[ "$ans" =~ ^[Yy]$ ]] && sudo rm -f "$pre" && echo "Removed $pre"
+    echo "Done."
 }
 
 

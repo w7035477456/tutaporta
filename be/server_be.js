@@ -218,32 +218,13 @@ import {
   unlockRecordVaultUsb
 } from './routes/recordVault/recordVaultUsbRoutes.js';
 import {
-  disconnectRecordVaultOneDrive,
-  downloadRecordVaultOneDriveBackupZip,
-  formatRecordVaultOneDrive,
-  getRecordVaultOneDriveConfig,
-  getRecordVaultOneDriveEmails,
-  getRecordVaultOneDriveStatus,
-  getRecordVaultOneDriveVaultTree,
-  getRecordVaultOneDriveUnlockGuard,
-  initRecordVaultOneDrive,
-  getRecordVaultOneDriveLogoffProgress,
-  getRecordVaultOneDriveOpenProgress,
-  getRecordVaultOneDriveSyncProgress,
-  logoffRecordVaultOneDrive,
-  rememberRecordVaultOneDriveEmail,
-  restoreRecordVaultOneDriveBackupZip,
-  syncRecordVaultOneDrive,
-  testWriteRecordVaultOneDrive,
-  unlockRecordVaultOneDrive
-} from './routes/recordVault/recordVaultOneDriveRoutes.js';
-import {
   downloadRecordVaultTutaDriveBackupZip,
   deleteRecordVaultTutaDriveBackupByName,
   downloadRecordVaultTutaDriveStoredBackup,
   formatRecordVaultTutaDrive,
   getRecordVaultTutaDriveBackupStatus,
   getRecordVaultTutaDriveStatus,
+  getRecordVaultTutaDriveVaultTree,
   initRecordVaultTutaDrive,
   logoffRecordVaultTutaDrive,
   applyRecordVaultTutaDriveMerge,
@@ -252,28 +233,24 @@ import {
   replaceRecordVaultTutaDriveBackup,
   restoreRecordVaultTutaDriveBackupZip,
   storeRecordVaultTutaDriveBackup,
+  syncRecordVaultTutaDrive,
   unlockRecordVaultTutaDrive
 } from './routes/recordVault/recordVaultTutaDriveRoutes.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
 import { getRecordVaultRagConfig } from './utils/recordVaultRagConfig.js';
 import { isIncludeUsbDmgExeEnabled } from './utils/includeUsbDmgExeConfig.js';
-import { getRecordVaultStorageConfig, logoffRecordVaultStorage } from './routes/recordVault/recordVaultStorageRoutes.js';
+import {
+  getRecordVaultStorageConfig,
+  getRecordVaultStorageLogoffProgress,
+  logoffRecordVaultStorage
+} from './routes/recordVault/recordVaultStorageRoutes.js';
 import { downloadRecordVaultBridgeInstaller } from './routes/recordVault/recordVaultBridgeInstaller.js';
 import {
   getRecordVaultSessionFileCounts,
   getRecordVaultUsage,
   postRecordVaultSessionFileCounts
 } from './routes/recordVault/recordVaultUsageRoutes.js';
-import {
-  buildVaultStorageChoice,
-  isVaultLocalUsbOffered,
-  isVaultOneDriveOffered
-} from './utils/recordVaultStorageFlags.js';
-import {
-  isOneDriveVaultOAuthConfigured,
-  recordVaultOneDriveOAuthCallback,
-  recordVaultOneDriveOAuthStart
-} from './routes/recordVault/recordVaultOneDriveOAuth.js';
+import { isVaultLocalUsbOffered } from './utils/recordVaultStorageFlags.js';
 
 // ---- Photo Albums (independent clone) ----
 import {
@@ -338,35 +315,20 @@ import {
   scanPhotoAlbumsUsb,
   unlockPhotoAlbumsUsb
 } from './routes/photoAlbums/photoAlbumsUsbRoutes.js';
-import {
-  disconnectPhotoAlbumsOneDrive,
-  downloadPhotoAlbumsOneDriveBackupZip,
-  downloadPhotoAlbumsOneDriveAlbumBackupZip,
-  getPhotoAlbumsOneDriveAlbumBackupProgress,
-  formatPhotoAlbumsOneDrive,
-  getPhotoAlbumsOneDriveConfig,
-  getPhotoAlbumsOneDriveEmails,
-  getPhotoAlbumsOneDriveStatus,
-  getPhotoAlbumsOneDriveVaultTree,
-  getPhotoAlbumsOneDriveUnlockGuard,
-  initPhotoAlbumsOneDrive,
-  getPhotoAlbumsOneDriveLogoffProgress,
-  getPhotoAlbumsOneDriveOpenProgress,
-  getPhotoAlbumsOneDriveSyncProgress,
-  logoffPhotoAlbumsOneDrive,
-  rememberPhotoAlbumsOneDriveEmail,
-  restorePhotoAlbumsOneDriveBackupZip,
-  syncPhotoAlbumsOneDrive,
-  testWritePhotoAlbumsOneDrive,
-  unlockPhotoAlbumsOneDrive
-} from './routes/photoAlbums/photoAlbumsOneDriveRoutes.js';
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
+  downloadPhotoAlbumsTutaDriveAlbumBackupZip,
   formatPhotoAlbumsTutaDrive,
+  getPhotoAlbumsTutaDriveAlbumBackupProgress,
+  getPhotoAlbumsTutaDriveLogoffProgress,
   getPhotoAlbumsTutaDriveOpenProgress,
   getPhotoAlbumsTutaDriveStatus,
+  getPhotoAlbumsTutaDriveSyncProgress,
+  getPhotoAlbumsTutaDriveVaultTree,
   initPhotoAlbumsTutaDrive,
   logoffPhotoAlbumsTutaDrive,
+  restorePhotoAlbumsTutaDriveBackupZip,
+  syncPhotoAlbumsTutaDrive,
   unlockPhotoAlbumsTutaDrive
 } from './routes/photoAlbums/photoAlbumsTutaDriveRoutes.js';
 import {
@@ -393,15 +355,6 @@ import {
   postPhotoAlbumsSessionFileCounts,
   postPhotoAlbumsTransferBytes
 } from './routes/photoAlbums/photoAlbumsUsageRoutes.js';
-import {
-  buildVaultStorageChoice as buildPhotoAlbumsStorageChoice,
-  isVaultOneDriveOffered as isPhotoAlbumsOneDriveOffered
-} from './utils/photoAlbumsStorageFlags.js';
-import {
-  isOneDriveVaultOAuthConfigured as isPhotoAlbumsOneDriveOAuthConfigured,
-  photoAlbumsOneDriveOAuthCallback,
-  photoAlbumsOneDriveOAuthStart
-} from './routes/photoAlbums/photoAlbumsOneDriveOAuth.js';
 import { clearPhotoAlbumsCacheIcon } from './utils/photoAlbumsCacheIcon.js';
 import {
   logoffVaultUsb as logoffPhotoAlbumsUsbSession,
@@ -416,7 +369,6 @@ import {
   VAULT_PRODUCT_RECORD_VAULT
 } from './utils/vaultClusterCoherence.js';
 import { validateMediaStorage } from './utils/sharedMediaStorage.js';
-import { getOneDriveStagingRootStatus } from './utils/recordVaultOneDriveStagingRoot.js';
 import { deleteMyVideo } from './routes/videos/deleteMyVideo.js';
 import { getAdminPhoto } from './routes/photos/getAdminPhoto.js';
 import { getAdminPhotoThumbnail } from './routes/photos/getAdminPhotoThumbnail.js';
@@ -868,9 +820,7 @@ app.use((req, res, next) => {
   }
   if (
     req.method === 'POST' &&
-    (req.path === '/api/photoAlbums/onedrive/restore-zip' ||
-      req.path === '/api/photoAlbums/usb/restore-zip' ||
-      req.path === '/api/recordVault/onedrive/restore-zip' ||
+    (req.path === '/api/photoAlbums/usb/restore-zip' ||
       req.path === '/api/recordVault/usb/restore-zip')
   ) {
     const cl = req.get('content-length');
@@ -909,9 +859,7 @@ const LARGE_MULTIPART_UPLOAD_POST_PATHS = new Set([
   '/api/recordVault/tutadrive/restore-zip',
   '/api/recordVault/tutadrive/backup-tree',
   '/api/recordVault/tutadrive/merge/preview',
-  '/api/recordVault/onedrive/restore-zip',
   '/api/recordVault/usb/restore-zip',
-  '/api/photoAlbums/onedrive/restore-zip',
   '/api/photoAlbums/usb/restore-zip'
 ]);
 app.use((req, res, next) => {
@@ -995,23 +943,8 @@ console.log(
   `[startup] Redis record-vault cache icons: ${RECORD_VAULT_CACHE_ICON_KEY_PREFIX}{onedrive|usb}:{singles_id} (shared across web servers; falls back to Postgres when Redis unavailable)`
 );
 console.log(
-  '[startup] Cluster state (signup, vault unlock, OneDrive dirty/queue, transfer bytes): Redis keys v1:* (in-memory fallback when Redis unavailable)'
+  '[startup] Cluster state (signup, vault unlock, transfer bytes): Redis keys v1:* (in-memory fallback when Redis unavailable)'
 );
-{
-  const stagingStatus = getOneDriveStagingRootStatus();
-  if (stagingStatus.configured) {
-    console.log('[startup] OneDrive staging', {
-      configured: stagingStatus.configured,
-      effective: stagingStatus.effective,
-      usingFallback: stagingStatus.usingFallback
-    });
-    if (stagingStatus.clusterMode && stagingStatus.usingFallback) {
-      console.error(
-        '[startup] CLUSTER_MULTI_SERVER: RECORD_VAULT_ONEDRIVE_STAGING_ROOT is set but not usable on this host'
-      );
-    }
-  }
-}
 {
   const mediaCheck = validateMediaStorage();
   if (mediaCheck.ok) {
@@ -1073,23 +1006,6 @@ app.get('/health', async (req, res) => {
   await logAndIncrementHealthPingCount(req);
   res.status(200).json({ status: 'ok' });
 });
-
-// Microsoft Azure publisher domain verification (OneDrive OAuth app registration)
-const microsoftIdentityAssociationPath = path.join(
-  __dirname,
-  '../fe/public/.well-known/microsoft-identity-association.json'
-);
-function sendMicrosoftIdentityAssociationFile(_req, res) {
-  if (!fs.existsSync(microsoftIdentityAssociationPath)) {
-    return res.status(404).type('text/plain').send('microsoft-identity-association.json not found');
-  }
-  res.set('Cache-Control', 'public, max-age=300');
-  res.type('application/json');
-  res.sendFile(microsoftIdentityAssociationPath);
-}
-// Azure may request either path; without .json must not fall through to SPA index.html.
-app.get('/.well-known/microsoft-identity-association.json', sendMicrosoftIdentityAssociationFile);
-app.get('/.well-known/microsoft-identity-association', sendMicrosoftIdentityAssociationFile);
 
 // DB health check for frontend – verifies Redis config and DB before any API use
 app.get('/api/health', async (req, res) => {
@@ -1153,14 +1069,13 @@ app.get('/api/publicConfig', (_req, res) => {
     signupDown: isSignupDownEnabled(),
     bypassSmsPhoneVerification: isBypassSmsPhoneVerificationEnabled(),
     googleSignupEnabled: isGoogleSignupOAuthConfigured(),
-    oneDriveVaultEnabled: buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured()).enabled,
     linkedInEnabled: isLinkedInOAuthConfigured(),
     blockMobile: isBlockMobileEnabled(),
     duplicatePhoneAllow: isDuplicatePhoneAllowed('ANYMEMBER'),
     onenoteUsbUpgrade: ['true', '1', 'yes', 'on'].includes(
       String(process.env.ONENOTE_USB_UPGRADE ?? '').trim().toLowerCase()
     ),
-    // TutaNotes panels: LEFT_SIDE=OneDrive|TutaDrive|None, RIGHT_SIDE=USB|None (~/.ssh/be/.env)
+    // TutaNotes panels: LEFT_SIDE=TutaDrive|None, RIGHT_SIDE=USB|None (~/.ssh/be/.env)
     leftSide: getLeftSideMode(),
     tutaDrive: isLeftSideTutaDrive(),
     rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
@@ -1651,31 +1566,13 @@ app.post('/api/recordVault/usb/format', ...recordVaultVaultAuth, formatRecordVau
 app.get('/api/recordVault/storage/config', ...recordVaultVaultAuth, getRecordVaultStorageConfig);
 app.get('/api/recordVault/bridge/installer/:platform', requireAuth, downloadRecordVaultBridgeInstaller);
 app.post('/api/recordVault/storage/logoff', ...recordVaultVaultAuth, logoffRecordVaultStorage);
+app.get('/api/recordVault/storage/logoff-progress', ...recordVaultVaultAuth, getRecordVaultStorageLogoffProgress);
 app.get('/api/recordVault/usage', ...recordVaultVaultAuth, getRecordVaultUsage);
 app.get('/api/recordVault/session-file-counts', requireAuth, getRecordVaultSessionFileCounts);
 app.post('/api/recordVault/session-file-counts', requireAuth, postRecordVaultSessionFileCounts);
-app.get('/api/recordVault/onedrive/config', ...recordVaultVaultAuth, getRecordVaultOneDriveConfig);
-app.get('/api/recordVault/onedrive/status', ...recordVaultVaultAuth, getRecordVaultOneDriveStatus);
-app.get('/api/recordVault/onedrive/vault-tree', ...recordVaultVaultAuth, getRecordVaultOneDriveVaultTree);
-app.get('/api/recordVault/onedrive/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultOneDriveBackupZip);
-app.get('/api/recordVault/onedrive/emails', requireAuth, getRecordVaultOneDriveEmails);
-app.post('/api/recordVault/onedrive/emails', requireAuth, rememberRecordVaultOneDriveEmail);
-app.get('/api/recordVault/onedrive/oauth/start', requireAuth, recordVaultOneDriveOAuthStart);
-app.get('/api/recordVault/onedrive/oauth/callback', recordVaultOneDriveOAuthCallback);
-app.post('/api/recordVault/onedrive/disconnect', ...recordVaultVaultAuth, disconnectRecordVaultOneDrive);
-app.get('/api/recordVault/onedrive/unlock-guard', ...recordVaultVaultAuth, getRecordVaultOneDriveUnlockGuard);
-app.post('/api/recordVault/onedrive/unlock', ...recordVaultVaultAuth, unlockRecordVaultOneDrive);
-app.get('/api/recordVault/onedrive/open-progress', ...recordVaultVaultAuth, getRecordVaultOneDriveOpenProgress);
-app.get('/api/recordVault/onedrive/sync-progress', ...recordVaultVaultAuth, getRecordVaultOneDriveSyncProgress);
-app.post('/api/recordVault/onedrive/logoff', ...recordVaultVaultAuth, logoffRecordVaultOneDrive);
-app.get('/api/recordVault/onedrive/logoff-progress', ...recordVaultVaultAuth, getRecordVaultOneDriveLogoffProgress);
-app.post('/api/recordVault/onedrive/sync', ...recordVaultVaultAuth, syncRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/init', ...recordVaultVaultAuth, initRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/format', ...recordVaultVaultAuth, formatRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/test-write', ...recordVaultVaultAuth, testWriteRecordVaultOneDrive);
-app.post('/api/recordVault/onedrive/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultOneDriveBackupZip);
-
 app.get('/api/recordVault/tutadrive/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveStatus);
+app.get('/api/recordVault/tutadrive/vault-tree', ...recordVaultVaultAuth, getRecordVaultTutaDriveVaultTree);
+app.post('/api/recordVault/tutadrive/sync', ...recordVaultVaultAuth, syncRecordVaultTutaDrive);
 app.post('/api/recordVault/tutadrive/unlock', ...recordVaultVaultAuth, unlockRecordVaultTutaDrive);
 app.post('/api/recordVault/tutadrive/init', ...recordVaultVaultAuth, initRecordVaultTutaDrive);
 app.post('/api/recordVault/tutadrive/format', ...recordVaultVaultAuth, formatRecordVaultTutaDrive);
@@ -1774,29 +1671,6 @@ app.get('/api/photoAlbums/usage', ...photoAlbumsVaultAuth, getPhotoAlbumsUsage);
 app.post('/api/photoAlbums/transfer-bytes', requireAuth, postPhotoAlbumsTransferBytes);
 app.get('/api/photoAlbums/session-file-counts', requireAuth, getPhotoAlbumsSessionFileCounts);
 app.post('/api/photoAlbums/session-file-counts', requireAuth, postPhotoAlbumsSessionFileCounts);
-app.get('/api/photoAlbums/onedrive/config', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveConfig);
-app.get('/api/photoAlbums/onedrive/status', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveStatus);
-app.get('/api/photoAlbums/onedrive/vault-tree', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveVaultTree);
-app.get('/api/photoAlbums/onedrive/album-backup-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveAlbumBackupProgress);
-app.get('/api/photoAlbums/onedrive/album-backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsOneDriveAlbumBackupZip);
-app.get('/api/photoAlbums/onedrive/backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsOneDriveBackupZip);
-app.get('/api/photoAlbums/onedrive/emails', requireAuth, getPhotoAlbumsOneDriveEmails);
-app.post('/api/photoAlbums/onedrive/emails', requireAuth, rememberPhotoAlbumsOneDriveEmail);
-app.get('/api/photoAlbums/onedrive/oauth/start', requireAuth, photoAlbumsOneDriveOAuthStart);
-app.get('/api/photoAlbums/onedrive/oauth/callback', photoAlbumsOneDriveOAuthCallback);
-app.post('/api/photoAlbums/onedrive/disconnect', ...photoAlbumsVaultAuth, disconnectPhotoAlbumsOneDrive);
-app.get('/api/photoAlbums/onedrive/unlock-guard', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveUnlockGuard);
-app.post('/api/photoAlbums/onedrive/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsOneDrive);
-app.get('/api/photoAlbums/onedrive/open-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveOpenProgress);
-app.get('/api/photoAlbums/onedrive/sync-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveSyncProgress);
-app.post('/api/photoAlbums/onedrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsOneDrive);
-app.get('/api/photoAlbums/onedrive/logoff-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsOneDriveLogoffProgress);
-app.post('/api/photoAlbums/onedrive/sync', ...photoAlbumsVaultAuth, syncPhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/init', ...photoAlbumsVaultAuth, initPhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/test-write', ...photoAlbumsVaultAuth, testWritePhotoAlbumsOneDrive);
-app.post('/api/photoAlbums/onedrive/restore-zip', ...photoAlbumsVaultAuth, restorePhotoAlbumsOneDriveBackupZip);
-
 app.get('/api/publicPrivateAlbum/:targetSinglesId', requireAuth, getPublicPrivateAlbum);
 app.get('/api/profile-photo/:singlesId', requireAuth, getProfilePhoto);
 app.get('/api/myPhotos', requireAuth, getMyPhotos);

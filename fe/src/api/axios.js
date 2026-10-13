@@ -11,9 +11,7 @@ function shouldRefreshPhotoAlbumsUsageAfterRequest(url) {
   if (!s.includes('/api/photoAlbums')) return false;
   if (s.includes('/api/photoAlbums/usage')) return false;
   if (s.includes('/api/photoAlbums/transfer-bytes')) return false;
-  if (s.includes('/api/photoAlbums/onedrive/open-progress')) return false;
-  if (s.includes('/api/photoAlbums/onedrive/sync-progress')) return false;
-  if (s.includes('/api/photoAlbums/onedrive/logoff-progress')) return false;
+  if (s.includes('/api/photoAlbums/tutadrive/open-progress')) return false;
   return true;
 }
 
@@ -50,7 +48,7 @@ function redirectToLoginAfterSessionEnd(error) {
     storeIdleLogoutNotice(error?.response?.data?.custom_logout_duration);
   }
 
-  // Idle auto-logout must hit /api/logout so cache_onedrive_icon / cache_usb_icon are nulled.
+  // Idle auto-logout must hit /api/logout so cache TutaCloud / USB icons are nulled.
   // Other session-end cases only clear the cookie (another device may still be logged in).
   const endSessionUrl =
     error?.response?.data?.sessionExpired === true ? '/api/logout' : '/api/clearAuthCookie';

@@ -169,7 +169,7 @@ export default function PhotoAlbumsUsageBar({
   const sessionFileCounts = usage?.sessionFileCounts || {};
   const usbTxRx = Number(sessionFileCounts.usbTxRx) || 0;
   const uiTxRx = Number(sessionFileCounts.uiTxRx) || 0;
-  const isOneDrive = storageType === 'onedrive';
+  const isOneDrive = storageType === 'tutadrive';
 
   useEffect(() => {
     return registerPhotoAlbumsDataPlanOpener(() => setDataPlanOpen(true));

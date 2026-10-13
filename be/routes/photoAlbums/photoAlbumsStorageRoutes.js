@@ -2,11 +2,10 @@ import {
   buildVaultStorageChoice,
   isVaultBackupUsbEnabled,
   isVaultLocalUsbOffered,
-  isVaultOneDriveOffered
+  isVaultTutaCloudOffered
 } from '../../utils/photoAlbumsStorageFlags.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
 import { isVaultE2eYellow } from '../../utils/photoAlbumsE2eYellowConfig.js';
-import { isOneDriveVaultOAuthConfigured } from '../../utils/photoAlbumsOneDrive/oneDriveApi.js';
 import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
 import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/photoAlbumsUsb/vaultCrypto.js';
 import { getVaultIconRetryDelaySeconds } from '../../utils/photoAlbumsUsb/unlockGuard.js';
@@ -29,12 +28,13 @@ function requireSinglesId(req, res) {
 export async function getPhotoAlbumsStorageConfig(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
-  let cacheOneDriveIcon = null;
+  // Legacy DB/Redis slot name `onedrive` — Tuta cloud workspace session icon.
+  let cacheTutaCloudIcon = null;
   let cacheUsbIcon = null;
   try {
-    cacheOneDriveIcon = await readPhotoAlbumsCacheIcon(singlesId, 'onedrive');
+    cacheTutaCloudIcon = await readPhotoAlbumsCacheIcon(singlesId, 'onedrive');
   } catch {
-    cacheOneDriveIcon = null;
+    cacheTutaCloudIcon = null;
   }
   try {
     cacheUsbIcon = await readPhotoAlbumsCacheIcon(singlesId, 'usb');
@@ -47,26 +47,22 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
   const usbBridgeInstallers = includeUsbDmgExe ? getPhotoAlbumsBridgeInstallerUrls() : { mac: null, win: null };
   const leftSide = getLeftSideMode();
   const tutaDrive = isLeftSideTutaDrive();
-  let oneDrive;
-  if (leftSide === 'None') {
-    oneDrive = { visible: false, oauthConfigured: false, enabled: false, tutaDrive: false };
-  } else if (tutaDrive) {
-    oneDrive = { visible: true, oauthConfigured: true, enabled: true, tutaDrive: true };
-  } else {
-    oneDrive = buildVaultStorageChoice(isVaultOneDriveOffered(), isOneDriveVaultOAuthConfigured());
-  }
+  const tutaCloud = {
+    ...buildVaultStorageChoice(isVaultTutaCloudOffered(), true),
+    tutaDrive
+  };
 
   return res.json({
     leftSide,
     tutaDrive,
     rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
-    oneDrive,
+    tutaCloud,
     localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
     backupUsbEnabled: isVaultBackupUsbEnabled(),
     iconEncryptionRequired: isPhotoAlbumsIconEncryptionEnabled(),
     encryptPhotoAndDb: isVaultPhotoAndDbEncryptionEnabled(),
     iconRetryDelaySeconds: getVaultIconRetryDelaySeconds(),
-    cacheOneDriveIcon,
+    cacheTutaCloudIcon,
     cacheUsbIcon,
     videoTutorialTutaphotoalbums,
     includeUsbDmgExe,
@@ -83,7 +79,7 @@ export async function logoffPhotoAlbumsStorage(req, res) {
   try {
     const result = await logoffVaultUsb(singlesId);
     await clearPhotoAlbumsCacheIcon(singlesId);
-    return res.json({ ...result, cacheOneDriveIcon: '', cacheUsbIcon: '' });
+    return res.json({ ...result, cacheTutaCloudIcon: '', cacheUsbIcon: '' });
   } catch (err) {
     console.error('[logoffPhotoAlbumsStorage]', err?.message || err);
     return res.status(400).json({ error: err?.message || 'Logoff failed' });

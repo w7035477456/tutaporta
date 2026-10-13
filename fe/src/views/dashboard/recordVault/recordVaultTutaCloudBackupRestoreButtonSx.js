@@ -1,8 +1,8 @@
 /**
- * Yellow Backup / Restore buttons on OneDrive MyNote dialogs.
+ * Yellow Backup / Restore buttons on TutaCloud MyNote dialogs.
  * Overrides GreenButton green default + hover.
  */
-export const recordVaultOneDriveBackupRestoreButtonSx = {
+export const recordVaultTutaCloudBackupRestoreButtonSx = {
   bgcolor: 'var(--theme-yellow-color) !important',
   color: '#000000 !important',
   WebkitTextFillColor: '#000000 !important',

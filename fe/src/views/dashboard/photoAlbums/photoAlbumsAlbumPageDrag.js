@@ -41,7 +41,7 @@ export function readAlbumPageDrag(dataTransfer) {
       pageIndex,
       pageNumber: Number(parsed.pageNumber) || pageIndex + 1,
       instanceKey: String(parsed.instanceKey || ''),
-      storageType: parsed.storageType === 'onedrive' ? 'onedrive' : 'usb'
+      storageType: parsed.storageType === 'tutadrive' ? 'onedrive' : 'usb'
     };
   } catch {
     return null;
@@ -54,6 +54,6 @@ export function serializeAlbumPageDrag(payload) {
     pageIndex: Number(payload.pageIndex),
     pageNumber: Number(payload.pageNumber) || Number(payload.pageIndex) + 1,
     instanceKey: String(payload.instanceKey || ''),
-    storageType: payload.storageType === 'onedrive' ? 'onedrive' : 'usb'
+    storageType: payload.storageType === 'tutadrive' ? 'onedrive' : 'usb'
   });
 }

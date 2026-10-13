@@ -34,7 +34,7 @@ import {
   clearVaultOpenProgress,
   getVaultOpenProgress,
   setVaultOpenProgress
-} from '../../utils/photoAlbumsOneDrive/vaultOpenProgress.js';
+} from '../../utils/photoAlbumsVaultOpenProgress.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
 

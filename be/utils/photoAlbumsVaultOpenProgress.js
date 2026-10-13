@@ -1,18 +1,18 @@
 /**
- * Cluster-safe OneDrive logoff progress (0–100) for FE polling.
- * Written by the logoff request; read by GET …/logoff-progress on any node.
+ * Cluster-safe Tuta cloud open/unlock progress (0–100) for FE polling.
+ * Written by the unlock/init request; read by GET …/open-progress on any node.
  */
 
-import { clusterRedisDel, clusterRedisGetJson, clusterRedisSetJson } from '../clusterRedisState.js';
+import { clusterRedisDel, clusterRedisGetJson, clusterRedisSetJson } from './clusterRedisState.js';
 
-const KEY_PREFIX = 'v1:photo_albums:onedrive:logoff_progress:';
+const KEY_PREFIX = 'v1:photo_albums:onedrive:open_progress:';
 const TTL_SEC = 180;
 
 function progressKey(singlesId) {
   return `${KEY_PREFIX}${Math.trunc(Number(singlesId))}`;
 }
 
-export async function setVaultLogoffProgress(singlesId, { percent = 0, label = '' } = {}) {
+export async function setVaultOpenProgress(singlesId, { percent = 0, label = '' } = {}) {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return;
   const clamped = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
@@ -27,7 +27,7 @@ export async function setVaultLogoffProgress(singlesId, { percent = 0, label = '
   );
 }
 
-export async function getVaultLogoffProgress(singlesId) {
+export async function getVaultOpenProgress(singlesId) {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return { percent: 0, label: '' };
   const raw = await clusterRedisGetJson(progressKey(id));
@@ -39,7 +39,7 @@ export async function getVaultLogoffProgress(singlesId) {
   };
 }
 
-export async function clearVaultLogoffProgress(singlesId) {
+export async function clearVaultOpenProgress(singlesId) {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return;
   await clusterRedisDel(progressKey(id));

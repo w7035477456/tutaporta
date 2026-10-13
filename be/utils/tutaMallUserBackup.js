@@ -23,8 +23,6 @@ import {
   tutaDatesVideosPath,
   tutaDatesVideosPathLegacyLargeCheap
 } from './tutaDatesMemberPaths.js';
-import { oneDriveStagingMountPath as notesOneDriveStagingMountPath } from './recordVaultOneDriveStagingRoot.js';
-import { oneDriveStagingMountPath as photoAlbumsOneDriveStagingMountPath } from './photoAlbumsOneDriveStagingRoot.js';
 import { fetchPhotoRowsForSinglesId } from './deletePhotoFromFolder.js';
 import { fetchVideoRowsForSinglesId } from './deleteVideoFromFolder.js';
 import { listMemberPhotoFilesOnDisk, listPhotoFolderFilesForMemberId } from './photoFilePath.js';
@@ -474,12 +472,6 @@ async function backupTutaNotesFiles(user, backupDir, summary) {
   ensureTutaDriveMemberLayout(memberId, { singlesId });
   copyTreeIfExists(tutaDriveNotesMountPath(memberId), path.join(filesRoot, 'tutadrive-notes'), summary, 'tutadrive-notes');
   copyTreeIfExists(tutaDrivePhotosPath(memberId), path.join(filesRoot, 'tutadrive-photos'), summary, 'tutadrive-photos');
-  copyTreeIfExists(
-    notesOneDriveStagingMountPath(singlesId),
-    path.join(filesRoot, 'notes-onedrive-staging'),
-    summary,
-    'notes-onedrive-staging'
-  );
   const recordNotes = optionalRecordNotesFolder(singlesId);
   if (recordNotes) {
     copyTreeIfExists(recordNotes, path.join(filesRoot, 'record-notes-folder'), summary, 'record-notes-folder');
@@ -496,12 +488,6 @@ async function backupTutaPhotoFiles(user, backupDir, summary) {
     path.join(filesRoot, 'tutadrive-photoalbums'),
     summary,
     'tutadrive-photoalbums'
-  );
-  copyTreeIfExists(
-    photoAlbumsOneDriveStagingMountPath(singlesId),
-    path.join(filesRoot, 'photoalbums-onedrive-staging'),
-    summary,
-    'photoalbums-onedrive-staging'
   );
   await copyMobileUploadStaging(singlesId, path.join(filesRoot, 'mobile-upload'), summary);
 }
@@ -916,12 +902,6 @@ async function restoreSectionFiles(user, backupDir, section, summary) {
         reason: err?.message || String(err)
       });
     }
-    await restoreTree(
-      path.join(filesRoot('tutanotes'), 'notes-onedrive-staging'),
-      notesOneDriveStagingMountPath(singlesId),
-      summary,
-      'notes-onedrive-staging'
-    );
     const recordNotes = optionalRecordNotesFolder(singlesId);
     if (recordNotes) {
       await restoreTree(
@@ -946,12 +926,6 @@ async function restoreSectionFiles(user, backupDir, section, summary) {
       tutaDrivePhotoAlbumsMountPath(memberId),
       summary,
       'tutadrive-photoalbums'
-    );
-    await restoreTree(
-      path.join(filesRoot('tutaphoto'), 'photoalbums-onedrive-staging'),
-      photoAlbumsOneDriveStagingMountPath(singlesId),
-      summary,
-      'photoalbums-onedrive-staging'
     );
     try {
       await restoreFilesFromDir(

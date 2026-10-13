@@ -2,12 +2,6 @@ import { getVaultSession, vaultUsbStatus } from './photoAlbumsUsb/vaultSession.j
 import { computeVaultFolderSizeBytes } from './photoAlbumsUsb/vaultFolderSize.js';
 import { getVaultTransferStats } from './photoAlbumsTransferTracking.js';
 import { getVaultSessionFileCounts } from './photoAlbumsSessionFileCounts.js';
-import { loadOneDriveConnection } from './photoAlbumsOneDrive/oneDriveTokenStore.js';
-import {
-  computeOneDriveFolderSizeBytes,
-  fetchOneDriveStorageQuota
-} from './photoAlbumsOneDrive/oneDriveApi.js';
-import { getAccessTokenForSingles } from './photoAlbumsOneDrive/oneDriveVaultSync.js';
 import {
   isLeftSideTutaDrive,
   loadTutaDriveMemberNotesPhotosSizeForSingles
@@ -56,9 +50,7 @@ export async function buildPhotoAlbumsUsageStats(singlesId, storageType = null) 
       uiTxRx: Number(sessionFileCounts.uiTxRx) || 0
     },
     subscriptionTier: 'FREE',
-    onedriveEmail: null,
     vaultFolderMb: 0,
-    onedriveStorage: null,
     tutaDrive: false,
     tutaDriveStorage: null
   };
@@ -69,34 +61,8 @@ export async function buildPhotoAlbumsUsageStats(singlesId, storageType = null) 
     return result;
   }
 
-  if (activeStorageType !== 'onedrive') {
-    return result;
-  }
-
-  const conn = await loadOneDriveConnection(singlesId);
-  result.onedriveEmail = String(conn?.email || '').trim() || null;
-
-  try {
-    const { accessToken, folderId } = await getAccessTokenForSingles(singlesId);
-    if (!result.onedriveEmail) {
-      result.onedriveEmail = String(conn?.email || '').trim() || null;
-    }
-
-    const quota = await fetchOneDriveStorageQuota(accessToken);
-    result.onedriveStorage = {
-      usedGb: quota.usedGb,
-      totalGb: quota.totalGb,
-      leftPct: quota.storageLeftPct
-    };
-
-    if (session?.unlocked && session.mountPath) {
-      result.vaultFolderMb = vaultFolderMbFromBytes(computeVaultFolderSizeBytes(session.mountPath));
-    } else if (folderId) {
-      const folderBytes = await computeOneDriveFolderSizeBytes(accessToken, folderId);
-      result.vaultFolderMb = vaultFolderMbFromBytes(folderBytes);
-    }
-  } catch (err) {
-    result.onedriveError = err?.message || 'Unable to load OneDrive usage';
+  if (activeStorageType === 'onedrive' && session?.unlocked && session.mountPath) {
+    result.vaultFolderMb = vaultFolderMbFromBytes(computeVaultFolderSizeBytes(session.mountPath));
   }
 
   return result;

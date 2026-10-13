@@ -24,7 +24,7 @@ const actionButtonSx = {
 };
 
 function storageLabel(storageType) {
-  return storageType === 'onedrive' ? 'TutaNotes Cloud' : 'TutaNotes USB';
+  return storageType === 'tutadrive' ? 'TutaNotes Cloud' : 'TutaNotes USB';
 }
 
 export default function RecordVaultCrossPaneTransferDialog({
@@ -125,11 +125,11 @@ RecordVaultCrossPaneTransferDialog.propTypes = {
   item: PropTypes.shape({
     kind: PropTypes.oneOf(['notebook', 'note', 'bill_schedule', 'bill_monthly', 'bill_yearly']),
     id: PropTypes.number,
-    storageType: PropTypes.oneOf(['onedrive', 'usb']),
+    storageType: PropTypes.oneOf(['tutadrive', 'usb']),
     name: PropTypes.string,
     notebookId: PropTypes.number
   }),
-  targetStorageType: PropTypes.oneOf(['onedrive', 'usb']),
+  targetStorageType: PropTypes.oneOf(['tutadrive', 'usb']),
   targetNotebookName: PropTypes.string,
   busy: PropTypes.bool,
   duplicateError: PropTypes.string,

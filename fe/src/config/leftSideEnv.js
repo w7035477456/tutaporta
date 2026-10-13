@@ -1,17 +1,16 @@
 /**
- * LEFT_SIDE — Record Vault left panel: OneDrive (default) | TutaDrive | None.
+ * LEFT_SIDE — Record Vault left panel: TutaDrive (default) | None.
  * Source: ~/.ssh/be/.env (mirrored in fe/vite.config.mjs).
  * Runtime override: GET /api/publicConfig.leftSide / .tutaDrive.
  */
 
 export function parseLeftSideMode(raw) {
-  const v = String(raw ?? 'OneDrive').trim().toLowerCase();
+  const v = String(raw ?? '').trim().toLowerCase();
   if (v === 'none' || v === 'off' || v === '0' || v === 'false' || v === 'hide') return 'None';
-  if (v === 'tutadrive' || v === 'tuta_drive' || v === 'tuta-drive') return 'TutaDrive';
-  return 'OneDrive';
+  return 'TutaDrive';
 }
 
-/** @returns {'OneDrive' | 'TutaDrive' | 'None'} */
+/** @returns {'TutaDrive' | 'None'} */
 export function getLeftSideModeFromVite() {
   return parseLeftSideMode(import.meta.env.LEFT_SIDE);
 }

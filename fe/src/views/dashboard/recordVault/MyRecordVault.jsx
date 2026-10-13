@@ -10,7 +10,6 @@ import SliderControlButton, {
 import { BUSY_HOURGLASS_MY_NOTE_SIZE } from 'config/busyHourglassEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
-  fetchRecordVaultOneDriveStatus,
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveStatus,
   fetchRecordVaultUsbStatus,
@@ -25,7 +24,6 @@ import { clearRecordVaultE2eSession } from 'utils/recordVaultClientSession';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { readRecordVaultLastUsbLocation } from 'utils/recordVaultUsbPreference';
 import RecordVaultAccessGate from './RecordVaultAccessGate';
-import RecordVaultOneDriveGate from './RecordVaultOneDriveGate';
 import RecordVaultTutaDriveGate from './RecordVaultTutaDriveGate';
 import RecordVaultUsbGate from './RecordVaultUsbGate';
 import RecordVaultWorkspacePane from './RecordVaultWorkspacePane';
@@ -54,8 +52,8 @@ import RecordVaultMobileDirectUploadDialog from './RecordVaultMobileDirectUpload
 import {
   TUTANOTES_CLOUD_LOGO,
   TUTANOTES_CLOUD_PANE_TOOLTIP,
-  TUTANOTES_ONEDRIVE_STRIP_COLOR,
-  TUTANOTES_ONEDRIVE_WORKSPACE_TITLE,
+  TUTANOTES_TUTACLOUD_STRIP_COLOR,
+  TUTANOTES_TUTACLOUD_WORKSPACE_TITLE,
   TUTANOTES_TUTADRIVE_STRIP_COLOR,
   TUTANOTES_TUTADRIVE_WORKSPACE_TITLE,
   TUTANOTES_HALF_PANEL_WIDTH,
@@ -73,15 +71,14 @@ const myNoteLoadingBackdropSx = {
 };
 
 /** Tab + frame colors from TutaNotes dual-login mockup. */
-const ONEDRIVE_TAB_COLOR = TUTANOTES_ONEDRIVE_STRIP_COLOR;
+const TUTACLOUD_TAB_COLOR = TUTANOTES_TUTACLOUD_STRIP_COLOR;
 const TUTADRIVE_TAB_COLOR = TUTANOTES_TUTADRIVE_STRIP_COLOR;
 const USB_TAB_COLOR = TUTANOTES_USB_STRIP_COLOR;
 const USB_TAB_LABEL_COLOR = TUTANOTES_USB_TAB_LABEL_COLOR;
 const USB_TITLE_BUTTON_BG = '#9C3CBB';
 const ACTIVE_PANE_BORDER_WIDTH = 16;
 
-const TAB_LABEL_ONEDRIVE = TUTANOTES_ONEDRIVE_WORKSPACE_TITLE;
-const TAB_LABEL_TUTADRIVE = TUTANOTES_TUTADRIVE_WORKSPACE_TITLE;
+const TAB_LABEL_TUTACLOUD = TUTANOTES_TUTACLOUD_WORKSPACE_TITLE;
 
 const storageTabButtonSx = {
   width: 'max-content',
@@ -308,10 +305,10 @@ function LoginScrollArea({ children }) {
 export default function MyRecordVault() {
   const { user } = useAuth();
   const [storageConfigLoaded, setStorageConfigLoaded] = useState(false);
-  const [oneDriveOffered, setOneDriveOffered] = useState(() => isLeftSideOfferedFromVite());
+  const [tutaCloudOffered, setTutaCloudOffered] = useState(() => isLeftSideOfferedFromVite());
   const [tutaDriveMode, setTutaDriveMode] = useState(() => isLeftSideTutaDriveFromVite());
   const [localUsbOffered, setLocalUsbOffered] = useState(() => isRightSideUsbFromVite());
-  const [oneDriveUnlocked, setOneDriveUnlocked] = useState(false);
+  const [tutaCloudUnlocked, setTutaCloudUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
   const [usbVolumeLabel, setUsbVolumeLabel] = useState(
     () => String(readRecordVaultLastUsbLocation()?.label || '').trim()
@@ -319,24 +316,24 @@ export default function MyRecordVault() {
   const usbTabLabel = formatUsbWorkspaceTitle(usbVolumeLabel);
   const [sessionChecking, setSessionChecking] = useState(true);
   const [error, setError] = useState('');
-  /** 'both' = side-by-side login chooser; 'onedrive' | 'usb' = full-window pane; 'compare' = both workspaces for drag-drop. */
+  /** 'both' = side-by-side login chooser; 'tutadrive' | 'usb' = full-window pane; 'compare' = both workspaces for drag-drop. */
   const [paneFocus, setPaneFocus] = useState('both');
   /** Which single pane to restore when leaving compare mode. */
-  const [compareReturnFocus, setCompareReturnFocus] = useState('onedrive');
+  const [compareReturnFocus, setCompareReturnFocus] = useState('tutadrive');
   /** Shared vault-password gate before Open TutaNotes Cloud / USB. */
   const [accessGateOpen, setAccessGateOpen] = useState(false);
   const accessUnlockedRef = useRef(false);
   /** Pending open side for Access Gate: `{ storageType, mountPath? }`. */
   const pendingOpenRef = useRef(null);
-  const [accessGateStorageType, setAccessGateStorageType] = useState('onedrive');
+  const [accessGateStorageType, setAccessGateStorageType] = useState('tutadrive');
   const [accessGateUsbMountPath, setAccessGateUsbMountPath] = useState('');
-  const [oneDriveProceedOpenToken, setOneDriveProceedOpenToken] = useState(0);
+  const [tutaCloudProceedOpenToken, setTutaCloudProceedOpenToken] = useState(0);
   const [usbProceedOpenToken, setUsbProceedOpenToken] = useState(0);
   const [usbGateRefreshToken, setUsbGateRefreshToken] = useState(0);
   const [sessionCountsRefreshToken, setSessionCountsRefreshToken] = useState(0);
-  const [oneDriveGateRefreshToken, setOneDriveGateRefreshToken] = useState(0);
+  const [tutaCloudGateRefreshToken, setTutaCloudGateRefreshToken] = useState(0);
   const [usbDualLogoffBusy, setUsbDualLogoffBusy] = useState(false);
-  const [oneDriveDualLogoffBusy, setOneDriveDualLogoffBusy] = useState(false);
+  const [tutaCloudDualLogoffBusy, setTutaCloudDualLogoffBusy] = useState(false);
   /** Header Profile & Records — full page overlay (no dating sidebar). */
   const [profilesRecordsOpen, setProfilesRecordsOpen] = useState(false);
   const [profilesRecordsInitialTab, setProfilesRecordsInitialTab] = useState('profiles');
@@ -373,7 +370,7 @@ export default function MyRecordVault() {
     // Prior mobile path unlocked vault without FDE — force logoff so desktop asks for password again.
     void (async () => {
       try {
-        if (oneDriveOffered) await logoffRecordVaultStorage({ storageType: 'onedrive' });
+        if (tutaCloudOffered) await logoffRecordVaultStorage({ storageType: 'tutadrive' });
       } catch {
         // ignore
       }
@@ -382,11 +379,11 @@ export default function MyRecordVault() {
       } catch {
         // ignore
       }
-      setOneDriveUnlocked(false);
+      setTutaCloudUnlocked(false);
       setUsbUnlocked(false);
       accessUnlockedRef.current = false;
     })();
-  }, [isCompactViewport, mobileTutaNotesUploadSession, oneDriveOffered, localUsbOffered]);
+  }, [isCompactViewport, mobileTutaNotesUploadSession, tutaCloudOffered, localUsbOffered]);
 
   /** Phone: only mall ↔ upload popup — never the desktop TutaNotes workspace. */
   useEffect(() => {
@@ -432,15 +429,15 @@ export default function MyRecordVault() {
     setError('');
     try {
       const [oneDriveStatus, usbStatus] = await Promise.all([
-        oneDriveOffered
+        tutaCloudOffered
           ? (tutaDriveMode
               ? fetchRecordVaultTutaDriveStatus()
-              : fetchRecordVaultOneDriveStatus()
+              : fetchRecordVaultTutaDriveStatus()
             ).catch(() => null)
           : Promise.resolve(null),
         localUsbOffered ? fetchRecordVaultUsbStatus().catch(() => null) : Promise.resolve(null)
       ]);
-      setOneDriveUnlocked(Boolean(oneDriveStatus?.session?.unlocked));
+      setTutaCloudUnlocked(Boolean(oneDriveStatus?.session?.unlocked));
       setUsbUnlocked(Boolean(usbStatus?.session?.unlocked));
       const sessionUsbLabel = String(usbStatus?.session?.label || '').trim();
       if (usbStatus?.session?.unlocked && sessionUsbLabel && sessionUsbLabel !== 'OneDrive') {
@@ -448,12 +445,12 @@ export default function MyRecordVault() {
       }
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Unable to read vault storage sessions'));
-      setOneDriveUnlocked(false);
+      setTutaCloudUnlocked(false);
       setUsbUnlocked(false);
     } finally {
       setSessionChecking(false);
     }
-  }, [oneDriveOffered, localUsbOffered, tutaDriveMode]);
+  }, [tutaCloudOffered, localUsbOffered, tutaDriveMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -461,17 +458,17 @@ export default function MyRecordVault() {
       const applyPanelSides = (cfg) => {
         if (!cfg) {
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
-          setOneDriveOffered(isLeftSideOfferedFromVite());
+          setTutaCloudOffered(isLeftSideOfferedFromVite());
           setLocalUsbOffered(isRightSideUsbFromVite());
           return;
         }
         if (cfg.leftSide != null || cfg.tutaDrive != null) {
           const leftMode = parseLeftSideMode(cfg.leftSide);
           setTutaDriveMode(Boolean(cfg.tutaDrive) || leftMode === 'TutaDrive');
-          if (cfg.oneDrive?.visible != null) {
-            setOneDriveOffered(Boolean(cfg.oneDrive.visible));
+          if (cfg.tutaCloud?.visible != null) {
+            setTutaCloudOffered(Boolean(cfg.tutaCloud.visible));
           } else {
-            setOneDriveOffered(leftMode !== 'None');
+            setTutaCloudOffered(leftMode !== 'None');
           }
         }
         if (cfg.rightSide != null || cfg.localUsb?.visible != null) {
@@ -501,11 +498,11 @@ export default function MyRecordVault() {
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
         applyPanelSides(cfg);
-        setOneDriveOffered(Boolean(cfg.oneDrive?.visible));
+        setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
       } catch {
         if (!cancelled) {
-          setOneDriveOffered(isLeftSideOfferedFromVite());
+          setTutaCloudOffered(isLeftSideOfferedFromVite());
           setLocalUsbOffered(isRightSideUsbFromVite());
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
         }
@@ -537,15 +534,15 @@ export default function MyRecordVault() {
 
   useEffect(() => {
     if (!storageConfigLoaded) return;
-    if (oneDriveOffered && localUsbOffered) return;
-    if (oneDriveOffered) setPaneFocus('onedrive');
+    if (tutaCloudOffered && localUsbOffered) return;
+    if (tutaCloudOffered) setPaneFocus('tutadrive');
     else if (localUsbOffered) setPaneFocus('usb');
-  }, [localUsbOffered, oneDriveOffered, storageConfigLoaded]);
+  }, [localUsbOffered, tutaCloudOffered, storageConfigLoaded]);
 
   const handleUsbUnlocked = useCallback(() => {
     setUsbUnlocked(true);
     // Dual layout: stay on side-by-side “Click this tab…” until the user clicks a tab.
-    if (oneDriveOffered && localUsbOffered) {
+    if (tutaCloudOffered && localUsbOffered) {
       setPaneFocus('both');
     } else {
       setPaneFocus('usb');
@@ -561,65 +558,65 @@ export default function MyRecordVault() {
         // Keep optimistic unlock
       }
     })();
-  }, [localUsbOffered, oneDriveOffered]);
+  }, [localUsbOffered, tutaCloudOffered]);
 
-  const handleOneDriveUnlocked = useCallback(() => {
-    setOneDriveUnlocked(true);
-    if (oneDriveOffered && localUsbOffered) {
+  const handleTutaCloudUnlocked = useCallback(() => {
+    setTutaCloudUnlocked(true);
+    if (tutaCloudOffered && localUsbOffered) {
       setPaneFocus('both');
     } else {
-      setPaneFocus('onedrive');
+      setPaneFocus('tutadrive');
     }
     setError('');
     void (async () => {
       try {
         const cloudStatus = tutaDriveMode
           ? await fetchRecordVaultTutaDriveStatus()
-          : await fetchRecordVaultOneDriveStatus();
+          : await fetchRecordVaultTutaDriveStatus();
         if (cloudStatus?.session?.unlocked) {
-          setOneDriveUnlocked(true);
+          setTutaCloudUnlocked(true);
         }
       } catch {
         // keep optimistic unlock
       }
     })();
-  }, [localUsbOffered, oneDriveOffered, tutaDriveMode]);
+  }, [localUsbOffered, tutaCloudOffered, tutaDriveMode]);
 
-  const selectOneDriveTab = useCallback(() => {
+  const selectTutaCloudTab = useCallback(() => {
     setPaneFocus((prev) => {
-      if (prev === 'compare') return 'onedrive';
+      if (prev === 'compare') return 'tutadrive';
       // Toggle back to dual login/tips when both storages are offered.
-      if (prev === 'onedrive' && oneDriveOffered && localUsbOffered) return 'both';
-      return 'onedrive';
+      if (prev === 'tutadrive' && tutaCloudOffered && localUsbOffered) return 'both';
+      return 'tutadrive';
     });
-  }, [localUsbOffered, oneDriveOffered]);
+  }, [localUsbOffered, tutaCloudOffered]);
 
   const selectUsbTab = useCallback(() => {
     setPaneFocus((prev) => {
       if (prev === 'compare') return 'usb';
-      if (prev === 'usb' && oneDriveOffered && localUsbOffered) return 'both';
+      if (prev === 'usb' && tutaCloudOffered && localUsbOffered) return 'both';
       return 'usb';
     });
-  }, [localUsbOffered, oneDriveOffered]);
+  }, [localUsbOffered, tutaCloudOffered]);
 
   const enterCompareMode = useCallback(() => {
-    if (!(oneDriveUnlocked && usbUnlocked && oneDriveOffered && localUsbOffered)) return;
-    if (paneFocus === 'onedrive' || paneFocus === 'usb') {
+    if (!(tutaCloudUnlocked && usbUnlocked && tutaCloudOffered && localUsbOffered)) return;
+    if (paneFocus === 'tutadrive' || paneFocus === 'usb') {
       setCompareReturnFocus(paneFocus);
     }
     setPaneFocus('compare');
-  }, [localUsbOffered, oneDriveOffered, oneDriveUnlocked, paneFocus, usbUnlocked]);
+  }, [localUsbOffered, tutaCloudOffered, tutaCloudUnlocked, paneFocus, usbUnlocked]);
 
   const returnFromCompareMode = useCallback(() => {
-    setPaneFocus(compareReturnFocus === 'usb' ? 'usb' : 'onedrive');
+    setPaneFocus(compareReturnFocus === 'usb' ? 'usb' : 'tutadrive');
   }, [compareReturnFocus]);
 
-  const handleOneDriveSessionEnded = useCallback(() => {
-    setOneDriveUnlocked(false);
+  const handleTutaCloudSessionEnded = useCallback(() => {
+    setTutaCloudUnlocked(false);
     setSessionCountsRefreshToken((n) => n + 1);
     setPaneFocus((prev) => {
       if (prev === 'compare') return usbUnlocked ? 'usb' : 'both';
-      if (prev === 'onedrive' && localUsbOffered) return 'both';
+      if (prev === 'tutadrive' && localUsbOffered) return 'both';
       return prev;
     });
   }, [localUsbOffered, usbUnlocked]);
@@ -628,11 +625,11 @@ export default function MyRecordVault() {
     setUsbUnlocked(false);
     setSessionCountsRefreshToken((n) => n + 1);
     setPaneFocus((prev) => {
-      if (prev === 'compare') return oneDriveUnlocked ? 'onedrive' : 'both';
-      if (prev === 'usb' && oneDriveOffered) return 'both';
+      if (prev === 'compare') return tutaCloudUnlocked ? 'tutadrive' : 'both';
+      if (prev === 'usb' && tutaCloudOffered) return 'both';
       return prev;
     });
-  }, [oneDriveOffered, oneDriveUnlocked]);
+  }, [tutaCloudOffered, tutaCloudUnlocked]);
 
   const handleDualPaneLogOffUsb = useCallback(async () => {
     if (usbDualLogoffBusy || !usbUnlocked) return;
@@ -650,18 +647,18 @@ export default function MyRecordVault() {
   }, [usbDualLogoffBusy, usbUnlocked, handleUsbSessionEnded]);
 
   const handleDualPaneLogOffOneDrive = useCallback(async () => {
-    if (oneDriveDualLogoffBusy || !oneDriveUnlocked) return;
-    setOneDriveDualLogoffBusy(true);
+    if (tutaCloudDualLogoffBusy || !tutaCloudUnlocked) return;
+    setTutaCloudDualLogoffBusy(true);
     setError('');
     try {
-      await logoffRecordVaultStorage({ storageType: 'onedrive' });
-      handleOneDriveSessionEnded();
+      await logoffRecordVaultStorage({ storageType: 'tutadrive' });
+      handleTutaCloudSessionEnded();
     } catch (err) {
-      setError(readRecordVaultApiError(err, tutaDriveMode ? 'Log off TutaDrive failed' : 'Log off OneDrive failed'));
+      setError(readRecordVaultApiError(err, 'Log off TutaCloud failed'));
     } finally {
-      setOneDriveDualLogoffBusy(false);
+      setTutaCloudDualLogoffBusy(false);
     }
-  }, [oneDriveDualLogoffBusy, oneDriveUnlocked, handleOneDriveSessionEnded, tutaDriveMode]);
+  }, [tutaCloudDualLogoffBusy, tutaCloudUnlocked, handleTutaCloudSessionEnded, tutaDriveMode]);
 
   const handleUsbLocationChange = useCallback((label) => {
     setUsbVolumeLabel(String(label || '').trim());
@@ -669,10 +666,10 @@ export default function MyRecordVault() {
 
   // Open TutaNotes Cloud / USB share one vault-password popup (Step 1), then resume icon unlock.
   // Mobile upload uses a separate sheet and never reaches these handlers.
-  const handleOneDriveOpenClicked = useCallback(() => {
+  const handleTutaCloudOpenClicked = useCallback(() => {
     if (accessUnlockedRef.current) return false;
-    pendingOpenRef.current = { storageType: 'onedrive' };
-    setAccessGateStorageType('onedrive');
+    pendingOpenRef.current = { storageType: 'tutadrive' };
+    setAccessGateStorageType('tutadrive');
     setAccessGateUsbMountPath('');
     setAccessGateOpen(true);
     return true;
@@ -693,8 +690,8 @@ export default function MyRecordVault() {
     setAccessGateOpen(false);
     const pending = pendingOpenRef.current;
     pendingOpenRef.current = null;
-    if (pending?.storageType === 'onedrive') {
-      setOneDriveProceedOpenToken((n) => n + 1);
+    if (pending?.storageType === 'tutadrive') {
+      setTutaCloudProceedOpenToken((n) => n + 1);
     } else if (pending?.storageType === 'usb') {
       setUsbProceedOpenToken((n) => n + 1);
     }
@@ -709,22 +706,22 @@ export default function MyRecordVault() {
   const handleAccessVaultFormatted = useCallback((formattedSide) => {
     if (formattedSide === 'usb') {
       setUsbGateRefreshToken((n) => n + 1);
-    } else if (formattedSide === 'onedrive') {
-      setOneDriveGateRefreshToken((n) => n + 1);
+    } else if (formattedSide === 'tutadrive') {
+      setTutaCloudGateRefreshToken((n) => n + 1);
     }
   }, []);
 
   const showWorkspace = storageConfigLoaded && !sessionChecking;
-  const showTabBar = oneDriveOffered && localUsbOffered;
+  const showTabBar = tutaCloudOffered && localUsbOffered;
   const showDual = showTabBar && paneFocus === 'both';
   const showCompare = showTabBar && paneFocus === 'compare';
-  const canEnterCompare = Boolean(oneDriveUnlocked && usbUnlocked && showTabBar);
-  const cloudTabLabel = tutaDriveMode ? TAB_LABEL_TUTADRIVE : TAB_LABEL_ONEDRIVE;
-  const cloudTabColor = tutaDriveMode ? TUTADRIVE_TAB_COLOR : ONEDRIVE_TAB_COLOR;
-  const cloudLogOffLabel = tutaDriveMode ? 'Log off TutaDrive' : 'Log off OneDrive';
-  const CloudGate = tutaDriveMode ? RecordVaultTutaDriveGate : RecordVaultOneDriveGate;
+  const canEnterCompare = Boolean(tutaCloudUnlocked && usbUnlocked && showTabBar);
+  const cloudTabLabel = TAB_LABEL_TUTACLOUD;
+  const cloudTabColor = TUTACLOUD_TAB_COLOR;
+  const cloudLogOffLabel = 'Log off TutaCloud';
+  const CloudGate = RecordVaultTutaDriveGate;
 
-  // Tutorial lives on the usage bar (USB + OneDrive) — never in the site header.
+  // Tutorial lives on the usage bar (USB + TutaCloud) — never in the site header.
   useEffect(() => {
     clearTutaNotesTutorialChrome();
     return () => {
@@ -732,25 +729,25 @@ export default function MyRecordVault() {
     };
   }, []);
 
-  const oneDriveVisible =
-    oneDriveOffered && (showDual || showCompare || paneFocus === 'onedrive' || !localUsbOffered);
-  const usbVisible = localUsbOffered && (showDual || showCompare || paneFocus === 'usb' || !oneDriveOffered);
+  const tutaCloudVisible =
+    tutaCloudOffered && (showDual || showCompare || paneFocus === 'tutadrive' || !localUsbOffered);
+  const usbVisible = localUsbOffered && (showDual || showCompare || paneFocus === 'usb' || !tutaCloudOffered);
   const sideBySideLayout = showDual || showCompare;
 
-  const renderOneDriveBody = () => {
-    if (showDual && oneDriveUnlocked) {
+  const renderTutaCloudBody = () => {
+    if (showDual && tutaCloudUnlocked) {
       return (
         <StorageCenterCluster>
           <GreenButton
             type="button"
             role="tab"
-            aria-selected={paneFocus === 'onedrive'}
+            aria-selected={paneFocus === 'tutadrive'}
             title={
               tutaDriveMode
                 ? 'Open or reload TutaNotes notes on TutaDrive'
                 : 'Open or reload TutaNotes notes on OneDrive'
             }
-            onClick={selectOneDriveTab}
+            onClick={selectTutaCloudTab}
             sx={storageTabButtonSx}
           >
             {cloudTabLabel}
@@ -758,30 +755,30 @@ export default function MyRecordVault() {
           <DualLogOffButton
             label={cloudLogOffLabel}
             onClick={() => void handleDualPaneLogOffOneDrive()}
-            disabled={oneDriveDualLogoffBusy}
+            disabled={tutaCloudDualLogoffBusy}
           />
         </StorageCenterCluster>
       );
     }
     // Expanded Cloud tab, compare mode, or Cloud-only → notebooks workspace.
-    if (oneDriveUnlocked && (paneFocus === 'onedrive' || paneFocus === 'compare' || !localUsbOffered)) {
+    if (tutaCloudUnlocked && (paneFocus === 'tutadrive' || paneFocus === 'compare' || !localUsbOffered)) {
       return (
-        <RecordVaultPaneProvider storageType="onedrive">
+        <RecordVaultPaneProvider storageType="tutadrive">
           <RecordVaultWorkspacePane
             unlocked
             compact
             compareMode={showCompare}
-            paneLabel={tutaDriveMode ? 'TutaDrive' : 'OneDrive'}
+            paneLabel="TutaCloud"
             canEnterCompare={canEnterCompare}
             onEnterCompare={enterCompareMode}
             onReturnFromCompare={returnFromCompareMode}
-            onSessionEnded={handleOneDriveSessionEnded}
+            onSessionEnded={handleTutaCloudSessionEnded}
             ragUiEnabled={ragUiEnabled}
           />
         </RecordVaultPaneProvider>
       );
     }
-    if (showDual || !oneDriveUnlocked) {
+    if (showDual || !tutaCloudUnlocked) {
       return (
         <LoginScrollArea>
           {showDual ? (
@@ -789,13 +786,13 @@ export default function MyRecordVault() {
               <GreenButton
                 type="button"
                 role="tab"
-                aria-selected={paneFocus === 'onedrive'}
+                aria-selected={paneFocus === 'tutadrive'}
                 title={
                   tutaDriveMode
                     ? 'Expand TutaNotes on TutaDrive to the full window'
                     : 'Expand TutaNotes on OneDrive to the full window'
                 }
-                onClick={selectOneDriveTab}
+                onClick={selectTutaCloudTab}
                 sx={storageTabButtonSx}
               >
                 {cloudTabLabel}
@@ -803,10 +800,10 @@ export default function MyRecordVault() {
               <CloudGate
                 embedded
                 open
-                onUnlocked={handleOneDriveUnlocked}
-                onOpenClicked={handleOneDriveOpenClicked}
-                proceedOpenToken={oneDriveProceedOpenToken}
-                accessFormatRefreshToken={oneDriveGateRefreshToken}
+                onUnlocked={handleTutaCloudUnlocked}
+                onOpenClicked={handleTutaCloudOpenClicked}
+                proceedOpenToken={tutaCloudProceedOpenToken}
+                accessFormatRefreshToken={tutaCloudGateRefreshToken}
                 {...(tutaDriveMode && !localUsbOffered ? { autoOpenOnMount: true } : {})}
               />
             </Box>
@@ -814,10 +811,10 @@ export default function MyRecordVault() {
             <CloudGate
               embedded
               open
-              onUnlocked={handleOneDriveUnlocked}
-              onOpenClicked={handleOneDriveOpenClicked}
-              proceedOpenToken={oneDriveProceedOpenToken}
-              accessFormatRefreshToken={oneDriveGateRefreshToken}
+              onUnlocked={handleTutaCloudUnlocked}
+              onOpenClicked={handleTutaCloudOpenClicked}
+              proceedOpenToken={tutaCloudProceedOpenToken}
+              accessFormatRefreshToken={tutaCloudGateRefreshToken}
               {...(tutaDriveMode && !localUsbOffered ? { autoOpenOnMount: true } : {})}
             />
           )}
@@ -850,7 +847,7 @@ export default function MyRecordVault() {
         </StorageCenterCluster>
       );
     }
-    if (usbUnlocked && (paneFocus === 'usb' || paneFocus === 'compare' || !oneDriveOffered)) {
+    if (usbUnlocked && (paneFocus === 'usb' || paneFocus === 'compare' || !tutaCloudOffered)) {
       return (
         <RecordVaultPaneProvider storageType="usb">
           <RecordVaultWorkspacePane
@@ -963,8 +960,8 @@ export default function MyRecordVault() {
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />
       <BusyHourglassOverlay
-        open={usbDualLogoffBusy || oneDriveDualLogoffBusy}
-        label={oneDriveDualLogoffBusy ? 'Logging off OneDrive' : 'Logging off USB'}
+        open={usbDualLogoffBusy || tutaCloudDualLogoffBusy}
+        label={tutaCloudDualLogoffBusy ? 'Logging off OneDrive' : 'Logging off USB'}
         backdropSx={myNoteLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />
@@ -982,19 +979,17 @@ export default function MyRecordVault() {
                 <GreenButton
                   type="button"
                   role="tab"
-                  aria-selected={paneFocus === 'onedrive'}
+                  aria-selected={paneFocus === 'tutadrive'}
                   title={
-                    paneFocus === 'onedrive'
-                      ? oneDriveOffered && localUsbOffered
-                        ? `Click again to show ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} and USB side by side`
-                        : tutaDriveMode
-                          ? 'TutaDrive Cloud is open'
-                          : 'TutaNotes Cloud is open'
-                      : oneDriveUnlocked
-                        ? `Open or reload TutaNotes notes on ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'}`
-                        : `Expand TutaNotes on ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} to the full window`
+                    paneFocus === 'tutadrive'
+                      ? tutaCloudOffered && localUsbOffered
+                        ? 'Click again to show TutaCloud and USB side by side'
+                        : 'TutaCloud is open'
+                      : tutaCloudUnlocked
+                        ? 'Open or reload TutaNotes notes on TutaCloud'
+                        : 'Expand TutaNotes on TutaCloud to the full window'
                   }
-                  onClick={selectOneDriveTab}
+                  onClick={selectTutaCloudTab}
                   sx={storageTabButtonSx}
                 >
                   {cloudTabLabel}
@@ -1007,7 +1002,7 @@ export default function MyRecordVault() {
                   aria-selected={paneFocus === 'usb'}
                   title={
                     paneFocus === 'usb'
-                      ? oneDriveOffered && localUsbOffered
+                      ? tutaCloudOffered && localUsbOffered
                         ? 'Click again to show OneDrive and USB side by side'
                         : 'TutaNotes USB is open'
                       : usbUnlocked
@@ -1032,15 +1027,15 @@ export default function MyRecordVault() {
               overflow: 'hidden'
             }}
           >
-            {oneDriveOffered ? (
+            {tutaCloudOffered ? (
               <Box
                 sx={{
                   ...loginColumnSx(),
-                  display: oneDriveVisible ? 'flex' : 'none',
+                  display: tutaCloudVisible ? 'flex' : 'none',
                   borderColor: cloudTabColor,
                   overflow: showDual ? 'visible' : 'hidden',
                   bgcolor:
-                    showDual || !oneDriveUnlocked ? cloudTabColor : TUTANOTES_WORKSPACE_PANEL_BG
+                    showDual || !tutaCloudUnlocked ? cloudTabColor : TUTANOTES_WORKSPACE_PANEL_BG
                 }}
               >
                 {/* Yellow title row when only one storage mode is offered, or per-pane titles in compare. */}
@@ -1062,9 +1057,9 @@ export default function MyRecordVault() {
                     overflow: showDual ? 'visible' : 'hidden'
                   }}
                 >
-                  {renderOneDriveBody()}
+                  {renderTutaCloudBody()}
                 </Box>
-                {!oneDriveUnlocked ? (
+                {!tutaCloudUnlocked ? (
                   <RecordVaultSessionFileCountsBar refreshToken={sessionCountsRefreshToken} />
                 ) : null}
               </Box>

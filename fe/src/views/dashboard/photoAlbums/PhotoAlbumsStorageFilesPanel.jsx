@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {
-  fetchPhotoAlbumsOneDriveVaultTree,
+  fetchPhotoAlbumsTutaDriveVaultTree,
   fetchPhotoAlbumsUsbVaultTree,
   readPhotoAlbumsApiError
 } from 'api/photoAlbumsFe';
@@ -232,7 +232,7 @@ function usbListingToTree(listing) {
 }
 
 export default function PhotoAlbumsStorageFilesPanel({ storageType, active = true, hideTitle = false }) {
-  const isOneDrive = storageType === 'onedrive';
+  const isOneDrive = storageType === 'tutadrive';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorPopupOpen, setErrorPopupOpen] = useState(false);
@@ -257,7 +257,7 @@ export default function PhotoAlbumsStorageFilesPanel({ storageType, active = tru
       }
       try {
         if (isOneDrive) {
-          const result = await fetchPhotoAlbumsOneDriveVaultTree();
+          const result = await fetchPhotoAlbumsTutaDriveVaultTree();
           if (cancelled) return;
           setTree(result.tree || null);
           setError('');
@@ -345,7 +345,7 @@ export default function PhotoAlbumsStorageFilesPanel({ storageType, active = tru
 }
 
 PhotoAlbumsStorageFilesPanel.propTypes = {
-  storageType: PropTypes.oneOf(['onedrive', 'usb']).isRequired,
+  storageType: PropTypes.oneOf(['tutadrive', 'usb']).isRequired,
   active: PropTypes.bool,
   hideTitle: PropTypes.bool
 };

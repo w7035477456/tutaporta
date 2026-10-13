@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {
-  fetchRecordVaultOneDriveVaultTree,
+  fetchRecordVaultTutaDriveVaultTree,
   fetchRecordVaultUsbVaultTree,
   readRecordVaultApiError
 } from 'api/recordVaultFe';
@@ -225,7 +225,7 @@ function usbListingToTree(listing) {
 }
 
 export default function RecordVaultStorageFilesPanel({ storageType, active = true }) {
-  const isOneDrive = storageType === 'onedrive';
+  const isOneDrive = storageType === 'tutadrive';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorPopupOpen, setErrorPopupOpen] = useState(false);
@@ -250,7 +250,7 @@ export default function RecordVaultStorageFilesPanel({ storageType, active = tru
       }
       try {
         if (isOneDrive) {
-          const result = await fetchRecordVaultOneDriveVaultTree();
+          const result = await fetchRecordVaultTutaDriveVaultTree();
           if (cancelled) return;
           setTree(result.tree || null);
           setError('');
@@ -336,6 +336,6 @@ export default function RecordVaultStorageFilesPanel({ storageType, active = tru
 }
 
 RecordVaultStorageFilesPanel.propTypes = {
-  storageType: PropTypes.oneOf(['onedrive', 'usb']).isRequired,
+  storageType: PropTypes.oneOf(['tutadrive', 'usb']).isRequired,
   active: PropTypes.bool
 };

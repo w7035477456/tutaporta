@@ -18,7 +18,7 @@ function formatUploadHint(contentLength) {
 }
 
 /** Parse multipart field `backup` into a temp zip file path. */
-export function parseOneDriveBackupZipUpload(req) {
+export function parseVaultBackupZipUpload(req) {
   return new Promise((resolve, reject) => {
     const contentType = String(req.headers['content-type'] || '');
     const contentLength = req.get?.('content-length') || req.headers['content-length'] || '';

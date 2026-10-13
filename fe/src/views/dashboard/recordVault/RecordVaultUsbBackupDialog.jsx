@@ -10,7 +10,7 @@ import {
   formatRecordVaultUsb,
   restoreRecordVaultUsbBackupZip
 } from 'api/recordVaultFe';
-import RecordVaultOneDriveVaultTreePanel from './RecordVaultOneDriveVaultTreePanel';
+import RecordVaultTutaCloudVaultTreePanel from './RecordVaultTutaCloudVaultTreePanel';
 import {
   tutaNotesFormatPostLoginButtonSx,
   tutaNotesOrangePostLoginButtonSx,
@@ -299,7 +299,7 @@ export default function RecordVaultUsbBackupDialog({
           ) : null}
 
           <Box sx={vaultTreeSectionSx}>
-            <RecordVaultOneDriveVaultTreePanel
+            <RecordVaultTutaCloudVaultTreePanel
               active={open && !vaultNeedsRelock}
               storageType="usb"
               refreshToken={treeRefreshToken}

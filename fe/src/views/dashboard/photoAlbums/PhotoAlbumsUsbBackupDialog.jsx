@@ -11,7 +11,7 @@ import {
   formatPhotoAlbumsUsb,
   restorePhotoAlbumsUsbBackupZip
 } from 'api/photoAlbumsFe';
-import PhotoAlbumsOneDriveVaultTreePanel from './PhotoAlbumsOneDriveVaultTreePanel';
+import PhotoAlbumsTutaCloudVaultTreePanel from './PhotoAlbumsTutaCloudVaultTreePanel';
 import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
@@ -358,7 +358,7 @@ export default function PhotoAlbumsUsbBackupDialog({
           ) : null}
 
           <Box sx={vaultTreeSectionSx}>
-            <PhotoAlbumsOneDriveVaultTreePanel
+            <PhotoAlbumsTutaCloudVaultTreePanel
               active={open}
               storageType="usb"
               refreshToken={treeRefreshToken}

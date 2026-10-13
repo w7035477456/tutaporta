@@ -19,7 +19,7 @@ export const TUTAPHOTOALBUMS_USB_STRIP_COLOR = '#6EB5E0';
 export const TUTAPHOTOALBUMS_USB_TAB_LABEL_COLOR = '#9B3DBA';
 
 export function tutaPhotoAlbumsStorageStripColor(storageType) {
-  return storageType === 'onedrive' ? TUTAPHOTOALBUMS_ONEDRIVE_STRIP_COLOR : TUTAPHOTOALBUMS_USB_STRIP_COLOR;
+  return storageType === 'tutadrive' ? TUTAPHOTOALBUMS_ONEDRIVE_STRIP_COLOR : TUTAPHOTOALBUMS_USB_STRIP_COLOR;
 }
 
 /** Expanded workspace yellow header — matches storage tab labels. */

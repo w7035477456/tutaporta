@@ -20,11 +20,9 @@ import {
 import {
   isRecordVaultUsbRequiredError,
   fetchRecordVaultStorageConfig,
-  fetchRecordVaultOneDriveConfig,
   fetchRecordVaultUsbStatus,
   fetchRecordVaultUsbLocations,
-  fetchRecordVaultOneDriveStatus,
-  rememberRecordVaultOneDriveEmail,
+  fetchRecordVaultTutaDriveStatus,
   probeRecordVaultBridge,
   setRecordVaultBridgeSinglesId,
   setRecordVaultBridgeStorageType,
@@ -60,7 +58,7 @@ import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_NOTE_SIZE } from 'config/busyHourglassEnv';
 import RecordVaultViewVaultDialog from './RecordVaultViewVaultDialog';
-import RecordVaultOneDriveBackupDialog from './RecordVaultOneDriveBackupDialog';
+import RecordVaultTutaCloudBackupDialog from './RecordVaultTutaCloudBackupDialog';
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import RecordVaultRagDialog from './RecordVaultRagDialog';
 import TutaNotesRagCheckboxMark, { tutaNotesRagCheckboxButtonSx } from './TutaNotesRagCheckboxMark';
@@ -719,7 +717,7 @@ const recordVaultContentScrollSx = {
   }
 };
 
-/** Notebook / Note / Shortcut list panels — always show a vertical scrollbar (OneDrive + USB). */
+/** Notebook / Note / Shortcut list panels — always show a vertical scrollbar (TutaCloud + USB). */
 const recordVaultMenuListScrollSx = {
   ...recordVaultContentScrollSx,
   pr: 0.25
@@ -1548,20 +1546,20 @@ export default function RecordVaultWorkspacePane({
   const [busyLabel, setBusyLabel] = useState('');
   const [batchUploadProgress] = useState(null);
   const [vaultLeaving, setVaultLeaving] = useState(false);
-  /** Honest 0–100% while Log off Cloud syncs dirty vault files to OneDrive. */
+  /** Honest 0–100% while Log off Cloud syncs dirty vault files to TutaCloud. */
   const [vaultLeavingProgressPercent, setVaultLeavingProgressPercent] = useState(0);
   const [vaultLeavingProgressLabel, setVaultLeavingProgressLabel] = useState('');
 
   const [vaultUsage, setVaultUsage] = useState(null);
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
   const [billScheduleTutorialOpen, setBillScheduleTutorialOpen] = useState(false);
-  const [oneDriveOffered, setOneDriveOffered] = useState(false);
+  const [tutaCloudOffered, setTutaCloudOffered] = useState(false);
   const [, setLocalUsbOffered] = useState(false);
   const [, setStorageConfigLoaded] = useState(false);
   const [] = useState(false);
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
-  const [viewVaultStorageType, setViewVaultStorageType] = useState('onedrive');
-  const [oneDriveBackupOpen, setOneDriveBackupOpen] = useState(false);
+  const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
+  const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [ragDialogOpen, setRagDialogOpen] = useState(false);
   const [ragSelectedNoteIds, setRagSelectedNoteIds] = useState([]);
@@ -1569,9 +1567,9 @@ export default function RecordVaultWorkspacePane({
   const [ragKeepModelBusy, setRagKeepModelBusy] = useState(false);
   const [ragKeepModelNotice, setRagKeepModelNotice] = useState('');
   const [ragConfiguredModel, setRagConfiguredModel] = useState('');
-  const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
-  const isTutaDrivePane = String(paneLabel || '').toLowerCase() === 'tutadrive';
-  const cloudViewLabel = isTutaDrivePane ? 'View TutaDrive' : 'View OneDrive';
+  const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState('onlinemallwebsitevault');
+  const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
+  const cloudViewLabel = isTutaCloudPane ? 'View TutaDrive' : 'View TutaCloud';
   const [usbVaultFolderLabel] = useState('USB');
   const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
@@ -2286,7 +2284,7 @@ export default function RecordVaultWorkspacePane({
 
   /**
    * Local PIN encrypt/decrypt maps into 0…localMaxPercent.
-   * On OneDrive, reserve the top of the bar for Cloud sync so we never sit at 100% while still uploading.
+   * On TutaCloud, reserve the top of the bar for Cloud sync so we never sit at 100% while still uploading.
    */
   const reportInnerEncryptProgress = useCallback(async (done, total, label = '', { maxPercent = 100 } = {}) => {
     const safeTotal = Math.max(1, Number(total) || 1);
@@ -2302,13 +2300,13 @@ export default function RecordVaultWorkspacePane({
   }, []);
 
   /**
-   * OneDrive vault.db flush after PIN work. Uses 85→99% while uploading; 100% only when finished.
+   * TutaCloud vault.db flush after PIN work. Uses 85→99% while uploading; 100% only when finished.
    * Must not block the busy dialog forever — axios has no default timeout and Cloud upload can hang.
    * Notes are already on disk; background upload + logoff still retry.
    */
-  const flushOneDriveAfterInnerPin = useCallback(
+  const flushTutaCloudAfterInnerPin = useCallback(
     async ({ showErrorOnFail = false, startPercent = 85 } = {}) => {
-      if (paneStorageType !== 'onedrive') return { ok: true, timedOut: false };
+      if (paneStorageType !== 'tutadrive') return { ok: true, timedOut: false };
       const floor = Math.max(0, Math.min(98, Math.round(Number(startPercent) || 85)));
       const mapCloudPercent = (p) => {
         const cloud = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
@@ -2383,8 +2381,8 @@ export default function RecordVaultWorkspacePane({
         const idNum = Number(fallbackId ?? row?.note_id);
         return Number.isFinite(idNum) && idNum >= 1 ? `Note ${idNum}` : 'note';
       };
-      // OneDrive: keep 0–85% for local PIN work; Cloud sync owns 85–100%.
-      const localMaxPercent = paneStorageType === 'onedrive' ? 85 : 100;
+      // TutaCloud: keep 0–85% for local PIN work; Cloud sync owns 85–100%.
+      const localMaxPercent = paneStorageType === 'tutadrive' ? 85 : 100;
       const progressOpts = { maxPercent: localMaxPercent };
       setInnerEncryptError('');
       setInnerEncryptBusy(true);
@@ -2421,7 +2419,7 @@ export default function RecordVaultWorkspacePane({
               );
               return false;
             }
-            const syncResult = await flushOneDriveAfterInnerPin({
+            const syncResult = await flushTutaCloudAfterInnerPin({
               showErrorOnFail: true,
               startPercent: localMaxPercent
             });
@@ -2445,7 +2443,7 @@ export default function RecordVaultWorkspacePane({
               return false;
             }
             await reportInnerEncryptProgress(1, 1, singleLabel, progressOpts);
-            const syncResult = await flushOneDriveAfterInnerPin({
+            const syncResult = await flushTutaCloudAfterInnerPin({
               showErrorOnFail: true,
               startPercent: localMaxPercent
             });
@@ -2501,7 +2499,7 @@ export default function RecordVaultWorkspacePane({
               }
               await reportInnerEncryptProgress(2 + i, totalNotes, progressLabel, progressOpts);
             }
-            await flushOneDriveAfterInnerPin({
+            await flushTutaCloudAfterInnerPin({
               showErrorOnFail: false,
               startPercent: localMaxPercent
             });
@@ -2510,7 +2508,7 @@ export default function RecordVaultWorkspacePane({
             await reportInnerEncryptProgress(0, 1, singleLabel, progressOpts);
             await unlockInnerEncryptedNote(id, pin, targetRow);
             await reportInnerEncryptProgress(1, 1, singleLabel, progressOpts);
-            await flushOneDriveAfterInnerPin({
+            await flushTutaCloudAfterInnerPin({
               showErrorOnFail: false,
               startPercent: localMaxPercent
             });
@@ -2554,7 +2552,7 @@ export default function RecordVaultWorkspacePane({
       unlockInnerEncryptedNote,
       noteRequiresInnerPinToView,
       reportInnerEncryptProgress,
-      flushOneDriveAfterInnerPin
+      flushTutaCloudAfterInnerPin
     ]
   );
 
@@ -2670,7 +2668,7 @@ export default function RecordVaultWorkspacePane({
       })();
       return;
     }
-    // OneDrive/USB note body fetch can take seconds — show hourglass on click, not after await.
+    // TutaCloud/USB note body fetch can take seconds — show hourglass on click, not after await.
     setNoteContentLoading(true);
     void (async () => {
       const prevNoteId = selectedNoteIdRef.current;
@@ -3026,17 +3024,17 @@ export default function RecordVaultWorkspacePane({
       try {
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
-        setOneDriveOffered(Boolean(cfg.oneDrive?.visible && cfg.oneDrive?.enabled));
+        setTutaCloudOffered(Boolean(cfg.oneDrive?.visible && cfg.oneDrive?.enabled));
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible && cfg.localUsb?.enabled));
         setVideoTutorialUrl(String(cfg?.videoTutorialTutanotes || '').trim());
         if (cfg.oneDrive?.visible && cfg.oneDrive?.enabled) {
           if (cfg.tutaDrive) {
-            setOneDriveVaultFolderName('TutaDrive');
+            setTutaCloudVaultFolderName('TutaDrive');
           } else {
             try {
-              const oneDriveCfg = await fetchRecordVaultOneDriveConfig();
+              const oneDriveCfg = await fetchRecordVaultStorageConfig();
               if (!cancelled && oneDriveCfg?.folderName) {
-                setOneDriveVaultFolderName(String(oneDriveCfg.folderName));
+                setTutaCloudVaultFolderName(String(oneDriveCfg.folderName));
               }
             } catch {
               // keep default folder name
@@ -3047,11 +3045,11 @@ export default function RecordVaultWorkspacePane({
         if (cancelled) return;
         const status = Number(err?.response?.status);
         if (status === 404) {
-          setOneDriveOffered(true);
+          setTutaCloudOffered(true);
           setLocalUsbOffered(true);
           return;
         }
-        setOneDriveOffered(false);
+        setTutaCloudOffered(false);
       } finally {
         if (!cancelled) setStorageConfigLoaded(true);
       }
@@ -3308,14 +3306,6 @@ export default function RecordVaultWorkspacePane({
       try {
         const usage = await vaultApi.fetchRecordVaultUsage();
         if (!cancelled) setVaultUsage(usage);
-        const email = String(usage?.onedriveEmail || '').trim();
-        if (!cancelled && usage?.storageType === 'onedrive' && email) {
-          try {
-            await rememberRecordVaultOneDriveEmail(email);
-          } catch {
-            // ignore history save errors on main screen load
-          }
-        }
       } catch {
         if (!cancelled) setVaultUsage(null);
       }
@@ -3359,7 +3349,7 @@ export default function RecordVaultWorkspacePane({
   const performVaultStorageLogoff = useCallback(async () => {
     setVaultLeavingProgressPercent(1);
     setVaultLeavingProgressLabel(
-      paneStorageType === 'onedrive' ? 'Saving notes to OneDrive…' : 'Logging off USB…'
+      paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
     );
     await vaultApi.logoffRecordVaultStorage({
       onProgress: (progress) => {
@@ -3376,7 +3366,7 @@ export default function RecordVaultWorkspacePane({
     onSessionEnded?.();
   }, [onSessionEnded, vaultApi, reportVaultLeavingProgress, paneStorageType]);
 
-  const handleOneDriveVaultRestored = useCallback(async () => {
+  const handleTutaCloudVaultRestored = useCallback(async () => {
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
 
@@ -3396,7 +3386,7 @@ export default function RecordVaultWorkspacePane({
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
       setVaultLeavingProgressLabel(
-        paneStorageType === 'onedrive' ? 'Saving notes to OneDrive…' : 'Logging off USB…'
+        paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
       );
       setError('');
       try {
@@ -3454,7 +3444,7 @@ export default function RecordVaultWorkspacePane({
     } else if (notebookScopePendingRef.current) {
       notebookScopePendingRef.current = false;
       setInnerEncryptUiScope('notebook');
-      // Notebook click kept the same open note — no OneDrive body fetch.
+      // Notebook click kept the same open note — no TutaCloud body fetch.
       setNoteContentLoading(false);
     }
   }, [
@@ -5038,7 +5028,7 @@ export default function RecordVaultWorkspacePane({
         const payload = {
           kind: billKind || (mime === DRAG_NOTEBOOK ? 'notebook' : 'note'),
           id: Number(id),
-          storageType: paneStorageType === 'onedrive' ? 'onedrive' : 'usb',
+          storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
           name,
           notebookId: Number.isFinite(notebookId) ? notebookId : null,
           noteIds: mime === DRAG_NOTE && draggedNoteIds.length > 1 ? draggedNoteIds : undefined
@@ -5188,7 +5178,7 @@ export default function RecordVaultWorkspacePane({
     (event, { targetNotebookId = null } = {}) => {
       const foreign = readCrossPaneDragFromEvent(event);
       if (!foreign) return false;
-      const pane = paneStorageType === 'onedrive' ? 'onedrive' : 'usb';
+      const pane = paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb';
       if (foreign.storageType === pane) return false;
       event.preventDefault();
       event.stopPropagation();
@@ -6505,11 +6495,11 @@ export default function RecordVaultWorkspacePane({
       <BusyHourglassOverlay
         open={crossPaneBusy}
         label={
-          crossPaneTransfer?.item?.storageType === 'onedrive'
+          crossPaneTransfer?.item?.storageType === 'tutadrive'
             ? paneStorageType === 'usb'
               ? 'Copying from Cloud to USB'
               : 'Transferring Cloud item'
-            : paneStorageType === 'onedrive'
+            : paneStorageType === 'tutadrive'
               ? 'Copying from USB to Cloud'
               : 'Transferring USB item'
         }
@@ -6520,13 +6510,13 @@ export default function RecordVaultWorkspacePane({
       />
       <BusyHourglassOverlay
         open={false}
-        label="Loading OneDrive sign-in"
+        label="Loading TutaCloud sign-in"
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />
       <BusyHourglassOverlay
         open={vaultLeaving}
-        label={paneStorageType === 'onedrive' ? 'Saving to Cloud' : 'Logging off USB'}
+        label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
         progressPercent={vaultLeavingProgressPercent}
         progressLabel={vaultLeavingProgressLabel}
         backdropSx={vaultLeavingBackdropSx}
@@ -6560,7 +6550,7 @@ export default function RecordVaultWorkspacePane({
       <RecordVaultCrossPaneTransferDialog
         open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
         item={crossPaneTransfer?.item || null}
-        targetStorageType={paneStorageType === 'onedrive' ? 'onedrive' : 'usb'}
+        targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
         targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
         busy={crossPaneBusy}
         duplicateError={crossPaneDuplicateError}
@@ -6764,15 +6754,15 @@ export default function RecordVaultWorkspacePane({
         open={viewVaultOpen}
         onClose={() => setViewVaultOpen(false)}
         storageType={viewVaultStorageType}
-        folderName={viewVaultStorageType === 'onedrive' ? oneDriveVaultFolderName : ''}
-        tutaDrive={isTutaDrivePane}
+        folderName={viewVaultStorageType === 'tutadrive' ? tutaCloudVaultFolderName : ''}
+        tutaDrive={isTutaCloudPane}
       />
-      <RecordVaultOneDriveBackupDialog
-        open={oneDriveBackupOpen}
-        onClose={() => setOneDriveBackupOpen(false)}
-        folderName={oneDriveVaultFolderName}
+      <RecordVaultTutaCloudBackupDialog
+        open={tutaCloudBackupOpen}
+        onClose={() => setTutaCloudBackupOpen(false)}
+        folderName={tutaCloudVaultFolderName}
         tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
-        onRestored={() => void handleOneDriveVaultRestored()}
+        onRestored={() => void handleTutaCloudVaultRestored()}
       />
       <RecordVaultUsbBackupDialog
         open={usbBackupOpen}
@@ -6925,7 +6915,7 @@ export default function RecordVaultWorkspacePane({
       />
       <BusyHourglassOverlay
         open={Boolean(unlocked && noteContentLoading && vaultUiReady)}
-        label={paneStorageType === 'onedrive' ? 'Loading note from OneDrive' : 'Loading note'}
+        label={paneStorageType === 'tutadrive' ? 'Loading note from TutaCloud' : 'Loading note'}
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />
@@ -7145,7 +7135,7 @@ export default function RecordVaultWorkspacePane({
               </Box>
               {!compareMode ? (
                 <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
-                  {paneStorageType === 'onedrive' && oneDriveOffered ? (
+                  {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
                     <Box
                       sx={{
                         ...menuRailButtonCellSx,
@@ -7161,7 +7151,7 @@ export default function RecordVaultWorkspacePane({
                         variant="yellow"
                         hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                         fullWidth
-                        onClick={() => setOneDriveBackupOpen(true)}
+                        onClick={() => setTutaCloudBackupOpen(true)}
                         disabled={busy}
                         aria-label="Backup/Restore"
                         title="Backup / Restore"
@@ -7205,7 +7195,7 @@ export default function RecordVaultWorkspacePane({
                       minWidth: 0,
                       maxWidth: canEnterCompare
                         ? '33%'
-                        : paneStorageType === 'usb' || (paneStorageType === 'onedrive' && oneDriveOffered)
+                        : paneStorageType === 'usb' || (paneStorageType === 'tutadrive' && tutaCloudOffered)
                           ? '50%'
                           : '100%',
                       overflow: 'visible'
@@ -7253,11 +7243,11 @@ export default function RecordVaultWorkspacePane({
                         fullWidth
                         onClick={() => onEnterCompare?.()}
                         disabled={busy}
-                        aria-label="OneDrive to USB compare"
-                        title="Open OneDrive and USB side by side to drag and drop notebooks and notes"
+                        aria-label="TutaCloud to USB compare"
+                        title="Open TutaCloud and USB side by side to drag and drop notebooks and notes"
                         sx={headerFullWidthButtonSx}
                       >
-                        OneDrive↔USB
+                        TutaCloud↔USB
                       </SliderControlButton>
                     </Box>
                   ) : null}
@@ -7694,7 +7684,7 @@ export default function RecordVaultWorkspacePane({
                             if (Number(nb.notebook_id) === Number(selectedNotebookId)) return;
                             notebookScopePendingRef.current = true;
                             setInnerEncryptUiScope('notebook');
-                            // Immediate feedback — note body may still be loading from OneDrive.
+                            // Immediate feedback — note body may still be loading from TutaCloud.
                             setNoteContentLoading(true);
                             setSelectedNotebookId(nb.notebook_id);
                           }}
@@ -8494,11 +8484,11 @@ export default function RecordVaultWorkspacePane({
                       fullWidth
                       singleLineLabel={false}
                       onClick={() => {
-                        setViewVaultStorageType(paneStorageType === 'onedrive' ? 'onedrive' : 'usb');
+                        setViewVaultStorageType(paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb');
                         setViewVaultOpen(true);
                       }}
                       disabled={busy || !unlocked}
-                      aria-label={paneStorageType === 'onedrive' ? cloudViewLabel : 'View USB'}
+                      aria-label={paneStorageType === 'tutadrive' ? cloudViewLabel : 'View USB'}
                       title={
                         paneStorageType === 'usb'
                           ? usbBridgeHealthy
@@ -8509,7 +8499,7 @@ export default function RecordVaultWorkspacePane({
                       sx={{
                         flexShrink: 0,
                         ...laneContainedButtonSx,
-                        // Stack "View" / "TutaDrive" (or USB / OneDrive) — one word per row.
+                        // Stack "View" / "TutaDrive" (or USB / TutaCloud) — one word per row.
                         display: 'inline-flex !important',
                         flexDirection: 'column !important',
                         height: 'auto !important',
@@ -8526,7 +8516,7 @@ export default function RecordVaultWorkspacePane({
                       }}
                     >
                       {renderMenuLabelOneWordPerLine(
-                        paneStorageType === 'onedrive' ? cloudViewLabel : 'View USB'
+                        paneStorageType === 'tutadrive' ? cloudViewLabel : 'View USB'
                       )}
                     </SliderControlButton>
                     <RecordVaultStorageFilesPanel storageType={paneStorageType || 'usb'} active={unlocked} />

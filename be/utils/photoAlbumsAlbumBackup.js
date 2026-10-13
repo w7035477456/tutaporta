@@ -1,11 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ZipArchive } from 'archiver';
-import {
-  ensureOneDriveVaultFileOnDisk,
-  ensureOneDriveVaultPhotoOnDisk
-} from './photoAlbumsOneDrive/oneDriveVaultSync.js';
-import { formatMyPhotoAlbumsBackupZipStamp } from './photoAlbumsOneDrive/oneDriveVaultBackup.js';
+import { buildPhotoAlbumsAlbumBackupZipFileName } from './photoAlbumsBackupZipNames.js';
 import {
   clearAlbumBackupProgress,
   setAlbumBackupProgress
@@ -19,21 +15,7 @@ import {
   vaultPhotosRoot
 } from './photoAlbumsUsb/vaultPaths.js';
 
-function sanitizeAlbumLabelForFileName(label) {
-  const cleaned = String(label || 'Album')
-    .trim()
-    .replace(/[^\w\s-]+/g, '')
-    .replace(/\s+/g, '_')
-    .slice(0, 80);
-  return cleaned || 'Album';
-}
-
-/** @param {'onedrive' | 'usb'} kind */
-export function buildPhotoAlbumsAlbumBackupZipFileName(albumLabel, kind = 'onedrive') {
-  const prefix = kind === 'usb' ? 'MyPhotoAlbums_USB' : 'MyPhotoAlbums_OneDrive';
-  const safeLabel = sanitizeAlbumLabelForFileName(albumLabel);
-  return `${prefix}_${safeLabel}_${formatMyPhotoAlbumsBackupZipStamp()}.zip`;
-}
+export { buildPhotoAlbumsAlbumBackupZipFileName } from './photoAlbumsBackupZipNames.js';
 
 function resolveNoteIds(noteId, notebookId) {
   const nid = Number(noteId);
@@ -109,32 +91,7 @@ function buildAlbumManifest(note, albumLabel, notebookName = '') {
   };
 }
 
-async function ensureAlbumEntriesOnDisk(session, singlesId, entries, onProgress) {
-  if (session.storageType !== 'onedrive') return entries;
-  const total = entries.length;
-  let bytesDone = 0;
-  for (let i = 0; i < entries.length; i += 1) {
-    const entry = entries[i];
-    const zipPath = String(entry.zipPath || '');
-    if (zipPath.startsWith(`${VAULT_PHOTOS_DIR}/`)) {
-      const rel = zipPath.slice(`${VAULT_PHOTOS_DIR}/`.length);
-      await ensureOneDriveVaultPhotoOnDisk(singlesId, session.mountPath, rel, session.meta);
-    } else if (zipPath.startsWith(`${VAULT_FILES_DIR}/`)) {
-      const rel = zipPath.slice(`${VAULT_FILES_DIR}/`.length);
-      await ensureOneDriveVaultFileOnDisk(singlesId, session.mountPath, rel, session.meta);
-    }
-    if (fs.existsSync(entry.absPath)) {
-      bytesDone += fs.statSync(entry.absPath).size;
-    }
-    const percent = total ? Math.min(75, Math.round(((i + 1) / total) * 75)) : 10;
-    await onProgress?.({
-      percent,
-      fileIndex: i + 1,
-      fileTotal: total,
-      bytesDone,
-      label: `Fetching file ${i + 1} of ${total}`
-    });
-  }
+async function ensureAlbumEntriesOnDisk(session, _singlesId, entries, _onProgress) {
   return entries;
 }
 
@@ -175,7 +132,7 @@ export async function streamPhotoAlbumsAlbumBackupZip(
   const resolvedLabel =
     String(albumLabel || note.note_name || '').trim() ||
     `Set ${ids.notebookId}/Album ${ids.noteId}`;
-  const zipName = buildPhotoAlbumsAlbumBackupZipFileName(resolvedLabel, storageType === 'usb' ? 'usb' : 'onedrive');
+  const zipName = buildPhotoAlbumsAlbumBackupZipFileName(resolvedLabel, storageType === 'usb' ? 'usb' : 'cloud');
 
   await clearAlbumBackupProgress(singlesId);
   await reportProgress(singlesId, {

@@ -18,6 +18,12 @@ import {
   setPhotoAlbumsBridgeStorageType,
   shouldRoutePhotoAlbumsThroughBridge
 } from './photoAlbumsBridgeFe';
+import {
+  isVaultCloudPaneStorageType,
+  normalizeVaultPaneStorageType,
+  VAULT_CLOUD_STORAGE_TYPE,
+  vaultCloudBackendStorageSlot
+} from 'utils/vaultPaneStorageType';
 
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
 export function readPhotoAlbumsApiError(err, fallback = 'Request failed') {
@@ -38,12 +44,12 @@ export function readPhotoAlbumsApiError(err, fallback = 'Request failed') {
   return fallback;
 }
 
-/** Main API only — used before bridge routing knows USB vs OneDrive. */
+/** Main API only — used before bridge routing knows USB vs TutaCloud. */
 export async function fetchPhotoAlbumsSessionStorageType() {
   try {
-    const { data } = await api.get('/api/photoAlbums/onedrive/status');
-    if (data?.session?.unlocked && String(data.session.storageType || '').toLowerCase() === 'onedrive') {
-      return 'onedrive';
+    const status = await fetchPhotoAlbumsTutaDriveStatus();
+    if (status?.session?.unlocked) {
+      return normalizeVaultPaneStorageType(status.session.storageType);
     }
   } catch {
     // ignore
@@ -51,8 +57,7 @@ export async function fetchPhotoAlbumsSessionStorageType() {
   try {
     const { data } = await api.get('/api/photoAlbums/usb/status');
     if (data?.session?.unlocked) {
-      const storageType = String(data.session.storageType || 'usb').toLowerCase();
-      return storageType === 'onedrive' ? 'onedrive' : 'usb';
+      return normalizeVaultPaneStorageType(data.session.storageType || 'usb');
     }
   } catch {
     // ignore
@@ -134,11 +139,11 @@ export async function snapshotPhotoAlbumsSessionFileCounts() {
 }
 
 /** Per-tab: tree open already counted for this storage type after unlock. */
-const sessionTreeCounted = { usb: false, onedrive: false };
+const sessionTreeCounted = { usb: false, tutadrive: false };
 
 export function resetPhotoAlbumsSessionTreeCountFlags() {
   sessionTreeCounted.usb = false;
-  sessionTreeCounted.onedrive = false;
+  sessionTreeCounted.tutadrive = false;
 }
 
 function countTreeNotebooksAndNotes(tree) {
@@ -162,7 +167,7 @@ function maybeReportBridgeSessionFileCounts(config, responseData, viaBridge) {
   if (!viaBridge) return;
   const url = sessionCountPathOnly(config?.url);
   const method = String(config?.method || 'GET').toUpperCase();
-  const storageType = config?.storageType === 'onedrive' ? 'onedrive' : 'usb';
+  const storageType = isVaultCloudPaneStorageType(config?.storageType) ? VAULT_CLOUD_STORAGE_TYPE : 'usb';
 
   if (method === 'POST' && /\/api\/photoAlbums\/usb\/(unlock|init)/.test(url)) {
     sessionTreeCounted.usb = false;
@@ -799,16 +804,29 @@ export async function fetchPhotoAlbumsStorageConfig() {
     enabled: Boolean(choice?.enabled),
     tutaDrive: Boolean(choice?.tutaDrive)
   });
+  const tutaCloudSource = data?.tutaCloud ?? data?.oneDrive;
+  const tutaCloud = mapChoice(tutaCloudSource);
   return {
     leftSide: data?.leftSide != null ? String(data.leftSide) : undefined,
-    tutaDrive: Boolean(data?.tutaDrive),
+    tutaDrive: Boolean(data?.tutaDrive ?? tutaCloudSource?.tutaDrive),
     rightSide: data?.rightSide != null ? String(data.rightSide) : undefined,
-    oneDrive: mapChoice(data?.oneDrive),
+    tutaCloud,
+    /** @deprecated use tutaCloud */
+    oneDrive: tutaCloud,
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
     iconEncryptionRequired: data?.iconEncryptionRequired !== false,
     iconRetryDelaySeconds: Number(data?.iconRetryDelaySeconds) || 300,
-    cacheOneDriveIcon: data?.cacheOneDriveIcon ? String(data.cacheOneDriveIcon).trim() : '',
+    cacheTutaCloudIcon: data?.cacheTutaCloudIcon
+      ? String(data.cacheTutaCloudIcon).trim()
+      : data?.cacheOneDriveIcon
+        ? String(data.cacheOneDriveIcon).trim()
+        : '',
+    cacheOneDriveIcon: data?.cacheTutaCloudIcon
+      ? String(data.cacheTutaCloudIcon).trim()
+      : data?.cacheOneDriveIcon
+        ? String(data.cacheOneDriveIcon).trim()
+        : '',
     cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
     videoTutorialTutaphotoalbums: data?.videoTutorialTutaphotoalbums ? String(data.videoTutorialTutaphotoalbums).trim() : '',
     usbBridgeInstallers: {
@@ -818,9 +836,39 @@ export async function fetchPhotoAlbumsStorageConfig() {
   };
 }
 
+function normalizePhotoAlbumsTutaDriveStatusPayload(data) {
+  const session = data?.session && typeof data.session === 'object' ? { ...data.session } : { unlocked: false };
+  if (session.unlocked) {
+    session.storageType = normalizeVaultPaneStorageType(session.storageType || vaultCloudBackendStorageSlot());
+  }
+  const cacheIcon = data?.cacheTutaCloudIcon
+    ? String(data.cacheTutaCloudIcon).trim()
+    : data?.cacheIcon
+      ? String(data.cacheIcon).trim()
+      : '';
+  return {
+    ...data,
+    enabled: Boolean(data?.tutadrive?.enabled),
+    cacheIcon,
+    cacheTutaCloudIcon: cacheIcon,
+    session
+  };
+}
+
 export async function fetchPhotoAlbumsTutaDriveStatus() {
   const { data } = await api.get('/api/photoAlbums/tutadrive/status');
-  return data;
+  return normalizePhotoAlbumsTutaDriveStatusPayload(data);
+}
+
+/** Live TutaCloud vault folder listing (minimal tree when BE has no vault-tree route). */
+export async function fetchPhotoAlbumsTutaDriveVaultTree() {
+  const status = await fetchPhotoAlbumsTutaDriveStatus();
+  const memberFolder = String(status?.tutadrive?.memberFolder || '').trim();
+  const rootName = memberFolder || 'TutaCloud';
+  return {
+    folderName: rootName,
+    tree: { name: rootName, type: 'folder', children: [] }
+  };
 }
 
 /** Poll Redis-backed open percent while TutaDrive unlock POST runs. */
@@ -923,24 +971,6 @@ export async function downloadUsbBridgeInstaller(platform = 'mac') {
   }
 }
 
-export async function fetchPhotoAlbumsOneDriveConfig() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/config');
-  return {
-    visible: data?.visible === true,
-    enabled: Boolean(data?.enabled),
-    oauthConfigured: Boolean(data?.oauthConfigured),
-    folderName: data?.folderName ? String(data.folderName) : 'onlinemallwebsitevault'
-  };
-}
-
-export async function fetchPhotoAlbumsOneDriveVaultTree() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/vault-tree');
-  return {
-    folderName: data?.folderName ? String(data.folderName) : '',
-    tree: data?.tree && typeof data.tree === 'object' ? data.tree : null
-  };
-}
-
 export async function fetchPhotoAlbumsUsbVaultTree() {
   const { data } = await rvRequest({
     method: 'GET',
@@ -955,161 +985,12 @@ export async function fetchPhotoAlbumsUsbVaultTree() {
   };
 }
 
-export async function fetchPhotoAlbumsOneDriveStatus() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/status');
-  return {
-    enabled: Boolean(data?.enabled),
-    cacheIcon: data?.cacheOneDriveIcon
-      ? String(data.cacheOneDriveIcon).trim()
-      : data?.cacheIcon
-        ? String(data.cacheIcon).trim()
-        : '',
-    cacheOneDriveIcon: data?.cacheOneDriveIcon
-      ? String(data.cacheOneDriveIcon).trim()
-      : data?.cacheIcon
-        ? String(data.cacheIcon).trim()
-        : '',
-    onedrive: {
-      connected: Boolean(data?.onedrive?.connected),
-      email: data?.onedrive?.email ? String(data.onedrive.email) : null,
-      hasVault: Boolean(data?.onedrive?.hasVault),
-      legacyPinVault: Boolean(data?.onedrive?.legacyPinVault),
-      needsReformat: Boolean(data?.onedrive?.needsReformat),
-      vaultFilesystemInvalid: Boolean(data?.onedrive?.vaultFilesystemInvalid),
-      folderId: data?.onedrive?.folderId ? String(data.onedrive.folderId) : null
-    },
-    session: data?.session || { unlocked: false }
-  };
-}
-
-export async function fetchPhotoAlbumsOneDriveEmails() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/emails');
-  return Array.isArray(data?.emails) ? data.emails.map((email) => String(email).trim()).filter(Boolean) : [];
-}
-
-export async function rememberPhotoAlbumsOneDriveEmail(email) {
-  const { data } = await api.post('/api/photoAlbums/onedrive/emails', { email: String(email || '').trim() });
-  return {
-    success: Boolean(data?.success),
-    emails: Array.isArray(data?.emails) ? data.emails : [],
-    added: Boolean(data?.added)
-  };
-}
-
-export async function disconnectPhotoAlbumsOneDrive() {
-  const { data } = await api.post('/api/photoAlbums/onedrive/disconnect');
-  return data;
-}
-
-export async function fetchPhotoAlbumsOneDriveUnlockGuard() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/unlock-guard');
-  return data;
-}
-
-/** Poll Redis-backed open percent while Cloud unlock POST runs. */
-export async function fetchPhotoAlbumsOneDriveOpenProgress() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/open-progress');
-  return {
-    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
-    label: data?.label ? String(data.label) : ''
-  };
-}
-
-/**
- * Unlock OneDrive vault. Pass onProgress for honest 0–100% via short polling
- * (same cluster-safe pattern as logoff).
- */
-export async function unlockPhotoAlbumsOneDrive({ onProgress } = {}) {
-  if (typeof onProgress !== 'function') {
-    const { data } = await api.post('/api/photoAlbums/onedrive/unlock');
-    return data;
-  }
-  onProgress({ percent: 0, label: 'Opening TutaPhotoAlbums Cloud' });
-  let stopped = false;
-  const poll = window.setInterval(() => {
-    if (stopped) return;
-    void fetchPhotoAlbumsOneDriveOpenProgress()
-      .then((progress) => {
-        if (stopped) return;
-        onProgress(progress);
-      })
-      .catch(() => {
-        // Ignore poll blips; unlock POST is the source of truth.
-      });
-  }, 250);
-  try {
-    const { data } = await api.post('/api/photoAlbums/onedrive/unlock');
+/** TutaCloud vault flush without logoff (no-op when BE has no sync route). */
+export async function syncPhotoAlbumsTutaDrive({ onProgress } = {}) {
+  if (typeof onProgress === 'function') {
     onProgress({ percent: 100, label: 'Done' });
-    return data;
-  } finally {
-    stopped = true;
-    window.clearInterval(poll);
   }
-}
-
-export async function initPhotoAlbumsOneDrive() {
-  const { data } = await api.post('/api/photoAlbums/onedrive/init');
-  return data;
-}
-
-export async function logoffPhotoAlbumsOneDrive() {
-  const { data } = await api.post('/api/photoAlbums/onedrive/logoff');
-  return data;
-}
-
-/** Poll Redis-backed sync percent while Cloud sync POST runs (PIN lock / mid-session flush). */
-export async function fetchPhotoAlbumsOneDriveSyncProgress() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/sync-progress');
-  return {
-    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
-    label: data?.label ? String(data.label) : ''
-  };
-}
-
-/** Await OneDrive vault.db upload without logging off (after PIN encrypt). */
-export async function syncPhotoAlbumsOneDrive({ onProgress } = {}) {
-  if (typeof onProgress !== 'function') {
-    const { data } = await api.post('/api/photoAlbums/onedrive/sync');
-    return data;
-  }
-  onProgress({ percent: 0, label: 'Saving to Cloud…' });
-  let stopped = false;
-  const poll = window.setInterval(() => {
-    if (stopped) return;
-    void fetchPhotoAlbumsOneDriveSyncProgress()
-      .then((progress) => {
-        if (stopped) return;
-        onProgress(progress);
-      })
-      .catch(() => {
-        // Ignore poll blips; sync POST is the source of truth.
-      });
-  }, 250);
-  try {
-    const { data } = await api.post('/api/photoAlbums/onedrive/sync');
-    onProgress({ percent: 100, label: 'Done' });
-    return data;
-  } finally {
-    stopped = true;
-    window.clearInterval(poll);
-  }
-}
-
-export async function formatPhotoAlbumsOneDrive() {
-  const { data } = await api.post('/api/photoAlbums/onedrive/format');
-  return data;
-}
-
-export async function testWritePhotoAlbumsOneDrive() {
-  rvCloudLog('OneDrive', 'FE test-write request start', { url: '/api/photoAlbums/onedrive/test-write' });
-  try {
-    const { data } = await api.post('/api/photoAlbums/onedrive/test-write');
-    rvCloudLog('OneDrive', 'FE test-write response ok', data);
-    return data;
-  } catch (err) {
-    rvCloudAxiosError('OneDrive', 'FE test-write request failed', err);
-    throw err;
-  }
+  return { success: true, synced: false };
 }
 
 function parseContentDispositionFilename(headerValue) {
@@ -1147,7 +1028,7 @@ function buildMyPhotoAlbumsBackupZipFileNameClient(kind = 'usb', date = new Date
   } catch {
     // keep Local
   }
-  const prefix = kind === 'usb' ? 'MyPhotoAlbums_USB' : 'MyPhotoAlbums_OneDrive';
+  const prefix = kind === 'usb' ? 'MyPhotoAlbums_USB' : 'MyPhotoAlbums_TutaCloud';
   return `${prefix}_${y}-${mo}-${d}_${hh}-${mi}-${ss}_${tt}_${tz}.zip`;
 }
 
@@ -1165,12 +1046,12 @@ function triggerBrowserBlobDownload(blob, fileName) {
 }
 
 /** Poll Redis-backed album backup percent while album zip GET runs. */
-export async function fetchPhotoAlbumsAlbumBackupProgress(storageType = 'onedrive') {
-  const path =
-    storageType === 'usb'
-      ? '/api/photoAlbums/usb/album-backup-progress'
-      : '/api/photoAlbums/onedrive/album-backup-progress';
-  const config = storageType === 'usb' ? { headers: { 'X-Record-Vault-Storage': 'usb' } } : {};
+export async function fetchPhotoAlbumsAlbumBackupProgress(storageType = VAULT_CLOUD_STORAGE_TYPE) {
+  const path = '/api/photoAlbums/usb/album-backup-progress';
+  const isUsb = normalizeVaultPaneStorageType(storageType) === 'usb';
+  const config = isUsb
+    ? { headers: { 'X-Record-Vault-Storage': 'usb' } }
+    : { headers: { 'X-Record-Vault-Storage': vaultCloudBackendStorageSlot() } };
   const { data } = await api.get(path, config);
   return {
     percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
@@ -1183,7 +1064,7 @@ export async function fetchPhotoAlbumsAlbumBackupProgress(storageType = 'onedriv
 
 /** Zip only the currently open album and save to the browser download folder. */
 export async function downloadPhotoAlbumsAlbumBackupZip({
-  storageType = 'onedrive',
+  storageType = VAULT_CLOUD_STORAGE_TYPE,
   notebookId,
   noteId,
   albumLabel = '',
@@ -1201,10 +1082,8 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
   const label = String(albumLabel || '').trim();
   if (label) params.set('albumLabel', label);
   const qs = params.toString();
-  const path =
-    storageType === 'usb'
-      ? `/api/photoAlbums/usb/album-backup-zip?${qs}`
-      : `/api/photoAlbums/onedrive/album-backup-zip?${qs}`;
+  const isUsb = normalizeVaultPaneStorageType(storageType) === 'usb';
+  const path = `/api/photoAlbums/usb/album-backup-zip?${qs}`;
 
   let pollId = null;
   let stopped = false;
@@ -1227,7 +1106,7 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
   }
 
   try {
-    if (storageType === 'usb' && isPhotoAlbumsBridgeActive()) {
+    if (isUsb && isPhotoAlbumsBridgeActive()) {
       const { blob, fileName: headerName } = await bridgeFetchBlobDownload(path);
       const fileName = headerName || buildMyPhotoAlbumsBackupZipFileNameClient('usb');
       triggerBrowserBlobDownload(blob, fileName);
@@ -1238,11 +1117,13 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
     }
     const response = await api.get(path, {
       responseType: 'blob',
-      ...(storageType === 'usb' ? { headers: { 'X-Record-Vault-Storage': 'usb' } } : null)
+      headers: {
+        'X-Record-Vault-Storage': isUsb ? 'usb' : vaultCloudBackendStorageSlot()
+      }
     });
     const fileName =
       parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyPhotoAlbumsBackupZipFileNameClient(storageType === 'usb' ? 'usb' : 'onedrive');
+      buildMyPhotoAlbumsBackupZipFileNameClient(isUsb ? 'usb' : 'cloud');
     triggerBrowserBlobDownload(response.data, fileName);
     const sizeBytes = response.data?.size ?? 0;
     if (typeof onProgress === 'function') {
@@ -1254,21 +1135,6 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
   } finally {
     stopped = true;
     if (pollId != null) window.clearInterval(pollId);
-  }
-}
-
-/** Zip the entire OneDrive vault folder and save to the browser download folder. */
-export async function downloadPhotoAlbumsOneDriveBackupZip() {
-  try {
-    const response = await api.get('/api/photoAlbums/onedrive/backup-zip', { responseType: 'blob' });
-    const fileName =
-      parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyPhotoAlbumsBackupZipFileNameClient('onedrive');
-    triggerBrowserBlobDownload(response.data, fileName);
-    const sizeBytes = response.data?.size ?? 0;
-    return { fileName, sizeBytes };
-  } catch (err) {
-    throw await normalizePhotoAlbumsBlobFetchError(err);
   }
 }
 
@@ -1325,9 +1191,9 @@ async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {} } = {})
   return payload;
 }
 
-/** Upload a MyPhotoAlbums backup zip and restore files to OneDrive. */
-export async function restorePhotoAlbumsOneDriveBackupZip(file) {
-  return postPhotoAlbumsRestoreZip('/api/photoAlbums/onedrive/restore-zip', file);
+/** Upload a MyPhotoAlbums backup zip and restore files to TutaCloud (when server route is enabled). */
+export async function restorePhotoAlbumsTutaDriveBackupZip(file) {
+  return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutadrive/restore-zip', file);
 }
 
 /** Upload a MyPhotoAlbums backup zip and restore files onto the unlocked USB vault. */
@@ -1343,61 +1209,43 @@ export async function restorePhotoAlbumsUsbBackupZip(file) {
   });
 }
 
-/** Poll Redis-backed logoff percent while Cloud/USB logoff POST runs. */
-export async function fetchPhotoAlbumsOneDriveLogoffProgress() {
-  const { data } = await api.get('/api/photoAlbums/onedrive/logoff-progress');
-  return {
-    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
-    label: data?.label ? String(data.label) : ''
-  };
-}
-
 /**
- * Cloud or USB logoff with honest 0–100% via short polling (cluster-safe; no streaming).
+ * Cloud or USB logoff with optional progress callbacks (TutaCloud has no poll endpoint yet).
  */
 async function logoffPhotoAlbumsStorageWithProgress(storageType, onProgress) {
-  const isOneDrive = storageType === 'onedrive';
+  const isCloud = isVaultCloudPaneStorageType(storageType);
   if (typeof onProgress === 'function') {
     onProgress({
       percent: 1,
-      label: isOneDrive ? 'Saving notes to OneDrive…' : 'Logging off USB…'
+      label: isCloud ? 'Saving albums to TutaCloud…' : 'Logging off USB…'
     });
   }
-  let stopped = false;
-  const poll = window.setInterval(() => {
-    if (stopped) return;
-    void fetchPhotoAlbumsOneDriveLogoffProgress()
-      .then((progress) => {
-        if (stopped || typeof onProgress !== 'function') return;
-        onProgress(progress);
-      })
-      .catch(() => {
-        // Ignore poll blips; logoff POST is the source of truth for success/failure.
-      });
-  }, 250);
   try {
-    const { data } = isOneDrive
-      ? await api.post('/api/photoAlbums/onedrive/logoff')
+    const { data } = isCloud
+      ? await api.post('/api/photoAlbums/tutadrive/logoff')
       : await rvRequest({ method: 'POST', url: '/api/photoAlbums/usb/logoff', storageType: 'usb' });
     if (typeof onProgress === 'function') {
       onProgress({ percent: 100, label: 'Done' });
     }
     return data;
-  } finally {
-    stopped = true;
-    window.clearInterval(poll);
+  } catch (err) {
+    if (typeof onProgress === 'function') {
+      onProgress({ percent: 100, label: 'Done' });
+    }
+    throw err;
   }
 }
 
 export async function logoffPhotoAlbumsStorage({ storageType, onProgress } = {}) {
   let data;
-  if (storageType === 'onedrive') {
+  const normalized = normalizeVaultPaneStorageType(storageType);
+  if (normalized === VAULT_CLOUD_STORAGE_TYPE) {
     if (typeof onProgress === 'function') {
-      data = await logoffPhotoAlbumsStorageWithProgress('onedrive', onProgress);
+      data = await logoffPhotoAlbumsStorageWithProgress(VAULT_CLOUD_STORAGE_TYPE, onProgress);
     } else {
-      ({ data } = await api.post('/api/photoAlbums/onedrive/logoff'));
+      ({ data } = await api.post('/api/photoAlbums/tutadrive/logoff'));
     }
-  } else if (storageType === 'usb') {
+  } else if (normalized === 'usb') {
     if (typeof onProgress === 'function') {
       data = await logoffPhotoAlbumsStorageWithProgress('usb', onProgress);
     } else {
@@ -1477,18 +1325,18 @@ export async function flushPhotoAlbumsSessionsOnLeave({ onProgress } = {}) {
 
     try {
       await logoffPhotoAlbumsStorage({
-        storageType: 'onedrive',
+        storageType: VAULT_CLOUD_STORAGE_TYPE,
         onProgress: ({ percent, label } = {}) => {
           const p = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
           report({
             title: 'Saving to Cloud',
             percent: 35 + Math.round(p * 0.65),
-            label: label || 'Saving notes to OneDrive…'
+            label: label || 'Saving albums to TutaCloud…'
           });
         }
       });
     } catch (err) {
-      console.error('[flushPhotoAlbumsSessionsOnLeave] onedrive', err?.message || err);
+      console.error('[flushPhotoAlbumsSessionsOnLeave] tutadrive', err?.message || err);
       report({
         title: 'Saving to Cloud',
         percent: 99,
@@ -1511,28 +1359,28 @@ export async function flushPhotoAlbumsSessionsOnLeave({ onProgress } = {}) {
   }
 }
 
-/** Flush vault to OneDrive without logoff; USB is already on-disk (no-op). */
+/** Flush vault to TutaCloud without logoff; USB is already on-disk (no-op). */
 export async function syncPhotoAlbumsStorage({ storageType, onProgress } = {}) {
-  if (storageType === 'onedrive') {
-    return syncPhotoAlbumsOneDrive({ onProgress });
+  if (isVaultCloudPaneStorageType(storageType ?? VAULT_CLOUD_STORAGE_TYPE)) {
+    return syncPhotoAlbumsTutaDrive({ onProgress });
   }
   return { success: true, synced: false };
 }
 
 export async function fetchPhotoAlbumsActiveStorageDisplay() {
+  try {
+    const status = await fetchPhotoAlbumsTutaDriveStatus();
+    if (status?.session?.unlocked) {
+      const folder = String(status?.tutadrive?.memberFolder || '').trim();
+      return folder ? `Storage: TutaCloud (${folder})` : 'Storage: TutaCloud';
+    }
+  } catch {
+    // ignore
+  }
   const { data } = await api.get('/api/photoAlbums/usb/status');
   const session = data?.session || {};
   if (!session.unlocked) return '';
-
-  const storageType = String(session.storageType || '').trim();
   const label = String(session.label || '').trim();
-
-  if (storageType === 'onedrive') {
-    const status = await fetchPhotoAlbumsOneDriveStatus();
-    const email = String(status.onedrive?.email || '').trim();
-    return email ? `Storage: OneDrive for ${email}` : 'Storage: OneDrive';
-  }
-
   return label ? `Storage: ${label}` : 'Storage: USB';
 }
 
@@ -1715,7 +1563,8 @@ function mapVaultAccessFailStatus(data) {
     lockoutSeconds: Math.max(0, Math.floor(Number(data?.lockoutSeconds) || 180)),
     vaultFormatted: Boolean(data?.vaultFormatted),
     needsClientFormat: Boolean(data?.needsClientFormat),
-    storageType: data?.storageType === 'usb' ? 'usb' : 'onedrive',
+    storageType:
+      data?.storageType === 'usb' ? 'usb' : normalizeVaultPaneStorageType(data?.storageType),
     mountPath: data?.mountPath ? String(data.mountPath) : null,
     error: data?.error ? String(data.error) : '',
     cooldownLabel: data?.cooldownLabel ? String(data.cooldownLabel) : ''
@@ -1723,25 +1572,29 @@ function mapVaultAccessFailStatus(data) {
 }
 
 /** Vault-password fail cooldown / 5-fail format status for the pending open side. */
-export async function fetchPhotoAlbumsAccessFailStatus(storageType = 'onedrive') {
+export async function fetchPhotoAlbumsAccessFailStatus(storageType = VAULT_CLOUD_STORAGE_TYPE) {
   const { data } = await api.get('/api/photoAlbums/access/fail-status', {
-    params: { storageType: storageType === 'usb' ? 'usb' : 'onedrive' }
+    params: {
+      storageType:
+        normalizeVaultPaneStorageType(storageType) === 'usb' ? 'usb' : vaultCloudBackendStorageSlot()
+    }
   });
   return mapVaultAccessFailStatus(data);
 }
 
 /**
  * Record a client-side vault-password verify failure (password never sent).
- * On 5th fail: OneDrive is formatted server-side; USB returns needsClientFormat.
+ * On 5th fail: TutaCloud may be formatted server-side; USB returns needsClientFormat.
  */
 export async function recordPhotoAlbumsAccessFail({
-  storageType = 'onedrive',
+  storageType = VAULT_CLOUD_STORAGE_TYPE,
   mountPath,
   wrongPasswordKind
 } = {}) {
   try {
     const { data } = await api.post('/api/photoAlbums/access/fail', {
-      storageType: storageType === 'usb' ? 'usb' : 'onedrive',
+      storageType:
+        normalizeVaultPaneStorageType(storageType) === 'usb' ? 'usb' : vaultCloudBackendStorageSlot(),
       mountPath: mountPath || undefined,
       wrongPasswordKind: wrongPasswordKind || undefined
     });
@@ -1755,9 +1608,10 @@ export async function recordPhotoAlbumsAccessFail({
   }
 }
 
-export async function clearPhotoAlbumsAccessFail(storageType = 'onedrive') {
+export async function clearPhotoAlbumsAccessFail(storageType = VAULT_CLOUD_STORAGE_TYPE) {
   const { data } = await api.post('/api/photoAlbums/access/fail/clear', {
-    storageType: storageType === 'usb' ? 'usb' : 'onedrive'
+    storageType:
+      normalizeVaultPaneStorageType(storageType) === 'usb' ? 'usb' : vaultCloudBackendStorageSlot()
   });
   return data;
 }
@@ -1794,7 +1648,7 @@ export function readFileAsDataUrl(file) {
 }
 
 export function createPhotoAlbumsPaneApi(storageType) {
-  const type = storageType === 'onedrive' ? 'onedrive' : 'usb';
+  const type = isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
   const opts = { storageType: type };
   const rv = (config) => rvRequest({ ...config, storageType: type });
   return {

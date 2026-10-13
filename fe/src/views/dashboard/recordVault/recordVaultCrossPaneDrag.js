@@ -47,7 +47,7 @@ export function parseCrossPaneDrag(raw) {
   try {
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (!data || typeof data !== 'object') return null;
-    const storageType = String(data.storageType || '').toLowerCase() === 'onedrive' ? 'onedrive' : 'usb';
+    const storageType = String(data.storageType || '').toLowerCase() === 'tutadrive' ? 'onedrive' : 'usb';
     let kind = null;
     if (data.kind === 'notebook') kind = 'notebook';
     else if (data.kind === 'note') kind = 'note';
@@ -85,7 +85,7 @@ export function readCrossPaneDragFromEvent(event) {
 export function isForeignCrossPaneDrag(event, paneStorageType) {
   const drag = readCrossPaneDragFromEvent(event);
   if (!drag) return false;
-  const pane = String(paneStorageType || '').toLowerCase() === 'onedrive' ? 'onedrive' : 'usb';
+  const pane = String(paneStorageType || '').toLowerCase() === 'tutadrive' ? 'onedrive' : 'usb';
   return drag.storageType !== pane;
 }
 

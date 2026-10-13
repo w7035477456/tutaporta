@@ -19,18 +19,22 @@ export const TUTANOTES_WORKSPACE_PANEL_BG = 'var(--theme-daynight-color)';
 export const TUTANOTES_WORKSPACE_CONTENT_BG = 'var(--theme-daynight-color)';
 
 /** Tab + expanded workspace chrome (matches MyRecordVault dual-login tabs). */
-export const TUTANOTES_ONEDRIVE_STRIP_COLOR = TUTANOTES_WORKSPACE_PANEL_BG;
+export const TUTANOTES_TUTACLOUD_STRIP_COLOR = TUTANOTES_WORKSPACE_PANEL_BG;
+/** @deprecated use TUTANOTES_TUTACLOUD_STRIP_COLOR */
+export const TUTANOTES_ONEDRIVE_STRIP_COLOR = TUTANOTES_TUTACLOUD_STRIP_COLOR;
 export const TUTANOTES_USB_STRIP_COLOR = '#6EB5E0';
 /** “TutaNotes on USB” tab / pane title text on the light-blue strip. */
 export const TUTANOTES_USB_TAB_LABEL_COLOR = '#9B3DBA';
 
 export function tutaNotesStorageStripColor(storageType) {
-  return storageType === 'onedrive' ? TUTANOTES_ONEDRIVE_STRIP_COLOR : TUTANOTES_USB_STRIP_COLOR;
+  return storageType === 'tutadrive' ? TUTANOTES_TUTACLOUD_STRIP_COLOR : TUTANOTES_USB_STRIP_COLOR;
 }
 
-/** Expanded workspace header strip — theme daylight (OneDrive / TutaDrive). USB keeps light-blue strip. */
-export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = 'TutaNotes on OneDrive';
-export const TUTANOTES_TUTADRIVE_WORKSPACE_TITLE = 'TutaNotes on TutaCloud';
+/** Expanded workspace header strip — theme daylight (TutaCloud). USB keeps light-blue strip. */
+export const TUTANOTES_TUTACLOUD_WORKSPACE_TITLE = 'TutaNotes on TutaCloud';
+export const TUTANOTES_TUTADRIVE_WORKSPACE_TITLE = TUTANOTES_TUTACLOUD_WORKSPACE_TITLE;
+/** @deprecated use TUTANOTES_TUTACLOUD_WORKSPACE_TITLE */
+export const TUTANOTES_ONEDRIVE_WORKSPACE_TITLE = TUTANOTES_TUTACLOUD_WORKSPACE_TITLE;
 export const TUTANOTES_USB_WORKSPACE_TITLE = 'TutaNotes on USB';
 
 export const TUTANOTES_TUTADRIVE_LOGIN_TITLE = 'TutaNotes';
@@ -53,7 +57,9 @@ export function formatUsbWorkspaceTitle(label) {
 }
 
 export const TUTANOTES_VIDEO_TUTORIAL_LABEL = 'Tutorial';
-export const TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL = 'Tutorial';
+export const TUTANOTES_TUTACLOUD_VIDEO_TUTORIAL_LABEL = 'Tutorial';
+/** @deprecated use TUTANOTES_TUTACLOUD_VIDEO_TUTORIAL_LABEL */
+export const TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL = TUTANOTES_TUTACLOUD_VIDEO_TUTORIAL_LABEL;
 export const TUTANOTES_USB_VIDEO_TUTORIAL_LABEL = 'Tutorial';
 /** Fixed short header button text — opens Current Context Tutorial popup. */
 export const TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL = 'Tutorial';

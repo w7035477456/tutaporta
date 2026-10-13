@@ -35,13 +35,13 @@ const COPY = {
     '1. Flexible Organization: You can create multiple Notes within a single Notebook.',
     '2. Quick Access: Drag any Notebook or Note to the Shortcuts panel on the right for fast access later.',
     '3. Powerful Search: Search instantly across all titles and text within your Notes and Notebooks.',
-    '4. Backup: Easily back up your work by clicking Backup/Restore OneDrive to create a ZIP archive.',
-    '5. Seamless File Transfer: Drag and drop to copy or move Notes and Notebooks between OneDrive and a USB drive.',
+    '4. Backup: Easily back up your work by clicking Backup/Restore on TutaCloud to create a ZIP archive.',
+    '5. Seamless File Transfer: Drag and drop to copy or move Notes and Notebooks between TutaCloud and a USB drive.',
     '6. Safe Disconnection: Always click Log off Cloud or Log off USB before disconnecting to prevent data loss.',
     '7. Import and Export: Seamlessly convert files to and from Markdown, HTML, and PDF using the File menu.',
     '8. Help and Dictation: Click Click here for Tutorial in the top-right corner to access tutorials and voice dictation.',
     '9. Upgrade Speed: Need faster performance? Click Click Here in the top-left corner to add high-priority server bandwidth (GB allocation).',
-    '10. USB versus OneDrive: USB is much faster than OneDrive, but requires USB Bridge. OneDrive is accessible on mobile.'
+    '10. USB versus TutaCloud: USB is much faster, but requires USB Bridge. TutaCloud is stored on the server and works from any browser.'
   ].join(' ')
 };
 

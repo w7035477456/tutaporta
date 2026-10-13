@@ -25,11 +25,9 @@ import {
   isPhotoAlbumsBridgeRouteMissingError,
   PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE,
   fetchPhotoAlbumsStorageConfig,
-  fetchPhotoAlbumsOneDriveConfig,
   fetchPhotoAlbumsUsbStatus,
   fetchPhotoAlbumsUsbLocations,
-  fetchPhotoAlbumsOneDriveStatus,
-  rememberPhotoAlbumsOneDriveEmail,
+  fetchPhotoAlbumsTutaDriveStatus,
   probePhotoAlbumsBridge,
   setPhotoAlbumsBridgeSinglesId,
   setPhotoAlbumsBridgeStorageType,
@@ -69,7 +67,7 @@ import { usePhotoAlbumsPaneStorageType } from './PhotoAlbumsPaneContext';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE } from 'config/busyHourglassEnv';
 import PhotoAlbumsViewVaultDialog from './PhotoAlbumsViewVaultDialog';
-import PhotoAlbumsOneDriveBackupDialog from './PhotoAlbumsOneDriveBackupDialog';
+import PhotoAlbumsTutaCloudBackupDialog from './PhotoAlbumsTutaCloudBackupDialog';
 import PhotoAlbumsUsbBackupDialog from './PhotoAlbumsUsbBackupDialog';
 import PhotoAlbumsStorageFilesPanel from './PhotoAlbumsStorageFilesPanel';
 import PhotoAlbumsFilesExplorerPanel from './PhotoAlbumsFilesExplorerPanel';
@@ -866,7 +864,7 @@ const photoAlbumsContentScrollSx = {
   }
 };
 
-/** Notebook / Note / Shortcut list panels — always show a vertical scrollbar (OneDrive + USB). */
+/** Notebook / Note / Shortcut list panels — always show a vertical scrollbar (TutaCloud + USB). */
 const photoAlbumsMenuListScrollSx = {
   ...photoAlbumsContentScrollSx,
   pr: 0.25,
@@ -1798,22 +1796,22 @@ export default function PhotoAlbumsWorkspacePane({
   const [busy, setBusy] = useState(false);
   const [batchUploadProgress, setBatchUploadProgress] = useState(null);
   const [vaultLeaving, setVaultLeaving] = useState(false);
-  /** Honest 0–100% while Log off Cloud syncs dirty vault files to OneDrive. */
+  /** Honest 0–100% while Log off Cloud syncs dirty vault files to TutaCloud. */
   const [vaultLeavingProgressPercent, setVaultLeavingProgressPercent] = useState(0);
   const [vaultLeavingProgressLabel, setVaultLeavingProgressLabel] = useState('');
 
   const [vaultUsage, setVaultUsage] = useState(null);
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
-  const [oneDriveOffered, setOneDriveOffered] = useState(false);
+  const [tutaCloudOffered, setTutaCloudOffered] = useState(false);
   const [, setLocalUsbOffered] = useState(false);
   const [, setStorageConfigLoaded] = useState(false);
   const [] = useState(false);
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
-  const [viewVaultStorageType, setViewVaultStorageType] = useState('onedrive');
-  const [oneDriveBackupOpen, setOneDriveBackupOpen] = useState(false);
+  const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
+  const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
-  const [oneDriveVaultFolderName, setOneDriveVaultFolderName] = useState('onlinemallwebsitevault');
-  const isTutaDrivePane = String(paneLabel || '').toLowerCase() === 'tutadrive';
+  const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState('onlinemallwebsitevault');
+  const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
   /** Zoom icon — hide sidebars/menus and show album only (not true fullscreen overlay). */
   const [albumFocusView, setAlbumFocusView] = useState(false);
@@ -2546,7 +2544,7 @@ export default function PhotoAlbumsWorkspacePane({
 
   /**
    * Local PIN encrypt/decrypt maps into 0…localMaxPercent.
-   * On OneDrive, reserve the top of the bar for Cloud sync so we never sit at 100% while still uploading.
+   * On TutaCloud, reserve the top of the bar for Cloud sync so we never sit at 100% while still uploading.
    */
   const reportInnerEncryptProgress = useCallback(async (done, total, label = '', { maxPercent = 100 } = {}) => {
     const safeTotal = Math.max(1, Number(total) || 1);
@@ -2562,13 +2560,13 @@ export default function PhotoAlbumsWorkspacePane({
   }, []);
 
   /**
-   * OneDrive vault.db flush after PIN work. Uses 85→99% while uploading; 100% only when finished.
+   * TutaCloud vault.db flush after PIN work. Uses 85→99% while uploading; 100% only when finished.
    * Must not block the busy dialog forever — axios has no default timeout and Cloud upload can hang.
    * Notes are already on disk; background upload + logoff still retry.
    */
-  const flushOneDriveAfterInnerPin = useCallback(
+  const flushTutaCloudAfterInnerPin = useCallback(
     async ({ showErrorOnFail = false, startPercent = 85 } = {}) => {
-      if (paneStorageType !== 'onedrive') return { ok: true, timedOut: false };
+      if (paneStorageType !== 'tutadrive') return { ok: true, timedOut: false };
       const floor = Math.max(0, Math.min(98, Math.round(Number(startPercent) || 85)));
       const mapCloudPercent = (p) => {
         const cloud = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
@@ -2643,8 +2641,8 @@ export default function PhotoAlbumsWorkspacePane({
         const idNum = Number(fallbackId ?? row?.note_id);
         return Number.isFinite(idNum) && idNum >= 1 ? `Note ${idNum}` : 'note';
       };
-      // OneDrive: keep 0–85% for local PIN work; Cloud sync owns 85–100%.
-      const localMaxPercent = paneStorageType === 'onedrive' ? 85 : 100;
+      // TutaCloud: keep 0–85% for local PIN work; Cloud sync owns 85–100%.
+      const localMaxPercent = paneStorageType === 'tutadrive' ? 85 : 100;
       const progressOpts = { maxPercent: localMaxPercent };
       setInnerEncryptError('');
       setInnerEncryptBusy(true);
@@ -2681,7 +2679,7 @@ export default function PhotoAlbumsWorkspacePane({
               );
               return false;
             }
-            const syncResult = await flushOneDriveAfterInnerPin({
+            const syncResult = await flushTutaCloudAfterInnerPin({
               showErrorOnFail: true,
               startPercent: localMaxPercent
             });
@@ -2705,7 +2703,7 @@ export default function PhotoAlbumsWorkspacePane({
               return false;
             }
             await reportInnerEncryptProgress(1, 1, singleLabel, progressOpts);
-            const syncResult = await flushOneDriveAfterInnerPin({
+            const syncResult = await flushTutaCloudAfterInnerPin({
               showErrorOnFail: true,
               startPercent: localMaxPercent
             });
@@ -2761,7 +2759,7 @@ export default function PhotoAlbumsWorkspacePane({
               }
               await reportInnerEncryptProgress(2 + i, totalNotes, progressLabel, progressOpts);
             }
-            await flushOneDriveAfterInnerPin({
+            await flushTutaCloudAfterInnerPin({
               showErrorOnFail: false,
               startPercent: localMaxPercent
             });
@@ -2770,7 +2768,7 @@ export default function PhotoAlbumsWorkspacePane({
             await reportInnerEncryptProgress(0, 1, singleLabel, progressOpts);
             await unlockInnerEncryptedNote(id, pin, targetRow);
             await reportInnerEncryptProgress(1, 1, singleLabel, progressOpts);
-            await flushOneDriveAfterInnerPin({
+            await flushTutaCloudAfterInnerPin({
               showErrorOnFail: false,
               startPercent: localMaxPercent
             });
@@ -2814,7 +2812,7 @@ export default function PhotoAlbumsWorkspacePane({
       unlockInnerEncryptedNote,
       noteRequiresInnerPinToView,
       reportInnerEncryptProgress,
-      flushOneDriveAfterInnerPin
+      flushTutaCloudAfterInnerPin
     ]
   );
 
@@ -3287,17 +3285,17 @@ export default function PhotoAlbumsWorkspacePane({
       try {
         const cfg = await fetchPhotoAlbumsStorageConfig();
         if (cancelled) return;
-        setOneDriveOffered(Boolean(cfg.oneDrive?.visible && cfg.oneDrive?.enabled));
+        setTutaCloudOffered(Boolean(cfg.oneDrive?.visible && cfg.oneDrive?.enabled));
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible && cfg.localUsb?.enabled));
         setVideoTutorialUrl(String(cfg?.videoTutorialTutaphotoalbums || '').trim());
         if (cfg.oneDrive?.visible && cfg.oneDrive?.enabled) {
           if (cfg.tutaDrive) {
-            setOneDriveVaultFolderName('TutaDrive');
+            setTutaCloudVaultFolderName('TutaDrive');
           } else {
             try {
-              const oneDriveCfg = await fetchPhotoAlbumsOneDriveConfig();
+              const oneDriveCfg = await fetchPhotoAlbumsStorageConfig();
               if (!cancelled && oneDriveCfg?.folderName) {
-                setOneDriveVaultFolderName(String(oneDriveCfg.folderName));
+                setTutaCloudVaultFolderName(String(oneDriveCfg.folderName));
               }
             } catch {
               // keep default folder name
@@ -3308,11 +3306,11 @@ export default function PhotoAlbumsWorkspacePane({
         if (cancelled) return;
         const status = Number(err?.response?.status);
         if (status === 404) {
-          setOneDriveOffered(true);
+          setTutaCloudOffered(true);
           setLocalUsbOffered(true);
           return;
         }
-        setOneDriveOffered(false);
+        setTutaCloudOffered(false);
       } finally {
         if (!cancelled) setStorageConfigLoaded(true);
       }
@@ -3387,13 +3385,13 @@ export default function PhotoAlbumsWorkspacePane({
     };
   }, [unlocked, paneStorageType, leaveUnlockedWorkspace]);
 
-  /** OneDrive: leave workspace when server session is no longer unlocked. */
+  /** TutaCloud: leave workspace when server session is no longer unlocked. */
   useEffect(() => {
-    if (!unlocked || paneStorageType !== 'onedrive') return undefined;
+    if (!unlocked || paneStorageType !== 'tutadrive') return undefined;
     let cancelled = false;
-    const refreshOneDriveSession = async () => {
+    const refreshTutaCloudSession = async () => {
       try {
-        const status = await fetchPhotoAlbumsOneDriveStatus();
+        const status = await fetchPhotoAlbumsTutaDriveStatus();
         if (cancelled) return;
         if (!status?.session?.unlocked) {
           setPhotoAlbumsBridgeStorageType(null);
@@ -3403,9 +3401,9 @@ export default function PhotoAlbumsWorkspacePane({
         // ignore transient status errors
       }
     };
-    void refreshOneDriveSession();
+    void refreshTutaCloudSession();
     const timerId = window.setInterval(() => {
-      void refreshOneDriveSession();
+      void refreshTutaCloudSession();
     }, 4000);
     return () => {
       cancelled = true;
@@ -3697,14 +3695,6 @@ export default function PhotoAlbumsWorkspacePane({
       try {
         const usage = await vaultApi.fetchPhotoAlbumsUsage();
         if (!cancelled) setVaultUsage(usage);
-        const email = String(usage?.onedriveEmail || '').trim();
-        if (!cancelled && usage?.storageType === 'onedrive' && email) {
-          try {
-            await rememberPhotoAlbumsOneDriveEmail(email);
-          } catch {
-            // ignore history save errors on main screen load
-          }
-        }
       } catch {
         if (!cancelled) setVaultUsage(null);
       }
@@ -3813,7 +3803,7 @@ export default function PhotoAlbumsWorkspacePane({
     }
     setVaultLeavingProgressPercent(2);
     setVaultLeavingProgressLabel(
-      paneStorageType === 'onedrive' ? 'Saving notes to OneDrive…' : 'Logging off USB…'
+      paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
     );
     await vaultApi.logoffPhotoAlbumsStorage({
       onProgress: (progress) => {
@@ -3830,7 +3820,7 @@ export default function PhotoAlbumsWorkspacePane({
     onSessionEnded?.();
   }, [onSessionEnded, vaultApi, reportVaultLeavingProgress, paneStorageType]);
 
-  const handleOneDriveVaultRestored = useCallback(async () => {
+  const handleTutaCloudVaultRestored = useCallback(async () => {
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
 
@@ -3848,7 +3838,7 @@ export default function PhotoAlbumsWorkspacePane({
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
       setVaultLeavingProgressLabel(
-        paneStorageType === 'onedrive' ? 'Saving notes to OneDrive…' : 'Logging off USB…'
+        paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
       );
       setError('');
       try {
@@ -6328,7 +6318,7 @@ export default function PhotoAlbumsWorkspacePane({
         const payload = {
           kind: mime === DRAG_NOTEBOOK ? 'notebook' : 'note',
           id: Number(id),
-          storageType: paneStorageType === 'onedrive' ? 'onedrive' : 'usb',
+          storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
           name,
           notebookId: Number.isFinite(notebookId) ? notebookId : null,
           noteIds: mime === DRAG_NOTE && draggedNoteIds.length > 1 ? draggedNoteIds : undefined
@@ -6478,7 +6468,7 @@ export default function PhotoAlbumsWorkspacePane({
     (event, { targetNotebookId = null } = {}) => {
       const foreign = readCrossPaneDragFromEvent(event);
       if (!foreign) return false;
-      const pane = paneStorageType === 'onedrive' ? 'onedrive' : 'usb';
+      const pane = paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb';
       if (foreign.storageType === pane) return false;
       event.preventDefault();
       event.stopPropagation();
@@ -6707,7 +6697,7 @@ export default function PhotoAlbumsWorkspacePane({
         pageIndex,
         pageNumber,
         instanceKey,
-        storageType: paneStorageType === 'onedrive' ? 'onedrive' : 'usb'
+        storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'
       };
       setActiveAlbumPageDrag(payload);
       setDraggingAlbumPage(true);
@@ -6794,7 +6784,7 @@ export default function PhotoAlbumsWorkspacePane({
           snapshot,
           sourceNoteId,
           targetNoteId: targetId,
-          storageType: paneStorageType === 'onedrive' ? 'onedrive' : 'usb',
+          storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
           deleteSourceAttachmentIds: snapshot.attachmentIds || [],
           removeFromSource: () => {
             api?.removeAlbumPage?.(drag.pageIndex);
@@ -7723,7 +7713,7 @@ export default function PhotoAlbumsWorkspacePane({
 
   const row2ShowsMobileUpload = !compareMode;
   const row2ActionSlotCount =
-    (paneStorageType === 'onedrive' && oneDriveOffered ? 1 : 0) +
+    (paneStorageType === 'tutadrive' && tutaCloudOffered ? 1 : 0) +
     (paneStorageType === 'usb' ? 1 : 0) +
     (row2ShowsMobileUpload ? 1 : 0) +
     (canEnterCompare ? 1 : 0);
@@ -7835,11 +7825,11 @@ export default function PhotoAlbumsWorkspacePane({
       <BusyHourglassOverlay
         open={crossPaneBusy}
         label={
-          crossPaneTransfer?.item?.storageType === 'onedrive'
+          crossPaneTransfer?.item?.storageType === 'tutadrive'
             ? paneStorageType === 'usb'
               ? 'Copying from Cloud to USB'
               : 'Transferring Cloud item'
-            : paneStorageType === 'onedrive'
+            : paneStorageType === 'tutadrive'
               ? 'Copying from USB to Cloud'
               : 'Transferring USB item'
         }
@@ -7850,13 +7840,13 @@ export default function PhotoAlbumsWorkspacePane({
       />
       <BusyHourglassOverlay
         open={false}
-        label="Loading OneDrive sign-in"
+        label="Loading TutaCloud sign-in"
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
       <BusyHourglassOverlay
         open={vaultLeaving}
-        label={paneStorageType === 'onedrive' ? 'Saving to Cloud' : 'Logging off USB'}
+        label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
         progressPercent={vaultLeavingProgressPercent}
         progressLabel={vaultLeavingProgressLabel}
         backdropSx={vaultLeavingBackdropSx}
@@ -7946,7 +7936,7 @@ export default function PhotoAlbumsWorkspacePane({
       <PhotoAlbumsCrossPaneTransferDialog
         open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
         item={crossPaneTransfer?.item || null}
-        targetStorageType={paneStorageType === 'onedrive' ? 'onedrive' : 'usb'}
+        targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
         targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
         busy={crossPaneBusy}
         duplicateError={crossPaneDuplicateError}
@@ -8148,16 +8138,16 @@ export default function PhotoAlbumsWorkspacePane({
         open={viewVaultOpen}
         onClose={() => setViewVaultOpen(false)}
         storageType={viewVaultStorageType}
-        folderName={viewVaultStorageType === 'onedrive' ? oneDriveVaultFolderName : ''}
-        tutaDrive={isTutaDrivePane}
+        folderName={viewVaultStorageType === 'tutadrive' ? tutaCloudVaultFolderName : ''}
+        tutaDrive={isTutaCloudPane}
       />
-      <PhotoAlbumsOneDriveBackupDialog
-        open={oneDriveBackupOpen}
-        onClose={() => setOneDriveBackupOpen(false)}
-        folderName={oneDriveVaultFolderName}
+      <PhotoAlbumsTutaCloudBackupDialog
+        open={tutaCloudBackupOpen}
+        onClose={() => setTutaCloudBackupOpen(false)}
+        folderName={tutaCloudVaultFolderName}
         albumContext={albumBackupContext}
-        onOpenMyPhotoAlbums={() => setOneDriveBackupOpen(false)}
-        onRestored={() => void handleOneDriveVaultRestored()}
+        onOpenMyPhotoAlbums={() => setTutaCloudBackupOpen(false)}
+        onRestored={() => void handleTutaCloudVaultRestored()}
       />
       <PhotoAlbumsUsbBackupDialog
         open={usbBackupOpen}
@@ -8444,14 +8434,14 @@ export default function PhotoAlbumsWorkspacePane({
                   minWidth: 0
                 }}
               >
-              {paneStorageType === 'onedrive' && oneDriveOffered ? (
+              {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
                     type="button"
                     variant="yellow"
                     hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                     onClick={() => {
-                      setOneDriveBackupOpen(true);
+                      setTutaCloudBackupOpen(true);
                     }}
                     disabled={busy}
                     aria-label="Backup/Restore"
@@ -8517,12 +8507,12 @@ export default function PhotoAlbumsWorkspacePane({
                       onEnterCompare?.();
                     }}
                     disabled={busy}
-                    aria-label="OneDrive to USB compare"
-                    title="Open OneDrive and USB side by side to drag and drop notebooks and notes"
+                    aria-label="TutaCloud to USB compare"
+                    title="Open TutaCloud and USB side by side to drag and drop notebooks and notes"
                     {...guestDemoBlockProps()}
                     sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
                   >
-                    {menuLabelsCompact ? '<=>' : 'OneDrive↔USB'}
+                    {menuLabelsCompact ? '<=>' : 'TutaCloud↔USB'}
                   </SliderControlButton>
                 </Box>
               ) : null}
@@ -9836,8 +9826,8 @@ export default function PhotoAlbumsWorkspacePane({
                   </Box>
                   <RowResizeHandle
                     label={
-                      paneStorageType === 'onedrive'
-                        ? 'Resize Shortcut and OneDrive Folders & Files'
+                      paneStorageType === 'tutadrive'
+                        ? 'Resize Shortcut and TutaCloud Folders & Files'
                         : 'Resize Shortcut and USB Folders & Files'
                     }
                     onMouseDown={startShortcutPaneResize}
@@ -9866,8 +9856,8 @@ export default function PhotoAlbumsWorkspacePane({
                         {
                           id: FILES_EXPLORER_TAB_FOLDERS,
                           label:
-                            paneStorageType === 'onedrive'
-                              ? 'OneDrive Folders & Files'
+                            paneStorageType === 'tutadrive'
+                              ? 'TutaCloud Folders & Files'
                               : 'USB Folders & Files'
                         },
                         { id: FILES_EXPLORER_TAB_EXPLORER, label: 'Files Explorer' },

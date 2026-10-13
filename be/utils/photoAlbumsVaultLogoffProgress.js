@@ -1,11 +1,11 @@
 /**
- * Cluster-safe OneDrive logoff progress (0–100) for FE polling.
+ * Cluster-safe vault logoff progress (0–100) for FE polling.
  * Written by the logoff request; read by GET …/logoff-progress on any node.
  */
 
-import { clusterRedisDel, clusterRedisGetJson, clusterRedisSetJson } from '../clusterRedisState.js';
+import { clusterRedisDel, clusterRedisGetJson, clusterRedisSetJson } from './clusterRedisState.js';
 
-const KEY_PREFIX = 'v1:record_vault:onedrive:logoff_progress:';
+const KEY_PREFIX = 'v1:photo_albums:onedrive:logoff_progress:';
 const TTL_SEC = 180;
 
 function progressKey(singlesId) {

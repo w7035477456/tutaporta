@@ -5,7 +5,7 @@ import { ZipArchive } from 'archiver';
 import { Extract } from 'unzipper';
 import { getVaultSession, flushDbToUsb, logoffVaultUsb } from './vaultSession.js';
 import { vaultRootOnMount, VAULT_DIR_NAME, VAULT_META_FILE } from './vaultPaths.js';
-import { buildMyPhotoAlbumsBackupZipFileName } from '../photoAlbumsOneDrive/oneDriveVaultBackup.js';
+import { buildMyPhotoAlbumsBackupZipFileName } from '../photoAlbumsBackupZipNames.js';
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];

@@ -118,7 +118,7 @@ function vaultPasswordReady(password, confirm) {
 }
 
 function normalizeStorageType(storageType) {
-  return storageType === 'usb' ? 'usb' : 'onedrive';
+  return storageType === 'usb' ? 'usb' : 'tutadrive';
 }
 
 const TUTANOTES_LOCK_WARNING_SUFFIX =
@@ -149,7 +149,7 @@ export default function RecordVaultAccessGate({
   open,
   onUnlocked,
   onClose,
-  storageType = 'onedrive',
+  storageType = 'tutadrive',
   usbMountPath = '',
   onVaultFormatted
 }) {
@@ -470,7 +470,7 @@ export default function RecordVaultAccessGate({
       const keyPayload = await rewrapDekForNewPassword(dekRaw, nextPassword);
       const result = await updateRecordVaultE2eKeys({
         ...keyPayload,
-        backends: ['usb', 'onedrive']
+        backends: ['usb', 'tutadrive']
       });
       const nextVault = result?.vault || vaultRow;
       setVaultRow(nextVault);

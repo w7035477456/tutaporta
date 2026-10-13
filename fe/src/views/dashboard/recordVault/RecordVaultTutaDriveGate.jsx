@@ -6,7 +6,7 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import RecordVaultOneDriveBackupDialog from './RecordVaultOneDriveBackupDialog';
+import RecordVaultTutaCloudBackupDialog from './RecordVaultTutaCloudBackupDialog';
 import {
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveStatus,
@@ -140,7 +140,7 @@ export default function RecordVaultTutaDriveGate({
 
   return (
     <>
-      <RecordVaultOneDriveBackupDialog
+      <RecordVaultTutaCloudBackupDialog
         open={open && backupDialogOpen}
         tutaDrive
         onClose={() => setBackupDialogOpen(false)}

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
-import PhotoAlbumsOneDriveVaultTreePanel from './PhotoAlbumsOneDriveVaultTreePanel';
+import PhotoAlbumsTutaCloudVaultTreePanel from './PhotoAlbumsTutaCloudVaultTreePanel';
 
 export default function PhotoAlbumsViewVaultDialog({
   open,
@@ -41,7 +41,7 @@ export default function PhotoAlbumsViewVaultDialog({
       >
         <ColorTemplate16PopupCenterWide.Title>{title}</ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body spacing={1.5}>
-          <PhotoAlbumsOneDriveVaultTreePanel
+          <PhotoAlbumsTutaCloudVaultTreePanel
             active={open}
             storageType={isUsb ? 'usb' : 'onedrive'}
             folderName={folderName}
@@ -58,7 +58,7 @@ export default function PhotoAlbumsViewVaultDialog({
 PhotoAlbumsViewVaultDialog.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
-  storageType: PropTypes.oneOf(['onedrive', 'usb']),
+  storageType: PropTypes.oneOf(['tutadrive', 'usb']),
   folderName: PropTypes.string,
   tutaDrive: PropTypes.bool
 };

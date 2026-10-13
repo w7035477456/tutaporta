@@ -1,19 +1,16 @@
 /**
  * Env toggles for TutaPhotoAlbums storage choices (~/.ssh/be/.env).
  *
- * DISABLE_ONEDRIVE / DISABLE_USBDRIVE retire Microsoft OneDrive / USB bridge.
- * LEFT_SIDE=TutaDrive uses local LARGE_CHEAP_STORAGE_FOLDER (not Microsoft Graph).
+ * DISABLE_USBDRIVE retires the USB bridge.
+ * LEFT_SIDE=TutaDrive uses local LARGE_CHEAP_STORAGE_FOLDER.
  */
 
-import {
-  isDisableOnedriveEnabled,
-  isDisableUsbDriveEnabled
-} from './vaultStorageDisableConfig.js';
+import { isDisableUsbDriveEnabled } from './vaultStorageDisableConfig.js';
 import { getLeftSideMode, getRightSideMode } from './tutaDriveMemberPaths.js';
 
-export function isVaultOneDriveOffered() {
-  if (isDisableOnedriveEnabled()) return false;
-  return getLeftSideMode() === 'OneDrive';
+/** Left-panel cloud workspace (TutaDrive when LEFT_SIDE=TutaDrive). */
+export function isVaultTutaCloudOffered() {
+  return getLeftSideMode() !== 'None';
 }
 
 export function isVaultLocalUsbOffered() {
@@ -30,13 +27,9 @@ export function isVaultBackupUsbEnabled() {
   return isVaultLocalUsbOffered();
 }
 
-/**
- * Microsoft Graph sync for the vault (upload on write/logoff, lazy download).
- * Off when OneDrive disabled or LEFT_SIDE=TutaDrive.
- */
+/** Microsoft Graph sync removed — vault cloud workspace is local TutaDrive only. */
 export function isVaultCloudSyncEnabled() {
-  if (isDisableOnedriveEnabled()) return false;
-  return getLeftSideMode() === 'OneDrive';
+  return false;
 }
 
 export function buildVaultStorageChoice(visible, oauthConfigured = true) {

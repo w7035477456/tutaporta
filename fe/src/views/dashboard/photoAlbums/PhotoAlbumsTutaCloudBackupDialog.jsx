@@ -8,10 +8,10 @@ import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { themedConfirm } from 'utils/themedDialog';
 import {
   downloadPhotoAlbumsAlbumBackupZip,
-  formatPhotoAlbumsOneDrive,
-  restorePhotoAlbumsOneDriveBackupZip
+  formatPhotoAlbumsTutaDrive,
+  restorePhotoAlbumsTutaDriveBackupZip
 } from 'api/photoAlbumsFe';
-import PhotoAlbumsOneDriveVaultTreePanel from './PhotoAlbumsOneDriveVaultTreePanel';
+import PhotoAlbumsTutaCloudVaultTreePanel from './PhotoAlbumsTutaCloudVaultTreePanel';
 import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
@@ -116,7 +116,7 @@ const generalSuccessMessageSx = {
   lineHeight: 1.45
 };
 
-export default function PhotoAlbumsOneDriveBackupDialog({
+export default function PhotoAlbumsTutaCloudBackupDialog({
   open,
   onClose,
   folderName = 'onlinemallwebsitevault',
@@ -175,7 +175,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
         albumLabel,
         onProgress: setBackupProgress
       });
-      const fileName = result?.fileName || 'MyPhotoAlbums_OneDrive.zip';
+      const fileName = result?.fileName || 'MyPhotoAlbums_TutaCloud.zip';
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
       setSuccess(
@@ -205,7 +205,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
     resetMessages();
     setBusy(true);
     try {
-      const result = await restorePhotoAlbumsOneDriveBackupZip(file);
+      const result = await restorePhotoAlbumsTutaDriveBackupZip(file);
       const count = Number(result?.restoredFiles) || 0;
       if (result?.merged) {
         const setName = String(result.notebookName || '').trim();
@@ -217,7 +217,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
         );
       } else {
         setSuccess(
-          `Restored ${count} file${count === 1 ? '' : 's'} to OneDrive (${folderName}). Open MyPhotoAlbums again with your Encrypt Password to load the restored notes.`
+          `Restored ${count} file${count === 1 ? '' : 's'} to TutaCloud (${folderName}). Open MyPhotoAlbums again with your Encrypt Password to load the restored notes.`
         );
       }
       setSuccessTone('general');
@@ -233,15 +233,15 @@ export default function PhotoAlbumsOneDriveBackupDialog({
   const handleFormat = async () => {
     if (busy) return;
     const ok = await themedConfirm(
-      `Format/Clear Entire TutaPhotoAlbums Cloud?\n\nThis deletes the existing OneDrive MyPhotoAlbums folder and creates a fresh blank vault. Other OneDrive files are not touched.\n\nBack up first if you want to keep your current albums.`
+      `Format/Clear Entire TutaPhotoAlbums Cloud?\n\nThis deletes the existing TutaCloud MyPhotoAlbums folder and creates a fresh blank vault. Other TutaCloud files are not touched.\n\nBack up first if you want to keep your current albums.`
     );
     if (!ok) return;
 
     resetMessages();
     setBusy(true);
     try {
-      await formatPhotoAlbumsOneDrive();
-      setSuccess(`Formatted ${folderName} on OneDrive. The folder is now blank and ready for a fresh vault.`);
+      await formatPhotoAlbumsTutaDrive();
+      setSuccess(`Formatted ${folderName} on TutaCloud. The folder is now blank and ready for a fresh vault.`);
       setSuccessTone('general');
       refreshVaultTree();
       onFormatted?.();
@@ -252,7 +252,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
     }
   };
 
-  const hourglassLabel = busy && backupProgress ? 'Backing up album' : 'Working on OneDrive backup';
+  const hourglassLabel = busy && backupProgress ? 'Backing up album' : 'Working on TutaCloud backup';
 
   return (
     <>
@@ -343,7 +343,7 @@ export default function PhotoAlbumsOneDriveBackupDialog({
           ) : null}
 
           <Box sx={vaultTreeSectionSx}>
-            <PhotoAlbumsOneDriveVaultTreePanel
+            <PhotoAlbumsTutaCloudVaultTreePanel
               active={open}
               refreshToken={treeRefreshToken}
               maxHeight="38vh"

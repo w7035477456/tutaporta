@@ -24,11 +24,11 @@ import {
   clearAlbumBackupProgress,
   getAlbumBackupProgress
 } from '../../utils/photoAlbumsAlbumBackupProgress.js';
-import { parseOneDriveBackupZipUpload } from '../../utils/photoAlbumsOneDrive/parseOneDriveBackupZipUpload.js';
+import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
 import {
   clearVaultLogoffProgress,
   setVaultLogoffProgress
-} from '../../utils/photoAlbumsOneDrive/vaultLogoffProgress.js';
+} from '../../utils/photoAlbumsVaultLogoffProgress.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -242,7 +242,7 @@ export async function restorePhotoAlbumsUsbBackupZip(req, res) {
 
   let upload = null;
   try {
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const result = await restoreUsbVaultFromZipFile(singlesId, upload.zipPath);
     return res.json({ success: true, ...result });
   } catch (err) {

@@ -13,7 +13,7 @@ let bridgeAvailable = false;
 let bridgeEnabled = true;
 let bridgeSinglesId = null;
 let bridgeUserGestureGranted = false;
-/** @type {'usb' | 'onedrive' | null} */
+/** @type {'usb' | 'tutadrive' | 'onedrive' | null} */
 let bridgeVaultStorageType = null;
 
 /** Production site cannot list USB on the server — always use the local bridge for drive paths. */
@@ -91,11 +91,11 @@ export function setRecordVaultBridgeSinglesId(singlesId) {
   bridgeSinglesId = Number.isFinite(id) && id > 0 ? id : null;
 }
 
-/** OneDrive vault sessions live on the main API; USB sessions may live in the local bridge. */
+/** TutaCloud vault sessions live on the main API; USB sessions may live in the local bridge. */
 export function setRecordVaultBridgeStorageType(storageType) {
   const normalized = String(storageType ?? '').trim().toLowerCase();
   bridgeVaultStorageType =
-    normalized === 'onedrive' || normalized === 'usb' ? normalized : null;
+    normalized === 'tutadrive' || normalized === 'onedrive' || normalized === 'usb' ? normalized : null;
 }
 
 export function getRecordVaultBridgeStorageType() {
@@ -353,8 +353,8 @@ export function shouldRouteRecordVaultThroughBridge(path, storageType = null) {
     }
     return bridgeAvailable;
   }
-  // OneDrive unlock + CRUD stay on the main API server (bridge has no cloud session).
-  if (activeStorageType === 'onedrive') return false;
+  // TutaCloud unlock + CRUD stay on the main API server (bridge has no cloud session).
+  if (activeStorageType === 'tutadrive' || activeStorageType === 'onedrive') return false;
   if (!bridgeAvailable) return false;
   if (!bridgeSinglesId) return false;
   if (activeStorageType !== 'usb') return false;

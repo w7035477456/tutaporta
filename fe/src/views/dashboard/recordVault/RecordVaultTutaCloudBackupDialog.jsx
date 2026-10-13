@@ -9,20 +9,19 @@ import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import {
   createRecordVaultTutaDriveEncryptedBackup,
   deleteRecordVaultTutaDriveBackup,
-  downloadRecordVaultOneDriveBackupZip,
+  downloadRecordVaultTutaDriveBackupZip,
   downloadRecordVaultTutaDriveStoredBackup,
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveBackupNotebookTree,
   fetchRecordVaultTutaDriveBackupStatus,
-  formatRecordVaultOneDrive,
   formatRecordVaultTutaDrive,
-  restoreRecordVaultOneDriveBackupZip,
+  restoreRecordVaultTutaDriveBackupZip,
   applyRecordVaultTutaDriveMerge,
   previewRecordVaultTutaDriveMergeFromStoredBackup,
   restoreRecordVaultTutaDriveEncryptedBackup,
   uploadRecordVaultTutaDriveStoredBackup
 } from 'api/recordVaultFe';
-import RecordVaultOneDriveVaultTreePanel from './RecordVaultOneDriveVaultTreePanel';
+import RecordVaultTutaCloudVaultTreePanel from './RecordVaultTutaCloudVaultTreePanel';
 import {
   tutaNotesFormatPostLoginButtonSx,
   tutaNotesPostLoginActionButtonSx,
@@ -449,7 +448,7 @@ function findOldestBackupSlot(slots) {
   return oldest;
 }
 
-export default function RecordVaultOneDriveBackupDialog({
+export default function RecordVaultTutaCloudBackupDialog({
   open,
   onClose,
   folderName = 'onlinemallwebsitevault',
@@ -667,7 +666,7 @@ export default function RecordVaultOneDriveBackupDialog({
         );
         setSuccessTone('backup');
       } else {
-        const result = await downloadRecordVaultOneDriveBackupZip();
+        const result = await downloadRecordVaultTutaDriveBackupZip();
         const fileName = result?.fileName || 'onlinemallwebsitevault-backup.zip';
         const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
@@ -991,10 +990,10 @@ export default function RecordVaultOneDriveBackupDialog({
         );
         setSuccessTone('general');
       } else {
-        const result = await restoreRecordVaultOneDriveBackupZip(file);
+        const result = await restoreRecordVaultTutaDriveBackupZip(file);
         const count = Number(result?.restoredFiles) || 0;
         setSuccess(
-          `Restored ${count} file${count === 1 ? '' : 's'} to OneDrive (${folderName}). Open MyNote again with your Encrypt Password to load the restored notes.`
+          `Restored ${count} file${count === 1 ? '' : 's'} to TutaCloud (${folderName}). Open MyNote again with your Encrypt Password to load the restored notes.`
         );
         setSuccessTone('general');
         refreshVaultTree();
@@ -1013,7 +1012,7 @@ export default function RecordVaultOneDriveBackupDialog({
     const ok = await themedConfirm(
       tutaDriveActive
         ? `Format TutaDrive vault?\n\nThis deletes notes under your member notes/TutaNotes folder. Photos folder is kept.\n\nBack up first if you want to keep your current notes.`
-        : `Format ${folderName}?\n\nThis deletes the existing OneDrive MyNote folder and creates a fresh vault with SAMPLE NOTEBOOK (SAMPLE NOTE1 / SAMPLE NOTE2). Other OneDrive files are not touched.\n\nBack up first if you want to keep your current notes.`
+        : `Format ${folderName}?\n\nThis deletes the existing TutaCloud MyNote folder and creates a fresh vault with SAMPLE NOTEBOOK (SAMPLE NOTE1 / SAMPLE NOTE2). Other TutaCloud files are not touched.\n\nBack up first if you want to keep your current notes.`
     );
     if (!ok) return;
 
@@ -1024,9 +1023,9 @@ export default function RecordVaultOneDriveBackupDialog({
         await formatRecordVaultTutaDrive();
         setSuccess('Formatted TutaDrive vault. Open TutaNotes again to create a fresh vault.');
       } else {
-        await formatRecordVaultOneDrive();
+        await formatRecordVaultTutaDrive();
         setSuccess(
-          `Formatted ${folderName} on OneDrive. Open TutaNotes again to see SAMPLE NOTEBOOK.`
+          `Formatted ${folderName} on TutaCloud. Open TutaNotes again to see SAMPLE NOTEBOOK.`
         );
       }
       setSuccessTone('general');
@@ -1158,7 +1157,7 @@ export default function RecordVaultOneDriveBackupDialog({
             ? (BACKUP_OPERATION_STEPS[backupProgress.operation] || BACKUP_OPERATION_STEPS.upload).title
             : tutaDriveActive
               ? 'Working on TutaDrive backup'
-              : 'Working on OneDrive backup'
+              : 'Working on TutaCloud backup'
         }
         progressPercent={backupProgress ? backupProgress.percent : null}
         progressLabel={buildBackupProgressLabel(backupProgress, progressNowMs)}
@@ -1193,7 +1192,7 @@ export default function RecordVaultOneDriveBackupDialog({
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
               ? 'Each backup zip can have its own password — it never leaves your browser. Only a password check and your hint are stored with the zip, so Restore / Merge can verify it. If you forget a zip password, that backup cannot be opened. Up to 3 backup zip files are kept. Before Format, run Backup first if you need to keep your notes.'
-              : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to OneDrive, choose Restore below.'}
+              : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to TutaCloud, choose Restore below.'}
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -1287,7 +1286,7 @@ export default function RecordVaultOneDriveBackupDialog({
 
           {!tutaDriveActive ? (
             <Box sx={vaultTreeSectionSx}>
-              <RecordVaultOneDriveVaultTreePanel
+              <RecordVaultTutaCloudVaultTreePanel
                 active={open}
                 refreshToken={treeRefreshToken}
                 maxHeight="22vh"
@@ -1311,7 +1310,7 @@ export default function RecordVaultOneDriveBackupDialog({
   );
 }
 
-RecordVaultOneDriveBackupDialog.propTypes = {
+RecordVaultTutaCloudBackupDialog.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
   folderName: PropTypes.string,

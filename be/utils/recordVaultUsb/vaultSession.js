@@ -14,7 +14,7 @@ import {
   listIconVaultUnlockKeys,
   vaultMetaUsesArgon2idKdf
 } from '../recordVaultIconKeys.js';
-import { isVaultBackupUsbEnabled, isVaultCloudSyncEnabled } from '../recordVaultStorageFlags.js';
+import { isVaultBackupUsbEnabled } from '../recordVaultStorageFlags.js';
 import { buildVaultFolderListing } from '../vaultFolderTreeListing.js';
 import { vaultMetaUsesPlaintextStorage } from '../recordVaultIconEncryption.js';
 import {
@@ -131,21 +131,12 @@ import {
 import { requireVaultAccessSession } from '../recordVaultAccessPassword.js';
 import { mimeTypeForRecordVaultExtension } from '../recordVaultFileFormats.js';
 import {
-  scheduleTrackedOneDriveUpload,
-  uploadOneDriveVaultOnLogoff,
-  ensureOneDriveVaultPhotoOnDisk,
-  ensureOneDriveVaultFileOnDisk
-} from '../recordVaultOneDrive/oneDriveVaultSync.js';
-import { markOneDrivePathDirty, takeOneDriveDirtyPaths, clearAllOneDriveDirty } from '../recordVaultOneDrive/oneDriveVaultDirty.js';
-import {
   registerVaultClusterUnlock,
   clearVaultClusterUnlock,
   getVaultClusterUnlock,
   isVaultMountPathPresent
 } from '../recordVaultClusterSession.js';
 import { readRecordVaultCacheIcon } from '../recordVaultCacheIcon.js';
-import { downloadVaultToStaging } from '../recordVaultOneDrive/oneDriveVaultSync.js';
-import { oneDriveStagingMountPath } from '../recordVaultOneDriveStagingRoot.js';
 import { flushVaultTransferBytes } from '../vaultTransferTracking.js';
 import {
   addVaultSessionFileCounts,
@@ -221,19 +212,8 @@ class VaultSession {
   }
 }
 
-function scheduleCloudRelativeSync(session, relativePath) {
-  if (!isVaultCloudSyncEnabled()) return;
-  if (!session?.driveSinglesId) return;
-  if (session.storageType !== 'onedrive') return;
-  void (async () => {
-    await markOneDrivePathDirty(session.driveSinglesId, relativePath);
-    await scheduleTrackedOneDriveUpload(session.driveSinglesId, session.mountPath, relativePath);
-  })().catch((err) => {
-    rvCloudWarn('OneDrive', 'background sync failed — path stays dirty for logoff retry', {
-      relativePath,
-      message: err?.message || String(err)
-    });
-  });
+function scheduleCloudRelativeSync(_session, _relativePath) {
+  // Tuta cloud workspace is local-only (no remote sync).
 }
 
 function getMirrorMountPaths(session) {
@@ -401,7 +381,7 @@ export function flushDbToUsb(session) {
 }
 
 /**
- * Coalesce rapid vault DB writes (multi-image drop) so USB/OneDrive staging is not rewritten on every file.
+ * Coalesce rapid vault DB writes (multi-image drop) so USB/cloud staging is not rewritten on every file.
  * Photo/attachment bytes still hit disk immediately via writeEncrypted*.
  */
 function scheduleFlushDbToUsb(session, delayMs = null) {
@@ -720,7 +700,7 @@ export async function requireVaultSession(req, res) {
   }
   if (usbSession && oneDriveSession) {
     res.status(400).json({
-      error: 'X-Record-Vault-Storage header is required when both OneDrive and USB vaults are unlocked',
+      error: 'X-Record-Vault-Storage header is required when both cloud and USB vaults are unlocked',
       code: 'RECORD_VAULT_STORAGE_TYPE_REQUIRED'
     });
     return null;
@@ -858,24 +838,9 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   const cluster = await getVaultClusterUnlock(id, normalizedType);
   if (!cluster?.mountPath) return null;
 
-  let mountPath = String(cluster.mountPath).trim();
-  if (normalizedType === 'onedrive' && isVaultCloudSyncEnabled() && !isVaultMountPathPresent(mountPath)) {
-    mountPath = oneDriveStagingMountPath(id);
-  }
+  const mountPath = String(cluster.mountPath).trim();
   if (!isVaultMountPathPresent(mountPath)) {
-    if (normalizedType !== 'onedrive' || !isVaultCloudSyncEnabled()) {
-      return null;
-    }
-    try {
-      const staged = await downloadVaultToStaging(id);
-      mountPath = staged.mountPath;
-    } catch (err) {
-      rvCloudWarn('Vault', 'cluster rehydrate failed — OneDrive staging unavailable', {
-        singlesId: id,
-        message: err?.message || String(err)
-      });
-      return null;
-    }
+    return null;
   }
 
   const key = await resolveVaultUnlockKey(id, normalizedType, mountPath);
@@ -900,17 +865,10 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   // Registry was read before vault.db, so the copy is at least this version.
   if (session) markVaultSessionClusterState(session, cluster);
   if (session && normalizedType === 'onedrive') {
-    // TutaDrive borrows this slot. Tagging it with driveSinglesId would turn a
-    // local-folder vault into a Microsoft-synced one on any rehydrate.
-    if (isVaultCloudSyncEnabled()) {
-      session.driveSinglesId = id;
-      session.driveFolderId = cluster.driveFolderId || session.driveFolderId || null;
-    } else {
-      session.driveSinglesId = null;
-      session.driveFolderId = null;
-      session.tutaDrive = true;
-      session.label = 'TutaDrive';
-    }
+    session.driveSinglesId = null;
+    session.driveFolderId = null;
+    session.tutaDrive = true;
+    session.label = 'TutaDrive';
   }
   return session;
 }
@@ -1244,9 +1202,7 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
       await onProgress({
         percent: 2,
         label:
-          normalizedType === 'onedrive'
-            ? 'Saving notes to OneDrive…'
-            : 'Saving USB vault…'
+          normalizedType === 'onedrive' ? 'Saving cloud vault…' : 'Saving USB vault…'
       });
     }
     if (dbDirty) {
@@ -1262,14 +1218,7 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
         await addVaultSessionFileCounts(id, { usbDelta: 1 });
       }
     }
-    if (session.storageType === 'onedrive' && session.driveSinglesId) {
-      const dirtyPaths = await takeOneDriveDirtyPaths(session.driveSinglesId);
-      await uploadOneDriveVaultOnLogoff(session.driveSinglesId, session.mountPath, {
-        dbDirty,
-        dirtyPaths,
-        onProgress
-      });
-    } else if (onProgress) {
+    if (onProgress && normalizedType === 'usb') {
       await onProgress({ percent: 70, label: 'Closing USB vault' });
     }
     if (session.db) {
@@ -1291,49 +1240,14 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
   return { success: true };
 }
 
-/**
- * Persist dirty vault DB to staging and await OneDrive upload — same sync half as logoff,
- * without closing the session / wiping staging / clearing cache icon.
- * Use after PIN encrypt so re-open (which re-downloads vault.db) keeps the ciphertext.
- */
-export async function flushAndAwaitCloudSync(singlesId, storageType = 'onedrive', { onProgress } = {}) {
-  if (!isVaultCloudSyncEnabled()) {
-    const local = getVaultSession(singlesId, normalizeVaultStorageType(storageType));
-    if (local?.dirty) forcePersistVaultDb(local);
-    return { success: true, synced: false };
-  }
-  const normalizedType = normalizeVaultStorageType(storageType);
-  let session = getVaultSession(singlesId, normalizedType);
-  if (!session) {
-    session = await tryRehydrateVaultSession(singlesId, normalizedType);
-  }
-  if (!session) {
-    return { success: true, synced: false };
-  }
-
-  const wasDirty = Boolean(session.dirty);
-  if (wasDirty) {
-    forcePersistVaultDb(session);
-  }
-
-  if (session.storageType !== 'onedrive' || !session.driveSinglesId) {
-    return { success: true, synced: false };
-  }
-
-  const dbFileName = getVaultDbFileName(session.meta);
-  // Encrypt path already flushed DB to disk + queued async upload; await it (and force db
-  // upload) so a later Open Cloud re-download cannot wipe the PIN ciphertext.
-  await markOneDrivePathDirty(session.driveSinglesId, dbFileName);
-  const dirtyPaths = await takeOneDriveDirtyPaths(session.driveSinglesId);
-  await uploadOneDriveVaultOnLogoff(session.driveSinglesId, session.mountPath, {
-    dbDirty: true,
-    dirtyPaths,
-    onProgress
-  });
-  return { success: true, synced: true };
+/** Persist dirty vault DB to disk without closing the session. */
+export async function flushAndAwaitCloudSync(singlesId, storageType = 'onedrive', { onProgress: _onProgress } = {}) {
+  const local = getVaultSession(singlesId, normalizeVaultStorageType(storageType));
+  if (local?.dirty) forcePersistVaultDb(local);
+  return { success: true, synced: false };
 }
 
-/** Drop in-memory vault without uploading local changes (e.g. after OneDrive restore from zip). */
+/** Drop in-memory vault without persisting local changes (e.g. after restore from zip). */
 export async function discardVaultSessionWithoutCloudSync(singlesId, storageType = 'onedrive') {
   const normalizedType = normalizeVaultStorageType(storageType);
   let session = getVaultSession(singlesId, normalizedType);
@@ -1347,9 +1261,6 @@ export async function discardVaultSessionWithoutCloudSync(singlesId, storageType
     return { success: true };
   }
   const id = Number(singlesId);
-  if (session.storageType === 'onedrive' && session.driveSinglesId) {
-    await clearAllOneDriveDirty(Number(session.driveSinglesId));
-  }
   session.dirty = false;
   try {
     if (session.db) {
@@ -2093,52 +2004,11 @@ export function vaultGetNoteImage(session, noteId, slot = 'center') {
   return { buffer, contentType };
 }
 
-export async function vaultEnsureNotePhotoOnDisk(session, noteId, slot = 'center') {
-  if (!isVaultCloudSyncEnabled()) return;
-  if (session.storageType !== 'onedrive') return;
-  const row = loadNote(session, noteId);
-  if (!row) return;
-  const fields = slotFields(slot);
-  const relative = row[fields.relative];
-  if (!relative) return;
-  await ensureOneDriveVaultPhotoOnDisk(session.driveSinglesId, session.mountPath, relative, session.meta);
-}
+export async function vaultEnsureNotePhotoOnDisk(_session, _noteId, _slot = 'center') {}
 
-export async function vaultEnsureNoteExtraImageOnDisk(session, noteId, imageId) {
-  if (!isVaultCloudSyncEnabled()) return;
-  if (session.storageType !== 'onedrive') return;
-  const row = queryOne(
-    session.db,
-    `SELECT relative_path FROM note_extra_images
-     WHERE image_id = ? AND note_id = ? AND deleted_at IS NULL`,
-    [imageId, noteId]
-  );
-  if (!row?.relative_path) return;
-  await ensureOneDriveVaultPhotoOnDisk(session.driveSinglesId, session.mountPath, row.relative_path, session.meta);
-}
+export async function vaultEnsureNoteExtraImageOnDisk(_session, _noteId, _imageId) {}
 
-export async function vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId) {
-  if (!isVaultCloudSyncEnabled()) return;
-  if (session.storageType !== 'onedrive') return;
-  const row = queryOne(
-    session.db,
-    `SELECT relative_path, shared_content_key, checksum, file_name FROM note_attachments
-     WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
-    [attachmentId, noteId]
-  );
-  if (!row?.relative_path) return;
-  // Shared sample files live on the app server assets — never fetch from OneDrive.
-  if (
-    resolveRecordVaultSharedContentKey({
-      sharedContentKey: row.shared_content_key,
-      checksum: row.checksum,
-      fileName: row.file_name
-    })
-  ) {
-    return;
-  }
-  await ensureOneDriveVaultFileOnDisk(session.driveSinglesId, session.mountPath, row.relative_path, session.meta);
-}
+export async function vaultEnsureNoteAttachmentOnDisk(_session, _noteId, _attachmentId) {}
 
 export function vaultAddNoteExtraImage(session, noteId, { buffer, ext }) {
   ensureNoteExtraImagesTable(session.db);
@@ -2379,7 +2249,7 @@ export async function vaultUsbStatus(singlesId, storageType = null) {
     mountPath: session?.mountPath || null,
     label:
       session?.storageType === 'onedrive'
-        ? 'OneDrive'
+        ? session?.label || 'TutaDrive'
         : session
           ? path.basename(session.mountPath)
           : null,

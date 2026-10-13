@@ -164,7 +164,7 @@ export default function RecordVaultUsageBar({
   const sessionFileCounts = usage?.sessionFileCounts || {};
   const usbTxRx = Number(sessionFileCounts.usbTxRx) || 0;
   const uiTxRx = Number(sessionFileCounts.uiTxRx) || 0;
-  const isOneDrive = storageType === 'onedrive';
+  const isOneDrive = storageType === 'tutadrive';
   const tutorialDetail = isOneDrive
     ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL
     : TUTANOTES_USB_VIDEO_TUTORIAL_LABEL;

@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { appLog } from '../logger.js';
-import { oneDriveStagingMountPath, resolveOneDriveStagingRoot } from './photoAlbumsOneDriveStagingRoot.js';
 import {
   VAULT_DB_FILE_ENCRYPTED,
   VAULT_DB_FILE_PLAIN,
@@ -93,7 +92,7 @@ function queryAllRows(db, sql, params = []) {
 /**
  * Roots to scan for byte-identical duplicates:
  * - unlocked vault photos/ + files/ under session.mountPath
- * - OneDrive staging for this user (RECORD_PHOTOALBUMS_ONEDRIVE_STAGING_ROOT/{id})
+ * - unlocked session mount only (TutaDrive / USB)
  */
 export function listPhotoAlbumsDedupeScanRoots({ session } = {}) {
   const roots = [];
@@ -125,12 +124,6 @@ export function listPhotoAlbumsDedupeScanRoots({ session } = {}) {
 
   if (session?.mountPath) {
     addVaultOrFolderRoots(session.mountPath);
-  }
-
-  const singlesId = session?.driveSinglesId ?? session?.singlesId;
-  if (singlesId != null && String(singlesId).trim() !== '') {
-    addVaultOrFolderRoots(oneDriveStagingMountPath(singlesId));
-    addRoot(path.join(resolveOneDriveStagingRoot(), String(singlesId)));
   }
 
   return roots;
@@ -188,8 +181,7 @@ function collectReferencedAbsPaths(session) {
  * Never deletes vault.meta.json / vault.db.
  *
  * Covers folders from:
- * - RECORD_PHOTOALBUMS_ONEDRIVE_STAGING_ROOT
- * - the unlocked session mount (USB / TutaDrive / staging)
+ * - the unlocked session mount (USB / TutaDrive)
  */
 export function removeDuplicateFilesInPhotoAlbumsEnvFolders({ session } = {}) {
   const roots = listPhotoAlbumsDedupeScanRoots({ session });

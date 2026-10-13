@@ -26,11 +26,11 @@ export const TUTANOTES_WELCOME_TUTORIAL_ITEMS = [
   },
   {
     label: '4. Backup:',
-    body: 'Easily back up your work by clicking “Backup/Restore OneDrive” to create a ZIP archive.'
+    body: 'Easily back up your work by clicking “Backup/Restore” on TutaCloud to create a ZIP archive.'
   },
   {
     label: '5. Seamless File Transfer:',
-    body: 'Drag and drop to copy or move Notes and Notebooks between OneDrive and a USB drive.'
+    body: 'Drag and drop to copy or move Notes and Notebooks between TutaCloud and a USB drive.'
   },
   {
     label: '6. Safe Disconnection:',

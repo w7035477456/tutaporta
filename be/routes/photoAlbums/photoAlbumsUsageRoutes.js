@@ -34,7 +34,7 @@ async function resolveLoginGateFileCounts(singlesId) {
   };
 }
 
-/** GET /api/photoAlbums/usage — transfer tally, vault folder size, OneDrive quota */
+/** GET /api/photoAlbums/usage — transfer tally and vault folder size */
 export async function getPhotoAlbumsUsage(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;

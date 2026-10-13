@@ -214,8 +214,8 @@ export async function transferRecordVaultItem({
   onProgress = null
 }) {
   if (mode !== 'copy' && mode !== 'move') throw new Error('Invalid transfer mode');
-  const sourceType = item.storageType === 'onedrive' ? 'onedrive' : 'usb';
-  const targetType = targetStorageType === 'onedrive' ? 'onedrive' : 'usb';
+  const sourceType = item.storageType === 'tutadrive' ? 'onedrive' : 'usb';
+  const targetType = targetStorageType === 'tutadrive' ? 'onedrive' : 'usb';
   if (sourceType === targetType) throw new Error('Source and destination must differ');
 
   const sourceApi = createRecordVaultPaneApi(sourceType);

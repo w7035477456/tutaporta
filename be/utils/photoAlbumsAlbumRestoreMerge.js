@@ -3,7 +3,6 @@ import os from 'os';
 import path from 'path';
 import { Extract } from 'unzipper';
 
-import { getOneDriveVaultFolderName } from './photoAlbumsOneDrive/oneDriveApi.js';
 import {
   flushDbToUsb,
   getVaultSession,
@@ -23,10 +22,7 @@ import { writeEncryptedVaultFile } from './photoAlbumsUsb/vaultSession.js';
 const ALBUM_MANIFEST_NAME = 'album-backup.manifest.json';
 
 function resolveAlbumBackupVaultRoot(extractDir) {
-  const candidates = [
-    path.join(extractDir, getOneDriveVaultFolderName()),
-    path.join(extractDir, VAULT_DIR_NAME)
-  ];
+  const candidates = [path.join(extractDir, VAULT_DIR_NAME), extractDir];
   for (const root of candidates) {
     if (fs.existsSync(path.join(root, ALBUM_MANIFEST_NAME))) return root;
   }

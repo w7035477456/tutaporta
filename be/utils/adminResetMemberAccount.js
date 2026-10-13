@@ -253,11 +253,11 @@ export async function hardResetMemberAccount(singlesId) {
         demoBuddies,
         billSchedule: bill,
         vaultNotes:
-          'This member TutaNotes folder under LARGE_CHEAP_STORAGE_FOLDER and notes OneDrive staging were removed.',
+          'This member TutaNotes folder under LARGE_CHEAP_STORAGE_FOLDER was removed.',
         vaultAlbums:
-          'This member TutaPhotoAlbums folder under LARGE_CHEAP_STORAGE_FOLDER and photo-album OneDrive staging were removed.',
+          'This member TutaPhotoAlbums folder under LARGE_CHEAP_STORAGE_FOLDER was removed.',
         mobileUploads:
-          'Phone uploads were removed from mobile_upload, Tuta Dates photo/video folders, OneDrive staging, and this member storage folders.'
+          'Phone uploads were removed from mobile_upload, Tuta Dates photo/video folders, and this member storage folders.'
       }
     };
   } catch (err) {

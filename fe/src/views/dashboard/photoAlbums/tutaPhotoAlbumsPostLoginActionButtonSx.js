@@ -2,7 +2,7 @@ import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { bsizeInputHeightResponsive } from 'config/bsizeEnv';
 import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
 import { GREEN_BUTTON_DISABLED_BG, GREEN_BUTTON_TEXT } from 'config/greenButton';
-import { photoAlbumsOneDriveBackupRestoreButtonSx } from './photoAlbumsOneDriveBackupRestoreButtonSx';
+import { photoAlbumsTutaCloudBackupRestoreButtonSx } from './photoAlbumsTutaCloudBackupRestoreButtonSx';
 
 function scaleResponsiveSize(responsive, factor) {
   return {
@@ -62,7 +62,7 @@ export const tutaPhotoAlbumsPostLoginActionButtonSx = {
 /** Yellow — View OneDrive Cloud / View USB */
 export const tutaPhotoAlbumsYellowPostLoginButtonSx = {
   ...tutaPhotoAlbumsPostLoginActionButtonSx,
-  ...photoAlbumsOneDriveBackupRestoreButtonSx
+  ...photoAlbumsTutaCloudBackupRestoreButtonSx
 };
 
 /** Orange — Backup & Restore Cloud / USB */

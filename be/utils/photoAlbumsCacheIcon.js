@@ -2,7 +2,10 @@ import pool from '../db/connection.js';
 import { getSingleLoginRedis } from './singleLoginSession.js';
 import { normalizePhotoAlbumsIconName } from './photoAlbumsIconKeys.js';
 
-/** @typedef {'onedrive' | 'usb'} PhotoAlbumsCacheIconKind */
+/**
+ * @typedef {'onedrive' | 'usb'} PhotoAlbumsCacheIconKind
+ * Slot `onedrive` is the legacy name for the Tuta cloud workspace session icon (TutaDrive).
+ */
 
 /** Cluster-wide cache — shared Redis (same REDIS_URL as single-login sessions). */
 export const PHOTO_ALBUMS_CACHE_ICON_KEY_PREFIX = 'v1:photo_albums:cache_icon:';

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
-import RecordVaultOneDriveVaultTreePanel from './RecordVaultOneDriveVaultTreePanel';
+import RecordVaultTutaCloudVaultTreePanel from './RecordVaultTutaCloudVaultTreePanel';
 
 export default function RecordVaultViewVaultDialog({
   open,
@@ -41,7 +41,7 @@ export default function RecordVaultViewVaultDialog({
       >
         <ColorTemplate16PopupCenterWide.Title>{title}</ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body spacing={1.5}>
-          <RecordVaultOneDriveVaultTreePanel
+          <RecordVaultTutaCloudVaultTreePanel
             active={open}
             storageType={isUsb ? 'usb' : 'onedrive'}
             folderName={folderName}
@@ -58,7 +58,7 @@ export default function RecordVaultViewVaultDialog({
 RecordVaultViewVaultDialog.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
-  storageType: PropTypes.oneOf(['onedrive', 'usb']),
+  storageType: PropTypes.oneOf(['tutadrive', 'usb']),
   folderName: PropTypes.string,
   tutaDrive: PropTypes.bool
 };

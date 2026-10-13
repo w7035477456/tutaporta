@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import { fetchPhotoAlbumsOneDriveVaultTree, fetchPhotoAlbumsUsbVaultTree } from 'api/photoAlbumsFe';
+import { fetchPhotoAlbumsTutaDriveVaultTree, fetchPhotoAlbumsUsbVaultTree } from 'api/photoAlbumsFe';
 
 const VAULT_TREE_INDENT_PX = 18;
 const VAULT_TREE_LINE_COLOR = 'var(--theme-yellow-color)';
@@ -156,10 +156,10 @@ function VaultTreeNode({ node, depth = 0, isLast = true, ancestorHasNext = [] })
   );
 }
 
-/** Shared vault folder descriptions + live tree (View OneDrive / View USB / Backup & Restore). */
-export default function PhotoAlbumsOneDriveVaultTreePanel({
+/** Shared vault folder descriptions + live tree (View TutaCloud / View USB / Backup & Restore). */
+export default function PhotoAlbumsTutaCloudVaultTreePanel({
   active = true,
-  storageType = 'onedrive',
+  storageType = 'tutadrive',
   folderName = '',
   refreshToken = 0,
   maxHeight = '58vh',
@@ -170,10 +170,10 @@ export default function PhotoAlbumsOneDriveVaultTreePanel({
   const [error, setError] = useState('');
   const [tree, setTree] = useState(null);
   const isUsb = storageType === 'usb';
-  const storageLabel = isUsb ? 'USB' : 'OneDrive Cloud';
+  const storageLabel = isUsb ? 'USB' : 'TutaCloud';
   const storageFolderHint = isUsb
     ? 'your USB vault folder'
-    : `your OneDrive vault folder${folderName ? ` (${folderName})` : ''}`;
+    : `your TutaCloud vault folder${folderName ? ` (${folderName})` : ''}`;
 
   useEffect(() => {
     if (!active) {
@@ -187,7 +187,7 @@ export default function PhotoAlbumsOneDriveVaultTreePanel({
     setLoading(true);
     setError('');
 
-    const load = isUsb ? fetchPhotoAlbumsUsbVaultTree() : fetchPhotoAlbumsOneDriveVaultTree();
+    const load = isUsb ? fetchPhotoAlbumsUsbVaultTree() : fetchPhotoAlbumsTutaDriveVaultTree();
     void load
       .then((result) => {
         if (cancelled) return;

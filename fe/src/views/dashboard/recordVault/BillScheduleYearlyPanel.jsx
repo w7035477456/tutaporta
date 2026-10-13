@@ -946,7 +946,7 @@ export default function BillScheduleYearlyPanel({
 }
 
 BillScheduleYearlyPanel.propTypes = {
-  storageType: PropTypes.oneOf(['onedrive', 'usb']),
+  storageType: PropTypes.oneOf(['tutadrive', 'usb']),
   videoTutorialUrl: PropTypes.string,
   onBillScheduleTutorialClick: PropTypes.func
 };

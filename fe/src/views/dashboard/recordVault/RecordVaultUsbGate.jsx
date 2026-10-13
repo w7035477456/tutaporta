@@ -7,7 +7,7 @@ import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import RecordVaultUsbLocationPicker from './RecordVaultUsbLocationPicker';
 import RecordVaultUsbAssignmentDropZone from './RecordVaultUsbAssignmentDropZone';
-import RecordVaultOneDriveGate from './RecordVaultOneDriveGate';
+import RecordVaultTutaDriveGate from './RecordVaultTutaDriveGate';
 import RecordVaultViewVaultDialog from './RecordVaultViewVaultDialog';
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import { recordVaultPopupCloseSx } from './recordVaultPopupCloseSx';
@@ -28,11 +28,10 @@ import {
   fetchRecordVaultUsbStatus,
   isRecordVaultBridgeAvailable,
   probeRecordVaultBridge,
-  fetchRecordVaultOneDriveConfig,
-  fetchRecordVaultOneDriveStatus,
-  initRecordVaultOneDrive,
-  unlockRecordVaultOneDrive,
-  fetchRecordVaultStorageConfig
+  fetchRecordVaultStorageConfig,
+  fetchRecordVaultTutaDriveStatus,
+  initRecordVaultTutaDrive,
+  unlockRecordVaultTutaDrive
 } from 'api/recordVaultFe';
 import { normalizeUsbBridgeInstallerUrl } from 'utils/usbBridgeInstallerDownloadUrl';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
@@ -70,14 +69,14 @@ import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 const ASSIGNED_USB_STATS_REFRESH_MS = 2500;
 
 function pickDefaultStorageBackend(cfg) {
-  if (cfg?.oneDrive?.visible) return 'onedrive';
+  if (cfg?.tutaCloud?.visible) return 'tutadrive';
   if (cfg?.localUsb?.visible) return 'usb';
-  return 'onedrive';
+  return 'tutadrive';
 }
 
 function buildPrivacyStorageLabel(cfg) {
   const parts = [];
-  if (cfg?.oneDrive?.visible) parts.push('OneDrive');
+  if (cfg?.tutaCloud?.visible) parts.push('TutaCloud');
   if (cfg?.localUsb?.visible) parts.push('personal USB');
   return parts.length ? parts.join(', ') : 'your chosen storage';
 }
@@ -121,15 +120,15 @@ export default function RecordVaultUsbGate({
   );
   const [includeUsbDmgExe, setIncludeUsbDmgExe] = useState(true);
   const prodBridgeHost = isRecordVaultBridgeHostContext();
-  const [oneDriveEnabled, setOneDriveEnabled] = useState(false);
-  const [oneDriveVisible, setOneDriveVisible] = useState(false);
-  const [oneDriveConnected, setOneDriveConnected] = useState(false);
-  const [oneDriveEmail, setOneDriveEmail] = useState('');
-  const [oneDriveHasVault, setOneDriveHasVault] = useState(false);
-  const [oneDriveNeedsReformat, setOneDriveNeedsReformat] = useState(false);
-  const [oneDriveLegacyPinVault, setOneDriveLegacyPinVault] = useState(false);
-  const [oneDriveBusy, setOneDriveBusy] = useState(false);
-  const [storageBackend, setStorageBackend] = useState(usbOnly ? 'usb' : 'onedrive');
+  const [tutaCloudEnabled, setTutaCloudEnabled] = useState(false);
+  const [tutaCloudVisible, setTutaCloudVisible] = useState(false);
+  const [tutaCloudConnected, setTutaCloudConnected] = useState(false);
+  const [tutaCloudEmail, setTutaCloudEmail] = useState('');
+  const [tutaCloudHasVault, setTutaCloudHasVault] = useState(false);
+  const [tutaCloudNeedsReformat, setTutaCloudNeedsReformat] = useState(false);
+  const [tutaCloudLegacyPinVault, setTutaCloudLegacyPinVault] = useState(false);
+  const [tutaCloudBusy, setTutaCloudBusy] = useState(false);
+  const [storageBackend, setStorageBackend] = useState(usbOnly ? 'usb' : 'tutadrive');
   const [localUsbVisible, setLocalUsbVisible] = useState(usbOnly);
   const [backupUsbEnabled, setBackupUsbEnabled] = useState(false);
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
@@ -157,14 +156,14 @@ export default function RecordVaultUsbGate({
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
         if (usbOnly) {
-          setOneDriveVisible(false);
-          setOneDriveEnabled(false);
+          setTutaCloudVisible(false);
+          setTutaCloudEnabled(false);
           setLocalUsbVisible(true);
           setStorageBackend('usb');
           setPrivacyStorageLabel('personal USB');
         } else {
-          setOneDriveVisible(Boolean(cfg.oneDrive.visible));
-          setOneDriveEnabled(Boolean(cfg.oneDrive.enabled));
+          setTutaCloudVisible(Boolean(cfg.tutaCloud.visible));
+          setTutaCloudEnabled(Boolean(cfg.tutaCloud.enabled));
           setLocalUsbVisible(Boolean(cfg.localUsb.visible));
           setStorageBackend(pickDefaultStorageBackend(cfg));
           setPrivacyStorageLabel(buildPrivacyStorageLabel(cfg));
@@ -189,14 +188,14 @@ export default function RecordVaultUsbGate({
         if (status === 404) {
           // Backend predates /storage/config — show all choices until BE is restarted.
           if (usbOnly) {
-            setOneDriveVisible(false);
+            setTutaCloudVisible(false);
             setLocalUsbVisible(true);
             setStorageBackend('usb');
             setPrivacyStorageLabel('personal USB');
           } else {
-            setOneDriveVisible(true);
+            setTutaCloudVisible(true);
             setLocalUsbVisible(true);
-            setPrivacyStorageLabel('OneDrive or personal USB');
+            setPrivacyStorageLabel('TutaCloud or personal USB');
           }
           return;
         }
@@ -270,12 +269,12 @@ export default function RecordVaultUsbGate({
   }, [applyUsbLocationLabels, prodBridgeHost]);
 
   useEffect(() => {
-    if (!open || !oneDriveConnected) return;
-    setError((prev) => (/OneDrive connection failed/i.test(prev) ? '' : prev));
+    if (!open || !tutaCloudConnected) return;
+    setError((prev) => (/TutaCloud connection failed/i.test(prev) ? '' : prev));
     setErrorSecondary((prev) =>
       /Microsoft|Azure|redirect URI|MICROSOFT_OAUTH|Graph API|server_error/i.test(prev) ? '' : prev
     );
-  }, [open, oneDriveConnected]);
+  }, [open, tutaCloudConnected]);
 
   useEffect(() => {
     if (!open || !localUsbVisible) return undefined;
@@ -321,53 +320,49 @@ export default function RecordVaultUsbGate({
     }
   }, [bridgeConnected]);
 
-  const refreshOneDriveStatus = useCallback(async () => {
-    if (!oneDriveVisible) {
-      setOneDriveEnabled(false);
-      setOneDriveConnected(false);
-      setOneDriveEmail('');
-      setOneDriveHasVault(false);
-      setOneDriveNeedsReformat(false);
-      setOneDriveLegacyPinVault(false);
+  const refreshTutaCloudStatus = useCallback(async () => {
+    if (!tutaCloudVisible) {
+      setTutaCloudEnabled(false);
+      setTutaCloudConnected(false);
+      setTutaCloudEmail('');
+      setTutaCloudHasVault(false);
+      setTutaCloudNeedsReformat(false);
+      setTutaCloudLegacyPinVault(false);
       return;
     }
     try {
-      const config = await fetchRecordVaultOneDriveConfig();
-      setOneDriveEnabled(Boolean(config.enabled));
-      if (!config.enabled) {
-        setOneDriveConnected(false);
-        setOneDriveEmail('');
-        setOneDriveHasVault(false);
-        setOneDriveNeedsReformat(false);
-        setOneDriveLegacyPinVault(false);
+      const config = await fetchRecordVaultStorageConfig();
+      const enabled = Boolean(config.tutaCloud?.enabled);
+      setTutaCloudEnabled(enabled);
+      if (!enabled) {
+        setTutaCloudConnected(false);
+        setTutaCloudEmail('');
+        setTutaCloudHasVault(false);
+        setTutaCloudNeedsReformat(false);
+        setTutaCloudLegacyPinVault(false);
         return;
       }
-      const status = await fetchRecordVaultOneDriveStatus();
-      const connected = Boolean(status.onedrive?.connected);
-      setOneDriveConnected(connected);
-      setOneDriveEmail(status.onedrive?.email || '');
-      setOneDriveHasVault(Boolean(status.onedrive?.hasVault));
-      setOneDriveNeedsReformat(Boolean(status.onedrive?.needsReformat));
-      setOneDriveLegacyPinVault(Boolean(status.onedrive?.legacyPinVault));
-      if (connected) {
-        setError((prev) => (/OneDrive/i.test(prev) ? '' : prev));
-        setErrorSecondary((prev) =>
-          /Microsoft|Azure|redirect URI|MICROSOFT_OAUTH|Graph API/i.test(prev) ? '' : prev
-        );
-      }
+      const status = await fetchRecordVaultTutaDriveStatus();
+      const flags = status?.tutadrive || {};
+      setTutaCloudConnected(true);
+      setTutaCloudEmail('');
+      setTutaCloudHasVault(Boolean(flags.hasVault));
+      setTutaCloudNeedsReformat(Boolean(flags.needsReformat));
+      setTutaCloudLegacyPinVault(Boolean(flags.legacyPinVault));
+      setError((prev) => (/TutaCloud/i.test(prev) ? '' : prev));
     } catch {
-      setOneDriveConnected(false);
+      setTutaCloudConnected(false);
     }
-  }, [oneDriveVisible]);
+  }, [tutaCloudVisible]);
 
   useEffect(() => {
-    if (!open || !oneDriveVisible) return undefined;
-    void refreshOneDriveStatus();
+    if (!open || !tutaCloudVisible) return undefined;
+    void refreshTutaCloudStatus();
     const timerId = window.setInterval(() => {
-      void refreshOneDriveStatus();
+      void refreshTutaCloudStatus();
     }, 8000);
     return () => window.clearInterval(timerId);
-  }, [open, oneDriveVisible, refreshOneDriveStatus]);
+  }, [open, tutaCloudVisible, refreshTutaCloudStatus]);
 
   const refreshUnlockGuard = useCallback(async (mountPath) => {
     const pathValue = String(mountPath ?? '').trim();
@@ -390,14 +385,14 @@ export default function RecordVaultUsbGate({
       setError('');
       setUnlockGuard(null);
       setPreferredMountPath('');
-      setStorageBackend(usbOnly ? 'usb' : 'onedrive');
-      setOneDriveVisible(false);
+      setStorageBackend(usbOnly ? 'usb' : 'tutadrive');
+      setTutaCloudVisible(false);
       setLocalUsbVisible(usbOnly);
-      setOneDriveEmail('');
-      setOneDriveConnected(false);
-      setOneDriveHasVault(false);
-      setOneDriveNeedsReformat(false);
-      setOneDriveLegacyPinVault(false);
+      setTutaCloudEmail('');
+      setTutaCloudConnected(false);
+      setTutaCloudHasVault(false);
+      setTutaCloudNeedsReformat(false);
+      setTutaCloudLegacyPinVault(false);
       return undefined;
     }
     setPreferredMountPath(readRecordVaultLastUsbLocation()?.mountPath || '');
@@ -587,30 +582,30 @@ export default function RecordVaultUsbGate({
 
   const unlockOrInitUsbVault = async ({ backend, location, setup } = {}) => {
     const activeBackend = backend || storageBackend;
-    if (activeBackend === 'onedrive') {
-      if (!oneDriveConnected) {
-        setError('Connect OneDrive first');
+    if (activeBackend === 'tutadrive') {
+      if (!tutaCloudEnabled) {
+        setError('TutaCloud is not available');
         return;
       }
       setBusy(true);
       setError('');
       try {
-        if (!oneDriveHasVault) {
-          await initRecordVaultOneDrive();
-          setOneDriveHasVault(true);
+        if (!tutaCloudHasVault) {
+          await initRecordVaultTutaDrive();
+          setTutaCloudHasVault(true);
           onUnlocked?.();
           return;
         }
-        await unlockRecordVaultOneDrive();
+        await unlockRecordVaultTutaDrive();
         setUnlockGuard(null);
         onUnlocked?.();
       } catch (err) {
         const data = err?.response?.data || {};
         if (data.vaultWiped) {
-          setOneDriveHasVault(false);
-          setOneDriveNeedsReformat(false);
+          setTutaCloudHasVault(false);
+          setTutaCloudNeedsReformat(false);
           setUnlockGuard(null);
-          setError(data.error || 'This OneDrive vault has been security-wiped clean.');
+          setError(data.error || 'This TutaCloud vault has been security-wiped clean.');
           return;
         }
         if (data.lockedUntil || data.remainingSeconds) {
@@ -621,7 +616,7 @@ export default function RecordVaultUsbGate({
             failedAttempts: data.failedAttempts ?? null
           });
         }
-        setError(data.error || err?.message || 'Unable to open OneDrive vault');
+        setError(data.error || err?.message || 'Unable to open TutaCloud vault');
       } finally {
         setBusy(false);
       }
@@ -791,11 +786,11 @@ export default function RecordVaultUsbGate({
   };
 
   const legacyPinVault =
-    storageBackend === 'onedrive'
-      ? oneDriveLegacyPinVault
+    storageBackend === 'tutadrive'
+      ? tutaCloudLegacyPinVault
       : Boolean(selectedPrimary?.legacyPinVault);
   const usbSelected =
-    Boolean(selectedPrimary?.mountPath) && !busy && !oneDriveBusy;
+    Boolean(selectedPrimary?.mountPath) && !busy && !tutaCloudBusy;
   /** Valid TutaNotes vault only — Open/View/Backup. Missing/broken → Format only. */
   const usbVaultBroken =
     Boolean(selectedPrimary?.legacyPinVault) || Boolean(selectedPrimary?.partial);
@@ -803,7 +798,7 @@ export default function RecordVaultUsbGate({
   const canFormatUsb = usbSelected;
   const canOpenUsb = usbVaultReady;
   const canViewOrBackupUsb = usbVaultReady;
-  const combinedStorageChoice = Boolean(!usbOnly && oneDriveVisible && localUsbVisible);
+  const combinedStorageChoice = Boolean(!usbOnly && tutaCloudVisible && localUsbVisible);
 
   const usbPostLoginActions = (
     <Box sx={tutaNotesPostLoginButtonRowSx}>
@@ -1143,10 +1138,10 @@ export default function RecordVaultUsbGate({
             {combinedStorageChoice ? (
               <>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <RecordVaultOneDriveGate
+                  <RecordVaultTutaDriveGate
                     embedded
                     open={open}
-                    onUnlocked={() => onUnlocked?.('onedrive')}
+                    onUnlocked={() => onUnlocked?.('tutadrive')}
                   />
                 </Box>
                 {usbStorageColumn}
@@ -1154,12 +1149,12 @@ export default function RecordVaultUsbGate({
             ) : (
               <>
                 {usbStorageColumn}
-                {oneDriveVisible && !localUsbVisible ? (
+                {tutaCloudVisible && !localUsbVisible ? (
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <RecordVaultOneDriveGate
+                    <RecordVaultTutaDriveGate
                       embedded
                       open={open}
-                      onUnlocked={() => onUnlocked?.('onedrive')}
+                      onUnlocked={() => onUnlocked?.('tutadrive')}
                     />
                   </Box>
                 ) : null}
@@ -1200,10 +1195,10 @@ export default function RecordVaultUsbGate({
             {combinedStorageChoice ? (
               <>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <RecordVaultOneDriveGate
+                  <RecordVaultTutaDriveGate
                     embedded
                     open={open}
-                    onUnlocked={() => onUnlocked?.('onedrive')}
+                    onUnlocked={() => onUnlocked?.('tutadrive')}
                   />
                 </Box>
                 {usbStorageColumn}
@@ -1211,12 +1206,12 @@ export default function RecordVaultUsbGate({
             ) : (
               <>
                 {usbStorageColumn}
-                {oneDriveVisible && !localUsbVisible ? (
+                {tutaCloudVisible && !localUsbVisible ? (
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <RecordVaultOneDriveGate
+                    <RecordVaultTutaDriveGate
                       embedded
                       open={open}
-                      onUnlocked={() => onUnlocked?.('onedrive')}
+                      onUnlocked={() => onUnlocked?.('tutadrive')}
                     />
                   </Box>
                 ) : null}
@@ -1225,7 +1220,7 @@ export default function RecordVaultUsbGate({
           </Box>
 
           <Stack spacing={1.5} sx={{ mt: 1 }}>
-            {localUsbVisible || oneDriveVisible ? (
+            {localUsbVisible || tutaCloudVisible ? (
               <Stack
                 spacing={1.5}
                 sx={{
@@ -1264,7 +1259,7 @@ export default function RecordVaultUsbGate({
             {localUsbVisible && storageBackend === 'usb' && !selectedPrimary ? (
               <ColorTemplate7PopupLargeDark.SectionDescription sx={{ color: 'var(--theme-yellow-color)', fontWeight: 700 }}>
                 Drag or click a USB above for primary
-                {oneDriveVisible ? ', or use OneDrive on the left.' : '.'}
+                {tutaCloudVisible ? ', or use TutaCloud on the left.' : '.'}
               </ColorTemplate7PopupLargeDark.SectionDescription>
             ) : null}
 

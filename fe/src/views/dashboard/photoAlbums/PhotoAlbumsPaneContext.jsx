@@ -5,12 +5,13 @@ const PhotoAlbumsPaneContext = createContext(null);
 
 export function PhotoAlbumsPaneProvider({ storageType, children }) {
   const normalized = String(storageType || '').trim().toLowerCase();
-  const value = normalized === 'onedrive' ? 'onedrive' : 'usb';
+  const value =
+    normalized === 'tutadrive' || normalized === 'cloud' || normalized === 'onedrive' ? 'tutadrive' : 'usb';
   return <PhotoAlbumsPaneContext.Provider value={value}>{children}</PhotoAlbumsPaneContext.Provider>;
 }
 
 PhotoAlbumsPaneProvider.propTypes = {
-  storageType: PropTypes.oneOf(['onedrive', 'usb']).isRequired,
+  storageType: PropTypes.oneOf(['tutadrive', 'usb']).isRequired,
   children: PropTypes.node
 };
 

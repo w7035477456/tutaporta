@@ -153,7 +153,7 @@ export async function throttleVaultTransferIfExhausted(singlesId, startedAtMs, {
 /**
  * Accumulate upload/download bytes in Redis; flush to Postgres on logoff.
  * Pass `startedAtMs` to apply over-quota throttle — only after the user is
- * inside an unlocked OneDrive/USB workspace (lazy media, save, logoff sync).
+ * inside an unlocked cloud/USB workspace (lazy media, save, logoff sync).
  * Omit `startedAtMs` for Open / gate restore so entry is never slowed.
  */
 export async function trackVaultTransferBytes(singlesId, bytes, startedAtMs = null, opts = {}) {

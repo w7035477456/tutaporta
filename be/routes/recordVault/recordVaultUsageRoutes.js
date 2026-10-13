@@ -33,7 +33,7 @@ async function resolveLoginGateFileCounts(singlesId) {
   };
 }
 
-/** GET /api/recordVault/usage — transfer tally, vault folder size, OneDrive quota */
+/** GET /api/recordVault/usage — transfer tally and vault folder size */
 export async function getRecordVaultUsage(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;

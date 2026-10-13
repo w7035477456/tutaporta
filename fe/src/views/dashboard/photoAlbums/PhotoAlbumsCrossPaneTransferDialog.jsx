@@ -24,7 +24,7 @@ const actionButtonSx = {
 };
 
 function storageLabel(storageType) {
-  return storageType === 'onedrive' ? 'TutaPhotoAlbums Cloud' : 'TutaPhotoAlbums USB';
+  return storageType === 'tutadrive' ? 'TutaPhotoAlbums Cloud' : 'TutaPhotoAlbums USB';
 }
 
 export default function PhotoAlbumsCrossPaneTransferDialog({
@@ -117,11 +117,11 @@ PhotoAlbumsCrossPaneTransferDialog.propTypes = {
   item: PropTypes.shape({
     kind: PropTypes.oneOf(['notebook', 'note']),
     id: PropTypes.number,
-    storageType: PropTypes.oneOf(['onedrive', 'usb']),
+    storageType: PropTypes.oneOf(['tutadrive', 'usb']),
     name: PropTypes.string,
     notebookId: PropTypes.number
   }),
-  targetStorageType: PropTypes.oneOf(['onedrive', 'usb']),
+  targetStorageType: PropTypes.oneOf(['tutadrive', 'usb']),
   targetNotebookName: PropTypes.string,
   busy: PropTypes.bool,
   duplicateError: PropTypes.string,

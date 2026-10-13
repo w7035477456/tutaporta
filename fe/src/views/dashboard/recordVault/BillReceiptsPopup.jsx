@@ -669,5 +669,5 @@ BillReceiptsPopup.propTypes = {
   onClose: PropTypes.func,
   onChanged: PropTypes.func,
   ensurePayload: PropTypes.object,
-  storageType: PropTypes.oneOf(['onedrive', 'usb'])
+  storageType: PropTypes.oneOf(['tutadrive', 'usb'])
 };

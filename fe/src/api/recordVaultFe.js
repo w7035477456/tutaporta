@@ -15,6 +15,12 @@ import {
   setRecordVaultBridgeStorageType,
   shouldRouteRecordVaultThroughBridge
 } from './recordVaultBridgeFe';
+import {
+  isVaultCloudPaneStorageType,
+  normalizeVaultPaneStorageType,
+  VAULT_CLOUD_STORAGE_TYPE,
+  vaultCloudBackendStorageSlot
+} from 'utils/vaultPaneStorageType';
 
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
 export function readRecordVaultApiError(err, fallback = 'Request failed') {
@@ -44,12 +50,12 @@ export function readRecordVaultApiError(err, fallback = 'Request failed') {
   return fallback;
 }
 
-/** Main API only — used before bridge routing knows USB vs OneDrive. */
+/** Main API only — used before bridge routing knows USB vs TutaCloud. */
 export async function fetchRecordVaultSessionStorageType() {
   try {
-    const { data } = await api.get('/api/recordVault/onedrive/status');
-    if (data?.session?.unlocked && String(data.session.storageType || '').toLowerCase() === 'onedrive') {
-      return 'onedrive';
+    const status = await fetchRecordVaultTutaDriveStatus();
+    if (status?.session?.unlocked) {
+      return normalizeVaultPaneStorageType(status.session.storageType);
     }
   } catch {
     // ignore
@@ -57,8 +63,7 @@ export async function fetchRecordVaultSessionStorageType() {
   try {
     const { data } = await api.get('/api/recordVault/usb/status');
     if (data?.session?.unlocked) {
-      const storageType = String(data.session.storageType || 'usb').toLowerCase();
-      return storageType === 'onedrive' ? 'onedrive' : 'usb';
+      return normalizeVaultPaneStorageType(data.session.storageType || 'usb');
     }
   } catch {
     // ignore
@@ -128,11 +133,11 @@ export async function snapshotRecordVaultSessionFileCounts() {
 }
 
 /** Per-tab: tree open already counted for this storage type after unlock. */
-const sessionTreeCounted = { usb: false, onedrive: false };
+const sessionTreeCounted = { usb: false, tutadrive: false };
 
 export function resetRecordVaultSessionTreeCountFlags() {
   sessionTreeCounted.usb = false;
-  sessionTreeCounted.onedrive = false;
+  sessionTreeCounted.tutadrive = false;
 }
 
 function countTreeNotebooksAndNotes(tree) {
@@ -150,13 +155,13 @@ function sessionCountPathOnly(url) {
 
 /**
  * Bridge has no Postgres — FE reports USB open + browser hops to the website API.
- * Website BE already counts OneDrive/in-process USB; skip when not via bridge.
+ * Website BE already counts TutaCloud/in-process USB; skip when not via bridge.
  */
 function maybeReportBridgeSessionFileCounts(config, responseData, viaBridge) {
   if (!viaBridge) return;
   const url = sessionCountPathOnly(config?.url);
   const method = String(config?.method || 'GET').toUpperCase();
-  const storageType = config?.storageType === 'onedrive' ? 'onedrive' : 'usb';
+  const storageType = isVaultCloudPaneStorageType(config?.storageType) ? VAULT_CLOUD_STORAGE_TYPE : 'usb';
 
   if (method === 'POST' && /\/api\/recordVault\/usb\/(unlock|init)/.test(url)) {
     sessionTreeCounted.usb = false;
@@ -642,17 +647,31 @@ export async function fetchRecordVaultStorageConfig() {
   const mapChoice = (choice) => ({
     visible: choice?.visible === true,
     oauthConfigured: Boolean(choice?.oauthConfigured),
-    enabled: Boolean(choice?.enabled)
+    enabled: Boolean(choice?.enabled),
+    tutaDrive: Boolean(choice?.tutaDrive)
   });
+  const tutaCloudSource = data?.tutaCloud ?? data?.oneDrive;
+  const tutaCloud = mapChoice(tutaCloudSource);
   return {
     leftSide: data?.leftSide != null ? String(data.leftSide) : '',
-    tutaDrive: Boolean(data?.tutaDrive),
-    oneDrive: mapChoice(data?.oneDrive),
+    tutaDrive: Boolean(data?.tutaDrive ?? tutaCloudSource?.tutaDrive),
+    tutaCloud,
+    /** @deprecated use tutaCloud */
+    oneDrive: tutaCloud,
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
     iconEncryptionRequired: data?.iconEncryptionRequired !== false,
     iconRetryDelaySeconds: Number(data?.iconRetryDelaySeconds) || 300,
-    cacheOneDriveIcon: data?.cacheOneDriveIcon ? String(data.cacheOneDriveIcon).trim() : '',
+    cacheTutaCloudIcon: data?.cacheTutaCloudIcon
+      ? String(data.cacheTutaCloudIcon).trim()
+      : data?.cacheOneDriveIcon
+        ? String(data.cacheOneDriveIcon).trim()
+        : '',
+    cacheOneDriveIcon: data?.cacheTutaCloudIcon
+      ? String(data.cacheTutaCloudIcon).trim()
+      : data?.cacheOneDriveIcon
+        ? String(data.cacheOneDriveIcon).trim()
+        : '',
     cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
     videoTutorialTutanotes: data?.videoTutorialTutanotes ? String(data.videoTutorialTutanotes).trim() : '',
     usbBridgeInstallers: {
@@ -707,18 +726,8 @@ export async function downloadUsbBridgeInstaller(platform = 'mac') {
   }
 }
 
-export async function fetchRecordVaultOneDriveConfig() {
-  const { data } = await api.get('/api/recordVault/onedrive/config');
-  return {
-    visible: data?.visible === true,
-    enabled: Boolean(data?.enabled),
-    oauthConfigured: Boolean(data?.oauthConfigured),
-    folderName: data?.folderName ? String(data.folderName) : 'onlinemallwebsitevault'
-  };
-}
-
-export async function fetchRecordVaultOneDriveVaultTree() {
-  const { data } = await api.get('/api/recordVault/onedrive/vault-tree');
+export async function fetchRecordVaultTutaDriveVaultTree() {
+  const { data } = await api.get('/api/recordVault/tutadrive/vault-tree');
   return {
     folderName: data?.folderName ? String(data.folderName) : '',
     tree: data?.tree && typeof data.tree === 'object' ? data.tree : null
@@ -739,101 +748,28 @@ export async function fetchRecordVaultUsbVaultTree() {
   };
 }
 
-export async function fetchRecordVaultOneDriveStatus() {
-  const { data } = await api.get('/api/recordVault/onedrive/status');
-  return {
-    enabled: Boolean(data?.enabled),
-    cacheIcon: data?.cacheOneDriveIcon
-      ? String(data.cacheOneDriveIcon).trim()
-      : data?.cacheIcon
-        ? String(data.cacheIcon).trim()
-        : '',
-    cacheOneDriveIcon: data?.cacheOneDriveIcon
-      ? String(data.cacheOneDriveIcon).trim()
-      : data?.cacheIcon
-        ? String(data.cacheIcon).trim()
-        : '',
-    onedrive: {
-      connected: Boolean(data?.onedrive?.connected),
-      email: data?.onedrive?.email ? String(data.onedrive.email) : null,
-      hasVault: Boolean(data?.onedrive?.hasVault),
-      legacyPinVault: Boolean(data?.onedrive?.legacyPinVault),
-      needsReformat: Boolean(data?.onedrive?.needsReformat),
-      vaultFilesystemInvalid: Boolean(data?.onedrive?.vaultFilesystemInvalid),
-      folderId: data?.onedrive?.folderId ? String(data.onedrive.folderId) : null
-    },
-    session: data?.session || { unlocked: false }
-  };
-}
-
-export async function fetchRecordVaultOneDriveEmails() {
-  const { data } = await api.get('/api/recordVault/onedrive/emails');
-  return Array.isArray(data?.emails) ? data.emails.map((email) => String(email).trim()).filter(Boolean) : [];
-}
-
-export async function rememberRecordVaultOneDriveEmail(email) {
-  const { data } = await api.post('/api/recordVault/onedrive/emails', { email: String(email || '').trim() });
-  return {
-    success: Boolean(data?.success),
-    emails: Array.isArray(data?.emails) ? data.emails : [],
-    added: Boolean(data?.added)
-  };
-}
-
-export async function disconnectRecordVaultOneDrive() {
-  const { data } = await api.post('/api/recordVault/onedrive/disconnect');
-  return data;
-}
-
-export async function fetchRecordVaultOneDriveUnlockGuard() {
-  const { data } = await api.get('/api/recordVault/onedrive/unlock-guard');
-  return data;
-}
-
-/** Poll Redis-backed open percent while Cloud unlock POST runs. */
-export async function fetchRecordVaultOneDriveOpenProgress() {
-  const { data } = await api.get('/api/recordVault/onedrive/open-progress');
-  return {
-    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
-    label: data?.label ? String(data.label) : ''
-  };
-}
-
-/**
- * Unlock OneDrive vault. Pass onProgress for honest 0–100% via short polling
- * (same cluster-safe pattern as logoff).
- */
-export async function unlockRecordVaultOneDrive({ onProgress } = {}) {
-  if (typeof onProgress !== 'function') {
-    const { data } = await api.post('/api/recordVault/onedrive/unlock');
-    return data;
+function normalizeRecordVaultTutaDriveStatusPayload(data) {
+  const session = data?.session && typeof data.session === 'object' ? { ...data.session } : { unlocked: false };
+  if (session.unlocked) {
+    session.storageType = normalizeVaultPaneStorageType(session.storageType || vaultCloudBackendStorageSlot());
   }
-  onProgress({ percent: 0, label: 'Opening TutaNotes Cloud' });
-  let stopped = false;
-  const poll = window.setInterval(() => {
-    if (stopped) return;
-    void fetchRecordVaultOneDriveOpenProgress()
-      .then((progress) => {
-        if (stopped) return;
-        onProgress(progress);
-      })
-      .catch(() => {
-        // Ignore poll blips; unlock POST is the source of truth.
-      });
-  }, 250);
-  try {
-    const { data } = await api.post('/api/recordVault/onedrive/unlock');
-    onProgress({ percent: 100, label: 'Done' });
-    return data;
-  } finally {
-    stopped = true;
-    window.clearInterval(poll);
-  }
+  const cacheIcon = data?.cacheTutaCloudIcon
+    ? String(data.cacheTutaCloudIcon).trim()
+    : data?.cacheIcon
+      ? String(data.cacheIcon).trim()
+      : '';
+  return {
+    ...data,
+    enabled: Boolean(data?.tutadrive?.enabled),
+    cacheIcon,
+    cacheTutaCloudIcon: cacheIcon,
+    session
+  };
 }
 
 export async function fetchRecordVaultTutaDriveStatus() {
   const { data } = await api.get('/api/recordVault/tutadrive/status');
-  return data;
+  return normalizeRecordVaultTutaDriveStatusPayload(data);
 }
 
 export async function unlockRecordVaultTutaDrive() {
@@ -856,69 +792,16 @@ export async function logoffRecordVaultTutaDrive() {
   return data;
 }
 
-export async function initRecordVaultOneDrive() {
-  const { data } = await api.post('/api/recordVault/onedrive/init');
-  return data;
-}
-
-export async function logoffRecordVaultOneDrive() {
-  const { data } = await api.post('/api/recordVault/onedrive/logoff');
-  return data;
-}
-
-/** Poll Redis-backed sync percent while Cloud sync POST runs (PIN lock / mid-session flush). */
-export async function fetchRecordVaultOneDriveSyncProgress() {
-  const { data } = await api.get('/api/recordVault/onedrive/sync-progress');
-  return {
-    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
-    label: data?.label ? String(data.label) : ''
-  };
-}
-
-/** Await OneDrive vault.db upload without logging off (after PIN encrypt). */
-export async function syncRecordVaultOneDrive({ onProgress } = {}) {
-  if (typeof onProgress !== 'function') {
-    const { data } = await api.post('/api/recordVault/onedrive/sync');
-    return data;
+/** Flush TutaCloud vault to disk without logoff (after PIN encrypt). */
+export async function syncRecordVaultTutaDrive({ onProgress } = {}) {
+  if (typeof onProgress === 'function') {
+    onProgress({ percent: 0, label: 'Saving to TutaCloud…' });
   }
-  onProgress({ percent: 0, label: 'Saving to Cloud…' });
-  let stopped = false;
-  const poll = window.setInterval(() => {
-    if (stopped) return;
-    void fetchRecordVaultOneDriveSyncProgress()
-      .then((progress) => {
-        if (stopped) return;
-        onProgress(progress);
-      })
-      .catch(() => {
-        // Ignore poll blips; sync POST is the source of truth.
-      });
-  }, 250);
-  try {
-    const { data } = await api.post('/api/recordVault/onedrive/sync');
+  const { data } = await api.post('/api/recordVault/tutadrive/sync');
+  if (typeof onProgress === 'function') {
     onProgress({ percent: 100, label: 'Done' });
-    return data;
-  } finally {
-    stopped = true;
-    window.clearInterval(poll);
   }
-}
-
-export async function formatRecordVaultOneDrive() {
-  const { data } = await api.post('/api/recordVault/onedrive/format');
   return data;
-}
-
-export async function testWriteRecordVaultOneDrive() {
-  rvCloudLog('OneDrive', 'FE test-write request start', { url: '/api/recordVault/onedrive/test-write' });
-  try {
-    const { data } = await api.post('/api/recordVault/onedrive/test-write');
-    rvCloudLog('OneDrive', 'FE test-write response ok', data);
-    return data;
-  } catch (err) {
-    rvCloudAxiosError('OneDrive', 'FE test-write request failed', err);
-    throw err;
-  }
 }
 
 function parseContentDispositionFilename(headerValue) {
@@ -956,7 +839,7 @@ function buildMyNoteBackupZipFileNameClient(kind = 'usb', date = new Date()) {
   } catch {
     // keep Local
   }
-  const prefix = kind === 'usb' ? 'MyNote_USB' : 'MyNote_OneDrive';
+  const prefix = kind === 'usb' ? 'MyNote_USB' : 'MyNote_TutaCloud';
   return `${prefix}_${y}-${mo}-${d}_${hh}-${mi}-${ss}_${tt}_${tz}.zip`;
 }
 
@@ -973,19 +856,28 @@ function triggerBrowserBlobDownload(blob, fileName) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Zip the entire OneDrive vault folder and save to the browser download folder. */
-export async function downloadRecordVaultOneDriveBackupZip() {
+/** Zip the TutaCloud vault folder and save to the browser download folder. */
+export async function downloadRecordVaultTutaDriveBackupZip() {
   try {
-    const response = await api.get('/api/recordVault/onedrive/backup-zip', { responseType: 'blob' });
+    const response = await api.get('/api/recordVault/tutadrive/backup-zip', { responseType: 'blob' });
     const fileName =
       parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyNoteBackupZipFileNameClient('onedrive');
+      buildMyNoteBackupZipFileNameClient('cloud');
     triggerBrowserBlobDownload(response.data, fileName);
     const sizeBytes = response.data?.size ?? 0;
     return { fileName, sizeBytes };
   } catch (err) {
     throw await normalizeRecordVaultBlobFetchError(err);
   }
+}
+
+/** Upload a plain MyNote backup zip and restore files to TutaCloud. */
+export async function restoreRecordVaultTutaDriveBackupZip(file) {
+  if (!file) throw new Error('Choose a backup zip file first');
+  const formData = new FormData();
+  formData.append('backup', file);
+  const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', formData);
+  return data;
 }
 
 /**
@@ -1379,15 +1271,6 @@ export async function downloadRecordVaultUsbBackupZip() {
   }
 }
 
-/** Upload a MyNote backup zip and restore files to OneDrive. */
-export async function restoreRecordVaultOneDriveBackupZip(file) {
-  if (!file) throw new Error('Choose a backup zip file first');
-  const formData = new FormData();
-  formData.append('backup', file);
-  const { data } = await api.post('/api/recordVault/onedrive/restore-zip', formData);
-  return data;
-}
-
 /** Upload a MyNote backup zip and restore files onto the unlocked USB vault. */
 export async function restoreRecordVaultUsbBackupZip(file) {
   if (!file) throw new Error('Choose a backup zip file first');
@@ -1406,8 +1289,8 @@ export async function restoreRecordVaultUsbBackupZip(file) {
 }
 
 /** Poll Redis-backed logoff percent while Cloud/USB logoff POST runs. */
-export async function fetchRecordVaultOneDriveLogoffProgress() {
-  const { data } = await api.get('/api/recordVault/onedrive/logoff-progress');
+export async function fetchRecordVaultStorageLogoffProgress() {
+  const { data } = await api.get('/api/recordVault/storage/logoff-progress');
   return {
     percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
     label: data?.label ? String(data.label) : ''
@@ -1418,17 +1301,17 @@ export async function fetchRecordVaultOneDriveLogoffProgress() {
  * Cloud or USB logoff with honest 0–100% via short polling (cluster-safe; no streaming).
  */
 async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
-  const isOneDrive = storageType === 'onedrive';
+  const isCloud = isVaultCloudPaneStorageType(storageType);
   if (typeof onProgress === 'function') {
     onProgress({
       percent: 1,
-      label: isOneDrive ? 'Saving notes to OneDrive…' : 'Logging off USB…'
+      label: isCloud ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
     });
   }
   let stopped = false;
   const poll = window.setInterval(() => {
     if (stopped) return;
-    void fetchRecordVaultOneDriveLogoffProgress()
+    void fetchRecordVaultStorageLogoffProgress()
       .then((progress) => {
         if (stopped || typeof onProgress !== 'function') return;
         onProgress(progress);
@@ -1438,8 +1321,8 @@ async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
       });
   }, 250);
   try {
-    const { data } = isOneDrive
-      ? await api.post('/api/recordVault/onedrive/logoff')
+    const { data } = isCloud
+      ? await api.post('/api/recordVault/tutadrive/logoff')
       : await rvRequest({ method: 'POST', url: '/api/recordVault/usb/logoff', storageType: 'usb' });
     if (typeof onProgress === 'function') {
       onProgress({ percent: 100, label: 'Done' });
@@ -1453,13 +1336,14 @@ async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
 
 export async function logoffRecordVaultStorage({ storageType, onProgress } = {}) {
   let data;
-  if (storageType === 'onedrive') {
+  const normalized = normalizeVaultPaneStorageType(storageType);
+  if (normalized === VAULT_CLOUD_STORAGE_TYPE) {
     if (typeof onProgress === 'function') {
-      data = await logoffRecordVaultStorageWithProgress('onedrive', onProgress);
+      data = await logoffRecordVaultStorageWithProgress(VAULT_CLOUD_STORAGE_TYPE, onProgress);
     } else {
-      ({ data } = await api.post('/api/recordVault/onedrive/logoff'));
+      ({ data } = await api.post('/api/recordVault/tutadrive/logoff'));
     }
-  } else if (storageType === 'usb') {
+  } else if (normalized === 'usb') {
     if (typeof onProgress === 'function') {
       data = await logoffRecordVaultStorageWithProgress('usb', onProgress);
     } else {
@@ -1526,18 +1410,18 @@ export async function flushRecordVaultSessionsOnLeave({ onProgress } = {}) {
 
     try {
       await logoffRecordVaultStorage({
-        storageType: 'onedrive',
+        storageType: VAULT_CLOUD_STORAGE_TYPE,
         onProgress: ({ percent, label } = {}) => {
           const p = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
           report({
             title: 'Saving to Cloud',
             percent: 35 + Math.round(p * 0.65),
-            label: label || 'Saving notes to OneDrive…'
+            label: label || 'Saving notes to TutaCloud…'
           });
         }
       });
     } catch (err) {
-      console.error('[flushRecordVaultSessionsOnLeave] onedrive', err?.message || err);
+      console.error('[flushRecordVaultSessionsOnLeave] tutadrive', err?.message || err);
       report({
         title: 'Saving to Cloud',
         percent: 99,
@@ -1560,28 +1444,28 @@ export async function flushRecordVaultSessionsOnLeave({ onProgress } = {}) {
   }
 }
 
-/** Flush vault to OneDrive without logoff; USB is already on-disk (no-op). */
+/** Flush vault to TutaCloud without logoff; USB is already on-disk (no-op). */
 export async function syncRecordVaultStorage({ storageType, onProgress } = {}) {
-  if (storageType === 'onedrive') {
-    return syncRecordVaultOneDrive({ onProgress });
+  if (isVaultCloudPaneStorageType(storageType ?? VAULT_CLOUD_STORAGE_TYPE)) {
+    return syncRecordVaultTutaDrive({ onProgress });
   }
   return { success: true, synced: false };
 }
 
 export async function fetchRecordVaultActiveStorageDisplay() {
+  try {
+    const status = await fetchRecordVaultTutaDriveStatus();
+    if (status?.session?.unlocked) {
+      const folder = String(status?.tutadrive?.memberFolder || '').trim();
+      return folder ? `Storage: TutaCloud (${folder})` : 'Storage: TutaCloud';
+    }
+  } catch {
+    // ignore
+  }
   const { data } = await api.get('/api/recordVault/usb/status');
   const session = data?.session || {};
   if (!session.unlocked) return '';
-
-  const storageType = String(session.storageType || '').trim();
   const label = String(session.label || '').trim();
-
-  if (storageType === 'onedrive') {
-    const status = await fetchRecordVaultOneDriveStatus();
-    const email = String(status.onedrive?.email || '').trim();
-    return email ? `Storage: OneDrive for ${email}` : 'Storage: OneDrive';
-  }
-
   return label ? `Storage: ${label}` : 'Storage: USB';
 }
 
@@ -1719,7 +1603,8 @@ function mapVaultAccessFailStatus(data) {
     vaultFormatted: Boolean(data?.vaultFormatted),
     needsClientFormat: Boolean(data?.needsClientFormat),
     tutaNotesLocked: Boolean(data?.tutaNotesLocked),
-    storageType: data?.storageType === 'usb' ? 'usb' : 'onedrive',
+    storageType:
+      data?.storageType === 'usb' ? 'usb' : normalizeVaultPaneStorageType(data?.storageType),
     mountPath: data?.mountPath ? String(data.mountPath) : null,
     error: data?.error ? String(data.error) : '',
     cooldownLabel: data?.cooldownLabel ? String(data.cooldownLabel) : ''
@@ -1727,9 +1612,12 @@ function mapVaultAccessFailStatus(data) {
 }
 
 /** Vault-password fail cooldown / 5-fail format status for the pending open side. */
-export async function fetchRecordVaultAccessFailStatus(storageType = 'onedrive') {
+export async function fetchRecordVaultAccessFailStatus(storageType = VAULT_CLOUD_STORAGE_TYPE) {
   const { data } = await api.get('/api/recordVault/access/fail-status', {
-    params: { storageType: storageType === 'usb' ? 'usb' : 'onedrive' }
+    params: {
+      storageType:
+        normalizeVaultPaneStorageType(storageType) === 'usb' ? 'usb' : vaultCloudBackendStorageSlot()
+    }
   });
   return mapVaultAccessFailStatus(data);
 }
@@ -1738,10 +1626,11 @@ export async function fetchRecordVaultAccessFailStatus(storageType = 'onedrive')
  * Record a client-side vault-password verify failure (password never sent).
  * On 5th fail: TutaNotes is locked (singles.lock_tuta_notes) until admin clears.
  */
-export async function recordRecordVaultAccessFail({ storageType = 'onedrive', mountPath } = {}) {
+export async function recordRecordVaultAccessFail({ storageType = VAULT_CLOUD_STORAGE_TYPE, mountPath } = {}) {
   try {
     const { data } = await api.post('/api/recordVault/access/fail', {
-      storageType: storageType === 'usb' ? 'usb' : 'onedrive',
+      storageType:
+        normalizeVaultPaneStorageType(storageType) === 'usb' ? 'usb' : vaultCloudBackendStorageSlot(),
       mountPath: mountPath || undefined
     });
     return mapVaultAccessFailStatus(data);
@@ -1754,9 +1643,10 @@ export async function recordRecordVaultAccessFail({ storageType = 'onedrive', mo
   }
 }
 
-export async function clearRecordVaultAccessFail(storageType = 'onedrive') {
+export async function clearRecordVaultAccessFail(storageType = VAULT_CLOUD_STORAGE_TYPE) {
   const { data } = await api.post('/api/recordVault/access/fail/clear', {
-    storageType: storageType === 'usb' ? 'usb' : 'onedrive'
+    storageType:
+      normalizeVaultPaneStorageType(storageType) === 'usb' ? 'usb' : vaultCloudBackendStorageSlot()
   });
   return data;
 }
@@ -1796,7 +1686,7 @@ export async function fetchRecordVaultRagStatus({ storageType } = {}) {
   const { data } = await rvRequest({
     method: 'GET',
     url: '/api/recordVault/rag/status',
-    storageType: storageType === 'onedrive' ? 'onedrive' : 'usb'
+    storageType: isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb'
   });
   return data;
 }
@@ -1808,7 +1698,7 @@ export async function queryRecordVaultRag({ noteIds, prompt, storageType, keepMo
     method: 'POST',
     url: '/api/recordVault/rag/query',
     data: { noteIds: ids, prompt: question, keepModelInMemory: Boolean(keepModelInMemory) },
-    storageType: storageType === 'onedrive' ? 'onedrive' : 'usb'
+    storageType: isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb'
   });
   return data;
 }
@@ -1818,13 +1708,13 @@ export async function setRecordVaultRagKeepModel({ enabled, storageType } = {}) 
     method: 'POST',
     url: '/api/recordVault/rag/keep-model',
     data: { enabled: Boolean(enabled) },
-    storageType: storageType === 'onedrive' ? 'onedrive' : 'usb'
+    storageType: isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb'
   });
   return data;
 }
 
 export function createRecordVaultPaneApi(storageType) {
-  const type = storageType === 'onedrive' ? 'onedrive' : 'usb';
+  const type = isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
   const opts = { storageType: type };
   const rv = (config) => rvRequest({ ...config, storageType: type });
   return {

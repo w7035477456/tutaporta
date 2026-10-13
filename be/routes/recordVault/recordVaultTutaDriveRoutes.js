@@ -1,5 +1,5 @@
 /**
- * TutaDrive Cloud — left-panel replacement for OneDrive when LEFT_SIDE=TutaDrive.
+ * TutaDrive Cloud — left-panel workspace when LEFT_SIDE=TutaDrive.
  * Vault under ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{member_id}/notes (encrypted at rest).
  * Photos under …/photos (symlinked from vault photos when possible).
  * Reuses the 'onedrive' session slot (workspace pane); no Microsoft sync.
@@ -40,7 +40,7 @@ import {
   TUTADRIVE_BACKUP_MAX,
   TUTADRIVE_BACKUP_NAME_RE
 } from '../../utils/recordVaultTutaDriveBackup.js';
-import { parseOneDriveBackupZipUpload } from '../../utils/recordVaultOneDrive/parseOneDriveBackupZipUpload.js';
+import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
 import {
@@ -98,13 +98,13 @@ async function resolveMemberContext(singlesId) {
   if (!memberId) {
     throw new Error('Your member number is not set; cannot open TutaDrive storage.');
   }
-  // Creates users/M{id}/notes/TutaNotes + photos for this user; migrates OneDrive staging once.
+  // Creates users/M{id}/notes/TutaNotes + photos for this user.
   const layout = ensureTutaDriveMemberLayout(memberId, { singlesId });
   return { memberId, ...layout };
 }
 
 /**
- * Drop a leftover OneDrive-staging session so writes go to TutaDrive M{id} path.
+ * Drop a leftover cloud-session slot so writes go to TutaDrive M{id} path.
  * Same 'onedrive' session slot is reused for TutaDrive.
  */
 async function dropStaleCloudSessionIfWrongMount(singlesId, notesMount) {
@@ -354,7 +354,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
     if (!memberId) {
       return res.status(400).json({ error: 'Your member number is not set; cannot store backup.' });
     }
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const encrypted = fs.readFileSync(upload.zipPath);
     const stored = storeTutaDriveEncryptedBackup(memberId, encrypted, {
       note: upload.note,
@@ -405,7 +405,7 @@ export async function replaceRecordVaultTutaDriveBackup(req, res) {
     if (!memberId) {
       return res.status(400).json({ error: 'Your member number is not set; cannot store backup.' });
     }
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const encrypted = fs.readFileSync(upload.zipPath);
     const stored = replaceTutaDriveEncryptedBackup(
       memberId,
@@ -524,7 +524,7 @@ export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
     if (!isLeftSideTutaDrive()) {
       return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
     }
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const result = await restoreTutaDriveVaultFromZipFile(singlesId, upload.zipPath);
     return res.json({ success: true, ...result });
   } catch (err) {
@@ -622,7 +622,7 @@ export async function listRecordVaultTutaDriveBackupTree(req, res) {
     if (!memberId) {
       return res.status(400).json({ error: 'Your member number is not set; cannot open backup.' });
     }
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const staging = await extractTutaDriveMergeZip(memberId, singlesId, upload.zipPath);
     stagingRoot = staging.stagingRoot;
     let key = getVaultSession(singlesId, 'onedrive')?.key ?? null;
@@ -674,7 +674,7 @@ export async function previewRecordVaultTutaDriveMerge(req, res) {
     if (!memberId) {
       return res.status(400).json({ error: 'Your member number is not set; cannot merge backup.' });
     }
-    upload = await parseOneDriveBackupZipUpload(req);
+    upload = await parseVaultBackupZipUpload(req);
     const staging = await extractTutaDriveMergeZip(memberId, singlesId, upload.zipPath);
     const preview = await previewTutaDriveMerge(session, staging);
     return res.json({ success: true, mergeId: staging.mergeId, ...preview });

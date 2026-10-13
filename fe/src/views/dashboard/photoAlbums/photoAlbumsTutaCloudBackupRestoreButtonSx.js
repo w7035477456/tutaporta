@@ -1,8 +1,8 @@
 /**
- * Yellow Backup / Restore buttons on OneDrive MyPhotoAlbums dialogs.
+ * Yellow Backup / Restore buttons on TutaCloud MyPhotoAlbums dialogs.
  * Overrides GreenButton green default + hover.
  */
-export const photoAlbumsOneDriveBackupRestoreButtonSx = {
+export const photoAlbumsTutaCloudBackupRestoreButtonSx = {
   bgcolor: 'var(--theme-yellow-color) !important',
   color: '#000000 !important',
   WebkitTextFillColor: '#000000 !important',
