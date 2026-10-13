@@ -7,6 +7,10 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import GreenButton from 'ui-component/GreenButton';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import {
+  TUTACLOUD_VAULT_BACKUP_ZIP_DEFAULT,
+  TUTACLOUD_VAULT_FOLDER_DEFAULT
+} from 'constants/tutaCloudVaultFolder';
+import {
   createRecordVaultTutaDriveEncryptedBackup,
   deleteRecordVaultTutaDriveBackup,
   downloadRecordVaultTutaDriveBackupZip,
@@ -451,7 +455,7 @@ function findOldestBackupSlot(slots) {
 export default function RecordVaultTutaCloudBackupDialog({
   open,
   onClose,
-  folderName = 'onlinemallwebsitevault',
+  folderName = TUTACLOUD_VAULT_FOLDER_DEFAULT,
   tutaDrive = false,
   onFormatted,
   onRestored
@@ -667,7 +671,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         setSuccessTone('backup');
       } else {
         const result = await downloadRecordVaultTutaDriveBackupZip();
-        const fileName = result?.fileName || 'onlinemallwebsitevault-backup.zip';
+        const fileName = result?.fileName || TUTACLOUD_VAULT_BACKUP_ZIP_DEFAULT;
         const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
         setSuccess(

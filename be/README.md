@@ -1,6 +1,6 @@
-# OnlineMallWebsite API Server
+# TutaMall.com API Server
 
-Backend API server for the OnlineMallWebsite application.
+Backend API server for the TutaMall.com application.
 
 ## Setup
 

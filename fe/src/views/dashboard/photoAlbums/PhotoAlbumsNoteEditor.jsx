@@ -95,7 +95,7 @@ import albumCoverImg from 'assets/images/albumcover.png';
 import albumCoverBackImg from 'assets/images/albumcoverback.png';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
-import zoomIconImg from 'assets/images/zoom.png';
+import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
 import { storePhotoAlbumsPresentation } from './photoAlbumsPresentationSession';
 import { useSlideShowMusicPlayback } from 'hooks/useSlideShowMusicPlayback';
 import SlideShowMusicControls from './SlideShowMusicControls';
@@ -2046,7 +2046,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const onAlbumFocusViewChangeRef = useRef(onAlbumFocusViewChange);
   onAlbumFocusViewChangeRef.current = onAlbumFocusViewChange;
 
-  const albumChromeHidden = albumFullscreen || albumFocusView;
+  const albumEditorChromeHidden = albumFullscreen || albumFocusView;
+  const albumZoomBarHidden = albumFullscreen;
 
   /** View-only while Full screen — no chrome / no edits. */
   const effectiveEditable = editable && !albumFullscreen;
@@ -6443,8 +6444,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         }}
         onConfirm={handlePlaceTextConfirm}
       />
-      {!albumChromeHidden ? header : null}
-      {!albumChromeHidden ? <PhotoAlbumsEditorToolbar editor={editor} /> : null}
+      {!albumEditorChromeHidden ? header : null}
+      {!albumEditorChromeHidden ? <PhotoAlbumsEditorToolbar editor={editor} /> : null}
 
       {editor && effectiveEditable ? (
         <BubbleMenu editor={editor} className="rv-bubble">
@@ -6478,7 +6479,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       {/* Template control sits above the binder (not on the page) so the 3×3 picker is never clipped.
           Keep this stacking context above the album zoom-scroll (incl. native scrollbars + page-edge bar).
           Fixed label size + horizontal scroll — no font auto-fit (avoids scrollbar/font jiggle). */}
-      {editable && !albumChromeHidden ? (
+      {editable && !albumEditorChromeHidden ? (
         <Box
           className="rv-editor__template-bar"
           sx={{
@@ -6781,7 +6782,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       ) : null}
 
-      {editable && !albumChromeHidden ? (
+      {editable && !albumEditorChromeHidden ? (
         <Box
           ref={thumbRowRef}
           className="rv-album-thumb-row"
@@ -6917,8 +6918,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       ) : null}
 
-      {!albumChromeHidden ? (
-        <PhotoAlbumsAlbumZoomBar value={albumZoom} onChange={handleAlbumZoomChange} />
+      {!albumZoomBarHidden ? (
+        <PhotoAlbumsAlbumZoomBar
+          value={albumZoom}
+          onChange={handleAlbumZoomChange}
+          focusViewActive={albumFocusView}
+          onFocusViewToggle={toggleAlbumFocusView}
+          showFocusToggle={!presentationMode}
+        />
       ) : null}
 
       <Box
@@ -6960,11 +6967,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 px: '8px',
                 bgcolor: 'var(--theme-daynight-color)'
               }
-            : // Outer album shell — theme daynight (letterbox around cover / pages).
-              { bgcolor: 'var(--theme-daynight-color)' })
+            : {
+                bgcolor: albumFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : 'var(--theme-daynight-color)'
+              })
         }}
       >
-        {!albumChromeHidden && !presentationMode ? (
+        {!albumEditorChromeHidden && !presentationMode ? (
           <Box
             component="span"
             data-pa-album-mode-badge=""
@@ -6997,45 +7005,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             {albumPageSideArrow('prev', 'embedded')}
             {albumPageSideArrow('next', 'embedded')}
           </>
-        ) : null}
-        {!presentationMode && !albumFullscreen ? (
-          <Box
-            component="button"
-            type="button"
-            onClick={toggleAlbumFocusView}
-            aria-label={
-              albumFocusView
-                ? 'Show menus, sidebars, and editing tools'
-                : 'Show album only — hide menus and sidebars'
-            }
-            title={
-              albumFocusView
-                ? 'Restore full workspace (Esc)'
-                : 'Show album only — hide sidebars and toolbars (Esc to restore)'
-            }
-            aria-pressed={albumFocusView}
-            sx={{
-              position: 'absolute',
-              bottom: 12,
-              right: 12,
-              zIndex: 50,
-              p: 0,
-              m: 0,
-              border: 'none',
-              bgcolor: 'transparent',
-              cursor: 'pointer',
-              lineHeight: 0,
-              '&:hover': { filter: 'brightness(1.08)' },
-              '&:active': { transform: 'scale(0.96)' }
-            }}
-          >
-            <Box
-              component="img"
-              src={zoomIconImg}
-              alt=""
-              sx={{ width: { xs: 36, sm: 44 }, height: { xs: 36, sm: 44 }, display: 'block' }}
-            />
-          </Box>
         ) : null}
         <Box
           className="rv-editor__album-zoom-scaler"
@@ -7455,7 +7424,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       </Box>
 
-      {!albumChromeHidden ? (
+      {!albumEditorChromeHidden ? (
         <Box className="rv-editor__footer">
           <span>{counts.words} words</span>
           <span>{counts.characters} characters</span>
@@ -7481,7 +7450,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
       />
       <PhotoAlbumsContextTutorial
-        active={Boolean(effectiveEditable && !presentationMode && !albumChromeHidden)}
+        active={Boolean(effectiveEditable && !presentationMode && !albumEditorChromeHidden)}
         photoEditActive={photoEditActive}
         panZoomActive={Boolean(photoPanZoomActive)}
         hasPageContext={Boolean(templates?.length)}

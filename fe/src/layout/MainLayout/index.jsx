@@ -55,6 +55,7 @@ import ColorTemplate15LandingPage from 'ui-component/ColorTemplate15LandingPage'
 import { isColorTemplate15LandingPageRoute } from 'config/colorTemplate15LandingPage';
 import { isColorTemplate14LandingFrameRoute } from 'config/colorTemplate14LandingFrame';
 import { isRecordVaultRoute, MY_NOTE_BANNER_IMAGE, myNoteHeaderBannerSx } from 'config/recordVaultLayout';
+import { useVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
 import {
   isPhotoAlbumsRoute,
   MY_PHOTO_ALBUMS_BANNER_IMAGE,
@@ -169,6 +170,7 @@ export default function MainLayout() {
   const isRecordVaultImmersiveRoute = isRecordVaultRoute(location.pathname);
   const isPhotoAlbumsImmersiveRoute = isPhotoAlbumsRoute(location.pathname);
   const isVaultImmersiveRoute = isRecordVaultImmersiveRoute || isPhotoAlbumsImmersiveRoute;
+  const vaultFocusFooterSuppressed = useVaultWorkspaceFocusSiteFooterSuppressed();
   const vaultHeaderBannerImage = isPhotoAlbumsImmersiveRoute
     ? MY_PHOTO_ALBUMS_BANNER_IMAGE
     : isRecordVaultImmersiveRoute
@@ -527,8 +529,8 @@ export default function MainLayout() {
                 immersiveMain={isVsinglesLandingRoute || isVaultImmersiveRoute}
                 showSidebar={!isVaultImmersiveRoute}
                 drawerOpen={drawerOpen}
-                footerAtScrollEnd={mobileFooterEndOfScroll}
-                showFixedFooter={!downLG && !mobileFooterEndOfScroll}
+                footerAtScrollEnd={mobileFooterEndOfScroll && !vaultFocusFooterSuppressed}
+                showFixedFooter={!downLG && !mobileFooterEndOfScroll && !vaultFocusFooterSuppressed}
                 landingPageWide={useLandingPagePanel}
                 landingFrameWide={useLandingFrame}
               >

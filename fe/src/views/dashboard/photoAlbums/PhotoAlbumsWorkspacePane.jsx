@@ -36,6 +36,7 @@ import {
   createPhotoAlbumsPaneApi,
   fetchPhotoAlbumsNoteAttachmentBlob
 } from 'api/photoAlbumsFe';
+import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 import { registerPhotoAlbumsLeavePrepare } from 'utils/photoAlbumsLeavePrepare';
 import { useAuth } from 'contexts/AuthContext';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
@@ -71,6 +72,8 @@ import PhotoAlbumsUsbBackupDialog from './PhotoAlbumsUsbBackupDialog';
 import PhotoAlbumsStorageFilesPanel from './PhotoAlbumsStorageFilesPanel';
 import PhotoAlbumsFilesExplorerPanel from './PhotoAlbumsFilesExplorerPanel';
 import PhotoAlbumsNoteEditor from './PhotoAlbumsNoteEditor';
+import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
+import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
 import {
   clearAttachmentVariantPreviewsForNote,
   setAttachmentVariantPreview
@@ -1809,12 +1812,16 @@ export default function PhotoAlbumsWorkspacePane({
   const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
-  const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState('onlinemallwebsitevault');
+  const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
   const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
   /** Zoom icon — hide sidebars/menus and show album only (not true fullscreen overlay). */
   const [albumFocusView, setAlbumFocusView] = useState(false);
   const hideWorkspaceChrome = albumFullscreen || albumFocusView;
+  useEffect(() => {
+    setVaultWorkspaceFocusSiteFooterSuppressed(hideWorkspaceChrome);
+    return () => setVaultWorkspaceFocusSiteFooterSuppressed(false);
+  }, [hideWorkspaceChrome]);
   const [usbVaultFolderLabel] = useState('USB');
   const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
@@ -7772,7 +7779,7 @@ export default function PhotoAlbumsWorkspacePane({
         display: 'flex',
         flexDirection: 'column',
         fontFamily: MAIN_FONT_FAMILY,
-        bgcolor: 'var(--theme-daynight-color)',
+        bgcolor: albumFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : 'var(--theme-daynight-color)',
         overflow: 'hidden'
       }}
     >

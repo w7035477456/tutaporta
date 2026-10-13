@@ -15,7 +15,7 @@ import {
 import { fetchUserCustomization } from 'api/userCustomizationFe';
 import MallAppEnrollmentDialog from 'ui-component/MallAppEnrollmentDialog';
 
-import onlinemall from 'assets/images/onlineMallInside.png';
+import tutaMallInside from 'assets/images/tutaMallInside.png';
 import eMarketPlaceImg from 'assets/images/onlineMarketPlace.png';
 import vProfessionalsImg from 'assets/images/onlineProfessionals.png';
 import eClassifiedsImg from 'assets/images/onlineClassifieds.png';
@@ -326,7 +326,7 @@ export default function Landing() {
         right: 0,
         bottom: 0,
         zIndex: 0,
-        backgroundImage: `url(${onlinemall})`,
+        backgroundImage: `url(${tutaMallInside})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',

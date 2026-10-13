@@ -85,7 +85,8 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
     onContentHeightChange,
     header = null,
     contentZoom = 100,
-    contentBgIndex = RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX
+    contentBgIndex = RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
+    editorChromeHidden = false
   },
   ref
 ) {
@@ -428,7 +429,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
 
   return (
     <Box className="rv-editor" sx={recordVaultThemeDaynightShellSx(contentBgIndex)}>
-      <RecordVaultEditorToolbar editor={editor} />
+      {!editorChromeHidden ? <RecordVaultEditorToolbar editor={editor} /> : null}
 
       {editor ? (
         <BubbleMenu editor={editor} className="rv-bubble">
@@ -465,10 +466,12 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         </Box>
       </Box>
 
-      <Box className="rv-editor__footer">
-        <span>{counts.words} words</span>
-        <span>{counts.characters} characters</span>
-      </Box>
+      {!editorChromeHidden ? (
+        <Box className="rv-editor__footer">
+          <span>{counts.words} words</span>
+          <span>{counts.characters} characters</span>
+        </Box>
+      ) : null}
     </Box>
   );
 });
@@ -481,7 +484,8 @@ RecordVaultNoteEditor.propTypes = {
   onContentHeightChange: PropTypes.func,
   header: PropTypes.node,
   contentZoom: PropTypes.number,
-  contentBgIndex: PropTypes.number
+  contentBgIndex: PropTypes.number,
+  editorChromeHidden: PropTypes.bool
 };
 
 export default RecordVaultNoteEditor;

@@ -47,6 +47,7 @@ import {
   peekMobileTutaNotesUploadSession
 } from 'utils/mobilePostLoginChoice';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 import RecordVaultSearchBar from './RecordVaultSearchBar';
 import {
   recordVaultMenuButtonFontRemFromTenths,
@@ -92,6 +93,9 @@ import {
 import RecordVaultNoteContentZoomBar, {
   NOTE_CONTENT_ZOOM_DEFAULT
 } from './RecordVaultNoteContentZoomBar';
+import VaultWorkspaceFocusToggleButton from 'ui-component/VaultWorkspaceFocusToggleButton';
+import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
+import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
 import RecordVaultFileMenu, {
   prepareImportedHtml,
   stripYamlFrontMatter,
@@ -1567,7 +1571,7 @@ export default function RecordVaultWorkspacePane({
   const [ragKeepModelBusy, setRagKeepModelBusy] = useState(false);
   const [ragKeepModelNotice, setRagKeepModelNotice] = useState('');
   const [ragConfiguredModel, setRagConfiguredModel] = useState('');
-  const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState('onlinemallwebsitevault');
+  const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
   const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const cloudViewLabel = isTutaCloudPane ? 'View TutaDrive' : 'View TutaCloud';
   const [usbVaultFolderLabel] = useState('USB');
@@ -1724,6 +1728,11 @@ export default function RecordVaultWorkspacePane({
   const noteMultiSelectAnchorIdRef = useRef(null);
   const [openNoteTitlePlain, setOpenNoteTitlePlain] = useState('');
   const [noteContentZoom, setNoteContentZoom] = useState(NOTE_CONTENT_ZOOM_DEFAULT);
+  /** Zoom icon — hide sidebars/menus and show note only (red letterbox shell). */
+  const [noteFocusView, setNoteFocusView] = useState(false);
+  const hideWorkspaceChrome = noteFocusView;
+  const workspaceShellBg = noteFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : TUTANOTES_WORKSPACE_PANEL_BG;
+  const workspaceContentBg = noteFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : TUTANOTES_WORKSPACE_CONTENT_BG;
   // While searching, the title shows blinking highlights (read-only) until the
   // user clicks it to edit; flips back to highlight view on blur / note swap.
   const [titleEditing, setTitleEditing] = useState(false);
@@ -1738,6 +1747,23 @@ export default function RecordVaultWorkspacePane({
   const [searchHitCount, setSearchHitCount] = useState(0);
   const [activeHitIndex, setActiveHitIndex] = useState(-1);
   const [noteContentLoading, setNoteContentLoading] = useState(false);
+
+  useEffect(() => {
+    setVaultWorkspaceFocusSiteFooterSuppressed(noteFocusView);
+    return () => setVaultWorkspaceFocusSiteFooterSuppressed(false);
+  }, [noteFocusView]);
+
+  useEffect(() => {
+    if (!noteFocusView) return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setNoteFocusView(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [noteFocusView]);
   const innerUnlockRef = useRef({});
   const [innerUnlockVersion, setInnerUnlockVersion] = useState(0);
   /** Inline PIN panel for unlock / re-encrypt / first-time enable. */
@@ -6475,7 +6501,7 @@ export default function RecordVaultWorkspacePane({
         display: 'flex',
         flexDirection: 'column',
         fontFamily: MAIN_FONT_FAMILY,
-        bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
+        bgcolor: workspaceShellBg,
         overflow: 'hidden'
       }}
     >
@@ -6954,6 +6980,7 @@ export default function RecordVaultWorkspacePane({
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
+          {!hideWorkspaceChrome ? (
           <RecordVaultUsageBar
             usage={vaultUsage}
             storageType={paneStorageType}
@@ -6961,6 +6988,8 @@ export default function RecordVaultWorkspacePane({
             onPurchased={() => refreshVaultUsageRef.current?.()}
             onGetMoreTokens={openPaymentTokenCheckout}
           />
+          ) : null}
+          {!hideWorkspaceChrome ? (
           <Box
             sx={{
               flexShrink: 0,
@@ -7347,8 +7376,9 @@ export default function RecordVaultWorkspacePane({
               <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'var(--theme-secondary-color)' }} aria-hidden />
             )}
           </Box>
+          ) : null}
 
-          {!compareMode ? (
+          {!hideWorkspaceChrome && !compareMode ? (
           <Box
             aria-label="Search results"
             sx={{
@@ -7508,7 +7538,7 @@ export default function RecordVaultWorkspacePane({
           </Box>
           ) : null}
 
-          {!compareMode ? (
+          {!hideWorkspaceChrome && !compareMode ? (
             <RecordVaultMobileUploadTray
             product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
               active={unlocked}
@@ -7556,7 +7586,7 @@ export default function RecordVaultWorkspacePane({
             </Box>
           ) : (
           <>
-          {leftMenuOpen ? (
+          {leftMenuOpen && !hideWorkspaceChrome ? (
             <>
               <Box
                 {...guestDemoAllowProps()}
@@ -7571,7 +7601,7 @@ export default function RecordVaultWorkspacePane({
                   minWidth: compareMode ? { md: 0 } : undefined,
                   display: 'flex',
                   flexDirection: 'column',
-                  bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
+                  bgcolor: workspaceShellBg,
                   minHeight: compact || compareMode ? 0 : { xs: 280, md: '100%' },
                   overflow: 'hidden',
                   boxSizing: 'border-box'
@@ -8048,7 +8078,7 @@ export default function RecordVaultWorkspacePane({
               flexDirection: 'column',
               position: 'relative',
               overflow: 'hidden',
-              bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
+              bgcolor: workspaceContentBg
             }}
           >
             {(() => {
@@ -8088,7 +8118,7 @@ export default function RecordVaultWorkspacePane({
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
+                bgcolor: workspaceContentBg
               };
               return (
                 <>
@@ -8098,6 +8128,7 @@ export default function RecordVaultWorkspacePane({
                       onReady={handleEditorReady}
                       onChange={scheduleSave}
                       contentZoom={noteContentZoom}
+                      editorChromeHidden={noteFocusView}
                       header={
                         selectedNote && !lockedNow ? (
                           <Box
@@ -8205,6 +8236,10 @@ export default function RecordVaultWorkspacePane({
                               value={noteContentZoom}
                               onChange={setNoteContentZoom}
                             />
+                            <VaultWorkspaceFocusToggleButton
+                              active={noteFocusView}
+                              onToggle={() => setNoteFocusView((v) => !v)}
+                            />
                           </Box>
                         ) : null
                       }
@@ -8295,7 +8330,7 @@ export default function RecordVaultWorkspacePane({
             onClose={closeInnerEncryptDialog}
           />
 
-          {rightMenuOpen ? (
+          {rightMenuOpen && !hideWorkspaceChrome ? (
             <>
               {!compareMode ? (
               <ColumnResizeHandle
@@ -8316,7 +8351,7 @@ export default function RecordVaultWorkspacePane({
                   minWidth: compareMode ? { md: 0 } : undefined,
                   display: 'flex',
                   flexDirection: 'column',
-                  bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG,
+                  bgcolor: workspaceContentBg,
                   minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
                   borderLeft: { md: '2px solid var(--theme-primary-color)' },
                   overflow: 'hidden',

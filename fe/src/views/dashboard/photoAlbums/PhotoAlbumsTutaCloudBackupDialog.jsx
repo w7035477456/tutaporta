@@ -14,6 +14,7 @@ import {
 import PhotoAlbumsTutaCloudVaultTreePanel from './PhotoAlbumsTutaCloudVaultTreePanel';
 import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
+import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 
 const BACKUP_POPUP_WIDTH = '90vw';
 const BACKUP_POPUP_HEIGHT = '90vh';
@@ -119,7 +120,7 @@ const generalSuccessMessageSx = {
 export default function PhotoAlbumsTutaCloudBackupDialog({
   open,
   onClose,
-  folderName = 'onlinemallwebsitevault',
+  folderName = TUTACLOUD_VAULT_FOLDER_DEFAULT,
   albumContext = null,
   onFormatted,
   onRestored,

@@ -2,7 +2,7 @@
 import { styled } from '@mui/material/styles';
 
 // project imports
-import onlineMallParkinglot from 'assets/images/onlineMallParkinglot.png';
+import tutaMallParkinglot from 'assets/images/tutaMallParkinglot.png';
 
 // ==============================|| AUTHENTICATION 1 WRAPPER ||============================== //
 
@@ -22,7 +22,7 @@ const AuthWrapper1 = styled('div')(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   backgroundColor: theme.vars.palette.grey[100],
-  backgroundImage: `url(${onlineMallParkinglot})`,
+  backgroundImage: `url(${tutaMallParkinglot})`,
   backgroundSize: 'cover',
   backgroundPosition: 'center',
   backgroundRepeat: 'no-repeat'

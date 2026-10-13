@@ -9,6 +9,7 @@ import {
   PHOTO_ALBUMS_THEME_INVERSE_FG,
   PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
 } from './photoAlbumsNoteFontTokens';
+import VaultWorkspaceFocusToggleButton from 'ui-component/VaultWorkspaceFocusToggleButton';
 
 export const PHOTO_ALBUMS_ZOOM_MIN = 0;
 export const PHOTO_ALBUMS_ZOOM_MAX = 100;
@@ -18,7 +19,13 @@ export const PHOTO_ALBUMS_ZOOM_STEP = 1;
  * Horizontal top scrollbar-style control to zoom the entire album binder
  * page from 0%–100% (TutaPhotoAlbums only).
  */
-export default function PhotoAlbumsAlbumZoomBar({ value = 100, onChange }) {
+export default function PhotoAlbumsAlbumZoomBar({
+  value = 100,
+  onChange,
+  focusViewActive = false,
+  onFocusViewToggle = null,
+  showFocusToggle = false
+}) {
   const zoom = Number.isFinite(value)
     ? Math.min(PHOTO_ALBUMS_ZOOM_MAX, Math.max(PHOTO_ALBUMS_ZOOM_MIN, value))
     : 100;
@@ -130,11 +137,17 @@ export default function PhotoAlbumsAlbumZoomBar({ value = 100, onChange }) {
       >
         {zoom}%
       </Typography>
+      {showFocusToggle ? (
+        <VaultWorkspaceFocusToggleButton active={focusViewActive} onToggle={onFocusViewToggle} />
+      ) : null}
     </Box>
   );
 }
 
 PhotoAlbumsAlbumZoomBar.propTypes = {
   value: PropTypes.number,
-  onChange: PropTypes.func
+  onChange: PropTypes.func,
+  focusViewActive: PropTypes.bool,
+  onFocusViewToggle: PropTypes.func,
+  showFocusToggle: PropTypes.bool
 };
