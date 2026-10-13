@@ -202,22 +202,6 @@ import {
   updateRecordVaultE2eKeys
 } from './routes/recordVault/recordVaultE2eRoutes.js';
 import {
-  browseRecordVaultUsbPath,
-  formatRecordVaultUsb,
-  getRecordVaultUsbStatus,
-  getRecordVaultUsbUnlockGuard,
-  getRecordVaultUsbIconDerivedKey,
-  getRecordVaultUsbVaultTree,
-  downloadRecordVaultUsbBackupZip,
-  restoreRecordVaultUsbBackupZip,
-  initRecordVaultUsb,
-  listRecordVaultUsbIcons,
-  listRecordVaultUsbLocations,
-  logoffRecordVaultUsb,
-  scanRecordVaultUsb,
-  unlockRecordVaultUsb
-} from './routes/recordVault/recordVaultUsbRoutes.js';
-import {
   downloadRecordVaultTutaDriveBackupZip,
   deleteRecordVaultTutaDriveBackupByName,
   downloadRecordVaultTutaDriveStoredBackup,
@@ -244,7 +228,6 @@ import {
   getRecordVaultStorageLogoffProgress,
   logoffRecordVaultStorage
 } from './routes/recordVault/recordVaultStorageRoutes.js';
-import { downloadRecordVaultBridgeInstaller } from './routes/recordVault/recordVaultBridgeInstaller.js';
 import {
   getRecordVaultSessionFileCounts,
   getRecordVaultUsage,
@@ -297,24 +280,6 @@ import {
   putPhotoAlbumsE2eKeys,
   updatePhotoAlbumsE2eKeys
 } from './routes/photoAlbums/photoAlbumsE2eRoutes.js';
-import {
-  browsePhotoAlbumsUsbPath,
-  formatPhotoAlbumsUsb,
-  getPhotoAlbumsUsbStatus,
-  getPhotoAlbumsUsbUnlockGuard,
-  getPhotoAlbumsUsbIconDerivedKey,
-  getPhotoAlbumsUsbVaultTree,
-  downloadPhotoAlbumsUsbBackupZip,
-  downloadPhotoAlbumsUsbAlbumBackupZip,
-  getPhotoAlbumsUsbAlbumBackupProgress,
-  restorePhotoAlbumsUsbBackupZip,
-  initPhotoAlbumsUsb,
-  listPhotoAlbumsUsbIcons,
-  listPhotoAlbumsUsbLocations,
-  logoffPhotoAlbumsUsb,
-  scanPhotoAlbumsUsb,
-  unlockPhotoAlbumsUsb
-} from './routes/photoAlbums/photoAlbumsUsbRoutes.js';
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
   formatPhotoAlbumsTutaDrive,
@@ -331,7 +296,6 @@ import {
   listPhotoAlbumsMobileUploadFiles,
   postPhotoAlbumsMobileUploadFile
 } from './routes/photoAlbums/photoAlbumsMobileUploadFolderRoutes.js';
-import { downloadPhotoAlbumsBridgeInstaller } from './routes/photoAlbums/photoAlbumsBridgeInstaller.js';
 import {
   acceptPhotoAlbumsInvite,
   createPhotoAlbumsInvite,
@@ -814,9 +778,7 @@ app.use((req, res, next) => {
   }
   if (
     req.method === 'POST' &&
-    (req.path === '/api/photoAlbums/usb/restore-zip' ||
-      req.path === '/api/photoAlbums/tutadrive/restore-zip' ||
-      req.path === '/api/recordVault/usb/restore-zip')
+    (req.path === '/api/photoAlbums/tutadrive/restore-zip')
   ) {
     const cl = req.get('content-length');
     const n = cl ? parseInt(cl, 10) : NaN;
@@ -854,8 +816,6 @@ const LARGE_MULTIPART_UPLOAD_POST_PATHS = new Set([
   '/api/recordVault/tutadrive/restore-zip',
   '/api/recordVault/tutadrive/backup-tree',
   '/api/recordVault/tutadrive/merge/preview',
-  '/api/recordVault/usb/restore-zip',
-  '/api/photoAlbums/usb/restore-zip',
   '/api/photoAlbums/tutadrive/restore-zip'
 ]);
 app.use((req, res, next) => {
@@ -1545,22 +1505,7 @@ app.post('/api/recordVault/access/hint', requireAuth, setRecordVaultAccessPasswo
 app.get('/api/recordVault/e2e/keys', requireAuth, getRecordVaultE2eKeys);
 app.post('/api/recordVault/e2e/keys', requireAuth, putRecordVaultE2eKeys);
 app.put('/api/recordVault/e2e/keys', requireAuth, updateRecordVaultE2eKeys);
-app.get('/api/recordVault/usb/unlock-guard', ...recordVaultVaultAuth, getRecordVaultUsbUnlockGuard);
-app.get('/api/recordVault/usb/icons', ...recordVaultVaultAuth, listRecordVaultUsbIcons);
-app.get('/api/recordVault/usb/scan', ...recordVaultVaultAuth, scanRecordVaultUsb);
-app.get('/api/recordVault/usb/locations', ...recordVaultVaultAuth, listRecordVaultUsbLocations);
-app.get('/api/recordVault/usb/browse', ...recordVaultVaultAuth, browseRecordVaultUsbPath);
-app.get('/api/recordVault/usb/vault-tree', ...recordVaultVaultAuth, getRecordVaultUsbVaultTree);
-app.get('/api/recordVault/usb/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultUsbBackupZip);
-app.post('/api/recordVault/usb/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultUsbBackupZip);
-app.get('/api/recordVault/usb/status', ...recordVaultVaultAuth, getRecordVaultUsbStatus);
-app.post('/api/recordVault/usb/unlock', ...recordVaultVaultAuth, unlockRecordVaultUsb);
-app.post('/api/recordVault/usb/icon-derived-key', ...recordVaultVaultAuth, getRecordVaultUsbIconDerivedKey);
-app.post('/api/recordVault/usb/logoff', ...recordVaultVaultAuth, logoffRecordVaultUsb);
-app.post('/api/recordVault/usb/init', ...recordVaultVaultAuth, initRecordVaultUsb);
-app.post('/api/recordVault/usb/format', ...recordVaultVaultAuth, formatRecordVaultUsb);
 app.get('/api/recordVault/storage/config', ...recordVaultVaultAuth, getRecordVaultStorageConfig);
-app.get('/api/recordVault/bridge/installer/:platform', requireAuth, downloadRecordVaultBridgeInstaller);
 app.post('/api/recordVault/storage/logoff', ...recordVaultVaultAuth, logoffRecordVaultStorage);
 app.get('/api/recordVault/storage/logoff-progress', ...recordVaultVaultAuth, getRecordVaultStorageLogoffProgress);
 app.get('/api/recordVault/usage', ...recordVaultVaultAuth, getRecordVaultUsage);
@@ -1634,22 +1579,6 @@ app.post('/api/photoAlbums/access/hint', requireAuth, setPhotoAlbumsAccessPasswo
 app.get('/api/photoAlbums/e2e/keys', requireAuth, getPhotoAlbumsE2eKeys);
 app.post('/api/photoAlbums/e2e/keys', requireAuth, putPhotoAlbumsE2eKeys);
 app.put('/api/photoAlbums/e2e/keys', requireAuth, updatePhotoAlbumsE2eKeys);
-app.get('/api/photoAlbums/usb/unlock-guard', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbUnlockGuard);
-app.get('/api/photoAlbums/usb/icons', ...photoAlbumsVaultAuth, listPhotoAlbumsUsbIcons);
-app.get('/api/photoAlbums/usb/scan', ...photoAlbumsVaultAuth, scanPhotoAlbumsUsb);
-app.get('/api/photoAlbums/usb/locations', ...photoAlbumsVaultAuth, listPhotoAlbumsUsbLocations);
-app.get('/api/photoAlbums/usb/browse', ...photoAlbumsVaultAuth, browsePhotoAlbumsUsbPath);
-app.get('/api/photoAlbums/usb/vault-tree', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbVaultTree);
-app.get('/api/photoAlbums/usb/album-backup-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbAlbumBackupProgress);
-app.get('/api/photoAlbums/usb/album-backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsUsbAlbumBackupZip);
-app.get('/api/photoAlbums/usb/backup-zip', ...photoAlbumsVaultAuth, downloadPhotoAlbumsUsbBackupZip);
-app.post('/api/photoAlbums/usb/restore-zip', ...photoAlbumsVaultAuth, restorePhotoAlbumsUsbBackupZip);
-app.get('/api/photoAlbums/usb/status', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbStatus);
-app.post('/api/photoAlbums/usb/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsUsb);
-app.post('/api/photoAlbums/usb/icon-derived-key', ...photoAlbumsVaultAuth, getPhotoAlbumsUsbIconDerivedKey);
-app.post('/api/photoAlbums/usb/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsUsb);
-app.post('/api/photoAlbums/usb/init', ...photoAlbumsVaultAuth, initPhotoAlbumsUsb);
-app.post('/api/photoAlbums/usb/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsUsb);
 app.get('/api/photoAlbums/storage/config', ...photoAlbumsVaultAuth, getPhotoAlbumsStorageConfig);
 app.get('/api/photoAlbums/tutadrive/status', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveStatus);
 app.get('/api/photoAlbums/tutadrive/open-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveOpenProgress);
@@ -1666,7 +1595,6 @@ app.get('/api/photoAlbums/mobile-upload/files', requireAuth, listPhotoAlbumsMobi
 app.post('/api/photoAlbums/mobile-upload/files', requireAuth, postPhotoAlbumsMobileUploadFile);
 app.get('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, getPhotoAlbumsMobileUploadFile);
 app.delete('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, deletePhotoAlbumsMobileUploadFile);
-app.get('/api/photoAlbums/bridge/installer/:platform', requireAuth, downloadPhotoAlbumsBridgeInstaller);
 app.post('/api/photoAlbums/storage/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsStorage);
 app.get('/api/photoAlbums/usage', ...photoAlbumsVaultAuth, getPhotoAlbumsUsage);
 app.post('/api/photoAlbums/transfer-bytes', requireAuth, postPhotoAlbumsTransferBytes);

@@ -337,26 +337,7 @@ export async function bridgeRequest({ method = 'GET', url, data, params, storage
   return { data: payload };
 }
 
-export function shouldRouteRecordVaultThroughBridge(path, storageType = null) {
-  const normalized = pathWithoutQuery(path);
-  const activeStorageType = storageType ?? bridgeVaultStorageType;
-  if (!bridgeEnabled) return false;
-  if (normalized.startsWith('/api/recordVault/access/')) return false;
-  // Icon secrets live on the main API DB — never on the local bridge.
-  if (normalized === '/api/recordVault/usb/icon-derived-key') return false;
-  // USB unlock/session/CRUD must hit the bridge process that holds the in-memory vault session.
-  // (Previously only locations/unlock-guard were force-routed; /usb/status went to the main API
-  // after unlock and immediately cleared the FE "unlocked" flag.)
-  if (normalized.startsWith('/api/recordVault/usb/')) {
-    if (isRecordVaultBridgeHostContext()) {
-      return bridgeAvailable || bridgeUserGestureGranted;
-    }
-    return bridgeAvailable;
-  }
-  // TutaCloud unlock + CRUD stay on the main API server (bridge has no cloud session).
-  if (activeStorageType === 'tutadrive' || activeStorageType === 'onedrive') return false;
-  if (!bridgeAvailable) return false;
-  if (!bridgeSinglesId) return false;
-  if (activeStorageType !== 'usb') return false;
-  return normalized.startsWith('/api/recordVault');
+/** USB bridge retired — all vault I/O goes through the main API (TutaCloud). */
+export function shouldRouteRecordVaultThroughBridge(_path, _storageType = null) {
+  return false;
 }

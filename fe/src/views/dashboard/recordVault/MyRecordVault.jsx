@@ -12,20 +12,16 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   fetchRecordVaultStorageConfig,
   fetchRecordVaultTutaDriveStatus,
-  fetchRecordVaultUsbStatus,
   logoffRecordVaultStorage,
   readRecordVaultApiError,
   setRecordVaultBridgeSinglesId,
   setRecordVaultBridgeStorageType
 } from 'api/recordVaultFe';
-import { probeRecordVaultBridge } from 'api/recordVaultBridgeFe';
 import { useAuth } from 'contexts/AuthContext';
 import { clearRecordVaultE2eSession } from 'utils/recordVaultClientSession';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
-import { readRecordVaultLastUsbLocation } from 'utils/recordVaultUsbPreference';
 import RecordVaultAccessGate from './RecordVaultAccessGate';
 import RecordVaultTutaDriveGate from './RecordVaultTutaDriveGate';
-import RecordVaultUsbGate from './RecordVaultUsbGate';
 import RecordVaultWorkspacePane from './RecordVaultWorkspacePane';
 import RecordVaultSessionFileCountsBar from './RecordVaultSessionFileCountsBar';
 import { RecordVaultPaneProvider } from './RecordVaultPaneContext';
@@ -36,7 +32,7 @@ import TutaNotesBrandTitle from './TutaNotesBrandTitle';
 import GreenButton from 'ui-component/GreenButton';
 import { GREEN_BUTTON_HOVER_SCALE } from 'config/greenButton';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
-import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
+import { parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { isRecordVaultRagUiEnabled } from 'config/recordVaultRagUiEnv';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
@@ -307,13 +303,9 @@ export default function MyRecordVault() {
   const [storageConfigLoaded, setStorageConfigLoaded] = useState(false);
   const [tutaCloudOffered, setTutaCloudOffered] = useState(() => isLeftSideOfferedFromVite());
   const [tutaDriveMode, setTutaDriveMode] = useState(() => isLeftSideTutaDriveFromVite());
-  const [localUsbOffered, setLocalUsbOffered] = useState(() => isRightSideUsbFromVite());
+  const [localUsbOffered, setLocalUsbOffered] = useState(false);
   const [tutaCloudUnlocked, setTutaCloudUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
-  const [usbVolumeLabel, setUsbVolumeLabel] = useState(
-    () => String(readRecordVaultLastUsbLocation()?.label || '').trim()
-  );
-  const usbTabLabel = formatUsbWorkspaceTitle(usbVolumeLabel);
   const [sessionChecking, setSessionChecking] = useState(true);
   const [error, setError] = useState('');
   /** 'both' = side-by-side login chooser; 'tutadrive' | 'usb' = full-window pane; 'compare' = both workspaces for drag-drop. */
@@ -459,7 +451,7 @@ export default function MyRecordVault() {
         if (!cfg) {
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
           setTutaCloudOffered(isLeftSideOfferedFromVite());
-          setLocalUsbOffered(isRightSideUsbFromVite());
+          setLocalUsbOffered(false);
           return;
         }
         if (cfg.leftSide != null || cfg.tutaDrive != null) {
@@ -471,13 +463,7 @@ export default function MyRecordVault() {
             setTutaCloudOffered(leftMode !== 'None');
           }
         }
-        if (cfg.rightSide != null || cfg.localUsb?.visible != null) {
-          if (cfg.localUsb?.visible != null) {
-            setLocalUsbOffered(Boolean(cfg.localUsb.visible));
-          } else {
-            setLocalUsbOffered(parseRightSideMode(cfg.rightSide) === 'USB');
-          }
-        }
+        setLocalUsbOffered(false);
       };
       try {
         // Runtime BE env (authoritative after pm2/be restart) — no auth required.
@@ -499,11 +485,11 @@ export default function MyRecordVault() {
         if (cancelled) return;
         applyPanelSides(cfg);
         setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
-        setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
+        setLocalUsbOffered(false);
       } catch {
         if (!cancelled) {
           setTutaCloudOffered(isLeftSideOfferedFromVite());
-          setLocalUsbOffered(isRightSideUsbFromVite());
+          setLocalUsbOffered(false);
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
         }
       } finally {
@@ -518,14 +504,6 @@ export default function MyRecordVault() {
   useEffect(() => {
     setRecordVaultBridgeSinglesId(user?.singles_id ?? null);
   }, [user?.singles_id]);
-
-  useEffect(() => {
-    void probeRecordVaultBridge();
-    const timerId = window.setInterval(() => {
-      void probeRecordVaultBridge();
-    }, 5000);
-    return () => window.clearInterval(timerId);
-  }, []);
 
   useEffect(() => {
     if (!storageConfigLoaded) return;
@@ -824,93 +802,6 @@ export default function MyRecordVault() {
     return null;
   };
 
-  const renderUsbBody = () => {
-    if (showDual && usbUnlocked) {
-      return (
-        <StorageCenterCluster>
-          <GreenButton
-            type="button"
-            role="tab"
-            aria-selected={paneFocus === 'usb'}
-            title="Open or reload TutaNotes notes on USB"
-            onClick={selectUsbTab}
-            {...guestDemoAllowProps()}
-            sx={usbTitleButtonSx}
-          >
-            {usbTabLabel}
-          </GreenButton>
-          <DualLogOffButton
-            label="Log off USB"
-            onClick={() => void handleDualPaneLogOffUsb()}
-            disabled={usbDualLogoffBusy}
-          />
-        </StorageCenterCluster>
-      );
-    }
-    if (usbUnlocked && (paneFocus === 'usb' || paneFocus === 'compare' || !tutaCloudOffered)) {
-      return (
-        <RecordVaultPaneProvider storageType="usb">
-          <RecordVaultWorkspacePane
-            unlocked
-            compact
-            compareMode={showCompare}
-            paneLabel="USB"
-            canEnterCompare={canEnterCompare}
-            onEnterCompare={enterCompareMode}
-            onReturnFromCompare={returnFromCompareMode}
-            onSessionEnded={handleUsbSessionEnded}
-            ragUiEnabled={ragUiEnabled}
-          />
-        </RecordVaultPaneProvider>
-      );
-    }
-    if (showDual || !usbUnlocked) {
-      return (
-        <LoginScrollArea>
-          {showDual ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, width: '100%' }}>
-              <GreenButton
-                type="button"
-                role="tab"
-                aria-selected={paneFocus === 'usb'}
-                title="Expand TutaNotes on USB to the full window"
-                onClick={selectUsbTab}
-                {...guestDemoAllowProps()}
-                sx={usbTitleButtonSx}
-              >
-                {usbTabLabel}
-              </GreenButton>
-              <RecordVaultUsbGate
-                embedded
-                usbOnly
-                open
-                suppressInlineErrors={accessGateOpen}
-                onUnlocked={handleUsbUnlocked}
-                onUsbLocationChange={handleUsbLocationChange}
-                onOpenClicked={handleUsbOpenClicked}
-                proceedOpenToken={usbProceedOpenToken}
-                accessFormatRefreshToken={usbGateRefreshToken}
-              />
-            </Box>
-          ) : (
-            <RecordVaultUsbGate
-              embedded
-              usbOnly
-              open
-              suppressInlineErrors={accessGateOpen}
-              onUnlocked={handleUsbUnlocked}
-              onUsbLocationChange={handleUsbLocationChange}
-              onOpenClicked={handleUsbOpenClicked}
-              proceedOpenToken={usbProceedOpenToken}
-              accessFormatRefreshToken={usbGateRefreshToken}
-            />
-          )}
-        </LoginScrollArea>
-      );
-    }
-    return null;
-  };
-
   return (
     <Box
       data-record-vault-shell
@@ -995,26 +886,6 @@ export default function MyRecordVault() {
                   {cloudTabLabel}
                 </GreenButton>
               </Box>
-              <Box sx={storageTabStripSx(USB_TAB_COLOR)}>
-                <GreenButton
-                  type="button"
-                  role="tab"
-                  aria-selected={paneFocus === 'usb'}
-                  title={
-                    paneFocus === 'usb'
-                      ? tutaCloudOffered && localUsbOffered
-                        ? 'Click again to show OneDrive and USB side by side'
-                        : 'TutaNotes USB is open'
-                      : usbUnlocked
-                        ? 'Open or reload TutaNotes notes on USB'
-                        : 'Expand TutaNotes on USB to the full window'
-                  }
-                  onClick={selectUsbTab}
-                  sx={usbTitleButtonSx}
-                >
-                  {usbTabLabel}
-                </GreenButton>
-              </Box>
             </Box>
           ) : null}
 
@@ -1065,42 +936,6 @@ export default function MyRecordVault() {
               </Box>
             ) : null}
 
-            {localUsbOffered ? (
-              <Box
-                sx={{
-                  ...loginColumnSx(),
-                  display: usbVisible ? 'flex' : 'none',
-                  borderColor: USB_TAB_COLOR,
-                  overflow: showDual ? 'visible' : 'hidden',
-                  bgcolor: showDual || !usbUnlocked ? USB_TAB_COLOR : TUTANOTES_WORKSPACE_PANEL_BG
-                }}
-              >
-                {(!showTabBar || showCompare) && !hideMyNoteShellForMobileUpload ? (
-                  <PaneHeader
-                    title={usbTabLabel}
-                    logoSrc={TUTANOTES_USB_LOGO}
-                    titleTooltip={TUTANOTES_USB_PANE_TOOLTIP}
-                    stripColor={showCompare ? USB_TAB_COLOR : undefined}
-                    titleColor={showCompare ? USB_TAB_LABEL_COLOR : undefined}
-                  />
-                ) : null}
-                <Box
-                  sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    minWidth: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: showDual ? 'visible' : 'hidden'
-                  }}
-                >
-                  {renderUsbBody()}
-                </Box>
-                {!usbUnlocked ? (
-                  <RecordVaultSessionFileCountsBar refreshToken={sessionCountsRefreshToken} />
-                ) : null}
-              </Box>
-            ) : null}
           </Box>
         </Box>
       ) : null}

@@ -18,7 +18,6 @@ import {
   setPhotoAlbumsBridgeSinglesId,
   setPhotoAlbumsBridgeStorageType
 } from 'api/photoAlbumsFe';
-import { probePhotoAlbumsBridge } from 'api/photoAlbumsBridgeFe';
 import { useAuth } from 'contexts/AuthContext';
 import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { clearPhotoAlbumsE2eSession } from 'utils/photoAlbumsClientSession';
@@ -38,7 +37,6 @@ import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import RecordVaultMobileDirectUploadDialog from '../recordVault/RecordVaultMobileDirectUploadDialog';
 import PhotoAlbumsAccessGate from './PhotoAlbumsAccessGate';
 import PhotoAlbumsTutaDriveGate from './PhotoAlbumsTutaDriveGate';
-import PhotoAlbumsUsbGate from './PhotoAlbumsUsbGate';
 import PhotoAlbumsWorkspacePane from './PhotoAlbumsWorkspacePane';
 import PhotoAlbumsSessionFileCountsBar from './PhotoAlbumsSessionFileCountsBar';
 import { PhotoAlbumsPaneProvider } from './PhotoAlbumsPaneContext';
@@ -320,7 +318,7 @@ export default function MyPhotoAlbums() {
   const [storageConfigLoaded, setStorageConfigLoaded] = useState(false);
   const [tutaCloudOffered, setTutaCloudOffered] = useState(() => isLeftSideOfferedFromVite());
   const [tutaDriveMode, setTutaDriveMode] = useState(() => isLeftSideTutaDriveFromVite());
-  const [localUsbOffered, setLocalUsbOffered] = useState(() => isRightSideUsbFromVite());
+  const [localUsbOffered, setLocalUsbOffered] = useState(false);
   const [tutaCloudUnlocked, setTutaCloudUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
   /** Volume name from USB radio / last mount — shown as `TutaPhotoAlbums on USB: (TutaUSB-1)`. */
@@ -517,7 +515,7 @@ export default function MyPhotoAlbums() {
         if (!cfg) {
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
           setTutaCloudOffered(isLeftSideOfferedFromVite());
-          setLocalUsbOffered(isRightSideUsbFromVite());
+          setLocalUsbOffered(false);
           return;
         }
         if (cfg.leftSide != null || cfg.tutaDrive != null) {
@@ -531,13 +529,7 @@ export default function MyPhotoAlbums() {
             setTutaCloudOffered(leftMode !== 'None');
           }
         }
-        if (cfg.rightSide != null || cfg.localUsb?.visible != null) {
-          if (cfg.localUsb?.visible != null) {
-            setLocalUsbOffered(Boolean(cfg.localUsb.visible));
-          } else {
-            setLocalUsbOffered(parseRightSideMode(cfg.rightSide) === 'USB');
-          }
-        }
+        setLocalUsbOffered(false);
       };
       try {
         const pubRes = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
@@ -555,11 +547,11 @@ export default function MyPhotoAlbums() {
         if (cancelled) return;
         applyPanelSides(cfg);
         setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
-        setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
+        setLocalUsbOffered(false);
       } catch {
         if (!cancelled) {
           setTutaCloudOffered(isLeftSideOfferedFromVite());
-          setLocalUsbOffered(isRightSideUsbFromVite());
+          setLocalUsbOffered(false);
           setTutaDriveMode(isLeftSideTutaDriveFromVite());
         }
       } finally {
@@ -574,14 +566,6 @@ export default function MyPhotoAlbums() {
   useEffect(() => {
     setPhotoAlbumsBridgeSinglesId(user?.singles_id ?? null);
   }, [user?.singles_id]);
-
-  useEffect(() => {
-    void probePhotoAlbumsBridge();
-    const timerId = window.setInterval(() => {
-      void probePhotoAlbumsBridge();
-    }, 5000);
-    return () => window.clearInterval(timerId);
-  }, []);
 
   useEffect(() => {
     if (!storageConfigLoaded) return;
@@ -905,94 +889,6 @@ export default function MyPhotoAlbums() {
     return null;
   };
 
-  const renderUsbBody = () => {
-    if (showDual && usbUnlocked) {
-      return (
-        <StorageCenterCluster>
-          <GreenButton
-            type="button"
-            role="tab"
-            aria-selected={paneFocus === 'usb'}
-            title="Open or reload TutaPhotoAlbums notes on USB"
-            onClick={selectUsbTab}
-            {...guestDemoAllowProps()}
-            sx={usbTitleButtonSx}
-          >
-            {usbTabLabel}
-          </GreenButton>
-          <DualLogOffButton
-            label="Log off USB"
-            onClick={() => void handleDualPaneLogOffUsb()}
-            disabled={usbDualLogoffBusy}
-          />
-        </StorageCenterCluster>
-      );
-    }
-    if (usbUnlocked && (paneFocus === 'usb' || paneFocus === 'compare' || !tutaCloudOffered)) {
-      return (
-        <PhotoAlbumsPaneProvider storageType="usb">
-          <PhotoAlbumsWorkspacePane
-            unlocked
-            compact
-            compareMode={showCompare}
-            paneLabel="USB"
-            canEnterCompare={canEnterCompare}
-            onEnterCompare={enterCompareMode}
-            onReturnFromCompare={returnFromCompareMode}
-            onSessionEnded={handleUsbSessionEnded}
-          />
-        </PhotoAlbumsPaneProvider>
-      );
-    }
-    if (showDual || !usbUnlocked) {
-      return (
-        <LoginScrollArea>
-          {showDual ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, width: '100%' }}>
-              <GreenButton
-                type="button"
-                role="tab"
-                aria-selected={paneFocus === 'usb'}
-                title="Expand TutaPhotoAlbums on USB to the full window"
-                onClick={selectUsbTab}
-                {...guestDemoAllowProps()}
-                sx={usbTitleButtonSx}
-              >
-                {usbTabLabel}
-              </GreenButton>
-              <PhotoAlbumsUsbGate
-                embedded
-                usbOnly
-                open
-                suppressInlineErrors={accessGateOpen}
-                onUnlocked={handleUsbUnlocked}
-                onUsbLocationChange={handleUsbLocationChange}
-                onOpenClicked={handleUsbOpenClicked}
-                proceedOpenToken={usbProceedOpenToken}
-                accessFormatRefreshToken={usbGateRefreshToken}
-                sessionNotice={usbSessionNotice}
-              />
-            </Box>
-          ) : (
-            <PhotoAlbumsUsbGate
-              embedded
-              usbOnly
-              open
-              suppressInlineErrors={accessGateOpen}
-              onUnlocked={handleUsbUnlocked}
-              onUsbLocationChange={handleUsbLocationChange}
-              onOpenClicked={handleUsbOpenClicked}
-              proceedOpenToken={usbProceedOpenToken}
-              accessFormatRefreshToken={usbGateRefreshToken}
-              sessionNotice={usbSessionNotice}
-            />
-          )}
-        </LoginScrollArea>
-      );
-    }
-    return null;
-  };
-
   return (
     <Box
       data-record-vault-shell
@@ -1090,26 +986,6 @@ export default function MyPhotoAlbums() {
                   {cloudTabLabel}
                 </GreenButton>
               </Box>
-              <Box sx={storageTabStripSx(USB_TAB_COLOR)}>
-                <GreenButton
-                  type="button"
-                  role="tab"
-                  aria-selected={paneFocus === 'usb'}
-                  title={
-                    paneFocus === 'usb'
-                      ? tutaCloudOffered && localUsbOffered
-                        ? `Click again to show ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} and USB side by side`
-                        : 'TutaPhotoAlbums USB is open'
-                      : usbUnlocked
-                        ? 'Open or reload TutaPhotoAlbums notes on USB'
-                        : 'Expand TutaPhotoAlbums on USB to the full window'
-                  }
-                  onClick={selectUsbTab}
-                  sx={usbTitleButtonSx}
-                >
-                  {usbTabLabel}
-                </GreenButton>
-              </Box>
             </Box>
           ) : null}
 
@@ -1162,44 +1038,6 @@ export default function MyPhotoAlbums() {
               </Box>
             ) : null}
 
-            {localUsbOffered ? (
-              <Box
-                sx={{
-                  ...loginColumnSx(),
-                  display: usbVisible ? 'flex' : 'none',
-                  borderColor: USB_TAB_COLOR,
-                  overflow: showDual ? 'visible' : 'hidden',
-                  bgcolor: showDual || !usbUnlocked ? USB_TAB_COLOR : 'var(--theme-daynight-color)'
-                }}
-              >
-                {!showTabBar || showCompare ? (
-                  hideMyPhotoShellForMobileUpload ? null : (
-                    <PaneHeader
-                      title={usbTabLabel}
-                      logoSrc={TUTAPHOTOALBUMS_USB_LOGO}
-                      titleTooltip={TUTAPHOTOALBUMS_USB_PANE_TOOLTIP}
-                      stripColor={showCompare ? USB_TAB_COLOR : undefined}
-                      titleColor={showCompare ? USB_TAB_LABEL_COLOR : undefined}
-                    />
-                  )
-                ) : null}
-                <Box
-                  sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    minWidth: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: showDual ? 'visible' : 'hidden'
-                  }}
-                >
-                  {renderUsbBody()}
-                </Box>
-                {!usbUnlocked ? (
-                  <PhotoAlbumsSessionFileCountsBar refreshToken={sessionCountsRefreshToken} />
-                ) : null}
-              </Box>
-            ) : null}
           </Box>
         </Box>
       ) : null}

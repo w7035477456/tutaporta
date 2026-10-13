@@ -13,8 +13,6 @@ import { logoffVaultUsb } from '../../utils/recordVaultUsb/vaultSession.js';
 import { clearRecordVaultCacheIcon, readRecordVaultCacheIcon } from '../../utils/recordVaultCacheIcon.js';
 import { getVaultLogoffProgress } from '../../utils/recordVaultVaultLogoffProgress.js';
 import { loadGlobalVideoTutorialTutanotes } from '../../utils/globalVideoTutorialTutanotes.js';
-import { getRecordVaultBridgeInstallerUrls } from './recordVaultBridgeInstaller.js';
-import { isIncludeUsbDmgExeEnabled } from '../../utils/includeUsbDmgExeConfig.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -44,8 +42,6 @@ export async function getRecordVaultStorageConfig(req, res) {
   }
 
   const videoTutorialTutanotes = await loadGlobalVideoTutorialTutanotes();
-  const includeUsbDmgExe = isIncludeUsbDmgExeEnabled();
-  const usbBridgeInstallers = includeUsbDmgExe ? getRecordVaultBridgeInstallerUrls() : { mac: null, win: null };
   const leftSide = getLeftSideMode();
   const tutaDrive = isLeftSideTutaDrive();
   const tutaCloud = {
@@ -66,8 +62,8 @@ export async function getRecordVaultStorageConfig(req, res) {
     cacheTutaCloudIcon,
     cacheUsbIcon,
     videoTutorialTutanotes,
-    includeUsbDmgExe,
-    usbBridgeInstallers,
+    includeUsbDmgExe: false,
+    usbBridgeInstallers: { mac: null, win: null },
     e2eYellow: isVaultE2eYellow()
   });
 }
