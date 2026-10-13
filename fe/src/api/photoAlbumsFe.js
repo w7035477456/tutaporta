@@ -25,6 +25,11 @@ import {
   vaultCloudBackendStorageSlot
 } from 'utils/vaultPaneStorageType';
 
+function resolvePhotoAlbumsApiStorageType(storageType) {
+  if (storageType == null || String(storageType).trim() === '') return null;
+  return isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
+}
+
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
 export function readPhotoAlbumsApiError(err, fallback = 'Request failed') {
   const data = err?.response?.data;
@@ -218,13 +223,14 @@ function maybeReportBridgeSessionFileCounts(config, responseData, viaBridge) {
 }
 
 async function rvRequest(config) {
-  const storageType = config?.storageType ?? null;
+  const paneStorageType = config?.storageType ?? null;
+  const storageType = resolvePhotoAlbumsApiStorageType(paneStorageType);
   const headers = { ...(config?.headers || {}) };
   if (storageType) {
     headers['X-Record-Vault-Storage'] = storageType;
   }
   const nextConfig = { ...config, headers };
-  const viaBridge = shouldRoutePhotoAlbumsThroughBridge(nextConfig.url, storageType);
+  const viaBridge = shouldRoutePhotoAlbumsThroughBridge(nextConfig.url, paneStorageType);
   const result = viaBridge ? await bridgeRequest(nextConfig) : await api(nextConfig);
   maybeReportBridgeSessionFileCounts(nextConfig, result?.data, viaBridge);
   return result;
@@ -375,11 +381,12 @@ export async function fetchPhotoAlbumsNoteAttachmentBlob(
     return blob;
   }
 
+  const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
       params: Object.keys(params).length ? params : undefined,
       responseType: 'blob',
-      headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+      headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
     });
     return data;
   } catch (err) {
@@ -408,11 +415,12 @@ export async function fetchPhotoAlbumsNoteImageBlob(noteId, slot = 'center', { c
     void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
     return blob;
   }
+  const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
       responseType: 'blob',
       params: cacheBust != null && String(cacheBust).trim() !== '' ? { v: cacheBust } : undefined,
-      headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+      headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
     });
     return data;
   } catch (err) {
@@ -436,11 +444,12 @@ export async function fetchPhotoAlbumsNoteExtraImageBlob(noteId, imageId, { cach
     void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
     return blob;
   }
+  const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
       responseType: 'blob',
       params: cacheBust != null && String(cacheBust).trim() !== '' ? { v: cacheBust } : undefined,
-      headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+      headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
     });
     return data;
   } catch (err) {
@@ -1385,8 +1394,9 @@ export async function fetchPhotoAlbumsActiveStorageDisplay() {
 }
 
 export async function fetchPhotoAlbumsUsage({ storageType } = {}) {
+  const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   const { data } = await api.get('/api/photoAlbums/usage', {
-    headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+    headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
   });
   return {
     storageType: data?.storageType ? String(data.storageType) : null,

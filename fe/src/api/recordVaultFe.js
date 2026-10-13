@@ -22,6 +22,12 @@ import {
   vaultCloudBackendStorageSlot
 } from 'utils/vaultPaneStorageType';
 
+/** Map pane id (`tutadrive`) → backend session slot header (`onedrive`). */
+function resolveRecordVaultApiStorageType(storageType) {
+  if (storageType == null || String(storageType).trim() === '') return null;
+  return isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
+}
+
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
 export function readRecordVaultApiError(err, fallback = 'Request failed') {
   const data = err?.response?.data;
@@ -212,13 +218,14 @@ function maybeReportBridgeSessionFileCounts(config, responseData, viaBridge) {
 }
 
 async function rvRequest(config) {
-  const storageType = config?.storageType ?? null;
+  const paneStorageType = config?.storageType ?? null;
+  const storageType = resolveRecordVaultApiStorageType(paneStorageType);
   const headers = { ...(config?.headers || {}) };
   if (storageType) {
     headers['X-Record-Vault-Storage'] = storageType;
   }
   const nextConfig = { ...config, headers };
-  const viaBridge = shouldRouteRecordVaultThroughBridge(nextConfig.url, storageType);
+  const viaBridge = shouldRouteRecordVaultThroughBridge(nextConfig.url, paneStorageType);
   const result = viaBridge ? await bridgeRequest(nextConfig) : await api(nextConfig);
   maybeReportBridgeSessionFileCounts(nextConfig, result?.data, viaBridge);
   return result;
@@ -267,11 +274,12 @@ export async function fetchRecordVaultNoteAttachmentBlob(noteId, attachmentId, {
     return blob;
   }
 
+  const headerSlot = resolveRecordVaultApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
       params: inline ? { inline: 1 } : undefined,
       responseType: 'blob',
-      headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+      headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
     });
     return data;
   } catch (err) {
@@ -300,11 +308,12 @@ export async function fetchRecordVaultNoteImageBlob(noteId, slot = 'center', { c
     void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
     return blob;
   }
+  const headerSlot = resolveRecordVaultApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
       responseType: 'blob',
       params: cacheBust != null && String(cacheBust).trim() !== '' ? { v: cacheBust } : undefined,
-      headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+      headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
     });
     return data;
   } catch (err) {
@@ -328,11 +337,12 @@ export async function fetchRecordVaultNoteExtraImageBlob(noteId, imageId, { cach
     void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
     return blob;
   }
+  const headerSlot = resolveRecordVaultApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
       responseType: 'blob',
       params: cacheBust != null && String(cacheBust).trim() !== '' ? { v: cacheBust } : undefined,
-      headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+      headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
     });
     return data;
   } catch (err) {
@@ -1470,8 +1480,9 @@ export async function fetchRecordVaultActiveStorageDisplay() {
 }
 
 export async function fetchRecordVaultUsage({ storageType } = {}) {
+  const headerSlot = resolveRecordVaultApiStorageType(storageType);
   const { data } = await api.get('/api/recordVault/usage', {
-    headers: storageType ? { 'X-Record-Vault-Storage': storageType } : undefined
+    headers: headerSlot ? { 'X-Record-Vault-Storage': headerSlot } : undefined
   });
   return {
     storageType: data?.storageType ? String(data.storageType) : null,
