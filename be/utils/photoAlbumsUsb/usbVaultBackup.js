@@ -87,15 +87,17 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
  * Restore USB `.recordvault` from a local zip (closes session first so files are not locked).
  * Caller must re-unlock with the security icon afterward.
  */
-export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
-  const session = getVaultSession(singlesId, 'usb');
+async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storageType) {
+  const session = getVaultSession(singlesId, storageType);
   if (!session?.mountPath) {
-    throw new Error('Record Vault USB not unlocked');
+    throw new Error(
+      storageType === 'usb' ? 'Record Vault USB not unlocked' : 'TutaPhotoAlbums TutaCloud vault not unlocked'
+    );
   }
   const mountPath = session.mountPath;
   const label = path.basename(mountPath);
 
-  await logoffVaultUsb(singlesId, 'usb');
+  await logoffVaultUsb(singlesId, storageType);
 
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-usb-restore-'));
   const extractDir = path.join(tmpRoot, 'extract');
@@ -139,4 +141,14 @@ export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
+}
+
+/** Restore USB `.recordvault` from a local zip (closes session first). */
+export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
+  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'usb');
+}
+
+/** Restore TutaCloud album vault from zip (internal session slot `onedrive`). */
+export async function restoreTutaCloudVaultFromZipFile(singlesId, zipFilePath) {
+  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'onedrive');
 }

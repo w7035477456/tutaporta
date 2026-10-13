@@ -317,18 +317,12 @@ import {
 } from './routes/photoAlbums/photoAlbumsUsbRoutes.js';
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
-  downloadPhotoAlbumsTutaDriveAlbumBackupZip,
   formatPhotoAlbumsTutaDrive,
-  getPhotoAlbumsTutaDriveAlbumBackupProgress,
-  getPhotoAlbumsTutaDriveLogoffProgress,
   getPhotoAlbumsTutaDriveOpenProgress,
   getPhotoAlbumsTutaDriveStatus,
-  getPhotoAlbumsTutaDriveSyncProgress,
-  getPhotoAlbumsTutaDriveVaultTree,
   initPhotoAlbumsTutaDrive,
   logoffPhotoAlbumsTutaDrive,
   restorePhotoAlbumsTutaDriveBackupZip,
-  syncPhotoAlbumsTutaDrive,
   unlockPhotoAlbumsTutaDrive
 } from './routes/photoAlbums/photoAlbumsTutaDriveRoutes.js';
 import {
@@ -821,6 +815,7 @@ app.use((req, res, next) => {
   if (
     req.method === 'POST' &&
     (req.path === '/api/photoAlbums/usb/restore-zip' ||
+      req.path === '/api/photoAlbums/tutadrive/restore-zip' ||
       req.path === '/api/recordVault/usb/restore-zip')
   ) {
     const cl = req.get('content-length');
@@ -860,7 +855,8 @@ const LARGE_MULTIPART_UPLOAD_POST_PATHS = new Set([
   '/api/recordVault/tutadrive/backup-tree',
   '/api/recordVault/tutadrive/merge/preview',
   '/api/recordVault/usb/restore-zip',
-  '/api/photoAlbums/usb/restore-zip'
+  '/api/photoAlbums/usb/restore-zip',
+  '/api/photoAlbums/tutadrive/restore-zip'
 ]);
 app.use((req, res, next) => {
   const isLargeUpload =
@@ -1661,6 +1657,11 @@ app.post('/api/photoAlbums/tutadrive/unlock', ...photoAlbumsVaultAuth, unlockPho
 app.post('/api/photoAlbums/tutadrive/init', ...photoAlbumsVaultAuth, initPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
+app.post(
+  '/api/photoAlbums/tutadrive/restore-zip',
+  ...photoAlbumsVaultAuth,
+  restorePhotoAlbumsTutaDriveBackupZip
+);
 app.get('/api/photoAlbums/mobile-upload/files', requireAuth, listPhotoAlbumsMobileUploadFiles);
 app.post('/api/photoAlbums/mobile-upload/files', requireAuth, postPhotoAlbumsMobileUploadFile);
 app.get('/api/photoAlbums/mobile-upload/files/:fileName', requireAuth, getPhotoAlbumsMobileUploadFile);
