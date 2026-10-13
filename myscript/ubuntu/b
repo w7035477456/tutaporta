@@ -763,6 +763,7 @@ To back up now with a note:          backupnote <text>
 To show all snapshots:               resticsnapshots
 To add a note to a snapshot:         resticnote <id> <text>
 To restore a specific snapshot:      RestoreSnapshot
+To remove old restore unpack + undo: resticCleanup
 To show latest 2 snapshot changes:   resticdiff
 To show nightly cron backup time:    showCronIncBackup
 EOF
@@ -899,27 +900,95 @@ RestoreSnapshot() {
         echo "=== $d"
         sudo rsync -a --delete --dry-run --itemize-changes "$stage$d/" "$d/"
     done
-    read -r -p "Apply these storage changes? [y/N]: " ans
-    if [[ "$ans" =~ ^[Yy]$ ]]; then
-        for d in "${storage[@]}"; do
-            sudo rsync -a --delete "$stage$d/" "$d/"
-        done
-        echo "Storage restored."
-    else
-        echo "Storage NOT restored (DB is restored; files are still current)."
-    fi
+    # DB-only restore (skipping rsync) leaves photos/notes/vault files newer than the snapshot.
+    echo -e "\n[4/5] Applying storage changes (always yes — required for DB + files to match snapshot)..."
+    for d in "${storage[@]}"; do
+        sudo rsync -a --delete "$stage$d/" "$d/"
+    done
+    echo "Storage restored."
 
     echo -e "\n[5/5] Starting app..."
     pm2 start tutamallPM2Process
     pm2 list
-    echo "Check https://tutamall.com. Undo DB: load $pre the same way."
+    echo "Check https://tutamall.com. Undo DB (if kept): load $pre the same way."
 
     echo
     read -r -p "Clean up unpacked snapshot folder $stage? [Y/n]: " ans
     [[ ! "$ans" =~ ^[Nn]$ ]] && sudo rm -rf "$stage" && echo "Removed $stage"
-    read -r -p "Also delete the undo DB dump $pre? [y/N]: " ans
-    [[ "$ans" =~ ^[Yy]$ ]] && sudo rm -f "$pre" && echo "Removed $pre"
+    read -r -p "Also delete the undo DB dump $pre? [Y/n]: " ans
+    [[ ! "$ans" =~ ^[Nn]$ ]] && sudo rm -f "$pre" && echo "Removed $pre"
     echo "Done."
+}
+
+# Leftover RestoreSnapshot unpack dirs and pre-restore safety dumps (not restic repo snapshots).
+resticCleanup() {
+    local backups=/home/lawsen0/backups
+    local -a stage_dirs undo_dumps
+    local d f ans n_stages n_undo n_files size
+
+    mapfile -t stage_dirs < <(find "$backups" -maxdepth 1 -type d -name 'restore-ubuntu-*' 2>/dev/null | sort)
+    mapfile -t undo_dumps < <(find "$backups" -maxdepth 1 -type f -name 'pre-restore-*.sql.zst' 2>/dev/null | sort)
+
+    n_stages=${#stage_dirs[@]}
+    n_undo=${#undo_dumps[@]}
+
+    if [ "$n_stages" -eq 0 ] && [ "$n_undo" -eq 0 ]; then
+        echo "Nothing to clean under $backups (no restore-ubuntu-* folders, no pre-restore-*.sql.zst)."
+        return 0
+    fi
+
+    echo "RestoreSnapshot leftovers in $backups (restic snapshots in ~/TERRAMASTER are NOT touched):"
+    echo
+    if [ "$n_stages" -gt 0 ]; then
+        echo "Unpacked snapshot folders ($n_stages):"
+        for d in "${stage_dirs[@]}"; do
+            size=$(sudo du -sh "$d" 2>/dev/null | awk '{print $1}')
+            n_files=$(sudo find "$d" 2>/dev/null | wc -l | tr -d ' ')
+            echo "  [DIR]  $d  (${size:-?}, ${n_files:-0} paths)"
+            sudo ls -la "$d" 2>/dev/null | sed 's/^/         /'
+        done
+        echo
+    fi
+    if [ "$n_undo" -gt 0 ]; then
+        echo "Undo DB dumps ($n_undo):"
+        for f in "${undo_dumps[@]}"; do
+            sudo ls -lh "$f" 2>/dev/null | sed 's/^/  [FILE] /'
+        done
+        echo
+    fi
+
+    read -r -p "Delete ALL of the above? [Y/n]: " ans
+    if [[ "$ans" =~ ^[Nn]$ ]]; then
+        echo "Cancelled."
+        return 0
+    fi
+
+    echo
+    echo "=== Deleting ==="
+    for d in "${stage_dirs[@]}"; do
+        echo "--- rm -rfv $d ---"
+        if ! sudo rm -rfv "$d" 2>&1; then
+            echo "ERROR: failed to remove $d" >&2
+        fi
+        if [ -e "$d" ]; then
+            echo "ERROR: still exists after rm: $d" >&2
+        else
+            echo "OK: removed $d"
+        fi
+    done
+    for f in "${undo_dumps[@]}"; do
+        echo "--- rm -fv $f ---"
+        if ! sudo rm -fv "$f" 2>&1; then
+            echo "ERROR: failed to remove $f" >&2
+        fi
+        if [ -e "$f" ]; then
+            echo "ERROR: still exists after rm: $f" >&2
+        else
+            echo "OK: removed $f"
+        fi
+    done
+    echo
+    echo "resticCleanup done: $n_stages folder(s), $n_undo undo dump(s)."
 }
 
 

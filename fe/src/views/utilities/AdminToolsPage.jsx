@@ -24,6 +24,7 @@ import AdminToolsAsnTab from './AdminToolsAsnTab';
 import AdminToolsTablesTab from './AdminToolsTablesTab';
 import AdminToolsWipeByIdTab from './AdminToolsWipeByIdTab';
 import AdminToolsLoginLogTab from './AdminToolsLoginLogTab';
+import AllSingles from 'views/dashboard/allSingles/AllSingles';
 
 const ADMIN_TOOLS_TABS = [
   { value: 'lookup', label: 'LookupByID' },
@@ -35,7 +36,8 @@ const ADMIN_TOOLS_TABS = [
   { value: 'duplicate', label: 'Duplicate' },
   { value: 'asn', label: 'ASN' },
   { value: 'tables', label: 'TableDel' },
-  { value: 'wipe-by-id', label: 'DeleteById' }
+  { value: 'wipe-by-id', label: 'DeleteById' },
+  { value: 'all-singles', label: 'All Singles' }
 ];
 
 function resolveAdminToolsTab(tabParam) {
@@ -180,7 +182,7 @@ function FileListPanel({ files, emptyMessage, showChecksum = false, onRemoveDup,
 
 export default function AdminToolsPage() {
   const { user, loading: authLoading } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(
     () => resolveAdminToolsTab(searchParams.get('tab')) ?? 'statistic'
   );
@@ -320,7 +322,10 @@ export default function AdminToolsPage() {
             <ColorTemplate9TableData.TabButton
               key={tab.value}
               selected={activeTab === tab.value}
-              onClick={() => setActiveTab(tab.value)}
+              onClick={() => {
+                setActiveTab(tab.value);
+                setSearchParams({ tab: tab.value }, { replace: true });
+              }}
             >
               {tab.label}
             </ColorTemplate9TableData.TabButton>
@@ -328,7 +333,7 @@ export default function AdminToolsPage() {
         </ColorTemplate9TableData.TabBar>
         <ColorTemplate9TableData.PanelDivider />
         <ColorTemplate9TableData.Content>
-          {activeTab !== 'test' && folder ? (
+          {activeTab !== 'test' && activeTab !== 'all-singles' && folder ? (
             <ColorTemplate9TableData.BodyText sx={{ mb: 1, wordBreak: 'break-all' }}>
               Folder: {folder}
             </ColorTemplate9TableData.BodyText>
@@ -359,6 +364,7 @@ export default function AdminToolsPage() {
           {!loading && activeTab === 'password-check' ? (
             <AdminToolsPasswordCheckTab onError={handleToolsError} />
           ) : null}
+          {!loading && activeTab === 'all-singles' ? <AllSingles /> : null}
           {!loading && activeTab === 'lookup' ? <AdminToolsLookupTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'login-log' ? <AdminToolsLoginLogTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'asn' ? <AdminToolsAsnTab onError={handleToolsError} /> : null}

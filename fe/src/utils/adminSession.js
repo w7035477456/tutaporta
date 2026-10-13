@@ -1,5 +1,11 @@
 import { formatAliasWithMemberCode } from 'utils/memberLabel';
 
+/** Global tools login id (BE `TOOLS_ONLY_ADMIN_LOGIN_ID`; case-insensitive). */
+export const TOOLS_ONLY_ADMIN_LOGIN_ID = 'admin';
+
+/** Default label in the login id field for the tools-only admin shortcut. */
+export const TOOLS_ONLY_ADMIN_LOGIN_LABEL = 'Admin';
+
 /** JWT role === 'Admin' (impersonation or elevated admin session). */
 export function isAdminSession(user) {
   return String(user?.role ?? '').trim() === 'Admin';

@@ -23,10 +23,14 @@ import {
   myPhotoAlbumsHeaderLogoWrapSx
 } from 'config/photoAlbumsLayout';
 import { IconMenu2 } from '@tabler/icons-react';
+import { useAuth } from 'contexts/AuthContext';
+import { isToolsOnlyAdminSession } from 'utils/adminSession';
 
 /** Region 2 left — logo (+ mobile menu toggle). */
 export default function HeaderLeft({ iconsOnly = false }) {
   const location = useLocation();
+  const { user } = useAuth();
+  const hideMenuToggle = isToolsOnlyAdminSession(user);
   const theme = useTheme();
   const downMD = useMediaQuery(theme.breakpoints.down('md'));
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
@@ -83,7 +87,7 @@ export default function HeaderLeft({ iconsOnly = false }) {
       <Box component="span" sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1 }}>
         <LogoSection />
       </Box>
-      {downMD && !vettingMobileTopCluster ? (
+      {downMD && !vettingMobileTopCluster && !hideMenuToggle ? (
         <Avatar
           variant="rounded"
           sx={{

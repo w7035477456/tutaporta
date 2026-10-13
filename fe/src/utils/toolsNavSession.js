@@ -1,8 +1,8 @@
 import { isAdminSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 
-/** Global admin login (`admin`) may open these app routes (not only Tools). */
-export const TOOLS_ONLY_ADMIN_ALLOWED_PATHS = [ADMIN_TOOLS_PATH, '/allSingles'];
+/** Global admin login (`admin`) — Tools page only (All Singles is a tab on Tools). */
+export const TOOLS_ONLY_ADMIN_ALLOWED_PATHS = [ADMIN_TOOLS_PATH];
 
 export function isToolsOnlyAdminAllowedPath(pathname) {
   const path = String(pathname ?? '');

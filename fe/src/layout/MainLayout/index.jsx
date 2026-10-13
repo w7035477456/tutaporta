@@ -155,6 +155,7 @@ export default function MainLayout() {
     };
   }, [hasUser, refreshSessionStatus]);
   const adminHeader = getAdminImpersonationHeaderState(user);
+  const toolsOnlyAdminSession = isToolsOnlyAdminSession(user);
   const showDemoOnlyBanner = !adminHeader && isGuestDemoLogin(user);
   const idvLockActive = isIdentificationVerificationLockActive(user);
   useFlowerShopLightThemeOverride();
@@ -236,13 +237,17 @@ export default function MainLayout() {
   useRouteOrientationLock();
 
   useEffect(() => {
+    if (toolsOnlyAdminSession) {
+      handlerDrawerOpen(false);
+      return;
+    }
     if (isNavigationCollapseDisabled()) {
       // Desktop UI tests: keep menu open. Mobile: closed so main content is full viewport width.
       handlerDrawerOpen(!mobileEdgeToEdge);
       return;
     }
     handlerDrawerOpen(!miniDrawer);
-  }, [miniDrawer, mobileEdgeToEdge]);
+  }, [miniDrawer, mobileEdgeToEdge, toolsOnlyAdminSession]);
 
   useEffect(() => {
     if (isNavigationCollapseDisabled()) return;
@@ -293,7 +298,7 @@ export default function MainLayout() {
       }}
     >
       {/* menu / drawer — phone: overlay only (rendered outside this flex row) */}
-      {!isLandingRoute && !isVaultImmersiveRoute && !mobileEdgeToEdge && <Sidebar />}
+      {!isLandingRoute && !isVaultImmersiveRoute && !mobileEdgeToEdge && !toolsOnlyAdminSession && <Sidebar />}
 
       {/* Scroll only the main column so overflow:auto does not clip sidebar rows scaled with transform */}
       <Box
@@ -314,7 +319,11 @@ export default function MainLayout() {
         <MainContentStyled
           stretch={!isLandingRoute && !singlesListMobileShrinkWrap && !mobileScrollShrinkWrap}
           edgeToEdge={(!isLandingRoute && mobileEdgeToEdge) || isVsinglesLandingRoute}
-          {...{ borderRadius, open: isLandingRoute ? false : drawerOpen, noTopMargin: true }}
+          {...{
+            borderRadius,
+            open: isLandingRoute || toolsOnlyAdminSession ? false : drawerOpen,
+            noTopMargin: true
+          }}
         >
           <Box
             sx={{
@@ -433,7 +442,9 @@ export default function MainLayout() {
                 </Box>
               ) : (
                 <>
-                  {mobileEdgeToEdge && !isLandingRoute && !isVaultImmersiveRoute ? <Sidebar /> : null}
+                  {mobileEdgeToEdge && !isLandingRoute && !isVaultImmersiveRoute && !toolsOnlyAdminSession ? (
+                    <Sidebar />
+                  ) : null}
                   {scaledContent}
                 </>
               )}
@@ -520,15 +531,15 @@ export default function MainLayout() {
                 showTopBanner={!isVaultImmersiveRoute && isDatingRoute}
                 topBannerImage={vaultHeaderBannerImage}
                 headerBannerSx={vaultHeaderBannerSx}
-                sidebarOpen={drawerOpen}
+                sidebarOpen={toolsOnlyAdminSession ? false : drawerOpen}
                 sidebarWidthPx={navDrawerOpenWidthPx}
                 sidebarTopOffsetPx={isDatingRoute ? 76 : 0}
                 borderRadius={borderRadius}
                 mainStretch={!mobileScrollShrinkWrap}
                 mainEdgeToEdge={mobileEdgeToEdge || isVsinglesLandingRoute || isVaultImmersiveRoute}
                 immersiveMain={isVsinglesLandingRoute || isVaultImmersiveRoute}
-                showSidebar={!isVaultImmersiveRoute}
-                drawerOpen={drawerOpen}
+                showSidebar={!isVaultImmersiveRoute && !toolsOnlyAdminSession}
+                drawerOpen={toolsOnlyAdminSession ? false : drawerOpen}
                 footerAtScrollEnd={mobileFooterEndOfScroll && !vaultFocusFooterSuppressed}
                 showFixedFooter={!downLG && !mobileFooterEndOfScroll && !vaultFocusFooterSuppressed}
                 landingPageWide={useLandingPagePanel}

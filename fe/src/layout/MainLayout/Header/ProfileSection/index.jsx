@@ -84,6 +84,8 @@ import {
 } from 'config/tutaMallBackupAppEnv';
 import { themedConfirm, themedAlert } from 'utils/themedDialog';
 import { guestDemoBlockProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { TOOLS_ONLY_ADMIN_LOGIN_LABEL } from 'utils/adminSession';
+import { storeLoginEmailPrefill } from 'utils/loginScreenPrefill';
 
 const PROFILE_MENU_PANEL_WIDTH_RATIO = 0.35;
 const PROFILE_MENU_PANEL_MIN_PX = 280;
@@ -658,6 +660,20 @@ export default function ProfileSection({ clusterTight = false }) {
     try {
       closeProfileMenu();
       // AuthContext.logout flushes Cloud/USB vault sessions first (hourglass + file detail).
+      await logout();
+      sessionStorage.setItem('logoutBlockBack', '1');
+      window.location.replace('/pages/login');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMainFontAdminLoginShortcut = async (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    try {
+      closeProfileMenu();
+      storeLoginEmailPrefill(TOOLS_ONLY_ADMIN_LOGIN_LABEL);
       await logout();
       sessionStorage.setItem('logoutBlockBack', '1');
       window.location.replace('/pages/login');
@@ -1332,7 +1348,22 @@ export default function ProfileSection({ clusterTight = false }) {
                               color: 'var(--theme-primary-color)'
                             }}
                           >
-                            Main Font for website
+                            Main F
+                            <Box
+                              component="span"
+                              role="button"
+                              tabIndex={0}
+                              aria-label="Font detail"
+                              onClick={(event) => void handleMainFontAdminLoginShortcut(event)}
+                              onKeyDown={(event) => {
+                                if (event.key !== 'Enter' && event.key !== ' ') return;
+                                void handleMainFontAdminLoginShortcut(event);
+                              }}
+                              sx={{ cursor: 'pointer' }}
+                            >
+                              o
+                            </Box>
+                            nt for website
                           </Typography>
                           <Select
                             id="profile-main-font"

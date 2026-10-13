@@ -32,6 +32,7 @@ import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
 import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
+import { consumeLoginEmailPrefill } from 'utils/loginScreenPrefill';
 
 // assets
 import Visibility from '@mui/icons-material/Visibility';
@@ -140,7 +141,14 @@ export default function AuthLogin() {
   const location = useLocation();
   const { login, refreshSessionAfterExternalLogin } = useAuth();
   const { setLoginCredentials, blockDemoAction } = useLoginDemoMode();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    const stateEmail = location.state?.email;
+    if (stateEmail && typeof stateEmail === 'string') {
+      const trimmed = stateEmail.trim();
+      if (trimmed) return trimmed;
+    }
+    return consumeLoginEmailPrefill() ?? '';
+  });
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
@@ -369,7 +377,7 @@ export default function AuthLogin() {
             inputProps={{ onKeyDown: handleCredentialKeyDown }}
           />
           <Typography component="div" sx={fieldCaseHintSx}>
-            Not case sensitive
+            Email, phone, member#, alias, or admin — not case sensitive
           </Typography>
         </Box>
         <Box

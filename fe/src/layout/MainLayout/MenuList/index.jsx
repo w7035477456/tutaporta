@@ -16,7 +16,6 @@ import { exitMenuIcon } from 'config/menuIcons';
 import NavItem from './NavItem';
 import NavGroup from './NavGroup';
 import menuItems, { toolsMenuItem } from 'menu-items';
-import dashboard from 'menu-items/dashboard';
 
 import { closeSidebarAfterNavSelectIfMobile, useGetMenuMaster } from 'api/menu';
 import { flushRecordVaultSessionsOnLeave } from 'api/recordVaultFe';
@@ -129,15 +128,13 @@ function filterToolsMenuItem(menuConfig, showToolsMenu) {
   };
 }
 
-const allSinglesMenuItem = dashboard.children?.find((item) => item?.id === 'allSingles');
-
 const toolsOnlyMenuItems = {
   items: [
     {
       id: 'menu-group-tools-only',
       type: 'group',
       title: '',
-      children: [allSinglesMenuItem, toolsMenuItem].filter(Boolean)
+      children: [toolsMenuItem].filter(Boolean)
     }
   ]
 };
