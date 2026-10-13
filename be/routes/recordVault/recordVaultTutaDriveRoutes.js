@@ -8,8 +8,10 @@
 import fs from 'fs';
 import path from 'path';
 import {
+  flushDbToUsb,
   getVaultSession,
   initializeVaultOnUsbWithKey,
+  listTutaDriveVaultFolderListing,
   unlockVaultUsbWithKey,
   logoffVaultUsb
 } from '../../utils/recordVaultUsb/vaultSession.js';
@@ -299,6 +301,51 @@ export async function unlockRecordVaultTutaDrive(req, res) {
     const mapped = unlockErrorResponse(err);
     if (mapped.status >= 500) console.error('[unlockRecordVaultTutaDrive]', err);
     return res.status(mapped.status).json(mapped.body);
+  }
+}
+
+/** GET /api/recordVault/tutadrive/vault-tree — nested listing of unlocked TutaCloud vault folder. */
+export async function getRecordVaultTutaDriveVaultTree(req, res) {
+  const singlesId = await requireVaultAccessSession(req, res);
+  if (!singlesId) return;
+
+  try {
+    const listing = listTutaDriveVaultFolderListing(singlesId);
+    if (!listing) {
+      return res.status(428).json({
+        error: 'TutaCloud vault not unlocked',
+        code: 'RECORD_VAULT_CLOUD_REQUIRED'
+      });
+    }
+    return res.json(listing);
+  } catch (err) {
+    console.error('[getRecordVaultTutaDriveVaultTree]', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Unable to list TutaCloud vault folder' });
+  }
+}
+
+/** POST /api/recordVault/tutadrive/sync — flush vault DB to local TutaCloud storage (no cloud upload). */
+export async function syncRecordVaultTutaDrive(req, res) {
+  const singlesId = await requireVaultAccessSession(req, res);
+  if (!singlesId) return;
+
+  try {
+    const session = getVaultSession(singlesId, 'onedrive');
+    if (!session?.unlocked || !session?.mountPath) {
+      return res.status(428).json({
+        error: 'TutaCloud vault not unlocked',
+        code: 'RECORD_VAULT_CLOUD_REQUIRED'
+      });
+    }
+    flushDbToUsb(session);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('[syncRecordVaultTutaDrive]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to save TutaCloud vault', {
+      route: 'syncRecordVaultTutaDrive',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
   }
 }
 
