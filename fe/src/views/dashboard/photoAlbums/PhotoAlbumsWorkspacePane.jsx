@@ -27,7 +27,6 @@ import {
   fetchPhotoAlbumsStorageConfig,
   fetchPhotoAlbumsUsbStatus,
   fetchPhotoAlbumsUsbLocations,
-  fetchPhotoAlbumsTutaDriveStatus,
   probePhotoAlbumsBridge,
   setPhotoAlbumsBridgeSinglesId,
   setPhotoAlbumsBridgeStorageType,
@@ -3378,32 +3377,6 @@ export default function PhotoAlbumsWorkspacePane({
     void refreshUsbBridgeHealth();
     const timerId = window.setInterval(() => {
       void refreshUsbBridgeHealth();
-    }, 4000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timerId);
-    };
-  }, [unlocked, paneStorageType, leaveUnlockedWorkspace]);
-
-  /** TutaCloud: leave workspace when server session is no longer unlocked. */
-  useEffect(() => {
-    if (!unlocked || paneStorageType !== 'tutadrive') return undefined;
-    let cancelled = false;
-    const refreshTutaCloudSession = async () => {
-      try {
-        const status = await fetchPhotoAlbumsTutaDriveStatus();
-        if (cancelled) return;
-        if (!status?.session?.unlocked) {
-          setPhotoAlbumsBridgeStorageType(null);
-          leaveUnlockedWorkspace();
-        }
-      } catch {
-        // ignore transient status errors
-      }
-    };
-    void refreshTutaCloudSession();
-    const timerId = window.setInterval(() => {
-      void refreshTutaCloudSession();
     }, 4000);
     return () => {
       cancelled = true;

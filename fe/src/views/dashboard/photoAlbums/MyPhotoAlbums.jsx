@@ -340,6 +340,9 @@ export default function MyPhotoAlbums() {
   const [accessGateOpen, setAccessGateOpen] = useState(false);
   /** Pending open side for Access Gate: `{ storageType, mountPath? }`. */
   const pendingOpenRef = useRef(null);
+  /** Encrypt Password satisfied this visit — skip re-opening access gate on auto-open retry. */
+  const accessUnlockedRef = useRef(false);
+  const initialPaneSessionCheckDoneRef = useRef(false);
   const [accessGateStorageType, setAccessGateStorageType] = useState('tutadrive');
   const [accessGateUsbMountPath, setAccessGateUsbMountPath] = useState('');
   const [tutaCloudProceedOpenToken, setTutaCloudProceedOpenToken] = useState(0);
@@ -417,6 +420,8 @@ export default function MyPhotoAlbums() {
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myPhotos visit.
     clearPhotoAlbumsE2eSession();
+    accessUnlockedRef.current = false;
+    initialPaneSessionCheckDoneRef.current = false;
   }, []);
 
   /** Mobile mall tile: stage-only upload sheet — do not unlock vault (desktop must still ask FDE). */
@@ -450,9 +455,12 @@ export default function MyPhotoAlbums() {
   }, []);
 
   const refreshPaneSessions = useCallback(async () => {
-    setSessionChecking(true);
-    setSessionProgressPercent(0);
-    setSessionProgressLabel('Starting TutaPhotoAlbums…');
+    const showBlockingCheck = !initialPaneSessionCheckDoneRef.current;
+    if (showBlockingCheck) {
+      setSessionChecking(true);
+      setSessionProgressPercent(0);
+      setSessionProgressLabel('Starting TutaPhotoAlbums…');
+    }
     setError('');
     try {
       const cloudLabel = tutaDriveMode ? 'TutaDrive' : 'OneDrive';
@@ -495,6 +503,7 @@ export default function MyPhotoAlbums() {
       setTutaCloudUnlocked(false);
       setUsbUnlocked(false);
     } finally {
+      initialPaneSessionCheckDoneRef.current = true;
       setSessionChecking(false);
       setSessionProgressPercent(null);
       setSessionProgressLabel('');
@@ -514,7 +523,9 @@ export default function MyPhotoAlbums() {
         if (cfg.leftSide != null || cfg.tutaDrive != null) {
           const leftMode = parseLeftSideMode(cfg.leftSide);
           setTutaDriveMode(Boolean(cfg.tutaDrive) || leftMode === 'TutaDrive');
-          if (cfg.oneDrive?.visible != null) {
+          if (cfg.tutaCloud?.visible != null) {
+            setTutaCloudOffered(Boolean(cfg.tutaCloud.visible));
+          } else if (cfg.oneDrive?.visible != null) {
             setTutaCloudOffered(Boolean(cfg.oneDrive.visible));
           } else {
             setTutaCloudOffered(leftMode !== 'None');
@@ -543,7 +554,7 @@ export default function MyPhotoAlbums() {
         const cfg = await fetchPhotoAlbumsStorageConfig();
         if (cancelled) return;
         applyPanelSides(cfg);
-        setTutaCloudOffered(Boolean(cfg.oneDrive?.visible));
+        setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
         setLocalUsbOffered(Boolean(cfg.localUsb?.visible));
       } catch {
         if (!cancelled) {
@@ -729,6 +740,7 @@ export default function MyPhotoAlbums() {
   // Always show Full Disk Encryption before Open Cloud/USB (user may set password or Skip).
   // Mobile upload uses a separate sheet and never reaches these handlers.
   const handleTutaCloudOpenClicked = useCallback(() => {
+    if (accessUnlockedRef.current) return false;
     pendingOpenRef.current = { storageType: 'tutadrive' };
     setAccessGateStorageType('tutadrive');
     setAccessGateUsbMountPath('');
@@ -741,6 +753,7 @@ export default function MyPhotoAlbums() {
   }, []);
 
   const handleUsbOpenClicked = useCallback((opts = {}) => {
+    if (accessUnlockedRef.current) return false;
     const mountPath = String(opts?.mountPath ?? '').trim();
     pendingOpenRef.current = { storageType: 'usb', mountPath };
     setAccessGateStorageType('usb');
@@ -750,6 +763,7 @@ export default function MyPhotoAlbums() {
   }, []);
 
   const handleAccessUnlocked = useCallback(() => {
+    accessUnlockedRef.current = true;
     setAccessGateOpen(false);
     const pending = pendingOpenRef.current;
     pendingOpenRef.current = null;

@@ -170,7 +170,15 @@ export const PHOTO_ALBUMS_STORAGE_HEADER = 'x-record-vault-storage';
 
 export function normalizeVaultStorageType(raw, fallback = 'usb') {
   const value = String(raw ?? fallback).trim().toLowerCase();
-  return value === 'onedrive' ? 'onedrive' : 'usb';
+  if (
+    value === 'onedrive' ||
+    value === 'tutadrive' ||
+    value === 'tutacloud' ||
+    value === 'cloud'
+  ) {
+    return 'onedrive';
+  }
+  return 'usb';
 }
 
 function vaultSessionKey(singlesId, storageType = 'usb') {
