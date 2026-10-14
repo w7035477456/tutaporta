@@ -104,8 +104,23 @@ function computeStatusLocal(row, year, today = new Date()) {
   return { status: 'NOT PAID', status_tone: 'upcoming' };
 }
 
+function dueSortKey(row) {
+  const month = Number(row.bill_month);
+  const day = Number(row.due_month_day);
+  const m = Number.isFinite(month) && month >= 1 && month <= 12 ? month : 99;
+  const d = Number.isFinite(day) && day >= 1 && day <= 31 ? day : 99;
+  return m * 100 + d;
+}
+
+/** Earliest due date first; rows without a due date last; ties keep their # order. */
+function sortByDueDate(rows) {
+  return [...(rows || [])].sort(
+    (a, b) => dueSortKey(a) - dueSortKey(b) || Number(a.row_index) - Number(b.row_index)
+  );
+}
+
 function withDerived(rows, year) {
-  return (rows || []).map((r) => ({
+  return sortByDueDate(rows).map((r) => ({
     ...r,
     ...computeStatusLocal(r, year)
   }));
@@ -292,12 +307,12 @@ export default function BillScheduleYearlyPanel({
   /** Persist current (or override) rows; clears dirty/blink on success. Returns saved rows or null. */
   const persistSchedule = useCallback(
     async (rowsOverride) => {
-      const toSave = Array.isArray(rowsOverride) ? rowsOverride : rowsRef.current;
+      const toSave = sortByDueDate(Array.isArray(rowsOverride) ? rowsOverride : rowsRef.current);
       setSaving(true);
       setError('');
       try {
         const payload = toSave.map((r, i) => ({
-          row_index: Number(r.row_index) || i + 1,
+          row_index: i + 1,
           bill_description: r.bill_description,
           bill_month: r.bill_month === '' || r.bill_month == null ? null : Number(r.bill_month),
           due_month_day:
@@ -326,10 +341,13 @@ export default function BillScheduleYearlyPanel({
   const openBillForRow = async (row, { payMode = false } = {}) => {
     let target = row;
     if (dirty) {
+      // Save renumbers # in due-date order, so locate the row by its sorted position.
+      const current = rowsRef.current.find((r) => Number(r.row_index) === Number(row.row_index)) || row;
+      const savedRowIndex = sortByDueDate(rowsRef.current).indexOf(current) + 1;
       const saved = await persistSchedule();
       if (!saved) return;
       target =
-        saved.find((r) => Number(r.row_index) === Number(row.row_index)) ||
+        saved.find((r) => Number(r.row_index) === savedRowIndex) ||
         saved.find((r) => Number(r.yearly_bill_id) === Number(row.yearly_bill_id)) ||
         row;
     }
@@ -586,7 +604,7 @@ export default function BillScheduleYearlyPanel({
                 key={`ybill-row-${row.row_index}-${index}`}
                 style={paid ? { background: PAID_ROW_BG } : undefined}
               >
-                <td style={{ textAlign: 'center', fontWeight: 700 }}>{row.row_index}</td>
+                <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
                 <td>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <TextField
