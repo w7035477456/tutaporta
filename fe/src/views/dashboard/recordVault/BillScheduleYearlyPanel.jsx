@@ -76,9 +76,13 @@ function normalizeAmountLocal(raw) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function isPaidAction(action) {
+  return /^paid$/i.test(String(action ?? '').trim());
+}
+
 function computeStatusLocal(row, year, today = new Date()) {
   if (row.bill_type === 'Auto') return { status: '', status_tone: 'auto' };
-  if (row.action === 'Paid') return { status: 'Paid', status_tone: 'paid' };
+  if (isPaidAction(row.action)) return { status: 'Paid', status_tone: 'paid' };
   const dueMonth = Number(row.bill_month);
   const dueDay = Number(row.due_month_day);
   if (
@@ -265,8 +269,8 @@ export default function BillScheduleYearlyPanel({
   };
 
   const updateRow = (index, patch) => {
-    setRows((prev) =>
-      prev.map((r, i) => {
+    setRows((prev) => {
+      const next = prev.map((r, i) => {
         if (i !== index) return r;
         const merged = { ...r, ...patch };
         if (merged.bill_type === 'Auto') {
@@ -274,8 +278,10 @@ export default function BillScheduleYearlyPanel({
           merged.paid_record_id = null;
         }
         return { ...merged, ...computeStatusLocal(merged, year) };
-      })
-    );
+      });
+      rowsRef.current = next;
+      return next;
+    });
     setSavedMsg('');
     setDirty(true);
   };
@@ -679,7 +685,7 @@ export default function BillScheduleYearlyPanel({
                       onChange={(e) => {
                         const next = e.target.value || null;
                         updateRow(index, { action: next });
-                        if (next === 'Paid') void openBillForRow(row);
+                        if (next === 'Paid') void openBillForRow(rowsRef.current[index]);
                       }}
                       sx={selectSx}
                       renderValue={(v) => {

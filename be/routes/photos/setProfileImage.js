@@ -7,6 +7,8 @@ import { activateSinglesStatusOnProfilePhoto } from '../../utils/activateSingles
 import { buildProfilePercentMatchZeroSetClauses } from '../../utils/zeroSinglesProfilePercentMatches.js';
 import { loadTableColumns, sqlIdent } from '../singles/checkrBioReviewDb.js';
 import { isAdminImpersonationSession } from '../../utils/adminAuth.js';
+import { loadMyPhotoBytes } from '../../utils/loadMyPhotoBytes.js';
+import { validateProfilePhotoLooksReal } from '../../utils/profilePhotoRealPhotoCheck.js';
 
 let cachedInitialSetupDoneUdt = null;
 
@@ -92,9 +94,22 @@ export async function setProfileImage(req, res) {
         return res.status(404).json({ error: 'Photo not found for this user' });
       }
 
+      const skipProfileChangeSideEffects = isAdminImpersonationSession(req.auth);
+      if (!skipProfileChangeSideEffects) {
+        try {
+          const photoBytes = await loadMyPhotoBytes(singlesId, photosId);
+          const realism = await validateProfilePhotoLooksReal(photoBytes);
+          if (!realism.ok) {
+            return res.status(400).json({ error: realism.error });
+          }
+        } catch (loadErr) {
+          console.error('[setProfileImage] profile photo realism check load error', loadErr?.message ?? loadErr);
+          return res.status(500).json({ error: 'Failed to read photo for profile check' });
+        }
+      }
+
       const schemaName = getDBSchema();
       const singlesColumns = await loadTableColumns(schemaName, 'singles');
-      const skipProfileChangeSideEffects = isAdminImpersonationSession(req.auth);
       const percentMatchZeroSql = skipProfileChangeSideEffects
         ? []
         : buildProfilePercentMatchZeroSetClauses(singlesColumns);

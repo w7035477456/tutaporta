@@ -2,6 +2,7 @@ import {
   RekognitionClient,
   CompareFacesCommand,
   DetectFacesCommand,
+  DetectLabelsCommand,
   DetectTextCommand,
   CreateFaceLivenessSessionCommand,
   GetFaceLivenessSessionResultsCommand
@@ -146,6 +147,18 @@ export async function detectSingleFace(bytes) {
   );
   const faces = response.FaceDetails || [];
   return { faceCount: faces.length, faces };
+}
+
+export async function detectImageLabels(bytes, { maxLabels = 50, minConfidence = 50 } = {}) {
+  const client = getClient();
+  const response = await client.send(
+    new DetectLabelsCommand({
+      Image: { Bytes: bytes },
+      MaxLabels: maxLabels,
+      MinConfidence: minConfidence
+    })
+  );
+  return response.Labels || [];
 }
 
 export async function detectTextDetections(bytes) {
