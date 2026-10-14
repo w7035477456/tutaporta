@@ -1,7 +1,7 @@
 import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { prepareLargeBackupFormData } from './chunkedBackupUploadFe';
-import { saveBlobToDownloadZipFolder } from 'utils/downloadZipFolder';
+import { saveBlobToZipFile } from 'utils/downloadZipFolder';
 import {
   normalizeUsbBridgeInstallerUrl,
   USB_BRIDGE_INSTALLER_API
@@ -957,17 +957,17 @@ export async function deleteRecordVaultTutaDriveBackup(fileName) {
 
 /**
  * Download one sealed EncryptedBackup_*.zip from the member folder.
- * With `targetDir` (from acquireDownloadZipFolder) the zip is written there; otherwise a normal browser download.
+ * With `targetFile` (from acquireSaveZipFile) the zip is written there; otherwise a normal browser download.
  */
-export async function downloadRecordVaultTutaDriveStoredBackup(fileName, { targetDir = null } = {}) {
+export async function downloadRecordVaultTutaDriveStoredBackup(fileName, { targetFile = null } = {}) {
   if (!fileName) throw new Error('Backup file name is required');
   try {
     const q = `?fileName=${encodeURIComponent(String(fileName))}`;
     const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob', timeout: 0 });
     const resolvedName =
-      parseContentDispositionFilename(response.headers?.['content-disposition']) || String(fileName);
-    if (targetDir) {
-      await saveBlobToDownloadZipFolder(targetDir, resolvedName, response.data);
+      targetFile?.name || parseContentDispositionFilename(response.headers?.['content-disposition']) || String(fileName);
+    if (targetFile) {
+      await saveBlobToZipFile(targetFile, response.data);
     } else {
       triggerBrowserBlobDownload(response.data, resolvedName);
     }

@@ -34,8 +34,7 @@ import {
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { themedAlert, themedConfirm, themedOverwriteSkip } from 'utils/themedDialog';
-import { acquireDownloadZipFolder } from 'utils/downloadZipFolder';
-import { saveUserZipFolder } from 'api/userCustomizationFe';
+import { acquireSaveZipFile } from 'utils/downloadZipFolder';
 import {
   ensureEncryptPasswordForBackupSeal,
   prepareBackupDecryptWithPassword
@@ -839,21 +838,16 @@ export default function RecordVaultTutaCloudBackupDialog({
 
   const handleDownloadBackup = async (fileName) => {
     resetMessages();
-    const folder = await acquireDownloadZipFolder();
-    if (folder?.cancelled) return;
-    if (folder?.label) {
-      saveUserZipFolder(folder.label).catch((err) => {
-        console.warn('[RecordVaultTutaCloudBackupDialog] save zip_folder failed', err?.message || err);
-      });
-    }
+    const saveTarget = await acquireSaveZipFile(fileName);
+    if (saveTarget?.cancelled) return;
     setBusy(true);
     setActioningFile(fileName);
     try {
-      const result = await downloadRecordVaultTutaDriveStoredBackup(fileName, { targetDir: folder?.dir || null });
+      const result = await downloadRecordVaultTutaDriveStoredBackup(fileName, { targetFile: saveTarget?.file || null });
       const savedName = result?.fileName || fileName;
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
-      const destination = folder?.label || 'your browser download folder';
+      const destination = saveTarget?.file ? 'the folder you chose' : 'your browser download folder';
       setSuccess(`Downloaded ${savedName}${sizeText} to ${destination}.`);
       setSuccessTone('backup');
       setBusy(false);

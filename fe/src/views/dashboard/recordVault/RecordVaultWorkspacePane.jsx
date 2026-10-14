@@ -792,7 +792,7 @@ function renderMenuLabelOneWordPerLine(label) {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length <= 1) {
     return (
-      <Box component="span" sx={{ ...menuButtonWordPerLineLabelSx, display: 'block' }}>
+      <Box component="span" data-menu-label-word="" sx={{ ...menuButtonWordPerLineLabelSx, display: 'block' }}>
         {text}
       </Box>
     );
@@ -804,6 +804,7 @@ function renderMenuLabelOneWordPerLine(label) {
           // eslint-disable-next-line react/no-array-index-key
           key={`${word}-${index}`}
           component="span"
+          data-menu-label-word=""
           sx={{
             display: 'block',
             width: '100%',
@@ -817,6 +818,55 @@ function renderMenuLabelOneWordPerLine(label) {
       ))}
     </Box>
   );
+}
+
+/** Rendered width of the text inside `el` (text nodes only — ignores ripple / icon spans). */
+function measureTextWidthPx(el) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let left = Infinity;
+  let right = -Infinity;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent.trim()) continue;
+    range.selectNodeContents(node);
+    const rect = range.getBoundingClientRect();
+    if (!rect.width) continue;
+    left = Math.min(left, rect.left);
+    right = Math.max(right, rect.right);
+  }
+  return right > left ? right - left : 0;
+}
+
+function horizontalChromePx(el) {
+  const cs = window.getComputedStyle(el);
+  return (
+    (parseFloat(cs.paddingLeft) || 0) +
+    (parseFloat(cs.paddingRight) || 0) +
+    (parseFloat(cs.borderLeftWidth) || 0) +
+    (parseFloat(cs.borderRightWidth) || 0)
+  );
+}
+
+/**
+ * Px to add to (positive) or remove from (negative) a swim lane so its widest label — one word
+ * per row in each notebook/note button, plus the Add button — just fits. null = nothing to measure.
+ * Every slot's available width changes 1:1 with the lane width (checkbox / lock / X are fixed).
+ */
+function measureLaneFitDeltaPx(laneEl) {
+  if (!laneEl) return null;
+  let delta = null;
+  laneEl.querySelectorAll('[data-menu-label-slot]').forEach((slot) => {
+    const button = slot.firstElementChild;
+    if (!button) return;
+    const words = button.querySelectorAll('[data-menu-label-word]');
+    const textWidth = words.length
+      ? Math.max(...Array.from(words, measureTextWidthPx))
+      : measureTextWidthPx(button);
+    const needed = textWidth + horizontalChromePx(button);
+    const diff = needed - slot.clientWidth;
+    delta = delta == null ? diff : Math.max(delta, diff);
+  });
+  return delta == null ? null : Math.ceil(delta) + 2;
 }
 
 /** Notebook column width — fit the longest single word (labels stack one word per row). */
@@ -1420,6 +1470,7 @@ function RenamableDraggableMenuRow({
     >
       <Box
         id={domId || undefined}
+        data-menu-label-slot=""
         sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
       >
         <MenuRowButton
@@ -4518,6 +4569,57 @@ export default function RecordVaultWorkspacePane({
     });
     return undefined;
   }, [displayNotebooks, notebookColAutoFit, menuButtonFontRem]);
+
+  const notebookLaneRef = useRef(null);
+  const noteLaneRef = useRef(null);
+
+  /** Resize the Notebook / Note swim lanes (wider or narrower) so the widest label just fits. */
+  const fitMenuLanesToLabels = useCallback(() => {
+    const notebookLane = notebookLaneRef.current;
+    const noteLane = noteLaneRef.current;
+    if (!notebookLane || !noteLane) return;
+    const notebookDelta = measureLaneFitDeltaPx(notebookLane) ?? 0;
+    const noteDelta = measureLaneFitDeltaPx(noteLane) ?? 0;
+    const notebookNow = notebookLane.offsetWidth;
+    const noteNow = noteLane.offsetWidth;
+    const nextNotebookCol = Math.max(MIN_MENU_COL_WIDTH, notebookNow + notebookDelta);
+    const nextNoteCol = Math.max(MIN_MENU_COL_WIDTH, noteNow + noteDelta);
+    const sidebarDelta = nextNotebookCol - notebookNow + (nextNoteCol - noteNow);
+    if (Math.abs(sidebarDelta) < 2 && Math.abs(nextNotebookCol - notebookColWidth) < 2) return;
+    const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const maxSidebar = Math.max(
+      MIN_SIDEBAR_WIDTH,
+      viewportW - rightSidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2
+    );
+    const nextSidebar = clamp(sidebarWidth + sidebarDelta, MIN_SIDEBAR_WIDTH, maxSidebar);
+    setNotebookColAutoFit(false);
+    setNotebookColWidth(nextNotebookCol);
+    setSidebarWidth(nextSidebar);
+    writeStoredLayout({
+      sidebarWidth: nextSidebar,
+      notebookColWidth: nextNotebookCol,
+      rightSidebarWidth,
+      shortcutPanePercent
+    });
+  }, [notebookColWidth, rightSidebarWidth, shortcutPanePercent, sidebarWidth]);
+
+  const fitMenuLanesToLabelsRef = useRef(fitMenuLanesToLabels);
+  fitMenuLanesToLabelsRef.current = fitMenuLanesToLabels;
+  const menuLanesVisible = leftMenuOpen && !hideWorkspaceChrome;
+  const prevMenuLanesVisibleRef = useRef(menuLanesVisible);
+  useEffect(() => {
+    const wasVisible = prevMenuLanesVisibleRef.current;
+    prevMenuLanesVisibleRef.current = menuLanesVisible;
+    if (wasVisible || !menuLanesVisible) return undefined;
+    let innerFrame = 0;
+    const outerFrame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(() => fitMenuLanesToLabelsRef.current());
+    });
+    return () => {
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+    };
+  }, [menuLanesVisible]);
 
   /**
    * Attach Chromium drag-out payloads so note(s) save as .html in Finder/Explorer.
@@ -7626,6 +7728,7 @@ export default function RecordVaultWorkspacePane({
                   }}
                 >
                   <Box
+                    ref={notebookLaneRef}
                     sx={{
                       ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
                       width: notebookColWidth,
@@ -7643,7 +7746,7 @@ export default function RecordVaultWorkspacePane({
                     onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
                     title="Drop a folder of .html notes here to import as a new notebook"
                   >
-                    <Box sx={laneAddButtonWrapSx}>
+                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
                       <SliderControlButton
                         type="button"
                         fullWidth
@@ -7761,6 +7864,7 @@ export default function RecordVaultWorkspacePane({
                   <ColumnResizeHandle onMouseDown={(e) => startColumnResize('notebookCol', e)} />
 
                   <Box
+                    ref={noteLaneRef}
                     sx={{
                       ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
                       flex: 1,
@@ -7777,7 +7881,7 @@ export default function RecordVaultWorkspacePane({
                     onDragLeave={handleNoteListFileDragLeave}
                     onDrop={(e) => void handleNoteListFileDrop(e)}
                   >
-                    <Box sx={laneAddButtonWrapSx}>
+                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
                       <SliderControlButton
                         type="button"
                         fullWidth
