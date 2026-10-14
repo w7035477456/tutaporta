@@ -123,7 +123,7 @@ function describeBackupRequestError(err, fallback) {
   if (apiError) return apiError;
   const status = Number(err?.response?.status) || 0;
   if (status === 413) {
-    return 'Server error 413: the backup zip is larger than the web server upload limit.';
+    return 'Server error 413: one upload request was larger than the Cloudflare 100 MB limit. Please try again.';
   }
   if (status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 524)) {
     return (

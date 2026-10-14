@@ -1,5 +1,6 @@
 import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
+import { prepareLargeBackupFormData } from './chunkedBackupUploadFe';
 import {
   normalizeUsbBridgeInstallerUrl,
   USB_BRIDGE_INSTALLER_API
@@ -886,7 +887,12 @@ export async function restoreRecordVaultTutaDriveBackupZip(file) {
   if (!file) throw new Error('Choose a backup zip file first');
   const formData = new FormData();
   formData.append('backup', file);
-  const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', formData);
+  const { formData: body } = await prepareLargeBackupFormData(formData);
+  const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', body, {
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
+  });
   return data;
 }
 
@@ -1059,10 +1065,20 @@ async function sendBackupFormWithProgress(method, url, formData, totalBytes, rep
   const startedAt = Date.now();
   let serverStageReported = false;
   report('send', fromPct, { loadedBytes: 0, totalBytes });
+  const prepared = await prepareLargeBackupFormData(formData, {
+    onProgress: (loaded, total) => {
+      const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+      report('send', percent, details);
+    }
+  });
+  if (prepared.chunked) {
+    serverStageReported = true;
+    report('server', toPct, { totalBytes });
+  }
   const { data } = await api.request({
     method,
     url,
-    data: formData,
+    data: prepared.formData,
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
     timeout: 0,
@@ -1228,7 +1244,8 @@ export async function fetchRecordVaultTutaDriveBackupNotebookTree(fileName) {
   const plainZip = await unsealRecordVaultTutaDriveStoredBackupBytes(undefined, fileName);
   const formData = new FormData();
   formData.append('backup', new Blob([plainZip], { type: 'application/zip' }), 'TutaNotes-open.zip');
-  const { data } = await api.post('/api/recordVault/tutadrive/backup-tree', formData, {
+  const { formData: body } = await prepareLargeBackupFormData(formData);
+  const { data } = await api.post('/api/recordVault/tutadrive/backup-tree', body, {
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
     timeout: 0

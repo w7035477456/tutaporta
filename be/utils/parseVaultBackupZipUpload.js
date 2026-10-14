@@ -2,6 +2,7 @@ import Busboy from 'busboy';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { assembleChunkedUpload, discardChunkedUpload } from './chunkedUploadStaging.js';
 
 /** Max sealed/plain backup zip the parser accepts (500 MiB). */
 const MAX_BACKUP_ZIP_BYTES = 500 * 1024 * 1024;
@@ -17,7 +18,11 @@ function formatUploadHint(contentLength) {
   );
 }
 
-/** Parse multipart field `backup` into a temp zip file path. */
+/**
+ * Parse multipart field `backup` into a temp zip file path. Zips over Cloudflare's 100 MB request
+ * limit arrive instead as `chunkedUploadId` + `chunkCount` + `totalBytes` fields referencing parts
+ * already sent to PUT /api/tutadrive/upload-chunk.
+ */
 export function parseVaultBackupZipUpload(req) {
   return new Promise((resolve, reject) => {
     const contentType = String(req.headers['content-type'] || '');
@@ -40,6 +45,9 @@ export function parseVaultBackupZipUpload(req) {
     let note = '';
     let hint = '';
     let dateStamp = '';
+    let chunkedUploadId = '';
+    let chunkCount = '';
+    let chunkedTotalBytes = '';
     let settled = false;
     /** Resolves once the temp zip is fully flushed to disk (busboy `finish` can fire earlier). */
     let fileWritten = Promise.resolve();
@@ -63,6 +71,12 @@ export function parseVaultBackupZipUpload(req) {
         hint = String(value || '');
       } else if (fieldname === 'dateStamp') {
         dateStamp = String(value || '');
+      } else if (fieldname === 'chunkedUploadId') {
+        chunkedUploadId = String(value || '').trim();
+      } else if (fieldname === 'chunkCount') {
+        chunkCount = String(value || '').trim();
+      } else if (fieldname === 'totalBytes') {
+        chunkedTotalBytes = String(value || '').trim();
       }
     });
     busboy.on('file', (fieldname, stream) => {
@@ -99,7 +113,23 @@ export function parseVaultBackupZipUpload(req) {
         fail(new Error(`Backup zip exceeds ${MAX_BACKUP_ZIP_BYTES / (1024 * 1024)} MiB limit`));
         return;
       }
-      if (!fileReceived || !fs.existsSync(zipPath) || !fs.statSync(zipPath).size) {
+      if (!fileReceived && chunkedUploadId) {
+        const singlesId = Number(req.auth?.singles_id);
+        try {
+          bytesWritten = await assembleChunkedUpload(singlesId, chunkedUploadId, {
+            chunkCount,
+            totalBytes: chunkedTotalBytes,
+            maxBytes: MAX_BACKUP_ZIP_BYTES,
+            destPath: zipPath
+          });
+        } catch (err) {
+          discardChunkedUpload(singlesId, chunkedUploadId);
+          fail(err);
+          return;
+        }
+        if (settled) return;
+      }
+      if (!(fileReceived || chunkedUploadId) || !fs.existsSync(zipPath) || !fs.statSync(zipPath).size) {
         fail(new Error(formatUploadHint(contentLength)));
         return;
       }

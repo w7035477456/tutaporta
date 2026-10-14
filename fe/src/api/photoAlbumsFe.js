@@ -1,5 +1,6 @@
 import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
+import { prepareLargeBackupFormData } from './chunkedBackupUploadFe';
 import {
   normalizeUsbBridgeInstallerUrl,
   USB_BRIDGE_INSTALLER_API
@@ -1171,10 +1172,13 @@ export async function downloadPhotoAlbumsUsbBackupZip() {
 }
 
 /** POST multipart restore zip — fetch() so the browser sets multipart boundary (axios defaults break Busboy). */
-async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {} } = {}) {
+async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {}, chunkLargeFile = false } = {}) {
   if (!file) throw new Error('Choose a backup zip file first');
-  const formData = new FormData();
+  let formData = new FormData();
   formData.append('backup', file, file.name || 'backup.zip');
+  if (chunkLargeFile) {
+    ({ formData } = await prepareLargeBackupFormData(formData));
+  }
   const base = getApiBaseUrl().replace(/\/$/, '');
   const url = `${base}${String(path || '').startsWith('/') ? path : `/${path}`}`;
   const response = await fetch(url, {
@@ -1202,7 +1206,7 @@ async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {} } = {})
 
 /** Upload a MyPhotoAlbums backup zip and restore files to TutaCloud (when server route is enabled). */
 export async function restorePhotoAlbumsTutaDriveBackupZip(file) {
-  return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutadrive/restore-zip', file);
+  return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutadrive/restore-zip', file, { chunkLargeFile: true });
 }
 
 /** Upload a MyPhotoAlbums backup zip and restore files onto the unlocked USB vault. */

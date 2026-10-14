@@ -220,6 +220,7 @@ import {
   syncRecordVaultTutaDrive,
   unlockRecordVaultTutaDrive
 } from './routes/recordVault/recordVaultTutaDriveRoutes.js';
+import { putTutaDriveUploadChunk } from './routes/recordVault/tutaDriveUploadChunkRoute.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
 import { getRecordVaultRagConfig } from './utils/recordVaultRagConfig.js';
 import { isIncludeUsbDmgExeEnabled } from './utils/includeUsbDmgExeConfig.js';
@@ -821,7 +822,8 @@ const LARGE_MULTIPART_UPLOAD_POST_PATHS = new Set([
 app.use((req, res, next) => {
   const isLargeUpload =
     (req.method === 'POST' && LARGE_MULTIPART_UPLOAD_POST_PATHS.has(req.path)) ||
-    (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutadrive/backup/'));
+    (req.method === 'PUT' &&
+      (req.path.startsWith('/api/recordVault/tutadrive/backup/') || req.path === '/api/tutadrive/upload-chunk'));
   if (!isLargeUpload) return next();
   return drainUploadBodyBeforeResponse(req, res, next);
 });
@@ -1528,6 +1530,7 @@ app.post('/api/recordVault/tutadrive/restore-zip', ...recordVaultVaultAuth, rest
 app.post('/api/recordVault/tutadrive/backup-tree', ...recordVaultVaultAuth, listRecordVaultTutaDriveBackupTree);
 app.post('/api/recordVault/tutadrive/merge/preview', ...recordVaultVaultAuth, previewRecordVaultTutaDriveMerge);
 app.post('/api/recordVault/tutadrive/merge/apply', ...recordVaultVaultAuth, applyRecordVaultTutaDriveMerge);
+app.put('/api/tutadrive/upload-chunk', requireAuth, putTutaDriveUploadChunk);
 
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----
 app.use('/api/photoAlbums', ...photoAlbumsTransferMeterStack);
