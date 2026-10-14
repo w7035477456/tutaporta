@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
+import YellowButtonTemplate from 'ui-component/YellowButtonTemplate';
 import ProfilePhotoUploadQrPanel, {
   PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE
 } from 'components/ProfilePhotoUploadQrPanel';
@@ -80,6 +81,8 @@ const lightSurfaceTextSx = {
 export default function BillReceiptsPopup({
   open,
   onClose,
+  onMarkPaid,
+  onCancel,
   onChanged,
   ensurePayload,
   storageType = 'onedrive'
@@ -200,6 +203,16 @@ export default function BillReceiptsPopup({
     await flushNotesNow();
     onClose?.();
   }, [flushNotesNow, onClose]);
+
+  const handleMarkPaid = useCallback(async () => {
+    await flushNotesNow();
+    onMarkPaid?.();
+  }, [flushNotesNow, onMarkPaid]);
+
+  const handleCancel = useCallback(async () => {
+    await flushNotesNow();
+    (onCancel || onClose)?.();
+  }, [flushNotesNow, onCancel, onClose]);
 
   const handleFiles = async (fileList) => {
     if (!paidRecordId || !fileList?.length) return;
@@ -640,6 +653,24 @@ export default function BillReceiptsPopup({
               </Box>
             )}
           </Box>
+          {onMarkPaid ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexShrink: 0 }}>
+              <ColorTemplate13DisableGreenButton
+                type="button"
+                disabled={loading || busy}
+                onClick={() => void handleMarkPaid()}
+              >
+                Paid
+              </ColorTemplate13DisableGreenButton>
+              <YellowButtonTemplate
+                type="button"
+                disabled={busy}
+                onClick={() => void handleCancel()}
+              >
+                Cancel
+              </YellowButtonTemplate>
+            </Box>
+          ) : null}
         </ColorTemplate16PopupCenterWide.Body>
       </ColorTemplate16PopupCenterWide>
       <ColorTemplate16PopupCenterWide
@@ -667,6 +698,8 @@ export default function BillReceiptsPopup({
 BillReceiptsPopup.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
+  onMarkPaid: PropTypes.func,
+  onCancel: PropTypes.func,
   onChanged: PropTypes.func,
   ensurePayload: PropTypes.object,
   storageType: PropTypes.oneOf(['tutadrive', 'usb'])

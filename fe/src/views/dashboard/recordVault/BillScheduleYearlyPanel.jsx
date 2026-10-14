@@ -31,6 +31,8 @@ const YELLOW = '#B6A001';
 const GREEN = '#7dcea0';
 const RED = '#e74c3c';
 const AUTO_PAY_TEXT = '#ffffff';
+/** Semi-transparent so the grey reads on both light and dark themes. */
+const PAID_ROW_BG = 'rgba(128, 128, 128, 0.45)';
 const MONTH_NAMES = [
   'January',
   'February',
@@ -82,7 +84,7 @@ function isPaidAction(action) {
 
 function computeStatusLocal(row, year, today = new Date()) {
   if (row.bill_type === 'Auto') return { status: '', status_tone: 'auto' };
-  if (isPaidAction(row.action)) return { status: 'Paid', status_tone: 'paid' };
+  if (isPaidAction(row.action)) return { status: 'PAID', status_tone: 'paid' };
   const dueMonth = Number(row.bill_month);
   const dueDay = Number(row.due_month_day);
   if (
@@ -93,12 +95,13 @@ function computeStatusLocal(row, year, today = new Date()) {
     dueDay < 1 ||
     dueDay > 31
   ) {
-    return { status: '', status_tone: 'none' };
+    const described = String(row.bill_description ?? '').trim().length > 0;
+    return { status: described ? 'NOT PAID' : '', status_tone: 'none' };
   }
   const due = new Date(year, dueMonth - 1, dueDay);
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   if (todayStart > due) return { status: 'Over Due', status_tone: 'overdue' };
-  return { status: '', status_tone: 'upcoming' };
+  return { status: 'NOT PAID', status_tone: 'upcoming' };
 }
 
 function withDerived(rows, year) {
@@ -200,6 +203,7 @@ export default function BillScheduleYearlyPanel({
   const [dirty, setDirty] = useState(false);
   const [billPopupOpen, setBillPopupOpen] = useState(false);
   const [billEnsurePayload, setBillEnsurePayload] = useState(null);
+  const [billPopupPayMode, setBillPopupPayMode] = useState(false);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const rowsRef = useRef(rows);
@@ -269,21 +273,20 @@ export default function BillScheduleYearlyPanel({
   };
 
   const updateRow = (index, patch) => {
-    setRows((prev) => {
-      const next = prev.map((r, i) => {
-        if (i !== index) return r;
-        const merged = { ...r, ...patch };
-        if (merged.bill_type === 'Auto') {
-          merged.action = null;
-          merged.paid_record_id = null;
-        }
-        return { ...merged, ...computeStatusLocal(merged, year) };
-      });
-      rowsRef.current = next;
-      return next;
+    const next = rowsRef.current.map((r, i) => {
+      if (i !== index) return r;
+      const merged = { ...r, ...patch };
+      if (merged.bill_type === 'Auto') {
+        merged.action = null;
+        merged.paid_record_id = null;
+      }
+      return { ...merged, ...computeStatusLocal(merged, year) };
     });
+    rowsRef.current = next;
+    setRows(next);
     setSavedMsg('');
     setDirty(true);
+    return next;
   };
 
   /** Persist current (or override) rows; clears dirty/blink on success. Returns saved rows or null. */
@@ -320,7 +323,7 @@ export default function BillScheduleYearlyPanel({
     [year, storageKey]
   );
 
-  const openBillForRow = async (row) => {
+  const openBillForRow = async (row, { payMode = false } = {}) => {
     let target = row;
     if (dirty) {
       const saved = await persistSchedule();
@@ -342,28 +345,45 @@ export default function BillScheduleYearlyPanel({
       bill_type: target.bill_type,
       action: target.action
     });
+    setBillPopupPayMode(payMode);
     setBillPopupOpen(true);
   };
 
   const handleBillChanged = (data) => {
     if (!data?.paidRecordId) return;
-    setRows((prev) =>
-      prev.map((r) => {
-        if (
-          (data.yearlyBillId && Number(r.yearly_bill_id) === Number(data.yearlyBillId)) ||
-          Number(r.paid_record_id) === Number(data.paidRecordId) ||
-          (Number(r.row_index) === Number(billEnsurePayload?.row_index) && !r.yearly_bill_id)
-        ) {
-          return {
-            ...r,
-            paid_record_id: data.paidRecordId,
-            yearly_bill_id: data.yearlyBillId || r.yearly_bill_id,
-            has_bill_content: Boolean(data.hasBillContent)
-          };
-        }
-        return r;
-      })
-    );
+    const next = rowsRef.current.map((r) => {
+      if (
+        (data.yearlyBillId && Number(r.yearly_bill_id) === Number(data.yearlyBillId)) ||
+        Number(r.paid_record_id) === Number(data.paidRecordId) ||
+        (Number(r.row_index) === Number(billEnsurePayload?.row_index) && !r.yearly_bill_id)
+      ) {
+        return {
+          ...r,
+          paid_record_id: data.paidRecordId,
+          yearly_bill_id: data.yearlyBillId || r.yearly_bill_id,
+          has_bill_content: Boolean(data.hasBillContent)
+        };
+      }
+      return r;
+    });
+    rowsRef.current = next;
+    setRows(next);
+  };
+
+  /** Close Bills/Receipts; nextAction 'Paid' | 'Not Paid' saves that Action on the popup's row. */
+  const finishBillPopup = async (nextAction) => {
+    const payload = billEnsurePayload;
+    setBillPopupOpen(false);
+    setBillEnsurePayload(null);
+    setBillPopupPayMode(false);
+    const index = payload
+      ? rowsRef.current.findIndex((r) => Number(r.row_index) === Number(payload.row_index))
+      : -1;
+    if (nextAction && index >= 0 && rowsRef.current[index].action !== nextAction) {
+      const next = updateRow(index, { action: nextAction });
+      if (await persistSchedule(next)) return;
+    }
+    await load(year);
   };
 
   const handleAdd = async () => {
@@ -559,9 +579,13 @@ export default function BillScheduleYearlyPanel({
           {rows.map((row, index) => {
             const auto = row.bill_type === 'Auto';
             const typeActionStatusBg = auto ? YELLOW : 'transparent';
-            const statusBg = auto ? YELLOW : cellToneBg(row.status_tone);
+            const paid = !auto && row.status_tone === 'paid';
+            const statusBg = auto ? YELLOW : paid ? 'transparent' : cellToneBg(row.status_tone);
             return (
-              <tr key={`ybill-row-${row.row_index}-${index}`}>
+              <tr
+                key={`ybill-row-${row.row_index}-${index}`}
+                style={paid ? { background: PAID_ROW_BG } : undefined}
+              >
                 <td style={{ textAlign: 'center', fontWeight: 700 }}>{row.row_index}</td>
                 <td>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -657,7 +681,7 @@ export default function BillScheduleYearlyPanel({
                     onChange={(e) => updateRow(index, { bill_type: e.target.value })}
                     sx={{
                       ...selectSx,
-                      bgcolor: auto ? YELLOW : BILL_SCHEDULE_SURFACE,
+                      bgcolor: auto ? YELLOW : paid ? 'transparent' : BILL_SCHEDULE_SURFACE,
                       ...(auto
                         ? {
                             color: AUTO_PAY_TEXT,
@@ -684,10 +708,13 @@ export default function BillScheduleYearlyPanel({
                       value={row.action || ''}
                       onChange={(e) => {
                         const next = e.target.value || null;
+                        if (next === 'Paid') {
+                          void openBillForRow(rowsRef.current[index], { payMode: true });
+                          return;
+                        }
                         updateRow(index, { action: next });
-                        if (next === 'Paid') void openBillForRow(rowsRef.current[index]);
                       }}
-                      sx={selectSx}
+                      sx={paid ? { ...selectSx, bgcolor: 'transparent' } : selectSx}
                       renderValue={(v) => {
                         if (!v) return <em style={{ opacity: 0.5 }}>Select</em>;
                         return v;
@@ -939,11 +966,9 @@ export default function BillScheduleYearlyPanel({
           open={billPopupOpen}
           storageType={storageKey}
           ensurePayload={billEnsurePayload}
-          onClose={() => {
-            setBillPopupOpen(false);
-            setBillEnsurePayload(null);
-            void load(year);
-          }}
+          onClose={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
+          onMarkPaid={() => void finishBillPopup('Paid')}
+          onCancel={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
           onChanged={handleBillChanged}
         />
       ) : null}

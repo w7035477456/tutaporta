@@ -1196,7 +1196,7 @@ export default function RecordVaultTutaCloudBackupDialog({
           <Box sx={formatWarningBoxSx}>
             {tutaDriveActive
               ? 'Each backup zip can have its own password — it never leaves your browser. Only a password check and your hint are stored with the zip, so Restore / Merge can verify it. If you forget a zip password, that backup cannot be opened. Up to 3 backup zip files are kept. Before Format, run Backup first if you need to keep your notes.'
-              : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to TutaCloud, choose Restore below.'}
+              : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud as Zip. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to TutaCloud, choose Restore below.'}
           </Box>
 
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -1209,7 +1209,7 @@ export default function RecordVaultTutaCloudBackupDialog({
                 onClick={() => void handleBackup()}
                 sx={actionButtonSx}
               >
-                Backup/Encrypt TutaNote to Cloud
+                Backup/Encrypt TutaNote to Cloud as Zip
               </GreenButton>
               <GreenButton
                 type="button"

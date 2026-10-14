@@ -30,6 +30,11 @@ import {
   TUTADRIVE_BACKUP_NOTE_MAX_LEN,
   tutaDriveBackupFileName
 } from './tutaDriveBackupNames.js';
+import {
+  BILL_SCHEDULE_BACKUP_FILE,
+  exportBillScheduleForBackup,
+  restoreBillScheduleFromBackup
+} from './billScheduleBackup.js';
 
 export { TUTADRIVE_BACKUP_NAME_RE };
 const BACKUP_NAME_RE = TUTADRIVE_BACKUP_NAME_RE;
@@ -361,6 +366,8 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
     throw new Error(`Missing ${VAULT_DIR_NAME} folder on TutaDrive`);
   }
 
+  const billSchedule = await exportBillScheduleForBackup(singlesId, notesMount);
+
   const zipName = `TutaNotes_TutaDrive_${todayBackupStamp()}.zip`;
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
@@ -371,10 +378,14 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
     archive.on('end', resolve);
     archive.pipe(res);
     archive.directory(vaultRoot, VAULT_DIR_NAME);
+    archive.append(billSchedule.json, { name: BILL_SCHEDULE_BACKUP_FILE });
+    for (const file of billSchedule.files) {
+      archive.file(file.absPath, { name: file.zipPath });
+    }
     void archive.finalize();
   });
 
-  return { fileName: zipName, memberId, notesMount };
+  return { fileName: zipName, memberId, notesMount, billScheduleRows: billSchedule.rowCount };
 }
 
 /**
@@ -504,11 +515,14 @@ export async function restoreTutaDriveVaultFromZipFile(singlesId, zipFilePath) {
 
     ensureTutaDriveMemberLayout(memberId, { singlesId });
 
+    const billSchedule = await restoreBillScheduleFromBackup(singlesId, extractDir, notesMount);
+
     return {
       restoredFiles: relFiles.length,
       restoredBytes,
       memberId,
       notesMount,
+      billSchedule,
       requiresReunlock: true
     };
   } finally {
