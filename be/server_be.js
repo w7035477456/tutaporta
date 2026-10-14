@@ -472,7 +472,13 @@ import {
   parseAllowedOriginPatterns,
   requireTrustedOriginFactory
 } from './middleware/requireTrustedOrigin.js';
-import { getUserCustomization, putUserCustomization, postLoadDefaultMusicUrls } from './routes/user/userCustomization.js';
+import {
+  getUserCustomization,
+  getUserZipFolder,
+  postLoadDefaultMusicUrls,
+  putUserCustomization,
+  putUserZipFolder
+} from './routes/user/userCustomization.js';
 import {
   getBpmDiagram,
   getBpmListings,
@@ -1764,6 +1770,8 @@ app.post('/api/chat/markVisited/:targetUserId', requireAuth, markChatVisitedHand
 app.get('/api/user/customization', requireAuth, getUserCustomization);
 app.put('/api/user/customization', requireAuth, putUserCustomization);
 app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoadDefaultMusicUrls);
+app.get('/api/user/customization/zip-folder', requireAuth, getUserZipFolder);
+app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 
 app.get('/api/eClassifieds/bpm/diagram', requireAuth, getBpmDiagram);
 app.get('/api/eClassifieds/bpm/listings', requireAuth, getBpmListings);

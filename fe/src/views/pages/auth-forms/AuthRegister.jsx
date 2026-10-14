@@ -8,9 +8,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 
 // project imports
-import Stack from '@mui/material/Stack';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
-import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import { registerUser } from 'api/registerFe';
 import enterEmailImg from 'assets/images/enterEmail.png';
@@ -41,6 +39,7 @@ import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
 import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
+import SignupDownPopup, { SIGNUP_DOWN_MSG } from './SignupDownPopup';
 
 // ===========================|| JWT - REGISTER ||=========================== //
 
@@ -48,11 +47,6 @@ const EMAIL_EXISTS_MSG = 'This email already exist in out system. Please double 
 const PHONE_EXISTS_MSG =
   'This phone number is already associated with an account. Please use a different number or sign in.';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** Shown when ~/.ssh/be/.env SIGNUP_DOWN=true (GET /api/publicConfig.signupDown or 503 from /api/register). */
-const SIGNUP_DOWN_MSG =
-  'Our sign up service is being upgraded. Please check back in a few days. ' +
-  'Meanwhile, log in as "demo" (no password) if you want to check it out in demo mode.';
-
 function isEmailAlreadyRegisteredMessage(msg) {
   const text = String(msg ?? '').toLowerCase();
   return text.includes('already exist') || text.includes(EMAIL_EXISTS_MSG.toLowerCase());
@@ -249,10 +243,6 @@ export default function AuthRegister() {
     setError('');
     setEmailError('');
     setPhoneError('');
-    if (signupDown) {
-      setSignupDownMessage(SIGNUP_DOWN_MSG);
-      return;
-    }
     if (!checked) {
       setError('Please agree to the terms and conditions.');
       return;
@@ -268,6 +258,13 @@ export default function AuthRegister() {
     const phoneValidationMessage = getUsSignupPhoneValidationMessage(phone);
     if (!isPhoneFormatValid) {
       setPhoneError(phoneValidationMessage || 'Please enter a valid US phone number.');
+      return;
+    }
+    if (signupDown) {
+      const formattedPhone = formatPhoneNumber(phone);
+      if (formattedPhone) sessionStorage.setItem(SIGNUP_REGISTER_PHONE_KEY, formattedPhone);
+      const qs = new URLSearchParams({ email: emailTrimmed, phone: formattedPhone || '' });
+      navigate(`/pages/phoneVerification?${qs}`, { state: { signupDown: true } });
       return;
     }
     setIsSubmitting(true);
@@ -448,22 +445,7 @@ export default function AuthRegister() {
         </SelectedButtonTemplate>
       </Box>
 
-      <ColorTemplate7PopupLargeDark
-        open={Boolean(signupDownMessage)}
-        onClose={() => setSignupDownMessage('')}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close sign up notice"
-      >
-        <ColorTemplate7PopupLargeDark.Body spacing={2}>
-          <ColorTemplate7PopupLargeDark.Title>Sign Up</ColorTemplate7PopupLargeDark.Title>
-          <ColorTemplate7PopupLargeDark.BodyText>{signupDownMessage}</ColorTemplate7PopupLargeDark.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="flex-end" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate7PopupLargeDark.ActionButton type="button" onClick={() => setSignupDownMessage('')}>
-              OK
-            </ColorTemplate7PopupLargeDark.ActionButton>
-          </Stack>
-        </ColorTemplate7PopupLargeDark.Body>
-      </ColorTemplate7PopupLargeDark>
+      <SignupDownPopup message={signupDownMessage} onClose={() => setSignupDownMessage('')} />
     </Box>
   );
 }

@@ -258,3 +258,14 @@ export async function loadDefaultCustomMusicUrls() {
   const { data } = await api.post('/api/user/customization/load-default-music-urls');
   return mapCustomizationResponse(data);
 }
+
+/** user_customization.zip_folder — folder last picked for backup zip downloads (null if never). */
+export async function fetchUserZipFolder() {
+  const { data } = await api.get('/api/user/customization/zip-folder');
+  return data?.zipFolder ?? null;
+}
+
+export async function saveUserZipFolder(zipFolder) {
+  const { data } = await api.put('/api/user/customization/zip-folder', { zipFolder });
+  return data?.zipFolder ?? null;
+}

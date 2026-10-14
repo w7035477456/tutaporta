@@ -460,6 +460,7 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS tuta_dates_enabled boolean NOT NULL DEFAULT true,
       ADD COLUMN IF NOT EXISTS tuta_notes_enabled boolean NOT NULL DEFAULT true,
       ADD COLUMN IF NOT EXISTS tuta_albums_enabled boolean NOT NULL DEFAULT true,
+      ADD COLUMN IF NOT EXISTS zip_folder text NULL,
       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT NOW()
   `);
   // Existing rows keep true (no one-time overwrite); new inserts default false until first Track Load Default.
@@ -1356,6 +1357,48 @@ export async function putUserCustomization(req, res) {
     }
     console.error('[userCustomization] put failed:', err);
     return res.status(500).json({ error: 'Failed to save customization' });
+  }
+}
+
+const ZIP_FOLDER_MAX_LEN = 300;
+
+/** GET /api/user/customization/zip-folder — folder last picked for backup zip downloads (or null). */
+export async function getUserZipFolder(req, res) {
+  const me = toSinglesId(req.auth?.singles_id);
+  if (!me) return res.status(401).json({ error: 'Authentication required' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT zip_folder FROM outdateddbsnapshotoct2024.user_customization WHERE singles_id = $1`,
+      [me]
+    );
+    return res.status(200).json({ zipFolder: rows[0]?.zip_folder ?? null });
+  } catch (err) {
+    console.error('[userCustomization] zip-folder get failed:', err);
+    return res.status(500).json({ error: 'Failed to load zip folder' });
+  }
+}
+
+/** PUT /api/user/customization/zip-folder { zipFolder } */
+export async function putUserZipFolder(req, res) {
+  const me = toSinglesId(req.auth?.singles_id);
+  if (!me) return res.status(401).json({ error: 'Authentication required' });
+  const raw = req.body?.zipFolder;
+  const zipFolder = raw == null ? null : String(raw).trim().slice(0, ZIP_FOLDER_MAX_LEN) || null;
+  try {
+    await ensureCustomizationSchema();
+    if (!(await selectCustomizationRow(me))) {
+      await upsertCustomizationRow(me, defaultCustomizationDbRow());
+    }
+    await pool.query(
+      `UPDATE outdateddbsnapshotoct2024.user_customization
+       SET zip_folder = $1, updated_at = NOW()
+       WHERE singles_id = $2`,
+      [zipFolder, me]
+    );
+    return res.status(200).json({ zipFolder });
+  } catch (err) {
+    console.error('[userCustomization] zip-folder put failed:', err);
+    return res.status(500).json({ error: 'Failed to save zip folder' });
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 // material-ui
 import Button from '@mui/material/Button';
@@ -25,6 +25,8 @@ import {
   getSignupReferralCodeFromSearchParams,
   resolveSignupReferByCodeForApi
 } from 'utils/signupReferralCode';
+import SignupDownPopup, { SIGNUP_DOWN_MSG, useSignupDown } from './SignupDownPopup';
+import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 
 // ===========================|| PHONE VERIFICATION ||=========================== //
 
@@ -150,7 +152,10 @@ const verificationSlotInputSx = (hasError) => ({
 
 export default function AuthPhoneVerification() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
+  const [signupDown] = useSignupDown(location.state?.signupDown === true);
+  const [signupDownMessage, setSignupDownMessage] = useState('');
   // Get email and phone from URL params (phone may be set at sign-up)
   const email = searchParams.get('email') || '';
   const phoneFromUrl = searchParams.get('phone') || '';
@@ -244,6 +249,10 @@ export default function AuthPhoneVerification() {
   const handleVerifySms = async (event) => {
     event.preventDefault();
     setError('');
+    if (signupDown) {
+      setSignupDownMessage(SIGNUP_DOWN_MSG);
+      return;
+    }
 
     const finalPhone = phoneInput || initialPhone;
     if (!email || !finalPhone) {
@@ -278,6 +287,11 @@ export default function AuthPhoneVerification() {
   };
 
   const handleSendSms = async () => {
+    if (signupDown) {
+      setError('');
+      setSignupDownMessage(SIGNUP_DOWN_MSG);
+      return;
+    }
     if (sendSmsCooldown > 0) return;
     const finalPhone = phoneInput || initialPhone;
     if (!email || !finalPhone) {
@@ -331,7 +345,8 @@ export default function AuthPhoneVerification() {
 
   /** Cooldown (shows Ns): always disabled. Send SMS / Resend: need 10-digit phone, consent, and email. */
   const sendSmsButtonDisabled =
-    isSendingSms || sendSmsCooldownActive || !isPhoneFormatValid || !consentChecked || !email.trim();
+    !signupDown &&
+    (isSendingSms || sendSmsCooldownActive || !isPhoneFormatValid || !consentChecked || !email.trim());
 
   const sendSmsButtonEl = (
     <AnimateButton scale={sendSmsButtonDisabled ? { hover: 1, tap: 1 } : undefined}>
@@ -347,7 +362,7 @@ export default function AuthPhoneVerification() {
         sx={{
           ...(sendSmsCooldown > 0
             ? sendSmsCooldownButtonSx
-            : isSendSmsEnabled && !isSendingSms
+            : signupDown || (isSendSmsEnabled && !isSendingSms)
               ? sendSmsPrimaryButtonSx
               : phoneFlowGreyButtonDisabledSx)
         }}
@@ -408,8 +423,8 @@ export default function AuthPhoneVerification() {
           color="primary"
           sx={phoneConsentCheckboxSx}
         />
-        <Box sx={{ ...greySecondaryBorderBoxSx, flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        <Box className={LIGHT_SURFACE_CLASS} sx={{ ...greySecondaryBorderBoxSx, flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" sx={{ color: '#000000' }}>
             To ensure account integrity,{' '}
             <Box component="span" sx={{ fontWeight: 700, textDecoration: 'underline' }}>
               this phone number will be permanently tied to this single account and cannot be reused for other registrations.
@@ -513,15 +528,19 @@ export default function AuthPhoneVerification() {
             size="large"
             type="submit"
             variant="contained"
-            disabled={isSubmitting || !isVerifySmsEnabled}
+            disabled={!signupDown && (isSubmitting || !isVerifySmsEnabled)}
             sx={{
-              ...(isVerifySmsEnabled && !isSubmitting ? sendSmsPrimaryButtonSx : phoneFlowGreyButtonDisabledSx)
+              ...(signupDown || (isVerifySmsEnabled && !isSubmitting)
+                ? sendSmsPrimaryButtonSx
+                : phoneFlowGreyButtonDisabledSx)
             }}
           >
             {isSubmitting ? 'Verifying...' : 'Verify SMS'}
           </Button>
         </AnimateButton>
       </Box>
+
+      <SignupDownPopup message={signupDownMessage} onClose={() => setSignupDownMessage('')} />
     </Box>
   );
 }

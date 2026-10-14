@@ -33,7 +33,9 @@ import {
 } from './tutaNotesPostLoginActionButtonSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
-import { themedConfirm, themedOverwriteSkip } from 'utils/themedDialog';
+import { themedAlert, themedConfirm, themedOverwriteSkip } from 'utils/themedDialog';
+import { acquireDownloadZipFolder } from 'utils/downloadZipFolder';
+import { saveUserZipFolder } from 'api/userCustomizationFe';
 import {
   ensureEncryptPasswordForBackupSeal,
   prepareBackupDecryptWithPassword
@@ -625,6 +627,14 @@ export default function RecordVaultTutaCloudBackupDialog({
     setTreeRefreshToken((value) => value + 1);
   };
 
+  /** Restore success popup; `onRestored` (logoff → Encrypt Password screen) runs only after the user closes it. */
+  const announceRestoreSuccessThenRedirect = async (zipFileName, result) => {
+    setBusy(false);
+    setBackupProgress(null);
+    await themedAlert(`Restore zip ${zipFileName} success`, { title: 'Restore complete' });
+    await onRestored?.(result);
+  };
+
   const handleBackup = async () => {
     resetMessages();
     if (tutaDriveActive && slotsFull && oldestSlot) {
@@ -811,13 +821,13 @@ export default function RecordVaultTutaCloudBackupDialog({
       progress.addInfo({ restoredFiles: count });
       progress.update({ stage: 'refresh', percent: 95 });
       refreshVaultTree();
-      await onRestored?.(result);
       progress.update({ stage: 'done', percent: 100 });
       const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
       setSuccess(
         `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive in ${elapsedText} (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
       );
       setSuccessTone('general');
+      await announceRestoreSuccessThenRedirect(fileName, result);
     } catch (err) {
       setError(describeBackupRequestError(err, 'Restore failed'));
     } finally {
@@ -829,14 +839,25 @@ export default function RecordVaultTutaCloudBackupDialog({
 
   const handleDownloadBackup = async (fileName) => {
     resetMessages();
+    const folder = await acquireDownloadZipFolder();
+    if (folder?.cancelled) return;
+    if (folder?.label) {
+      saveUserZipFolder(folder.label).catch((err) => {
+        console.warn('[RecordVaultTutaCloudBackupDialog] save zip_folder failed', err?.message || err);
+      });
+    }
     setBusy(true);
     setActioningFile(fileName);
     try {
-      const result = await downloadRecordVaultTutaDriveStoredBackup(fileName);
+      const result = await downloadRecordVaultTutaDriveStoredBackup(fileName, { targetDir: folder?.dir || null });
+      const savedName = result?.fileName || fileName;
       const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
       const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
-      setSuccess(`Downloaded ${result?.fileName || fileName}${sizeText} to your browser download folder.`);
+      const destination = folder?.label || 'your browser download folder';
+      setSuccess(`Downloaded ${savedName}${sizeText} to ${destination}.`);
       setSuccessTone('backup');
+      setBusy(false);
+      await themedAlert(`Success download zip name ${savedName} to ${destination}`, { title: 'Download complete' });
     } catch (err) {
       setError(describeBackupRequestError(err, 'Download failed'));
     } finally {
@@ -987,12 +1008,12 @@ export default function RecordVaultTutaCloudBackupDialog({
         progress.addInfo({ restoredFiles: count });
         progress.update({ stage: 'refresh', percent: 95 });
         refreshVaultTree();
-        await onRestored?.(result);
         const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
         setSuccess(
           `Restored ${count} file${count === 1 ? '' : 's'} to TutaDrive in ${elapsedText} (decrypted with your Encrypt Password). Open TutaNotes again to load the restored notes.`
         );
         setSuccessTone('general');
+        await announceRestoreSuccessThenRedirect(file.name, result);
       } else {
         const result = await restoreRecordVaultTutaDriveBackupZip(file);
         const count = Number(result?.restoredFiles) || 0;
@@ -1001,7 +1022,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         );
         setSuccessTone('general');
         refreshVaultTree();
-        await onRestored?.(result);
+        await announceRestoreSuccessThenRedirect(file.name, result);
       }
     } catch (err) {
       setError(describeBackupRequestError(err, 'Restore failed'));
