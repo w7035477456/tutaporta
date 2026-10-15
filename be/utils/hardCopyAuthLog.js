@@ -12,6 +12,7 @@ export const DEMO_HARD_COPY_LOG_PATH = path.join(BE_DIR, 'demolog.log');
 export const REGISTER_HARD_COPY_LOG_PATH = path.join(BE_DIR, 'registerlog.log');
 export const REQUEST_HARD_COPY_LOG_PATH = path.join(BE_DIR, 'requestlog.log');
 export const APPROVE_HARD_COPY_LOG_PATH = path.join(BE_DIR, 'approvelog.log');
+export const RAFFLE_HARD_COPY_LOG_PATH = path.join(BE_DIR, 'raffle_log.log');
 
 function formatLogDate(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -105,6 +106,44 @@ export function appendBioRequestHardCopy({
   appendOnly(
     REQUEST_HARD_COPY_LOG_PATH,
     `${when}\tip=${ip}\tbio=${bio}\t${partyFields('requester', requester)}\t${partyFields('requestee', requestee)}`
+  );
+}
+
+function isoField(value) {
+  if (!value) return '-';
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? logField(value) : formatLogDate(d);
+}
+
+/** Generate My Raffle: one line per newly issued raffle number. */
+export function appendRaffleHardCopy({
+  raffleNumber,
+  raffleGenerateId,
+  raffleGenerateDatetime,
+  singlesId,
+  singlesEmail,
+  singlesFullname,
+  eventTitle,
+  hostFullName,
+  hostUrl,
+  hostEventStart,
+  hostEventEnd
+} = {}) {
+  appendOnly(
+    RAFFLE_HARD_COPY_LOG_PATH,
+    [
+      `raffle_generate_id=${logField(raffleGenerateId)}`,
+      `raffle_generate_datetime=${isoField(raffleGenerateDatetime)}`,
+      `raffle_number=${logField(raffleNumber)}`,
+      `singles_id=${logField(singlesId)}`,
+      `singles_email=${logField(singlesEmail)}`,
+      `singles_fullname=${logField(singlesFullname)}`,
+      `event_title=${logField(eventTitle)}`,
+      `host_full_name=${logField(hostFullName)}`,
+      `host_url=${logField(hostUrl)}`,
+      `host_event_start=${isoField(hostEventStart)}`,
+      `host_event_end=${isoField(hostEventEnd)}`
+    ].join('\t')
   );
 }
 

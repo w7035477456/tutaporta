@@ -481,7 +481,7 @@ import {
   putUserCustomization,
   putUserZipFolder
 } from './routes/user/userCustomization.js';
-import { getRaffleState, postRaffleTicket } from './routes/raffle/raffleRoutes.js';
+import { getRaffleState, postRaffleSelect, postRaffleTicket } from './routes/raffle/raffleRoutes.js';
 import {
   getBpmDiagram,
   getBpmListings,
@@ -1778,6 +1778,7 @@ app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoa
 app.get('/api/user/customization/zip-folder', requireAuth, getUserZipFolder);
 app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
+app.post('/api/raffle/select', requireAuth, postRaffleSelect);
 app.post('/api/raffle/tickets', requireAuth, postRaffleTicket);
 
 app.get('/api/eClassifieds/bpm/diagram', requireAuth, getBpmDiagram);

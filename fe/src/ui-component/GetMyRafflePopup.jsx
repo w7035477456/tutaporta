@@ -7,7 +7,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import { createRaffleTicket, fetchRaffleState } from 'api/raffleFe';
+import { createRaffleTicket, fetchRaffleState, selectRaffleEvent } from 'api/raffleFe';
 
 function apiErrorMessage(err, fallback) {
   return String(err?.response?.data?.error || '').trim() || fallback;
@@ -62,14 +62,25 @@ RaffleTicketCard.propTypes = {
   }).isRequired
 };
 
+function formatWindowTime(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+const DEFAULT_ALREADY_GENERATED_MESSAGE =
+  'You already generate a raffle for this event. Only 1 raffle per email login.';
+
 /**
- * Get My Raffle — event drop-down (opens the Meetup page in a new window), Generate Raffle Number
- * (one per account per event, issued + stored server-side), then number + verification code + QR.
+ * Get My Raffle — drop-down of raffle_event rows with event_show_combo = true (opens the Meetup page
+ * in a new window and links member ↔ host ↔ event), Generate My Raffle (one per login per event,
+ * only inside the host's raffle window), then number + verification code + QR.
  */
 export default function GetMyRafflePopup({ open, onClose }) {
   const [events, setEvents] = useState([]);
   const [tickets, setTickets] = useState([]);
-  const [eventKey, setEventKey] = useState('');
+  const [alreadyMessage, setAlreadyMessage] = useState(DEFAULT_ALREADY_GENERATED_MESSAGE);
+  const [freshEventIds, setFreshEventIds] = useState([]);
+  const [eventId, setEventId] = useState('');
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -79,11 +90,13 @@ export default function GetMyRafflePopup({ open, onClose }) {
     let cancelled = false;
     setLoading(true);
     setError('');
+    setFreshEventIds([]);
     fetchRaffleState()
       .then((state) => {
         if (cancelled) return;
         setEvents(state.events);
         setTickets(state.tickets);
+        if (state.alreadyGeneratedMessage) setAlreadyMessage(state.alreadyGeneratedMessage);
       })
       .catch((err) => {
         if (!cancelled) setError(apiErrorMessage(err, 'Could not load raffles. Please try again.'));
@@ -96,23 +109,31 @@ export default function GetMyRafflePopup({ open, onClose }) {
     };
   }, [open]);
 
-  const ticket = useMemo(() => tickets.find((t) => t.eventKey === eventKey) || null, [tickets, eventKey]);
+  const selectedId = Number(eventId) || null;
+  const selectedEvent = useMemo(() => events.find((e) => e.eventId === selectedId) || null, [events, selectedId]);
+  const ticket = useMemo(() => tickets.find((t) => t.eventId === selectedId) || null, [tickets, selectedId]);
+  const ticketIsFresh = ticket ? freshEventIds.includes(ticket.eventId) : false;
 
   const handleEventChange = (event) => {
-    const key = event.target.value;
-    setEventKey(key);
+    const nextId = event.target.value;
+    setEventId(nextId);
     setError('');
-    const url = events.find((e) => e.key === key)?.url;
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    const picked = events.find((e) => e.eventId === Number(nextId));
+    if (picked?.url) window.open(picked.url, '_blank', 'noopener,noreferrer');
+    if (picked) void selectRaffleEvent(picked.eventId).catch(() => {});
   };
 
   const handleGenerate = async () => {
-    if (!eventKey || generating) return;
+    if (!selectedId || generating) return;
     setGenerating(true);
     setError('');
     try {
-      const { ticket: issued } = await createRaffleTicket(eventKey);
-      if (issued) setTickets((prev) => [...prev.filter((t) => t.eventKey !== issued.eventKey), issued]);
+      const { ticket: issued, alreadyHad, message } = await createRaffleTicket(selectedId);
+      if (issued) {
+        setTickets((prev) => [...prev.filter((t) => t.eventId !== issued.eventId), issued]);
+        if (!alreadyHad) setFreshEventIds((prev) => [...prev, issued.eventId]);
+        if (alreadyHad && message) setAlreadyMessage(message);
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create your raffle. Please try again.'));
     } finally {
@@ -130,7 +151,7 @@ export default function GetMyRafflePopup({ open, onClose }) {
             fullWidth
             size="small"
             label="Event"
-            value={eventKey}
+            value={eventId}
             onChange={handleEventChange}
             disabled={loading}
             SelectProps={{ native: true }}
@@ -141,11 +162,17 @@ export default function GetMyRafflePopup({ open, onClose }) {
               Select an event
             </option>
             {events.map((event) => (
-              <option key={event.key} value={event.key}>
+              <option key={event.eventId} value={String(event.eventId)}>
                 {event.label}
               </option>
             ))}
           </TextField>
+
+          {selectedEvent && selectedEvent.raffleStart && selectedEvent.raffleEnd ? (
+            <Typography sx={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 600 }}>
+              Raffle open {formatWindowTime(selectedEvent.raffleStart)} – {formatWindowTime(selectedEvent.raffleEnd)}
+            </Typography>
+          ) : null}
 
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -153,7 +180,7 @@ export default function GetMyRafflePopup({ open, onClose }) {
             </Box>
           ) : null}
 
-          {!loading && eventKey && !ticket ? (
+          {!loading && selectedId && !ticket ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
               <ColorTemplate13DisableGreenButton
                 type="button"
@@ -162,13 +189,13 @@ export default function GetMyRafflePopup({ open, onClose }) {
                 onClick={() => void handleGenerate()}
                 sx={{ fontWeight: 800, fontSize: { xs: '1.05rem', sm: '1.2rem' }, px: 2.5 }}
               >
-                {generating ? 'Generating…' : 'Generate Raffle Number'}
+                {generating ? 'Generating…' : 'Generate My Raffle'}
               </ColorTemplate13DisableGreenButton>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>Only 1 raffle per email account</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>Only 1 raffle per email login</Typography>
             </Box>
           ) : null}
 
-          {!loading && !eventKey ? (
+          {!loading && !selectedId ? (
             <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>Choose your Meetup event above.</Typography>
           ) : null}
 
@@ -179,6 +206,11 @@ export default function GetMyRafflePopup({ open, onClose }) {
           {ticket ? (
             <>
               <RaffleTicketCard ticket={ticket} />
+              {!ticketIsFresh ? (
+                <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>
+                  {alreadyMessage}
+                </Typography>
+              ) : null}
               <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>
                 Take a screenshot of this screen and bring it to the Meetup event.
               </Typography>
