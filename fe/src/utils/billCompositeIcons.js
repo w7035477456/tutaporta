@@ -7,6 +7,7 @@ import {
   faBolt,
   faCalendarDays,
   faCar,
+  faCarSide,
   faCheck,
   faCirclePlus,
   faCloud,
@@ -19,6 +20,7 @@ import {
   faHouse,
   faShieldHalved,
   faSquareCheck,
+  faUmbrella,
   faWifi
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -40,6 +42,9 @@ const BILL_COMPOSITE_ICONS = {
   },
   'car-smog-check': {
     draw: (maskId) => drawCarSmogCheck(maskId)
+  },
+  'auto-insurance': {
+    draw: (maskId) => drawAutoInsurance(maskId)
   },
   anniversary: {
     draw: (maskId) => drawAnniversaryRings(maskId)
@@ -168,6 +173,18 @@ function drawCarSmogCheck(maskId) {
     '<circle cx="196" cy="404" r="20"/>' +
     '<rect x="380" y="438" width="92" height="28" rx="14"/>' +
     `<g mask="url(#${cloudMask})"><path d="${cloud.path}" transform="${cloud.transform}"/></g>`
+  );
+}
+
+/** Umbrella canopy (handle cut off) sheltering a side-view car (auto insurance). */
+function drawAutoInsurance(maskId) {
+  const umbrella = fitIcon(faUmbrella, { x: 124, y: 0, w: 392, h: 392 });
+  const canopyBottom = (umbrella.scale * 290).toFixed(2);
+  const car = fitIcon(faCarSide, { x: 128, y: 221, w: 384, h: 307 });
+  return (
+    maskWith(maskId, `<rect x="0" y="${canopyBottom}" width="${VIEW_W}" height="${VIEW_H}" fill="#000"/>`) +
+    `<g mask="url(#${maskId})"><path d="${umbrella.path}" transform="${umbrella.transform}"/></g>` +
+    `<path d="${car.path}" transform="${car.transform}"/>`
   );
 }
 

@@ -207,7 +207,8 @@ function MiniMonthCalendar({ year, month, marks, today }) {
 export default function BillScheduleYearlyPanel({
   storageType: storageTypeProp,
   videoTutorialUrl = '',
-  onBillScheduleTutorialClick
+  onBillScheduleTutorialClick,
+  headerRightAction = null
 }) {
   const paneStorageType = useRecordVaultPaneStorageType();
   const now = useMemo(() => new Date(), []);
@@ -517,6 +518,7 @@ export default function BillScheduleYearlyPanel({
         videoTutorialUrl={videoTutorialUrl}
         onTutorialClick={onBillScheduleTutorialClick}
         disabled={loading || saving}
+        rightAction={headerRightAction}
       />
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75, flexShrink: 0 }}>
         <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>
@@ -1026,5 +1028,6 @@ export default function BillScheduleYearlyPanel({
 BillScheduleYearlyPanel.propTypes = {
   storageType: PropTypes.oneOf(['tutadrive', 'usb']),
   videoTutorialUrl: PropTypes.string,
-  onBillScheduleTutorialClick: PropTypes.func
+  onBillScheduleTutorialClick: PropTypes.func,
+  headerRightAction: PropTypes.node
 };

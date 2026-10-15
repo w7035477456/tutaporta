@@ -24,8 +24,15 @@ const tutorialButtonSx = {
   fontWeight: 800
 };
 
+const textTutorialLabel = (
+  <Box component="span" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.05 }}>
+    <span>Text</span>
+    <span>Tutorial</span>
+  </Box>
+);
+
 /**
- * Header pair: VIDEO TUTORIALS graphic + orange Tutorial button.
+ * Header pair: VIDEO TUTORIALS graphic + orange two-row "Text Tutorial" button.
  * - Graphic → floating YouTube theater window
  * - Tutorial → caller opens context / instruction popup
  */
@@ -64,7 +71,7 @@ export default function WorkspaceVideoTutorialPair({
           whiteSpace: 'nowrap'
         }}
       >
-        Tutorial
+        {textTutorialLabel}
       </UnSelectedButtonTemplate>
     ) : (
       <SliderControlButton
@@ -82,7 +89,7 @@ export default function WorkspaceVideoTutorialPair({
         {...guestDemoAllowProps()}
         sx={tutorialButtonSx}
       >
-        Tutorial
+        {textTutorialLabel}
       </SliderControlButton>
     );
 

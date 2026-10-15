@@ -62,7 +62,7 @@ export const TUTANOTES_TUTACLOUD_VIDEO_TUTORIAL_LABEL = 'Tutorial';
 export const TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL = TUTANOTES_TUTACLOUD_VIDEO_TUTORIAL_LABEL;
 export const TUTANOTES_USB_VIDEO_TUTORIAL_LABEL = 'Tutorial';
 /** Fixed short header button text — opens Current Context Tutorial popup. */
-export const TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL = 'Tutorial';
+export const TUTANOTES_VIDEO_TUTORIAL_BUTTON_LABEL = 'Text Tutorial';
 
 /** Login + icon-decrypt popups: each 1/3 viewport width (alone or side-by-side = 2/3 vw). */
 export const TUTANOTES_HALF_PANEL_WIDTH = '33.333vw';

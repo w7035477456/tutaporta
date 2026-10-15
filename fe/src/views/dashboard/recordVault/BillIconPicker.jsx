@@ -17,7 +17,7 @@ const BILL_ICON_PINNED = [
   'online-bill',
   'tax-bill',
   'car-safety-inspection',
-  'archive',
+  'auto-insurance',
   'university',
   'search',
   'lightbulb',
@@ -30,8 +30,8 @@ const BILL_ICON_PINNED = [
   'internet-bill'
 ];
 
-/** Row 1 of the tray — fills its tray box, and is drawn 50% bigger in the Bill Schedule icon column. */
-const BILL_ICON_FEATURED = BILL_ICON_PINNED.slice(0, 10);
+/** Row 1 of the tray + auto insurance — fill their tray box, and are drawn 50% bigger in the Bill Schedule icon column. */
+const BILL_ICON_FEATURED = [...BILL_ICON_PINNED.slice(0, 10), 'auto-insurance'];
 const BILL_ICON_FEATURED_SCALE = 1.5;
 /** Every tray box + icon is 50% bigger than the security-icon grid. */
 const BILL_ICON_TRAY_SCALE = 1.5;

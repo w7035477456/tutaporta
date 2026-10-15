@@ -8244,12 +8244,19 @@ export default function RecordVaultWorkspacePane({
             }}
           >
             {(() => {
+              const billFocusToggle = (
+                <VaultWorkspaceFocusToggleButton
+                  active={noteFocusView}
+                  onToggle={() => setNoteFocusView((v) => !v)}
+                />
+              );
               if (isBillMonthlyView) {
                 return (
                   <BillScheduleMonthlyPanel
                     storageType={paneStorageType}
                     videoTutorialUrl={videoTutorialUrl}
                     onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                    headerRightAction={billFocusToggle}
                   />
                 );
               }
@@ -8259,6 +8266,7 @@ export default function RecordVaultWorkspacePane({
                     storageType={paneStorageType}
                     videoTutorialUrl={videoTutorialUrl}
                     onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                    headerRightAction={billFocusToggle}
                   />
                 );
               }
