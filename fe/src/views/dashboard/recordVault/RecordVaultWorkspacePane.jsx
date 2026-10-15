@@ -1278,6 +1278,10 @@ function ShortcutMenuRow({
       lockTitle={lockTitle}
       locked={locked}
     >
+      <Box
+        data-menu-label-slot=""
+        sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
+      >
       <MenuRowButton
         selected={selected}
         locked={locked}
@@ -1320,6 +1324,7 @@ function ShortcutMenuRow({
       >
         {renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
       </MenuRowButton>
+      </Box>
     </MenuRowWithDelete>
   );
 }
@@ -4659,6 +4664,43 @@ export default function RecordVaultWorkspacePane({
     };
   }, [menuLanesVisible]);
 
+  const shortcutLaneRef = useRef(null);
+
+  /** Resize the right Shortcut column (wider or narrower) so the widest shortcut label just fits. */
+  const fitShortcutLaneToLabels = useCallback(() => {
+    if (compareMode || typeof window === 'undefined' || window.innerWidth < 900) return;
+    const delta = measureLaneFitDeltaPx(shortcutLaneRef.current);
+    if (delta == null || Math.abs(delta) < 2) return;
+    const maxRight = Math.max(
+      MIN_RIGHT_SIDEBAR_WIDTH,
+      window.innerWidth - (leftMenuOpen ? sidebarWidth : 0) - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2
+    );
+    const nextRight = clamp(rightSidebarWidth + delta, MIN_RIGHT_SIDEBAR_WIDTH, maxRight);
+    if (Math.abs(nextRight - rightSidebarWidth) < 2) return;
+    setRightSidebarWidth(nextRight);
+    writeStoredLayout({
+      sidebarWidth,
+      notebookColWidth,
+      rightSidebarWidth: nextRight,
+      shortcutPanePercent
+    });
+  }, [compareMode, leftMenuOpen, notebookColWidth, rightSidebarWidth, shortcutPanePercent, sidebarWidth]);
+
+  const fitShortcutLaneToLabelsRef = useRef(fitShortcutLaneToLabels);
+  fitShortcutLaneToLabelsRef.current = fitShortcutLaneToLabels;
+  const shortcutLaneVisible = rightMenuOpen && !hideWorkspaceChrome;
+  useEffect(() => {
+    if (!shortcutLaneVisible) return undefined;
+    let innerFrame = 0;
+    const outerFrame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(() => fitShortcutLaneToLabelsRef.current());
+    });
+    return () => {
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+    };
+  }, [shortcutLaneVisible, shortcuts]);
+
   /**
    * Attach Chromium drag-out payloads so note(s) save as .html in Finder/Explorer.
    * One note → DownloadURL (lands in the drop folder).
@@ -7757,6 +7799,111 @@ export default function RecordVaultWorkspacePane({
                     gap: compact ? 0.75 : 1
                   }}
                 >
+                {/* Bill Schedule: separate box above the two swim lanes (label + Monthly/Yearly) + tutorial pair. */}
+                <Box
+                  sx={{
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1,
+                    maxWidth: '100%'
+                  }}
+                >
+                <Box
+                  sx={{
+                    flexShrink: 0,
+                    alignSelf: 'center',
+                    width: notebookColWidth,
+                    maxWidth: '100%',
+                    border: '2px solid var(--theme-primary-color)',
+                    borderRadius: 1,
+                    bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
+                    p: compact ? 0.75 : 1,
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.75
+                  }}
+                  onDragOver={(e) => {
+                    if (!crossPaneDropActive) return;
+                    if (!isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    if (
+                      tryHandleForeignCrossPaneDrop(e, {
+                        targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
+                      })
+                    ) {
+                      return;
+                    }
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      textAlign: 'center',
+                      fontFamily: MAIN_FONT_FAMILY,
+                      fontSize: '0.95rem',
+                      lineHeight: 1.2,
+                      userSelect: 'none'
+                    }}
+                  >
+                    Bill Schedule
+                  </Typography>
+                  {(billScheduleNotebook.notes || []).map((note) => (
+                      <Box key={note.note_id} sx={{ width: '100%', flexShrink: 0 }}>
+                        <RenamableDraggableMenuRow
+                          id={note.note_id}
+                          domId={`record-vault-note-${note.note_id}`}
+                          label={note.note_name}
+                          buttonTitle={`${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`}
+                          selected={Number(note.note_id) === Number(selectedNoteId)}
+                          editing={false}
+                          editValue=""
+                          onEditValueChange={() => {}}
+                          onSelect={() => openBillScheduleNote(note.note_id)}
+                          onStartEdit={() => {}}
+                          onCommitEdit={() => {}}
+                          onCancelEdit={() => {}}
+                          dragMime={DRAG_NOTE}
+                          dragNotebookId={BILL_SCHEDULE_NOTEBOOK_ID}
+                          draggingId={draggingNoteId}
+                          dropTargetId={dropTargetNoteId}
+                          acceptForeignDrop={
+                            crossPaneDropActive &&
+                            isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)
+                          }
+                          dragTitle={`Drag ${note.note_name} to the other vault to copy or move`}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={() => {}}
+                          onDrop={(e) => {
+                            if (
+                              tryHandleForeignCrossPaneDrop(e, {
+                                targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
+                              })
+                            ) {
+                              return;
+                            }
+                          }}
+                          disabled={busy || crossPaneBusy}
+                        />
+                      </Box>
+                  ))}
+                </Box>
+                <WorkspaceVideoTutorialPair
+                  videoTutorialUrl={videoTutorialUrl}
+                  onTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                  tutorialVariant="orange"
+                  tutorialAriaLabel="Open Bill Schedule tutorial"
+                  tutorialTitle="Open Bill Schedule tutorial"
+                  iconHeight={{ xs: 72, sm: 84 }}
+                  sx={{ ml: 0 }}
+                />
+                </Box>
                 <Box
                   sx={{
                     display: 'flex',
@@ -8104,112 +8251,6 @@ export default function RecordVaultWorkspacePane({
                     </Box>
                   </Box>
                 </Box>
-
-                {/* Bill Schedule: separate box under the two swim lanes (label + Monthly/Yearly) + tutorial pair. */}
-                <Box
-                  sx={{
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 1,
-                    maxWidth: '100%'
-                  }}
-                >
-                <Box
-                  sx={{
-                    flexShrink: 0,
-                    alignSelf: 'center',
-                    width: notebookColWidth,
-                    maxWidth: '100%',
-                    border: '2px solid var(--theme-primary-color)',
-                    borderRadius: 1,
-                    bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
-                    p: compact ? 0.75 : 1,
-                    boxSizing: 'border-box',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.75
-                  }}
-                  onDragOver={(e) => {
-                    if (!crossPaneDropActive) return;
-                    if (!isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onDrop={(e) => {
-                    if (
-                      tryHandleForeignCrossPaneDrop(e, {
-                        targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
-                      })
-                    ) {
-                      return;
-                    }
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontWeight: 800,
-                      textAlign: 'center',
-                      fontFamily: MAIN_FONT_FAMILY,
-                      fontSize: '0.95rem',
-                      lineHeight: 1.2,
-                      userSelect: 'none'
-                    }}
-                  >
-                    Bill Schedule
-                  </Typography>
-                  {(billScheduleNotebook.notes || []).map((note) => (
-                      <Box key={note.note_id} sx={{ width: '100%', flexShrink: 0 }}>
-                        <RenamableDraggableMenuRow
-                          id={note.note_id}
-                          domId={`record-vault-note-${note.note_id}`}
-                          label={note.note_name}
-                          buttonTitle={`${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`}
-                          selected={Number(note.note_id) === Number(selectedNoteId)}
-                          editing={false}
-                          editValue=""
-                          onEditValueChange={() => {}}
-                          onSelect={() => openBillScheduleNote(note.note_id)}
-                          onStartEdit={() => {}}
-                          onCommitEdit={() => {}}
-                          onCancelEdit={() => {}}
-                          dragMime={DRAG_NOTE}
-                          dragNotebookId={BILL_SCHEDULE_NOTEBOOK_ID}
-                          draggingId={draggingNoteId}
-                          dropTargetId={dropTargetNoteId}
-                          acceptForeignDrop={
-                            crossPaneDropActive &&
-                            isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)
-                          }
-                          dragTitle={`Drag ${note.note_name} to the other vault to copy or move`}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={() => {}}
-                          onDrop={(e) => {
-                            if (
-                              tryHandleForeignCrossPaneDrop(e, {
-                                targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
-                              })
-                            ) {
-                              return;
-                            }
-                          }}
-                          disabled={busy || crossPaneBusy}
-                        />
-                      </Box>
-                  ))}
-                </Box>
-                <WorkspaceVideoTutorialPair
-                  videoTutorialUrl={videoTutorialUrl}
-                  onTutorialClick={() => setBillScheduleTutorialOpen(true)}
-                  tutorialVariant="orange"
-                  tutorialAriaLabel="Open Bill Schedule tutorial"
-                  tutorialTitle="Open Bill Schedule tutorial"
-                  iconHeight={{ xs: 72, sm: 84 }}
-                  sx={{ ml: 0 }}
-                />
-                </Box>
                 </Box>
               </Box>
 
@@ -8541,6 +8582,7 @@ export default function RecordVaultWorkspacePane({
                   }}
                 >
                   <Box
+                    ref={shortcutLaneRef}
                     sx={{
                       ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
                       flex: `${shortcutPanePercent} 1 0`,
@@ -8564,6 +8606,7 @@ export default function RecordVaultWorkspacePane({
                       }
                     }}
                   >
+                    <Box data-menu-label-slot="" sx={{ width: '100%', mb: 1 }}>
                     <SliderControlButton
                       type="button"
                       fullWidth
@@ -8572,7 +8615,6 @@ export default function RecordVaultWorkspacePane({
                       disabled
                       disableHoverScale
                       sx={{
-                        mb: 1,
                         pointerEvents: 'none',
                         cursor: 'default',
                         ...laneContainedButtonSx,
@@ -8591,6 +8633,7 @@ export default function RecordVaultWorkspacePane({
                     >
                       Shortcut
                     </SliderControlButton>
+                    </Box>
                     <Typography sx={{ fontSize: '0.85rem', mb: 1, opacity: 0.85 }}>
                       Drag notebooks or notes here
                     </Typography>
