@@ -38,6 +38,7 @@ export function getVaultInitialDataMb() {
 }
 
 const PENDING_BYTES_PREFIX = 'v1:record_vault:transfer_pending_bytes:';
+const BYTES_PER_MB = 1024 * 1024;
 
 function pendingBytesKey(singlesId) {
   return `${PENDING_BYTES_PREFIX}${Math.trunc(Number(singlesId))}`;
@@ -47,12 +48,6 @@ function sleepMs(ms) {
   const n = Math.max(0, Math.floor(Number(ms) || 0));
   if (n <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, n));
-}
-
-function pendingBytesToMb(pendingBytes) {
-  const b = Math.max(0, Math.floor(Number(pendingBytes) || 0));
-  if (b <= 0) return 0;
-  return Math.max(1, Math.ceil(b / (1024 * 1024)));
 }
 
 export async function addVaultTransferBytes(singlesId, bytes) {
@@ -143,10 +138,23 @@ export async function trackVaultTransferBytes(singlesId, bytes, startedAtMs = nu
   const id = Math.trunc(Number(singlesId));
   const b = Math.floor(Number(bytes));
   if (!Number.isFinite(id) || id < 1 || !Number.isFinite(b) || b <= 0) return;
-  await clusterRedisIncrBy(pendingBytesKey(id), b);
+  const pendingAfter = await clusterRedisIncrBy(pendingBytesKey(id), b);
+  if (pendingAfter >= BYTES_PER_MB) {
+    await flushWholeMbTransferBytes(id);
+  }
   if (startedAtMs != null) {
     await throttleVaultTransferIfExhausted(id, startedAtMs, opts);
   }
+}
+
+/** Move whole MB from Redis pending into Postgres; the sub-MB remainder stays pending. */
+async function flushWholeMbTransferBytes(singlesId) {
+  const pending = await clusterRedisTakeInt(pendingBytesKey(singlesId));
+  if (pending <= 0) return;
+  const remainder = pending % BYTES_PER_MB;
+  if (remainder > 0) await clusterRedisIncrBy(pendingBytesKey(singlesId), remainder);
+  const wholeBytes = pending - remainder;
+  if (wholeBytes > 0) await addVaultTransferBytes(singlesId, wholeBytes);
 }
 
 export async function flushVaultTransferBytes(singlesId) {
@@ -173,10 +181,13 @@ export async function getVaultTransferStats(singlesId) {
     if (!Number.isFinite(refillRemainMb)) refillRemainMb = initialDataMb;
     let refillBoughtMb = Number(rows[0]?.refill_bought_mb);
     if (!Number.isFinite(refillBoughtMb) || refillBoughtMb < 0) refillBoughtMb = initialDataMb;
+    let pendingBytes = 0;
     if (Number.isFinite(id) && id >= 1) {
-      const pendingMb = pendingBytesToMb(await clusterRedisGetInt(pendingBytesKey(id)));
-      refillRemainMb -= pendingMb;
+      pendingBytes = Math.max(0, await clusterRedisGetInt(pendingBytesKey(id)));
     }
+    const refillRemainMbExact = refillRemainMb - pendingBytes / BYTES_PER_MB;
+    refillRemainMb = Math.floor(refillRemainMbExact);
+    const overageThrottled = refillRemainMbExact <= 0;
     const leftMb = refillRemainMb;
     const leftPct =
       initialDataMb > 0
@@ -186,13 +197,19 @@ export async function getVaultTransferStats(singlesId) {
           : 0;
     return {
       usedMb,
+      /** Lifetime TutaNotes Tx/Rx bytes (Postgres total + Redis pending). */
+      usedBytes: usedMb * BYTES_PER_MB + pendingBytes,
       limitMb: initialDataMb,
       leftMb,
       leftPct,
       refillRemainMb,
+      refillRemainMbExact,
+      pendingTransferBytes: pendingBytes,
       refillBoughtMb,
       refillBlockMb: VAULT_REFILL_BLOCK_MB,
-      overageThrottled: refillRemainMb <= 0
+      overageThrottled,
+      /** Current transfer slowdown multiple: 1 at full speed, NOTES_OVERLIMIT_THROTTLE_MULTIPLE when depleted. */
+      throttleFactor: overageThrottled ? VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR : 1
     };
   } catch (err) {
     console.warn('[vault-transfer] stats unavailable:', err?.message || err);
@@ -204,7 +221,8 @@ export async function getVaultTransferStats(singlesId) {
       refillRemainMb: initialDataMb,
       refillBoughtMb: initialDataMb,
       refillBlockMb: VAULT_REFILL_BLOCK_MB,
-      overageThrottled: false
+      overageThrottled: false,
+      throttleFactor: 1
     };
   }
 }

@@ -126,12 +126,37 @@ TutaDriveTotalLabel.propTypes = {
   usage: PropTypes.object
 };
 
-/** TutaDrive notes+photos disk use in MB (falls back to the vault folder size). */
-function tutaDriveUsedMb(usage) {
-  const bytes = Number(usage?.tutaDriveStorage?.totalBytes);
+/** Lifetime TutaNotes Tx/Rx in MB — every download / upload / restore / merge / open adds to it. */
+function transferUsedMb(transfer) {
+  const bytes = Number(transfer?.usedBytes);
   if (Number.isFinite(bytes) && bytes >= 0) return bytes / (1024 * 1024);
-  return Math.max(0, Number(usage?.vaultFolderMb) || 0);
+  return Math.max(0, Number(transfer?.usedMb) || 0);
 }
+
+const throttleIndexSx = {
+  ...usageBarFontSx,
+  flexShrink: 0,
+  fontWeight: 900,
+  color: '#fff',
+  WebkitTextFillColor: '#fff',
+  whiteSpace: 'nowrap',
+  px: 0.5
+};
+
+/** "T10" = transfers currently run 10× slower; "T1" = full speed. */
+function ThrottleIndexLabel({ factor }) {
+  const n = Math.max(1, Math.round(Number(factor) || 1));
+  const title = n > 1 ? `Data depleted — transfers are ${n}× slower. Refill to return to full speed.` : 'Full transfer speed';
+  return (
+    <Typography component="span" sx={throttleIndexSx} title={title}>
+      T{n}
+    </Typography>
+  );
+}
+
+ThrottleIndexLabel.propTypes = {
+  factor: PropTypes.number
+};
 
 /** Red segment never shrinks below this, so its label stays readable. */
 const USAGE_METER_MIN_RED_PX = 76;
@@ -147,7 +172,7 @@ const usageMeterLabelSx = {
 };
 
 /**
- * Red = bytes used (TutaDrive disk total, else data used), green = data plan bought.
+ * Red = lifetime TutaNotes data transferred, green = data plan bought.
  * Click anywhere (except an admin-editable amount) to open Refill / Add blocks.
  */
 function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPlan, onSaved }) {
@@ -387,7 +412,7 @@ export default function RecordVaultUsageBar({
       <UsageBarShell actions={actions} blackBar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
           <UsageMeter
-            usedMb={usage?.tutaDrive ? tutaDriveUsedMb(usage) : Math.max(0, refillBoughtMb - refillRemainMb)}
+            usedMb={transferUsedMb(transfer)}
             boughtMb={refillBoughtMb}
             remainMb={refillRemainMb}
             blockLabel={blockLabel}
@@ -396,6 +421,7 @@ export default function RecordVaultUsageBar({
             onSaved={() => onPurchased?.()}
           />
           <AddMoreGbLink onClick={() => setDataPlanOpen(true)} />
+          <ThrottleIndexLabel factor={Number(transfer.throttleFactor) || (depleted ? 10 : 1)} />
           {depleted ? (
             <Typography component="span" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
               (<VaultOverageSpeedThrottledPhrase />)

@@ -3883,6 +3883,7 @@ export default function RecordVaultWorkspacePane({
 
   const closeTutaCloudBackupDialog = useCallback(() => {
     setTutaCloudBackupOpen(false);
+    void refreshVaultUsageRef.current?.();
     const resolve = exitBackupDialogResolveRef.current;
     exitBackupDialogResolveRef.current = null;
     resolve?.();

@@ -374,6 +374,7 @@ import { lookupSystemToolsAdminSingles } from './utils/systemToolsAdmin.js';
 import { adminImpersonate, adminReturnAdmin } from './routes/admin/adminImpersonate.js';
 import { attachAuthIfPresent } from './middleware/attachAuthIfPresent.js';
 import { photoAlbumsTransferMeterStack } from './middleware/photoAlbumsTransferMeter.js';
+import { recordVaultTransferMeterStack } from './middleware/recordVaultTransferMeter.js';
 import { getPublicKey } from './jwtKeys.js';
 import { clearAuthCookie, getAuthTokenFromCookies, getKeepMeLoginDays } from './utils/authCookie.js';
 import { getMallDepartmentMode } from './mallDepartmentMode.js';
@@ -1469,6 +1470,7 @@ const photoAlbumsVaultAuth = [
   requireAuth,
   createVaultClusterCoherenceMiddleware({ product: VAULT_PRODUCT_PHOTO_ALBUMS, hooks: photoAlbumsVaultClusterHooks })
 ];
+app.use('/api/recordVault', ...recordVaultTransferMeterStack);
 app.get('/api/recordVault', ...recordVaultVaultAuth, getRecordVaultTree);
 app.get('/api/recordVault/search', ...recordVaultVaultAuth, searchRecordVaultNotes);
 app.get('/api/recordVault/rag/status', ...recordVaultVaultAuth, getRecordVaultRagStatus);

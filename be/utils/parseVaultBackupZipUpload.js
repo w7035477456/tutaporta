@@ -122,6 +122,7 @@ export function parseVaultBackupZipUpload(req) {
             maxBytes: MAX_BACKUP_ZIP_BYTES,
             destPath: zipPath
           });
+          req.chunkedUploadBytes = bytesWritten;
         } catch (err) {
           discardChunkedUpload(singlesId, chunkedUploadId);
           fail(err);

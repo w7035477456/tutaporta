@@ -28,7 +28,7 @@ function shouldMeterPhotoAlbumsTransfer(path) {
   return true;
 }
 
-function estimateRequestBytes(req) {
+export function estimateRequestBytes(req) {
   const fromHeader = Number(req.headers['content-length']);
   if (Number.isFinite(fromHeader) && fromHeader > 0) return Math.floor(fromHeader);
   if (req.body == null) return 0;
@@ -41,7 +41,7 @@ function estimateRequestBytes(req) {
   }
 }
 
-function patchResponseByteCounter(res, onComplete) {
+export function patchResponseByteCounter(res, onComplete) {
   let resBytes = 0;
   const origWrite = res.write;
   const origEnd = res.end;
