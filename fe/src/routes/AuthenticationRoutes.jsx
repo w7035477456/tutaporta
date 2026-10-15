@@ -4,7 +4,7 @@ import MinimalLayout from 'layout/MinimalLayout';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
 import { LIVE_FACE_SCAN_POPUP_PATH } from 'constants/liveFaceScanPopupRoute';
 import { getSpecialLoginPath } from 'config/specialLoginEnv';
-import { GET_MY_RAFFLE_PATH, RAFFLE_MUSTAFA_PATH, RAFFLE_PATH } from 'constants/raffleRoute';
+import { GET_MY_RAFFLE_PATH, RAFFLE_MUSTAFA_PATH, RAFFLE_PATH, RAFFLE_SAMPLE_PATH } from 'constants/raffleRoute';
 
 // maintenance routing
 const LoginPage = Loadable(lazy(() => import('views/pages/authentication/Login')));
@@ -32,6 +32,7 @@ const LiveFaceScanPopupPage = Loadable(lazy(() => import('views/utilities/LiveFa
 const ResumePage = Loadable(lazy(() => import('views/pages/ResumePage')));
 const RaffleInfoPage = Loadable(lazy(() => import('views/pages/raffle/RaffleInfoPage')));
 const RaffleRedirect = Loadable(lazy(() => import('views/pages/raffle/RaffleRedirect')));
+const RaffleSamplePage = Loadable(lazy(() => import('views/pages/raffle/RaffleSamplePage')));
 
 // ==============================|| AUTHENTICATION ROUTING ||============================== //
 
@@ -129,6 +130,10 @@ const authenticationChildren = [
     {
       path: RAFFLE_PATH,
       element: <RaffleInfoPage />
+    },
+    {
+      path: RAFFLE_SAMPLE_PATH,
+      element: <RaffleSamplePage />
     },
     {
       path: RAFFLE_MUSTAFA_PATH,
