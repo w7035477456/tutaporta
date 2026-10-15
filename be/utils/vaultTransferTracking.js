@@ -139,12 +139,27 @@ export async function trackVaultTransferBytes(singlesId, bytes, startedAtMs = nu
   const b = Math.floor(Number(bytes));
   if (!Number.isFinite(id) || id < 1 || !Number.isFinite(b) || b <= 0) return;
   const pendingAfter = await clusterRedisIncrBy(pendingBytesKey(id), b);
-  if (pendingAfter >= BYTES_PER_MB) {
+  if (pendingAfter < b) {
+    await addPendingWhileRedisDown(id, b);
+  } else if (pendingAfter >= BYTES_PER_MB) {
     await flushWholeMbTransferBytes(id);
   }
   if (startedAtMs != null) {
     await throttleVaultTransferIfExhausted(id, startedAtMs, opts);
   }
+}
+
+/**
+ * Sub-MB bytes held only while Redis INCRBY is failing (auth / outage); whole MB still go
+ * straight to Postgres so at most <1MB per user per process can be lost.
+ */
+const redisDownPendingBytes = new Map();
+
+async function addPendingWhileRedisDown(singlesId, bytes) {
+  const total = (redisDownPendingBytes.get(singlesId) || 0) + bytes;
+  const remainder = total % BYTES_PER_MB;
+  redisDownPendingBytes.set(singlesId, remainder);
+  if (total - remainder > 0) await addVaultTransferBytes(singlesId, total - remainder);
 }
 
 /** Move whole MB from Redis pending into Postgres; the sub-MB remainder stays pending. */
@@ -214,6 +229,8 @@ export async function getVaultTransferStats(singlesId) {
   } catch (err) {
     console.warn('[vault-transfer] stats unavailable:', err?.message || err);
     return {
+      /** Placeholder only — the UI keeps its last real tally when this is set. */
+      unavailable: true,
       usedMb: 0,
       limitMb: initialDataMb,
       leftMb: initialDataMb,

@@ -126,11 +126,15 @@ TutaDriveTotalLabel.propTypes = {
   usage: PropTypes.object
 };
 
-/** Lifetime TutaNotes Tx/Rx in MB — every download / upload / restore / merge / open adds to it. */
-function transferUsedMb(transfer) {
-  const bytes = Number(transfer?.usedBytes);
-  if (Number.isFinite(bytes) && bytes >= 0) return bytes / (1024 * 1024);
-  return Math.max(0, Number(transfer?.usedMb) || 0);
+/**
+ * Data used from the current plan: singles.refill_bought_mb − refill_remain_mb (Postgres, per user)
+ * minus Redis sub-MB pending. Every TutaNotes / TutaPhoto download / upload / restore / merge / open
+ * lowers remain, so this only grows until the next purchase.
+ */
+function transferUsedMb(transfer, boughtMb) {
+  const remainExact = Number(transfer?.refillRemainMbExact);
+  const remain = Number.isFinite(remainExact) ? remainExact : Number(transfer?.refillRemainMb) || 0;
+  return Math.max(0, (Number(boughtMb) || 0) - remain);
 }
 
 const throttleIndexSx = {
@@ -172,7 +176,7 @@ const usageMeterLabelSx = {
 };
 
 /**
- * Red = lifetime TutaNotes data transferred, green = data plan bought.
+ * Red = data used from the plan (bought − remain), green = data plan bought.
  * Click anywhere (except an admin-editable amount) to open Refill / Add blocks.
  */
 function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPlan, onSaved }) {
@@ -412,7 +416,7 @@ export default function RecordVaultUsageBar({
       <UsageBarShell actions={actions} blackBar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
           <UsageMeter
-            usedMb={transferUsedMb(transfer)}
+            usedMb={transferUsedMb(transfer, refillBoughtMb)}
             boughtMb={refillBoughtMb}
             remainMb={refillRemainMb}
             blockLabel={blockLabel}

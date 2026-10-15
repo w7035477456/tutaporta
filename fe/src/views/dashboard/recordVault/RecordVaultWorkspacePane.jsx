@@ -3393,9 +3393,13 @@ export default function RecordVaultWorkspacePane({
     const loadUsage = async () => {
       try {
         const usage = await vaultApi.fetchRecordVaultUsage();
-        if (!cancelled) setVaultUsage(usage);
+        if (cancelled) return;
+        // Server could not read Postgres — keep the last real tally instead of flashing 0gb.
+        setVaultUsage((prev) =>
+          usage?.transfer?.unavailable && prev?.transfer ? { ...usage, transfer: prev.transfer } : usage
+        );
       } catch {
-        if (!cancelled) setVaultUsage(null);
+        // Transient network / server error — keep showing the last numbers.
       }
     };
     refreshVaultUsageRef.current = loadUsage;

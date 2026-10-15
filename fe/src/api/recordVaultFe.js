@@ -1549,13 +1549,21 @@ export async function fetchRecordVaultUsage({ storageType } = {}) {
     transfer: data?.transfer
       ? {
           usedMb: Number(data.transfer.usedMb) || 0,
+          usedBytes: Number(data.transfer.usedBytes) || 0,
           limitMb: Number(data.transfer.limitMb) || 100,
           leftMb: Number(data.transfer.leftMb) || 0,
           leftPct: Number(data.transfer.leftPct) || 0,
           refillRemainMb: Number(data.transfer.refillRemainMb) || 0,
+          refillRemainMbExact:
+            data.transfer.refillRemainMbExact != null
+              ? Number(data.transfer.refillRemainMbExact)
+              : Number(data.transfer.refillRemainMb) || 0,
+          pendingTransferBytes: Number(data.transfer.pendingTransferBytes) || 0,
           refillBoughtMb: Number(data.transfer.refillBoughtMb) || 0,
           refillBlockMb: Number(data.transfer.refillBlockMb) || 10 * 1024,
-          overageThrottled: Boolean(data.transfer.overageThrottled)
+          overageThrottled: Boolean(data.transfer.overageThrottled),
+          throttleFactor: Number(data.transfer.throttleFactor) || 1,
+          unavailable: Boolean(data.transfer.unavailable)
         }
       : null,
     sessionFileCounts: {
