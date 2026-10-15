@@ -11,6 +11,7 @@ import PropTypes from 'prop-types';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
+import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
 import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
@@ -60,6 +61,7 @@ function blankRow(rowIndex) {
     bill_type: 'Manual',
     action: null,
     paid_record_id: null,
+    bill_icon: null,
     has_bill_content: false,
     status: '',
     status_tone: 'none'
@@ -147,6 +149,8 @@ export default function BillScheduleMonthlyPanel({
   const [billPopupOpen, setBillPopupOpen] = useState(false);
   const [billEnsurePayload, setBillEnsurePayload] = useState(null);
   const [billPopupPayMode, setBillPopupPayMode] = useState(false);
+  /** Row index whose Icon column tray is open, or null. */
+  const [iconPickerIndex, setIconPickerIndex] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const rowsRef = useRef(rows);
@@ -234,12 +238,14 @@ export default function BillScheduleMonthlyPanel({
       try {
         const payload = toSave.map((r, i) => ({
           row_index: i + 1,
+          monthly_bill_id: r.monthly_bill_id || undefined,
           bill_description: r.bill_description,
           due_day: r.due_day === '' || r.due_day == null ? null : Number(r.due_day),
           amount: normalizeAmountLocal(r.amount),
           bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
           action: r.bill_type === 'Auto' ? null : r.action,
-          paid_record_id: r.paid_record_id
+          paid_record_id: r.paid_record_id,
+          bill_icon: r.bill_icon || null
         }));
         const data = await saveMonthlyBill(year, month, payload, { storageType: storageKey });
         const next = withDerived(data?.rows || [], year, month);
@@ -330,6 +336,14 @@ export default function BillScheduleMonthlyPanel({
     setRows(nextRows);
     setSavedMsg('');
     await persistSchedule(nextRows);
+  };
+
+  const handlePickBillIcon = async (iconName) => {
+    const index = iconPickerIndex;
+    setIconPickerIndex(null);
+    if (index == null || !rowsRef.current[index]) return;
+    const next = updateRow(index, { bill_icon: iconName || null });
+    await persistSchedule(next);
   };
 
   const handleRemoveRow = async (index) => {
@@ -517,6 +531,7 @@ export default function BillScheduleMonthlyPanel({
         <thead>
           <tr>
             <th style={{ width: 40 }}>#</th>
+            <th style={{ width: 48, textAlign: 'center' }}>Icon</th>
             <th>Bill Description</th>
             <th style={{ width: 88 }}>Due Date</th>
             <th style={{ width: 120 }}>Amount</th>
@@ -538,6 +553,13 @@ export default function BillScheduleMonthlyPanel({
                 style={paid ? { background: PAID_ROW_BG } : undefined}
               >
                 <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <BillIconCell
+                    iconName={row.bill_icon}
+                    disabled={loading || saving}
+                    onClick={() => setIconPickerIndex(index)}
+                  />
+                </td>
                 <td>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <TextField
@@ -903,6 +925,13 @@ export default function BillScheduleMonthlyPanel({
           ))}
         </Box>
       </Box>
+
+      <BillIconPickerDialog
+        open={iconPickerIndex != null}
+        selectedIcon={iconPickerIndex != null ? rows[iconPickerIndex]?.bill_icon : null}
+        onSelect={(iconName) => void handlePickBillIcon(iconName)}
+        onClose={() => setIconPickerIndex(null)}
+      />
 
       {billPopupOpen ? (
         <BillReceiptsPopup

@@ -29,7 +29,7 @@ export default function BillScheduleTutorialHeaderBar({
         tutorialVariant="orange"
         tutorialAriaLabel="Open Bill Schedule tutorial"
         tutorialTitle="Open Bill Schedule tutorial"
-        iconHeight={{ xs: 36, sm: 42 }}
+        iconHeight={{ xs: 72, sm: 84 }}
         sx={{ ml: 0 }}
       />
     </Box>

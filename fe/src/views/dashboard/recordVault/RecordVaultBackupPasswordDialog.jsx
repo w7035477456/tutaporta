@@ -22,7 +22,8 @@ const verifiedTextSx = { fontWeight: 700, color: '#1b7a2e !important', WebkitTex
 
 /**
  * TutaDrive backup password screen — same layout for Backup and Restore / Merge / Open.
- * Backup: any new password for this zip (nothing to verify yet); note + hint editable.
+ * Backup: any new password for this zip (nothing to verify yet), or blank to seal with the
+ * Encrypt Password; note + hint editable and optional.
  * Restore / Merge / Open: note + hint read-only; the typed password is checked against the zip's
  * stored verifier (`passwordCheck`), or against the Encrypt Password for older backups without one.
  * Resolves via onConfirm({ note, hint, password, dateStamp }).
@@ -94,12 +95,7 @@ export default function RecordVaultBackupPasswordDialog({
 
   const confirm = async () => {
     if (verifying) return;
-    if (isBackup) {
-      if (!password.trim()) {
-        setError('Enter a password for this backup zip');
-        return;
-      }
-    } else {
+    if (!isBackup) {
       const ok = await verify();
       if (!ok) return;
     }
@@ -169,7 +165,11 @@ export default function RecordVaultBackupPasswordDialog({
                 autoFocus={!isBackup}
                 type="password"
                 placeholder={
-                  isBackup ? 'Any new password for this zip' : zipHasOwnPassword ? 'Password of this zip' : 'Your Encrypt Password'
+                  isBackup
+                    ? 'Blank = the password you use to enter TutaNotes'
+                    : zipHasOwnPassword
+                      ? 'Password of this zip'
+                      : 'Your Encrypt Password'
                 }
                 value={password}
                 onChange={(e) => {
@@ -195,6 +195,11 @@ export default function RecordVaultBackupPasswordDialog({
               ) : null}
               {verified ? (
                 <ColorTemplate16PopupCenterWide.BodyText sx={verifiedTextSx}>✓ Verified</ColorTemplate16PopupCenterWide.BodyText>
+              ) : null}
+              {isBackup ? (
+                <ColorTemplate16PopupCenterWide.BodyText sx={helperTextSx}>
+                  (Optional. Leave blank to encrypt this zip with the same password you use to enter TutaNotes)
+                </ColorTemplate16PopupCenterWide.BodyText>
               ) : null}
             </Box>
           </ColorTemplate16PopupCenterWide.FormRow>
@@ -223,7 +228,11 @@ export default function RecordVaultBackupPasswordDialog({
           <ColorTemplate16PopupCenterWide.ActionButton type="button" disabled={verifying} onClick={cancel}>
             Cancel
           </ColorTemplate16PopupCenterWide.ActionButton>
-          <ColorTemplate16PopupCenterWide.ActionButton type="button" disabled={verifying || !password} onClick={() => void confirm()}>
+          <ColorTemplate16PopupCenterWide.ActionButton
+            type="button"
+            disabled={verifying || (!isBackup && !password)}
+            onClick={() => void confirm()}
+          >
             {verifying && !showVerifyButton ? 'Verifying…' : MODE_CONFIRM_LABEL[mode] || MODE_CONFIRM_LABEL.backup}
           </ColorTemplate16PopupCenterWide.ActionButton>
         </Stack>

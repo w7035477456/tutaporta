@@ -19,6 +19,7 @@ import menuItems, { toolsMenuItem } from 'menu-items';
 
 import { closeSidebarAfterNavSelectIfMobile, useGetMenuMaster } from 'api/menu';
 import { flushRecordVaultSessionsOnLeave } from 'api/recordVaultFe';
+import { offerRecordVaultBackupBeforeExit } from 'utils/recordVaultExitBackupGate';
 import { navigationDrawerOpenState } from 'config/navigationCollapseEnv';
 import { useAuth } from 'contexts/AuthContext';
 import { applyProfilePhotoMenuDisabled, needsProfilePhotoSetup } from 'utils/profilePhotoSetup';
@@ -286,6 +287,7 @@ function MenuList() {
     if (identificationVerificationLockActive || exitToMallBusy) return;
     setExitToMallBusy(true);
     try {
+      await offerRecordVaultBackupBeforeExit();
       await flushRecordVaultSessionsOnLeave();
       const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');
       await flushPhotoAlbumsSessionsOnLeave();

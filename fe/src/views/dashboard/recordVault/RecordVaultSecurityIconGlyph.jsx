@@ -1,17 +1,31 @@
+import { useId } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { BUSY_HOURGLASS_IMAGE } from 'config/busyHourglassEnv';
 import { getFontAwesome5ObjectIconDefinition } from 'utils/fontAwesome5ObjectIcons';
+import { billCompositeIconSvgMarkup, isBillCompositeIconName } from 'utils/billCompositeIcons';
 
 export const RECORD_VAULT_HOURGLASS_ICON_NAME = 'hourglass';
 
 /** Security icon glyph — hourglass uses colorful hourglass4.png; others use Font Awesome. */
 export default function RecordVaultSecurityIconGlyph({ iconName, sizePx }) {
+  const instanceId = useId();
   const name = String(iconName ?? '')
     .trim()
     .toLowerCase()
     .replace(/^fa-/, '');
+
+  if (isBillCompositeIconName(name)) {
+    return (
+      <Box
+        component="span"
+        aria-hidden
+        sx={{ width: sizePx, height: sizePx, display: 'inline-flex', color: 'currentColor', lineHeight: 0 }}
+        dangerouslySetInnerHTML={{ __html: billCompositeIconSvgMarkup(name, instanceId) }}
+      />
+    );
+  }
 
   if (name === RECORD_VAULT_HOURGLASS_ICON_NAME) {
     return (

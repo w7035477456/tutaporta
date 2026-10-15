@@ -17,7 +17,8 @@ import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
 import { reportRecordVaultOverageThrottleDepleted } from 'utils/recordVaultOverageThrottleUi';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/VaultOverageThrottleNotice';
 import AdminEditableUsageDataAmount, {
-  formatUsageDataAmount
+  formatUsageDataAmount,
+  formatUsageDataAmountCompact
 } from 'ui-component/AdminEditableUsageDataAmount';
 
 const usageBarFontSx = {
@@ -83,32 +84,6 @@ UsageBarShell.propTypes = {
   blackBar: PropTypes.bool
 };
 
-function UpgradeDataPlanLink({ onClick }) {
-  return (
-    <Link
-      component="button"
-      type="button"
-      onClick={onClick}
-      underline="always"
-      sx={{
-        ...yellowTextSx,
-        textDecorationColor: 'currentColor',
-        fontWeight: 800,
-        border: 0,
-        p: 0,
-        bgcolor: 'transparent',
-        cursor: 'pointer'
-      }}
-    >
-      Click Here
-    </Link>
-  );
-}
-
-UpgradeDataPlanLink.propTypes = {
-  onClick: PropTypes.func.isRequired
-};
-
 function SessionFileCountLabel({ usbTxRx = 0, uiTxRx = 0 }) {
   const usb = Math.max(0, Math.trunc(Number(usbTxRx) || 0));
   const ui = Math.max(0, Math.trunc(Number(uiTxRx) || 0));
@@ -151,6 +126,160 @@ TutaDriveTotalLabel.propTypes = {
   usage: PropTypes.object
 };
 
+/** TutaDrive notes+photos disk use in MB (falls back to the vault folder size). */
+function tutaDriveUsedMb(usage) {
+  const bytes = Number(usage?.tutaDriveStorage?.totalBytes);
+  if (Number.isFinite(bytes) && bytes >= 0) return bytes / (1024 * 1024);
+  return Math.max(0, Number(usage?.vaultFolderMb) || 0);
+}
+
+/** Red segment never shrinks below this, so its label stays readable. */
+const USAGE_METER_MIN_RED_PX = 76;
+
+const usageMeterLabelSx = {
+  ...usageBarFontSx,
+  fontSize: { xs: '0.8rem !important', sm: '0.92rem !important', md: '1rem !important' },
+  fontWeight: 900,
+  color: '#000',
+  WebkitTextFillColor: '#000',
+  whiteSpace: 'nowrap',
+  px: 0.75
+};
+
+/**
+ * Red = bytes used (TutaDrive disk total, else data used), green = data plan bought.
+ * Click anywhere (except an admin-editable amount) to open Refill / Add blocks.
+ */
+function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPlan, onSaved }) {
+  const used = Math.max(0, Number(usedMb) || 0);
+  const bought = Math.max(0, Number(boughtMb) || 0);
+  const usedPct = used + bought > 0 ? (used / (used + bought)) * 100 : 0;
+  const title =
+    `Used ${formatUsageDataAmount(used)} · Data Remain ${formatUsageDataAmount(remainMb)} of ` +
+    `${formatUsageDataAmount(bought)}. Click to Refill/Add ${blockLabel} blocks.`;
+  const openPlan = (event) => {
+    if (event.target instanceof Element && event.target.closest('[data-admin-usage-amount]')) return;
+    onOpenPlan();
+  };
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={openPlan}
+      title={title}
+      aria-label={title}
+      sx={{
+        display: 'flex',
+        alignItems: 'stretch',
+        width: '100%',
+        maxWidth: 640,
+        minHeight: 30,
+        p: 0,
+        border: '2px solid #fff',
+        borderRadius: 1,
+        overflow: 'hidden',
+        bgcolor: '#000',
+        cursor: 'pointer'
+      }}
+    >
+      <Box
+        sx={{
+          flex: '0 0 auto',
+          width: `max(${USAGE_METER_MIN_RED_PX}px, ${usedPct.toFixed(2)}%)`,
+          bgcolor: '#e53935',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRight: '2px solid #000'
+        }}
+      >
+        <Box component="span" sx={usageMeterLabelSx}>
+          {formatUsageDataAmountCompact(used)}
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          flex: '1 1 auto',
+          minWidth: 0,
+          bgcolor: depleted ? '#9e9e9e' : '#60C447',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <Box component="span" sx={usageMeterLabelSx}>
+          <AdminEditableUsageDataAmount field="bought" valueMb={bought} onSaved={onSaved} compact />
+          {depleted ? ' — depleted, click to refill' : ''}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+UsageMeter.propTypes = {
+  usedMb: PropTypes.number,
+  boughtMb: PropTypes.number,
+  remainMb: PropTypes.number,
+  blockLabel: PropTypes.string,
+  depleted: PropTypes.bool,
+  onOpenPlan: PropTypes.func.isRequired,
+  onSaved: PropTypes.func
+};
+
+function AddMoreGbLink({ onClick }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={onClick}
+      sx={{
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        px: 0.75,
+        py: 0.25,
+        border: '1px solid #000',
+        borderRadius: 0.5,
+        bgcolor: 'var(--theme-yellow-color)',
+        cursor: 'pointer',
+        lineHeight: 1.1
+      }}
+    >
+      <Box
+        component="span"
+        sx={{
+          ...usageBarFontSx,
+          lineHeight: 1.1,
+          color: '#000',
+          WebkitTextFillColor: '#000',
+          textDecoration: 'underline',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        Click here
+      </Box>
+      <Box
+        component="span"
+        sx={{
+          ...usageBarFontSx,
+          fontSize: { xs: '0.55rem !important', sm: '0.62rem !important', md: '0.68rem !important' },
+          lineHeight: 1.1,
+          color: '#000',
+          WebkitTextFillColor: '#000',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        to add more gb
+      </Box>
+    </Box>
+  );
+}
+
+AddMoreGbLink.propTypes = {
+  onClick: PropTypes.func.isRequired
+};
+
 export default function RecordVaultUsageBar({
   usage,
   storageType = 'usb',
@@ -188,7 +317,7 @@ export default function RecordVaultUsageBar({
         tutorialVariant="orange"
         tutorialAriaLabel={tutorialDetail}
         tutorialTitle={tutorialDetail}
-        iconHeight={{ xs: 28, sm: 32 }}
+        iconHeight={{ xs: 56, sm: 64 }}
         sx={{ ml: 0 }}
       />
     </>
@@ -256,53 +385,23 @@ export default function RecordVaultUsageBar({
   return (
     <>
       <UsageBarShell actions={actions} blackBar>
-        <Typography
-          component="div"
-          sx={{
-            ...yellowTextSx,
-            whiteSpace: 'nowrap'
-          }}
-        >
-          <TutaDriveTotalLabel usage={usage} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <UsageMeter
+            usedMb={usage?.tutaDrive ? tutaDriveUsedMb(usage) : Math.max(0, refillBoughtMb - refillRemainMb)}
+            boughtMb={refillBoughtMb}
+            remainMb={refillRemainMb}
+            blockLabel={blockLabel}
+            depleted={depleted}
+            onOpenPlan={() => setDataPlanOpen(true)}
+            onSaved={() => onPurchased?.()}
+          />
+          <AddMoreGbLink onClick={() => setDataPlanOpen(true)} />
           {depleted ? (
-            <>
-              Data Depleted:{' '}
-              <AdminEditableUsageDataAmount
-                field="remain"
-                valueMb={refillRemainMb}
-                onSaved={() => onPurchased?.()}
-              />{' '}
-              of{' '}
-              <AdminEditableUsageDataAmount
-                field="bought"
-                valueMb={refillBoughtMb}
-                onSaved={() => onPurchased?.()}
-              />{' '}
-              (
-              <VaultOverageSpeedThrottledPhrase />
-              ). <UpgradeDataPlanLink onClick={() => setDataPlanOpen(true)} /> to Refill/Add{' '}
-              {blockLabel} blocks
-            </>
-          ) : (
-            <>
-              Data Remain{' '}
-              <AdminEditableUsageDataAmount
-                field="remain"
-                valueMb={refillRemainMb}
-                onSaved={() => onPurchased?.()}
-              />{' '}
-              of{' '}
-              <AdminEditableUsageDataAmount
-                field="bought"
-                valueMb={refillBoughtMb}
-                onSaved={() => onPurchased?.()}
-              />
-              .{' '}
-              <UpgradeDataPlanLink onClick={() => setDataPlanOpen(true)} /> to Refill/Add{' '}
-              {blockLabel} blocks
-            </>
-          )}
-        </Typography>
+            <Typography component="span" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
+              (<VaultOverageSpeedThrottledPhrase />)
+            </Typography>
+          ) : null}
+        </Box>
       </UsageBarShell>
       <RecordVaultDataPlanDialog
         open={dataPlanOpen}

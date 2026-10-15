@@ -898,7 +898,8 @@ export async function restoreRecordVaultTutaDriveBackupZip(file) {
 }
 
 /**
- * TutaDrive backup: zip vault → seal in-browser with the password typed for this backup (TNBAK3) →
+ * TutaDrive backup: zip vault → seal in-browser with the password typed for this backup (TNBAK3),
+ * or with the Encrypt Password DEK (TNBAK2) when no password was typed →
  * store as users/M{id}/EncryptedTutaNotesZip_YYYY_MM_DD[_note].zip (keeps up to 3).
  * Server keeps the salt + verifier + hint from the header so Restore / Merge can check the password.
  */
@@ -911,17 +912,30 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
   note = '',
   { hint = '', dateStamp = '', password = '', onProgress, estimatedTotalBytes = 0 } = {}
 ) {
-  const { sealTutaDriveBackupZipWithPassword } = await import('utils/recordVaultClientVaultCrypto');
-  if (!String(password || '')) {
-    throw new Error('Enter a password for this backup zip');
+  const { sealTutaDriveBackupZipWithDek, sealTutaDriveBackupZipWithPassword } = await import(
+    'utils/recordVaultClientVaultCrypto'
+  );
+  const withZipPassword = Boolean(String(password || ''));
+  if (!withZipPassword) {
+    const { isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
+    if (!isRecordVaultE2eUnlocked()) {
+      throw new Error('Unlock with your Encrypt Password first, then Backup again');
+    }
   }
   const report = makeBackupProgressReporter(onProgress);
   const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutadrive/backup-zip', report, 'build', 0, 35, {
     estimatedTotalBytes
   });
-  report('seal', 35, { totalBytes: zipBuf.length, withZipPassword: true });
-  const sealed = await sealTutaDriveBackupZipWithPassword(zipBuf, password, { hint, note });
-  report('seal', 50, { totalBytes: sealed.length, withZipPassword: true, done: true });
+  report('seal', 35, { totalBytes: zipBuf.length, withZipPassword });
+  let sealed;
+  if (withZipPassword) {
+    sealed = await sealTutaDriveBackupZipWithPassword(zipBuf, password, { hint, note });
+  } else {
+    const { getRecordVaultE2eDek } = await import('utils/recordVaultClientSession');
+    const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
+    sealed = await sealTutaDriveBackupZipWithDek(zipBuf, getRecordVaultE2eDek(), vaultKeys);
+  }
+  report('seal', 50, { totalBytes: sealed.length, withZipPassword, done: true });
   const formData = new FormData();
   formData.append(
     'backup',
@@ -947,6 +961,12 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
 export async function fetchRecordVaultTutaDriveBackupStatus() {
   const { data } = await api.get('/api/recordVault/tutadrive/backup/status');
   return data;
+}
+
+/** True when TutaNotes changed since this unlock and since the newest TutaCloud backup. */
+export async function fetchRecordVaultTutaDriveNeedsBackup() {
+  const { data } = await api.get('/api/recordVault/tutadrive/backup/needs-backup');
+  return Boolean(data?.needsBackup);
 }
 
 export async function deleteRecordVaultTutaDriveBackup(fileName) {

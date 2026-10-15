@@ -207,6 +207,7 @@ import {
   downloadRecordVaultTutaDriveStoredBackup,
   formatRecordVaultTutaDrive,
   getRecordVaultTutaDriveBackupStatus,
+  getRecordVaultTutaDriveNeedsBackup,
   getRecordVaultTutaDriveStatus,
   getRecordVaultTutaDriveVaultTree,
   initRecordVaultTutaDrive,
@@ -1531,6 +1532,7 @@ app.post('/api/recordVault/tutadrive/backup', ...recordVaultVaultAuth, storeReco
 app.put('/api/recordVault/tutadrive/backup/:fileName', ...recordVaultVaultAuth, replaceRecordVaultTutaDriveBackup);
 app.get('/api/recordVault/tutadrive/backup', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveStoredBackup);
 app.get('/api/recordVault/tutadrive/backup/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveBackupStatus);
+app.get('/api/recordVault/tutadrive/backup/needs-backup', ...recordVaultVaultAuth, getRecordVaultTutaDriveNeedsBackup);
 app.delete('/api/recordVault/tutadrive/backup/:fileName', ...recordVaultVaultAuth, deleteRecordVaultTutaDriveBackupByName);
 app.post('/api/recordVault/tutadrive/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultTutaDriveBackupZip);
 app.post('/api/recordVault/tutadrive/backup-tree', ...recordVaultVaultAuth, listRecordVaultTutaDriveBackupTree);

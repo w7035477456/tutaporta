@@ -23,12 +23,23 @@ import {
 import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
 import { requireVaultAccessSession } from '../../utils/recordVaultAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/recordVaultUsb/usbScan.js';
-import { vaultHasDbFile, vaultMetaPath } from '../../utils/recordVaultUsb/vaultPaths.js';
+import {
+  listVaultDbFileNames,
+  vaultHasDbFile,
+  vaultMetaPath,
+  vaultRootOnMount
+} from '../../utils/recordVaultUsb/vaultPaths.js';
+import pool from '../../db/connection.js';
+import {
+  getVaultClusterUnlockState,
+  VAULT_PRODUCT_RECORD_VAULT
+} from '../../utils/vaultClusterCoherence.js';
 import {
   ensureTutaDriveMemberLayout,
   getLeftSideMode,
   isLeftSideTutaDrive,
   loadMemberIdForSingles,
+  tutaDriveNotesMountPath,
   wipeTutaDriveMemberVault
 } from '../../utils/tutaDriveMemberPaths.js';
 import {
@@ -553,6 +564,75 @@ export async function getRecordVaultTutaDriveBackupStatus(req, res) {
     console.error('[getRecordVaultTutaDriveBackupStatus]', err?.message || err);
     return sendRecordVaultError(res, err, 'Unable to read backup status', {
       route: 'getRecordVaultTutaDriveBackupStatus',
+      singlesId,
+      status: 400
+    });
+  }
+}
+
+/** Unlock may run one-off DB migrations that rewrite vault.db just after unlocked_at. */
+const NEEDS_BACKUP_UNLOCK_GRACE_MS = 15_000;
+
+function newestVaultDbMtimeMs(notesMount) {
+  const vaultRoot = vaultRootOnMount(notesMount);
+  let newest = 0;
+  for (const name of listVaultDbFileNames()) {
+    try {
+      newest = Math.max(newest, fs.statSync(path.join(vaultRoot, name)).mtimeMs);
+    } catch {
+      /* missing variant */
+    }
+  }
+  return newest;
+}
+
+async function newestBillScheduleChangeMs(singlesId) {
+  const { rows } = await pool.query(
+    `SELECT GREATEST(
+       (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.monthly_bill WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.yearly_bill WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.paid_record WHERE singles_id = $1)
+     ) AS newest`,
+    [singlesId]
+  );
+  const newest = rows[0]?.newest;
+  return newest ? new Date(newest).getTime() : 0;
+}
+
+/**
+ * GET /api/recordVault/tutadrive/backup/needs-backup
+ * True when TutaNotes (vault.db) or the bill schedule changed after this unlock and after the newest backup.
+ */
+export async function getRecordVaultTutaDriveNeedsBackup(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    if (!isLeftSideTutaDrive()) return res.json({ needsBackup: false });
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) return res.json({ needsBackup: false });
+    const session = getVaultSession(singlesId, 'onedrive');
+    const clusterState = await getVaultClusterUnlockState(VAULT_PRODUCT_RECORD_VAULT, singlesId, 'onedrive');
+    if (!session && !clusterState) return res.json({ needsBackup: false });
+
+    const notesMount = tutaDriveNotesMountPath(memberId);
+    const newestBackupMs = listTutaDriveBackups(memberId)[0]?.mtimeMs || 0;
+    const unlockedAtMs = Number(clusterState?.unlockedAt) || 0;
+    const since = Math.max(newestBackupMs, unlockedAtMs ? unlockedAtMs + NEEDS_BACKUP_UNLOCK_GRACE_MS : 0);
+    const lastChangeMs = Math.max(
+      newestVaultDbMtimeMs(notesMount),
+      await newestBillScheduleChangeMs(singlesId)
+    );
+    const pendingFlush = Boolean(session?.dirty);
+    return res.json({
+      needsBackup: pendingFlush || lastChangeMs > since,
+      lastChangeMs,
+      newestBackupMs,
+      unlockedAtMs
+    });
+  } catch (err) {
+    console.error('[getRecordVaultTutaDriveNeedsBackup]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to check backup status', {
+      route: 'getRecordVaultTutaDriveNeedsBackup',
       singlesId,
       status: 400
     });

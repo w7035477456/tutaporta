@@ -28,8 +28,13 @@ import {
   setRecordVaultBridgeStorageType,
   readRecordVaultApiError,
   readFileAsDataUrl,
-  createRecordVaultPaneApi
+  createRecordVaultPaneApi,
+  fetchRecordVaultTutaDriveNeedsBackup
 } from 'api/recordVaultFe';
+import {
+  offerRecordVaultBackupBeforeExit,
+  registerRecordVaultExitBackupPrompt
+} from 'utils/recordVaultExitBackupGate';
 import { useAuth } from 'contexts/AuthContext';
 import { themedAlert, themedConfirm } from 'utils/themedDialog';
 import { emptyEnexStats, enexImportSummaryMessage } from './recordVaultEnexImport';
@@ -79,6 +84,7 @@ import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
 import BillScheduleInstructionPopup from './BillScheduleInstructionPopup';
+import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
 import {
   BILL_SCHEDULE_NOTEBOOK_ID,
   billScheduleCrossPaneKind,
@@ -3453,6 +3459,7 @@ export default function RecordVaultWorkspacePane({
 
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
+    await offerRecordVaultBackupBeforeExit();
     // Drop the phone upload-page flags first — a failed logoff must not strand the
     // next visit on the white upload sheet.
     clearMobileTutaNotesUploadSession();
@@ -3870,6 +3877,36 @@ export default function RecordVaultWorkspacePane({
       // Still switch views; persist errors already surface in the pane.
     }
   }, []);
+
+  /** Resolves the pending exit once Backup & Restore (opened by the exit prompt) closes. */
+  const exitBackupDialogResolveRef = useRef(null);
+
+  const closeTutaCloudBackupDialog = useCallback(() => {
+    setTutaCloudBackupOpen(false);
+    const resolve = exitBackupDialogResolveRef.current;
+    exitBackupDialogResolveRef.current = null;
+    resolve?.();
+  }, []);
+
+  const offerTutaCloudBackupBeforeExit = useCallback(async () => {
+    await flushPendingNoteSave();
+    if (!(await fetchRecordVaultTutaDriveNeedsBackup())) return;
+    await new Promise((resolve) => {
+      exitBackupDialogResolveRef.current = resolve;
+      setTutaCloudBackupOpen(true);
+    });
+  }, [flushPendingNoteSave]);
+
+  useEffect(() => {
+    if (paneStorageType !== 'tutadrive' || !tutaCloudOffered || !unlocked) return undefined;
+    const unregister = registerRecordVaultExitBackupPrompt(offerTutaCloudBackupBeforeExit);
+    return () => {
+      unregister();
+      const resolve = exitBackupDialogResolveRef.current;
+      exitBackupDialogResolveRef.current = null;
+      resolve?.();
+    };
+  }, [paneStorageType, tutaCloudOffered, unlocked, offerTutaCloudBackupBeforeExit]);
 
   const openPaymentWorkspace = useCallback(() => {
     void (async () => {
@@ -6887,7 +6924,7 @@ export default function RecordVaultWorkspacePane({
       />
       <RecordVaultTutaCloudBackupDialog
         open={tutaCloudBackupOpen}
-        onClose={() => setTutaCloudBackupOpen(false)}
+        onClose={closeTutaCloudBackupDialog}
         folderName={tutaCloudVaultFolderName}
         tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
         onRestored={() => void handleTutaCloudVaultRestored()}
@@ -8067,7 +8104,17 @@ export default function RecordVaultWorkspacePane({
                   </Box>
                 </Box>
 
-                {/* Bill Schedule: separate box under the two swim lanes (label + Monthly/Yearly). */}
+                {/* Bill Schedule: separate box under the two swim lanes (label + Monthly/Yearly) + tutorial pair. */}
+                <Box
+                  sx={{
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1,
+                    maxWidth: '100%'
+                  }}
+                >
                 <Box
                   sx={{
                     flexShrink: 0,
@@ -8151,6 +8198,16 @@ export default function RecordVaultWorkspacePane({
                         />
                       </Box>
                   ))}
+                </Box>
+                <WorkspaceVideoTutorialPair
+                  videoTutorialUrl={videoTutorialUrl}
+                  onTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                  tutorialVariant="orange"
+                  tutorialAriaLabel="Open Bill Schedule tutorial"
+                  tutorialTitle="Open Bill Schedule tutorial"
+                  iconHeight={{ xs: 72, sm: 84 }}
+                  sx={{ ml: 0 }}
+                />
                 </Box>
                 </Box>
               </Box>

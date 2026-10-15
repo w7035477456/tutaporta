@@ -19,6 +19,13 @@ export function formatUsageDataAmount(mb, { precisionGb = 1, precisionMb = 1 } =
   return `${sign}${mbText}mb`;
 }
 
+/** Always gb, at most 1 decimal, trailing ".0" dropped (189.5mb → 0.2gb, 10240mb → 10gb). */
+export function formatUsageDataAmountCompact(mb) {
+  const value = Number(mb);
+  const gb = Number.isFinite(value) ? value / 1024 : 0;
+  return `${gb.toFixed(1).replace(/\.0$/, '').replace(/^-0$/, '0')}gb`;
+}
+
 /**
  * Parse admin-typed amount to integer MB.
  * Accepts "50gb", "19.7 GB", "20213mb", or a bare number (treated as MB).
@@ -47,7 +54,8 @@ export default function AdminEditableUsageDataAmount({
   field,
   valueMb,
   onSaved,
-  sx = null
+  sx = null,
+  compact = false
 }) {
   const { user } = useAuth();
   const canEdit = isImpersonationSession(user);
@@ -58,7 +66,7 @@ export default function AdminEditableUsageDataAmount({
   const inputRef = useRef(null);
   const skipBlurCancelRef = useRef(false);
 
-  const label = formatUsageDataAmount(valueMb);
+  const label = compact ? formatUsageDataAmountCompact(valueMb) : formatUsageDataAmount(valueMb);
 
   useEffect(() => {
     if (!editing) return undefined;
@@ -196,6 +204,7 @@ export default function AdminEditableUsageDataAmount({
   return (
     <Box
       component="span"
+      data-admin-usage-amount=""
       onDoubleClick={beginEdit}
       title="Admin: double-click to edit · Enter to save"
       sx={{
@@ -213,5 +222,7 @@ AdminEditableUsageDataAmount.propTypes = {
   field: PropTypes.oneOf(['remain', 'bought']).isRequired,
   valueMb: PropTypes.number,
   onSaved: PropTypes.func,
-  sx: PropTypes.object
+  sx: PropTypes.object,
+  /** Label always in gb with at most 1 decimal (10gb, 0.2gb). */
+  compact: PropTypes.bool
 };

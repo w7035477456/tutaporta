@@ -54,6 +54,7 @@ import { HEADER_PROFILE_AVATAR_SIZE, headerProfileChipHeightCss } from 'config/h
 import { SIDEBAR_MENU_ICON_CLASS, exitToMallYellowDashedBorderSx } from 'config/selectedUnselectedButtonTemplate';
 import { pickRandomProfileMenuGreetingLines } from 'utils/profileMenuGreeting';
 import { requestOpenVaultProfilesRecords } from 'utils/vaultProfilesRecordsGate';
+import { offerRecordVaultBackupBeforeExit } from 'utils/recordVaultExitBackupGate';
 import {
   TOUR_STEP_THEME,
   VSINGLES_TOUR_END_EVENT,
@@ -518,6 +519,7 @@ export default function ProfileSection({ clusterTight = false }) {
   const handleExitOrLogout = async () => {
     try {
       closeProfileMenu();
+      await offerRecordVaultBackupBeforeExit();
       await flushRecordVaultSessionsOnLeave();
       const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');
       await flushPhotoAlbumsSessionsOnLeave();
@@ -659,6 +661,7 @@ export default function ProfileSection({ clusterTight = false }) {
   const handleLogoutBottom = async () => {
     try {
       closeProfileMenu();
+      await offerRecordVaultBackupBeforeExit();
       // AuthContext.logout flushes Cloud/USB vault sessions first (hourglass + file detail).
       await logout();
       sessionStorage.setItem('logoutBlockBack', '1');
@@ -673,6 +676,7 @@ export default function ProfileSection({ clusterTight = false }) {
     event.preventDefault();
     try {
       closeProfileMenu();
+      await offerRecordVaultBackupBeforeExit();
       storeLoginEmailPrefill(TOOLS_ONLY_ADMIN_LOGIN_LABEL);
       await logout();
       sessionStorage.setItem('logoutBlockBack', '1');

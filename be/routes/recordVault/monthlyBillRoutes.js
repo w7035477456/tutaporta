@@ -1,5 +1,6 @@
 import pool from '../../db/connection.js';
 import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
+import { normalizeBillIcon } from '../../utils/billIconName.js';
 
 function toInt(value) {
   const n = Number(value);
@@ -134,6 +135,7 @@ function mapRow(row, year, month) {
     bill_type: row.bill_type === 'Auto' ? 'Auto' : 'Manual',
     action: row.action ?? null,
     paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
+    bill_icon: row.bill_icon || null,
     has_bill_content: Boolean(row.has_bill_content),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -183,12 +185,12 @@ async function ensureMonthCloned(client, singlesId, year, month, storageBackend)
     `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type,
-       action, paid_record_id
+       action, paid_record_id, bill_icon
      )
      SELECT
        singles_id, storage_backend, $3, $4, row_index,
        bill_description, due_day, amount, bill_type,
-       NULL, NULL
+       NULL, NULL, bill_icon
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
         AND bill_year = $5 AND bill_month = $6
@@ -287,12 +289,14 @@ export async function putMonthlyBill(req, res) {
       const paidRecordId = toInt(row?.paid_record_id);
       return {
         row_index: rowIndex,
+        prior_bill_id: toInt(row?.monthly_bill_id) || null,
         bill_description: String(row?.bill_description ?? '').slice(0, 500),
         due_day: normalizeDueDay(row?.due_day),
         amount: normalizeAmount(row?.amount),
         bill_type: billType,
         action,
-        paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null
+        paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null,
+        bill_icon: normalizeBillIcon(row?.bill_icon)
       };
     });
 
@@ -306,6 +310,24 @@ export async function putMonthlyBill(req, res) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // Rows saved without paid_record_id keep their Bills/Receipts link (the DELETE below
+      // would otherwise orphan the paid_record and its attachments).
+      const { rows: priorLinks } = await client.query(
+        `SELECT monthly_bill_id, paid_record_id
+           FROM outdateddbsnapshotoct2024.monthly_bill
+          WHERE singles_id = $1 AND storage_backend = $2
+            AND bill_year = $3 AND bill_month = $4
+            AND paid_record_id IS NOT NULL`,
+        [singlesId, storageBackend, year, month]
+      );
+      const priorPaidByBillId = new Map(
+        priorLinks.map((p) => [Number(p.monthly_bill_id), Number(p.paid_record_id)])
+      );
+      for (const r of normalized) {
+        if (!r.paid_record_id && r.prior_bill_id) {
+          r.paid_record_id = priorPaidByBillId.get(r.prior_bill_id) || null;
+        }
+      }
       await client.query(
         `DELETE FROM outdateddbsnapshotoct2024.monthly_bill
           WHERE singles_id = $1 AND storage_backend = $2
@@ -317,8 +339,8 @@ export async function putMonthlyBill(req, res) {
           `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
-             action, paid_record_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+             action, paid_record_id, bill_icon
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
            RETURNING monthly_bill_id`,
           [
             singlesId,
@@ -331,7 +353,8 @@ export async function putMonthlyBill(req, res) {
             r.amount,
             r.bill_type,
             r.action,
-            r.paid_record_id
+            r.paid_record_id,
+            r.bill_icon
           ]
         );
         const newBillId = Number(inserted[0]?.monthly_bill_id);

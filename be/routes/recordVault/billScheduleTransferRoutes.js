@@ -49,11 +49,11 @@ async function copyMonthly(client, singlesId, source, target) {
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
-       bill_description, due_day, amount, bill_type, action, paid_record_id
+       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
      )
      SELECT
        singles_id, $3, bill_year, bill_month, row_index,
-       bill_description, due_day, amount, bill_type, action, paid_record_id
+       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, source, target]
@@ -64,11 +64,11 @@ async function copyYearly(client, singlesId, source, target) {
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
-       bill_description, due_month_day, amount, bill_type, action, paid_record_id
+       bill_description, due_month_day, amount, bill_type, action, paid_record_id, bill_icon
      )
      SELECT
        singles_id, $3, bill_year, bill_month, row_index,
-       bill_description, due_month_day, amount, bill_type, action, paid_record_id
+       bill_description, due_month_day, amount, bill_type, action, paid_record_id, bill_icon
        FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, source, target]

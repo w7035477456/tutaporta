@@ -417,10 +417,15 @@ const backupOpenTreeNoteSx = {
   color: 'rgba(255,255,255,0.92)'
 };
 
-/** Build exactly maxSlots rows; empty slots keep Upload available. */
+/** Build exactly maxSlots rows, oldest backup first (newest in the last filled row); empty slots keep Upload available. */
 function buildBackupSlots(backups, maxSlots) {
   const max = Math.max(1, Number(maxSlots) || 3);
-  const list = Array.isArray(backups) ? backups.slice(0, max) : [];
+  const list = Array.isArray(backups)
+    ? [...backups]
+        .sort((a, b) => (Number(b?.mtimeMs) || 0) - (Number(a?.mtimeMs) || 0))
+        .slice(0, max)
+        .reverse()
+    : [];
   const slots = [];
   for (let i = 0; i < max; i += 1) {
     const bk = list[i] || null;
@@ -636,16 +641,25 @@ export default function RecordVaultTutaCloudBackupDialog({
 
   const handleBackup = async () => {
     resetMessages();
-    if (tutaDriveActive && slotsFull && oldestSlot) {
-      const ok = await themedConfirm(
-        `All ${maxBackups} backup slots are full.\n\nThe oldest slot (row ${oldestSlot.rowNumber}) will be overwritten:\n${oldestSlot.fileName}\n\nContinue with Backup?`
-      );
-      if (!ok) return;
-    }
     let backupInput = null;
     if (tutaDriveActive) {
       backupInput = await askBackupPassword({ mode: 'backup' });
       if (!backupInput) return;
+      const quickBackup = !backupInput.note && !backupInput.password && !backupInput.hint;
+      if (slotsFull && oldestSlot && !quickBackup) {
+        const ok = await themedConfirm(
+          `All ${maxBackups} backup slots are full.\n\nThe oldest slot (row ${oldestSlot.rowNumber}) will be overwritten:\n${oldestSlot.fileName}\n\nContinue with Backup?`
+        );
+        if (!ok) return;
+      }
+      if (!backupInput.password) {
+        try {
+          if (!(await ensureEncryptPasswordForBackupSeal('backup'))) return;
+        } catch (err) {
+          setError(err?.message || 'Unable to unlock Encrypt Password');
+          return;
+        }
+      }
     }
     setBusy(true);
     try {
@@ -674,9 +688,10 @@ export default function RecordVaultTutaCloudBackupDialog({
         await loadBackupList();
         progress.update({ stage: 'done', percent: 100 });
         const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
-        setSuccess(
-          `Backup sealed with the password you chose for this zip and saved as ${rel}${sizeText} in ${elapsedText}.${noteText}`
-        );
+        const sealedWith = backupInput.password
+          ? 'the password you chose for this zip'
+          : 'the password you use to enter TutaNotes';
+        setSuccess(`Backup sealed with ${sealedWith} and saved as ${rel}${sizeText} in ${elapsedText}.${noteText}`);
         setSuccessTone('backup');
       } else {
         const result = await downloadRecordVaultTutaDriveBackupZip();

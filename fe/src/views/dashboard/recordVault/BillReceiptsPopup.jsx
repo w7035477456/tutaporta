@@ -23,6 +23,7 @@ import { recordVaultPopupCloseSx } from './recordVaultPopupCloseSx';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
 import BillReceiptAttachmentPreview from './BillReceiptAttachmentPreview';
+import BillReceiptZoomViewer from './BillReceiptZoomViewer';
 
 const SKIP_DUPLICATE_MESSAGE = 'Skipping upload duplicate file';
 const SKIP_DUPLICATE_TOAST_MS = 3000;
@@ -73,6 +74,16 @@ const lightSurfaceTextSx = {
   }
 };
 
+/** Paid / Zoom stay true green on every theme (theme action-green can be remapped, e.g. to blue). */
+const FIXED_BUTTON_GREEN = '#60C447';
+const fixedGreenButtonSx = {
+  '&&:not(.Mui-disabled), &&:not(.Mui-disabled):hover': {
+    bgcolor: `${FIXED_BUTTON_GREEN} !important`,
+    color: '#000 !important',
+    WebkitTextFillColor: '#000 !important'
+  }
+};
+
 /**
  * Bills/Receipts popup — four equal quadrants (50/50 × 50/50):
  * Notes | BILLS/RECEIPTS upload+thumbs
@@ -90,6 +101,8 @@ export default function BillReceiptsPopup({
   const notesTimerRef = useRef(null);
   const skipToastTimerRef = useRef(null);
   const fileInputRef = useRef(null);
+  /** Bill row this popup's paid_record is linked to (from ensure) — upload/notes responses omit it. */
+  const billLinkRef = useRef({ monthlyBillId: null, yearlyBillId: null });
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -99,6 +112,7 @@ export default function BillReceiptsPopup({
   const [attachments, setAttachments] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   const showSkipDuplicateToast = useCallback((message = SKIP_DUPLICATE_MESSAGE) => {
     const text = String(message || SKIP_DUPLICATE_MESSAGE).trim() || SKIP_DUPLICATE_MESSAGE;
@@ -110,8 +124,24 @@ export default function BillReceiptsPopup({
     }, SKIP_DUPLICATE_TOAST_MS);
   }, []);
 
+  const notifyChanged = useCallback(
+    (data) => {
+      if (!data) return;
+      onChanged?.({
+        ...data,
+        monthlyBillId: data.monthlyBillId || billLinkRef.current.monthlyBillId,
+        yearlyBillId: data.yearlyBillId || billLinkRef.current.yearlyBillId
+      });
+    },
+    [onChanged]
+  );
+  const notifyChangedRef = useRef(notifyChanged);
+  notifyChangedRef.current = notifyChanged;
+
   const applyPayload = useCallback((data, { mergeAttachments = false } = {}) => {
     if (!data) return;
+    if (data.monthlyBillId) billLinkRef.current.monthlyBillId = data.monthlyBillId;
+    if (data.yearlyBillId) billLinkRef.current.yearlyBillId = data.yearlyBillId;
     if (data.paidRecordId != null) setPaidRecordId(Number(data.paidRecordId) || null);
     if (data.notesText != null) setNotesText(String(data.notesText || ''));
     if (Array.isArray(data.attachments)) {
@@ -130,8 +160,8 @@ export default function BillReceiptsPopup({
     if (!paidRecordId) return;
     const data = await fetchPaidRecord(paidRecordId);
     applyPayload(data);
-    onChanged?.(data);
-  }, [applyPayload, onChanged, paidRecordId]);
+    notifyChanged(data);
+  }, [applyPayload, notifyChanged, paidRecordId]);
 
   useEffect(() => {
     if (!open || !ensurePayload) return undefined;
@@ -142,11 +172,13 @@ export default function BillReceiptsPopup({
     setAttachments([]);
     setNotesText('');
     setSelectedId(null);
+    billLinkRef.current = { monthlyBillId: null, yearlyBillId: null };
     void (async () => {
       try {
         const data = await ensurePaidRecord(ensurePayload, { storageType });
         if (cancelled) return;
         applyPayload(data);
+        notifyChangedRef.current(data);
       } catch (err) {
         if (!cancelled) {
           setError(err?.response?.data?.error || err?.message || 'Unable to open bill receipts');
@@ -175,13 +207,13 @@ export default function BillReceiptsPopup({
         try {
           const data = await savePaidRecordNotes(paidRecordId, value);
           applyPayload(data);
-          onChanged?.(data);
+          notifyChanged(data);
         } catch (err) {
           setError(err?.response?.data?.error || err?.message || 'Failed to save notes');
         }
       }, 450);
     },
-    [applyPayload, onChanged, paidRecordId]
+    [applyPayload, notifyChanged, paidRecordId]
   );
 
   const flushNotesNow = useCallback(async () => {
@@ -193,11 +225,11 @@ export default function BillReceiptsPopup({
     try {
       const data = await savePaidRecordNotes(paidRecordId, notesText);
       applyPayload(data);
-      onChanged?.(data);
+      notifyChanged(data);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Failed to save notes');
     }
-  }, [applyPayload, notesText, onChanged, paidRecordId]);
+  }, [applyPayload, notesText, notifyChanged, paidRecordId]);
 
   const handleClose = useCallback(async () => {
     await flushNotesNow();
@@ -253,7 +285,7 @@ export default function BillReceiptsPopup({
       }
       if (last) {
         applyPayload(last);
-        onChanged?.(last);
+        notifyChanged(last);
         if (last.uploadedAttachmentId && !last.skipped) setSelectedId(last.uploadedAttachmentId);
       }
       if (skipNotes.length) {
@@ -273,7 +305,7 @@ export default function BillReceiptsPopup({
     try {
       const data = await deletePaidRecordAttachment(paidRecordId, attachmentId);
       applyPayload(data);
-      onChanged?.(data);
+      notifyChanged(data);
     } catch (err) {
       setError(err?.response?.data?.error || err?.message || 'Delete failed');
     } finally {
@@ -353,7 +385,7 @@ export default function BillReceiptsPopup({
                     fullWidth
                     value={notesText}
                     disabled={!paidRecordId || busy}
-                    placeholder="Enter text notes here"
+                    placeholder="Enter text notes here (URL/Login/Password):"
                     onChange={(e) => {
                       const v = e.target.value;
                       setNotesText(v);
@@ -602,7 +634,7 @@ export default function BillReceiptsPopup({
                       </Typography>
                     )}
                   </Box>
-                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', flexShrink: 0 }}>
+                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', gap: 2, flexShrink: 0 }}>
                     <ColorTemplate13DisableGreenButton
                       type="button"
                       disabled={!selected || !paidRecordId}
@@ -616,6 +648,14 @@ export default function BillReceiptsPopup({
                       }}
                     >
                       Download
+                    </ColorTemplate13DisableGreenButton>
+                    <ColorTemplate13DisableGreenButton
+                      type="button"
+                      disabled={!selected || !paidRecordId}
+                      onClick={() => setZoomOpen(true)}
+                      sx={fixedGreenButtonSx}
+                    >
+                      Zoom
                     </ColorTemplate13DisableGreenButton>
                   </Box>
                 </Box>
@@ -659,6 +699,7 @@ export default function BillReceiptsPopup({
                 type="button"
                 disabled={loading || busy}
                 onClick={() => void handleMarkPaid()}
+                sx={fixedGreenButtonSx}
               >
                 Paid
               </ColorTemplate13DisableGreenButton>
@@ -673,6 +714,12 @@ export default function BillReceiptsPopup({
           ) : null}
         </ColorTemplate16PopupCenterWide.Body>
       </ColorTemplate16PopupCenterWide>
+      <BillReceiptZoomViewer
+        open={zoomOpen && Boolean(selected && paidRecordId)}
+        onClose={() => setZoomOpen(false)}
+        paidRecordId={paidRecordId}
+        attachment={selected}
+      />
       <ColorTemplate16PopupCenterWide
         open={Boolean(skipToast)}
         onClose={() => {

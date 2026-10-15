@@ -12,6 +12,7 @@ import path from 'path';
 import pool, { getDBSchema } from '../db/connection.js';
 import { loadTableColumns } from '../routes/singles/checkrBioReviewDb.js';
 import { billReceiptRelativePath, billReceiptsDirAbs } from './paidRecordStorage.js';
+import { normalizeBillIcon } from './billIconName.js';
 
 export const BILL_SCHEDULE_BACKUP_FILE = 'bill_schedule.json';
 const BILL_SCHEDULE_BACKUP_VERSION = 1;
@@ -38,7 +39,7 @@ async function attachmentHasChecksumColumn() {
 export async function exportBillScheduleForBackup(singlesId, notesMount) {
   const { rows: monthly } = await pool.query(
     `SELECT bill_year, bill_month, row_index, bill_description, due_day, amount,
-            bill_type, action, paid_record_id
+            bill_type, action, paid_record_id, bill_icon
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
       ORDER BY bill_year, bill_month, row_index`,
@@ -46,7 +47,7 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
   );
   const { rows: yearly } = await pool.query(
     `SELECT bill_year, bill_month, row_index, bill_description, due_month_day, amount,
-            bill_type, action, paid_record_id
+            bill_type, action, paid_record_id, bill_icon
        FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2
       ORDER BY bill_year, row_index`,
@@ -287,8 +288,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       const { rows: inserted } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
            singles_id, storage_backend, bill_year, bill_month, row_index,
-           bill_description, due_day, amount, bill_type, action, paid_record_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING monthly_bill_id`,
         [
           singlesId,
@@ -301,7 +302,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           String(r?.amount ?? ''),
           billType,
           normalizeAction(billType, r?.action),
-          oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null
+          oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null,
+          normalizeBillIcon(r?.bill_icon)
         ]
       );
       if (oldPaidId) await linkPaidRecord(oldPaidId, 'monthly', Number(inserted[0].monthly_bill_id));
@@ -313,8 +315,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       const { rows: inserted } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
            singles_id, storage_backend, bill_year, bill_month, row_index,
-           bill_description, due_month_day, amount, bill_type, action, paid_record_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           bill_description, due_month_day, amount, bill_type, action, paid_record_id, bill_icon
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING yearly_bill_id`,
         [
           singlesId,
@@ -327,7 +329,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           String(r?.amount ?? ''),
           billType,
           normalizeAction(billType, r?.action),
-          oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null
+          oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null,
+          normalizeBillIcon(r?.bill_icon)
         ]
       );
       if (oldPaidId) await linkPaidRecord(oldPaidId, 'yearly', Number(inserted[0].yearly_bill_id));
