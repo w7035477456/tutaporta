@@ -36,7 +36,7 @@ import { ProfilesRecordsInstructionPopup } from './ProfilesRecordsInstruction';
 import ProfilesRecordsInviteFriendsTab from './ProfilesRecordsInviteFriendsTab';
 import ProfilesRecordsReferEmailTab from './ProfilesRecordsReferEmailTab';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
-import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
+import PageVideoTextTutorialPair from 'components/PageVideoTextTutorialPair';
 import {
   AltEmailPopup,
   ChangeEmailPopup,
@@ -858,7 +858,7 @@ export default function ProfilesRecordsPage({
             gridRow: { xs: 2, sm: 'auto' }
           }}
         >
-          <PageVideoTutorialsButton pageKey="profileRecords" />
+          <PageVideoTextTutorialPair pageKey="profileRecords" onTutorialClick={() => setInstructionOpen(true)} />
           <Box
             sx={{
               display: 'flex',
@@ -942,7 +942,7 @@ export default function ProfilesRecordsPage({
           </Typography>
         ) : null}
       <Box sx={{ justifySelf: { xs: 'end', sm: 'end' }, gridColumn: { xs: '1', sm: '3' }, gridRow: { xs: 3, sm: 'auto' } }}>
-        <PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />
+        <PageInstructionEarnTokensAction />
       </Box>
     </Box>
   );

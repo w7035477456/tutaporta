@@ -17,7 +17,7 @@ import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCen
 import PageInstructionPopup from 'ui-component/PageInstructionPopup';
 import PageInstructionAudioTutorial from 'ui-component/PageInstructionAudioTutorial';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
-import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
+import PageVideoTextTutorialPair from 'components/PageVideoTextTutorialPair';
 import EarnTokensPageTitle from 'ui-component/EarnTokensPageTitle';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import FriendshipStatesDiagramZoom from 'ui-component/FriendshipStatesDiagramZoom';
@@ -504,8 +504,8 @@ export default function AllSingles() {
           </Typography>
         </EarnTokensPageTitle>
       }
-      center={<PageVideoTutorialsButton pageKey="allSingles" />}
-        secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
+      center={<PageVideoTextTutorialPair pageKey="allSingles" onTutorialClick={() => setInstructionOpen(true)} />}
+        secondary={<PageInstructionEarnTokensAction />}
     >
       <AllSinglesWelcomePanel expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} downSM={downSM}>
         <Typography

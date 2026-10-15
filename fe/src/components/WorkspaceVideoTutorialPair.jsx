@@ -38,6 +38,8 @@ const textTutorialLabel = (
  */
 export default function WorkspaceVideoTutorialPair({
   videoTutorialUrl = '',
+  /** Per-page ENV video (PageVideoTutorialsButton `pageKey`) — used when `videoTutorialUrl` is empty. */
+  pageKey,
   onTutorialClick,
   tutorialDisabled = false,
   tutorialAriaLabel = 'Open tutorial',
@@ -48,8 +50,11 @@ export default function WorkspaceVideoTutorialPair({
   iconHeight = { xs: 72, sm: 84 },
   sx
 }) {
-  const watchTutorialsHref =
-    String(videoTutorialUrl || '').trim() || DEFAULT_WORKSPACE_VIDEO_TUTORIAL_URL;
+  const explicitUrl = String(videoTutorialUrl || '').trim();
+  const videoLinkProps =
+    !explicitUrl && pageKey
+      ? { pageKey }
+      : { href: explicitUrl || DEFAULT_WORKSPACE_VIDEO_TUTORIAL_URL };
 
   const tutorialControl =
     tutorialVariant === 'orange' ? (
@@ -105,7 +110,7 @@ export default function WorkspaceVideoTutorialPair({
       }}
     >
       <PageVideoTutorialsButton
-        href={watchTutorialsHref}
+        {...videoLinkProps}
         sx={{
           height: iconHeight,
           flexShrink: 0
@@ -118,6 +123,7 @@ export default function WorkspaceVideoTutorialPair({
 
 WorkspaceVideoTutorialPair.propTypes = {
   videoTutorialUrl: PropTypes.string,
+  pageKey: PropTypes.string,
   onTutorialClick: PropTypes.func,
   tutorialDisabled: PropTypes.bool,
   tutorialAriaLabel: PropTypes.string,

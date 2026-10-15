@@ -156,7 +156,7 @@ import {
   hoverMagnifyFontSizeSx
 } from 'config/hoverMagnifyEnv';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
-import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
+import PageVideoTextTutorialPair from 'components/PageVideoTextTutorialPair';
 import { PROFILES_RECORDS_PATH, PROFILES_RECORDS_TAB_PAY_HISTORY } from 'constants/profilesRecordsRoute';
 import {
   clearRefereeRewardUxAfterProfileSetup,
@@ -3616,7 +3616,7 @@ export default function MyStory() {
             zIndex: 2
           }}
         >
-          <PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />
+          <PageInstructionEarnTokensAction />
         </Box>
         <MainCard
           sx={{
@@ -3679,7 +3679,7 @@ export default function MyStory() {
                 gap: { xs: 1.15, sm: 1.35 }
               }}
             >
-              <PageVideoTutorialsButton pageKey="myAlbum" />
+              <PageVideoTextTutorialPair pageKey="myAlbum" onTutorialClick={() => setInstructionOpen(true)} />
               <Typography
                 component="h1"
                 sx={{

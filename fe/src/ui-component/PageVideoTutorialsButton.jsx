@@ -7,7 +7,7 @@ import { openYoutubeTutorialWindow } from 'utils/openYoutubeTutorialWindow';
 import videoTutorialImg from 'assets/images/videoTutorial.png';
 
 /** 2× the dating top-banner strip height — used for all menu VIDEO TUTORIALS icons. */
-const VIDEO_TUTORIALS_ICON_HEIGHT = {
+export const VIDEO_TUTORIALS_ICON_HEIGHT = {
   xs: DATING_TOP_BANNER_HEIGHT.xs * 2,
   sm: DATING_TOP_BANNER_HEIGHT.sm * 2
 };

@@ -40,7 +40,7 @@ import {
 } from 'utils/profilePhotoChangeGate';
 import { SelfReportBiographyInstructionPopup } from './SelfReportBiographyInstruction';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
-import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
+import PageVideoTextTutorialPair from 'components/PageVideoTextTutorialPair';
 import EarnTokensPageTitle from 'ui-component/EarnTokensPageTitle';
 import DomainVerificationPopup from './DomainVerificationPopup';
 import AcademicRecordVerificationPopup from './AcademicRecordVerificationPopup';
@@ -313,8 +313,8 @@ export default function SelfReportBiographyPage() {
           </Typography>
         </EarnTokensPageTitle>
       }
-      center={<PageVideoTutorialsButton pageKey="mySelfReportBio" />}
-      secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
+      center={<PageVideoTextTutorialPair pageKey="mySelfReportBio" onTutorialClick={() => setInstructionOpen(true)} />}
+      secondary={<PageInstructionEarnTokensAction />}
     >
       <SelfReportBiographyInstructionPopup open={instructionOpen} onClose={() => setInstructionOpen(false)} />
       <ProfilePhotoChangeWaitDialog

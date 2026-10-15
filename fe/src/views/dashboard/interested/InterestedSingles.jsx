@@ -15,6 +15,7 @@ import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeD
 import PageInstructionPopup from 'ui-component/PageInstructionPopup';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
+import PageVideoTextTutorialPair from 'components/PageVideoTextTutorialPair';
 // project imports
 import MainCard from 'ui-component/cards/MainCard';
 
@@ -398,7 +399,8 @@ export default function InterestedSingles() {
           Interested
         </Typography>
       }
-        secondary={<PageInstructionEarnTokensAction onInstructionClick={() => setInstructionOpen(true)} />}
+      center={<PageVideoTextTutorialPair onTutorialClick={() => setInstructionOpen(true)} />}
+        secondary={<PageInstructionEarnTokensAction />}
     >
       <Box
         data-suppress-touch-contextmenu="true"
