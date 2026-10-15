@@ -14,6 +14,9 @@ import {
 } from 'utils/mobilePostLoginChoice';
 import { fetchUserCustomization } from 'api/userCustomizationFe';
 import MallAppEnrollmentDialog from 'ui-component/MallAppEnrollmentDialog';
+import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import GetMyRafflePopup from 'ui-component/GetMyRafflePopup';
+import { takeGetMyRafflePending } from 'constants/raffleRoute';
 
 import tutaMallInside from 'assets/images/tutaMallInside.png';
 import eMarketPlaceImg from 'assets/images/onlineMarketPlace.png';
@@ -110,6 +113,14 @@ export default function Landing() {
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
   const [enrollmentForcedOpen, setEnrollmentForcedOpen] = useState(false);
+  const [raffleOpen, setRaffleOpen] = useState(false);
+
+  const openGetMyRaffle = useCallback(() => setRaffleOpen(true), []);
+
+  useEffect(() => {
+    if (takeGetMyRafflePending()) openGetMyRaffle();
+  }, [openGetMyRaffle]);
+
   const [enrollment, setEnrollment] = useState({
     tutaDatesEnabled: true,
     tutaNotesEnabled: true,
@@ -498,6 +509,25 @@ export default function Landing() {
           </Box>
         ))}
       </Box>
+      <Box
+        sx={{
+          position: 'absolute',
+          top: { xs: 8, sm: 16 },
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 3
+        }}
+      >
+        <ColorTemplate13DisableGreenButton
+          type="button"
+          hoverEnlargeFont
+          onClick={openGetMyRaffle}
+          sx={{ whiteSpace: 'nowrap', fontWeight: 800, fontSize: { xs: '1.05rem', sm: '1.3rem' }, px: 2.5 }}
+        >
+          Get My Raffle
+        </ColorTemplate13DisableGreenButton>
+      </Box>
+      <GetMyRafflePopup open={raffleOpen} onClose={() => setRaffleOpen(false)} />
       <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
       <MallAppEnrollmentDialog
         {...(enrollmentForcedOpen

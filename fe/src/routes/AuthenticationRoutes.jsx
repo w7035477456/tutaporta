@@ -4,6 +4,7 @@ import MinimalLayout from 'layout/MinimalLayout';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
 import { LIVE_FACE_SCAN_POPUP_PATH } from 'constants/liveFaceScanPopupRoute';
 import { getSpecialLoginPath } from 'config/specialLoginEnv';
+import { GET_MY_RAFFLE_PATH, RAFFLE_MUSTAFA_PATH, RAFFLE_PATH } from 'constants/raffleRoute';
 
 // maintenance routing
 const LoginPage = Loadable(lazy(() => import('views/pages/authentication/Login')));
@@ -29,6 +30,8 @@ const MobilePhotoUploadPage = Loadable(lazy(() => import('views/pages/MobilePhot
 const GoogleOAuthBridgePage = Loadable(lazy(() => import('views/pages/authentication/GoogleOAuthBridge')));
 const LiveFaceScanPopupPage = Loadable(lazy(() => import('views/utilities/LiveFaceScanPopupPage')));
 const ResumePage = Loadable(lazy(() => import('views/pages/ResumePage')));
+const RaffleInfoPage = Loadable(lazy(() => import('views/pages/raffle/RaffleInfoPage')));
+const RaffleRedirect = Loadable(lazy(() => import('views/pages/raffle/RaffleRedirect')));
 
 // ==============================|| AUTHENTICATION ROUTING ||============================== //
 
@@ -122,6 +125,18 @@ const authenticationChildren = [
     {
       path: '/resume',
       element: <ResumePage />
+    },
+    {
+      path: RAFFLE_PATH,
+      element: <RaffleInfoPage />
+    },
+    {
+      path: RAFFLE_MUSTAFA_PATH,
+      element: <RaffleRedirect />
+    },
+    {
+      path: GET_MY_RAFFLE_PATH,
+      element: <RaffleRedirect openPopup />
     },
     {
       path: '/mobilePhotoUpload',
