@@ -77,6 +77,17 @@ function formatWindowTime(value, timeZone, withZone = false) {
   }
 }
 
+const RAFFLE_ALREADY_RED = '#e60000';
+
+const raffleNoticeBoxSx = {
+  textAlign: 'center',
+  fontWeight: 800,
+  color: '#111',
+  px: 1.5,
+  py: 1,
+  borderRadius: 1
+};
+
 const DEFAULT_ALREADY_GENERATED_MESSAGE = 'You already generate a raffle for this event. Only 1 raffle per email login.';
 
 /**
@@ -105,6 +116,9 @@ export default function GetMyRafflePopup({ open, onClose }) {
         if (cancelled) return;
         setEvents(state.events);
         setTickets(state.tickets);
+        const listed = state.tickets.filter((t) => state.events.some((e) => e.eventId === t.eventId));
+        const latest = listed[listed.length - 1];
+        if (latest) setEventId((prev) => prev || String(latest.eventId));
         if (state.alreadyGeneratedMessage) setAlreadyMessage(state.alreadyGeneratedMessage);
       })
       .catch((err) => {
@@ -152,9 +166,12 @@ export default function GetMyRafflePopup({ open, onClose }) {
 
   return (
     <ColorTemplate16PopupCenterWide open={open} onClose={onClose} maxWidth="min(620px, 94vw)">
-      <ColorTemplate16PopupCenterWide.Title>Get My Raffle</ColorTemplate16PopupCenterWide.Title>
+      <ColorTemplate16PopupCenterWide.Title>{ticket ? 'Your Raffle' : 'Get My Raffle'}</ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1.5 }}>
+          {ticket && !ticketIsFresh ? (
+            <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: RAFFLE_ALREADY_RED }}>{alreadyMessage}</Typography>
+          ) : null}
           <TextField
             select
             fullWidth
@@ -214,11 +231,15 @@ export default function GetMyRafflePopup({ open, onClose }) {
           {ticket ? (
             <>
               <RaffleTicketCard ticket={ticket} />
-              {!ticketIsFresh ? (
-                <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>{alreadyMessage}</Typography>
-              ) : null}
-              <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>
+              <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: '#5cc84a' }}>
                 Take a screenshot of this screen and bring it to the Meetup event.
+              </Typography>
+              <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: '#ffe01b', fontWeight: 500, fontSize: '1.05rem' }}>
+                If the event host draws{' '}
+                <Box component="strong" sx={{ fontWeight: 800 }}>
+                  Raffle #{ticket.raffleNumber}
+                </Box>
+                , show them this screenshot, then return here to claim your $200 cash prize via PayPal, Zelle, or Venmo.
               </Typography>
             </>
           ) : null}
