@@ -24,6 +24,7 @@ import AdminToolsAsnTab from './AdminToolsAsnTab';
 import AdminToolsTablesTab from './AdminToolsTablesTab';
 import AdminToolsWipeByIdTab from './AdminToolsWipeByIdTab';
 import AdminToolsLoginLogTab from './AdminToolsLoginLogTab';
+import AdminToolsRafflesTab from './AdminToolsRafflesTab';
 import AllSingles from 'views/dashboard/allSingles/AllSingles';
 
 const ADMIN_TOOLS_TABS = [
@@ -37,7 +38,8 @@ const ADMIN_TOOLS_TABS = [
   { value: 'asn', label: 'ASN' },
   { value: 'tables', label: 'TableDel' },
   { value: 'wipe-by-id', label: 'DeleteById' },
-  { value: 'all-singles', label: 'All Singles' }
+  { value: 'all-singles', label: 'All Singles' },
+  { value: 'raffles', label: 'Raffles' }
 ];
 
 function resolveAdminToolsTab(tabParam) {
@@ -367,6 +369,7 @@ export default function AdminToolsPage() {
           {!loading && activeTab === 'all-singles' ? <AllSingles /> : null}
           {!loading && activeTab === 'lookup' ? <AdminToolsLookupTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'login-log' ? <AdminToolsLoginLogTab onError={handleToolsError} /> : null}
+          {!loading && activeTab === 'raffles' ? <AdminToolsRafflesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'asn' ? <AdminToolsAsnTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'tables' ? <AdminToolsTablesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'wipe-by-id' ? <AdminToolsWipeByIdTab onError={handleToolsError} /> : null}

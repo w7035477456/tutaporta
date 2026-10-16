@@ -439,6 +439,7 @@ import {
   postAdminPasswordCheckSetSingles,
   postAdminPasswordHashPreview
 } from './routes/admin/adminPasswordCheck.js';
+import { getAdminRaffleLogEvents, postAdminRaffleLogLookup } from './routes/admin/adminRaffleLog.js';
 import {
   postAdminAuditRegistrationLookup,
   postAdminCycleSinglesStatus,
@@ -1332,6 +1333,8 @@ app.post('/api/admin/wipe-by-singles-id/photos/list', requireAuth, requireAdminR
 app.post('/api/admin/wipe-by-singles-id/photos/delete', requireAuth, requireAdminRole, postAdminWipeBySinglesIdPhotoDelete);
 app.get('/api/admin/photo/:id/thumbnail', requireAuth, requireAdminRole, getAdminPhotoThumbnail);
 app.get('/api/admin/photo/:id', requireAuth, requireAdminRole, getAdminPhoto);
+app.get('/api/admin/raffle-log/events', requireAuth, requireAdminRole, getAdminRaffleLogEvents);
+app.post('/api/admin/raffle-log/lookup', requireAuth, requireAdminRole, postAdminRaffleLogLookup);
 app.post('/api/admin/password-check', requireAuth, requireAdminRole, postAdminPasswordCheck);
 app.post('/api/admin/password-check/hash', requireAuth, requireAdminRole, postAdminPasswordHashPreview);
 app.post('/api/admin/password-check/lookup', requireAuth, requireAdminRole, postAdminPasswordCheckLookup);

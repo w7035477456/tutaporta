@@ -200,6 +200,18 @@ export async function fetchAdminLoginLogLookupAll() {
   return data;
 }
 
+/** Admin Tools → Raffles tab */
+export async function fetchAdminRaffleLogEvents() {
+  const { data } = await api.get('/api/admin/raffle-log/events');
+  return Array.isArray(data?.events) ? data.events : [];
+}
+
+/** → { rows: [{ when, action, number, code, result, singlesId, name, event, host, eventId, imageFile }], total } */
+export async function fetchAdminRaffleLogLookup({ eventId, action, result, singlesId, from, to, when }) {
+  const { data } = await api.post('/api/admin/raffle-log/lookup', { eventId, action, result, singlesId, from, to, when });
+  return data;
+}
+
 export async function cycleAdminSinglesStatus({ singlesId }) {
   const { data } = await api.post('/api/admin/singles/cycle-status', { singlesId });
   return data;
