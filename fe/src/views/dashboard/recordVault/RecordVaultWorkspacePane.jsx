@@ -1424,8 +1424,8 @@ function RenamableDraggableMenuRow({
       onSelect?.(event);
       return;
     }
-    if (selected && !locked) onStartEdit();
-    else onSelect?.(event);
+    // Single click only selects; rename needs a double-click (onDoubleClick).
+    if (!selected) onSelect?.(event);
   };
 
   if (editing) {
@@ -1493,7 +1493,7 @@ function RenamableDraggableMenuRow({
           title={
             locked
               ? 'Locked — enter PIN to view'
-              : buttonTitle || dragTitle || 'Drag to reorder; click selected to rename'
+              : buttonTitle || dragTitle || 'Drag to reorder; double-click to rename'
           }
           onPointerDown={handleRowPointerDown}
           onPointerUp={handleRowPointerUp}
@@ -1645,7 +1645,6 @@ export default function RecordVaultWorkspacePane({
   const [crossPaneProgressLabel, setCrossPaneProgressLabel] = useState('');
   const [crossPaneDuplicateError, setCrossPaneDuplicateError] = useState('');
   const [duplicateNamePopup, setDuplicateNamePopup] = useState('');
-  const [renameSavedPopup, setRenameSavedPopup] = useState('');
   /** 'notebook' | 'note' — name prompt before creating a new item. */
   const [createItemDialog, setCreateItemDialog] = useState(null);
   /** Auto-dismiss success toasts after notes-list import/export (queued; work continues in parallel). */
@@ -6160,7 +6159,6 @@ export default function RecordVaultWorkspacePane({
           sc.target_type === 'notebook' && Number(sc.notebook_id) === Number(notebookId) ? { ...sc, label: trimmed } : sc
         )
       );
-      setRenameSavedPopup(`Rename “${trimmed}” saved`);
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Failed to rename notebook'));
     } finally {
@@ -6217,7 +6215,6 @@ export default function RecordVaultWorkspacePane({
     try {
       await vaultApi.updateRecordVaultNote(noteId, { note_name: trimmed });
       patchNoteTitleInTree(noteId, trimmed);
-      setRenameSavedPopup(`Rename “${trimmed}” saved`);
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Failed to rename note'));
     } finally {
@@ -6274,7 +6271,6 @@ export default function RecordVaultWorkspacePane({
     setError('');
     try {
       await vaultApi.updateRecordVaultNote(noteId, { note_name: upper });
-      setRenameSavedPopup(`Rename “${upper}” saved`);
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Failed to rename note'));
     }
@@ -7057,22 +7053,6 @@ export default function RecordVaultWorkspacePane({
           <ColorTemplate16PopupCenterWide.BodyText>{duplicateNamePopup}</ColorTemplate16PopupCenterWide.BodyText>
           <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
             <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setDuplicateNamePopup('')}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(renameSavedPopup)}
-        onClose={() => setRenameSavedPopup('')}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close rename saved dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Rename saved</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>{renameSavedPopup}</ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setRenameSavedPopup('')}>
               OK
             </ColorTemplate16PopupCenterWide.ActionButton>
           </Stack>

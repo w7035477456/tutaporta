@@ -132,6 +132,7 @@ export function appendRaffleHardCopy({
   appendOnly(
     RAFFLE_HARD_COPY_LOG_PATH,
     [
+      'action=generate',
       `raffle_generate_id=${logField(raffleGenerateId)}`,
       `raffle_generate_datetime=${isoField(raffleGenerateDatetime)}`,
       `raffle_number=${logField(raffleNumber)}`,
@@ -145,6 +146,18 @@ export function appendRaffleHardCopy({
       `host_event_end=${isoField(hostEventEnd)}`
     ].join('\t')
   );
+}
+
+/**
+ * /vr host action (draw | scan | code), same append-only raffle_log.log.
+ * `fields` keys are written in insertion order as key=value after action= and datetime=.
+ */
+export function appendRaffleHostActionHardCopy(action, fields = {}, at = new Date()) {
+  const parts = [`action=${logField(action)}`, `datetime=${formatLogDate(at instanceof Date ? at : new Date())}`];
+  for (const [key, value] of Object.entries(fields)) {
+    parts.push(`${key}=${value instanceof Date ? isoField(value) : logField(value)}`);
+  }
+  appendOnly(RAFFLE_HARD_COPY_LOG_PATH, parts.join('\t'));
 }
 
 /** Brief/full bio approval. Full client IP. */

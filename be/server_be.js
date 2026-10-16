@@ -483,6 +483,12 @@ import {
 } from './routes/user/userCustomization.js';
 import { getRaffleState, postRaffleSelect, postRaffleTicket } from './routes/raffle/raffleRoutes.js';
 import {
+  getRaffleHostEvents,
+  postRaffleHostDraw,
+  postRaffleHostLogin,
+  postRaffleHostVerify
+} from './routes/raffle/raffleHostRoutes.js';
+import {
   getBpmDiagram,
   getBpmListings,
   getBpmInstances,
@@ -1780,6 +1786,10 @@ app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
 app.post('/api/raffle/select', requireAuth, postRaffleSelect);
 app.post('/api/raffle/tickets', requireAuth, postRaffleTicket);
+app.get('/api/raffle/host/events', getRaffleHostEvents);
+app.post('/api/raffle/host/login', postRaffleHostLogin);
+app.post('/api/raffle/host/draw', postRaffleHostDraw);
+app.post('/api/raffle/host/verify', postRaffleHostVerify);
 
 app.get('/api/eClassifieds/bpm/diagram', requireAuth, getBpmDiagram);
 app.get('/api/eClassifieds/bpm/listings', requireAuth, getBpmListings);

@@ -21,7 +21,7 @@ function newVerifyCode() {
 }
 
 /** K7Q4MZ9X → K7Q4-MZ9X */
-function formatVerifyCode(code) {
+export function formatVerifyCode(code) {
   const c = String(code || '');
   return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
 }
@@ -111,7 +111,7 @@ async function ensureRaffleUserRow(singlesId, event) {
   return rows[0] || null;
 }
 
-async function loadSinglesForLog(singlesId) {
+export async function loadSinglesForLog(singlesId) {
   const { rows } = await pool.query(`SELECT to_jsonb(s) AS j FROM ${S}.singles s WHERE s.singles_id = $1 LIMIT 1`, [
     singlesId
   ]);

@@ -5,6 +5,9 @@
 #   scripts/raffle-setup.sh event           # new raffle_event row  (local Postgres)
 #   scripts/raffle-setup.sh host ubuntu     # from the Mac, insert on Ubuntu Primary via ubuntu-psql.sh
 #   scripts/raffle-setup.sh event ubuntu
+#   scripts/raffle-setup.sh password [ubuntu]   # set / change a host's /vr password
+#
+# Host passwords are typed hidden (twice) and stored only as a bcrypt hash (be/node_modules/bcrypt).
 #
 # Blank answer = NULL (except required fields). setup_event first asks the event's time zone
 # (Eastern default; Central / Mountain / Western-Pacific, or any IANA name), then date/times are
@@ -19,7 +22,7 @@ TZ_LABEL=Eastern
 
 kind="${1:-}"
 target="${2:-local}"
-case "$kind" in host|event) ;; *) echo "usage: $0 host|event [local|ubuntu]" >&2; exit 2 ;; esac
+case "$kind" in host|event|password) ;; *) echo "usage: $0 host|event|password [local|ubuntu]" >&2; exit 2 ;; esac
 case "$target" in local|ubuntu) ;; *) echo "target must be local or ubuntu" >&2; exit 2 ;; esac
 
 run_sql() {
@@ -85,21 +88,60 @@ confirm() {
   [[ "$answer" =~ ^[Yy]$ ]] || { echo "Cancelled, nothing written."; exit 1; }
 }
 
+ask_host_password_hash() {
+  local pw pw2
+  while true; do
+    read -r -s -p "Host password for /vr (min 6 characters): " pw; echo >&2
+    if [[ ${#pw} -lt 6 ]]; then echo "  too short" >&2; continue; fi
+    read -r -s -p "Type it again: " pw2; echo >&2
+    [[ "$pw" == "$pw2" ]] && break
+    echo "  passwords do not match" >&2
+  done
+  printf '%s' "$pw" | (cd "$SCRIPT_DIR/../be" && node --input-type=module -e "
+import bcrypt from 'bcrypt';
+let s = '';
+process.stdin.on('data', (d) => { s += d; }).on('end', async () => { process.stdout.write(await bcrypt.hash(s, 12)); });")
+}
+
 setup_host() {
   echo "New raffle_host on [$target]"
-  local name email phone url
+  local name email phone url hash
   name="$(ask "host_full_name" required)"
   email="$(ask "host_email")"
   phone="$(ask "host_phone")"
   url="$(ask "host_url")"
+  hash="$(ask_host_password_hash)"
+  [[ "$hash" == \$2* ]] || { echo "Could not hash the password (is be/node_modules installed?)" >&2; exit 1; }
 
-  printf '\n  host_full_name = %s\n  host_email     = %s\n  host_phone     = %s\n  host_url       = %s\n\n' \
+  printf '\n  host_full_name = %s\n  host_email     = %s\n  host_phone     = %s\n  host_url       = %s\n  host password  = (set, stored as bcrypt hash)\n\n' \
     "$name" "${email:-NULL}" "${phone:-NULL}" "${url:-NULL}"
   confirm
 
-  run_sql -c "INSERT INTO $S.raffle_host (host_full_name, host_email, host_phone, host_url)
-VALUES ($(lit "$name"), $(lit "$email"), $(lit "$phone"), $(lit "$url"))
+  run_sql -c "INSERT INTO $S.raffle_host (host_full_name, host_email, host_phone, host_url, host_password_hash)
+VALUES ($(lit "$name"), $(lit "$email"), $(lit "$phone"), $(lit "$url"), $(lit "$hash"))
 RETURNING raffle_host_id, host_full_name, host_email, host_phone, host_url;"
+}
+
+setup_password() {
+  echo "Set /vr host password on [$target]"
+  run_sql -c "SELECT raffle_host_id, host_full_name, (host_password_hash IS NOT NULL) AS has_password FROM $S.raffle_host ORDER BY raffle_host_id;"
+  local host_id host_name hash
+  while true; do
+    host_id="$(ask "raffle_host_id" required)"
+    if [[ "$host_id" =~ ^[0-9]+$ ]]; then
+      host_name="$(run_sql -At -c "SELECT host_full_name FROM $S.raffle_host WHERE raffle_host_id = $host_id;")"
+      [[ -n "$host_name" ]] && break
+      echo "  no raffle_host with id $host_id" >&2
+    else
+      echo "  must be a number" >&2
+    fi
+  done
+  hash="$(ask_host_password_hash)"
+  [[ "$hash" == \$2* ]] || { echo "Could not hash the password (is be/node_modules installed?)" >&2; exit 1; }
+  printf '\n  Set password for raffle_host_id %s (%s)\n\n' "$host_id" "$host_name"
+  confirm
+  run_sql -c "UPDATE $S.raffle_host SET host_password_hash = $(lit "$hash"), host_failed_attempts = 0, host_locked_until = NULL
+WHERE raffle_host_id = $host_id RETURNING raffle_host_id, host_full_name;"
 }
 
 setup_event() {

@@ -4,6 +4,8 @@ export const RAFFLE_PATH = '/raffle';
 export const RAFFLE_SAMPLE_PATH = '/rafflesample';
 /** Event link handed out at the Meetup — sends members to the mall (login / signup first). */
 export const RAFFLE_MUSTAFA_PATH = '/raffleMustafa';
+/** Event host page: draw the winning number and verify the winner's ticket (host password). */
+export const RAFFLE_HOST_PATH = '/vr';
 /** Direct link — opens the mall and pops the Get My Raffle popup. */
 export const GET_MY_RAFFLE_PATH = '/getmyraffle';
 

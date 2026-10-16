@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Show every raffle ticket ever generated, from the append-only ~/.ssh/be/raffle_log.log.
+# Show the append-only ~/.ssh/be/raffle_log.log: member raffles generated (action=generate) and
+# /vr host actions (draw = winning number drawn, scan / code = winner verification).
 #
 #   scripts/raffle-log.sh                # table: when, number, code, member, event, host
 #   scripts/raffle-log.sh -l             # long form: every field of every ticket
@@ -48,8 +49,8 @@ function val(key,   i, n) {
 function cut(s, w) { return length(s) > w ? substr(s, 1, w - 1) "…" : s }
 BEGIN {
   if (!long) {
-    printf "%-25s %-6s %-10s %-9s %-26s %-18s %-34s %s\n", "generated", "number", "code", "singles", "email", "name", "event", "host"
-    printf "%-25s %-6s %-10s %-9s %-26s %-18s %-34s %s\n", "---------", "------", "----", "-------", "-----", "----", "-----", "----"
+    printf "%-25s %-8s %-6s %-10s %-15s %-9s %-18s %-30s %s\n", "when", "action", "number", "code", "result", "singles", "name", "event", "host"
+    printf "%-25s %-8s %-6s %-10s %-15s %-9s %-18s %-30s %s\n", "----", "------", "------", "----", "------", "-------", "----", "-----", "----"
   }
 }
 filter != "" && index(tolower($0), tolower(filter)) == 0 { next }
@@ -63,10 +64,14 @@ filter != "" && index(tolower($0), tolower(filter)) == 0 { next }
     }
     print ""
   } else {
-    printf "%-25s %-6s %-10s %-9s %-26s %-18s %-34s %s\n",
-      val("raffle_generate_datetime"), val("raffle_number"), val("raffle_generate_id"), val("singles_id"),
-      cut(val("singles_email"), 26), cut(val("singles_fullname"), 18), cut(val("event_title"), 34), val("host_full_name")
+    action = val("action"); if (action == "-") action = "generate"
+    when = val("datetime"); if (when == "-") when = val("raffle_generate_datetime")
+    number = val("raffle_number"); if (number == "-") number = val("winning_raffle_number")
+    code = val("verification_code"); if (code == "-") code = val("raffle_generate_id")
+    printf "%-25s %-8s %-6s %-10s %-15s %-9s %-18s %-30s %s\n",
+      when, action, number, code, val("result"), val("singles_id"),
+      cut(val("singles_fullname"), 18), cut(val("event_title"), 30), val("host_full_name")
   }
 }
-END { printf "%s%d ticket(s) in %s on %s\n", (long ? "" : "\n"), count, logfile, host }
+END { printf "%s%d row(s) in %s on %s\n", (long ? "" : "\n"), count, logfile, host }
 ' "$LOG"

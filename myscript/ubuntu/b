@@ -115,6 +115,7 @@ alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
 setup_host()  { bash "$HOME/code/main/scripts/raffle-setup.sh" host  local; }
 setup_event() { bash "$HOME/code/main/scripts/raffle-setup.sh" event local; }
 rafflelog() { bash "$HOME/code/main/scripts/raffle-log.sh" "$@"; }
+set_host_password() { bash "$HOME/code/main/scripts/raffle-setup.sh" password local; }
 #-----------------------
 alias createnewmember='bash ${HOME}/code/main/CreateNewMember.sh'
 alias createnewposting='bash ${HOME}/code/main/CreatePosting.sh'
