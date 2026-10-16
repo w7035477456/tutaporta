@@ -59,6 +59,7 @@ function ticketPayload(row) {
   return {
     eventId: Number(row.event_id),
     eventLabel: eventLabel(row),
+    eventAddress: String(row.event_build_n_address || '').trim(),
     raffleNumber: Number(row.raffle_number),
     verifyCode,
     verifyPath: `/raffle/verify/${verifyCode}`,
@@ -139,7 +140,7 @@ export async function getRaffleState(req, res) {
     );
     const { rows: ticketRows } = await pool.query(
       `SELECT u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime,
-              e.event_title, h.host_full_name
+              e.event_title, e.event_build_n_address, h.host_full_name
          FROM ${S}.raffle_user u
          JOIN ${S}.raffle_event e ON e.event_id = u.event_id
          JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
@@ -220,7 +221,12 @@ export async function postRaffleTicket(req, res) {
     let row = await ensureRaffleUserRow(singlesId, event);
     if (!row) return res.status(500).json({ error: 'Could not create your raffle. Please try again.' });
 
-    const withEvent = (r) => ({ ...r, event_title: event.event_title, host_full_name: event.host_full_name });
+    const withEvent = (r) => ({
+      ...r,
+      event_title: event.event_title,
+      event_build_n_address: event.event_build_n_address,
+      host_full_name: event.host_full_name
+    });
     if (row.raffle_number != null) {
       return res.json({ ticket: ticketPayload(withEvent(row)), alreadyHad: true, message: RAFFLE_ALREADY_GENERATED_MESSAGE });
     }

@@ -43,6 +43,9 @@ function RaffleTicketCard({ ticket }) {
           {ticket.verifyCode}
         </Typography>
         <Typography sx={{ fontSize: '0.85rem', mt: 0.5 }}>{ticket.eventLabel}</Typography>
+        {ticket.eventAddress ? (
+          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#333' }}>{ticket.eventAddress}</Typography>
+        ) : null}
         {issuedAt ? <Typography sx={{ fontSize: '0.85rem', color: '#333' }}>{issuedAt.toLocaleString()}</Typography> : null}
       </Box>
       <Box sx={{ bgcolor: '#fff', p: 1, lineHeight: 0 }}>
@@ -55,6 +58,7 @@ function RaffleTicketCard({ ticket }) {
 RaffleTicketCard.propTypes = {
   ticket: PropTypes.shape({
     eventLabel: PropTypes.string,
+    eventAddress: PropTypes.string,
     raffleNumber: PropTypes.number,
     verifyCode: PropTypes.string,
     verifyPath: PropTypes.string,
