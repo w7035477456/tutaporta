@@ -9,7 +9,7 @@ import ColorTemplate9TableData from 'ui-component/ColorTemplate9TableData';
 import { fetchAdminRaffleLogEvents, fetchAdminRaffleLogLookup } from 'api/adminToolsFe';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 
-const ACTION_OPTIONS = ['generate', 'draw', 'code', 'scan'];
+const ACTION_OPTIONS = ['generate', 'draw', 'code', 'scan', 'payout'];
 const RESULT_OPTIONS = ['valid', 'invalid', 'already_claimed'];
 const ALL_WHEN = ['past', 'today', 'future'];
 const WHEN_OPTIONS = [

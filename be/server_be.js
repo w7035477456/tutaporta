@@ -482,7 +482,7 @@ import {
   putUserCustomization,
   putUserZipFolder
 } from './routes/user/userCustomization.js';
-import { getRaffleState, postRaffleSelect, postRaffleTicket } from './routes/raffle/raffleRoutes.js';
+import { getRaffleState, postRafflePayout, postRaffleSelect, postRaffleTicket } from './routes/raffle/raffleRoutes.js';
 import {
   getRaffleHostEvents,
   postRaffleHostDraw,
@@ -1789,6 +1789,7 @@ app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
 app.post('/api/raffle/select', requireAuth, postRaffleSelect);
 app.post('/api/raffle/tickets', requireAuth, postRaffleTicket);
+app.post('/api/raffle/payout', requireAuth, postRafflePayout);
 app.get('/api/raffle/host/events', getRaffleHostEvents);
 app.post('/api/raffle/host/login', postRaffleHostLogin);
 app.post('/api/raffle/host/draw', postRaffleHostDraw);

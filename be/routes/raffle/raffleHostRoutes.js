@@ -299,7 +299,7 @@ export async function postRaffleHostVerify(req, res) {
       message = `ALREADY CLAIMED — ticket #${ticket.raffle_number} was already verified.`;
     } else {
       const { rows } = await pool.query(
-        `UPDATE ${S}.raffle_user SET raffle_claimed = true
+        `UPDATE ${S}.raffle_user SET raffle_claimed = true, raffle_claimed_datetime = now()
           WHERE raffle_user_id = $1 AND raffle_claimed = false
           RETURNING raffle_user_id`,
         [ticket.raffle_user_id]

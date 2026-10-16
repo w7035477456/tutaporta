@@ -9,7 +9,7 @@ import pool from '../../db/connection.js';
 import { RAFFLE_HARD_COPY_LOG_PATH } from '../../utils/hardCopyAuthLog.js';
 
 const S = 'outdateddbsnapshotoct2024';
-const ACTIONS = new Set(['generate', 'draw', 'code', 'scan']);
+const ACTIONS = new Set(['generate', 'draw', 'code', 'scan', 'payout']);
 const WHEN_VALUES = new Set(['past', 'today', 'future']);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -31,7 +31,7 @@ function toRow(f) {
     action: f.action || 'generate',
     number: f.raffle_number || f.winning_raffle_number || '',
     code: f.verification_code || f.raffle_generate_id || '',
-    result: f.result || '',
+    result: f.result || (f.payout_method ? `${f.payout_method}: ${f.payout_info || ''}` : ''),
     singlesId: f.singles_id || '',
     name: f.singles_fullname || '',
     event: f.event_title || '',

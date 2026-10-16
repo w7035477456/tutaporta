@@ -99,7 +99,7 @@ const DEFAULT_ALREADY_GENERATED_MESSAGE = 'You already generate a raffle for thi
  * in a new window and links member ↔ host ↔ event), Generate My Raffle (one per login per event,
  * only inside the host's raffle window), then number + verification code + QR.
  */
-export default function GetMyRafflePopup({ open, onClose }) {
+export default function GetMyRafflePopup({ open, onClose, initialEventId = null }) {
   const [events, setEvents] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [alreadyMessage, setAlreadyMessage] = useState(DEFAULT_ALREADY_GENERATED_MESSAGE);
@@ -118,9 +118,14 @@ export default function GetMyRafflePopup({ open, onClose }) {
     fetchRaffleState()
       .then((state) => {
         if (cancelled) return;
-        setEvents(state.events);
+        const comboEvents = state.events.filter((e) => e.showCombo !== false);
+        setEvents(comboEvents);
         setTickets(state.tickets);
-        const listed = state.tickets.filter((t) => state.events.some((e) => e.eventId === t.eventId));
+        if (initialEventId && comboEvents.some((e) => e.eventId === Number(initialEventId))) {
+          setEventId(String(initialEventId));
+          return;
+        }
+        const listed = state.tickets.filter((t) => comboEvents.some((e) => e.eventId === t.eventId));
         const latest = listed[listed.length - 1];
         if (latest) setEventId((prev) => prev || String(latest.eventId));
         if (state.alreadyGeneratedMessage) setAlreadyMessage(state.alreadyGeneratedMessage);
@@ -134,7 +139,7 @@ export default function GetMyRafflePopup({ open, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, initialEventId]);
 
   const selectedId = Number(eventId) || null;
   const selectedEvent = useMemo(() => events.find((e) => e.eventId === selectedId) || null, [events, selectedId]);
@@ -243,7 +248,9 @@ export default function GetMyRafflePopup({ open, onClose }) {
                 <Box component="strong" sx={{ fontWeight: 800 }}>
                   Raffle #{ticket.raffleNumber}
                 </Box>
-                , Congratulation! you must present at event to claim it, have the host scan your phone screenshot of this raffle ticket (else the host again draw a different raffle ticket), then return here to claim your $200 cash prize via PayPal, Zelle, or Venmo.
+                , Congratulation! you must present at event to claim it, have the host scan your phone screenshot of this raffle ticket
+                (else the host again draw a different raffle ticket), then return here to claim your $200 cash prize via PayPal, Zelle, or
+                Venmo.
               </Typography>
             </>
           ) : null}
@@ -255,5 +262,6 @@ export default function GetMyRafflePopup({ open, onClose }) {
 
 GetMyRafflePopup.propTypes = {
   open: PropTypes.bool.isRequired,
-  onClose: PropTypes.func
+  onClose: PropTypes.func,
+  initialEventId: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
 };

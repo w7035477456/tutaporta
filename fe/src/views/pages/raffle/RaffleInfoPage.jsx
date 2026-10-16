@@ -18,35 +18,35 @@ import {
 } from 'views/pages/authentication/authPageLayoutSx';
 import { getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv';
-import { GET_MY_RAFFLE_PATH, RAFFLE_MUSTAFA_PATH } from 'constants/raffleRoute';
+import { GET_MY_RAFFLE_PATH } from 'constants/raffleRoute';
 
 const linkSx = { color: 'var(--theme-primary-color)', fontWeight: 700 };
 
 const RAFFLE_STEPS = [
   <>
     Go to{' '}
-    <Box component={Link} to={RAFFLE_MUSTAFA_PATH} sx={linkSx}>
-      tutamall.com/raffleMustafa
+    <Box component={Link} to="/register" sx={linkSx}>
+      tutamall.com/register
     </Box>
     .
   </>,
   <>Log in or sign up for an account with a real US phone number and email address.</>,
+  <>All standard registration initialization require upload profile photo, live facial scan, and scanning your Driver License.</>,
   <>
-    Click the <strong>&ldquo;Get My Raffle&rdquo;</strong> button on the main screen (or go to{' '}
+    After that, click the <strong>&ldquo;Get My Raffle&rdquo;</strong> button on the main screen (or go to{' '}
     <Box component={Link} to={GET_MY_RAFFLE_PATH} sx={linkSx}>
-      tutamall.com/getmyraffle
+      tutamall.com/mall
     </Box>
     ).
   </>,
-  <>Take a screenshot of the raffle pop-up screen.</>,
-  <>Bring the screenshot to the Meetup event, where the host will read out a random number.</>,
-  <>
-    The winner will come up and show the screenshot of their raffle ticket on their phone. If the number matches,
-    they&apos;ll receive an envelope with a <strong>$100 Amazon gift card</strong>.
-  </>,
+  <>A popup of Raffle ticket will appear. Take a screenshot of the raffle ticket and save to you phone.</>,
+  <>Bring the screenshot to the Meetup event, where the host will read out a random winning raffle number..</>,
+  <>The winner need to physically go to host to claim, and allow host to scan your raffle ticket bar code from your phone screenshot.</>,
+  <>If you have the winning raffle number, also, after event, return to tutalamll.com/mall to click on yellow "Claim your winning Raffle",
+    and enter your info so the $200 can be sent to you via your choice of Zelle/Paypal/or Venmo.</>,
   <>
     If the person with the winning number is not at the event, the host will pick a different number, and keep
-    picking until someone at the event calls out, <strong>&ldquo;It&apos;s me!&rdquo;</strong>
+    picking until someone at the event calls claim it.
   </>
 ];
 
@@ -125,14 +125,11 @@ export default function RaffleInfoPage() {
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
                   <Button
                     variant="outlined"
-                    onClick={() => navigate(GET_MY_RAFFLE_PATH)}
+                    onClick={() => navigate("/register")}
                     sx={returnButtonSx}
                     data-guest-demo-allow="true"
                   >
-                    Get My Raffle
-                  </Button>
-                  <Button variant="outlined" onClick={() => navigate(-1)} sx={returnButtonSx} data-guest-demo-allow="true">
-                    Return
+                    Go to Register New Account
                   </Button>
                 </Box>
               </Stack>

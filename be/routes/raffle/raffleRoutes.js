@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import pool from '../../db/connection.js';
-import { appendRaffleHardCopy } from '../../utils/hardCopyAuthLog.js';
+import { appendRaffleHardCopy, appendRaffleHostActionHardCopy } from '../../utils/hardCopyAuthLog.js';
 
 const S = 'outdateddbsnapshotoct2024';
 
@@ -63,9 +63,17 @@ function ticketPayload(row) {
     raffleNumber: Number(row.raffle_number),
     verifyCode,
     verifyPath: `/raffle/verify/${verifyCode}`,
-    createdAt: row.raffle_generate_datetime
+    createdAt: row.raffle_generate_datetime,
+    claimed: row.raffle_claimed === true,
+    claimedAt: row.raffle_claimed_datetime || null,
+    paypalInfo: row.paypal_info || '',
+    venmoInfo: row.venmo_info || '',
+    prizePaid: row.raffle_prize_paid === true,
+    prizePaidAt: row.raffle_prize_paid_datetime || null
   };
 }
+
+export const RAFFLE_PRIZE_DOLLARS = 200;
 
 function authSinglesId(req) {
   const id = Number(req.auth?.singles_id);
@@ -125,21 +133,30 @@ export async function loadSinglesForLog(singlesId) {
   return { email: String(j.email ?? '').trim(), fullname };
 }
 
-/** GET /api/raffle — drop-down events (event_show_combo = true) + this member's generated raffles. */
+/**
+ * GET /api/raffle — drop-down events (event_show_combo = true, plus forever every event this member won /
+ * claimed) + this member's generated raffles with claim / payout state.
+ */
 export async function getRaffleState(req, res) {
   const singlesId = authSinglesId(req);
   if (!singlesId) return res.status(401).json({ error: 'Authentication required' });
   try {
     const { rows: eventRows } = await pool.query(
       `SELECT e.event_id, e.event_title, e.event_url, e.event_night_datetime, e.event_build_n_address,
-              e.host_event_raffle_start, e.host_event_raffle_end, e.event_time_zone, h.host_full_name
+              e.host_event_raffle_start, e.host_event_raffle_end, e.event_time_zone, e.event_show_combo,
+              COALESCE(now() > e.event_night_datetime, false) AS night_passed, h.host_full_name
          FROM ${S}.raffle_event e
          JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
         WHERE e.event_show_combo = true
-        ORDER BY e.event_night_datetime NULLS LAST, e.event_id`
+           OR EXISTS (SELECT 1 FROM ${S}.raffle_user c
+                       WHERE c.event_id = e.event_id AND c.singles_id = $1 AND c.raffle_claimed)
+        ORDER BY e.event_night_datetime NULLS LAST, e.event_id`,
+      [singlesId]
     );
     const { rows: ticketRows } = await pool.query(
       `SELECT u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime,
+              u.raffle_claimed, u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
+              u.raffle_prize_paid, u.raffle_prize_paid_datetime,
               e.event_title, e.event_build_n_address, h.host_full_name
          FROM ${S}.raffle_user u
          JOIN ${S}.raffle_event e ON e.event_id = u.event_id
@@ -152,14 +169,18 @@ export async function getRaffleState(req, res) {
       events: eventRows.map((row) => ({
         eventId: Number(row.event_id),
         label: eventLabel(row),
+        title: row.event_title || '',
         url: row.event_url || '',
         nightDatetime: row.event_night_datetime,
+        nightPassed: row.night_passed === true,
+        showCombo: row.event_show_combo === true,
         address: row.event_build_n_address || '',
         raffleStart: row.host_event_raffle_start,
         raffleEnd: row.host_event_raffle_end,
         timeZone: row.event_time_zone || DEFAULT_EVENT_TIME_ZONE
       })),
       tickets: ticketRows.map(ticketPayload),
+      prizeDollars: RAFFLE_PRIZE_DOLLARS,
       alreadyGeneratedMessage: RAFFLE_ALREADY_GENERATED_MESSAGE
     });
   } catch (err) {
@@ -285,5 +306,62 @@ export async function postRaffleTicket(req, res) {
   } catch (err) {
     console.error('[raffle] generate failed:', err?.message || err);
     return res.status(500).json({ error: 'Could not create your raffle. Please try again.' });
+  }
+}
+
+const PAYOUT_METHODS = new Set(['paypal', 'venmo']);
+const PAYOUT_INFO_MAX = 120;
+
+/**
+ * POST /api/raffle/payout { eventId, method: 'paypal' | 'venmo', info } — winner (raffle_claimed = true) says
+ * where to send the prize. Saved once into paypal_info or venmo_info; admin then sets raffle_prize_paid.
+ */
+export async function postRafflePayout(req, res) {
+  const singlesId = authSinglesId(req);
+  if (!singlesId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.auth?.guest_demo_login === true) return res.status(403).json({ error: 'Please log in with your own account.' });
+  const eventId = parseEventId(req.body?.eventId);
+  const method = String(req.body?.method || '').toLowerCase();
+  const info = String(req.body?.info || '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (!eventId) return res.status(400).json({ error: 'Please choose an event.' });
+  if (!PAYOUT_METHODS.has(method)) return res.status(400).json({ error: 'Please choose PayPal or Venmo.' });
+  if (info.length < 3 || info.length > PAYOUT_INFO_MAX) {
+    return res.status(400).json({ error: `Please enter your ${method === 'paypal' ? 'PayPal' : 'Venmo'} ID.` });
+  }
+  try {
+    const column = method === 'paypal' ? 'paypal_info' : 'venmo_info';
+    const { rows } = await pool.query(
+      `UPDATE ${S}.raffle_user u SET ${column} = $3
+         FROM ${S}.raffle_event e, ${S}.raffle_host h
+        WHERE u.singles_id = $1 AND u.event_id = $2 AND u.raffle_claimed
+          AND u.paypal_info IS NULL AND u.venmo_info IS NULL
+          AND e.event_id = u.event_id AND h.raffle_host_id = e.raffle_host_id
+        RETURNING u.raffle_user_id, u.raffle_number, u.raffle_generated_id, e.event_title, h.host_full_name`,
+      [singlesId, eventId, info]
+    );
+    const saved = rows[0];
+    if (!saved) {
+      return res.status(409).json({ error: 'There is no unclaimed prize for this event, or it was already submitted.' });
+    }
+    const who = await loadSinglesForLog(singlesId).catch(() => ({ email: '', fullname: '' }));
+    appendRaffleHostActionHardCopy('payout', {
+      event_id: eventId,
+      event_title: saved.event_title,
+      host_full_name: saved.host_full_name,
+      raffle_number: saved.raffle_number,
+      verification_code: formatVerifyCode(saved.raffle_generated_id),
+      raffle_user_id: saved.raffle_user_id,
+      singles_id: singlesId,
+      singles_email: who.email,
+      singles_fullname: who.fullname,
+      payout_method: method,
+      payout_info: info
+    });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[raffle] payout failed:', err?.message || err);
+    return res.status(500).json({ error: 'Could not save your payout info. Please try again.' });
   }
 }

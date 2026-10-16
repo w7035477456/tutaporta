@@ -14,8 +14,7 @@ import {
 } from 'utils/mobilePostLoginChoice';
 import { fetchUserCustomization } from 'api/userCustomizationFe';
 import MallAppEnrollmentDialog from 'ui-component/MallAppEnrollmentDialog';
-import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import GetMyRafflePopup from 'ui-component/GetMyRafflePopup';
+import MallRafflePanel from 'ui-component/MallRafflePanel';
 import { takeGetMyRafflePending } from 'constants/raffleRoute';
 
 import tutaMallInside from 'assets/images/tutaMallInside.png';
@@ -113,9 +112,9 @@ export default function Landing() {
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
   const [enrollmentForcedOpen, setEnrollmentForcedOpen] = useState(false);
-  const [raffleOpen, setRaffleOpen] = useState(false);
+  const [raffleOpenRequest, setRaffleOpenRequest] = useState(0);
 
-  const openGetMyRaffle = useCallback(() => setRaffleOpen(true), []);
+  const openGetMyRaffle = useCallback(() => setRaffleOpenRequest((n) => n + 1), []);
 
   useEffect(() => {
     if (takeGetMyRafflePending()) openGetMyRaffle();
@@ -518,16 +517,8 @@ export default function Landing() {
           zIndex: 3
         }}
       >
-        <ColorTemplate13DisableGreenButton
-          type="button"
-          hoverEnlargeFont
-          onClick={openGetMyRaffle}
-          sx={{ whiteSpace: 'nowrap', fontWeight: 800, fontSize: { xs: '1.05rem', sm: '1.3rem' }, px: 2.5 }}
-        >
-          Get My Raffle
-        </ColorTemplate13DisableGreenButton>
+        <MallRafflePanel openRequest={raffleOpenRequest} />
       </Box>
-      <GetMyRafflePopup open={raffleOpen} onClose={() => setRaffleOpen(false)} />
       <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
       <MallAppEnrollmentDialog
         {...(enrollmentForcedOpen
