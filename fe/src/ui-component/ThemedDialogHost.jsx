@@ -114,6 +114,16 @@ export default function ThemedDialogHost() {
                   >
                     {dialog.skipLabel || 'Skip'}
                   </ColorTemplate16PopupCenterWide.ActionButton>
+                  {dialog.skipAllLabel ? (
+                    <ColorTemplate16PopupCenterWide.ActionButton type="button" onClick={() => closeWith('skipAll')}>
+                      {dialog.skipAllLabel}
+                    </ColorTemplate16PopupCenterWide.ActionButton>
+                  ) : null}
+                  {dialog.newerAllLabel ? (
+                    <ColorTemplate16PopupCenterWide.ActionButton type="button" onClick={() => closeWith('newerAll')}>
+                      {dialog.newerAllLabel}
+                    </ColorTemplate16PopupCenterWide.ActionButton>
+                  ) : null}
                   <ColorTemplate16PopupCenterWide.ActionButton
                     type="button"
                     onClick={() => closeWith('overwrite')}

@@ -86,8 +86,9 @@ export function themedPrompt(message, defaultValue = '', options = {}) {
 
 /**
  * @param {string} message
- * @param {{ title?: string, overwriteLabel?: string, skipLabel?: string }} [options]
- * @returns {Promise<'overwrite'|'skip'|null>}
+ * @param {{ title?: string, overwriteLabel?: string, skipLabel?: string, skipAllLabel?: string, newerAllLabel?: string }} [options]
+ *   skipAllLabel / newerAllLabel add buttons that resolve 'skipAll' / 'newerAll'.
+ * @returns {Promise<'overwrite'|'skip'|'skipAll'|'newerAll'|null>}
  */
 export function themedOverwriteSkip(message, options = {}) {
   return requestDialog({
@@ -95,6 +96,8 @@ export function themedOverwriteSkip(message, options = {}) {
     message: String(message ?? ''),
     title: options.title || 'Note conflict',
     overwriteLabel: options.overwriteLabel || 'Overwrite',
-    skipLabel: options.skipLabel || 'Skip'
+    skipLabel: options.skipLabel || 'Skip',
+    skipAllLabel: options.skipAllLabel || '',
+    newerAllLabel: options.newerAllLabel || ''
   });
 }

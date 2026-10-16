@@ -222,6 +222,19 @@ function formatTransferLine(verb, progress) {
   return lines;
 }
 
+function formatMergeNoteTime(iso) {
+  const ms = Date.parse(iso || '');
+  if (!Number.isFinite(ms)) return 'unknown';
+  return new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/** Zip copy strictly newer than the current note; missing dates count as not newer (skip). */
+function isZipNoteNewer(row) {
+  const zipMs = Date.parse(row?.backupUpdatedAt || '');
+  const liveMs = Date.parse(row?.liveUpdatedAt || '');
+  return Number.isFinite(zipMs) && Number.isFinite(liveMs) && zipMs > liveMs;
+}
+
 /** Multi-line status for BusyHourglassOverlay while a backup Upload / Restore / Merge runs. */
 function buildBackupProgressLabel(progress, nowMs) {
   if (!progress) return '';
@@ -766,14 +779,25 @@ export default function RecordVaultTutaCloudBackupDialog({
 
       setBusy(false);
       const decisions = {};
+      let conflictMode = '';
       for (const row of notes) {
         const backupNoteId = String(row.backupNoteId);
         const noteName = String(row.noteName || '').trim();
         if (row.conflict) {
-          const choice = await themedOverwriteSkip(
-            `Note "${noteName}" exist, overwrite current with version from zip or skip?`
-          );
-          decisions[backupNoteId] = choice === 'overwrite' ? 'overwrite' : 'skip';
+          if (!conflictMode) {
+            const choice = await themedOverwriteSkip(
+              `Note "${noteName}" exist, overwrite current with version from zip or skip?\n` +
+                `Zip: ${formatMergeNoteTime(row.backupUpdatedAt)}   Current: ${formatMergeNoteTime(row.liveUpdatedAt)}`,
+              { skipAllLabel: 'Skip All', newerAllLabel: 'Newer All' }
+            );
+            if (choice === 'skipAll' || choice === 'newerAll') {
+              conflictMode = choice;
+            } else {
+              decisions[backupNoteId] = choice === 'overwrite' ? 'overwrite' : 'skip';
+              continue;
+            }
+          }
+          decisions[backupNoteId] = conflictMode === 'newerAll' && isZipNoteNewer(row) ? 'overwrite' : 'skip';
         } else {
           decisions[backupNoteId] = 'add';
         }

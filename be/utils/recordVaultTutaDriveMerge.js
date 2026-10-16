@@ -190,7 +190,8 @@ function listBackupNotes(backupCtx) {
   const { db } = backupCtx;
   return queryAll(
     db,
-    `SELECT n.note_id, n.notebook_id, n.note_name, nb.notebook_name, n.display_order, nb.display_order AS notebook_order
+    `SELECT n.note_id, n.notebook_id, n.note_name, nb.notebook_name, n.display_order, nb.display_order AS notebook_order,
+            n.updated_at
      FROM notes n
      INNER JOIN notebooks nb ON nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
      WHERE n.deleted_at IS NULL
@@ -198,13 +199,26 @@ function listBackupNotes(backupCtx) {
   );
 }
 
-function findLiveNoteIdByTitle(liveSession, noteName) {
-  const row = queryOne(
+function findLiveNoteByTitle(liveSession, noteName) {
+  return queryOne(
     liveSession.db,
-    `SELECT note_id FROM notes WHERE deleted_at IS NULL AND lower(note_name) = lower(?) ORDER BY note_id ASC LIMIT 1`,
+    `SELECT note_id, updated_at FROM notes WHERE deleted_at IS NULL AND lower(note_name) = lower(?) ORDER BY note_id ASC LIMIT 1`,
     [String(noteName || '').trim()]
   );
+}
+
+function findLiveNoteIdByTitle(liveSession, noteName) {
+  const row = findLiveNoteByTitle(liveSession, noteName);
   return row ? Number(row.note_id) : null;
+}
+
+/** SQLite datetime('now') text is UTC without a zone ("YYYY-MM-DD HH:MM:SS") → ISO string, or null. */
+function sqliteUtcToIso(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const hasZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(raw);
+  const ms = Date.parse(hasZone ? raw.replace(' ', 'T') : `${raw.replace(' ', 'T')}Z`);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
 }
 
 function findLiveNotebookIdByName(liveSession, notebookName) {
@@ -459,12 +473,14 @@ export async function previewTutaDriveMerge(liveSession, stagingManifest) {
   try {
     const notes = listBackupNotes(backupCtx).map((row) => {
       const noteName = String(row.note_name || '').trim();
-      const conflict = Boolean(findLiveNoteIdByTitle(liveSession, noteName));
+      const live = findLiveNoteByTitle(liveSession, noteName);
       return {
         backupNoteId: Number(row.note_id),
         noteName,
         notebookName: String(row.notebook_name || '').trim(),
-        conflict
+        conflict: Boolean(live),
+        backupUpdatedAt: sqliteUtcToIso(row.updated_at),
+        liveUpdatedAt: live ? sqliteUtcToIso(live.updated_at) : null
       };
     });
     return { notes };
