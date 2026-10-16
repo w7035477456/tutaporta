@@ -2996,6 +2996,33 @@ latestbranch() {
     git for-each-ref --sort=-committerdate refs/heads/ refs/remotes/origin/ \
         --format='%(refname:short)' | sed 's/origin\///' | grep -v 'HEAD' | head -n 1
 }
+# Pull the most recently updated branch on origin into the repo of the current folder.
+#   pulllatest           # newest origin branch
+#   pulllatest <branch>  # a specific branch
+pulllatest() {
+    local top
+    top=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "pulllatest: $(pwd) is not inside a git repo" >&2; return 1; }
+    echo "Repo: $top"
+    git -C "$top" fetch --prune origin || return 1
+
+    local branch="${1:-}"
+    if [ -z "$branch" ]; then
+        branch=$(git -C "$top" for-each-ref --sort=-committerdate refs/remotes/origin/ --format='%(refname:short)' \
+            | grep -v '^origin$' | grep -v '/HEAD$' | head -n 1 | sed 's#^origin/##')
+    fi
+    [ -n "$branch" ] || { echo "pulllatest: no branches found on origin" >&2; return 1; }
+
+    if [ -n "$(git -C "$top" status --porcelain --untracked-files=no)" ]; then
+        echo "pulllatest: uncommitted changes in $top — commit or 'git stash' first:" >&2
+        git -C "$top" status --short --untracked-files=no >&2
+        return 1
+    fi
+
+    echo "Latest branch: $branch (current: $(git -C "$top" branch --show-current))"
+    git -C "$top" switch "$branch" 2>/dev/null || git -C "$top" switch --track "origin/$branch" || return 1
+    git -C "$top" pull --ff-only origin "$branch" || return 1
+    git -C "$top" log -1 --format='Now at %h  %cd  %s' --date=format:'%Y-%m-%d %H:%M'
+}
 alias makeSound='for i in {1..20}; do echo -e "\a"; sleep 0.02; done'
 
 work2() {
