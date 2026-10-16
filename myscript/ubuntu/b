@@ -111,6 +111,9 @@ setbasestorage() {
 
 setbasestorage
 alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
+#------ raffle: setup_host / setup_event ----
+setup_host()  { bash "$HOME/code/main/scripts/raffle-setup.sh" host  local; }
+setup_event() { bash "$HOME/code/main/scripts/raffle-setup.sh" event local; }
 #-----------------------
 alias createnewmember='bash ${HOME}/code/main/CreateNewMember.sh'
 alias createnewposting='bash ${HOME}/code/main/CreatePosting.sh'

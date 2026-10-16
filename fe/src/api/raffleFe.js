@@ -1,7 +1,7 @@
 import api from './axios';
 
 /**
- * events: [{ eventId, label, url, nightDatetime, address, raffleStart, raffleEnd }] (event_show_combo = true)
+ * events: [{ eventId, label, url, nightDatetime, address, raffleStart, raffleEnd, timeZone }] (event_show_combo = true)
  * tickets: [{ eventId, eventLabel, raffleNumber, verifyCode, verifyPath, createdAt }]
  */
 export async function fetchRaffleState() {

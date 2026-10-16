@@ -31,13 +31,27 @@ function eventLabel(row) {
   return host ? `${row.event_title} (hosted by ${host})` : row.event_title;
 }
 
-function formatEasternTime(value) {
+const DEFAULT_EVENT_TIME_ZONE = 'America/New_York';
+
+function formatEventTime(value, timeZone) {
   if (!value) return '';
-  return new Date(value).toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    dateStyle: 'medium',
-    timeStyle: 'short'
-  });
+  const opts = { dateStyle: 'medium', timeStyle: 'short' };
+  try {
+    return new Date(value).toLocaleString('en-US', { ...opts, timeZone: timeZone || DEFAULT_EVENT_TIME_ZONE });
+  } catch {
+    return new Date(value).toLocaleString('en-US', { ...opts, timeZone: DEFAULT_EVENT_TIME_ZONE });
+  }
+}
+
+function timeZoneAbbrev(value, timeZone) {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', { timeZone: timeZone || DEFAULT_EVENT_TIME_ZONE, timeZoneName: 'short' })
+      .formatToParts(new Date(value))
+      .find((p) => p.type === 'timeZoneName');
+    return part?.value || '';
+  } catch {
+    return '';
+  }
 }
 
 function ticketPayload(row) {
@@ -66,7 +80,7 @@ function parseEventId(raw) {
 async function loadComboEvent(eventId) {
   const { rows } = await pool.query(
     `SELECT e.event_id, e.event_title, e.event_url, e.event_night_datetime, e.event_build_n_address,
-            e.host_event_raffle_start, e.host_event_raffle_end, e.raffle_host_id,
+            e.host_event_raffle_start, e.host_event_raffle_end, e.raffle_host_id, e.event_time_zone,
             h.host_full_name, h.host_url,
             COALESCE(now() BETWEEN e.host_event_raffle_start AND e.host_event_raffle_end, false) AS raffle_open
        FROM ${S}.raffle_event e
@@ -117,7 +131,7 @@ export async function getRaffleState(req, res) {
   try {
     const { rows: eventRows } = await pool.query(
       `SELECT e.event_id, e.event_title, e.event_url, e.event_night_datetime, e.event_build_n_address,
-              e.host_event_raffle_start, e.host_event_raffle_end, h.host_full_name
+              e.host_event_raffle_start, e.host_event_raffle_end, e.event_time_zone, h.host_full_name
          FROM ${S}.raffle_event e
          JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
         WHERE e.event_show_combo = true
@@ -141,7 +155,8 @@ export async function getRaffleState(req, res) {
         nightDatetime: row.event_night_datetime,
         address: row.event_build_n_address || '',
         raffleStart: row.host_event_raffle_start,
-        raffleEnd: row.host_event_raffle_end
+        raffleEnd: row.host_event_raffle_end,
+        timeZone: row.event_time_zone || DEFAULT_EVENT_TIME_ZONE
       })),
       tickets: ticketRows.map(ticketPayload),
       alreadyGeneratedMessage: RAFFLE_ALREADY_GENERATED_MESSAGE
@@ -190,10 +205,15 @@ export async function postRaffleTicket(req, res) {
     if (!event) return res.status(400).json({ error: 'Please choose an event.' });
 
     if (!event.raffle_open) {
-      const start = formatEasternTime(event.host_event_raffle_start);
-      const end = formatEasternTime(event.host_event_raffle_end);
+      const tz = event.event_time_zone;
+      const start = formatEventTime(event.host_event_raffle_start, tz);
+      const end = formatEventTime(event.host_event_raffle_end, tz);
+      const abbrev = timeZoneAbbrev(event.host_event_raffle_end, tz);
       return res.status(403).json({
-        error: start && end ? `Raffle for this event is open only from ${start} to ${end} (ET).` : 'Raffle for this event is not open.'
+        error:
+          start && end
+            ? `Raffle for this event is open only from ${start} to ${end}${abbrev ? ` (${abbrev})` : ''}.`
+            : 'Raffle for this event is not open.'
       });
     }
 

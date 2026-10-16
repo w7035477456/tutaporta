@@ -62,13 +62,22 @@ RaffleTicketCard.propTypes = {
   }).isRequired
 };
 
-function formatWindowTime(value) {
+function formatWindowTime(value, timeZone, withZone = false) {
   if (!value) return '';
-  return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const opts = { dateStyle: 'medium', timeStyle: 'short' };
+  try {
+    const text = new Date(value).toLocaleString(undefined, { ...opts, timeZone });
+    if (!withZone) return text;
+    const zone = new Intl.DateTimeFormat(undefined, { timeZone, timeZoneName: 'short' })
+      .formatToParts(new Date(value))
+      .find((p) => p.type === 'timeZoneName')?.value;
+    return zone ? `${text} ${zone}` : text;
+  } catch {
+    return new Date(value).toLocaleString(undefined, opts);
+  }
 }
 
-const DEFAULT_ALREADY_GENERATED_MESSAGE =
-  'You already generate a raffle for this event. Only 1 raffle per email login.';
+const DEFAULT_ALREADY_GENERATED_MESSAGE = 'You already generate a raffle for this event. Only 1 raffle per email login.';
 
 /**
  * Get My Raffle — drop-down of raffle_event rows with event_show_combo = true (opens the Meetup page
@@ -170,7 +179,8 @@ export default function GetMyRafflePopup({ open, onClose }) {
 
           {selectedEvent && selectedEvent.raffleStart && selectedEvent.raffleEnd ? (
             <Typography sx={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 600 }}>
-              Raffle open {formatWindowTime(selectedEvent.raffleStart)} – {formatWindowTime(selectedEvent.raffleEnd)}
+              Raffle open {formatWindowTime(selectedEvent.raffleStart, selectedEvent.timeZone)} –{' '}
+              {formatWindowTime(selectedEvent.raffleEnd, selectedEvent.timeZone, true)}
             </Typography>
           ) : null}
 
@@ -199,17 +209,13 @@ export default function GetMyRafflePopup({ open, onClose }) {
             <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>Choose your Meetup event above.</Typography>
           ) : null}
 
-          {error ? (
-            <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>{error}</Typography>
-          ) : null}
+          {error ? <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>{error}</Typography> : null}
 
           {ticket ? (
             <>
               <RaffleTicketCard ticket={ticket} />
               {!ticketIsFresh ? (
-                <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>
-                  {alreadyMessage}
-                </Typography>
+                <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>{alreadyMessage}</Typography>
               ) : null}
               <Typography sx={{ textAlign: 'center', fontWeight: 700 }}>
                 Take a screenshot of this screen and bring it to the Meetup event.
