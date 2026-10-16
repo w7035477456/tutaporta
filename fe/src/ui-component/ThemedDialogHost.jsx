@@ -24,6 +24,8 @@ export default function ThemedDialogHost() {
           cancelLabel: req.cancelLabel || 'Cancel',
           overwriteLabel: req.overwriteLabel || 'Overwrite',
           skipLabel: req.skipLabel || 'Skip',
+          skipAllLabel: req.skipAllLabel || '',
+          newerAllLabel: req.newerAllLabel || '',
           inputType: req.inputType || 'text',
           inputValue: req.defaultValue == null ? '' : String(req.defaultValue),
           resolve
