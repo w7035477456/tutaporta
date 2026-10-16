@@ -243,7 +243,7 @@ export default function GetMyRafflePopup({ open, onClose }) {
                 <Box component="strong" sx={{ fontWeight: 800 }}>
                   Raffle #{ticket.raffleNumber}
                 </Box>
-                , show them this screenshot, then return here to claim your $200 cash prize via PayPal, Zelle, or Venmo.
+                , Congratulation! you must present at event to claim it, have the host scan your phone screenshot of this raffle ticket (else the host again draw a different raffle ticket), then return here to claim your $200 cash prize via PayPal, Zelle, or Venmo.
               </Typography>
             </>
           ) : null}
