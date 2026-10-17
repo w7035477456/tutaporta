@@ -24,7 +24,7 @@ export default function PhoneVerification() {
     <AuthWrapper1>
       <Stack sx={{ ...authShellStackSx, ...authFixedFooterContentPaddingBottom }}>
         <AuthStandardDialogFrame>
-          <AuthCardWrapper fullWidth sx={{ bgcolor: '#fff' }}>
+          <AuthCardWrapper fullWidth>
             <Stack sx={{ alignItems: 'center', justifyContent: 'center', gap: 2, px: { xs: 1, sm: 2 }, boxSizing: 'border-box', width: '100%' }}>
               <Box sx={{ mb: 3 }}>
                 <Link to="#" aria-label="logo">

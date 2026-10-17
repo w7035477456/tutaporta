@@ -139,10 +139,10 @@ const verificationSlotInputSx = (hasError) => ({
   fontSize: authEnvButtonFontSize,
   fontWeight: 600,
   border: '2px solid',
-  borderColor: hasError ? 'error.main' : '#000',
+  borderColor: hasError ? 'error.main' : 'var(--theme-primary-color)',
   borderRadius: 1,
-  bgcolor: '#fff',
-  color: 'text.primary',
+  bgcolor: 'background.paper',
+  color: 'var(--theme-primary-color)',
   '&:focus': {
     outline: 'none',
     borderColor: 'var(--theme-primary-color)',
@@ -436,7 +436,7 @@ export default function AuthPhoneVerification() {
 
       <Box sx={{ mt: 2 }}>{sendSmsButtonEl}</Box>
 
-      <Box sx={{ mt: 2, height: 5, bgcolor: '#000', width: '100%', flexShrink: 0, borderRadius: 0 }} />
+      <Box sx={{ mt: 2, height: 5, bgcolor: 'var(--theme-primary-color)', width: '100%', flexShrink: 0, borderRadius: 0 }} />
 
       <Box sx={{ ...fieldWithRightImageRowSx, mt: 2, alignItems: 'flex-start' }}>
         <Box
