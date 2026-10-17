@@ -43,7 +43,7 @@ const RAFFLE_STEPS = [
   <>Bring the screenshot to the Meetup event, where the host will read out a random winning raffle number..</>,
   <>The winner need to physically go to host to claim, and allow host to scan your raffle ticket bar code from your phone screenshot.</>,
   <>If you have the winning raffle number, also, after event, return to tutalamll.com/mall to click on yellow "Claim your winning Raffle",
-    and enter your info so the $200 can be sent to you via your choice of Zelle/Paypal/or Venmo.</>,
+    and enter your info so the $200 can be sent to you via your choice of Paypal or Venmo.</>,
   <>
     If the person with the winning number is not at the event, the host will pick a different number, and keep
     picking until someone at the event calls claim it.

@@ -249,7 +249,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
                   Raffle #{ticket.raffleNumber}
                 </Box>
                 , Congratulation! you must present at event to claim it, have the host scan your phone screenshot of this raffle ticket
-                (else the host again draw a different raffle ticket), then return here to claim your $200 cash prize via PayPal, Zelle, or
+                (else the host again draw a different raffle ticket), then return here to claim your $200 cash prize via PayPal, or
                 Venmo.
               </Typography>
             </>
