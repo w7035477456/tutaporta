@@ -115,6 +115,18 @@ alias isdbsame='$HOME/code/main/scripts/compare-pg-schema.sh'
 setup_host()  { bash "$HOME/code/main/scripts/raffle-setup.sh" host  local; }
 setup_event() { bash "$HOME/code/main/scripts/raffle-setup.sh" event local; }
 rafflelog() { bash "$HOME/code/main/scripts/raffle-log.sh" "$@"; }
+markPrizePaid()       { bash "$HOME/code/main/scripts/raffle-prize.sh" paid "${1:?usage: markPrizePaid <CODE>}" local; }
+raffle_winners()      { bash "$HOME/code/main/scripts/raffle-prize.sh" list local; }
+raffle_paid()         { bash "$HOME/code/main/scripts/raffle-prize.sh" paid "$1" local; }
+raffle_unpaid()       { bash "$HOME/code/main/scripts/raffle-prize.sh" unpaid "$1" local; }
+raffle_claimed_time() { bash "$HOME/code/main/scripts/raffle-prize.sh" claimed "$1" "$2" local; }
+rafflehelp() {
+    cat <<'EOF'
+raffle_winners both
+markPrizePaid V4JB-GHKH both
+raffle_claimed_time V4JB-GHKH '2026-10-16 11:03:54-04' ubuntu
+EOF
+}
 set_host_password() { bash "$HOME/code/main/scripts/raffle-setup.sh" password local; }
 #-----------------------
 alias createnewmember='bash ${HOME}/code/main/CreateNewMember.sh'
@@ -3007,8 +3019,8 @@ pulllatest() {
 
     local branch="${1:-}"
     if [ -z "$branch" ]; then
-        branch=$(git -C "$top" for-each-ref --sort=-committerdate refs/remotes/origin/ --format='%(refname:short)' \
-            | grep -v '^origin$' | grep -v '/HEAD$' | head -n 1 | sed 's#^origin/##')
+        local fmt='%(refname:short)'
+        branch=$(git -C "$top" for-each-ref --sort=-committerdate --format="$fmt" refs/remotes/origin/ | grep -v '^origin$' | grep -v '/HEAD$' | head -n 1 | sed 's|^origin/||')
     fi
     [ -n "$branch" ] || { echo "pulllatest: no branches found on origin" >&2; return 1; }
 
