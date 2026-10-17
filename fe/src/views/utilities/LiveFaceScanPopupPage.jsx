@@ -108,7 +108,8 @@ const dragWindowHintSx = {
 };
 
 const idlePromptLargeSx = {
-  ...liveScanPopupLabelSx
+  ...liveScanPopupLabelSx,
+  fontSize: scaleVwFontSize(getDesktopButtonFontSizeVw(), LIVE_SCAN_POPUP_UI_SCALE * 2)
 };
 
 const restartScanButtonSx = {
@@ -626,6 +627,13 @@ export default function LiveFaceScanPopupPage() {
           Please drag this window next to Camera for direct eye to camera line of sight
         </ColorTemplate7PopupLargeDark.BodyText>
 
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
+          <ColorTemplate7PopupLargeDark.BodyText sx={idlePromptLargeSx}>Center your face</ColorTemplate7PopupLargeDark.BodyText>
+          <ColorTemplate7PopupLargeDark.BodyText sx={idlePromptLargeSx}>
+            Click anywhere to start live scan
+          </ColorTemplate7PopupLargeDark.BodyText>
+        </Box>
+
         <Box sx={cameraCircleSx}>
           {starting ? (
             <CircularProgress sx={{ color: '#ffffff', width: 144, height: 144 }} />
@@ -640,13 +648,6 @@ export default function LiveFaceScanPopupPage() {
               aria-hidden={!cameraPreviewReady}
             />
           )}
-        </Box>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, width: '100%' }}>
-          <ColorTemplate7PopupLargeDark.BodyText sx={idlePromptLargeSx}>Center your face</ColorTemplate7PopupLargeDark.BodyText>
-          <ColorTemplate7PopupLargeDark.BodyText sx={idlePromptLargeSx}>
-            Click anywhere to start live scan
-          </ColorTemplate7PopupLargeDark.BodyText>
         </Box>
 
         {errorText ? (

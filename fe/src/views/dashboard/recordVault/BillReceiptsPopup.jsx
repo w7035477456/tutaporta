@@ -701,7 +701,7 @@ export default function BillReceiptsPopup({
                 onClick={() => void handleMarkPaid()}
                 sx={fixedGreenButtonSx}
               >
-                Paid
+                Save
               </ColorTemplate13DisableGreenButton>
               <YellowButtonTemplate
                 type="button"
