@@ -5,6 +5,7 @@ import { enforceClientApiCooldown } from 'utils/clientApiCooldown';
 import { storeIdleLogoutNotice, storeSessionInvalidNotice, storeSessionSupersededNotice } from 'utils/sessionEndNotice';
 import { forceAuthLoginRedirect, shouldForceLoginRedirect } from 'utils/forceAuthLoginRedirect';
 import { requestPhotoAlbumsUsageRefresh } from 'utils/photoAlbumsUsageRefreshGate';
+import { ID_INITIALIZATION_REQUIRED_CODE, notifyIdInitializationRequired } from 'utils/idInitializationRequired';
 
 function shouldRefreshPhotoAlbumsUsageAfterRequest(url) {
   const s = String(url || '');
@@ -131,6 +132,9 @@ api.interceptors.response.use(
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       if (handleAuthFailureRedirect(error)) {
         return Promise.reject(error);
+      }
+      if (error.response.data?.code === ID_INITIALIZATION_REQUIRED_CODE) {
+        notifyIdInitializationRequired();
       }
     }
     if (error.response && error.response.status === 429) {

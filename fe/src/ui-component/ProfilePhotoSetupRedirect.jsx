@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
@@ -8,12 +8,12 @@ import {
   isPathAllowedDuringFirstLoginPhase,
   needsMyStoryFirstLoginSetup
 } from 'utils/firstLoginOnboarding';
-import { isPathRequiringProfilePhoto, MY_STORY_PATH } from 'utils/profilePhotoSetup';
+import { MY_STORY_PATH } from 'utils/profilePhotoSetup';
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
 
 /**
- * Dating-only first-login gate: photo / nickname / secret icon are required when entering
- * TutaDates routes — not when opening TutaNotes or TutaPhotos from the mall.
+ * First-login gate (photo / gender / nickname / secret icon): until ID initialization
+ * completes, every route except My Story redirects back to My Story.
  */
 export default function ProfilePhotoSetupRedirect() {
   const { user, loading } = useAuth();
@@ -28,8 +28,6 @@ export default function ProfilePhotoSetupRedirect() {
     if (!needsMyStoryFirstLoginSetup(user)) return;
     const phase = getFirstLoginOnboardingPhase(user);
     if (isPathAllowedDuringFirstLoginPhase(pathname, phase)) return;
-    // Only yank to MyStory when the user opens a dating path (e.g. TutaDates tile).
-    if (!isPathRequiringProfilePhoto(pathname)) return;
     navigate(MY_STORY_PATH, { replace: true });
   }, [loading, user, pathname, navigate]);
 

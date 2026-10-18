@@ -286,13 +286,24 @@ const govIdSlotColumnSx = {
   minWidth: { xs: '100%', sm: 280 }
 };
 
-function SlotErrorBlock({ errorText, manualSupportChecked, onManualSupportChange }) {
+const slotVerifyErrorAlertSx = {
+  ...slotVerifyErrorTextSx,
+  color: '#d00000',
+  WebkitTextFillColor: '#d00000',
+  bgcolor: '#ffeb3b',
+  borderRadius: 1,
+  px: 1,
+  py: 0.75
+};
+
+function SlotErrorBlock({ errorText, manualSupportChecked, onManualSupportChange, alertStyle = false, hideManualSupport = false }) {
   if (!errorText) return null;
   return (
-    <Stack spacing={0.75} sx={{ width: '100%', maxWidth: 220, px: 0.5 }}>
-      <Box sx={slotVerifyErrorTextSx}>
+    <Stack spacing={0.75} sx={{ width: '100%', maxWidth: alertStyle ? 320 : 220, px: 0.5 }}>
+      <Box sx={alertStyle ? slotVerifyErrorAlertSx : slotVerifyErrorTextSx}>
         {errorText}
       </Box>
+      {hideManualSupport ? null : (
       <FormControlLabel
         sx={{
           alignItems: 'flex-start',
@@ -315,6 +326,7 @@ function SlotErrorBlock({ errorText, manualSupportChecked, onManualSupportChange
         }
         label={MANUAL_SUPPORT_LABEL}
       />
+      )}
     </Stack>
   );
 }
@@ -322,7 +334,9 @@ function SlotErrorBlock({ errorText, manualSupportChecked, onManualSupportChange
 SlotErrorBlock.propTypes = {
   errorText: PropTypes.string,
   manualSupportChecked: PropTypes.bool,
-  onManualSupportChange: PropTypes.func
+  onManualSupportChange: PropTypes.func,
+  alertStyle: PropTypes.bool,
+  hideManualSupport: PropTypes.bool
 };
 
 function MatchReadout({
@@ -480,6 +494,8 @@ function VerificationSlot({
   centerSlotOnPage = false,
   dimSlotPreview = false,
   failLabel,
+  failAlertStyle = false,
+  hideManualSupport = false,
   manualSupportChecked,
   onManualSupportChange,
   footer,
@@ -590,6 +606,8 @@ function VerificationSlot({
             errorText={slotError}
             manualSupportChecked={manualSupportChecked}
             onManualSupportChange={onManualSupportChange}
+            alertStyle={failAlertStyle}
+            hideManualSupport={hideManualSupport}
           />
         </Box>
       ) : (
@@ -633,6 +651,8 @@ VerificationSlot.propTypes = {
   centerSlotOnPage: PropTypes.bool,
   dimSlotPreview: PropTypes.bool,
   failLabel: PropTypes.string,
+  failAlertStyle: PropTypes.bool,
+  hideManualSupport: PropTypes.bool,
   manualSupportChecked: PropTypes.bool,
   onManualSupportChange: PropTypes.func,
   footer: PropTypes.node,
@@ -1154,6 +1174,9 @@ export default function IdentificationVerificationBoard({
   }
 
   if (wizardStep === WIZARD_STEP_DRIVER_LICENSE) {
+    const driverLicenseStepVerified = driverLicenseVerified && profileVerified;
+    const driverLicenseStepFail =
+      driverLicenseFail || (driverLicenseVerified && !profileVerified ? profileFail : null);
     return (
       <Stack spacing={2} sx={wizardStepStackSx}>
         {uploadDialog}
@@ -1170,13 +1193,15 @@ export default function IdentificationVerificationBoard({
             slotReady={driverLicenseSlotReady}
             hideVerifyButton
             verifying={driverLicenseVerifying}
-            verified={driverLicenseVerified}
+            verified={driverLicenseStepVerified}
             matchPct={driverLicenseMatchPct}
             matchThreshold={faceMatchThreshold}
             matchReadoutVariant="dlProfile"
             showMatchWhenPct
             slotProcessingLabel="Extracting and matching driver license…"
-            failLabel={driverLicenseVerified ? null : driverLicenseFail}
+            failLabel={driverLicenseStepVerified ? null : driverLicenseStepFail}
+            failAlertStyle
+            hideManualSupport
             manualSupportChecked={driverLicenseManualSupport}
             onManualSupportChange={onDriverLicenseManualSupportChange}
             actionBetweenFrameAndVerify={

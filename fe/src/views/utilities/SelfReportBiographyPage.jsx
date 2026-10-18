@@ -426,7 +426,7 @@ export default function SelfReportBiographyPage() {
               clearSignupIdentificationVerificationRequired();
               markFirstLoginOnboardingCongratsPending();
               await refreshAll();
-              navigate('/allSingles');
+              navigate('/mall');
             }}
             onFailed={async () => {
               await setChannelStatus('id', 'error');

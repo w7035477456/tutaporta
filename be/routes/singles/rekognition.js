@@ -37,6 +37,7 @@ import {
 } from '../../utils/adminImpersonationRekognitionBypass.js';
 import { singlesStatusBlockedMessage } from '../../utils/singlesStatus.js';
 import { invalidateAuthUserCache } from '../../utils/authUserLookupCache.js';
+import { markIdInitializationCompleted } from '../../utils/idInitialization.js';
 
 const CHECKR_SCHEMA = 'outdateddbsnapshotoct2024';
 
@@ -627,6 +628,7 @@ async function markIdentityVerified(client, singlesId) {
        last_vetted_at = CURRENT_TIMESTAMP`,
     [singlesId]
   );
+  await markIdInitializationCompleted(client, singlesId);
 }
 
 async function memberHasProfilePhoto(singlesId) {
@@ -1539,6 +1541,7 @@ export async function postMarkOver18Verified(req, res) {
       `UPDATE outdateddbsnapshotoct2024.singles
        SET over_18_verified = true,
            ${SQL_STATUS_NEW_TO_ACTIVE},
+           id_initialization_completed = true,
            updated_at = CURRENT_TIMESTAMP
        WHERE singles_id = $1
        RETURNING status::text AS status`,
@@ -1546,9 +1549,37 @@ export async function postMarkOver18Verified(req, res) {
     );
     const status = rows[0]?.status ?? null;
     console.log('[rekognition:mark-over-18-verified]', { singlesId, status });
-    return res.json({ success: true, over_18_verified: true, status });
+    return res.json({ success: true, over_18_verified: true, status, id_initialization_completed: true });
   } catch (err) {
     console.error('[rekognition:mark-over-18-verified]', err?.message || err);
     return res.status(500).json({ error: err?.message || 'Failed to mark over 18 verified' });
+  }
+}
+
+/**
+ * POST /api/me/id-initialization/pilot-skip
+ * PILOTUSER only: mark mandatory ID initialization complete (Skip button in the IDV dialog).
+ */
+export async function postPilotSkipIdInitialization(req, res) {
+  const singlesId = Number(req.auth?.singles_id);
+  if (!Number.isFinite(singlesId) || singlesId < 1) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT member_category::text AS member_category
+       FROM outdateddbsnapshotoct2024.singles
+       WHERE singles_id = $1
+       LIMIT 1`,
+      [singlesId]
+    );
+    if (String(rows[0]?.member_category ?? '').trim().toUpperCase() !== 'PILOTUSER') {
+      return res.status(403).json({ error: 'Skip is only available to pilot users' });
+    }
+    await markIdInitializationCompleted(pool, singlesId);
+    return res.json({ success: true, id_initialization_completed: true });
+  } catch (err) {
+    console.error('[rekognition:pilot-skip-id-initialization]', err?.message || err);
+    return res.status(500).json({ error: 'Failed to skip identification verification' });
   }
 }

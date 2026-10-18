@@ -13,10 +13,11 @@ import {
   markSignupIdentificationVerificationRequired,
   SIGNUP_ID_VERIFICATION_LOCK_CHANGED_EVENT
 } from 'utils/signupIdentificationVerification';
+import { ID_INITIALIZATION_REQUIRED_EVENT } from 'utils/idInitializationRequired';
 
-/** Keeps members on Self-Report-Bio until Identification Verification (over_18) completes. */
+/** Keeps members on Self-Report-Bio until singles.id_initialization_completed is true. */
 export default function IdentificationVerificationSetupRedirect() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshSessionStatus } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [lockTick, setLockTick] = useState(0);
@@ -26,6 +27,12 @@ export default function IdentificationVerificationSetupRedirect() {
     window.addEventListener(SIGNUP_ID_VERIFICATION_LOCK_CHANGED_EVENT, onLockChanged);
     return () => window.removeEventListener(SIGNUP_ID_VERIFICATION_LOCK_CHANGED_EVENT, onLockChanged);
   }, []);
+
+  useEffect(() => {
+    const onRequired = () => void refreshSessionStatus?.({ force: true });
+    window.addEventListener(ID_INITIALIZATION_REQUIRED_EVENT, onRequired);
+    return () => window.removeEventListener(ID_INITIALIZATION_REQUIRED_EVENT, onRequired);
+  }, [refreshSessionStatus]);
 
   useEffect(() => {
     if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;

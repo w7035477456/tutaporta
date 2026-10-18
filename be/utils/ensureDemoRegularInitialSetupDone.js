@@ -1,6 +1,7 @@
 import { sqlBooleanEnumLiteral } from './booleanEnum.js';
 import { getDBSchema } from '../db/connection.js';
 import { isInitialSetupBypassMemberCategory } from './memberCategory.js';
+import { markIdInitializationCompleted } from './idInitialization.js';
 
 export { isInitialSetupBypassMemberCategory };
 
@@ -64,5 +65,6 @@ export async function ensureDemoRegularInitialSetupDone(db, singlesId, memberCat
        )`,
     [id]
   );
+  await markIdInitializationCompleted(db, id);
   return true;
 }

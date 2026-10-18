@@ -13,6 +13,7 @@ import { ensureDemoRegularInitialSetupDone } from './ensureDemoRegularInitialSet
 import { ensureSeededDemoBuddiesOnLogin } from './ensureSeededDemoBuddiesOnLogin.js';
 import { insertDemoLoginLog } from './loginLog.js';
 import { normalizeOver18Verified } from './over18Verified.js';
+import { normalizeIdInitializationCompleted } from './idInitialization.js';
 import { normalizeOptinoutBitmap } from './optinoutBitmap.js';
 
 /**
@@ -47,6 +48,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
   try {
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
+              id_initialization_completed,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
@@ -58,6 +60,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
       userWithoutPassword.over_18_verified = flagsRes.rows[0].over_18_verified;
       userWithoutPassword.optinout_bitmap = flagsRes.rows[0].optinout_bitmap;
       userWithoutPassword.has_secret_icon = flagsRes.rows[0].has_secret_icon;
+      userWithoutPassword.id_initialization_completed = flagsRes.rows[0].id_initialization_completed;
     }
   } catch (err) {
     console.error('[issueUserLoginSession] refresh seed flags:', err?.message ?? err);
@@ -138,6 +141,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
       seeded_demo_buddies_boolean: seededDemoBuddies,
       gender_self_report: genderSelfReport,
       over_18_verified: over18Verified,
+      id_initialization_completed: normalizeIdInitializationCompleted(userWithoutPassword.id_initialization_completed),
       optinout_bitmap: normalizeOptinoutBitmap(userWithoutPassword.optinout_bitmap),
       has_secret_icon: hasSecretIcon
     },

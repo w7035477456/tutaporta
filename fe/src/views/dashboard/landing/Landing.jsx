@@ -32,6 +32,8 @@ import { fetchOnenoteUsbUpgradeBlocked } from 'api/onenoteUsbUpgradeFe';
 import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
 import { tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
 import { themedAlert } from 'utils/themedDialog';
+import { FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE } from 'config/firstLoginAutoPopupsEnv';
+import { consumeFirstLoginOnboardingCongratsPending } from 'utils/firstLoginOnboarding';
 import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 
@@ -119,6 +121,11 @@ export default function Landing() {
   useEffect(() => {
     if (takeGetMyRafflePending()) openGetMyRaffle();
   }, [openGetMyRaffle]);
+
+  useEffect(() => {
+    if (!consumeFirstLoginOnboardingCongratsPending()) return;
+    void themedAlert(FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE, { okLabel: 'OK' });
+  }, []);
 
   const [enrollment, setEnrollment] = useState({
     tutaDatesEnabled: true,

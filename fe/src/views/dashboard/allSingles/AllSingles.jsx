@@ -62,10 +62,6 @@ import {
   ALL_SINGLES_INSTRUCTION_POPUP_TEXT,
   ALL_SINGLES_WELCOME_BANNER_TEXT
 } from 'constants/allSinglesInstructionText';
-import { FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE } from 'config/firstLoginAutoPopupsEnv';
-import { consumeFirstLoginOnboardingCongratsPending } from 'utils/firstLoginOnboarding';
-import { themedAlert } from 'utils/themedDialog';
-
 // ==============================|| ALL SINGLES ||============================== //
 
 const INSTRUCTION_POPUP_TEXT = ALL_SINGLES_INSTRUCTION_POPUP_TEXT;
@@ -281,20 +277,6 @@ export default function AllSingles() {
           console.warn('[AllSingles] load welcome panel preference failed', err?.message ?? err);
         }
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!consumeFirstLoginOnboardingCongratsPending()) return undefined;
-    let cancelled = false;
-    void (async () => {
-      await themedAlert(FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE, { okLabel: 'OK' });
-      if (cancelled) return;
-      setInstructionAutoPlay(true);
-      setInstructionOpen(true);
     })();
     return () => {
       cancelled = true;

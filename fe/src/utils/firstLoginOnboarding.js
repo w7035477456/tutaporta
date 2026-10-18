@@ -57,17 +57,35 @@ export function hasSecretIconSet(user) {
 }
 
 /**
+ * singles.id_initialization_completed from /api/me, login, or /api/me/session-status.
+ * @returns {boolean | null} null when the session payload has not loaded the flag yet.
+ */
+export function getIdInitializationCompleted(user) {
+  const raw = user?.id_initialization_completed;
+  if (raw === true || raw === false) return raw;
+  return null;
+}
+
+/**
  * @returns {'profile_photo' | 'gender' | 'alias_secret' | 'id_verification' | 'done'}
  */
 export function getFirstLoginOnboardingPhase(user) {
   if (isFirstLoginOnboardingExempt(user)) return 'done';
+  const idInitializationCompleted = getIdInitializationCompleted(user);
+  if (idInitializationCompleted === true) return 'done';
   if (!hasProfilePhotoFk(user)) return 'profile_photo';
   if (!hasGenderSelfReport(user)) return 'gender';
   if (!hasAliasNickname(user) || !hasSecretIconSet(user)) return 'alias_secret';
+  if (idInitializationCompleted === false) return 'id_verification';
   if (isSinglesStatusNew(user?.status) || isOver18VerificationPending(user?.over_18_verified)) {
     return 'id_verification';
   }
   return 'done';
+}
+
+/** Mandatory "Initialization of ID Process" not finished — every route redirects to onboarding. */
+export function isIdInitializationIncomplete(user) {
+  return getFirstLoginOnboardingPhase(user) !== 'done';
 }
 
 export function needsMyStoryFirstLoginSetup(user) {
@@ -79,12 +97,9 @@ export function needsIdentificationVerificationFirstLogin(user) {
   return getFirstLoginOnboardingPhase(user) === 'id_verification';
 }
 
+/** Until ID initialization completes, only the current onboarding page is reachable (no /mall, Notes, Photos). */
 export function isPathAllowedDuringFirstLoginPhase(pathname, phase) {
   const path = String(pathname ?? '');
-  // Post-login mall hub + enrollment popup — do not yank to My Album until user opens TutaDates.
-  if (path === '/mall' || path === '/' || path === '/landing') return true;
-  // Notes / Photos are independent of dating first-login (photo, nickname, secret icon).
-  if (isMallNotesOrPhotosPath(path)) return true;
   if (phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret') {
     return path === MY_STORY_PATH;
   }

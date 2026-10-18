@@ -8,6 +8,14 @@ import {
   setVetBioVerificationStatus,
   verificationStatusLabel
 } from '../../utils/vetBioVerificationServices.js';
+import pool from '../../db/connection.js';
+import { getRekognitionConfig } from '../../lib/rekognitionClient.js';
+import { CONSENT_DESCRIPTION_LIVE_FACE_SCAN_VIDEO } from '../../constants/consentRecordVariants.js';
+import {
+  completeIdInitializationAfterManualVideoIfEligible,
+  loadIdInitializationGateRow,
+  normalizeIdInitializationCompleted
+} from '../../utils/idInitialization.js';
 
 const SERVICE_META = [
   {
@@ -173,8 +181,16 @@ export async function postIdVerificationDateOnClose(req, res) {
         error: 'id_verification_date column is not available on vet_bio. Run addVetBioVerificationDateColumns.sql.'
       });
     }
+    if (verificationComplete) {
+      await completeIdInitializationAfterManualVideoIfEligible(pool, singlesId, {
+        skipDlPassportCheck: Boolean(getRekognitionConfig()?.skipDlPassportCheck),
+        liveFaceScanVideoDescription: CONSENT_DESCRIPTION_LIVE_FACE_SCAN_VIDEO
+      });
+    }
+    const gateRow = await loadIdInitializationGateRow(singlesId);
     return res.json({
       idVerificationDate: outcome.idVerificationDate,
+      id_initialization_completed: normalizeIdInitializationCompleted(gateRow?.id_initialization_completed),
       message: outcome.idVerificationDate ? 'Identification verification date recorded.' : 'Identification verification date cleared.'
     });
   } catch (error) {

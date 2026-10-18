@@ -77,6 +77,12 @@ export async function markOver18Verified() {
   return data;
 }
 
+/** PILOTUSER only: mark singles.id_initialization_completed = true (IDV dialog Skip). */
+export async function postPilotSkipIdInitialization() {
+  const { data } = await api.post('/api/me/id-initialization/pilot-skip');
+  return data;
+}
+
 export function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

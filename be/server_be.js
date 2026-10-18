@@ -137,6 +137,7 @@ import {
   previewLiveScanProfileMatch,
   postIdVerificationManualSupportEmail,
   postMarkOver18Verified,
+  postPilotSkipIdInitialization,
   getMeasureOneEducationStatus,
   startMeasureOneEducationVerification,
   syncMeasureOneEducationVerification,
@@ -381,6 +382,10 @@ import { getMallDepartmentMode } from './mallDepartmentMode.js';
 import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
 import { ensureSeededDemoBuddiesOnLogin } from './utils/ensureSeededDemoBuddiesOnLogin.js';
 import { normalizeOver18Verified } from './utils/over18Verified.js';
+import {
+  normalizeIdInitializationCompleted,
+  requireIdInitializationCompleted
+} from './utils/idInitialization.js';
 import { normalizeOptinoutBitmap } from './utils/optinoutBitmap.js';
 import { closeLoginLogSession } from './utils/loginLog.js';
 import appLog from './logger.js';
@@ -1126,6 +1131,7 @@ app.get('/api/me', async (req, res) => {
         seeded_demo_buddies_boolean,
         gender_self_report,
         over_18_verified,
+        id_initialization_completed,
         (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM outdateddbsnapshotoct2024.singles 
        WHERE singles_id = $1`,
@@ -1150,6 +1156,7 @@ app.get('/api/me', async (req, res) => {
     // Re-read flags after possible seed on /api/me
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
+              id_initialization_completed,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
@@ -1175,6 +1182,9 @@ app.get('/api/me', async (req, res) => {
         flags.seeded_demo_buddies_boolean === true,
       gender_self_report: genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null,
       over_18_verified: normalizeOver18Verified(flags.over_18_verified ?? row.over_18_verified),
+      id_initialization_completed: normalizeIdInitializationCompleted(
+        flags.id_initialization_completed ?? row.id_initialization_completed
+      ),
       optinout_bitmap: normalizeOptinoutBitmap(flags.optinout_bitmap),
       has_secret_icon:
         flags.has_secret_icon === true ||
@@ -1208,7 +1218,7 @@ app.get('/api/me/session-status', requireAuth, async (req, res) => {
   if (req.auth?.tools_only) return res.json({ tools_only: true });
   try {
     const { rows } = await pool.query(
-      `SELECT status::text AS status, over_18_verified, optinout_bitmap
+      `SELECT status::text AS status, over_18_verified, optinout_bitmap, id_initialization_completed
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
       [req.auth.singles_id]
@@ -1218,6 +1228,7 @@ app.get('/api/me/session-status', requireAuth, async (req, res) => {
     return res.json({
       status: row.status ?? null,
       over_18_verified: normalizeOver18Verified(row.over_18_verified),
+      id_initialization_completed: normalizeIdInitializationCompleted(row.id_initialization_completed),
       optinout_bitmap: normalizeOptinoutBitmap(row.optinout_bitmap)
     });
   } catch (err) {
@@ -1745,6 +1756,7 @@ app.post('/api/rekognition/live-scan-profile-match', requireAuth, previewLiveSca
 app.post('/api/rekognition/id-capture', requireAuth, captureDriverLicenseFromIdImage);
 app.post('/api/rekognition/manual-support-email', requireAuth, postIdVerificationManualSupportEmail);
 app.post('/api/rekognition/mark-over-18-verified', requireAuth, postMarkOver18Verified);
+app.post('/api/me/id-initialization/pilot-skip', requireAuth, postPilotSkipIdInitialization);
 app.get('/api/measureone/education/status', requireAuth, getMeasureOneEducationStatus);
 app.post('/api/measureone/education/start', requireAuth, startMeasureOneEducationVerification);
 app.post('/api/measureone/education/sync', requireAuth, syncMeasureOneEducationVerification);
@@ -1804,10 +1816,10 @@ app.get('/api/user/customization/zip-folder', requireAuth, getUserZipFolder);
 app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
 app.get('/api/raffle/refer-code/validate', getRaffleReferCodeValidate);
-app.post('/api/raffle/select', requireAuth, postRaffleSelect);
-app.post('/api/raffle/tickets', requireAuth, postRaffleTicket);
-app.post('/api/raffle/bonus-tickets', requireAuth, postRaffleBonusTickets);
-app.post('/api/raffle/payout', requireAuth, postRafflePayout);
+app.post('/api/raffle/select', requireAuth, requireIdInitializationCompleted, postRaffleSelect);
+app.post('/api/raffle/tickets', requireAuth, requireIdInitializationCompleted, postRaffleTicket);
+app.post('/api/raffle/bonus-tickets', requireAuth, requireIdInitializationCompleted, postRaffleBonusTickets);
+app.post('/api/raffle/payout', requireAuth, requireIdInitializationCompleted, postRafflePayout);
 app.get('/api/raffle/host/events', getRaffleHostEvents);
 app.post('/api/raffle/host/login', postRaffleHostLogin);
 app.post('/api/raffle/host/draw', postRaffleHostDraw);

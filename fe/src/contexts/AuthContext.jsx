@@ -35,6 +35,13 @@ function toNullableInteger(value) {
   return Math.trunc(n);
 }
 
+/** @returns {boolean | null} null when the payload did not include the flag. */
+function normalizeIdInitializationCompleted(raw) {
+  if (raw === true || raw === 'true') return true;
+  if (raw === false || raw === 'false') return false;
+  return null;
+}
+
 function normalizeUserShape(rawUser, authMeta = {}) {
   if (!rawUser || typeof rawUser !== 'object') return null;
   const impersonatedRaw = rawUser.impersonated_by_admin_id ?? authMeta.impersonated_by_admin_id;
@@ -52,6 +59,7 @@ function normalizeUserShape(rawUser, authMeta = {}) {
     prefix: toNullableInteger(rawUser.prefix ?? rawUser.member_prefix ?? rawUser.memberPrefix),
     profile_image_fk: toNullableInteger(rawUser.profile_image_fk ?? rawUser.profileImageFk),
     over_18_verified: normalizeOver18Verified(rawUser.over_18_verified),
+    id_initialization_completed: normalizeIdInitializationCompleted(rawUser.id_initialization_completed),
     has_secret_icon: rawUser.has_secret_icon === true || rawUser.has_secret_icon === 'true',
     role: String(rawUser.role ?? authMeta.role ?? 'user').trim() || 'user',
     tools_only: Boolean(rawUser.tools_only ?? authMeta.tools_only),
@@ -119,6 +127,16 @@ export const AuthProvider = ({ children }) => {
         over_18_verified: normalizeOver18Verified(value),
         ...(status ? { status } : {})
       });
+    });
+  }, []);
+
+  /** After the server confirms singles.id_initialization_completed (IDV Save / pilot skip). */
+  const updateSessionIdInitializationCompleted = useCallback((value) => {
+    const next = normalizeIdInitializationCompleted(value);
+    if (next == null) return;
+    setUser((prev) => {
+      if (!prev || prev.id_initialization_completed === next) return prev;
+      return normalizeUserShape({ ...prev, id_initialization_completed: next });
     });
   }, []);
 
@@ -247,10 +265,13 @@ export const AuthProvider = ({ children }) => {
       setUser((prev) => {
         if (!prev || prev.tools_only) return prev;
         const nextOver18 = normalizeOver18Verified(data.over_18_verified);
+        const nextIdInitializationCompleted =
+          normalizeIdInitializationCompleted(data.id_initialization_completed) ?? prev.id_initialization_completed;
         if (
           prev.status === data.status &&
           prev.over_18_verified === nextOver18 &&
-          prev.optinout_bitmap === data.optinout_bitmap
+          prev.optinout_bitmap === data.optinout_bitmap &&
+          prev.id_initialization_completed === nextIdInitializationCompleted
         ) {
           return prev;
         }
@@ -258,7 +279,8 @@ export const AuthProvider = ({ children }) => {
           ...prev,
           status: data.status ?? null,
           over_18_verified: nextOver18,
-          optinout_bitmap: data.optinout_bitmap
+          optinout_bitmap: data.optinout_bitmap,
+          id_initialization_completed: nextIdInitializationCompleted
         });
       });
     } catch {
@@ -436,6 +458,7 @@ export const AuthProvider = ({ children }) => {
         updateSessionNickname,
         updateSessionDemoBuddyFlags,
         updateSessionOver18Verified,
+        updateSessionIdInitializationCompleted,
         updateSessionOptinoutBitmap,
         updateSessionHasSecretIcon
       }}

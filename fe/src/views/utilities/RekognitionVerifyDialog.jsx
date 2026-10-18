@@ -26,7 +26,8 @@ import {
   previewFaceMatchForIdImage,
   previewLiveScanProfileMatch,
   postIdVerificationManualSupportEmail,
-  markOver18Verified
+  markOver18Verified,
+  postPilotSkipIdInitialization
 } from 'api/rekognitionFe';
 import { normalizeVerificationImageFile, normalizeVerificationImageFromUrl } from 'utils/normalizeVerificationImage';
 import { uploadMyPhoto, setProfilePhoto } from 'api/myPhotosFe';
@@ -79,6 +80,8 @@ function ageFromDobText(dobText) {
 }
 
 const VERIFICATION_COMPLETE_PREFIX = 'Verification complete';
+const PROFILE_DL_MISMATCH_MESSAGE =
+  'ERROR: your profile does not match your driver license. Please click "Previous" to upload matching Profile photo, or upload matching driver license.';
 
 const IDV_WIZARD_STEP_CONSENT = 1;
 
@@ -263,8 +266,16 @@ export default function RekognitionVerifyDialog({
   onVerified,
   onFailed
 }) {
-  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, logout, updateSessionOver18Verified } =
-    useAuth();
+  const {
+    user,
+    profilePhotoCacheBust,
+    bumpProfilePhotoCache,
+    updateSessionProfilePhoto,
+    refreshAuthProfilePhoto,
+    logout,
+    updateSessionOver18Verified,
+    updateSessionIdInitializationCompleted
+  } = useAuth();
   const adminImpersonationBypass = isAdminImpersonationBypassSession(user);
   const showPilotSkip = isPilotUserCategory(user?.member_category);
   const navigate = useNavigate();
@@ -921,27 +932,24 @@ export default function RekognitionVerifyDialog({
 
   const applyProfileIdMatchFromCapture = useCallback(
     (data) => {
-      const threshold = data?.faceMatchThreshold ?? status?.faceMatchThreshold ?? 90;
       const matchPct = data?.profileMatchPercentMatch ?? data?.idMatchSimilarity ?? null;
       const matched = Boolean(data?.profileMatchMatched ?? data?.matched);
       setProfileMatchPct(matchPct);
       setDriverLicenseMatchPct(matchPct);
       if (matchPct == null) {
         setProfileVerified(false);
-        setProfileVerifyError('');
+        setProfileVerifyError(PROFILE_DL_MISMATCH_MESSAGE);
         return;
       }
       if (!matched) {
-        setProfileVerifyError(
-          `Profile photo ↔ ID face match ${Math.round(matchPct)}% (need ${threshold}%).`
-        );
+        setProfileVerifyError(PROFILE_DL_MISMATCH_MESSAGE);
         setProfileVerified(false);
         return;
       }
       setProfileVerifyError('');
       setProfileVerified(true);
     },
-    [status?.faceMatchThreshold]
+    []
   );
 
   const enforceUnder18FromIdCapture = useCallback(
@@ -1416,8 +1424,9 @@ export default function RekognitionVerifyDialog({
         } else {
           appendDebugLog('Admin impersonation — skipped consent record save');
         }
+        const closeOutcome = await postIdVerificationDateOnClose({ verificationComplete: true });
+        updateSessionIdInitializationCompleted?.(closeOutcome?.id_initialization_completed);
         await onVerified?.({ manualLiveScanVideo: true });
-        await postIdVerificationDateOnClose({ verificationComplete: true });
         onClose?.();
         return;
       }
@@ -1474,8 +1483,9 @@ export default function RekognitionVerifyDialog({
       }
 
       setResult(data);
+      const closeOutcome = await postIdVerificationDateOnClose({ verificationComplete: true });
+      updateSessionIdInitializationCompleted?.(closeOutcome?.id_initialization_completed);
       await onVerified?.(data);
-      await postIdVerificationDateOnClose({ verificationComplete: true });
       onClose?.();
     } catch (err) {
       const data = err?.response?.data;
@@ -1516,12 +1526,24 @@ export default function RekognitionVerifyDialog({
     handleWizardPrevious();
   }, [wizardStep, handleClose, handleWizardPrevious]);
 
-  const handlePilotSkipIdentificationVerification = useCallback(() => {
+  const handlePilotSkipIdentificationVerification = useCallback(async () => {
     if (closing || submitting) return;
-    clearSignupIdentificationVerificationRequired();
-    onClose?.();
-    navigate('/allSingles');
-  }, [closing, submitting, onClose, navigate]);
+    setClosing(true);
+    setErrorText('');
+    try {
+      const skipped = await postPilotSkipIdInitialization();
+      updateSessionIdInitializationCompleted?.(skipped?.id_initialization_completed);
+      clearSignupIdentificationVerificationRequired();
+      onClose?.();
+      navigate('/mall');
+    } catch (err) {
+      setErrorText(
+        sanitizeUserFacingTechTerms(err?.response?.data?.error || err?.message || 'Failed to skip identification verification')
+      );
+    } finally {
+      setClosing(false);
+    }
+  }, [closing, submitting, onClose, navigate, updateSessionIdInitializationCompleted]);
 
   const handleHiddenPassportOOver18Bypass = useCallback(async () => {
     if (closing || submitting) return;
@@ -1530,11 +1552,12 @@ export default function RekognitionVerifyDialog({
     try {
       const marked = await markOver18Verified();
       updateSessionOver18Verified?.(true, marked?.status);
+      updateSessionIdInitializationCompleted?.(marked?.id_initialization_completed);
       clearSignupIdentificationVerificationRequired();
       const { markFirstLoginOnboardingCongratsPending } = await import('utils/firstLoginOnboarding');
       markFirstLoginOnboardingCongratsPending();
       onClose?.();
-      navigate('/allSingles');
+      navigate('/mall');
     } catch (err) {
       setErrorText(
         sanitizeUserFacingTechTerms(err?.response?.data?.error || err?.message || 'Failed to update over-18 status')
@@ -1542,7 +1565,7 @@ export default function RekognitionVerifyDialog({
     } finally {
       setClosing(false);
     }
-  }, [closing, submitting, onClose, updateSessionOver18Verified, navigate]);
+  }, [closing, submitting, onClose, updateSessionOver18Verified, updateSessionIdInitializationCompleted, navigate]);
 
   const livenessBlocked =
     !adminImpersonationBypass && status?.requireLivenessEffective && !status?.livenessConfigured;
@@ -1827,7 +1850,7 @@ export default function RekognitionVerifyDialog({
         >
           {showPilotSkip ? (
             <IdvActionButton
-              onClick={handlePilotSkipIdentificationVerification}
+              onClick={() => void handlePilotSkipIdentificationVerification()}
               disabled={closing || submitting}
               aria-label="Skip identification verification"
             >

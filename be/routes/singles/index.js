@@ -143,7 +143,8 @@ export {
   captureDriverLicenseFromIdImage,
   previewFaceMatchForIdImage,
   previewLiveScanProfileMatch,
-  postMarkOver18Verified
+  postMarkOver18Verified,
+  postPilotSkipIdInitialization
 } from './rekognition.js';
 export { postIdVerificationManualSupportEmail } from './idVerificationManualSupportEmail.js';
 export {
