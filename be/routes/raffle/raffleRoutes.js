@@ -67,6 +67,7 @@ function ticketPayload(row) {
     claimed: row.raffle_claimed === true,
     claimedAt: row.raffle_claimed_datetime || null,
     bonus: row.raffle_bonus === true,
+    won: row.raffle_win === true || row.raffle_claimed === true,
     paypalInfo: row.paypal_info || '',
     venmoInfo: row.venmo_info || '',
     prizePaid: row.raffle_prize_paid === true,
@@ -186,7 +187,7 @@ export async function loadSinglesForLog(singlesId) {
 
 /**
  * GET /api/raffle — drop-down events (event_show_combo = true, plus forever every event this member won /
- * claimed) + this member's generated raffles with claim / payout state.
+ * claimed or holds a raffle for — past ones feed the "Past Event" list) + this member's generated raffles.
  */
 export async function getRaffleState(req, res) {
   const singlesId = authSinglesId(req);
@@ -200,14 +201,15 @@ export async function getRaffleState(req, res) {
          JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
         WHERE e.event_show_combo = true
            OR EXISTS (SELECT 1 FROM ${S}.raffle_user c
-                       WHERE c.event_id = e.event_id AND c.singles_id = $1 AND c.raffle_claimed)
+                       WHERE c.event_id = e.event_id AND c.singles_id = $1
+                         AND (c.raffle_claimed OR c.raffle_number IS NOT NULL))
         ORDER BY e.event_night_datetime NULLS LAST, e.event_id`,
       [singlesId]
     );
     const { rows: ticketRows } = await pool.query(
       `SELECT u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime,
               u.raffle_claimed, u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
-              u.raffle_prize_paid, u.raffle_prize_paid_datetime, u.raffle_bonus,
+              u.raffle_prize_paid, u.raffle_prize_paid_datetime, u.raffle_bonus, u.raffle_win,
               e.event_title, e.event_build_n_address, h.host_full_name
          FROM ${S}.raffle_user u
          JOIN ${S}.raffle_event e ON e.event_id = u.event_id

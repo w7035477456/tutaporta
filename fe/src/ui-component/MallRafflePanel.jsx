@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import { raffleButtonColorSx } from 'config/raffleButtonColors';
-import GetMyRafflePopup from 'ui-component/GetMyRafflePopup';
+import GetMyRafflePopup, { RaffleTicketCard } from 'ui-component/GetMyRafflePopup';
 import { fetchRaffleState, submitRafflePayout } from 'api/raffleFe';
 
 const PANEL_YELLOW = '#ffe01b';
@@ -43,6 +43,51 @@ function formatWhen(value, timeZone) {
     return new Date(value).toLocaleString();
   }
 }
+
+/** 8/15/2026 in the event's own time zone ('' when the event has no date). */
+function formatEventDate(value, timeZone) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleDateString('en-US', { timeZone });
+  } catch {
+    return new Date(value).toLocaleDateString('en-US');
+  }
+}
+
+const WINNING_RED = '#d50000';
+const WINNING_TEXT = Array.from({ length: 12 }, () => 'Winning Raffle').join(' \u2605 ');
+
+const winningStripSx = {
+  position: 'absolute',
+  overflow: 'hidden',
+  whiteSpace: 'nowrap',
+  fontWeight: 900,
+  fontSize: '0.8rem',
+  lineHeight: '20px',
+  letterSpacing: 0.5,
+  textTransform: 'uppercase',
+  '--mr-color': '#fff',
+  bgcolor: WINNING_RED
+};
+
+/** Ticket card framed on all four sides by repeating "Winning Raffle" text. */
+function WinningRaffleFrame({ children }) {
+  return (
+    <Box sx={{ position: 'relative', p: '20px', bgcolor: WINNING_RED, borderRadius: 1 }}>
+      <Typography sx={{ ...winningStripSx, top: 0, left: 0, right: 0, height: 20 }}>{WINNING_TEXT}</Typography>
+      <Typography sx={{ ...winningStripSx, bottom: 0, left: 0, right: 0, height: 20 }}>{WINNING_TEXT}</Typography>
+      <Typography sx={{ ...winningStripSx, top: 20, bottom: 20, left: 0, width: 20, writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+        {WINNING_TEXT}
+      </Typography>
+      <Typography sx={{ ...winningStripSx, top: 20, bottom: 20, right: 0, width: 20, writingMode: 'vertical-rl' }}>
+        {WINNING_TEXT}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+WinningRaffleFrame.propTypes = { children: PropTypes.node };
 
 /** Event name, date, location + claim / paid times under "Raffle Prize Claimed" / "Raffle Prize Paid". */
 function PrizeStatusBox({ title, bg, color, event, ticket, showPaid }) {
@@ -164,6 +209,8 @@ export default function MallRafflePanel({ openRequest = 0 }) {
   const [tickets, setTickets] = useState([]);
   const [prizeDollars, setPrizeDollars] = useState(200);
   const [eventId, setEventId] = useState('');
+  const [pastEventId, setPastEventId] = useState('');
+  const [referCode, setReferCode] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
 
@@ -179,6 +226,7 @@ export default function MallRafflePanel({ openRequest = 0 }) {
       setEvents(state.events);
       setTickets(state.tickets);
       setPrizeDollars(state.prizeDollars);
+      setReferCode(state.referCode);
       setLoadError('');
       const pending = state.tickets.find((t) => t.claimed && !t.paypalInfo && !t.venmoInfo);
       if (pending) {
@@ -186,8 +234,9 @@ export default function MallRafflePanel({ openRequest = 0 }) {
         return;
       }
       setEventId((prev) => {
-        if (prev && state.events.some((e) => e.eventId === Number(prev))) return prev;
-        const listed = state.tickets.filter((t) => state.events.some((e) => e.eventId === t.eventId));
+        const listable = state.events.filter((e) => e.showCombo || state.tickets.some((t) => t.eventId === e.eventId && t.claimed));
+        if (prev && listable.some((e) => e.eventId === Number(prev))) return prev;
+        const listed = state.tickets.filter((t) => listable.some((e) => e.eventId === t.eventId));
         return listed.length ? String(listed[listed.length - 1].eventId) : '';
       });
     } catch (err) {
@@ -201,10 +250,65 @@ export default function MallRafflePanel({ openRequest = 0 }) {
 
   const selectedId = Number(eventId) || null;
   const event = events.find((e) => e.eventId === selectedId) || null;
-  const ticket = tickets.find((t) => t.eventId === selectedId) || null;
+  const ticket =
+    tickets.find((t) => t.eventId === selectedId && t.claimed) || tickets.find((t) => t.eventId === selectedId && !t.bonus) || null;
+
+  /** Event drop-down: open (combo) events + any event this member claimed a prize for. */
+  const comboEvents = useMemo(
+    () => events.filter((e) => e.showCombo || tickets.some((t) => t.eventId === e.eventId && t.claimed)),
+    [events, tickets]
+  );
+  /** Past Event drop-down: events already started where this member generated raffles, newest first. */
+  const pastEvents = useMemo(
+    () =>
+      events
+        .filter((e) => e.nightPassed && tickets.some((t) => t.eventId === e.eventId))
+        .sort((a, b) => new Date(b.nightDatetime || 0) - new Date(a.nightDatetime || 0)),
+    [events, tickets]
+  );
+  const pastSelectedId = Number(pastEventId) || null;
+  const pastEvent = pastEvents.find((e) => e.eventId === pastSelectedId) || null;
+  const pastTickets = useMemo(
+    () =>
+      tickets
+        .filter((t) => t.eventId === pastSelectedId)
+        .sort((a, b) => Number(Boolean(b.won)) - Number(Boolean(a.won)) || Number(Boolean(a.bonus)) - Number(Boolean(b.bonus))),
+    [tickets, pastSelectedId]
+  );
 
   let body;
-  if (ticket?.claimed && !ticket.paypalInfo && !ticket.venmoInfo) {
+  if (pastEvent) {
+    body = (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Typography sx={{ fontWeight: 800, textAlign: 'center' }}>
+          Your {pastTickets.length === 1 ? 'raffle' : `${pastTickets.length} raffles`} for {formatEventDate(pastEvent.nightDatetime, pastEvent.timeZone)}{' '}
+          {pastEvent.title || pastEvent.label}
+        </Typography>
+        <Box
+          sx={{
+            maxHeight: { xs: 380, sm: 440 },
+            overflowY: pastTickets.length > 1 ? 'scroll' : 'visible',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.25,
+            pr: pastTickets.length > 1 ? 0.75 : 0
+          }}
+        >
+          {pastTickets.map((t) => (
+            <Box key={t.verifyCode} sx={{ flexShrink: 0 }}>
+              {t.won ? (
+                <WinningRaffleFrame>
+                  <RaffleTicketCard ticket={t} referCode={referCode} />
+                </WinningRaffleFrame>
+              ) : (
+                <RaffleTicketCard ticket={t} referCode={referCode} />
+              )}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  } else if (ticket?.claimed && !ticket.paypalInfo && !ticket.venmoInfo) {
     body = <PayoutForm event={event} ticket={ticket} prizeDollars={prizeDollars} onSubmitted={load} />;
   } else if (ticket?.claimed && ticket.prizePaid) {
     body = <PrizeStatusBox title="Raffle Prize Paid" bg="#fff" color="#111" event={event} ticket={ticket} showPaid />;
@@ -261,18 +365,48 @@ export default function MallRafflePanel({ openRequest = 0 }) {
             component="select"
             value={eventId}
             disabled={Boolean(pendingPayout)}
-            onChange={(e) => setEventId(e.target.value)}
+            onChange={(e) => {
+              setEventId(e.target.value);
+              setPastEventId('');
+            }}
             title={pendingPayout ? 'Please finish claiming your prize first.' : undefined}
             sx={{ ...fieldSx, flex: 1 }}
           >
             <option value="">↓ Select your event</option>
-            {events.map((ev) => (
+            {comboEvents.map((ev) => (
               <option key={ev.eventId} value={String(ev.eventId)}>
                 {ev.title || ev.label}
+                {ev.nightDatetime ? ` ${formatEventDate(ev.nightDatetime, ev.timeZone)}` : ''}
               </option>
             ))}
           </Box>
         </Box>
+        {pastEvents.length ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography
+              component="label"
+              sx={{ fontWeight: 800, fontSize: { xs: '0.9rem', sm: '1rem' }, lineHeight: 1.05, textAlign: 'center', flexShrink: 0 }}
+            >
+              Past
+              <br />
+              Event
+            </Typography>
+            <Box
+              component="select"
+              value={pastEventId}
+              disabled={Boolean(pendingPayout)}
+              onChange={(e) => setPastEventId(e.target.value)}
+              sx={{ ...fieldSx, flex: 1 }}
+            >
+              <option value="">↓ Past event you had raffles</option>
+              {pastEvents.map((ev) => (
+                <option key={ev.eventId} value={String(ev.eventId)}>
+                  {formatEventDate(ev.nightDatetime, ev.timeZone)} {ev.title || ev.label}
+                </option>
+              ))}
+            </Box>
+          </Box>
+        ) : null}
         {loadError ? <Typography sx={{ '--mr-color': '#b00000', fontWeight: 700, textAlign: 'center' }}>{loadError}</Typography> : null}
         {body}
       </Box>

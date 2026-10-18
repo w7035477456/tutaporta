@@ -14,7 +14,7 @@ function apiErrorMessage(err, fallback) {
   return String(err?.response?.data?.error || '').trim() || fallback;
 }
 
-function RaffleTicketCard({ ticket, referCode }) {
+export function RaffleTicketCard({ ticket, referCode }) {
   const verifyUrl = `${window.location.origin}${ticket.verifyPath}`;
   const issuedAt = ticket.createdAt ? new Date(ticket.createdAt) : null;
   return (
