@@ -45,11 +45,11 @@ const RAFFLE_STEPS = [
     .
   </>,
   <>Log in or sign up for an account with a real US phone number and email address.</>,
-  <>Standard registration requires uploading a profile photo, a live facial scan, and scanning (we don't store image) your driver&apos;s license.</>,
   <>
-    After that, click the{' '}
-    <RaffleTicketButtonPicture />{' '}
-    button on the main screen (or go to{' '}
+    Standard positive ID registration, any real profile photo, compare to your facial scan and validate name with DL.
+  </>,
+  <>
+    After that, click the <RaffleTicketButtonPicture /> button on the main screen (or go to{' '}
     <Box component={Link} to={GET_MY_RAFFLE_PATH} sx={linkSx}>
       tutamall.com/mall
     </Box>
@@ -57,18 +57,21 @@ const RAFFLE_STEPS = [
   </>,
   <>A raffle ticket popup will appear. Take a screenshot of the raffle ticket and save it to your phone.</>,
   <>Bring the screenshot to the Meetup event, where the host will read out a random winning raffle number.</>,
-  <>If you have the winning raffle number, immediately claim and go in person to the host, let the host scan the raffle ticket barcode from yourphone screenshot of the raffle ticket.</>,
+  <>
+    If you have the winning raffle number, immediately claim and go in person to the host, let the host scan the raffle ticket barcode from
+    yourphone screenshot of the raffle ticket.
+  </>,
   <>
     If you have the winning raffle number, after the event return to{' '}
     <Box component={Link} to={GET_MY_RAFFLE_PATH} sx={linkSx}>
       tutamall.com/mall
     </Box>
-    , click the yellow &ldquo;Claim your winning Raffle&rdquo; button, and enter your info so the $200 can be sent to
-    you by PayPal or Venmo, your choice.
+    , click the yellow &ldquo;Claim your winning Raffle&rdquo; button, and enter your info so the $200 can be sent to you by PayPal or
+    Venmo, your choice.
   </>,
   <>
-    If the person with the winning number is not at the event, the host will pick a different number and keep
-    picking until someone at the event claims it.
+    If the person with the winning number is not at the event, the host will pick a different number and keep picking until someone at the
+    event claims it.
   </>
 ];
 
@@ -87,8 +90,8 @@ const BONUS_STEPS = [
     and click <strong>&ldquo;Get My Raffle&rdquo;</strong> 2 more times per friend.
   </>,
   <>
-    Screenshot every raffle tickets and bring them all to the Meetup event. The more tickets you have, the better your
-    chances of matching the winning number!
+    Screenshot every raffle tickets and bring them all to the Meetup event. The more tickets you have, the better your chances of matching
+    the winning number!
   </>
 ];
 
@@ -167,13 +170,11 @@ export default function RaffleInfoPage() {
                 {showBonus ? (
                   <>
                     <Typography variant="body1" sx={{ width: '100%' }}>
-                      <strong>Refer friends for extra tickets!</strong> For every friend who signs up for a new
-                      TutaMall account, you get 2 more raffle tickets FREE. Each friend needs their own unique US phone
-                      number and email address.
+                      <strong>Refer friends for extra tickets!</strong> For every friend who signs up for a new TutaMall account, you get 2
+                      more raffle tickets FREE. Each friend needs their own unique US phone number and email address.
                     </Typography>
                     <Box component="ul" sx={{ width: '100%', pl: 3, m: 0 }}>
                       {BONUS_STEPS.map((step, index) => (
-                        // eslint-disable-next-line react/no-array-index-key
                         <Typography key={index} component="li" variant="body1" sx={{ mb: 1.25 }}>
                           {step}
                         </Typography>
@@ -184,7 +185,6 @@ export default function RaffleInfoPage() {
                   <>
                     <Box component="ol" sx={{ width: '100%', pl: 3, m: 0 }}>
                       {RAFFLE_STEPS.map((step, index) => (
-                        // eslint-disable-next-line react/no-array-index-key
                         <Typography key={index} component="li" variant="body1" sx={{ mb: 1.25 }}>
                           {step}
                         </Typography>
@@ -213,12 +213,7 @@ export default function RaffleInfoPage() {
                   </>
                 )}
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => navigate("/register")}
-                    sx={returnButtonSx}
-                    data-guest-demo-allow="true"
-                  >
+                  <Button variant="outlined" onClick={() => navigate('/register')} sx={returnButtonSx} data-guest-demo-allow="true">
                     Go to Register New Account
                   </Button>
                 </Box>
