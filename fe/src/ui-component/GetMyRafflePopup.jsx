@@ -129,7 +129,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
   const [events, setEvents] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [referCode, setReferCode] = useState('');
-  const [refer, setRefer] = useState({ credit: 0, friends: 0, per: 2 });
+  const [refer, setRefer] = useState({ credit: 0, remaining: 0, friends: 0, per: 2 });
   const [bonusCount, setBonusCount] = useState('');
   const [bonusGenerating, setBonusGenerating] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -155,8 +155,8 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
         setTickets(state.tickets);
         setReferCode(state.referCode);
         setPrizeDollars(state.prizeDollars);
-        setRefer({ credit: state.referCredit, friends: state.referFriends, per: state.rafflePerRefer });
-        setBonusCount(state.referCredit > 0 ? String(state.referCredit * state.rafflePerRefer) : '');
+        setRefer({ credit: state.referCredit, remaining: state.referRemaining, friends: state.referFriends, per: state.rafflePerRefer });
+        setBonusCount(state.referRemaining > 0 ? String(state.referRemaining) : '');
         if (initialEventId && comboEvents.some((e) => e.eventId === Number(initialEventId))) {
           setEventId(String(initialEventId));
           return;
@@ -192,7 +192,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
     return () => window.clearInterval(timer);
   }, [open]);
 
-  const bonusMax = refer.credit * refer.per;
+  const bonusMax = refer.remaining;
   const eventStarted = Boolean(selectedEvent?.nightDatetime) && now >= new Date(selectedEvent.nightDatetime).getTime();
   const bonusCountNum = Number(bonusCount);
   const bonusCountValid = Number.isInteger(bonusCountNum) && bonusCountNum >= 1 && bonusCountNum <= bonusMax;
@@ -202,10 +202,10 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
     setBonusGenerating(true);
     setError('');
     try {
-      const { tickets: issued, referCredit } = await createRaffleBonusTickets(selectedId, bonusCountNum);
+      const { tickets: issued, referCredit, referRemaining } = await createRaffleBonusTickets(selectedId, bonusCountNum);
       setTickets((prev) => [...prev, ...issued]);
-      setRefer((prev) => ({ ...prev, credit: referCredit }));
-      setBonusCount(referCredit > 0 ? String(referCredit * refer.per) : '');
+      setRefer((prev) => ({ ...prev, credit: referCredit, remaining: referRemaining }));
+      setBonusCount(referRemaining > 0 ? String(referRemaining) : '');
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create your bonus raffles. Please try again.'));
     } finally {
@@ -253,7 +253,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
       <ColorTemplate16PopupCenterWide.Body>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'stretch', gap: 2 }}>
           <Box sx={{ flex: '1 1 0%', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1.5 }}>
-            {ticket && !ticketIsFresh && refer.credit <= 0 && eventTickets.length === 1 ? (
+            {ticket && !ticketIsFresh && bonusMax <= 0 && eventTickets.length === 1 ? (
               <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: RAFFLE_ALREADY_RED }}>{alreadyMessage}</Typography>
             ) : null}
             <TextField
@@ -278,7 +278,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
               ))}
             </TextField>
 
-            {!loading && selectedId && (refer.credit > 0 || eventTickets.length > 1) ? (
+            {!loading && selectedId && (bonusMax > 0 || eventTickets.length > 1) ? (
               <Box sx={bonusBoxSx}>
                 <Typography sx={{ fontFamily: 'serif', fontWeight: 800, fontSize: { xs: '1.25rem', sm: '1.4rem' }, lineHeight: 1.25 }}>
                   Congratulations! {refer.friends} {refer.friends === 1 ? 'friend' : 'friends'} you referred{' '}

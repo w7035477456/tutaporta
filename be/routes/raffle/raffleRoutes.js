@@ -158,8 +158,25 @@ export function rafflePerRefer() {
   return Number.isInteger(n) && n >= 1 ? n : 2;
 }
 
-/** Remaining singles.raffle_refer_credit + how many friends ever registered with this member's code. */
+/**
+ * Bonus tickets already paid for by spent credits but not generated yet (a credit covers `per` tickets; generating
+ * fewer leaves the rest). Rows from one Generate click share raffle_generate_datetime (one transaction's now()).
+ */
+async function loadBonusLeftover(db, singlesId, per) {
+  const { rows } = await db.query(
+    `SELECT COALESCE(sum(b.credits), 0)::int AS credits, COALESCE(sum(b.n), 0)::int AS tickets
+       FROM (SELECT max(raffle_bonus_credits_used) AS credits, count(*) AS n
+               FROM ${S}.raffle_user
+              WHERE singles_id = $1 AND raffle_bonus
+              GROUP BY event_id, raffle_generate_datetime) b`,
+    [singlesId]
+  );
+  return Math.max(0, (Number(rows[0]?.credits) || 0) * per - (Number(rows[0]?.tickets) || 0));
+}
+
+/** Unspent credits, bonus tickets still available to generate (any event), friends registered with my code. */
 async function loadReferStats(singlesId) {
+  const per = rafflePerRefer();
   const { rows } = await pool.query(
     `SELECT s.raffle_refer_credit,
             (SELECT count(*)::int FROM ${S}.singles f
@@ -168,7 +185,9 @@ async function loadReferStats(singlesId) {
        FROM ${S}.singles s WHERE s.singles_id = $1`,
     [singlesId]
   );
-  return { credit: Number(rows[0]?.raffle_refer_credit) || 0, friends: Number(rows[0]?.friends) || 0 };
+  const credit = Number(rows[0]?.raffle_refer_credit) || 0;
+  const leftover = await loadBonusLeftover(pool, singlesId, per);
+  return { credit, remaining: credit * per + leftover, friends: Number(rows[0]?.friends) || 0 };
 }
 
 export async function loadSinglesForLog(singlesId) {
@@ -220,7 +239,7 @@ export async function getRaffleState(req, res) {
     );
     const refer = await loadReferStats(singlesId).catch((err) => {
       console.error('[raffle] refer stats failed:', err?.message || err);
-      return { credit: 0, friends: 0 };
+      return { credit: 0, remaining: 0, friends: 0 };
     });
     const referCode =
       req.auth?.guest_demo_login === true
@@ -232,6 +251,7 @@ export async function getRaffleState(req, res) {
     return res.json({
       referCode,
       referCredit: refer.credit,
+      referRemaining: refer.remaining,
       referFriends: refer.friends,
       rafflePerRefer: rafflePerRefer(),
       events: eventRows.map((row) => ({
@@ -379,7 +399,8 @@ export async function postRaffleTicket(req, res) {
 
 /**
  * POST /api/raffle/bonus-tickets { eventId, count } — spend singles.raffle_refer_credit on extra tickets.
- *   Each credit = rafflePerRefer() tickets; count up to credit × per; credits used = ceil(count / per).
+ *   Each credit = rafflePerRefer() tickets. Leftover tickets from a partly used credit are spent first; then
+ *   credits used = ceil((count − leftover) / per). count up to credit × per + leftover.
  *   Closed from event_night_datetime (event start) on. New rows: raffle_bonus = true, appended to existing ones.
  */
 export async function postRaffleBonusTickets(req, res) {
@@ -408,14 +429,15 @@ export async function postRaffleBonusTickets(req, res) {
       [singlesId]
     );
     const credit = Number(creditRows[0]?.raffle_refer_credit) || 0;
-    const maxTickets = credit * per;
+    const leftover = await loadBonusLeftover(client, singlesId, per);
+    const maxTickets = credit * per + leftover;
     if (count > maxTickets) {
       await client.query('ROLLBACK');
       return res.status(400).json({
         error: maxTickets ? `You can generate up to ${maxTickets} bonus tickets.` : 'You have no bonus raffle tickets left.'
       });
     }
-    const creditsUsed = Math.ceil(count / per);
+    const creditsUsed = Math.ceil(Math.max(0, count - leftover) / per);
 
     const issued = [];
     for (let i = 0; i < count; i += 1) {
@@ -488,6 +510,7 @@ export async function postRaffleBonusTickets(req, res) {
     return res.status(201).json({
       tickets: issued.map((t) => ticketPayload(withEvent(t))),
       referCredit: Number(updated[0]?.raffle_refer_credit) || 0,
+      referRemaining: maxTickets - count,
       creditsUsed
     });
   } catch (err) {
