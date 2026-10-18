@@ -10,6 +10,7 @@ import AuthWrapper1 from 'views/pages/authentication/AuthWrapper1';
 import AuthCardWrapper from 'views/pages/authentication/AuthCardWrapper';
 import AuthInnerStack from 'views/pages/authentication/AuthInnerStack';
 import Logo from 'ui-component/Logo';
+import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import AuthFooter from 'ui-component/cards/AuthFooter';
 import {
   authShellStackSx,
@@ -44,7 +45,7 @@ const RAFFLE_STEPS = [
     .
   </>,
   <>Log in or sign up for an account with a real US phone number and email address.</>,
-  <>Standard registration requires uploading a profile photo, a live facial scan, and scanning your driver&apos;s license.</>,
+  <>Standard registration requires uploading a profile photo, a live facial scan, and scanning (we don't store image) your driver&apos;s license.</>,
   <>
     After that, click the{' '}
     <RaffleTicketButtonPicture />{' '}
@@ -95,6 +96,12 @@ export default function RaffleInfoPage() {
   const [showBonus, setShowBonus] = useState(false);
   const navigate = useNavigate();
 
+  /** Back to wherever the member came from; opened directly (no in-app history) → home. */
+  const handleClose = () => {
+    if ((window.history.state?.idx ?? 0) > 0) navigate(-1);
+    else navigate('/', { replace: true });
+  };
+
   const returnButtonSx = {
     ...authButtonBoldSx,
     minWidth: 120,
@@ -132,7 +139,8 @@ export default function RaffleInfoPage() {
           }}
         >
           <Box sx={legalInfoDialogScrollSx}>
-            <AuthCardWrapper tight sx={{ width: '100%', maxWidth: '100%' }}>
+            <AuthCardWrapper tight sx={{ width: '100%', maxWidth: '100%', position: 'relative' }}>
+              <ColorTemplate6CloseX onClose={handleClose} aria-label="Close raffle guide" />
               <Stack spacing={3} sx={{ alignItems: 'center', textAlign: 'left' }}>
                 <Box>
                   <Link to="/pages/login" aria-label="logo">

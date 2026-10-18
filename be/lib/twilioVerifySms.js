@@ -13,11 +13,20 @@ function getTwilioClient() {
   return twilioClient;
 }
 
+/** ~/.ssh/be/.env BYPASS_TWILIO=true — never call Twilio; every SMS send succeeds and every code is approved. */
+export function isTwilioBypassed() {
+  return ['true', '1', 'yes', 'on'].includes(String(process.env.BYPASS_TWILIO ?? '').trim().toLowerCase());
+}
+
 export function isTwilioVerifyConfigured() {
-  return Boolean(accountSid && authToken && serviceSid);
+  return isTwilioBypassed() || Boolean(accountSid && authToken && serviceSid);
 }
 
 export async function sendTwilioVerificationSms(toPhoneE164) {
+  if (isTwilioBypassed()) {
+    console.log('[twilio] BYPASS_TWILIO: SMS not sent', { to: toPhoneE164 });
+    return { status: 'pending', bypassed: true };
+  }
   if (!isTwilioVerifyConfigured()) {
     throw new Error('Twilio Verify is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_SERVICE_SID (or TWILIO_ServiceSID).');
   }
@@ -29,6 +38,10 @@ export async function sendTwilioVerificationSms(toPhoneE164) {
 }
 
 export async function checkTwilioVerificationCode(toPhoneE164, code) {
+  if (isTwilioBypassed()) {
+    console.log('[twilio] BYPASS_TWILIO: code assumed approved', { to: toPhoneE164 });
+    return true;
+  }
   if (!isTwilioVerifyConfigured()) {
     throw new Error('Twilio Verify is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_SERVICE_SID (or TWILIO_ServiceSID).');
   }

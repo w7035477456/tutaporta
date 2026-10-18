@@ -4,6 +4,7 @@ import { referCodeFromMemberId } from '../../utils/referCodeFromMemberId.js';
 import { resolveReferByCode, resolveReferByCodeForSignup } from '../../utils/referByCode.js';
 import { referCodeFromRegistrationMeta } from '../../utils/registrationReferralMeta.js';
 import { isTwilioVerifyConfigured, sendTwilioVerificationSms } from '../../lib/twilioVerifySms.js';
+import { isBypassSmsPhoneVerificationEnabled } from '../../utils/bypassSmsPhoneVerification.js';
 import {
   formatPhoneForDuplicateCheck,
   isDuplicatePhoneAllowed,
@@ -129,6 +130,16 @@ export async function createPassword(req, res) {
       );
       console.log(LOG_PREFIX, 'session created without sending SMS', { to: formattedPhone });
       return res.json({ success: true, message: 'Password created. Ready to send SMS verification.' });
+    }
+
+    if (isBypassSmsPhoneVerificationEnabled()) {
+      await pool.query(
+        `INSERT INTO outdateddbsnapshotoct2024.verifications (email, phone, password_hash, kind, expires_at)
+         VALUES ($1, $2, $3, 'phone_verify_session', $4)`,
+        [emailNorm, formattedPhone, passwordHash_AAAAA, expiresAt_AAAAA]
+      );
+      console.log(LOG_PREFIX, 'BYPASS_TWILIO: session created, SMS not sent', { to: formattedPhone });
+      return res.json({ success: true, bypassed: true, message: 'Phone verification bypassed.' });
     }
 
     if (!isTwilioVerifyConfigured()) {

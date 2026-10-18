@@ -8,6 +8,7 @@ import InputLabel from '@mui/material/InputLabel';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
 
 // project imports
 import AnimateButton from 'ui-component/extended/AnimateButton';
@@ -18,7 +19,14 @@ import enterPhoneImg from 'assets/images/enterPhone.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import { verifyPhone } from 'api/verifyPhoneFe';
 import { createPassword } from 'api/createPasswordFe';
-import { SIGNUP_REGISTER_PHONE_KEY, formatPhoneNumber } from 'utils/signupParams';
+import { bypassSignupSmsVerification } from 'api/bypassSignupSmsVerificationFe';
+import { getApiBaseUrl } from 'config/apiBaseUrl';
+import {
+  SIGNUP_CREATE_PASSWORD_PAYLOAD_KEY,
+  SIGNUP_REGISTER_PHONE_KEY,
+  buildCreatePasswordQuery,
+  formatPhoneNumber
+} from 'utils/signupParams';
 import {
   clearStoredSignupReferralCode,
   markRefereeRewardUxAfterProfileSetup,
@@ -193,6 +201,53 @@ export default function AuthPhoneVerification() {
   useEffect(() => {
     getSignupReferralCodeFromSearchParams(searchParams);
   }, [searchParams]);
+
+  /** BE BYPASS_TWILIO: skip this screen and treat the phone as SMS-verified. */
+  const [bypassingSms, setBypassingSms] = useState(false);
+  const bypassAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (signupDown || !email || bypassAttemptedRef.current) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/api/publicConfig`, { credentials: 'include' });
+        const cfg = res.ok ? await res.json() : null;
+        if (cancelled || !cfg?.bypassSmsPhoneVerification) return;
+        bypassAttemptedRef.current = true;
+        setBypassingSms(true);
+        const finalPhone = initialPhone;
+        const raw = sessionStorage.getItem(SIGNUP_CREATE_PASSWORD_PAYLOAD_KEY);
+        const payload = raw ? JSON.parse(raw) : null;
+        if (payload?.code && payload?.password && finalPhone) {
+          await bypassSignupSmsVerification(payload.code, email, finalPhone);
+          await createPassword(payload.code, email, payload.password, finalPhone, {
+            sendSms: false,
+            referByCode: resolveSignupReferByCodeForApi()
+          });
+          sessionStorage.removeItem(SIGNUP_CREATE_PASSWORD_PAYLOAD_KEY);
+          markRefereeRewardUxAfterProfileSetup();
+          clearStoredSignupReferralCode();
+          navigate(`/pages/phoneVerificationSuccess?email=${encodeURIComponent(email)}`, { replace: true });
+          return;
+        }
+        const qs = buildCreatePasswordQuery({
+          email,
+          code: payload?.code || '',
+          phone: finalPhone,
+          token: resolveSignupReferByCodeForApi()
+        });
+        navigate(`/pages/createPassword?${qs}`, { replace: true });
+      } catch (err) {
+        if (cancelled) return;
+        bypassAttemptedRef.current = false;
+        setBypassingSms(false);
+        setError(err.message || 'Failed to bypass SMS verification.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [signupDown, email, initialPhone, navigate]);
 
   const handleVerificationSlotChange = (index, e) => {
     const raw = e.target.value.replace(/\D/g, '');
@@ -384,6 +439,14 @@ export default function AuthPhoneVerification() {
       verificationSlotRefs.current[idx]?.focus();
     }
   }, [inputFocusToken]);
+
+  if (bypassingSms) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box component="form" noValidate onSubmit={handleVerifySms} sx={authFormContentSx}>

@@ -5,6 +5,7 @@ import { resolveReferByCodeForSignup } from '../../utils/referByCode.js';
 import { referCodeFromActiveRegistrationEmail } from '../../utils/registrationReferralMeta.js';
 import { checkTwilioVerificationCode, isTwilioVerifyConfigured } from '../../lib/twilioVerifySms.js';
 import { isUndefinedTableError } from '../../lib/pgErrors.js';
+import { isBypassSmsPhoneVerificationEnabled } from '../../utils/bypassSmsPhoneVerification.js';
 import { formatPhoneForDuplicateCheck, respondIfDuplicatePhone } from '../../utils/duplicatePhonePolicy.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
@@ -55,8 +56,9 @@ export async function verifyPhone(req, res) {
       return res.status(400).json({ error: 'Email, phone, and verification code are required' });
     }
 
+    const bypassTwilio = isBypassSmsPhoneVerificationEnabled();
     const verificationCode = String(verificationCodeRaw ?? '').trim().replace(/\D/g, '');
-    if (!verificationCode || verificationCode.length !== 6) {
+    if (!bypassTwilio && (!verificationCode || verificationCode.length !== 6)) {
       return res.status(400).json({
         error: 'Invalid verification code',
         details: 'The verification code must be exactly 6 digits.'
@@ -110,7 +112,10 @@ export async function verifyPhone(req, res) {
     }
 
     let isCodeApproved = false;
-    if (!isTwilioVerifyConfigured()) {
+    if (bypassTwilio) {
+      console.log('BYPASS_TWILIO: phone verification assumed successful', { to: formattedPhone });
+      isCodeApproved = true;
+    } else if (!isTwilioVerifyConfigured()) {
       console.error('❌ Twilio Verify SMS not configured');
       return res.status(500).json({
         error: 'SMS service not configured',

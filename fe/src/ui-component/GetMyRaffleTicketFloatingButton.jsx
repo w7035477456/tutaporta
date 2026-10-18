@@ -7,7 +7,8 @@ import { RAFFLE_HOST_PATH, RAFFLE_PATH } from 'constants/raffleRoute';
 const PANEL_BLUE = '#1e88e5';
 const BUTTON_WHITE = '#ffffff';
 const LABEL_RED = '#d50000';
-const HIDDEN_PATHS = [RAFFLE_PATH, RAFFLE_HOST_PATH];
+/** /mall has its own raffle panel. */
+const HIDDEN_PATHS = [RAFFLE_PATH, RAFFLE_HOST_PATH, '/mall'];
 
 /**
  * Floating top-center "Get My Raffle Ticket" (red label, white button, blue box) on every screen.
@@ -18,7 +19,8 @@ export default function GetMyRaffleTicketFloatingButton() {
 
   useEffect(() => router.subscribe((state) => setPathname(state.location.pathname)), []);
 
-  if (HIDDEN_PATHS.some((p) => pathname.toLowerCase() === p.toLowerCase())) return null;
+  const current = pathname.toLowerCase().replace(/\/+$/, '');
+  if (HIDDEN_PATHS.some((p) => current === p.toLowerCase())) return null;
 
   return (
     <Box

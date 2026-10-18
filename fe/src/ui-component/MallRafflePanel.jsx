@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import { raffleButtonColorSx } from 'config/raffleButtonColors';
 import GetMyRafflePopup, { RaffleTicketCard } from 'ui-component/GetMyRafflePopup';
+import RaffleEventSelect from 'ui-component/RaffleEventSelect';
+import getMyRaffleTicketImg from 'assets/images/getmyraffleticket.png';
 import { fetchRaffleState, submitRafflePayout } from 'api/raffleFe';
 
 const PANEL_YELLOW = '#ffe01b';
+/** Never narrower than the Get My Raffle Ticket image + placeholders. */
+const PANEL_MIN_PX = 340;
+/** Everything around the event text: panel border + padding (26), label column + gap (64), input padding + × / ▾ (84). */
+const PANEL_CHROME_PX = 174;
 
 const fieldSx = {
   height: 36,
@@ -54,6 +60,19 @@ function formatEventDate(value, timeZone) {
   }
 }
 
+/** Earliest event first; events without a date last. */
+function byEventDateAsc(a, b) {
+  const ta = a.nightDatetime ? new Date(a.nightDatetime).getTime() : Infinity;
+  const tb = b.nightDatetime ? new Date(b.nightDatetime).getTime() : Infinity;
+  return ta - tb || a.eventId - b.eventId;
+}
+
+/** "10/16/2026 Singles Mingle @ Mad Oak…" */
+function eventOption(ev) {
+  const date = formatEventDate(ev.nightDatetime, ev.timeZone);
+  return { value: String(ev.eventId), label: `${date ? `${date} ` : ''}${ev.title || ev.label}` };
+}
+
 const WINNING_RED = '#d50000';
 const WINNING_TEXT = Array.from({ length: 12 }, () => 'Winning Raffle').join(' \u2605 ');
 
@@ -70,24 +89,102 @@ const winningStripSx = {
   bgcolor: WINNING_RED
 };
 
-/** Ticket card framed on all four sides by repeating "Winning Raffle" text. */
+const winningFrameSx = {
+  position: 'relative',
+  p: '20px',
+  bgcolor: WINNING_RED,
+  borderRadius: 1,
+  '@keyframes winningRaffleBlink': {
+    '0%, 35%': { opacity: 1 },
+    '50%, 65%': { opacity: 0.1 },
+    '100%': { opacity: 1 }
+  },
+  '& .winning-raffle-text': { animation: 'winningRaffleBlink 2.4s ease-in-out infinite' },
+  '@media (prefers-reduced-motion: reduce)': { '& .winning-raffle-text': { animation: 'none' } }
+};
+
+/** Ticket card framed on all four sides by slowly blinking "Winning Raffle" text. */
 function WinningRaffleFrame({ children }) {
+  const text = <span className="winning-raffle-text">{WINNING_TEXT}</span>;
   return (
-    <Box sx={{ position: 'relative', p: '20px', bgcolor: WINNING_RED, borderRadius: 1 }}>
-      <Typography sx={{ ...winningStripSx, top: 0, left: 0, right: 0, height: 20 }}>{WINNING_TEXT}</Typography>
-      <Typography sx={{ ...winningStripSx, bottom: 0, left: 0, right: 0, height: 20 }}>{WINNING_TEXT}</Typography>
-      <Typography sx={{ ...winningStripSx, top: 20, bottom: 20, left: 0, width: 20, writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-        {WINNING_TEXT}
+    <Box sx={winningFrameSx}>
+      <Typography sx={{ ...winningStripSx, top: 0, left: 0, right: 0, height: 20 }}>{text}</Typography>
+      <Typography sx={{ ...winningStripSx, bottom: 0, left: 0, right: 0, height: 20 }}>{text}</Typography>
+      <Typography
+        sx={{ ...winningStripSx, top: 20, bottom: 20, left: 0, width: 20, writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+      >
+        {text}
       </Typography>
-      <Typography sx={{ ...winningStripSx, top: 20, bottom: 20, right: 0, width: 20, writingMode: 'vertical-rl' }}>
-        {WINNING_TEXT}
-      </Typography>
+      <Typography sx={{ ...winningStripSx, top: 20, bottom: 20, right: 0, width: 20, writingMode: 'vertical-rl' }}>{text}</Typography>
       {children}
     </Box>
   );
 }
 
 WinningRaffleFrame.propTypes = { children: PropTypes.node };
+
+/** Diagonal "Claimed" (host scanned) / "Prize Paid" (Venmo / PayPal sent) stamp over a ticket card. */
+function RaffleStatusStamp({ ticket, prizeDollars, children }) {
+  const stamp = ticket.prizePaid ? { text: 'Prize\nPaid', bg: '#1e88e5' } : ticket.claimed ? { text: 'Claimed', bg: '#43c64a' } : null;
+  const paidTo = ticket.paypalInfo ? `PayPal ${ticket.paypalInfo}` : ticket.venmoInfo ? `Venmo ${ticket.venmoInfo}` : '';
+  return (
+    <Box sx={{ position: 'relative' }}>
+      {children}
+      {ticket.prizePaid && paidTo ? (
+        <Typography
+          sx={{
+            '--mr-color': '#fff',
+            mt: 1,
+            mb: -0.5,
+            textAlign: 'center',
+            fontWeight: 900,
+            fontSize: { xs: '1.05rem', sm: '1.15rem' },
+            lineHeight: 1.25,
+            wordBreak: 'break-word'
+          }}
+        >
+          ${prizeDollars} paid to {paidTo}
+        </Typography>
+      ) : null}
+      {stamp ? (
+        <Box
+          component="span"
+          aria-label={stamp.text.replace('\n', ' ')}
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%) rotate(-50deg)',
+            whiteSpace: 'pre',
+            textAlign: 'center',
+            lineHeight: 0.95,
+            fontWeight: 900,
+            fontSize: { xs: '2.6rem', sm: '3rem' },
+            color: stamp.bg,
+            WebkitTextStroke: '2px #000',
+            paintOrder: 'stroke fill',
+            textShadow: '2px 2px 0 #000',
+            pointerEvents: 'none',
+            userSelect: 'none'
+          }}
+        >
+          {stamp.text}
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
+
+RaffleStatusStamp.propTypes = {
+  ticket: PropTypes.shape({
+    claimed: PropTypes.bool,
+    prizePaid: PropTypes.bool,
+    paypalInfo: PropTypes.string,
+    venmoInfo: PropTypes.string
+  }).isRequired,
+  prizeDollars: PropTypes.number,
+  children: PropTypes.node
+};
 
 /** Event name, date, location + claim / paid times under "Raffle Prize Claimed" / "Raffle Prize Paid". */
 function PrizeStatusBox({ title, bg, color, event, ticket, showPaid }) {
@@ -210,6 +307,8 @@ export default function MallRafflePanel({ openRequest = 0 }) {
   const [prizeDollars, setPrizeDollars] = useState(200);
   const [eventId, setEventId] = useState('');
   const [pastEventId, setPastEventId] = useState('');
+  /** A Past Event is showing — reloads must not refill the (blank) Event field. */
+  const pastPickedRef = useRef(false);
   const [referCode, setReferCode] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -233,8 +332,9 @@ export default function MallRafflePanel({ openRequest = 0 }) {
         setEventId(String(pending.eventId));
         return;
       }
+      if (pastPickedRef.current) return;
       setEventId((prev) => {
-        const listable = state.events.filter((e) => e.showCombo || state.tickets.some((t) => t.eventId === e.eventId && t.claimed));
+        const listable = state.events.filter((e) => e.showCombo && !e.nightPassed);
         if (prev && listable.some((e) => e.eventId === Number(prev))) return prev;
         const listed = state.tickets.filter((t) => listable.some((e) => e.eventId === t.eventId));
         return listed.length ? String(listed[listed.length - 1].eventId) : '';
@@ -253,19 +353,38 @@ export default function MallRafflePanel({ openRequest = 0 }) {
   const ticket =
     tickets.find((t) => t.eventId === selectedId && t.claimed) || tickets.find((t) => t.eventId === selectedId && !t.bonus) || null;
 
-  /** Event drop-down: open (combo) events + any event this member claimed a prize for. */
+  /** Event drop-down: upcoming (combo) events only — plus a won event still waiting for PayPal / Venmo info. */
   const comboEvents = useMemo(
-    () => events.filter((e) => e.showCombo || tickets.some((t) => t.eventId === e.eventId && t.claimed)),
-    [events, tickets]
+    () => events.filter((e) => (e.showCombo && !e.nightPassed) || e.eventId === pendingPayout?.eventId).sort(byEventDateAsc),
+    [events, pendingPayout]
   );
-  /** Past Event drop-down: events already started where this member generated raffles, newest first. */
+  /** Past Event drop-down: events already started where this member generated raffles. */
   const pastEvents = useMemo(
-    () =>
-      events
-        .filter((e) => e.nightPassed && tickets.some((t) => t.eventId === e.eventId))
-        .sort((a, b) => new Date(b.nightDatetime || 0) - new Date(a.nightDatetime || 0)),
+    () => events.filter((e) => e.nightPassed && tickets.some((t) => t.eventId === e.eventId)).sort(byEventDateAsc),
     [events, tickets]
   );
+  const comboOptions = useMemo(() => comboEvents.map(eventOption), [comboEvents]);
+  const pastOptions = useMemo(() => pastEvents.map(eventOption), [pastEvents]);
+  /** Pixel width of the longest "date + event name" in the field font — the panel is sized to just fit it. */
+  const panelRef = useRef(null);
+  const [longestLabelPx, setLongestLabelPx] = useState(0);
+  useLayoutEffect(() => {
+    const labels = [...comboOptions, ...pastOptions].map((o) => o.label);
+    const measure = () => {
+      const ctx = document.createElement('canvas').getContext('2d');
+      const el = panelRef.current?.querySelector('.MuiAutocomplete-input') || panelRef.current;
+      if (!ctx || !el) return;
+      const style = window.getComputedStyle(el);
+      ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      setLongestLabelPx(Math.ceil(Math.max(0, ...labels.map((l) => ctx.measureText(l).width))));
+    };
+    measure();
+    let cancelled = false;
+    document.fonts?.ready.then(() => !cancelled && measure());
+    return () => {
+      cancelled = true;
+    };
+  }, [comboOptions, pastOptions]);
   const pastSelectedId = Number(pastEventId) || null;
   const pastEvent = pastEvents.find((e) => e.eventId === pastSelectedId) || null;
   const pastTickets = useMemo(
@@ -276,39 +395,41 @@ export default function MallRafflePanel({ openRequest = 0 }) {
     [tickets, pastSelectedId]
   );
 
-  let body;
-  if (pastEvent) {
-    body = (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <Typography sx={{ fontWeight: 800, textAlign: 'center' }}>
-          Your {pastTickets.length === 1 ? 'raffle' : `${pastTickets.length} raffles`} for {formatEventDate(pastEvent.nightDatetime, pastEvent.timeZone)}{' '}
-          {pastEvent.title || pastEvent.label}
-        </Typography>
-        <Box
-          sx={{
-            maxHeight: { xs: 380, sm: 440 },
-            overflowY: pastTickets.length > 1 ? 'scroll' : 'visible',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1.25,
-            pr: pastTickets.length > 1 ? 0.75 : 0
-          }}
-        >
-          {pastTickets.map((t) => (
-            <Box key={t.verifyCode} sx={{ flexShrink: 0 }}>
-              {t.won ? (
-                <WinningRaffleFrame>
+  const pastBody = pastEvent ? (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <Typography sx={{ fontWeight: 800, textAlign: 'center' }}>
+        Your {pastTickets.length === 1 ? 'raffle' : `${pastTickets.length} raffles`} for{' '}
+        {formatEventDate(pastEvent.nightDatetime, pastEvent.timeZone)} {pastEvent.title || pastEvent.label}
+      </Typography>
+      <Box
+        sx={{
+          maxHeight: { xs: 380, sm: 440 },
+          overflowY: pastTickets.length > 1 ? 'scroll' : 'visible',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.25,
+          pr: pastTickets.length > 1 ? 0.75 : 0
+        }}
+      >
+        {pastTickets.map((t) => (
+          <Box key={t.verifyCode} sx={{ flexShrink: 0 }}>
+            {t.won ? (
+              <WinningRaffleFrame>
+                <RaffleStatusStamp ticket={t} prizeDollars={prizeDollars}>
                   <RaffleTicketCard ticket={t} referCode={referCode} />
-                </WinningRaffleFrame>
-              ) : (
-                <RaffleTicketCard ticket={t} referCode={referCode} />
-              )}
-            </Box>
-          ))}
-        </Box>
+                </RaffleStatusStamp>
+              </WinningRaffleFrame>
+            ) : (
+              <RaffleTicketCard ticket={t} referCode={referCode} />
+            )}
+          </Box>
+        ))}
       </Box>
-    );
-  } else if (ticket?.claimed && !ticket.paypalInfo && !ticket.venmoInfo) {
+    </Box>
+  ) : null;
+
+  let body;
+  if (ticket?.claimed && !ticket.paypalInfo && !ticket.venmoInfo) {
     body = <PayoutForm event={event} ticket={ticket} prizeDollars={prizeDollars} onSubmitted={load} />;
   } else if (ticket?.claimed && ticket.prizePaid) {
     body = <PrizeStatusBox title="Raffle Prize Paid" bg="#fff" color="#111" event={event} ticket={ticket} showPaid />;
@@ -334,17 +455,36 @@ export default function MallRafflePanel({ openRequest = 0 }) {
     );
   } else {
     body = (
-      <ColorTemplate13DisableGreenButton type="button" hoverEnlargeFont onClick={() => setPopupOpen(true)} sx={pillSx}>
-        Get My Raffle
-      </ColorTemplate13DisableGreenButton>
+      <Box
+        component="button"
+        type="button"
+        disabled={!selectedId}
+        title={selectedId ? undefined : 'Select your event first.'}
+        aria-label="Get My Raffle Ticket"
+        onClick={() => setPopupOpen(true)}
+        sx={{
+          alignSelf: 'center',
+          p: 0,
+          border: 0,
+          bgcolor: 'transparent',
+          lineHeight: 0,
+          cursor: 'pointer',
+          transition: 'transform 0.15s ease',
+          '&:not(:disabled):hover': { transform: 'scale(1.05)' },
+          '&:disabled': { cursor: 'not-allowed', filter: 'grayscale(1)', opacity: 0.55 }
+        }}
+      >
+        <Box component="img" src={getMyRaffleTicketImg} alt="" sx={{ height: { xs: 44, sm: 52 }, width: 'auto', display: 'block' }} />
+      </Box>
     );
   }
 
   return (
     <>
       <Box
+        ref={panelRef}
         sx={{
-          width: 'min(440px, 92vw)',
+          width: `min(${Math.max(PANEL_MIN_PX, longestLabelPx + PANEL_CHROME_PX)}px, 96vw)`,
           bgcolor: PANEL_YELLOW,
           border: '3px solid #111',
           borderRadius: 2,
@@ -361,26 +501,22 @@ export default function MallRafflePanel({ openRequest = 0 }) {
           <Typography component="label" sx={{ fontWeight: 800, fontSize: { xs: '1rem', sm: '1.1rem' }, flexShrink: 0 }}>
             Event
           </Typography>
-          <Box
-            component="select"
+          <RaffleEventSelect
+            options={comboOptions}
             value={eventId}
             disabled={Boolean(pendingPayout)}
-            onChange={(e) => {
-              setEventId(e.target.value);
+            onChange={(next) => {
+              setEventId(next);
               setPastEventId('');
+              pastPickedRef.current = false;
+              if (next && tickets.some((t) => t.eventId === Number(next) && !t.claimed)) setPopupOpen(true);
             }}
+            placeholder="↓ Select your event"
             title={pendingPayout ? 'Please finish claiming your prize first.' : undefined}
-            sx={{ ...fieldSx, flex: 1 }}
-          >
-            <option value="">↓ Select your event</option>
-            {comboEvents.map((ev) => (
-              <option key={ev.eventId} value={String(ev.eventId)}>
-                {ev.title || ev.label}
-                {ev.nightDatetime ? ` ${formatEventDate(ev.nightDatetime, ev.timeZone)}` : ''}
-              </option>
-            ))}
-          </Box>
+          />
         </Box>
+        {loadError ? <Typography sx={{ '--mr-color': '#b00000', fontWeight: 700, textAlign: 'center' }}>{loadError}</Typography> : null}
+        {body}
         {pastEvents.length ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography
@@ -391,24 +527,20 @@ export default function MallRafflePanel({ openRequest = 0 }) {
               <br />
               Event
             </Typography>
-            <Box
-              component="select"
+            <RaffleEventSelect
+              options={pastOptions}
               value={pastEventId}
               disabled={Boolean(pendingPayout)}
-              onChange={(e) => setPastEventId(e.target.value)}
-              sx={{ ...fieldSx, flex: 1 }}
-            >
-              <option value="">↓ Past event you had raffles</option>
-              {pastEvents.map((ev) => (
-                <option key={ev.eventId} value={String(ev.eventId)}>
-                  {formatEventDate(ev.nightDatetime, ev.timeZone)} {ev.title || ev.label}
-                </option>
-              ))}
-            </Box>
+              onChange={(next) => {
+                setPastEventId(next);
+                pastPickedRef.current = Boolean(next);
+                if (next) setEventId('');
+              }}
+              placeholder="↓ Past event you had raffles"
+            />
           </Box>
         ) : null}
-        {loadError ? <Typography sx={{ '--mr-color': '#b00000', fontWeight: 700, textAlign: 'center' }}>{loadError}</Typography> : null}
-        {body}
+        {pastBody}
       </Box>
       <GetMyRafflePopup
         open={popupOpen}

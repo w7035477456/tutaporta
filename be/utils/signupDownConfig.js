@@ -1,10 +1,16 @@
-/** When true, new-account sign up is paused (~/.ssh/be/.env SIGNUP_DOWN). Default: false. */
+import { isBypassSmsPhoneVerificationEnabled } from './bypassSmsPhoneVerification.js';
+
+/**
+ * When true, new-account sign up is paused (~/.ssh/be/.env SIGNUP_DOWN). Default: false.
+ * BYPASS_TWILIO=true overrides it — sign up only waits on Twilio, which is then skipped.
+ */
 
 export const SIGNUP_DOWN_MESSAGE =
   'Our sign up service is awaiting Twilio SMS approval. Please check back in a few days. ' +
   'Meanwhile, log in as "demo" (no password) if you want to check it out in demo mode.';
 
 export function isSignupDownEnabled() {
+  if (isBypassSmsPhoneVerificationEnabled()) return false;
   const raw = String(process.env.SIGNUP_DOWN ?? '')
     .trim()
     .replace(/;+$/, '')
