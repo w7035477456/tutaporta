@@ -137,6 +137,7 @@ function mapRow(row, year, month) {
     paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
     bill_icon: row.bill_icon || null,
     has_bill_content: Boolean(row.has_bill_content),
+    email_scan_pending: Boolean(row.email_scan_pending),
     created_at: row.created_at,
     updated_at: row.updated_at,
     ...derived
@@ -172,9 +173,9 @@ async function findPriorMonthWithRows(client, singlesId, year, month, storageBac
 
 /**
  * If target month has no rows, clone template fields from latest prior month
- * (action + paid_record_id left NULL).
+ * (action + paid_record_id left NULL). Unapproved Auto Scan rows are not cloned.
  */
-async function ensureMonthCloned(client, singlesId, year, month, storageBackend) {
+export async function ensureMonthCloned(client, singlesId, year, month, storageBackend) {
   const existing = await countMonthRows(client, singlesId, year, month, storageBackend);
   if (existing > 0) return { cloned: false, from: null };
 
@@ -194,6 +195,7 @@ async function ensureMonthCloned(client, singlesId, year, month, storageBackend)
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
         AND bill_year = $5 AND bill_month = $6
+        AND email_scan_pending = false
       ORDER BY row_index ASC`,
     [singlesId, storageBackend, year, month, prior.year, prior.month]
   );
@@ -296,7 +298,8 @@ export async function putMonthlyBill(req, res) {
         bill_type: billType,
         action,
         paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null,
-        bill_icon: normalizeBillIcon(row?.bill_icon)
+        bill_icon: normalizeBillIcon(row?.bill_icon),
+        email_scan_pending: row?.email_scan_pending === true
       };
     });
 
@@ -339,8 +342,8 @@ export async function putMonthlyBill(req, res) {
           `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
-             action, paid_record_id, bill_icon
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+             action, paid_record_id, bill_icon, email_scan_pending
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
            RETURNING monthly_bill_id`,
           [
             singlesId,
@@ -354,7 +357,8 @@ export async function putMonthlyBill(req, res) {
             r.bill_type,
             r.action,
             r.paid_record_id,
-            r.bill_icon
+            r.bill_icon,
+            r.email_scan_pending
           ]
         );
         const newBillId = Number(inserted[0]?.monthly_bill_id);

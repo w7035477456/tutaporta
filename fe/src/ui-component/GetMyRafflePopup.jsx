@@ -7,13 +7,14 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import { createRaffleTicket, fetchRaffleState, selectRaffleEvent } from 'api/raffleFe';
+import { raffleButtonColorSx } from 'config/raffleButtonColors';
+import { createRaffleBonusTickets, createRaffleTicket, fetchRaffleState, selectRaffleEvent } from 'api/raffleFe';
 
 function apiErrorMessage(err, fallback) {
   return String(err?.response?.data?.error || '').trim() || fallback;
 }
 
-function RaffleTicketCard({ ticket }) {
+function RaffleTicketCard({ ticket, referCode }) {
   const verifyUrl = `${window.location.origin}${ticket.verifyPath}`;
   const issuedAt = ticket.createdAt ? new Date(ticket.createdAt) : null;
   return (
@@ -48,14 +49,26 @@ function RaffleTicketCard({ ticket }) {
         ) : null}
         {issuedAt ? <Typography sx={{ fontSize: '0.85rem', color: '#333' }}>{issuedAt.toLocaleString()}</Typography> : null}
       </Box>
-      <Box sx={{ bgcolor: '#fff', p: 1, lineHeight: 0 }}>
-        <QRCodeSVG value={verifyUrl} size={150} level="M" includeMargin={false} aria-label="Raffle verification QR code" />
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Box sx={{ bgcolor: '#fff', p: 1, lineHeight: 0 }}>
+          <QRCodeSVG value={verifyUrl} size={150} level="M" includeMargin={false} aria-label="Raffle verification QR code" />
+        </Box>
+        {referCode ? (
+          <Typography sx={{ color: RAFFLE_ALREADY_RED, fontWeight: 600, fontSize: '1.05rem', lineHeight: 1.25, textAlign: 'center' }}>
+            Friend
+            <br />
+            Refer Code
+            <br />
+            {referCode}
+          </Typography>
+        ) : null}
       </Box>
     </Box>
   );
 }
 
 RaffleTicketCard.propTypes = {
+  referCode: PropTypes.string,
   ticket: PropTypes.shape({
     eventLabel: PropTypes.string,
     eventAddress: PropTypes.string,
@@ -92,6 +105,19 @@ const raffleNoticeBoxSx = {
   borderRadius: 1
 };
 
+const bonusBoxSx = {
+  bgcolor: '#ffe01b',
+  color: '#111',
+  border: '3px solid #000',
+  borderRadius: 3,
+  p: { xs: 1.5, sm: 2 },
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1
+};
+
+const bonusTextSx = { fontFamily: 'serif', fontSize: { xs: '1.05rem', sm: '1.15rem' }, lineHeight: 1.3, color: '#111' };
+
 const DEFAULT_ALREADY_GENERATED_MESSAGE = 'You already generate a raffle for this event. Only 1 raffle per email login.';
 
 /**
@@ -102,6 +128,12 @@ const DEFAULT_ALREADY_GENERATED_MESSAGE = 'You already generate a raffle for thi
 export default function GetMyRafflePopup({ open, onClose, initialEventId = null }) {
   const [events, setEvents] = useState([]);
   const [tickets, setTickets] = useState([]);
+  const [referCode, setReferCode] = useState('');
+  const [refer, setRefer] = useState({ credit: 0, friends: 0, per: 2 });
+  const [bonusCount, setBonusCount] = useState('');
+  const [bonusGenerating, setBonusGenerating] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [prizeDollars, setPrizeDollars] = useState(200);
   const [alreadyMessage, setAlreadyMessage] = useState(DEFAULT_ALREADY_GENERATED_MESSAGE);
   const [freshEventIds, setFreshEventIds] = useState([]);
   const [eventId, setEventId] = useState('');
@@ -121,6 +153,10 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
         const comboEvents = state.events.filter((e) => e.showCombo !== false);
         setEvents(comboEvents);
         setTickets(state.tickets);
+        setReferCode(state.referCode);
+        setPrizeDollars(state.prizeDollars);
+        setRefer({ credit: state.referCredit, friends: state.referFriends, per: state.rafflePerRefer });
+        setBonusCount(state.referCredit > 0 ? String(state.referCredit * state.rafflePerRefer) : '');
         if (initialEventId && comboEvents.some((e) => e.eventId === Number(initialEventId))) {
           setEventId(String(initialEventId));
           return;
@@ -143,8 +179,39 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
 
   const selectedId = Number(eventId) || null;
   const selectedEvent = useMemo(() => events.find((e) => e.eventId === selectedId) || null, [events, selectedId]);
-  const ticket = useMemo(() => tickets.find((t) => t.eventId === selectedId) || null, [tickets, selectedId]);
+  const ticket = useMemo(() => tickets.find((t) => t.eventId === selectedId && !t.bonus) || null, [tickets, selectedId]);
+  const eventTickets = useMemo(
+    () => tickets.filter((t) => t.eventId === selectedId).sort((a, b) => Number(Boolean(a.bonus)) - Number(Boolean(b.bonus))),
+    [tickets, selectedId]
+  );
   const ticketIsFresh = ticket ? freshEventIds.includes(ticket.eventId) : false;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, [open]);
+
+  const bonusMax = refer.credit * refer.per;
+  const eventStarted = Boolean(selectedEvent?.nightDatetime) && now >= new Date(selectedEvent.nightDatetime).getTime();
+  const bonusCountNum = Number(bonusCount);
+  const bonusCountValid = Number.isInteger(bonusCountNum) && bonusCountNum >= 1 && bonusCountNum <= bonusMax;
+
+  const handleGenerateBonus = async () => {
+    if (!selectedId || bonusGenerating || !bonusCountValid || eventStarted) return;
+    setBonusGenerating(true);
+    setError('');
+    try {
+      const { tickets: issued, referCredit } = await createRaffleBonusTickets(selectedId, bonusCountNum);
+      setTickets((prev) => [...prev, ...issued]);
+      setRefer((prev) => ({ ...prev, credit: referCredit }));
+      setBonusCount(referCredit > 0 ? String(referCredit * refer.per) : '');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not create your bonus raffles. Please try again.'));
+    } finally {
+      setBonusGenerating(false);
+    }
+  };
 
   const handleEventChange = (event) => {
     const nextId = event.target.value;
@@ -162,7 +229,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
     try {
       const { ticket: issued, alreadyHad, message } = await createRaffleTicket(selectedId);
       if (issued) {
-        setTickets((prev) => [...prev.filter((t) => t.eventId !== issued.eventId), issued]);
+        setTickets((prev) => [...prev.filter((t) => t.eventId !== issued.eventId || t.bonus), issued]);
         if (!alreadyHad) setFreshEventIds((prev) => [...prev, issued.eventId]);
         if (alreadyHad && message) setAlreadyMessage(message);
       }
@@ -173,12 +240,19 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
     }
   };
 
+  const raffleOpenLine = selectedEvent ? (
+    <Typography sx={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 600 }}>
+      Raffle open {formatWindowTime(selectedEvent.raffleStart, selectedEvent.timeZone)} –{' '}
+      {formatWindowTime(selectedEvent.raffleEnd, selectedEvent.timeZone, true)}
+    </Typography>
+  ) : null;
+
   return (
     <ColorTemplate16PopupCenterWide open={open} onClose={onClose} maxWidth="min(620px, 94vw)">
       <ColorTemplate16PopupCenterWide.Title>{ticket ? 'Your Raffle' : 'Get My Raffle'}</ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 1.5 }}>
-          {ticket && !ticketIsFresh ? (
+          {ticket && !ticketIsFresh && refer.credit <= 0 ? (
             <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: RAFFLE_ALREADY_RED }}>{alreadyMessage}</Typography>
           ) : null}
           <TextField
@@ -203,12 +277,59 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
             ))}
           </TextField>
 
-          {selectedEvent && selectedEvent.raffleStart && selectedEvent.raffleEnd ? (
-            <Typography sx={{ textAlign: 'center', fontSize: '0.9rem', fontWeight: 600 }}>
-              Raffle open {formatWindowTime(selectedEvent.raffleStart, selectedEvent.timeZone)} –{' '}
-              {formatWindowTime(selectedEvent.raffleEnd, selectedEvent.timeZone, true)}
-            </Typography>
+          {!loading && selectedId && refer.credit > 0 ? (
+            <Box sx={bonusBoxSx}>
+              <Typography sx={{ fontFamily: 'serif', fontWeight: 800, fontSize: { xs: '1.25rem', sm: '1.4rem' }, lineHeight: 1.25 }}>
+                Congratulations! {refer.friends} {refer.friends === 1 ? 'friend' : 'friends'} you referred{' '}
+                {refer.friends === 1 ? 'has' : 'have'} registered.
+              </Typography>
+              <Typography sx={bonusTextSx}>
+                In addition to your own raffle ticket, you&apos;ve earned {refer.friends * refer.per} bonus tickets, for a total of{' '}
+                {1 + refer.friends * refer.per} raffle tickets.
+              </Typography>
+              <Typography sx={bonusTextSx}>How many tickets would you like to generate now?</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                <Typography component="label" htmlFor="raffle-bonus-count" sx={{ ...bonusTextSx, fontWeight: 800 }}>
+                  Number of tickets:
+                </Typography>
+                <Box
+                  component="input"
+                  id="raffle-bonus-count"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={bonusMax}
+                  value={bonusCount}
+                  disabled={eventStarted || bonusGenerating}
+                  onChange={(e) => setBonusCount(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  sx={{ width: 64, fontSize: '1.1rem', textAlign: 'center', border: '1px solid #333', borderRadius: 0.5, bgcolor: '#fff', color: '#000' }}
+                />
+                <Typography sx={bonusTextSx}>(up to {bonusMax})</Typography>
+              </Box>
+              <Box>
+                <ColorTemplate13DisableGreenButton
+                  type="button"
+                  hoverEnlargeFont
+                  disabled={eventStarted || bonusGenerating || !bonusCountValid}
+                  onClick={() => void handleGenerateBonus()}
+                  sx={{ fontWeight: 700, fontSize: '1rem', px: 2, ...raffleButtonColorSx }}
+                >
+                  {bonusGenerating ? 'Generating…' : 'Generate Raffles Tickets'}
+                </ColorTemplate13DisableGreenButton>
+              </Box>
+              {eventStarted ? (
+                <Typography sx={{ ...bonusTextSx, fontWeight: 800, color: RAFFLE_ALREADY_RED }}>
+                  The event has started — bonus tickets can no longer be generated.
+                </Typography>
+              ) : null}
+              <Typography sx={bonusTextSx}>
+                Already generated some? They&apos;re shown below. Scroll through and screenshot each one so you can match and claim them
+                at the event.
+              </Typography>
+            </Box>
           ) : null}
+
+          {selectedEvent && selectedEvent.raffleStart && selectedEvent.raffleEnd && !eventTickets.length ? raffleOpenLine : null}
 
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -223,7 +344,7 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
                 hoverEnlargeFont
                 disabled={generating}
                 onClick={() => void handleGenerate()}
-                sx={{ fontWeight: 800, fontSize: { xs: '1.05rem', sm: '1.2rem' }, px: 2.5 }}
+                sx={{ fontWeight: 800, fontSize: { xs: '1.05rem', sm: '1.2rem' }, px: 2.5, ...raffleButtonColorSx }}
               >
                 {generating ? 'Generating…' : 'Generate My Raffle'}
               </ColorTemplate13DisableGreenButton>
@@ -237,21 +358,42 @@ export default function GetMyRafflePopup({ open, onClose, initialEventId = null 
 
           {error ? <Typography sx={{ textAlign: 'center', fontWeight: 700, color: 'var(--theme-error-color)' }}>{error}</Typography> : null}
 
-          {ticket ? (
+          {eventTickets.length ? (
             <>
-              <RaffleTicketCard ticket={ticket} />
-              <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: '#5cc84a' }}>
-                Take a screenshot of this screen and bring it to the Meetup event.
-              </Typography>
-              <Typography sx={{ ...raffleNoticeBoxSx, bgcolor: '#ffe01b', fontWeight: 500, fontSize: '1.05rem' }}>
-                If the event host draws{' '}
-                <Box component="strong" sx={{ fontWeight: 800 }}>
-                  Raffle #{ticket.raffleNumber}
+              <Box sx={{ fontFamily: 'serif', color: '#111' }}>
+                <Typography sx={{ fontFamily: 'serif', fontWeight: 800, fontSize: '1.05rem', lineHeight: 1.3 }}>
+                  Don&apos;t forget to screenshot each of your raffle tickets and bring them to the event. Physical present at event
+                  required.
+                </Typography>
+                <Typography sx={{ fontFamily: 'serif', fontSize: '1rem', lineHeight: 1.35, mt: 0.75 }}>
+                  When the host calls out a winning number, check your tickets. If it matches one of yours, shout &ldquo;I win!&rdquo; and
+                  show your screenshot to the host to be scanned. Then come back to this site to claim your ${prizeDollars} prize, which
+                  will be sent to your Venmo or PayPal.
+                </Typography>
+              </Box>
+              {selectedEvent && selectedEvent.raffleStart && selectedEvent.raffleEnd ? raffleOpenLine : null}
+              {eventTickets.length > 1 ? (
+                <Box
+                  sx={{
+                    maxHeight: { xs: 380, sm: 440 },
+                    overflowY: 'scroll',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.25,
+                    pr: 0.75,
+                    border: '2px solid #000',
+                    p: 1
+                  }}
+                >
+                  {eventTickets.map((t) => (
+                    <Box key={t.verifyCode} sx={{ flexShrink: 0 }}>
+                      <RaffleTicketCard ticket={t} referCode={referCode} />
+                    </Box>
+                  ))}
                 </Box>
-                , Congratulation! you must present at event to claim it, have the host scan your phone screenshot of this raffle ticket
-                (else the host again draw a different raffle ticket), then return here to claim your $200 cash prize via PayPal, or
-                Venmo.
-              </Typography>
+              ) : (
+                <RaffleTicketCard ticket={eventTickets[0]} referCode={referCode} />
+              )}
             </>
           ) : null}
         </Box>

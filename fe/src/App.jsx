@@ -21,6 +21,7 @@ import { AuthProvider } from 'contexts/AuthContext';
 import { UiTestRecordingProvider } from 'contexts/UiTestRecordingContext';
 import GlobalClickSound from 'ui-component/GlobalClickSound';
 import GuestDemoGate from 'ui-component/GuestDemoGate';
+import GetMyRaffleTicketFloatingButton from 'ui-component/GetMyRaffleTicketFloatingButton';
 
 // ==============================|| APP ||============================== //
 
@@ -75,6 +76,7 @@ export default function App() {
                 <GlobalClickSound />
                 <GuestDemoGate />
                 <RouterProvider router={router} />
+                <GetMyRaffleTicketFloatingButton />
                 <TooManyRequestsModal />
                 <RateWarnPopup />
                 <SessionTimeoutWarning />

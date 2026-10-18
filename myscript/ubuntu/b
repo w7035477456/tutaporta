@@ -9,7 +9,15 @@ unalias -a
 alias testModel='curl -sS -X POST http://127.0.0.1:8765/keep-model -H "Content-Type: application/json" -d "{\"enabled\": true}" | python3 -m json.tool'
 alias testRagHealth='curl -sS http://127.0.0.1:8765/health | python3 -m json.tool'
 alias startOlama='cd ~/code/main && ./scripts/start-rag-service.sh'
+alias startaimodelbg='~/code/main/scripts/start-rag-service-bg.sh'
+alias diskspace='df -h /'
 alias checkOlama='curl -sS http://127.0.0.1:8765/health;curl -sS http://127.0.0.1:11434/api/tags'
+
+# Ollama (:11434) + TutaNotes RAG service (:8765) in the background — AI LLM RAG and Auto Scan Emails.
+# febeprod step 6 (so work2 / work2_deploy) runs this. Log: ~/code/main/rag_service/rag.log
+startllm() {
+    "$HOME/code/main/scripts/start-rag-service-bg.sh"
+}
 #----------------------
 
 backupUserAll() {
@@ -2975,6 +2983,8 @@ febeprod() {
     deployartifactverify || { echo "ERROR: deployartifactverify failed" >&2; return 1; }
     echo "=== febeprod 5/6: pm2restart ==="
     pm2restart || { echo "ERROR: pm2restart failed" >&2; return 1; }
+    echo "=== febeprod 6/6: startllm (Ollama + RAG service, OLLAMA_MODEL from ~/.ssh/be/.env) ==="
+    startllm || echo "WARN: RAG service not ready — site deployed; check rag_service/rag.log" >&2
     return 0
 }
 alias beprod='check_pg && (savedir; pm2 flush; cleancompileresetrunbeprod && deployartifactwrite && deployartifactverify && pm2restart)'

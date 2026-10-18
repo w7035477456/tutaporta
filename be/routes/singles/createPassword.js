@@ -10,6 +10,7 @@ import {
   respondIfDuplicatePhone
 } from '../../utils/duplicatePhonePolicy.js';
 import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
+import { processRaffleReferSignup } from '../../utils/raffleReferSignup.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { hashPassword } from '../../utils/passwordHash.js';
@@ -243,6 +244,7 @@ async function finishRegistrationAfterPhoneVerified(
         referByCode: account.referByCode,
         isNewAccount: true
       });
+      await processRaffleReferSignup({ newSinglesId: account.singlesId, email: emailNorm });
       await attachOrInsertSignupLoginLog(req, {
         singlesId: account.singlesId,
         email: emailNorm,

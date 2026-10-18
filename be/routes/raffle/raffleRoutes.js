@@ -66,6 +66,7 @@ function ticketPayload(row) {
     createdAt: row.raffle_generate_datetime,
     claimed: row.raffle_claimed === true,
     claimedAt: row.raffle_claimed_datetime || null,
+    bonus: row.raffle_bonus === true,
     paypalInfo: row.paypal_info || '',
     venmoInfo: row.venmo_info || '',
     prizePaid: row.raffle_prize_paid === true,
@@ -91,7 +92,8 @@ async function loadComboEvent(eventId) {
     `SELECT e.event_id, e.event_title, e.event_url, e.event_night_datetime, e.event_build_n_address,
             e.host_event_raffle_start, e.host_event_raffle_end, e.raffle_host_id, e.event_time_zone,
             h.host_full_name, h.host_url,
-            COALESCE(now() BETWEEN e.host_event_raffle_start AND e.host_event_raffle_end, false) AS raffle_open
+            COALESCE(now() BETWEEN e.host_event_raffle_start AND e.host_event_raffle_end, false) AS raffle_open,
+            COALESCE(now() >= e.event_night_datetime, false) AS night_passed
        FROM ${S}.raffle_event e
        JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
       WHERE e.event_id = $1 AND e.event_show_combo = true
@@ -106,17 +108,66 @@ async function ensureRaffleUserRow(singlesId, event) {
   await pool.query(
     `INSERT INTO ${S}.raffle_user (singles_id, raffle_host_id, event_id)
      VALUES ($1, $2, $3)
-     ON CONFLICT (singles_id, event_id) DO NOTHING`,
+     ON CONFLICT (singles_id, event_id) WHERE NOT raffle_bonus DO NOTHING`,
     [singlesId, event.raffle_host_id, event.event_id]
   );
   const { rows } = await pool.query(
     `SELECT raffle_user_id, event_id, raffle_number, raffle_generated_id, raffle_generate_datetime
        FROM ${S}.raffle_user
-      WHERE singles_id = $1 AND event_id = $2
+      WHERE singles_id = $1 AND event_id = $2 AND NOT raffle_bonus
       LIMIT 1`,
     [singlesId, event.event_id]
   );
   return rows[0] || null;
+}
+
+/** Permanent 4-digit Friend Refer Code (singles.raffle_refer_code); assigned once, reused across every event. */
+async function ensureRaffleReferCode(singlesId) {
+  for (let attempt = 0; attempt < MAX_GENERATE_ATTEMPTS; attempt += 1) {
+    try {
+      const { rows } = await pool.query(
+        `WITH assigned AS (
+           UPDATE ${S}.singles s
+              SET raffle_refer_code = (
+                SELECT n::text FROM generate_series(1000, 9999) AS n
+                 WHERE NOT EXISTS (SELECT 1 FROM ${S}.singles t WHERE t.raffle_refer_code = n::text)
+                 ORDER BY random()
+                 LIMIT 1
+              )
+            WHERE s.singles_id = $1 AND s.raffle_refer_code IS NULL
+            RETURNING s.raffle_refer_code
+         )
+         SELECT raffle_refer_code FROM assigned
+         UNION ALL
+         SELECT raffle_refer_code FROM ${S}.singles WHERE singles_id = $1 AND raffle_refer_code IS NOT NULL
+         LIMIT 1`,
+        [singlesId]
+      );
+      return String(rows[0]?.raffle_refer_code || '');
+    } catch (err) {
+      if (err?.code !== '23505') throw err;
+    }
+  }
+  return '';
+}
+
+/** Bonus raffle tickets per referral credit (~/.ssh/be/.env RAFFLE_PER_REFER, default 2). */
+export function rafflePerRefer() {
+  const n = Number.parseInt(process.env.RAFFLE_PER_REFER, 10);
+  return Number.isInteger(n) && n >= 1 ? n : 2;
+}
+
+/** Remaining singles.raffle_refer_credit + how many friends ever registered with this member's code. */
+async function loadReferStats(singlesId) {
+  const { rows } = await pool.query(
+    `SELECT s.raffle_refer_credit,
+            (SELECT count(*)::int FROM ${S}.singles f
+              WHERE s.raffle_refer_code IS NOT NULL AND f.raffle_refer_by_code = s.raffle_refer_code
+                AND f.singles_id <> s.singles_id) AS friends
+       FROM ${S}.singles s WHERE s.singles_id = $1`,
+    [singlesId]
+  );
+  return { credit: Number(rows[0]?.raffle_refer_credit) || 0, friends: Number(rows[0]?.friends) || 0 };
 }
 
 export async function loadSinglesForLog(singlesId) {
@@ -156,16 +207,31 @@ export async function getRaffleState(req, res) {
     const { rows: ticketRows } = await pool.query(
       `SELECT u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime,
               u.raffle_claimed, u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
-              u.raffle_prize_paid, u.raffle_prize_paid_datetime,
+              u.raffle_prize_paid, u.raffle_prize_paid_datetime, u.raffle_bonus,
               e.event_title, e.event_build_n_address, h.host_full_name
          FROM ${S}.raffle_user u
          JOIN ${S}.raffle_event e ON e.event_id = u.event_id
          JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
         WHERE u.singles_id = $1 AND u.raffle_number IS NOT NULL
-        ORDER BY u.raffle_generate_datetime`,
+        ORDER BY u.raffle_bonus, u.raffle_generate_datetime, u.raffle_user_id`,
       [singlesId]
     );
+    const refer = await loadReferStats(singlesId).catch((err) => {
+      console.error('[raffle] refer stats failed:', err?.message || err);
+      return { credit: 0, friends: 0 };
+    });
+    const referCode =
+      req.auth?.guest_demo_login === true
+        ? ''
+        : await ensureRaffleReferCode(singlesId).catch((err) => {
+            console.error('[raffle] refer code failed:', err?.message || err);
+            return '';
+          });
     return res.json({
+      referCode,
+      referCredit: refer.credit,
+      referFriends: refer.friends,
+      rafflePerRefer: rafflePerRefer(),
       events: eventRows.map((row) => ({
         eventId: Number(row.event_id),
         label: eventLabel(row),
@@ -306,6 +372,128 @@ export async function postRaffleTicket(req, res) {
   } catch (err) {
     console.error('[raffle] generate failed:', err?.message || err);
     return res.status(500).json({ error: 'Could not create your raffle. Please try again.' });
+  }
+}
+
+/**
+ * POST /api/raffle/bonus-tickets { eventId, count } — spend singles.raffle_refer_credit on extra tickets.
+ *   Each credit = rafflePerRefer() tickets; count up to credit × per; credits used = ceil(count / per).
+ *   Closed from event_night_datetime (event start) on. New rows: raffle_bonus = true, appended to existing ones.
+ */
+export async function postRaffleBonusTickets(req, res) {
+  const singlesId = authSinglesId(req);
+  if (!singlesId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.auth?.guest_demo_login === true) {
+    return res.status(403).json({ error: 'Please log in or sign up with your own account to get a raffle.' });
+  }
+  const eventId = parseEventId(req.body?.eventId);
+  const count = Number(req.body?.count);
+  if (!eventId) return res.status(400).json({ error: 'Please choose an event.' });
+  if (!Number.isInteger(count) || count < 1) return res.status(400).json({ error: 'Please enter how many tickets to generate.' });
+
+  const per = rafflePerRefer();
+  const client = await pool.connect();
+  try {
+    const event = await loadComboEvent(eventId);
+    if (!event) return res.status(400).json({ error: 'Please choose an event.' });
+    if (event.night_passed) {
+      return res.status(403).json({ error: 'Bonus raffle tickets closed when the event started.' });
+    }
+
+    await client.query('BEGIN');
+    const { rows: creditRows } = await client.query(
+      `SELECT raffle_refer_credit FROM ${S}.singles WHERE singles_id = $1 FOR UPDATE`,
+      [singlesId]
+    );
+    const credit = Number(creditRows[0]?.raffle_refer_credit) || 0;
+    const maxTickets = credit * per;
+    if (count > maxTickets) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: maxTickets ? `You can generate up to ${maxTickets} bonus tickets.` : 'You have no bonus raffle tickets left.'
+      });
+    }
+    const creditsUsed = Math.ceil(count / per);
+
+    const issued = [];
+    for (let i = 0; i < count; i += 1) {
+      let row = null;
+      for (let attempt = 0; attempt < MAX_GENERATE_ATTEMPTS && !row; attempt += 1) {
+        await client.query('SAVEPOINT bonus_ticket');
+        try {
+          const { rows } = await client.query(
+            `INSERT INTO ${S}.raffle_user
+               (singles_id, raffle_host_id, event_id, raffle_bonus, raffle_bonus_batch_count, raffle_bonus_credits_used,
+                raffle_number, raffle_generated_id, raffle_generate_datetime)
+             SELECT $1, $2, $3, true, $4, $5, pick.n, $6, now()
+               FROM (
+                 SELECT n FROM generate_series(1, 1000) AS n
+                  WHERE NOT EXISTS (SELECT 1 FROM ${S}.raffle_user t WHERE t.event_id = $3 AND t.raffle_number = n)
+                  ORDER BY random()
+                  LIMIT 1
+               ) AS pick
+             RETURNING raffle_user_id, event_id, raffle_number, raffle_generated_id, raffle_generate_datetime, raffle_bonus`,
+            [singlesId, event.raffle_host_id, event.event_id, count, creditsUsed, newVerifyCode()]
+          );
+          await client.query('RELEASE SAVEPOINT bonus_ticket');
+          if (!rows[0]) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'All 1,000 raffle numbers for this event are taken.' });
+          }
+          row = rows[0];
+        } catch (err) {
+          await client.query('ROLLBACK TO SAVEPOINT bonus_ticket');
+          if (err?.code !== '23505') throw err;
+        }
+      }
+      if (!row) {
+        await client.query('ROLLBACK');
+        return res.status(503).json({ error: 'Raffle is busy right now. Please try again.' });
+      }
+      issued.push(row);
+    }
+
+    const { rows: updated } = await client.query(
+      `UPDATE ${S}.singles SET raffle_refer_credit = raffle_refer_credit - $2
+        WHERE singles_id = $1 RETURNING raffle_refer_credit`,
+      [singlesId, creditsUsed]
+    );
+    await client.query('COMMIT');
+
+    const who = await loadSinglesForLog(singlesId).catch(() => ({ email: '', fullname: '' }));
+    for (const t of issued) {
+      appendRaffleHardCopy({
+        raffleNumber: t.raffle_number,
+        raffleGenerateId: formatVerifyCode(t.raffle_generated_id),
+        raffleGenerateDatetime: t.raffle_generate_datetime,
+        singlesId,
+        singlesEmail: who.email,
+        singlesFullname: who.fullname,
+        eventTitle: `${event.event_title} [bonus]`,
+        hostFullName: event.host_full_name,
+        hostUrl: event.host_url,
+        hostEventStart: event.host_event_raffle_start,
+        hostEventEnd: event.host_event_raffle_end
+      });
+    }
+
+    const withEvent = (r) => ({
+      ...r,
+      event_title: event.event_title,
+      event_build_n_address: event.event_build_n_address,
+      host_full_name: event.host_full_name
+    });
+    return res.status(201).json({
+      tickets: issued.map((t) => ticketPayload(withEvent(t))),
+      referCredit: Number(updated[0]?.raffle_refer_credit) || 0,
+      creditsUsed
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[raffle] bonus generate failed:', err?.message || err);
+    return res.status(500).json({ error: 'Could not create your bonus raffles. Please try again.' });
+  } finally {
+    client.release();
   }
 }
 

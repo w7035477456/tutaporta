@@ -482,7 +482,14 @@ import {
   putUserCustomization,
   putUserZipFolder
 } from './routes/user/userCustomization.js';
-import { getRaffleState, postRafflePayout, postRaffleSelect, postRaffleTicket } from './routes/raffle/raffleRoutes.js';
+import {
+  getRaffleState,
+  postRaffleBonusTickets,
+  postRafflePayout,
+  postRaffleSelect,
+  postRaffleTicket
+} from './routes/raffle/raffleRoutes.js';
+import { getRaffleReferCodeValidate } from './utils/raffleReferSignup.js';
 import {
   getRaffleHostEvents,
   postRaffleHostDraw,
@@ -538,6 +545,12 @@ import {
 import { getMonthlyBill, putMonthlyBill } from './routes/recordVault/monthlyBillRoutes.js';
 import { getYearlyBill, putYearlyBill } from './routes/recordVault/yearlyBillRoutes.js';
 import { transferBillSchedule } from './routes/recordVault/billScheduleTransferRoutes.js';
+import {
+  getEmailScanStatus,
+  postEmailScanInbox,
+  postEmailScanRun
+} from './routes/recordVault/emailScanRoutes.js';
+import { startEmailScanPoller } from './utils/emailScan.js';
 import {
   postPaidRecordEnsure,
   getPaidRecord,
@@ -1761,6 +1774,9 @@ app.put('/api/monthlyBill', requireAuth, putMonthlyBill);
 app.get('/api/yearlyBill', requireAuth, getYearlyBill);
 app.put('/api/yearlyBill', requireAuth, putYearlyBill);
 app.post('/api/billSchedule/transfer', requireAuth, transferBillSchedule);
+app.post('/api/emailScan/inbox', requireAuth, postEmailScanInbox);
+app.get('/api/emailScan/status', requireAuth, getEmailScanStatus);
+app.post('/api/emailScan/run', requireAuth, postEmailScanRun);
 
 app.post('/api/paidRecord/ensure', requireAuth, postPaidRecordEnsure);
 app.get('/api/paidRecord/:id', requireAuth, getPaidRecord);
@@ -1787,8 +1803,10 @@ app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoa
 app.get('/api/user/customization/zip-folder', requireAuth, getUserZipFolder);
 app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
+app.get('/api/raffle/refer-code/validate', getRaffleReferCodeValidate);
 app.post('/api/raffle/select', requireAuth, postRaffleSelect);
 app.post('/api/raffle/tickets', requireAuth, postRaffleTicket);
+app.post('/api/raffle/bonus-tickets', requireAuth, postRaffleBonusTickets);
 app.post('/api/raffle/payout', requireAuth, postRafflePayout);
 app.get('/api/raffle/host/events', getRaffleHostEvents);
 app.post('/api/raffle/host/login', postRaffleHostLogin);
@@ -1963,6 +1981,11 @@ httpServer.listen(PORT, () => {
     startBillOverdueEmailDaily();
   } catch (err) {
     console.error('[startup] bill overdue email schedule failed:', err?.message ?? err);
+  }
+  try {
+    startEmailScanPoller();
+  } catch (err) {
+    console.error('[startup] email scan poller failed:', err?.message ?? err);
   }
 });
 

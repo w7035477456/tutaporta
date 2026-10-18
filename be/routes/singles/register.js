@@ -16,6 +16,12 @@ import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { getUsSignupPhoneValidationMessage, validateUsSignupPhone } from '../../utils/usPhoneValidation.js';
 import { insertSignupLoginLog } from '../../utils/loginLog.js';
 import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
+import {
+  RAFFLE_REFER_INVALID_MESSAGE,
+  clearRaffleReferPending,
+  raffleReferCodeExists,
+  saveRaffleReferPending
+} from '../../utils/raffleReferSignup.js';
 
 const EMAIL_EXISTS_ERROR = 'This email already exist in out system. Please double check your email.';
 const CODE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -58,7 +64,7 @@ export function buildRegistrationVerifyEmailUrl({ base, refRaw }) {
 
 export async function registerUser(req, res) {
   try {
-    const { email, phone: phoneRaw, ref: refRaw, referByCode: referByCodeRaw, token: tokenRaw } = req.body;
+    const { email, phone: phoneRaw, ref: refRaw, referByCode: referByCodeRaw, token: tokenRaw, raffleReferCode } = req.body;
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
@@ -68,6 +74,11 @@ export async function registerUser(req, res) {
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailPattern.test(emailTrimmed)) {
       return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const raffleReferRaw = String(raffleReferCode ?? '').trim();
+    if (raffleReferRaw && !(await raffleReferCodeExists(raffleReferRaw))) {
+      return res.status(400).json({ error: RAFFLE_REFER_INVALID_MESSAGE, raffleReferInvalid: true });
     }
 
     if (phoneRaw != null && String(phoneRaw).trim() !== '') {
@@ -150,6 +161,8 @@ export async function registerUser(req, res) {
          VALUES ($1, $2, $3, 'registration_email', $4)`,
         [emailTrimmed, code, registrationMetaJson, expiresAt]
       );
+      if (raffleReferRaw) await saveRaffleReferPending(emailTrimmed, raffleReferRaw);
+      else await clearRaffleReferPending(emailTrimmed);
     } catch (dbErr) {
       console.error('[register] DB error saving verification:', dbErr);
       return res.status(500).json({

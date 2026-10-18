@@ -1,6 +1,7 @@
 import api from 'api/axios';
 import { readStoredSignupReferralCode } from 'utils/signupReferralCode';
 import { readStoredGoogleSignupToken } from 'utils/googleSignupOAuth';
+import { clearSignupRaffleReferCode, readSignupRaffleReferCode } from 'utils/raffleReferCode';
 
 /**
  * Finish Google signup after SMS verify (no password UI, no auto-login).
@@ -15,7 +16,9 @@ export async function completeGoogleSignup({ email, phone, signupToken, termsAcc
     signupToken: token,
     termsAccepted: Boolean(termsAccepted),
     ref: ref || undefined,
-    token: ref || undefined
+    token: ref || undefined,
+    raffleReferCode: readSignupRaffleReferCode() || undefined
   });
+  clearSignupRaffleReferCode();
   return data;
 }

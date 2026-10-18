@@ -9,6 +9,7 @@ import { formatPhoneForDuplicateCheck, respondIfDuplicatePhone } from '../../uti
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
+import { processRaffleReferSignup } from '../../utils/raffleReferSignup.js';
 import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
 import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 
@@ -190,6 +191,7 @@ export async function verifyPhone(req, res) {
           referByCode: account.referByCode,
           isNewAccount: true
         });
+        await processRaffleReferSignup({ newSinglesId: account.singlesId, email: emailNorm });
         await attachOrInsertSignupLoginLog(req, {
           singlesId: account.singlesId,
           email: emailNorm,

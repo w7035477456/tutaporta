@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import { raffleButtonColorSx } from 'config/raffleButtonColors';
 import GetMyRafflePopup from 'ui-component/GetMyRafflePopup';
 import { fetchRaffleState, submitRafflePayout } from 'api/raffleFe';
 
@@ -21,7 +22,14 @@ const fieldSx = {
   fontFamily: 'inherit'
 };
 
-const pillSx = { whiteSpace: 'nowrap', fontWeight: 800, fontSize: { xs: '1.05rem', sm: '1.2rem' }, px: 2.5, alignSelf: 'center' };
+const pillSx = {
+  whiteSpace: 'nowrap',
+  fontWeight: 800,
+  fontSize: { xs: '1.05rem', sm: '1.2rem' },
+  px: 2.5,
+  alignSelf: 'center',
+  ...raffleButtonColorSx
+};
 
 function apiErrorMessage(err, fallback) {
   return String(err?.response?.data?.error || '').trim() || fallback;

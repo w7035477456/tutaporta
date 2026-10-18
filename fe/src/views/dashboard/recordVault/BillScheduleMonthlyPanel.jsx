@@ -14,7 +14,12 @@ import BillColumnButton from './BillColumnButton';
 import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
-import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
+import AutoScanEmailsPopup from './AutoScanEmailsPopup';
+import {
+  BILL_SCHEDULE_PENDING_ROW_STYLE,
+  billScheduleApproveBtnSx,
+  billScheduleRemoveRowBtnSx
+} from './billScheduleConstants';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
   BILL_SCHEDULE_INK,
@@ -154,6 +159,7 @@ export default function BillScheduleMonthlyPanel({
   const [iconPickerIndex, setIconPickerIndex] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
+  const [autoScanOpen, setAutoScanOpen] = useState(false);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const storageKey =
@@ -246,7 +252,8 @@ export default function BillScheduleMonthlyPanel({
           bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
           action: r.bill_type === 'Auto' ? null : r.action,
           paid_record_id: r.paid_record_id,
-          bill_icon: r.bill_icon || null
+          bill_icon: r.bill_icon || null,
+          email_scan_pending: r.email_scan_pending === true
         }));
         const data = await saveMonthlyBill(year, month, payload, { storageType: storageKey });
         const next = withDerived(data?.rows || [], year, month);
@@ -373,6 +380,19 @@ export default function BillScheduleMonthlyPanel({
     setSavedMsg('');
     await persistSchedule();
   };
+
+  const handleApproveRow = async (index) => {
+    const next = updateRow(index, { email_scan_pending: false });
+    await persistSchedule(next);
+  };
+
+  const handleAutoScanFinished = useCallback(() => {
+    if (dirty) {
+      setSavedMsg('Auto Scan found new bills — click SAVE, then reopen this month to see them.');
+      return;
+    }
+    notifyRecordVaultTreeReload(null);
+  }, [dirty]);
 
   const calendarMarks = useMemo(() => {
     const map = new Map();
@@ -552,7 +572,10 @@ export default function BillScheduleMonthlyPanel({
             return (
               <tr
                 key={`bill-row-${row.row_index}-${index}`}
-                style={paid ? { background: PAID_ROW_BG } : undefined}
+                style={{
+                  ...(paid ? { background: PAID_ROW_BG } : null),
+                  ...(row.email_scan_pending ? BILL_SCHEDULE_PENDING_ROW_STYLE : null)
+                }}
               >
                 <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
                 <td style={{ textAlign: 'center' }}>
@@ -572,6 +595,18 @@ export default function BillScheduleMonthlyPanel({
                       placeholder="Bill description"
                       sx={{ ...inputSx, flex: 1, minWidth: 0 }}
                     />
+                    {row.email_scan_pending ? (
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="Approve scanned bill"
+                        disabled={loading || saving}
+                        onClick={() => void handleApproveRow(index)}
+                        sx={billScheduleApproveBtnSx}
+                      >
+                        Approve
+                      </Box>
+                    ) : null}
                     <Box
                       component="button"
                       type="button"
@@ -702,6 +737,9 @@ export default function BillScheduleMonthlyPanel({
       >
         <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
           Add
+        </ColorTemplate13DisableGreenButton>
+        <ColorTemplate13DisableGreenButton type="button" onClick={() => setAutoScanOpen(true)} disabled={loading}>
+          Auto Scan Emails
         </ColorTemplate13DisableGreenButton>
         <ColorTemplate13DisableGreenButton
           type="button"
@@ -933,6 +971,13 @@ export default function BillScheduleMonthlyPanel({
         selectedIcon={iconPickerIndex != null ? rows[iconPickerIndex]?.bill_icon : null}
         onSelect={(iconName) => void handlePickBillIcon(iconName)}
         onClose={() => setIconPickerIndex(null)}
+      />
+
+      <AutoScanEmailsPopup
+        open={autoScanOpen}
+        onClose={() => setAutoScanOpen(false)}
+        storageType={storageKey}
+        onScanFinished={handleAutoScanFinished}
       />
 
       {billPopupOpen ? (

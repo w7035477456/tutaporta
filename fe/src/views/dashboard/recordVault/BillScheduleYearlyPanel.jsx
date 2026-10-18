@@ -14,7 +14,11 @@ import BillColumnButton from './BillColumnButton';
 import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
-import { billScheduleRemoveRowBtnSx } from './billScheduleConstants';
+import {
+  BILL_SCHEDULE_PENDING_ROW_STYLE,
+  billScheduleApproveBtnSx,
+  billScheduleRemoveRowBtnSx
+} from './billScheduleConstants';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
   BILL_SCHEDULE_INK,
@@ -327,7 +331,8 @@ export default function BillScheduleYearlyPanel({
           bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
           action: r.bill_type === 'Auto' ? null : r.action,
           paid_record_id: r.paid_record_id,
-          bill_icon: r.bill_icon || null
+          bill_icon: r.bill_icon || null,
+          email_scan_pending: r.email_scan_pending === true
         }));
         const data = await saveYearlyBill(year, payload, { storageType: storageKey });
         const next = withDerived(data?.rows || [], year);
@@ -453,6 +458,11 @@ export default function BillScheduleYearlyPanel({
   const handleSave = async () => {
     setSavedMsg('');
     await persistSchedule();
+  };
+
+  const handleApproveRow = async (index) => {
+    const next = updateRow(index, { email_scan_pending: false });
+    await persistSchedule(next);
   };
 
   /** marksByMonth: Map<month, Map<day, tone>> */
@@ -619,7 +629,10 @@ export default function BillScheduleYearlyPanel({
             return (
               <tr
                 key={`ybill-row-${row.row_index}-${index}`}
-                style={paid ? { background: PAID_ROW_BG } : undefined}
+                style={{
+                  ...(paid ? { background: PAID_ROW_BG } : null),
+                  ...(row.email_scan_pending ? BILL_SCHEDULE_PENDING_ROW_STYLE : null)
+                }}
               >
                 <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
                 <td style={{ textAlign: 'center' }}>
@@ -639,6 +652,18 @@ export default function BillScheduleYearlyPanel({
                       placeholder="Bill description"
                       sx={{ ...inputSx, flex: 1, minWidth: 0 }}
                     />
+                    {row.email_scan_pending ? (
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="Approve scanned bill"
+                        disabled={loading || saving}
+                        onClick={() => void handleApproveRow(index)}
+                        sx={billScheduleApproveBtnSx}
+                      >
+                        Approve
+                      </Box>
+                    ) : null}
                     <Box
                       component="button"
                       type="button"

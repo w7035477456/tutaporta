@@ -16,6 +16,11 @@ import { getUsSignupPhoneValidationMessage, validateUsSignupPhone } from '../../
 import { resolveSignupMemberCategory } from '../../utils/signupMemberCategory.js';
 import { resolveReferByCodeForSignup } from '../../utils/referByCode.js';
 import { processReferralSignupReward } from '../../utils/referralSignupReward.js';
+import {
+  normalizeRaffleReferCode,
+  processRaffleReferSignup,
+  saveRaffleReferPending
+} from '../../utils/raffleReferSignup.js';
 import { attachOrInsertSignupLoginLog } from '../../utils/loginLog.js';
 import { isBypassSmsPhoneVerificationEnabled } from '../../utils/bypassSmsPhoneVerification.js';
 
@@ -581,6 +586,11 @@ export async function googleSignupComplete(req, res) {
       referByCode: account.referByCode,
       isNewAccount: true
     });
+
+    if (normalizeRaffleReferCode(req.body?.raffleReferCode)) {
+      await saveRaffleReferPending(emailNorm, req.body.raffleReferCode).catch(() => false);
+    }
+    await processRaffleReferSignup({ newSinglesId: account.singlesId, email: emailNorm });
 
     await attachOrInsertSignupLoginLog(req, {
       singlesId: account.singlesId,

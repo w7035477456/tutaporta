@@ -118,7 +118,7 @@ export function buildRefereeRewardDescription(referrerMemberId, when = new Date(
   return `Referee reward, 1 token for signing up with valid referer code by ${referrerLabel} on ${whenText}. Congratulations.`;
 }
 
-function isSmtpConfigured() {
+export function isSmtpConfigured() {
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
   return Boolean(
@@ -129,7 +129,7 @@ function isSmtpConfigured() {
   );
 }
 
-function createTransporter() {
+export function createTransporter() {
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
   const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';

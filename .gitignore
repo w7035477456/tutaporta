@@ -35,6 +35,7 @@ be/usb/
 
 # Python RAG microservice local venv
 rag_service/.venv/
+rag_service/*.log
 
 # USB bridge desktop — installers live in repo-root usb/ after build
 be/recordVaultBridge/desktop/dist/

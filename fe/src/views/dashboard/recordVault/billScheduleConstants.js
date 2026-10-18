@@ -65,6 +65,29 @@ export const billScheduleRemoveRowBtnSx = {
   borderRadius: 0.5
 };
 
+/** Green Approve control beside × on rows added by Auto Scan Emails. */
+export const billScheduleApproveBtnSx = {
+  height: 24,
+  flexShrink: 0,
+  px: 1,
+  border: '1px solid #000',
+  bgcolor: '#43a047',
+  color: '#fff',
+  fontWeight: 800,
+  fontSize: '0.75rem',
+  lineHeight: 1,
+  cursor: 'pointer',
+  borderRadius: 0.5,
+  '&:hover': { filter: 'brightness(1.1)' },
+  '&:disabled': { opacity: 0.5, cursor: 'default' }
+};
+
+/** Red dashed outline on Auto Scan rows until Approve is clicked. */
+export const BILL_SCHEDULE_PENDING_ROW_STYLE = {
+  outline: '3px dashed #e53935',
+  outlineOffset: '-3px'
+};
+
 export function buildBillScheduleNotebook() {
   return {
     notebook_id: BILL_SCHEDULE_NOTEBOOK_ID,

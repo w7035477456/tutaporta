@@ -44,7 +44,7 @@ def _load_rag_keys_from_be_env() -> None:
 _load_rag_keys_from_be_env()
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3:30b-a3b")
 OLLAMA_KEEP_ALIVE_DEFAULT = os.environ.get("OLLAMA_KEEP_ALIVE", "5m")
 OLLAMA_KEEP_ALIVE_PINNED = os.environ.get("OLLAMA_KEEP_ALIVE_PINNED", "-1")
 CHUNK_SIZE = int(os.environ.get("RAG_CHUNK_SIZE", "900"))

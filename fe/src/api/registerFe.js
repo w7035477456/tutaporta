@@ -15,7 +15,8 @@ export const registerUser = async (email, phone, options = {}) => {
       email,
       phone: phone || undefined,
       ref: ref || undefined,
-      token: ref || undefined
+      token: ref || undefined,
+      raffleReferCode: options.raffleReferCode || undefined
     })
   });
 
