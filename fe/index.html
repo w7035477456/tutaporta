@@ -6,7 +6,8 @@
     <link rel="icon" type="image/png" href="/tutaMallNeon.png" />
     <link rel="icon" type="image/x-icon" href="/tutaMallNeon.ico" />
     <link rel="apple-touch-icon" href="/tutaMallNeon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- use-credentials: Cloudflare challenges /manifest.webmanifest; without the cf_clearance cookie Chrome gets HTML and never offers install -->
+    <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <meta name="apple-mobile-web-app-title" content="TutaMall">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">

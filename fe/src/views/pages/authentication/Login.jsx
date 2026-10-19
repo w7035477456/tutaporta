@@ -165,7 +165,7 @@ function Login() {
                   })}
                 >
                   <Box component="span" sx={{ display: 'block' }}>
-                    Login TutaMall.com
+                    Login
                   </Box>
                 </Typography>
                 <Typography
