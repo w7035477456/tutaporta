@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -7,11 +7,7 @@ import Typography from '@mui/material/Typography';
 import { useAuth } from 'contexts/AuthContext';
 import { useSiteAudio } from 'contexts/SiteAudioContext';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
-import {
-  markMobileTutaDatesUploadPending,
-  markMobileTutaNotesUploadPending,
-  markMobileTutaPhotoUploadPending
-} from 'utils/mobilePostLoginChoice';
+import { requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
 import { fetchUserCustomization } from 'api/userCustomizationFe';
 import MallAppEnrollmentDialog from 'ui-component/MallAppEnrollmentDialog';
 import MallRafflePanel from 'ui-component/MallRafflePanel';
@@ -41,8 +37,14 @@ import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSess
 
 const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
 
-/** Compact/mobile: these mall tiles open that product's upload popup only (never the desktop app). */
-const MOBILE_UPLOAD_REDIRECT_TILE_IDS = new Set(['vsingles', 'photoAlbums', 'recordVault']);
+/** Compact/mobile: these mall tiles stay on desktop — show a notice instead of opening the app. */
+const DESKTOP_ONLY_TILE_IDS = new Set(['vsingles', 'photoAlbums', 'recordVault']);
+
+const DESKTOP_ONLY_TILE_LABEL = {
+  vsingles: 'TutaDates',
+  photoAlbums: 'TutaPhoto',
+  recordVault: 'TutaNotes'
+};
 
 /** Mall tiles gated by user_customization enrollment flags. */
 const ENROLLMENT_TILE_TO_FLAG = {
@@ -104,7 +106,6 @@ function getMallStageSize(cols, rows) {
 
 export default function Landing() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { mediaVolume } = useSiteAudio();
   const isCompact = useCompactLoginViewport();
   const audioContextRef = useRef(null);
@@ -209,32 +210,12 @@ export default function Landing() {
     setEnrollmentForcedOpen(true);
   }, []);
 
-  /** Phone mall: each tile opens that product's upload popup only — never the desktop workspace. */
-  const openMobileProductUpload = useCallback(
-    (tileId, event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      if (!isTileEnrolled(tileId)) {
-        setEnrollmentForcedOpen(true);
-        return;
-      }
-      if (tileId === 'recordVault') {
-        markMobileTutaNotesUploadPending();
-        navigate(`${MY_RECORD_VAULT_PATH}?mobileUpload=1`);
-        return;
-      }
-      if (tileId === 'photoAlbums') {
-        markMobileTutaPhotoUploadPending();
-        navigate(`${MY_PHOTO_ALBUMS_PATH}?mobileUpload=1`);
-        return;
-      }
-      if (tileId === 'vsingles') {
-        markMobileTutaDatesUploadPending();
-        navigate('/myStory?mobileUpload=1');
-      }
-    },
-    [isTileEnrolled, navigate]
-  );
+  /** Phone mall: TutaDates / TutaNotes / TutaPhoto stay on a desktop screen. */
+  const openDesktopOnlyApp = useCallback((tileId, event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    requestDesktopOnlyAppsNotice(DESKTOP_ONLY_TILE_LABEL[tileId] || '');
+  }, []);
 
   const visibleDepartments = useMemo(() => {
     const memberKeys = [user?.member_id, user?.member_category]
@@ -401,13 +382,13 @@ export default function Landing() {
               const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
               const gateTutaDatesStatus = !gateUpgrade && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
               const gateEnrollment = !gateUpgrade && !gateTutaDatesStatus && !isTileEnrolled(d.id);
-              const gateMobileUpload =
+              const gateDesktopOnly =
                 !gateUpgrade &&
                 !gateTutaDatesStatus &&
                 !gateEnrollment &&
                 isCompact &&
-                MOBILE_UPLOAD_REDIRECT_TILE_IDS.has(d.id);
-              const tileActivatesPopup = gateUpgrade || gateTutaDatesStatus || gateEnrollment || gateMobileUpload;
+                DESKTOP_ONLY_TILE_IDS.has(d.id);
+              const tileActivatesPopup = gateUpgrade || gateTutaDatesStatus || gateEnrollment || gateDesktopOnly;
               const isLink = Boolean(d.url) && !tileActivatesPopup;
               const onTileActivate = gateUpgrade
                 ? openUpgradePopup
@@ -415,8 +396,8 @@ export default function Landing() {
                   ? openTutaDatesStatusBlocked
                   : gateEnrollment
                     ? openEnrollmentToEnableApp
-                    : gateMobileUpload
-                      ? (event) => openMobileProductUpload(d.id, event)
+                    : gateDesktopOnly
+                      ? (event) => openDesktopOnlyApp(d.id, event)
                       : undefined;
 
               return (

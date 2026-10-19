@@ -36,6 +36,7 @@ import { parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { isRecordVaultRagUiEnabled } from 'config/recordVaultRagUiEnv';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
 import {
   clearMobileTutaNotesUploadSession,
   consumeMobileTutaNotesUploadPending,
@@ -377,17 +378,12 @@ export default function MyRecordVault() {
     })();
   }, [isCompactViewport, mobileTutaNotesUploadSession, tutaCloudOffered, localUsbOffered]);
 
-  /** Phone: only mall ↔ upload popup — never the desktop TutaNotes workspace. */
+  /** Phone: TutaNotes stays on a desktop screen. */
   useEffect(() => {
     if (!isCompactViewport) return;
-    const uploadIntent =
-      searchParams.get('mobileUpload') === '1' ||
-      peekMobileTutaNotesUploadPending() ||
-      peekMobileTutaNotesUploadSession();
-    if (!uploadIntent) {
-      navigate('/mall', { replace: true });
-    }
-  }, [isCompactViewport, searchParams, navigate]);
+    requestDesktopOnlyAppsNotice('TutaNotes');
+    navigate('/mall', { replace: true });
+  }, [isCompactViewport, navigate]);
 
   useEffect(() => {
     // Yellow E2E: DEK lives only in this tab — clear on each /myNote visit.

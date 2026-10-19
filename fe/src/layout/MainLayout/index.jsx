@@ -40,6 +40,9 @@ import AdminImpersonationBanner from 'ui-component/AdminImpersonationBanner';
 import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeaderCenter';
 import DemoOnlyModeBanner from 'ui-component/DemoOnlyModeBanner';
 import MobilePostLoginChooserDialog from 'ui-component/MobilePostLoginChooserDialog';
+import DesktopOnlyAppsDialog from 'ui-component/DesktopOnlyAppsDialog';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { desktopOnlyAppForPath, requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
 import { getAdminImpersonationHeaderState, adminImpersonationHeaderCenterWrapSx } from 'config/adminImpersonationHeader';
 import LegacyPasswordUpgradeDialog from 'views/auth-forms/LegacyPasswordUpgradeDialog';
 import RecordVaultLeaveBusyOverlay from 'ui-component/RecordVaultLeaveBusyOverlay';
@@ -130,7 +133,8 @@ export default function MainLayout() {
   const mobileEdgeToEdge = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, requiresPasswordUpgrade, upgradeLegacyPassword, refreshSessionStatus } = useAuth();
+  const { user, loading: authLoading, requiresPasswordUpgrade, upgradeLegacyPassword, refreshSessionStatus } = useAuth();
+  const isCompactViewport = useCompactLoginViewport();
   const hasUser = Boolean(user);
 
   // Admin Tools may change singles.status (e.g. → new) while this tab is open; re-read it so the
@@ -139,6 +143,14 @@ export default function MainLayout() {
     if (!hasUser) return;
     void refreshSessionStatus({ force: true });
   }, [hasUser, location.pathname, refreshSessionStatus]);
+
+  useEffect(() => {
+    if (authLoading || !isCompactViewport) return;
+    const appName = desktopOnlyAppForPath(location.pathname, user);
+    if (!appName) return;
+    requestDesktopOnlyAppsNotice(appName);
+    navigate('/mall', { replace: true });
+  }, [authLoading, isCompactViewport, location.pathname, user, navigate]);
 
   useEffect(() => {
     if (!hasUser || typeof window === 'undefined') return undefined;
@@ -561,6 +573,7 @@ export default function MainLayout() {
       <ProfilePhotoSetupRedirect />
       <IdentificationVerificationSetupRedirect />
       <MobilePostLoginChooserDialog />
+      <DesktopOnlyAppsDialog />
       <LegacyPasswordUpgradeDialog
         open={Boolean(user) && requiresPasswordUpgrade}
         onSubmit={upgradeLegacyPassword}

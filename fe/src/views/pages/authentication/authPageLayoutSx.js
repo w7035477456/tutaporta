@@ -112,6 +112,14 @@ export const authShellStackSx = {
 export const authFixedFooterContentPaddingBottom = { pb: `${getAuthFooterHeightVh()}vh` };
 
 /**
+ * Login / register use the mall footer, which is taller than FOOTER_HEIGHT on a phone.
+ * Reserve that height so the last field can scroll above the footer.
+ */
+export const authMallFooterContentPaddingBottom = {
+  pb: { xs: '196px', md: `${getAuthFooterHeightVh()}vh` }
+};
+
+/**
  * About / Terms / Privacy: margins from fe/.env (same scroll column, not FOOTER_HEIGHT).
  * - FOOTERPAGES_RIGHT_LEFT_MARGIN => left/right % of vw
  * - FOOTERPAGES_TOP_MARGIN => top % of vh

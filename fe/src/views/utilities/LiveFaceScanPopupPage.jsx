@@ -46,8 +46,8 @@ const liveScanPopupBodyStackSx = {
 };
 
 const cameraCircleSx = {
-  width: { xs: 240 * LIVE_SCAN_POPUP_UI_SCALE, sm: 280 * LIVE_SCAN_POPUP_UI_SCALE },
-  height: { xs: 240 * LIVE_SCAN_POPUP_UI_SCALE, sm: 280 * LIVE_SCAN_POPUP_UI_SCALE },
+  width: { xs: 'min(72vw, 280px)', sm: 280 * LIVE_SCAN_POPUP_UI_SCALE },
+  height: { xs: 'min(72vw, 280px)', sm: 280 * LIVE_SCAN_POPUP_UI_SCALE },
   borderRadius: '50%',
   overflow: 'hidden',
   bgcolor: '#000000',

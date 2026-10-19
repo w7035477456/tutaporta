@@ -23,7 +23,7 @@ import {
   authEnvTextFontSize,
   authLinkHoverScaleSx,
   authShellStackSx,
-  authFixedFooterContentPaddingBottom
+  authMallFooterContentPaddingBottom
 } from './authPageLayoutSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
@@ -126,7 +126,7 @@ function Login() {
           message={idleLogoutNotice || ''}
           onClose={() => setIdleLogoutNotice(null)}
         />
-        <Stack sx={{ ...authShellStackSx, ...authFixedFooterContentPaddingBottom, boxSizing: 'border-box' }}>
+        <Stack sx={{ ...authShellStackSx, ...authMallFooterContentPaddingBottom, boxSizing: 'border-box' }}>
           <AuthStandardDialogFrame>
             <AuthCardWrapper fullWidth>
               <Stack sx={{ alignItems: 'stretch', justifyContent: 'center', gap: 2, width: '100%' }}>

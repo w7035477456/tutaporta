@@ -48,6 +48,7 @@ export default function GenderSelfReportPopup({ open, onCompleted }) {
       closeOnBackdrop={false}
       bodyTextAlignLeft
       centeredLeadLines={1}
+      maxWidth="min(520px, 94vw)"
     >
       <ColorTemplate16PopupCenterWide.Title>What Gender are you?</ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body spacing={2}>

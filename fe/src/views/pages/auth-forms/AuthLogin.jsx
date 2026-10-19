@@ -30,7 +30,6 @@ import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
-import { requestMobilePostLoginChooser } from 'utils/mobilePostLoginChoice';
 import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 import { consumeLoginEmailPrefill } from 'utils/loginScreenPrefill';
 
@@ -240,15 +239,12 @@ export default function AuthLogin() {
           navigate(ADMIN_TOOLS_PATH);
           return;
         }
-        if (isMobileViewport) {
-          requestMobilePostLoginChooser();
-        }
         requestMallAppEnrollmentPopup();
         const from = location.state?.from;
         navigate(resolvePostLoginPath(from), { replace: true });
       }
     },
-    [navigate, location.state, isMobileViewport]
+    [navigate, location.state]
   );
 
   const handleGoogleSignIn = useCallback(async () => {

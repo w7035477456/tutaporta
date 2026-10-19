@@ -15,7 +15,7 @@ import Footer from 'layout/MainLayout/Footer';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import {
   authEnvTextFontSize,
-  authFixedFooterContentPaddingBottom,
+  authMallFooterContentPaddingBottom,
   authShellStackSx
 } from './authPageLayoutSx';
 import { getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
@@ -60,7 +60,7 @@ export default function ClaimToken() {
 
   return (
     <AuthWrapper1>
-      <Stack sx={{ ...authShellStackSx, ...authFixedFooterContentPaddingBottom }}>
+      <Stack sx={{ ...authShellStackSx, ...authMallFooterContentPaddingBottom }}>
         <AuthStandardDialogFrame>
           <AuthCardWrapper fullWidth>
             <Stack sx={{ alignItems: 'stretch', justifyContent: 'center', gap: 2, width: '100%' }}>

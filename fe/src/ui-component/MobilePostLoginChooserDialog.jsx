@@ -6,16 +6,13 @@ import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeD
 import GreenButton from 'ui-component/GreenButton';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { useAuth } from 'contexts/AuthContext';
-import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import {
   clearMobilePostLoginChooserPending,
-  markMobileTutaDatesUploadPending,
-  markMobileTutaNotesUploadPending,
-  markMobileTutaPhotoUploadPending,
   MOBILE_POST_LOGIN_CHOOSER_EVENT,
   peekMobilePostLoginChooserPending
 } from 'utils/mobilePostLoginChoice';
+import { requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
 
 const DESKTOP_RECOMMEND_MESSAGE =
   'We currently development mobile verison of TutaDates/TutaNotes/TutaPhotos.  Until it is available, we recommend you use our desktop version, which is much easier and better experience because larger screensize';
@@ -62,13 +59,13 @@ export default function MobilePostLoginChooserDialog() {
   const tryOpenChooser = useCallback(() => {
     if (!user || !isCompact) return;
     if (!peekMobilePostLoginChooserPending()) return;
+    clearMobilePostLoginChooserPending();
+    setOpen(false);
     if (guestDemo) {
-      clearMobilePostLoginChooserPending();
-      setOpen(false);
       setDemoMobileBlockedOpen(true);
       return;
     }
-    setOpen(true);
+    requestDesktopOnlyAppsNotice();
   }, [user, isCompact, guestDemo]);
 
   useEffect(() => {
@@ -84,43 +81,19 @@ export default function MobilePostLoginChooserDialog() {
     setOpen(false);
   }, []);
 
-  const goTutaNotesUpload = useCallback(() => {
-    if (guestDemo) {
+  const blockDesktopApp = useCallback(
+    (appName) => {
+      if (guestDemo) {
+        closeChooser();
+        setDemoMobileBlockedOpen(true);
+        return;
+      }
       closeChooser();
-      setDemoMobileBlockedOpen(true);
-      return;
-    }
-    markMobileTutaNotesUploadPending();
-    closeChooser();
-    navigate(`${MY_RECORD_VAULT_PATH}?mobileUpload=1`, { replace: true });
-  }, [closeChooser, guestDemo, navigate]);
-
-  const goTutaPhotoUpload = useCallback(() => {
-    if (guestDemo) {
-      closeChooser();
-      setDemoMobileBlockedOpen(true);
-      return;
-    }
-    markMobileTutaPhotoUploadPending();
-    closeChooser();
-    navigate('/myPhotos?mobileUpload=1', { replace: true });
-  }, [closeChooser, guestDemo, navigate]);
-
-  const goTutaDatesUpload = useCallback(() => {
-    if (guestDemo) {
-      closeChooser();
-      setDemoMobileBlockedOpen(true);
-      return;
-    }
-    markMobileTutaDatesUploadPending();
-    closeChooser();
-    navigate('/myStory?mobileUpload=1', { replace: true });
-  }, [closeChooser, guestDemo, navigate]);
-
-  const goUseApps = useCallback(() => {
-    closeChooser();
-    setDesktopRecommendOpen(true);
-  }, [closeChooser]);
+      requestDesktopOnlyAppsNotice(appName);
+      navigate('/mall', { replace: true });
+    },
+    [closeChooser, guestDemo, navigate]
+  );
 
   const closeDesktopRecommend = useCallback(() => {
     setDesktopRecommendOpen(false);
@@ -150,16 +123,16 @@ export default function MobilePostLoginChooserDialog() {
             Choose where to upload a photo, or continue to the apps.
           </Typography>
           <Stack spacing={1.25} sx={{ width: '100%' }}>
-            <GreenButton type="button" onClick={goTutaNotesUpload} singleLineLabel={false} sx={choiceButtonSx}>
-              Upload Photo to TutaNotes
+            <GreenButton type="button" onClick={() => blockDesktopApp('TutaNotes')} singleLineLabel={false} sx={choiceButtonSx}>
+              TutaNotes
             </GreenButton>
-            <GreenButton type="button" onClick={goTutaPhotoUpload} singleLineLabel={false} sx={choiceButtonSx}>
-              Upload Photo to TutaPhoto
+            <GreenButton type="button" onClick={() => blockDesktopApp('TutaPhoto')} singleLineLabel={false} sx={choiceButtonSx}>
+              TutaPhoto
             </GreenButton>
-            <GreenButton type="button" onClick={goTutaDatesUpload} singleLineLabel={false} sx={choiceButtonSx}>
-              Upload photo to TutaDates
+            <GreenButton type="button" onClick={() => blockDesktopApp('TutaDates')} singleLineLabel={false} sx={choiceButtonSx}>
+              TutaDates
             </GreenButton>
-            <GreenButton type="button" onClick={goUseApps} singleLineLabel={false} sx={useAppsButtonSx}>
+            <GreenButton type="button" onClick={() => blockDesktopApp('')} singleLineLabel={false} sx={useAppsButtonSx}>
               Use TutaDates/TutaNotes/TutaPhotos
             </GreenButton>
           </Stack>

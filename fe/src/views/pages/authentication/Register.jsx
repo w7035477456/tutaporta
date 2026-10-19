@@ -17,7 +17,7 @@ import AuthRegister from '../auth-forms/AuthRegister';
 import {
   authEnvTextFontSize,
   authEnvTitleFontSize,
-  authFixedFooterContentPaddingBottom,
+  authMallFooterContentPaddingBottom,
   authShellStackSx
 } from './authPageLayoutSx';
 import { validateReferralCode } from 'api/validateReferralCodeFe';
@@ -111,11 +111,11 @@ export default function Register() {
 
   return (
     <AuthWrapper1>
-      <Stack sx={{ ...authShellStackSx, ...authFixedFooterContentPaddingBottom }}>
+      <Stack sx={{ ...authShellStackSx, ...authMallFooterContentPaddingBottom }}>
         <AuthStandardDialogFrame>
           <AuthCardWrapper fullWidth>
-            <Stack sx={{ alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-              <Box sx={{ mb: 3 }}>
+            <Stack sx={{ alignItems: 'center', justifyContent: 'center', gap: { xs: 1.25, md: 2 } }}>
+              <Box sx={{ mb: { xs: 1, md: 3 } }}>
                 <Link to="#" aria-label="theme logo">
                   <Logo authBranding />
                 </Link>

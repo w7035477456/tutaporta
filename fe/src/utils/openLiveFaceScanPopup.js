@@ -14,6 +14,13 @@ export function getLiveFaceScanPopupWindowSize() {
   }
   const availW = window.screen?.availWidth ?? 1200;
   const availH = window.screen?.availHeight ?? 900;
+  const phone = availW <= 600 || (availW <= 926 && availH <= 540);
+  if (phone) {
+    return {
+      width: Math.max(320, Math.round(availW)),
+      height: Math.max(480, Math.round(availH))
+    };
+  }
   return {
     width: Math.min(1020, Math.max(920, Math.round(availW * 0.78))),
     height: Math.min(980, Math.max(860, Math.round(availH * 0.86)))

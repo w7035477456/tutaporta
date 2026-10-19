@@ -46,7 +46,7 @@ import SecurityIconPickerDialog from './SecurityIconPickerDialog';
 import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
 import GenderSelfReportPopup from 'ui-component/GenderSelfReportPopup';
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
-import { hasGenderSelfReport } from 'utils/firstLoginOnboarding';
+import { hasGenderSelfReport, isIdInitializationIncomplete } from 'utils/firstLoginOnboarding';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { markSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import {
@@ -107,6 +107,7 @@ import {
   peekMobileTutaDatesUploadSession
 } from 'utils/mobilePostLoginChoice';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
+import { requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
 import { bumpPhotosAlbumCacheBust } from 'api/photoCacheBust';
 import {
   invalidateMyPicksFeedCache,
@@ -1744,26 +1745,26 @@ export default function MyStory() {
 
   /** Mobile post-login / mall tile → Upload photo to TutaDates. */
   useEffect(() => {
+    if (isIdInitializationIncomplete(user)) return;
     if (searchParams.get('mobileUpload') === '1' || peekMobileTutaDatesUploadPending()) {
       setMobileTutaDatesUploadUi(true);
       markMobileTutaDatesUploadSession();
     }
-  }, [searchParams]);
+  }, [searchParams, user]);
 
-  /** Phone: only mall ↔ upload popup — never the desktop My Album workspace. */
+  /**
+   * Phone: ID initialization (profile photo, gender, nickname, security icon) stays here.
+   * After that, My Album is the TutaDates workspace and stays on desktop.
+   */
   useEffect(() => {
     if (!isCompactViewport) return;
-    const uploadIntent =
-      searchParams.get('mobileUpload') === '1' ||
-      peekMobileTutaDatesUploadPending() ||
-      peekMobileTutaDatesUploadSession() ||
-      mobileTutaDatesUploadUi;
-    if (!uploadIntent) {
-      navigate('/mall', { replace: true });
-    }
-  }, [isCompactViewport, searchParams, navigate, mobileTutaDatesUploadUi]);
+    if (isIdInitializationIncomplete(user)) return;
+    requestDesktopOnlyAppsNotice('TutaDates');
+    navigate('/mall', { replace: true });
+  }, [isCompactViewport, user, navigate]);
 
   useEffect(() => {
+    if (isIdInitializationIncomplete(user)) return undefined;
     if (mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaDatesUploadPending();
@@ -1777,7 +1778,7 @@ export default function MyStory() {
     setMobileDirectUploadOpen(true);
     setMobileTutaDatesUploadUi(true);
     return undefined;
-  }, [mobileDirectUploadOpen, searchParams, setSearchParams]);
+  }, [mobileDirectUploadOpen, searchParams, setSearchParams, user]);
 
   const handleExitMobileDatesUploadToMall = useCallback(() => {
     clearMobileTutaDatesUploadSession();
@@ -3342,7 +3343,7 @@ export default function MyStory() {
     </ColorTemplate7PopupLargeDark>
   );
 
-  if (hideWorkspaceForMobileTutaDatesUpload) {
+  if (hideWorkspaceForMobileTutaDatesUpload && !isIdInitializationIncomplete(user)) {
     return (
       <Box
         sx={{
@@ -3602,7 +3603,7 @@ export default function MyStory() {
           borderRadius: { xs: 0, sm: 3 },
           p: { xs: 0, sm: 3 },
           position: 'relative',
-          display: 'flex',
+          display: isCompactViewport && isIdInitializationIncomplete(user) ? 'none' : 'flex',
           flexDirection: 'column',
           ...myStoryPageShellSx(myStoryPhoneLayout)
         }}

@@ -232,8 +232,11 @@ export function colorTemplate15ApplicationFrameFooterShellSx({ inline = false } 
     py: 0.75,
     display: 'flex',
     alignItems: 'center',
+    justifyContent: { xs: 'center', md: 'flex-start' },
+    flexWrap: { xs: 'wrap', md: 'nowrap' },
+    rowGap: { xs: 0.25, md: 0 },
     gap: { xs: 0.5, sm: 1 },
-    overflowX: 'clip',
+    overflowX: { xs: 'visible', md: 'clip' },
     overflowY: 'visible',
     flexShrink: 0,
     ...(inline ? {} : { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1200 }),
@@ -245,7 +248,7 @@ export function colorTemplate15ApplicationFrameFooterShellSx({ inline = false } 
 export function colorTemplate15ApplicationFrameFooterLeftSx(overrides = {}) {
   return {
     // Do not use width:100% — that forces FooterRight (Mute/Track) off the right edge.
-    flex: '1 1 auto',
+    flex: { xs: '1 1 100%', md: '1 1 auto' },
     minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
@@ -259,19 +262,19 @@ export function colorTemplate15ApplicationFrameFooterLeftSx(overrides = {}) {
 /** Region 6 — mute / track / support cluster (single compact row, flush right). */
 export function colorTemplate15ApplicationFrameFooterRightSx(overrides = {}) {
   return {
-    flex: '0 1 auto',
-    marginLeft: 'auto',
+    flex: { xs: '1 1 100%', md: '0 1 auto' },
+    marginLeft: { xs: 0, md: 'auto' },
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: { xs: 'center', md: 'flex-end' },
     gap: { xs: 0.5, sm: 0.75 },
     minWidth: 0,
     // Wide enough that the volume slider reads as a horizontal bar — Support / Mute
     // shift left to make room. Still capped so Track never clips past the right edge.
-    maxWidth: { xs: 'min(100%, 80vw)', sm: 'min(760px, 68vw)' },
-    flexWrap: 'nowrap',
-    overflow: 'hidden',
+    maxWidth: { xs: '100%', sm: 'min(760px, 68vw)' },
+    flexWrap: { xs: 'wrap', md: 'nowrap' },
+    overflow: { xs: 'visible', md: 'hidden' },
     ...overrides
   };
 }

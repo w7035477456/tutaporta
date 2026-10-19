@@ -369,8 +369,8 @@ export function colorTemplate7PopupSliderSx(overrides = {}) {
 export function colorTemplate7PopupInputSx(overrides = {}, inputHeight = 'bsize') {
   const rootHeight = colorTemplate7PopupInputRootHeightSx(inputHeight);
   return {
-    width: COLOR_TEMPLATE7_POPUP_INPUT_WIDTH,
-    maxWidth: COLOR_TEMPLATE7_POPUP_INPUT_WIDTH,
+    width: { xs: '100%', sm: COLOR_TEMPLATE7_POPUP_INPUT_WIDTH },
+    maxWidth: { xs: '100%', sm: COLOR_TEMPLATE7_POPUP_INPUT_WIDTH },
     mx: 'auto',
     display: 'block',
     alignSelf: 'center',
