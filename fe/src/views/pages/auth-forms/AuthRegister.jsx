@@ -40,7 +40,6 @@ import {
   clearGoogleSignupToken
 } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
-import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
 import SignupDownPopup, { SIGNUP_DOWN_MSG } from './SignupDownPopup';
@@ -166,7 +165,6 @@ export default function AuthRegister() {
 
   const navigateAfterGoogleLogin = useCallback(async () => {
     await refreshSessionAfterExternalLogin();
-    requestMallAppEnrollmentPopup();
     navigate(resolvePostLoginPath(location.state?.from), { replace: true });
   }, [refreshSessionAfterExternalLogin, location.state, navigate]);
 

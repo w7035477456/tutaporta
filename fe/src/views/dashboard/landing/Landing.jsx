@@ -8,8 +8,7 @@ import { useAuth } from 'contexts/AuthContext';
 import { useSiteAudio } from 'contexts/SiteAudioContext';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
-import { fetchUserCustomization } from 'api/userCustomizationFe';
-import MallAppEnrollmentDialog from 'ui-component/MallAppEnrollmentDialog';
+import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
 import MallRafflePanel from 'ui-component/MallRafflePanel';
 import { takeGetMyRafflePending } from 'constants/raffleRoute';
 
@@ -26,11 +25,11 @@ import { TUTADATES_PATH } from 'constants/tutaDatesRoute';
 import { isOnenoteUsbUpgrade } from 'config/onenoteUsbUpgradeEnv';
 import { fetchOnenoteUsbUpgradeBlocked } from 'api/onenoteUsbUpgradeFe';
 import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
-import { tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
+import { canChangeTutaDatesOptIn, tutaDatesOptInBlockedMessage, tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
 import { themedAlert } from 'utils/themedDialog';
 import { FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE } from 'config/firstLoginAutoPopupsEnv';
 import { consumeFirstLoginOnboardingCongratsPending } from 'utils/firstLoginOnboarding';
-import { isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { isGuestDemoLogin, notifyGuestDemoBlocked } from 'utils/guestDemoLogin';
 import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSession';
 
 // ==============================|| LANDING PAGE ||============================== //
@@ -52,6 +51,73 @@ const ENROLLMENT_TILE_TO_FLAG = {
   recordVault: 'tutaNotesEnabled',
   photoAlbums: 'tutaAlbumsEnabled'
 };
+
+const ENROLLMENT_FLAG_LABEL = {
+  tutaDatesEnabled: 'TutaDates',
+  tutaNotesEnabled: 'TutaNotes',
+  tutaAlbumsEnabled: 'TutaPhotos'
+};
+
+function readEnrollmentPrefs(prefs) {
+  return {
+    tutaDatesEnabled: prefs?.tutaDatesEnabled !== false,
+    tutaNotesEnabled: prefs?.tutaNotesEnabled !== false,
+    tutaAlbumsEnabled: prefs?.tutaAlbumsEnabled !== false
+  };
+}
+
+/** Yellow box in a tile's top-right corner; red check = enrolled. Tiles without `onToggle` show an empty, inert box. */
+function MallTileCheckbox({ checked, label, onToggle }) {
+  const interactive = Boolean(onToggle);
+  const activate = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggle();
+  };
+  return (
+    <Box
+      data-guest-demo-allow="true"
+      {...(interactive
+        ? {
+            role: 'checkbox',
+            'aria-checked': checked,
+            'aria-label': `Use ${label}`,
+            tabIndex: 0,
+            onClick: activate,
+            onKeyDown: (event) => {
+              if (event.key === 'Enter' || event.key === ' ') activate(event);
+            }
+          }
+        : { 'aria-hidden': true })}
+      sx={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 3,
+        width: 48,
+        height: 48,
+        boxSizing: 'border-box',
+        bgcolor: '#ffeb3b',
+        border: '3px solid #000',
+        borderRadius: 1,
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
+        cursor: interactive ? 'pointer' : 'default',
+        pointerEvents: interactive ? 'auto' : 'none',
+        overflow: 'visible'
+      }}
+    >
+      {checked ? (
+        <Box
+          component="svg"
+          viewBox="0 0 24 24"
+          sx={{ position: 'absolute', left: 2, bottom: 2, width: 58, height: 58, overflow: 'visible' }}
+        >
+          <path d="M3 13 L9 19 L22 2" fill="none" stroke="#d50000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
 
 const departments = [
   { id: 'vsingles', title: 'Tuta Dates', url: TUTADATES_PATH, image: tutaDatesImg },
@@ -105,7 +171,7 @@ function getMallStageSize(cols, rows) {
 }
 
 export default function Landing() {
-  const { user } = useAuth();
+  const { user, updateSessionOptinoutBitmap } = useAuth();
   const { mediaVolume } = useSiteAudio();
   const isCompact = useCompactLoginViewport();
   const audioContextRef = useRef(null);
@@ -114,7 +180,6 @@ export default function Landing() {
   const [mallGrid, setMallGrid] = useState(() => getMallStageSize(3, 2));
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
-  const [enrollmentForcedOpen, setEnrollmentForcedOpen] = useState(false);
   const [raffleOpenRequest, setRaffleOpenRequest] = useState(0);
 
   const openGetMyRaffle = useCallback(() => setRaffleOpenRequest((n) => n + 1), []);
@@ -151,11 +216,7 @@ export default function Landing() {
       try {
         const prefs = await fetchUserCustomization();
         if (cancelled) return;
-        setEnrollment({
-          tutaDatesEnabled: prefs.tutaDatesEnabled !== false,
-          tutaNotesEnabled: prefs.tutaNotesEnabled !== false,
-          tutaAlbumsEnabled: prefs.tutaAlbumsEnabled !== false
-        });
+        setEnrollment(readEnrollmentPrefs(prefs));
       } catch {
         // keep defaults (all enrolled)
       }
@@ -165,14 +226,38 @@ export default function Landing() {
     };
   }, [user]);
 
-  const applyEnrollmentPrefs = useCallback((prefs) => {
-    if (!prefs) return;
-    setEnrollment({
-      tutaDatesEnabled: prefs.tutaDatesEnabled !== false,
-      tutaNotesEnabled: prefs.tutaNotesEnabled !== false,
-      tutaAlbumsEnabled: prefs.tutaAlbumsEnabled !== false
-    });
-  }, []);
+  const guestDemo = isGuestDemoLogin(user);
+  const enrollmentReadOnly = !user || isToolsOnlyAdminSession(user) || isImpersonationSession(user);
+
+  const toggleEnrollment = useCallback(
+    async (flag) => {
+      const next = !(enrollment[flag] !== false);
+      if (guestDemo) {
+        if (!next) notifyGuestDemoBlocked();
+        return;
+      }
+      if (flag === 'tutaDatesEnabled' && !canChangeTutaDatesOptIn(user?.status)) {
+        void themedAlert(tutaDatesOptInBlockedMessage(user?.status));
+        return;
+      }
+      setEnrollment((prev) => ({ ...prev, [flag]: next }));
+      try {
+        const prefs = await saveUserCustomization({ [flag]: next });
+        updateSessionOptinoutBitmap?.(prefs.optinoutBitmap);
+      } catch (err) {
+        const blocked = err?.response?.data;
+        if (blocked?.code === 'TUTADATES_OPTIN_BLOCKED') {
+          setEnrollment(readEnrollmentPrefs(blocked));
+          updateSessionOptinoutBitmap?.(blocked.optinoutBitmap);
+          void themedAlert(blocked.error);
+          return;
+        }
+        setEnrollment((prev) => ({ ...prev, [flag]: !next }));
+        void themedAlert(`Could not save your ${ENROLLMENT_FLAG_LABEL[flag]} choice. Please try again.`);
+      }
+    },
+    [enrollment, guestDemo, updateSessionOptinoutBitmap, user?.status]
+  );
 
   const isTileEnrolled = useCallback(
     (tileId) => {
@@ -204,10 +289,11 @@ export default function Landing() {
     setUpgradePopupOpen(true);
   }, []);
 
-  const openEnrollmentToEnableApp = useCallback((event) => {
+  const openEnrollmentToEnableApp = useCallback((tileId, event) => {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    setEnrollmentForcedOpen(true);
+    const label = ENROLLMENT_FLAG_LABEL[ENROLLMENT_TILE_TO_FLAG[tileId]] || 'this app';
+    void themedAlert(`Please check the yellow box in the top corner of the ${label} tile to enable ${label}.`);
   }, []);
 
   /** Phone mall: TutaDates / TutaNotes / TutaPhoto stay on a desktop screen. */
@@ -379,6 +465,7 @@ export default function Landing() {
             }}
           >
             {rowDepts.map((d) => {
+              const enrollmentFlag = ENROLLMENT_TILE_TO_FLAG[d.id];
               const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
               const gateTutaDatesStatus = !gateUpgrade && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
               const gateEnrollment = !gateUpgrade && !gateTutaDatesStatus && !isTileEnrolled(d.id);
@@ -395,7 +482,7 @@ export default function Landing() {
                 : gateTutaDatesStatus
                   ? openTutaDatesStatusBlocked
                   : gateEnrollment
-                    ? openEnrollmentToEnableApp
+                    ? (event) => openEnrollmentToEnableApp(d.id, event)
                     : gateDesktopOnly
                       ? (event) => openDesktopOnlyApp(d.id, event)
                       : undefined;
@@ -441,8 +528,7 @@ export default function Landing() {
                     boxSizing: 'border-box',
                     boxShadow: 'none',
                     zIndex: 1,
-                    opacity: gateEnrollment || gateTutaDatesStatus ? 0.55 : 1,
-                    transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease',
+                    transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                     '&:hover': {
                       zIndex: 2,
                       transform: 'scale(1.08)',
@@ -462,7 +548,9 @@ export default function Landing() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       bgcolor: 'transparent',
-                      boxShadow: 'none'
+                      boxShadow: 'none',
+                      opacity: gateEnrollment || gateTutaDatesStatus ? 0.55 : 1,
+                      transition: 'opacity 0.2s ease'
                     }}
                   >
                     {d.image ? (
@@ -490,6 +578,13 @@ export default function Landing() {
                       </Typography>
                     )}
                   </Box>
+                  <MallTileCheckbox
+                    checked={enrollmentFlag ? guestDemo || isTileEnrolled(d.id) : false}
+                    label={ENROLLMENT_FLAG_LABEL[enrollmentFlag] || d.title}
+                    onToggle={
+                      enrollmentFlag && !enrollmentReadOnly ? () => void toggleEnrollment(enrollmentFlag) : undefined
+                    }
+                  />
                 </Box>
               );
             })}
@@ -508,16 +603,6 @@ export default function Landing() {
         <MallRafflePanel openRequest={raffleOpenRequest} />
       </Box>
       <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
-      <MallAppEnrollmentDialog
-        {...(enrollmentForcedOpen
-          ? {
-              open: true,
-              onClose: () => setEnrollmentForcedOpen(false),
-              showEnableHint: true
-            }
-          : {})}
-        onEnrollmentChange={applyEnrollmentPrefs}
-      />
     </Box>
   );
 }

@@ -30,7 +30,6 @@ import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
-import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 import { consumeLoginEmailPrefill } from 'utils/loginScreenPrefill';
 
 // assets
@@ -239,7 +238,6 @@ export default function AuthLogin() {
           navigate(ADMIN_TOOLS_PATH);
           return;
         }
-        requestMallAppEnrollmentPopup();
         const from = location.state?.from;
         navigate(resolvePostLoginPath(from), { replace: true });
       }
