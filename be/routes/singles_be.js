@@ -11,7 +11,7 @@ import { insertNewSinglesAccount, SQL_SIGNUP_STATUS_FOR_EXISTING_ROW } from '../
 import { normalizeEmailForDb } from '../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../utils/insertAuditRegistration.js';
 import { attachOrInsertSignupLoginLog } from '../utils/loginLog.js';
-import { referCodeFromMemberId } from '../utils/referCodeFromMemberId.js';
+import { SQL_NEW_MY_REFER_CODE } from '../utils/signupReferCode.js';
 import { resolveReferByCode } from '../utils/referByCode.js';
 import { verifyPassword } from '../utils/passwordHash.js';
 import { sqlInterestedIsTrue } from './singles/interestedSql.js';
@@ -406,18 +406,17 @@ export const verifyPhone_HHHHHHHH = async (req, res) => {
       );
 
       if (existingUser.rows.length > 0) {
-        const memberId = existingUser.rows[0]?.member_id;
         const existingSinglesId = existingUser.rows[0]?.singles_id;
         await pool.query(
           `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
                ${SQL_SIGNUP_STATUS_FOR_EXISTING_ROW},
-               my_refer_code = COALESCE(my_refer_code, $4),
-               refer_by_code = COALESCE(refer_by_code, $5),
+               my_refer_code = COALESCE(my_refer_code, ${SQL_NEW_MY_REFER_CODE}),
+               refer_by_code = COALESCE(refer_by_code, $4),
                updated_at = CURRENT_TIMESTAMP
            WHERE email = $3`,
-          [storedData.password, formattedPhone, normalizeEmailForDb(email), referCodeFromMemberId(memberId), resolvedReferByCode]
+          [storedData.password, formattedPhone, normalizeEmailForDb(email), resolvedReferByCode]
         );
         await recordAuditRegistrationChange(pool, {
           singlesId: existingSinglesId,

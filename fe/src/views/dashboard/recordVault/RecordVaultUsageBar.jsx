@@ -176,15 +176,20 @@ const usageMeterLabelSx = {
 };
 
 /**
- * Red = data used from the plan (bought − remain), green = data plan bought.
+ * Red = data used. Green = data still left.
+ * Widths are shares of the purchased total, so the two labels add up to that total
+ * (10gb bought and 4gb used → red 4gb + green 6gb).
  * Click anywhere (except an admin-editable amount) to open Refill / Add blocks.
  */
 function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPlan, onSaved }) {
-  const used = Math.max(0, Number(usedMb) || 0);
   const bought = Math.max(0, Number(boughtMb) || 0);
-  const usedPct = used + bought > 0 ? (used / (used + bought)) * 100 : 0;
+  const usedRaw = Math.max(0, Number(usedMb) || 0);
+  const used = bought > 0 ? Math.min(usedRaw, bought) : usedRaw;
+  const remain = bought > 0 ? Math.max(0, bought - used) : Math.max(0, Number(remainMb) || 0);
+  const showUsed = used > 0;
+  const showRemain = remain > 0 || !showUsed;
   const title =
-    `Used ${formatUsageDataAmount(used)} · Data Remain ${formatUsageDataAmount(remainMb)} of ` +
+    `Used ${formatUsageDataAmount(used)} · ${formatUsageDataAmount(remain)} left of ` +
     `${formatUsageDataAmount(bought)}. Click to Refill/Add ${blockLabel} blocks.`;
   const openPlan = (event) => {
     if (event.target instanceof Element && event.target.closest('[data-admin-usage-amount]')) return;
@@ -211,36 +216,44 @@ function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPl
         cursor: 'pointer'
       }}
     >
-      <Box
-        sx={{
-          flex: '0 0 auto',
-          width: `max(${USAGE_METER_MIN_RED_PX}px, ${usedPct.toFixed(2)}%)`,
-          bgcolor: '#e53935',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRight: '2px solid #000'
-        }}
-      >
-        <Box component="span" sx={usageMeterLabelSx}>
-          {formatUsageDataAmountCompact(used)}
+      {showUsed ? (
+        <Box
+          sx={{
+            flexGrow: used,
+            flexShrink: 1,
+            flexBasis: 0,
+            minWidth: showRemain && remain > 0 ? USAGE_METER_MIN_RED_PX : 0,
+            bgcolor: '#e53935',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRight: showRemain && remain > 0 ? '2px solid #000' : 'none'
+          }}
+        >
+          <Box component="span" sx={usageMeterLabelSx}>
+            {formatUsageDataAmountCompact(used)}
+          </Box>
         </Box>
-      </Box>
-      <Box
-        sx={{
-          flex: '1 1 auto',
-          minWidth: 0,
-          bgcolor: depleted ? '#9e9e9e' : '#60C447',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        <Box component="span" sx={usageMeterLabelSx}>
-          <AdminEditableUsageDataAmount field="bought" valueMb={bought} onSaved={onSaved} compact />
-          {depleted ? ' — depleted, click to refill' : ''}
+      ) : null}
+      {showRemain ? (
+        <Box
+          sx={{
+            flexGrow: remain > 0 ? remain : 1,
+            flexShrink: 1,
+            flexBasis: 0,
+            minWidth: 0,
+            bgcolor: depleted ? '#9e9e9e' : '#60C447',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <Box component="span" sx={usageMeterLabelSx}>
+            <AdminEditableUsageDataAmount field="remain" valueMb={remain} onSaved={onSaved} compact />
+            {depleted ? ' — depleted, click to refill' : ''}
+          </Box>
         </Box>
-      </Box>
+      ) : null}
     </Box>
   );
 }
@@ -346,7 +359,6 @@ export default function RecordVaultUsageBar({
         tutorialVariant="orange"
         tutorialAriaLabel={tutorialDetail}
         tutorialTitle={tutorialDetail}
-        iconHeight={{ xs: 56, sm: 64 }}
         sx={{ ml: 0 }}
       />
     </>

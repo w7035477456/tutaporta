@@ -300,8 +300,7 @@ const ADD_NEW_POSTING_BORDER = '16px dotted #d32f2f';
 /** Uploaded / Public / Private / Public Video Vault album panels */
 const MY_STORY_ALBUM_PANEL_BORDER = '5px solid #d32f2f';
 
-const MOBILE_UPLOAD_MAX_CSS = '(max-width:768px)';
-/** Mobile upload strip below editor — solid panel behind camera/gallery graphic */
+/** Phone camera/gallery panel — solid panel behind the graphic. Tablets use the desktop drop zone. */
 const MOBILE_UPLOAD_SURFACE_BG = '#C7E6C8';
 
 const ACCEPT = MY_STORY_UPLOAD_ACCEPT;
@@ -1158,7 +1157,9 @@ export default function MyStory() {
   const theme = useTheme();
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
   const myStoryPhoneLayout = useMediaQuery(SIDEBAR_MOBILE_CLOSE_MEDIA);
-  const isMobileUpload = useMediaQuery(MOBILE_UPLOAD_MAX_CSS);
+  const isCompactViewport = useCompactLoginViewport();
+  /** Camera/gallery takeover is phones only. iPad Mini (768) and other tablets keep the desktop page. */
+  const isMobileUpload = isCompactViewport;
   const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname, updateSessionDemoBuddyFlags, updateSessionHasSecretIcon } = useAuth();
   const { photos, myPhotosLoading, refetchMyPhotos } = useMyPhotos(user?.singles_id);
   const { albumVideos, refetchMyAlbumVideos } = useMyAlbumVideos(user?.singles_id);
@@ -1188,7 +1189,6 @@ export default function MyStory() {
   const [mobileDirectUploadOpen, setMobileDirectUploadOpen] = useState(false);
   /** Bumped after a phone pick is staged so the Mobile Upload strip reloads at once. */
   const [mobileUploadTrayRefreshToken, setMobileUploadTrayRefreshToken] = useState(0);
-  const isCompactViewport = useCompactLoginViewport();
   const [mobileTutaDatesUploadUi, setMobileTutaDatesUploadUi] = useState(
     () => peekMobileTutaDatesUploadSession() || peekMobileTutaDatesUploadPending()
   );
@@ -4234,9 +4234,9 @@ export default function MyStory() {
             <Box
               sx={{
                 display: 'flex',
-                flexDirection: { xs: 'column', md: 'row' },
+                flexDirection: 'row',
                 alignItems: 'stretch',
-                gap: { xs: 2, md: 2 },
+                gap: '1.5vw',
                 width: '100%'
               }}
             >
@@ -4250,10 +4250,10 @@ export default function MyStory() {
                   border: '3px solid var(--theme-primary-color)',
                   borderRadius: 2,
                   bgcolor: dragOver ? 'var(--theme-daynight-color)' : 'var(--theme-secondary-color)',
-                  minHeight: { xs: 200, md: 'clamp(140px, 14vw, 200px)' },
-                  flex: { xs: '1 1 auto', md: '1 1 50%' },
-                  width: { xs: '100%', md: '50%' },
-                  maxWidth: { md: '50%' },
+                  minHeight: 'clamp(120px, 18vh, 200px)',
+                  flex: '1 1 50%',
+                  width: '50%',
+                  maxWidth: '50%',
                   minWidth: 0,
                   display: 'flex',
                   flexDirection: 'column',
@@ -4275,10 +4275,10 @@ export default function MyStory() {
                       alt="Drag and drop or click to upload images"
                       className="my-story-upload-graphic"
                       sx={{
-                        maxWidth: 'min(100%, clamp(120px, 18vw, 240px))',
+                        maxWidth: 'min(100%, clamp(96px, 14vw, 240px))',
                         width: '100%',
                         height: 'auto',
-                        mb: { xs: 1, md: 0.5 },
+                        mb: '0.6vh',
                         display: 'block',
                         cursor: 'pointer',
                         userSelect: 'none',
@@ -4293,16 +4293,13 @@ export default function MyStory() {
                         textAlign: 'center',
                         color: 'var(--theme-primary-color)',
                         fontWeight: 700,
-                        fontSize: { xs: 'clamp(1rem, 3.5vw, 1.35rem)', md: 'clamp(1.1rem, 1.2vw, 1.5rem)' },
+                        fontSize: 'clamp(1rem, 1.4vw, 1.5rem)',
                         lineHeight: 1.35,
                         maxWidth: '100%',
                         ...buttonHoverMagnifyTransitionSx,
                         '@media (hover: hover)': {
                           '.my-story-upload-drop:hover &': hoverMagnifyFontSizeSx({
-                            baseFontSize: {
-                              xs: 'clamp(1rem, 3.5vw, 1.35rem)',
-                              sm: 'clamp(1.1rem, 1.2vw, 1.5rem)'
-                            }
+                            baseFontSize: 'clamp(1rem, 1.4vw, 1.5rem)'
                           })
                         }
                       }}
@@ -4316,7 +4313,7 @@ export default function MyStory() {
                         ...comicStyle,
                         textAlign: 'center',
                         color: 'var(--theme-primary-color)',
-                        fontSize: { xs: 'clamp(0.85rem, 3vw, 1.1rem)', md: 'clamp(0.95rem, 1vw, 1.25rem)' },
+                        fontSize: 'clamp(0.85rem, 1.15vw, 1.25rem)',
                         lineHeight: 1.35,
                         maxWidth: '100%'
                       }}
@@ -4330,7 +4327,7 @@ export default function MyStory() {
                         ...comicStyle,
                         textAlign: 'center',
                         color: 'var(--theme-primary-color)',
-                        fontSize: { xs: 'clamp(0.85rem, 3vw, 1.1rem)', md: 'clamp(0.95rem, 1vw, 1.25rem)' },
+                        fontSize: 'clamp(0.85rem, 1.15vw, 1.25rem)',
                         lineHeight: 1.35,
                         maxWidth: '100%'
                       }}
@@ -4342,9 +4339,9 @@ export default function MyStory() {
               </Box>
               <Box
                 sx={{
-                  flex: { xs: '1 1 auto', md: '1 1 50%' },
-                  width: { xs: '100%', md: '50%' },
-                  maxWidth: { md: '50%' },
+                  flex: '1 1 50%',
+                  width: '50%',
+                  maxWidth: '50%',
                   minWidth: 0,
                   alignSelf: 'stretch',
                   display: 'flex'

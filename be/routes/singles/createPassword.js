@@ -1,6 +1,6 @@
 import pool from '../../db/connection.js';
 import { insertNewSinglesAccount, SQL_SIGNUP_STATUS_FOR_EXISTING_ROW } from '../../utils/newSinglesAccount.js';
-import { referCodeFromMemberId } from '../../utils/referCodeFromMemberId.js';
+import { SQL_NEW_MY_REFER_CODE } from '../../utils/signupReferCode.js';
 import { resolveReferByCode, resolveReferByCodeForSignup } from '../../utils/referByCode.js';
 import { referCodeFromRegistrationMeta } from '../../utils/registrationReferralMeta.js';
 import { isTwilioVerifyConfigured, sendTwilioVerificationSms } from '../../lib/twilioVerifySms.js';
@@ -223,18 +223,17 @@ async function finishRegistrationAfterPhoneVerified(
       [emailNorm]
     );
     if (existingUser.rows.length > 0) {
-      const memberId = existingUser.rows[0]?.member_id;
       const existingSinglesId = existingUser.rows[0]?.singles_id;
         await pool.query(
           `UPDATE outdateddbsnapshotoct2024.singles
            SET password_hash = $1,
                phone = $2,
                ${SQL_SIGNUP_STATUS_FOR_EXISTING_ROW},
-               my_refer_code = COALESCE(my_refer_code, $4),
-               refer_by_code = COALESCE(refer_by_code, $5),
+               my_refer_code = COALESCE(my_refer_code, ${SQL_NEW_MY_REFER_CODE}),
+               refer_by_code = COALESCE(refer_by_code, $4),
                updated_at = CURRENT_TIMESTAMP
            WHERE email = $3`,
-          [passwordHash, formattedPhone, emailNorm, referCodeFromMemberId(memberId), resolvedReferByCode]
+          [passwordHash, formattedPhone, emailNorm, resolvedReferByCode]
         );
       await recordAuditRegistrationChange(pool, {
         singlesId: existingSinglesId,

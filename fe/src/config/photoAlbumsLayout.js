@@ -1,12 +1,12 @@
 import { MY_PHOTO_ALBUMS_LEGACY_PATH, MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
 import { headerBarMinHeightCss } from 'config/headerProfileChipEnv';
-import myPhotoAlbumsHeaderLogoImage from 'assets/images/tutamallwebsitelogo.png';
+import myPhotoAlbumsHeaderLogoImage from 'assets/images/BannerTutaPhotos.png';
 import myPhotoAlbumsBannerImage from 'assets/images/myPhotoAlbums.png';
 import myPhotoAlbumsBackgroundImage from 'assets/images/myPhotoAlbumsBackground.png';
 
 export { MY_PHOTO_ALBUMS_PATH };
 
-/** Header logo for /myPhotos — small TutaMall.com mark (left of toolbar). */
+/** Header logo for /myPhotos — TutaPhotos banner (left of toolbar). */
 export const MY_PHOTO_ALBUMS_HEADER_LOGO_IMAGE = myPhotoAlbumsHeaderLogoImage;
 
 /** Top header strip artwork for /myPhotos — tiled across full app-bar width. */

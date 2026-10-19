@@ -12,10 +12,13 @@ const PENDING_MAX_AGE_DAYS = 7;
 export const RAFFLE_REFER_INVALID_MESSAGE =
   'Incorrect refer code. Please retry so your friend get refer credit, or leave it blank and continue';
 
-/** '1234' or '' — anything else (partial, letters) is not a raffle refer code. */
+/** 'R1234' from 'R1234' / 'r1234' / '1234'; '' for anything else (partial, other letters). */
 export function normalizeRaffleReferCode(raw) {
-  const code = String(raw ?? '').trim();
-  return /^[0-9]{4}$/.test(code) ? code : '';
+  const m = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .match(/^R?(\d{4})$/);
+  return m ? `R${m[1]}` : '';
 }
 
 export async function raffleReferCodeExists(code) {
@@ -160,7 +163,7 @@ export async function processRaffleReferSignup({ newSinglesId, email }) {
   return true;
 }
 
-/** GET /api/raffle/refer-code/validate?code=1234 → { valid } (public; used on /register). */
+/** GET /api/raffle/refer-code/validate?code=R1234 → { valid } (public; used on /register). */
 export async function getRaffleReferCodeValidate(req, res) {
   try {
     const valid = await raffleReferCodeExists(req.query?.code);

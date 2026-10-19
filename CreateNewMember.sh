@@ -656,7 +656,6 @@ COMPANY_EMAIL="$(printf '%s' "$FIRST_NAME" | tr '[:upper:]' '[:lower:]').$(print
 CITIZENSHIP="United States of America"
 BIRTH_COUNTRY="$(pick_from "${BIRTH_COUNTRIES[@]}")"
 FULLNAME="${FIRST_NAME} ${MIDDLE_NAME} ${LAST_NAME}"
-MY_REFER_CODE=$(printf '%06d' "$(rand_int 0 999999)")
 
 FAV_HOBBIES="$(pick_from "${HOBBIES[@]}")"
 FAV_FOOD="$(pick_from "${FOODS[@]}")"
@@ -783,7 +782,9 @@ WITH new_row AS (
     '$(sql_escape "$HEIGHT")',
     '$(sql_escape "$CITIZENSHIP")',
     '$(sql_escape "$BIRTH_COUNTRY")',
-    '$(sql_escape "$MY_REFER_CODE")',
+    (SELECT 'A' || n FROM generate_series(1000, 9999) AS n
+      WHERE NOT EXISTS (SELECT 1 FROM ${SCHEMA}.singles t WHERE t.my_refer_code = 'A' || n)
+      ORDER BY random() LIMIT 1),
     ${INITIAL_SETUP_DONE},
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP

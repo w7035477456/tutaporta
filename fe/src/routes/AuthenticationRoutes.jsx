@@ -27,6 +27,7 @@ const PasswordResetSentPage = Loadable(lazy(() => import('views/pages/authentica
 const ResetPasswordPage = Loadable(lazy(() => import('views/pages/authentication/ResetPassword')));
 const ConfirmEmailChangePage = Loadable(lazy(() => import('views/pages/authentication/ConfirmEmailChange')));
 const MobilePhotoUploadPage = Loadable(lazy(() => import('views/pages/MobilePhotoUploadPage')));
+const MobileHomeButtonPage = Loadable(lazy(() => import('views/pages/MobileHomeButtonPage')));
 const GoogleOAuthBridgePage = Loadable(lazy(() => import('views/pages/authentication/GoogleOAuthBridge')));
 const LiveFaceScanPopupPage = Loadable(lazy(() => import('views/utilities/LiveFaceScanPopupPage')));
 const ResumePage = Loadable(lazy(() => import('views/pages/ResumePage')));
@@ -147,6 +148,10 @@ const authenticationChildren = [
   {
     path: GET_MY_RAFFLE_PATH,
     element: <RaffleRedirect openPopup />
+  },
+  {
+    path: '/mobile',
+    element: <MobileHomeButtonPage />
   },
   {
     path: '/mobilePhotoUpload',

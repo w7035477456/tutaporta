@@ -114,8 +114,22 @@ export default function Register() {
       <Stack sx={{ ...authShellStackSx, ...authMallFooterContentPaddingBottom }}>
         <AuthStandardDialogFrame>
           <AuthCardWrapper fullWidth>
-            <Stack sx={{ alignItems: 'center', justifyContent: 'center', gap: { xs: 1.25, md: 2 } }}>
-              <Box sx={{ mb: { xs: 1, md: 3 } }}>
+            <Stack sx={{ alignItems: 'center', justifyContent: 'flex-start', gap: { xs: 0.75, md: 2 }, width: '100%' }}>
+              <Box
+                sx={{
+                  mb: { xs: 0.25, md: 3 },
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  '& img': {
+                    width: { xs: 'auto', md: '100%' },
+                    maxWidth: '100%',
+                    maxHeight: { xs: '9vh', md: 'none' },
+                    height: 'auto',
+                    display: 'block'
+                  }
+                }}
+              >
                 <Link to="#" aria-label="theme logo">
                   <Logo authBranding />
                 </Link>

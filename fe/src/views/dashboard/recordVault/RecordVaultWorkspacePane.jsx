@@ -7884,7 +7884,6 @@ export default function RecordVaultWorkspacePane({
                   tutorialVariant="orange"
                   tutorialAriaLabel="Open Bill Schedule tutorial"
                   tutorialTitle="Open Bill Schedule tutorial"
-                  iconHeight={{ xs: 72, sm: 84 }}
                   sx={{ ml: 0 }}
                 />
                 </Box>

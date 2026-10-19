@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import pool from '../../db/connection.js';
 import { appendRaffleHardCopy, appendRaffleHostActionHardCopy } from '../../utils/hardCopyAuthLog.js';
+import { DEFAULT_REFER_BY_CODE } from '../../utils/referByCode.js';
 
 const S = 'outdateddbsnapshotoct2024';
 
@@ -122,7 +123,7 @@ async function ensureRaffleUserRow(singlesId, event) {
   return rows[0] || null;
 }
 
-/** Permanent 4-digit Friend Refer Code (singles.raffle_refer_code); assigned once, reused across every event. */
+/** Permanent Friend Refer Code R#### (singles.raffle_refer_code); assigned once, reused across every event. */
 async function ensureRaffleReferCode(singlesId) {
   for (let attempt = 0; attempt < MAX_GENERATE_ATTEMPTS; attempt += 1) {
     try {
@@ -130,8 +131,8 @@ async function ensureRaffleReferCode(singlesId) {
         `WITH assigned AS (
            UPDATE ${S}.singles s
               SET raffle_refer_code = (
-                SELECT n::text FROM generate_series(1000, 9999) AS n
-                 WHERE NOT EXISTS (SELECT 1 FROM ${S}.singles t WHERE t.raffle_refer_code = n::text)
+                SELECT 'R' || n FROM generate_series(1000, 9999) AS n
+                 WHERE NOT EXISTS (SELECT 1 FROM ${S}.singles t WHERE t.raffle_refer_code = 'R' || n)
                  ORDER BY random()
                  LIMIT 1
               )
@@ -576,5 +577,101 @@ export async function postRafflePayout(req, res) {
   } catch (err) {
     console.error('[raffle] payout failed:', err?.message || err);
     return res.status(500).json({ error: 'Could not save your payout info. Please try again.' });
+  }
+}
+
+/**
+ * GET /api/raffle/relationships — members related to the caller:
+ *   - both hold a generated raffle ticket for the same event (current or past), and/or
+ *   - one is the other's raffle referrer (singles.raffle_refer_by_code = other's raffle_refer_code), and/or
+ *   - one is the other's member referrer via the Refer Email / Post FB code
+ *     (singles.refer_by_code = other's my_refer_code; default DEFAULT_REFER_BY_CODE ignored).
+ * → { relationships: [{ singlesId, events: [{ eventId, title, hostName, nightDatetime, eventDate }],
+ *                       isMyReferrer, isMyReferee, isMyMemberReferrer, isMyMemberReferee }] }
+ */
+export async function getRaffleRelationships(req, res) {
+  const singlesId = authSinglesId(req);
+  if (!singlesId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.auth?.guest_demo_login === true) return res.json({ relationships: [] });
+  try {
+    const [{ rows: eventRows }, { rows: referRows }, { rows: memberReferRows }] = await Promise.all([
+      pool.query(
+        `SELECT DISTINCT o.singles_id AS other_id, e.event_id, e.event_title, e.event_night_datetime,
+                e.event_time_zone, h.host_full_name
+           FROM ${S}.raffle_user mine
+           JOIN ${S}.raffle_user o
+             ON o.event_id = mine.event_id AND o.singles_id <> mine.singles_id AND o.raffle_number IS NOT NULL
+           JOIN ${S}.raffle_event e ON e.event_id = mine.event_id
+           JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
+          WHERE mine.singles_id = $1 AND mine.raffle_number IS NOT NULL
+          ORDER BY e.event_night_datetime NULLS LAST, e.event_id`,
+        [singlesId]
+      ),
+      pool.query(
+        `SELECT s.singles_id AS other_id,
+                (me.raffle_refer_by_code IS NOT NULL AND s.raffle_refer_code = me.raffle_refer_by_code) AS is_my_referrer,
+                (me.raffle_refer_code IS NOT NULL AND s.raffle_refer_by_code = me.raffle_refer_code) AS is_my_referee
+           FROM ${S}.singles me
+           JOIN ${S}.singles s ON s.singles_id <> me.singles_id
+          WHERE me.singles_id = $1
+            AND ((me.raffle_refer_by_code IS NOT NULL AND s.raffle_refer_code = me.raffle_refer_by_code)
+              OR (me.raffle_refer_code IS NOT NULL AND s.raffle_refer_by_code = me.raffle_refer_code))`,
+        [singlesId]
+      ),
+      pool.query(
+        `WITH me AS (
+           SELECT btrim(COALESCE(my_refer_code::text, '')) AS my_code,
+                  btrim(COALESCE(refer_by_code::text, '')) AS by_code
+             FROM ${S}.singles WHERE singles_id = $1
+         )
+         SELECT s.singles_id AS other_id,
+                (me.by_code NOT IN ('', $2) AND btrim(COALESCE(s.my_refer_code::text, '')) = me.by_code) AS is_my_referrer,
+                (me.my_code NOT IN ('', $2) AND btrim(COALESCE(s.refer_by_code::text, '')) = me.my_code) AS is_my_referee
+           FROM ${S}.singles s, me
+          WHERE s.singles_id <> $1
+            AND ((me.by_code NOT IN ('', $2) AND btrim(COALESCE(s.my_refer_code::text, '')) = me.by_code)
+              OR (me.my_code NOT IN ('', $2) AND btrim(COALESCE(s.refer_by_code::text, '')) = me.my_code))`,
+        [singlesId, DEFAULT_REFER_BY_CODE]
+      )
+    ]);
+
+    const byId = new Map();
+    const entry = (otherId) => {
+      const id = Number(otherId);
+      if (!byId.has(id)) {
+        byId.set(id, {
+          singlesId: id,
+          events: [],
+          isMyReferrer: false,
+          isMyReferee: false,
+          isMyMemberReferrer: false,
+          isMyMemberReferee: false
+        });
+      }
+      return byId.get(id);
+    };
+    for (const row of eventRows) {
+      entry(row.other_id).events.push({
+        eventId: Number(row.event_id),
+        title: row.event_title || '',
+        hostName: String(row.host_full_name || '').trim(),
+        nightDatetime: row.event_night_datetime,
+        eventDate: row.event_night_datetime ? formatEventTime(row.event_night_datetime, row.event_time_zone) : ''
+      });
+    }
+    for (const row of referRows) {
+      const e = entry(row.other_id);
+      e.isMyReferrer = e.isMyReferrer || row.is_my_referrer === true;
+      e.isMyReferee = e.isMyReferee || row.is_my_referee === true;
+    }
+    for (const row of memberReferRows) {
+      const e = entry(row.other_id);
+      e.isMyMemberReferrer = e.isMyMemberReferrer || row.is_my_referrer === true;
+      e.isMyMemberReferee = e.isMyMemberReferee || row.is_my_referee === true;
+    }
+    return res.json({ relationships: [...byId.values()] });
+  } catch (err) {
+    console.error('[raffle] relationships failed:', err?.message || err);
+    return res.status(500).json({ error: 'Could not load raffle relationships.' });
   }
 }

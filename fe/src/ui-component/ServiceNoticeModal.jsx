@@ -3,7 +3,7 @@ import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-import welcomeMall from 'assets/images/welcomeMall.png';
+import welcomeMall from 'assets/images/BannerTutaMall.png';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 
 // ==============================|| SERVICE NOTICE MODAL ||============================== //

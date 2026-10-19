@@ -10,7 +10,7 @@ export function parseRegistrationMeta(passwordHash) {
   }
 }
 
-/** Six-digit referrer code saved at /api/register (registration_email.password_hash JSON). */
+/** A#### referrer code saved at /api/register (registration_email.password_hash JSON). */
 export function referCodeFromRegistrationMeta(passwordHash) {
   const meta = parseRegistrationMeta(passwordHash);
   return normalizeReferralCodeQuery(meta.ref);

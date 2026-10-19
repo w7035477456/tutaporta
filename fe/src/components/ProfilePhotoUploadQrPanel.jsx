@@ -287,7 +287,7 @@ export default function ProfilePhotoUploadQrPanel({
         sx={{
           width: '100%',
           height: '100%',
-          minHeight: { xs: 200, md: 'clamp(140px, 14vw, 200px)' },
+          minHeight: 'clamp(120px, 18vh, 200px)',
           display: 'flex',
           flexDirection: 'column',
           textAlign: 'center',
@@ -322,12 +322,20 @@ export default function ProfilePhotoUploadQrPanel({
                 position: 'relative',
                 display: 'inline-flex',
                 bgcolor: '#fff',
-                p: 1,
+                p: '0.8vh',
                 borderRadius: 1.5,
                 maxWidth: '100%'
               }}
             >
-              <Box sx={{ lineHeight: 0, opacity: phoneUploadBusy ? 0.35 : 1 }}>
+              <Box
+                sx={{
+                  lineHeight: 0,
+                  opacity: phoneUploadBusy ? 0.35 : 1,
+                  width: qrSizeProp ? qrSize : 'min(156px, 18vw)',
+                  maxWidth: '100%',
+                  '& svg': { width: '100%', height: 'auto', display: 'block' }
+                }}
+              >
                 <QRCodeSVG
                   value={session.mobileUrl}
                   size={qrSize}

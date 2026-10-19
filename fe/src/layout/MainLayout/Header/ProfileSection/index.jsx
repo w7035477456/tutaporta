@@ -16,9 +16,11 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 // project imports
 import Transitions from 'ui-component/extended/Transitions';
+import ScaleToFitHeightBox from 'ui-component/ScaleToFitHeightBox';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import PageVideoTutorialsButton from 'ui-component/PageVideoTutorialsButton';
@@ -90,6 +92,10 @@ import { storeLoginEmailPrefill } from 'utils/loginScreenPrefill';
 
 const PROFILE_MENU_PANEL_WIDTH_RATIO = 0.35;
 const PROFILE_MENU_PANEL_MIN_PX = 280;
+const PROFILE_MENU_MOBILE_WIDTH_CSS = 'min(96vw, 480px)';
+const PROFILE_MENU_POPPER_OFFSET_PX = 14;
+/** Popper overflow padding + Paper border so the scaled panel clears the screen bottom. */
+const PROFILE_MENU_MOBILE_BOTTOM_RESERVE_PX = 18;
 
 /** Show ~/tutamallBackup/{prefix} as /tutamallBackup/{prefix} (hide OS home path). */
 function formatTutaMallBackupLocation(backupDir) {
@@ -303,6 +309,7 @@ const headerProfileChipIconSizeSx = {
 
 export default function ProfileSection({ clusterTight = false }) {
   const theme = useTheme();
+  const isMobilePanel = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const location = useLocation();
   const {
@@ -374,16 +381,30 @@ export default function ProfileSection({ clusterTight = false }) {
     closeProfileMenu();
   };
 
+  const [mobilePanelMaxHeightPx, setMobilePanelMaxHeightPx] = useState(0);
+
   useEffect(() => {
     if (!open) return undefined;
 
     const syncMenuPanelWidth = () => {
       setMenuPanelWidthPx(profileMenuPanelWidthPx(window.innerWidth));
+      const viewportH = window.visualViewport?.height || window.innerHeight;
+      const anchorBottom = anchorRef.current?.getBoundingClientRect().bottom ?? 0;
+      setMobilePanelMaxHeightPx(
+        Math.max(
+          200,
+          Math.floor(viewportH - anchorBottom - PROFILE_MENU_POPPER_OFFSET_PX - PROFILE_MENU_MOBILE_BOTTOM_RESERVE_PX)
+        )
+      );
     };
 
     syncMenuPanelWidth();
     window.addEventListener('resize', syncMenuPanelWidth);
-    return () => window.removeEventListener('resize', syncMenuPanelWidth);
+    window.visualViewport?.addEventListener('resize', syncMenuPanelWidth);
+    return () => {
+      window.removeEventListener('resize', syncMenuPanelWidth);
+      window.visualViewport?.removeEventListener('resize', syncMenuPanelWidth);
+    };
   }, [open]);
 
   const themeChoiceRows = useMemo(() => {
@@ -948,15 +969,15 @@ export default function ProfileSection({ clusterTight = false }) {
         transition
         sx={{
           zIndex: tourActive ? 1700 : 1400,
-          width: `${menuPanelWidthPx}px`,
-          maxWidth: '50vw',
+          width: isMobilePanel ? PROFILE_MENU_MOBILE_WIDTH_CSS : `${menuPanelWidthPx}px`,
+          maxWidth: isMobilePanel ? '96vw' : '50vw',
           boxSizing: 'border-box'
         }}
         modifiers={[
           {
             name: 'offset',
             options: {
-              offset: [0, 14]
+              offset: [0, PROFILE_MENU_POPPER_OFFSET_PX]
             }
           },
           {
@@ -984,8 +1005,8 @@ export default function ProfileSection({ clusterTight = false }) {
                   bgcolor: 'var(--theme-secondary-color)',
                   backgroundImage: 'none',
                   boxShadow: 'none',
-                  overflow: 'visible',
-                  mb: 2,
+                  overflow: isMobilePanel ? 'hidden' : 'visible',
+                  mb: isMobilePanel ? 0 : 2,
                   border: '3px solid var(--theme-daynight-color)',
                   borderRadius: `${borderRadius}px`,
                   ...PROFILE_MENU_PANEL_FILL_SX,
@@ -996,6 +1017,7 @@ export default function ProfileSection({ clusterTight = false }) {
                 }}
               >
                 {open && (
+                  <ScaleToFitHeightBox enabled={isMobilePanel} maxHeightPx={mobilePanelMaxHeightPx}>
                   <Box>
                     <Box
                       sx={{
@@ -1100,9 +1122,9 @@ export default function ProfileSection({ clusterTight = false }) {
                         pt: 0,
                         pb: 1.5,
                         height: '100%',
-                        maxHeight: 'calc(100dvh - 340px)',
+                        maxHeight: isMobilePanel ? 'none' : 'calc(100dvh - 340px)',
                         overflowX: 'visible',
-                        overflowY: 'auto',
+                        overflowY: isMobilePanel ? 'visible' : 'auto',
                         color: 'var(--theme-primary-color)',
                         '& .MuiRadio-root': {
                           color: 'var(--theme-primary-color)',
@@ -1522,6 +1544,7 @@ export default function ProfileSection({ clusterTight = false }) {
                       ) : null}
                     </Stack>
                   </Box>
+                  </ScaleToFitHeightBox>
                 )}
               </Paper>
               </Transitions>

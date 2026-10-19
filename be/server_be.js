@@ -488,6 +488,7 @@ import {
   putUserZipFolder
 } from './routes/user/userCustomization.js';
 import {
+  getRaffleRelationships,
   getRaffleState,
   postRaffleBonusTickets,
   postRafflePayout,
@@ -1815,6 +1816,7 @@ app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoa
 app.get('/api/user/customization/zip-folder', requireAuth, getUserZipFolder);
 app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
+app.get('/api/raffle/relationships', requireAuth, getRaffleRelationships);
 app.get('/api/raffle/refer-code/validate', getRaffleReferCodeValidate);
 app.post('/api/raffle/select', requireAuth, requireIdInitializationCompleted, postRaffleSelect);
 app.post('/api/raffle/tickets', requireAuth, requireIdInitializationCompleted, postRaffleTicket);

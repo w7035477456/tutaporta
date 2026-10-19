@@ -1,33 +1,34 @@
-/** Default when signup URL has no valid ?ref= six-digit code — means no referrer. */
-export const DEFAULT_REFER_BY_CODE = '123456';
+/** Default when signup URL has no valid ?ref= A#### code — means no referrer. */
+export const DEFAULT_REFER_BY_CODE = 'A0000';
 
+/** 'A1234' from 'A1234' / 'a1234' / '1234'; '' for anything else. */
 export function normalizeReferByCodeDigits(raw) {
-  const digits = String(raw ?? '').replace(/\D/g, '');
-  return /^\d{6}$/.test(digits) ? digits : '';
+  const m = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .match(/^A?(\d{4})$/);
+  return m ? `A${m[1]}` : '';
 }
 
-/** True when code is the reserved no-referrer sentinel (123456). */
+/** True when code is the reserved no-referrer sentinel (A0000). */
 export function isDefaultReferByCode(raw) {
   return normalizeReferByCodeDigits(raw) === DEFAULT_REFER_BY_CODE;
 }
 
-/** True when a signup may earn referral rewards (real six-digit code, not the sentinel). */
+/** True when a signup may earn referral rewards (real A#### code, not the sentinel). */
 export function isRewardEligibleReferByCode(raw) {
-  const digits = normalizeReferByCodeDigits(raw);
-  return Boolean(digits) && digits !== DEFAULT_REFER_BY_CODE;
+  const code = normalizeReferByCodeDigits(raw);
+  return Boolean(code) && code !== DEFAULT_REFER_BY_CODE;
 }
 
 /** @param {string | null | undefined} raw — URL ?token= / ?ref= or API referByCode */
 export function resolveReferByCode(raw) {
-  if (isDefaultReferByCode(raw)) return DEFAULT_REFER_BY_CODE;
-  const digits = normalizeReferByCodeDigits(raw);
-  if (digits) return digits;
-  return DEFAULT_REFER_BY_CODE;
+  return normalizeReferByCodeDigits(raw) || DEFAULT_REFER_BY_CODE;
 }
 
 /**
  * Prefer explicit request code, else registration_email metadata, else default.
- * Never treats 123456 from any source as a real referrer code.
+ * Never treats A0000 from any source as a real referrer code.
  * @param {{ referByCode?: string, ref?: string, token?: string, metaRef?: string }} sources
  */
 export function resolveReferByCodeForSignup(sources = {}) {

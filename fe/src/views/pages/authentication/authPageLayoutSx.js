@@ -116,7 +116,7 @@ export const authFixedFooterContentPaddingBottom = { pb: `${getAuthFooterHeightV
  * Reserve that height so the last field can scroll above the footer.
  */
 export const authMallFooterContentPaddingBottom = {
-  pb: { xs: '196px', md: `${getAuthFooterHeightVh()}vh` }
+  pb: { xs: 'var(--site-footer-height, 18vh)', md: `${getAuthFooterHeightVh()}vh` }
 };
 
 /**

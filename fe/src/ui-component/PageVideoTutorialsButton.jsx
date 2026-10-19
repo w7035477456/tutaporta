@@ -1,78 +1,54 @@
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
-import { DATING_TOP_BANNER_HEIGHT } from 'config/datingTopBanner';
+import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import { getPageVideoTutorialUrl } from 'config/pageVideoTutorialEnv';
+import {
+  ORANGE_INSTRUCTION_BUTTON_TEMPLATE_PROPS,
+  orangeUnSelectedInstructionButtonSx
+} from 'config/orangeInstructionButton';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { openYoutubeTutorialWindow } from 'utils/openYoutubeTutorialWindow';
-import videoTutorialImg from 'assets/images/videoTutorial.png';
 
-/** 2× the dating top-banner strip height — used for all menu VIDEO TUTORIALS icons. */
-export const VIDEO_TUTORIALS_ICON_HEIGHT = {
-  xs: DATING_TOP_BANNER_HEIGHT.xs * 2,
-  sm: DATING_TOP_BANNER_HEIGHT.sm * 2
-};
+const videoTutorialLabel = (
+  <Box component="span" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.05 }}>
+    <span>Video</span>
+    <span>Tutorial</span>
+  </Box>
+);
 
 /**
- * Centered page-header Video Tutorials control — opens the per-page ENV URL (or an explicit
- * `href`) in a theater-style popup (full-window player).
- * Icon: `assets/images/videoTutorial.png`.
+ * Orange two-row "Video Tutorial" button (same look as "Text Tutorial") — opens the per-page
+ * ENV URL (or an explicit `href`) in a theater-style popup (full-window player).
  */
 export default function PageVideoTutorialsButton({ pageKey, href: hrefProp, sx }) {
   const hrefFromEnv = pageKey ? getPageVideoTutorialUrl(pageKey) : '';
   const href = String(hrefProp ?? '').trim() || hrefFromEnv;
   const disabled = !href;
 
-  const handleClick = (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!href) return;
-    openYoutubeTutorialWindow(href);
-  };
-
   return (
-    <Box
-      component="a"
-      href={href || undefined}
-      role="link"
-      tabIndex={0}
-      aria-label="Watch Tutorials"
-      aria-disabled={disabled}
-      onClick={handleClick}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          handleClick(event);
-        }
-      }}
+    <UnSelectedButtonTemplate
+      type="button"
+      fitLabelWidth
+      disabled={disabled}
+      {...ORANGE_INSTRUCTION_BUTTON_TEMPLATE_PROPS}
       {...guestDemoAllowProps()}
+      onClick={(event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        if (!href) return;
+        openYoutubeTutorialWindow(href);
+      }}
+      aria-label="Watch video tutorial"
+      title="Video tutorial"
       sx={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        ...orangeUnSelectedInstructionButtonSx({ transformOrigin: 'center center' }),
+        whiteSpace: 'nowrap',
         flexShrink: 0,
-        lineHeight: 0,
-        textDecoration: 'none',
-        cursor: disabled ? 'default' : 'pointer',
-        opacity: disabled ? 0.55 : 1,
-        userSelect: 'none',
-        height: VIDEO_TUTORIALS_ICON_HEIGHT,
         ...sx
       }}
     >
-      <Box
-        component="img"
-        src={videoTutorialImg}
-        alt="Watch Tutorials"
-        draggable={false}
-        sx={{
-          display: 'block',
-          height: '100%',
-          width: 'auto',
-          maxWidth: { xs: '92vw', sm: 560 },
-          objectFit: 'contain',
-          pointerEvents: 'none'
-        }}
-      />
-    </Box>
+      {videoTutorialLabel}
+    </UnSelectedButtonTemplate>
   );
 }
 

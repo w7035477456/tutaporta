@@ -6,6 +6,7 @@ import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13Disab
 import { raffleButtonColorSx } from 'config/raffleButtonColors';
 import GetMyRafflePopup, { RaffleTicketCard } from 'ui-component/GetMyRafflePopup';
 import RaffleEventSelect from 'ui-component/RaffleEventSelect';
+import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import getMyRaffleTicketImg from 'assets/images/getmyraffleticket.png';
 import { fetchRaffleState, submitRafflePayout } from 'api/raffleFe';
 
@@ -494,9 +495,22 @@ export default function MallRafflePanel({ openRequest = 0 }) {
           gap: 1,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
           boxSizing: 'border-box',
+          position: 'relative',
           '&& .MuiTypography-root': { color: 'var(--mr-color, #111) !important' }
         }}
       >
+        {pastEvent ? (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: -0.5 }}>
+            <ColorTemplate6CloseX
+              aria-label="Close past event raffle"
+              positionSx={{ position: 'static' }}
+              onClose={() => {
+                setPastEventId('');
+                pastPickedRef.current = false;
+              }}
+            />
+          </Box>
+        ) : null}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography component="label" sx={{ fontWeight: 800, fontSize: { xs: '1rem', sm: '1.1rem' }, flexShrink: 0 }}>
             Event

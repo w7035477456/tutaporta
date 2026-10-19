@@ -20,7 +20,13 @@ import {
   getUsSignupPhoneValidationMessage,
   validateUsSignupPhone
 } from 'utils/usPhoneValidation';
-import { getSignupReferralCodeFromSearchParams, resolveSignupReferByCodeForApi } from 'utils/signupReferralCode';
+import {
+  clearStoredSignupReferralCode,
+  getSignupReferralCodeFromSearchParams,
+  persistSignupReferralCode,
+  resolveSignupReferByCodeForApi
+} from 'utils/signupReferralCode';
+import { validateReferralCode } from 'api/validateReferralCodeFe';
 import { authRegisterFormContentSx } from '../authentication/authPageLayoutSx';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -38,7 +44,7 @@ import { requestMallAppEnrollmentPopup } from 'utils/mallAppEnrollment';
 import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 import { useAuth } from 'contexts/AuthContext';
 import SignupDownPopup, { SIGNUP_DOWN_MSG } from './SignupDownPopup';
-import RaffleReferCodeInput from './RaffleReferCodeInput';
+import ReferCodeInput from './ReferCodeInput';
 import { RAFFLE_REFER_INVALID_MESSAGE, storeSignupRaffleReferCode, validateRaffleReferCode } from 'utils/raffleReferCode';
 
 // ===========================|| JWT - REGISTER ||=========================== //
@@ -139,7 +145,9 @@ export default function AuthRegister() {
   const [error, setError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  /** Typed digits only — sent as R#### / A####. */
   const [raffleReferCode, setRaffleReferCode] = useState('');
+  const [signupReferDigits, setSignupReferDigits] = useState('');
   const [raffleReferPopup, setRaffleReferPopup] = useState('');
   const emailTrimmed = email.trim();
   const isEmailFormatValid = EMAIL_PATTERN.test(emailTrimmed);
@@ -169,13 +177,13 @@ export default function AuthRegister() {
     setError('');
   };
 
-  /** '' (blank) is fine; anything else must be 4 digits that exist in singles.raffle_refer_code. */
-  const checkRaffleReferCode = async (code) => {
-    if (!code) return true;
+  /** '' (blank) is fine; anything else must be R + 4 digits that exist in singles.raffle_refer_code. */
+  const checkRaffleReferCode = async (digits) => {
+    if (!digits) return true;
     let valid = false;
-    if (code.length === 4) {
+    if (digits.length === 4) {
       try {
-        valid = await validateRaffleReferCode(code);
+        valid = await validateRaffleReferCode(`R${digits}`);
       } catch {
         valid = false;
       }
@@ -189,6 +197,34 @@ export default function AuthRegister() {
     if (next.length === 4) void checkRaffleReferCode(next);
   };
 
+  /** '' (blank) is fine; anything else must be A + 4 digits that exist in singles.my_refer_code. */
+  const checkSignupReferCode = async (digits) => {
+    if (!digits) {
+      clearStoredSignupReferralCode();
+      return true;
+    }
+    let valid = false;
+    if (digits.length === 4) {
+      try {
+        valid = (await validateReferralCode(`A${digits}`))?.valid === true;
+      } catch {
+        valid = false;
+      }
+    }
+    if (valid) persistSignupReferralCode(`A${digits}`);
+    else {
+      clearStoredSignupReferralCode();
+      setRaffleReferPopup(RAFFLE_REFER_INVALID_MESSAGE);
+    }
+    return valid;
+  };
+
+  const handleSignupReferChange = (next) => {
+    setSignupReferDigits(next);
+    if (!next) clearStoredSignupReferralCode();
+    else if (next.length === 4) void checkSignupReferCode(next);
+  };
+
   const handlePhoneChange = (e) => {
     setPhone(formatPhoneNumber(e.target.value));
     setPhoneError('');
@@ -196,7 +232,7 @@ export default function AuthRegister() {
   };
 
   useEffect(() => {
-    getSignupReferralCodeFromSearchParams(searchParams);
+    setSignupReferDigits(getSignupReferralCodeFromSearchParams(searchParams).slice(1));
     const fromGoogle = resolveGoogleSignupPrefillEmail(searchParams);
     const storedToken = readStoredGoogleSignupToken();
     if (fromGoogle && storedToken) {
@@ -279,7 +315,8 @@ export default function AuthRegister() {
       return;
     }
     if (!(await checkRaffleReferCode(raffleReferCode))) return;
-    storeSignupRaffleReferCode(raffleReferCode);
+    if (!(await checkSignupReferCode(signupReferDigits))) return;
+    storeSignupRaffleReferCode(raffleReferCode ? `R${raffleReferCode}` : '');
     if (signupDown) {
       const formattedPhone = formatPhoneNumber(phone);
       if (formattedPhone) sessionStorage.setItem(SIGNUP_REGISTER_PHONE_KEY, formattedPhone);
@@ -310,7 +347,7 @@ export default function AuthRegister() {
         return;
       }
 
-      await registerUser(emailTrimmed, formattedPhone, { raffleReferCode });
+      await registerUser(emailTrimmed, formattedPhone, { raffleReferCode: raffleReferCode ? `R${raffleReferCode}` : '' });
       navigate('/pages/registrationEmailed', { state: { email: emailTrimmed, phone: formattedPhone } });
     } catch (err) {
       console.error('Registration error:', err);
@@ -413,7 +450,20 @@ export default function AuthRegister() {
         </Typography>
       )}
 
-      <RaffleReferCodeInput value={raffleReferCode} onChange={handleRaffleReferChange} disabled={isSubmitting} />
+      <ReferCodeInput
+        label="Raffle Refer Code"
+        prefix="R"
+        value={raffleReferCode}
+        onChange={handleRaffleReferChange}
+        disabled={isSubmitting}
+      />
+      <ReferCodeInput
+        label="Signup Refer Code"
+        prefix="A"
+        value={signupReferDigits}
+        onChange={handleSignupReferChange}
+        disabled={isSubmitting}
+      />
 
       <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 2, mb: 1.5 }}>
         <Checkbox

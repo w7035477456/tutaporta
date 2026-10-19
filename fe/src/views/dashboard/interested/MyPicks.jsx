@@ -45,6 +45,8 @@ import { usePostingAlbumMediaFullscreen } from 'hooks/usePostingAlbumMediaFullsc
 import PostingAlbumMediaFullscreen from 'ui-component/PostingAlbumMediaFullscreen';
 import AlbumMediaDoubleClickSurface from 'ui-component/AlbumMediaDoubleClickSurface';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
+import RaffleRelationshipBadge from 'ui-component/RaffleRelationshipBadge';
+import useRaffleRelationships from 'hooks/useRaffleRelationships';
 import PageInstructionEarnTokensAction from 'ui-component/PageInstructionEarnTokensAction';
 import PageVideoTextTutorialPair from 'components/PageVideoTextTutorialPair';
 import EarnTokensPageTitle from 'ui-component/EarnTokensPageTitle';
@@ -139,6 +141,7 @@ function persistMyPicksOrder(storageKey, ids) {
 
 export default function MyPicks() {
   const { user } = useAuth();
+  const raffleRelationships = useRaffleRelationships();
   const {
     open: firstVisitWelcomeOpen,
     onClose: closeFirstVisitWelcome
@@ -883,6 +886,11 @@ export default function MyPicks() {
                             selected={selected}
                             onClick={() => setSelectedSinglesId(Number(person.singles_id))}
                             {...guestDemoAllowProps()}
+                          />
+                          <RaffleRelationshipBadge
+                            relationship={raffleRelationships.get(Number(person.singles_id))}
+                            memberLabel={memberLabel}
+                            belowOtherSash={Boolean(relationshipKind || showRequestedRibbon)}
                           />
                           {relationshipKind ? (
                             <Box component="span" aria-label="Approved" sx={MEMBER_INCOMING_APPROVED_SASH_SX}>

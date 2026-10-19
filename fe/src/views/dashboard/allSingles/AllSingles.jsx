@@ -32,6 +32,8 @@ import audioAllSinglesSora from 'assets/sound/all_singles_instruction_Sora.m4a';
 import audioAllSinglesJessica from 'assets/sound/all_singles_instruction_Jessica.m4a';
 import audioAllSinglesMichael from 'assets/sound/all_singles_instruction_Michael.m4a';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
+import RaffleRelationshipBadge from 'ui-component/RaffleRelationshipBadge';
+import useRaffleRelationships from 'hooks/useRaffleRelationships';
 import {
   colorTemplate8PhotoGalleryWrapItemSx,
   colorTemplate8PhotoGalleryWrapListSx,
@@ -216,6 +218,7 @@ export default function AllSingles() {
   const theme = useTheme();
   const navigate = useNavigate();
   const { user, profilePhotoCacheBust } = useAuth();
+  const raffleRelationships = useRaffleRelationships();
   const toolsOnlyAdmin = isToolsOnlyAdminSession(user);
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchQuery, setSearchQuery] = useState('');
@@ -841,6 +844,10 @@ export default function AllSingles() {
                     {personIndex_DDDDDDD.vetted_basic_status ? (
                       <Box component="img" src={verifiedSeal} alt="Vetted" sx={allSinglesVerifiedSealSx} />
                     ) : null}
+                    <RaffleRelationshipBadge
+                      relationship={raffleRelationships.get(Number(personIndex_DDDDDDD.singles_id))}
+                      memberLabel={memberLabel}
+                    />
                   </Box>
                   <ColorTemplate8PhotoGallery.NameButton onDoubleClick={() => openInterestedAlbum(personIndex_DDDDDDD)}>
                     <ColorTemplate8PhotoGallery.Label

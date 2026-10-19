@@ -77,7 +77,7 @@ const RAFFLE_STEPS = [
 
 const BONUS_STEPS = [
   <>
-    After Registering, you see <RaffleTicketButtonPicture /> has a &ldquo;Your Friend Refer Code: ####&rdquo;.
+    After Registering, you see <RaffleTicketButtonPicture /> has a &ldquo;Your Friend Refer Code: R####&rdquo;.
   </>,
   <>Share this code with your friends.</>,
   <>Your friend enters the code when they register.</>,

@@ -21,8 +21,22 @@ const digitBoxSx = {
   '&:focus': { borderColor: CLEAR_GREEN, boxShadow: `0 0 0 2px ${CLEAR_GREEN}` }
 };
 
-/** "Raffle Refer Code" — 4 single-digit boxes + Clear. `value` is a string of 0–4 digits. */
-export default function RaffleReferCodeInput({ value, onChange, disabled = false }) {
+const prefixBoxSx = {
+  ...digitBoxSx,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxSizing: 'border-box',
+  bgcolor: '#e8e8e8',
+  mr: 0.75,
+  userSelect: 'none'
+};
+
+/**
+ * Refer code entry — fixed letter box (e.g. R / A) + 4 single-digit boxes + Clear.
+ * `value` is the 0–4 typed digits only (no letter); parents add `prefix` when sending.
+ */
+export default function ReferCodeInput({ label, prefix, value, onChange, disabled = false }) {
   const inputsRef = useRef([]);
   const digits = Array.from({ length: DIGIT_COUNT }, (_, i) => value[i] || '');
 
@@ -66,12 +80,15 @@ export default function RaffleReferCodeInput({ value, onChange, disabled = false
   return (
     <Box sx={{ mt: 2, width: '100%' }}>
       <Typography sx={{ color: 'var(--theme-primary-color)', fontWeight: 600, fontSize: { xs: '1.05rem', sm: '1.2rem' } }}>
-        Raffle Refer Code{' '}
+        {label}{' '}
         <Box component="span" sx={{ fontWeight: 400, fontSize: '0.9em' }}>
           (If applicable, optional)
         </Box>
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.75 }}>
+        <Box aria-hidden sx={prefixBoxSx}>
+          {prefix}
+        </Box>
         {digits.map((digit, index) => (
           <Box
             // eslint-disable-next-line react/no-array-index-key
@@ -84,7 +101,7 @@ export default function RaffleReferCodeInput({ value, onChange, disabled = false
             inputMode="numeric"
             autoComplete="off"
             maxLength={DIGIT_COUNT}
-            aria-label={`Raffle refer code digit ${index + 1}`}
+            aria-label={`${label} digit ${index + 1} (after ${prefix})`}
             value={digit}
             disabled={disabled}
             onChange={handleChange(index)}
@@ -122,7 +139,9 @@ export default function RaffleReferCodeInput({ value, onChange, disabled = false
   );
 }
 
-RaffleReferCodeInput.propTypes = {
+ReferCodeInput.propTypes = {
+  label: PropTypes.string.isRequired,
+  prefix: PropTypes.string.isRequired,
   value: PropTypes.string.isRequired,
   onChange: PropTypes.func.isRequired,
   disabled: PropTypes.bool

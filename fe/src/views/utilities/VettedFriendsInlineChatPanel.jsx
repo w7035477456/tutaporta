@@ -35,6 +35,7 @@ import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomiza
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { getDesktopIconSizeVw } from 'config/desktopFontEnv';
 import { useAuth } from 'contexts/AuthContext';
+import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import {
   COLOR_TEMPLATE1_BG_SELECTED,
   COLOR_TEMPLATE1_BG_UNSELECTED,
@@ -64,8 +65,7 @@ function parsePxLen(cssLen) {
 const BASE_MOBILE_CHAT_PX = parsePxLen(MOBILE_TEXT_FONT_PX);
 const BASE_DESKTOP_CHAT_PX = parsePxLen(DESKTOP_TEXT_FONT_PX);
 
-/** Match My Photo album: drag-and-drop replaced with tap camera / gallery on narrow viewports */
-const MOBILE_UPLOAD_MAX_CSS = '(max-width:768px)';
+/** Phone camera/gallery panel. Tablets keep the desktop drag-and-drop drop zone. */
 const MOBILE_UPLOAD_SURFACE_BG = '#C7E6C8';
 const ACCEPT = 'image/jpeg,image/jpg,image/png,image/gif,image/webp,image/jfif';
 const ALLOWED_UPLOAD_EXT = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'jfif']);
@@ -380,7 +380,7 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
   const incomingBubbleTextColor = COLOR_TEMPLATE1_TEXT_UNSELECTED;
   const navigate = useNavigate();
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
-  const isMobileUpload = useMediaQuery(MOBILE_UPLOAD_MAX_CSS);
+  const isMobileUpload = useCompactLoginViewport();
   const { user } = useAuth();
   const friendId = Number(requestRow?.singles_id_to);
   const friendIdOk = Number.isFinite(friendId) && friendId > 0;
@@ -1595,7 +1595,7 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
                 borderColor: dragOverPhotoDrop ? 'primary.main' : 'grey.400',
                 borderRadius: 2,
                 bgcolor: 'var(--theme-secondary-color)',
-                minHeight: 200,
+                minHeight: 'clamp(120px, 22vh, 220px)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -1611,7 +1611,7 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
                 src={dragDropClickUploadImg}
                 alt="Drag and drop or click to upload"
                 sx={{
-                  maxWidth: 'min(100%, 220px)',
+                  maxWidth: 'min(100%, clamp(120px, 22vw, 240px))',
                   width: '100%',
                   height: 'auto',
                   mb: 1,

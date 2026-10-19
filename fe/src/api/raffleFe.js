@@ -1,7 +1,7 @@
 import api from './axios';
 
 /**
- * referCode: this member's permanent 4-digit Friend Refer Code (same on every raffle)
+ * referCode: this member's permanent Friend Refer Code (R####) (same on every raffle)
  * referCredit / referFriends / rafflePerRefer: unspent referral credits, friends registered, tickets per credit
  * referRemaining: bonus tickets still available to generate (unspent credits × per + leftover of a partly used credit)
  * tickets[].bonus: true for extra tickets bought with referral credits (several per event)
@@ -43,6 +43,16 @@ export async function createRaffleBonusTickets(eventId, count) {
     referCredit: Number(data?.referCredit) || 0,
     referRemaining: Number(data?.referRemaining) || 0
   };
+}
+
+/**
+ * Members related to me (same-event raffle tickets, raffle referrer / referee, Refer Email / Post FB referrer / referee)
+ * → [{ singlesId, events: [{ eventId, title, hostName, eventDate }], isMyReferrer, isMyReferee,
+ *      isMyMemberReferrer, isMyMemberReferee }].
+ */
+export async function fetchRaffleRelationships() {
+  const { data } = await api.get('/api/raffle/relationships');
+  return Array.isArray(data?.relationships) ? data.relationships : [];
 }
 
 /** Generate My Raffle — new ticket, or the existing one with `message` when already generated. */

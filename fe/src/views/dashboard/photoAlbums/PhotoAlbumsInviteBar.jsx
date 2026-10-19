@@ -175,7 +175,6 @@ export default function PhotoAlbumsInviteBar({
           tutorialVariant="orange"
           tutorialAriaLabel="Open context tutorial"
           tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
-          iconHeight={{ xs: 72, sm: 84 }}
           sx={{ ml: 0.25, mr: 0.25, alignSelf: 'center' }}
         />
         <TextField

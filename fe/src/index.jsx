@@ -39,8 +39,8 @@ import App from 'App';
 installClientApiCooldownFetchGuard();
 installFeBeTrafficLog(api);
 void syncFeBeTrafficLogFromPublicConfig();
-import * as serviceWorker from 'serviceWorker';
 import reportWebVitals from 'reportWebVitals';
+import { registerHomeButtonServiceWorker } from 'utils/homeButtonInstall';
 import { ConfigProvider } from 'contexts/ConfigContext';
 import { SiteAudioProvider } from 'contexts/SiteAudioContext';
 
@@ -83,10 +83,8 @@ if (import.meta.env.DEV && typeof sessionStorage !== 'undefined') {
   }
 }
 
-// If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
-serviceWorker.unregister();
+// No-cache worker so Chrome can offer Make Home Button on /mobile. Does not cache the app.
+registerHomeButtonServiceWorker();
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

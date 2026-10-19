@@ -13,6 +13,7 @@ import {
 import { colorTemplate15LandingPageRegion7CompanionSx } from 'config/colorTemplate15LandingPage';
 import { colorTemplate14LandingFrameRegion7CompanionSx } from 'config/colorTemplate14LandingFrame';
 import { DATING_TOP_BANNER_IMAGE } from 'config/datingTopBanner';
+import bannerTutaDates from 'assets/images/BannerTutaDates.png';
 import { getAdminImpersonationHeaderState } from 'config/adminImpersonationHeader';
 import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeaderCenter';
 import DemoOnlyModeBanner from 'ui-component/DemoOnlyModeBanner';
@@ -157,9 +158,8 @@ export default function ApplicationShell({
   );
 
   const showFrameFooter = showFixedFooter && !footerAtScrollEnd;
-  const frameTopBanner =
-    topBannerImageOverride ??
-    (showTopBanner && !adminHeader ? DATING_TOP_BANNER_IMAGE : undefined);
+  const showTutaDatesBanner = !topBannerImageOverride && showTopBanner && !adminHeader;
+  const frameTopBanner = topBannerImageOverride ?? (showTutaDatesBanner ? DATING_TOP_BANNER_IMAGE : undefined);
 
   return (
     <ColorTemplate15ApplicationFrame
@@ -174,7 +174,7 @@ export default function ApplicationShell({
         ) : null
       }
       showHeader={showHeader}
-      headerLeft={<HeaderLeft />}
+      headerLeft={<HeaderLeft bannerImage={showTutaDatesBanner ? bannerTutaDates : undefined} />}
       headerRight={<HeaderRight />}
       sidebar={showSidebar ? <Sidebar /> : false}
       sidebarOpen={showSidebar ? sidebarOpen : false}

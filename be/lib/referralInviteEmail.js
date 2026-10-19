@@ -1,5 +1,6 @@
 import { wrapEmailHtml } from './emailHtml.js';
 import { formatMemberDisplayCode } from '../utils/memberDisplayCode.js';
+import { isRewardEligibleReferByCode, normalizeReferByCodeDigits } from '../utils/referByCode.js';
 
 /** Breaks Gmail duplicate-content clipping that shows a "..." trim control. */
 const GMAIL_CLIP_BREAK = '\u200B';
@@ -23,9 +24,9 @@ export function formatReferralInviteMemberGreeting({ alias, memberId }) {
 
 export function buildRegistrationReferralUrl(baseUrl, myReferCode) {
   const base = String(baseUrl ?? '').trim().replace(/\/$/, '');
-  const digits = String(myReferCode ?? '').replace(/\D/g, '');
-  if (!/^\d{6}$/.test(digits)) return `${base}/entertoken`;
-  return `${base}/entertoken?token=${encodeURIComponent(digits)}`;
+  const code = normalizeReferByCodeDigits(myReferCode);
+  if (!isRewardEligibleReferByCode(code)) return `${base}/entertoken`;
+  return `${base}/entertoken?token=${encodeURIComponent(code)}`;
 }
 
 function defaultForwardedMessage({ referralUrl, referCode }) {

@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
@@ -284,8 +284,24 @@ function ColorTemplate15ApplicationFrameFooterBar({
   showSupportButton = true,
   sx
 }) {
+  const footerRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = footerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const apply = () => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
+      if (height > 0) {
+        document.documentElement.style.setProperty('--site-footer-height', `${height}px`);
+      }
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
     <Box
+      ref={footerRef}
       sx={{ ...colorTemplate15ApplicationFrameFooterShellSx({ inline }), ...(sx || {}) }}
     >
       {footerLeft ?? <ColorTemplate15ApplicationFrameFooterLeft />}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
@@ -28,6 +28,7 @@ import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import GreenButton from 'ui-component/GreenButton';
 import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
 import { guestDemoAllowProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { normalizeSignupReferralCode } from 'utils/signupReferralCode';
 import { PROFILES_RECORDS_OPEN_TABS, PROFILES_RECORDS_TAB_PAY_HISTORY } from 'constants/profilesRecordsRoute';
 import RefereeRewardCongratulationsPopup from './RefereeRewardCongratulationsPopup';
 import { getPricePerTokenFromEnv } from 'config/pricePerTokenEnv';
@@ -283,6 +284,30 @@ function ProfilesRecordsUserTimeReadout({ userTimeZoneProfile, sx }) {
     </Typography>
   );
 }
+
+/** ColorTemplate15LandingPage clips overflow, so the standalone page must own its vertical scroll. */
+function ProfilesRecordsPageScrollRoot({ children }) {
+  return (
+    <Box
+      sx={{
+        flex: '1 1 0%',
+        minHeight: 0,
+        minWidth: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        '& > *': { flexShrink: 0 }
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+ProfilesRecordsPageScrollRoot.propTypes = {
+  children: PropTypes.node
+};
 
 export default function ProfilesRecordsPage({
   visibleTabs = null,
@@ -947,8 +972,10 @@ export default function ProfilesRecordsPage({
     </Box>
   );
 
+  const PageScrollRoot = embedded ? Fragment : ProfilesRecordsPageScrollRoot;
+
   return (
-    <>
+    <PageScrollRoot>
       {!embedded ? (
         <Box
           sx={{
@@ -1520,7 +1547,7 @@ export default function ProfilesRecordsPage({
                 <ProfilesRecordsReferEmailTab
                   accountEmail={profileForm.email || user?.email}
                   pageTextColor={pageTextColor}
-                  hasReferralCode={/^\d{6}$/.test(String(myReferCode ?? '').replace(/\D/g, ''))}
+                  hasReferralCode={Boolean(normalizeSignupReferralCode(myReferCode))}
                   myReferCode={myReferCode}
                 />
               ) : null}
@@ -1782,7 +1809,7 @@ export default function ProfilesRecordsPage({
         </ColorTemplate7PopupLargeDark.Body>
       </ColorTemplate7PopupLargeDark>
     </MainCard>
-    </>
+    </PageScrollRoot>
   );
 }
 

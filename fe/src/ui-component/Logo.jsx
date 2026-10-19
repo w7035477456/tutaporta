@@ -3,7 +3,7 @@ import { useTheme, useColorScheme } from '@mui/material/styles';
 
 import logo from 'assets/images/vettedSingleLogoText.jpeg';
 import logoDark from 'assets/images/vettedSingleLogoText.jpeg'; // optional
-import welcomeMall from 'assets/images/welcomeMall.png';
+import welcomeMall from 'assets/images/BannerTutaMall.png';
 
 // ==============================|| LOGO SVG ||============================== //
 

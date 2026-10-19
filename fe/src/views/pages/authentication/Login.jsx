@@ -129,8 +129,23 @@ function Login() {
         <Stack sx={{ ...authShellStackSx, ...authMallFooterContentPaddingBottom, boxSizing: 'border-box' }}>
           <AuthStandardDialogFrame>
             <AuthCardWrapper fullWidth>
-              <Stack sx={{ alignItems: 'stretch', justifyContent: 'center', gap: 2, width: '100%' }}>
-                <Box sx={{ mb: 1, alignSelf: 'center' }}>
+              <Stack sx={{ alignItems: 'stretch', justifyContent: 'flex-start', gap: { xs: 0.75, md: 2 }, width: '100%' }}>
+                <Box
+                  sx={{
+                    mb: { xs: 0.25, md: 1 },
+                    alignSelf: 'center',
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    '& img': {
+                      width: { xs: 'auto', md: '100%' },
+                      maxWidth: '100%',
+                      maxHeight: { xs: '11vh', md: 'none' },
+                      height: 'auto',
+                      display: 'block'
+                    }
+                  }}
+                >
                   <Link to="#" aria-label="logo">
                     <Logo authBranding />
                   </Link>

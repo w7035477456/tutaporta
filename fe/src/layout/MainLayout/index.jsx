@@ -10,6 +10,7 @@ import Box from '@mui/material/Box';
 
 // assets - top banner for dating pages
 import { DATING_TOP_BANNER_IMAGE } from 'config/datingTopBanner';
+import bannerTutaDates from 'assets/images/BannerTutaDates.png';
 import { headerBarMinHeightCss } from 'config/headerProfileChipEnv';
 
 // project imports
@@ -81,7 +82,9 @@ import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSess
 function datingAppBarSx({ isLandingRoute, isDatingRoute, adminHeader, isVaultImmersiveRoute }) {
   if (isLandingRoute) {
     return {
-      bgcolor: 'var(--theme-primary-color)',
+      bgcolor: '#79C4D6',
+      backgroundColor: '#79C4D6',
+      backgroundImage: 'none',
       boxShadow: 'none',
       zIndex: 1200
     };
@@ -106,7 +109,35 @@ function datingAppBarSx({ isLandingRoute, isDatingRoute, adminHeader, isVaultImm
 
 function DatingAppBarToolbar({ iconsOnly, adminHeader, showDemoOnlyBanner }) {
   return (
-    <Toolbar sx={{ p: 2, minHeight: headerBarMinHeightCss(), boxSizing: 'border-box', backgroundImage: 'none', position: 'relative' }}>
+    <Toolbar
+      sx={{
+        p: 2,
+        minHeight: headerBarMinHeightCss(),
+        boxSizing: 'border-box',
+        backgroundImage: 'none',
+        backgroundColor: 'transparent',
+        position: 'relative'
+      }}
+    >
+      {iconsOnly ? (
+        <Box
+          component="img"
+          src={bannerTutaDates}
+          alt="TutaDates"
+          sx={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            height: '100%',
+            width: 'auto',
+            maxWidth: 'min(720px, calc(100% - 240px))',
+            objectFit: 'contain',
+            objectPosition: 'left center',
+            pointerEvents: 'none',
+            zIndex: 0
+          }}
+        />
+      ) : null}
       {adminHeader ? (
         <Box sx={adminImpersonationHeaderCenterWrapSx}>
           <AdminImpersonationHeaderCenter label={adminHeader.label} />

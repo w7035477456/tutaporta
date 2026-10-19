@@ -39,6 +39,28 @@ export const MEMBER_RELATIONSHIP_RIBBON_SX = {
   bgcolor: '#FFEB3B'
 };
 
+/** Raffle "Related" sash — red text on yellow; clickable, grows 25% on hover. */
+export const MEMBER_RAFFLE_RELATED_SASH_SX = {
+  ...MEMBER_DIAGONAL_SASH_BASE_SX,
+  bgcolor: '#FFEB3B',
+  color: '#E53935',
+  WebkitTextFillColor: '#E53935',
+  WebkitTextStroke: '0.45px #E53935',
+  textShadow: 'none',
+  m: 0,
+  font: 'inherit',
+  fontSize: MEMBER_DIAGONAL_SASH_BASE_SX.fontSize,
+  fontWeight: 800,
+  pointerEvents: 'auto',
+  cursor: 'pointer',
+  zIndex: 101,
+  transition: 'transform 0.15s ease',
+  '@media (hover: hover)': {
+    '&:hover': { transform: 'rotate(-45deg) scale(1.25)' }
+  },
+  '&:focus-visible': { transform: 'rotate(-45deg) scale(1.25)', outline: '2px solid #000' }
+};
+
 /** Received Bio Req — Approved sash (black on green). */
 export const MEMBER_INCOMING_APPROVED_SASH_SX = {
   ...MEMBER_DIAGONAL_SASH_BASE_SX,

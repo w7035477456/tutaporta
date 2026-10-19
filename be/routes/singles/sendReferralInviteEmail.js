@@ -9,7 +9,8 @@ import {
   formatReferralInviteMemberGreeting
 } from '../../lib/referralInviteEmail.js';
 import { getPublicAppUrl } from '../../utils/publicAppUrl.js';
-import { referCodeFromMemberId } from '../../utils/referCodeFromMemberId.js';
+import { ensureMyReferCode } from '../../utils/signupReferCode.js';
+import { normalizeReferByCodeDigits } from '../../utils/referByCode.js';
 
 const LOG_PREFIX = '[sendReferralInviteEmail]';
 const REFERRAL_EMAIL_FROM = OUTBOUND_EMAIL_FROM_HEADER;
@@ -65,11 +66,9 @@ export async function sendReferralInviteEmail(req, res) {
       return res.status(404).json({ error: 'User profile not found.' });
     }
 
-    let referCode = String(row.my_refer_code ?? '').replace(/\D/g, '');
-    if (!/^\d{6}$/.test(referCode) && row.member_id != null) {
-      referCode = referCodeFromMemberId(row.member_id) || '';
-    }
-    if (!/^\d{6}$/.test(referCode)) {
+    const referCode =
+      normalizeReferByCodeDigits(row.my_refer_code) || normalizeReferByCodeDigits(await ensureMyReferCode(pool, singlesId));
+    if (!referCode) {
       return res.status(400).json({
         error: 'Your referral code is not available yet. Complete registration to generate your invite link.'
       });

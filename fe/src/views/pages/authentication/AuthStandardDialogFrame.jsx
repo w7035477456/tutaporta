@@ -6,6 +6,7 @@ import Box from '@mui/material/Box';
 
 import AuthInnerStack from './AuthInnerStack';
 import { getMobileScrollbarOverflowSx } from 'config/authDialogEnv';
+import { MOBILE_DIALOG_TARGET_WIDTH_FRAC } from './AuthMobileDialogFit';
 import { standardAuthDialogScrollSx, standardAuthDialogInnerColumnSx } from './authPageLayoutSx';
 
 /**
@@ -18,12 +19,15 @@ import { standardAuthDialogScrollSx, standardAuthDialogInnerColumnSx } from './a
 export default function AuthStandardDialogFrame({ children }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const mobileWidthVw = MOBILE_DIALOG_TARGET_WIDTH_FRAC * 100;
+  const mobileSideVw = (100 - mobileWidthVw) / 2;
 
   return (
     <AuthInnerStack
       sx={{
         flex: '1 1 0',
         minHeight: 0,
+        height: isMobile ? '100%' : undefined,
         width: '100%',
         paddingTop: 0,
         justifyContent: 'flex-start',
@@ -37,10 +41,34 @@ export default function AuthStandardDialogFrame({ children }) {
       <Box
         sx={{
           ...standardAuthDialogScrollSx,
-          ...(isMobile ? getMobileScrollbarOverflowSx(true) : {})
+          ...(isMobile
+            ? {
+                width: `${mobileWidthVw}vw`,
+                maxWidth: `${mobileWidthVw}vw`,
+                ml: `${mobileSideVw}vw`,
+                mr: `${mobileSideVw}vw`,
+                mt: '0.6vh',
+                mb: '0.6vh',
+                flex: '1 1 0',
+                height: '100%',
+                maxHeight: '100%',
+                minHeight: 0,
+                overflow: 'hidden',
+                ...getMobileScrollbarOverflowSx(true),
+                overflowY: 'hidden',
+                overflowX: 'hidden'
+              }
+            : {})
         }}
       >
-        <Box sx={standardAuthDialogInnerColumnSx}>{children}</Box>
+        <Box
+          sx={{
+            ...standardAuthDialogInnerColumnSx,
+            ...(isMobile ? { height: '100%', flex: '1 1 auto', minHeight: 0 } : {})
+          }}
+        >
+          {children}
+        </Box>
       </Box>
     </AuthInnerStack>
   );

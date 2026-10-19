@@ -1,12 +1,12 @@
 import { MY_RECORD_VAULT_LEGACY_PATH, MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { headerBarMinHeightCss } from 'config/headerProfileChipEnv';
-import myNoteHeaderLogoImage from 'assets/images/tutamallwebsitelogo.png';
+import myNoteHeaderLogoImage from 'assets/images/BannerTutaNotes.png';
 import myNoteBannerImage from 'assets/images/myNote.png';
 import myNoteBackgroundImage from 'assets/images/myNoteBackground.png';
 
 export { MY_RECORD_VAULT_PATH };
 
-/** Header logo for /myNote — small TutaMall.com mark (left of toolbar). */
+/** Header logo for /myNote — TutaNotes banner (left of toolbar). */
 export const MY_NOTE_HEADER_LOGO_IMAGE = myNoteHeaderLogoImage;
 
 /** Top header strip artwork for /myNote — tiled across full app-bar width. */

@@ -1,7 +1,8 @@
 import pool, { getDBSchema } from '../../db/connection.js';
 import { respondSessionInvalid } from '../../utils/sessionInvalidResponse.js';
 import { formatMemberDisplayCode, formatMemberIdDigits } from '../../utils/memberDisplayCode.js';
-import { referCodeFromMemberId } from '../../utils/referCodeFromMemberId.js';
+import { ensureMyReferCode } from '../../utils/signupReferCode.js';
+import { normalizeReferByCodeDigits } from '../../utils/referByCode.js';
 import { resolveRequestsAppSchema } from './resolveRequestsAppSchema.js';
 import {
   cleanAlias,
@@ -76,18 +77,6 @@ const PROFILE_COLUMN_CANDIDATES = {
   secret_icon: ['secret_icon'],
   custom_logout_duration: ['custom_logout_duration']
 };
-
-function normalizeSixDigitReferCode(raw) {
-  const digits = String(raw ?? '').replace(/\D/g, '');
-  return /^\d{6}$/.test(digits) ? digits : null;
-}
-
-/** DB value, else deterministic code from member_id (same as sendReferralInviteEmail). */
-function resolveProfileReferCode(row) {
-  const fromDb = normalizeSixDigitReferCode(row?.my_refer_code);
-  if (fromDb) return fromDb;
-  return normalizeSixDigitReferCode(referCodeFromMemberId(row?.member_id));
-}
 
 function cleanNullableText(raw) {
   if (raw == null) return null;
@@ -1943,19 +1932,8 @@ export async function getSettingsProfile(req, res) {
     }
 
     const row = profileResult.rows[0];
-    const resolvedReferCode = resolveProfileReferCode(row);
-    if (resolvedReferCode && !normalizeSixDigitReferCode(row.my_refer_code)) {
-      const referCol = pickColumn(columnSet, PROFILE_COLUMN_CANDIDATES.my_refer_code);
-      if (referCol) {
-        await client.query(
-          `UPDATE outdateddbsnapshotoct2024.singles
-           SET ${sqlIdent(referCol)} = $1
-           WHERE singles_id = $2
-             AND (${sqlIdent(referCol)} IS NULL OR BTRIM(${sqlIdent(referCol)}::text) = '')`,
-          [resolvedReferCode, singlesId]
-        );
-      }
-    }
+    const resolvedReferCode =
+      normalizeReferByCodeDigits(row.my_refer_code) || normalizeReferByCodeDigits(await ensureMyReferCode(client, singlesId)) || null;
     const tokenBalance = await getTokenBalance(client, singlesId);
     return res.json({
       id: row.id == null ? null : row.id,

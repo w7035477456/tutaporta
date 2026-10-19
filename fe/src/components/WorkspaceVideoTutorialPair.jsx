@@ -32,8 +32,8 @@ const textTutorialLabel = (
 );
 
 /**
- * Header pair: VIDEO TUTORIALS graphic + orange two-row "Text Tutorial" button.
- * - Graphic → floating YouTube theater window
+ * Header pair: orange two-row "Video Tutorial" + "Text Tutorial" buttons.
+ * - Video Tutorial → floating YouTube theater window
  * - Tutorial → caller opens context / instruction popup
  */
 export default function WorkspaceVideoTutorialPair({
@@ -46,8 +46,6 @@ export default function WorkspaceVideoTutorialPair({
   tutorialTitle = 'Open tutorial',
   /** Prefer orange (site standard). Yellow kept for rare overrides. */
   tutorialVariant = 'orange',
-  /** Default 2× prior size so the VIDEO TUTORIALS graphic reads clearly in album/notes headers. */
-  iconHeight = { xs: 72, sm: 84 },
   sx
 }) {
   const explicitUrl = String(videoTutorialUrl || '').trim();
@@ -109,13 +107,7 @@ export default function WorkspaceVideoTutorialPair({
         ...sx
       }}
     >
-      <PageVideoTutorialsButton
-        {...videoLinkProps}
-        sx={{
-          height: iconHeight,
-          flexShrink: 0
-        }}
-      />
+      <PageVideoTutorialsButton {...videoLinkProps} />
       {tutorialControl}
     </Box>
   );
@@ -129,12 +121,5 @@ WorkspaceVideoTutorialPair.propTypes = {
   tutorialAriaLabel: PropTypes.string,
   tutorialTitle: PropTypes.string,
   tutorialVariant: PropTypes.oneOf(['yellow', 'orange']),
-  iconHeight: PropTypes.oneOfType([
-    PropTypes.number,
-    PropTypes.shape({
-      xs: PropTypes.number,
-      sm: PropTypes.number
-    })
-  ]),
   sx: PropTypes.object
 };

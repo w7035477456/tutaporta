@@ -45,7 +45,7 @@ export default function ClaimToken() {
   const handleSignUp = () => {
     const code = normalizeSignupReferralCode(referrerCode);
     if (!code) {
-      setError('Please enter a valid 6-digit referrer code.');
+      setError('Please enter a valid referrer code: A followed by 4 digits (e.g. A5837).');
       return;
     }
     setError('');
@@ -95,9 +95,8 @@ export default function ClaimToken() {
                 }}
                 fullWidth
                 size="small"
-                inputMode="numeric"
                 autoComplete="off"
-                placeholder="123456"
+                placeholder="A5837"
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     bgcolor: '#ffffff',

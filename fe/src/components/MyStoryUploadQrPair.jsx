@@ -27,15 +27,9 @@ const uploadGraphicHoverSx = {
   }
 };
 
-const captionFontSize = {
-  xs: 'clamp(1rem, 3.5vw, 1.35rem)',
-  sm: 'clamp(1.1rem, 1.2vw, 1.5rem)'
-};
+const captionFontSize = 'clamp(1rem, 1.4vw, 1.5rem)';
 
-const extensionsFontSize = {
-  xs: 'clamp(0.85rem, 3vw, 1.1rem)',
-  sm: 'clamp(0.95rem, 1vw, 1.25rem)'
-};
+const extensionsFontSize = 'clamp(0.85rem, 1.15vw, 1.25rem)';
 
 /**
  * My Album & Posts desktop row: drag-drop upload (left) + phone QR (right).
@@ -68,9 +62,9 @@ export default function MyStoryUploadQrPair({
     <Box
       sx={{
         display: 'flex',
-        flexDirection: { xs: 'column', md: 'row' },
+        flexDirection: 'row',
         alignItems: 'stretch',
-        gap: { xs: 2, md: 2 },
+        gap: '1.5vw',
         width: '100%',
         minWidth: 0,
         minHeight: 0,
@@ -99,10 +93,10 @@ export default function MyStoryUploadQrPair({
           border: '3px solid var(--theme-primary-color)',
           borderRadius: 2,
           bgcolor: dragOver ? 'var(--theme-daynight-color)' : 'var(--theme-secondary-color)',
-          minHeight: { xs: 200, md: 'clamp(140px, 14vw, 200px)' },
-          flex: { xs: '1 1 auto', md: '1 1 50%' },
-          width: { xs: '100%', md: '50%' },
-          maxWidth: { md: '50%' },
+          minHeight: 'clamp(120px, 18vh, 200px)',
+          flex: '1 1 50%',
+          width: '50%',
+          maxWidth: '50%',
           minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
@@ -124,10 +118,10 @@ export default function MyStoryUploadQrPair({
               alt="Drag and drop or click to upload images"
               className="my-story-upload-graphic"
               sx={{
-                maxWidth: 'min(100%, clamp(120px, 18vw, 240px))',
+                maxWidth: 'min(100%, clamp(96px, 14vw, 240px))',
                 width: '100%',
                 height: 'auto',
-                mb: { xs: 1, md: 0.5 },
+                mb: '0.6vh',
                 display: 'block',
                 cursor: 'pointer',
                 userSelect: 'none',
@@ -194,9 +188,9 @@ export default function MyStoryUploadQrPair({
       </Box>
       <Box
         sx={{
-          flex: { xs: '1 1 auto', md: '1 1 50%' },
-          width: { xs: '100%', md: '50%' },
-          maxWidth: { md: '50%' },
+          flex: '1 1 50%',
+          width: '50%',
+          maxWidth: '50%',
           minWidth: 0,
           alignSelf: 'stretch',
           display: 'flex'

@@ -13,6 +13,9 @@ function openedMixin(theme, openWidthPx) {
     width: w,
     borderRight: 'none',
     zIndex: theme.zIndex.drawer,
+    // Paper is position:fixed/top:0 by default, which slides it over the fixed app header.
+    position: 'absolute',
+    top: 0,
     background: sidebarBg,
     // Match parent flex row height (viewport minus header/footer) instead of full viewport.
     height: '100%',
@@ -33,6 +36,8 @@ function closedMixin(theme) {
   return {
     borderRight: 'none',
     zIndex: theme.zIndex.drawer,
+    position: 'absolute',
+    top: 0,
     background: sidebarBg,
     height: '100%',
     maxHeight: '100%',

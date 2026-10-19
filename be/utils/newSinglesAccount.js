@@ -1,5 +1,5 @@
 import { DEFAULT_NEW_USER_THEME } from '../lib/defaultNewUserPreferences.js';
-import { referCodeFromMemberId } from './referCodeFromMemberId.js';
+import { SQL_NEW_MY_REFER_CODE } from './signupReferCode.js';
 import { resolveReferByCode } from './referByCode.js';
 import { allocateMemberIdForCategory, allocateNextSinglesId } from './allocateMemberId.js';
 import { recordAuditRegistrationNew } from './insertAuditRegistration.js';
@@ -37,13 +37,13 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
   const resolvedCategory = memberCategory ?? resolveSignupMemberCategory(emailNorm);
   const newSinglesId = await allocateNextSinglesId(client);
   const memberId = await allocateMemberIdForCategory(client, { memberCategory: resolvedCategory, singlesId: newSinglesId });
-  const myReferCode = referCodeFromMemberId(memberId);
   const resolvedReferByCode = resolveReferByCode(referByCode);
   const phoneForInsert = await resolvePhoneForNewSinglesAccount(client, formattedPhone, resolvedCategory);
+  let myReferCode = '';
 
   await client.query('BEGIN');
   try {
-    await client.query(
+    const { rows: insertedRows } = await client.query(
       `INSERT INTO outdateddbsnapshotoct2024.singles (
          singles_id, member_id, email, password_hash, phone, status, optinout_bitmap, theme,
          my_refer_code, refer_by_code, member_category, refill_remain_mb, refill_bought_mb,
@@ -51,9 +51,10 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
        )
        VALUES (
          $1, $2, $3, $4, $5, 'new'::outdateddbsnapshotoct2024.singles_status, ${OPTINOUT_DEFAULT_BITMAP}, $6,
-         $7, $8, $9, $10, $10,
+         ${SQL_NEW_MY_REFER_CODE}, $7, $8, $9, $9,
          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-       )`,
+       )
+       RETURNING my_refer_code`,
       [
         newSinglesId,
         memberId,
@@ -61,12 +62,12 @@ export async function insertNewSinglesAccount(client, { emailNorm, passwordHash,
         passwordHash,
         phoneForInsert,
         DEFAULT_NEW_USER_THEME,
-        myReferCode,
         resolvedReferByCode,
         resolvedCategory,
         COMPLIMENTARY_NEW_MEMBER_DATA_MB
       ]
     );
+    myReferCode = String(insertedRows[0]?.my_refer_code ?? '');
     await recordAuditRegistrationNew(client, {
       singlesId: newSinglesId,
       email: emailNorm,

@@ -1,12 +1,15 @@
-/** sessionStorage — six-digit ?ref= from /register (persists through signup). */
+/** sessionStorage — A#### ?ref= from /register (persists through signup). */
 export const SIGNUP_REFERRAL_CODE_KEY = 'signupReferralCode';
 
-export const DEFAULT_REFER_BY_CODE = '123456';
+export const DEFAULT_REFER_BY_CODE = 'A0000';
 
-/** @param {string | null | undefined} raw */
+/** 'A1234' from 'A1234' / 'a1234' / '1234'; '' for anything else. */
 export function normalizeSignupReferralCode(raw) {
-  const digits = String(raw ?? '').replace(/\D/g, '');
-  return /^\d{6}$/.test(digits) ? digits : '';
+  const m = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .match(/^A?(\d{4})$/);
+  return m ? `A${m[1]}` : '';
 }
 
 export function isDefaultReferByCode(raw) {
@@ -62,7 +65,7 @@ export function clearRefereeRewardUxAfterProfileSetup() {
   sessionStorage.removeItem(REFEREE_REWARD_UX_AFTER_PROFILE_KEY);
 }
 
-/** ?token= or ?ref= on /claimtoken (six-digit referrer code). */
+/** ?token= or ?ref= on /claimtoken (A#### referrer code). */
 export function getClaimTokenReferralFromSearchParams(searchParams) {
   return persistSignupReferralCode(searchParams?.get?.('token') ?? searchParams?.get?.('ref') ?? '');
 }
@@ -93,7 +96,7 @@ export function buildEnterTokenUrlWithReferral(rawCode) {
   return `/entertoken?token=${encodeURIComponent(code)}`;
 }
 
-/** Code sent to BE on successful registration (valid ref or default 123456). */
+/** Code sent to BE on successful registration (valid ref or default A0000). */
 export function resolveSignupReferByCodeForApi() {
   return readStoredSignupReferralCode() || DEFAULT_REFER_BY_CODE;
 }

@@ -2,7 +2,7 @@ import pool from '../../db/connection.js';
 import { formatMemberDisplayCode } from '../../utils/memberDisplayCode.js';
 import { DEFAULT_REFER_BY_CODE, isDefaultReferByCode, normalizeReferByCodeDigits } from '../../utils/referByCode.js';
 
-/** Six-digit ref from query/body; empty when missing, invalid, or reserved no-referrer sentinel. */
+/** A#### ref from query/body; empty when missing, invalid, or reserved no-referrer sentinel. */
 export function normalizeReferralCodeQuery(raw) {
   const digits = normalizeReferByCodeDigits(raw);
   if (!digits || isDefaultReferByCode(digits)) return '';

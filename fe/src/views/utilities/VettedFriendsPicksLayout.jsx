@@ -118,6 +118,8 @@ import VettedFriendsGroupChatPanel from 'views/utilities/VettedFriendsGroupChatP
 import { colorTemplate1WallColorByTheme } from 'config/colorTemplate1';
 import { colorTemplate10MenuItemButtonSx } from 'config/colorTemplate10Menu';
 import { getMyPicksAvatarSize } from 'config/myPicksCardEnv';
+import RaffleRelationshipBadge from 'ui-component/RaffleRelationshipBadge';
+import useRaffleRelationships from 'hooks/useRaffleRelationships';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
 
 /** fe/.env MOBILE_FONT_SIZE_TEXT / DESKTOP_FONT_SIZE_TEXT — Vetted Friends main content copy */
@@ -731,6 +733,7 @@ export default function VettedFriendsPicksLayout({
   onInlineChatOpenChange
 }) {
   const { user } = useAuth();
+  const raffleRelationships = useRaffleRelationships();
   const navigate = useNavigate();
   const theme = useTheme();
   const downSM = useMediaQuery(theme.breakpoints.down('sm'));
@@ -2555,6 +2558,11 @@ export default function VettedFriendsPicksLayout({
                         }
                       }}
                       {...guestDemoAllowProps()}
+                    />
+                    <RaffleRelationshipBadge
+                      relationship={raffleRelationships.get(Number(singlesId))}
+                      memberLabel={memberLabel}
+                      belowOtherSash={Boolean(relationshipKind)}
                     />
                     {relationshipKind ? (
                       <Box component="span" aria-label="Approved" sx={MEMBER_INCOMING_APPROVED_SASH_SX}>

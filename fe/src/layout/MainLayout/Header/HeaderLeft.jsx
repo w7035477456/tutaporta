@@ -27,7 +27,7 @@ import { useAuth } from 'contexts/AuthContext';
 import { isToolsOnlyAdminSession } from 'utils/adminSession';
 
 /** Region 2 left — logo (+ mobile menu toggle). */
-export default function HeaderLeft({ iconsOnly = false }) {
+export default function HeaderLeft({ iconsOnly = false, bannerImage, bannerAlt = 'TutaDates' }) {
   const location = useLocation();
   const { user } = useAuth();
   const hideMenuToggle = isToolsOnlyAdminSession(user);
@@ -54,7 +54,7 @@ export default function HeaderLeft({ iconsOnly = false }) {
           <Box
             component="img"
             src={MY_PHOTO_ALBUMS_HEADER_LOGO_IMAGE}
-            alt="TutaMall.com"
+            alt="TutaPhotos"
             sx={myPhotoAlbumsHeaderLogoImgSx}
           />
         </Box>
@@ -74,7 +74,7 @@ export default function HeaderLeft({ iconsOnly = false }) {
           <Box
             component="img"
             src={MY_NOTE_HEADER_LOGO_IMAGE}
-            alt="TutaMall.com"
+            alt="TutaNotes"
             sx={myNoteHeaderLogoImgSx}
           />
         </Box>
@@ -83,16 +83,38 @@ export default function HeaderLeft({ iconsOnly = false }) {
   }
 
   return (
-    <Box sx={{ width: downMD ? 'auto' : 180, display: 'flex' }}>
-      <Box component="span" sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1 }}>
-        <LogoSection />
-      </Box>
+    <Box sx={{ width: downMD || bannerImage ? 'auto' : 180, display: 'flex', alignItems: 'center', alignSelf: 'stretch' }}>
+      {bannerImage ? (
+        <Box
+          component="img"
+          src={bannerImage}
+          alt={bannerAlt}
+          sx={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            height: '100%',
+            width: 'auto',
+            maxWidth: 'min(720px, calc(100% - 240px))',
+            objectFit: 'contain',
+            objectPosition: 'left center',
+            pointerEvents: 'none',
+            zIndex: 0
+          }}
+        />
+      ) : (
+        <Box component="span" sx={{ display: { xs: 'none', md: 'block' }, flexGrow: 1 }}>
+          <LogoSection />
+        </Box>
+      )}
       {downMD && !vettingMobileTopCluster && !hideMenuToggle ? (
         <Avatar
           variant="rounded"
           sx={{
             ...theme.typography.commonAvatar,
             ...avatarSx,
+            position: 'relative',
+            zIndex: 1,
             overflow: 'hidden',
             transition: 'all .2s ease-in-out',
             color: '#fff',

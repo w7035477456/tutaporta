@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 // material-ui
 import Box from '@mui/material/Box';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 
 // project imports
 import MainCard from 'ui-component/cards/MainCard';
@@ -9,6 +11,60 @@ import AuthMobileDialogFit from './AuthMobileDialogFit';
 // ==============================|| AUTHENTICATION CARD WRAPPER ||============================== //
 
 export default function AuthCardWrapper({ children, tight, disableMobileFit, fullWidth = false, sx: sxOverride, ...other }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const fillMobile = isMobile && !disableMobileFit;
+
+  if (fillMobile) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          minHeight: 0,
+          flex: '1 1 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box'
+        }}
+      >
+        <MainCard
+          sx={{
+            width: '100%',
+            maxWidth: '100%',
+            height: '100%',
+            flex: '1 1 auto',
+            minHeight: 0,
+            my: 0,
+            mx: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            color: 'var(--theme-primary-color)',
+            ...(sxOverride && typeof sxOverride === 'object' ? sxOverride : {})
+          }}
+          content={false}
+          {...other}
+        >
+          <Box
+            sx={{
+              boxSizing: 'border-box',
+              height: '100%',
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              pt: 'max(42px, 4.8vh)',
+              pb: '1.2vh',
+              px: '2.4vw'
+            }}
+          >
+            <AuthMobileDialogFit>{children}</AuthMobileDialogFit>
+          </Box>
+        </MainCard>
+      </Box>
+    );
+  }
+
   const stretchFill =
     sxOverride?.height === '100%' ||
     sxOverride?.flex === '1 1 auto' ||
