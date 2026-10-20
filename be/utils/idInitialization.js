@@ -1,5 +1,6 @@
 import pool from '../db/connection.js';
 import { isAdminImpersonationSession } from './adminAuth.js';
+import { isIdSealMatchPassing } from './idSeal.js';
 import {
   isAdminMemberCategory,
   isInitialSetupBypassMemberCategory,
@@ -62,7 +63,7 @@ export async function completeIdInitializationAfterManualVideoIfEligible(
   if (!Number.isFinite(id) || id < 1) return false;
   const { rows } = await db.query(
     `SELECT s.over_18_verified,
-            s.dl_profile_scan_result,
+            s.profile_dl_match,
             EXISTS (
               SELECT 1
               FROM outdateddbsnapshotoct2024.consent_record cr
@@ -77,7 +78,7 @@ export async function completeIdInitializationAfterManualVideoIfEligible(
   );
   const row = rows[0];
   if (!row || row.over_18_verified !== true || !row.has_live_scan_video) return false;
-  const dlMatched = String(row.dl_profile_scan_result ?? '').trim() === 'Match';
+  const dlMatched = isIdSealMatchPassing(row.profile_dl_match);
   if (!skipDlPassportCheck && !dlMatched) return false;
   return markIdInitializationCompleted(db, id);
 }

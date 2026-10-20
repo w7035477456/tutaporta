@@ -60,6 +60,7 @@ function normalizeUserShape(rawUser, authMeta = {}) {
     profile_image_fk: toNullableInteger(rawUser.profile_image_fk ?? rawUser.profileImageFk),
     over_18_verified: normalizeOver18Verified(rawUser.over_18_verified),
     id_initialization_completed: normalizeIdInitializationCompleted(rawUser.id_initialization_completed),
+    id_seal_earned: rawUser.id_seal_earned === true,
     has_secret_icon: rawUser.has_secret_icon === true || rawUser.has_secret_icon === 'true',
     role: String(rawUser.role ?? authMeta.role ?? 'user').trim() || 'user',
     tools_only: Boolean(rawUser.tools_only ?? authMeta.tools_only),
@@ -267,11 +268,13 @@ export const AuthProvider = ({ children }) => {
         const nextOver18 = normalizeOver18Verified(data.over_18_verified);
         const nextIdInitializationCompleted =
           normalizeIdInitializationCompleted(data.id_initialization_completed) ?? prev.id_initialization_completed;
+        const nextIdSealEarned = data.id_seal_earned === true;
         if (
           prev.status === data.status &&
           prev.over_18_verified === nextOver18 &&
           prev.optinout_bitmap === data.optinout_bitmap &&
-          prev.id_initialization_completed === nextIdInitializationCompleted
+          prev.id_initialization_completed === nextIdInitializationCompleted &&
+          prev.id_seal_earned === nextIdSealEarned
         ) {
           return prev;
         }
@@ -280,13 +283,20 @@ export const AuthProvider = ({ children }) => {
           status: data.status ?? null,
           over_18_verified: nextOver18,
           optinout_bitmap: data.optinout_bitmap,
-          id_initialization_completed: nextIdInitializationCompleted
+          id_initialization_completed: nextIdInitializationCompleted,
+          id_seal_earned: nextIdSealEarned
         });
       });
     } catch {
       /* transient — next navigation / focus retries */
     }
   }, []);
+
+  // Verification Save (or a bypass) just finished: pick up the server's ID seal decision.
+  const idInitializationCompleted = user?.id_initialization_completed;
+  useEffect(() => {
+    if (idInitializationCompleted === true) void refreshSessionStatus({ force: true });
+  }, [idInitializationCompleted, refreshSessionStatus]);
 
   const login = async (email, password, rememberMe = false) => {
     const response = await api.post('/api/verifyPassword', {

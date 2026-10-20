@@ -382,6 +382,7 @@ import { getMallDepartmentMode } from './mallDepartmentMode.js';
 import { ensureDemoRegularInitialSetupDone } from './utils/ensureDemoRegularInitialSetupDone.js';
 import { ensureSeededDemoBuddiesOnLogin } from './utils/ensureSeededDemoBuddiesOnLogin.js';
 import { normalizeOver18Verified } from './utils/over18Verified.js';
+import { computeIdSealEarned } from './utils/idSeal.js';
 import {
   normalizeIdInitializationCompleted,
   requireIdInitializationCompleted
@@ -1157,7 +1158,7 @@ app.get('/api/me', async (req, res) => {
     // Re-read flags after possible seed on /api/me
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
-              id_initialization_completed,
+              id_initialization_completed, profile_livescan_match, profile_dl_match,
               (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
@@ -1186,6 +1187,7 @@ app.get('/api/me', async (req, res) => {
       id_initialization_completed: normalizeIdInitializationCompleted(
         flags.id_initialization_completed ?? row.id_initialization_completed
       ),
+      id_seal_earned: computeIdSealEarned(flags),
       optinout_bitmap: normalizeOptinoutBitmap(flags.optinout_bitmap),
       has_secret_icon:
         flags.has_secret_icon === true ||
@@ -1219,7 +1221,8 @@ app.get('/api/me/session-status', requireAuth, async (req, res) => {
   if (req.auth?.tools_only) return res.json({ tools_only: true });
   try {
     const { rows } = await pool.query(
-      `SELECT status::text AS status, over_18_verified, optinout_bitmap, id_initialization_completed
+      `SELECT status::text AS status, over_18_verified, optinout_bitmap, id_initialization_completed,
+              profile_livescan_match, profile_dl_match
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
       [req.auth.singles_id]
@@ -1230,6 +1233,7 @@ app.get('/api/me/session-status', requireAuth, async (req, res) => {
       status: row.status ?? null,
       over_18_verified: normalizeOver18Verified(row.over_18_verified),
       id_initialization_completed: normalizeIdInitializationCompleted(row.id_initialization_completed),
+      id_seal_earned: computeIdSealEarned(row),
       optinout_bitmap: normalizeOptinoutBitmap(row.optinout_bitmap)
     });
   } catch (err) {

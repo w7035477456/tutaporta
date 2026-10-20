@@ -11,6 +11,7 @@ import PropTypes from 'prop-types';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
+import { attachDropToBillRow, billRowDropResultMessage, readBillRowDrop } from './billRowDropAttach';
 import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
@@ -221,6 +222,7 @@ export default function BillScheduleYearlyPanel({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [attachingRowIndex, setAttachingRowIndex] = useState(null);
   const [savedMsg, setSavedMsg] = useState('');
   const [dirty, setDirty] = useState(false);
   const [billPopupOpen, setBillPopupOpen] = useState(false);
@@ -350,20 +352,21 @@ export default function BillScheduleYearlyPanel({
     [year, storageKey]
   );
 
-  const openBillForRow = async (row, { payMode = false } = {}) => {
+  /** Saves pending edits first (renumbers rows), then returns the Bills/Receipts ensure payload for the row. */
+  const resolveBillEnsurePayload = async (row) => {
     let target = row;
     if (dirty) {
       // Save renumbers # in due-date order, so locate the row by its sorted position.
       const current = rowsRef.current.find((r) => Number(r.row_index) === Number(row.row_index)) || row;
       const savedRowIndex = sortByDueDate(rowsRef.current).indexOf(current) + 1;
       const saved = await persistSchedule();
-      if (!saved) return;
+      if (!saved) return null;
       target =
         saved.find((r) => Number(r.row_index) === savedRowIndex) ||
         saved.find((r) => Number(r.yearly_bill_id) === Number(row.yearly_bill_id)) ||
         row;
     }
-    setBillEnsurePayload({
+    return {
       kind: 'yearly',
       year,
       row_index: Number(target.row_index) || 1,
@@ -374,18 +377,44 @@ export default function BillScheduleYearlyPanel({
       amount: target.amount,
       bill_type: target.bill_type,
       action: target.action
-    });
+    };
+  };
+
+  const openBillForRow = async (row, { payMode = false } = {}) => {
+    const payload = await resolveBillEnsurePayload(row);
+    if (!payload) return;
+    setBillEnsurePayload(payload);
     setBillPopupPayMode(payMode);
     setBillPopupOpen(true);
   };
 
-  const handleBillChanged = (data) => {
+  /** Drop Mobile Upload photos / computer files on a row's Bill button to attach them without opening the popup. */
+  const dropAttachOnRow = async (row, dataTransfer) => {
+    const dropped = readBillRowDrop(dataTransfer);
+    if (!dropped.mobileUploadNames.length && !dropped.files.length) return;
+    setError('');
+    setSavedMsg('');
+    setAttachingRowIndex(Number(row.row_index));
+    try {
+      const payload = await resolveBillEnsurePayload(row);
+      if (!payload) return;
+      const result = await attachDropToBillRow(payload, storageKey, dropped);
+      if (result.record) handleBillChanged(result.record, payload.row_index);
+      setSavedMsg(billRowDropResultMessage(result, payload.bill_description));
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to attach file to bill');
+    } finally {
+      setAttachingRowIndex(null);
+    }
+  };
+
+  const handleBillChanged = (data, rowIndex = billEnsurePayload?.row_index) => {
     if (!data?.paidRecordId) return;
     const next = rowsRef.current.map((r) => {
       if (
         (data.yearlyBillId && Number(r.yearly_bill_id) === Number(data.yearlyBillId)) ||
         Number(r.paid_record_id) === Number(data.paidRecordId) ||
-        (Number(r.row_index) === Number(billEnsurePayload?.row_index) && !r.yearly_bill_id)
+        (Number(r.row_index) === Number(rowIndex) && !r.yearly_bill_id)
       ) {
         return {
           ...r,
@@ -736,8 +765,9 @@ export default function BillScheduleYearlyPanel({
                 <td style={{ textAlign: 'center' }}>
                   <BillColumnButton
                     hasContent={Boolean(row.has_bill_content)}
-                    disabled={loading || saving}
+                    disabled={loading || saving || attachingRowIndex != null}
                     onClick={() => void openBillForRow(row)}
+                    onDropAttach={(dataTransfer) => void dropAttachOnRow(row, dataTransfer)}
                   />
                 </td>
                 <td style={{ background: typeActionStatusBg }}>

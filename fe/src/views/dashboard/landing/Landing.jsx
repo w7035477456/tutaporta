@@ -52,6 +52,9 @@ const ENROLLMENT_TILE_TO_FLAG = {
   photoAlbums: 'tutaAlbumsEnabled'
 };
 
+/** Every member always has these apps; only the TutaDates box can be unchecked. */
+const ALWAYS_ENROLLED_FLAGS = new Set(['tutaNotesEnabled', 'tutaAlbumsEnabled']);
+
 const ENROLLMENT_FLAG_LABEL = {
   tutaDatesEnabled: 'TutaDates',
   tutaNotesEnabled: 'TutaNotes',
@@ -61,14 +64,17 @@ const ENROLLMENT_FLAG_LABEL = {
 function readEnrollmentPrefs(prefs) {
   return {
     tutaDatesEnabled: prefs?.tutaDatesEnabled !== false,
-    tutaNotesEnabled: prefs?.tutaNotesEnabled !== false,
-    tutaAlbumsEnabled: prefs?.tutaAlbumsEnabled !== false
+    tutaNotesEnabled: true,
+    tutaAlbumsEnabled: true
   };
 }
 
-/** Yellow box in a tile's top-right corner; red check = enrolled. `disabled` = greyed box that can never be checked. */
-function MallTileCheckbox({ checked, label, onToggle, disabled = false }) {
-  const interactive = Boolean(onToggle) && !disabled;
+/**
+ * Yellow box in a tile's top-right corner; red check = enrolled. `disabled` = greyed box that can never be checked.
+ * `locked` = always checked and cannot be unchecked.
+ */
+function MallTileCheckbox({ checked, label, onToggle, disabled = false, locked = false }) {
+  const interactive = Boolean(onToggle) && !disabled && !locked;
   const activate = (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -99,7 +105,19 @@ function MallTileCheckbox({ checked, label, onToggle, disabled = false }) {
                 event.stopPropagation();
               }
             }
-          : { 'aria-hidden': true })}
+          : locked
+            ? {
+                role: 'checkbox',
+                'aria-checked': true,
+                'aria-disabled': true,
+                'aria-label': `${label} is always included`,
+                title: `${label} is always included`,
+                onClick: (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }
+              }
+            : { 'aria-hidden': true })}
       sx={{
         position: 'absolute',
         top: 10,
@@ -112,8 +130,8 @@ function MallTileCheckbox({ checked, label, onToggle, disabled = false }) {
         border: disabled ? '3px solid #616161' : '3px solid #000',
         borderRadius: 1,
         boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
-        cursor: interactive ? 'pointer' : disabled ? 'not-allowed' : 'default',
-        pointerEvents: interactive || disabled ? 'auto' : 'none',
+        cursor: interactive ? 'pointer' : disabled || locked ? 'not-allowed' : 'default',
+        pointerEvents: interactive || disabled || locked ? 'auto' : 'none',
         overflow: 'visible'
       }}
     >
@@ -248,6 +266,7 @@ export default function Landing() {
 
   const toggleEnrollment = useCallback(
     async (flag) => {
+      if (ALWAYS_ENROLLED_FLAGS.has(flag)) return;
       const next = !(enrollment[flag] !== false);
       if (guestDemo) {
         if (!next) notifyGuestDemoBlocked();
@@ -279,7 +298,7 @@ export default function Landing() {
   const isTileEnrolled = useCallback(
     (tileId) => {
       const flag = ENROLLMENT_TILE_TO_FLAG[tileId];
-      if (!flag) return true;
+      if (!flag || ALWAYS_ENROLLED_FLAGS.has(flag)) return true;
       return enrollment[flag] !== false;
     },
     [enrollment]
@@ -614,6 +633,7 @@ export default function Landing() {
                     checked={enrollmentFlag ? guestDemo || isTileEnrolled(d.id) : false}
                     label={ENROLLMENT_FLAG_LABEL[enrollmentFlag] || d.title}
                     disabled={tileDisabled}
+                    locked={ALWAYS_ENROLLED_FLAGS.has(enrollmentFlag)}
                     onToggle={
                       enrollmentFlag && !enrollmentReadOnly ? () => void toggleEnrollment(enrollmentFlag) : undefined
                     }

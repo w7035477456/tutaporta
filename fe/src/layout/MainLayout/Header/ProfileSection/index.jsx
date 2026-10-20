@@ -79,7 +79,6 @@ import { formatLastFirstMiddleName } from 'utils/fullNameFormat';
 import api from 'api/axios';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import idCertifiedSeal from 'assets/images/idcertified.png';
-import { getIdInitializationCompleted } from 'utils/firstLoginOnboarding';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { fetchTutaMallBackupStatus, postTutaMallBackupApp, postTutaMallRestoreApp } from 'api/tutaMallUserBackupFe';
 import {
@@ -934,7 +933,7 @@ export default function ProfileSection({ clusterTight = false }) {
         }
         label={
           <>
-          {getIdInitializationCompleted(user) === true ? (
+          {user?.id_seal_earned === true ? (
             <Box
               component="img"
               src={idCertifiedSeal}

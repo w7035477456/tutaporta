@@ -8,6 +8,7 @@ import {
 import { formatBriefBioGovIdDisplay, formatPassportGovIdDisplay, readCitizenshipDisplayValue, readPlaceOfBirthDisplayValue } from '../../utils/govIdDocumentLabels.js';
 import { normalizeApprovalStatus, APPROVAL_STATUS_APPROVE } from '../../utils/approvalStatusEnum.js';
 import { isRegularMemberCategory } from '../../utils/memberCategory.js';
+import { isIdSealMatchPassing } from '../../utils/idSeal.js';
 
 function readVettedGroup(row, prefix) {
   const responseKey = prefix;
@@ -118,58 +119,26 @@ function readMatchPercent(raw) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
-function readProfileDlVettedGroup(singlesRow, vetRow) {
-  const dl = readMatchPercent(singlesRow?.dl_profile_percent_match);
-  const scanResult = String(singlesRow?.dl_profile_scan_result ?? '').trim();
+/** 0 = not measured yet (column default), shown as no status. */
+function readIdSealMatchVettedGroup(rawPercent, label, vetRow) {
+  const pct = readMatchPercent(rawPercent);
+  if (pct == null || pct <= 0) {
+    return { verificationStatus: null, vettedDate: null, vettedNote: null };
+  }
   const fromVet = readVettedGroup(vetRow, 'profilephoto');
-  const note = dl != null ? `DL ${dl}%` : null;
-  if (scanResult === 'Match') {
-    return {
-      verificationStatus: 'info_matches',
-      vettedDate: fromVet?.vettedDate ?? null,
-      vettedNote: note ?? fromVet?.vettedNote ?? null
-    };
-  }
-  if (scanResult === 'Not Match') {
-    return {
-      verificationStatus: 'info_not_matches',
-      vettedDate: fromVet?.vettedDate ?? null,
-      vettedNote: note ?? fromVet?.vettedNote ?? null
-    };
-  }
-  if (note) {
-    return {
-      verificationStatus: fromVet?.verificationStatus ?? null,
-      vettedDate: fromVet?.vettedDate ?? null,
-      vettedNote: note
-    };
-  }
-  return fromVet;
+  return {
+    verificationStatus: isIdSealMatchPassing(rawPercent) ? 'info_matches' : 'info_not_matches',
+    vettedDate: fromVet?.vettedDate ?? null,
+    vettedNote: `${label} ${pct}%`
+  };
+}
+
+function readProfileDlVettedGroup(singlesRow, vetRow) {
+  return readIdSealMatchVettedGroup(singlesRow?.profile_dl_match, 'DL', vetRow);
 }
 
 function readProfileLiveVettedGroup(singlesRow, vetRow) {
-  const live = readMatchPercent(singlesRow?.live_scan_percent_match);
-  const fromVet = readVettedGroup(vetRow, 'profilephoto');
-  const note = live != null ? `LIVE ${live}%` : null;
-  if (live != null && live >= 80) {
-    return {
-      verificationStatus: 'info_matches',
-      vettedDate: fromVet?.vettedDate ?? null,
-      vettedNote: note
-    };
-  }
-  if (live != null) {
-    return {
-      verificationStatus: 'info_not_matches',
-      vettedDate: fromVet?.vettedDate ?? null,
-      vettedNote: note
-    };
-  }
-  return {
-    verificationStatus: null,
-    vettedDate: null,
-    vettedNote: null
-  };
+  return readIdSealMatchVettedGroup(singlesRow?.profile_livescan_match, 'LIVE', vetRow);
 }
 
 function readProfilePpVettedGroup(singlesRow, vetRow) {
@@ -311,7 +280,7 @@ function buildBriefBioRows(singlesRow, vetRow) {
       label: 'Profile&DL photo',
       matchKind: 'dl',
       matchLabel: 'DL',
-      matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.dl_profile_percent_match),
+      matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.profile_dl_match),
       comparisonImageKind: 'driver_license',
       comparisonImagePhotosId: singlesRow?.dl_face_reference_photos_id ?? null,
       vetted: profileDlVetted
@@ -321,7 +290,7 @@ function buildBriefBioRows(singlesRow, vetRow) {
       label: 'Profile&Live',
       matchKind: 'live',
       matchLabel: 'LIVE',
-      matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.live_scan_percent_match),
+      matchPercent: forceRegularPhotoMatch ? 100 : readMatchPercent(singlesRow?.profile_livescan_match),
       comparisonImageKind: 'profile',
       primaryImagePhotosId: singlesRow?.live_scan_reference_photos_id ?? null,
       comparisonImagePhotosId: singlesRow?.profile_image_fk ?? null,
@@ -471,11 +440,10 @@ async function loadBioReviewForSinglesId(singlesId) {
        s.pp_nationality,
        s.pp_place_of_birth,
        s.gov_id_array,
-       s.dl_profile_percent_match,
-       s.dl_profile_scan_result,
+       s.profile_dl_match,
        s.pp_profile_percent_match,
        s.pp_profile_scan_result,
-       s.live_scan_percent_match,
+       s.profile_livescan_match,
        (
          SELECT p.photos_id
          FROM ${schema}.photos p

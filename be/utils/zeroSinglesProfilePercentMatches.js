@@ -2,12 +2,12 @@ import { getDBSchema } from '../db/connection.js';
 import { loadTableColumns, sqlIdent } from '../routes/singles/checkrBioReviewDb.js';
 
 const PROFILE_PERCENT_MATCH_COLUMNS = [
-  'dl_profile_percent_match',
-  'pp_profile_percent_match',
-  'live_scan_percent_match'
+  'profile_dl_match',
+  'profile_livescan_match',
+  'pp_profile_percent_match'
 ];
 
-/** SET clause fragments: dl_profile_percent_match = 0, ... */
+/** SET clause fragments: profile_dl_match = 0, ... (a new profile photo also removes the ID seal). */
 export function buildProfilePercentMatchZeroSetClauses(singlesColumns) {
   return PROFILE_PERCENT_MATCH_COLUMNS.filter((column) => singlesColumns.has(column)).map(
     (column) => `${column} = 0`

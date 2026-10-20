@@ -502,7 +502,7 @@ export default function RecordVaultMobileUploadTray({
           {emptyHint ||
             (isGrid
               ? 'Take a photo or choose from gallery — thumbnails appear here.'
-              : 'Scan Mobile Upload QR — photos appear here. Drag a thumbnail onto a note.')}
+              : 'Scan Mobile Upload QR (sign in on Mobile, choose TutaNotes Upload) — photos appear here. Drag a thumbnail onto a note.')}
         </Typography>
       ) : null}
       {files.map((entry) => (

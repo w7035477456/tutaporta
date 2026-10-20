@@ -6,6 +6,8 @@ export const OPTINOUT_TUTANOTES = 2;
 export const OPTINOUT_TUTAPHOTOS = 4;
 export const OPTINOUT_ALL_APPS = OPTINOUT_TUTADATES | OPTINOUT_TUTANOTES | OPTINOUT_TUTAPHOTOS;
 export const OPTINOUT_DEFAULT_BITMAP = OPTINOUT_ALL_APPS;
+/** TutaNotes + TutaPhotos are always on for every member; only TutaDates can be opted out. */
+export const OPTINOUT_ALWAYS_ON = OPTINOUT_TUTANOTES | OPTINOUT_TUTAPHOTOS;
 
 /** Mall enrollment API keys ↔ bitmap bits. */
 export const OPTINOUT_API_KEY_TO_BIT = Object.freeze({
@@ -33,7 +35,7 @@ export function normalizeOptinoutBitmap(raw) {
  * @returns {{ tutaDatesEnabled: boolean, tutaNotesEnabled: boolean, tutaAlbumsEnabled: boolean }}
  */
 export function optinoutBitmapToEnrollment(bitmap) {
-  const n = normalizeOptinoutBitmap(bitmap);
+  const n = normalizeOptinoutBitmap(bitmap) | OPTINOUT_ALWAYS_ON;
   return {
     tutaDatesEnabled: (n & OPTINOUT_TUTADATES) !== 0,
     tutaNotesEnabled: (n & OPTINOUT_TUTANOTES) !== 0,
@@ -52,7 +54,7 @@ export function applyEnrollmentPatchToBitmap(bitmap, patch) {
     if (!Object.prototype.hasOwnProperty.call(patch ?? {}, key)) continue;
     n = patch[key] ? n | bit : n & ~bit;
   }
-  return n;
+  return n | OPTINOUT_ALWAYS_ON;
 }
 
 /**

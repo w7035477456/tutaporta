@@ -507,6 +507,47 @@ export default function BillReceiptsPopup({
                       }}
                     />
                   </Box>
+                </Box>
+
+                {/* Bottom-left: Preview + uploaded thumbnails + Download/Zoom */}
+                <Box sx={{ ...quadrantSx, ...lightSurfaceTextSx, bgcolor: '#f5f5f5' }}>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      p: 1,
+                      minHeight: 0,
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {selected && paidRecordId ? (
+                      <Box
+                        title="Double-click to zoom full screen"
+                        onDoubleClick={() => setZoomOpen(true)}
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'zoom-in'
+                        }}
+                      >
+                        <BillReceiptAttachmentPreview
+                          paidRecordId={paidRecordId}
+                          attachment={selected}
+                          mode="preview"
+                          fitContainer
+                        />
+                      </Box>
+                    ) : (
+                      <Typography sx={{ color: 'rgba(0, 0, 0, 0.55)', fontWeight: 700 }}>
+                        {attachments.length ? 'Click a receipt below' : 'No receipts uploaded yet'}
+                      </Typography>
+                    )}
+                  </Box>
                   {attachments.length > 0 ? (
                     <Box
                       sx={{
@@ -527,6 +568,7 @@ export default function BillReceiptsPopup({
                         return (
                           <Box
                             key={att.attachmentId}
+                            title={`${att.originalFileName || 'Receipt'} — click to preview, double-click to zoom`}
                             sx={{
                               position: 'relative',
                               width: 64,
@@ -541,6 +583,11 @@ export default function BillReceiptsPopup({
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedId(att.attachmentId);
+                            }}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedId(att.attachmentId);
+                              setZoomOpen(true);
                             }}
                           >
                             {att.previewable || att.previewKind ? (
@@ -572,6 +619,7 @@ export default function BillReceiptsPopup({
                                 e.stopPropagation();
                                 void handleDelete(att.attachmentId);
                               }}
+                              onDoubleClick={(e) => e.stopPropagation()}
                               sx={{
                                 position: 'absolute',
                                 top: 2,
@@ -596,44 +644,6 @@ export default function BillReceiptsPopup({
                       })}
                     </Box>
                   ) : null}
-                </Box>
-
-                {/* Bottom-left: Preview + Download */}
-                <Box sx={{ ...quadrantSx, ...lightSurfaceTextSx, bgcolor: '#f5f5f5' }}>
-                  <Box
-                    sx={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      p: 1,
-                      minHeight: 0,
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {selected && paidRecordId ? (
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <BillReceiptAttachmentPreview
-                          paidRecordId={paidRecordId}
-                          attachment={selected}
-                          mode="preview"
-                          fitContainer
-                        />
-                      </Box>
-                    ) : (
-                      <Typography sx={{ color: 'rgba(0, 0, 0, 0.55)', fontWeight: 700 }}>
-                        Select a receipt above
-                      </Typography>
-                    )}
-                  </Box>
                   <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', gap: 2, flexShrink: 0 }}>
                     <ColorTemplate13DisableGreenButton
                       type="button"

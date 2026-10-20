@@ -29,8 +29,17 @@ describe('singles.optinout_bitmap', () => {
       tutaAlbumsEnabled: true
     });
     assert.equal(applyEnrollmentPatchToBitmap(7, { tutaDatesEnabled: false }), 6);
-    assert.equal(applyEnrollmentPatchToBitmap(0, { tutaAlbumsEnabled: true }), 4);
-    assert.equal(applyEnrollmentPatchToBitmap(7, { tutaNotesEnabled: false, tutaAlbumsEnabled: false }), 1);
+    assert.equal(applyEnrollmentPatchToBitmap(6, { tutaDatesEnabled: true }), 7);
+  });
+
+  it('never lets TutaNotes / TutaPhotos be turned off', () => {
+    assert.equal(applyEnrollmentPatchToBitmap(7, { tutaNotesEnabled: false, tutaAlbumsEnabled: false }), 7);
+    assert.equal(applyEnrollmentPatchToBitmap(1, {}), 7);
+    assert.deepEqual(optinoutBitmapToEnrollment(0), {
+      tutaDatesEnabled: false,
+      tutaNotesEnabled: true,
+      tutaAlbumsEnabled: true
+    });
   });
 
   it('keeps reserved bits untouched', () => {

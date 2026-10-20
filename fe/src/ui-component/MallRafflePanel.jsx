@@ -8,6 +8,7 @@ import GetMyRafflePopup, { RaffleTicketCard } from 'ui-component/GetMyRafflePopu
 import RaffleEventSelect from 'ui-component/RaffleEventSelect';
 import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import getMyRaffleTicketImg from 'assets/images/getmyraffleticket.png';
+import rafflesBannerImg from 'assets/images/rafflesbanner.png';
 import { fetchRaffleState, submitRafflePayout } from 'api/raffleFe';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
@@ -494,6 +495,7 @@ export default function MallRafflePanel({ openRequest = 0 }) {
         type="button"
         aria-expanded={expanded}
         aria-controls="mall-raffle-panel"
+        aria-label="Raffle"
         {...guestDemoAllowProps()}
         onClick={() => setExpanded((v) => !v)}
         sx={{
@@ -501,20 +503,22 @@ export default function MallRafflePanel({ openRequest = 0 }) {
           display: 'block',
           m: 0,
           mb: expanded ? 0.5 : 0,
-          py: 0.25,
-          bgcolor: '#000',
-          color: '#fff',
+          p: 0,
+          bgcolor: 'transparent',
           border: 0,
           borderRadius: 1,
-          fontFamily: 'inherit',
-          fontWeight: 900,
-          fontSize: { xs: '1.6rem', sm: '1.8rem' },
-          lineHeight: 1.2,
+          overflow: 'hidden',
           cursor: 'pointer',
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)'
         }}
       >
-        Raffle
+        <Box
+          component="img"
+          src={rafflesBannerImg}
+          alt=""
+          draggable={false}
+          sx={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
+        />
       </Box>
       <Box
         id="mall-raffle-panel"

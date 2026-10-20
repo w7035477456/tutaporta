@@ -38,6 +38,11 @@ import {
 import { singlesStatusBlockedMessage } from '../../utils/singlesStatus.js';
 import { invalidateAuthUserCache } from '../../utils/authUserLookupCache.js';
 import { markIdInitializationCompleted } from '../../utils/idInitialization.js';
+import {
+  combineLiveScanMatches,
+  profilePhotoVettedFromIdSealMatches,
+  updateSinglesIdSealMatch
+} from '../../utils/idSeal.js';
 
 const CHECKR_SCHEMA = 'outdateddbsnapshotoct2024';
 
@@ -239,113 +244,40 @@ async function assertLivenessSession(sessionId, minConfidence) {
   return { results, evaluation };
 }
 
-const DL_PHOTO_MATCH_THRESHOLD = 90;
-
-function resolveLiveScanProfileCapture({ liveScanSkipped, similarity }) {
-  if (liveScanSkipped) {
-    return { percentMatch: null };
-  }
-  const pct = Number.isFinite(Number(similarity)) ? Math.round(Number(similarity)) : null;
-  return { percentMatch: pct };
+function roundedPercentOrNull(similarity) {
+  return Number.isFinite(Number(similarity)) ? Math.round(Number(similarity)) : null;
 }
 
-function resolveDlPhotoScanCapture({ liveScanSkipped, similarity }) {
-  if (liveScanSkipped) {
-    return { percentMatch: null, scanResult: 'Not Match' };
-  }
-  const pct = Number.isFinite(Number(similarity)) ? Math.round(Number(similarity)) : null;
-  const scanResult = pct != null && pct >= DL_PHOTO_MATCH_THRESHOLD ? 'Match' : 'Not Match';
-  return { percentMatch: pct, scanResult };
-}
-
-function resolveProfileIdMatchCapture({ similarity, threshold = DL_PHOTO_MATCH_THRESHOLD }) {
-  const pct = Number.isFinite(Number(similarity)) ? Math.round(Number(similarity)) : null;
+function resolveProfileIdMatchCapture({ similarity, threshold }) {
+  const pct = roundedPercentOrNull(similarity);
   const scanResult = pct != null && pct >= threshold ? 'Match' : 'Not Match';
   return { percentMatch: pct, scanResult };
 }
 
-function profilePhotoVettedFromScanResult(scanResult, percentMatch) {
-  const matched = scanResult === 'Match';
-  const note =
-    percentMatch != null
-      ? `Live scan face match ${percentMatch}%`
-      : scanResult === 'Not Match'
-        ? 'Live face scan skipped or not matched'
-        : 'Live scan face match not available';
-  return {
-    profilephoto_vetted: matched ? 'info_matches' : 'info_not_matches',
-    profilephoto_vetted_note: note
-  };
-}
-
-async function computeLiveScanProfileMatch(livenessSessionId, profileBytes) {
+async function computeLiveScanProfileMatch(livenessSessionId, profileBytes, dlBytes = null) {
   const sessionId = toTrimmedText(livenessSessionId);
   if (!sessionId) {
-    return { liveScanSkipped: true, similarity: null };
+    return { liveScanSkipped: true, similarity: null, dlSimilarity: null };
   }
   const results = await getFaceLivenessSessionResults(sessionId);
   const referenceImageBytes = results.referenceImageBytes;
   if (!referenceImageBytes) {
-    return { liveScanSkipped: false, similarity: null, noFaceOnReference: true };
+    return { liveScanSkipped: false, similarity: null, dlSimilarity: null, noFaceOnReference: true };
   }
   const refFaces = await detectSingleFace(referenceImageBytes);
   if (refFaces.faceCount < 1) {
-    return { liveScanSkipped: false, similarity: null, noFaceOnReference: true };
+    return { liveScanSkipped: false, similarity: null, dlSimilarity: null, noFaceOnReference: true };
   }
   const match = await compareFaces(referenceImageBytes, profileBytes, 0);
-  return { liveScanSkipped: false, similarity: match.similarity, noFaceOnReference: false };
-}
-
-async function updateSinglesLiveScanProfileMatch(client, singlesId, capture) {
-  const colRes = await client.query(
-    `SELECT column_name
-     FROM information_schema.columns
-     WHERE table_schema = 'outdateddbsnapshotoct2024'
-       AND table_name = 'singles'`
-  );
-  const columnSet = new Set(colRes.rows.map((row) => row.column_name));
-  const updates = [];
-  const values = [];
-  if (columnSet.has('live_scan_percent_match')) {
-    values.push(capture.percentMatch);
-    updates.push(`live_scan_percent_match = $${values.length}`);
+  let dlSimilarity = null;
+  if (dlBytes?.length) {
+    try {
+      dlSimilarity = (await compareFaces(referenceImageBytes, dlBytes, 0)).similarity;
+    } catch (err) {
+      console.warn('[rekognition] live scan ↔ driver license compare failed:', err?.message ?? err);
+    }
   }
-  if (!updates.length) return capture;
-  updates.push('updated_at = CURRENT_TIMESTAMP');
-  values.push(singlesId);
-  await client.query(
-    `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
-    values
-  );
-  return capture;
-}
-
-async function updateSinglesDlProfileMatch(client, singlesId, capture) {
-  const colRes = await client.query(
-    `SELECT column_name
-     FROM information_schema.columns
-     WHERE table_schema = 'outdateddbsnapshotoct2024'
-       AND table_name = 'singles'`
-  );
-  const columnSet = new Set(colRes.rows.map((row) => row.column_name));
-  const updates = [];
-  const values = [];
-  if (columnSet.has('dl_profile_percent_match')) {
-    values.push(capture.percentMatch);
-    updates.push(`dl_profile_percent_match = $${values.length}`);
-  }
-  if (columnSet.has('dl_profile_scan_result')) {
-    values.push(capture.scanResult);
-    updates.push(`dl_profile_scan_result = $${values.length}`);
-  }
-  if (!updates.length) return capture;
-  updates.push('updated_at = CURRENT_TIMESTAMP');
-  values.push(singlesId);
-  await client.query(
-    `UPDATE outdateddbsnapshotoct2024.singles SET ${updates.join(', ')} WHERE singles_id = $${values.length}`,
-    values
-  );
-  return capture;
+  return { liveScanSkipped: false, similarity: match.similarity, dlSimilarity, noFaceOnReference: false };
 }
 
 async function updateSinglesPpProfileMatch(client, singlesId, capture) {
@@ -380,13 +312,12 @@ async function updateVetBioAfterVerification(
   client,
   singlesId,
   parsed,
-  dlPhotoCapture,
+  idSealMatches,
   passportParsed = null
 ) {
   const schemaName = await resolveBioSchema();
   const vetColumns = await loadTableColumns(schemaName, 'vet_bio');
   const now = new Date();
-  const profilePhotoVetted = profilePhotoVettedFromScanResult(dlPhotoCapture.scanResult, dlPhotoCapture.percentMatch);
 
   const applyVettedField = (columns, field, value, note) => {
     if (value == null || value === '' || !vetColumns.has(field)) return;
@@ -399,11 +330,9 @@ async function updateVetBioAfterVerification(
     }
   };
 
-  const columns = {
-    profilephoto_vetted: profilePhotoVetted.profilephoto_vetted,
-    profilephoto_vetted_date: now,
-    profilephoto_vetted_note: profilePhotoVetted.profilephoto_vetted_note
-  };
+  const columns = idSealMatches
+    ? { ...profilePhotoVettedFromIdSealMatches(idSealMatches), profilephoto_vetted_date: now }
+    : {};
   const age = computeAgeFromDob(parsed.dateOfBirth);
   if (age != null && vetColumns.has('age')) {
     columns.age = age;
@@ -660,9 +589,7 @@ async function runAdminImpersonationIdCapture(client, singlesId, slotDocumentTyp
     console.warn('[rekognition:idCapture:adminBypass] face crop skipped', faceCropError?.message || faceCropError);
   }
 
-  if (slotDocumentType === 'driver_license') {
-    await updateSinglesDlProfileMatch(client, singlesId, matchCapture);
-  } else if (slotDocumentType === 'passport') {
+  if (slotDocumentType === 'passport') {
     await updateSinglesPpProfileMatch(client, singlesId, matchCapture);
   }
 
@@ -684,8 +611,6 @@ async function runAdminImpersonationIdentityVerify(client, singlesId, cfg, { pas
   const parsed = passportParsed ? mergeIdCardParsed(dlParsed, passportParsed) : dlParsed;
 
   const matchCapture = adminImpersonationMatchCapture(cfg.faceMatchThreshold);
-  const liveScanProfileCapture = { percentMatch: matchCapture.percentMatch };
-  const dlPhotoCapture = { percentMatch: matchCapture.percentMatch, scanResult: matchCapture.scanResult };
 
   await client.query('BEGIN');
   if (idBytes?.length) {
@@ -694,12 +619,10 @@ async function runAdminImpersonationIdentityVerify(client, singlesId, cfg, { pas
   if (passportBytes?.length) {
     await persistIdFaceCropPhoto(client, singlesId, passportBytes, 'pp_face_ref_');
   }
-  await updateSinglesLiveScanProfileMatch(client, singlesId, liveScanProfileCapture);
-  await updateSinglesDlProfileMatch(client, singlesId, dlPhotoCapture);
   if (passportParsed) {
     await updateSinglesPpProfileMatch(client, singlesId, matchCapture);
   }
-  await updateVetBioAfterVerification(client, singlesId, dlParsed, dlPhotoCapture, passportParsed);
+  await updateVetBioAfterVerification(client, singlesId, dlParsed, null, passportParsed);
   await updateSinglesMailingFromId(client, singlesId, parsed);
   await updateSinglesDlCaptureFromId(client, singlesId, dlParsed, 'driver_license');
   if (passportParsed) {
@@ -708,7 +631,7 @@ async function runAdminImpersonationIdentityVerify(client, singlesId, cfg, { pas
   await markIdentityVerified(client, singlesId);
   await client.query('COMMIT');
 
-  return { parsed, dlPhotoCapture, liveScanProfileCapture, matchCapture };
+  return { parsed, matchCapture };
 }
 
 export async function getRekognitionStatus(req, res) {
@@ -841,7 +764,7 @@ export async function verifyIdentityWithRekognition(req, res) {
         console.warn('[rekognition:verify:adminBypass] optional ID image decode skipped', imageError?.message);
       }
 
-      const { parsed, dlPhotoCapture, liveScanProfileCapture } = await runAdminImpersonationIdentityVerify(
+      const { parsed, matchCapture } = await runAdminImpersonationIdentityVerify(
         client,
         singlesId,
         cfg,
@@ -854,11 +777,10 @@ export async function verifyIdentityWithRekognition(req, res) {
         success: true,
         adminImpersonationBypass: true,
         message: 'Identity verification completed (admin impersonation bypass)',
-        profileMatchSimilarity: dlPhotoCapture.percentMatch,
-        idMatchSimilarity: dlPhotoCapture.percentMatch,
-        dlProfilePercentMatch: dlPhotoCapture.percentMatch,
-        dlProfileScanResult: dlPhotoCapture.scanResult,
-        liveScanPercentMatch: liveScanProfileCapture.percentMatch,
+        profileMatchSimilarity: matchCapture.percentMatch,
+        idMatchSimilarity: matchCapture.percentMatch,
+        dlProfilePercentMatch: matchCapture.percentMatch,
+        liveScanPercentMatch: matchCapture.percentMatch,
         livenessSummary: { passed: true, adminImpersonationBypass: true },
         livenessEnforced: mustEnforceLiveness,
         useProfilePhotoAsSelfie: true,
@@ -921,16 +843,14 @@ export async function verifyIdentityWithRekognition(req, res) {
         }
       }
 
-      const liveScanProfileCapture = resolveLiveScanProfileCapture({
-        liveScanSkipped,
-        similarity: liveScanProfileMatch.similarity
-      });
+      const liveScanPercentMatch = liveScanSkipped ? null : roundedPercentOrNull(liveScanProfileMatch.similarity);
 
       await client.query('BEGIN');
       if (!liveScanSkipped && livenessSessionId) {
         await persistLiveScanReferencePhoto(client, singlesId, livenessSessionId);
       }
-      await updateSinglesLiveScanProfileMatch(client, singlesId, liveScanProfileCapture);
+      // No driver license in this mode, so the live scan cannot be checked against it: both scores stay 0.
+      await updateSinglesIdSealMatch(client, singlesId, { profileLivescanMatch: 0, profileDlMatch: 0 });
       await markIdentityVerified(client, singlesId);
       await client.query('COMMIT');
 
@@ -938,7 +858,7 @@ export async function verifyIdentityWithRekognition(req, res) {
         success: true,
         message: 'Live face scan verification completed',
         skipDlPassportCheck: true,
-        liveScanPercentMatch: liveScanProfileCapture.percentMatch,
+        liveScanPercentMatch,
         livenessSummary,
         livenessEnforced: mustEnforceLiveness,
         useProfilePhotoAsSelfie: true
@@ -1066,7 +986,8 @@ export async function verifyIdentityWithRekognition(req, res) {
 
     const liveScanProfileMatch = await computeLiveScanProfileMatch(
       livenessSessionId,
-      profileBytes
+      profileBytes,
+      idBytes
     );
     const liveScanSkipped = cfg.skipLiveFaceScan || liveScanProfileMatch.liveScanSkipped;
     if (mustEnforceLiveness && !liveScanSkipped) {
@@ -1086,14 +1007,17 @@ export async function verifyIdentityWithRekognition(req, res) {
         });
       }
     }
-    const liveScanProfileCapture = resolveLiveScanProfileCapture({
-      liveScanSkipped,
-      similarity: liveScanProfileMatch.similarity
-    });
-    const dlPhotoCapture = resolveDlPhotoScanCapture({
-      liveScanSkipped,
-      similarity: liveScanProfileMatch.similarity
-    });
+    const profileDlSimilarity = useProfilePhotoAsSelfie
+      ? idMatch.similarity
+      : (await compareFaces(profileBytes, idBytes, 0)).similarity;
+    const idSealMatches = {
+      profileDlMatch: profileDlSimilarity,
+      profileLivescanMatch: liveScanSkipped
+        ? 0
+        : combineLiveScanMatches(liveScanProfileMatch.similarity, liveScanProfileMatch.dlSimilarity)
+    };
+    const liveScanPercentMatch = liveScanSkipped ? null : roundedPercentOrNull(liveScanProfileMatch.similarity);
+    const dlProfilePercentMatch = roundedPercentOrNull(profileDlSimilarity);
 
     await client.query('BEGIN');
     await persistIdFaceCropPhoto(client, singlesId, idBytes, 'dl_face_ref_');
@@ -1103,13 +1027,12 @@ export async function verifyIdentityWithRekognition(req, res) {
     if (!liveScanSkipped && livenessSessionId) {
       await persistLiveScanReferencePhoto(client, singlesId, livenessSessionId);
     }
-    await updateSinglesLiveScanProfileMatch(client, singlesId, liveScanProfileCapture);
-    await updateSinglesDlProfileMatch(client, singlesId, dlPhotoCapture);
+    await updateSinglesIdSealMatch(client, singlesId, idSealMatches);
     await updateVetBioAfterVerification(
       client,
       singlesId,
       dlOcr.parsed,
-      dlPhotoCapture,
+      idSealMatches,
       passportBytes ? passportOcr.parsed : null
     );
     await updateSinglesMailingFromId(client, singlesId, parsed);
@@ -1125,9 +1048,8 @@ export async function verifyIdentityWithRekognition(req, res) {
       message: 'Identity verification completed',
       profileMatchSimilarity: profileMatch.similarity,
       idMatchSimilarity: idMatch.similarity,
-      dlProfilePercentMatch: dlPhotoCapture.percentMatch,
-      dlProfileScanResult: dlPhotoCapture.scanResult,
-      liveScanPercentMatch: liveScanProfileCapture.percentMatch,
+      dlProfilePercentMatch,
+      liveScanPercentMatch,
       livenessSummary,
       livenessEnforced: mustEnforceLiveness,
       useProfilePhotoAsSelfie,
@@ -1463,7 +1385,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
           faceMatchThreshold: cfg.faceMatchThreshold
         };
         if (slotDocumentType === 'driver_license') {
-          await updateSinglesDlProfileMatch(client, singlesId, matchCapture);
+          await updateSinglesIdSealMatch(client, singlesId, { profileDlMatch: cmp.similarity });
         } else if (slotDocumentType === 'passport') {
           await updateSinglesPpProfileMatch(client, singlesId, matchCapture);
         }
@@ -1530,6 +1452,7 @@ export async function captureDriverLicenseFromIdImage(req, res) {
 /**
  * POST /api/rekognition/mark-over-18-verified
  * Dev/support bypass: set singles.over_18_verified = true for the authenticated member.
+ * Testing shortcut only — leaves profile_dl_match / profile_livescan_match alone, so no ID seal.
  */
 export async function postMarkOver18Verified(req, res) {
   const singlesId = Number(req.auth?.singles_id);
