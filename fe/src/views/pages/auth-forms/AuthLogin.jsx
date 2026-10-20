@@ -5,7 +5,6 @@ import { useLoginDemoMode } from 'contexts/LoginDemoModeContext';
 import { ADMIN_TOOLS_PATH } from 'constants/adminToolsRoute';
 import {
   DEMO_LOGIN_PASSWORD_HINT,
-  DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE,
   guestDemoAllowProps,
   isDemoLoginAliasId
 } from 'utils/guestDemoLogin';
@@ -29,7 +28,6 @@ import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
 import { openGoogleSignupPopup, persistGoogleSignupEmail, persistGoogleSignupToken } from 'utils/googleSignupOAuth';
 import { resolvePostLoginPath } from 'utils/postLoginNavigation';
-import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { consumeLoginEmailPrefill } from 'utils/loginScreenPrefill';
 
 // assets
@@ -155,9 +153,7 @@ export default function AuthLogin() {
   const [errorSecondary, setErrorSecondary] = useState('');
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [demoMobileBlockedOpen, setDemoMobileBlockedOpen] = useState(false);
   const [googlePasswordHelpOpen, setGooglePasswordHelpOpen] = useState(false);
-  const isMobileViewport = useCompactLoginViewport();
   const isDemoAliasLogin = isDemoLoginAliasId(email);
   const passwordVisible = showPassword || isDemoAliasLogin;
   const isFormValid = email.trim().length > 0 && (isDemoAliasLogin || password.trim().length > 0);
@@ -280,11 +276,6 @@ export default function AuthLogin() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (signInDisabled) return;
-
-    if (isMobileViewport && isDemoLoginAliasId(email)) {
-      setDemoMobileBlockedOpen(true);
-      return;
-    }
 
     setIsLoading(true);
     setError('');
@@ -452,25 +443,6 @@ export default function AuthLogin() {
         </Box>
       ) : null}
       </Box>
-
-      <ColorTemplate7PopupLargeDark
-        open={demoMobileBlockedOpen}
-        onClose={() => setDemoMobileBlockedOpen(false)}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close demo mobile notice"
-        maxWidth="min(96vw, 420px)"
-        centerInWindow
-      >
-        <ColorTemplate7PopupLargeDark.Title>Demo mode</ColorTemplate7PopupLargeDark.Title>
-        <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', textAlign: 'center' }}>
-            {DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE}
-          </Typography>
-          <GreenButton type="button" onClick={() => setDemoMobileBlockedOpen(false)} sx={{ width: '100%' }}>
-            OK
-          </GreenButton>
-        </ColorTemplate7PopupLargeDark.Body>
-      </ColorTemplate7PopupLargeDark>
 
       <ColorTemplate7PopupLargeDark
         open={googlePasswordHelpOpen}

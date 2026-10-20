@@ -466,9 +466,12 @@ export default function Landing() {
           >
             {rowDepts.map((d) => {
               const enrollmentFlag = ENROLLMENT_TILE_TO_FLAG[d.id];
-              const gateUpgrade = blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
-              const gateTutaDatesStatus = !gateUpgrade && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
-              const gateEnrollment = !gateUpgrade && !gateTutaDatesStatus && !isTileEnrolled(d.id);
+              const demoOnPhoneApp = guestDemo && isCompact && DESKTOP_ONLY_TILE_IDS.has(d.id);
+              const gateUpgrade =
+                !demoOnPhoneApp && blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
+              const gateTutaDatesStatus =
+                !demoOnPhoneApp && !gateUpgrade && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
+              const gateEnrollment = !demoOnPhoneApp && !gateUpgrade && !gateTutaDatesStatus && !isTileEnrolled(d.id);
               const gateDesktopOnly =
                 !gateUpgrade &&
                 !gateTutaDatesStatus &&

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import Typography from '@mui/material/Typography';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import GreenButton from 'ui-component/GreenButton';
+import { useAuth } from 'contexts/AuthContext';
 import { DESKTOP_ONLY_APPS_EVENT } from 'utils/desktopOnlyApps';
+import { DEMO_MOBILE_APPS_BLOCKED_MESSAGE, isGuestDemoLogin } from 'utils/guestDemoLogin';
 
 const DESKTOP_ONLY_MESSAGE =
   'TutaDates, TutaNotes, and TutaPhoto currently only support a desktop computer. Their screens are too complex and rich to use on a phone. Please open them on a desktop.';
@@ -12,6 +14,8 @@ const DESKTOP_ONLY_MESSAGE =
  * Registration, ID initialization, and raffle stay available.
  */
 export default function DesktopOnlyAppsDialog() {
+  const { user } = useAuth();
+  const guestDemo = isGuestDemoLogin(user);
   const [open, setOpen] = useState(false);
   const [appName, setAppName] = useState('');
 
@@ -26,6 +30,10 @@ export default function DesktopOnlyAppsDialog() {
 
   const close = useCallback(() => setOpen(false), []);
 
+  let title = 'Desktop only';
+  if (guestDemo) title = 'Demo Mode';
+  else if (appName) title = `${appName} needs a desktop`;
+
   return (
     <ColorTemplate7PopupLargeDark
       open={open}
@@ -35,12 +43,10 @@ export default function DesktopOnlyAppsDialog() {
       maxWidth="min(96vw, 440px)"
       centerInWindow
     >
-      <ColorTemplate7PopupLargeDark.Title>
-        {appName ? `${appName} needs a desktop` : 'Desktop only'}
-      </ColorTemplate7PopupLargeDark.Title>
+      <ColorTemplate7PopupLargeDark.Title>{title}</ColorTemplate7PopupLargeDark.Title>
       <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
         <Typography variant="body1" sx={{ textAlign: 'center', lineHeight: 1.45 }}>
-          {DESKTOP_ONLY_MESSAGE}
+          {guestDemo ? DEMO_MOBILE_APPS_BLOCKED_MESSAGE : DESKTOP_ONLY_MESSAGE}
         </Typography>
         <GreenButton type="button" onClick={close} sx={{ width: '100%', mt: 1 }}>
           OK

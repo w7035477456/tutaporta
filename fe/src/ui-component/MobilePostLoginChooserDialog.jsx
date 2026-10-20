@@ -6,7 +6,7 @@ import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeD
 import GreenButton from 'ui-component/GreenButton';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { useAuth } from 'contexts/AuthContext';
-import { DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE, isGuestDemoLogin } from 'utils/guestDemoLogin';
+import { isGuestDemoLogin } from 'utils/guestDemoLogin';
 import {
   clearMobilePostLoginChooserPending,
   MOBILE_POST_LOGIN_CHOOSER_EVENT,
@@ -45,7 +45,7 @@ const useAppsButtonSx = {
 /**
  * After mobile/compact login: pick upload destination or see desktop recommendation.
  * Mall taps on Tuta Dates / Albums / Notes reopen this chooser on compact viewports.
- * Guest demo ("demo" / guest) never gets mobile upload — desktop-only notice instead.
+ * Guest demo ("demo" / guest) lands on the mall with no notice; app taps show the demo notice.
  */
 export default function MobilePostLoginChooserDialog() {
   const navigate = useNavigate();
@@ -54,17 +54,13 @@ export default function MobilePostLoginChooserDialog() {
   const guestDemo = isGuestDemoLogin(user);
   const [open, setOpen] = useState(false);
   const [desktopRecommendOpen, setDesktopRecommendOpen] = useState(false);
-  const [demoMobileBlockedOpen, setDemoMobileBlockedOpen] = useState(false);
 
   const tryOpenChooser = useCallback(() => {
     if (!user || !isCompact) return;
     if (!peekMobilePostLoginChooserPending()) return;
     clearMobilePostLoginChooserPending();
     setOpen(false);
-    if (guestDemo) {
-      setDemoMobileBlockedOpen(true);
-      return;
-    }
+    if (guestDemo) return;
     requestDesktopOnlyAppsNotice();
   }, [user, isCompact, guestDemo]);
 
@@ -83,25 +79,15 @@ export default function MobilePostLoginChooserDialog() {
 
   const blockDesktopApp = useCallback(
     (appName) => {
-      if (guestDemo) {
-        closeChooser();
-        setDemoMobileBlockedOpen(true);
-        return;
-      }
       closeChooser();
       requestDesktopOnlyAppsNotice(appName);
       navigate('/mall', { replace: true });
     },
-    [closeChooser, guestDemo, navigate]
+    [closeChooser, navigate]
   );
 
   const closeDesktopRecommend = useCallback(() => {
     setDesktopRecommendOpen(false);
-    navigate('/mall', { replace: true });
-  }, [navigate]);
-
-  const closeDemoMobileBlocked = useCallback(() => {
-    setDemoMobileBlockedOpen(false);
     navigate('/mall', { replace: true });
   }, [navigate]);
 
@@ -153,25 +139,6 @@ export default function MobilePostLoginChooserDialog() {
             {DESKTOP_RECOMMEND_MESSAGE}
           </Typography>
           <GreenButton type="button" onClick={closeDesktopRecommend} sx={{ ...choiceButtonSx, mt: 1 }}>
-            OK
-          </GreenButton>
-        </ColorTemplate7PopupLargeDark.Body>
-      </ColorTemplate7PopupLargeDark>
-
-      <ColorTemplate7PopupLargeDark
-        open={demoMobileBlockedOpen}
-        onClose={closeDemoMobileBlocked}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close demo mobile notice"
-        maxWidth="min(96vw, 420px)"
-        centerInWindow
-      >
-        <ColorTemplate7PopupLargeDark.Title>Demo mode</ColorTemplate7PopupLargeDark.Title>
-        <ColorTemplate7PopupLargeDark.Body spacing={1.5}>
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', textAlign: 'center' }}>
-            {DEMO_MOBILE_LOGIN_BLOCKED_MESSAGE}
-          </Typography>
-          <GreenButton type="button" onClick={closeDemoMobileBlocked} sx={{ ...choiceButtonSx, mt: 1 }}>
             OK
           </GreenButton>
         </ColorTemplate7PopupLargeDark.Body>

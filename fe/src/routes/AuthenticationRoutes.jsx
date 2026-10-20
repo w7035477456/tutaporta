@@ -28,6 +28,7 @@ const ResetPasswordPage = Loadable(lazy(() => import('views/pages/authentication
 const ConfirmEmailChangePage = Loadable(lazy(() => import('views/pages/authentication/ConfirmEmailChange')));
 const MobilePhotoUploadPage = Loadable(lazy(() => import('views/pages/MobilePhotoUploadPage')));
 const MobileHomeButtonPage = Loadable(lazy(() => import('views/pages/MobileHomeButtonPage')));
+const InstallQrPage = Loadable(lazy(() => import('views/pages/InstallQrPage')));
 const GoogleOAuthBridgePage = Loadable(lazy(() => import('views/pages/authentication/GoogleOAuthBridge')));
 const LiveFaceScanPopupPage = Loadable(lazy(() => import('views/utilities/LiveFaceScanPopupPage')));
 const ResumePage = Loadable(lazy(() => import('views/pages/ResumePage')));
@@ -152,6 +153,10 @@ const authenticationChildren = [
   {
     path: '/mobile',
     element: <MobileHomeButtonPage />
+  },
+  {
+    path: '/install',
+    element: <InstallQrPage />
   },
   {
     path: '/mobilePhotoUpload',
