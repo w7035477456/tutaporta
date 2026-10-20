@@ -181,6 +181,9 @@ export default function Landing() {
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
   const [raffleOpenRequest, setRaffleOpenRequest] = useState(0);
+  const raffleWrapRef = useRef(null);
+  /** Phone layout: px from the mall area's top to below the Raffle bar / panel; tiles start there. */
+  const [narrowTilesTop, setNarrowTilesTop] = useState(null);
 
   const openGetMyRaffle = useCallback(() => setRaffleOpenRequest((n) => n + 1), []);
 
@@ -349,11 +352,15 @@ export default function Landing() {
       }
       setMallGrid(nextGrid);
 
+      const raffleEl = raffleWrapRef.current;
+      const tilesTop = narrow && raffleEl ? raffleEl.offsetTop + raffleEl.offsetHeight + 8 : null;
+      setNarrowTilesTop(tilesTop);
+
       let availableWidth;
       let availableHeight;
       if (el.clientWidth > 0 && el.clientHeight > 0) {
         availableWidth = Math.max(320, el.clientWidth);
-        availableHeight = Math.max(220, el.clientHeight);
+        availableHeight = Math.max(220, el.clientHeight - (tilesTop ?? 0) - (tilesTop == null ? 0 : 8));
       } else {
         const isSmallScreen = window.innerWidth < 600;
         const reservedVerticalSpace = narrow ? (isSmallScreen ? 190 : 140) : 380;
@@ -381,6 +388,7 @@ export default function Landing() {
     updateMallScale();
     const ro = new ResizeObserver(() => updateMallScale());
     ro.observe(el);
+    if (raffleWrapRef.current) ro.observe(raffleWrapRef.current);
     window.addEventListener('resize', updateMallScale);
 
     return () => {
@@ -426,12 +434,13 @@ export default function Landing() {
       <Box
         sx={{
           position: 'absolute',
-          top: '50%',
+          top: narrowTilesTop == null ? '50%' : `${narrowTilesTop}px`,
           left: '50%',
           width: `${mallGrid.stageW}px`,
           height: `${mallGrid.stageH}px`,
-          transform: `translate(-50%, -50%) scale(${mallScale})`,
-          transformOrigin: 'center center',
+          transform:
+            narrowTilesTop == null ? `translate(-50%, -50%) scale(${mallScale})` : `translateX(-50%) scale(${mallScale})`,
+          transformOrigin: narrowTilesTop == null ? 'center center' : 'top center',
           overflow: 'visible',
           isolation: 'isolate',
           display: 'flex',
@@ -595,6 +604,7 @@ export default function Landing() {
         ))}
       </Box>
       <Box
+        ref={raffleWrapRef}
         sx={{
           position: 'absolute',
           top: { xs: 8, sm: 16 },

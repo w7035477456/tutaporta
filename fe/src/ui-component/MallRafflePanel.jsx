@@ -9,6 +9,7 @@ import RaffleEventSelect from 'ui-component/RaffleEventSelect';
 import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import getMyRaffleTicketImg from 'assets/images/getmyraffleticket.png';
 import { fetchRaffleState, submitRafflePayout } from 'api/raffleFe';
+import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 const PANEL_YELLOW = '#ffe01b';
 /** Never narrower than the Get My Raffle Ticket image + placeholders. */
@@ -313,9 +314,13 @@ export default function MallRafflePanel({ openRequest = 0 }) {
   const [referCode, setReferCode] = useState('');
   const [popupOpen, setPopupOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [expanded, setExpanded] = useState(true);
 
   useEffect(() => {
-    if (openRequest > 0) setPopupOpen(true);
+    if (openRequest > 0) {
+      setExpanded(true);
+      setPopupOpen(true);
+    }
   }, [openRequest]);
 
   const pendingPayout = useMemo(() => tickets.find((t) => t.claimed && !t.paypalInfo && !t.venmoInfo) || null, [tickets]);
@@ -480,17 +485,47 @@ export default function MallRafflePanel({ openRequest = 0 }) {
     );
   }
 
+  const panelWidth = `min(${Math.max(PANEL_MIN_PX, longestLabelPx + PANEL_CHROME_PX)}px, 96vw)`;
+
   return (
     <>
       <Box
+        component="button"
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="mall-raffle-panel"
+        {...guestDemoAllowProps()}
+        onClick={() => setExpanded((v) => !v)}
+        sx={{
+          width: panelWidth,
+          display: 'block',
+          m: 0,
+          mb: expanded ? 0.5 : 0,
+          py: 0.25,
+          bgcolor: '#000',
+          color: '#fff',
+          border: 0,
+          borderRadius: 1,
+          fontFamily: 'inherit',
+          fontWeight: 900,
+          fontSize: { xs: '1.6rem', sm: '1.8rem' },
+          lineHeight: 1.2,
+          cursor: 'pointer',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.35)'
+        }}
+      >
+        Raffle
+      </Box>
+      <Box
+        id="mall-raffle-panel"
         ref={panelRef}
         sx={{
-          width: `min(${Math.max(PANEL_MIN_PX, longestLabelPx + PANEL_CHROME_PX)}px, 96vw)`,
+          width: panelWidth,
           bgcolor: PANEL_YELLOW,
           border: '3px solid #111',
           borderRadius: 2,
           p: { xs: 1, sm: 1.25 },
-          display: 'flex',
+          display: expanded ? 'flex' : 'none',
           flexDirection: 'column',
           gap: 1,
           boxShadow: '0 4px 16px rgba(0,0,0,0.35)',

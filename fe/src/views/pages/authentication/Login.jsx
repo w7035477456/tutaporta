@@ -16,6 +16,8 @@ import Logo from 'ui-component/Logo';
 import Footer from 'layout/MainLayout/Footer';
 import AuthLogin from '../auth-forms/AuthLogin';
 import SessionEndNoticeDialog from 'ui-component/SessionEndNoticeDialog';
+import InstallQrCard from 'ui-component/InstallQrCard';
+import { getAuthFooterHeightVh } from 'config/authFooterEnv';
 import { LoginDemoModeProvider } from 'contexts/LoginDemoModeContext';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { consumeSessionEndNotice } from 'utils/sessionEndNotice';
@@ -195,6 +197,23 @@ function Login() {
               </Stack>
             </AuthCardWrapper>
           </AuthStandardDialogFrame>
+          <Box
+            {...guestDemoAllowProps()}
+            sx={{
+              display: { xs: 'none', md: 'block' },
+              position: 'fixed',
+              left: 8,
+              bottom: `calc(${getAuthFooterHeightVh()}vh + 8px)`,
+              width: 200,
+              p: 1.5,
+              bgcolor: '#000000',
+              borderRadius: 2,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
+              zIndex: 2
+            }}
+          >
+            <InstallQrCard compact />
+          </Box>
           <Footer />
         </Stack>
       </AuthWrapper1>
