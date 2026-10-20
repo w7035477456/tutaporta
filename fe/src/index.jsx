@@ -34,10 +34,12 @@ console.error = (...args) => {
 import api from 'api/axios';
 import { installFeBeTrafficLog, syncFeBeTrafficLogFromPublicConfig } from 'utils/feBeTrafficLog';
 import { installClientApiCooldownFetchGuard } from 'utils/clientApiCooldown';
+import { installLastClickTransferMeter } from 'utils/lastClickTransferMeter';
 import App from 'App';
 
 installClientApiCooldownFetchGuard();
 installFeBeTrafficLog(api);
+installLastClickTransferMeter(api);
 void syncFeBeTrafficLogFromPublicConfig();
 import reportWebVitals from 'reportWebVitals';
 import { registerHomeButtonServiceWorker } from 'utils/homeButtonInstall';

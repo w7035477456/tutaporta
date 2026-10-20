@@ -15,6 +15,7 @@ import {
 import RecordVaultDataPlanDialog from './RecordVaultDataPlanDialog';
 import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
 import { reportRecordVaultOverageThrottleDepleted } from 'utils/recordVaultOverageThrottleUi';
+import { useLastClickTransferMb } from 'utils/lastClickTransferMeter';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/VaultOverageThrottleNotice';
 import AdminEditableUsageDataAmount, {
   formatUsageDataAmount,
@@ -26,16 +27,6 @@ const usageBarFontSx = {
   fontSize: { xs: '0.72rem !important', sm: '0.82rem !important', md: '0.9rem !important' },
   lineHeight: 1.35,
   fontWeight: 700
-};
-
-const sessionCountSx = {
-  ...usageBarFontSx,
-  flexShrink: 0,
-  color: '#fff',
-  WebkitTextFillColor: '#fff',
-  whiteSpace: 'nowrap',
-  fontWeight: 700,
-  px: 0.25
 };
 
 const yellowTextSx = {
@@ -84,45 +75,73 @@ UsageBarShell.propTypes = {
   blackBar: PropTypes.bool
 };
 
-function SessionFileCountLabel({ usbTxRx = 0, uiTxRx = 0 }) {
-  const usb = Math.max(0, Math.trunc(Number(usbTxRx) || 0));
-  const ui = Math.max(0, Math.trunc(Number(uiTxRx) || 0));
+function LastClickTransferLabel() {
+  const mb = useLastClickTransferMb();
   return (
-    <Typography component="span" sx={sessionCountSx} title="Session file transfer counts (reset on next unlock)">
-      Usb tx/rx={usb}, ui tx/rx={ui}
+    <Typography
+      component="span"
+      sx={yellowTextSx}
+      title="Data moved between server and browser by your last click"
+    >
+      {mb.toFixed(1)} mb
     </Typography>
   );
 }
 
-SessionFileCountLabel.propTypes = {
-  usbTxRx: PropTypes.number,
-  uiTxRx: PropTypes.number
+/** MB stored on disk for this member's TutaNotes, or null when the server did not report it. */
+function tutaNotesStorageMb(usage) {
+  const notesBytes = Number(usage?.tutaDriveStorage?.notesBytes);
+  if (Number.isFinite(notesBytes) && notesBytes >= 0) return notesBytes / (1024 * 1024);
+  const folderMb = Number(usage?.vaultFolderMb);
+  if (Number.isFinite(folderMb) && folderMb > 0) return folderMb;
+  return null;
+}
+
+/** Yellow strip above the data meter: total TutaNotes storage for this member. */
+function TutaNotesStorageBar({ usage }) {
+  const storageMb = tutaNotesStorageMb(usage);
+  if (storageMb == null) return null;
+  const photosMb = (Number(usage?.tutaDriveStorage?.photosBytes) || 0) / (1024 * 1024);
+  const title = usage?.tutaDriveStorage
+    ? `TutaNotes storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk ` +
+      `(photos ${formatUsageDataAmount(photosMb, { precisionGb: 2 })} counted separately)`
+    : `TutaNotes storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk`;
+  return (
+    <Box
+      title={title}
+      aria-label={title}
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        minHeight: 26,
+        px: 1,
+        border: '2px solid #fff',
+        borderRadius: 1,
+        bgcolor: 'var(--theme-yellow-color)'
+      }}
+    >
+      <Box component="span" sx={usageMeterLabelSx}>
+        Storage {formatUsageDataAmountCompact(storageMb)}
+      </Box>
+    </Box>
+  );
+}
+
+TutaNotesStorageBar.propTypes = {
+  usage: PropTypes.object
 };
 
-/** TutaDrive Total GB from notes+photos folders only (always shown in gb, 1 decimal). */
-function formatTutaDriveTotalGb(usage) {
-  const bytes = Number(usage?.tutaDriveStorage?.totalBytes);
-  if (Number.isFinite(bytes) && bytes >= 0) {
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}gb`;
-  }
-  const mb = Number(usage?.vaultFolderMb) || 0;
-  return `${Math.max(0, mb / 1024).toFixed(1)}gb`;
-}
-
-function TutaDriveTotalLabel({ usage }) {
-  if (!usage?.tutaDrive) return null;
-  const label = formatTutaDriveTotalGb(usage);
-  const notesMb = (Number(usage?.tutaDriveStorage?.notesBytes) || 0) / (1024 * 1024);
-  const photosMb = (Number(usage?.tutaDriveStorage?.photosBytes) || 0) / (1024 * 1024);
-  const title = `Disk Total = notes (${formatUsageDataAmount(notesMb)}) + photos (${formatUsageDataAmount(photosMb)}) under users/M####/`;
+function StorageAndLastClickRow({ usage }) {
   return (
-    <Typography component="span" sx={yellowTextSx} title={title}>
-      Total {label}.{' '}
-    </Typography>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+      <TutaNotesStorageBar usage={usage} />
+      <LastClickTransferLabel />
+    </Box>
   );
 }
 
-TutaDriveTotalLabel.propTypes = {
+StorageAndLastClickRow.propTypes = {
   usage: PropTypes.object
 };
 
@@ -188,9 +207,9 @@ function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPl
   const remain = bought > 0 ? Math.max(0, bought - used) : Math.max(0, Number(remainMb) || 0);
   const showUsed = used > 0;
   const showRemain = remain > 0 || !showUsed;
+  const fmt = (mb) => formatUsageDataAmount(mb, { precisionGb: 2 });
   const title =
-    `Used ${formatUsageDataAmount(used)} · ${formatUsageDataAmount(remain)} left of ` +
-    `${formatUsageDataAmount(bought)}. Click to Refill/Add ${blockLabel} blocks.`;
+    `Used ${fmt(used)} · ${fmt(remain)} left of ${fmt(bought)}. Click to Refill/Add ${blockLabel} blocks.`;
   const openPlan = (event) => {
     if (event.target instanceof Element && event.target.closest('[data-admin-usage-amount]')) return;
     onOpenPlan();
@@ -332,9 +351,6 @@ export default function RecordVaultUsageBar({
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const transfer = usage?.transfer;
-  const sessionFileCounts = usage?.sessionFileCounts || {};
-  const usbTxRx = Number(sessionFileCounts.usbTxRx) || 0;
-  const uiTxRx = Number(sessionFileCounts.uiTxRx) || 0;
   const isOneDrive = storageType === 'tutadrive';
   const tutorialDetail = isOneDrive
     ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL
@@ -352,7 +368,6 @@ export default function RecordVaultUsageBar({
 
   const actions = (
     <>
-      <SessionFileCountLabel usbTxRx={usbTxRx} uiTxRx={uiTxRx} />
       <WorkspaceVideoTutorialPair
         videoTutorialUrl={videoTutorialUrl}
         onTutorialClick={() => setTutorialOpen(true)}
@@ -402,11 +417,7 @@ export default function RecordVaultUsageBar({
     return (
       <>
         <UsageBarShell actions={actions}>
-          {usage?.tutaDrive ? (
-            <Typography component="div" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
-              <TutaDriveTotalLabel usage={usage} />
-            </Typography>
-          ) : null}
+          <StorageAndLastClickRow usage={usage} />
         </UsageBarShell>
         <TutaNotesWelcomeTutorialPopup open={tutorialOpen} onClose={() => setTutorialOpen(false)} />
       </>
@@ -426,7 +437,8 @@ export default function RecordVaultUsageBar({
   return (
     <>
       <UsageBarShell actions={actions} blackBar>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+        <StorageAndLastClickRow usage={usage} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, mt: 0.5 }}>
           <UsageMeter
             usedMb={transferUsedMb(transfer, refillBoughtMb)}
             boughtMb={refillBoughtMb}

@@ -1217,8 +1217,8 @@ export default function ProfileSection({ clusterTight = false }) {
                           }}
                         >
                           {[
-                            { key: 'full', label: 'Full Paletes', full: true },
-                            { key: 'minimal', label: 'Minimal Palete', full: false }
+                            { key: 'full', label: 'Full Palettes', full: true },
+                            { key: 'minimal', label: 'Mini Palette', full: false }
                           ].map(({ key, label, full }) => {
                             const selected = colorFullPalete === full;
                             const Template = selected ? SelectedButtonTemplate : UnSelectedButtonTemplate;

@@ -19,11 +19,11 @@ export function formatUsageDataAmount(mb, { precisionGb = 1, precisionMb = 1 } =
   return `${sign}${mbText}mb`;
 }
 
-/** Always gb, at most 1 decimal, trailing ".0" dropped (189.5mb → 0.2gb, 10240mb → 10gb). */
+/** Always gb, 2 decimals, trailing ".00" dropped (5068.8mb → 4.95gb, 10240mb → 10gb). */
 export function formatUsageDataAmountCompact(mb) {
   const value = Number(mb);
   const gb = Number.isFinite(value) ? value / 1024 : 0;
-  return `${gb.toFixed(1).replace(/\.0$/, '').replace(/^-0$/, '0')}gb`;
+  return `${gb.toFixed(2).replace(/\.00$/, '').replace(/^-0$/, '0')}gb`;
 }
 
 /**
