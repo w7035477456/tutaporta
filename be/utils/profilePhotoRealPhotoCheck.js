@@ -1,6 +1,42 @@
 import { detectImageLabels, detectSingleFace, getRekognitionConfig, isRekognitionConfigured } from '../lib/rekognitionClient.js';
 
-export const PROFILE_PHOTO_AVATAR_REJECT_MESSAGE = 'Please upload your actual photo';
+export const PROFILE_PHOTO_AVATAR_REJECT_MESSAGE =
+  'Please upload real photo, because momentarily, your profile must match your Driver License Photo and live facial scan to continue.';
+
+export const PROFILE_PHOTO_NOT_REAL_CODE = 'PROFILE_PHOTO_NOT_REAL';
+
+/**
+ * Stylized avatars often score high on Person/Photography yet pick up many weak
+ * "artificial" tags at once; real selfies rarely hit more than one or two.
+ */
+const ARTIFICIAL_CLUSTER_TERMS = new Set([
+  'art',
+  'drawing',
+  'comics',
+  'comic',
+  'cartoon',
+  'illustration',
+  'anime',
+  'animation',
+  'sketch',
+  'doodle',
+  'clip art',
+  'painting',
+  'sticker',
+  'stencil',
+  'toy',
+  'figurine',
+  'doll',
+  'elf',
+  'mannequin',
+  'graphics',
+  'emoji',
+  'modern art',
+  'statue',
+  'sculpture'
+]);
+const ARTIFICIAL_CLUSTER_MIN_CONFIDENCE = 50;
+const ARTIFICIAL_CLUSTER_MIN_COUNT = 5;
 
 const STRONG_AVATAR_LABEL_TERMS = [
   'cartoon',
@@ -28,7 +64,7 @@ function labelConfidence(label) {
 }
 
 function matchesAvatarTerm(name, terms) {
-  return terms.some((term) => name.includes(term));
+  return terms.some((term) => new RegExp(`\\b${term}`).test(name));
 }
 
 /**
@@ -67,18 +103,52 @@ export function assessProfilePhotoLabels(labels) {
     return { isLikelyAvatar: true, ...bestWeak };
   }
 
+  const artificialNames = new Set();
+  for (const label of list) {
+    if (labelConfidence(label) < ARTIFICIAL_CLUSTER_MIN_CONFIDENCE) continue;
+    const name = String(label?.Name ?? '').toLowerCase();
+    if (ARTIFICIAL_CLUSTER_TERMS.has(name)) artificialNames.add(name);
+  }
+  if (artificialNames.size >= ARTIFICIAL_CLUSTER_MIN_COUNT) {
+    return {
+      isLikelyAvatar: true,
+      matchedLabel: [...artificialNames].join(','),
+      confidence: ARTIFICIAL_CLUSTER_MIN_CONFIDENCE
+    };
+  }
+
   return { isLikelyAvatar: false };
+}
+
+function failClosedWhenUnavailable() {
+  const raw = String(process.env.PROFILE_PHOTO_REAL_CHECK_FAIL_CLOSED ?? '').trim().toLowerCase();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return process.env.NODE_ENV === 'production';
+}
+
+function unavailableResult(reason) {
+  if (failClosedWhenUnavailable()) {
+    console.warn('[profilePhotoRealPhotoCheck] check unavailable; rejecting (fail-closed)', reason);
+    return {
+      ok: false,
+      code: PROFILE_PHOTO_NOT_REAL_CODE,
+      error: 'We could not verify your photo right now. Please try again in a minute.'
+    };
+  }
+  console.warn('[profilePhotoRealPhotoCheck] check unavailable; allowing profile set', reason);
+  return { ok: true };
 }
 
 /**
  * Rejects illustrated / avatar profile images (Make this Profile).
  * @param {Buffer} bytes
- * @returns {Promise<{ ok: true } | { ok: false, error: string }>}
+ * @returns {Promise<{ ok: true } | { ok: false, error: string, code: string }>}
  */
 export async function validateProfilePhotoLooksReal(bytes) {
   const cfg = getRekognitionConfig();
   if (!cfg.enabled || !isRekognitionConfigured()) {
-    return { ok: true };
+    return unavailableResult('rekognition disabled or not configured');
   }
 
   try {
@@ -86,18 +156,20 @@ export async function validateProfilePhotoLooksReal(bytes) {
       detectImageLabels(bytes, { maxLabels: 50, minConfidence: 50 }),
       detectSingleFace(bytes)
     ]);
+    const faceCount = (faceResult?.faces || []).filter(
+      (f) => Number(f?.Confidence) >= 90 && Number(f?.BoundingBox?.Width) >= 0.08
+    ).length;
     const labelAssessment = assessProfilePhotoLabels(labels);
-    if (labelAssessment.isLikelyAvatar) {
-      console.log('[profilePhotoRealPhotoCheck] reject avatar-like image', {
+    if (labelAssessment.isLikelyAvatar || faceCount !== 1) {
+      console.log('[profilePhotoRealPhotoCheck] reject non-real profile image', {
         matchedLabel: labelAssessment.matchedLabel,
         confidence: labelAssessment.confidence,
-        faceCount: faceResult?.faceCount ?? 0
+        faceCount
       });
-      return { ok: false, error: PROFILE_PHOTO_AVATAR_REJECT_MESSAGE };
+      return { ok: false, code: PROFILE_PHOTO_NOT_REAL_CODE, error: PROFILE_PHOTO_AVATAR_REJECT_MESSAGE };
     }
     return { ok: true };
   } catch (err) {
-    console.warn('[profilePhotoRealPhotoCheck] Rekognition check failed; allowing profile set', err?.message ?? err);
-    return { ok: true };
+    return unavailableResult(err?.message ?? err);
   }
 }

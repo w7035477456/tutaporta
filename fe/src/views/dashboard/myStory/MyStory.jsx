@@ -47,6 +47,12 @@ import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
 import GenderSelfReportPopup from 'ui-component/GenderSelfReportPopup';
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
 import { hasGenderSelfReport, isIdInitializationIncomplete } from 'utils/firstLoginOnboarding';
+import {
+  PROFILE_PHOTO_NOT_REAL_ACK_EVENT,
+  PROFILE_PHOTO_NOT_REAL_MESSAGE,
+  isProfilePhotoNotRealError,
+  requestProfilePhotoNotRealNotice
+} from 'utils/profilePhotoRealCheck';
 import { SELF_REPORT_BIOGRAPHY_PATH } from 'constants/selfReportBiographyRoute';
 import { markSignupIdentificationVerificationRequired } from 'utils/signupIdentificationVerification';
 import {
@@ -1836,14 +1842,18 @@ export default function MyStory() {
       setShowFirstPhotoDialog(false);
       return;
     }
-    if (photos.length === 0) {
-      setShowFirstPhotoDialog(true);
-      return;
-    }
-    setShowFirstPhotoDialog(false);
+    // Album rows may be rejected non-real photos, so keep asking for an upload until a profile photo is set.
     // Do not auto-run Make this Profile on pre-existing album rows (orphan/demo/stale cache).
     // Auto-make runs only after the member uploads in this session (see handleFiles).
-  }, [myPhotosLoading, profilePhotoId, user?.singles_id, photos.length]);
+    setShowFirstPhotoDialog(true);
+  }, [myPhotosLoading, profilePhotoId, user?.singles_id]);
+
+  useEffect(() => {
+    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED || profilePhotoId) return undefined;
+    const reopenFirstPhotoUpload = () => setShowFirstPhotoDialog(true);
+    window.addEventListener(PROFILE_PHOTO_NOT_REAL_ACK_EVENT, reopenFirstPhotoUpload);
+    return () => window.removeEventListener(PROFILE_PHOTO_NOT_REAL_ACK_EVENT, reopenFirstPhotoUpload);
+  }, [profilePhotoId]);
 
   const runMakeThisProfile = useCallback(
     async (photoId, { tryCrop = true, resetProfilePhotoVetting: shouldResetProfilePhotoVetting = false } = {}) => {
@@ -1903,7 +1913,12 @@ export default function MyStory() {
           }
         }
       } catch (err) {
-        setUploadError(err?.response?.data?.error || err?.message || 'Failed to crop or set profile photo');
+        if (isProfilePhotoNotRealError(err)) {
+          pendingAutoMakePhotoIdRef.current = null;
+          requestProfilePhotoNotRealNotice(err.response.data.error);
+        } else {
+          setUploadError(err?.response?.data?.error || err?.message || 'Failed to crop or set profile photo');
+        }
         throw err;
       }
     },
@@ -3486,6 +3501,9 @@ export default function MyStory() {
         />
         <ColorTemplate7PopupLargeDark.Body spacing={2}>
           <ColorTemplate7PopupLargeDark.Title>Please upload 1 profile photo</ColorTemplate7PopupLargeDark.Title>
+          <Typography variant="body1" sx={{ textAlign: 'center', lineHeight: 1.45, mt: '-8px !important' }}>
+            {PROFILE_PHOTO_NOT_REAL_MESSAGE}
+          </Typography>
           {isMobileUpload ? (
             <Box sx={{ mb: 1 }}>
               <Box

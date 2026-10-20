@@ -12,6 +12,8 @@ import {
   stagingProductForUploadPurpose
 } from '../../utils/mobilePhotoUploadSession.js';
 import { setProfileImageForSingles } from '../../utils/setProfileImageForSingles.js';
+import { loadMyPhotoBytes } from '../../utils/loadMyPhotoBytes.js';
+import { validateProfilePhotoLooksReal } from '../../utils/profilePhotoRealPhotoCheck.js';
 import {
   debugMobilePhotoUpload,
   errorMobilePhotoUpload,
@@ -476,8 +478,13 @@ async function handleMobilePhotoUploadPost(req, res, token) {
       );
       const currentProfileId = Number(profile.rows[0]?.profile_image_fk);
       if (!Number.isFinite(currentProfileId) || currentProfileId < 1) {
-        debugMobilePhotoUpload('afterPhotoUpload set profile_image_fk', { singlesId, photosId });
-        await setProfileImageForSingles(singlesId, photosId);
+        const realism = await validateProfilePhotoLooksReal(await loadMyPhotoBytes(singlesId, photosId));
+        if (realism.ok) {
+          debugMobilePhotoUpload('afterPhotoUpload set profile_image_fk', { singlesId, photosId });
+          await setProfileImageForSingles(singlesId, photosId);
+        } else {
+          debugMobilePhotoUpload('afterPhotoUpload skip profile (not a real photo)', { singlesId, photosId });
+        }
       } else {
         debugMobilePhotoUpload('afterPhotoUpload skip profile (already set)', {
           singlesId,

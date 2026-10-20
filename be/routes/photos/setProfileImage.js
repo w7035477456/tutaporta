@@ -100,7 +100,7 @@ export async function setProfileImage(req, res) {
           const photoBytes = await loadMyPhotoBytes(singlesId, photosId);
           const realism = await validateProfilePhotoLooksReal(photoBytes);
           if (!realism.ok) {
-            return res.status(400).json({ error: realism.error });
+            return res.status(400).json({ error: realism.error, code: realism.code });
           }
         } catch (loadErr) {
           console.error('[setProfileImage] profile photo realism check load error', loadErr?.message ?? loadErr);
@@ -145,6 +145,54 @@ export async function setProfileImage(req, res) {
   } catch (err) {
     console.error('Set profile image error:', err);
     res.status(500).json({ error: 'Failed to set profile image' });
+  }
+}
+
+/**
+ * POST /api/profilePhoto/recheck
+ * Onboarding guard for members whose profile photo predates the real-photo check:
+ * when the current profile photo looks like an avatar and ID verification is not
+ * complete yet, clear profile_image_fk so onboarding returns to the photo step.
+ */
+export async function recheckProfileImage(req, res) {
+  try {
+    const singlesId = req.auth?.singles_id;
+    if (!singlesId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    if (isAdminImpersonationSession(req.auth)) {
+      return res.json({ ok: true });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT profile_image_fk, id_initialization_completed
+       FROM outdateddbsnapshotoct2024.singles
+       WHERE singles_id = $1
+       LIMIT 1`,
+      [singlesId]
+    );
+    const row = rows[0];
+    const photosId = Number(row?.profile_image_fk);
+    if (!row || !Number.isFinite(photosId) || photosId < 1 || row.id_initialization_completed === true) {
+      return res.json({ ok: true });
+    }
+
+    const realism = await validateProfilePhotoLooksReal(await loadMyPhotoBytes(singlesId, photosId));
+    if (realism.ok) {
+      return res.json({ ok: true, photos_id: photosId });
+    }
+
+    await pool.query(
+      `UPDATE outdateddbsnapshotoct2024.singles
+       SET profile_image_fk = NULL
+       WHERE singles_id = $1 AND profile_image_fk = $2`,
+      [singlesId, photosId]
+    );
+    console.log('[recheckProfileImage] cleared non-real profile photo', { singlesId, photosId });
+    return res.json({ ok: false, code: realism.code, error: realism.error });
+  } catch (err) {
+    console.error('Recheck profile image error:', err);
+    res.status(500).json({ error: 'Failed to recheck profile image' });
   }
 }
 

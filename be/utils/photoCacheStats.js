@@ -63,10 +63,9 @@ export async function recordPhotoCacheResult(clientIp, is304, photoId = null) {
       ? ` totals: hits=${hits} misses=${misses} (${pctCached}% cached)`
       : ' totals: (none — Redis not configured)';
 
-  // Always console.log (same as [getMyPhotos]) — not gated by PM2_LOG_LEVEL.
-  const line = `[PhotoCache] ${status} ${label}${idPart} ip=${clientIp} window=${windowMinutesLabel()}m${totalsPart}${redisNote}`;
-  console.log(line);
-  appLog.info(line);
+  appLog.info(
+    `[PhotoCache] ${status} ${label}${idPart} ip=${clientIp} window=${windowMinutesLabel()}m${totalsPart}${redisNote}`
+  );
 }
 
 /** @param {string} clientIp */

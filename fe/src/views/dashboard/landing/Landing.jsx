@@ -66,9 +66,9 @@ function readEnrollmentPrefs(prefs) {
   };
 }
 
-/** Yellow box in a tile's top-right corner; red check = enrolled. Tiles without `onToggle` show an empty, inert box. */
-function MallTileCheckbox({ checked, label, onToggle }) {
-  const interactive = Boolean(onToggle);
+/** Yellow box in a tile's top-right corner; red check = enrolled. `disabled` = greyed box that can never be checked. */
+function MallTileCheckbox({ checked, label, onToggle, disabled = false }) {
+  const interactive = Boolean(onToggle) && !disabled;
   const activate = (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -88,7 +88,18 @@ function MallTileCheckbox({ checked, label, onToggle }) {
               if (event.key === 'Enter' || event.key === ' ') activate(event);
             }
           }
-        : { 'aria-hidden': true })}
+        : disabled
+          ? {
+              role: 'checkbox',
+              'aria-checked': false,
+              'aria-disabled': true,
+              'aria-label': `${label} is not available yet`,
+              onClick: (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }
+          : { 'aria-hidden': true })}
       sx={{
         position: 'absolute',
         top: 10,
@@ -97,16 +108,16 @@ function MallTileCheckbox({ checked, label, onToggle }) {
         width: 48,
         height: 48,
         boxSizing: 'border-box',
-        bgcolor: '#ffeb3b',
-        border: '3px solid #000',
+        bgcolor: disabled ? '#9e9e9e' : '#ffeb3b',
+        border: disabled ? '3px solid #616161' : '3px solid #000',
         borderRadius: 1,
         boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',
-        cursor: interactive ? 'pointer' : 'default',
-        pointerEvents: interactive ? 'auto' : 'none',
+        cursor: interactive ? 'pointer' : disabled ? 'not-allowed' : 'default',
+        pointerEvents: interactive || disabled ? 'auto' : 'none',
         overflow: 'visible'
       }}
     >
-      {checked ? (
+      {checked && !disabled ? (
         <Box
           component="svg"
           viewBox="0 0 24 24"
@@ -118,6 +129,9 @@ function MallTileCheckbox({ checked, label, onToggle }) {
     </Box>
   );
 }
+
+/** Not live yet: tile does nothing and its corner box cannot be checked. */
+const DISABLED_TILE_IDS = new Set(['eMarketPlace', 'onlineProfessionals', 'eClassifieds']);
 
 const departments = [
   { id: 'vsingles', title: 'Tuta Dates', url: TUTADATES_PATH, image: tutaDatesImg },
@@ -487,8 +501,10 @@ export default function Landing() {
                 !gateEnrollment &&
                 isCompact &&
                 DESKTOP_ONLY_TILE_IDS.has(d.id);
-              const tileActivatesPopup = gateUpgrade || gateTutaDatesStatus || gateEnrollment || gateDesktopOnly;
-              const isLink = Boolean(d.url) && !tileActivatesPopup;
+              const tileDisabled = DISABLED_TILE_IDS.has(d.id);
+              const tileActivatesPopup =
+                !tileDisabled && (gateUpgrade || gateTutaDatesStatus || gateEnrollment || gateDesktopOnly);
+              const isLink = Boolean(d.url) && !tileActivatesPopup && !tileDisabled;
               const onTileActivate = gateUpgrade
                 ? openUpgradePopup
                 : gateTutaDatesStatus
@@ -505,8 +521,9 @@ export default function Landing() {
                   component={isLink ? Link : 'div'}
                   {...(isLink ? { to: d.url } : {})}
                   data-guest-demo-allow="true"
-                  onMouseEnter={handleTileHover}
-                  onClick={onTileActivate}
+                  onMouseEnter={tileDisabled ? undefined : handleTileHover}
+                  onClick={tileDisabled ? undefined : onTileActivate}
+                  aria-disabled={tileDisabled || undefined}
                   role={tileActivatesPopup ? 'button' : undefined}
                   tabIndex={tileActivatesPopup ? 0 : undefined}
                   onKeyDown={
@@ -530,7 +547,7 @@ export default function Landing() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    cursor: isLink || tileActivatesPopup ? 'pointer' : 'default',
+                    cursor: tileDisabled ? 'not-allowed' : isLink || tileActivatesPopup ? 'pointer' : 'default',
                     textDecoration: 'none',
                     WebkitTouchCallout: 'none',
                     WebkitUserSelect: 'none',
@@ -541,12 +558,14 @@ export default function Landing() {
                     boxShadow: 'none',
                     zIndex: 1,
                     transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
-                    '&:hover': {
-                      zIndex: 2,
-                      transform: 'scale(1.08)',
-                      borderColor: 'var(--theme-error-color)',
-                      boxShadow: 'inset 0 0 50px rgba(255, 0, 0, 0.6), 0 0 20px rgba(255, 0, 0, 0.4)'
-                    }
+                    '&:hover': tileDisabled
+                      ? {}
+                      : {
+                          zIndex: 2,
+                          transform: 'scale(1.08)',
+                          borderColor: 'var(--theme-error-color)',
+                          boxShadow: 'inset 0 0 50px rgba(255, 0, 0, 0.6), 0 0 20px rgba(255, 0, 0, 0.4)'
+                        }
                   }}
                 >
                   <Box
@@ -561,7 +580,8 @@ export default function Landing() {
                       justifyContent: 'center',
                       bgcolor: 'transparent',
                       boxShadow: 'none',
-                      opacity: gateEnrollment || gateTutaDatesStatus ? 0.55 : 1,
+                      opacity: tileDisabled || gateEnrollment || gateTutaDatesStatus ? 0.55 : 1,
+                      filter: tileDisabled ? 'grayscale(1)' : 'none',
                       transition: 'opacity 0.2s ease'
                     }}
                   >
@@ -593,6 +613,7 @@ export default function Landing() {
                   <MallTileCheckbox
                     checked={enrollmentFlag ? guestDemo || isTileEnrolled(d.id) : false}
                     label={ENROLLMENT_FLAG_LABEL[enrollmentFlag] || d.title}
+                    disabled={tileDisabled}
                     onToggle={
                       enrollmentFlag && !enrollmentReadOnly ? () => void toggleEnrollment(enrollmentFlag) : undefined
                     }

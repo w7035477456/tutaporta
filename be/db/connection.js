@@ -121,8 +121,13 @@ function startPostgresBusySampler(pool) {
   }, intervalMs);
 }
 
-/** Verbose pool/query logging (set SHOW_PG_PERFORMANCE_LOG=false in ~/.ssh/be/.env to disable). */
+/**
+ * Verbose pool/query logging: only at PM2_LOG_LEVEL=DEBUG or TRACE
+ * (and SHOW_PG_PERFORMANCE_LOG not false). Read per call so the 10s env refresh applies.
+ */
 function isPgLogEnabled() {
+  const level = String(process.env.PM2_LOG_LEVEL ?? 'INFO').trim().toUpperCase();
+  if (level !== 'DEBUG' && level !== 'TRACE') return false;
   const raw = String(process.env.SHOW_PG_PERFORMANCE_LOG ?? 'true').trim().toLowerCase();
   return !['0', 'false', 'no', 'off', 'n'].includes(raw);
 }
@@ -343,7 +348,7 @@ if (STANDALONE) {
   console.log('[connection] DB_HOST:', cfg.host, 'DB_PORT:', cfg.port, 'DB_NAME:', cfg.database, 'DB_SCHEMA:', getDBSchema());
   if (isPgLogEnabled()) {
     console.log(
-      '[connection] SHOW_PG_PERFORMANCE_LOG enabled — SQL logged as [p N%, Mmsec] (busy % + query time; set SHOW_PG_PERFORMANCE_LOG=false to disable)'
+      '[connection] PM2_LOG_LEVEL DEBUG/TRACE — SQL logged as [p N%, Mmsec] (busy % + query time; set SHOW_PG_PERFORMANCE_LOG=false to disable)'
     );
     startPostgresBusySampler(currentPool);
   }

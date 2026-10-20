@@ -36,6 +36,7 @@ import LandscapeRecommendFloating from './LandscapeRecommendFloating';
 import MobileOrientationSimulatedViewport from './MobileOrientationSimulatedViewport';
 import VsinglesGuidedTourOverlay from 'views/dashboard/vsingles/VsinglesGuidedTourOverlay';
 import ProfilePhotoSetupRedirect from 'ui-component/ProfilePhotoSetupRedirect';
+import ProfilePhotoRealCheckDialog from 'ui-component/ProfilePhotoRealCheckDialog';
 import IdentificationVerificationSetupRedirect from 'ui-component/IdentificationVerificationSetupRedirect';
 import AdminImpersonationBanner from 'ui-component/AdminImpersonationBanner';
 import AdminImpersonationHeaderCenter from 'ui-component/AdminImpersonationHeaderCenter';
@@ -605,6 +606,7 @@ export default function MainLayout() {
       <IdentificationVerificationSetupRedirect />
       <MobilePostLoginChooserDialog />
       <DesktopOnlyAppsDialog />
+      <ProfilePhotoRealCheckDialog />
       <LegacyPasswordUpgradeDialog
         open={Boolean(user) && requiresPasswordUpgrade}
         onSubmit={upgradeLegacyPassword}

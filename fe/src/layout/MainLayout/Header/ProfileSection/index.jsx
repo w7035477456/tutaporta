@@ -78,6 +78,8 @@ import {
 import { formatLastFirstMiddleName } from 'utils/fullNameFormat';
 import api from 'api/axios';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
+import idCertifiedSeal from 'assets/images/idcertified.png';
+import { getIdInitializationCompleted } from 'utils/firstLoginOnboarding';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { fetchTutaMallBackupStatus, postTutaMallBackupApp, postTutaMallRestoreApp } from 'api/tutaMallUserBackupFe';
 import {
@@ -877,8 +879,7 @@ export default function ProfileSection({ clusterTight = false }) {
             overflow: 'visible',
             pl: '4px !important',
             pr: '8px !important',
-            position: 'relative',
-            zIndex: 2
+            position: 'relative'
           },
           // transition: 'var(--theme-primary-color) 0.2s ease, border-color 0.2s ease',
           '&:hover': {
@@ -932,6 +933,25 @@ export default function ProfileSection({ clusterTight = false }) {
           />
         }
         label={
+          <>
+          {getIdInitializationCompleted(user) === true ? (
+            <Box
+              component="img"
+              src={idCertifiedSeal}
+              alt="ID verified"
+              title="ID verified"
+              sx={{
+                position: 'absolute',
+                right: 'calc(100% - 4px)',
+                bottom: '-4px',
+                width: `calc(${HEADER_PROFILE_AVATAR_SIZE} * 0.5)`,
+                height: 'auto',
+                zIndex: 4,
+                pointerEvents: 'none',
+                filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))'
+              }}
+            />
+          ) : null}
           <Box
             component="span"
             sx={{
@@ -954,6 +974,7 @@ export default function ProfileSection({ clusterTight = false }) {
               }}
             />
           </Box>
+          </>
         }
         ref={anchorRef}
         aria-controls={open ? 'menu-list-grow' : undefined}
