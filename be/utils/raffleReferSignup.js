@@ -101,7 +101,8 @@ async function sendRaffleReferEmails({ referrer, referee, credit }) {
 
 /**
  * After a brand-new account is created: if its email has a pending Raffle Refer Code, link the new member
- * (singles.raffle_refer_by_code) and add 1 to the referrer's singles.raffle_refer_credit, then email both.
+ * (singles.raffle_refer_by_code), mark it ANYMEMBER-R (wins over ANYMEMBER-S when both codes were entered),
+ * and add 1 to the referrer's singles.raffle_refer_credit, then email both.
  * Runs once per new member; never throws (signup must not fail on this).
  */
 export async function processRaffleReferSignup({ newSinglesId, email }) {
@@ -125,7 +126,13 @@ export async function processRaffleReferSignup({ newSinglesId, email }) {
       return false;
     }
     const { rows: refereeRows } = await client.query(
-      `UPDATE ${S}.singles SET raffle_refer_by_code = $2
+      `UPDATE ${S}.singles
+          SET raffle_refer_by_code = $2,
+              member_category = CASE
+                WHEN member_category::text IN ('ANYMEMBER', 'ANYMEMBER-S')
+                  THEN 'ANYMEMBER-R'::${S}.member_category_enum
+                ELSE member_category
+              END
         WHERE singles_id = $1 AND raffle_refer_by_code IS NULL
         RETURNING singles_id, member_id, alias, email`,
       [singlesId, pending.raffle_refer_code]

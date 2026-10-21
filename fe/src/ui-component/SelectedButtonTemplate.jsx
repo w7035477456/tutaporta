@@ -27,7 +27,8 @@ export function selectedButtonTemplateSx({
   shrinkLabelToFit = false,
   shrinkLabelMaxFontSize,
   selectedLabelScale,
-  thickBlackBorder = false
+  thickBlackBorder = false,
+  transformOrigin
 } = {}) {
   return {
     ...baseButtonSx(SELECTED_BUTTON_TEMPLATE_BG, SELECTED_BUTTON_TEMPLATE_TEXT, SELECTED_BUTTON_TEMPLATE_BORDER, hoverScale, {
@@ -35,7 +36,8 @@ export function selectedButtonTemplateSx({
       sizeButtonToLabel,
       shrinkLabelToFit,
       shrinkLabelMaxFontSize,
-      thickBlackBorder
+      thickBlackBorder,
+      ...(transformOrigin ? { transformOrigin } : null)
     }),
     ...buttonTemplateSelectedLabelScaleSx(selectedLabelScale)
   };
@@ -53,6 +55,8 @@ export default function SelectedButtonTemplate({
   thickBlackBorder = false,
   /** Black box around label text — selected indicator (Desire). Opt out for plain CTAs. */
   labelTextBox = true,
+  /** Hover-scale anchor; default 'left center' (sidebar). Use 'center' for centered CTAs. */
+  transformOrigin,
   fullWidth = false,
   sx,
   children,
@@ -70,7 +74,8 @@ export default function SelectedButtonTemplate({
       shrinkLabelToFit: shrinkLabelToFit && !fitLabelOnResize && !singleLineLabel,
       shrinkLabelMaxFontSize,
       selectedLabelScale,
-      thickBlackBorder
+      thickBlackBorder,
+      transformOrigin
     });
     const extra = typeof sx === 'function' ? sx(theme) : sx || {};
     return {
@@ -105,6 +110,7 @@ SelectedButtonTemplate.propTypes = {
   selectedLabelScale: PropTypes.number,
   thickBlackBorder: PropTypes.bool,
   labelTextBox: PropTypes.bool,
+  transformOrigin: PropTypes.string,
   fullWidth: PropTypes.bool,
   sx: PropTypes.oneOfType([PropTypes.object, PropTypes.func]),
   children: PropTypes.node

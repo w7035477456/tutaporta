@@ -5,8 +5,17 @@ export const MEMBER_CATEGORY_VALUES = Object.freeze([
   'DEMOUSER',
   'PILOTUSER',
   'REGULARMEMBER',
-  'ANYMEMBER'
+  'ANYMEMBER',
+  'ANYMEMBER-R',
+  'ANYMEMBER-S'
 ]);
+
+/** Signed up with a Raffle Refer Code (R####). */
+export const ANYMEMBER_RAFFLE_REFER = 'ANYMEMBER-R';
+/** Signed up with a Signup Refer Code (A####, not A0000). */
+export const ANYMEMBER_SIGNUP_REFER = 'ANYMEMBER-S';
+/** Every category that behaves exactly like ANYMEMBER. */
+export const ANYMEMBER_CATEGORIES = Object.freeze(['ANYMEMBER', ANYMEMBER_RAFFLE_REFER, ANYMEMBER_SIGNUP_REFER]);
 
 /** Legacy PascalCase / mixed-case labels → canonical uppercase enum. */
 const MEMBER_CATEGORY_ALIASES = Object.freeze({
@@ -16,7 +25,9 @@ const MEMBER_CATEGORY_ALIASES = Object.freeze({
   pilotuser: 'PILOTUSER',
   regularmember: 'REGULARMEMBER',
   anymember: 'ANYMEMBER',
-  allmember: 'ANYMEMBER'
+  allmember: 'ANYMEMBER',
+  'anymember-r': 'ANYMEMBER-R',
+  'anymember-s': 'ANYMEMBER-S'
 });
 
 /**
@@ -66,8 +77,9 @@ export function isRegularMemberCategory(raw) {
   return normalizeMemberCategoryEnum(raw) === 'REGULARMEMBER';
 }
 
+/** ANYMEMBER, ANYMEMBER-R or ANYMEMBER-S. */
 export function isAnyMemberCategory(raw) {
-  return normalizeMemberCategoryEnum(raw) === 'ANYMEMBER';
+  return ANYMEMBER_CATEGORIES.includes(normalizeMemberCategoryEnum(raw));
 }
 
 /** DemoUser / RegularMember: skip mandatory setup / IDV nav locks. */

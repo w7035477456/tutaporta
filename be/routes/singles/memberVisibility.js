@@ -1,4 +1,4 @@
-import { normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
+import { ANYMEMBER_CATEGORIES, normalizeMemberCategoryEnum } from '../../utils/memberCategory.js';
 import { buildTutaDatesOptedInWhereSql } from '../../utils/optinoutBitmap.js';
 
 function parseAllowedMemberCategories() {
@@ -25,7 +25,7 @@ export function buildSinglesActiveStatusWhereSql(alias = 's') {
 }
 
 /** Categories always eligible when status=active (CreateNewMember.sh). */
-const ALWAYS_VISIBLE_MEMBER_CATEGORIES = ['REGULARMEMBER', 'ANYMEMBER'];
+const ALWAYS_VISIBLE_MEMBER_CATEGORIES = ['REGULARMEMBER', ...ANYMEMBER_CATEGORIES];
 
 export function buildSinglesVisibilityWhereSql(alias = 's', paramIndex = 1) {
   const activeStatusSql = buildSinglesActiveStatusWhereSql(alias);

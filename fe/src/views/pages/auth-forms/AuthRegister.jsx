@@ -109,6 +109,9 @@ const registerConsentCheckboxSx = {
   }
 };
 
+/** Sign Up background — overrides the selected-button theme color on this button only. */
+const SIGN_UP_BUTTON_GREEN = '#60C447';
+
 /** I agree copy — always black on #FFF2CD regardless of theme */
 const registerConsentCopyBoxSx = {
   bgcolor: '#FFF2CD',
@@ -463,6 +466,25 @@ export default function AuthRegister() {
         disabled={isSubmitting}
       />
 
+      {error && (
+        <Typography variant="body2" color="error" sx={{ mt: 1, mb: 1 }}>
+          {error}
+        </Typography>
+      )}
+
+      <Box sx={{ mt: 2 }}>
+        <SelectedButtonTemplate
+          fullWidth
+          fitLabelWidth={false}
+          transformOrigin="center"
+          type="submit"
+          disabled={isSubmitting || !isSignUpEnabled}
+          sx={{ '--theme-secondary-color': SIGN_UP_BUTTON_GREEN }}
+        >
+          {isSubmitting ? (googleBound ? 'Creating account…' : 'Sending...') : 'Sign Up'}
+        </SelectedButtonTemplate>
+      </Box>
+
       <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 2, mb: 1.5 }}>
         <Checkbox
           checked={checked}
@@ -498,23 +520,6 @@ export default function AuthRegister() {
             . By checking this box and providing my number, I also give explicit consent to receive automated one-time identity verification codes and account security alerts from TutaMall.com and TutaDates. Consent is not a condition of purchase. Message and data rates may apply. Message frequency varies. Reply HELP for help or STOP to cancel.
           </Typography>
         </Box>
-      </Box>
-
-      {error && (
-        <Typography variant="body2" color="error" sx={{ mt: 1, mb: 1 }}>
-          {error}
-        </Typography>
-      )}
-
-      <Box sx={{ mt: 2 }}>
-        <SelectedButtonTemplate
-          fullWidth
-          fitLabelWidth={false}
-          type="submit"
-          disabled={isSubmitting || !isSignUpEnabled}
-        >
-          {isSubmitting ? (googleBound ? 'Creating account…' : 'Sending...') : 'Sign Up'}
-        </SelectedButtonTemplate>
       </Box>
 
       <SignupDownPopup message={signupDownMessage} onClose={() => setSignupDownMessage('')} />

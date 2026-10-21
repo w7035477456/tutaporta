@@ -14,6 +14,7 @@ import Box from '@mui/material/Box';
 // project imports
 import AnimateButton from 'ui-component/extended/AnimateButton';
 import GreenButton from 'ui-component/GreenButton';
+import { greenButtonSx } from 'config/greenButton';
 import SmsVerificationDigitRow from 'ui-component/SmsVerificationDigitRow';
 import CustomFormControl from 'ui-component/extended/Form/CustomFormControl';
 import { verifyRegistrationLink } from 'api/verifyRegistrationLinkFe';
@@ -25,7 +26,7 @@ import { bypassSignupSmsVerification } from 'api/bypassSignupSmsVerificationFe';
 import { completeGoogleSignup } from 'api/googleSignupFe';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import enterPasswordImg from 'assets/images/enterPassword.png';
-import emailCodeVerifiedImg from 'assets/images/emailCodeVerified.png';
+import enterEmailImg from 'assets/images/enterEmail.png';
 import {
   SIGNUP_CREATE_PASSWORD_PAYLOAD_KEY,
   SIGNUP_REGISTER_PHONE_KEY,
@@ -64,6 +65,69 @@ const createPasswordFieldInputPaddingSx = {
   '& .MuiInputBase-input': {
     padding: '38.5px 14px 3.5px !important'
   }
+};
+
+const SIGNUP_ACTION_GREEN = '#60C447';
+
+/** Enabled Send SMS Code / Verify SMS; GreenButton's `&.Mui-disabled` grey still wins when disabled. */
+const signupActionGreenButtonSx = (() => {
+  const baseHover = greenButtonSx()['@media (hover: hover)'];
+  return {
+    bgcolor: `${SIGNUP_ACTION_GREEN} !important`,
+    '@media (hover: hover)': {
+      ...baseHover,
+      '&:hover:not(.Mui-disabled)': {
+        ...baseHover['&:hover:not(.Mui-disabled)'],
+        bgcolor: `${SIGNUP_ACTION_GREEN} !important`
+      }
+    }
+  };
+})();
+
+/** Verified email — one white outlined box (notched "Email Address" legend) with email, PASSED line, @ icon. */
+const verifiedEmailBoxSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1.5,
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  m: 0,
+  mb: 2,
+  px: 1.75,
+  pt: 0.5,
+  pb: 1.5,
+  border: '1px solid var(--theme-white-color, #fff)',
+  borderRadius: 1
+};
+
+const verifiedEmailLegendSx = {
+  px: 0.5,
+  ml: -0.5,
+  fontSize: '0.8rem',
+  color: 'var(--theme-white-color, #fff)'
+};
+
+const verifiedEmailTextSx = {
+  color: 'var(--theme-white-color, #fff)',
+  fontSize: authEnvButtonFontSize,
+  lineHeight: 1.3,
+  overflowWrap: 'anywhere'
+};
+
+const verifiedEmailPassedTextSx = {
+  color: SIGNUP_ACTION_GREEN,
+  fontWeight: 800,
+  fontSize: authEnvButtonFontSize,
+  lineHeight: 1.3,
+  mt: 0.5
+};
+
+const verifiedEmailIconSx = {
+  flex: '0 0 auto',
+  width: { xs: 48, sm: 56 },
+  height: 'auto',
+  objectFit: 'contain'
 };
 
 /** Password / confirm password — typed value + placeholder use inverse-daynight on dark themes */
@@ -111,12 +175,15 @@ const sendSmsCooldownButtonSx = {
   '&.Mui-disabled': { bgcolor: '#e0e0e0', color: 'text.primary', opacity: 0.9 }
 };
 
-/** Centered above the 6-digit inputs; smaller than body copy so it stays on one line. */
+/**
+ * Centered above the 6-digit inputs; one line that always fits. Font tracks the row width
+ * (parent sets containerType: inline-size) — the !important beats authFormContentSx's body2 size.
+ */
 const smsCodeInstructionTextSx = (active) => ({
   mb: 1,
   textAlign: 'center',
   fontWeight: 600,
-  fontSize: authEnvTextFontSize,
+  fontSize: 'min(1rem, 2.7cqi) !important',
   lineHeight: 1.15,
   whiteSpace: 'nowrap',
   width: '100%',
@@ -173,6 +240,7 @@ export default function AuthCreatePassword() {
   const [smsSent, setSmsSent] = useState(false);
   const [isSendingSms, setIsSendingSms] = useState(false);
   const [isVerifyingSms, setIsVerifyingSms] = useState(false);
+  const [smsCodeIncorrect, setSmsCodeIncorrect] = useState(false);
   const [sendSmsCooldown, setSendSmsCooldown] = useState(0);
   const [referralStatus, setReferralStatus] = useState('absent');
   const [referrerAlias, setReferrerAlias] = useState('');
@@ -517,6 +585,7 @@ export default function AuthCreatePassword() {
       const next = Array.from({ length: 6 }, (_, j) => digits[j] || '');
       setCodeChars(next);
       setError('');
+      setSmsCodeIncorrect(false);
       const focusIdx = Math.min(Math.max(digits.length - 1, 0), 5);
       requestAnimationFrame(() => verificationSlotRefs.current[focusIdx]?.focus());
       return;
@@ -528,6 +597,7 @@ export default function AuthCreatePassword() {
       return n;
     });
     setError('');
+    setSmsCodeIncorrect(false);
     if (digit && index < 5) {
       requestAnimationFrame(() => verificationSlotRefs.current[index + 1]?.focus());
     }
@@ -560,18 +630,21 @@ export default function AuthCreatePassword() {
     const next = Array.from({ length: 6 }, (_, j) => text[j] || '');
     setCodeChars(next);
     setError('');
+    setSmsCodeIncorrect(false);
     requestAnimationFrame(() => verificationSlotRefs.current[Math.min(text.length, 5)]?.focus());
   };
 
   const handleClearVerificationCode = () => {
     setCodeChars(['', '', '', '', '', '']);
     setError('');
+    setSmsCodeIncorrect(false);
     requestAnimationFrame(() => verificationSlotRefs.current[0]?.focus());
   };
 
   const handleSendSmsCode = async () => {
     if (sendSmsCodeButtonDisabled) return;
     setError('');
+    setSmsCodeIncorrect(false);
     const codeTrimmed = registrationCode.trim();
     if (!isGoogleSignup && codeTrimmed.length !== 6) {
       setError('Please enter the 6-character code from your registration email.');
@@ -605,6 +678,7 @@ export default function AuthCreatePassword() {
     event.preventDefault();
     if (!isVerifySmsEnabled) return;
     setError('');
+    setSmsCodeIncorrect(false);
     setIsVerifyingSms(true);
     try {
       const data = await verifyPhone(emailTrimmed, displayPhone, verificationCode, {
@@ -639,10 +713,13 @@ export default function AuthCreatePassword() {
       clearStoredSignupReferralCode();
       navigate(`/pages/phoneVerificationSuccess?email=${encodeURIComponent(emailTrimmed)}`);
     } catch (err) {
+      const message = err?.response?.data?.error || err.message || '';
+      if (/^Invalid verification code/i.test(message)) {
+        setSmsCodeIncorrect(true);
+        return;
+      }
       setError(
-        err?.response?.data?.error ||
-          err.message ||
-          'The phone verification code is incorrect. Please enter again or register phone number again.'
+        message || 'The phone verification code is incorrect. Please enter again or register phone number again.'
       );
     } finally {
       setIsVerifyingSms(false);
@@ -717,33 +794,6 @@ export default function AuthCreatePassword() {
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center'
-  };
-
-  /** Pill under verified mail icon (right column) when link verified */
-  const emailVerificationPassedStripSx = {
-    bgcolor: 'success.main',
-    color: 'var(--theme-white-color)',
-    py: 0.75,
-    px: 1.5,
-    borderRadius: 10,
-    textAlign: 'center',
-    width: '100%',
-    boxSizing: 'border-box'
-  };
-
-  /** `emailCodeVerified.png` — same 30% shrink as other auth mail icons */
-  const emailCodeVerifiedPicSx = {
-    width: { xs: 84, sm: 98, md: 112 },
-    maxWidth: '100%',
-    height: 'auto',
-    objectFit: 'contain'
-  };
-
-  const outlineNoneSx = {
-    '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
-    '&:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
-    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
-    '&.Mui-error .MuiOutlinedInput-notchedOutline': { border: 'none' }
   };
 
   const smsVerificationPassedStripSx = {
@@ -847,71 +897,19 @@ export default function AuthCreatePassword() {
       )}
 
       {emailCodeVerified ? (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: { xs: 'stretch', sm: 'flex-start' },
-            gap: { xs: 2, sm: 3 },
-            width: '100%',
-            mb: 2
-          }}
-        >
-          <Stack sx={{ flex: '1 1 auto', minWidth: 0, width: '100%' }}>
-            <CustomFormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel htmlFor="outlined-adornment-email-create" sx={{ color: 'var(--theme-primary-color)', '&.Mui-focused': { color: 'var(--theme-primary-color)' }, '&.MuiInputLabel-shrink': { color: 'var(--theme-primary-color)' } }}>
-                Email Address
-              </InputLabel>
-              <OutlinedInput
-                id="outlined-adornment-email-create"
-                type="email"
-                value={email}
-                name="email"
-                placeholder="you@example.com"
-                disabled
-                autoComplete="off"
-                inputProps={{ readOnly: true, autoComplete: 'off' }}
-                required
-                sx={{ ...outlineNoneSx, ...createPasswordFieldInputPaddingSx }}
-              />
-            </CustomFormControl>
-
-            <CustomFormControl fullWidth sx={{ mt: 3, mb: 2 }} error={isCodeError}>
-              <InputLabel htmlFor="outlined-adornment-code" sx={{ color: 'var(--theme-primary-color)', '&.Mui-focused': { color: 'var(--theme-primary-color)' }, '&.MuiInputLabel-shrink': { color: 'var(--theme-primary-color)' } }}>
-                Registration Code
-              </InputLabel>
-              <OutlinedInput
-                id="outlined-adornment-code"
-                type="text"
-                value={registrationCode}
-                onChange={handleCodeChange}
-                name="registrationCode"
-                placeholder="e.g. AB12CD"
-                disabled={registrationCodeLocked}
-                inputProps={{ maxLength: 6, style: { textTransform: 'uppercase', letterSpacing: 2 } }}
-                required
-                sx={{ ...outlineNoneSx, ...createPasswordFieldInputPaddingSx }}
-              />
-            </CustomFormControl>
-          </Stack>
-
-          <Stack
-            sx={{
-              flex: '0 0 auto',
-              alignItems: 'center',
-              gap: 1.25,
-              alignSelf: { xs: 'flex-end', sm: 'flex-start' },
-              ml: { sm: 'auto' },
-              maxWidth: { xs: 'min(100%, 200px)', sm: 'none' }
-            }}
-          >
-            <Box component="img" src={emailCodeVerifiedImg} alt="Email verified" sx={emailCodeVerifiedPicSx} />
-            <Box sx={emailVerificationPassedStripSx}>
-              <Typography variant="body2" sx={{ color: 'var(--theme-white-color)', fontWeight: 700, letterSpacing: 0.02 }}>
-                Email verification PASSED
-              </Typography>
-            </Box>
-          </Stack>
+        <Box component="fieldset" sx={verifiedEmailBoxSx}>
+          <Box component="legend" sx={verifiedEmailLegendSx}>
+            Email Address
+          </Box>
+          <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+            <Typography component="div" sx={verifiedEmailTextSx}>
+              {email}
+            </Typography>
+            <Typography component="div" sx={verifiedEmailPassedTextSx}>
+              Email Verification passed
+            </Typography>
+          </Box>
+          <Box component="img" src={enterEmailImg} alt="" sx={verifiedEmailIconSx} />
         </Box>
       ) : (
         <>
@@ -1028,6 +1026,7 @@ export default function AuthCreatePassword() {
                   void handleSendSmsCode();
                 }}
                 disabled={sendSmsCodeButtonDisabled}
+                sx={signupActionGreenButtonSx}
                 aria-busy={isSendingSms}
               >
                 {isSendingSms
@@ -1045,7 +1044,7 @@ export default function AuthCreatePassword() {
             </Typography>
           ) : null}
 
-          <Box sx={{ mt: 2, width: '100%', minWidth: 0 }}>
+          <Box sx={{ mt: 2, width: '100%', minWidth: 0, containerType: 'inline-size' }}>
             <Typography
               variant="body2"
               component="p"
@@ -1096,7 +1095,7 @@ export default function AuthCreatePassword() {
               <SmsVerificationDigitRow
                 codeChars={codeChars}
                 enabled={isSmsCodeEntryEnabled}
-                hasError={!!error}
+                hasError={!!error || smsCodeIncorrect}
                 slotRefs={verificationSlotRefs}
                 onSlotChange={handleVerificationSlotChange}
                 onSlotKeyDown={handleVerificationSlotKeyDown}
@@ -1111,10 +1110,27 @@ export default function AuthCreatePassword() {
                   void handleVerifySms(e);
                 }}
                 disabled={isVerifyingSms || !isVerifySmsEnabled}
+                sx={signupActionGreenButtonSx}
               >
                 {isVerifyingSms ? 'Verifying...' : 'Verify SMS'}
               </GreenButton>
             </Box>
+
+            {smsCodeIncorrect ? (
+              <Typography
+                role="alert"
+                sx={{
+                  color: '#FF1E1E !important',
+                  WebkitTextFillColor: '#FF1E1E',
+                  fontWeight: 400,
+                  textAlign: 'center',
+                  mt: 1,
+                  fontSize: authEnvTextFontSize
+                }}
+              >
+                Incorrect SMS Code. Please try again.
+              </Typography>
+            ) : null}
           </Box>
         </>
       )}

@@ -1,6 +1,7 @@
 import { DEFAULT_NEW_USER_THEME } from '../lib/defaultNewUserPreferences.js';
 import { SQL_NEW_MY_REFER_CODE } from './signupReferCode.js';
-import { resolveReferByCode } from './referByCode.js';
+import { isRewardEligibleReferByCode, resolveReferByCode } from './referByCode.js';
+import { ANYMEMBER_SIGNUP_REFER, normalizeMemberCategoryEnum } from './memberCategory.js';
 import { allocateMemberIdForCategory, allocateNextSinglesId } from './allocateMemberId.js';
 import { recordAuditRegistrationNew } from './insertAuditRegistration.js';
 import { resolveSignupMemberCategory } from './signupMemberCategory.js';
@@ -26,6 +27,18 @@ export const SQL_SIGNUP_STATUS_FOR_EXISTING_ROW = `status = CASE
                END,
                optinout_bitmap = ${OPTINOUT_DEFAULT_BITMAP}`;
 
+/** Public signup with a Signup Refer Code owned by an existing member → ANYMEMBER-S. */
+async function applySignupReferCategory(client, category, referByCode) {
+  if (normalizeMemberCategoryEnum(category) !== 'ANYMEMBER' || !isRewardEligibleReferByCode(referByCode)) {
+    return category;
+  }
+  const { rows } = await client.query(
+    'SELECT 1 FROM outdateddbsnapshotoct2024.singles WHERE my_refer_code = $1 LIMIT 1',
+    [referByCode]
+  );
+  return rows.length ? ANYMEMBER_SIGNUP_REFER : category;
+}
+
 /**
  * Insert a new singles row after phone/password signup (status = new until the ID scan sets active / under18).
  * emailNorm should be lowercase (see normalizeEmailForDb); stored as text on singles.email.
@@ -34,10 +47,14 @@ export const SQL_SIGNUP_STATUS_FOR_EXISTING_ROW = `status = CASE
  * @returns {Promise<{ singlesId: number, memberId: number }>}
  */
 export async function insertNewSinglesAccount(client, { emailNorm, passwordHash, formattedPhone, referByCode, memberCategory }) {
-  const resolvedCategory = memberCategory ?? resolveSignupMemberCategory(emailNorm);
+  const resolvedReferByCode = resolveReferByCode(referByCode);
+  const resolvedCategory = await applySignupReferCategory(
+    client,
+    memberCategory ?? resolveSignupMemberCategory(emailNorm),
+    resolvedReferByCode
+  );
   const newSinglesId = await allocateNextSinglesId(client);
   const memberId = await allocateMemberIdForCategory(client, { memberCategory: resolvedCategory, singlesId: newSinglesId });
-  const resolvedReferByCode = resolveReferByCode(referByCode);
   const phoneForInsert = await resolvePhoneForNewSinglesAccount(client, formattedPhone, resolvedCategory);
   let myReferCode = '';
 

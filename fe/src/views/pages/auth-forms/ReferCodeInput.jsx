@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography';
 
 const DIGIT_COUNT = 4;
 const CLEAR_GREEN = '#5cc84a';
+const CLEAR_YELLOW = '#FFD600';
 
 const digitBoxSx = {
   width: { xs: 38, sm: 42 },
@@ -124,12 +125,12 @@ export default function ReferCodeInput({ label, prefix, value, onChange, disable
             height: { xs: 38, sm: 40 },
             border: 0,
             borderRadius: 1.5,
-            bgcolor: CLEAR_GREEN,
-            color: '#fff',
+            bgcolor: CLEAR_YELLOW,
+            color: '#000',
             fontSize: '1.15rem',
             fontWeight: 600,
             cursor: 'pointer',
-            '&:disabled': { opacity: 0.6, cursor: 'default' }
+            '&:disabled': { color: '#757575', cursor: 'default' }
           }}
         >
           Clear

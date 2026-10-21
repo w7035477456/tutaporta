@@ -112,7 +112,20 @@ const fieldWithRightImagePicSx = {
 /** CustomFormControl input padding + 8px below label */
 const phoneFieldInputPaddingSx = {
   '& .MuiInputBase-input': {
-    padding: '38.5px 14px 3.5px !important'
+    padding: '38.5px 14px 3.5px !important',
+    color: '#FFFF00',
+    WebkitTextFillColor: '#FFFF00',
+    caretColor: '#FFFF00',
+    '&::placeholder': {
+      color: '#9e9e9e',
+      WebkitTextFillColor: '#9e9e9e'
+    }
+  }
+};
+
+const phoneFieldLabelAboveInputSx = {
+  '& > label, & > label[data-shrink="false"]': {
+    top: 0
   }
 };
 
@@ -455,7 +468,7 @@ export default function AuthPhoneVerification() {
       </Typography>
       <Box sx={fieldWithRightImageRowSx}>
         <Box sx={fieldWithRightImageInputColSx}>
-          <CustomFormControl fullWidth>
+          <CustomFormControl fullWidth sx={phoneFieldLabelAboveInputSx}>
             <InputLabel htmlFor="outlined-adornment-phone-number">Phone Number</InputLabel>
             <OutlinedInput
               id="outlined-adornment-phone-number"

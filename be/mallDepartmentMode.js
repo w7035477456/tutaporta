@@ -1,4 +1,4 @@
-import { normalizeMemberCategoryEnum } from './utils/memberCategory.js';
+import { isAnyMemberCategory, normalizeMemberCategoryEnum } from './utils/memberCategory.js';
 
 /**
  * Mall tile visibility from ~/.ssh/be/.env using member-category keys
@@ -10,7 +10,7 @@ import { normalizeMemberCategoryEnum } from './utils/memberCategory.js';
  * - PILOTUSER
  * - ADMIN
  * - REGULARMEMBER
- * - ANYMEMBER
+ * - ANYMEMBER (also used for ANYMEMBER-R / ANYMEMBER-S)
  *
  * Values (case-insensitive):
  * - show_all
@@ -44,8 +44,9 @@ function normalizeMode(raw) {
 /** Read uppercase member category key from env (legacy PascalCase keys still accepted). */
 function envForMemberCategory(memberCategory) {
   const normalized = normalizeMemberCategoryEnum(memberCategory);
-  const category = normalized ?? String(memberCategory ?? '').trim().toUpperCase();
+  let category = normalized ?? String(memberCategory ?? '').trim().toUpperCase();
   if (!category) return '';
+  if (isAnyMemberCategory(category)) category = 'ANYMEMBER';
   return process.env[category] ?? '';
 }
 

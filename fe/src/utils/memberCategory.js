@@ -5,8 +5,13 @@ export const MEMBER_CATEGORY_VALUES = Object.freeze([
   'DEMOUSER',
   'PILOTUSER',
   'REGULARMEMBER',
-  'ANYMEMBER'
+  'ANYMEMBER',
+  'ANYMEMBER-R',
+  'ANYMEMBER-S'
 ]);
+
+/** Every category that behaves exactly like ANYMEMBER (-R raffle refer, -S signup refer). */
+export const ANYMEMBER_CATEGORIES = Object.freeze(['ANYMEMBER', 'ANYMEMBER-R', 'ANYMEMBER-S']);
 
 /** Legacy PascalCase / mixed-case labels → canonical uppercase enum. */
 const MEMBER_CATEGORY_ALIASES = Object.freeze({
@@ -16,7 +21,9 @@ const MEMBER_CATEGORY_ALIASES = Object.freeze({
   pilotuser: 'PILOTUSER',
   regularmember: 'REGULARMEMBER',
   anymember: 'ANYMEMBER',
-  allmember: 'ANYMEMBER'
+  allmember: 'ANYMEMBER',
+  'anymember-r': 'ANYMEMBER-R',
+  'anymember-s': 'ANYMEMBER-S'
 });
 
 /**
@@ -68,6 +75,10 @@ export function isDemoUserCategory(raw) {
 
 export function isRegularMemberCategory(raw) {
   return normalizeMemberCategory(raw) === 'REGULARMEMBER';
+}
+
+export function isAnyMemberCategory(raw) {
+  return ANYMEMBER_CATEGORIES.includes(normalizeMemberCategory(raw));
 }
 
 /** DemoUser / RegularMember: full menus; skip mandatory profile-photo setup gate. */
