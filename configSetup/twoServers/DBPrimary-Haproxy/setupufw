@@ -1,0 +1,46 @@
+#!/bin/bash
+# xbox1 192.168.202.201 — HAProxy + Nginx + Postgres PRIMARY.
+# Install: sudo install -m 755 setupufw /usr/local/bin/setupufw && sudo setupufw
+# Resets all UFW rules. Run from the Mac (192.168.44.104) SSH session, or locally on the console.
+set -euo pipefail
+[[ $EUID -eq 0 ]] || { echo "Run with sudo"; exit 1; }
+
+MAC=192.168.44.104
+WEB1=192.168.202.203   # xbox3 web server + replica
+
+echo "Starting UFW Configuration for xbox1 (HAProxy + Postgres Primary)..."
+
+# 1. Reset & Defaults (outgoing open: HAProxy → xbox3:40000 needs no inbound rule)
+ufw --force reset
+ufw default deny incoming
+ufw default allow outgoing
+
+# 2. Keep IPv6 on so (v6) rules apply too (Cloudflare can arrive over IPv6)
+sed -i 's/^IPV6=no/IPV6=yes/' /etc/default/ufw
+
+# 3. SSH Lockdown (Port 59221 from trusted Mac)
+ufw allow from $MAC to any port 59221 proto tcp
+ufw deny 22/tcp
+echo "SSH secured on port 59221 for trusted IP."
+
+# 4. Loopback (HAProxy fe_web 127.0.0.1:50000, Nginx gate :41000, local Postgres)
+ufw allow in on lo
+ufw allow out on lo
+
+# 5. HAProxy — public web traffic (Cloudflare allowlist is enforced inside haproxy.cfg)
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# HAProxy stats UI from the Mac only
+ufw allow from $MAC to any port 9900 proto tcp
+
+# 6. Postgres Primary :50010
+#    xbox3: BE reads/writes (test_user1) + streaming replication (replicator)
+ufw allow from $WEB1 to any port 50010 proto tcp
+#    Mac DBeaver
+ufw allow from $MAC to any port 50010 proto tcp
+
+# 7. Enable
+ufw --force enable
+ufw status verbose
+echo "UFW secured and active for xbox1 (HAProxy + Postgres Primary)."

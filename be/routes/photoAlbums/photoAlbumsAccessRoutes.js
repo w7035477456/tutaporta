@@ -175,7 +175,8 @@ export async function postPhotoAlbumsAccessFail(req, res) {
         ? PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR
         : PHOTO_ALBUMS_WRONG_PASSWORD_ERROR;
     const status = await photoAlbumsAccessFail(singlesId, readStorageType(req), { wrongPasswordError });
-    const httpStatus = status.vaultFormatted || status.needsClientFormat ? 403 : status.locked ? 429 : 401;
+    const httpStatus =
+      status.tutaPhotosLocked || status.vaultFormatted || status.needsClientFormat ? 403 : status.locked ? 429 : 401;
     return res.status(httpStatus).json(status);
   } catch (err) {
     console.error('[postPhotoAlbumsAccessFail]', err?.message || err);

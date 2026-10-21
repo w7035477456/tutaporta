@@ -6,6 +6,7 @@ import { storeIdleLogoutNotice, storeSessionInvalidNotice, storeSessionSupersede
 import { forceAuthLoginRedirect, shouldForceLoginRedirect } from 'utils/forceAuthLoginRedirect';
 import { requestPhotoAlbumsUsageRefresh } from 'utils/photoAlbumsUsageRefreshGate';
 import { ID_INITIALIZATION_REQUIRED_CODE, notifyIdInitializationRequired } from 'utils/idInitializationRequired';
+import { isServerDownError, markServerDownError } from 'utils/serverDownError';
 
 function shouldRefreshPhotoAlbumsUsageAfterRequest(url) {
   const s = String(url || '');
@@ -128,6 +129,9 @@ api.interceptors.response.use(
     const url = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
     if (shouldRefreshPhotoAlbumsUsageAfterRequest(url)) {
       requestPhotoAlbumsUsageRefresh();
+    }
+    if (isServerDownError(error)) {
+      return Promise.reject(markServerDownError(error));
     }
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       if (handleAuthFailureRedirect(error)) {

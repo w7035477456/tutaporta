@@ -2,11 +2,11 @@ import pool from '../db/connection.js';
 import { getDBSchema } from '../config/envConfig.js';
 import { invalidateAuthUserCache } from './authUserLookupCache.js';
 
-export const TUTANOTES_LOCK_WARNING_SUFFIX =
-  'Five consecutive fails will lock TutaNotes, and you must contact tech support after that.';
+/** Completes "… will ___." in failAttemptWarning(). */
+export const TUTANOTES_LOCK_CONSEQUENCE = 'lock TutaNotes, and you must contact tech support after that';
 
 export const TUTANOTES_LOCKED_MESSAGE =
-  'TutaNotes is locked after five failed Encrypt Password attempts. Please contact tech support.';
+  'TutaNotes is locked after six failed Encrypt Password attempts in a row. Please contact tech support.';
 
 function schema() {
   return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');

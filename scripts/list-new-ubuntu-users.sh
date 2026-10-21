@@ -1,7 +1,7 @@
 #!/bin/bash
 # List singles users that exist on Ubuntu but not Mac (and vice versa).
 #
-# Uses the same SSH as Mac f2 / isdbsame (port 59221 + corruptedKey_march2024).
+# Uses the same SSH as Mac f2 / isdbsame (port 59221 + ~/.ssh/xbox2.pem).
 #
 #   listNewUbuntuUsers
 #   listNewUbuntuUsers --verbose
@@ -27,7 +27,7 @@ list-new-ubuntu-users.sh [--ubuntu-host user@host] [--verbose]
 Compares outdateddbsnapshotoct2024.singles on Mac vs Ubuntu (by email).
 Prints users that exist on only one side.
 
-SSH defaults (same as f2 / isdbsame): port 59221, IdentitiesOnly, corruptedKey_march2024.
+SSH defaults (same as f2 / isdbsame): port 59221, IdentitiesOnly, ~/.ssh/xbox2.pem.
 Override: COMPARE_SCHEMA_SSH_BIN, DEPLOY_SSH_KEY, DEPLOY_SSH_PORT (see deploy-ssh-mac.sh).
 
 Environment:

@@ -27,7 +27,9 @@ import { loadVideosBySinglesIds, mapSinglesLookupVideos } from '../../utils/load
 import { RECORD4SUPPORT_FILE_PREFIX } from '../../utils/saveRecord4SupportVideo.js';
 import { ensureDemoRegularInitialSetupDone } from '../../utils/ensureDemoRegularInitialSetupDone.js';
 import { clearTutaNotesLock } from '../../utils/tutaNotesLock.js';
+import { clearTutaPhotosLock } from '../../utils/tutaPhotosLock.js';
 import { clearVaultAccessFailStatus } from '../../utils/recordVaultAccessFailGuard.js';
+import { clearVaultAccessFailStatus as clearPhotoAlbumsAccessFailStatus } from '../../utils/photoAlbumsAccessFailGuard.js';
 import { invalidateAuthUserCache } from '../../utils/authUserLookupCache.js';
 
 const SINGLES_LOOKUP_WILDCARD_LIMIT = 500;
@@ -53,6 +55,7 @@ const SINGLES_LOOKUP_SELECT = `SELECT s.singles_id,
             s.alias,
             s.password_attempt_count,
             s.lock_tuta_notes,
+            s.lock_tuta_photos,
             s.my_refer_code,
             s.refer_by_code,
             s.profile_image_fk,
@@ -184,6 +187,7 @@ function mapSinglesLookupRow(row, videosBySinglesId = new Map()) {
         ? Number(row.password_attempt_count)
         : 0,
     lockTutaNotes: Boolean(row.lock_tuta_notes),
+    lockTutaPhotos: Boolean(row.lock_tuta_photos),
     myReferCode: String(row.my_refer_code ?? '').trim(),
     referByCode: String(row.refer_by_code ?? '').trim(),
     referBySinglesId:
@@ -493,7 +497,7 @@ export async function postAdminResetPasswordAttemptCount(req, res) {
 
 /**
  * POST /api/admin/singles/clear-lock-tuta-notes
- * Body: { singlesId } — admin clears TutaNotes lock after 5 failed Encrypt Password attempts.
+ * Body: { singlesId } — admin clears TutaNotes lock after 6 failed Encrypt Password attempts in a row.
  */
 export async function postAdminClearLockTutaNotes(req, res) {
   const singlesId = parseSinglesIdInput(req.body?.singlesId ?? req.body?.singles_id);
@@ -516,6 +520,34 @@ export async function postAdminClearLockTutaNotes(req, res) {
   } catch (err) {
     console.error('[postAdminClearLockTutaNotes]', err?.message ?? err);
     return res.status(500).json({ error: err?.message || 'Failed to clear TutaNotes lock.' });
+  }
+}
+
+/**
+ * POST /api/admin/singles/clear-lock-tuta-photos
+ * Body: { singlesId } — admin clears TutaPhotos lock after 6 failed Encrypt Password attempts in a row.
+ */
+export async function postAdminClearLockTutaPhotos(req, res) {
+  const singlesId = parseSinglesIdInput(req.body?.singlesId ?? req.body?.singles_id);
+  if (!singlesId) {
+    return res.status(400).json({ error: 'singlesId is required.' });
+  }
+  if (!(await allowSinglesMutationForId(res, singlesId))) {
+    return;
+  }
+
+  try {
+    const cleared = await clearTutaPhotosLock(singlesId);
+    await clearPhotoAlbumsAccessFailStatus(singlesId, 'onedrive');
+    await clearPhotoAlbumsAccessFailStatus(singlesId, 'usb');
+    return res.json({
+      success: true,
+      singlesId: cleared.singlesId,
+      lockTutaPhotos: cleared.lockTutaPhotos
+    });
+  } catch (err) {
+    console.error('[postAdminClearLockTutaPhotos]', err?.message ?? err);
+    return res.status(500).json({ error: err?.message || 'Failed to clear TutaPhotos lock.' });
   }
 }
 

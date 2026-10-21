@@ -1,0 +1,19 @@
+xbox3 backend env: /home/lawsen0/.ssh/be/.env   (copy it from xbox2, then change ONLY these keys)
+Secrets stay in that file — never paste values into this repo.
+
+DB_HOST=192.168.202.201
+    The BE has a single DB pool (be/db/connection.js) used for reads AND writes,
+    so it must point at the Primary on xbox1. The local replica is a hot standby
+    (read-only copy / failover) until the BE gets a separate read pool.
+DB_PORT=50010
+    unchanged
+REDIS_URL=redis://127.0.0.1:6379
+    Redis runs on xbox3 next to the BE (install.sh). If REDIS_HOST is set, use 127.0.0.1.
+
+Unchanged (same public hostname, FE+BE same origin behind HAProxy):
+    PUBLIC_APP_URL, FRONTEND_PUBLIC_URL, ALLOWED_ORIGINS, EMAIL_LINK_BASE_URL,
+    REGISTRATION_EMAIL_BASE_URL, PORT=40000 (BE listens on all interfaces, so HAProxy on xbox1 can reach it), DB_NAME, DB_SCHEMA, DB_USER, DB_PASSWORD.
+
+fe/.env (/home/lawsen0/code/main/fe/.env): copy from xbox2 unchanged.
+
+After editing: pm2 restart tutamallPM2Process

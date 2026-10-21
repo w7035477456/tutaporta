@@ -451,6 +451,7 @@ import {
   postAdminCycleSinglesStatus,
   postAdminResetPasswordAttemptCount,
   postAdminClearLockTutaNotes,
+  postAdminClearLockTutaPhotos,
   postAdminSetSinglesMemberCategory,
   postAdminSetSinglesStatus,
   postAdminSinglesLookupAll
@@ -1380,6 +1381,7 @@ app.post('/api/admin/singles/set-member-category', requireAuth, requireAdminRole
 app.post('/api/admin/singles/set-token-balance', requireAuth, requireAdminRole, postAdminSetSinglesTokenBalance);
 app.post('/api/admin/singles/reset-password-attempt-count', requireAuth, requireAdminRole, postAdminResetPasswordAttemptCount);
 app.post('/api/admin/singles/clear-lock-tuta-notes', requireAuth, requireAdminRole, postAdminClearLockTutaNotes);
+app.post('/api/admin/singles/clear-lock-tuta-photos', requireAuth, requireAdminRole, postAdminClearLockTutaPhotos);
 app.post('/api/admin/singles/soft-reset', requireAuth, requireAdminRole, postAdminSinglesSoftReset);
 app.post('/api/admin/singles/hard-reset', requireAuth, requireAdminRole, postAdminSinglesHardReset);
 app.get('/api/admin/blocked-asn-vpn', requireAuth, requireAdminRole, getAdminBlockedAsnVpn);

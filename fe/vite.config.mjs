@@ -102,7 +102,14 @@ export default defineConfig(({ mode }) => {
   const apiProxy = {
     '/api': {
       target: `http://127.0.0.1:${apiPort}`,
-      changeOrigin: true
+      changeOrigin: true,
+      configure: (proxy) => {
+        proxy.on('error', (_err, _req, res) => {
+          if (!res || res.headersSent || res.writableEnded || typeof res.writeHead !== 'function') return;
+          res.writeHead(502, { 'Content-Type': 'application/json', 'X-Tuta-Upstream-Down': '1' });
+          res.end(JSON.stringify({ serverDown: true }));
+        });
+      }
     }
   };
 

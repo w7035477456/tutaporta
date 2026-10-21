@@ -1,13 +1,20 @@
 import fs from 'fs';
 import { vaultMetaPath, vaultRootOnMount } from './vaultPaths.js';
 import { readVaultMeta } from './usbScan.js';
+import {
+  failAttemptLocks,
+  failAttemptStartsCooldown,
+  failAttemptWarning,
+  FAIL_LOCK_AT_ATTEMPT
+} from '../failAttemptPolicy.js';
 
-export const UNLOCK_MAX_FAILED_ATTEMPTS = 5;
+export const UNLOCK_MAX_FAILED_ATTEMPTS = FAIL_LOCK_AT_ATTEMPT;
+const USB_WIPE_CONSEQUENCE = 'security-wipe clean the USB';
 
 /** Default: 5 minutes expressed in seconds. */
 const DEFAULT_PHOTOALBUMS_ICON_RETRY_DELAY_SEC = 300;
 
-/** Seconds to wait after each wrong security icon — env PHOTOALBUMS_ICON_RETRY_DELAY_SEC (default 300). */
+/** Seconds to wait after the 3rd wrong security icon in a row — env PHOTOALBUMS_ICON_RETRY_DELAY_SEC (default 300). */
 export function getVaultIconRetryDelaySeconds() {
   const raw = process.env.PHOTOALBUMS_ICON_RETRY_DELAY_SEC;
   if (raw === undefined || String(raw).trim() === '') return DEFAULT_PHOTOALBUMS_ICON_RETRY_DELAY_SEC;
@@ -41,12 +48,12 @@ export function formatVaultIconRetryDelayLabel(totalSeconds) {
 
 export function vaultIconUnlockPolicyHint() {
   const delayLabel = formatVaultIconRetryDelayLabel(getVaultIconRetryDelaySeconds());
-  return `You must wait ${delayLabel} to retry. Five consecutive wrong guesses will security-wipe clean the USB.`;
+  return `3 wrong guesses in a row start a ${delayLabel} retry cooldown, and 3 more wrong guesses after that will security-wipe clean the USB.`;
 }
 
 export const UNLOCK_POLICY_HINT = vaultIconUnlockPolicyHint();
 export const UNLOCK_WIPED_MESSAGE =
-  'Five incorrect security icons in a row. This USB vault has been security-wiped clean.';
+  'Six incorrect security icons in a row. This USB vault has been security-wiped clean.';
 
 export class PhotoAlbumsUnlockError extends Error {
   constructor(message, details = {}) {
@@ -127,13 +134,15 @@ export function assertUnlockNotLocked(mountPath, meta) {
     lockedUntil: guard.lockedUntil,
     remainingSeconds,
     failedAttempts: guard.failedAttempts,
-    errorSecondary: formatLockoutSecondary(remainingSeconds)
+    errorSecondary: formatLockoutSecondary(remainingSeconds, guard.failedAttempts)
   });
 }
 
-function formatLockoutSecondary(remainingSeconds) {
+function formatLockoutSecondary(remainingSeconds, failedAttempts) {
+  const warning = failAttemptWarning(failedAttempts, USB_WIPE_CONSEQUENCE);
+  if (remainingSeconds <= 0) return `Wrong guess ${failedAttempts} of ${UNLOCK_MAX_FAILED_ATTEMPTS}. ${warning}`;
   const delayLabel = formatVaultIconRetryDelayLabel(getVaultIconRetryDelaySeconds());
-  return `You must wait ${delayLabel} to retry (${formatCountdown(remainingSeconds)} remaining). Five consecutive wrong guesses will security-wipe clean the USB.`;
+  return `You must wait ${delayLabel} to retry (${formatCountdown(remainingSeconds)} remaining). ${warning}`;
 }
 
 export function formatCountdown(totalSeconds) {
@@ -153,7 +162,7 @@ export function recordFailedUnlockAttempt(mountPath, meta) {
   const guard = readUnlockGuard(meta);
   const nextAttempts = guard.failedAttempts + 1;
 
-  if (nextAttempts >= UNLOCK_MAX_FAILED_ATTEMPTS) {
+  if (failAttemptLocks(nextAttempts)) {
     secureWipeVault(mountPath);
     throw new PhotoAlbumsUnlockError(UNLOCK_WIPED_MESSAGE, {
       code: 'PHOTO_ALBUMS_USB_WIPED',
@@ -163,7 +172,9 @@ export function recordFailedUnlockAttempt(mountPath, meta) {
     });
   }
 
-  const lockedUntil = new Date(Date.now() + getVaultIconUnlockLockoutMs()).toISOString();
+  const lockedUntil = failAttemptStartsCooldown(nextAttempts)
+    ? new Date(Date.now() + getVaultIconUnlockLockoutMs()).toISOString()
+    : null;
   const nextGuard = {
     failedAttempts: nextAttempts,
     lockedUntil
@@ -177,7 +188,7 @@ export function recordFailedUnlockAttempt(mountPath, meta) {
     lockedUntil,
     remainingSeconds,
     failedAttempts: nextAttempts,
-    errorSecondary: formatLockoutSecondary(remainingSeconds)
+    errorSecondary: formatLockoutSecondary(remainingSeconds, nextAttempts)
   });
 }
 

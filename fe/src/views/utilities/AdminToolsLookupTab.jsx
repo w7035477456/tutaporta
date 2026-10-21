@@ -20,6 +20,7 @@ import {
   resetAdminPasswordAttemptCount,
   cascadeDeleteAdminTableRow,
   clearAdminLockTutaNotes,
+  clearAdminLockTutaPhotos,
   fetchAdminVideoObjectUrl
 } from 'api/adminToolsFe';
 import { invalidateAllSinglesCache } from 'api/allSinglesFe';
@@ -572,6 +573,7 @@ export default function AdminToolsLookupTab({ onError }) {
   const [pwdRetryResetBusyById, setPwdRetryResetBusyById] = useState({});
   const [cascadeDeleteBusyById, setCascadeDeleteBusyById] = useState({});
   const [lockTutaNotesBusyById, setLockTutaNotesBusyById] = useState({});
+  const [lockTutaPhotosBusyById, setLockTutaPhotosBusyById] = useState({});
   const [playerVideoUrl, setPlayerVideoUrl] = useState('');
   const [playerVideoLabel, setPlayerVideoLabel] = useState('');
   const [playerVideoLoading, setPlayerVideoLoading] = useState(false);
@@ -807,6 +809,36 @@ export default function AdminToolsLookupTab({ onError }) {
       }
     },
     [lockTutaNotesBusyById, onError]
+  );
+
+  const handleClearLockTutaPhotos = useCallback(
+    async (row) => {
+      const id = Number(row?.singlesId);
+      if (!Number.isFinite(id) || id < 1 || isAdminSinglesLookupRow(row) || lockTutaPhotosBusyById[id]) {
+        return;
+      }
+      const ok = await themedConfirm(
+        `Clear TutaPhotos lock for singles_id ${id} (${row.alias || row.email || 'member'})?\n\nThey can try Encrypt Password again.`
+      );
+      if (!ok) return;
+      setLockTutaPhotosBusyById((prev) => ({ ...prev, [id]: true }));
+      onError?.('');
+      try {
+        await clearAdminLockTutaPhotos({ singlesId: id });
+        setSinglesRows((prev) =>
+          prev.map((entry) => (entry.singlesId === id ? { ...entry, lockTutaPhotos: false } : entry))
+        );
+      } catch (err) {
+        onError?.(err?.response?.data?.error || err?.message || 'Failed to clear TutaPhotos lock.');
+      } finally {
+        setLockTutaPhotosBusyById((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }
+    },
+    [lockTutaPhotosBusyById, onError]
   );
 
   const handleCycleStatus = useCallback((singlesId) => {
@@ -1301,6 +1333,7 @@ export default function AdminToolsLookupTab({ onError }) {
                   const hardResetBusy = Boolean(hardResetBusyById[row.singlesId]);
                   const cascadeDeleteBusy = Boolean(cascadeDeleteBusyById[row.singlesId]);
                   const lockTutaNotesBusy = Boolean(lockTutaNotesBusyById[row.singlesId]);
+                  const lockTutaPhotosBusy = Boolean(lockTutaPhotosBusyById[row.singlesId]);
                   const pwdRetryCount = Number(row.passwordAttemptCount ?? 0);
                   const pwdRetryResetBusy = Boolean(pwdRetryResetBusyById[row.singlesId]);
                   return (
@@ -1343,6 +1376,7 @@ export default function AdminToolsLookupTab({ onError }) {
                         {row.alias ? ` · ${row.alias}` : ''}
                         {` · pwd retry ${pwdRetryCount}`}
                         {row.lockTutaNotes ? ' · TutaNotes LOCKED' : ''}
+                        {row.lockTutaPhotos ? ' · TutaPhotos LOCKED' : ''}
                         {row.myReferCode ? ` · my refer ${row.myReferCode}` : ''}
                         {row.referByCode ? ` · refer by ${formatReferByDisplay(row)}` : ''}
                       </ColorTemplate9TableData.BodyText>
@@ -1387,6 +1421,16 @@ export default function AdminToolsLookupTab({ onError }) {
                               sx={{ whiteSpace: 'nowrap', width: '100%' }}
                             >
                               {lockTutaNotesBusy ? 'Unlocking…' : 'Unlock TutaNotes'}
+                            </SelectedButtonTemplate>
+                          ) : null}
+                          {row.lockTutaPhotos ? (
+                            <SelectedButtonTemplate
+                              type="button"
+                              disabled={lockTutaPhotosBusy || saveBusy || listBusy}
+                              onClick={() => void handleClearLockTutaPhotos(row)}
+                              sx={{ whiteSpace: 'nowrap', width: '100%' }}
+                            >
+                              {lockTutaPhotosBusy ? 'Unlocking…' : 'Unlock TutaPhotos'}
                             </SelectedButtonTemplate>
                           ) : null}
                           <SelectedButtonTemplate

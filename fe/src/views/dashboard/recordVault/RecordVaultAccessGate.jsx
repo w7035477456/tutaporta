@@ -26,6 +26,7 @@ import {
   setRecordVaultE2eSession
 } from 'utils/recordVaultClientSession';
 import { formatRecordVaultUnlockCountdown } from 'utils/recordVaultUnlockCountdown';
+import { failAttemptWarning, FAIL_LOCK_AT_ATTEMPT } from 'utils/failAttemptPolicy';
 import { DEMO_ENCRYPT_PASSWORD, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { useAuth } from 'contexts/AuthContext';
 import RecordVaultZeroKnowledgeNotice from './RecordVaultZeroKnowledgeNotice';
@@ -121,11 +122,10 @@ function normalizeStorageType(storageType) {
   return storageType === 'usb' ? 'usb' : 'tutadrive';
 }
 
-const TUTANOTES_LOCK_WARNING_SUFFIX =
-  'Five consecutive fails will lock TutaNotes, and you must contact tech support after that.';
+const TUTANOTES_LOCK_CONSEQUENCE = 'lock TutaNotes, and you must contact tech support after that';
 
 const TUTANOTES_LOCKED_MESSAGE =
-  'TutaNotes is locked after five failed Encrypt Password attempts. Please contact tech support.';
+  'TutaNotes is locked after six failed Encrypt Password attempts in a row. Please contact tech support.';
 
 /** Fail bar while cooldown is active (live countdown). */
 function buildVaultAccessFailCooldownMessage({
@@ -134,16 +134,16 @@ function buildVaultAccessFailCooldownMessage({
   cooldownSeconds
 }) {
   const attempt = Math.max(1, Math.floor(Number(failedAttempts) || 1));
-  const max = Math.max(attempt, Math.floor(Number(maxFailedAttempts) || 5));
+  const max = Math.max(attempt, Math.floor(Number(maxFailedAttempts) || FAIL_LOCK_AT_ATTEMPT));
   const countdown = formatRecordVaultUnlockCountdown(cooldownSeconds);
-  return `Incorrect Encrypt Password try ${attempt} of ${max}. Retry cooldown ${countdown}. ${TUTANOTES_LOCK_WARNING_SUFFIX}`;
+  return `Incorrect Encrypt Password try ${attempt} of ${max}. Retry cooldown ${countdown}. ${failAttemptWarning(attempt, TUTANOTES_LOCK_CONSEQUENCE)}`;
 }
 
 /**
  * Shared vault-password popup for Open TutaNotes Cloud and Open TutaNotes USB.
  * Yellow E2E: password → KEK → DEK in the browser; server stores salt + wrapped DEK only.
  *
- * Wrong password: 2-minute retry cooldown. Five fails → lock TutaNotes until admin clears.
+ * Wrong password: 3 fails in a row → 2-minute retry cooldown; 3 more → lock TutaNotes until admin clears.
  */
 export default function RecordVaultAccessGate({
   open,
@@ -172,7 +172,7 @@ export default function RecordVaultAccessGate({
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [cooldownUntilMs, setCooldownUntilMs] = useState(0);
   const [failedAttempts, setFailedAttempts] = useState(0);
-  const [maxFailedAttempts, setMaxFailedAttempts] = useState(5);
+  const [maxFailedAttempts, setMaxFailedAttempts] = useState(FAIL_LOCK_AT_ATTEMPT);
   const [tutaNotesLocked, setTutaNotesLocked] = useState(false);
   /** Guest demo: auto-unlock with DEMO_ENCRYPT_PASSWORD — hide the Encrypt Password popup. */
   const [demoAutoUnlocking, setDemoAutoUnlocking] = useState(false);
@@ -184,7 +184,7 @@ export default function RecordVaultAccessGate({
     (status) => {
       const remaining = Math.max(0, Math.floor(Number(status?.remainingSeconds) || 0));
       const attempts = Math.max(0, Math.floor(Number(status?.failedAttempts) || 0));
-      const maxAttempts = Math.max(1, Math.floor(Number(status?.maxFailedAttempts) || 5));
+      const maxAttempts = Math.max(1, Math.floor(Number(status?.maxFailedAttempts) || FAIL_LOCK_AT_ATTEMPT));
       setFailedAttempts(attempts);
       setMaxFailedAttempts(maxAttempts);
 
@@ -722,7 +722,7 @@ export default function RecordVaultAccessGate({
         open={Boolean(open) && !demoAutoUnlocking}
         onClose={handleClose}
         closeOnBackdrop={false}
-        closeButtonDisabled={verifyLocked}
+        closeButtonDisabled={cooldownSeconds > 0}
       >
         <ColorTemplate16PopupCenterWide.Title>Full Disk Encryption</ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body>
@@ -809,7 +809,7 @@ export default function RecordVaultAccessGate({
                   <Box component="span" sx={{ fontWeight: 800 }}>
                     Retry cooldown {formatRecordVaultUnlockCountdown(cooldownSeconds)}.
                   </Box>{' '}
-                  {TUTANOTES_LOCK_WARNING_SUFFIX}
+                  {failAttemptWarning(Math.max(1, failedAttempts), TUTANOTES_LOCK_CONSEQUENCE)}
                 </>
               ) : (
                 error

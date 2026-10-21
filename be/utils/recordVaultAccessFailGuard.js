@@ -1,20 +1,26 @@
 /**
  * Encrypt Password fail guard (Step 1 gate).
- * Cluster-safe via PostgreSQL: 2-minute cooldown after each wrong password;
- * 5 consecutive fails → lock TutaNotes (singles.lock_tuta_notes) until admin clears.
+ * Cluster-safe via PostgreSQL: 3 consecutive fails → retry cooldown;
+ * 3 more fails after that (6 in a row) → lock TutaNotes (singles.lock_tuta_notes) until admin clears.
  */
 
 import pool from '../db/connection.js';
 import { getDBSchema } from '../config/envConfig.js';
 import { formatCountdown } from './recordVaultUsb/unlockGuard.js';
 import {
+  failAttemptLocks,
+  failAttemptStartsCooldown,
+  failAttemptWarning,
+  FAIL_LOCK_AT_ATTEMPT
+} from './failAttemptPolicy.js';
+import {
   isTutaNotesLocked,
   lockTutaNotesForSingles,
-  TUTANOTES_LOCK_WARNING_SUFFIX,
+  TUTANOTES_LOCK_CONSEQUENCE,
   TUTANOTES_LOCKED_MESSAGE
 } from './tutaNotesLock.js';
 
-export const VAULT_ACCESS_MAX_FAILED_ATTEMPTS = 5;
+export const VAULT_ACCESS_MAX_FAILED_ATTEMPTS = FAIL_LOCK_AT_ATTEMPT;
 /** Default 2 minutes — env VAULT_ACCESS_RETRY_DELAY_SEC. */
 const DEFAULT_RETRY_DELAY_SEC = 120;
 
@@ -39,6 +45,12 @@ function remainingLockSeconds(lockedUntil, nowMs = Date.now()) {
   const untilMs = Date.parse(lockedUntil);
   if (!Number.isFinite(untilMs)) return 0;
   return Math.max(0, Math.ceil((untilMs - nowMs) / 1000));
+}
+
+function buildWrongPasswordError(failedAttempts, remainingSeconds) {
+  const attempt = Math.max(1, failedAttempts);
+  const cooldown = remainingSeconds > 0 ? ` Retry cooldown ${formatCountdown(remainingSeconds)}.` : '';
+  return `Incorrect Encrypt Password try ${attempt} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}.${cooldown} ${failAttemptWarning(attempt, TUTANOTES_LOCK_CONSEQUENCE)}`;
 }
 
 function buildTutaNotesLockedStatus(storageType, failedAttempts = VAULT_ACCESS_MAX_FAILED_ATTEMPTS) {
@@ -96,7 +108,8 @@ export async function getVaultAccessFailStatus(singlesId, storageType = 'onedriv
     maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
     lockoutSeconds: getVaultAccessRetryDelaySeconds(),
     storageType: side,
-    tutaNotesLocked: false
+    tutaNotesLocked: false,
+    ...(failedAttempts > 0 ? { error: buildWrongPasswordError(failedAttempts, remainingSeconds) } : {})
   };
 }
 
@@ -116,7 +129,7 @@ export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedr
 
 /**
  * Record a wrong vault-password attempt for the pending open side.
- * 5 consecutive fails → singles.lock_tuta_notes (admin must clear).
+ * 3rd consecutive fail → retry cooldown; 6th → singles.lock_tuta_notes (admin must clear).
  */
 export async function recordVaultAccessFail(singlesId, storageType = 'onedrive', { mountPath } = {}) {
   const id = Number(singlesId);
@@ -157,7 +170,6 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
     const currentRemainingSeconds = remainingLockSeconds(currentLockedUntil);
     if (currentRemainingSeconds > 0) {
       await client.query('COMMIT');
-      const attempt = Math.max(1, currentAttempts);
       return {
         locked: true,
         lockedUntil: currentLockedUntil,
@@ -166,7 +178,7 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
         maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
         lockoutSeconds: getVaultAccessRetryDelaySeconds(),
         storageType: side,
-        error: `Incorrect Encrypt Password try ${attempt} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}. Retry cooldown ${formatCountdown(currentRemainingSeconds)}. ${TUTANOTES_LOCK_WARNING_SUFFIX}`,
+        error: buildWrongPasswordError(currentAttempts, currentRemainingSeconds),
         cooldownLabel: `Retry cooldown ${formatCountdown(currentRemainingSeconds)}`,
         vaultFormatted: false,
         needsClientFormat: false,
@@ -175,15 +187,18 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
     }
 
     nextAttempts = currentAttempts + 1;
+    const cooldownSec = failAttemptStartsCooldown(nextAttempts) ? getVaultAccessRetryDelaySeconds() : 0;
     const { rows: updatedRows } = await client.query(
       `UPDATE ${schema()}.notes_vault
           SET access_failed_attempts = $3,
-              access_locked_until = NOW() + ($4::double precision * INTERVAL '1 second'),
+              access_locked_until = CASE WHEN $4::double precision > 0
+                THEN NOW() + ($4::double precision * INTERVAL '1 second')
+                ELSE NULL END,
               updated_at = NOW()
         WHERE singles_id = $1
           AND storage_backend = $2
       RETURNING access_locked_until`,
-      [id, side, nextAttempts, getVaultAccessRetryDelaySeconds()]
+      [id, side, nextAttempts, cooldownSec]
     );
     lockedUntil = updatedRows[0]?.access_locked_until
       ? new Date(updatedRows[0].access_locked_until).toISOString()
@@ -200,7 +215,7 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
     client.release();
   }
 
-  if (nextAttempts >= VAULT_ACCESS_MAX_FAILED_ATTEMPTS) {
+  if (failAttemptLocks(nextAttempts)) {
     try {
       await lockTutaNotesForSingles(id);
       await clearVaultAccessFailStatus(id, 'onedrive');
@@ -227,8 +242,8 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
 
   const remainingSeconds = remainingLockSeconds(lockedUntil);
   return {
-    locked: true,
-    lockedUntil,
+    locked: remainingSeconds > 0,
+    lockedUntil: remainingSeconds > 0 ? lockedUntil : null,
     remainingSeconds,
     failedAttempts: nextAttempts,
     maxFailedAttempts: VAULT_ACCESS_MAX_FAILED_ATTEMPTS,
@@ -237,7 +252,7 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
     needsClientFormat: false,
     tutaNotesLocked: false,
     storageType: side,
-    error: `Incorrect Encrypt Password try ${nextAttempts} of ${VAULT_ACCESS_MAX_FAILED_ATTEMPTS}. Retry cooldown ${formatCountdown(remainingSeconds)}. ${TUTANOTES_LOCK_WARNING_SUFFIX}`,
-    cooldownLabel: `Retry cooldown ${formatCountdown(remainingSeconds)}`
+    error: buildWrongPasswordError(nextAttempts, remainingSeconds),
+    cooldownLabel: remainingSeconds > 0 ? `Retry cooldown ${formatCountdown(remainingSeconds)}` : ''
   };
 }

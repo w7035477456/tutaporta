@@ -1,0 +1,39 @@
+#!/bin/bash
+# xbox3 192.168.202.203 — Web server (FE/BE :40000) + Postgres REPLICA + Redis.
+# Install: sudo install -m 755 setupufw /usr/local/bin/setupufw && sudo setupufw
+# Resets all UFW rules. Run from the Mac (192.168.44.104) SSH session, or locally on the console.
+set -euo pipefail
+[[ $EUID -eq 0 ]] || { echo "Run with sudo"; exit 1; }
+
+MAC=192.168.44.104
+HAPROXY=192.168.202.201   # xbox1 HAProxy + Postgres Primary
+
+echo "Starting UFW Configuration for xbox3 (Web server + Postgres Replica)..."
+
+# 1. Reset & Defaults (outgoing open: BE → xbox1:50010 and replica streaming need no inbound rule)
+ufw --force reset
+ufw default deny incoming
+ufw default allow outgoing
+
+# 2. Keep IPv6 on so (v6) rules apply too
+sed -i 's/^IPV6=no/IPV6=yes/' /etc/default/ufw
+
+# 3. SSH Lockdown (Port 59221 from trusted Mac)
+ufw allow from $MAC to any port 59221 proto tcp
+ufw deny 22/tcp
+echo "SSH secured on port 59221 for trusted IP."
+
+# 4. Loopback (BE → local Redis :6379 and local replica :50010)
+ufw allow in on lo
+ufw allow out on lo
+
+# 5. Web server — app traffic only from HAProxy on xbox1 (no 80/443 here)
+ufw allow from $HAPROXY to any port 40000 proto tcp
+
+# 6. Postgres Replica :50010 — read-only, Mac DBeaver only
+ufw allow from $MAC to any port 50010 proto tcp
+
+# 7. Enable
+ufw --force enable
+ufw status verbose
+echo "UFW secured and active for xbox3 (Web server + Postgres Replica)."

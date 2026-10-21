@@ -17,6 +17,9 @@ Thumbs.db
 !fe/.env
 # Ubuntu prod copy of ~/.ssh/be/.env (secrets)
 myscript/ubuntu/be.env
+# configSetup/ server config copies — env files hold secrets
+configSetup/**/*.env
+configSetup/**/*.env.*
 
 # Logs/temp at repo root
 *.log

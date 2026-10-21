@@ -1573,10 +1573,11 @@ function mapVaultAccessFailStatus(data) {
     lockedUntil: data?.lockedUntil ? String(data.lockedUntil) : null,
     remainingSeconds: Math.max(0, Math.floor(Number(data?.remainingSeconds) || 0)),
     failedAttempts: Math.max(0, Math.floor(Number(data?.failedAttempts) || 0)),
-    maxFailedAttempts: Math.max(1, Math.floor(Number(data?.maxFailedAttempts) || 5)),
+    maxFailedAttempts: Math.max(1, Math.floor(Number(data?.maxFailedAttempts) || 6)),
     lockoutSeconds: Math.max(0, Math.floor(Number(data?.lockoutSeconds) || 180)),
     vaultFormatted: Boolean(data?.vaultFormatted),
     needsClientFormat: Boolean(data?.needsClientFormat),
+    tutaPhotosLocked: Boolean(data?.tutaPhotosLocked),
     storageType:
       data?.storageType === 'usb' ? 'usb' : normalizeVaultPaneStorageType(data?.storageType),
     mountPath: data?.mountPath ? String(data.mountPath) : null,
@@ -1585,7 +1586,7 @@ function mapVaultAccessFailStatus(data) {
   };
 }
 
-/** Vault-password fail cooldown / 5-fail format status for the pending open side. */
+/** Vault-password fail cooldown (3rd fail) / lock (6th fail) status for the pending open side. */
 export async function fetchPhotoAlbumsAccessFailStatus(storageType = VAULT_CLOUD_STORAGE_TYPE) {
   const { data } = await api.get('/api/photoAlbums/access/fail-status', {
     params: {
@@ -1598,7 +1599,7 @@ export async function fetchPhotoAlbumsAccessFailStatus(storageType = VAULT_CLOUD
 
 /**
  * Record a client-side vault-password verify failure (password never sent).
- * On 5th fail: TutaCloud may be formatted server-side; USB returns needsClientFormat.
+ * 3rd fail in a row: retry cooldown. 6th: TutaPhotos is locked (singles.lock_tuta_photos) until admin clears.
  */
 export async function recordPhotoAlbumsAccessFail({
   storageType = VAULT_CLOUD_STORAGE_TYPE,

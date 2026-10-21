@@ -1662,7 +1662,7 @@ function mapVaultAccessFailStatus(data) {
     lockedUntil: data?.lockedUntil ? String(data.lockedUntil) : null,
     remainingSeconds: Math.max(0, Math.floor(Number(data?.remainingSeconds) || 0)),
     failedAttempts: Math.max(0, Math.floor(Number(data?.failedAttempts) || 0)),
-    maxFailedAttempts: Math.max(1, Math.floor(Number(data?.maxFailedAttempts) || 5)),
+    maxFailedAttempts: Math.max(1, Math.floor(Number(data?.maxFailedAttempts) || 6)),
     lockoutSeconds: Math.max(0, Math.floor(Number(data?.lockoutSeconds) || 120)),
     vaultFormatted: Boolean(data?.vaultFormatted),
     needsClientFormat: Boolean(data?.needsClientFormat),
@@ -1675,7 +1675,7 @@ function mapVaultAccessFailStatus(data) {
   };
 }
 
-/** Vault-password fail cooldown / 5-fail format status for the pending open side. */
+/** Vault-password fail cooldown (3rd fail) / lock (6th fail) status for the pending open side. */
 export async function fetchRecordVaultAccessFailStatus(storageType = VAULT_CLOUD_STORAGE_TYPE) {
   const { data } = await api.get('/api/recordVault/access/fail-status', {
     params: {
@@ -1688,7 +1688,7 @@ export async function fetchRecordVaultAccessFailStatus(storageType = VAULT_CLOUD
 
 /**
  * Record a client-side vault-password verify failure (password never sent).
- * On 5th fail: TutaNotes is locked (singles.lock_tuta_notes) until admin clears.
+ * 3rd fail in a row: retry cooldown. 6th: TutaNotes is locked (singles.lock_tuta_notes) until admin clears.
  */
 export async function recordRecordVaultAccessFail({ storageType = VAULT_CLOUD_STORAGE_TYPE, mountPath } = {}) {
   try {

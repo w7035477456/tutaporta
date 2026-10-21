@@ -1190,7 +1190,7 @@ securecode() {
 }
 
 #########################
-# f2 on Mac = SSH to this box (corruptedKey_march2024). On Ubuntu you are already here.
+# f2 on Mac = SSH to this box (ssh xbox2, ~/.ssh/xbox2.pem). On Ubuntu you are already here.
 alias f2='echo "f2 is Mac→xbox2 only. Already on $(hostname -s)." && cd ~/code/main'
 #########################
 updatetype() {

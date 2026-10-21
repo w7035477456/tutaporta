@@ -4,7 +4,7 @@
 # First stdout line is always "same" or "difference". On "difference" an object-level report
 # follows (only on Mac / only on Ubuntu / changed with -Ubuntu +Mac lines). --quiet = first line only.
 #
-# Uses the same SSH as Mac f2 alias (port 59221 + corruptedKey_march2024 via deploy-ssh-mac.sh).
+# Uses the same SSH as Mac f2 alias (port 59221 + ~/.ssh/xbox2.pem via deploy-ssh-mac.sh).
 #
 #   isdbsame
 #   isdbsame --quiet
@@ -37,7 +37,7 @@ Stdout: first line "same" or "difference"; on difference, an object-level report
 --verbose: stderr summary always (hosts, line counts); raw diff snippet only when different.
 --save-dumps dir: keep mac_/ubuntu_ normalized + raw dumps (used by syncdbmacubuntu).
 
-SSH defaults (same as f2 alias): port 59221, IdentitiesOnly, corruptedKey_march2024.
+SSH defaults (same as f2 alias): port 59221, IdentitiesOnly, ~/.ssh/xbox2.pem.
 Override: COMPARE_SCHEMA_SSH_BIN, DEPLOY_SSH_KEY, DEPLOY_SSH_PORT (see deploy-ssh-mac.sh).
 
 Environment:

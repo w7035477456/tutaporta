@@ -1,0 +1,90 @@
+#!/bin/bash
+# setupufw.sh -- configures UFW for HAProxy / Web / DB nodes
+# Updated for All-in-one architecture 
+
+if [ "$EUID" -ne 0 ]; then
+  echo "+ Please run as root (use sudo)"
+  exit 1
+fi
+
+MYIP=$(hostname -I | awk '{print $1}')
+
+# --- cluster members ---
+HAPROXY_IP="192.168.222.202"
+WEB_SERVERS=("192.168.222.201" "192.168.222.203" "192.168.222.204" "192.168.222.205" \
+             "192.168.222.206" "192.168.222.207" "192.168.222.208" "192.168.222.209")
+POSTGRES_IP="192.168.222.201"
+
+# --- ports ---
+APP_PORT=40000
+POSTGRES_PORT=50010
+SSH_PORT=59221
+# Updated to match the Ideal-desire trusted IP
+SSH_TRUSTED_IP="192.168.44.104"
+
+echo "Detected local IP: $MYIP"
+echo "Select this node role:"
+echo "1) haproxy"
+echo "2) webserver"
+echo "3) postgres"
+echo "4) All-in-one"
+read -p "Choice [1-4]: " choice
+
+case $choice in
+  1) ROLE="haproxy" ;;
+  2) ROLE="webserver" ;;
+  3) ROLE="postgres" ;;
+  4) ROLE="all-in-one" ;;
+  *) echo "Invalid choice"; exit 1 ;;
+esac
+
+# --- BASELINE POLICY ---
+# Running these explicitly fixes the 'Missing policy' error
+ufw --force reset
+ufw default deny incoming
+ufw default allow outgoing
+# Ensure IPv6 is enabled to restore (v6) rules
+sed -i 's/^IPV6=no/IPV6=yes/' /etc/default/ufw
+
+# --- SSH & LOOPBACK ---
+ufw allow from $SSH_TRUSTED_IP to any port $SSH_PORT proto tcp
+ufw deny 22/tcp
+ufw allow in on lo
+ufw allow out on lo
+
+# --- ROLE-SPECIFIC RULES ---
+case $ROLE in
+  haproxy)
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    for ip in "${WEB_SERVERS[@]}"; do
+      ufw allow from "$ip" to any port $APP_PORT proto tcp
+    done
+    ufw allow from $SSH_TRUSTED_IP to any port 9000 proto tcp
+    ;;
+  webserver)
+    ufw allow from $HAPROXY_IP to any port $APP_PORT proto tcp
+    ufw allow from $POSTGRES_IP to any port $POSTGRES_PORT proto tcp
+    ;;
+  postgres)
+    for ip in "${WEB_SERVERS[@]}"; do
+      ufw allow from "$ip" to any port $POSTGRES_PORT proto tcp
+    done
+    # Also allow the Mac desktop to manage the DB
+    ufw allow from $SSH_TRUSTED_IP to any port $POSTGRES_PORT proto tcp
+    ;;
+  all-in-one)
+    echo "Setting up restricted All-in-one rules..."
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+    ufw allow from 127.0.0.1 to any port 10000 proto tcp
+    ufw allow in on lo to any port 50010 proto tcp
+    ufw allow from 127.0.0.1 to any port 40000 proto tcp
+
+    # ADD THIS LINE BELOW TO ALLOW YOUR MAC DESKTOP
+    ufw allow from $SSH_TRUSTED_IP to any port $POSTGRES_PORT proto tcp
+    ;;
+esac
+
+ufw --force enable
+ufw status verbose

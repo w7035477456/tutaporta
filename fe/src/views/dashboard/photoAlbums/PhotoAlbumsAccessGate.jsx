@@ -31,6 +31,7 @@ import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
 import { closeErrorPopup } from 'ui-component/ErrorPopup';
 import { COLOR_TEMPLATE7_POPUP_ACTION_GREEN } from 'config/colorTemplate7PopupLargeDark';
 import { formatRecordVaultUnlockCountdown } from 'utils/recordVaultUnlockCountdown';
+import { failAttemptWarning, FAIL_LOCK_AT_ATTEMPT } from 'utils/failAttemptPolicy';
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 
 const MIN_VAULT_PASSWORD_LEN = 8;
@@ -156,9 +157,14 @@ function normalizeStorageType(storageType) {
 const PHOTO_ALBUMS_WRONG_PASSWORD_ERROR = 'Incorrect Encrypt password, please try again';
 const PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR = 'Incorrect current Encrypt password';
 
-function buildPhotoAlbumsCooldownError(wrongPasswordError, cooldownSeconds) {
+const TUTAPHOTOS_LOCK_CONSEQUENCE = 'lock TutaPhotos, and you must contact tech support after that';
+const TUTAPHOTOS_LOCKED_MESSAGE =
+  'TutaPhotos is locked after six failed Encrypt Password attempts in a row. Please contact tech support.';
+
+function buildPhotoAlbumsCooldownError(wrongPasswordError, cooldownSeconds, failedAttempts) {
+  const attempt = Math.max(1, Math.floor(Number(failedAttempts) || 1));
   const countdown = formatRecordVaultUnlockCountdown(cooldownSeconds);
-  return `${wrongPasswordError} Retry Cool Down ${countdown}.`;
+  return `${wrongPasswordError} (try ${attempt} of ${FAIL_LOCK_AT_ATTEMPT}). Retry Cool Down ${countdown}. ${failAttemptWarning(attempt, TUTAPHOTOS_LOCK_CONSEQUENCE)}`;
 }
 
 /**
@@ -197,12 +203,25 @@ export default function PhotoAlbumsAccessGate({
   const [cooldownWrongPasswordError, setCooldownWrongPasswordError] = useState(
     PHOTO_ALBUMS_WRONG_PASSWORD_ERROR
   );
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [tutaPhotosLocked, setTutaPhotosLocked] = useState(false);
 
   const applyFailStatus = useCallback((status) => {
     const remaining = Math.max(0, Math.floor(Number(status?.remainingSeconds) || 0));
     const wrongMsg = String(status?.error || '').startsWith(PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR)
       ? PHOTO_ALBUMS_WRONG_CURRENT_PASSWORD_ERROR
       : PHOTO_ALBUMS_WRONG_PASSWORD_ERROR;
+    const attempts = Math.max(0, Math.floor(Number(status?.failedAttempts) || 0));
+    setFailedAttempts(attempts);
+
+    if (status?.tutaPhotosLocked) {
+      setTutaPhotosLocked(true);
+      setCooldownSeconds(0);
+      setCooldownUntilMs(0);
+      setError(status?.error || TUTAPHOTOS_LOCKED_MESSAGE);
+      return;
+    }
+    setTutaPhotosLocked(false);
 
     if (remaining > 0) {
       setCooldownWrongPasswordError(wrongMsg);
@@ -213,7 +232,7 @@ export default function PhotoAlbumsAccessGate({
           ? untilMs
           : Date.now() + remaining * 1000
       );
-      setError(buildPhotoAlbumsCooldownError(wrongMsg, remaining));
+      setError(buildPhotoAlbumsCooldownError(wrongMsg, remaining, attempts));
       return;
     }
 
@@ -241,6 +260,8 @@ export default function PhotoAlbumsAccessGate({
     setChangePasswordOpen(false);
     setSkipVerifyMode(false);
     setError('');
+    setFailedAttempts(0);
+    setTutaPhotosLocked(false);
     setChecking(true);
     void (async () => {
       try {
@@ -255,7 +276,7 @@ export default function PhotoAlbumsAccessGate({
         setVaultRow(e2e.vault || null);
         setHint(accessStatus?.hint || '');
         setNewHint(accessStatus?.hint || '');
-        if (failStatus?.remainingSeconds > 0) {
+        if (failStatus?.tutaPhotosLocked || failStatus?.remainingSeconds > 0 || failStatus?.failedAttempts > 0) {
           applyFailStatus(failStatus);
         }
       } catch (err) {
@@ -293,8 +314,8 @@ export default function PhotoAlbumsAccessGate({
 
   useEffect(() => {
     if (!open || cooldownSeconds <= 0) return;
-    setError(buildPhotoAlbumsCooldownError(cooldownWrongPasswordError, cooldownSeconds));
-  }, [open, cooldownSeconds, cooldownWrongPasswordError]);
+    setError(buildPhotoAlbumsCooldownError(cooldownWrongPasswordError, cooldownSeconds, failedAttempts));
+  }, [open, cooldownSeconds, cooldownWrongPasswordError, failedAttempts]);
 
   const persistHint = async (nextHint = hint) => {
     try {
@@ -343,6 +364,10 @@ export default function PhotoAlbumsAccessGate({
   };
 
   const handleVerifyVaultPassword = async () => {
+    if (tutaPhotosLocked) {
+      setError(TUTAPHOTOS_LOCKED_MESSAGE);
+      return;
+    }
     const value = currentPassword.trim();
     if (!value) {
       setError('Enter your Encrypt Password');
@@ -391,6 +416,10 @@ export default function PhotoAlbumsAccessGate({
   };
 
   const handleSetNewVaultPassword = async () => {
+    if (tutaPhotosLocked) {
+      setError(TUTAPHOTOS_LOCKED_MESSAGE);
+      return;
+    }
     const priorPassword = changeCurrentPassword.trim();
     const nextPassword = newPassword.trim();
     const confirm = confirmPassword.trim();
@@ -469,6 +498,10 @@ export default function PhotoAlbumsAccessGate({
   };
 
   const handleSetVaultPassword = async () => {
+    if (tutaPhotosLocked) {
+      setError(TUTAPHOTOS_LOCKED_MESSAGE);
+      return;
+    }
     const value = newPassword.trim();
     const confirm = confirmPassword.trim();
     if (cooldownSeconds > 0) {
@@ -527,7 +560,7 @@ export default function PhotoAlbumsAccessGate({
   };
 
   const setPasswordReady = vaultPasswordReady(newPassword, confirmPassword);
-  const verifyLocked = cooldownSeconds > 0;
+  const verifyLocked = cooldownSeconds > 0 || tutaPhotosLocked;
   const inputsLocked = busy || verifyLocked;
 
   const handleClose = useCallback(() => {
@@ -764,7 +797,7 @@ export default function PhotoAlbumsAccessGate({
         open={Boolean(open)}
         onClose={handleClose}
         closeOnBackdrop={false}
-        closeButtonDisabled={busy || verifyLocked}
+        closeButtonDisabled={busy || cooldownSeconds > 0}
       >
         <ColorTemplate16PopupCenterWide.Title>Full Disk Encryption</ColorTemplate16PopupCenterWide.Title>
         <ColorTemplate16PopupCenterWide.Body>
@@ -827,12 +860,13 @@ export default function PhotoAlbumsAccessGate({
 
             {error ? (
               <ColorTemplate16PopupCenterWide.ErrorBar>
-                {cooldownSeconds > 0 ? (
+                {cooldownSeconds > 0 && !tutaPhotosLocked ? (
                   <>
-                    {cooldownWrongPasswordError}{' '}
+                    {cooldownWrongPasswordError} (try {Math.max(1, failedAttempts)} of {FAIL_LOCK_AT_ATTEMPT}).{' '}
                     <Box component="span" sx={{ fontWeight: 800 }}>
                       Retry Cool Down {formatRecordVaultUnlockCountdown(cooldownSeconds)}.
-                    </Box>
+                    </Box>{' '}
+                    {failAttemptWarning(Math.max(1, failedAttempts), TUTAPHOTOS_LOCK_CONSEQUENCE)}
                   </>
                 ) : (
                   error

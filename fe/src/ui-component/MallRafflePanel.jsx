@@ -501,6 +501,8 @@ export default function MallRafflePanel({ openRequest = 0 }) {
         sx={{
           width: panelWidth,
           display: 'block',
+          position: 'relative',
+          containerType: 'inline-size',
           m: 0,
           mb: expanded ? 0.5 : 0,
           p: 0,
@@ -519,6 +521,34 @@ export default function MallRafflePanel({ openRequest = 0 }) {
           draggable={false}
           sx={{ width: '100%', height: 'auto', display: 'block', userSelect: 'none' }}
         />
+        {/* Covers the banner's black "Raffle" panel (x 531–810, tiles y 10–81 of the 1338×98 PNG). */}
+        <Box
+          component="span"
+          sx={{
+            position: 'absolute',
+            left: '40%',
+            width: '20.25%',
+            top: '10.2%',
+            height: '73.5%',
+            bgcolor: PANEL_YELLOW,
+            border: '1px solid #111',
+            borderRadius: '3px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#d50000',
+            fontFamily: 'inherit',
+            fontWeight: 900,
+            fontSize: '3.4cqw',
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
+            userSelect: 'none',
+            pointerEvents: 'none'
+          }}
+        >
+          Toggle Me
+        </Box>
       </Box>
       <Box
         id="mall-raffle-panel"

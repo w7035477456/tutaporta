@@ -1,0 +1,33 @@
+---
+description: Two-server Ubuntu pre-production (xbox1 + xbox3, Dell S6000 40 Gb switch) — replaces the All-in-1 xbox2 development box
+alwaysApply: true
+---
+
+# Two-server Ubuntu pre-production (xbox1 + xbox3)
+
+Previously all development ran on one **All-in-1** Ubuntu server, **xbox2 (`192.168.222.202`)** — HAProxy/Nginx, Postgres Primary, and the web server (FE + BE) on one box, no switch, to keep power usage down (see `all-in-1UbuntuDevelopment.mdc`).
+
+**Andrew is now transitioning to semi-production-ready, using two Ubuntu servers:**
+
+| Server | IP | Holds |
+|--------|----|-------|
+| **xbox1** | `192.168.202.201` | 1) **Postgres DB, Primary** 2) **HAProxy / Nginx** |
+| **xbox3** | `192.168.202.203` | 1) **Postgres DB, Replica** 2) **Webserver, FE & BE** |
+| ~~xbox2~~ | ~~`192.168.222.202`~~ | **Shut off** (All-in-1 development box retired) |
+
+## Network layout
+
+- Internet → Cloudflare → ONT → Router(45) → **Outter (210)** router (`:80` / `:443` forwarded in).
+- Outter **OPT1** → **Dell S6000 40 Gb QSFP+ switch** → xbox1 and xbox3 (40 Gb QSFP+ links). The All-in-1 setup had no switch (direct connect).
+- HAProxy on xbox1 is the public front door; it forwards app traffic to the web server on xbox3.
+
+## What this means for code and ops
+
+- **Cluster rules are now real, not hypothetical** (`all-in-1UbuntuDevelopment.mdc` §3–§6):
+  - FE + BE stay same-origin behind HAProxy (no CORS).
+  - App servers are stateless — Postgres (or Redis) for shared state, no in-process session memory.
+  - **Writes / DDL → Primary on xbox1.** **Reads → local Replica on xbox3.** Tolerate replication lag or read Primary for read-your-writes.
+  - `vault_cluster_state` is read **and** written on Primary (xbox1).
+- **Schema parity:** DDL is applied on the Primary (xbox1); the Replica (xbox3) follows via replication. Mac ↔ Ubuntu parity checks (`isdbsame`) compare against the Primary.
+- **SSH:** same hardening as `ssh.mdc` (port `59221`, `IdentitiesOnly`, `~/.ssh/xbox2.pem` key unless Andrew provides new keys). Scripts / aliases that still hard-code `192.168.222.202` (xbox2) must be pointed at xbox1 / xbox3 as the cutover happens — ask Andrew which host before changing deploy targets.
+- **Config files** listed in `ubuntu_config_files.mdc` now split by role: HAProxy, Nginx and Postgres Primary configs on xbox1; FE/BE `.env` and Postgres Replica configs on xbox3.

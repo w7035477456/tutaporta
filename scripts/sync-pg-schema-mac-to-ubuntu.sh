@@ -10,7 +10,7 @@
 # Mac ~/b:
 #   alias syncdbmacubuntu='$HOME/code/main/scripts/sync-pg-schema-mac-to-ubuntu.sh'
 #
-# SSH: same as f2 / isdbsame (deploy-ssh-mac.sh: port 59221, IdentitiesOnly, corruptedKey_march2024).
+# SSH: same as f2 / isdbsame (deploy-ssh-mac.sh: port 59221, IdentitiesOnly, ~/.ssh/xbox2.pem).
 # Exit codes: 0 = SQL generated (or already same), 2 = error
 set -uo pipefail
 
