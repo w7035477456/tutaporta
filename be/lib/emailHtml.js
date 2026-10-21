@@ -2,23 +2,23 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-/** CID for inline logo in all transactional emails. */
-export const EMAIL_LOGO_CID = 'tutamallwebsitelogo';
+/** CID for inline header banner in all outgoing emails. */
+export const EMAIL_LOGO_CID = 'bannertutamall';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Inline logo from fe/src/assets/images/tutamallwebsitelogo.png (or EMAIL_LOGO_PATH). */
+/** Inline header banner fe/src/assets/images/BannerTutaMall.png; EMAIL_LOGO_PATH only if the banner file is missing. */
 export function getEmailLogoAttachment() {
   const envPath = (process.env.EMAIL_LOGO_PATH || process.env.REGISTRATION_EMAIL_LOGO_PATH)?.trim();
   const candidates = [
-    envPath,
-    path.join(__dirname, '../../fe/src/assets/images/tutamallwebsitelogo.png')
+    path.join(__dirname, '../../fe/src/assets/images/BannerTutaMall.png'),
+    envPath
   ].filter(Boolean);
 
   for (const logoPath of candidates) {
     if (fs.existsSync(logoPath)) {
       return {
-        filename: 'tutamallwebsitelogo.png',
+        filename: path.basename(logoPath),
         path: logoPath,
         cid: EMAIL_LOGO_CID
       };
@@ -33,7 +33,7 @@ export const getRegistrationEmailLogoAttachment = getEmailLogoAttachment;
 export function buildEmailLogoHeaderHtml() {
   if (!getEmailLogoAttachment()) return '';
   return `<p style="margin: 0 0 24px; text-align: center;">
-    <img src="cid:${EMAIL_LOGO_CID}" alt="Welcome to our TutaMall.com" style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto;" />
+    <img src="cid:${EMAIL_LOGO_CID}" alt="TutaMall.com" style="width: 100%; max-width: 600px; height: auto; display: block; margin: 0 auto;" />
   </p>`;
 }
 

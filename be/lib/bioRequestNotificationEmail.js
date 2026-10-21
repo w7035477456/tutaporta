@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import pool from '../db/connection.js';
 import { OUTBOUND_EMAIL_FROM_HEADER } from './emailFrom.js';
 import { sendOutboundMail } from './outboundMail.js';
+import { wrapEmailHtml } from './emailHtml.js';
 import { getPublicAppUrl } from '../utils/publicAppUrl.js';
 
 const LOG_PREFIX = '[bioRequestNotificationEmail]';
@@ -70,7 +71,9 @@ function buildEmailBodies({ requesterLabel, recipientLabel, briefRequested, full
   });
   const subject = `Bio request from ${requesterLabel}`;
   const text = `${bellLine}.\n\nSign in to respond on Received Bio Requests:\n${actionUrl}\n`;
-  const html = `<p>${bellLine}.</p><p><a href="${actionUrl}">Open Received Bio Requests</a> to approve or deny.</p>`;
+  const html = wrapEmailHtml(
+    `<p>${bellLine}.</p><p><a href="${actionUrl}">Open Received Bio Requests</a> to approve or deny.</p>`
+  );
   return { subject, text, html };
 }
 

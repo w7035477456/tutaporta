@@ -45,6 +45,16 @@ const fieldWithRightImageRowSx = {
   minWidth: 0
 };
 
+/** Fixed green — Minimal Palete remaps --theme-action-green-color away from green. */
+const SIGN_IN_GREEN = '#60C446';
+/** Triple `&` outranks the base hover rule without replacing its `@media (hover: hover)` block. */
+const signInFixedGreenSx = {
+  '&&&:not(.Mui-disabled)': { bgcolor: `${SIGN_IN_GREEN} !important` }
+};
+
+const LOGIN_EMAIL_INPUT_ID = 'outlined-adornment-email-login';
+const LOGIN_PASSWORD_INPUT_ID = 'outlined-adornment-password-login';
+
 /** Input grows with modal width; graphic stays fixed-size at the content’s right edge. */
 const fieldWithRightImageInputColSx = {
   flex: '1 1 0%',
@@ -156,9 +166,36 @@ export default function AuthLogin() {
   const [googlePasswordHelpOpen, setGooglePasswordHelpOpen] = useState(false);
   const isDemoAliasLogin = isDemoLoginAliasId(email);
   const passwordVisible = showPassword || isDemoAliasLogin;
-  const isFormValid = email.trim().length > 0 && (isDemoAliasLogin || password.trim().length > 0);
+  /** Chrome hides autofilled values from JS until a user gesture; :-webkit-autofill still matches. */
+  const [credentialsAutofilled, setCredentialsAutofilled] = useState(false);
+  const isFormValid =
+    (email.trim().length > 0 && (isDemoAliasLogin || password.trim().length > 0)) || credentialsAutofilled;
   /** Compact/mobile: allow login, then show post-login upload chooser (not the old hard block). */
   const signInDisabled = isLoading || !isFormValid || maxAttemptsReached;
+
+  useEffect(() => {
+    const isAutofilled = (el) => {
+      try {
+        return Boolean(el?.matches(':-webkit-autofill'));
+      } catch {
+        return false;
+      }
+    };
+    let ticks = 0;
+    const timer = window.setInterval(() => {
+      ticks += 1;
+      const emailEl = document.getElementById(LOGIN_EMAIL_INPUT_ID);
+      const passwordEl = document.getElementById(LOGIN_PASSWORD_INPUT_ID);
+      const emailFilled = Boolean(emailEl?.value?.trim()) || isAutofilled(emailEl);
+      const passwordFilled = Boolean(passwordEl?.value) || isAutofilled(passwordEl);
+      setCredentialsAutofilled(emailFilled && passwordFilled && (isAutofilled(emailEl) || isAutofilled(passwordEl)));
+      if (emailEl?.value) setEmail(emailEl.value);
+      if (passwordEl?.value) setPassword(passwordEl.value);
+      if (ticks >= 40) window.clearInterval(timer);
+    }, 250);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setLoginCredentials(email, password);
@@ -197,6 +234,7 @@ export default function AuthLogin() {
     const next = event.target.value;
     const nextIsDemo = isDemoLoginAliasId(next);
     const prevIsDemo = isDemoLoginAliasId(email);
+    setCredentialsAutofilled(false);
     setEmail(next);
     if (nextIsDemo && !prevIsDemo) {
       setShowPassword(true);
@@ -282,8 +320,11 @@ export default function AuthLogin() {
     setErrorSecondary('');
     setMaxAttemptsReached(false);
 
+    const submitEmail = email || document.getElementById(LOGIN_EMAIL_INPUT_ID)?.value || '';
+    const submitPassword = password || document.getElementById(LOGIN_PASSWORD_INPUT_ID)?.value || '';
+
     try {
-      const response = await login(email, password, false);
+      const response = await login(submitEmail, submitPassword, false);
       completeLoginNavigation(response);
     } catch (err) {
       const responseData = err?.response?.data;
@@ -306,7 +347,13 @@ export default function AuthLogin() {
   };
 
   const signInButton = (
-    <GreenButton type="submit" disabled={signInDisabled} hoverTopmost {...guestDemoAllowProps()}>
+    <GreenButton
+      type="submit"
+      disabled={signInDisabled}
+      hoverTopmost
+      sx={signInFixedGreenSx}
+      {...guestDemoAllowProps()}
+    >
       {isLoading ? 'Signing in...' : 'Sign In'}
     </GreenButton>
   );
@@ -351,7 +398,7 @@ export default function AuthLogin() {
       <Box sx={{ ...fieldWithRightImageRowSx, mb: 2 }}>
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
-            id="outlined-adornment-email-login"
+            id={LOGIN_EMAIL_INPUT_ID}
             label="Email or Phone"
             type="text"
             value={email}
@@ -379,12 +426,16 @@ export default function AuthLogin() {
       <Box sx={fieldWithRightImageRowSx}>
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
-            id="outlined-adornment-password-login"
+            id={LOGIN_PASSWORD_INPUT_ID}
             label="Password"
             type={passwordVisible ? 'text' : 'password'}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setCredentialsAutofilled(false);
+              setPassword(e.target.value);
+            }}
             name="password"
+            autoComplete="current-password"
             required={!isDemoAliasLogin}
             inputProps={{ onKeyDown: handleCredentialKeyDown }}
             endAdornment={

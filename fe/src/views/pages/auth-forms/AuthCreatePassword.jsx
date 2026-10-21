@@ -996,16 +996,21 @@ export default function AuthCreatePassword() {
               mt: 2,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 1,
-              flexWrap: 'nowrap',
+              justifyContent: { xs: 'center', sm: 'space-between' },
+              gap: { xs: 1.5, sm: 1 },
+              flexWrap: { xs: 'wrap', sm: 'nowrap' },
               width: '100%',
               minWidth: 0
             }}
           >
             <Typography
               variant="body2"
-              sx={{ color: 'var(--theme-primary-color)', fontWeight: 600, flex: '1 1 auto', minWidth: 0 }}
+              sx={{
+                color: 'var(--theme-primary-color)',
+                fontWeight: 600,
+                flex: { xs: '1 1 100%', sm: '1 1 auto' },
+                minWidth: 0
+              }}
             >
               Phone:{' '}
               <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
@@ -1061,59 +1066,67 @@ export default function AuthCreatePassword() {
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: 'auto 1fr auto',
+                gridTemplateColumns: { xs: '1fr 1fr', sm: 'auto 1fr auto' },
+                gridTemplateAreas: { xs: '"digits digits" "clear verify"', sm: '"clear digits verify"' },
                 alignItems: 'end',
-                columnGap: { xs: 0.5, sm: 1 },
+                columnGap: { xs: 2, sm: 1 },
+                rowGap: { xs: 2, sm: 0 },
                 width: '100%',
                 minWidth: 0
               }}
               onPaste={handleVerificationSlotsPaste}
             >
-              <Button
-                type="button"
-                variant="contained"
-                size="medium"
-                onClick={handleClearVerificationCode}
-                disabled={!isClearSmsCodeEnabled}
-                sx={{
-                  ...authButtonBoldSx,
-                  ...smsCompactPillButtonSx,
-                  flexShrink: 0,
-                  ...(isClearSmsCodeEnabled
-                    ? sendSmsCodeButtonSx
-                    : {
-                        ...phoneFlowGreyButtonDisabledSx,
-                        borderRadius: 999,
-                        textTransform: 'none',
-                        boxShadow: 'none'
-                      })
-                }}
-              >
-                Clear
-              </Button>
+              <Box sx={{ gridArea: 'clear', display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                <Button
+                  type="button"
+                  variant="contained"
+                  size="medium"
+                  onClick={handleClearVerificationCode}
+                  disabled={!isClearSmsCodeEnabled}
+                  sx={{
+                    ...authButtonBoldSx,
+                    ...smsCompactPillButtonSx,
+                    flexShrink: 0,
+                    ...(isClearSmsCodeEnabled
+                      ? sendSmsCodeButtonSx
+                      : {
+                          ...phoneFlowGreyButtonDisabledSx,
+                          borderRadius: 999,
+                          textTransform: 'none',
+                          boxShadow: 'none'
+                        })
+                  }}
+                >
+                  Clear
+                </Button>
+              </Box>
 
-              <SmsVerificationDigitRow
-                codeChars={codeChars}
-                enabled={isSmsCodeEntryEnabled}
-                hasError={!!error || smsCodeIncorrect}
-                slotRefs={verificationSlotRefs}
-                onSlotChange={handleVerificationSlotChange}
-                onSlotKeyDown={handleVerificationSlotKeyDown}
-                onPaste={handleVerificationSlotsPaste}
-              />
+              <Box sx={{ gridArea: 'digits', minWidth: 0 }}>
+                <SmsVerificationDigitRow
+                  codeChars={codeChars}
+                  enabled={isSmsCodeEntryEnabled}
+                  hasError={!!error || smsCodeIncorrect}
+                  slotRefs={verificationSlotRefs}
+                  onSlotChange={handleVerificationSlotChange}
+                  onSlotKeyDown={handleVerificationSlotKeyDown}
+                  onPaste={handleVerificationSlotsPaste}
+                />
+              </Box>
 
-              <GreenButton
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  void handleVerifySms(e);
-                }}
-                disabled={isVerifyingSms || !isVerifySmsEnabled}
-                sx={signupActionGreenButtonSx}
-              >
-                {isVerifyingSms ? 'Verifying...' : 'Verify SMS'}
-              </GreenButton>
+              <Box sx={{ gridArea: 'verify', display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' } }}>
+                <GreenButton
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void handleVerifySms(e);
+                  }}
+                  disabled={isVerifyingSms || !isVerifySmsEnabled}
+                  sx={signupActionGreenButtonSx}
+                >
+                  {isVerifyingSms ? 'Verifying...' : 'Verify SMS'}
+                </GreenButton>
+              </Box>
             </Box>
 
             {smsCodeIncorrect ? (

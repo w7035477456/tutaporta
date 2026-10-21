@@ -56,7 +56,7 @@ export default function CreateHomeShortcutButton() {
   return (
     <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
       <ButtonBase type="button" onClick={onClick} sx={buttonSx}>
-        {'Create Home\nShort Cut'}
+        {'Add to\nHome Screen'}
       </ButtonBase>
       {message ? (
         <Typography role="status" sx={{ color: '#FFFF00', fontSize: '0.85rem', textAlign: 'center', px: 1 }}>

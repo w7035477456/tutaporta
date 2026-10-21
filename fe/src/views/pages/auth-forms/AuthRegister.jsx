@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 
 // material-ui
 import Checkbox from '@mui/material/Checkbox';
+import CheckIcon from '@mui/icons-material/Check';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -111,6 +112,43 @@ const registerConsentCheckboxSx = {
 
 /** Sign Up background — overrides the selected-button theme color on this button only. */
 const SIGN_UP_BUTTON_GREEN = '#60C447';
+const SIGN_UP_BUTTON_DISABLED_GREY = '#737373';
+
+/** Grey until email + phone + consent are all complete. */
+const signUpButtonSx = {
+  '--theme-secondary-color': SIGN_UP_BUTTON_GREEN,
+  '&.Mui-disabled': {
+    '--theme-secondary-color': SIGN_UP_BUTTON_DISABLED_GREY,
+    bgcolor: `${SIGN_UP_BUTTON_DISABLED_GREY} !important`,
+    color: '#000000 !important',
+    WebkitTextFillColor: '#000000',
+    opacity: 1,
+    boxShadow: 'none'
+  }
+};
+
+/** Unchecked consent checkbox blinks yellow/red until checked; checked = yellow box + check mark. */
+const consentBlinkKeyframes = {
+  '@keyframes registerConsentBlink': {
+    '0%, 100%': { backgroundColor: '#FFFF00' },
+    '50%': { backgroundColor: '#FF0000' }
+  }
+};
+
+const registerConsentCheckboxStateSx = (isChecked) => ({
+  ...consentBlinkKeyframes,
+  borderRadius: '4px',
+  bgcolor: '#FFFF00',
+  '& .MuiSvgIcon-root': {
+    color: '#000000'
+  },
+  ...(isChecked
+    ? { outline: '2px solid #000000', outlineOffset: '-2px' }
+    : {
+        animation: 'registerConsentBlink 1s steps(1, end) infinite',
+        '@media (prefers-reduced-motion: reduce)': { animation: 'none', bgcolor: '#FF0000' }
+      })
+});
 
 /** I agree copy — always black on #FFF2CD regardless of theme */
 const registerConsentCopyBoxSx = {
@@ -479,7 +517,7 @@ export default function AuthRegister() {
           transformOrigin="center"
           type="submit"
           disabled={isSubmitting || !isSignUpEnabled}
-          sx={{ '--theme-secondary-color': SIGN_UP_BUTTON_GREEN }}
+          sx={signUpButtonSx}
         >
           {isSubmitting ? (googleBound ? 'Creating account…' : 'Sending...') : 'Sign Up'}
         </SelectedButtonTemplate>
@@ -491,7 +529,8 @@ export default function AuthRegister() {
           onChange={(e) => setChecked(e.target.checked)}
           name="checked"
           color="primary"
-          sx={registerConsentCheckboxSx}
+          checkedIcon={<CheckIcon />}
+          sx={{ ...registerConsentCheckboxSx, ...registerConsentCheckboxStateSx(checked) }}
         />
         <Box className={LIGHT_SURFACE_CLASS} sx={registerConsentCopyBoxSx}>
           <Typography variant="body2" sx={{ color: '#000000' }}>

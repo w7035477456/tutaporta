@@ -15,6 +15,7 @@ import AuthStandardDialogFrame from './AuthStandardDialogFrame';
 import Logo from 'ui-component/Logo';
 import Footer from 'layout/MainLayout/Footer';
 import AuthLogin from '../auth-forms/AuthLogin';
+import CreateHomeShortcutButton from 'ui-component/CreateHomeShortcutButton';
 import SessionEndNoticeDialog from 'ui-component/SessionEndNoticeDialog';
 import InstallQrCard from 'ui-component/InstallQrCard';
 import { getAuthFooterHeightVh } from 'config/authFooterEnv';
@@ -170,6 +171,7 @@ function Login() {
                     Login
                   </Box>
                 </Typography>
+                <CreateHomeShortcutButton />
                 <Typography
                   variant="caption"
                   sx={{ fontSize: '16px', textAlign: 'center', color: 'var(--theme-primary-color)' }}
