@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import YellowButtonTemplate from 'ui-component/YellowButtonTemplate';
 
 const PUBLIC_ORIGIN = 'https://tutamall.com';
 
@@ -54,7 +54,7 @@ export default function InstallQrCard({ compact = false }) {
         />
       </Box>
       <Typography sx={{ color: '#ffffff', fontSize: compact ? '0.65rem' : '1rem', wordBreak: 'break-all' }}>{url}</Typography>
-      <ColorTemplate13DisableGreenButton
+      <YellowButtonTemplate
         type="button"
         onClick={onDownload}
         sx={
@@ -70,7 +70,7 @@ export default function InstallQrCard({ compact = false }) {
         }
       >
         Download QR Image
-      </ColorTemplate13DisableGreenButton>
+      </YellowButtonTemplate>
     </Stack>
   );
 }

@@ -103,9 +103,9 @@ const registerConsentCheckboxSx = {
   mt: 0.25,
   flexShrink: 0,
   '& .MuiSvgIcon-root': {
-    width: getDesktopIconSizeVw(),
-    height: getDesktopIconSizeVw(),
-    fontSize: getDesktopIconSizeVw()
+    width: `max(${getDesktopIconSizeVw()}, 28px)`,
+    height: `max(${getDesktopIconSizeVw()}, 28px)`,
+    fontSize: `max(${getDesktopIconSizeVw()}, 28px)`
   }
 };
 

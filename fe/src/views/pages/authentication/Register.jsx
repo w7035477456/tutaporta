@@ -14,6 +14,7 @@ import AuthStandardDialogFrame from './AuthStandardDialogFrame';
 import Logo from 'ui-component/Logo';
 import Footer from 'layout/MainLayout/Footer';
 import AuthRegister from '../auth-forms/AuthRegister';
+import CreateHomeShortcutButton from 'ui-component/CreateHomeShortcutButton';
 import {
   authEnvTextFontSize,
   authEnvTitleFontSize,
@@ -150,6 +151,7 @@ export default function Register() {
                   {referralMessage}
                 </Typography>
               ) : null}
+              <CreateHomeShortcutButton />
               <Stack sx={{ alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                 <Typography
                   component="h1"

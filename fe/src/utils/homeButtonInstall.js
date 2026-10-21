@@ -1,12 +1,14 @@
-/** Chrome install prompt captured on /mobile so Make Home Button can open it. */
+/** Chrome install prompt captured on /mobile and /register so Make Home Button / Create Home Short Cut can open it. */
 
 let deferredPrompt = null;
 const listeners = new Set();
 
+const INSTALL_PROMPT_PATHS = new Set(['/mobile', '/register', '/pages/register']);
+
 function isMobileHomePath() {
   if (typeof window === 'undefined') return false;
   const path = String(window.location.pathname || '').replace(/\/+$/, '') || '/';
-  return path === '/mobile';
+  return INSTALL_PROMPT_PATHS.has(path);
 }
 
 function notify() {
