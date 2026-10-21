@@ -13,6 +13,7 @@ import {
   readRecordVaultApiError,
   unlockRecordVaultTutaDrive
 } from 'api/recordVaultFe';
+import { isRecordVaultE2eUnlocked } from 'utils/recordVaultClientSession';
 import TutaNotesBrandTitle from './TutaNotesBrandTitle';
 import {
   TUTANOTES_CLOUD_LOGO,
@@ -56,7 +57,7 @@ export default function RecordVaultTutaDriveGate({
     try {
       const status = await fetchRecordVaultTutaDriveStatus();
       setMemberFolder(String(status?.tutadrive?.memberFolder || '').trim());
-      if (status?.session?.unlocked) {
+      if (status?.session?.unlocked && isRecordVaultE2eUnlocked()) {
         onUnlocked?.();
       }
     } catch (err) {

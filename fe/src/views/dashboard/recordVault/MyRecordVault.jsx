@@ -18,7 +18,7 @@ import {
   setRecordVaultBridgeStorageType
 } from 'api/recordVaultFe';
 import { useAuth } from 'contexts/AuthContext';
-import { clearRecordVaultE2eSession } from 'utils/recordVaultClientSession';
+import { clearRecordVaultE2eSession, isRecordVaultE2eUnlocked } from 'utils/recordVaultClientSession';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import RecordVaultAccessGate from './RecordVaultAccessGate';
 import RecordVaultTutaDriveGate from './RecordVaultTutaDriveGate';
@@ -425,7 +425,9 @@ export default function MyRecordVault() {
           : Promise.resolve(null),
         localUsbOffered ? fetchRecordVaultUsbStatus().catch(() => null) : Promise.resolve(null)
       ]);
-      setTutaCloudUnlocked(Boolean(oneDriveStatus?.session?.unlocked));
+      // Server session outlives this tab's DEK (reload / revisit) — re-ask the Encrypt Password so
+      // Backup can seal with it instead of prompting again.
+      setTutaCloudUnlocked(Boolean(oneDriveStatus?.session?.unlocked) && isRecordVaultE2eUnlocked());
       setUsbUnlocked(Boolean(usbStatus?.session?.unlocked));
       const sessionUsbLabel = String(usbStatus?.session?.label || '').trim();
       if (usbStatus?.session?.unlocked && sessionUsbLabel && sessionUsbLabel !== 'OneDrive') {
