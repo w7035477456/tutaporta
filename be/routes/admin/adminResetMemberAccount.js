@@ -1,5 +1,6 @@
 import { hardResetMemberAccount, softResetMemberAccount } from '../../utils/adminResetMemberAccount.js';
 import { allowSinglesMutationForId } from '../../utils/systemToolsAdmin.js';
+import { allowAdminActionOnAccount } from '../../utils/protectedAccounts.js';
 
 function parseSinglesId(raw) {
   const id = Math.trunc(Number(raw));
@@ -16,6 +17,9 @@ export async function postAdminSinglesSoftReset(req, res) {
     return res.status(400).json({ error: 'singlesId is required.' });
   }
   if (!(await allowSinglesMutationForId(res, singlesId))) {
+    return;
+  }
+  if (!(await allowAdminActionOnAccount(res, singlesId))) {
     return;
   }
 
@@ -39,6 +43,9 @@ export async function postAdminSinglesHardReset(req, res) {
     return res.status(400).json({ error: 'singlesId is required.' });
   }
   if (!(await allowSinglesMutationForId(res, singlesId))) {
+    return;
+  }
+  if (!(await allowAdminActionOnAccount(res, singlesId))) {
     return;
   }
 

@@ -459,7 +459,8 @@ import {
   postAdminClearLockTutaPhotos,
   postAdminSetSinglesMemberCategory,
   postAdminSetSinglesStatus,
-  postAdminSinglesLookupAll
+  postAdminSinglesLookupAll,
+  postAdminSinglesSetFields
 } from './routes/admin/adminAuditRegistrationLookup.js';
 import {
   postAdminSinglesHardReset,
@@ -1383,6 +1384,7 @@ app.post('/api/admin/audit-registrations/lookup', requireAuth, requireAdminRole,
 app.post('/api/admin/login-log/lookup', requireAuth, requireAdminRole, postAdminLoginLogLookup);
 app.post('/api/admin/login-log/lookup-all', requireAuth, requireAdminRole, postAdminLoginLogLookupAll);
 app.post('/api/admin/singles/lookup-all', requireAuth, requireAdminRole, postAdminSinglesLookupAll);
+app.post('/api/admin/singles/set-fields', requireAuth, requireAdminRole, postAdminSinglesSetFields);
 app.post('/api/admin/singles/cycle-status', requireAuth, requireAdminRole, postAdminCycleSinglesStatus);
 app.post('/api/admin/singles/set-status', requireAuth, requireAdminRole, postAdminSetSinglesStatus);
 app.post('/api/admin/singles/set-member-category', requireAuth, requireAdminRole, postAdminSetSinglesMemberCategory);

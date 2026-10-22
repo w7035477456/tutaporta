@@ -71,7 +71,7 @@ function readEnrollmentPrefs(prefs) {
 
 /**
  * Yellow box in a tile's top-right corner; red check = enrolled. `disabled` = greyed box that can never be checked.
- * `locked` = always checked and cannot be unchecked.
+ * `locked` = always checked and cannot be unchecked (light grey box, red check).
  */
 function MallTileCheckbox({ checked, label, onToggle, disabled = false, locked = false }) {
   const interactive = Boolean(onToggle) && !disabled && !locked;
@@ -126,7 +126,7 @@ function MallTileCheckbox({ checked, label, onToggle, disabled = false, locked =
         width: 48,
         height: 48,
         boxSizing: 'border-box',
-        bgcolor: disabled ? '#9e9e9e' : '#ffeb3b',
+        bgcolor: disabled ? '#9e9e9e' : locked ? '#bdbdbd' : '#ffeb3b',
         border: disabled ? '3px solid #616161' : '3px solid #000',
         borderRadius: 1,
         boxShadow: '0 2px 6px rgba(0, 0, 0, 0.5)',

@@ -1,5 +1,6 @@
 import pool from '../../db/connection.js';
 import { allowSinglesMutationForId } from '../../utils/systemToolsAdmin.js';
+import { allowAdminActionOnAccount } from '../../utils/protectedAccounts.js';
 import {
   ADMIN_WIPE_BY_SINGLES_ID_TABLES,
   parseAdminWipeSearchTarget,
@@ -151,6 +152,9 @@ export async function postAdminWipeBySinglesIdDelete(req, res) {
   if (!(await allowSinglesMutationForId(res, singlesId))) {
     return;
   }
+  if (!(await allowAdminActionOnAccount(res, singlesId))) {
+    return;
+  }
 
   if (tableKey === WIPE_PHOTO_FOLDER_KEY) {
     try {
@@ -218,6 +222,9 @@ export async function postAdminWipeBySinglesIdCascadeDelete(req, res) {
   }
 
   if (!(await allowSinglesMutationForId(res, singlesId))) {
+    return;
+  }
+  if (!(await allowAdminActionOnAccount(res, singlesId))) {
     return;
   }
 

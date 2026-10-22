@@ -11,7 +11,8 @@ import {
   materializePastedHtmlImages,
   normalizePastedHtml,
   plainTextToHtml,
-  recordVaultPasteSignature
+  recordVaultPasteSignature,
+  shouldHandleRecordVaultPaste
 } from './recordVaultPasteFromClipboard';
 
 function mockClipboardData({ html = '', plain = '', files = [] } = {}) {
@@ -300,5 +301,18 @@ describeDom('web page paste (amazon.com)', () => {
   it('leaves plain Apple Notes style markup unstyled', () => {
     const html = normalizePastedHtml('<div>Sept 1st rent</div><div><br></div><div>Aug 1st rent</div>');
     expect(html).toBe('<p>Sept 1st rent</p><p><br></p><p>Aug 1st rent</p>');
+  });
+});
+
+describe('shouldHandleRecordVaultPaste', () => {
+  it('lets ProseMirror paste slices copied from a TutaNotes editor (keeps text color)', () => {
+    const html =
+      '<meta charset="utf-8"><p data-pm-slice="1 1 []"><span style="color: rgb(223, 7, 7)">PAID</span></p>';
+    expect(shouldHandleRecordVaultPaste(mockClipboardData({ html, plain: 'PAID' }))).toBe(false);
+  });
+
+  it('still handles external HTML (Apple Notes / Word)', () => {
+    const html = '<p><span style="color: red">PAID</span></p>';
+    expect(shouldHandleRecordVaultPaste(mockClipboardData({ html, plain: 'PAID' }))).toBe(true);
   });
 });

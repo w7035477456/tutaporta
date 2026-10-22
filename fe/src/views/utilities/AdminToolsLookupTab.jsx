@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import ColorTemplate9TableData, { useColorTemplate9AutoFitColumnWidths } from 'ui-component/ColorTemplate9TableData';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
-import { formatMemberCategoryLabel, isAdminMemberCategory } from 'utils/memberCategory';
+import { formatMemberCategoryLabel, isAdminMemberCategory, MEMBER_CATEGORY_VALUES } from 'utils/memberCategory';
 import { themedConfirm } from 'utils/themedDialog';
 import {
   saveAdminSinglesStatus,
   saveAdminSinglesMemberCategory,
   saveAdminSinglesTokenBalance,
+  saveAdminSinglesFields,
   fetchAdminAuditRegistrationLookup,
   fetchAdminSinglesLookupAll,
   softResetAdminMemberAccount,
@@ -35,13 +38,24 @@ import { buildProfilePhotoUrl } from 'utils/profilePhotoUrl';
 import UserRound from 'assets/images/users/profile.jpeg';
 
 import { MIN_AUDIT_COLUMN_WIDTHS_PX, MIN_SINGLES_COLUMN_WIDTHS_PX } from 'utils/adminToolsLookupTableColumns';
-import { truncateColorTemplate9AutoFitText } from 'utils/colorTemplate9AutoFitColumns';
+import {
+  buildColorTemplate9AutoFitGridTemplateColumns,
+  sumColorTemplate9AutoFitColumnWidths,
+  truncateColorTemplate9AutoFitText
+} from 'utils/colorTemplate9AutoFitColumns';
 import { formatVideoFileAge, sortSinglesRowsByVideoAge } from 'utils/formatVideoFileAge';
 
 const CASCADE_DELETE_LABEL = 'Cascd Del';
 const SOFT_RESET_LABEL = 'Default Reset';
 const HARD_RESET_LABEL = 'Factory Reset';
 const LOGIN_RESET_LABEL = 'Login # Reset';
+const PROTECTED_ACCOUNT_TITLE = 'Protected account (PROTECT_ACCOUNTS) — disabled';
+const LOOKUP_BUTTON_ZOOM = 0.5;
+const lookupHalfButtonSx = { whiteSpace: 'nowrap', zoom: LOOKUP_BUTTON_ZOOM };
+const protectedAccountButtonSx = {
+  ...lookupHalfButtonSx,
+  '&.Mui-disabled': { opacity: 0.35, filter: 'grayscale(1)', cursor: 'not-allowed', pointerEvents: 'auto' }
+};
 /** Size / display columns from the first N characters of header + cell text. */
 const LOOKUP_COLUMN_DISPLAY_CHARS = 30;
 
@@ -135,7 +149,7 @@ function LookupImpersonateButton({ targetSinglesId }) {
       type="button"
       disabled={impersonateBusy}
       onClick={() => void handleImpersonateClick()}
-      sx={{ whiteSpace: 'nowrap', width: '100%', maxWidth: '100%' }}
+      sx={{ ...lookupHalfButtonSx, px: 0, minWidth: 0, maxWidth: '100%' }}
     >
       {impersonateBusy ? 'Impersonating…' : 'Impersonate'}
     </SelectedButtonTemplate>
@@ -235,6 +249,11 @@ const lookupScrollHeaderCellSx = {
   }
 };
 
+const lookupHalfHeaderCellSx = {
+  ...lookupScrollHeaderCellSx,
+  '& .MuiTypography-root': { ...lookupScrollHeaderCellSx['& .MuiTypography-root'], zoom: LOOKUP_BUTTON_ZOOM }
+};
+
 const lookupAgeSortHeaderSx = {
   ...lookupScrollHeaderCellSx,
   cursor: 'pointer',
@@ -321,26 +340,27 @@ const lookupPhotoAvatarSx = {
 
 const SINGLES_COL = {
   PHOTO: 0,
-  ALIAS: 1,
-  EMAIL: 2,
-  SINGLES_ID: 3,
-  MEMBER_ID: 4,
-  IMPERSONATE: 5,
-  STATUS: 6,
-  TOKEN_BALANCE: 7,
-  PHONE: 8,
-  CASCADE_DELETE: 9,
-  RESET: 10,
-  HARD_RESET: 11,
-  LOGIN_RESET: 12,
-  MY_REFER_CODE: 13,
-  REFER_BY: 14,
-  VIEW_VIDEO: 15,
-  VIDEO_AGE: 16
+  CATEGORY: 1,
+  ALIAS: 2,
+  EMAIL: 3,
+  SINGLES_ID: 4,
+  MEMBER_ID: 5,
+  CASCADE_DELETE: 6,
+  IMPERSONATE: 7,
+  TOKEN_BALANCE: 8,
+  PHONE: 9,
+  STATUS: 10,
+  RESET: 11,
+  HARD_RESET: 12,
+  LOGIN_RESET: 13,
+  MY_REFER_CODE: 14,
+  REFER_BY: 15,
+  VIEW_VIDEO: 16,
+  VIDEO_AGE: 17
 };
 
-/** Photo, Alias, Email stay pinned left while the rest of the grid scrolls horizontally. */
-const SINGLES_FROZEN_COLUMN_COUNT = 3;
+/** Photo, Category, Alias, Email stay pinned left while the rest of the grid scrolls horizontally. */
+const SINGLES_FROZEN_COLUMN_COUNT = 4;
 
 const AUDIT_COL = {
   SPACER: 0,
@@ -359,7 +379,8 @@ const sectionTitleSx = {
   mb: 0.75
 };
 
-function hasLookupInput({ singlesIdInput, emailInput, aliasInput, memberIdInput, phoneInput }) {
+function hasLookupInput({ singlesIdInput, emailInput, aliasInput, memberIdInput, phoneInput, memberCategoryInput }) {
+  if (String(memberCategoryInput ?? '').trim()) return true;
   if (String(singlesIdInput ?? '').trim()) return true;
   if (String(emailInput ?? '').trim()) return true;
   if (String(aliasInput ?? '').trim()) return true;
@@ -425,31 +446,41 @@ function buildSinglesLookupColumnButtons() {
     null,
     null,
     null,
-    {
-      labels: ['Impersonate', 'Impersonating…'],
-      variant: 'selected'
-    },
-    {
-      labels: statusLabels,
-      variant: 'selected'
-    },
-    null,
     null,
     {
       labels: [CASCADE_DELETE_LABEL, 'Deleting…'],
-      variant: 'selected'
+      variant: 'selected',
+      scale: LOOKUP_BUTTON_ZOOM
+    },
+    {
+      labels: ['Impersonate', 'Impersonating…'],
+      variant: 'selected',
+      chromePx: 12,
+      scale: LOOKUP_BUTTON_ZOOM
+    },
+    null,
+    null,
+    {
+      labels: statusLabels,
+      variant: 'selected',
+      companionTexts: ['18+'],
+      companionGapPx: 12,
+      scale: LOOKUP_BUTTON_ZOOM
     },
     {
       labels: [SOFT_RESET_LABEL, '…'],
-      variant: 'selected'
+      variant: 'selected',
+      scale: LOOKUP_BUTTON_ZOOM
     },
     {
       labels: [HARD_RESET_LABEL, '…'],
-      variant: 'selected'
+      variant: 'selected',
+      scale: LOOKUP_BUTTON_ZOOM
     },
     {
       labels: [LOGIN_RESET_LABEL, '…'],
-      variant: 'selected'
+      variant: 'selected',
+      scale: LOOKUP_BUTTON_ZOOM
     },
     null,
     null,
@@ -486,21 +517,22 @@ function buildSinglesLookupColumnTexts(rows) {
   const statusLabels = SINGLES_STATUS_VALUES.map((value) => formatSinglesStatusLabel(value));
   return [
     ['Photo', ...rows.map(() => 'Photo')],
+    ['Category', ...rows.map((row) => truncateLookupDisplay(formatMemberCategoryLabel(row.memberCategory)))],
     ['Alias', ...rows.map((row) => truncateLookupDisplay(row.alias || '—'))],
     ['Email', ...rows.map((row) => truncateLookupDisplay(row.email || '—'))],
     ['singles_id', ...rows.map((row) => truncateLookupDisplay(row.singlesId ?? '—'))],
     ['member_id', ...rows.map((row) => truncateLookupDisplay(row.memberId ?? '—'))],
+    [
+      CASCADE_DELETE_LABEL,
+      ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : CASCADE_DELETE_LABEL))
+    ],
     ['Impersonate', ...rows.map(() => 'Impersonate')],
+    ['Tokens', ...rows.map((row) => truncateLookupDisplay(formatTokenBalanceDisplay(row.accountBalanceToken)))],
+    ['Phone', ...rows.map((row) => truncateLookupDisplay(row.phone || '—'))],
     [
       'status',
       ...statusLabels.map((label) => truncateLookupDisplay(label)),
       ...rows.map((row) => truncateLookupDisplay(formatSinglesStatusLabel(row.status)))
-    ],
-    ['Tokens', ...rows.map((row) => truncateLookupDisplay(formatTokenBalanceDisplay(row.accountBalanceToken)))],
-    ['Phone', ...rows.map((row) => truncateLookupDisplay(row.phone || '—'))],
-    [
-      CASCADE_DELETE_LABEL,
-      ...rows.map((row) => (isAdminSinglesLookupRow(row) ? '' : CASCADE_DELETE_LABEL))
     ],
     [
       SOFT_RESET_LABEL,
@@ -532,6 +564,92 @@ function buildAuditLookupColumnTexts(rows) {
   ];
 }
 
+const FROZEN_EDGE_STORAGE_KEY = 'adminToolsLookupFrozenEdgeDeltaPx_v1';
+const FROZEN_EDGE_MIN_COLUMN_PX = 60;
+const FROZEN_EDGE_MAX_DELTA_PX = 1200;
+
+function readStoredFrozenEdgeDeltaPx() {
+  if (typeof window === 'undefined') return 0;
+  const n = Math.trunc(Number(window.localStorage.getItem(FROZEN_EDGE_STORAGE_KEY)));
+  return Number.isFinite(n) ? n : 0;
+}
+
+const FROZEN_EDGE_COLOR = 'var(--theme-yellow-color, #FFEB3B)';
+
+/** Drag handle on the right edge of the last frozen column (Email): yellow double line, ↔ arrow in header; double-click resets. */
+function FrozenEdgeDragHandle({ onPointerDown, onReset, showArrow = false }) {
+  return (
+    <Box
+      role="separator"
+      aria-orientation="vertical"
+      title="Drag left / right to resize · double-click to reset"
+      onPointerDown={onPointerDown}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onReset();
+      }}
+      onClick={(e) => e.stopPropagation()}
+      sx={{
+        display: { xs: 'none', sm: 'flex' },
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        right: 0,
+        width: showArrow ? 26 : 10,
+        cursor: 'col-resize',
+        touchAction: 'none',
+        zIndex: 20,
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          right: 1,
+          width: 5,
+          borderLeft: `1.5px solid ${FROZEN_EDGE_COLOR}`,
+          borderRight: `1.5px solid ${FROZEN_EDGE_COLOR}`,
+          boxSizing: 'border-box',
+          opacity: 0.85
+        },
+        '&:hover::after': { opacity: 1, bgcolor: 'rgba(255,235,59,0.35)' }
+      }}
+    >
+      {showArrow ? (
+        <SwapHorizIcon sx={{ color: FROZEN_EDGE_COLOR, fontSize: 20, mr: '7px', pointerEvents: 'none' }} />
+      ) : null}
+    </Box>
+  );
+}
+
+/** Text columns admins can double-click to edit (row key → set-fields body key). */
+const INLINE_EDIT_FIELDS = ['alias', 'email', 'phone', 'memberId', 'myReferCode', 'referByCode'];
+
+function savedInlineFieldsFromRow(row) {
+  return {
+    alias: String(row.alias ?? ''),
+    email: String(row.email ?? ''),
+    phone: String(row.phone ?? ''),
+    memberId: row.memberId != null ? String(row.memberId) : '',
+    myReferCode: String(row.myReferCode ?? ''),
+    referByCode: String(row.referByCode ?? '')
+  };
+}
+
+const inlineEditFieldSx = {
+  ...inputFieldSx,
+  width: '100%',
+  minWidth: 0,
+  '& .MuiInputBase-input': {
+    ...inputFieldSx['& .MuiInputBase-input'],
+    py: 0.5,
+    px: 0.75
+  }
+};
+
+const inlineEditedTextSx = { color: 'var(--theme-yellow-color, #FFEB3B)', fontStyle: 'italic', fontWeight: 700 };
+
 function LookupField({ label, value, onChange, inputMode, pattern }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: '1 1 160px', minWidth: 0 }}>
@@ -557,10 +675,14 @@ export default function AdminToolsLookupTab({ onError }) {
   const [aliasInput, setAliasInput] = useState('');
   const [memberIdInput, setMemberIdInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
+  const [memberCategoryInput, setMemberCategoryInput] = useState('');
   const [singlesRows, setSinglesRows] = useState([]);
   const [savedStatusById, setSavedStatusById] = useState({});
   const [savedMemberCategoryById, setSavedMemberCategoryById] = useState({});
   const [savedAccountBalanceTokenById, setSavedAccountBalanceTokenById] = useState({});
+  const [savedInlineFieldsById, setSavedInlineFieldsById] = useState({});
+  /** { id, field } of the cell currently in edit mode (double-click). */
+  const [editingCell, setEditingCell] = useState(null);
   const [auditRows, setAuditRows] = useState([]);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [lookupAllBusy, setLookupAllBusy] = useState(false);
@@ -637,9 +759,7 @@ export default function AdminToolsLookupTab({ onError }) {
   }, []);
 
   const {
-    columnWidthsPx: singlesTableColumnWidthsPx,
-    gridTemplateColumns: singlesTableGridSx,
-    minTableWidthPx: singlesTableMinWidthPx
+    columnWidthsPx: singlesAutoColumnWidthsPx
   } = useColorTemplate9AutoFitColumnWidths({
       columnTexts: singlesColumnTexts,
       columnButtons: singlesColumnButtons,
@@ -647,6 +767,68 @@ export default function AdminToolsLookupTab({ onError }) {
       maxMeasureChars: LOOKUP_COLUMN_DISPLAY_CHARS,
       enabled: singlesRows.length > 0
     });
+
+  const [frozenEdgeDeltaPx, setFrozenEdgeDeltaPx] = useState(readStoredFrozenEdgeDeltaPx);
+  const frozenEdgeAutoWidthPx = Number(singlesAutoColumnWidthsPx[SINGLES_FROZEN_COLUMN_COUNT - 1]) || 0;
+  const singlesTableColumnWidthsPx = useMemo(() => {
+    const widths = [...singlesAutoColumnWidthsPx];
+    const index = SINGLES_FROZEN_COLUMN_COUNT - 1;
+    widths[index] = Math.max(FROZEN_EDGE_MIN_COLUMN_PX, Math.trunc(frozenEdgeAutoWidthPx + frozenEdgeDeltaPx));
+    return widths;
+  }, [frozenEdgeAutoWidthPx, frozenEdgeDeltaPx, singlesAutoColumnWidthsPx]);
+  const singlesTableGridSx = useMemo(
+    () => buildColorTemplate9AutoFitGridTemplateColumns(singlesTableColumnWidthsPx),
+    [singlesTableColumnWidthsPx]
+  );
+  const singlesTableMinWidthPx = useMemo(
+    () => sumColorTemplate9AutoFitColumnWidths(singlesTableColumnWidthsPx),
+    [singlesTableColumnWidthsPx]
+  );
+
+  const handleFrozenEdgePointerDown = useCallback(
+    (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startDelta = frozenEdgeDeltaPx;
+      const minDelta = FROZEN_EDGE_MIN_COLUMN_PX - frozenEdgeAutoWidthPx;
+      let latest = startDelta;
+      const prevCursor = document.body.style.cursor;
+      const prevUserSelect = document.body.style.userSelect;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      const onMove = (moveEvent) => {
+        latest = Math.min(FROZEN_EDGE_MAX_DELTA_PX, Math.max(minDelta, Math.trunc(startDelta + moveEvent.clientX - startX)));
+        setFrozenEdgeDeltaPx(latest);
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+        document.body.style.cursor = prevCursor;
+        document.body.style.userSelect = prevUserSelect;
+        try {
+          window.localStorage.setItem(FROZEN_EDGE_STORAGE_KEY, String(latest));
+        } catch {
+          // ignore quota / private mode
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    },
+    [frozenEdgeAutoWidthPx, frozenEdgeDeltaPx]
+  );
+
+  const handleFrozenEdgeReset = useCallback(() => {
+    setFrozenEdgeDeltaPx(0);
+    try {
+      window.localStorage.removeItem(FROZEN_EDGE_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const { gridTemplateColumns: auditTableGridSx, minTableWidthPx: auditTableMinWidthPx } =
     useColorTemplate9AutoFitColumnWidths({
@@ -660,8 +842,10 @@ export default function AdminToolsLookupTab({ onError }) {
     const savedStatus = {};
     const savedMemberCategory = {};
     const savedAccountBalanceToken = {};
+    const savedInlineFields = {};
     for (const row of rows) {
       if (row?.singlesId != null) {
+        savedInlineFields[row.singlesId] = savedInlineFieldsFromRow(row);
         savedStatus[row.singlesId] = String(row.status ?? 'blank');
         savedMemberCategory[row.singlesId] = String(row.memberCategory ?? 'PUBLIC');
         savedAccountBalanceToken[row.singlesId] = parseTokenBalanceValue(row.accountBalanceToken);
@@ -670,6 +854,8 @@ export default function AdminToolsLookupTab({ onError }) {
     setSavedStatusById(savedStatus);
     setSavedMemberCategoryById(savedMemberCategory);
     setSavedAccountBalanceTokenById(savedAccountBalanceToken);
+    setSavedInlineFieldsById(savedInlineFields);
+    setEditingCell(null);
   }, []);
 
   const lookupPayload = useCallback(
@@ -678,15 +864,16 @@ export default function AdminToolsLookupTab({ onError }) {
       email: String(emailInput ?? '').trim() || undefined,
       alias: String(aliasInput ?? '').trim() || undefined,
       memberId: String(memberIdInput ?? '').trim() || undefined,
-      phone: String(phoneInput ?? '').trim() || undefined
+      phone: String(phoneInput ?? '').trim() || undefined,
+      memberCategory: memberCategoryInput || undefined
     }),
-    [aliasInput, emailInput, memberIdInput, phoneInput, singlesIdInput]
+    [aliasInput, emailInput, memberCategoryInput, memberIdInput, phoneInput, singlesIdInput]
   );
 
-  const applySinglesLookupResult = useCallback((rows) => {
+  const applySinglesLookupResult = useCallback((rows, { populateFields = true } = {}) => {
     setSinglesRows(rows);
     syncSavedFields(rows);
-    if (rows[0]) {
+    if (populateFields && rows[0]) {
       populateFieldsFromSinglesRow(rows[0], {
         setSinglesIdInput,
         setEmailInput,
@@ -698,9 +885,12 @@ export default function AdminToolsLookupTab({ onError }) {
   }, [syncSavedFields]);
 
   const runLookup = useCallback(async () => {
-    const data = await fetchAdminAuditRegistrationLookup(lookupPayload());
+    const payload = lookupPayload();
+    const data = await fetchAdminAuditRegistrationLookup(payload);
     const rows = Array.isArray(data?.singlesRows) ? data.singlesRows : [];
-    applySinglesLookupResult(rows);
+    const categoryOnly =
+      Boolean(payload.memberCategory) && !payload.singlesId && !payload.email && !payload.alias && !payload.memberId && !payload.phone;
+    applySinglesLookupResult(rows, { populateFields: !categoryOnly });
     setAuditRows(Array.isArray(data?.rows) ? data.rows : []);
     onError?.('');
   }, [applySinglesLookupResult, lookupPayload, onError]);
@@ -714,7 +904,7 @@ export default function AdminToolsLookupTab({ onError }) {
   }, [applySinglesLookupResult, onError]);
 
   const handleLookupClick = useCallback(async () => {
-    if (!hasLookupInput({ singlesIdInput, emailInput, aliasInput, memberIdInput, phoneInput })) {
+    if (!hasLookupInput({ singlesIdInput, emailInput, aliasInput, memberIdInput, phoneInput, memberCategoryInput })) {
       setHasSearched(false);
       setSinglesRows([]);
       setSavedStatusById({});
@@ -741,7 +931,7 @@ export default function AdminToolsLookupTab({ onError }) {
     } finally {
       setLookupBusy(false);
     }
-  }, [aliasInput, emailInput, memberIdInput, onError, phoneInput, runLookup, singlesIdInput]);
+  }, [aliasInput, emailInput, memberCategoryInput, memberIdInput, onError, phoneInput, runLookup, singlesIdInput]);
 
   const handleLookupAllClick = useCallback(async () => {
     setHasSearched(true);
@@ -768,6 +958,7 @@ export default function AdminToolsLookupTab({ onError }) {
     setAliasInput('');
     setMemberIdInput('');
     setPhoneInput('');
+    setMemberCategoryInput('');
     setSinglesRows([]);
     setSavedStatusById({});
     setSavedMemberCategoryById({});
@@ -874,10 +1065,13 @@ export default function AdminToolsLookupTab({ onError }) {
         String(row.status ?? 'blank') !== String(savedStatusById[id] ?? 'blank') ||
         String(row.memberCategory ?? 'PUBLIC') !== String(savedMemberCategoryById[id] ?? 'PUBLIC') ||
         parseTokenBalanceValue(row.accountBalanceToken) !==
-          parseTokenBalanceValue(savedAccountBalanceTokenById[id] ?? 0)
+          parseTokenBalanceValue(savedAccountBalanceTokenById[id] ?? 0) ||
+        INLINE_EDIT_FIELDS.some(
+          (field) => String(row[field] ?? '') !== String(savedInlineFieldsById[id]?.[field] ?? '')
+        )
       );
     },
-    [savedAccountBalanceTokenById, savedMemberCategoryById, savedStatusById]
+    [savedAccountBalanceTokenById, savedInlineFieldsById, savedMemberCategoryById, savedStatusById]
   );
 
   const hasUnsavedStatusChanges = singlesRows.some((row) => rowHasUnsavedChanges(row));
@@ -910,6 +1104,19 @@ export default function AdminToolsLookupTab({ onError }) {
             accountBalanceToken: parseTokenBalanceValue(row.accountBalanceToken)
           });
         }
+        const changedFields = {};
+        for (const field of INLINE_EDIT_FIELDS) {
+          const next = String(row[field] ?? '');
+          if (next !== String(savedInlineFieldsById[row.singlesId]?.[field] ?? '')) changedFields[field] = next.trim();
+        }
+        if (Object.keys(changedFields).length) {
+          try {
+            await saveAdminSinglesFields({ singlesId: row.singlesId, ...changedFields });
+          } catch (err) {
+            const reason = err?.response?.data?.error || err?.message || 'Failed to save';
+            throw new Error(`${row.alias || row.email || `singles_id ${row.singlesId}`}: ${reason}`);
+          }
+        }
       }
       await (lastLookupWasAll ? runLookupAll() : runLookup());
       await Promise.all([
@@ -933,10 +1140,95 @@ export default function AdminToolsLookupTab({ onError }) {
     runLookup,
     runLookupAll,
     savedAccountBalanceTokenById,
+    savedInlineFieldsById,
     savedMemberCategoryById,
     savedStatusById,
     singlesRows
   ]);
+
+  const startCellEdit = useCallback(
+    (row, field) => {
+      if (isAdminSinglesLookupRow(row) || row?.singlesId == null || saveBusy || listBusy) return;
+      setEditingCell({ id: row.singlesId, field });
+    },
+    [listBusy, saveBusy]
+  );
+
+  const setRowField = useCallback((id, field, value) => {
+    setSinglesRows((prev) => prev.map((entry) => (entry.singlesId === id ? { ...entry, [field]: value } : entry)));
+  }, []);
+
+  const revertCellEdit = useCallback(
+    (id, field) => {
+      const saved =
+        field === 'memberCategory'
+          ? String(savedMemberCategoryById[id] ?? 'PUBLIC')
+          : String(savedInlineFieldsById[id]?.[field] ?? '');
+      setRowField(id, field, saved);
+      setEditingCell(null);
+    },
+    [savedInlineFieldsById, savedMemberCategoryById, setRowField]
+  );
+
+  /** Display text, or an input / Category select while that cell is in edit mode. */
+  const renderEditableCellContent = (row, field, displayText, textProps = {}) => {
+    const id = row.singlesId;
+    const editing = editingCell?.id === id && editingCell?.field === field;
+    if (editing && field === 'memberCategory') {
+      return (
+        <TextField
+          select
+          size="small"
+          autoFocus
+          value={String(row.memberCategory ?? 'PUBLIC')}
+          onChange={(e) => {
+            setRowField(id, 'memberCategory', e.target.value);
+            setEditingCell(null);
+          }}
+          SelectProps={{ defaultOpen: true, onClose: () => setEditingCell(null) }}
+          sx={inlineEditFieldSx}
+        >
+          {MEMBER_CATEGORY_VALUES.map((value) => (
+            <MenuItem key={value} value={value}>
+              {value}
+            </MenuItem>
+          ))}
+        </TextField>
+      );
+    }
+    if (editing) {
+      return (
+        <TextField
+          size="small"
+          autoFocus
+          value={String(row[field] ?? '')}
+          onChange={(e) => setRowField(id, field, e.target.value)}
+          onBlur={() => setEditingCell(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') setEditingCell(null);
+            if (e.key === 'Escape') revertCellEdit(id, field);
+          }}
+          onFocus={(e) => e.target.select()}
+          inputProps={{ 'aria-label': `Edit ${field} for singles_id ${id}` }}
+          sx={inlineEditFieldSx}
+        />
+      );
+    }
+    const changed =
+      field === 'memberCategory'
+        ? String(row.memberCategory ?? 'PUBLIC') !== String(savedMemberCategoryById[id] ?? 'PUBLIC')
+        : String(row[field] ?? '') !== String(savedInlineFieldsById[id]?.[field] ?? '');
+    const editable = !isAdminSinglesLookupRow(row);
+    return (
+      <ColorTemplate9TableData.BodyText
+        {...textProps}
+        sx={{ ...lookupBodyTextSx, ...(changed ? inlineEditedTextSx : null), ...(editable ? { cursor: 'text' } : null) }}
+        title={editable ? `${textProps.title ? `${textProps.title} · ` : ''}Double-click to edit` : textProps.title}
+      >
+        {displayText}
+      </ColorTemplate9TableData.BodyText>
+    );
+  };
 
   /** Rendered above and below the singles table so long lists can be saved without scrolling. */
   const singlesSaveButton = (
@@ -1118,7 +1410,7 @@ export default function AdminToolsLookupTab({ onError }) {
     [cascadeDeleteBusyById, listBusy, onError, runLookup, saveBusy]
   );
 
-  const hasInput = hasLookupInput({ singlesIdInput, emailInput, aliasInput, memberIdInput, phoneInput });
+  const hasInput = hasLookupInput({ singlesIdInput, emailInput, aliasInput, memberIdInput, phoneInput, memberCategoryInput });
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'stretch', width: '100%' }}>
@@ -1179,6 +1471,32 @@ export default function AdminToolsLookupTab({ onError }) {
           </Typography>
 
           <LookupField label="Phone:" value={phoneInput} onChange={setPhoneInput} />
+
+          <Typography sx={bigOrSx} aria-hidden>
+            OR
+          </Typography>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: '1 1 160px', minWidth: 0 }}>
+            <Typography sx={labelSx}>Category:</Typography>
+            <TextField
+              select
+              value={memberCategoryInput}
+              onChange={(e) => setMemberCategoryInput(e.target.value)}
+              size="small"
+              fullWidth
+              sx={inputFieldSx}
+              SelectProps={{ displayEmpty: true }}
+            >
+              <MenuItem value="">
+                <em>Any</em>
+              </MenuItem>
+              {MEMBER_CATEGORY_VALUES.map((value) => (
+                <MenuItem key={value} value={value}>
+                  {value}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap', pt: 1.5 }}>
@@ -1223,6 +1541,13 @@ export default function AdminToolsLookupTab({ onError }) {
                     Photo
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
+                    columnIndex={SINGLES_COL.CATEGORY}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}
+                    title="singles.member_category"
+                  >
+                    Category
+                  </ColorTemplate9TableData.HeaderCell>
+                  <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.ALIAS}
                     sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupColumnSortHeaderSx }}
                     onClick={() => handleCycleColumnSort('alias')}
@@ -1239,6 +1564,7 @@ export default function AdminToolsLookupTab({ onError }) {
                     aria-sort={columnSortAria(tableSort, 'email')}
                   >
                     {columnSortHeaderLabel('Email', tableSort, 'email')}
+                    <FrozenEdgeDragHandle showArrow onPointerDown={handleFrozenEdgePointerDown} onReset={handleFrozenEdgeReset} />
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.SINGLES_ID}
@@ -1259,16 +1585,16 @@ export default function AdminToolsLookupTab({ onError }) {
                     {columnSortHeaderLabel('member_id', tableSort, 'memberId')}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
-                    columnIndex={SINGLES_COL.IMPERSONATE}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    columnIndex={SINGLES_COL.CASCADE_DELETE}
+                    sx={{ justifyContent: 'center', ...lookupHalfHeaderCellSx }}
                   >
-                    Impersonate
+                    {CASCADE_DELETE_LABEL}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
-                    columnIndex={SINGLES_COL.STATUS}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupScrollHeaderCellSx }}
+                    columnIndex={SINGLES_COL.IMPERSONATE}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupHalfHeaderCellSx }}
                   >
-                    status
+                    Impersonate
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.TOKEN_BALANCE}
@@ -1283,26 +1609,29 @@ export default function AdminToolsLookupTab({ onError }) {
                   >
                     Phone
                   </ColorTemplate9TableData.HeaderCell>
-                  <ColorTemplate9TableData.HeaderCell sx={{ justifyContent: 'center', ...lookupScrollHeaderCellSx }}>
-                    {CASCADE_DELETE_LABEL}
+                  <ColorTemplate9TableData.HeaderCell
+                    columnIndex={SINGLES_COL.STATUS}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, ...lookupHalfHeaderCellSx }}
+                  >
+                    status
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.RESET}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupHalfHeaderCellSx }}
                     title="Re-apply new-member defaults without deleting user content"
                   >
                     {SOFT_RESET_LABEL}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.HARD_RESET}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupHalfHeaderCellSx }}
                     title="Cascade-delete user content, then re-apply new-member defaults"
                   >
                     {HARD_RESET_LABEL}
                   </ColorTemplate9TableData.HeaderCell>
                   <ColorTemplate9TableData.HeaderCell
                     columnIndex={SINGLES_COL.LOGIN_RESET}
-                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupScrollHeaderCellSx }}
+                    sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'center', ...lookupHalfHeaderCellSx }}
                     title="Reset login attempt count to 0 (max 3 per 24 hours)"
                   >
                     {LOGIN_RESET_LABEL}
@@ -1354,17 +1683,31 @@ export default function AdminToolsLookupTab({ onError }) {
                       />
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.CATEGORY}
+                      sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      onDoubleClick={() => startCellEdit(row, 'memberCategory')}
+                    >
+                      {renderEditableCellContent(
+                        row,
+                        'memberCategory',
+                        truncateLookupDisplay(formatMemberCategoryLabel(row.memberCategory))
+                      )}
+                    </ColorTemplate9TableData.BodyCell>
+                    <ColorTemplate9TableData.BodyCell
                       columnIndex={SINGLES_COL.ALIAS}
                       sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      onDoubleClick={() => startCellEdit(row, 'alias')}
                     >
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
-                        {truncateLookupDisplay(row.alias || '—')}
-                      </ColorTemplate9TableData.BodyText>
+                      {renderEditableCellContent(row, 'alias', truncateLookupDisplay(row.alias || '—'))}
                     </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell columnIndex={SINGLES_COL.EMAIL}>
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx} title={row.email || undefined}>
-                        {truncateLookupDisplay(row.email || '—')}
-                      </ColorTemplate9TableData.BodyText>
+                    <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.EMAIL}
+                      onDoubleClick={() => startCellEdit(row, 'email')}
+                    >
+                      <FrozenEdgeDragHandle onPointerDown={handleFrozenEdgePointerDown} onReset={handleFrozenEdgeReset} />
+                      {renderEditableCellContent(row, 'email', truncateLookupDisplay(row.email || '—'), {
+                        title: row.email || undefined
+                      })}
                       <ColorTemplate9TableData.BodyText sx={{ display: { xs: 'block', sm: 'none' }, opacity: 0.85 }}>
                         {row.singlesId != null ? `singles_id ${row.singlesId}` : 'singles_id —'}
                         {row.memberId != null ? ` · member_id ${row.memberId}` : ''}
@@ -1389,10 +1732,22 @@ export default function AdminToolsLookupTab({ onError }) {
                     <ColorTemplate9TableData.BodyCell
                       columnIndex={SINGLES_COL.MEMBER_ID}
                       sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      onDoubleClick={() => startCellEdit(row, 'memberId')}
                     >
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
-                        {row.memberId ?? '—'}
-                      </ColorTemplate9TableData.BodyText>
+                      {renderEditableCellContent(row, 'memberId', row.memberId === '' || row.memberId == null ? '—' : row.memberId)}
+                    </ColorTemplate9TableData.BodyCell>
+                    <ColorTemplate9TableData.BodyCell sx={{ justifyContent: 'center' }}>
+                      {isAdminSinglesLookupRow(row) ? null : (
+                        <SelectedButtonTemplate
+                          type="button"
+                          disabled={row.protectedAccount || cascadeDeleteBusy || softResetBusy || hardResetBusy || saveBusy || listBusy}
+                          title={row.protectedAccount ? PROTECTED_ACCOUNT_TITLE : undefined}
+                          onClick={() => void handleCascadeDeleteSingles(row)}
+                          sx={protectedAccountButtonSx}
+                        >
+                          {cascadeDeleteBusy ? 'Deleting…' : CASCADE_DELETE_LABEL}
+                        </SelectedButtonTemplate>
+                      )}
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell
                       columnIndex={SINGLES_COL.IMPERSONATE}
@@ -1400,52 +1755,6 @@ export default function AdminToolsLookupTab({ onError }) {
                     >
                       {isAdminSinglesLookupRow(row) ? null : (
                         <LookupImpersonateButton targetSinglesId={row.singlesId} />
-                      )}
-                    </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell
-                      columnIndex={SINGLES_COL.STATUS}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}
-                    >
-                      {isAdminSinglesLookupRow(row) ? (
-                        <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx}>
-                          {formatSinglesStatusLabel(row.status)}
-                          {row.over18Verified === true ? ' · 18+' : ''}
-                        </ColorTemplate9TableData.BodyText>
-                      ) : (
-                        <>
-                          {row.lockTutaNotes ? (
-                            <SelectedButtonTemplate
-                              type="button"
-                              disabled={lockTutaNotesBusy || saveBusy || listBusy}
-                              onClick={() => void handleClearLockTutaNotes(row)}
-                              sx={{ whiteSpace: 'nowrap', width: '100%' }}
-                            >
-                              {lockTutaNotesBusy ? 'Unlocking…' : 'Unlock TutaNotes'}
-                            </SelectedButtonTemplate>
-                          ) : null}
-                          {row.lockTutaPhotos ? (
-                            <SelectedButtonTemplate
-                              type="button"
-                              disabled={lockTutaPhotosBusy || saveBusy || listBusy}
-                              onClick={() => void handleClearLockTutaPhotos(row)}
-                              sx={{ whiteSpace: 'nowrap', width: '100%' }}
-                            >
-                              {lockTutaPhotosBusy ? 'Unlocking…' : 'Unlock TutaPhotos'}
-                            </SelectedButtonTemplate>
-                          ) : null}
-                          <SelectedButtonTemplate
-                            type="button"
-                            disabled={saveBusy}
-                            onClick={() => handleCycleStatus(row.singlesId)}
-                          >
-                            {formatSinglesStatusLabel(row.status)}
-                          </SelectedButtonTemplate>
-                          {row.over18Verified === true ? (
-                            <ColorTemplate9TableData.BodyText sx={{ ...lookupBodyTextSx, fontWeight: 700, mb: 0 }}>
-                              18+
-                            </ColorTemplate9TableData.BodyText>
-                          ) : null}
-                        </>
                       )}
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell
@@ -1477,21 +1786,57 @@ export default function AdminToolsLookupTab({ onError }) {
                     <ColorTemplate9TableData.BodyCell
                       columnIndex={SINGLES_COL.PHONE}
                       sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      onDoubleClick={() => startCellEdit(row, 'phone')}
                     >
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx} title={row.phone || undefined}>
-                        {truncateLookupDisplay(row.phone || '—')}
-                      </ColorTemplate9TableData.BodyText>
+                      {renderEditableCellContent(row, 'phone', truncateLookupDisplay(row.phone || '—'), {
+                        title: row.phone || undefined
+                      })}
                     </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell sx={{ justifyContent: 'center' }}>
-                      {isAdminSinglesLookupRow(row) ? null : (
-                        <SelectedButtonTemplate
-                          type="button"
-                          disabled={cascadeDeleteBusy || softResetBusy || hardResetBusy || saveBusy || listBusy}
-                          onClick={() => void handleCascadeDeleteSingles(row)}
-                          sx={{ whiteSpace: 'nowrap' }}
-                        >
-                          {cascadeDeleteBusy ? 'Deleting…' : CASCADE_DELETE_LABEL}
-                        </SelectedButtonTemplate>
+                    <ColorTemplate9TableData.BodyCell
+                      columnIndex={SINGLES_COL.STATUS}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}
+                    >
+                      {isAdminSinglesLookupRow(row) ? (
+                        <ColorTemplate9TableData.BodyText sx={{ ...lookupBodyTextSx, zoom: LOOKUP_BUTTON_ZOOM }}>
+                          {formatSinglesStatusLabel(row.status)}
+                          {row.over18Verified === true ? ' · 18+' : ''}
+                        </ColorTemplate9TableData.BodyText>
+                      ) : (
+                        <>
+                          {row.lockTutaNotes ? (
+                            <SelectedButtonTemplate
+                              type="button"
+                              disabled={lockTutaNotesBusy || saveBusy || listBusy}
+                              onClick={() => void handleClearLockTutaNotes(row)}
+                              sx={{ ...lookupHalfButtonSx, width: '100%' }}
+                            >
+                              {lockTutaNotesBusy ? 'Unlocking…' : 'Unlock TutaNotes'}
+                            </SelectedButtonTemplate>
+                          ) : null}
+                          {row.lockTutaPhotos ? (
+                            <SelectedButtonTemplate
+                              type="button"
+                              disabled={lockTutaPhotosBusy || saveBusy || listBusy}
+                              onClick={() => void handleClearLockTutaPhotos(row)}
+                              sx={{ ...lookupHalfButtonSx, width: '100%' }}
+                            >
+                              {lockTutaPhotosBusy ? 'Unlocking…' : 'Unlock TutaPhotos'}
+                            </SelectedButtonTemplate>
+                          ) : null}
+                          <SelectedButtonTemplate
+                            type="button"
+                            disabled={saveBusy}
+                            onClick={() => handleCycleStatus(row.singlesId)}
+                            sx={lookupHalfButtonSx}
+                          >
+                            {formatSinglesStatusLabel(row.status)}
+                          </SelectedButtonTemplate>
+                          {row.over18Verified === true ? (
+                            <ColorTemplate9TableData.BodyText sx={{ ...lookupBodyTextSx, fontWeight: 700, mb: 0, zoom: LOOKUP_BUTTON_ZOOM }}>
+                              18+
+                            </ColorTemplate9TableData.BodyText>
+                          ) : null}
+                        </>
                       )}
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell
@@ -1501,9 +1846,10 @@ export default function AdminToolsLookupTab({ onError }) {
                       {isAdminSinglesLookupRow(row) ? null : (
                         <SelectedButtonTemplate
                           type="button"
-                          disabled={softResetBusy || hardResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          disabled={row.protectedAccount || softResetBusy || hardResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          title={row.protectedAccount ? PROTECTED_ACCOUNT_TITLE : undefined}
                           onClick={() => void handleSoftResetMember(row)}
-                          sx={{ whiteSpace: 'nowrap' }}
+                          sx={protectedAccountButtonSx}
                         >
                           {softResetBusy ? '…' : SOFT_RESET_LABEL}
                         </SelectedButtonTemplate>
@@ -1516,9 +1862,10 @@ export default function AdminToolsLookupTab({ onError }) {
                       {isAdminSinglesLookupRow(row) ? null : (
                         <SelectedButtonTemplate
                           type="button"
-                          disabled={hardResetBusy || softResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          disabled={row.protectedAccount || hardResetBusy || softResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          title={row.protectedAccount ? PROTECTED_ACCOUNT_TITLE : undefined}
                           onClick={() => void handleHardResetMember(row)}
-                          sx={{ whiteSpace: 'nowrap' }}
+                          sx={protectedAccountButtonSx}
                         >
                           {hardResetBusy ? '…' : HARD_RESET_LABEL}
                         </SelectedButtonTemplate>
@@ -1531,27 +1878,30 @@ export default function AdminToolsLookupTab({ onError }) {
                       {isAdminSinglesLookupRow(row) ? null : (
                         <SelectedButtonTemplate
                           type="button"
-                          disabled={pwdRetryResetBusy || hardResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
+                          disabled={row.protectedAccount || pwdRetryResetBusy || hardResetBusy || cascadeDeleteBusy || saveBusy || listBusy}
                           onClick={() => void handleResetLoginAttempts(row)}
-                          title={`Current login attempt count: ${pwdRetryCount}`}
-                          sx={{ whiteSpace: 'nowrap' }}
+                          title={row.protectedAccount ? PROTECTED_ACCOUNT_TITLE : `Current login attempt count: ${pwdRetryCount}`}
+                          sx={protectedAccountButtonSx}
                         >
                           {pwdRetryResetBusy ? '…' : LOGIN_RESET_LABEL}
                         </SelectedButtonTemplate>
                       )}
                     </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                      <ColorTemplate9TableData.BodyText sx={lookupBodyTextSx} title={row.myReferCode || undefined}>
-                        {truncateLookupDisplay(row.myReferCode || '—')}
-                      </ColorTemplate9TableData.BodyText>
+                    <ColorTemplate9TableData.BodyCell
+                      sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      onDoubleClick={() => startCellEdit(row, 'myReferCode')}
+                    >
+                      {renderEditableCellContent(row, 'myReferCode', truncateLookupDisplay(row.myReferCode || '—'), {
+                        title: row.myReferCode || undefined
+                      })}
                     </ColorTemplate9TableData.BodyCell>
-                    <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                      <ColorTemplate9TableData.BodyText
-                        sx={lookupBodyTextSx}
-                        title={formatReferByDisplay(row) !== '—' ? formatReferByDisplay(row) : undefined}
-                      >
-                        {truncateLookupDisplay(formatReferByDisplay(row))}
-                      </ColorTemplate9TableData.BodyText>
+                    <ColorTemplate9TableData.BodyCell
+                      sx={{ display: { xs: 'none', sm: 'flex' } }}
+                      onDoubleClick={() => startCellEdit(row, 'referByCode')}
+                    >
+                      {renderEditableCellContent(row, 'referByCode', truncateLookupDisplay(formatReferByDisplay(row)), {
+                        title: formatReferByDisplay(row) !== '—' ? formatReferByDisplay(row) : undefined
+                      })}
                     </ColorTemplate9TableData.BodyCell>
                     <ColorTemplate9TableData.BodyCell sx={viewVideoCellSx}>
                       {Array.isArray(row.videos) && row.videos.length ? (

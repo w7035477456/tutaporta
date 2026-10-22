@@ -477,7 +477,9 @@ export default function RecordVaultTutaCloudBackupDialog({
   folderName = TUTACLOUD_VAULT_FOLDER_DEFAULT,
   tutaDrive = false,
   onFormatted,
-  onRestored
+  onRestored,
+  /** Exit to Mall / Logout with unsaved changes: only Backup is enabled (X too) until a backup succeeds. */
+  requireBackupBeforeClose = false
 }) {
   const fileInputRef = useRef(null);
   const uploadInputRef = useRef(null);
@@ -504,6 +506,17 @@ export default function RecordVaultTutaCloudBackupDialog({
   const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
 
   const backupProgressActive = Boolean(backupProgress);
+  const [requiredBackupDone, setRequiredBackupDone] = useState(false);
+  /** Zip created by Backup during this open — its name shows in red in the slot list. */
+  const [justCreatedFileName, setJustCreatedFileName] = useState('');
+  const backupLocked = requireBackupBeforeClose && !requiredBackupDone;
+
+  useEffect(() => {
+    if (open) {
+      setRequiredBackupDone(false);
+      setJustCreatedFileName('');
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!backupProgressActive) return undefined;
@@ -631,7 +644,7 @@ export default function RecordVaultTutaCloudBackupDialog({
   };
 
   const handleClose = () => {
-    if (busy) return;
+    if (busy || backupLocked) return;
     resetMessages();
     setOpenBackupFileName('');
     setOpenBackupNotebooks([]);
@@ -706,6 +719,8 @@ export default function RecordVaultTutaCloudBackupDialog({
           : 'the password you use to enter TutaNotes';
         setSuccess(`Backup sealed with ${sealedWith} and saved as ${rel}${sizeText} in ${elapsedText}.${noteText}`);
         setSuccessTone('backup');
+        setRequiredBackupDone(true);
+        setJustCreatedFileName(fileName);
       } else {
         const result = await downloadRecordVaultTutaDriveBackupZip();
         const fileName = result?.fileName || TUTACLOUD_VAULT_BACKUP_ZIP_DEFAULT;
@@ -715,6 +730,7 @@ export default function RecordVaultTutaCloudBackupDialog({
           `Backup to zip completed. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
         );
         setSuccessTone('backup');
+        setRequiredBackupDone(true);
       }
       refreshVaultTree();
     } catch (err) {
@@ -1100,7 +1116,7 @@ export default function RecordVaultTutaCloudBackupDialog({
     const fileName = slot?.fileName || '';
     const empty = Boolean(slot?.empty);
     const isActioning = Boolean(fileName) && actioningFile === fileName;
-    const filledDisabled = busy || empty;
+    const filledDisabled = busy || backupLocked || empty;
     return (
       <>
         <GreenButton
@@ -1113,7 +1129,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         </GreenButton>
         <GreenButton
           type="button"
-          disabled={busy}
+          disabled={busy || backupLocked}
           onClick={() => void handleUploadClick(slot)}
           sx={{ ...backupRowButtonSx, opacity: isActioning ? 0.6 : 1 }}
         >
@@ -1236,7 +1252,13 @@ export default function RecordVaultTutaCloudBackupDialog({
         hidden
         onChange={(event) => void handleUploadFile(event)}
       />
-      <ColorTemplate16PopupCenterWide open={open} onClose={handleClose} closeOnBackdrop={!busy}>
+      <ColorTemplate16PopupCenterWide
+        open={open}
+        onClose={handleClose}
+        closeOnBackdrop={!busy && !backupLocked}
+        closeButtonDisabled={busy || backupLocked}
+        closeButtonAriaLabel={backupLocked ? 'Backup first, then close' : 'Close popup'}
+      >
         <ColorTemplate16PopupCenterWide.Title>
           Backup &amp; Restore TutaNotes Cloud
         </ColorTemplate16PopupCenterWide.Title>
@@ -1253,6 +1275,12 @@ export default function RecordVaultTutaCloudBackupDialog({
               : 'If you do not want to store your data on TutaCloud, before you select the "Format TutaNotes Cloud" button below, backup all your data first to a zip file on your storage. Click Backup/Encrypt TutaNote to Cloud as Zip. Once you have done that, you may use Format TutaNotes Cloud to delete your online data. Later, when you decide to restore your backup to TutaCloud, choose Restore below.'}
           </Box>
 
+          {backupLocked ? (
+            <ColorTemplate16PopupCenterWide.ErrorBar>
+              Your TutaNotes changed since the last backup. Click &quot;Backup/Encrypt TutaNote to Cloud as Zip&quot;
+              before leaving. When the backup completes, all buttons unlock and X continues your exit.
+            </ColorTemplate16PopupCenterWide.ErrorBar>
+          ) : null}
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
 
           <Stack spacing={1.5}>
@@ -1267,7 +1295,7 @@ export default function RecordVaultTutaCloudBackupDialog({
               </GreenButton>
               <GreenButton
                 type="button"
-                disabled={busy}
+                disabled={busy || backupLocked}
                 onClick={() => void handleFormat()}
                 sx={actionButtonSx}
               >
@@ -1276,7 +1304,7 @@ export default function RecordVaultTutaCloudBackupDialog({
               {!tutaDriveActive && (
                 <GreenButton
                   type="button"
-                  disabled={busy}
+                  disabled={busy || backupLocked}
                   onClick={handleRestoreClick}
                   sx={restoreYellowButtonSx}
                 >
@@ -1293,15 +1321,22 @@ export default function RecordVaultTutaCloudBackupDialog({
                   !slot.empty && Number(slot.sizeBytes) > 0
                     ? (Number(slot.sizeBytes) / (1024 * 1024)).toFixed(1)
                     : '';
-                const label = slot.empty
-                  ? ''
-                  : mb
-                    ? `${slot.fileName} (${mb}mb)`
-                    : slot.fileName;
+                const justCreated = !slot.empty && Boolean(justCreatedFileName) && slot.fileName === justCreatedFileName;
                 const labelBox = (
                   <Box sx={slot.empty ? backupRowLabelSx : { ...backupRowLabelSx, flex: 'none', minWidth: 0 }}>
                     <Box component="span">
-                      {slot.rowNumber}) {label}
+                      {slot.rowNumber}){' '}
+                      {slot.empty ? null : (
+                        <>
+                          <Box
+                            component="span"
+                            sx={justCreated ? { color: 'var(--theme-error-color, #d32f2f)', fontWeight: 800 } : undefined}
+                          >
+                            {slot.fileName}
+                          </Box>
+                          {mb ? ` (${mb}mb)` : ''}
+                        </>
+                      )}
                     </Box>
                     {!slot.empty && slot.note ? (
                       <Box component="span" sx={backupRowNoteSx}>
@@ -1374,5 +1409,6 @@ RecordVaultTutaCloudBackupDialog.propTypes = {
   folderName: PropTypes.string,
   tutaDrive: PropTypes.bool,
   onFormatted: PropTypes.func,
-  onRestored: PropTypes.func
+  onRestored: PropTypes.func,
+  requireBackupBeforeClose: PropTypes.bool
 };

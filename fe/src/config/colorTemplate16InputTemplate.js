@@ -108,6 +108,11 @@ export function colorTemplate16InputSx(overrides = {}) {
       caretColor: COLOR_TEMPLATE16_TEXT,
       transition: 'background-color 5000s ease-in-out 0s'
     },
+    /* Chrome draws the hovered "Saved info" preview in its own small UA font; ::first-line is the only hook it honors. */
+    '& .MuiInputBase-input:-webkit-autofill::first-line': {
+      ...colorTemplate16InputFontSx,
+      fontFamily: 'inherit'
+    },
     ...overrides
   };
 }

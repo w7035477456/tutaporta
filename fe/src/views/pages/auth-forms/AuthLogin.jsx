@@ -409,7 +409,7 @@ export default function AuthLogin() {
             inputProps={{ onKeyDown: handleCredentialKeyDown }}
           />
           <Typography component="div" sx={fieldCaseHintSx}>
-            Email, phone, member#, alias, or admin — not case sensitive
+            Email, phone — not case sensitive
           </Typography>
         </Box>
         <Box
@@ -453,7 +453,7 @@ export default function AuthLogin() {
             }
           />
           <Typography component="div" sx={fieldCaseHintSx}>
-            Case sensitive
+            Password is case sensitive
           </Typography>
         </Box>
         <Box

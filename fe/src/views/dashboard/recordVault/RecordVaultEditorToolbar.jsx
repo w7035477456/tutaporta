@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { rememberRecordVaultColor } from './recordVaultRepeatColor';
 import { useEditorState } from '@tiptap/react';
 import { themedPrompt } from 'utils/themedDialog';
 import {
@@ -228,21 +229,36 @@ export default function RecordVaultEditorToolbar({ editor }) {
       </div>
 
       <div className="rv-tb__group">
-        <label className="rv-tb__color" title="Text color">
+        <label className="rv-tb__color" title="Text color (Ctrl+Shift+R repeats the last color)">
           <span>A</span>
-          <input type="color" onChange={(e) => chain().setColor(e.target.value).run()} />
+          <input
+            type="color"
+            onChange={(e) => {
+              rememberRecordVaultColor('text', e.target.value);
+              chain().setColor(e.target.value).run();
+            }}
+          />
         </label>
-        <label className="rv-tb__color" title="Highlight color">
+        <label className="rv-tb__color" title="Highlight color (Ctrl+Shift+R repeats the last color)">
           <span className="rv-tb__hl">A</span>
           <input
             type="color"
             defaultValue="#fff176"
-            onChange={(e) => chain().toggleHighlight({ color: e.target.value }).run()}
+            onChange={(e) => {
+              rememberRecordVaultColor('highlight', e.target.value);
+              chain().toggleHighlight({ color: e.target.value }).run();
+            }}
           />
         </label>
-        <label className="rv-tb__color" title="Background color">
+        <label className="rv-tb__color" title="Background color (Ctrl+Shift+R repeats the last color)">
           <span className="rv-tb__bg">A</span>
-          <input type="color" onChange={(e) => chain().setBackgroundColor(e.target.value).run()} />
+          <input
+            type="color"
+            onChange={(e) => {
+              rememberRecordVaultColor('background', e.target.value);
+              chain().setBackgroundColor(e.target.value).run();
+            }}
+          />
         </label>
         <Btn
           title="Clear color / highlight"

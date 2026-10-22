@@ -68,12 +68,13 @@ export function measureColorTemplate9TextsMaxWidthPx(texts, fontSizePx, fontWeig
  * @param {{ variant?: 'colorTemplate9' | 'selected', minWidthPx?: number, maxChars?: number }} [opts]
  */
 export function measureColorTemplate9InCellButtonWidthPx(label, buttonFontSizePx, opts = {}) {
-  const { variant = 'colorTemplate9', minWidthPx = 0, maxChars = 0 } = opts;
+  const { variant = 'colorTemplate9', minWidthPx = 0, maxChars = 0, chromePx: chromeOverridePx } = opts;
   const fontWeight = variant === 'selected' ? 600 : 700;
-  const chromePx =
+  const defaultChromePx =
     variant === 'selected'
       ? COLOR_TEMPLATE9_AUTO_FIT_SELECTED_BUTTON_CHROME_PX
       : COLOR_TEMPLATE9_AUTO_FIT_BUTTON_CHROME_PX;
+  const chromePx = Number.isFinite(chromeOverridePx) ? chromeOverridePx : defaultChromePx;
   const textWidth = measureColorTemplate9TextsMaxWidthPx([label], buttonFontSizePx, fontWeight, maxChars);
   const contentWidth = textWidth + chromePx + COLOR_TEMPLATE9_AUTO_FIT_TEXT_BUFFER_PX;
   return Math.max(Math.trunc(minWidthPx) || 0, Math.ceil(contentWidth));
@@ -86,6 +87,8 @@ export function measureColorTemplate9InCellButtonWidthPx(label, buttonFontSizePx
  * @property {number} [minWidthPx] — sx minWidth on the rendered button
  * @property {string[]} [companionTexts] — text rendered beside the button in the same cell
  * @property {number} [companionGapPx] — gap between companion text and button
+ * @property {number} [scale] — CSS zoom on the rendered buttons; also scales that column's text (header + labels)
+ * @property {number} [chromePx] — override horizontal padding/border slack (e.g. buttons with px: 0)
  */
 
 /**
@@ -95,7 +98,7 @@ export function measureColorTemplate9InCellButtonWidthPx(label, buttonFontSizePx
  */
 export function measureColorTemplate9ColumnButtonsMaxWidthPx(spec, buttonFontSizePx, maxChars = 0) {
   if (!spec?.labels?.length) return 0;
-  const { labels, variant = 'colorTemplate9', minWidthPx = 0, companionTexts = [], companionGapPx = 0 } = spec;
+  const { labels, variant = 'colorTemplate9', minWidthPx = 0, companionTexts = [], companionGapPx = 0, chromePx } = spec;
   const gap = Math.max(0, Math.trunc(companionGapPx) || 0);
   let max = 0;
 
@@ -103,7 +106,8 @@ export function measureColorTemplate9ColumnButtonsMaxWidthPx(spec, buttonFontSiz
     const buttonWidth = measureColorTemplate9InCellButtonWidthPx(labels[i], buttonFontSizePx, {
       variant,
       minWidthPx,
-      maxChars
+      maxChars,
+      chromePx
     });
     const companion = companionTexts[i] ?? companionTexts[0] ?? '';
     const companionWidth = companion
@@ -118,7 +122,8 @@ export function measureColorTemplate9ColumnButtonsMaxWidthPx(spec, buttonFontSiz
       const buttonWidth = measureColorTemplate9InCellButtonWidthPx(labels[0] ?? '', buttonFontSizePx, {
         variant,
         minWidthPx,
-        maxChars
+        maxChars,
+        chromePx
       });
       max = Math.max(max, companionWidth + gap + buttonWidth);
     }
@@ -156,14 +161,13 @@ export function computeColorTemplate9AutoFitColumnWidthsPx({
   return (columnTexts || []).map((texts, index) => {
     const min = Math.max(0, Math.trunc(Number(minWidthsPx[index]) || 0)) || 48;
     const extra = Math.max(0, Math.trunc(Number(extraWidthsPx[index]) || 0));
-    const regular = measureColorTemplate9TextsMaxWidthPx(texts, textFontSizePx, 400, maxChars);
-    const bold = measureColorTemplate9TextsMaxWidthPx(texts, textFontSizePx, 700, maxChars);
+    const rawScale = Number(columnButtons[index]?.scale);
+    const scale = rawScale > 0 ? rawScale : 1;
+    const regular = measureColorTemplate9TextsMaxWidthPx(texts, textFontSizePx * scale, 400, maxChars);
+    const bold = measureColorTemplate9TextsMaxWidthPx(texts, textFontSizePx * scale, 700, maxChars);
     const textWidth = Math.max(regular, bold);
-    const buttonWidth = measureColorTemplate9ColumnButtonsMaxWidthPx(
-      columnButtons[index],
-      buttonFontSizePx,
-      maxChars
-    );
+    const buttonWidth =
+      measureColorTemplate9ColumnButtonsMaxWidthPx(columnButtons[index], buttonFontSizePx, maxChars) * scale;
     const contentWidth = Math.max(textWidth, buttonWidth);
     return Math.max(
       min,

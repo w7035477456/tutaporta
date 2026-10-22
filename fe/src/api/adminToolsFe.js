@@ -239,6 +239,12 @@ export async function saveAdminSinglesMemberCategory({ singlesId, memberCategory
   return data;
 }
 
+/** Admin Tools inline edit: { singlesId, alias?, email?, phone?, memberId?, myReferCode?, referByCode? } */
+export async function saveAdminSinglesFields({ singlesId, ...fields }) {
+  const { data } = await api.post('/api/admin/singles/set-fields', { singlesId, ...fields });
+  return data;
+}
+
 export async function saveAdminSinglesTokenBalance({ singlesId, accountBalanceToken }) {
   const { data } = await api.post('/api/admin/singles/set-token-balance', {
     singlesId,

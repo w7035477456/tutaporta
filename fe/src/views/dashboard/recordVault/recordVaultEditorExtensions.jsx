@@ -29,6 +29,7 @@ import { createSuggestionRender } from './recordVaultEditorSuggestion';
 import { RecordVaultResizableImage } from './recordVaultResizableImage';
 import { RecordVaultAttachmentNode } from './recordVaultAttachmentNode';
 import { RecordVaultSearchHighlight } from './recordVaultSearchHighlight';
+import { RecordVaultRepeatColor } from './recordVaultRepeatColor';
 
 const lowlight = createLowlight(common);
 
@@ -100,6 +101,7 @@ export const RECORD_VAULT_MENTION_ITEMS = [
 /** All FREE TipTap extensions wired for the Record Vault note editor. */
 export function buildRecordVaultEditorExtensions() {
   return [
+    RecordVaultRepeatColor,
     StarterKit.configure({
       codeBlock: false, // replaced by CodeBlockLowlight for syntax highlighting
       link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },

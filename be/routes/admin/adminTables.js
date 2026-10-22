@@ -1,5 +1,6 @@
 import pool from '../../db/connection.js';
 import { allowSinglesMutationForId } from '../../utils/systemToolsAdmin.js';
+import { allowAdminActionOnAccount } from '../../utils/protectedAccounts.js';
 import {
   ADMIN_TOOLS_DB_SCHEMA,
   ADMIN_TOOLS_TABLES,
@@ -214,6 +215,9 @@ export async function postAdminTableCascadeDelete(req, res) {
   }
 
   if (def.key === 'singles' && !(await allowSinglesMutationForId(res, Number(idValue)))) {
+    return;
+  }
+  if (def.key === 'singles' && !(await allowAdminActionOnAccount(res, Number(idValue)))) {
     return;
   }
 

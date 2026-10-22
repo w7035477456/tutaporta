@@ -1,6 +1,9 @@
 import pool from '../../db/connection.js';
 import { allowSinglesMutationForId } from '../../utils/systemToolsAdmin.js';
+import { allowAdminActionOnAccount, isProtectedAccountEmail } from '../../utils/protectedAccounts.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
+import { normalizeUsPhoneDigits } from '../../utils/usPhoneValidation.js';
+import { normalizeReferByCodeDigits } from '../../utils/referByCode.js';
 import { recordAuditRegistrationSinglesStatusChange } from '../../utils/insertAuditRegistration.js';
 import { PASSWORD_ATTEMPT_EPOCH } from '../../utils/passwordAttemptTracking.js';
 import {
@@ -73,8 +76,12 @@ function parseSinglesIdInput(raw) {
   return parsed?.mode === 'exact' ? parsed.value : null;
 }
 
+function parseMemberCategoryLookup(body) {
+  return normalizeMemberCategoryEnum(body?.memberCategory ?? body?.member_category);
+}
+
 function hasLookupInput(body) {
-  return hasAdminLookupInput(body);
+  return hasAdminLookupInput(body) || Boolean(parseMemberCategoryLookup(body));
 }
 
 /**
@@ -189,6 +196,7 @@ function mapSinglesLookupRow(row, videosBySinglesId = new Map()) {
     lockTutaNotes: Boolean(row.lock_tuta_notes),
     lockTutaPhotos: Boolean(row.lock_tuta_photos),
     myReferCode: String(row.my_refer_code ?? '').trim(),
+    protectedAccount: isProtectedAccountEmail(row.email),
     referByCode: String(row.refer_by_code ?? '').trim(),
     referBySinglesId:
       row.refer_by_singles_id != null && Number.isFinite(Number(row.refer_by_singles_id))
@@ -218,6 +226,12 @@ export async function searchSinglesForLookup(db, body) {
   paramIndex = appendAliasCondition(conditions, params, aliasLookup, paramIndex);
   paramIndex = appendMemberIdCondition(conditions, params, memberIdLookup, paramIndex);
   paramIndex = appendPhoneCondition(conditions, params, phoneLookup, paramIndex);
+  const memberCategory = parseMemberCategoryLookup(body);
+  if (memberCategory) {
+    conditions.push(`s.member_category = \$${paramIndex}::outdateddbsnapshotoct2024.member_category_enum`);
+    params.push(memberCategory);
+    paramIndex += 1;
+  }
 
   if (!conditions.length) {
     return [];
@@ -278,12 +292,12 @@ function mapAuditLookupRow(row) {
 
 /**
  * POST /api/admin/audit-registrations/lookup
- * Body: { singlesId?, email?, alias?, memberId?, phone? }
+ * Body: { singlesId?, email?, alias?, memberId?, phone?, memberCategory? }
  */
 export async function postAdminAuditRegistrationLookup(req, res) {
   try {
     if (!hasLookupInput(req.body)) {
-      return res.status(400).json({ error: 'Enter Single Id, Email, Alias, Member Id, or Phone.' });
+      return res.status(400).json({ error: 'Enter Single Id, Email, Alias, Member Id, Phone, or Category.' });
     }
 
     const { rows, criteria } = await searchAuditRegistrations(pool, req.body);
@@ -468,6 +482,9 @@ export async function postAdminResetPasswordAttemptCount(req, res) {
   if (!singlesId) {
     return res.status(400).json({ error: 'singlesId is required.' });
   }
+  if (!(await allowAdminActionOnAccount(res, singlesId))) {
+    return;
+  }
 
   try {
     const { rows } = await pool.query(
@@ -615,5 +632,108 @@ export async function postAdminCycleSinglesStatus(req, res) {
     return res.status(500).json({ error: 'Failed to update singles status.' });
   } finally {
     client.release();
+  }
+}
+
+const SET_FIELDS_UNIQUE_LABELS = {
+  singles_email_unique_idx: 'Email',
+  singles_phone_unique_idx: 'Phone',
+  unique_member_id: 'member_id',
+  singles_my_refer_code_uniq: 'My Refer Code'
+};
+
+/**
+ * Validate admin inline edits → { columns: { col: value }, error? }. Only keys present in body are touched.
+ * @param {Record<string, unknown>} body
+ */
+function parseAdminSinglesFieldEdits(body) {
+  const columns = {};
+  const has = (key) => Object.prototype.hasOwnProperty.call(body, key);
+
+  if (has('alias')) {
+    const alias = String(body.alias ?? '').trim();
+    if (alias.length > 255) return { error: 'Alias must be 255 characters or fewer.' };
+    columns.alias = alias || null;
+  }
+  if (has('email')) {
+    const email = normalizeEmailForDb(body.email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Enter a valid email address.' };
+    columns.email = email;
+  }
+  if (has('phone')) {
+    const digits = normalizeUsPhoneDigits(body.phone);
+    if (digits.length !== 10) return { error: 'Phone must be a 10-digit US number.' };
+    columns.phone = `+1${digits}`;
+  }
+  if (has('memberId')) {
+    const raw = String(body.memberId ?? '').trim();
+    if (!/^\d{1,18}$/.test(raw) || Number(raw) < 1) return { error: 'member_id must be a positive whole number.' };
+    columns.member_id = raw;
+  }
+  if (has('myReferCode')) {
+    const raw = String(body.myReferCode ?? '').trim();
+    const code = normalizeReferByCodeDigits(raw);
+    if (raw && !code) return { error: 'My Refer Code must look like A1234.' };
+    columns.my_refer_code = code || null;
+  }
+  if (has('referByCode')) {
+    const raw = String(body.referByCode ?? '').trim();
+    const code = normalizeReferByCodeDigits(raw);
+    if (raw && !code) return { error: 'I refer by must look like A1234.' };
+    columns.refer_by_code = code || null;
+  }
+  return { columns };
+}
+
+/**
+ * POST /api/admin/singles/set-fields
+ * Body: { singlesId, alias?, email?, phone?, memberId?, myReferCode?, referByCode? } — Admin Tools inline edit.
+ */
+export async function postAdminSinglesSetFields(req, res) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const singlesId = parseSinglesIdInput(body.singlesId ?? body.singles_id);
+  if (!singlesId) {
+    return res.status(400).json({ error: 'singlesId is required.' });
+  }
+  if (!(await allowSinglesMutationForId(res, singlesId))) {
+    return;
+  }
+
+  const { columns, error } = parseAdminSinglesFieldEdits(body);
+  if (error) return res.status(400).json({ error });
+  const keys = Object.keys(columns);
+  if (!keys.length) return res.status(400).json({ error: 'No fields to update.' });
+
+  try {
+    const { rows: currentRows } = await pool.query(
+      `SELECT email FROM outdateddbsnapshotoct2024.singles WHERE singles_id = $1`,
+      [singlesId]
+    );
+    if (!currentRows.length) return res.status(404).json({ error: 'Singles row not found.' });
+    if (columns.email !== undefined && columns.email !== normalizeEmailForDb(currentRows[0].email)) {
+      if (isProtectedAccountEmail(currentRows[0].email)) {
+        return res.status(403).json({ error: 'Protected account (PROTECT_ACCOUNTS) — email cannot be changed.' });
+      }
+    }
+
+    const setSql = keys.map((col, i) => `${col} = $${i + 2}`).join(', ');
+    const { rows } = await pool.query(
+      `UPDATE outdateddbsnapshotoct2024.singles
+       SET ${setSql}, updated_at = CURRENT_TIMESTAMP
+       WHERE singles_id = $1
+       RETURNING singles_id`,
+      [singlesId, ...keys.map((col) => columns[col])]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Singles row not found.' });
+
+    await invalidateAuthUserCache(singlesId);
+    return res.json({ success: true, singlesId, updated: keys });
+  } catch (err) {
+    if (err?.code === '23505') {
+      const label = SET_FIELDS_UNIQUE_LABELS[err.constraint] || 'That value';
+      return res.status(409).json({ error: `${label} is already used by another member.` });
+    }
+    console.error('[postAdminSinglesSetFields]', err?.message ?? err);
+    return res.status(500).json({ error: 'Failed to update singles fields.' });
   }
 }

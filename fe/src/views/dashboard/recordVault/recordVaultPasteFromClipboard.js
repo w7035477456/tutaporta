@@ -1019,6 +1019,8 @@ export function shouldHandleRecordVaultPaste(clipboardData) {
   const plain = String(clipboardData.getData('text/plain') || '');
   const files = collectClipboardImageFiles(clipboardData);
   if (files.length) return true;
+  // Copied from a TipTap/ProseMirror editor: let PM paste its own slice so marks (text color, highlight) survive.
+  if (/\bdata-pm-slice=/.test(html)) return false;
   if (html) return true;
   if (countObjectReplacementChars(plain)) return true;
   if (plain.length >= 8 || /\n/.test(plain)) return true;

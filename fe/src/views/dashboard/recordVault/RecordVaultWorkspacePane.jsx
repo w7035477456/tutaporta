@@ -1626,6 +1626,7 @@ export default function RecordVaultWorkspacePane({
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
   const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
+  const [tutaCloudBackupRequired, setTutaCloudBackupRequired] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [ragDialogOpen, setRagDialogOpen] = useState(false);
   const [ragSelectedNoteIds, setRagSelectedNoteIds] = useState([]);
@@ -3891,6 +3892,7 @@ export default function RecordVaultWorkspacePane({
 
   const closeTutaCloudBackupDialog = useCallback(() => {
     setTutaCloudBackupOpen(false);
+    setTutaCloudBackupRequired(false);
     void refreshVaultUsageRef.current?.();
     const resolve = exitBackupDialogResolveRef.current;
     exitBackupDialogResolveRef.current = null;
@@ -3902,6 +3904,7 @@ export default function RecordVaultWorkspacePane({
     if (!(await fetchRecordVaultTutaDriveNeedsBackup())) return;
     await new Promise((resolve) => {
       exitBackupDialogResolveRef.current = resolve;
+      setTutaCloudBackupRequired(true);
       setTutaCloudBackupOpen(true);
     });
   }, [flushPendingNoteSave]);
@@ -6971,6 +6974,7 @@ export default function RecordVaultWorkspacePane({
         folderName={tutaCloudVaultFolderName}
         tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
         onRestored={() => void handleTutaCloudVaultRestored()}
+        requireBackupBeforeClose={tutaCloudBackupRequired}
       />
       <RecordVaultUsbBackupDialog
         open={usbBackupOpen}
