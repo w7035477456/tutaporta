@@ -5,7 +5,7 @@
 #   scripts/raffle-setup.sh event           # new raffle_event row  (local Postgres)
 #   scripts/raffle-setup.sh host ubuntu     # from the Mac, insert on Ubuntu Primary via ubuntu-psql.sh
 #   scripts/raffle-setup.sh event ubuntu
-#   scripts/raffle-setup.sh password [ubuntu]   # set / change a host's /vr password
+#   scripts/raffle-setup.sh password [ubuntu]   # set / change a host's /host password
 #
 # Host passwords are typed hidden (twice) and stored only as a bcrypt hash (be/node_modules/bcrypt).
 #
@@ -91,7 +91,7 @@ confirm() {
 ask_host_password_hash() {
   local pw pw2
   while true; do
-    read -r -s -p "Host password for /vr (min 6 characters): " pw; echo >&2
+    read -r -s -p "Host password for /host (min 6 characters): " pw; echo >&2
     if [[ ${#pw} -lt 6 ]]; then echo "  too short" >&2; continue; fi
     read -r -s -p "Type it again: " pw2; echo >&2
     [[ "$pw" == "$pw2" ]] && break
@@ -123,7 +123,7 @@ RETURNING raffle_host_id, host_full_name, host_email, host_phone, host_url;"
 }
 
 setup_password() {
-  echo "Set /vr host password on [$target]"
+  echo "Set /host password on [$target]"
   run_sql -c "SELECT raffle_host_id, host_full_name, (host_password_hash IS NOT NULL) AS has_password FROM $S.raffle_host ORDER BY raffle_host_id;"
   local host_id host_name hash
   while true; do

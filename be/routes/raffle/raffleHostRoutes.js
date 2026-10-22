@@ -1,5 +1,5 @@
 /**
- * /vr — raffle host page (public; every action re-checks the host password, no server session).
+ * /host — raffle host page (public; every action re-checks the host password, no server session).
  *   GET  /api/raffle/host/events   drop-down (event_show_combo = true)
  *   POST /api/raffle/host/login    { eventId, password }
  *   POST /api/raffle/host/draw     { eventId, password } → new winning number (raffle_win = true); 409 once a winner is claimed

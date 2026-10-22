@@ -1,6 +1,6 @@
 import api from './axios';
 
-/** /vr host page. Every call carries the host password (kept in page memory only — no session). */
+/** /host page. Every call carries the host password (kept in page memory only — no session). */
 
 export async function fetchRaffleHostEvents() {
   const { data } = await api.get('/api/raffle/host/events');

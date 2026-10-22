@@ -1,10 +1,10 @@
 import nodemailer from 'nodemailer';
-import { OUTBOUND_EMAIL_FROM_HEADER } from './emailFrom.js';
+import { OUTBOUND_EMAIL_FROM_ADDRESS, OUTBOUND_EMAIL_FROM_HEADER } from './emailFrom.js';
 import { wrapEmailHtml } from './emailHtml.js';
 import { sendOutboundMail } from './outboundMail.js';
 import { getPublicAppUrl } from '../utils/publicAppUrl.js';
 
-const DEFAULT_SUPPORT_TO = 'support@onlinemail.website';
+const DEFAULT_SUPPORT_TO = OUTBOUND_EMAIL_FROM_ADDRESS;
 const LOG_PREFIX = '[liveFaceScanVideoSupportEmail]';
 
 function escapeHtml(value) {

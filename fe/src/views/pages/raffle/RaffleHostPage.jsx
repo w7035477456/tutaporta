@@ -142,7 +142,7 @@ ResultBox.propTypes = {
   })
 };
 
-/** tutamall.com/vr — Meetup host: pick event + host password, draw winning numbers, verify the winner's ticket. */
+/** tutamall.com/host — Meetup host: pick event + host password, draw winning numbers, verify the winner's ticket. */
 export default function RaffleHostPage() {
   const [events, setEvents] = useState([]);
   const [eventsError, setEventsError] = useState('');
@@ -327,11 +327,11 @@ export default function RaffleHostPage() {
           <Box component="ol" sx={{ m: 0, pl: 3, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <li>Select Event title and enter your Host password</li>
             <li>
-              Tap <b>Generate Winning Raffle</b> and announce the raffle number out loud.
+              Tap <b>Draw Winning Number</b> and announce the raffle number out loud.
             </li>
             <li>If the winner comes forward in person, go to the verification step below.</li>
             <li>
-              If no one claims the prize within 30 seconds, tap <b>Generate Winning Raffle</b> again. Repeat until a winner comes forward.
+              If no one claims the prize within 30 seconds, tap <b>Draw Winning Number</b> again. Repeat until a winner comes forward.
             </li>
             <li>
               Tap <b>Scan</b> and scan the winner&apos;s raffle ticket. It can be a paper ticket or one shown on their phone. Can&apos;t
@@ -396,10 +396,9 @@ export default function RaffleHostPage() {
                 onClick={() => void handleDraw()}
                 sx={pillButtonSx}
               >
-                {drawBusy ? 'Drawing…' : 'Generate Raffle win#'}
+                {drawBusy ? 'Drawing…' : 'Draw Winning Number'}
               </ColorTemplate13DisableGreenButton>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                <Typography sx={labelSx}>Raffle Win #</Typography>
                 <Box
                   sx={{
                     bgcolor: '#e60000',

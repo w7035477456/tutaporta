@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Show the append-only ~/.ssh/be/raffle_log.log: member raffles generated (action=generate) and
-# /vr host actions (draw = winning number drawn, scan / code = winner verification).
+# /host actions (draw = winning number drawn, scan / code = winner verification).
 #
 #   scripts/raffle-log.sh                # table: when, number, code, member, event, host
 #   scripts/raffle-log.sh -l             # long form: every field of every ticket

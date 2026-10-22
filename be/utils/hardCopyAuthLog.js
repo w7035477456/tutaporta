@@ -149,7 +149,7 @@ export function appendRaffleHardCopy({
 }
 
 /**
- * /vr host action (draw | scan | code), same append-only raffle_log.log.
+ * /host action (draw | scan | code), same append-only raffle_log.log.
  * `fields` keys are written in insertion order as key=value after action= and datetime=.
  */
 export function appendRaffleHostActionHardCopy(action, fields = {}, at = new Date()) {

@@ -66,7 +66,7 @@ const RAFFLE_STEPS = [
     <Box component={Link} to={GET_MY_RAFFLE_PATH} sx={linkSx}>
       tutamall.com/mall
     </Box>
-    , click the yellow &ldquo;Claim your winning Raffle&rdquo; button, and enter your info so the $200 can be sent to you by PayPal or
+    , click the yellow &ldquo;Claim my winning Raffle&rdquo; button, and enter your info so the $200 can be sent to you by PayPal or
     Venmo, your choice.
   </>,
   <>

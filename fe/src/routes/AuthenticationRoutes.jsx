@@ -4,7 +4,15 @@ import MinimalLayout from 'layout/MinimalLayout';
 import ProtectedRoute from 'ui-component/ProtectedRoute';
 import { LIVE_FACE_SCAN_POPUP_PATH } from 'constants/liveFaceScanPopupRoute';
 import { getSpecialLoginPath } from 'config/specialLoginEnv';
-import { GET_MY_RAFFLE_PATH, RAFFLE_HOST_PATH, RAFFLE_MUSTAFA_PATH, RAFFLE_PATH, RAFFLE_SAMPLE_PATH } from 'constants/raffleRoute';
+import {
+  GET_MY_RAFFLE_PATH,
+  RAFFLE_HOST_LEGACY_PATH,
+  RAFFLE_HOST_PATH,
+  RAFFLE_MUSTAFA_PATH,
+  RAFFLE_PATH,
+  RAFFLE_SAMPLE_PATH
+} from 'constants/raffleRoute';
+import RedirectPreservingLocation from './RedirectPreservingLocation';
 
 // maintenance routing
 const LoginPage = Loadable(lazy(() => import('views/pages/authentication/Login')));
@@ -141,6 +149,10 @@ const authenticationChildren = [
   {
     path: RAFFLE_HOST_PATH,
     element: <RaffleHostPage />
+  },
+  {
+    path: RAFFLE_HOST_LEGACY_PATH,
+    element: <RedirectPreservingLocation to={RAFFLE_HOST_PATH} />
   },
   {
     path: RAFFLE_MUSTAFA_PATH,

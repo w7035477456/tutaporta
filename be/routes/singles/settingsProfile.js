@@ -12,7 +12,10 @@ import {
   ALIAS_DOUBLED_WORD_MESSAGE
 } from '../../utils/aliasValidation.js';
 import nodemailer from 'nodemailer';
-import { OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
+import { OUTBOUND_EMAIL_FROM_ADDRESS, OUTBOUND_EMAIL_FROM_HEADER } from '../../lib/emailFrom.js';
+
+/** Internal payment receipt (testing) goes to the support inbox. */
+const PAYMENT_RECEIPT_TO_EMAIL = OUTBOUND_EMAIL_FROM_ADDRESS;
 import { wrapEmailHtml } from '../../lib/emailHtml.js';
 import { sendOutboundMail } from '../../lib/outboundMail.js';
 import {
