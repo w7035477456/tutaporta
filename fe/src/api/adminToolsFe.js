@@ -212,6 +212,18 @@ export async function fetchAdminRaffleLogLookup({ eventId, action, result, singl
   return data;
 }
 
+/** → [{ raffleUserId, singlesId, name, email, eventId, event, host, number, status, payout, verifiedAt, paidAt }] */
+export async function fetchAdminRaffleWinners({ eventId } = {}) {
+  const { data } = await api.get('/api/admin/raffle-winners', { params: eventId ? { eventId } : {} });
+  return Array.isArray(data?.winners) ? data.winners : [];
+}
+
+/** CLAIMED → PAID. → updated winner row */
+export async function markAdminRaffleWinnerPaid(raffleUserId) {
+  const { data } = await api.post('/api/admin/raffle-winners/paid', { raffleUserId });
+  return data?.winner || null;
+}
+
 export async function cycleAdminSinglesStatus({ singlesId }) {
   const { data } = await api.post('/api/admin/singles/cycle-status', { singlesId });
   return data;

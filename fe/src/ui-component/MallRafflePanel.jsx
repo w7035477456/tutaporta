@@ -77,7 +77,8 @@ function eventOption(ev) {
 }
 
 const WINNING_RED = '#d50000';
-const WINNING_TEXT = Array.from({ length: 12 }, () => 'Winning Raffle').join(' \u2605 ');
+const winningText = (raffleNumber) =>
+  Array.from({ length: 12 }, () => `Winning Ticket${raffleNumber ? ` ${raffleNumber}` : ''}`).join(' \u2605 ');
 
 const winningStripSx = {
   position: 'absolute',
@@ -98,17 +99,16 @@ const winningFrameSx = {
   bgcolor: WINNING_RED,
   borderRadius: 1,
   '@keyframes winningRaffleBlink': {
-    '0%, 35%': { opacity: 1 },
-    '50%, 65%': { opacity: 0.1 },
-    '100%': { opacity: 1 }
+    '0%, 100%': { opacity: 1 },
+    '50%': { opacity: 0.1 }
   },
-  '& .winning-raffle-text': { animation: 'winningRaffleBlink 2.4s ease-in-out infinite' },
+  '& .winning-raffle-text': { animation: 'winningRaffleBlink 0.5s steps(1, end) infinite' },
   '@media (prefers-reduced-motion: reduce)': { '& .winning-raffle-text': { animation: 'none' } }
 };
 
-/** Ticket card framed on all four sides by slowly blinking "Winning Raffle" text. */
-function WinningRaffleFrame({ children }) {
-  const text = <span className="winning-raffle-text">{WINNING_TEXT}</span>;
+/** Ticket card framed on all four sides by rapidly blinking "WINNING TICKET ###" text. */
+function WinningRaffleFrame({ raffleNumber, children }) {
+  const text = <span className="winning-raffle-text">{winningText(raffleNumber)}</span>;
   return (
     <Box sx={winningFrameSx}>
       <Typography sx={{ ...winningStripSx, top: 0, left: 0, right: 0, height: 20 }}>{text}</Typography>
@@ -124,11 +124,68 @@ function WinningRaffleFrame({ children }) {
   );
 }
 
-WinningRaffleFrame.propTypes = { children: PropTypes.node };
+WinningRaffleFrame.propTypes = { raffleNumber: PropTypes.number, children: PropTypes.node };
 
-/** Diagonal "Claimed" (host scanned) / "Prize Paid" (Venmo / PayPal sent) stamp over a ticket card. */
+const CLAIM_BLUE = '#8fd3f5';
+
+/** raffle_user.raffle_status = WINVERIFIED — host verified, PayPal / Venmo not submitted yet. */
+const isPrizePending = (t) => t?.status === 'WINVERIFIED';
+
+/**
+ * WINVERIFIED (host scanned the winning ticket): blue "Claim your $N prize" PayPal / Venmo form under the ticket,
+ * framed by the blinking WINNING TICKET border. Submit → CLAIMED and the panel switches to "Raffle Prize Claimed".
+ * × hides it behind a "Claim My Raffle Prize" button; a refresh shows it again.
+ */
+function ClaimPrizeSection({ event, ticket, prizeDollars, onSubmitted }) {
+  const [open, setOpen] = useState(true);
+  if (!open) {
+    return (
+      <ColorTemplate13DisableGreenButton type="button" hoverEnlargeFont onClick={() => setOpen(true)} sx={pillSx}>
+        Claim My Raffle Prize
+      </ColorTemplate13DisableGreenButton>
+    );
+  }
+  return (
+    <WinningRaffleFrame raffleNumber={ticket.raffleNumber}>
+      <Box sx={{ bgcolor: CLAIM_BLUE, borderRadius: 1, p: 1.25, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 40 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: { xs: '1.15rem', sm: '1.3rem' }, textAlign: 'center', px: 5 }}>
+            Claim your ${prizeDollars} prize
+          </Typography>
+          <ColorTemplate6CloseX
+            aria-label="Close claim prize"
+            positionSx={{ position: 'absolute', top: 0, right: 0 }}
+            onClose={() => setOpen(false)}
+          />
+        </Box>
+        <PayoutForm event={event} ticket={ticket} prizeDollars={prizeDollars} onSubmitted={onSubmitted} />
+      </Box>
+    </WinningRaffleFrame>
+  );
+}
+
+/** Won the draw but the host has not scanned / typed the code yet. */
+function AwaitingHostVerifyNote({ prizeDollars }) {
+  return (
+    <Typography sx={{ fontWeight: 500, textAlign: 'center', lineHeight: 1.35 }}>
+      <b>Your number was drawn!</b> Show this ticket to the host within 10 seconds to be scanned. Once the host confirms your ticket is
+      valid, a <b>&ldquo;Claim My Raffle Prize&rdquo;</b> button will appear here. Tap it to enter your info, and we&rsquo;ll send{' '}
+      {`your $${prizeDollars}`} by PayPal or Venmo, your choice.
+    </Typography>
+  );
+}
+
+AwaitingHostVerifyNote.propTypes = { prizeDollars: PropTypes.number };
+
+/** raffle_status → diagonal stamp: WINVERIFIED (host scanned), CLAIMED (PayPal / Venmo submitted), PAID (admin paid). */
+const STATUS_STAMPS = {
+  WINVERIFIED: { text: 'Win\nVerified', bg: '#ffe01b' },
+  CLAIMED: { text: 'Claimed', bg: '#43c64a' },
+  PAID: { text: 'Prize\nPaid', bg: '#1e88e5' }
+};
+
 function RaffleStatusStamp({ ticket, prizeDollars, children }) {
-  const stamp = ticket.prizePaid ? { text: 'Prize\nPaid', bg: '#1e88e5' } : ticket.claimed ? { text: 'Claimed', bg: '#43c64a' } : null;
+  const stamp = STATUS_STAMPS[ticket.status] || null;
   const paidTo = ticket.paypalInfo ? `PayPal ${ticket.paypalInfo}` : ticket.venmoInfo ? `Venmo ${ticket.venmoInfo}` : '';
   return (
     <Box sx={{ position: 'relative' }}>
@@ -180,7 +237,7 @@ function RaffleStatusStamp({ ticket, prizeDollars, children }) {
 
 RaffleStatusStamp.propTypes = {
   ticket: PropTypes.shape({
-    claimed: PropTypes.bool,
+    status: PropTypes.string,
     prizePaid: PropTypes.bool,
     paypalInfo: PropTypes.string,
     venmoInfo: PropTypes.string
@@ -262,8 +319,8 @@ function PayoutForm({ event, ticket, prizeDollars, onSubmitted }) {
         />
         <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, pl: 3.25 }}>
-        <Typography sx={{ fontSize: '0.85rem', flexShrink: 0 }}>{hint}</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 0.5, pl: 3.25 }}>
+        <Typography sx={{ fontSize: '0.85rem', overflowWrap: 'anywhere' }}>{hint}</Typography>
         <Box
           component="input"
           type="text"
@@ -272,7 +329,7 @@ function PayoutForm({ event, ticket, prizeDollars, onSubmitted }) {
           onChange={(e) => setText(e.target.value)}
           maxLength={120}
           autoComplete="off"
-          sx={{ ...fieldSx, flex: 1 }}
+          sx={{ ...fieldSx, width: '100%', boxSizing: 'border-box' }}
         />
       </Box>
     </Box>
@@ -288,6 +345,13 @@ function PayoutForm({ event, ticket, prizeDollars, onSubmitted }) {
         Congratulation, you won ${prizeDollars} cash for {event?.title || ticket.eventLabel}!
       </Typography>
       <Typography sx={{ fontSize: '0.95rem', textAlign: 'center' }}>Please select how you like to receive the deposit:</Typography>
+      <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, textAlign: 'center', lineHeight: 1.35 }}>
+        We will deposit the ${prizeDollars} within 48 hours and you will get an email confirming the deposit. Contact us at{' '}
+        <Box component="a" href="mailto:raffle@tutamall.com" sx={{ color: '#0b3d91', fontWeight: 800 }}>
+          raffle@tutamall.com
+        </Box>{' '}
+        for any questions.
+      </Typography>
       {option('paypal', 'Deposit to PayPal', 'Your PayPal ID (email/phone):', paypal, setPaypal)}
       {option('venmo', 'Deposit to Venmo', 'Your Venmo ID (email/phone/@handle):', venmo, setVenmo)}
       {error ? <Typography sx={{ '--mr-color': '#b00000', fontWeight: 700, textAlign: 'center' }}>{error}</Typography> : null}
@@ -324,7 +388,18 @@ export default function MallRafflePanel({ openRequest = 0 }) {
     }
   }, [openRequest]);
 
-  const pendingPayout = useMemo(() => tickets.find((t) => t.claimed && !t.paypalInfo && !t.venmoInfo) || null, [tickets]);
+  const pendingPayout = useMemo(() => tickets.find(isPrizePending) || null, [tickets]);
+  const pendingPayoutKey = pendingPayout ? `${pendingPayout.eventId}:${pendingPayout.raffleNumber}` : '';
+
+  /** Unclaimed prize: keep the winning ticket + Claim My Raffle Prize open and on screen. */
+  useEffect(() => {
+    if (!pendingPayoutKey) return;
+    setExpanded(true);
+    const id = window.requestAnimationFrame(() =>
+      document.getElementById('mall-raffle-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    );
+    return () => window.cancelAnimationFrame(id);
+  }, [pendingPayoutKey]);
 
   const load = useCallback(async () => {
     try {
@@ -334,9 +409,11 @@ export default function MallRafflePanel({ openRequest = 0 }) {
       setPrizeDollars(state.prizeDollars);
       setReferCode(state.referCode);
       setLoadError('');
-      const pending = state.tickets.find((t) => t.claimed && !t.paypalInfo && !t.venmoInfo);
+      const pending = state.tickets.find(isPrizePending);
       if (pending) {
         setEventId(String(pending.eventId));
+        setPastEventId('');
+        pastPickedRef.current = false;
         return;
       }
       if (pastPickedRef.current) return;
@@ -358,7 +435,7 @@ export default function MallRafflePanel({ openRequest = 0 }) {
   const selectedId = Number(eventId) || null;
   const event = events.find((e) => e.eventId === selectedId) || null;
   const ticket =
-    tickets.find((t) => t.eventId === selectedId && t.claimed) || tickets.find((t) => t.eventId === selectedId && !t.bonus) || null;
+    tickets.find((t) => t.eventId === selectedId && t.status) || tickets.find((t) => t.eventId === selectedId && !t.bonus) || null;
 
   /** Event drop-down: upcoming (combo) events only — plus a won event still waiting for PayPal / Venmo info. */
   const comboEvents = useMemo(
@@ -393,7 +470,7 @@ export default function MallRafflePanel({ openRequest = 0 }) {
     };
   }, [comboOptions, pastOptions]);
   const pastSelectedId = Number(pastEventId) || null;
-  const pastEvent = pastEvents.find((e) => e.eventId === pastSelectedId) || null;
+  const pastEvent = (pastSelectedId !== selectedId && pastEvents.find((e) => e.eventId === pastSelectedId)) || null;
   const pastTickets = useMemo(
     () =>
       tickets
@@ -420,12 +497,22 @@ export default function MallRafflePanel({ openRequest = 0 }) {
       >
         {pastTickets.map((t) => (
           <Box key={t.verifyCode} sx={{ flexShrink: 0 }}>
-            {t.won ? (
-              <WinningRaffleFrame>
-                <RaffleStatusStamp ticket={t} prizeDollars={prizeDollars}>
-                  <RaffleTicketCard ticket={t} referCode={referCode} />
-                </RaffleStatusStamp>
-              </WinningRaffleFrame>
+            {t.status ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <WinningRaffleFrame raffleNumber={t.raffleNumber}>
+                  <RaffleStatusStamp ticket={t} prizeDollars={prizeDollars}>
+                    <RaffleTicketCard ticket={t} referCode={referCode} />
+                  </RaffleStatusStamp>
+                </WinningRaffleFrame>
+                {isPrizePending(t) ? (
+                  <ClaimPrizeSection event={pastEvent} ticket={t} prizeDollars={prizeDollars} onSubmitted={load} />
+                ) : null}
+              </Box>
+            ) : t.won ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <RaffleTicketCard ticket={t} referCode={referCode} />
+                <AwaitingHostVerifyNote prizeDollars={prizeDollars} />
+              </Box>
             ) : (
               <RaffleTicketCard ticket={t} referCode={referCode} />
             )}
@@ -436,11 +523,18 @@ export default function MallRafflePanel({ openRequest = 0 }) {
   ) : null;
 
   let body;
-  if (ticket?.claimed && !ticket.paypalInfo && !ticket.venmoInfo) {
-    body = <PayoutForm event={event} ticket={ticket} prizeDollars={prizeDollars} onSubmitted={load} />;
-  } else if (ticket?.claimed && ticket.prizePaid) {
+  if (isPrizePending(ticket)) {
+    body = (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <WinningRaffleFrame raffleNumber={ticket.raffleNumber}>
+          <RaffleTicketCard ticket={ticket} referCode={referCode} />
+        </WinningRaffleFrame>
+        <ClaimPrizeSection event={event} ticket={ticket} prizeDollars={prizeDollars} onSubmitted={load} />
+      </Box>
+    );
+  } else if (ticket?.status === 'PAID') {
     body = <PrizeStatusBox title="Raffle Prize Paid" bg="#fff" color="#111" event={event} ticket={ticket} showPaid />;
-  } else if (ticket?.claimed) {
+  } else if (ticket?.status === 'CLAIMED') {
     body = <PrizeStatusBox title="Raffle Prize Claimed" bg="#1e88e5" color="#fff" event={event} ticket={ticket} />;
   } else if (event?.nightPassed) {
     body = (
@@ -497,7 +591,7 @@ export default function MallRafflePanel({ openRequest = 0 }) {
         aria-controls="mall-raffle-panel"
         aria-label="Raffle"
         {...guestDemoAllowProps()}
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded((v) => (pendingPayout ? true : !v))}
         sx={{
           width: panelWidth,
           display: 'block',
@@ -592,7 +686,7 @@ export default function MallRafflePanel({ openRequest = 0 }) {
               setEventId(next);
               setPastEventId('');
               pastPickedRef.current = false;
-              if (next && tickets.some((t) => t.eventId === Number(next) && !t.claimed)) setPopupOpen(true);
+              if (next && tickets.some((t) => t.eventId === Number(next) && !t.status)) setPopupOpen(true);
             }}
             placeholder="↓ Select your event"
             title={pendingPayout ? 'Please finish claiming your prize first.' : undefined}
@@ -665,6 +759,13 @@ PrizeStatusBox.propTypes = {
 };
 
 PayoutForm.propTypes = {
+  event: eventShape,
+  ticket: ticketShape.isRequired,
+  prizeDollars: PropTypes.number.isRequired,
+  onSubmitted: PropTypes.func.isRequired
+};
+
+ClaimPrizeSection.propTypes = {
   event: eventShape,
   ticket: ticketShape.isRequired,
   prizeDollars: PropTypes.number.isRequired,

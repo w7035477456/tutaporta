@@ -2,8 +2,15 @@ import crypto from 'node:crypto';
 import pool from '../../db/connection.js';
 import { appendRaffleHardCopy, appendRaffleHostActionHardCopy } from '../../utils/hardCopyAuthLog.js';
 import { DEFAULT_REFER_BY_CODE } from '../../utils/referByCode.js';
+import { sendRafflePayoutEmailFireAndForget } from '../../lib/rafflePayoutEmail.js';
 
 const S = 'outdateddbsnapshotoct2024';
+
+/** SQL: the event's current winning number = newest raffle_draw row (NULL before the first draw). */
+export function latestDrawNumberSql(eventIdExpr) {
+  return `(SELECT d.raffle_number FROM ${S}.raffle_draw d WHERE d.event_id = ${eventIdExpr}
+            ORDER BY d.raffle_draw_datetime DESC, d.raffle_draw_id DESC LIMIT 1)`;
+}
 
 /** No 0/O/1/I/L — easy to read aloud and type from a screenshot. */
 const VERIFY_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -65,14 +72,14 @@ function ticketPayload(row) {
     verifyCode,
     verifyPath: `/raffle/verify/${verifyCode}`,
     createdAt: row.raffle_generate_datetime,
-    claimed: row.raffle_claimed === true,
     claimedAt: row.raffle_claimed_datetime || null,
     bonus: row.raffle_bonus === true,
-    won: row.raffle_win === true || row.raffle_claimed === true,
+    won: row.is_drawn === true || Boolean(row.raffle_status),
     paypalInfo: row.paypal_info || '',
     venmoInfo: row.venmo_info || '',
     prizePaid: row.raffle_prize_paid === true,
-    prizePaidAt: row.raffle_prize_paid_datetime || null
+    prizePaidAt: row.raffle_prize_paid_datetime || null,
+    status: row.raffle_status || ''
   };
 }
 
@@ -222,14 +229,15 @@ export async function getRaffleState(req, res) {
         WHERE e.event_show_combo = true
            OR EXISTS (SELECT 1 FROM ${S}.raffle_user c
                        WHERE c.event_id = e.event_id AND c.singles_id = $1
-                         AND (c.raffle_claimed OR c.raffle_number IS NOT NULL))
+                         AND (c.raffle_status IS NOT NULL OR c.raffle_number IS NOT NULL))
         ORDER BY e.event_night_datetime NULLS LAST, e.event_id`,
       [singlesId]
     );
     const { rows: ticketRows } = await pool.query(
       `SELECT u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime,
-              u.raffle_claimed, u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
-              u.raffle_prize_paid, u.raffle_prize_paid_datetime, u.raffle_bonus, u.raffle_win,
+              u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
+              u.raffle_prize_paid, u.raffle_prize_paid_datetime, u.raffle_bonus, u.raffle_status,
+              COALESCE(u.raffle_number = ${latestDrawNumberSql('u.event_id')}, false) AS is_drawn,
               e.event_title, e.event_build_n_address, h.host_full_name
          FROM ${S}.raffle_user u
          JOIN ${S}.raffle_event e ON e.event_id = u.event_id
@@ -275,6 +283,30 @@ export async function getRaffleState(req, res) {
   } catch (err) {
     console.error('[raffle] load failed:', err?.message || err);
     return res.status(500).json({ error: 'Could not load raffles. Please try again.' });
+  }
+}
+
+/**
+ * GET /api/raffle/pending-prize — host-verified win (raffle_status = WINVERIFIED), PayPal / Venmo not submitted yet.
+ * The FE keeps sending this member back to /mall until the payout form is submitted.
+ */
+export async function getRafflePendingPrize(req, res) {
+  const singlesId = authSinglesId(req);
+  if (!singlesId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.auth?.guest_demo_login === true) return res.json({ pending: false, eventId: null });
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.event_id
+         FROM ${S}.raffle_user u
+        WHERE u.singles_id = $1 AND u.raffle_status = 'WINVERIFIED'
+        ORDER BY u.raffle_claimed_datetime DESC NULLS LAST, u.raffle_user_id DESC
+        LIMIT 1`,
+      [singlesId]
+    );
+    return res.json({ pending: rows.length > 0, eventId: rows[0] ? Number(rows[0].event_id) : null });
+  } catch (err) {
+    console.error('[raffle] pending prize check failed:', err?.message || err);
+    return res.status(500).json({ error: 'Could not check raffle prize.' });
   }
 }
 
@@ -527,7 +559,7 @@ const PAYOUT_METHODS = new Set(['paypal', 'venmo']);
 const PAYOUT_INFO_MAX = 120;
 
 /**
- * POST /api/raffle/payout { eventId, method: 'paypal' | 'venmo', info } — winner (raffle_claimed = true) says
+ * POST /api/raffle/payout { eventId, method: 'paypal' | 'venmo', info } — winner (raffle_status = WINVERIFIED) says
  * where to send the prize. Saved once into paypal_info or venmo_info; admin then sets raffle_prize_paid.
  */
 export async function postRafflePayout(req, res) {
@@ -547,10 +579,10 @@ export async function postRafflePayout(req, res) {
   try {
     const column = method === 'paypal' ? 'paypal_info' : 'venmo_info';
     const { rows } = await pool.query(
-      `UPDATE ${S}.raffle_user u SET ${column} = $3
+      `UPDATE ${S}.raffle_user u
+          SET ${column} = $3, ${method === 'paypal' ? 'venmo_info' : 'paypal_info'} = NULL, raffle_status = 'CLAIMED'
          FROM ${S}.raffle_event e, ${S}.raffle_host h
-        WHERE u.singles_id = $1 AND u.event_id = $2 AND u.raffle_claimed
-          AND u.paypal_info IS NULL AND u.venmo_info IS NULL
+        WHERE u.singles_id = $1 AND u.event_id = $2 AND u.raffle_status = 'WINVERIFIED'
           AND e.event_id = u.event_id AND h.raffle_host_id = e.raffle_host_id
         RETURNING u.raffle_user_id, u.raffle_number, u.raffle_generated_id, e.event_title, h.host_full_name`,
       [singlesId, eventId, info]
@@ -573,6 +605,7 @@ export async function postRafflePayout(req, res) {
       payout_method: method,
       payout_info: info
     });
+    sendRafflePayoutEmailFireAndForget(saved.raffle_user_id);
     return res.json({ ok: true });
   } catch (err) {
     console.error('[raffle] payout failed:', err?.message || err);

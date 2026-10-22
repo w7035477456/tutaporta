@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Select from '@mui/material/Select';
@@ -6,10 +7,41 @@ import MenuItem from '@mui/material/MenuItem';
 import Checkbox from '@mui/material/Checkbox';
 import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import ColorTemplate9TableData from 'ui-component/ColorTemplate9TableData';
-import { fetchAdminRaffleLogEvents, fetchAdminRaffleLogLookup } from 'api/adminToolsFe';
+import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import {
+  fetchAdminRaffleLogEvents,
+  fetchAdminRaffleLogLookup,
+  fetchAdminRaffleWinners,
+  markAdminRaffleWinnerPaid
+} from 'api/adminToolsFe';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 
-const ACTION_OPTIONS = ['generate', 'draw', 'code', 'scan', 'payout'];
+const ACTION_OPTIONS = ['generate', 'draw', 'code', 'scan', 'payout', 'paid'];
+
+/** raffle_user.raffle_status → badge colors. */
+const STATUS_COLORS = {
+  WINVERIFIED: { bg: '#ffe01b', color: '#111' },
+  CLAIMED: { bg: '#1e88e5', color: '#fff' },
+  PAID: { bg: '#43c64a', color: '#111' }
+};
+
+const WINNER_COLUMNS = [
+  ['status', 'status'],
+  ['number', 'number'],
+  ['name', 'name'],
+  ['singlesId', 'singles'],
+  ['email', 'email'],
+  ['event', 'event'],
+  ['payout', 'payout'],
+  ['verifiedAt', 'verified'],
+  ['paidAt', 'paid']
+];
+
+function formatWhen(value) {
+  if (!value) return '-';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+}
 const RESULT_OPTIONS = ['valid', 'invalid', 'already_claimed'];
 const ALL_WHEN = ['past', 'today', 'future'];
 const WHEN_OPTIONS = [
@@ -140,6 +172,123 @@ function MultiSelect({ options, value, onChange, width = 170 }) {
     </Select>
   );
 }
+
+/**
+ * Verified winners: WINVERIFIED (host scanned) → CLAIMED (PayPal / Venmo submitted) → PAID (Mark Paid here).
+ */
+function RaffleWinnersPanel({ eventId, onError }) {
+  const [winners, setWinners] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [payingId, setPayingId] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setWinners(await fetchAdminRaffleWinners({ eventId: eventId ? Number(eventId) : undefined }));
+    } catch (err) {
+      setWinners([]);
+      onError?.(err?.response?.data?.error || err?.message || 'Failed to load raffle winners');
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId, onError]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const markPaid = async (w) => {
+    if (!window.confirm(`Mark raffle #${w.number} (${w.name || `singles ${w.singlesId}`}) as PAID?\n${w.payout}`)) return;
+    setPayingId(w.raffleUserId);
+    onError?.('');
+    try {
+      const updated = await markAdminRaffleWinnerPaid(w.raffleUserId);
+      if (updated) setWinners((prev) => prev.map((x) => (x.raffleUserId === updated.raffleUserId ? updated : x)));
+      else await load();
+    } catch (err) {
+      onError?.(err?.response?.data?.error || err?.message || 'Failed to mark paid');
+      await load();
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  return (
+    <Box sx={panelSx}>
+      <Box sx={{ ...rowSx, justifyContent: 'space-between' }}>
+        <Typography sx={{ ...labelSx, fontSize: { xs: '1rem', sm: '1.15rem' } }}>Raffle Winners</Typography>
+        <SelectedButtonTemplate type="button" disabled={loading} onClick={() => void load()}>
+          {loading ? 'Loading…' : 'Refresh'}
+        </SelectedButtonTemplate>
+      </Box>
+      {!winners.length ? (
+        <ColorTemplate9TableData.EmptyText>{loading ? 'Loading…' : 'No verified winners yet.'}</ColorTemplate9TableData.EmptyText>
+      ) : (
+        <Box sx={{ width: '100%', overflowX: 'auto', bgcolor: '#000', border: '1px solid #333', p: 1, boxSizing: 'border-box' }}>
+          <Box component="table" sx={{ borderCollapse: 'collapse', fontFamily: MONO, fontSize: { xs: 12, sm: 13 }, color: LOG_YELLOW }}>
+            <thead>
+              <tr>
+                {WINNER_COLUMNS.map(([key, label]) => (
+                  <Box component="th" key={key} sx={{ ...cellSx, color: '#fff', fontWeight: 700, borderBottom: '1px dashed #fff' }}>
+                    {label}
+                  </Box>
+                ))}
+                <Box component="th" sx={{ ...cellSx, borderBottom: '1px dashed #fff' }} />
+              </tr>
+            </thead>
+            <tbody>
+              {winners.map((w) => (
+                <tr key={w.raffleUserId}>
+                  {WINNER_COLUMNS.map(([key]) => (
+                    <Box component="td" key={key} sx={{ ...cellSx, verticalAlign: 'middle' }}>
+                      {key === 'status' ? (
+                        <Box
+                          component="span"
+                          sx={{
+                            px: 1,
+                            py: 0.25,
+                            fontWeight: 800,
+                            borderRadius: '999px',
+                            bgcolor: STATUS_COLORS[w.status]?.bg || '#555',
+                            color: STATUS_COLORS[w.status]?.color || '#fff'
+                          }}
+                        >
+                          {w.status || '-'}
+                        </Box>
+                      ) : key === 'verifiedAt' || key === 'paidAt' ? (
+                        formatWhen(w[key])
+                      ) : w[key] === '' || w[key] == null ? (
+                        '-'
+                      ) : (
+                        String(w[key])
+                      )}
+                    </Box>
+                  ))}
+                  <Box component="td" sx={{ ...cellSx, verticalAlign: 'middle' }}>
+                    <ColorTemplate13DisableGreenButton
+                      type="button"
+                      disabled={w.status !== 'CLAIMED' || payingId != null}
+                      title={w.status === 'CLAIMED' ? 'Prize sent — mark PAID' : 'Only CLAIMED winners (PayPal / Venmo submitted) can be paid'}
+                      onClick={() => void markPaid(w)}
+                      sx={{ py: 0.25, px: 1.5, minWidth: 0, fontSize: 13 }}
+                    >
+                      {payingId === w.raffleUserId ? 'Saving…' : w.status === 'PAID' ? 'Paid' : 'Mark Paid'}
+                    </ColorTemplate13DisableGreenButton>
+                  </Box>
+                </tr>
+              ))}
+            </tbody>
+          </Box>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+RaffleWinnersPanel.propTypes = {
+  eventId: PropTypes.string,
+  onError: PropTypes.func
+};
 
 function OrText() {
   return (
@@ -331,6 +480,8 @@ export default function AdminToolsRafflesTab({ onError }) {
           </ColorTemplate9TableData.EmptyText>
         ) : null}
       </Box>
+
+      <RaffleWinnersPanel eventId={eventId} onError={onError} />
 
       {hasSearched && !busy ? (
         <Box

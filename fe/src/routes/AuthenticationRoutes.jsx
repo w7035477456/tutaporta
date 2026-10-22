@@ -10,7 +10,8 @@ import {
   RAFFLE_HOST_PATH,
   RAFFLE_MUSTAFA_PATH,
   RAFFLE_PATH,
-  RAFFLE_SAMPLE_PATH
+  RAFFLE_SAMPLE_PATH,
+  RAFFLE_STEPS_PATH
 } from 'constants/raffleRoute';
 import RedirectPreservingLocation from './RedirectPreservingLocation';
 
@@ -43,6 +44,7 @@ const ResumePage = Loadable(lazy(() => import('views/pages/ResumePage')));
 const RaffleInfoPage = Loadable(lazy(() => import('views/pages/raffle/RaffleInfoPage')));
 const RaffleRedirect = Loadable(lazy(() => import('views/pages/raffle/RaffleRedirect')));
 const RaffleSamplePage = Loadable(lazy(() => import('views/pages/raffle/RaffleSamplePage')));
+const RaffleStepsPage = Loadable(lazy(() => import('views/pages/raffle/RaffleStepsPage')));
 const RaffleHostPage = Loadable(lazy(() => import('views/pages/raffle/RaffleHostPage')));
 
 // ==============================|| AUTHENTICATION ROUTING ||============================== //
@@ -145,6 +147,10 @@ const authenticationChildren = [
   {
     path: RAFFLE_SAMPLE_PATH,
     element: <RaffleSamplePage />
+  },
+  {
+    path: RAFFLE_STEPS_PATH,
+    element: <RaffleStepsPage />
   },
   {
     path: RAFFLE_HOST_PATH,

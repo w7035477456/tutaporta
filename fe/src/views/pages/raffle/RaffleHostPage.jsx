@@ -331,7 +331,7 @@ export default function RaffleHostPage() {
             </li>
             <li>If the winner comes forward in person, go to the verification step below.</li>
             <li>
-              If no one claims the prize within 30 seconds, tap <b>Draw Winning Number</b> again. Repeat until a winner comes forward.
+              If no one claims the prize within 10 seconds, tap <b>Draw Winning Number</b> again. Repeat until a winner comes forward.
             </li>
             <li>
               Tap <b>Scan</b> and scan the winner&apos;s raffle ticket. It can be a paper ticket or one shown on their phone. Can&apos;t

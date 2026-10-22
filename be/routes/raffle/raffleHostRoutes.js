@@ -2,7 +2,7 @@
  * /host — raffle host page (public; every action re-checks the host password, no server session).
  *   GET  /api/raffle/host/events   drop-down (event_show_combo = true)
  *   POST /api/raffle/host/login    { eventId, password }
- *   POST /api/raffle/host/draw     { eventId, password } → new winning number (raffle_win = true); 409 once a winner is claimed
+ *   POST /api/raffle/host/draw     { eventId, password } → new winning number (recorded in raffle_draw); 409 once a winner is verified
  *   POST /api/raffle/host/verify   multipart { eventId, password, winNumber, code, source, image? }
  */
 import crypto from 'node:crypto';
@@ -13,13 +13,16 @@ import bcrypt from 'bcrypt';
 import Busboy from 'busboy';
 import pool from '../../db/connection.js';
 import { appendRaffleHostActionHardCopy } from '../../utils/hardCopyAuthLog.js';
-import { formatVerifyCode, loadSinglesForLog } from './raffleRoutes.js';
+import { formatVerifyCode, latestDrawNumberSql, loadSinglesForLog } from './raffleRoutes.js';
 
 const S = 'outdateddbsnapshotoct2024';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const VERIFY_CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/;
+/** Event night as a calendar date (text) in the event's own zone; alias `e` = raffle_event. */
+const EVENT_LOCAL_DATE_SQL = `((e.event_night_datetime AT TIME ZONE e.event_time_zone)::date)::text`;
+const WRONG_EVENT_MESSAGE = 'ERROR: ticket not from this event and date';
 
 class HostError extends Error {
   constructor(status, message, extra = {}) {
@@ -71,7 +74,8 @@ async function authenticateHost(eventIdRaw, passwordRaw) {
 
   const { rows } = await pool.query(
     `SELECT e.event_id, e.event_title, e.raffle_host_id, h.host_full_name, h.host_password_hash,
-            h.host_locked_until, (h.host_locked_until IS NOT NULL AND h.host_locked_until > now()) AS locked
+            h.host_locked_until, (h.host_locked_until IS NOT NULL AND h.host_locked_until > now()) AS locked,
+            ${EVENT_LOCAL_DATE_SQL} AS event_local_date
        FROM ${S}.raffle_event e
        JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
       WHERE e.event_id = $1 AND e.event_show_combo = true
@@ -122,8 +126,8 @@ async function authenticateHost(eventIdRaw, passwordRaw) {
 async function loadDrawCounts(eventId) {
   const { rows } = await pool.query(
     `SELECT count(*) FILTER (WHERE raffle_number IS NOT NULL)::int AS issued,
-            count(*) FILTER (WHERE raffle_number IS NOT NULL AND raffle_win)::int AS drawn,
-            count(*) FILTER (WHERE raffle_claimed)::int AS claimed
+            count(*) FILTER (WHERE raffle_number IS NOT NULL AND raffle_number = ${latestDrawNumberSql('$1')})::int AS drawn,
+            count(*) FILTER (WHERE raffle_status IS NOT NULL)::int AS claimed
        FROM ${S}.raffle_user WHERE event_id = $1`,
     [eventId]
   );
@@ -176,8 +180,8 @@ const RAFFLE_MAX_NUMBER = 1000;
 
 /**
  * POST /api/raffle/host/draw { eventId, password, previousNumber? } — every click draws a NEW random number
- * 1–1000 (never previousNumber) and sets raffle_win = true only on the ticket holding it (if any); every other
- * unclaimed ticket gets raffle_win = false, so a no-show can no longer claim. Closed once a ticket is claimed.
+ * 1–1000 (never previousNumber) and records it in raffle_draw — the newest draw is the only number that can be
+ * verified, so a no-show holding an earlier number can no longer claim. Closed once a ticket is verified.
  */
 export async function postRaffleHostDraw(req, res) {
   try {
@@ -188,16 +192,18 @@ export async function postRaffleHostDraw(req, res) {
     const prev = Number(req.body?.previousNumber);
     let number = crypto.randomInt(1, RAFFLE_MAX_NUMBER + 1);
     while (number === prev) number = crypto.randomInt(1, RAFFLE_MAX_NUMBER + 1);
+    number = 265; // TEMP-FAKE-DRAW: one-time test, remove after use
     const { rows } = await pool.query(
-      `UPDATE ${S}.raffle_user SET raffle_win = (raffle_number = $1)
-        WHERE event_id = $2 AND raffle_number IS NOT NULL AND raffle_claimed = false
-          AND NOT EXISTS (SELECT 1 FROM ${S}.raffle_user c WHERE c.event_id = $2 AND c.raffle_claimed)
-        RETURNING raffle_user_id, singles_id, raffle_win`,
+      `INSERT INTO ${S}.raffle_draw (event_id, raffle_number, raffle_user_id)
+       SELECT $2, $1, (SELECT u.raffle_user_id FROM ${S}.raffle_user u WHERE u.event_id = $2 AND u.raffle_number = $1)
+        WHERE NOT EXISTS (SELECT 1 FROM ${S}.raffle_user c WHERE c.event_id = $2 AND c.raffle_status IS NOT NULL)
+       RETURNING raffle_user_id,
+                 (SELECT u.singles_id FROM ${S}.raffle_user u WHERE u.raffle_user_id = raffle_draw.raffle_user_id) AS singles_id`,
       [number, event.event_id]
     );
     const counts = await loadDrawCounts(event.event_id);
-    if (counts.claimed > 0) throw new HostError(409, DRAWING_CLOSED_MESSAGE, { ...counts, closed: true });
-    const holder = rows.find((r) => r.raffle_win);
+    if (!rows[0] || counts.claimed > 0) throw new HostError(409, DRAWING_CLOSED_MESSAGE, { ...counts, closed: true });
+    const holder = rows[0].raffle_user_id ? rows[0] : null;
     appendRaffleHostActionHardCopy('draw', {
       event_id: event.event_id,
       event_title: event.event_title,
@@ -260,7 +266,7 @@ function saveScanImage(image, eventId, ticket) {
   return name;
 }
 
-/** POST /api/raffle/host/verify — scan (QR photo) or typed verification code; marks raffle_claimed. */
+/** POST /api/raffle/host/verify — scan (QR photo) or typed verification code; sets raffle_status = WINVERIFIED. */
 export async function postRaffleHostVerify(req, res) {
   try {
     const { fields, image } = await parseHostVerifyMultipart(req);
@@ -272,12 +278,20 @@ export async function postRaffleHostVerify(req, res) {
     let ticket = null;
     if (code) {
       const { rows } = await pool.query(
-        `SELECT raffle_user_id, singles_id, event_id, raffle_number, raffle_win, raffle_claimed
-           FROM ${S}.raffle_user WHERE raffle_generated_id = $1 LIMIT 1`,
+        `SELECT u.raffle_user_id, u.singles_id, u.event_id, u.raffle_number, u.raffle_status,
+                COALESCE(u.raffle_number = ${latestDrawNumberSql('u.event_id')}, false) AS is_drawn,
+                ${EVENT_LOCAL_DATE_SQL} AS event_local_date
+           FROM ${S}.raffle_user u
+           JOIN ${S}.raffle_event e ON e.event_id = u.event_id
+          WHERE u.raffle_generated_id = $1 LIMIT 1`,
         [code]
       );
       ticket = rows[0] || null;
     }
+    const sameEventAndDate =
+      Boolean(ticket) &&
+      Number(ticket.event_id) === Number(event.event_id) &&
+      (ticket.event_local_date ?? null) === (event.event_local_date ?? null);
 
     let status = 'invalid';
     let message;
@@ -288,32 +302,32 @@ export async function postRaffleHostVerify(req, res) {
           : 'Verification code must be 8 letters/numbers (like K7Q4-MZ9X).';
     } else if (!ticket) {
       message = 'NOT VALID — no raffle ticket has this verification code.';
-    } else if (Number(ticket.event_id) !== Number(event.event_id)) {
-      message = 'NOT VALID — this ticket is for a different event.';
+    } else if (!sameEventAndDate) {
+      message = WRONG_EVENT_MESSAGE;
     } else if (winNumber && Number(ticket.raffle_number) !== winNumber) {
       message = `NOT VALID — this ticket is #${ticket.raffle_number}, but the drawn number is #${winNumber}.`;
-    } else if (!ticket.raffle_win) {
+    } else if (!ticket.is_drawn) {
       message = `NOT VALID — ticket #${ticket.raffle_number} is not the current winning number.`;
-    } else if (ticket.raffle_claimed) {
+    } else if (ticket.raffle_status) {
       status = 'already_claimed';
       message = `ALREADY CLAIMED — ticket #${ticket.raffle_number} was already verified.`;
     } else {
       const { rows } = await pool.query(
-        `UPDATE ${S}.raffle_user SET raffle_claimed = true, raffle_claimed_datetime = now()
-          WHERE raffle_user_id = $1 AND raffle_claimed = false
+        `UPDATE ${S}.raffle_user SET raffle_claimed_datetime = now(), raffle_status = 'WINVERIFIED'
+          WHERE raffle_user_id = $1 AND raffle_status IS NULL
           RETURNING raffle_user_id`,
         [ticket.raffle_user_id]
       );
       if (rows[0]) {
         status = 'valid';
-        message = `VALID WINNER — raffle #${ticket.raffle_number}. Prize claimed.`;
+        message = `VALID WINNER — raffle #${ticket.raffle_number}. Win verified.`;
       } else {
         status = 'already_claimed';
         message = `ALREADY CLAIMED — ticket #${ticket.raffle_number} was already verified.`;
       }
     }
 
-    const matchedTicket = ticket && Number(ticket.event_id) === Number(event.event_id) ? ticket : null;
+    const matchedTicket = sameEventAndDate ? ticket : null;
     let imageFile = '';
     try {
       imageFile = saveScanImage(image, event.event_id, matchedTicket);

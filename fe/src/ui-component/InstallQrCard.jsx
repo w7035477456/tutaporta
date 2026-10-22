@@ -38,7 +38,7 @@ export default function InstallQrCard({ compact = false }) {
         component={compact ? 'h2' : 'h1'}
         sx={{ fontSize: compact ? '1rem' : '2rem', fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}
       >
-        Get TutaMall on your phone
+        Get TutaMall Shortcut onto your phone Home Screen
       </Typography>
       <Typography sx={{ color: '#ffffff', fontSize: compact ? '0.72rem' : '1.1rem', lineHeight: 1.35 }}>
         Point your phone camera at this code, open the link, then tap Make Home Button.

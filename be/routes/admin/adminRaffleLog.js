@@ -3,13 +3,15 @@
  *   GET  /api/admin/raffle-log/events   drop-down (event_show_combo = true)
  *   POST /api/admin/raffle-log/lookup   { eventId?, action?: string[], result?: string[], singlesId?, from?, to?, when?: ['past'|'today'|'future'] }
  * Filters are ANDed; empty filters are ignored. The log lives on each server's disk.
+ *   GET  /api/admin/raffle-winners?eventId=   verified winners with raffle_status (WINVERIFIED / CLAIMED / PAID)
+ *   POST /api/admin/raffle-winners/paid       { raffleUserId } — CLAIMED → PAID (raffle_prize_paid = true)
  */
 import fs from 'fs';
 import pool from '../../db/connection.js';
-import { RAFFLE_HARD_COPY_LOG_PATH } from '../../utils/hardCopyAuthLog.js';
+import { RAFFLE_HARD_COPY_LOG_PATH, appendRaffleHostActionHardCopy } from '../../utils/hardCopyAuthLog.js';
 
 const S = 'outdateddbsnapshotoct2024';
-const ACTIONS = new Set(['generate', 'draw', 'code', 'scan', 'payout']);
+const ACTIONS = new Set(['generate', 'draw', 'code', 'scan', 'payout', 'paid']);
 const WHEN_VALUES = new Set(['past', 'today', 'future']);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -131,5 +133,88 @@ export async function postAdminRaffleLogLookup(req, res) {
   } catch (err) {
     console.error('[adminRaffleLog] lookup:', err?.message || err);
     return res.status(500).json({ error: 'Could not read the raffle log.' });
+  }
+}
+
+const WINNER_SELECT = `
+  SELECT u.raffle_user_id, u.singles_id, u.event_id, u.raffle_number, u.raffle_status,
+         u.raffle_claimed_datetime, u.paypal_info, u.venmo_info, u.raffle_prize_paid_datetime,
+         e.event_title, h.host_full_name,
+         NULLIF(TRIM(CONCAT_WS(' ', s.mailing_firstname, s.mailing_lastname)), '') AS fullname, s.email
+    FROM ${S}.raffle_user u
+    JOIN ${S}.raffle_event e ON e.event_id = u.event_id
+    JOIN ${S}.raffle_host h ON h.raffle_host_id = e.raffle_host_id
+    LEFT JOIN ${S}.singles s ON s.singles_id = u.singles_id`;
+
+function winnerRow(r) {
+  return {
+    raffleUserId: Number(r.raffle_user_id),
+    singlesId: Number(r.singles_id),
+    name: r.fullname || '',
+    email: r.email || '',
+    eventId: Number(r.event_id),
+    event: r.event_title || '',
+    host: r.host_full_name || '',
+    number: r.raffle_number == null ? '' : Number(r.raffle_number),
+    status: r.raffle_status || '',
+    payout: r.paypal_info ? `PayPal: ${r.paypal_info}` : r.venmo_info ? `Venmo: ${r.venmo_info}` : '',
+    verifiedAt: r.raffle_claimed_datetime || null,
+    paidAt: r.raffle_prize_paid_datetime || null
+  };
+}
+
+/** GET /api/admin/raffle-winners?eventId= */
+export async function getAdminRaffleWinners(req, res) {
+  try {
+    const eventId = Number(req.query?.eventId);
+    const byEvent = Number.isInteger(eventId) && eventId > 0;
+    const { rows } = await pool.query(
+      `${WINNER_SELECT}
+        WHERE u.raffle_status IS NOT NULL ${byEvent ? 'AND u.event_id = $1' : ''}
+        ORDER BY CASE u.raffle_status WHEN 'CLAIMED' THEN 0 WHEN 'WINVERIFIED' THEN 1 ELSE 2 END,
+                 u.raffle_claimed_datetime DESC NULLS LAST, u.raffle_user_id DESC`,
+      byEvent ? [eventId] : []
+    );
+    return res.json({ winners: rows.map(winnerRow) });
+  } catch (err) {
+    console.error('[adminRaffleLog] winners:', err?.message || err);
+    return res.status(500).json({ error: 'Could not load raffle winners.' });
+  }
+}
+
+/** POST /api/admin/raffle-winners/paid { raffleUserId } — only a CLAIMED winner (payout info on file) can be paid. */
+export async function postAdminRaffleWinnerPaid(req, res) {
+  const raffleUserId = Number(req.body?.raffleUserId);
+  if (!Number.isInteger(raffleUserId) || raffleUserId < 1) return res.status(400).json({ error: 'Missing raffle winner.' });
+  try {
+    const { rows } = await pool.query(
+      `WITH paid AS (
+         UPDATE ${S}.raffle_user
+            SET raffle_status = 'PAID', raffle_prize_paid = true, raffle_prize_paid_datetime = now()
+          WHERE raffle_user_id = $1 AND raffle_status = 'CLAIMED'
+          RETURNING *
+       )
+       ${WINNER_SELECT.replace(`${S}.raffle_user u`, 'paid u')}`,
+      [raffleUserId]
+    );
+    const saved = rows[0];
+    if (!saved) return res.status(409).json({ error: 'Only a CLAIMED winner (PayPal / Venmo submitted) can be marked paid.' });
+    const winner = winnerRow(saved);
+    appendRaffleHostActionHardCopy('paid', {
+      event_id: winner.eventId,
+      event_title: winner.event,
+      host_full_name: winner.host,
+      raffle_number: winner.number,
+      raffle_user_id: winner.raffleUserId,
+      singles_id: winner.singlesId,
+      singles_fullname: winner.name,
+      result: 'PAID',
+      payout_info: winner.payout,
+      admin_singles_id: req.auth?.singles_id ?? ''
+    });
+    return res.json({ ok: true, winner });
+  } catch (err) {
+    console.error('[adminRaffleLog] mark paid:', err?.message || err);
+    return res.status(500).json({ error: 'Could not mark the prize paid.' });
   }
 }

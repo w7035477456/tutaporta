@@ -61,12 +61,12 @@ SELECT format(\$f\$DO \$do\$ DECLARE sid integer; BEGIN
   SELECT singles_id INTO sid FROM $S.singles WHERE lower(email) = lower(%L) ORDER BY singles_id LIMIT 1;
   IF sid IS NULL THEN RAISE NOTICE 'SKIP Mac ticket %s (#%s, event %s): member %s not on Ubuntu'; RETURN; END IF;
   BEGIN
-    INSERT INTO $S.raffle_user (singles_id, raffle_host_id, event_id, raffle_number, raffle_generated_id, raffle_generate_datetime, raffle_win, raffle_claimed,
+    INSERT INTO $S.raffle_user (singles_id, raffle_host_id, event_id, raffle_number, raffle_generated_id, raffle_generate_datetime, raffle_status,
       raffle_claimed_datetime, paypal_info, venmo_info, raffle_prize_paid, raffle_prize_paid_datetime)
-    VALUES (sid, %s, %s, %L, %L, %L, %L, %L, %L, %L, %L, %L, %L)
+    VALUES (sid, %s, %s, %L, %L, %L, %L, %L, %L, %L, %L, %L)
     ON CONFLICT (singles_id, event_id) DO UPDATE SET raffle_host_id = EXCLUDED.raffle_host_id, raffle_number = EXCLUDED.raffle_number,
       raffle_generated_id = EXCLUDED.raffle_generated_id, raffle_generate_datetime = EXCLUDED.raffle_generate_datetime,
-      raffle_win = EXCLUDED.raffle_win, raffle_claimed = EXCLUDED.raffle_claimed,
+      raffle_status = EXCLUDED.raffle_status,
       raffle_claimed_datetime = EXCLUDED.raffle_claimed_datetime, paypal_info = EXCLUDED.paypal_info, venmo_info = EXCLUDED.venmo_info,
       raffle_prize_paid = EXCLUDED.raffle_prize_paid, raffle_prize_paid_datetime = EXCLUDED.raffle_prize_paid_datetime;
     RAISE NOTICE 'OK   Mac ticket %s (#%s, event %s) -> Ubuntu singles_id %%', sid;
@@ -76,7 +76,7 @@ SELECT format(\$f\$DO \$do\$ DECLARE sid integer; BEGIN
 END \$do\$;\$f\$,
   s.email,
   u.raffle_user_id, coalesce(u.raffle_number::text, '-'), u.event_id, coalesce(s.email, 'singles_id ' || u.singles_id),
-  u.raffle_host_id, u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime, u.raffle_win, u.raffle_claimed,
+  u.raffle_host_id, u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_generate_datetime, u.raffle_status,
   u.raffle_claimed_datetime, u.paypal_info, u.venmo_info, u.raffle_prize_paid, u.raffle_prize_paid_datetime,
   u.raffle_user_id, coalesce(u.raffle_number::text, '-'), u.event_id,
   u.raffle_user_id, coalesce(u.raffle_number::text, '-'), u.event_id)
@@ -97,5 +97,5 @@ echo "Ubuntu raffle rows now:"
 "$UB" -c "SELECT 'host' AS kind, raffle_host_id AS id, host_full_name AS info, (host_password_hash IS NOT NULL) AS has_password FROM $S.raffle_host
           UNION ALL SELECT 'event', event_id, left(event_title, 45), event_show_combo FROM $S.raffle_event
           ORDER BY 1 DESC, 2;"
-"$UB" -c "SELECT u.raffle_user_id, u.singles_id, s.email, u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_win, u.raffle_claimed
+"$UB" -c "SELECT u.raffle_user_id, u.singles_id, s.email, u.event_id, u.raffle_number, u.raffle_generated_id, u.raffle_status
             FROM $S.raffle_user u LEFT JOIN $S.singles s ON s.singles_id = u.singles_id ORDER BY u.event_id, u.raffle_user_id;"

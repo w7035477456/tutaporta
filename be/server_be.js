@@ -445,7 +445,12 @@ import {
   postAdminPasswordCheckSetSingles,
   postAdminPasswordHashPreview
 } from './routes/admin/adminPasswordCheck.js';
-import { getAdminRaffleLogEvents, postAdminRaffleLogLookup } from './routes/admin/adminRaffleLog.js';
+import {
+  getAdminRaffleLogEvents,
+  getAdminRaffleWinners,
+  postAdminRaffleLogLookup,
+  postAdminRaffleWinnerPaid
+} from './routes/admin/adminRaffleLog.js';
 import {
   postAdminAuditRegistrationLookup,
   postAdminCycleSinglesStatus,
@@ -492,6 +497,7 @@ import {
 import {
   getRaffleRelationships,
   getRaffleState,
+  getRafflePendingPrize,
   postRaffleBonusTickets,
   postRafflePayout,
   postRaffleSelect,
@@ -1365,6 +1371,8 @@ app.get('/api/admin/photo/:id/thumbnail', requireAuth, requireAdminRole, getAdmi
 app.get('/api/admin/photo/:id', requireAuth, requireAdminRole, getAdminPhoto);
 app.get('/api/admin/raffle-log/events', requireAuth, requireAdminRole, getAdminRaffleLogEvents);
 app.post('/api/admin/raffle-log/lookup', requireAuth, requireAdminRole, postAdminRaffleLogLookup);
+app.get('/api/admin/raffle-winners', requireAuth, requireAdminRole, getAdminRaffleWinners);
+app.post('/api/admin/raffle-winners/paid', requireAuth, requireAdminRole, postAdminRaffleWinnerPaid);
 app.post('/api/admin/password-check', requireAuth, requireAdminRole, postAdminPasswordCheck);
 app.post('/api/admin/password-check/hash', requireAuth, requireAdminRole, postAdminPasswordHashPreview);
 app.post('/api/admin/password-check/lookup', requireAuth, requireAdminRole, postAdminPasswordCheckLookup);
@@ -1823,6 +1831,7 @@ app.post('/api/user/customization/load-default-music-urls', requireAuth, postLoa
 app.get('/api/user/customization/zip-folder', requireAuth, getUserZipFolder);
 app.put('/api/user/customization/zip-folder', requireAuth, putUserZipFolder);
 app.get('/api/raffle', requireAuth, getRaffleState);
+app.get('/api/raffle/pending-prize', requireAuth, getRafflePendingPrize);
 app.get('/api/raffle/relationships', requireAuth, getRaffleRelationships);
 app.get('/api/raffle/refer-code/validate', getRaffleReferCodeValidate);
 app.post('/api/raffle/select', requireAuth, requireIdInitializationCompleted, postRaffleSelect);

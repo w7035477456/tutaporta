@@ -37,8 +37,6 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.raffle_user (
   raffle_number integer NULL CHECK (raffle_number BETWEEN 1 AND 1000),
   raffle_generated_id text NULL,
   raffle_generate_datetime timestamptz NULL,
-  raffle_win boolean NOT NULL DEFAULT false,
-  raffle_claimed boolean NOT NULL DEFAULT false,
   CONSTRAINT raffle_user_singles_event_uniq UNIQUE (singles_id, event_id),
   CONSTRAINT raffle_user_event_number_uniq UNIQUE (event_id, raffle_number),
   CONSTRAINT raffle_user_generated_id_uniq UNIQUE (raffle_generated_id)

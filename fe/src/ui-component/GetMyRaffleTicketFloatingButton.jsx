@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import router from 'routes';
-import { RAFFLE_HOST_PATH, RAFFLE_PATH } from 'constants/raffleRoute';
+import { RAFFLE_HOST_PATH, RAFFLE_PATH, RAFFLE_STEPS_PATH } from 'constants/raffleRoute';
 
 /** Fixed on every theme: red label, white button, blue box. */
 const PANEL_BLUE = '#1e88e5';
 const BUTTON_WHITE = '#ffffff';
 const LABEL_RED = '#d50000';
 /** /mall has its own raffle panel. */
-const HIDDEN_PATHS = [RAFFLE_PATH, RAFFLE_HOST_PATH, '/mall'];
+const HIDDEN_PATHS = [RAFFLE_PATH, RAFFLE_HOST_PATH, RAFFLE_STEPS_PATH, '/mall'];
 
 /**
  * Floating top-center "Get My Raffle Ticket" (red label, white button, blue box) on every screen.

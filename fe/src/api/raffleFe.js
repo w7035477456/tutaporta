@@ -25,9 +25,19 @@ export async function fetchRaffleState() {
   };
 }
 
+/** Fired on window after a payout is saved — ProtectedRoute stops sending the member back to /mall. */
+export const RAFFLE_PRIZE_SUBMITTED_EVENT = 'tutamall:raffle-prize-submitted';
+
 /** Winner picks where the prize goes: method 'paypal' | 'venmo', info = ID / email / phone / handle. */
 export async function submitRafflePayout(eventId, method, info) {
   await api.post('/api/raffle/payout', { eventId, method, info });
+  window.dispatchEvent(new Event(RAFFLE_PRIZE_SUBMITTED_EVENT));
+}
+
+/** Host-verified win still waiting for PayPal / Venmo → { pending, eventId }. */
+export async function fetchRafflePendingPrize() {
+  const { data } = await api.get('/api/raffle/pending-prize');
+  return { pending: data?.pending === true, eventId: data?.eventId ? Number(data.eventId) : null };
 }
 
 /** Member picked an event — links singles ↔ host ↔ event (raffle_user row, number still empty). */

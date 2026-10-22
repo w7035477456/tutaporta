@@ -36,6 +36,41 @@ function RaffleTicketButtonPicture() {
   );
 }
 
+const bonusPromptBlinkSx = {
+  '@keyframes raffleBonusPromptBlink': {
+    '0%, 100%': { opacity: 1 },
+    '50%': { opacity: 0.15 }
+  },
+  animation: 'raffleBonusPromptBlink 0.5s steps(1, end) infinite',
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' }
+};
+
+/** "Want two more raffle tickets for FREE? Click Here" — fast blink; shown above and below the steps. */
+function BonusTicketsPrompt({ onClick }) {
+  return (
+    <Typography sx={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '1.25rem', ...bonusPromptBlinkSx }}>
+      Want two more raffle tickets for FREE?{' '}
+      <Box
+        component="button"
+        type="button"
+        data-guest-demo-allow="true"
+        onClick={onClick}
+        sx={{
+          ...linkSx,
+          font: 'inherit',
+          textDecoration: 'underline',
+          bgcolor: 'transparent',
+          border: 0,
+          p: 0,
+          cursor: 'pointer'
+        }}
+      >
+        Click Here
+      </Box>
+    </Typography>
+  );
+}
+
 const RAFFLE_STEPS = [
   <>
     Go to{' '}
@@ -150,6 +185,7 @@ export default function RaffleInfoPage() {
                     <Logo authBranding />
                   </Link>
                 </Box>
+                {showBonus ? null : <BonusTicketsPrompt onClick={() => setShowBonus(true)} />}
                 <Typography
                   variant="h4"
                   sx={{
@@ -190,26 +226,7 @@ export default function RaffleInfoPage() {
                         </Typography>
                       ))}
                     </Box>
-                    <Typography sx={{ width: '100%', textAlign: 'center', fontWeight: 700, fontSize: '1.25rem' }}>
-                      Want two more raffle tickets for FREE?{' '}
-                      <Box
-                        component="button"
-                        type="button"
-                        data-guest-demo-allow="true"
-                        onClick={() => setShowBonus(true)}
-                        sx={{
-                          ...linkSx,
-                          font: 'inherit',
-                          textDecoration: 'underline',
-                          bgcolor: 'transparent',
-                          border: 0,
-                          p: 0,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Click Here
-                      </Box>
-                    </Typography>
+                    <BonusTicketsPrompt onClick={() => setShowBonus(true)} />
                   </>
                 )}
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>

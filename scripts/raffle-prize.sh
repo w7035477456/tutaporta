@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Raffle prize admin (raffle_user): list winners, mark a prize paid, set a claim time.
 #
-#   raffle-prize.sh list                         [local|ubuntu|both]   # claimed tickets + PayPal/Venmo + paid
-#   raffle-prize.sh paid    <CODE>               [local|ubuntu|both]   # raffle_prize_paid = true, paid time = now
+#   raffle-prize.sh list                         [local|ubuntu|both]   # verified winners (raffle_status) + PayPal/Venmo + paid
+#   raffle-prize.sh paid    <CODE>               [local|ubuntu|both]   # CLAIMED -> PAID (raffle_prize_paid = true, paid time = now)
 #   raffle-prize.sh unpaid  <CODE>               [local|ubuntu|both]   # undo paid
 #   raffle-prize.sh claimed <CODE> '<datetime>'  [local|ubuntu|both]   # set raffle_claimed_datetime
 #
@@ -41,7 +41,7 @@ norm_code() {
 show_ticket_sql() {
   echo "SELECT u.raffle_user_id, s.email, e.event_title, u.raffle_number,
                substr(u.raffle_generated_id, 1, 4) || '-' || substr(u.raffle_generated_id, 5) AS code,
-               u.raffle_claimed, u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
+               u.raffle_status, u.raffle_claimed_datetime, u.paypal_info, u.venmo_info,
                u.raffle_prize_paid, u.raffle_prize_paid_datetime
           FROM $S.raffle_user u
           JOIN $S.raffle_event e ON e.event_id = u.event_id
@@ -53,17 +53,19 @@ show_ticket_sql() {
 cmd="${1:-}"
 case "$cmd" in
   list)
-    run_sql "${2:-local}" "$(show_ticket_sql "u.raffle_claimed")"
+    run_sql "${2:-local}" "$(show_ticket_sql "u.raffle_status IS NOT NULL")"
     ;;
   paid|unpaid)
     [[ $# -ge 2 ]] || usage
     code="$(norm_code "$2")"
     if [[ "$cmd" == paid ]]; then
-      set_clause="raffle_prize_paid = true, raffle_prize_paid_datetime = now()"
+      set_clause="raffle_status = 'PAID', raffle_prize_paid = true, raffle_prize_paid_datetime = now()"
+      from_status="CLAIMED"
     else
-      set_clause="raffle_prize_paid = NULL, raffle_prize_paid_datetime = NULL"
+      set_clause="raffle_status = 'CLAIMED', raffle_prize_paid = NULL, raffle_prize_paid_datetime = NULL"
+      from_status="PAID"
     fi
-    run_sql "${3:-local}" "UPDATE $S.raffle_user SET $set_clause WHERE raffle_generated_id = '$code' AND raffle_claimed;
+    run_sql "${3:-local}" "UPDATE $S.raffle_user SET $set_clause WHERE raffle_generated_id = '$code' AND raffle_status = '$from_status';
                           $(show_ticket_sql "u.raffle_generated_id = '$code'")"
     ;;
   claimed)
@@ -73,7 +75,7 @@ case "$cmd" in
     [[ "$when" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}[\ T][0-9]{2}:[0-9]{2}(:[0-9]{2})?([+-][0-9]{2}(:?[0-9]{2})?)?$ ]] \
       || { echo "Datetime must look like 2026-10-16 11:03:54-04" >&2; exit 1; }
     run_sql "${4:-local}" "UPDATE $S.raffle_user SET raffle_claimed_datetime = '$when'::timestamptz
-                            WHERE raffle_generated_id = '$code' AND raffle_claimed;
+                            WHERE raffle_generated_id = '$code' AND raffle_status IS NOT NULL;
                           $(show_ticket_sql "u.raffle_generated_id = '$code'")"
     ;;
   *) usage ;;

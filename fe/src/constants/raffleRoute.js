@@ -2,6 +2,8 @@
 export const RAFFLE_PATH = '/raffle';
 /** Public page showing a sample raffle screenshot (image at /raffleimage.jpg). */
 export const RAFFLE_SAMPLE_PATH = '/rafflesample';
+/** Public page showing the raffle steps picture (assets/images/raffleSteps.png). */
+export const RAFFLE_STEPS_PATH = '/rafflesteps';
 /** Event link handed out at the Meetup — sends members to the mall (login / signup first). */
 export const RAFFLE_MUSTAFA_PATH = '/raffleMustafa';
 /** Event host page: draw the winning number and verify the winner's ticket (host password). */
