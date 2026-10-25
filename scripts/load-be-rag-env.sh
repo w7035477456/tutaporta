@@ -22,14 +22,23 @@ load_be_rag_env() {
     val="${val#\'}"
     val="${val%\'}"
     case "$key" in
-      OLLAMA_MODEL|OLLAMA_BASE_URL|OLLAMA_KEEP_ALIVE|OLLAMA_KEEP_ALIVE_PINNED|RAG_HOST|RAG_PORT)
+      AI_MODEL_ENABLE|OLLAMA_MODEL|OLLAMA_BASE_URL|OLLAMA_KEEP_ALIVE|OLLAMA_KEEP_ALIVE_PINNED|RAG_HOST|RAG_PORT)
         export "$key=$val"
         ;;
     esac
   done <"$env_file"
 }
 
+# AI_MODEL_ENABLE=false|0|no|off → do not start Ollama / OLLAMA_MODEL. Unset or true → start.
+ai_model_enabled() {
+  case "$(printf '%s' "${AI_MODEL_ENABLE:-true}" | tr '[:upper:]' '[:lower:]')" in
+    false|0|no|off) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   load_be_rag_env
+  echo "AI_MODEL_ENABLE=${AI_MODEL_ENABLE:-"(unset → true)"}"
   echo "OLLAMA_MODEL=${OLLAMA_MODEL:-"(unset)"}"
 fi

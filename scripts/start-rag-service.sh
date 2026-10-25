@@ -2,6 +2,16 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Same OLLAMA_MODEL as Node (~/.ssh/be/.env), then script default if still unset.
+# shellcheck source=scripts/load-be-rag-env.sh
+source "$ROOT/scripts/load-be-rag-env.sh"
+load_be_rag_env
+if ! ai_model_enabled; then
+  echo "AI_MODEL_ENABLE=${AI_MODEL_ENABLE} — not starting AI model / RAG service"
+  exit 0
+fi
+
 cd "$ROOT/rag_service"
 
 if [[ ! -f .venv/bin/activate ]]; then
@@ -23,10 +33,6 @@ fi
 source .venv/bin/activate
 pip install -q -r requirements.txt
 
-# Same OLLAMA_MODEL as Node (~/.ssh/be/.env), then script default if still unset.
-# shellcheck source=scripts/load-be-rag-env.sh
-source "$ROOT/scripts/load-be-rag-env.sh"
-load_be_rag_env
 # shellcheck source=scripts/rag-default-model.sh
 source "$ROOT/scripts/rag-default-model.sh"
 export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"

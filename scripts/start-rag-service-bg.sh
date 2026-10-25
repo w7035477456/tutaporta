@@ -9,6 +9,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/load-be-rag-env.sh
 source "$ROOT/scripts/load-be-rag-env.sh"
 load_be_rag_env
+if ! ai_model_enabled; then
+  echo "[rag-bg] AI_MODEL_ENABLE=${AI_MODEL_ENABLE} — skipping Ollama + AI model start"
+  exit 0
+fi
 # shellcheck source=scripts/rag-default-model.sh
 source "$ROOT/scripts/rag-default-model.sh"
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
