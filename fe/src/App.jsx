@@ -15,6 +15,7 @@ import BrowserZoomWarning from 'ui-component/BrowserZoomWarning';
 import ErrorPopup from 'ui-component/ErrorPopup';
 import ThemedDialogHost from 'ui-component/ThemedDialogHost';
 import { isGlobalErrorPopupEnabled } from 'config/globalErrorPopupEnv';
+import { installEnterKeySubmit } from 'utils/enterKeySubmit';
 
 // auth provider
 import { AuthProvider } from 'contexts/AuthContext';
@@ -65,6 +66,8 @@ export default function App() {
     document.addEventListener('contextmenu', onContextMenuCapture, true);
     return () => document.removeEventListener('contextmenu', onContextMenuCapture, true);
   }, []);
+
+  useEffect(() => installEnterKeySubmit(), []);
 
   return (
     <ThemeCustomization>
