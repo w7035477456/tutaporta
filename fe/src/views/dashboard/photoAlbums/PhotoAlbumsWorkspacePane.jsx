@@ -27,8 +27,7 @@ import {
   readPhotoAlbumsApiError,
   readPhotoAlbumsOpenFailureMessage,
   readFileAsDataUrl,
-  createPhotoAlbumsPaneApi,
-  resetPhotoAlbumsTutaDrive
+  createPhotoAlbumsPaneApi
 } from 'api/photoAlbumsFe';
 import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 import { registerPhotoAlbumsLeavePrepare } from 'utils/photoAlbumsLeavePrepare';
@@ -3787,35 +3786,6 @@ export default function PhotoAlbumsWorkspacePane({
   const handleUsbVaultRestoredOrFormatted = useCallback(async () => {
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
-
-  const handleResetAlbum = useCallback(async () => {
-    if (busy || !isTutaCloudPane) return;
-    const ok = await themedConfirm(
-      'Reset Album?\n\nThis permanently deletes EVERY album set, album, page and photo in TutaPhotos on TutaCloud, and stops every album you shared with other people.\n\nThis cannot be undone. Use Backup/Restore first if you want to keep anything.'
-    );
-    if (!ok) return;
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      await resetPhotoAlbumsTutaDrive();
-    } catch (err) {
-      setError(readPhotoAlbumsApiError(err, 'Reset Album failed'));
-      setBusy(false);
-      return;
-    }
-    setBusy(false);
-    setPhotoAlbumsBridgeStorageType(null);
-    setNotebooks([]);
-    setShortcuts([]);
-    setSelectedNotebookId(null);
-    setSelectedNoteId(null);
-    setSharedAlbums([]);
-    onSessionEnded?.();
-  }, [busy, isTutaCloudPane, onSessionEnded]);
 
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
@@ -8186,9 +8156,7 @@ export default function PhotoAlbumsWorkspacePane({
               onGetMoreTokens={openPaymentTokenCheckout}
               onRequestUsageRefresh={() => refreshVaultUsageRef.current?.()}
               onRestoreSampleAlbum={
-                sharedAlbumView || compareMode || !isTutaCloudPane
-                  ? null
-                  : () => void handleResetAlbum()
+                sharedAlbumView || compareMode ? null : () => void handleRestoreSampleAlbum()
               }
               restoreSampleAlbumDisabled={busy || !unlocked}
             />
@@ -9350,11 +9318,6 @@ export default function PhotoAlbumsWorkspacePane({
                       onAlbumPageDragEnd={sharedAlbumView ? undefined : handleAlbumPageDragEnd}
                       onOrderPrint={
                         sharedAlbumView ? undefined : handleAddCurrentPageToOrderAlbum
-                      }
-                      onResetAlbum={
-                        sharedAlbumView || compareMode
-                          ? undefined
-                          : () => void handleRestoreSampleAlbum()
                       }
                       orderAlbumActive={orderAlbumActive}
                       orderFilmstripEntries={orderAlbumActive ? orderFilmstripEntries : null}
