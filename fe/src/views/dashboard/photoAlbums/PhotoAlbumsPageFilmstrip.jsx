@@ -106,7 +106,8 @@ export function PageThumb({
         onPageDragStart?.(e, {
           pageIndex: pageIndex ?? pageNumber - 1,
           pageNumber,
-          modelKey: model?.key
+          modelKey: model?.key,
+          attachmentId: photoFrame ? photoIds[0] ?? null : null
         });
       }}
       onDragEnd={(e) => {
@@ -117,7 +118,9 @@ export function PageThumb({
       aria-current={active ? 'page' : undefined}
       title={
         canDragPage
-          ? `Page ${pageNumber} — drag onto another album to move this page`
+          ? photoFrame
+            ? `Photo on page ${pageNumber} — drag onto another album to copy or move it`
+            : `Page ${pageNumber} — drag onto another album to move this page`
           : photoFrame
             ? `Photo on page ${pageNumber}`
             : `Page ${pageNumber}`
@@ -547,8 +550,8 @@ export default function PhotoAlbumsPageFilmstrip({
       <SliderControlButton
         type="button"
         hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-        aria-label="Reset Album — delete every album, page and photo in TutaPhotos on TutaCloud"
-        title="Reset Album — delete every album, page and photo in TutaPhotos on TutaCloud and start with a blank vault"
+        aria-label="Reset Album — bring SAMPLE SET and SAMPLE ALBUM back to the original sample"
+        title="Bring back SAMPLE SET, SAMPLE ALBUM and its sample photos (your other albums are not touched)"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.preventDefault();

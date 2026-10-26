@@ -11,7 +11,7 @@ import SliderControlButton, {
   SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
-import { themedAlert, themedConfirm } from 'utils/themedDialog';
+import { themedAlert, themedChoice, themedConfirm } from 'utils/themedDialog';
 import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDownsizeMedia';
 import {
   isPhotoAlbumsStorageNotUnlockedError,
@@ -135,6 +135,11 @@ import {
   serializeAlbumPageDrag,
   setActiveAlbumPageDrag
 } from './photoAlbumsAlbumPageDrag';
+import {
+  DRAG_TRAY_PHOTO,
+  isTrayPhotoDrag,
+  readTrayPhotoDragAttachmentId
+} from './photoAlbumsPagePhotoDrag';
 import { commitAlbumPageMoveToNote } from './photoAlbumsMoveAlbumPage';
 import { setPhotoAlbumsColumnResizing } from './photoAlbumsColumnResizeGate';
 import {
@@ -1538,6 +1543,8 @@ function RenamableDraggableMenuRow({
   noteImageDropActive = false,
   acceptForeignDrop = false,
   albumPageDropActive = false,
+  /** Album rows: accept a Green Tray photo (copy / move it into this album). */
+  trayPhotoDropEnabled = false,
   onToggleLock,
   lockTitle,
   /** Optional warm-up before drag (e.g. fetch note body for Finder HTML export). */
@@ -1696,7 +1703,8 @@ function RenamableDraggableMenuRow({
             const albumPageDrag =
               albumPageDropActive ||
               isAlbumPageDrag(e.dataTransfer) ||
-              types.includes(DRAG_ALBUM_PAGE);
+              types.includes(DRAG_ALBUM_PAGE) ||
+              (trayPhotoDropEnabled && types.includes(DRAG_TRAY_PHOTO));
             const isInternalVaultDrag =
               types.includes(DRAG_NOTEBOOK) ||
               types.includes(DRAG_NOTE) ||
@@ -1729,7 +1737,8 @@ function RenamableDraggableMenuRow({
             const albumPageDrag =
               albumPageDropActive ||
               isAlbumPageDrag(e.dataTransfer) ||
-              types.includes(DRAG_ALBUM_PAGE);
+              types.includes(DRAG_ALBUM_PAGE) ||
+              (trayPhotoDropEnabled && types.includes(DRAG_TRAY_PHOTO));
             const isInternalVaultDrag =
               types.includes(DRAG_NOTEBOOK) ||
               types.includes(DRAG_NOTE) ||
@@ -6487,6 +6496,7 @@ export default function PhotoAlbumsWorkspacePane({
         pageIndex,
         pageNumber,
         instanceKey,
+        attachmentId: Number(meta?.attachmentId) >= 1 ? Number(meta.attachmentId) : null,
         storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'
       };
       setActiveAlbumPageDrag(payload);
@@ -6507,6 +6517,79 @@ export default function PhotoAlbumsWorkspacePane({
     setDraggingAlbumPage(false);
     setDropTargetNoteId(null);
   }, []);
+
+  /** Copy or Move one photo (Green / Blue Tray) into another album's Green Tray. */
+  const transferPhotoToNote = useCallback(
+    async ({ sourceNoteId, attachmentId, pageKey, pageNumber, targetId }) => {
+      if (busy) return;
+      const targetRow = findNoteRowById(targetId).note;
+      if (!targetRow) {
+        setError('Target album not found.');
+        return;
+      }
+      const targetLabel =
+        photoAlbumsNoteSidebarLabel(targetRow, notes, notebooks) ||
+        String(targetRow.note_name || 'album').trim() ||
+        'album';
+      const what = pageNumber ? `the photo on page ${pageNumber}` : 'this photo';
+      const mode = await themedChoice(`Copy or Move ${what} into album “${targetLabel}”?`, {
+        choices: [
+          { value: 'copy', label: 'Copy' },
+          { value: 'move', label: 'Move' }
+        ]
+      });
+      if (mode !== 'copy' && mode !== 'move') return;
+
+      setBusy(true);
+      setError('');
+      try {
+        const result = await vaultApi.transferPhotoAlbumsNoteAttachment(sourceNoteId, attachmentId, {
+          targetNoteId: targetId,
+          mode
+        });
+        if (mode === 'move' && pageKey) {
+          noteEditorApiRef.current?.removePagePhoto?.(pageKey, attachmentId);
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+          }
+          skipSaveRef.current = false;
+          await persistNoteRef.current?.();
+        }
+        const added = result?.attachment;
+        setNotebooks((prev) =>
+          prev.map((nb) => ({
+            ...nb,
+            notes: (nb.notes || []).map((note) => {
+              const nid = Number(note.note_id);
+              let attachments = note.attachments;
+              if (mode === 'move' && nid === sourceNoteId && Array.isArray(attachments)) {
+                attachments = attachments.filter((entry) => Number(entry.attachment_id) !== attachmentId);
+              }
+              if (added && nid === targetId && Array.isArray(attachments)) {
+                const addedId = Number(added.attachment_id);
+                if (!attachments.some((entry) => Number(entry.attachment_id) === addedId)) {
+                  attachments = [...attachments, added];
+                }
+              }
+              if (attachments === note.attachments) return note;
+              return {
+                ...note,
+                attachments,
+                album_media_count: countPhotoAlbumsSidebarMediaInAttachments(attachments)
+              };
+            })
+          }))
+        );
+      } catch (err) {
+        setError(readPhotoAlbumsApiError(err, mode === 'move' ? 'Failed to move photo' : 'Failed to copy photo'));
+      } finally {
+        setBusy(false);
+        bumpVaultUsage();
+      }
+    },
+    [busy, bumpVaultUsage, findNoteRowById, notebooks, notes, vaultApi]
+  );
 
   const handleMoveAlbumPageToNote = useCallback(
     async (event, targetNoteId) => {
@@ -6544,6 +6627,17 @@ export default function PhotoAlbumsWorkspacePane({
       }
       if (noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(sourceNoteId)) {
         setError('Unlock the current album before moving a page.');
+        return;
+      }
+
+      if (drag.attachmentId) {
+        await transferPhotoToNote({
+          sourceNoteId,
+          attachmentId: drag.attachmentId,
+          pageKey: String(drag.instanceKey || '').split('#')[0] || null,
+          pageNumber: drag.pageNumber,
+          targetId
+        });
         return;
       }
 
@@ -6601,8 +6695,29 @@ export default function PhotoAlbumsWorkspacePane({
       notes,
       paneStorageType,
       selectedNote,
-      selectedNoteId
+      selectedNoteId,
+      transferPhotoToNote
     ]
+  );
+
+  const handleTrayPhotoDropOnNote = useCallback(
+    async (event, targetNoteId) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDropTargetNoteId(null);
+      const attachmentId = readTrayPhotoDragAttachmentId(event.dataTransfer);
+      const sourceNoteId = Number(selectedNoteId);
+      const targetId = Number(targetNoteId);
+      if (!attachmentId || !Number.isFinite(sourceNoteId) || sourceNoteId < 1) return;
+      if (sourceNoteId === targetId) return;
+      const targetRow = findNoteRowById(targetId).note;
+      if (targetRow && noteHasInnerEncryption(targetRow)) {
+        setError('Cannot copy or move a photo into a PIN-protected album. Remove the PIN on that album first.');
+        return;
+      }
+      await transferPhotoToNote({ sourceNoteId, attachmentId, pageKey: null, pageNumber: null, targetId });
+    },
+    [findNoteRowById, noteHasInnerEncryption, selectedNoteId, transferPhotoToNote]
   );
 
   const handleNotebookRowDrop = useCallback(
@@ -8071,7 +8186,9 @@ export default function PhotoAlbumsWorkspacePane({
               onGetMoreTokens={openPaymentTokenCheckout}
               onRequestUsageRefresh={() => refreshVaultUsageRef.current?.()}
               onRestoreSampleAlbum={
-                sharedAlbumView || compareMode ? null : () => void handleRestoreSampleAlbum()
+                sharedAlbumView || compareMode || !isTutaCloudPane
+                  ? null
+                  : () => void handleResetAlbum()
               }
               restoreSampleAlbumDisabled={busy || !unlocked}
             />
@@ -8829,7 +8946,7 @@ export default function PhotoAlbumsWorkspacePane({
                             crossPaneDropActive
                               ? 'Drop here to copy or move from the other vault'
                               : draggingAlbumPage
-                                ? 'Drop album page here to move it into this album'
+                                ? 'Drop here to copy or move into this album'
                                 : multiSelectedNoteIds.length > 1
                                   ? `Shift-selected: ${multiSelectedNoteIds.length} albums — drag onto an album-set to move`
                                   : 'Drag onto an album-set to move; drop a page thumb here to receive that page'
@@ -8839,7 +8956,12 @@ export default function PhotoAlbumsWorkspacePane({
                           onPrefetchDrag={prefetchNoteHtmlExport}
                           onDragOver={setDropTargetNoteId}
                           albumPageDropActive={draggingAlbumPage}
+                          trayPhotoDropEnabled
                           onDrop={(e, toId, mime) => {
+                            if (isTrayPhotoDrag(e.dataTransfer)) {
+                              void handleTrayPhotoDropOnNote(e, toId);
+                              return;
+                            }
                             if (isAlbumPageDrag(e.dataTransfer) || draggingAlbumPage) {
                               void handleMoveAlbumPageToNote(e, toId);
                               return;
@@ -9230,7 +9352,9 @@ export default function PhotoAlbumsWorkspacePane({
                         sharedAlbumView ? undefined : handleAddCurrentPageToOrderAlbum
                       }
                       onResetAlbum={
-                        sharedAlbumView || !isTutaCloudPane ? undefined : handleResetAlbum
+                        sharedAlbumView || compareMode
+                          ? undefined
+                          : () => void handleRestoreSampleAlbum()
                       }
                       orderAlbumActive={orderAlbumActive}
                       orderFilmstripEntries={orderAlbumActive ? orderFilmstripEntries : null}

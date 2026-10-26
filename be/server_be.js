@@ -256,6 +256,7 @@ import {
   uploadPhotoAlbumsNoteAttachment,
   getPhotoAlbumsMediaQuota,
   deletePhotoAlbumsNoteAttachment,
+  transferPhotoAlbumsNoteAttachment,
   restorePhotoAlbumsSampleAlbum,
   reconcilePhotoAlbumsAlbumPhotoSeq,
   getPhotoAlbumsTree,
@@ -1632,6 +1633,11 @@ app.post(
   reconcilePhotoAlbumsAlbumPhotoSeq
 );
 app.delete('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', ...photoAlbumsVaultAuth, deletePhotoAlbumsNoteAttachment);
+app.post(
+  '/api/photoAlbums/notes/:noteId/attachments/:attachmentId/transfer',
+  ...photoAlbumsVaultAuth,
+  transferPhotoAlbumsNoteAttachment
+);
 app.post('/api/photoAlbums/restore-sample-album', ...photoAlbumsVaultAuth, restorePhotoAlbumsSampleAlbum);
 app.post('/api/photoAlbums/shortcuts', ...photoAlbumsVaultAuth, createPhotoAlbumsShortcut);
 app.put('/api/photoAlbums/shortcuts/reorder', ...photoAlbumsVaultAuth, reorderPhotoAlbumsShortcuts);

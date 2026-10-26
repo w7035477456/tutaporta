@@ -2571,6 +2571,111 @@ export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
   return { success: true, attachment_id: Number(attachmentId) };
 }
 
+/**
+ * Copy or move one album photo/video into another album. The destination gets a new
+ * attachment row (its own photo seq + file path) that is not placed on any page, so it
+ * shows in that album's Green Tray. Move then deletes the source attachment.
+ * If the destination already holds the same file (checksum), that row is reused.
+ * @returns {{ success: true, mode: 'copy'|'move', attachment: object, duplicate: boolean }}
+ */
+export async function vaultTransferNoteAttachment(session, noteId, attachmentId, targetNoteId, mode = 'copy') {
+  const transferMode = mode === 'move' ? 'move' : 'copy';
+  const sourceNoteId = Number(noteId);
+  const destNoteId = Number(targetNoteId);
+  if (sourceNoteId === destNoteId) throw new Error('Choose a different album');
+  const target = loadNote(session, destNoteId);
+  if (!target) throw new Error('Note not found');
+  const src = queryOne(
+    session.db,
+    `SELECT attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, source_taken_at_ms
+     FROM note_attachments WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
+    [attachmentId, sourceNoteId]
+  );
+  if (!src) throw new Error('Attachment not found');
+
+  const fullBuf = readVaultFileOrNull(session, src.relative_path);
+  if (!fullBuf?.length) throw new Error('Photo file is missing');
+  const checksum = src.checksum
+    ? String(src.checksum)
+    : crypto.createHash('sha256').update(fullBuf).digest('hex');
+
+  let destId = Number(
+    queryOne(
+      session.db,
+      `SELECT attachment_id FROM note_attachments
+        WHERE note_id = ? AND deleted_at IS NULL AND checksum = ? ORDER BY attachment_id LIMIT 1`,
+      [destNoteId, checksum]
+    )?.attachment_id ?? 0
+  );
+  const duplicate = destId > 0;
+
+  if (!duplicate) {
+    const ext = String(src.file_extension || 'bin').replace(/^\./, '').toLowerCase();
+    const orderRow = queryOne(
+      session.db,
+      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM note_attachments WHERE note_id = ?`,
+      [destNoteId]
+    );
+    const albumPhotoSeq = nextAlbumPhotoSeqForNote(session, destNoteId);
+    session.db.run(
+      `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, source_taken_at_ms, album_photo_seq)
+       VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?)`,
+      [
+        destNoteId,
+        src.file_name,
+        ext,
+        fullBuf.length,
+        checksum,
+        src.mime_type || mimeTypeForPhotoAlbumsExtension(ext),
+        Number(orderRow?.next_order ?? 0),
+        src.source_taken_at_ms ?? Date.now(),
+        albumPhotoSeq
+      ]
+    );
+    destId = Number(queryOne(session.db, `SELECT last_insert_rowid() AS id`).id);
+    const relativePath = fileRelativePath(target.notebook_id, destNoteId, destId, ext, albumPhotoSeq);
+    session.db.run(`UPDATE note_attachments SET relative_path = ? WHERE attachment_id = ?`, [relativePath, destId]);
+    writeEncryptedVaultFile(session, relativePath, fullBuf);
+
+    for (const variant of ['display', 'thumb']) {
+      let buf = readVaultFileOrNull(session, fileRelativePathForVariant(src.relative_path, variant));
+      if (!buf && isPhotoAlbumsRasterImageExtension(ext)) {
+        try {
+          buf =
+            variant === 'display'
+              ? await buildPhotoAlbumsDisplay1000pxBuffer(fullBuf, ext)
+              : await buildPhotoAlbumsThumbnailBuffer(fullBuf, ext);
+        } catch (err) {
+          console.warn('[vaultTransferNoteAttachment] variant build failed:', err?.message || err);
+        }
+      }
+      if (buf?.length) writeEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, variant), buf);
+    }
+    refreshNoteSearchText(session.db, destNoteId);
+  }
+
+  if (transferMode === 'move') {
+    deleteEncryptedVaultFile(session, src.relative_path);
+    deleteAttachmentVariants(session, src.relative_path);
+    session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE attachment_id = ?`, [
+      src.attachment_id
+    ]);
+    refreshNoteSearchText(session.db, sourceNoteId);
+  }
+
+  markDirty(session);
+  flushDbToUsb(session);
+  const attachment = mapAttachmentRow(
+    queryOne(
+      session.db,
+      `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, checksum, mime_type, display_order, album_photo_seq, source_taken_at_ms, created_at
+       FROM note_attachments WHERE attachment_id = ?`,
+      [destId]
+    )
+  );
+  return { success: true, mode: transferMode, attachment, duplicate };
+}
+
 function readVaultFileOrNull(session, relativePath) {
   try {
     const buf = readEncryptedVaultFile(session, relativePath);

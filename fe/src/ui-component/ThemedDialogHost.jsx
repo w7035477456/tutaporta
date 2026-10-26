@@ -26,6 +26,7 @@ export default function ThemedDialogHost() {
           skipLabel: req.skipLabel || 'Skip',
           skipAllLabel: req.skipAllLabel || '',
           newerAllLabel: req.newerAllLabel || '',
+          choices: Array.isArray(req.choices) ? req.choices : [],
           inputType: req.inputType || 'text',
           inputValue: req.defaultValue == null ? '' : String(req.defaultValue),
           resolve
@@ -44,11 +45,14 @@ export default function ThemedDialogHost() {
   const isConfirm = dialog?.type === 'confirm';
   const isPrompt = dialog?.type === 'prompt';
   const isOverwriteSkip = dialog?.type === 'overwriteSkip';
+  const isChoice = dialog?.type === 'choice';
 
   return (
     <ColorTemplate16PopupCenterWide
       open={open}
-      onClose={() => closeWith(isConfirm ? false : isPrompt || isOverwriteSkip ? null : undefined)}
+      onClose={() =>
+        closeWith(isConfirm ? false : isPrompt || isOverwriteSkip || isChoice ? null : undefined)
+      }
       closeOnBackdrop={false}
       bodyTextAlignLeft={false}
       centeredLeadLines={0}
@@ -108,7 +112,17 @@ export default function ThemedDialogHost() {
               flexWrap="wrap"
               sx={{ width: '100%', pt: 0.5 }}
             >
-              {isOverwriteSkip ? (
+              {isChoice ? (
+                dialog.choices.map((choice) => (
+                  <ColorTemplate16PopupCenterWide.ActionButton
+                    key={choice.value}
+                    type="button"
+                    onClick={() => closeWith(choice.value)}
+                  >
+                    {choice.label}
+                  </ColorTemplate16PopupCenterWide.ActionButton>
+                ))
+              ) : isOverwriteSkip ? (
                 <>
                   <ColorTemplate16PopupCenterWide.ActionButton
                     type="button"

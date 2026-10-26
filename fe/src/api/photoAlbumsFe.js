@@ -615,6 +615,17 @@ export async function deletePhotoAlbumsNoteAttachment(noteId, attachmentId, { st
   return data;
 }
 
+/** Copy or move one album photo into another album's Green Tray. `mode`: 'copy' | 'move'. */
+export async function transferPhotoAlbumsNoteAttachment(noteId, attachmentId, { targetNoteId, mode }, { storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: `/api/photoAlbums/notes/${noteId}/attachments/${attachmentId}/transfer`,
+    data: { targetNoteId, mode },
+    storageType
+  });
+  return data;
+}
+
 /** Bring SAMPLE SET / SAMPLE ALBUM and its bundled photos back (same seed as a new member). */
 export async function restorePhotoAlbumsSampleAlbum({ storageType } = {}) {
   const { data } = await rvRequest({ method: 'POST', url: '/api/photoAlbums/restore-sample-album', storageType });
@@ -1706,6 +1717,8 @@ export function createPhotoAlbumsPaneApi(storageType) {
     reconcilePhotoAlbumsAlbumPhotoSeq: (noteId) => reconcilePhotoAlbumsAlbumPhotoSeq(noteId, opts),
     deletePhotoAlbumsNoteAttachment: (noteId, attachmentId) =>
       deletePhotoAlbumsNoteAttachment(noteId, attachmentId, opts),
+    transferPhotoAlbumsNoteAttachment: (noteId, attachmentId, body) =>
+      transferPhotoAlbumsNoteAttachment(noteId, attachmentId, body, opts),
     restorePhotoAlbumsSampleAlbum: () => restorePhotoAlbumsSampleAlbum(opts),
     searchPhotoAlbumsNotes: (query) => searchPhotoAlbumsNotes(query, opts),
     fetchPhotoAlbumsUsage: () => fetchPhotoAlbumsUsage(opts),

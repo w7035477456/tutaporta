@@ -162,7 +162,7 @@ export default function PhotoAlbumsUsageBar({
           hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
           disabled={restoreSampleAlbumDisabled}
           onClick={onRestoreSampleAlbum}
-          title="Bring back SAMPLE SET, SAMPLE ALBUM and its sample photos (your other albums are not touched)"
+          title="Delete every album, page and photo in TutaPhotos on TutaCloud and start with a blank vault"
           sx={{ px: 0.75, py: 0.3, whiteSpace: 'nowrap', minWidth: 'auto' }}
         >
           Restore Sample Album

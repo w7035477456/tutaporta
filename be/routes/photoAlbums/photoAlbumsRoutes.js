@@ -33,6 +33,7 @@ import {
   vaultAddNoteAttachment,
   vaultCountAccountMedia,
   vaultDeleteNoteAttachment,
+  vaultTransferNoteAttachment,
   vaultRestoreSampleAlbum,
   vaultGetNoteAttachment,
   vaultReconcileAlbumPhotoSeq,
@@ -1035,6 +1036,36 @@ export async function deletePhotoAlbumsNoteAttachment(req, res) {
   } catch (err) {
     console.error('[deletePhotoAlbumsNoteAttachment]', err?.message || err);
     const message = err?.message || 'Failed to delete attachment';
+    if (message === 'Attachment not found' || message === 'Note not found') {
+      return res.status(404).json({ error: message });
+    }
+    return res.status(500).json({ error: message });
+  }
+}
+
+/** POST /api/photoAlbums/notes/:noteId/attachments/:attachmentId/transfer — { targetNoteId, mode: 'copy'|'move' } */
+export async function transferPhotoAlbumsNoteAttachment(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+
+  const noteId = Number(req.params.noteId);
+  const attachmentId = Number(req.params.attachmentId);
+  const targetNoteId = Number(req.body?.targetNoteId);
+  const mode = req.body?.mode === 'move' ? 'move' : 'copy';
+  if (
+    ![noteId, attachmentId, targetNoteId].every((n) => Number.isFinite(n) && n >= 1) ||
+    noteId === targetNoteId
+  ) {
+    return res.status(400).json({ error: 'Invalid note, attachment or target album' });
+  }
+
+  try {
+    const result = await vaultTransferNoteAttachment(session, noteId, attachmentId, targetNoteId, mode);
+    logImpersonatedMutation(req);
+    return res.json(result);
+  } catch (err) {
+    console.error('[transferPhotoAlbumsNoteAttachment]', err?.message || err);
+    const message = err?.message || 'Failed to copy or move photo';
     if (message === 'Attachment not found' || message === 'Note not found') {
       return res.status(404).json({ error: message });
     }

@@ -2126,7 +2126,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           attachmentIds: []
         };
       },
-      removeAlbumPage: (pageIndex) => removeAlbumPageAt(pageIndex)
+      removeAlbumPage: (pageIndex) => removeAlbumPageAt(pageIndex),
+      removePagePhoto: (pageKey, attachmentId) => handleRemovePagePhotoRef.current?.(pageKey, attachmentId)
     }),
     [editor, emitHtml, handleResizePage, pageSize.width, removeAlbumPageAt]
   );
@@ -2624,6 +2625,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     },
     [effectiveEditable, setAlbumPagePhotos, removeAlbumPageAt, shownAlbumPagePhotoIds]
   );
+  const handleRemovePagePhotoRef = useRef(handleRemovePagePhoto);
+  handleRemovePagePhotoRef.current = handleRemovePagePhoto;
 
   const handlePageDrop = useCallback(
     (event) => {

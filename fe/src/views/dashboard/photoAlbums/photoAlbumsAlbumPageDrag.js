@@ -2,7 +2,7 @@
 
 export const DRAG_ALBUM_PAGE = 'application/x-record-vault-album-page';
 
-/** @type {null | { noteId: number, pageIndex: number, pageNumber: number, instanceKey: string, storageType: string }} */
+/** @type {null | { noteId: number, pageIndex: number, pageNumber: number, instanceKey: string, attachmentId?: number|null, storageType: string }} */
 let activeAlbumPageDrag = null;
 
 export function setActiveAlbumPageDrag(payload) {
@@ -41,6 +41,7 @@ export function readAlbumPageDrag(dataTransfer) {
       pageIndex,
       pageNumber: Number(parsed.pageNumber) || pageIndex + 1,
       instanceKey: String(parsed.instanceKey || ''),
+      attachmentId: Number(parsed.attachmentId) >= 1 ? Math.trunc(Number(parsed.attachmentId)) : null,
       storageType: parsed.storageType === 'tutadrive' ? 'onedrive' : 'usb'
     };
   } catch {
@@ -54,6 +55,7 @@ export function serializeAlbumPageDrag(payload) {
     pageIndex: Number(payload.pageIndex),
     pageNumber: Number(payload.pageNumber) || Number(payload.pageIndex) + 1,
     instanceKey: String(payload.instanceKey || ''),
+    attachmentId: Number(payload.attachmentId) >= 1 ? Math.trunc(Number(payload.attachmentId)) : null,
     storageType: payload.storageType === 'tutadrive' ? 'onedrive' : 'usb'
   });
 }

@@ -67,6 +67,28 @@ export function themedConfirm(message, options = {}) {
 }
 
 /**
+ * One button per choice; the X closes with null.
+ * @param {string} message
+ * @param {{ title?: string, choices: { value: string, label: string }[] }} options
+ * @returns {Promise<string|null>} chosen value, or null if closed
+ */
+export function themedChoice(message, options = {}) {
+  const choices = (Array.isArray(options.choices) ? options.choices : [])
+    .filter((c) => c && c.value != null)
+    .map((c) => ({ value: String(c.value), label: String(c.label ?? c.value) }));
+  if (typeof dialogHandler !== 'function') {
+    const first = choices[0];
+    return Promise.resolve(first && window.confirm(`${message}\n\nOK = ${first.label}`) ? first.value : null);
+  }
+  return dialogHandler({
+    type: 'choice',
+    message: String(message ?? ''),
+    title: options.title || 'Please confirm',
+    choices
+  }).then((result) => (result == null ? null : String(result)));
+}
+
+/**
  * @param {string} message
  * @param {string} [defaultValue]
  * @param {{ title?: string, okLabel?: string, cancelLabel?: string, inputType?: string }} [options]
