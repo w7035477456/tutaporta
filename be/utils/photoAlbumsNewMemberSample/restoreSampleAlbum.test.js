@@ -6,6 +6,7 @@ import initSqlJs from 'sql.js';
 import { VAULT_SCHEMA_SQL } from '../photoAlbumsUsb/vaultSchema.js';
 import {
   loadInitializeSampleManifest,
+  loadSampleAlbumBodyHtml,
   restorePhotoAlbumsSampleAlbumDb,
   seedPhotoAlbumsNewMemberSampleDb
 } from './seedPhotoAlbumsNewMemberSample.js';
@@ -28,6 +29,14 @@ function all(db, sql, params = []) {
 }
 
 const sampleIds = () => loadInitializeSampleManifest().attachments.map((a) => Number(a.attachmentId));
+const liveSampleIds = () =>
+  loadInitializeSampleManifest()
+    .attachments.filter((a) => a.deleted !== true)
+    .map((a) => Number(a.attachmentId));
+const liveIds = (db) =>
+  all(db, `SELECT attachment_id FROM note_attachments WHERE deleted_at IS NULL ORDER BY attachment_id`).map((r) =>
+    Number(r.attachment_id)
+  );
 
 describe('restorePhotoAlbumsSampleAlbumDb', () => {
   before(async () => {
@@ -49,9 +58,9 @@ describe('restorePhotoAlbumsSampleAlbumDb', () => {
     seedPhotoAlbumsNewMemberSampleDb(db);
     db.run(`UPDATE note_attachments SET deleted_at = datetime('now')`);
     const result = restorePhotoAlbumsSampleAlbumDb(db);
-    assert.deepEqual(result.restoredAttachmentIds, sampleIds());
+    assert.deepEqual(result.restoredAttachmentIds, liveSampleIds());
     const live = all(db, `SELECT note_id FROM note_attachments WHERE deleted_at IS NULL`);
-    assert.equal(live.length, sampleIds().length);
+    assert.equal(live.length, liveSampleIds().length);
     assert.ok(live.every((row) => Number(row.note_id) === result.noteId));
   });
 
@@ -74,7 +83,7 @@ describe('restorePhotoAlbumsSampleAlbumDb', () => {
     db.run(`UPDATE notebooks SET deleted_at = datetime('now') WHERE notebook_id <> ?`, [mySet]);
 
     const result = restorePhotoAlbumsSampleAlbumDb(db);
-    assert.deepEqual(result.restoredAttachmentIds, sampleIds());
+    assert.deepEqual(result.restoredAttachmentIds, liveSampleIds());
     assert.notEqual(result.notebookId, mySet);
     const sets = all(db, `SELECT notebook_name FROM notebooks WHERE deleted_at IS NULL ORDER BY display_order`);
     assert.deepEqual(
@@ -99,5 +108,29 @@ describe('restorePhotoAlbumsSampleAlbumDb', () => {
     const row = all(db, `SELECT note_id, file_name FROM note_attachments WHERE attachment_id = 1`)[0];
     assert.equal(row.file_name, 'mine.jpg');
     assert.equal(Number(row.note_id), 1);
+  });
+
+  it('seeds a new member with the template layout and only the template photos live', () => {
+    const db = freshDb();
+    seedPhotoAlbumsNewMemberSampleDb(db);
+    assert.equal(all(db, `SELECT body_text FROM notes`)[0].body_text, loadSampleAlbumBodyHtml());
+    assert.deepEqual(liveIds(db), liveSampleIds());
+    assert.equal(all(db, `SELECT * FROM note_attachments`).length, sampleIds().length);
+  });
+
+  it('resets an edited SAMPLE ALBUM back to the template layout and photos', () => {
+    const db = freshDb();
+    seedPhotoAlbumsNewMemberSampleDb(db);
+    db.run(`UPDATE notes SET body_text = '<p>my edits</p>'`);
+    db.run(`UPDATE note_attachments SET deleted_at = NULL`);
+    db.run(
+      `INSERT INTO note_attachments (attachment_id, note_id, file_name, file_extension, relative_path)
+       VALUES (20, 1, 'mine.jpg', 'jpg', '1/1/att_20_20.jpg')`
+    );
+    const result = restorePhotoAlbumsSampleAlbumDb(db);
+    assert.equal(all(db, `SELECT body_text FROM notes`)[0].body_text, loadSampleAlbumBodyHtml());
+    assert.deepEqual(liveIds(db), liveSampleIds());
+    assert.ok(result.removedAttachmentIds.includes(20));
+    assert.equal(all(db, `SELECT * FROM notes`).length, 1);
   });
 });

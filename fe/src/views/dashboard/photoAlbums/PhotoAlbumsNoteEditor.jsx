@@ -1355,13 +1355,31 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const maxW = Math.max(startW, screenWidthForStretch(maxStretch));
       let targetW = startW;
 
+      // The page clips overflow, so the drag preview is a screen-fixed copy of the bar.
+      const handleRect = handleEl.getBoundingClientRect();
+      const ghostEl = handleEl.cloneNode(true);
+      Object.assign(ghostEl.style, {
+        position: 'fixed',
+        left: `${handleRect.left}px`,
+        top: `${handleRect.top}px`,
+        width: `${handleRect.width}px`,
+        height: `${handleRect.height}px`,
+        right: 'auto',
+        bottom: 'auto',
+        minHeight: '0',
+        zIndex: '5000',
+        pointerEvents: 'none'
+      });
+      document.body.appendChild(ghostEl);
+      handleEl.style.visibility = 'hidden';
+
       setPageResizeDragging(true);
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'ew-resize';
 
       const onMove = (moveEvent) => {
         targetW = Math.max(minW, Math.min(maxW, startW + moveEvent.clientX - startX));
-        handleEl.style.transform = `translateX(${(targetW - startW) / zoomScale}px)`;
+        ghostEl.style.transform = `translateX(${targetW - startW}px)`;
       };
 
       const onUp = () => {
@@ -1369,7 +1387,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         window.removeEventListener('mouseup', onUp);
         document.body.style.removeProperty('user-select');
         document.body.style.removeProperty('cursor');
-        handleEl.style.removeProperty('transform');
+        ghostEl.remove();
+        handleEl.style.removeProperty('visibility');
         setPageResizeDragging(false);
         if (Math.abs(targetW - startW) < 2) return;
 

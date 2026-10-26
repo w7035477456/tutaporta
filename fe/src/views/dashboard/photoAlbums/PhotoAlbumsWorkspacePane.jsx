@@ -4583,6 +4583,12 @@ export default function PhotoAlbumsWorkspacePane({
     try {
       await flushPendingNoteSave();
       await vaultApi.restorePhotoAlbumsSampleAlbum();
+      // The server just reset SAMPLE ALBUM's layout; the open editor must not save over it on logoff.
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      editorHydratedRef.current.key = '';
     } catch (err) {
       setError(readPhotoAlbumsApiError(err, 'Restore Sample Album failed'));
       setBusy(false);

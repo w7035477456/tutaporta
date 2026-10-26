@@ -19,6 +19,28 @@ function queryOne(db, sql, params = []) {
   return row;
 }
 
+function queryAll(db, sql, params = []) {
+  const stmt = db.prepare(sql);
+  stmt.bind(params);
+  const rows = [];
+  while (stmt.step()) rows.push(stmt.getAsObject());
+  stmt.free();
+  return rows;
+}
+
+function softDeleteAttachment(db, attachmentId) {
+  db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE attachment_id = ?`, [attachmentId]);
+}
+
+/** Template photos marked `deleted` in manifest.json are seeded soft-deleted (as in the source vault). */
+function isTemplateDeleted(att) {
+  return att?.deleted === true;
+}
+
+function sqliteNow() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
 function buildSearchText(noteName, bodyHtml, attachments) {
   const parts = [
     noteName,
@@ -59,28 +81,14 @@ export function seedPhotoAlbumsNewMemberSampleDb(db) {
   const noteId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
 
   attachments.forEach((att, index) => {
-    const attachmentId = Number(att.attachmentId) || index + 1;
-    const albumPhotoSeq = Number(att.albumPhotoSeq) || attachmentId;
-    const ext = String(att.fileExtension || 'bin').replace(/^\./, '').toLowerCase();
-    const relativePath = fileRelativePath(notebookId, noteId, attachmentId, ext, albumPhotoSeq);
+    const { attachmentId, values } = insertSampleAttachmentValues(att, index, notebookId, noteId);
     db.run(
       `INSERT INTO note_attachments (
          attachment_id, note_id, file_name, file_extension, relative_path,
-         file_size_bytes, checksum, mime_type, display_order, source_taken_at_ms, album_photo_seq
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        attachmentId,
-        noteId,
-        att.fileName,
-        ext,
-        relativePath,
-        Number(att.fileSizeBytes) || 0,
-        att.checksum || null,
-        att.mimeType || null,
-        index,
-        Number(att.sourceTakenAtMs) || null,
-        albumPhotoSeq
-      ]
+         file_size_bytes, checksum, mime_type, display_order, source_taken_at_ms, album_photo_seq,
+         deleted_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [attachmentId, ...values, isTemplateDeleted(att) ? sqliteNow() : null]
     );
   });
 
@@ -114,12 +122,13 @@ function insertSampleAttachmentValues(att, index, notebookId, noteId) {
 }
 
 /**
- * "Restore Sample Album": bring SAMPLE SET / SAMPLE ALBUM and its 7 bundled photos back into
- * an existing vault without touching the member's other albums. Reuses an active SAMPLE SET /
- * SAMPLE ALBUM by name, otherwise creates them at the top of the list. Sample attachment ids
- * stay fixed (1…7): a soft-deleted or orphaned row with that id is revived into the sample
- * album; an id still used by a live album elsewhere is left alone.
- * Returns { notebookId, noteId, restoredAttachmentIds }.
+ * "Restore Sample Album": reset SAMPLE SET / SAMPLE ALBUM to the bundled template (layout from
+ * sampleAlbumBody.html + the manifest's photos) without touching the member's other albums.
+ * Reuses an active SAMPLE SET / SAMPLE ALBUM by name (overwriting its layout), otherwise creates
+ * them at the top of the list. Sample attachment ids stay fixed (1…7): a soft-deleted or orphaned
+ * row with that id is revived into the sample album; an id still used by a live album elsewhere
+ * is left alone. Template photos marked `deleted` and photos the member added are soft-deleted.
+ * Returns { notebookId, noteId, restoredAttachmentIds, removedAttachmentIds }.
  */
 export function restorePhotoAlbumsSampleAlbumDb(db) {
   const manifest = loadInitializeSampleManifest();
@@ -150,8 +159,9 @@ export function restorePhotoAlbumsSampleAlbumDb(db) {
       [notebookId, albumName]
     )?.note_id ?? 0
   );
+  const bodyHtml = loadSampleAlbumBodyHtml();
+  const searchText = buildSearchText(albumName, bodyHtml, attachments);
   if (!noteId) {
-    const bodyHtml = loadSampleAlbumBodyHtml();
     const top = queryOne(
       db,
       `SELECT MIN(display_order) AS m FROM notes WHERE deleted_at IS NULL AND notebook_id = ?`,
@@ -161,9 +171,35 @@ export function restorePhotoAlbumsSampleAlbumDb(db) {
     db.run(
       `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
        VALUES (?, ?, ?, ?, ?)`,
-      [notebookId, albumName, bodyHtml, order, buildSearchText(albumName, bodyHtml, attachments)]
+      [notebookId, albumName, bodyHtml, order, searchText]
     );
     noteId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
+  } else {
+    // Reset the existing SAMPLE ALBUM to the template layout (pages, photo edits, emojis, text).
+    db.run(
+      `UPDATE notes
+          SET body_text = ?, search_text = ?, inner_encrypt_enabled = 0, inner_pin_salt = NULL,
+              updated_at = datetime('now')
+        WHERE note_id = ?`,
+      [bodyHtml, searchText, noteId]
+    );
+  }
+
+  const templateIds = new Set(
+    attachments.map((att, index) => Number(att.attachmentId) || index + 1)
+  );
+  // Photos the member added to SAMPLE ALBUM are not part of the template.
+  const removedAttachmentIds = [];
+  const liveRows = queryAll(
+    db,
+    `SELECT attachment_id FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL`,
+    [noteId]
+  );
+  for (const row of liveRows) {
+    const attachmentId = Number(row.attachment_id);
+    if (templateIds.has(attachmentId)) continue;
+    softDeleteAttachment(db, attachmentId);
+    removedAttachmentIds.push(attachmentId);
   }
 
   const restoredAttachmentIds = [];
@@ -177,6 +213,13 @@ export function restorePhotoAlbumsSampleAlbumDb(db) {
         WHERE a.attachment_id = ?`,
       [attachmentId]
     );
+    if (isTemplateDeleted(att)) {
+      if (existing && Number(existing.note_id) === noteId && existing.deleted_at == null) {
+        softDeleteAttachment(db, attachmentId);
+        removedAttachmentIds.push(attachmentId);
+      }
+      return;
+    }
     if (!existing) {
       db.run(
         `INSERT INTO note_attachments (
@@ -189,7 +232,15 @@ export function restorePhotoAlbumsSampleAlbumDb(db) {
       return;
     }
     const isLive = existing.deleted_at == null && existing.live_note_id != null;
-    if (isLive) return;
+    if (isLive) {
+      if (Number(existing.note_id) === noteId) {
+        db.run(`UPDATE note_attachments SET display_order = ? WHERE attachment_id = ?`, [
+          index,
+          attachmentId
+        ]);
+      }
+      return;
+    }
     db.run(
       `UPDATE note_attachments
           SET note_id = ?, file_name = ?, file_extension = ?, relative_path = ?, file_size_bytes = ?,
@@ -213,7 +264,7 @@ export function restorePhotoAlbumsSampleAlbumDb(db) {
     );
   }
 
-  return { notebookId, noteId, restoredAttachmentIds };
+  return { notebookId, noteId, restoredAttachmentIds, removedAttachmentIds };
 }
 
 /**
