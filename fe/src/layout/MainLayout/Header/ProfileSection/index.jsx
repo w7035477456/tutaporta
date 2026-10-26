@@ -541,7 +541,7 @@ export default function ProfileSection({ clusterTight = false }) {
   const handleExitOrLogout = async () => {
     try {
       closeProfileMenu();
-      await offerRecordVaultBackupBeforeExit();
+      if (!(await offerRecordVaultBackupBeforeExit())) return;
       await flushRecordVaultSessionsOnLeave();
       const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');
       await flushPhotoAlbumsSessionsOnLeave();
@@ -683,7 +683,7 @@ export default function ProfileSection({ clusterTight = false }) {
   const handleLogoutBottom = async () => {
     try {
       closeProfileMenu();
-      await offerRecordVaultBackupBeforeExit();
+      if (!(await offerRecordVaultBackupBeforeExit())) return;
       // AuthContext.logout flushes Cloud/USB vault sessions first (hourglass + file detail).
       await logout();
       sessionStorage.setItem('logoutBlockBack', '1');
@@ -698,7 +698,7 @@ export default function ProfileSection({ clusterTight = false }) {
     event.preventDefault();
     try {
       closeProfileMenu();
-      await offerRecordVaultBackupBeforeExit();
+      if (!(await offerRecordVaultBackupBeforeExit())) return;
       storeLoginEmailPrefill(TOOLS_ONLY_ADMIN_LOGIN_LABEL);
       await logout();
       sessionStorage.setItem('logoutBlockBack', '1');

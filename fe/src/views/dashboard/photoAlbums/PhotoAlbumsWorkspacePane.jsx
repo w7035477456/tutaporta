@@ -3818,7 +3818,6 @@ export default function PhotoAlbumsWorkspacePane({
       const sourceKey = String(item.id || `order-${idx}`);
       const emptyModel = {
         key: sourceKey,
-        slots: [],
         photos: []
       };
       if (item.kind === 'page') {
@@ -4104,7 +4103,7 @@ export default function PhotoAlbumsWorkspacePane({
     const pageIndex = Number(api?.getAlbumPageIndex?.() ?? 0) || 0;
     const pageCount = Number(api?.getAlbumPageCount?.() ?? 0) || 0;
     if (pageCount < 1) {
-      setError('Add a Template to the page before adding it to For Order.');
+      setError('Add a page to the album before adding it to For Order.');
       return;
     }
     const snapshot = api?.snapshotAlbumPage?.(pageIndex);
@@ -4118,8 +4117,8 @@ export default function PhotoAlbumsWorkspacePane({
       photoAlbumsNoteSidebarLabel(selectedNote, selectedNotebook?.notes || [], notebooks) ||
       'Album';
     const pageKey =
-      snapshot?.template?.key != null
-        ? String(snapshot.template.key)
+      snapshot?.page?.key != null
+        ? String(snapshot.page.key)
         : film?.pageKey || film?.model?.key || null;
     const item = {
       id: newOrderAlbumItemId(),
@@ -6470,7 +6469,7 @@ export default function PhotoAlbumsWorkspacePane({
 
       const api = noteEditorApiRef.current;
       const snapshot = api?.snapshotAlbumPage?.(drag.pageIndex);
-      if (!snapshot?.template?.id) {
+      if (!snapshot?.page?.key) {
         setError('Could not read that album page.');
         return;
       }
@@ -8427,7 +8426,6 @@ export default function PhotoAlbumsWorkspacePane({
                     const model =
                       searchFoundPages.models?.[idx] || {
                         key: `missing-${idx}`,
-                        slots: [],
                         photos: []
                       };
                     return (

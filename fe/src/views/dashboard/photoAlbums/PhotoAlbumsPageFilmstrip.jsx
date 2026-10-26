@@ -4,10 +4,6 @@ import Box from '@mui/material/Box';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
 } from 'ui-component/SliderControlButton';
-import {
-  getPhotoAlbumsPageTemplate,
-  resolveAlbumTemplateSlots
-} from './photoAlbumsPageTemplates';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
@@ -22,7 +18,7 @@ const ACTIVE_BORDER = '4px solid #e53935';
 const IDLE_BORDER = '2px solid #333';
 
 /**
- * Build lightweight page preview models (slot outlines) for the filmstrip.
+ * Build lightweight page preview models for the filmstrip.
  * `editor` / `pageWidth` are kept in the signature for callers; pages carry no photos.
  */
 export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
@@ -32,21 +28,15 @@ export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
     return [
       {
         key: 'empty-page',
-        slots: [],
         photos: []
       }
     ];
   }
 
-  return list.map((inst) => {
-    const layout = getPhotoAlbumsPageTemplate(inst.id);
-    const slots = layout ? resolveAlbumTemplateSlots(layout, inst.slots) : [];
-    return {
-      key: String(inst.key || inst.id || 'page'),
-      slots,
-      photos: []
-    };
-  });
+  return list.map((inst) => ({
+    key: String(inst.key || 'page'),
+    photos: []
+  }));
 }
 
 export function PageThumb({
@@ -153,23 +143,7 @@ export function PageThumb({
           // Let the thumb own HTML5 drag — nested photo boxes must not steal the gesture.
           pointerEvents: 'none'
         }}
-      >
-        {(model.slots || []).map((slot) => (
-          <Box
-            key={slot.id}
-            sx={{
-              position: 'absolute',
-              left: `${slot.x}%`,
-              top: `${slot.y}%`,
-              width: `${slot.w}%`,
-              height: `${slot.h}%`,
-              border: slot.type === 'text' ? '1px dashed #90caf9' : '1px solid #bdbdbd',
-              bgcolor: slot.type === 'text' ? 'rgba(144,202,249,0.15)' : PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
-              boxSizing: 'border-box'
-            }}
-          />
-        ))}
-      </Box>
+      />
       {canDelete ? (
         <Box
           component="button"
@@ -223,7 +197,6 @@ export function PageThumb({
 PageThumb.propTypes = {
   model: PropTypes.shape({
     key: PropTypes.string,
-    slots: PropTypes.array,
     photos: PropTypes.array
   }).isRequired,
   pageNumber: PropTypes.number.isRequired,
@@ -292,7 +265,7 @@ export default function PhotoAlbumsPageFilmstrip({
   const displayEntries = useMemo(() => {
     if (hasOverride) {
       return overrideEntries.map((entry, idx) => ({
-        model: entry.model || { key: entry.sourceKey || `order-${idx}`, slots: [], photos: [] },
+        model: entry.model || { key: entry.sourceKey || `order-${idx}`, photos: [] },
         pageIndex: idx,
         pageNumber: idx + 1,
         noteId: entry.noteId,

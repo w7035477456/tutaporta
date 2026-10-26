@@ -7,7 +7,8 @@
 let exitBackupPrompt = null;
 
 /**
- * @param {() => Promise<void>} prompt resolves once the member is done with Backup & Restore
+ * @param {() => Promise<boolean | void>} prompt resolves once the member is done with Backup & Restore;
+ *   resolves `false` when they closed it without backing up (the exit is cancelled)
  * @returns {() => void} unregister
  */
 export function registerRecordVaultExitBackupPrompt(prompt) {
@@ -17,12 +18,16 @@ export function registerRecordVaultExitBackupPrompt(prompt) {
   };
 }
 
-/** Never blocks the exit: errors just skip the prompt. */
+/**
+ * @returns {Promise<boolean>} false only when the member closed Backup & Restore without backing up;
+ *   errors never block the exit.
+ */
 export async function offerRecordVaultBackupBeforeExit() {
-  if (typeof exitBackupPrompt !== 'function') return;
+  if (typeof exitBackupPrompt !== 'function') return true;
   try {
-    await exitBackupPrompt();
+    return (await exitBackupPrompt()) !== false;
   } catch (err) {
     console.warn('[offerRecordVaultBackupBeforeExit]', err?.message || err);
+    return true;
   }
 }

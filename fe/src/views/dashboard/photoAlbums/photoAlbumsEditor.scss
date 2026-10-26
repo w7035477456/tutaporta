@@ -297,8 +297,8 @@
   min-height: 0;
 }
 
-/* Album collage: no PM padding — absolute photos + yellow/red template chrome
-   share the same (0,0) origin. Padding was shifting chrome off the slots. */
+/* Album collage: no PM padding — absolute photos + page chrome
+   share the same (0,0) origin. */
 .rv-editor__body--album .ProseMirror {
   padding: 0;
   /* Shell clips one spread; JS sets minHeight / width — do not inherit 55vh / 100% stretch. */
@@ -637,7 +637,7 @@
 }
 
 /* ---------- Drag/drop position indicator ---------- */
-/* Album photos snap to template slots — hide ProseMirror dropcursor widgets. */
+/* Hide ProseMirror dropcursor widgets on album pages. */
 .rv-editor .rv-dropcursor,
 .rv-dropcursor,
 .ProseMirror-dropcursor,
@@ -724,39 +724,6 @@
     background-color: #ffe600;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 10px rgba(255, 230, 0, 0.9);
   }
-}
-
-@keyframes rvAlbumOutlineBlinkBlueBlack {
-  0%,
-  100% {
-    outline-color: #2979ff;
-  }
-  50% {
-    outline-color: #000000;
-  }
-}
-
-@keyframes rvAlbumOutlineBlinkRedYellow {
-  0%,
-  100% {
-    outline-color: #ff1744;
-  }
-  50% {
-    outline-color: #ffe600;
-  }
-}
-
-/* Slot selection — rapid blue ↔ black */
-.rv-album-chrome-outline-blink-slot {
-  animation: rvAlbumOutlineBlinkBlueBlack 0.45s ease-in-out infinite;
-}
-
-/* Template selection removed — never blink the template frame. */
-.rv-album-chrome-outline-blink-template,
-.rv-album-chrome-outline-blink,
-.rv-album-template-overlay.is-template-mode {
-  animation: none !important;
-  outline: none !important;
 }
 
 /* ---------- Footer ---------- */

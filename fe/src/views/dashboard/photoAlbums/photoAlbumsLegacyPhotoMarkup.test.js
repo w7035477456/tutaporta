@@ -20,7 +20,7 @@ describe('stripLegacyAlbumPhotoMarkup', () => {
     expect(stripLegacyAlbumPhotoMarkup(html)).toBe(`${TEMPLATE}<p>x</p>`);
   });
 
-  it('keeps text labels, templates and plain content untouched', () => {
+  it('keeps text labels, pages and plain content untouched', () => {
     const html = `${TEMPLATE}<p>hello</p>${LABEL}`;
     expect(stripLegacyAlbumPhotoMarkup(html)).toBe(html);
   });

@@ -478,7 +478,7 @@ export default function RecordVaultTutaCloudBackupDialog({
   tutaDrive = false,
   onFormatted,
   onRestored,
-  /** Exit to Mall / Logout with unsaved changes: only Backup is enabled (X too) until a backup succeeds. */
+  /** Exit to Mall / Logout with unsaved changes: only Backup and X are enabled until a backup succeeds. */
   requireBackupBeforeClose = false
 }) {
   const fileInputRef = useRef(null);
@@ -509,12 +509,15 @@ export default function RecordVaultTutaCloudBackupDialog({
   const [requiredBackupDone, setRequiredBackupDone] = useState(false);
   /** Zip created by Backup during this open — its name shows in red in the slot list. */
   const [justCreatedFileName, setJustCreatedFileName] = useState('');
+  /** Exit to Mall / Logout flow: "Zip success, you can exit now" popup on top after Backup. */
+  const [exitReadyOpen, setExitReadyOpen] = useState(false);
   const backupLocked = requireBackupBeforeClose && !requiredBackupDone;
 
   useEffect(() => {
     if (open) {
       setRequiredBackupDone(false);
       setJustCreatedFileName('');
+      setExitReadyOpen(false);
     }
   }, [open]);
 
@@ -643,14 +646,25 @@ export default function RecordVaultTutaCloudBackupDialog({
     setSuccessTone('');
   };
 
-  const handleClose = () => {
-    if (busy || backupLocked) return;
+  const resetDialogState = () => {
     resetMessages();
     setOpenBackupFileName('');
     setOpenBackupNotebooks([]);
     setUploadTargetFile(null);
     setUploadMode('');
+    setExitReadyOpen(false);
+  };
+
+  const handleClose = () => {
+    if (busy) return;
+    resetDialogState();
     onClose?.();
+  };
+
+  /** Exit on the "Zip success" popup — the caller continues its Exit to Mall or Logout. */
+  const handleExitAfterBackup = () => {
+    resetDialogState();
+    onClose?.('exit');
   };
 
   const refreshVaultTree = () => {
@@ -721,6 +735,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         setSuccessTone('backup');
         setRequiredBackupDone(true);
         setJustCreatedFileName(fileName);
+        if (requireBackupBeforeClose) setExitReadyOpen(true);
       } else {
         const result = await downloadRecordVaultTutaDriveBackupZip();
         const fileName = result?.fileName || TUTACLOUD_VAULT_BACKUP_ZIP_DEFAULT;
@@ -731,6 +746,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         );
         setSuccessTone('backup');
         setRequiredBackupDone(true);
+        if (requireBackupBeforeClose) setExitReadyOpen(true);
       }
       refreshVaultTree();
     } catch (err) {
@@ -1256,8 +1272,8 @@ export default function RecordVaultTutaCloudBackupDialog({
         open={open}
         onClose={handleClose}
         closeOnBackdrop={!busy && !backupLocked}
-        closeButtonDisabled={busy || backupLocked}
-        closeButtonAriaLabel={backupLocked ? 'Backup first, then close' : 'Close popup'}
+        closeButtonDisabled={busy}
+        closeButtonAriaLabel={backupLocked ? 'Close without leaving TutaNotes' : 'Close popup'}
       >
         <ColorTemplate16PopupCenterWide.Title>
           Backup &amp; Restore TutaNotes Cloud
@@ -1278,7 +1294,8 @@ export default function RecordVaultTutaCloudBackupDialog({
           {backupLocked ? (
             <ColorTemplate16PopupCenterWide.ErrorBar>
               Your TutaNotes changed since the last backup. Click &quot;Backup/Encrypt TutaNote to Cloud as Zip&quot;
-              before leaving. When the backup completes, all buttons unlock and X continues your exit.
+              before leaving. X closes this popup and keeps you in TutaNotes; Exit to Mall or Logoff returns here
+              until the backup completes. After the backup, all buttons unlock and X continues your exit.
             </ColorTemplate16PopupCenterWide.ErrorBar>
           ) : null}
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -1399,6 +1416,25 @@ export default function RecordVaultTutaCloudBackupDialog({
         onCancel={() => closePasswordDialog(null)}
         onConfirm={(result) => closePasswordDialog(result)}
       />
+      <ColorTemplate16PopupCenterWide
+        open={Boolean(open && exitReadyOpen)}
+        onClose={() => setExitReadyOpen(false)}
+        closeOnBackdrop={false}
+        bodyTextAlignLeft={false}
+        centeredLeadLines={0}
+        overlaySx={{ zIndex: 39000 }}
+        closeButtonAriaLabel="Stay in Backup & Restore"
+      >
+        <ColorTemplate16PopupCenterWide.Title>Backup complete</ColorTemplate16PopupCenterWide.Title>
+        <ColorTemplate16PopupCenterWide.Body spacing={2}>
+          <ColorTemplate16PopupCenterWide.BodyText>Zip success, you can exit now.</ColorTemplate16PopupCenterWide.BodyText>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <GreenButton type="button" onClick={handleExitAfterBackup} sx={actionButtonSx}>
+              Exit
+            </GreenButton>
+          </Box>
+        </ColorTemplate16PopupCenterWide.Body>
+      </ColorTemplate16PopupCenterWide>
     </>
   );
 }

@@ -27,12 +27,6 @@ import {
 } from './photoAlbumsAlbumTitleStyle';
 import { PhotoAlbumsAlbumLayoutContext } from './photoAlbumsAlbumLayoutContext';
 import PhotoAlbumsEditorToolbar from './PhotoAlbumsEditorToolbar';
-import PhotoAlbumsPageTemplateOverlay from './PhotoAlbumsPageTemplateOverlay';
-import PhotoAlbumsTemplatePickerPanel, {
-  DRAG_ALBUM_TEMPLATE,
-  isAlbumTemplateDrag,
-  readAlbumTemplateDragId
-} from './PhotoAlbumsTemplatePickerPanel';
 import PhotoAlbumsAlbumZoomBar from './PhotoAlbumsAlbumZoomBar';
 import PhotoAlbumsPageFilmstrip, { buildAlbumPageFilmstripModels } from './PhotoAlbumsPageFilmstrip';
 import PhotoAlbumsPageFlipOverlay, {
@@ -44,11 +38,11 @@ import { findAlbumPagesMatchingSearchTerms } from './photoAlbumsPageSearch';
 import PhotoAlbumsThumbnailTray from './thumbnails/PhotoAlbumsThumbnailTray';
 import { buildPhotoAlbumsTrayItems } from './thumbnails/photoAlbumsTrayItems';
 import {
-  albumTemplateBlockHeight,
-  createAlbumTemplateInstance,
-  parseAlbumTemplateInstancesFromHtml,
-  serializeAlbumTemplateInstances
-} from './photoAlbumsPageTemplates';
+  albumPageBlockHeight,
+  createAlbumPageInstance,
+  parseAlbumPageInstancesFromHtml,
+  serializeAlbumPageInstances
+} from './photoAlbumsPages';
 import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
 import { getAlbumBinderWidthRatio, getAlbumSlideshowBinderWidthRatio } from 'config/albumBinderWidthEnv';
@@ -80,7 +74,7 @@ import { stripLegacyAlbumPhotoMarkup } from './photoAlbumsLegacyPhotoMarkup';
 import './photoAlbumsEditor.scss';
 
 const EMPTY_DOC = '<p></p>';
-const TEMPLATE_MARKER_RE = /<div\b[^>]*data-rv-album-template\b[^>]*>\s*<\/div>/gi;
+const ALBUM_PAGE_MARKER_RE = /<div\b[^>]*data-rv-album-template\b[^>]*>\s*<\/div>/gi;
 /** Match workspace pane drag MIME types (avoid circular import of WorkspacePane). */
 const DRAG_NOTEBOOK = 'application/x-record-vault-notebook-id';
 const DRAG_NOTE = 'application/x-record-vault-note-id';
@@ -99,9 +93,7 @@ const ALBUM_FS_NAV_PAD_PX = 56;
 /** Page-edge leaves this much black beside the page (fallback if no padding). */
 const ALBUM_PAGE_EDGE_GAP_FROM_SCROLLBAR_PX = 24;
 const PAGE_RESIZE_HANDLE_WIDTH = 30;
-const TEMPLATE_STACK_GAP = 24;
-/** First template top — flush to top of the album page (chrome sits in page padding above). */
-const ALBUM_TEMPLATE_MIN_Y = 0;
+const ALBUM_PAGE_STACK_GAP = 24;
 
 const THUMB_ROW_STAGING_PERCENT_LS = 'photoAlbumsThumbRowStagingPercent_v1';
 const THUMB_ROW_RESIZE_HANDLE_PX = 30;
@@ -210,7 +202,7 @@ function albumPageXForSpreadColumn(pageIndex, pageWidth, binderWidth) {
 function albumPageTopForSpreadRow(spreadRow, pageHeight) {
   const row = Math.max(0, Math.round(Number(spreadRow) || 0));
   const h = Math.max(1, Math.round(Number(pageHeight) || 1));
-  return row * (h + TEMPLATE_STACK_GAP);
+  return row * (h + ALBUM_PAGE_STACK_GAP);
 }
 
 function albumSpreadCanvasWidth(pageWidth, binderWidth) {
@@ -231,14 +223,14 @@ function albumSinglePageWidth(pageSizeWidth, canvasWidthPx, binderWidthPx = 0) {
   return 480;
 }
 
-/** True when saved template x/y still use the old vertical stack (not spread columns). */
-function albumTemplatesNeedSpreadRestack(instances, pageWidth, binderWidth, orientation = 'portrait') {
+/** True when saved page x/y still use the old vertical stack (not spread columns). */
+function albumPagesNeedSpreadRestack(instances, pageWidth, binderWidth, orientation = 'portrait') {
   const list = instances || [];
   if (!list.length) return false;
   const pw = Math.max(200, Math.round(Number(pageWidth) || 480));
   const bw = Math.max(0, Math.round(Number(binderWidth) || 0));
-  const h = albumTemplateBlockHeight(pw, orientation);
-  // Any template wider than ~1.2 pages was likely saved using spread canvas width as "page" width.
+  const h = albumPageBlockHeight(pw, orientation);
+  // Any page wider than ~1.2 pages was likely saved using spread canvas width as "page" width.
   const maxOkW = Math.round(pw * 1.2);
   return list.some((inst, pageIndex) => {
     const expectedX = albumPageXForSpreadColumn(pageIndex, pw, bw);
@@ -253,11 +245,6 @@ function albumTemplatesNeedSpreadRestack(instances, pageWidth, binderWidth, orie
   });
 }
 
-/** Page-top Y for template index (one template = one page, stacked vertically). */
-function albumPageTopForIndex(pageIndex, pageHeight) {
-  return albumPageTopForSpreadRow(albumSpreadRowForPageIndex(pageIndex), pageHeight);
-}
-
 /** Page order for the book: top-to-bottom Y, then X (legacy), then array order. */
 function sortAlbumPagesByBand(instances) {
   return [...(instances || [])].sort((a, b) => {
@@ -268,12 +255,12 @@ function sortAlbumPagesByBand(instances) {
 }
 
 /**
- * Flush every template to its own book-page band in the given order
+ * Flush every page to its own book-page band in the given order
  * (stacked in data only). Input order = page order (left → right / 1 → N).
  * The UI shows one two-page spread at a time in the black shell (flip), not a scroll stack.
  * Remaps snapped photos and text labels when `editor` is set.
  */
-function restackTemplatesFlushToPages(
+function restackAlbumPagesFlush(
   instances,
   pageWidth,
   orientation,
@@ -282,25 +269,23 @@ function restackTemplatesFlushToPages(
 ) {
   const pw = Math.max(200, Math.round(Number(pageWidth) || 480));
   const bw = Math.max(0, Math.round(Number(binderWidth) || 0));
-  const h = albumTemplateBlockHeight(pw, orientation);
+  const h = albumPageBlockHeight(pw, orientation);
   // Preserve caller order — do not re-sort by Y (that put new pages on the left).
   const ordered = [...(instances || [])];
   const pageBands = ordered.map((inst, pageIndex) => {
-    const oldBand = templateBand(inst, pw, orientation);
+    const oldBand = albumPageBand(inst, pw, orientation);
     const spreadRow = albumSpreadRowForPageIndex(pageIndex);
-    const replaced = createAlbumTemplateInstance({
+    const replaced = createAlbumPageInstance({
       key: inst.key,
-      id: inst.id,
       x: albumPageXForSpreadColumn(pageIndex, pw, bw),
       y: albumPageTopForSpreadRow(spreadRow, h),
       w: pw,
-      h,
-      slots: inst.slots
+      h
     });
     return {
       pageIndex,
       oldBand,
-      newBand: templateBand(replaced, pw, orientation),
+      newBand: albumPageBand(replaced, pw, orientation),
       replaced
     };
   });
@@ -312,7 +297,7 @@ function restackTemplatesFlushToPages(
 
     state.doc.descendants((node, pos) => {
       // Text/emoji labels must follow their page band too — otherwise inserting a
-      // new Template steals prior-page stickers into the blank page's Y range.
+      // new page steals prior-page stickers into the blank page's Y range.
       if (node.type.name !== PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) return;
       const pl = parseOptionalPx(node.attrs.posLeft);
       const pt = parseOptionalPx(node.attrs.posTop);
@@ -345,18 +330,18 @@ function restackTemplatesFlushToPages(
   return pageBands.map((entry) => entry.replaced);
 }
 
-function stripAlbumTemplateMarker(html) {
-  return String(html || '').replace(TEMPLATE_MARKER_RE, '');
+function stripAlbumPageMarker(html) {
+  return String(html || '').replace(ALBUM_PAGE_MARKER_RE, '');
 }
 
 function stripAlbumMarkers(html) {
-  // Drop accidental drag text TipTap inserted when a vault/Finder/staging drop missed a slot.
+  // Drop accidental drag text TipTap inserted when a vault/Finder/staging drop missed the page.
   const cleaned = stripPhotoAlbumsDragJunkBodyRows(
     String(html || '')
       .replace(/<p[^>]*>\s*pa-staged:\d+\s*<\/p>/gi, '')
       .replace(/(^|>)\s*pa-staged:\d+\s*(<|$)/gi, '$1$2')
   );
-  return stripAlbumTitleStyleMarker(stripLegacyAlbumPhotoMarkup(stripAlbumTemplateMarker(cleaned)));
+  return stripAlbumTitleStyleMarker(stripLegacyAlbumPhotoMarkup(stripAlbumPageMarker(cleaned)));
 }
 
 /** Remove live TipTap paragraphs that are only leftover drag junk (pa-staged / .html names). */
@@ -386,18 +371,18 @@ function withAlbumMarkers(
 ) {
   const body = stripAlbumMarkers(html);
   const parts = [];
-  const templateJson = serializeAlbumTemplateInstances(instances);
+  const pagesJson = serializeAlbumPageInstances(instances);
   const orient =
     String(orientation || '').toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
   const pageW = Number(pageWidthPx);
   const pageWAttr =
     Number.isFinite(pageW) && pageW >= 200 ? ` data-album-page-width="${Math.round(pageW)}"` : '';
-  if (templateJson) {
+  if (pagesJson) {
     parts.push(
-      `<div data-rv-album-template="" data-album-templates="${templateJson}" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`
+      `<div data-rv-album-template="" data-album-templates="${pagesJson}" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`
     );
   } else {
-    // Persist orientation (+ page width) even with no templates yet.
+    // Persist orientation (+ page width) even with no pages yet.
     parts.push(
       `<div data-rv-album-template="" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`
     );
@@ -481,9 +466,9 @@ function findRestackPageBandIndex(cx, cy, pageBands) {
   return bestIdx;
 }
 
-function templateBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
+function albumPageBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
   const w = inst.w > 0 ? inst.w : pageWidthFallback;
-  const h = inst.h > 0 ? inst.h : albumTemplateBlockHeight(w, orientation);
+  const h = inst.h > 0 ? inst.h : albumPageBlockHeight(w, orientation);
   return {
     left: inst.x || 0,
     top: inst.y || 0,
@@ -492,16 +477,16 @@ function templateBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
   };
 }
 
-function lowestTemplateBottom(instances) {
+function lowestAlbumPageBottom(instances) {
   let bottom = 0;
   for (const inst of instances || []) {
-    const band = templateBand(inst);
+    const band = albumPageBand(inst);
     bottom = Math.max(bottom, band.top + band.height);
   }
   return bottom;
 }
 
-/** Ensure the ProseMirror canvas is tall enough for the template band + content. */
+/** Ensure the ProseMirror canvas is tall enough for the page band + content. */
 function ensureAlbumCanvasMinHeight(editor, minHeight, { allowShrink = false } = {}) {
   const pm = editor?.view?.dom;
   if (!pm || !(minHeight > 0)) return;
@@ -677,14 +662,14 @@ function setAlbumCanvasWidth(editor, pageWidth, binderWidthPx = 0) {
 }
 
 /**
- * Right edge of templates + placed photos (layout px).
+ * Right edge of pages + placed photos (layout px).
  * Do NOT floor to the current page/client width — that made "reduce" a no-op
  * after enlarge (originWidth stayed at the enlarged canvas size).
  */
 function measureAlbumContentWidth(editor, instances, emptyFallback = 480) {
   let maxR = 0;
   for (const inst of instances || []) {
-    const band = templateBand(inst, emptyFallback);
+    const band = albumPageBand(inst, emptyFallback);
     maxR = Math.max(maxR, band.left + band.width);
   }
   if (editor) {
@@ -724,9 +709,9 @@ function scalePxAttr(raw, scale, min = null) {
   return next;
 }
 
-function scaleTemplateInstance(inst, scale) {
+function scaleAlbumPageInstance(inst, scale) {
   const w0 = inst.w > 0 ? inst.w : 480;
-  const h0 = inst.h > 0 ? inst.h : albumTemplateBlockHeight(w0, 'portrait');
+  const h0 = inst.h > 0 ? inst.h : albumPageBlockHeight(w0, 'portrait');
   return {
     ...inst,
     x: Math.max(0, Math.round((inst.x || 0) * scale)),
@@ -750,10 +735,10 @@ function scaleTextLabelAttrs(attrs, scale) {
 
 /**
  * Apply a uniform page scale from origin snapshots (avoids live-drag drift).
- * Returns the next templates list.
+ * Returns the next pages list.
  */
-function applyAlbumPageScaleFromOrigin(editor, originTemplates, scale, originTextLabelsById = null) {
-  const nextTemplates = (originTemplates || []).map((inst) => scaleTemplateInstance(inst, scale));
+function applyAlbumPageScaleFromOrigin(editor, originPages, scale, originTextLabelsById = null) {
+  const nextPages = (originPages || []).map((inst) => scaleAlbumPageInstance(inst, scale));
   if (editor && originTextLabelsById?.size) {
     const { state } = editor;
     let tr = state.tr;
@@ -770,7 +755,7 @@ function applyAlbumPageScaleFromOrigin(editor, originTemplates, scale, originTex
     });
     if (changed) editor.view.dispatch(tr);
   }
-  return nextTemplates;
+  return nextPages;
 }
 
 const PAGE_RESIZE_BAR_YELLOW = 'var(--theme-yellow-color, #ffe600)';
@@ -780,7 +765,7 @@ const PAGE_RESIZE_BAR_RED = '#e53935';
  * Album page actions — fixed label size, content-width buttons on one row.
  * Overflow scrolls horizontally (no font auto-fit — that ResizeObserver loop jiggled the bar).
  */
-const albumTemplateBarButtonSx = {
+const albumBarButtonSx = {
   flex: '0 0 auto',
   flexGrow: 0,
   flexShrink: 0,
@@ -806,7 +791,7 @@ function scrollActiveHitIntoView(editor) {
 }
 
 /**
- * TipTap editor for Photo Albums pages — binder canvas, template pages, text labels.
+ * TipTap editor for Photo Albums pages — binder canvas, album pages, text labels.
  * Photos live in the thumbnail tray (vault attachments); they are not placed on pages.
  */
 const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
@@ -861,14 +846,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const onContentHeightRef = useRef(onContentHeightChange);
   onContentHeightRef.current = onContentHeightChange;
 
-  const [templates, setTemplates] = useState(() => parseAlbumTemplateInstancesFromHtml(initialContent));
+  const [albumPages, setAlbumPages] = useState(() => parseAlbumPageInstancesFromHtml(initialContent));
   const trayItems = useMemo(() => buildPhotoAlbumsTrayItems(trayAttachments), [trayAttachments]);
   const [albumTitleStyle, setAlbumTitleStyle] = useState(() =>
     parseAlbumTitleStyleFromHtml(initialContent)
   );
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [contextTutorialOpenKey] = useState(0);
-  const templatePickerAnchorRef = useRef(null);
   const [albumZoom, setAlbumZoom] = useState(DEFAULT_ALBUM_ZOOM);
   const [albumFullscreen, setAlbumFullscreen] = useState(() => Boolean(presentationMode));
   /** Full Slide: fullscreen + auto-advance album pages on a loop. */
@@ -886,13 +869,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   useSlideShowMusicPlayback(Boolean(albumFullscreen && albumFullSlide));
 
-  // Slot geometry uses ProseMirror box (same coords as free-placed photos).
+  // Page geometry uses ProseMirror box (same coords as free-placed photos).
   const [pageSize, setPageSize] = useState({ width: 0, height: 0, offsetLeft: 0, offsetTop: 0 });
   /** Persisted page content width — survives React re-renders that would wipe DOM style.width. */
   const [albumCanvasWidthPx, setAlbumCanvasWidthPx] = useState(() => {
     const fromMarker = parseAlbumPageWidthFromHtml(initialContent);
     if (fromMarker > 0) return fromMarker;
-    const list = parseAlbumTemplateInstancesFromHtml(initialContent);
+    const list = parseAlbumPageInstancesFromHtml(initialContent);
     const w = Number(list?.[0]?.w) || 0;
     return w >= 200 ? Math.round(w) : 0;
   });
@@ -908,13 +891,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
    * Manual Zoom slider turns this off until Portrait / Landscape / Resize Page.
    */
   const albumAutoZoomRef = useRef(true);
-  /** Page + template aspect: portrait (taller) or landscape (wider). */
+  /** Page aspect: portrait (taller) or landscape (wider). */
   const [pageOrientation, setPageOrientation] = useState(() =>
     parseAlbumOrientationFromHtml(initialContent)
   );
   const pageOrientationRef = useRef(pageOrientation);
   pageOrientationRef.current = pageOrientation;
-  /** 0-based index into template instances sorted by page order (each template = one page). */
+  /** 0-based index into album pages sorted by page order. */
   const [albumPageIndex, setAlbumPageIndex] = useState(() =>
     Math.max(0, Math.round(Number(presentationPageIndex) || 0))
   );
@@ -929,8 +912,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   albumCoverFaceRef.current = albumCoverFace;
   const albumOnClosedCover = albumCoverFace === 'front' || albumCoverFace === 'back';
   const goToAlbumPageRef = useRef(null);
-  const templatesRef = useRef(templates);
-  templatesRef.current = templates;
+  const albumPagesRef = useRef(albumPages);
+  albumPagesRef.current = albumPages;
   const albumTitleStyleRef = useRef(albumTitleStyle);
   albumTitleStyleRef.current = albumTitleStyle;
   const pageRef = useRef(null);
@@ -956,7 +939,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const placeTextAlbumTitleModeRef = useRef(false);
   /** Optional page coords for a new label. */
   const placeTextPagePosRef = useRef(null);
-  /** Pixel box of ProseMirror inside pageScaleRef — template overlays use this origin. */
+  /** Pixel box of ProseMirror inside pageScaleRef — page overlays use this origin. */
   const [pmLayerBox, setPmLayerBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
 
 
@@ -978,7 +961,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     onChangeRef.current?.(
       withAlbumMarkers(
         rawHtml,
-        templatesRef.current,
+        albumPagesRef.current,
         pageOrientationRef.current,
         albumCanvasWidthPxRef.current,
         albumTitleStyleRef.current
@@ -1017,13 +1000,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           return false;
         }
       },
-      // Vault / Finder / staging / template drags are handled by the page shell.
+      // Vault / Finder / staging drags are handled by the page shell.
       // Block TipTap from inserting drag text (e.g. "Set 1-Album 1.html", "pa-staged:N").
       handleDrop: (_view, event, _slice, moved) => {
         if (moved) return false;
         const dt = event?.dataTransfer;
         if (!dt) return false;
-        if (isAlbumTemplateDrag(dt) || isFilesExplorerDrag(dt)) {
+        if (isFilesExplorerDrag(dt)) {
           return true;
         }
         const types = dt.types ? Array.from(dt.types) : [];
@@ -1036,7 +1019,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           types.includes(DRAG_SHORTCUT) ||
           types.includes(DRAG_ALBUM_PAGE) ||
           types.includes(DRAG_CROSS_PANE) ||
-          types.includes(DRAG_ALBUM_TEMPLATE) ||
           types.includes(DRAG_FILES_EXPLORER) ||
           types.includes(DRAG_FILES_EXPLORER_FLAG)
         ) {
@@ -1096,12 +1078,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const applyPresentationFit = () => {
         const scrollEl = zoomScrollRef.current;
         flushAlbumScrollOrigin(scrollEl);
-        const fromTemplates = Math.round(Number(templatesRef.current?.[0]?.w) || 0);
-        const pages = sortAlbumPagesByBand(templatesRef.current || []);
+        const fromPages = Math.round(Number(albumPagesRef.current?.[0]?.w) || 0);
+        const pages = sortAlbumPagesByBand(albumPagesRef.current || []);
         const activePage = pages[albumPageIndexRef.current] || pages[0] || null;
         const pw =
           (albumCanvasWidthPxRef.current >= 200 ? albumCanvasWidthPxRef.current : 0) ||
-          (fromTemplates >= 200 ? fromTemplates : 0) ||
+          (fromPages >= 200 ? fromPages : 0) ||
           (activePage?.w >= 200 ? Math.round(activePage.w) : 0) ||
           albumPageWidthFromViewport(scrollEl, 100) ||
           480;
@@ -1111,7 +1093,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         const blockH =
           activePage?.h > 40
             ? Math.round(activePage.h)
-            : albumTemplateBlockHeight(pw, orient);
+            : albumPageBlockHeight(pw, orient);
         // Exact one-page height — do not add the edit-mode +240 gutter.
         ensureAlbumCanvasMinHeight(editor, blockH, { allowShrink: true });
         // No page-edge resize handle in view mode.
@@ -1147,8 +1129,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       applyAlbumBinderWidthToDom(scrollEl, binderWidthPx, pw);
       applyAlbumCanvasWidth(pw, binderWidthPx);
       const orient = pageOrientationRef.current;
-      const current = templatesRef.current || [];
-      const blockH = albumTemplateBlockHeight(pw, orient);
+      const current = albumPagesRef.current || [];
+      const blockH = albumPageBlockHeight(pw, orient);
       // Shell height includes the album title footer band — omit it and top/bottom
       // primary margin disappears (page paints taller than the fit assumed).
       const titleBand = String(albumTitle || '').trim()
@@ -1156,7 +1138,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         : 0;
       const viewH = Math.max(blockH, 200) + titleBand;
       if (current.length) {
-        const next = restackTemplatesFlushToPages(
+        const next = restackAlbumPagesFlush(
           sortAlbumPagesByBand(current),
           pw,
           orient,
@@ -1177,9 +1159,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               Math.round(Number(inst.h) || 0) === Math.round(Number(prev.h) || 0)
             );
           });
-        templatesRef.current = next;
+        albumPagesRef.current = next;
         if (!geometryUnchanged) {
-          setTemplates(next);
+          setAlbumPages(next);
           emitHtml(editor.getHTML());
         }
         // Shell shows one book page — do not grow canvas for stacked page bands.
@@ -1220,8 +1202,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   fitAlbumPageFlushToViewportRef.current = fitAlbumPageFlushToViewport;
 
   /**
-   * Portrait (10×12) / Landscape (12×10) — every template page in this album
-   * switches aspect together (restacked flush). Slot % layouts stay the same; block w×h changes.
+   * Portrait (10×12) / Landscape (12×10) — every page in this album
+   * switches aspect together (restacked flush); page w×h changes.
    */
   const applyPageOrientation = useCallback(
     (nextOrientation) => {
@@ -1238,8 +1220,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           ? albumCanvasWidthPx
           : albumPageWidthFromViewport(zoomScrollRef.current) || pageSize.width || 480;
       applyAlbumCanvasWidth(pw);
-      const nextBlockH = albumTemplateBlockHeight(pw, mode);
-      const current = templatesRef.current || [];
+      const nextBlockH = albumPageBlockHeight(pw, mode);
+      const current = albumPagesRef.current || [];
 
       if (!current.length) {
         ensureAlbumCanvasMinHeight(editor, nextBlockH, { allowShrink: true });
@@ -1250,15 +1232,15 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         return;
       }
 
-      const next = restackTemplatesFlushToPages(
+      const next = restackAlbumPagesFlush(
         sortAlbumPagesByBand(current),
         pw,
         mode,
         editor,
         albumBinderWidthPxRef.current
       );
-      templatesRef.current = next;
-      setTemplates(next);
+      albumPagesRef.current = next;
+      setAlbumPages(next);
       ensureAlbumCanvasMinHeight(editor, nextBlockH, { allowShrink: true });
       requestAnimationFrame(() => {
         emitHtml(editor.getHTML());
@@ -1274,7 +1256,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     if (!(albumCanvasWidthPx > 0) || !editor) return;
     albumBinderWidthPxRef.current = albumBinderWidthPx;
     setAlbumCanvasWidth(editor, albumCanvasWidthPx, albumBinderWidthPx);
-  }, [albumCanvasWidthPx, albumBinderWidthPx, editor, templates, pageResizeDragging]);
+  }, [albumCanvasWidthPx, albumBinderWidthPx, editor, albumPages, pageResizeDragging]);
 
   useLayoutEffect(() => {
     if (!(albumBinderWidthPx > 0)) return;
@@ -1288,7 +1270,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   /** Migrate legacy / bloated page geometry into left|binder|right columns. Always remaps photos. */
   useLayoutEffect(() => {
     if (!editor) return;
-    const current = templatesRef.current || [];
+    const current = albumPagesRef.current || [];
     if (!current.length) return;
     const pw = albumSinglePageWidth(
       pageSize.width,
@@ -1302,16 +1284,16 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       setAlbumBinderWidthPx(bw);
     }
     const orient = pageOrientationRef.current;
-    if (!albumTemplatesNeedSpreadRestack(current, pw, bw, orient)) return;
-    const next = restackTemplatesFlushToPages(
+    if (!albumPagesNeedSpreadRestack(current, pw, bw, orient)) return;
+    const next = restackAlbumPagesFlush(
       sortAlbumPagesByBand(current),
       pw,
       orient,
       editor,
       bw
     );
-    templatesRef.current = next;
-    setTemplates(next);
+    albumPagesRef.current = next;
+    setAlbumPages(next);
     if (bw > 0) albumBinderWidthPxRef.current = bw;
     setAlbumCanvasWidth(editor, pw, bw);
     setAlbumCanvasWidthPx(pw);
@@ -1358,7 +1340,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   /**
    * Yellow + grey-dash page edge (matches column splitters; dash turns red on hover/drag).
-   * Drag resizes the page; templates + photos scale together.
+   * Drag resizes the page; pages + photos scale together.
    * Live preview uses CSS transform (slider-smooth); geometry is baked on mouseup.
    */
   const startPageContentResize = useCallback(
@@ -1373,7 +1355,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
       const zoomScale = Math.max(0.01, (Number(albumZoom) || 100) / 100);
       const startX = event.clientX;
-      const originTemplates = (templatesRef.current || []).map((inst) => ({ ...inst }));
+      const originPages = (albumPagesRef.current || []).map((inst) => ({ ...inst }));
       const originTextLabelsById = new Map();
       editor.state.doc.descendants((node) => {
         if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
@@ -1386,12 +1368,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         pageEl,
         pageSize.width || albumCanvasWidthPx,
         editor,
-        originTemplates
+        originPages
       );
       const originHeight = Math.max(
         scaleEl.offsetHeight || 0,
         pageEl.offsetHeight || 0,
-        lowestTemplateBottom(originTemplates) + 240
+        lowestAlbumPageBottom(originPages) + 240
       );
 
       let latestScale = 1;
@@ -1458,13 +1440,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
         const next = applyAlbumPageScaleFromOrigin(
           editor,
-          originTemplates,
+          originPages,
           latestScale,
           originTextLabelsById
         );
-        templatesRef.current = next;
-        setTemplates(next);
-        const bottom = lowestTemplateBottom(next);
+        albumPagesRef.current = next;
+        setAlbumPages(next);
+        const bottom = lowestAlbumPageBottom(next);
         if (bottom > 0) ensureAlbumCanvasMinHeight(editor, bottom, { allowShrink: true });
         setPageResizeDragging(false);
         requestAnimationFrame(() => {
@@ -1570,60 +1552,16 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       editor.off('update', measure);
       window.removeEventListener('resize', measure);
     };
-  }, [editor, templates, albumZoom]);
+  }, [editor, albumPages, albumZoom]);
 
-  const persistTemplates = useCallback(
+  const persistAlbumPages = useCallback(
     (nextList) => {
       const list = Array.isArray(nextList) ? nextList : [];
-      templatesRef.current = list;
-      setTemplates(list);
+      albumPagesRef.current = list;
+      setAlbumPages(list);
       if (editor) requestAnimationFrame(() => emitHtml(editor.getHTML()));
     },
     [editor, emitHtml]
-  );
-
-  /** Per-slot move/resize (% overrides). */
-  const handleSlotGeometryChange = useCallback(
-    (instanceKey, slotId, nextPct, { live } = {}) => {
-      const prev = (templatesRef.current || []).find((inst) => inst.key === instanceKey);
-      if (!prev || !slotId) return;
-      const nextInst = {
-        ...prev,
-        slots: {
-          ...(prev.slots || {}),
-          [slotId]: {
-            x: nextPct.x,
-            y: nextPct.y,
-            w: nextPct.w,
-            h: nextPct.h
-          }
-        }
-      };
-      const next = (templatesRef.current || []).map((inst) =>
-        inst.key === instanceKey ? nextInst : inst
-      );
-      templatesRef.current = next;
-      setTemplates(next);
-      if (editor && !live) requestAnimationFrame(() => emitHtml(editor.getHTML()));
-    },
-    [editor, emitHtml]
-  );
-
-  const handleDeleteTemplate = useCallback(
-    (instanceKey) => {
-      const target = (templatesRef.current || []).find((t) => t.key === instanceKey);
-      if (editor && target) {
-        const pw = Math.max(
-          200,
-          Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
-        );
-        const band = templateBand(target, pw, pageOrientationRef.current);
-        removeTextLabelsInBand(editor, band);
-      }
-      const next = (templatesRef.current || []).filter((t) => t.key !== instanceKey);
-      persistTemplates(next);
-    },
-    [editor, persistTemplates, pageSize.width]
   );
 
   /**
@@ -1881,7 +1819,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     };
   }, [editor, handleEditExistingTextLabel]);
 
-  /** Clear page text/templates; zoom 95%; flush + stretch to edge. Tray photos are untouched. */
+  /** Clear page text/pages; zoom 95%; flush + stretch to edge. Tray photos are untouched. */
   const handleResetPage = useCallback(() => {
     if (!editor) return;
 
@@ -1892,14 +1830,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     // Clear remaining text / empty the page body.
     editor.commands.setContent(EMPTY_DOC, { emitUpdate: false });
 
-    setTemplatePickerOpen(false);
-    templatesRef.current = [];
-    setTemplates([]);
-    persistTemplates([]);
+    albumPagesRef.current = [];
+    setAlbumPages([]);
+    persistAlbumPages([]);
     albumAutoZoomRef.current = true;
     fitAlbumPageFlushToViewport();
     requestAnimationFrame(() => emitHtml(editor.getHTML()));
-  }, [editor, persistTemplates, emitHtml, fitAlbumPageFlushToViewport]);
+  }, [editor, persistAlbumPages, emitHtml, fitAlbumPageFlushToViewport]);
 
   /** Fit entire album page into the shell (AUTO-ZOOM on) — no scrollbars. */
   const handleResizePage = useCallback(() => {
@@ -1954,63 +1891,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     };
   }, [editor, pageResizeDragging, noteId]);
 
-  const handleSelectTemplate = useCallback(
-    (nextId) => {
-      setTemplatePickerOpen(false);
-      if (!nextId || !editor) return;
-
-      // New template = new page to the RIGHT of the current page (higher page #).
-      const pw = albumPageWidthFromViewport(zoomScrollRef.current);
-      applyAlbumCanvasWidth(pw);
-      syncAlbumBinderFromViewport(zoomScrollRef.current);
-      const orient = pageOrientationRef.current;
-      const nextBlockH = albumTemplateBlockHeight(pw, orient);
-      const current = templatesRef.current || [];
-      const ordered = sortAlbumPagesByBand(current);
-
-      const insertAt = ordered.length === 0 ? 0 : Math.min(ordered.length, albumPageIndex + 1);
-      const added = createAlbumTemplateInstance({
-        id: nextId,
-        x: 0,
-        y: albumPageTopForIndex(insertAt, nextBlockH),
-        w: pw,
-        h: nextBlockH
-      });
-      const nextOrdered = [...ordered.slice(0, insertAt), added, ...ordered.slice(insertAt)];
-      const nextList = restackTemplatesFlushToPages(
-        nextOrdered,
-        pw,
-        orient,
-        editor,
-        albumBinderWidthPxRef.current
-      );
-
-      templatesRef.current = nextList;
-      setTemplates(nextList);
-      setAlbumPageIndex(albumSpreadLeftPageIndex(insertAt));
-      const titleBand = String(albumTitle || '').trim()
-        ? albumPageTitleBandHeightPx(albumTitleStyleRef.current)
-        : 0;
-      ensureAlbumCanvasMinHeight(editor, nextBlockH + titleBand, { allowShrink: true });
-      // Template creates a page — turn AUTO-ZOOM on and fit with primary margin.
-      albumAutoZoomRef.current = true;
-      requestAnimationFrame(() => {
-        emitHtml(editor.getHTML());
-        flushAlbumScrollOrigin(zoomScrollRef.current);
-        fitAlbumPageFlushToViewportRef.current?.();
-        requestAnimationFrame(() => fitAlbumPageFlushToViewportRef.current?.());
-      });
-    },
-    [
-      editor,
-      emitHtml,
-      applyAlbumCanvasWidth,
-      albumPageIndex,
-      syncAlbumBinderFromViewport,
-      albumTitle
-    ]
-  );
-
   const exitAlbumFullscreen = useCallback(() => {
     if (presentationMode) {
       try {
@@ -2022,14 +1902,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     }
     setAlbumFullscreen(false);
     setAlbumFullSlide(false);
-    setTemplatePickerOpen(false);
     onAlbumFullscreenChangeRef.current?.(false);
     requestAnimationFrame(() => fitAlbumPageFlushToViewportRef.current?.());
   }, [presentationMode]);
 
   const toggleAlbumFocusView = useCallback(() => {
     if (presentationMode || albumFullscreen) return;
-    setTemplatePickerOpen(false);
     const next = !albumFocusView;
     onAlbumFocusViewChangeRef.current?.(next);
     requestAnimationFrame(() => {
@@ -2045,31 +1923,29 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const enterAlbumFullscreen = useCallback(
     (opts = {}) => {
       if (!editor) return;
-      setTemplatePickerOpen(false);
 
-      const current = templatesRef.current || [];
+      const current = albumPagesRef.current || [];
       if (!current.length) {
         const pw = albumPageWidthFromViewport(zoomScrollRef.current);
         applyAlbumCanvasWidth(pw);
         syncAlbumBinderFromViewport(zoomScrollRef.current);
         const orient = pageOrientationRef.current;
-        const nextBlockH = albumTemplateBlockHeight(pw, orient);
-        const working = createAlbumTemplateInstance({
-          id: 't1',
+        const nextBlockH = albumPageBlockHeight(pw, orient);
+        const working = createAlbumPageInstance({
           x: 0,
           y: 0,
           w: pw,
           h: nextBlockH
         });
-        templatesRef.current = [working];
-        setTemplates([working]);
+        albumPagesRef.current = [working];
+        setAlbumPages([working]);
         ensureAlbumCanvasMinHeight(editor, nextBlockH, { allowShrink: true });
         emitHtml(editor.getHTML());
       }
 
       const html = withAlbumMarkers(
         editor.getHTML(),
-        templatesRef.current,
+        albumPagesRef.current,
         pageOrientationRef.current,
         albumCanvasWidthPxRef.current,
         albumTitleStyleRef.current
@@ -2143,7 +2019,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       getHTML: () =>
         withAlbumMarkers(
           editor?.getHTML() ?? '',
-          templatesRef.current,
+          albumPagesRef.current,
           pageOrientationRef.current,
           albumCanvasWidthPxRef.current,
           albumTitleStyleRef.current
@@ -2154,20 +2030,20 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       setContent: (html, nextEditable) => {
         if (!editor) return;
         suppressAutoFitUntilRef.current = Date.now() + 400;
-        const list = parseAlbumTemplateInstancesFromHtml(html);
+        const list = parseAlbumPageInstancesFromHtml(html);
         const orient = parseAlbumOrientationFromHtml(html);
         const titleStyle = parseAlbumTitleStyleFromHtml(html);
-        templatesRef.current = list;
+        albumPagesRef.current = list;
         pageOrientationRef.current = orient;
         albumTitleStyleRef.current = titleStyle;
-        setTemplates(list);
+        setAlbumPages(list);
         setPageOrientation(orient);
         setAlbumTitleStyle(titleStyle);
         editor.commands.setContent(stripAlbumMarkers(html) || EMPTY_DOC, { emitUpdate: false });
         if (purgeAlbumDragJunkFromEditor(editor)) {
           requestAnimationFrame(() => emitHtml(editor.getHTML()));
         }
-        const bottom = lowestTemplateBottom(list);
+        const bottom = lowestAlbumPageBottom(list);
         if (bottom > 0) ensureAlbumCanvasMinHeight(editor, bottom, { allowShrink: true });
         // Stretch + flush after hydrate (same as enter / Resize Page) so saved width
         // cannot leave the binder inset with a black gap.
@@ -2204,15 +2080,15 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       /** Same as Resize Page — zoom 95%, flush top-left, stretch page-edge to dashed target. */
       resizePage: () => handleResizePage(),
       /**
-       * Snapshot one album page (template + photos/labels in that band) without removing it.
+       * Snapshot one album page (page + labels in that band) without removing it.
        * Used when dragging a filmstrip thumb onto another album.
        */
       getAlbumPageIndex: () => albumPageIndexRef.current || 0,
-      getAlbumPageCount: () => sortAlbumPagesByBand(templatesRef.current || []).length,
+      getAlbumPageCount: () => sortAlbumPagesByBand(albumPagesRef.current || []).length,
       goToAlbumPage: (pageIndex, opts) => goToAlbumPageRef.current?.(pageIndex, opts),
       getFilmstripModelForPage: (pageIndex) => {
         if (!editor) return null;
-        const ordered = sortAlbumPagesByBand(templatesRef.current || []);
+        const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
         if (!ordered.length) return null;
         const idx = Math.max(0, Math.min(ordered.length - 1, Math.round(Number(pageIndex) || 0)));
         const pw = Math.max(
@@ -2222,18 +2098,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         const models = buildAlbumPageFilmstripModels(editor, ordered, pw);
         const pageKey = ordered[idx]?.key != null ? String(ordered[idx].key) : null;
         return {
-          model: models[idx] || { key: pageKey || `page-${idx}`, slots: [], photos: [] },
+          model: models[idx] || { key: pageKey || `page-${idx}`, photos: [] },
           orientation: pageOrientationRef.current || 'portrait',
           pageWidth: pw,
           pageIndex: idx,
           pageKey
         };
       },
-      /** Prefer stable template key so ForOrder survives page reorder. */
+      /** Prefer stable page key so ForOrder survives page reorder. */
       goToAlbumPageByKey: (pageKey, opts) => {
         const key = String(pageKey || '').trim();
         if (!key) return false;
-        const ordered = sortAlbumPagesByBand(templatesRef.current || []);
+        const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
         const idx = ordered.findIndex((t) => String(t?.key) === key);
         if (idx < 0) return false;
         goToAlbumPageRef.current?.(idx, opts);
@@ -2241,17 +2117,17 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       },
       snapshotAlbumPage: (pageIndex) => {
         if (!editor) return null;
-        const ordered = sortAlbumPagesByBand(templatesRef.current || []);
+        const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
         if (!ordered.length) return null;
         const idx = Math.max(0, Math.min(ordered.length - 1, Math.round(Number(pageIndex) || 0)));
-        const template = ordered[idx];
-        if (!template) return null;
+        const page = ordered[idx];
+        if (!page) return null;
         const pw = Math.max(
           200,
           Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
         );
         const orient = pageOrientationRef.current;
-        const band = templateBand(template, pw, orient);
+        const band = albumPageBand(page, pw, orient);
         const textLabels = [];
         editor.state.doc.descendants((node) => {
           if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
@@ -2263,7 +2139,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           }
         });
         return {
-          template: { ...template },
+          page: { ...page },
           photos: [],
           textLabels,
           orientation: orient,
@@ -2272,10 +2148,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           attachmentIds: []
         };
       },
-      /** Remove one album page (template + nodes in band), then restack remaining pages. */
+      /** Remove one album page (and nodes in its band), then restack remaining pages. */
       removeAlbumPage: (pageIndex) => {
         if (!editor) return false;
-        const ordered = sortAlbumPagesByBand(templatesRef.current || []);
+        const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
         if (!ordered.length) return false;
         const idx = Math.max(0, Math.min(ordered.length - 1, Math.round(Number(pageIndex) || 0)));
         const target = ordered[idx];
@@ -2285,18 +2161,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
         );
         const orient = pageOrientationRef.current;
-        const band = templateBand(target, pw, orient);
+        const band = albumPageBand(target, pw, orient);
         removeTextLabelsInBand(editor, band);
         const remaining = ordered.filter((_, i) => i !== idx);
-        const nextList = restackTemplatesFlushToPages(
+        const nextList = restackAlbumPagesFlush(
           remaining,
           pw,
           orient,
           editor,
           albumBinderWidthPxRef.current
         );
-        templatesRef.current = nextList;
-        setTemplates(nextList);
+        albumPagesRef.current = nextList;
+        setAlbumPages(nextList);
         setAlbumPageIndex((prev) => {
           if (!nextList.length) return 0;
           if (prev > idx) return Math.max(0, prev - 1);
@@ -2408,7 +2284,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         return;
       }
       if (!editor) return;
-      const ordered = sortAlbumPagesByBand(templatesRef.current || []);
+      const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
       if (!ordered.length) return;
       const idx = Math.max(0, Math.min(ordered.length - 1, Math.round(Number(pageIndex) || 0)));
       const pageLabel = `page ${idx + 1}`;
@@ -2426,18 +2302,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
       );
       const orient = pageOrientationRef.current;
-      const band = templateBand(target, pw, orient);
+      const band = albumPageBand(target, pw, orient);
       removeTextLabelsInBand(editor, band);
       const remaining = ordered.filter((_, i) => i !== idx);
-      const nextList = restackTemplatesFlushToPages(
+      const nextList = restackAlbumPagesFlush(
         remaining,
         pw,
         orient,
         editor,
         albumBinderWidthPxRef.current
       );
-      templatesRef.current = nextList;
-      setTemplates(nextList);
+      albumPagesRef.current = nextList;
+      setAlbumPages(nextList);
       setAlbumPageIndex((prev) => {
         if (!nextList.length) return 0;
         let next = prev;
@@ -2461,7 +2337,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const handleDeleteAllAlbumPages = useCallback(async () => {
     if (!editable || orderAlbumActive) return;
     if (!editor) return;
-    const ordered = sortAlbumPagesByBand(templatesRef.current || []);
+    const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
     if (!ordered.length) return;
     const n = ordered.length;
     if (
@@ -2477,37 +2353,31 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     );
     const orient = pageOrientationRef.current;
     for (let i = ordered.length - 1; i >= 0; i -= 1) {
-      removeTextLabelsInBand(editor, templateBand(ordered[i], pw, orient));
+      removeTextLabelsInBand(editor, albumPageBand(ordered[i], pw, orient));
     }
-    templatesRef.current = [];
-    setTemplates([]);
-    persistTemplates([]);
+    albumPagesRef.current = [];
+    setAlbumPages([]);
+    persistAlbumPages([]);
     setAlbumPageIndex(0);
     requestAnimationFrame(() => emitHtml(editor.getHTML()));
-  }, [editable, orderAlbumActive, editor, pageSize.width, persistTemplates, emitHtml]);
+  }, [editable, orderAlbumActive, editor, pageSize.width, persistAlbumPages, emitHtml]);
 
   const handlePageDrop = useCallback(
     (event) => {
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      const templateDrag = isAlbumTemplateDrag(event.dataTransfer);
-      if (!templateDrag && !types.includes('Files')) return;
+      if (!types.includes('Files')) return;
       event.preventDefault();
       event.stopPropagation();
       if (!editable) return;
 
       const files = Array.from(event.dataTransfer?.files || []);
-      const templateId = templateDrag ? readAlbumTemplateDragId(event.dataTransfer) : null;
 
       void (async () => {
         await runPhotoAlbumsTrafficWaitIfNeeded();
-        if (templateId) {
-          handleSelectTemplate(templateId);
-          return;
-        }
         if (files.length) onStageOsFiles?.(files);
       })();
     },
-    [editable, onStageOsFiles, handleSelectTemplate]
+    [editable, onStageOsFiles]
   );
 
   const counts = useEditorState({
@@ -2521,8 +2391,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         : { characters: 0, words: 0 }
   });
 
-  /** Each template instance is one album page (book order). */
-  const albumPagesSorted = useMemo(() => sortAlbumPagesByBand(templates), [templates]);
+  /** Album pages in book order. */
+  const albumPagesSorted = useMemo(() => sortAlbumPagesByBand(albumPages), [albumPages]);
 
   /** Top-left workspace mode badge. */
   const albumWorkspaceModeLabel = albumPagesSorted.length > 0 ? 'Album View Mode' : 'Album Create Mode';
@@ -2624,13 +2494,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const leftAlbumPage = albumPagesSorted[albumSpreadLeftIndex] || albumPagesSorted[0] || null;
   const rightAlbumPage =
     albumSpreadRightIndex < albumPagesSorted.length ? albumPagesSorted[albumSpreadRightIndex] : null;
-  const activeSpreadPages = useMemo(() => {
-    const pages = [];
-    if (leftAlbumPage) pages.push(leftAlbumPage);
-    if (rightAlbumPage) pages.push(rightAlbumPage);
-    return pages;
-  }, [leftAlbumPage, rightAlbumPage]);
-  const activeAlbumPage = leftAlbumPage;
   const spreadPageWidthPx = albumSinglePageWidth(
     pageSize.width,
     albumCanvasWidthPx,
@@ -2643,7 +2506,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         left: 0,
         top: 0,
         width: spreadPageWidthPx,
-        height: albumTemplateBlockHeight(spreadPageWidthPx, orient)
+        height: albumPageBlockHeight(spreadPageWidthPx, orient)
       };
     }
     const idx = albumPagesSorted.findIndex((p) => p.key === leftAlbumPage.key);
@@ -2653,7 +2516,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     const h =
       leftAlbumPage.h > 40
         ? Math.round(leftAlbumPage.h)
-        : albumTemplateBlockHeight(pw, orient);
+        : albumPageBlockHeight(pw, orient);
     return {
       left: albumPageXForSpreadColumn(Math.max(0, idx), pw, bw),
       top: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(Math.max(0, idx)), h),
@@ -2670,7 +2533,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     const h =
       rightAlbumPage.h > 40
         ? Math.round(rightAlbumPage.h)
-        : albumTemplateBlockHeight(pw, orient);
+        : albumPageBlockHeight(pw, orient);
     return {
       left: albumPageXForSpreadColumn(Math.max(0, idx), pw, bw),
       top: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(Math.max(0, idx)), h),
@@ -2697,7 +2560,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const row = albumSpreadRowForPageIndex(pageIdx);
       const inst = pages[pageIdx];
       const h =
-        inst.h > 40 ? Math.round(inst.h) : albumTemplateBlockHeight(pw, orient);
+        inst.h > 40 ? Math.round(inst.h) : albumPageBlockHeight(pw, orient);
       bands.push({
         left: albumPageXForSpreadColumn(pageIdx, pw, bw),
         top: albumPageTopForSpreadRow(row, h),
@@ -2739,30 +2602,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       : 0;
   const albumSpreadColumnOffsetPx =
     spreadPageWidthPx > 0 ? spreadPageWidthPx + albumBinderWidthPx : 0;
-
-  /** Force spread shell coords — never trust bloated saved inst.w (old spread-as-page bug). */
-  const spreadBandForInstance = (inst, pageIndexHint = -1) => {
-    if (!inst) return null;
-    const ordered = albumPagesSorted;
-    const idx =
-      pageIndexHint >= 0
-        ? pageIndexHint
-        : Math.max(
-            0,
-            ordered.findIndex((p) => p.key === inst.key)
-          );
-    const pw = spreadPageWidthPx;
-    const bw = albumBinderWidthPx;
-    const orient = pageOrientationRef.current || 'portrait';
-    const h =
-      inst.h > 40 ? Math.round(inst.h) : albumTemplateBlockHeight(pw, orient);
-    return {
-      left: albumPageXForSpreadColumn(idx, pw, bw),
-      top: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(idx), h),
-      width: pw,
-      height: h
-    };
-  };
 
   /** Book-flip shell: ProseMirror may stack spreads internally; shell stays one spread tall. */
   useEffect(() => {
@@ -3415,8 +3254,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             top: '50%',
             transform: 'translateY(-50%)',
             ...(isPrev ? { left: { xs: 8, sm: 16 } } : { right: { xs: 8, sm: 16 } }),
-            // Above album pages / template overlay (~45) / selected photos (~50–90);
-            // below Page-templates picker (~200).
+            // Above album pages / page overlay (~45) / selected photos (~50–90);
+            // below the album action bar (~200).
             zIndex: embedded ? 120 : 14010,
             border: 'none',
             bgcolor: 'rgba(0,0,0,0.45)',
@@ -3770,12 +3609,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </BubbleMenu>
       ) : null}
 
-      {/* Template control sits above the binder (not on the page) so the 3×3 picker is never clipped.
-          Keep this stacking context above the album zoom-scroll (incl. native scrollbars + page-edge bar).
+      {/* Keep this stacking context above the album zoom-scroll (incl. native scrollbars + page-edge bar).
           Fixed label size + horizontal scroll — no font auto-fit (avoids scrollbar/font jiggle). */}
       {editable && !albumEditorChromeHidden ? (
         <Box
-          className="rv-editor__template-bar"
+          className="rv-editor__album-bar"
           sx={{
             position: 'relative',
             zIndex: 200,
@@ -3810,45 +3648,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               minWidth: 0
             }}
           >
-            <Box
-              ref={templatePickerAnchorRef}
-              data-pa-album-bar-btn-wrap=""
-              sx={{
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'stretch',
-                flex: '0 0 auto'
-              }}
-            >
-              <GreenButton
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() =>
-                  runAfterTrafficWait(() => {
-                    setTemplatePickerOpen((open) => !open);
-                  })
-                }
-                aria-expanded={templatePickerOpen}
-                aria-haspopup="dialog"
-                aria-label="Choose page template"
-                {...guestDemoBlockProps()}
-                sx={albumTemplateBarButtonSx}
-              >
-                Template
-              </GreenButton>
-              <PhotoAlbumsTemplatePickerPanel
-                open={templatePickerOpen}
-                anchorEl={templatePickerAnchorRef.current}
-                selectedTemplateId={
-                  activeAlbumPage?.id || templates[templates.length - 1]?.id || ''
-                }
-                orientation={pageOrientation}
-                onSelect={(id) => runAfterTrafficWait(() => handleSelectTemplate(id))}
-                onClose={() => {
-                  setTemplatePickerOpen(false);
-                }}
-              />
-            </Box>
             {[
               {
                 key: 'reset',
@@ -3907,7 +3706,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 title={btn.title}
                 {...(btn.demoBlock ? guestDemoBlockProps() : null)}
                 sx={{
-                  ...albumTemplateBarButtonSx,
+                  ...albumBarButtonSx,
                   ...(btn.pressed
                     ? {
                         bgcolor: '#ffffff !important',
@@ -3971,7 +3770,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 aria-pressed={btn.pressed != null ? Boolean(btn.pressed) : undefined}
                 title={btn.title}
                 {...(btn.demoBlock ? guestDemoBlockProps() : null)}
-                sx={albumTemplateBarButtonSx}
+                sx={albumBarButtonSx}
               >
                 {btn.label}
               </GreenButton>
@@ -4100,9 +3899,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         ref={zoomScrollRef}
         className="rv-editor__album-zoom-scroll"
         onDragOver={(e) => {
-          const templateDrag = isAlbumTemplateDrag(e.dataTransfer);
           const files = Array.from(e.dataTransfer?.types || []).includes('Files');
-          if (!templateDrag && !files) return;
+          if (!files) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
         }}
@@ -4114,7 +3912,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           // Book pages flip left/right — no stacked-page scrollbar.
           overflow: 'hidden',
           position: 'relative',
-          // Below template bar / Page templates picker (zIndex 200) so page-edge bar stays under the popup.
+          // Below the album action bar (zIndex 200).
           zIndex: 1,
           ...(albumFullscreen
             ? {
@@ -4284,28 +4082,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                     overflow: 'visible'
                   }}
                 >
-                  {activeSpreadPages.map((inst) => {
-                    const band = spreadBandForInstance(inst);
-                    if (!band) return null;
-                    return (
-                      <PhotoAlbumsPageTemplateOverlay
-                        key={inst.key}
-                        templateId={inst.id}
-                        pageWidth={band.width}
-                        pageHeight={band.height}
-                        offsetLeft={band.left}
-                        offsetTop={band.top}
-                        slotOverrides={inst.slots || null}
-                        editable={effectiveEditable}
-                        dragScale={Math.max(0.01, albumZoom / 100)}
-                        pageKey={inst.key}
-                        onSlotGeometryChange={(slotId, pct, opts) =>
-                          handleSlotGeometryChange(inst.key, slotId, pct, opts)
-                        }
-                        onDelete={() => runAfterTrafficWait(() => handleDeleteTemplate(inst.key))}
-                      />
-                    );
-                  })}
                   {[
                     {
                       key: 'left',
@@ -4514,7 +4290,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   role="separator"
                   aria-orientation="vertical"
                   aria-label="Resize album page"
-                  title="Drag to resize the page — templates and photos scale together"
+                  title="Drag to resize the page — pages and photos scale together"
                   onMouseDown={startPageContentResize}
                   sx={{
                     position: 'absolute',
@@ -4572,7 +4348,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         active={Boolean(effectiveEditable && !presentationMode && !albumEditorChromeHidden)}
         photoEditActive={false}
         panZoomActive={false}
-        hasPageContext={Boolean(templates?.length)}
+        hasPageContext={Boolean(albumPages?.length)}
         hasAlbumPhotos={trayItems.length > 0}
         openRequestKey={contextTutorialOpenKey}
       />

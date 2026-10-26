@@ -287,7 +287,7 @@ function MenuList() {
     if (identificationVerificationLockActive || exitToMallBusy) return;
     setExitToMallBusy(true);
     try {
-      await offerRecordVaultBackupBeforeExit();
+      if (!(await offerRecordVaultBackupBeforeExit())) return;
       await flushRecordVaultSessionsOnLeave();
       const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');
       await flushPhotoAlbumsSessionsOnLeave();

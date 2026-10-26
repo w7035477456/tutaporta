@@ -22,7 +22,7 @@ function parseOptionalPx(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-function templateBand(inst, pageWidthFallback = 480) {
+function albumPageBand(inst, pageWidthFallback = 480) {
   const w = inst?.w > 0 ? inst.w : pageWidthFallback;
   const h = inst?.h > 0 ? inst.h : Math.round(w * 1.2);
   return {
@@ -54,7 +54,7 @@ export function findAlbumPagesMatchingSearchTerms(editor, pages, pageWidth, term
   if (!lowered.length || !list.length || !editor?.state?.doc) return [];
 
   const pw = Math.max(200, Math.round(Number(pageWidth) || 480));
-  const bands = list.map((inst) => templateBand(inst, pw));
+  const bands = list.map((inst) => albumPageBand(inst, pw));
   const hits = new Set();
 
   editor.state.doc.descendants((node) => {

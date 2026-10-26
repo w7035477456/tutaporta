@@ -1,16 +1,16 @@
 /**
- * Helpers to move one album page (template + text labels) into another album note.
+ * Helpers to move one album page (page + text labels) into another album note.
  */
 import {
-  albumTemplateBlockHeight,
-  createAlbumTemplateInstance,
-  parseAlbumTemplateInstancesFromHtml,
-  serializeAlbumTemplateInstances
-} from './photoAlbumsPageTemplates';
+  albumPageBlockHeight,
+  createAlbumPageInstance,
+  parseAlbumPageInstancesFromHtml,
+  serializeAlbumPageInstances
+} from './photoAlbumsPages';
 import { updatePhotoAlbumsNote, fetchPhotoAlbumsNote } from 'api/photoAlbumsFe';
 import { stripLegacyAlbumPhotoMarkup } from './photoAlbumsLegacyPhotoMarkup';
 
-const TEMPLATE_MARKER_RE = /<div\b[^>]*data-rv-album-template\b[^>]*>\s*<\/div>/gi;
+const ALBUM_PAGE_MARKER_RE = /<div\b[^>]*data-rv-album-template\b[^>]*>\s*<\/div>/gi;
 
 function escapeAttr(value) {
   return String(value ?? '')
@@ -26,7 +26,7 @@ function attrPair(name, value) {
 
 function stripAlbumMarkers(html) {
   return stripLegacyAlbumPhotoMarkup(String(html || ''))
-    .replace(TEMPLATE_MARKER_RE, '')
+    .replace(ALBUM_PAGE_MARKER_RE, '')
     .replace(/<div\b[^>]*data-rv-album-title-style\b[^>]*>\s*<\/div>/gi, '');
 }
 
@@ -54,9 +54,9 @@ function albumPageTopForIndex(pageIndex, pageHeight) {
   return idx * (h + 24);
 }
 
-function templateBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
+function albumPageBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
   const w = inst?.w > 0 ? inst.w : pageWidthFallback;
-  const h = inst?.h > 0 ? inst.h : albumTemplateBlockHeight(w, orientation);
+  const h = inst?.h > 0 ? inst.h : albumPageBlockHeight(w, orientation);
   return {
     left: inst?.x || 0,
     top: inst?.y || 0,
@@ -114,25 +114,25 @@ function textLabelAttrsToHtml(attrs) {
   );
 }
 
-function withUpdatedTemplates(html, instances, orientation, pageWidthPx) {
+function withUpdatedPages(html, instances, orientation, pageWidthPx) {
   const body = stripAlbumMarkers(html);
   const titleStyle = parseAlbumTitleStyleMarker(html);
-  const templateJson = serializeAlbumTemplateInstances(instances);
+  const pagesJson = serializeAlbumPageInstances(instances);
   const orient =
     String(orientation || '').toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
   const pageW = Number(pageWidthPx);
   const pageWAttr =
     Number.isFinite(pageW) && pageW >= 200 ? ` data-album-page-width="${Math.round(pageW)}"` : '';
-  const templateMarker = templateJson
-    ? `<div data-rv-album-template="" data-album-templates="${templateJson}" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`
+  const pagesMarker = pagesJson
+    ? `<div data-rv-album-template="" data-album-templates="${pagesJson}" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`
     : `<div data-rv-album-template="" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`;
-  return `${templateMarker}${titleStyle}${body || '<p></p>'}`;
+  return `${pagesMarker}${titleStyle}${body || '<p></p>'}`;
 }
 
 /**
  * Append a page snapshot into target note HTML. Returns updated HTML.
  * @param {string} targetHtml
- * @param {{ template: object, textLabels: object[], orientation?: string, pageWidth?: number }} snapshot
+ * @param {{ page: object, textLabels: object[], orientation?: string, pageWidth?: number }} snapshot
  */
 export function appendAlbumPageSnapshotToHtml(targetHtml, snapshot) {
   const orient =
@@ -140,24 +140,22 @@ export function appendAlbumPageSnapshotToHtml(targetHtml, snapshot) {
     'landscape'
       ? 'landscape'
       : 'portrait';
-  const existing = parseAlbumTemplateInstancesFromHtml(targetHtml);
+  const existing = parseAlbumPageInstancesFromHtml(targetHtml);
   const fromHtmlW = parseAlbumPageWidthFromHtml(targetHtml);
   const snapW = Math.round(Number(snapshot?.pageWidth) || 0);
-  const templateW = Math.round(Number(snapshot?.template?.w) || 0);
-  const pw = Math.max(200, fromHtmlW || snapW || templateW || 480);
-  const blockH = albumTemplateBlockHeight(pw, orient);
-  const oldBand = templateBand(snapshot.template, pw, orient);
+  const sourcePageW = Math.round(Number(snapshot?.page?.w) || 0);
+  const pw = Math.max(200, fromHtmlW || snapW || sourcePageW || 480);
+  const blockH = albumPageBlockHeight(pw, orient);
+  const oldBand = albumPageBand(snapshot.page, pw, orient);
   const insertAt = existing.length;
-  const newInst = createAlbumTemplateInstance({
-    id: snapshot.template?.id,
+  const newInst = createAlbumPageInstance({
     x: 0,
     y: albumPageTopForIndex(insertAt, blockH),
     w: pw,
-    h: blockH,
-    slots: snapshot.template?.slots
+    h: blockH
   });
-  const newBand = templateBand(newInst, pw, orient);
-  const nextTemplates = [...existing, newInst];
+  const newBand = albumPageBand(newInst, pw, orient);
+  const nextPages = [...existing, newInst];
 
   const labelHtml = (Array.isArray(snapshot.textLabels) ? snapshot.textLabels : [])
     .map((attrs) => {
@@ -170,7 +168,7 @@ export function appendAlbumPageSnapshotToHtml(targetHtml, snapshot) {
   const body = stripAlbumMarkers(targetHtml);
   const titleStyle = parseAlbumTitleStyleMarker(targetHtml);
   const withBody = `${titleStyle}${body || '<p></p>'}${labelHtml}`;
-  return withUpdatedTemplates(withBody, nextTemplates, orient, pw);
+  return withUpdatedPages(withBody, nextPages, orient, pw);
 }
 
 /**

@@ -3468,7 +3468,7 @@ export default function RecordVaultWorkspacePane({
 
   const handleExitToMall = useCallback(async () => {
     if (busy) return;
-    await offerRecordVaultBackupBeforeExit();
+    if (!(await offerRecordVaultBackupBeforeExit())) return;
     // Drop the phone upload-page flags first — a failed logoff must not strand the
     // next visit on the white upload sheet.
     clearMobileTutaNotesUploadSession();
@@ -3890,23 +3890,31 @@ export default function RecordVaultWorkspacePane({
   /** Resolves the pending exit once Backup & Restore (opened by the exit prompt) closes. */
   const exitBackupDialogResolveRef = useRef(null);
 
-  const closeTutaCloudBackupDialog = useCallback(() => {
+  /** `reason === 'exit'`: Exit on the "Zip success" popup — continue the pending Exit to Mall / Logout. */
+  const closeTutaCloudBackupDialog = useCallback((reason) => {
     setTutaCloudBackupOpen(false);
     setTutaCloudBackupRequired(false);
     void refreshVaultUsageRef.current?.();
     const resolve = exitBackupDialogResolveRef.current;
     exitBackupDialogResolveRef.current = null;
-    resolve?.();
+    resolve?.(reason === 'exit' ? 'exit' : 'closed');
   }, []);
 
+  /** @returns {Promise<boolean>} false when X closed the dialog and a backup is still needed. */
   const offerTutaCloudBackupBeforeExit = useCallback(async () => {
     await flushPendingNoteSave();
-    if (!(await fetchRecordVaultTutaDriveNeedsBackup())) return;
-    await new Promise((resolve) => {
+    if (!(await fetchRecordVaultTutaDriveNeedsBackup())) return true;
+    const outcome = await new Promise((resolve) => {
       exitBackupDialogResolveRef.current = resolve;
       setTutaCloudBackupRequired(true);
       setTutaCloudBackupOpen(true);
     });
+    if (outcome !== 'closed') return true;
+    try {
+      return !(await fetchRecordVaultTutaDriveNeedsBackup());
+    } catch {
+      return true;
+    }
   }, [flushPendingNoteSave]);
 
   useEffect(() => {
@@ -5292,7 +5300,7 @@ export default function RecordVaultWorkspacePane({
               // ignore
             }
           });
-        }, 120_000);
+        }, 120000);
       };
 
       const finishUi = () => {

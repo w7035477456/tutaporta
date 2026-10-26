@@ -16,7 +16,6 @@ export const PHOTO_ALBUMS_CONTEXT_TUTORIAL_COPY = {
       'You are in Album Create Mode',
       '• 1) Add Photos: Click Open Folder to select the photos you want to include. "Use "Add All to Thumbnail Tray" or "Add selected to Thumbnail Tray".',
       '• 2A) Auto: Click "Auto Layout" above the thumbnail tray. AI will choose the best template (portrait vs landscape) and number of photos per page.',
-      '• 2B) Manual: Click "Template" to create your first page layout, then drag photos into the different photo slots on the template.',
       '• 2C) Hybrid: Use "Auto Layout 1" to auto-layout one page at a time so you can manually edit before proceeding.',
       '• 3) Once one or more photos exist on the album, proceed to Album Edit Mode by double-clicking any photo.'
     ].join('\n')
