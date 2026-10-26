@@ -1,0 +1,50 @@
+---
+description: Ubuntu pre-production (xbox1 + xbox3 + xbox4, Dell S6000 40 Gb switch) — replaces the All-in-1 xbox2 development box
+alwaysApply: true
+---
+
+# Three-server Ubuntu pre-production (xbox1 + xbox3 + xbox4)
+
+Previously all development ran on one **All-in-1** Ubuntu server, **xbox2 (`192.168.222.202`)** — HAProxy/Nginx, Postgres Primary, and the web server (FE + BE) on one box, no switch, to keep power usage down (see `all-in-1UbuntuDevelopment.mdc`).
+
+**Andrew is now transitioning to semi-production-ready, using three Ubuntu servers:**
+
+| Server | IP | Holds |
+|--------|----|-------|
+| **xbox1** | `192.168.202.201` | 1) **Postgres DB, Primary** 2) **HAProxy / Nginx** |
+| **xbox3** | `192.168.202.203` | 1) **Postgres DB, Replica** 2) **Webserver, FE & BE** |
+| **xbox4** | `192.168.202.204` | 1) **Webserver, FE & BE** (second web server, same role as xbox3) 2) **Two NVIDIA P100 GPUs for running LLMs** |
+| ~~xbox2~~ | ~~`192.168.222.202`~~ | **Shut off** (All-in-1 development box retired) |
+
+## Network layout
+
+- Internet → Cloudflare → ONT → Router(45) → **Outter (210)** router (`:80` / `:443` forwarded in).
+- Outter **OPT1** → **Dell S6000 40 Gb QSFP+ switch** → xbox1, xbox3 and xbox4 (40 Gb QSFP+ links). The All-in-1 setup had no switch (direct connect).
+- HAProxy on xbox1 is the public front door; it **round-robins** app traffic between the web servers on **xbox3** and **xbox4** (no session pinning / sticky sessions).
+
+## Shared storage (`FAST_STORAGE_FOLDER` / `LARGE_CHEAP_STORAGE_FOLDER`)
+
+Both storage folders must look the same from every web server, because consecutive requests can land on any of them.
+
+| Env var | Physical storage | How it is shared |
+|-----|-----|-----|
+| **`FAST_STORAGE_FOLDER`** | Local NVMe on each server, mounted under **`/mnt`** | **GlusterFS** replicated volume across **xbox1, xbox3 and xbox4**. Every node holds a full copy, so reads stay local and fast. |
+| **`LARGE_CHEAP_STORAGE_FOLDER`** | USB external enclosure attached to **xbox1** only (local mount on xbox1) | xbox1 exports it over **NFS**; **xbox3 and xbox4** mount it as NFS clients. |
+
+- The web server cluster is **xbox3 + xbox4** today and may grow to **xbox5 / xbox6 / xbox7 / xbox8**. Each new web server must join the GlusterFS volume (add a replica brick on its NVMe under `/mnt`) and mount the xbox1 NFS export, before HAProxy sends it traffic.
+- Use the **same mount path on every server** so `FAST_STORAGE_FOLDER` and `LARGE_CHEAP_STORAGE_FOLDER` in the BE `.env` are identical across web servers.
+- Code must reach files only through these env vars, never a server-local path. Anything written to a local disk outside these mounts is invisible to the other web servers.
+- `LARGE_CHEAP_STORAGE_FOLDER` depends on xbox1 being up (single host, no replication). Treat it as slower bulk storage and handle mount / I/O errors (for example a stale NFS handle) gracefully instead of crashing.
+
+## What this means for code and ops
+
+- **Cluster rules are now real, not hypothetical** (`all-in-1UbuntuDevelopment.mdc` §3–§6):
+  - FE + BE stay same-origin behind HAProxy (no CORS).
+  - App servers are stateless — Postgres (or Redis) for shared state, no in-process session memory. Consecutive requests from the same user can land on xbox3 or xbox4, so anything kept in one server's memory or local disk will be missing on the other.
+  - **Writes / DDL → Primary on xbox1.** **Reads → local Replica on xbox3.** Tolerate replication lag or read Primary for read-your-writes.
+  - `vault_cluster_state` is read **and** written on Primary (xbox1).
+  - **Deploys go to both web servers** (xbox3 and xbox4) so they always run the same FE/BE build.
+  - **LLM workloads run on xbox4** (two P100 GPUs). xbox3 has no GPU, so LLM requests landing on xbox3 must be forwarded to xbox4 rather than run locally.
+- **Schema parity:** DDL is applied on the Primary (xbox1); the Replica (xbox3) follows via replication. Mac ↔ Ubuntu parity checks (`isdbsame`) compare against the Primary.
+- **SSH:** same hardening as `ssh.mdc` (port `59221`, `IdentitiesOnly`, `~/.ssh/xbox2.pem` key unless Andrew provides new keys). Scripts / aliases that still hard-code `192.168.222.202` (xbox2) must be pointed at xbox1 / xbox3 / xbox4 as the cutover happens — ask Andrew which host before changing deploy targets.
+- **Config files** listed in `ubuntu_config_files.mdc` now split by role: HAProxy, Nginx and Postgres Primary configs on xbox1; FE/BE `.env` on both xbox3 and xbox4 (kept in sync); Postgres Replica configs on xbox3.

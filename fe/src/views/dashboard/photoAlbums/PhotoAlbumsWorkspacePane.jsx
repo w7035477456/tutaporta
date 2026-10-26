@@ -33,8 +33,7 @@ import {
   readPhotoAlbumsApiError,
   readPhotoAlbumsOpenFailureMessage,
   readFileAsDataUrl,
-  createPhotoAlbumsPaneApi,
-  fetchPhotoAlbumsNoteAttachmentBlob
+  createPhotoAlbumsPaneApi
 } from 'api/photoAlbumsFe';
 import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 import { registerPhotoAlbumsLeavePrepare } from 'utils/photoAlbumsLeavePrepare';
@@ -45,12 +44,9 @@ import {
   isMacOsMetadataFileName,
   isPhotoAlbumsStagingPhotoFile,
   isPhotoAlbumsStagingAlbumMediaFile,
-  isPhotoAlbumsStagingPhotoExtension,
   isPhotoAlbumsStagingVideoFile,
-  photoAlbumsStagingPhotoPrefersServerThumb,
   photoAlbumsUploadFileName,
-  probePhotoAlbumsImageFile,
-  resolvePhotoAlbumsFileExtension
+  probePhotoAlbumsImageFile
 } from 'utils/photoAlbumsFileFormats';
 import PhotoAlbumsSearchBar from './PhotoAlbumsSearchBar';
 import PhotoAlbumsInviteBar from './PhotoAlbumsInviteBar';
@@ -74,10 +70,6 @@ import PhotoAlbumsFilesExplorerPanel from './PhotoAlbumsFilesExplorerPanel';
 import PhotoAlbumsNoteEditor from './PhotoAlbumsNoteEditor';
 import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
 import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
-import {
-  clearAttachmentVariantPreviewsForNote,
-  setAttachmentVariantPreview
-} from './photoAlbumsAttachmentVariantCache';
 import { formatPhotoAlbumsSidebarAlbumLines } from './photoAlbumsAlbumTitleStyle';
 import {
   countPhotoAlbumsSidebarMediaInAttachments,
@@ -154,8 +146,6 @@ import {
 } from './photoAlbumsAlbumPageDrag';
 import { commitAlbumPageMoveToNote } from './photoAlbumsMoveAlbumPage';
 import { setPhotoAlbumsColumnResizing } from './photoAlbumsColumnResizeGate';
-import { mergeStagingItemPreview, primeStagingAttachmentPreview } from './photoAlbumsStagingPreviewCache';
-import { createPhotoStagingPreviewObjectUrl } from './photoAlbumsFilesExplorerDrag';
 import {
   photoAlbumsSourceTakenAtMs,
   sortPhotoAlbumsFilesBySourceTakenAt
@@ -2262,7 +2252,7 @@ export default function PhotoAlbumsWorkspacePane({
     return nb?.notes || [];
   }, [searchActive, displayNotebooks, notebooks, selectedNotebookId, selectedNotebook]);
 
-  const loadNoteContent = useCallback(async (noteId, { syncStaging = true } = {}) => {
+  const loadNoteContent = useCallback(async (noteId) => {
     const id = Number(noteId);
     if (!Number.isFinite(id) || id < 1) return null;
     const note = await vaultApi.fetchPhotoAlbumsNote(id);
@@ -2282,10 +2272,6 @@ export default function PhotoAlbumsWorkspacePane({
         })
       }))
     );
-    // Alley + ENV hard-file purge already ran in vaultGetNote; mirror kept attachments in UI.
-    if (syncStaging) {
-      noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(note.attachments || []);
-    }
     return note;
   }, [vaultApi]);
 
@@ -3436,53 +3422,7 @@ export default function PhotoAlbumsWorkspacePane({
         setNoteContentLoadProgressPercent(15);
         setNoteContentLoadProgressLabel('Loading album pages…');
         // Always fetch on display so BE runs size+checksum attachment purge + ENV folder hard-file cleanup.
-        const note = await loadNoteContent(id);
-        if (cancelled) return;
-        // Prefetch all album page photos as *_1000px (never full) before clearing hourglass.
-        clearAttachmentVariantPreviewsForNote(id);
-        const attachments = Array.isArray(note?.attachments) ? note.attachments : [];
-        const photoIds = [];
-        for (const row of attachments) {
-          const aid = Number(row?.attachment_id ?? row?.attachmentId);
-          const ext = String(row?.file_extension ?? row?.fileExtension ?? '')
-            .replace(/^\./, '')
-            .toLowerCase();
-          if (!Number.isFinite(aid) || aid < 1) continue;
-          if (!isPhotoAlbumsStagingPhotoExtension(ext)) continue;
-          photoIds.push(aid);
-        }
-        const photoTotal = photoIds.length;
-        if (photoTotal) {
-          setNoteContentLoadProgressPercent(35);
-          setNoteContentLoadProgressLabel(`Preparing ${photoTotal} photo preview${photoTotal === 1 ? '' : 's'}…`);
-          let done = 0;
-          await Promise.all(
-            photoIds.map(async (aid) => {
-              if (cancelled) return;
-              try {
-                const blob = await fetchPhotoAlbumsNoteAttachmentBlob(id, aid, {
-                  inline: true,
-                  storageType: paneStorageType,
-                  variant: 'display'
-                });
-                if (cancelled || !blob) return;
-                const url = URL.createObjectURL(blob);
-                setAttachmentVariantPreview(id, aid, 'display', url);
-              } catch {
-                // Node view will retry individually.
-              } finally {
-                done += 1;
-                if (!cancelled) {
-                  const pct = 35 + Math.round((done / photoTotal) * 60);
-                  setNoteContentLoadProgressPercent(pct);
-                  setNoteContentLoadProgressLabel(
-                    `Loading photo ${done} of ${photoTotal}…`
-                  );
-                }
-              }
-            })
-          );
-        }
+        await loadNoteContent(id);
         if (!cancelled) {
           setNoteContentLoadProgressPercent(100);
           setNoteContentLoadProgressLabel('Ready');
@@ -3554,8 +3494,6 @@ export default function PhotoAlbumsWorkspacePane({
       // Drop title-matching body rows (ignore [n]/[#]); leave title intact.
       const cleanedBody = cleanPhotoAlbumsNoteBodyHtml(rawBody, titlePlain);
       api.setContent(cleanedBody || '<p></p>', true);
-      // Alley display: drop size+checksum duplicates; prune IDs purged on the server.
-      api.syncStagingAlleyFromAttachments?.(selectedNote.attachments || []);
       if (cleanedBody !== rawBody) {
         patchNoteRowInTree(id, { body_text: cleanedBody, content_loaded: true });
         void vaultApi.updatePhotoAlbumsNote(id, { body_text: cleanedBody }).catch(() => {
@@ -3584,14 +3522,6 @@ export default function PhotoAlbumsWorkspacePane({
     editorHydratedRef.current.key = key;
     hydratedDraftKeyRef.current = '';
     api.setContent(String(sharedAlbumView.html || '') || '<p></p>', true);
-    const staged = (sharedAlbumView.attachments || [])
-      .map((row) => ({
-        attachmentId: Number(row.attachmentId),
-        fileName: String(row.fileName || ''),
-        fileExtension: String(row.fileExtension || '')
-      }))
-      .filter((row) => Number.isFinite(row.attachmentId) && row.attachmentId > 0);
-    api.syncStagingAlleyFromAttachments?.(staged);
   }, [sharedAlbumView, editorReadyTick]);
 
   // Highlight (and scroll to) the active search terms inside the open note body.
@@ -4444,97 +4374,7 @@ export default function PhotoAlbumsWorkspacePane({
     });
   }, []);
 
-  /**
-   * Upload one dropped file to the selected note and embed it inline in the note
-   * body at the drop location (instead of a separate list). The file bytes live
-   * server-side keyed by the returned attachment id; the note body only keeps a
-   * lightweight reference node.
-   */
-  const uploadNoteVaultFile = useCallback(
-    async (inputFile, coords) => {
-      let file = inputFile;
-      if (!selectedNote || !file || busy) return;
-      const noteId = Number(selectedNote.note_id);
-      if (!isAllowedPhotoAlbumsFile(file)) {
-        setError(`Unsupported vault file type: ${file.name || 'file'}`);
-        return;
-      }
-      const isVideoFile = isPhotoAlbumsStagingVideoFile(file);
-      quotaPopupShownRef.current = false;
-      downsizeNoticeShownRef.current = false;
-      await refreshMediaQuota();
-      if (!(await reserveMediaQuotaSlot(isVideoFile))) return;
-
-      const quota = mediaQuotaRef.current;
-      const limitMb = isVideoFile ? quota.videoMaxMb : quota.imageMaxMb;
-      if (file.size > limitMb * 1024 * 1024) {
-        if (isVideoFile || !isPhotoAlbumsStagingPhotoFile(file)) {
-          releaseMediaQuotaSlot(isVideoFile);
-          setError(TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE);
-          return;
-        }
-        await announceDownsizeOnce(file.size);
-        const smaller = await downsizeImageFileToMaxMb(file, limitMb);
-        if (!smaller) {
-          releaseMediaQuotaSlot(isVideoFile);
-          setError(TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE);
-          return;
-        }
-        file = smaller;
-      }
-      setBusy(true);
-      setError('');
-      try {
-        const dataUrl = await readFileAsDataUrl(file);
-        const attachment = await vaultApi.uploadPhotoAlbumsNoteAttachment(noteId, {
-          file: dataUrl,
-          file_name: photoAlbumsUploadFileName(file),
-          source_taken_at_ms: photoAlbumsSourceTakenAtMs(file)
-        });
-        if (attachment) {
-          const fresh = await loadNoteContent(noteId);
-          if (!attachment.duplicate) {
-            noteEditorApiRef.current?.insertAttachmentAtCoords?.(
-              {
-                attachmentId: Number(attachment.attachment_id),
-                fileName: attachment.file_name || '',
-                fileExtension: attachment.file_extension || '',
-                fileSizeBytes: attachment.file_size_bytes ?? null,
-                checksum: attachment.checksum || null,
-                albumPhotoSeq:
-                  attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null
-              },
-              coords
-            );
-          }
-          noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(
-            fresh?.attachments || selectedNote.attachments || []
-          );
-        }
-      } catch (err) {
-        setError(readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`));
-      } finally {
-        setBusy(false);
-        bumpVaultUsage();
-      }
-    },
-    [
-      selectedNote,
-      busy,
-      vaultApi,
-      bumpVaultUsage,
-      loadNoteContent,
-      refreshMediaQuota,
-      reserveMediaQuotaSlot,
-      releaseMediaQuotaSlot,
-      announceDownsizeOnce
-    ]
-  );
-
-  /**
-   * Remove a vault attachment (server-side file) for the selected note. Returns
-   * true on success so the inline node view can then delete itself from the body.
-   */
+  /** Remove a vault attachment (server-side file) for the selected note. Returns true on success. */
   const handleDeleteVaultAttachment = useCallback(
     async (attachmentId) => {
       if (!selectedNote || busy) return false;
@@ -4686,63 +4526,6 @@ export default function PhotoAlbumsWorkspacePane({
     },
     [flushPendingNoteSave]
   );
-
-  // Keep the inline attachment node views pointed at the open note so their
-  // Launch/View/Download/Remove controls act on the right note + storage.
-  useEffect(() => {
-    const api = noteEditorApiRef.current;
-    if (!api?.setAttachmentContext) return;
-    api.setAttachmentContext({
-      noteId: selectedNote ? Number(selectedNote.note_id) : null,
-      storageType: paneStorageType,
-      busy,
-      onServerDelete: handleDeleteVaultAttachment
-    });
-  }, [selectedNote, paneStorageType, busy, handleDeleteVaultAttachment, editorReadyTick]);
-
-  // Legacy vault files were stored only in a separate list. Now that files live
-  // inline in the note body, append any file not yet referenced by an inline node
-  // to the end of the body once per note load (nothing gets lost when the old
-  // bottom list is gone). New drops already insert their node at the drop point.
-  const attachmentBackfillRef = useRef({});
-  useEffect(() => {
-    const api = noteEditorApiRef.current;
-    if (!api?.getAttachmentIds || !api?.appendAttachments) return;
-    if (!selectedNote) return;
-    const id = Number(selectedNote.note_id);
-    const locked = noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(id);
-    if (locked || !selectedNote.content_loaded) return;
-    if (attachmentBackfillRef.current[id]) return;
-    const atts = Array.isArray(selectedNote.attachments) ? selectedNote.attachments : [];
-    attachmentBackfillRef.current[id] = true;
-    if (!atts.length) return;
-    const present = new Set(api.getAttachmentIds());
-    const staged = new Set(
-      (api.getStagedAttachmentIds?.() || []).map((id) => String(id))
-    );
-    const missing = atts.filter((a) => {
-      const id = String(a.attachment_id);
-      return !present.has(id) && !staged.has(id);
-    });
-    if (!missing.length) return;
-    api.appendAttachments(
-      missing.map((a) => ({
-        attachmentId: Number(a.attachment_id),
-        fileName: a.file_name || '',
-        fileExtension: a.file_extension || '',
-        fileSizeBytes: a.file_size_bytes ?? null,
-        checksum: a.checksum || null
-      }))
-    );
-    scheduleSave();
-  }, [
-    selectedNote,
-    editorReadyTick,
-    innerUnlockVersion,
-    noteRequiresInnerPinToView,
-    isInnerNoteUnlocked,
-    scheduleSave
-  ]);
 
   // ── File menu (Import / Export) ────────────────────────────────────────────
   // Read the open note's body straight from the TipTap editor. markdown uses the
@@ -5010,9 +4793,8 @@ export default function PhotoAlbumsWorkspacePane({
   );
 
   /**
-   * Upload a file into the note's vault attachment list and stage it in the
-   * top-bar tray (does not place it on the page until the user drops it).
-   * Do not gate on `busy` — multi-file drops must queue, not silently skip.
+   * Upload a file into the note's vault attachment list; the thumbnail tray shows it
+   * once the note reloads. Do not gate on `busy` — multi-file drops must queue, not silently skip.
    */
   const uploadNoteVaultFileToStaging = useCallback(
     async (inputFile, { skipBusy = false, skipReconcile = false } = {}) => {
@@ -5064,12 +4846,6 @@ export default function PhotoAlbumsWorkspacePane({
         }
       }
 
-      const fileExt = resolvePhotoAlbumsFileExtension(file);
-      let localPreviewUrl = '';
-      if (!photoAlbumsStagingPhotoPrefersServerThumb(fileExt)) {
-        localPreviewUrl = createPhotoStagingPreviewObjectUrl(file, file.name || '');
-      }
-
       if (!skipBusy) setBusy(true);
       setError('');
       try {
@@ -5083,70 +4859,18 @@ export default function PhotoAlbumsWorkspacePane({
           source_taken_at_ms: photoAlbumsSourceTakenAtMs(file)
         });
         if (attachment) {
-          const attachmentId = Number(attachment.attachment_id);
-          const isDuplicate = Boolean(attachment.duplicate);
-          const seqFromUpload =
-            attachment.album_photo_seq != null ? Number(attachment.album_photo_seq) : null;
-          // Never bind a new File object-URL to a reused (duplicate) attachment id —
-          // tray thumb would disagree with the vault bytes Auto Layout places on the page.
-          if (!isDuplicate && Number.isFinite(attachmentId) && attachmentId > 0) {
-            const previewUrl =
-              localPreviewUrl ||
-              primeStagingAttachmentPreview(attachmentId, file, file.name || '') ||
-              '';
-            if (previewUrl) localPreviewUrl = previewUrl;
-          } else if (isDuplicate && localPreviewUrl) {
+          // Tray items are derived from the reloaded note's vault attachments.
+          if (!skipReconcile && typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function') {
             try {
-              URL.revokeObjectURL(localPreviewUrl);
-            } catch {
-              // ignore
+              await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId);
+            } catch (reconcileErr) {
+              console.warn('[uploadNoteVaultFileToStaging] reconcile album seq failed', reconcileErr);
             }
-            localPreviewUrl = '';
           }
-          const ext = String(attachment.file_extension || '').toLowerCase();
-          const isTrayMedia =
-            isPhotoAlbumsStagingAlbumMediaFile({
-              name: attachment.file_name || file.name,
-              type: file.type
-            }) || isPhotoAlbumsStagingAlbumMediaFile({ name: `x.${ext}` });
-          if (isTrayMedia && Number.isFinite(attachmentId) && attachmentId > 0) {
-            noteEditorApiRef.current?.addStagedAttachment?.(
-              mergeStagingItemPreview({
-                attachmentId,
-                fileName: attachment.file_name || '',
-                fileExtension: attachment.file_extension || '',
-                fileSizeBytes: attachment.file_size_bytes ?? null,
-                checksum: attachment.checksum || null,
-                albumPhotoSeq:
-                  Number.isFinite(seqFromUpload) && seqFromUpload >= 1 ? seqFromUpload : null,
-                ...(!isDuplicate && localPreviewUrl ? { localPreviewUrl } : null)
-              })
-            );
-          }
-          const fresh = await loadNoteContent(noteId, { syncStaging: !skipReconcile });
-          if (!skipReconcile) {
-            const attachmentsAfter =
-              typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function'
-                ? await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId)
-                : fresh?.attachments || selectedNote.attachments || [];
-            noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(attachmentsAfter);
-          }
+          await loadNoteContent(noteId);
           return true;
-        } else if (localPreviewUrl) {
-          try {
-            URL.revokeObjectURL(localPreviewUrl);
-          } catch {
-            // ignore
-          }
         }
       } catch (err) {
-        if (localPreviewUrl) {
-          try {
-            URL.revokeObjectURL(localPreviewUrl);
-          } catch {
-            // ignore
-          }
-        }
         return failStaging(
           readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`)
         );
@@ -5168,8 +4892,7 @@ export default function PhotoAlbumsWorkspacePane({
   );
 
   /**
-   * Drag files onto the editor / staging tray → vault attachments land in the
-   * top-bar tray. Drag tray thumbnails onto template slots to place them.
+   * Drag files onto the editor / thumbnail tray → vault attachments land in the tray.
    */
   const handleContentFileDrop = useCallback(
     async (event) => {
@@ -5303,18 +5026,14 @@ export default function PhotoAlbumsWorkspacePane({
         }
         if (total > 0) {
           const noteId = Number(selectedNote.note_id);
-          let attachmentsAfter = [];
           try {
             if (typeof vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq === 'function') {
-              attachmentsAfter = await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId);
+              await vaultApi.reconcilePhotoAlbumsAlbumPhotoSeq(noteId);
             }
           } catch (reconcileErr) {
             console.warn('[handleStageOsFiles] reconcile album seq failed', reconcileErr);
           }
-          const fresh = await loadNoteContent(noteId, { syncStaging: false });
-          noteEditorApiRef.current?.syncStagingAlleyFromAttachments?.(
-            attachmentsAfter.length ? attachmentsAfter : fresh?.attachments || []
-          );
+          await loadNoteContent(noteId);
         }
         setBatchUploadProgress({
           label: `Adding to Thumbnail Tray (${total} of ${total})`,
@@ -6342,7 +6061,7 @@ export default function PhotoAlbumsWorkspacePane({
               // ignore
             }
           });
-        }, 120_000);
+        }, 120000);
       };
 
       const finishUi = () => {
@@ -6761,10 +6480,8 @@ export default function PhotoAlbumsWorkspacePane({
       try {
         await commitAlbumPageMoveToNote({
           snapshot,
-          sourceNoteId,
           targetNoteId: targetId,
           storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
-          deleteSourceAttachmentIds: snapshot.attachmentIds || [],
           removeFromSource: () => {
             api?.removeAlbumPage?.(drag.pageIndex);
           }
@@ -9476,6 +9193,9 @@ export default function PhotoAlbumsWorkspacePane({
                             setError(readPhotoAlbumsApiError(err, 'Failed to rename note'));
                           });
                       }}
+                      trayAttachments={
+                        sharedAlbumView ? sharedAlbumView.attachments : selectedNote?.attachments
+                      }
                       onStageOsFiles={(files) => handleStageOsFiles(files)}
                       onRemoveStagedAttachment={(id) => void handleRemoveStagedAttachment(id)}
                       onRemoveAllStagedAttachments={(ids) =>

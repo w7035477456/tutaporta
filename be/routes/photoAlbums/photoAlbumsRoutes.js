@@ -22,6 +22,7 @@ import {
   vaultEnsureNotePhotoOnDisk,
   vaultEnsureNoteExtraImageOnDisk,
   vaultEnsureNoteAttachmentOnDisk,
+  vaultEnsureNoteAttachmentThumbnail,
   vaultReorderNotebooks,
   vaultReorderNotes,
   vaultReorderShortcuts,
@@ -53,6 +54,7 @@ import {
 } from '../../utils/photoAlbumsFileFormats.js';
 import { tutaPhotoQuotaConfig } from '../../utils/tutaPhotoQuotaConfig.js';
 import { photoAlbumsInlinePreviewPayload } from '../../utils/photoAlbumsInlinePreview.js';
+import { normalizeAttachmentVariant } from '../../utils/photoAlbumsAttachmentVariants.js';
 import { parseMediaDataUrl } from '../../utils/parseMediaDataUrl.js';
 import { DEFAULT_BODY_TEXT } from '../../utils/photoAlbumsUsb/vaultSchema.js';
 import { addVaultSessionFileCounts } from '../../utils/photoAlbumsSessionFileCounts.js';
@@ -812,6 +814,9 @@ export async function getPhotoAlbumsNoteAttachment(req, res) {
   try {
     const variant = String(req.query?.variant || req.query?.v || 'full');
     await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId, { variant });
+    if (normalizeAttachmentVariant(variant) === 'thumb') {
+      await vaultEnsureNoteAttachmentThumbnail(session, noteId, attachmentId);
+    }
     const file = vaultGetNoteAttachment(session, noteId, attachmentId, { variant });
     if (!file) return res.status(404).json({ error: 'Attachment not found' });
     await bumpUiFileCount(session);

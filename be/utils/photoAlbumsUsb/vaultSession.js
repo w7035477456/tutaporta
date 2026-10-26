@@ -126,7 +126,15 @@ import {
   normalizePhotoAlbumsAttachmentBuffer,
   photoAlbumsExtensionRequiresJpegFullFile
 } from '../photoAlbumsAttachmentVariants.js';
-import { normalizePhotoAlbumsVideoBuffer } from '../photoAlbumsNormalizeVideo.js';
+import {
+  buildPhotoAlbumsVideoPosterThumbnailBuffer,
+  normalizePhotoAlbumsVideoBuffer
+} from '../photoAlbumsNormalizeVideo.js';
+import {
+  isLeftSideTutaDrive,
+  loadMemberIdForSingles,
+  tutaDrivePhotoAlbumsMountPath
+} from '../tutaDriveMemberPaths.js';
 import {
   registerVaultClusterUnlock,
   clearVaultClusterUnlock,
@@ -469,9 +477,8 @@ export function deleteEncryptedPhoto(session, relativePath) {
 export function writeEncryptedVaultFile(session, relativePath, buffer) {
   const enc = sealVaultBuffer(buffer, session.key);
   writeToMirrorPaths(session, (mountPath) => {
-    const abs = vaultFileStoragePath(mountPath, relativePath, session.meta);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, enc);
+    // Atomic: an interrupted write (USB unplugged) never leaves a truncated file under the final name.
+    atomicWriteFileSync(vaultFileStoragePath(mountPath, relativePath, session.meta), enc);
   });
   if (session.storageType === 'onedrive') {
     scheduleCloudRelativeSync(
@@ -803,6 +810,22 @@ async function migrateSessionIconVaultToArgon2id(session, iconName) {
   return true;
 }
 
+/**
+ * TutaDrive album vaults live under LARGE_CHEAP_STORAGE_FOLDER. After that folder moves
+ * (e.g. to a USB drive) the absolute mount persisted in vault_cluster_state can still point
+ * at the old copy; reopening it there would read/write the wrong disk.
+ */
+async function isCurrentTutaDriveAlbumsMount(singlesId, mountPath) {
+  if (!isLeftSideTutaDrive()) return true;
+  try {
+    const memberId = await loadMemberIdForSingles(singlesId);
+    if (!memberId) return false;
+    return path.resolve(tutaDrivePhotoAlbumsMountPath(memberId)) === path.resolve(mountPath);
+  } catch {
+    return false;
+  }
+}
+
 /** In-flight rehydrates per session key — parallel requests must not open the vault twice. */
 const rehydrateInFlight = new Map();
 
@@ -829,6 +852,13 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
 
   const mountPath = String(cluster.mountPath).trim();
   if (!isVaultMountPathPresent(mountPath)) {
+    return null;
+  }
+  if (normalizedType === 'onedrive' && !(await isCurrentTutaDriveAlbumsMount(id, mountPath))) {
+    rvCloudWarn('Vault', 'cluster rehydrate skipped: stale TutaDrive mount path', {
+      singlesId: id,
+      mountPath
+    });
     return null;
   }
 
@@ -2467,6 +2497,15 @@ export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName
     } catch (err) {
       console.warn('[vaultAddNoteAttachment] variant write failed:', err?.message || err);
     }
+  } else if (isPhotoAlbumsStagingVideoExtension(cleanExt)) {
+    try {
+      const poster = await buildPhotoAlbumsVideoPosterThumbnailBuffer(workingBuffer, { ext: cleanExt });
+      if (poster?.length) {
+        writeEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'thumb'), poster);
+      }
+    } catch (err) {
+      console.warn('[vaultAddNoteAttachment] video poster failed:', err?.message || err);
+    }
   }
 
   refreshNoteSearchText(session.db, noteId);
@@ -2509,6 +2548,87 @@ export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
   return { success: true, attachment_id: Number(attachmentId) };
 }
 
+function readVaultFileOrNull(session, relativePath) {
+  try {
+    const buf = readEncryptedVaultFile(session, relativePath);
+    return buf?.length ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Thumbs are always JPEG; a write cut short (e.g. USB unplugged) lacks the EOI marker. */
+function isCompleteJpeg(buf) {
+  return (
+    Buffer.isBuffer(buf) &&
+    buf.length > 4 &&
+    buf[0] === 0xff &&
+    buf[1] === 0xd8 &&
+    buf[buf.length - 2] === 0xff &&
+    buf[buf.length - 1] === 0xd9
+  );
+}
+
+/** session → Map<attachmentId, Promise<boolean>>; dedupes concurrent rebuilds of one thumb. */
+const thumbnailRebuildsInFlight = new WeakMap();
+
+async function rebuildAttachmentThumbnail(session, row, thumbRel) {
+  const ext = String(row.file_extension || '').replace(/^\./, '').toLowerCase();
+  let thumb = null;
+  if (isPhotoAlbumsRasterImageExtension(ext)) {
+    const display = readVaultFileOrNull(session, fileRelativePathForVariant(row.relative_path, 'display'));
+    const source = display || readVaultFileOrNull(session, row.relative_path);
+    if (!source) return false;
+    thumb = await buildPhotoAlbumsThumbnailBuffer(source, display ? 'jpg' : ext);
+  } else if (isPhotoAlbumsStagingVideoExtension(ext)) {
+    const source = readVaultFileOrNull(session, row.relative_path);
+    if (!source) return false;
+    thumb = await buildPhotoAlbumsVideoPosterThumbnailBuffer(source, { ext });
+  }
+  if (!thumb?.length) return false;
+  writeEncryptedVaultFile(session, thumbRel, thumb);
+  return true;
+}
+
+/**
+ * Make sure `att_*_thumbnail.jpg` exists (and decrypts) for a photo or video attachment,
+ * rebuilding it from the display/full file when missing or corrupt. Never throws.
+ * @returns {Promise<boolean>} true when a usable thumbnail is on disk afterwards.
+ */
+export async function vaultEnsureNoteAttachmentThumbnail(session, noteId, attachmentId) {
+  if (!session?.db) return false;
+  const row = queryOne(
+    session.db,
+    `SELECT attachment_id, file_extension, relative_path
+     FROM note_attachments
+     WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
+    [attachmentId, noteId]
+  );
+  if (!row?.relative_path) return false;
+  const thumbRel = fileRelativePathForVariant(row.relative_path, 'thumb');
+  if (!thumbRel || thumbRel === row.relative_path) return false;
+  if (isCompleteJpeg(readVaultFileOrNull(session, thumbRel))) return true;
+
+  let inflight = thumbnailRebuildsInFlight.get(session);
+  if (!inflight) {
+    inflight = new Map();
+    thumbnailRebuildsInFlight.set(session, inflight);
+  }
+  const key = Number(row.attachment_id);
+  if (!inflight.has(key)) {
+    inflight.set(
+      key,
+      rebuildAttachmentThumbnail(session, row, thumbRel)
+        .catch((err) => {
+          console.warn(`[vaultEnsureNoteAttachmentThumbnail] attachment ${key}:`, err?.message || err);
+          return false;
+        })
+        .finally(() => inflight.delete(key))
+    );
+  }
+  return inflight.get(key);
+}
+
 export function vaultGetNoteAttachment(session, noteId, attachmentId, { variant: variantRaw } = {}) {
   const row = queryOne(
     session.db,
@@ -2523,8 +2643,8 @@ export function vaultGetNoteAttachment(session, noteId, attachmentId, { variant:
   let rel = basePath;
   if (variant === 'display' || variant === 'thumb') {
     const preferred = fileRelativePathForVariant(basePath, variant);
-    const preferredBuf = readEncryptedVaultFile(session, preferred);
-    if (preferredBuf?.length) {
+    const preferredBuf = readVaultFileOrNull(session, preferred);
+    if (preferredBuf) {
       return {
         buffer: preferredBuf,
         fileName:
@@ -2539,8 +2659,8 @@ export function vaultGetNoteAttachment(session, noteId, attachmentId, { variant:
     // Fallback: display missing → try thumb then full; thumb missing → full.
     if (variant === 'display') {
       const thumbPath = fileRelativePathForVariant(basePath, 'thumb');
-      const thumbBuf = readEncryptedVaultFile(session, thumbPath);
-      if (thumbBuf?.length) {
+      const thumbBuf = readVaultFileOrNull(session, thumbPath);
+      if (thumbBuf) {
         return {
           buffer: thumbBuf,
           fileName: String(row.file_name || 'photo').replace(/\.[^.]+$/, '') + '_thumbnail.jpg',

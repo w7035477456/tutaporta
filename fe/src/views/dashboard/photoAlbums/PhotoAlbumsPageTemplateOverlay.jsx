@@ -7,7 +7,6 @@ import {
   getPhotoAlbumsPageTemplate,
   resolveAlbumTemplateSlots
 } from './photoAlbumsPageTemplates';
-import { isStagedAttachmentDrag } from './PhotoAlbumsPhotoStagingTray';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 const MIN_SLOT_PX = 48;
@@ -27,11 +26,9 @@ function pxRectToSlotPct(rect, pageW, pageH) {
 }
 
 /**
- * Dashed photo/text placeholders for one album template instance.
- * Template size/position is fixed — no template select, move, or resize.
- * Click a slot → slot control; click outside any slot → unselect slot only.
- * Picture slots NEVER resize or pan — scroll only zooms the photo inside the window.
- * Text slots: scroll/drag can reshape the text box.
+ * Dashed photo/text placeholders for one album template instance (one page).
+ * Double-click a slot to select it; a selected text slot can be dragged or wheel-resized.
+ * Picture slots are fixed size. Photos are not placed on pages yet.
  */
 export default function PhotoAlbumsPageTemplateOverlay({
   templateId = '',
@@ -40,99 +37,64 @@ export default function PhotoAlbumsPageTemplateOverlay({
   offsetLeft = 0,
   offsetTop = 0,
   slotOverrides = null,
-  highlightSlotId = '',
-  occupiedSlotIds = null,
   editable = true,
-  stagingDragActive = false,
   dragScale = 1,
   /** Template instance key — each template is one album page for prev/next nav. */
   pageKey = '',
-  onMoveResize: _onMoveResize,
   onSlotGeometryChange,
-  onSlotPhotoZoom,
-  onSlotPhotoPan,
-  onSlotPhotoScale,
-  /** Return true when the photo occupying this slot is the TipTap-selected node. */
-  isSlotPhotoSelected = null,
-  onDelete,
-  onStagedPhotoDrop
+  onDelete
 }) {
-  void _onMoveResize;
   const template = getPhotoAlbumsPageTemplate(templateId);
   const slots = useMemo(
     () => resolveAlbumTemplateSlots(template, slotOverrides),
     [template, slotOverrides]
   );
   const [selectedSlotId, setSelectedSlotId] = useState('');
-  const [slotDragOverId, setSlotDragOverId] = useState('');
   const liveRef = useRef(null);
   const slotElsRef = useRef({});
-  const overlayRef = useRef(null);
   const scale = Math.max(0.01, Number(dragScale) || 1);
-  const canEditLayout = editable;
-  const slotMode = canEditLayout && Boolean(selectedSlotId);
-  const occupancyReady = occupiedSlotIds instanceof Set;
+  const slotMode = editable && Boolean(selectedSlotId);
 
-  // Scroll-wheel: picture slots never capture the wheel (page scrollbar scrolls).
-  // Text slots may still be reshaped with the wheel when already selected.
-  useLayoutEffect(() => {
-    if (!canEditLayout) return undefined;
-    const onWheel = (e) => {
-      const factor = e.deltaY < 0 ? WHEEL_SCALE_IN : WHEEL_SCALE_OUT;
-
+  const slotIdAtPoint = useCallback(
+    (clientX, clientY) => {
       for (const slot of slots) {
         const el = slotElsRef.current[slot.id];
         if (!el) continue;
         const r = el.getBoundingClientRect();
-        if (
-          e.clientX < r.left ||
-          e.clientX > r.right ||
-          e.clientY < r.top ||
-          e.clientY > r.bottom
-        ) {
-          continue;
+        if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+          return slot;
         }
-        // Picture slots: do not zoom with the wheel — leave vertical page scroll alone.
-        if (slot.type !== 'text') {
-          return;
-        }
-
-        // Text slots may still be reshaped with the wheel when already selected.
-        if (!onSlotGeometryChange) return;
-        if (selectedSlotId !== slot.id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const rect = albumSlotToPx(slot, pageWidth, pageHeight);
-        const origin = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
-        const cx = origin.x + origin.w / 2;
-        const cy = origin.y + origin.h / 2;
-        let w = Math.max(MIN_SLOT_PX, Math.round(origin.w * factor));
-        let h = Math.max(MIN_SLOT_PX, Math.round(origin.h * factor));
-        let x = Math.round(cx - w / 2);
-        let y = Math.round(cy - h / 2);
-        if (x < 0) x = 0;
-        if (y < 0) y = 0;
-        if (x + w > pageWidth) w = Math.max(MIN_SLOT_PX, pageWidth - x);
-        if (y + h > pageHeight) h = Math.max(MIN_SLOT_PX, pageHeight - y);
-        onSlotGeometryChange(slot.id, pxRectToSlotPct({ x, y, w, h }, pageWidth, pageHeight), {
-          live: false
-        });
-        return;
       }
-      // Outside slots: do not select/resize the template.
+      return null;
+    },
+    [slots]
+  );
+
+  // Wheel over a selected text slot reshapes it; everything else scrolls the page.
+  useLayoutEffect(() => {
+    if (!editable || !onSlotGeometryChange || !selectedSlotId) return undefined;
+    const onWheel = (e) => {
+      const slot = slotIdAtPoint(e.clientX, e.clientY);
+      if (!slot || slot.type !== 'text' || slot.id !== selectedSlotId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? WHEEL_SCALE_IN : WHEEL_SCALE_OUT;
+      const rect = albumSlotToPx(slot, pageWidth, pageHeight);
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let w = Math.max(MIN_SLOT_PX, Math.round(rect.width * factor));
+      let h = Math.max(MIN_SLOT_PX, Math.round(rect.height * factor));
+      const x = Math.max(0, Math.round(cx - w / 2));
+      const y = Math.max(0, Math.round(cy - h / 2));
+      if (x + w > pageWidth) w = Math.max(MIN_SLOT_PX, pageWidth - x);
+      if (y + h > pageHeight) h = Math.max(MIN_SLOT_PX, pageHeight - y);
+      onSlotGeometryChange(slot.id, pxRectToSlotPct({ x, y, w, h }, pageWidth, pageHeight), {
+        live: false
+      });
     };
     window.addEventListener('wheel', onWheel, { passive: false, capture: true });
     return () => window.removeEventListener('wheel', onWheel, { capture: true });
-  }, [
-    canEditLayout,
-    onSlotGeometryChange,
-    selectedSlotId,
-    pageWidth,
-    pageHeight,
-    slotOverrides,
-    templateId,
-    slots
-  ]);
+  }, [editable, onSlotGeometryChange, selectedSlotId, slotIdAtPoint, pageWidth, pageHeight]);
 
   useEffect(() => {
     if (!slotMode) return undefined;
@@ -143,129 +105,37 @@ export default function PhotoAlbumsPageTemplateOverlay({
     return () => window.removeEventListener('keydown', onKey);
   }, [slotMode]);
 
-  /**
-   * Occupied slots are pointer-events:none so photos stay draggable. Capture-phase:
-   * single-click outside a slot clears slot chrome; slot select is double-click only
-   * (drop must not enter blinking selected mode).
-   */
+  // Click outside every slot of this page clears the slot selection.
   useLayoutEffect(() => {
-    if (!canEditLayout) return undefined;
+    if (!slotMode) return undefined;
     const onPointerDown = (e) => {
       if (e.button != null && e.button !== 0) return;
       const t = e.target;
-      if (!(t instanceof Element)) return;
-      if (
-        t.closest(
-          [
-            '.rv-album-template__delete',
-            '.rv-photo-tile__actions',
-            'button',
-            'a'
-          ].join(',')
-        )
-      ) {
-        return;
-      }
-      let hitId = '';
-      for (const slot of slots) {
-        const el = slotElsRef.current[slot.id];
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
-          continue;
-        }
-        hitId = slot.id;
-        break;
-      }
-      // Clicking a slot does not select — double-click does (see onDblClick).
-      if (hitId) return;
+      if (t instanceof Element && t.closest('.rv-album-template__delete, button, a')) return;
+      if (slotIdAtPoint(e.clientX, e.clientY)) return;
       setSelectedSlotId('');
-    };
-    const onDblClick = (e) => {
-      if (e.button != null && e.button !== 0) return;
-      const t = e.target;
-      if (!(t instanceof Element)) return;
-      if (
-        t.closest(
-          [
-            '.rv-album-template__delete',
-            '.rv-photo-tile__actions',
-            'button',
-            'a'
-          ].join(',')
-        )
-      ) {
-        return;
-      }
-      for (const slot of slots) {
-        const el = slotElsRef.current[slot.id];
-        if (!el) continue;
-        const r = el.getBoundingClientRect();
-        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
-          continue;
-        }
-        // Occupied photo/text: let the node receive edit-mode double-click.
-        if (occupancyReady && occupiedSlotIds.has(slot.id)) return;
-        setSelectedSlotId(slot.id);
-        return;
-      }
     };
     window.addEventListener('mousedown', onPointerDown, true);
-    window.addEventListener('dblclick', onDblClick, true);
-    return () => {
-      window.removeEventListener('mousedown', onPointerDown, true);
-      window.removeEventListener('dblclick', onDblClick, true);
-    };
-  }, [canEditLayout, slots, occupancyReady, occupiedSlotIds]);
-
-  const acceptStagedDragOver = useCallback(
-    (event) => {
-      if (!editable || !onStagedPhotoDrop) return false;
-      if (!isStagedAttachmentDrag(event.dataTransfer) && !stagingDragActive) return false;
-      event.preventDefault();
-      event.stopPropagation();
-      event.dataTransfer.dropEffect = 'copy';
-      return true;
-    },
-    [editable, onStagedPhotoDrop, stagingDragActive]
-  );
-
-  const handleSlotDrop = useCallback(
-    (event) => {
-      if (!editable || !onStagedPhotoDrop) return;
-      if (!isStagedAttachmentDrag(event.dataTransfer) && !stagingDragActive) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setSlotDragOverId('');
-      // Drop fills the slot only — never enter blinking selected mode.
-      setSelectedSlotId('');
-      onStagedPhotoDrop(event);
-    },
-    [editable, onStagedPhotoDrop, stagingDragActive]
-  );
+    return () => window.removeEventListener('mousedown', onPointerDown, true);
+  }, [slotMode, slotIdAtPoint]);
 
   const startSlotMove = useCallback(
     (slotId, rect) => (event) => {
-      if (!canEditLayout || !onSlotGeometryChange || event.button !== 0) return;
+      if (!editable || !onSlotGeometryChange || event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
-      setSelectedSlotId(slotId);
 
       const startX = event.clientX;
       const startY = event.clientY;
       const origin = { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
-      let latestPct = null;
 
       const onMove = (moveEvent) => {
         const dx = (moveEvent.clientX - startX) / scale;
         const dy = (moveEvent.clientY - startY) / scale;
-        let x = Math.round(origin.x + dx);
-        let y = Math.round(origin.y + dy);
-        x = Math.max(0, Math.min(pageWidth - origin.w, x));
-        y = Math.max(0, Math.min(pageHeight - origin.h, y));
-        latestPct = pxRectToSlotPct({ x, y, w: origin.w, h: origin.h }, pageWidth, pageHeight);
-        liveRef.current = latestPct;
-        onSlotGeometryChange(slotId, latestPct, { live: true });
+        const x = Math.max(0, Math.min(pageWidth - origin.w, Math.round(origin.x + dx)));
+        const y = Math.max(0, Math.min(pageHeight - origin.h, Math.round(origin.y + dy)));
+        liveRef.current = pxRectToSlotPct({ x, y, w: origin.w, h: origin.h }, pageWidth, pageHeight);
+        onSlotGeometryChange(slotId, liveRef.current, { live: true });
       };
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
@@ -280,17 +150,13 @@ export default function PhotoAlbumsPageTemplateOverlay({
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [canEditLayout, onSlotGeometryChange, pageWidth, pageHeight, scale]
+    [editable, onSlotGeometryChange, pageWidth, pageHeight, scale]
   );
 
   if (!template || pageWidth < 8 || pageHeight < 8) return null;
 
-  const borderOpacity = 1;
-  const fillOpacity = 1;
-
   return (
     <Box
-      ref={overlayRef}
       data-pa-album-page-key={pageKey || undefined}
       className={`rv-album-template-overlay${slotMode ? ' is-slot-mode' : ''}`}
       sx={{
@@ -301,115 +167,41 @@ export default function PhotoAlbumsPageTemplateOverlay({
         height: pageHeight,
         pointerEvents: 'none',
         zIndex: 40,
-        /* No template frame outline/blink — templates are never selected. */
         outline: 'none',
         boxSizing: 'border-box',
         overflow: 'visible'
       }}
     >
-
       {slots.map((slot) => {
         const rect = albumSlotToPx(slot, pageWidth, pageHeight);
         const isPhoto = slot.type === 'photo';
-        const highlighted = highlightSlotId && highlightSlotId === slot.id;
-        const occupied = occupancyReady && occupiedSlotIds.has(slot.id);
         const isSlotSelected = selectedSlotId === slot.id;
-        const photoNodeSelected =
-          occupied &&
-          isPhoto &&
-          typeof isSlotPhotoSelected === 'function' &&
-          Boolean(isSlotPhotoSelected(slot.id));
-        const photoBorder =
-          photoNodeSelected || isSlotSelected || highlighted || slotDragOverId === slot.id
-            ? BLUE
-            : '#c62828';
-        const textBorder =
-          isSlotSelected || highlighted || slotDragOverId === slot.id ? BLUE : '#1976d2';
-        const showPhotoSlotOutline =
-          !occupied ||
-          photoNodeSelected ||
-          isSlotSelected ||
-          highlighted ||
-          slotDragOverId === slot.id ||
-          stagingDragActive;
-        const slotOutline = photoNodeSelected
-          ? '2rem solid #e53935'
-          : isPhoto
-            ? showPhotoSlotOutline
-              ? `${SLOT_STROKE_PX}px dashed ${photoBorder}`
-              : 'none'
-            : `${SLOT_STROKE_PX}px dashed ${textBorder}`;
-        // Empty / staging-drop: full surface. Occupied: border strips only so the
-        // photo underneath stays draggable (return to thumbnail alley).
-        // Until occupancy is known, do not cover photos with fullHit (fail closed).
-        const fullHit =
-          stagingDragActive || (occupancyReady && !occupied && !isSlotSelected);
-        const hideOccupiedPhotoChrome =
-          occupied &&
-          isPhoto &&
-          !stagingDragActive &&
-          !photoNodeSelected &&
-          !isSlotSelected &&
-          !highlighted &&
-          slotDragOverId !== slot.id;
-        const showBorderHits = !fullHit && !occupied;
-        const selectSlot = (e) => {
-          if (!canEditLayout) return;
-          e.stopPropagation();
-          setSelectedSlotId(slot.id);
-        };
-        const onSlotMouseDown = (e) => {
-          if (!canEditLayout) return;
-          // Move only after the slot is already selected (double-click). Picture slots never move.
-          if (!occupied && slot.type === 'text' && selectedSlotId === slot.id) {
-            startSlotMove(slot.id, rect)(e);
-          }
-        };
-        const borderHit = {
-          position: 'absolute',
-          pointerEvents: 'auto',
-          zIndex: 2,
-          bgcolor: 'transparent'
-        };
+        const idleColor = isPhoto ? '#c62828' : '#1976d2';
+        const strokeColor = isSlotSelected ? BLUE : idleColor;
         return (
           <Box
             key={slot.id}
             data-album-slot={slot.id}
             data-album-slot-type={slot.type}
-            className={
-              photoNodeSelected
-                ? 'rv-album-chrome-outline-blink-photo-slot'
-                : isSlotSelected
-                  ? 'rv-album-chrome-outline-blink-slot'
-                  : undefined
-            }
+            className={isSlotSelected ? 'rv-album-chrome-outline-blink-slot' : undefined}
             ref={(el) => {
               if (el) slotElsRef.current[slot.id] = el;
               else delete slotElsRef.current[slot.id];
             }}
-            onMouseDown={fullHit ? onSlotMouseDown : undefined}
-            onDoubleClick={fullHit ? selectSlot : undefined}
-            onDragEnter={(e) => {
-              if (acceptStagedDragOver(e)) setSlotDragOverId(slot.id);
+            onMouseDown={(e) => {
+              if (editable && !isPhoto && isSlotSelected) startSlotMove(slot.id, rect)(e);
             }}
-            onDragOver={(e) => {
-              if (acceptStagedDragOver(e)) setSlotDragOverId(slot.id);
+            onDoubleClick={(e) => {
+              if (!editable) return;
+              e.stopPropagation();
+              setSelectedSlotId(slot.id);
             }}
-            onDragLeave={(e) => {
-              if (e.currentTarget.contains(e.relatedTarget)) return;
-              setSlotDragOverId((id) => (id === slot.id ? '' : id));
-            }}
-            onDrop={handleSlotDrop}
             title={
               isSlotSelected
                 ? isPhoto
-                  ? 'Slot selected · double-click photo to select it · drag to swap or return to thumbnails (Pan&Zoom off) · Pan&Zoom to pan inside'
+                  ? 'Slot selected · slot size is fixed · Esc or click outside to unselect'
                   : 'Scroll wheel to resize text box · drag to move · Esc or click outside to unselect'
-                : occupied
-                  ? 'Drag photo to another slot to swap · drag to thumbnails to return · double-click for Edit Photo / Pan&Zoom'
-                  : isPhoto
-                    ? 'Drop a photo · drag another tray photo here to swap · double-click slot to select · slot size is fixed'
-                    : 'Drop a photo or enter text · double-click to select · then scroll/drag'
+                : 'Double-click to select slot'
             }
             sx={{
               position: 'absolute',
@@ -417,56 +209,25 @@ export default function PhotoAlbumsPageTemplateOverlay({
               top: rect.top,
               width: rect.width,
               height: rect.height,
-              /* Outline (not border) so the dashed line sits on the box edge —
-                 same edge the 9-dots are anchored to.
-                 When the photo inside is selected, use a thick solid red frame that
-                 stays slot-sized while the photo zooms underneath (clipped). */
               border: 'none',
-              outline: slotOutline,
+              outline: `${SLOT_STROKE_PX}px dashed ${strokeColor}`,
               outlineOffset: 0,
-              opacity: borderOpacity,
-              bgcolor: fullHit || isSlotSelected || photoNodeSelected
-                ? isPhoto
-                  ? highlighted ||
-                    slotDragOverId === slot.id ||
-                    isSlotSelected ||
-                    photoNodeSelected
-                    ? `rgba(41,121,255,${0.14 * fillOpacity})`
-                    : `rgba(198,40,40,${0.06 * fillOpacity})`
-                  : highlighted || slotDragOverId === slot.id || isSlotSelected
-                    ? `rgba(41,121,255,${0.14 * fillOpacity})`
-                    : `rgba(25,118,210,${0.06 * fillOpacity})`
-                : 'transparent',
-              borderRadius: 0,
+              bgcolor: isSlotSelected
+                ? 'rgba(41,121,255,0.14)'
+                : isPhoto
+                  ? 'rgba(198,40,40,0.06)'
+                  : 'rgba(25,118,210,0.06)',
               boxSizing: 'border-box',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: canEditLayout
-                ? isSlotSelected
-                  ? occupied || isPhoto
-                    ? 'default'
-                    : 'grab'
-                  : 'pointer'
-                : 'default',
-              pointerEvents: hideOccupiedPhotoChrome ? 'none' : fullHit ? 'auto' : 'none',
-              visibility: hideOccupiedPhotoChrome ? 'hidden' : 'visible',
-              zIndex: photoNodeSelected || isSlotSelected ? 12 : stagingDragActive ? 20 : occupied ? 8 : 1,
-              transition: isSlotSelected || photoNodeSelected
-                ? 'background-color 0.12s ease, opacity 0.2s ease'
-                : 'background-color 0.12s ease, outline-color 0.12s ease, opacity 0.2s ease'
+              cursor: editable ? (isSlotSelected && !isPhoto ? 'grab' : 'pointer') : 'default',
+              pointerEvents: editable ? 'auto' : 'none',
+              zIndex: isSlotSelected ? 12 : 1,
+              transition: 'background-color 0.12s ease, outline-color 0.12s ease'
             }}
           >
-            {!showBorderHits ? null : (
-              <>
-                <Box onDoubleClick={selectSlot} title="Double-click to select slot" sx={{ ...borderHit, left: 0, right: 0, top: 0, height: 14 }} />
-                <Box onDoubleClick={selectSlot} title="Double-click to select slot" sx={{ ...borderHit, left: 0, right: 0, bottom: 0, height: 14 }} />
-                <Box onDoubleClick={selectSlot} title="Double-click to select slot" sx={{ ...borderHit, left: 0, top: 0, bottom: 0, width: 14 }} />
-                <Box onDoubleClick={selectSlot} title="Double-click to select slot" sx={{ ...borderHit, right: 0, top: 0, bottom: 0, width: 14 }} />
-              </>
-            )}
-
-            {!occupied && !isSlotSelected ? (
+            {!isSlotSelected ? (
               <Typography
                 sx={{
                   color: isPhoto ? '#c62828' : '#1565c0',
@@ -479,7 +240,7 @@ export default function PhotoAlbumsPageTemplateOverlay({
                   opacity: 0.75
                 }}
               >
-                {isPhoto ? 'Drop photo' : 'Drop photo or enter text'}
+                {isPhoto ? 'Photo' : 'Text'}
               </Typography>
             ) : null}
           </Box>
@@ -548,18 +309,9 @@ PhotoAlbumsPageTemplateOverlay.propTypes = {
   offsetLeft: PropTypes.number,
   offsetTop: PropTypes.number,
   slotOverrides: PropTypes.object,
-  highlightSlotId: PropTypes.string,
-  occupiedSlotIds: PropTypes.instanceOf(Set),
   editable: PropTypes.bool,
-  stagingDragActive: PropTypes.bool,
   dragScale: PropTypes.number,
   pageKey: PropTypes.string,
-  onMoveResize: PropTypes.func,
   onSlotGeometryChange: PropTypes.func,
-  onSlotPhotoZoom: PropTypes.func,
-  onSlotPhotoPan: PropTypes.func,
-  onSlotPhotoScale: PropTypes.func,
-  isSlotPhotoSelected: PropTypes.func,
-  onDelete: PropTypes.func,
-  onStagedPhotoDrop: PropTypes.func
+  onDelete: PropTypes.func
 };

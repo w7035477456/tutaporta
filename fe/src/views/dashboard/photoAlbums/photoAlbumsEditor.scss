@@ -189,7 +189,7 @@
 }
 
 /* Staging tray: full filename on hover (yellow on black).
-   Primary path: portaled fixed plate from PhotoAlbumsPhotoStagingTray (z-index max).
+   Primary path: portaled fixed plate from thumbnails/PhotoAlbumsThumbnailTray (z-index max).
    Absolute rules below are fallback if a non-portaled .rv-album-staging__thumb-name exists. */
 .rv-album-staging__thumb {
   position: relative;
@@ -388,18 +388,13 @@
     /* Expanded by JS when photos are dragged past the right / bottom edge */
     box-sizing: border-box;
 
-    > *:not(.rv-attachment-photo):not(.rv-text-label) {
+    > *:not(.rv-text-label) {
       flex: 1 1 100%;
       width: 100%;
     }
 
-    > * + *:not(.rv-attachment-photo):not(.rv-text-label) {
+    > * + *:not(.rv-text-label) {
       margin-top: 0.6em;
-    }
-
-    > .rv-attachment-photo + *:not(.rv-attachment-photo):not(.rv-text-label),
-    > *:not(.rv-attachment-photo):not(.rv-text-label) + .rv-attachment-photo {
-      margin-top: 0.35em;
     }
 
     h1 { font-size: 1.9em; font-weight: 700; }
@@ -456,201 +451,6 @@
 
       &.ProseMirror-selectednode {
         outline: 2px solid #2f6fed;
-      }
-    }
-
-    /* Inline vault file (attachment) node view */
-    .rv-attachment-node {
-      display: block;
-      margin: 6px 0;
-
-      &.ProseMirror-selectednode > * {
-        outline: 2px solid #2f6fed;
-        border-radius: 4px;
-      }
-    }
-
-    .rv-attachment-photo {
-      display: block;
-      margin: 0;
-      flex: 1 1 calc(33.333% - 12px);
-      /* Block native browser drag of page photos (huge translucent ghost). */
-      -webkit-user-drag: none;
-      user-select: none;
-
-      img,
-      .rv-photo-tile,
-      .rv-photo-window {
-        -webkit-user-drag: none !important;
-        user-select: none;
-      }
-      max-width: calc(50% - 6px);
-      min-width: 140px;
-      position: relative;
-
-      /* Filename chip is inline top-right next to return X (photoAlbumsAttachmentNode). */
-      .rv-attachment-photo__name:not(.is-portaled) {
-        display: none;
-      }
-
-      &:hover .rv-attachment-photo__name:not(.is-portaled),
-      &:focus-within .rv-attachment-photo__name:not(.is-portaled),
-      &.is-selected .rv-attachment-photo__name:not(.is-portaled),
-      &.ProseMirror-selectednode .rv-attachment-photo__name:not(.is-portaled) {
-        display: inline;
-      }
-
-      &--size-1 {
-        flex: 1 1 calc(55% - 12px);
-        max-width: calc(66% - 6px);
-        min-width: 200px;
-      }
-
-      &--size-2 {
-        flex: 1 1 calc(40% - 12px);
-        max-width: calc(48% - 6px);
-      }
-
-      &--sized {
-        flex: 0 0 auto;
-        min-width: 0;
-        max-width: 100%;
-      }
-
-      &--placed {
-        position: absolute;
-        flex: none !important;
-        margin: 0 !important;
-        z-index: 2;
-        max-width: none !important;
-      }
-
-      /* Slot window: clips the photo; filename sits top-right next to return X. */
-      &--framed {
-        /* Photo clip is on .rv-photo-window — keep wrapper visible for top chrome. */
-        overflow: visible !important;
-        box-sizing: border-box;
-        /* Stay BELOW template slot overlay (~40) so zoomed photo is clipped/hidden
-           behind the fixed slot window — never raise framed photos above slots. */
-        z-index: 3 !important;
-
-        .rv-photo-window {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          overflow: hidden !important;
-          background: var(--theme-daynight-color);
-          z-index: 1;
-        }
-
-        .rv-photo-tile {
-          margin: 0;
-          /* Photo pans/zooms underneath the slot clip — lower than window chrome. */
-          z-index: 0;
-        }
-
-        img {
-          max-width: none !important;
-        }
-      }
-
-      &.is-moving {
-        z-index: 90 !important;
-        opacity: 0.96;
-      }
-
-      /*
-       * Free-placed selected photo: stack above chrome so blink is visible.
-       * Framed + selected: also stack above the slot overlay so the full-frame
-       * red↔black border blink is visible for every image format (png/svg/…).
-       * Pan&Zoom uses yellow↔black (.is-pan-zoom).
-       */
-      &.is-selected:not(.rv-attachment-photo--framed),
-      &.ProseMirror-selectednode:not(.rv-attachment-photo--framed) {
-        z-index: 80 !important;
-      }
-
-      /* Framed + selected: clip photo in window only; filename in top-right chrome. */
-      &.is-selected.rv-attachment-photo--framed,
-      &.ProseMirror-selectednode.rv-attachment-photo--framed {
-        overflow: visible !important;
-        /* Above template slot overlay (~40) so the selection border blink shows. */
-        z-index: 50 !important;
-      }
-
-      &.is-selected > .rv-photo-window,
-      &.ProseMirror-selectednode > .rv-photo-window {
-        outline: none;
-        animation: none;
-        overflow: hidden !important;
-      }
-
-      /*
-       * Paint selection OUTSIDE the photo (outline-offset >= 0) so it does not
-       * cover View / Full / Zoom / Download / Remove.
-       * Default (relocate/swap): solid red. Pan&Zoom mode: solid yellow.
-       */
-      &.is-selected::after,
-      &.ProseMirror-selectednode::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        z-index: 1000;
-        box-sizing: border-box;
-        pointer-events: none;
-        outline: 2rem solid #e53935;
-        outline-offset: 0;
-        animation: none;
-        border-radius: 0;
-      }
-
-      &.is-selected.is-pan-zoom::after,
-      &.ProseMirror-selectednode.is-pan-zoom::after {
-        outline-color: #ffeb3b;
-        animation: none;
-      }
-
-      &.is-selected > *:not(.rv-photo-window),
-      &.ProseMirror-selectednode > *:not(.rv-photo-window) {
-        outline: none;
-      }
-
-      &__resize {
-        position: absolute;
-        width: 14px;
-        height: 14px;
-        z-index: 5;
-        border-radius: 2px;
-        background:
-          linear-gradient(135deg, transparent 0 42%, #fff 42% 50%, transparent 50% 62%, #fff 62% 70%, transparent 70%),
-          rgba(47, 111, 237, 0.9);
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
-        opacity: 0.95;
-
-        &:hover {
-          background-color: #2f6fed;
-        }
-
-        &--se {
-          right: 2px;
-          bottom: 2px;
-          cursor: nwse-resize;
-        }
-        &--sw {
-          left: 2px;
-          bottom: 2px;
-          cursor: nesw-resize;
-        }
-        &--ne {
-          right: 2px;
-          top: 2px;
-          cursor: nesw-resize;
-        }
-        &--nw {
-          left: 2px;
-          top: 2px;
-          cursor: nwse-resize;
-        }
       }
     }
 
@@ -946,53 +746,9 @@
   }
 }
 
-/* Selected photo — 2rem border blinks red ↔ black (relocate / swap mode) */
-@keyframes rvAlbumPhotoSelectBlinkRedBlack {
-  0%,
-  100% {
-    outline-color: #e53935;
-  }
-  50% {
-    outline-color: #000000;
-  }
-}
-
-/* Selected photo in Pan&Zoom — yellow ↔ black */
-@keyframes rvAlbumPhotoSelectBlinkYellowBlack {
-  0%,
-  100% {
-    outline-color: #ffeb3b;
-  }
-  50% {
-    outline-color: #000000;
-  }
-}
-
-/* Legacy alias — prefer RedBlack / YellowBlack */
-@keyframes rvAlbumPhotoSelectBlinkRedBlue {
-  0%,
-  100% {
-    outline-color: #e53935;
-  }
-  50% {
-    outline-color: #000000;
-  }
-}
-
 /* Slot selection — rapid blue ↔ black */
 .rv-album-chrome-outline-blink-slot {
   animation: rvAlbumOutlineBlinkBlueBlack 0.45s ease-in-out infinite;
-}
-
-/* Occupied slot whose photo is TipTap-selected — solid red frame (slot-sized). */
-.rv-album-chrome-outline-blink-photo-slot {
-  animation: none !important;
-  outline-color: #e53935 !important;
-}
-
-.rv-album-chrome-outline-blink-photo-slot-pan-zoom {
-  animation: none !important;
-  outline-color: #ffeb3b !important;
 }
 
 /* Template selection removed — never blink the template frame. */

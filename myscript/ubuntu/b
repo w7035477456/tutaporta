@@ -102,6 +102,15 @@ debugStartup() {
 
 alias showdbfolder='psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "SHOW data_directory;"'
 
+# Which disk Postgres data and /mnt/pgdata16 live on (same device = Postgres on the NVMe).
+pgdisk() {
+    local datadir
+    datadir="$(psql -X -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -Atc "SHOW data_directory;")" || return 1
+    echo "data_directory = $datadir"
+    df -h "$datadir" /mnt/pgdata16
+    lsblk -o NAME,SIZE,MODEL,MOUNTPOINT
+}
+
 setbasestorage() {
     case "$(uname -s)" in
         Darwin)

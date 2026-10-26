@@ -6,35 +6,16 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import 'katex/dist/katex.min.css';
 import GreenButton from 'ui-component/GreenButton';
-import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
-import { BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE } from 'config/busyHourglassEnv';
-import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import Typography from '@mui/material/Typography';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { themedConfirm } from 'utils/themedDialog';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
 import { buildPhotoAlbumsEditorExtensions } from './photoAlbumsEditorExtensions';
 import {
-  PHOTO_ALBUMS_ATTACHMENT_NODE_NAME,
-  detachTextAndEmojiNearPhoto,
-  insertCompanionLabelsOnPhoto,
-  photoPageRectFromAttrs,
-  clearPinnedPhotoEditPos,
-  listTextAndEmojiNearPhoto,
-  listTextAndEmojiForPhotoPos
-} from './photoAlbumsAttachmentNode';
-import { evictFramedPhotoInFrameToStaging, evictDuplicateFramedPhotosInSlots } from './photoAlbumsSlotOccupancy';
-import {
   PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME,
   newLabelId
 } from './photoAlbumsTextLabelNode';
 import PhotoAlbumsPlaceTextDialog, { PLACE_TEXT_DEFAULTS } from './PhotoAlbumsPlaceTextDialog';
-import {
-  buildPlaceTextPositionSession,
-  commitPlaceTextPositionSession,
-  resolvePlaceTextCaption
-} from './photoAlbumsPlaceTextPosition';
 import {
   albumPageTitleBandHeightPx,
   albumTitleStyleMarkerHtml,
@@ -44,7 +25,6 @@ import {
   parseAlbumTitleStyleFromHtml,
   stripAlbumTitleStyleMarker
 } from './photoAlbumsAlbumTitleStyle';
-import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
 import { PhotoAlbumsAlbumLayoutContext } from './photoAlbumsAlbumLayoutContext';
 import PhotoAlbumsEditorToolbar from './PhotoAlbumsEditorToolbar';
 import PhotoAlbumsPageTemplateOverlay from './PhotoAlbumsPageTemplateOverlay';
@@ -55,38 +35,20 @@ import PhotoAlbumsTemplatePickerPanel, {
 } from './PhotoAlbumsTemplatePickerPanel';
 import PhotoAlbumsAlbumZoomBar from './PhotoAlbumsAlbumZoomBar';
 import PhotoAlbumsPageFilmstrip, { buildAlbumPageFilmstripModels } from './PhotoAlbumsPageFilmstrip';
-import PhotoAlbumsPhotoFullscreenOverlay from './PhotoAlbumsPhotoFullscreenOverlay';
 import PhotoAlbumsPageFlipOverlay, {
   captureAlbumSpreadPageHalves,
   prefersAlbumPageFlipReducedMotion
 } from './PhotoAlbumsPageFlipOverlay';
 import PhotoAlbumsContextTutorial from './PhotoAlbumsContextTutorial';
 import { findAlbumPagesMatchingSearchTerms } from './photoAlbumsPageSearch';
-import PhotoAlbumsPhotoStagingTray, {
-  DRAG_STAGED_ATTACHMENT,
-  DRAG_STAGED_FLAG,
-  isStagedAttachmentDrag,
-  readStagedAttachmentDrag
-} from './PhotoAlbumsPhotoStagingTray';
+import PhotoAlbumsThumbnailTray from './thumbnails/PhotoAlbumsThumbnailTray';
+import { buildPhotoAlbumsTrayItems } from './thumbnails/photoAlbumsTrayItems';
 import {
-  albumSlotToPx,
   albumTemplateBlockHeight,
   createAlbumTemplateInstance,
-  findAlbumPhotoSnapAmongInstances,
-  getPhotoAlbumsPageTemplate,
   parseAlbumTemplateInstancesFromHtml,
-  PHOTO_ALBUMS_AUTO_LAYOUT_BY_COUNT,
-  resolveAlbumTemplateSlots,
   serializeAlbumTemplateInstances
 } from './photoAlbumsPageTemplates';
-import {
-  buildFramedPhotoAttrsForSlot,
-  planAutoLayoutPages,
-  planFillEmptyTemplatePages,
-  resolveStagingPhotoAspects,
-  sortStagingPhotosByAlbumPhotoSeq
-} from './photoAlbumsAutoLayout';
-import { getPhotoAlbumsAttachmentViewKind, fileExtensionLower, isPhotoAlbumsStagingVideoExtension } from 'utils/photoAlbumsFileFormats';
 import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
 import { getAlbumBinderWidthRatio, getAlbumSlideshowBinderWidthRatio } from 'config/albumBinderWidthEnv';
@@ -113,13 +75,12 @@ import {
   isFilesExplorerDrag
 } from './photoAlbumsFilesExplorerDrag';
 import { remapTextLabelAttrsToBand } from './photoAlbumsMoveAlbumPage';
-import { mergeStagingItemPreview } from './photoAlbumsStagingPreviewCache';
 import { setPhotoAlbumsColumnResizing } from './photoAlbumsColumnResizeGate';
+import { stripLegacyAlbumPhotoMarkup } from './photoAlbumsLegacyPhotoMarkup';
 import './photoAlbumsEditor.scss';
 
 const EMPTY_DOC = '<p></p>';
 const TEMPLATE_MARKER_RE = /<div\b[^>]*data-rv-album-template\b[^>]*>\s*<\/div>/gi;
-const STAGING_MARKER_RE = /<div\b[^>]*data-rv-album-staging\b[^>]*>\s*<\/div>/gi;
 /** Match workspace pane drag MIME types (avoid circular import of WorkspacePane). */
 const DRAG_NOTEBOOK = 'application/x-record-vault-notebook-id';
 const DRAG_NOTE = 'application/x-record-vault-note-id';
@@ -238,126 +199,6 @@ function albumSpreadLeftPageIndex(pageIndex) {
   return albumSpreadRowForPageIndex(pageIndex) * ALBUM_SPREAD_PAGE_COUNT;
 }
 
-/** Left + right template instances visible in the current spread. */
-function activeSpreadPageInstances(orderedPages, pageIndex) {
-  const ordered = orderedPages || [];
-  if (!ordered.length) return [];
-  const leftIdx = albumSpreadLeftPageIndex(pageIndex);
-  const pages = [];
-  if (ordered[leftIdx]) pages.push(ordered[leftIdx]);
-  const rightIdx = leftIdx + 1;
-  if (rightIdx < ordered.length && ordered[rightIdx]) pages.push(ordered[rightIdx]);
-  return pages;
-}
-
-/**
- * Force left|binder|right x/y/w so overlay, snap, and occupancy share one coordinate space.
- * Never trust a bloated saved inst.w (legacy “spread width as page width” data).
- */
-function withSpreadPageGeometry(
-  instances,
-  pageWidth,
-  binderWidth = 0,
-  orientation = 'portrait'
-) {
-  const pw = Math.max(200, Math.round(Number(pageWidth) || 480));
-  const bw = Math.max(0, Math.round(Number(binderWidth) || 0));
-  const ordered = sortAlbumPagesByBand(instances || []);
-  return ordered.map((inst, pageIndex) => {
-    const h =
-      inst.h > 40
-        ? Math.round(inst.h)
-        : albumTemplateBlockHeight(pw, orientation);
-    return {
-      ...inst,
-      x: albumPageXForSpreadColumn(pageIndex, pw, bw),
-      y: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(pageIndex), h),
-      w: pw,
-      h
-    };
-  });
-}
-
-/** Photo slots already occupied on each template instance (by framed photo center). */
-function collectOccupiedSlotsByInstanceKey(editor, instances, pageWidth, pageOrientation, binderWidth = 0) {
-  const next = {};
-  if (!editor) return next;
-  const corrected = withSpreadPageGeometry(
-    instances,
-    pageWidth,
-    binderWidth,
-    pageOrientation
-  );
-  for (const inst of corrected) {
-    const layout = getPhotoAlbumsPageTemplate(inst.id);
-    if (!layout) continue;
-    const band = templateBand(inst, pageWidth, pageOrientation);
-    const occupied = new Set();
-    editor.state.doc.descendants((node) => {
-      if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-      const fl = parseOptionalPx(node.attrs.frameLeft);
-      const ft = parseOptionalPx(node.attrs.frameTop);
-      const fw = parseOptionalPx(node.attrs.frameWidth);
-      const fh = parseOptionalPx(node.attrs.frameHeight);
-      if (fl == null || ft == null || fw == null || fh == null) return;
-      const cx = fl + fw / 2;
-      const cy = ft + fh / 2;
-      // Only count photos that actually sit on this page band (not other spreads).
-      if (
-        cx < band.left ||
-        cx > band.left + band.width ||
-        cy < band.top ||
-        cy > band.top + band.height
-      ) {
-        return;
-      }
-      for (const slot of resolveAlbumTemplateSlots(layout, inst.slots)) {
-        if (slot.type !== 'photo') continue;
-        const rect = albumSlotToPx(slot, band.width, band.height);
-        const left = band.left + rect.left;
-        const top = band.top + rect.top;
-        if (cx >= left && cx <= left + rect.width && cy >= top && cy <= top + rect.height) {
-          occupied.add(slot.id);
-          break;
-        }
-      }
-    });
-    next[inst.key] = occupied;
-  }
-  return next;
-}
-
-function buildAutoLayoutPhotoNodes(editor, inst, photos, slots, band, placedIds) {
-  const nodes = [];
-  const nodeType = editor?.state?.schema?.nodes?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-  if (!nodeType || !inst) return nodes;
-  const blockW = band.width;
-  const blockHInst = band.height;
-  for (let si = 0; si < photos.length && si < slots.length; si += 1) {
-    const photo = photos[si];
-    const slot = slots[si];
-    const rect = albumSlotToPx(slot, blockW, blockHInst);
-    const frameAttrs = buildFramedPhotoAttrsForSlot(photo.aspect, rect, band.left, band.top);
-    const attachmentId = Number(photo.attachmentId);
-    if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
-    nodes.push(
-      nodeType.create({
-        attachmentId,
-        fileName: String(photo.fileName || ''),
-        fileExtension: String(photo.fileExtension || ''),
-        fileSizeBytes: photo.fileSizeBytes ?? null,
-        checksum: photo.checksum ? String(photo.checksum) : null,
-        ...(Number.isFinite(Number(photo.albumPhotoSeq)) && Number(photo.albumPhotoSeq) >= 1
-          ? { albumPhotoSeq: Number(photo.albumPhotoSeq) }
-          : null),
-        ...frameAttrs
-      })
-    );
-    placedIds.add(attachmentId);
-  }
-  return nodes;
-}
-
 function albumPageXForSpreadColumn(pageIndex, pageWidth, binderWidth) {
   const col = Math.max(0, Number(pageIndex) || 0) % ALBUM_SPREAD_PAGE_COUNT;
   const pw = Math.max(200, Math.round(Number(pageWidth) || 480));
@@ -460,9 +301,7 @@ function restackTemplatesFlushToPages(
       pageIndex,
       oldBand,
       newBand: templateBand(replaced, pw, orientation),
-      replaced,
-      templateLayoutId: replaced.id,
-      slotOverrides: replaced.slots
+      replaced
     };
   });
 
@@ -472,33 +311,6 @@ function restackTemplatesFlushToPages(
     let changed = false;
 
     state.doc.descendants((node, pos) => {
-      if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
-        const fl = parseOptionalPx(node.attrs.frameLeft);
-        const ft = parseOptionalPx(node.attrs.frameTop);
-        const fw = parseOptionalPx(node.attrs.frameWidth);
-        const fh = parseOptionalPx(node.attrs.frameHeight);
-        if (fl == null || ft == null || fw == null || fh == null) return;
-
-        const cx = fl + fw / 2;
-        const cy = ft + fh / 2;
-        const bandIdx = findRestackPageBandIndex(cx, cy, pageBands);
-        if (bandIdx < 0) return;
-
-        const { oldBand, newBand, templateLayoutId, slotOverrides } = pageBands[bandIdx];
-        const nextAttrs = computeFramedPhotoBandRemapAttrs(
-          node,
-          oldBand,
-          newBand,
-          templateLayoutId,
-          slotOverrides
-        );
-        if (!nextAttrs) return;
-
-        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...nextAttrs });
-        changed = true;
-        return;
-      }
-
       // Text/emoji labels must follow their page band too — otherwise inserting a
       // new Template steals prior-page stickers into the blank page's Y range.
       if (node.type.name !== PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) return;
@@ -537,10 +349,6 @@ function stripAlbumTemplateMarker(html) {
   return String(html || '').replace(TEMPLATE_MARKER_RE, '');
 }
 
-function stripAlbumStagingMarker(html) {
-  return String(html || '').replace(STAGING_MARKER_RE, '');
-}
-
 function stripAlbumMarkers(html) {
   // Drop accidental drag text TipTap inserted when a vault/Finder/staging drop missed a slot.
   const cleaned = stripPhotoAlbumsDragJunkBodyRows(
@@ -548,7 +356,7 @@ function stripAlbumMarkers(html) {
       .replace(/<p[^>]*>\s*pa-staged:\d+\s*<\/p>/gi, '')
       .replace(/(^|>)\s*pa-staged:\d+\s*(<|$)/gi, '$1$2')
   );
-  return stripAlbumTitleStyleMarker(stripAlbumStagingMarker(stripAlbumTemplateMarker(cleaned)));
+  return stripAlbumTitleStyleMarker(stripLegacyAlbumPhotoMarkup(stripAlbumTemplateMarker(cleaned)));
 }
 
 /** Remove live TipTap paragraphs that are only leftover drag junk (pa-staged / .html names). */
@@ -569,169 +377,9 @@ function purgeAlbumDragJunkFromEditor(editor) {
   return true;
 }
 
-function normalizeCompanionLabels(raw) {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((c) => {
-      if (!c || typeof c !== 'object') return null;
-      const attrs = c.attrs && typeof c.attrs === 'object' ? { ...c.attrs } : null;
-      if (!attrs) return null;
-      return {
-        attrs,
-        relX: Number.isFinite(Number(c.relX)) ? Number(c.relX) : 0.08,
-        relY: Number.isFinite(Number(c.relY)) ? Number(c.relY) : 0.08,
-        relBoxW: Number.isFinite(Number(c.relBoxW)) ? Number(c.relBoxW) : null,
-        relBoxH: Number.isFinite(Number(c.relBoxH)) ? Number(c.relBoxH) : null
-      };
-    })
-    .filter(Boolean);
-}
-
-/** Skip emoji stickers — Add Text dropdown lists readable photo/video captions only. */
-function isPlaceTextEmojiSticker(attrs) {
-  if (/Emoji/i.test(String(attrs?.fontFamily || ''))) return true;
-  const t = String(attrs?.text || '').trim();
-  if (!t || /\s/.test(t)) return false;
-  if (/[A-Za-z0-9]/.test(t)) return false;
-  return [...t].length <= 8;
-}
-
-/**
- * Plain text labels overlapping the photo at `photoPos` (for Add Text select, ≥2).
- * @returns {{ labelId: string, pos: number, text: string, color: *, outlineColor: *, outlineWidth: *, fontSize: *, fontFamily: *, fontWeight: * }[]}
- */
-function collectPlaceTextLabelsNearPhoto(editor, photoPos) {
-  if (!editor?.state || !Number.isFinite(photoPos)) return [];
-  const node = editor.state.doc.nodeAt(photoPos);
-  if (!node || node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return [];
-  const rect = photoPageRectFromAttrs(node.attrs);
-  if (!rect) return [];
-  return listTextAndEmojiForPhotoPos(editor.state, photoPos)
-    .filter((item) => !isPlaceTextEmojiSticker(item.attrs))
-    .map((item) => ({
-      labelId: String(item.attrs?.labelId || ''),
-      pos: item.pos,
-      text: String(item.attrs?.text || '').trim() || 'Text',
-      color: item.attrs?.color,
-      outlineColor: item.attrs?.outlineColor,
-      outlineWidth: item.attrs?.outlineWidth,
-      fontSize: item.attrs?.fontSize,
-      fontFamily: item.attrs?.fontFamily,
-      fontWeight: item.attrs?.fontWeight
-    }));
-}
-
-function serializeStagingItems(items) {
-  const list = (Array.isArray(items) ? items : [])
-    .map((item) => {
-      const companionLabels = normalizeCompanionLabels(item.companionLabels);
-      const seq = Number(item.albumPhotoSeq);
-      return {
-        attachmentId: Number(item.attachmentId),
-        fileName: String(item.fileName || ''),
-        fileExtension: String(item.fileExtension || ''),
-        fileSizeBytes: item.fileSizeBytes == null ? null : Number(item.fileSizeBytes),
-        checksum: item.checksum ? String(item.checksum) : null,
-        ...(Number.isFinite(seq) && seq >= 1 ? { albumPhotoSeq: seq } : null),
-        ...(companionLabels.length ? { companionLabels } : null)
-      };
-    })
-    .filter((item) => Number.isFinite(item.attachmentId) && item.attachmentId > 0);
-  if (!list.length) return '';
-  return JSON.stringify(list).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
-/** Keep first of each attachment; also drop size+checksum duplicates. */
-function dedupeStagingItems(items) {
-  const out = [];
-  const seenIds = new Set();
-  const seenChecksums = new Set();
-  for (const item of Array.isArray(items) ? items : []) {
-    const id = Number(item?.attachmentId);
-    if (!Number.isFinite(id) || id < 1) continue;
-    if (seenIds.has(id)) continue;
-    const size = item.fileSizeBytes == null ? null : Number(item.fileSizeBytes);
-    const checksum = item.checksum ? String(item.checksum).toLowerCase() : '';
-    if (checksum && Number.isFinite(size)) {
-      const key = `${size}:${checksum}`;
-      if (seenChecksums.has(key)) continue;
-      seenChecksums.add(key);
-    }
-    seenIds.add(id);
-    const companionLabels = normalizeCompanionLabels(item.companionLabels);
-    const seq = Number(item.albumPhotoSeq);
-    out.push({
-      attachmentId: id,
-      fileName: String(item.fileName || ''),
-      fileExtension: String(item.fileExtension || ''),
-      fileSizeBytes: Number.isFinite(size) ? size : null,
-      checksum: checksum || null,
-      ...(Number.isFinite(seq) && seq >= 1 ? { albumPhotoSeq: seq } : null),
-      ...(item.localPreviewUrl ? { localPreviewUrl: String(item.localPreviewUrl) } : null),
-      ...(companionLabels.length ? { companionLabels } : null)
-    });
-  }
-  return out;
-}
-
-function parseStagingItemsFromHtml(html) {
-  const raw = String(html || '');
-  const match = raw.match(/data-staging-json=["']([^"']*)["']/i);
-  if (!match) return [];
-  try {
-    const decoded = match[1]
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&amp;/g, '&');
-    const parsed = JSON.parse(decoded);
-    if (!Array.isArray(parsed)) return [];
-    return dedupeStagingItems(
-      parsed.map((item) => ({
-        attachmentId: Number(item?.attachmentId ?? item?.attachment_id),
-        fileName: String(item?.fileName || item?.file_name || ''),
-        fileExtension: String(item?.fileExtension || item?.file_extension || ''),
-        fileSizeBytes: item?.fileSizeBytes ?? item?.file_size_bytes ?? null,
-        checksum: item?.checksum ?? null,
-        albumPhotoSeq:
-          item?.albumPhotoSeq != null
-            ? Number(item.albumPhotoSeq)
-            : item?.album_photo_seq != null
-              ? Number(item.album_photo_seq)
-              : null,
-        companionLabels: item?.companionLabels ?? item?.companion_labels ?? null
-      }))
-    );
-  } catch {
-    return [];
-  }
-}
-
-function attachmentAlbumPhotoSeq(a) {
-  const n = Number(a?.album_photo_seq ?? a?.albumPhotoSeq);
-  return Number.isFinite(n) && n >= 1 ? n : null;
-}
-
-function syncAlbumPhotoSeqOnPage(editor, liveById) {
-  if (!editor?.view || !liveById?.size) return;
-  let tr = editor.state.tr;
-  let changed = false;
-  editor.state.doc.descendants((node, pos) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    const id = Number(node.attrs.attachmentId);
-    const live = liveById.get(id);
-    const seq = live ? attachmentAlbumPhotoSeq(live) : null;
-    const cur = Number(node.attrs.albumPhotoSeq);
-    if ((seq == null && !Number.isFinite(cur)) || seq === cur) return;
-    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, albumPhotoSeq: seq });
-    changed = true;
-  });
-  if (changed && tr.docChanged) editor.view.dispatch(tr);
-}
-
 function withAlbumMarkers(
   html,
   instances,
-  stagingItems,
   orientation = 'portrait',
   pageWidthPx = null,
   titleStyle = null
@@ -752,12 +400,6 @@ function withAlbumMarkers(
     // Persist orientation (+ page width) even with no templates yet.
     parts.push(
       `<div data-rv-album-template="" data-album-orientation="${orient}"${pageWAttr} style="display:none"></div>`
-    );
-  }
-  const stagingJson = serializeStagingItems(stagingItems);
-  if (stagingJson) {
-    parts.push(
-      `<div data-rv-album-staging="" data-staging-json="${stagingJson}" style="display:none"></div>`
     );
   }
   parts.push(albumTitleStyleMarkerHtml(titleStyle || DEFAULT_ALBUM_TITLE_STYLE));
@@ -783,79 +425,6 @@ function parseOptionalPx(value) {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
-/** Resolve a tray-drop snap from the DOM slot under the cursor (zoom / binder-safe). */
-function snapAlbumPhotoSlotAtClientPoint(clientX, clientY, activeSpread) {
-  const list = Array.isArray(activeSpread) ? activeSpread : [];
-  if (!list.length) return null;
-  const stack =
-    typeof document.elementsFromPoint === 'function'
-      ? document.elementsFromPoint(clientX, clientY)
-      : [document.elementFromPoint(clientX, clientY)].filter(Boolean);
-  let slotEl = null;
-  for (const el of stack) {
-    if (!(el instanceof Element)) continue;
-    const hit = el.closest?.('[data-album-slot][data-album-slot-type="photo"]');
-    if (hit) {
-      slotEl = hit;
-      break;
-    }
-  }
-  if (!slotEl) return null;
-  const slotId = String(slotEl.getAttribute('data-album-slot') || '').trim();
-  if (!slotId) return null;
-  const pageKey = String(
-    slotEl.closest?.('[data-pa-album-page-key]')?.getAttribute('data-pa-album-page-key') || ''
-  ).trim();
-  const inst = pageKey
-    ? list.find((t) => t.key === pageKey)
-    : null;
-  if (!inst) return null;
-  const layout = getPhotoAlbumsPageTemplate(inst.id);
-  if (!layout) return null;
-  const slot = resolveAlbumTemplateSlots(layout, inst.slots).find((s) => s.id === slotId);
-  if (!slot || slot.type !== 'photo') return null;
-  const blockW = inst.w > 0 ? inst.w : 480;
-  const blockH = inst.h > 0 ? inst.h : albumTemplateBlockHeight(blockW);
-  const rect = albumSlotToPx(slot, blockW, blockH);
-  return {
-    left: (inst.x || 0) + rect.left,
-    top: (inst.y || 0) + rect.top,
-    width: rect.width,
-    height: rect.height,
-    slotId,
-    instanceKey: inst.key,
-    highlightId: `${inst.key}:${slotId}`
-  };
-}
-
-/** Contain-fit a photo or video into a template slot frame (full media visible; letterbox OK). */
-function coverFitAttrsForSlotRect(slotRect, originX, originY, aspect = 4 / 3) {
-  const fw = Math.max(80, Math.round(slotRect.width) || 80);
-  const fh = Math.max(40, Math.round(slotRect.height) || 40);
-  const left = Math.round(originX + slotRect.left);
-  const top = Math.round(originY + slotRect.top);
-  const a = Number(aspect) > 0 ? Number(aspect) : 4 / 3;
-  let pw = fw;
-  let ph = Math.round(pw / a);
-  if (ph > fh) {
-    ph = fh;
-    pw = Math.round(ph * a);
-  }
-  return {
-    posLeft: left,
-    posTop: top,
-    width: pw,
-    height: ph,
-    panX: Math.round((fw - pw) / 2),
-    panY: Math.round((fh - ph) / 2),
-    frameLeft: left,
-    frameTop: top,
-    frameWidth: fw,
-    frameHeight: fh,
-    slotFit: 'contain'
-  };
-}
-
 function pointInBand(cx, cy, band) {
   return (
     cx >= band.left &&
@@ -863,30 +432,6 @@ function pointInBand(cx, cy, band) {
     cy >= band.top &&
     cy <= band.top + band.height
   );
-}
-
-/** Center of a placed / framed attachment node (page coords). */
-function attachmentNodeCenter(node) {
-  if (!node || node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return null;
-  const fl = parseOptionalPx(node.attrs.frameLeft);
-  const ft = parseOptionalPx(node.attrs.frameTop);
-  const fw = parseOptionalPx(node.attrs.frameWidth);
-  const fh = parseOptionalPx(node.attrs.frameHeight);
-  if (fl != null && ft != null && fw != null && fh != null) {
-    return { cx: fl + fw / 2, cy: ft + fh / 2 };
-  }
-  const pl = parseOptionalPx(node.attrs.posLeft);
-  const pt = parseOptionalPx(node.attrs.posTop);
-  const pwNode = parseOptionalPx(node.attrs.width) || 120;
-  const phNode = parseOptionalPx(node.attrs.height) || 90;
-  if (pl == null || pt == null) return null;
-  return { cx: pl + pwNode / 2, cy: pt + phNode / 2 };
-}
-
-function attachmentNodeInBand(node, band) {
-  const center = attachmentNodeCenter(node);
-  if (!center || !band) return false;
-  return pointInBand(center.cx, center.cy, band);
 }
 
 function removeTextLabelsInBand(editor, band) {
@@ -910,60 +455,6 @@ function removeTextLabelsInBand(editor, band) {
   return true;
 }
 
-/** Return every photo in `band` to the green thumbnail tray (text labels on page are removed). */
-function returnPhotosInBandToStagingTray(editor, band) {
-  const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-  if (!editor || !band || typeof store?.returnAttachmentToStaging !== 'function') return 0;
-  const attrsList = [];
-  editor.state.doc.descendants((node) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    if (!attachmentNodeInBand(node, band)) return;
-    attrsList.push(node.attrs);
-  });
-  let count = 0;
-  for (const attrs of attrsList) {
-    const attachmentId = Number(attrs.attachmentId);
-    if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
-    const returned = store.returnAttachmentToStaging({
-      attachmentId,
-      fileName: String(attrs.fileName || ''),
-      fileExtension: String(attrs.fileExtension || ''),
-      fileSizeBytes: attrs.fileSizeBytes ?? null,
-      checksum: attrs.checksum ? String(attrs.checksum) : null,
-      _photoRect: photoPageRectFromAttrs(attrs)
-    });
-    if (returned) count += 1;
-  }
-  removeTextLabelsInBand(editor, band);
-  return count;
-}
-
-/** Return every photo on the album page to the thumbnail tray. */
-function returnAllPagePhotosToStagingTray(editor) {
-  const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-  if (!editor || typeof store?.returnAttachmentToStaging !== 'function') return 0;
-  const attrsList = [];
-  editor.state.doc.descendants((node) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    attrsList.push(node.attrs);
-  });
-  let count = 0;
-  for (const attrs of attrsList) {
-    const attachmentId = Number(attrs.attachmentId);
-    if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
-    const returned = store.returnAttachmentToStaging({
-      attachmentId,
-      fileName: String(attrs.fileName || ''),
-      fileExtension: String(attrs.fileExtension || ''),
-      fileSizeBytes: attrs.fileSizeBytes ?? null,
-      checksum: attrs.checksum ? String(attrs.checksum) : null,
-      _photoRect: photoPageRectFromAttrs(attrs)
-    });
-    if (returned) count += 1;
-  }
-  return count;
-}
-
 function albumBandsMatch(a, b) {
   return (
     a &&
@@ -973,99 +464,6 @@ function albumBandsMatch(a, b) {
     a.width === b.width &&
     a.height === b.height
   );
-}
-
-/**
- * Remap one framed photo from oldBand → newBand (slot-aware). Returns attr patch or null.
- */
-function computeFramedPhotoBandRemapAttrs(node, oldBand, newBand, templateLayoutId, slotOverrides = null) {
-  if (!oldBand || !newBand) return null;
-  if (oldBand.width < 8 || oldBand.height < 8 || newBand.width < 8 || newBand.height < 8) {
-    return null;
-  }
-  if (albumBandsMatch(oldBand, newBand)) return null;
-
-  const fl = parseOptionalPx(node.attrs.frameLeft);
-  const ft = parseOptionalPx(node.attrs.frameTop);
-  const fw = parseOptionalPx(node.attrs.frameWidth);
-  const fh = parseOptionalPx(node.attrs.frameHeight);
-  if (fl == null || ft == null || fw == null || fh == null) return null;
-
-  const cx = fl + fw / 2;
-  const cy = ft + fh / 2;
-  if (!pointInBand(cx, cy, oldBand)) return null;
-
-  const layout = getPhotoAlbumsPageTemplate(templateLayoutId);
-  const slots = layout?.slots?.length ? resolveAlbumTemplateSlots(layout, slotOverrides) : [];
-
-  let newFl;
-  let newFt;
-  let newFw;
-  let newFh;
-  let matched = false;
-
-  for (const slot of slots) {
-    const oldRect = albumSlotToPx(slot, oldBand.width, oldBand.height);
-    const oldLeft = oldBand.left + oldRect.left;
-    const oldTop = oldBand.top + oldRect.top;
-    if (
-      cx >= oldLeft &&
-      cx <= oldLeft + oldRect.width &&
-      cy >= oldTop &&
-      cy <= oldTop + oldRect.height
-    ) {
-      const newRect = albumSlotToPx(slot, newBand.width, newBand.height);
-      newFl = newBand.left + newRect.left;
-      newFt = newBand.top + newRect.top;
-      newFw = Math.max(40, newRect.width);
-      newFh = Math.max(40, newRect.height);
-      matched = true;
-      break;
-    }
-  }
-
-  if (!matched) {
-    const sx = newBand.width / oldBand.width;
-    const sy = newBand.height / oldBand.height;
-    newFl = Math.round(newBand.left + (fl - oldBand.left) * sx);
-    newFt = Math.round(newBand.top + (ft - oldBand.top) * sy);
-    newFw = Math.max(40, Math.round(fw * sx));
-    newFh = Math.max(40, Math.round(fh * sy));
-  }
-
-  const oldPw = parseOptionalPx(node.attrs.width) || fw;
-  const oldPh = parseOptionalPx(node.attrs.height) || fh;
-  const oldPanX = parseOptionalPx(node.attrs.panX) ?? 0;
-  const oldPanY = parseOptionalPx(node.attrs.panY) ?? 0;
-  const sx = newFw / Math.max(1, fw);
-  const sy = newFh / Math.max(1, fh);
-  const newPw = Math.max(newFw, Math.round(oldPw * sx));
-  const newPh = Math.max(newFh, Math.round(oldPh * sy));
-  let newPanX = Math.round(oldPanX * sx);
-  let newPanY = Math.round(oldPanY * sy);
-  if (newPw >= newFw) {
-    newPanX = Math.min(0, Math.max(newFw - newPw, newPanX));
-  } else {
-    newPanX = Math.min(newFw - newPw, Math.max(0, newPanX));
-  }
-  if (newPh >= newFh) {
-    newPanY = Math.min(0, Math.max(newFh - newPh, newPanY));
-  } else {
-    newPanY = Math.min(newFh - newPh, Math.max(0, newPanY));
-  }
-
-  return {
-    posLeft: newFl,
-    posTop: newFt,
-    width: newPw,
-    height: newPh,
-    panX: newPanX,
-    panY: newPanY,
-    frameLeft: newFl,
-    frameTop: newFt,
-    frameWidth: newFw,
-    frameHeight: newFh
-  };
 }
 
 /** When old page bands overlap (insert-before-restack), prefer the later page in book order. */
@@ -1083,52 +481,6 @@ function findRestackPageBandIndex(cx, cy, pageBands) {
   return bestIdx;
 }
 
-/**
- * Drop slot-window attrs for photos whose frame center sits in `band`
- * (or all framed photos when band is omitted).
- * @deprecated Prefer returnPhotosInBandToStagingTray — callers should send photos to the tray.
- */
-function releaseAttachmentsFromTemplateFrames(editor, band = null) {
-  if (!editor) return false;
-  const { state } = editor;
-  let tr = state.tr;
-  let changed = false;
-
-  state.doc.descendants((node, pos) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    const frameLeft = parseOptionalPx(node.attrs.frameLeft);
-    const frameTop = parseOptionalPx(node.attrs.frameTop);
-    const frameWidth = parseOptionalPx(node.attrs.frameWidth);
-    const frameHeight = parseOptionalPx(node.attrs.frameHeight);
-    if (frameLeft == null || frameTop == null || frameWidth == null || frameHeight == null) {
-      return;
-    }
-    if (band) {
-      const cx = frameLeft + frameWidth / 2;
-      const cy = frameTop + frameHeight / 2;
-      if (!pointInBand(cx, cy, band)) return;
-    }
-    tr = tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      posLeft: frameLeft,
-      posTop: frameTop,
-      width: frameWidth,
-      height: frameHeight,
-      panX: null,
-      panY: null,
-      frameLeft: null,
-      frameTop: null,
-      frameWidth: null,
-      frameHeight: null,
-      slotFit: null
-    });
-    changed = true;
-  });
-
-  if (changed) editor.view.dispatch(tr);
-  return changed;
-}
-
 function templateBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
   const w = inst.w > 0 ? inst.w : pageWidthFallback;
   const h = inst.h > 0 ? inst.h : albumTemplateBlockHeight(w, orientation);
@@ -1140,235 +492,6 @@ function templateBand(inst, pageWidthFallback = 480, orientation = 'portrait') {
   };
 }
 
-/**
- * When a template block is moved/resized, keep snapped photos glued to their
- * slots — frames and cover-sized tiles scale with the new slot geometry.
- */
-function remapFramedPhotosForTemplateResize(editor, templateLayoutId, oldBand, newBand, slotOverrides = null) {
-  if (!editor || !oldBand || !newBand) return false;
-  if (oldBand.width < 8 || oldBand.height < 8 || newBand.width < 8 || newBand.height < 8) {
-    return false;
-  }
-  if (albumBandsMatch(oldBand, newBand)) return false;
-
-  const { state } = editor;
-  let tr = state.tr;
-  let changed = false;
-
-  state.doc.descendants((node, pos) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    const nextAttrs = computeFramedPhotoBandRemapAttrs(
-      node,
-      oldBand,
-      newBand,
-      templateLayoutId,
-      slotOverrides
-    );
-    if (!nextAttrs) return;
-    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...nextAttrs });
-    changed = true;
-  });
-
-  if (changed) editor.view.dispatch(tr);
-  return changed;
-}
-
-/**
- * Move/resize one slot's framed photo to a new absolute frame rect (proportional).
- * `oldFrame` / `newFrame`: { left, top, width, height } in page/PM coords.
- */
-function remapPhotoForSlotFrameChange(editor, oldFrame, newFrame) {
-  if (!editor || !oldFrame || !newFrame) return false;
-  const { state } = editor;
-  let tr = state.tr;
-  let changed = false;
-  const oLeft = oldFrame.left;
-  const oTop = oldFrame.top;
-  const oW = Math.max(1, oldFrame.width);
-  const oH = Math.max(1, oldFrame.height);
-  const nLeft = Math.round(newFrame.left);
-  const nTop = Math.round(newFrame.top);
-  const nW = Math.max(40, Math.round(newFrame.width));
-  const nH = Math.max(40, Math.round(newFrame.height));
-
-  state.doc.descendants((node, pos) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    const fl = parseOptionalPx(node.attrs.frameLeft);
-    const ft = parseOptionalPx(node.attrs.frameTop);
-    const fw = parseOptionalPx(node.attrs.frameWidth);
-    const fh = parseOptionalPx(node.attrs.frameHeight);
-    if (fl == null || ft == null || fw == null || fh == null) return;
-    const cx = fl + fw / 2;
-    const cy = ft + fh / 2;
-    if (cx < oLeft || cx > oLeft + oW || cy < oTop || cy > oTop + oH) return;
-
-    const sx = nW / oW;
-    const sy = nH / oH;
-    const oldPw = parseOptionalPx(node.attrs.width) || fw;
-    const oldPh = parseOptionalPx(node.attrs.height) || fh;
-    const oldPanX = parseOptionalPx(node.attrs.panX) ?? 0;
-    const oldPanY = parseOptionalPx(node.attrs.panY) ?? 0;
-    const newPw = Math.max(nW, Math.round(oldPw * sx));
-    const newPh = Math.max(nH, Math.round(oldPh * sy));
-    let newPanX = Math.round(oldPanX * sx);
-    let newPanY = Math.round(oldPanY * sy);
-    if (newPw >= nW) newPanX = Math.min(0, Math.max(nW - newPw, newPanX));
-    else newPanX = Math.min(nW - newPw, Math.max(0, newPanX));
-    if (newPh >= nH) newPanY = Math.min(0, Math.max(nH - newPh, newPanY));
-    else newPanY = Math.min(nH - newPh, Math.max(0, newPanY));
-
-    tr = tr.setNodeMarkup(pos, undefined, {
-      ...node.attrs,
-      posLeft: nLeft,
-      posTop: nTop,
-      width: newPw,
-      height: newPh,
-      panX: newPanX,
-      panY: newPanY,
-      frameLeft: nLeft,
-      frameTop: nTop,
-      frameWidth: nW,
-      frameHeight: nH
-    });
-    changed = true;
-  });
-
-  if (changed) editor.view.dispatch(tr);
-  return changed;
-}
-
-/**
- * Clamp pan inside a fixed slot window.
- * Allow dragging partly out (clipped) — keep a small overlap so the photo does not vanish.
- */
-function clampPanInsideFrame(panX, panY, photoW, photoH, frameW, frameH) {
-  const fw = Math.max(1, frameW);
-  const fh = Math.max(1, frameH);
-  const pw = Math.max(1, photoW);
-  const ph = Math.max(1, photoH);
-  const minOverlapX = Math.max(24, Math.min(64, Math.round(fw * 0.12)));
-  const minOverlapY = Math.max(24, Math.min(64, Math.round(fh * 0.12)));
-  const minX = minOverlapX - pw;
-  const maxX = fw - minOverlapX;
-  const minY = minOverlapY - ph;
-  const maxY = fh - minOverlapY;
-  return {
-    panX: Math.round(Math.min(maxX, Math.max(minX, panX))),
-    panY: Math.round(Math.min(maxY, Math.max(minY, panY)))
-  };
-}
-
-/** Find the framed attachment whose frame center sits inside `frame`. */
-function findFramedPhotoInFrame(state, frame) {
-  if (!state || !frame) return null;
-  const fLeft = frame.left;
-  const fTop = frame.top;
-  const fW = Math.max(1, frame.width);
-  const fH = Math.max(1, frame.height);
-  let found = null;
-  state.doc.descendants((node, pos) => {
-    if (found || node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-    const fl = parseOptionalPx(node.attrs.frameLeft);
-    const ft = parseOptionalPx(node.attrs.frameTop);
-    const fw = parseOptionalPx(node.attrs.frameWidth);
-    const fh = parseOptionalPx(node.attrs.frameHeight);
-    if (fl == null || ft == null || fw == null || fh == null) return;
-    const cx = fl + fw / 2;
-    const cy = ft + fh / 2;
-    if (cx < fLeft || cx > fLeft + fW || cy < fTop || cy > fTop + fH) return;
-    found = { node, pos, fl, ft, fw, fh };
-  });
-  return found;
-}
-
-/** Write width/height/pan for the photo inside a fixed slot frame (frame* unchanged). */
-function setPhotoTransformInsideFrame(editor, frame, next) {
-  if (!editor || !frame || !next) return false;
-  const hit = findFramedPhotoInFrame(editor.state, frame);
-  if (!hit) return false;
-  const fw = Math.max(1, hit.fw);
-  const fh = Math.max(1, hit.fh);
-  const width = Math.max(40, Math.round(next.width ?? parseOptionalPx(hit.node.attrs.width) ?? fw));
-  const height = Math.max(40, Math.round(next.height ?? parseOptionalPx(hit.node.attrs.height) ?? fh));
-  const pan = clampPanInsideFrame(
-    next.panX ?? parseOptionalPx(hit.node.attrs.panX) ?? 0,
-    next.panY ?? parseOptionalPx(hit.node.attrs.panY) ?? 0,
-    width,
-    height,
-    fw,
-    fh
-  );
-  const tr = editor.state.tr.setNodeMarkup(hit.pos, undefined, {
-    ...hit.node.attrs,
-    width,
-    height,
-    panX: pan.panX,
-    panY: pan.panY
-  });
-  editor.view.dispatch(tr);
-  return true;
-}
-
-/** Snapshot of photo transform for a slot-handle drag gesture. */
-function readPhotoTransformInFrame(editor, frame) {
-  const hit = findFramedPhotoInFrame(editor?.state, frame);
-  if (!hit) return null;
-  const fw = Math.max(1, hit.fw);
-  const fh = Math.max(1, hit.fh);
-  const width = Math.max(fw, parseOptionalPx(hit.node.attrs.width) || fw);
-  const height = Math.max(fh, parseOptionalPx(hit.node.attrs.height) || fh);
-  return {
-    width,
-    height,
-    panX: parseOptionalPx(hit.node.attrs.panX) ?? 0,
-    panY: parseOptionalPx(hit.node.attrs.panY) ?? 0,
-    frameW: fw,
-    frameH: fh
-  };
-}
-
-/**
- * Scale photo inside a fixed frame from an origin snapshot (keeps visual center).
- * Used by slot 8-circle handles and scroll-wheel zoom.
- */
-function scalePhotoInsideFrameFromOrigin(editor, frame, origin, factor) {
-  if (!editor || !frame || !origin || !(factor > 0)) return false;
-  const fw = Math.max(1, origin.frameW || frame.width);
-  const fh = Math.max(1, origin.frameH || frame.height);
-  const oldPw = Math.max(1, origin.width);
-  const oldPh = Math.max(1, origin.height);
-  const aspect = oldPw / Math.max(1, oldPh);
-  const minW = Math.max(40, Math.round(fw * 0.35));
-  const maxW = Math.round(fw * 4);
-  let newPw = Math.min(maxW, Math.max(minW, Math.round(oldPw * factor)));
-  let newPh = Math.round(newPw / aspect);
-  if (newPh < Math.round(fh * 0.35)) {
-    newPh = Math.max(40, Math.round(fh * 0.35));
-    newPw = Math.round(newPh * aspect);
-  }
-  const oldPanX = origin.panX ?? 0;
-  const oldPanY = origin.panY ?? 0;
-  const visCx = fw / 2 - oldPanX;
-  const visCy = fh / 2 - oldPanY;
-  const relX = visCx / Math.max(1, oldPw);
-  const relY = visCy / Math.max(1, oldPh);
-  const newPanX = fw / 2 - relX * newPw;
-  const newPanY = fh / 2 - relY * newPh;
-  return setPhotoTransformInsideFrame(editor, frame, {
-    width: newPw,
-    height: newPh,
-    panX: newPanX,
-    panY: newPanY
-  });
-}
-
-/** Scroll-wheel zoom of the photo inside a slot frame (clipped by frame bounds). */
-function zoomPhotoInsideFrame(editor, frame, factor) {
-  const origin = readPhotoTransformInFrame(editor, frame);
-  if (!origin) return false;
-  return scalePhotoInsideFrameFromOrigin(editor, frame, origin, factor);
-}
-
 function lowestTemplateBottom(instances) {
   let bottom = 0;
   for (const inst of instances || []) {
@@ -1376,121 +499,6 @@ function lowestTemplateBottom(instances) {
     bottom = Math.max(bottom, band.top + band.height);
   }
   return bottom;
-}
-
-/**
- * Move every album photo fully below the template band so dashed slots never
- * cover existing photos. Updates both free-place pos* and snapped frame* attrs.
- */
-function pushAttachmentsBelowTemplateBand(editor, bandTopPx, bandHeightPx) {
-  if (!editor) return false;
-  const bandTop = Math.max(0, Math.round(bandTopPx) || 0);
-  const bandBottom = bandTop + Math.max(0, Math.round(bandHeightPx) || 0);
-  if (!bandBottom) return false;
-
-  const { state, view } = editor;
-  const pm = view.dom;
-  const pmRect = pm.getBoundingClientRect();
-  const gap = 16;
-  const items = [];
-
-  state.doc.descendants((node, pos) => {
-    if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-
-    const frameLeft = parseOptionalPx(node.attrs.frameLeft);
-    const frameTop = parseOptionalPx(node.attrs.frameTop);
-    const frameWidth = parseOptionalPx(node.attrs.frameWidth);
-    const frameHeight = parseOptionalPx(node.attrs.frameHeight);
-    const inFrame =
-      frameLeft != null && frameTop != null && frameWidth != null && frameHeight != null;
-
-    let left = inFrame ? frameLeft : parseOptionalPx(node.attrs.posLeft);
-    let top = inFrame ? frameTop : parseOptionalPx(node.attrs.posTop);
-    let height =
-      (inFrame ? frameHeight : parseOptionalPx(node.attrs.height)) ||
-      parseOptionalPx(node.attrs.height) ||
-      null;
-
-    if (left == null || top == null || height == null) {
-      const dom = view.nodeDOM(pos);
-      const el = dom?.nodeType === 1 ? dom : null;
-      if (el) {
-        const r = el.getBoundingClientRect();
-        // Guard CSS zoom:0 / collapsed layout — ignore tiny rects.
-        if (r.width >= 8 && r.height >= 8) {
-          if (left == null) left = Math.max(0, Math.round(r.left - pmRect.left));
-          if (top == null) top = Math.max(0, Math.round(r.top - pmRect.top));
-          if (height == null) height = Math.max(40, Math.round(r.height));
-        }
-      }
-    }
-
-    left = left ?? 0;
-    top = top ?? 0;
-    height = height ?? 160;
-
-    items.push({
-      pos,
-      node,
-      left,
-      top,
-      height,
-      inFrame,
-      frameWidth,
-      frameHeight: inFrame ? frameHeight : null
-    });
-  });
-
-  if (!items.length) return false;
-
-  items.sort((a, b) => a.top - b.top || a.left - b.left);
-
-  let tr = state.tr;
-  let changed = false;
-  let nextY = bandBottom + gap;
-
-  for (const item of items) {
-    // Photos entirely above the template stay put.
-    if (item.top + item.height <= bandTop) continue;
-
-    let newTop = item.top;
-    // Anything that intersects the band or sits above the running floor is pushed down.
-    if (newTop < nextY) {
-      newTop = nextY;
-    }
-    nextY = newTop + item.height + gap;
-
-    if (newTop === item.top && item.inFrame === false) {
-      const prevLeft = parseOptionalPx(item.node.attrs.posLeft);
-      const prevTop = parseOptionalPx(item.node.attrs.posTop);
-      if (prevLeft === item.left && prevTop === item.top) continue;
-    }
-    if (
-      item.inFrame &&
-      newTop === item.top &&
-      parseOptionalPx(item.node.attrs.frameTop) === item.top &&
-      parseOptionalPx(item.node.attrs.posTop) === item.top
-    ) {
-      continue;
-    }
-
-    const attrs = {
-      ...item.node.attrs,
-      posLeft: item.left,
-      posTop: newTop
-    };
-    if (item.inFrame) {
-      attrs.frameLeft = item.left;
-      attrs.frameTop = newTop;
-      attrs.frameWidth = item.frameWidth;
-      attrs.frameHeight = item.frameHeight;
-    }
-    tr = tr.setNodeMarkup(item.pos, undefined, attrs);
-    changed = true;
-  }
-
-  if (changed) view.dispatch(tr);
-  return changed;
 }
 
 /** Ensure the ProseMirror canvas is tall enough for the template band + content. */
@@ -1681,15 +689,6 @@ function measureAlbumContentWidth(editor, instances, emptyFallback = 480) {
   }
   if (editor) {
     editor.state.doc.descendants((node) => {
-      if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
-        const fl = parseOptionalPx(node.attrs.frameLeft);
-        const fw = parseOptionalPx(node.attrs.frameWidth);
-        const pl = parseOptionalPx(node.attrs.posLeft);
-        const pw = parseOptionalPx(node.attrs.width);
-        if (fl != null && fw != null) maxR = Math.max(maxR, fl + fw);
-        else if (pl != null && pw != null) maxR = Math.max(maxR, pl + pw);
-        return;
-      }
       if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
         const pl = parseOptionalPx(node.attrs.posLeft);
         if (pl != null) maxR = Math.max(maxR, pl + 200);
@@ -1737,22 +736,6 @@ function scaleTemplateInstance(inst, scale) {
   };
 }
 
-function scaleAttachmentAttrs(attrs, scale) {
-  return {
-    ...attrs,
-    posLeft: scalePxAttr(attrs.posLeft, scale),
-    posTop: scalePxAttr(attrs.posTop, scale),
-    width: scalePxAttr(attrs.width, scale, 40),
-    height: scalePxAttr(attrs.height, scale, 40),
-    panX: scalePxAttr(attrs.panX, scale),
-    panY: scalePxAttr(attrs.panY, scale),
-    frameLeft: scalePxAttr(attrs.frameLeft, scale),
-    frameTop: scalePxAttr(attrs.frameTop, scale),
-    frameWidth: scalePxAttr(attrs.frameWidth, scale, 40),
-    frameHeight: scalePxAttr(attrs.frameHeight, scale, 40)
-  };
-}
-
 function scaleTextLabelAttrs(attrs, scale) {
   const fontSize = Number(attrs.fontSize);
   return {
@@ -1769,28 +752,13 @@ function scaleTextLabelAttrs(attrs, scale) {
  * Apply a uniform page scale from origin snapshots (avoids live-drag drift).
  * Returns the next templates list.
  */
-function applyAlbumPageScaleFromOrigin(
-  editor,
-  originTemplates,
-  originPhotosById,
-  scale,
-  originTextLabelsById = null
-) {
+function applyAlbumPageScaleFromOrigin(editor, originTemplates, scale, originTextLabelsById = null) {
   const nextTemplates = (originTemplates || []).map((inst) => scaleTemplateInstance(inst, scale));
-  if (editor && (originPhotosById?.size || originTextLabelsById?.size)) {
+  if (editor && originTextLabelsById?.size) {
     const { state } = editor;
     let tr = state.tr;
     let changed = false;
     state.doc.descendants((node, pos) => {
-      if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
-        const id = Number(node.attrs.attachmentId);
-        const origin = originPhotosById?.get(id);
-        if (!origin) return;
-        const nextAttrs = scaleAttachmentAttrs(origin, scale);
-        tr = tr.setNodeMarkup(pos, undefined, nextAttrs);
-        changed = true;
-        return;
-      }
       if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
         const id = String(node.attrs.labelId || '');
         const origin = originTextLabelsById?.get(id);
@@ -1838,8 +806,8 @@ function scrollActiveHitIntoView(editor) {
 }
 
 /**
- * TipTap editor for Photo Albums pages — binder canvas, template layouts, and
- * free-placed photos that can snap into template slots.
+ * TipTap editor for Photo Albums pages — binder canvas, template pages, text labels.
+ * Photos live in the thumbnail tray (vault attachments); they are not placed on pages.
  */
 const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     {
@@ -1852,6 +820,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     noteId = null,
     sharedAlbumId = null,
     storageType = null,
+    /** Vault attachment rows for this album (source of truth for the thumbnail tray). */
+    trayAttachments = null,
     onStageOsFiles = null,
     onRemoveStagedAttachment = null,
     onRemoveAllStagedAttachments = null,
@@ -1892,16 +862,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   onContentHeightRef.current = onContentHeightChange;
 
   const [templates, setTemplates] = useState(() => parseAlbumTemplateInstancesFromHtml(initialContent));
-  const [stagedPhotos, setStagedPhotos] = useState(() => parseStagingItemsFromHtml(initialContent));
+  const trayItems = useMemo(() => buildPhotoAlbumsTrayItems(trayAttachments), [trayAttachments]);
   const [albumTitleStyle, setAlbumTitleStyle] = useState(() =>
     parseAlbumTitleStyleFromHtml(initialContent)
   );
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  /** Auto Layout / Auto Layout 1 — hourglass + % + stats. */
-  const [autoLayoutProgress, setAutoLayoutProgress] = useState(null);
-  /** Guide popup: drop photo with no template, or return a page photo to the tray. */
-  const [needTemplateGuideOpen, setNeedTemplateGuideOpen] = useState(false);
-  const [contextTutorialOpenKey, setContextTutorialOpenKey] = useState(0);
+  const [contextTutorialOpenKey] = useState(0);
   const templatePickerAnchorRef = useRef(null);
   const [albumZoom, setAlbumZoom] = useState(DEFAULT_ALBUM_ZOOM);
   const [albumFullscreen, setAlbumFullscreen] = useState(() => Boolean(presentationMode));
@@ -1963,15 +929,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   albumCoverFaceRef.current = albumCoverFace;
   const albumOnClosedCover = albumCoverFace === 'front' || albumCoverFace === 'back';
   const goToAlbumPageRef = useRef(null);
-  const [highlightSlotId, setHighlightSlotId] = useState('');
-  const [highlightInstanceKey, setHighlightInstanceKey] = useState('');
-  const [occupiedByInstance, setOccupiedByInstance] = useState(() => ({}));
   const templatesRef = useRef(templates);
   templatesRef.current = templates;
-  /** Active blue-dot photo pan/scale gesture (origin snapshot until mouseup). */
-  const slotPhotoGestureRef = useRef(null);
-  const stagedPhotosRef = useRef(stagedPhotos);
-  stagedPhotosRef.current = stagedPhotos;
   const albumTitleStyleRef = useRef(albumTitleStyle);
   albumTitleStyleRef.current = albumTitleStyle;
   const pageRef = useRef(null);
@@ -1987,31 +946,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const runAlbumPageFlipThenRef = useRef(null);
   const [pageResizeDragging, setPageResizeDragging] = useState(false);
   const [placeTextOpen, setPlaceTextOpen] = useState(false);
-  /** Photo/video preview session for split Add Text dialog (top-half live preview). */
-  const [placeTextMediaSession, setPlaceTextMediaSession] = useState(null);
   const [placeTextSeed, setPlaceTextSeed] = useState('');
   const [placeTextStyle, setPlaceTextStyle] = useState(null);
-  /** When ≥2 labels on the photo, Add Text shows a select of existing captions. */
-  const [placeTextExistingLabels, setPlaceTextExistingLabels] = useState([]);
-  /** Pre-select an existing label in that dropdown (double-click edit). */
-  const [placeTextInitialExistingId, setPlaceTextInitialExistingId] = useState(null);
   const placeTextSelectionRef = useRef({ from: 0, to: 0, empty: true });
-  /** Avoid TDZ — attachment store may sync before handlePlaceFloatingText is declared. */
-  const handlePlaceFloatingTextRef = useRef(null);
   /** When set, Add Text OK updates this label instead of inserting a new one. */
   const placeTextEditingLabelIdRef = useRef(null);
   const placeTextEditingPosRef = useRef(null);
   /** When true, Add Text OK updates album-wide page title style (all pages). */
   const placeTextAlbumTitleModeRef = useRef(false);
-  /** Optional page coords when Add Text is opened from a selected photo. */
+  /** Optional page coords for a new label. */
   const placeTextPagePosRef = useRef(null);
-  /** Doc pos of the photo that opened Place Text — keep red border after OK. */
-  const placeTextPhotoPosRef = useRef(null);
-  /** Place emoji sticker immediately at client coords (from picker click). */
-  const placeEmojiAtClientPointRef = useRef(null);
-  /** Pixel box of ProseMirror inside pageScaleRef — yellow/red dots use this origin. */
+  /** Pixel box of ProseMirror inside pageScaleRef — template overlays use this origin. */
   const [pmLayerBox, setPmLayerBox] = useState({ left: 0, top: 0, width: 0, height: 0 });
-  const [photoViewer, setPhotoViewer] = useState(null);
 
 
   const handleAlbumZoomChange = useCallback((next) => {
@@ -2033,7 +979,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       withAlbumMarkers(
         rawHtml,
         templatesRef.current,
-        stagedPhotosRef.current,
         pageOrientationRef.current,
         albumCanvasWidthPxRef.current,
         albumTitleStyleRef.current
@@ -2060,23 +1005,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     editorProps: {
       // Album zoom-pane owns scrolling — do not jump after insert/focus/drop.
       handleScrollToSelection: () => true,
-      // Photos enter edit mode only via double-click (node view). Block TipTap’s
-      // default single-click NodeSelection on album photo atoms.
-      handleClickOn: (_view, _pos, node) => {
-        if (node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return true;
-        return false;
-      },
-      // Kill native browser drag of page photos (huge translucent ghost) —
-      // relocate/pan is custom and only when the photo is in edit mode.
+      // Kill native browser drag of text labels (huge translucent ghost).
       handleDOMEvents: {
         dragstart: (_view, event) => {
           const t = event?.target;
           if (!(t instanceof Element)) return false;
-          if (
-            t.closest(
-              '.rv-attachment-photo, .rv-photo-tile, .rv-photo-window, .rv-text-label'
-            )
-          ) {
+          if (t.closest('.rv-text-label')) {
             event.preventDefault();
             return true;
           }
@@ -2089,7 +1023,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         if (moved) return false;
         const dt = event?.dataTransfer;
         if (!dt) return false;
-        if (isStagedAttachmentDrag(dt) || isAlbumTemplateDrag(dt) || isFilesExplorerDrag(dt)) {
+        if (isAlbumTemplateDrag(dt) || isFilesExplorerDrag(dt)) {
           return true;
         }
         const types = dt.types ? Array.from(dt.types) : [];
@@ -2102,8 +1036,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           types.includes(DRAG_SHORTCUT) ||
           types.includes(DRAG_ALBUM_PAGE) ||
           types.includes(DRAG_CROSS_PANE) ||
-          types.includes(DRAG_STAGED_ATTACHMENT) ||
-          types.includes(DRAG_STAGED_FLAG) ||
           types.includes(DRAG_ALBUM_TEMPLATE) ||
           types.includes(DRAG_FILES_EXPLORER) ||
           types.includes(DRAG_FILES_EXPLORER_FLAG)
@@ -2442,15 +1374,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const zoomScale = Math.max(0.01, (Number(albumZoom) || 100) / 100);
       const startX = event.clientX;
       const originTemplates = (templatesRef.current || []).map((inst) => ({ ...inst }));
-      const originPhotosById = new Map();
       const originTextLabelsById = new Map();
       editor.state.doc.descendants((node) => {
-        if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
-          const id = Number(node.attrs.attachmentId);
-          if (!Number.isFinite(id) || id < 1) return;
-          originPhotosById.set(id, { ...node.attrs });
-          return;
-        }
         if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
           const id = String(node.attrs.labelId || '');
           if (!id) return;
@@ -2534,7 +1459,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         const next = applyAlbumPageScaleFromOrigin(
           editor,
           originTemplates,
-          originPhotosById,
           latestScale,
           originTextLabelsById
         );
@@ -2570,31 +1494,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   useEffect(() => {
     if (editor) onReadyRef.current?.();
   }, [editor]);
-
-  /**
-   * Attachment node views load photos via editor.storage.noteId / storageType.
-   * WorkspacePane sets this through setAttachmentContext; presentation tabs only
-   * pass props — sync here so Full screen / Full Slide actually show images.
-   */
-  useEffect(() => {
-    if (!editor) return;
-    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (!store) return;
-    const id = Number(noteId);
-    store.noteId = Number.isFinite(id) && id > 0 ? id : null;
-    const sharedId = Number(sharedAlbumId);
-    store.sharedAlbumId = Number.isFinite(sharedId) && sharedId > 0 ? sharedId : null;
-    if (storageType) store.storageType = storageType;
-    store.openPlaceText = (pagePos) => handlePlaceFloatingTextRef.current?.(pagePos);
-    store.openPlaceEmoji = (em, clientX, clientY) =>
-      placeEmojiAtClientPointRef.current?.(em, clientX, clientY);
-    store.attachmentCtxVersion = (Number(store.attachmentCtxVersion) || 0) + 1;
-    try {
-      editor.view.dispatch(editor.state.tr.setMeta('paAttachmentCtx', store.attachmentCtxVersion));
-    } catch {
-      // editor may be unmounting
-    }
-  }, [editor, noteId, sharedAlbumId, storageType]);
 
   useEffect(() => {
     if (!editor) return undefined;
@@ -2673,194 +1572,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     };
   }, [editor, templates, albumZoom]);
 
-  // Snap helper — only the visible spread pages can receive tray / relocate snaps.
-  // Geometry MUST match the overlay (spread columns), not stale/bloated saved x/w.
-  useEffect(() => {
-    if (!editor) return undefined;
-    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (!store) return undefined;
-    const activePageInstances = () => {
-      const pw =
-        albumCanvasWidthPxRef.current >= 200 ? albumCanvasWidthPxRef.current : 480;
-      const bw = albumBinderWidthPxRef.current || 0;
-      const orient = pageOrientationRef.current || 'portrait';
-      const corrected = withSpreadPageGeometry(
-        templatesRef.current || [],
-        pw,
-        bw,
-        orient
-      );
-      return activeSpreadPageInstances(corrected, albumPageIndexRef.current || 0);
-    };
-    store.findPhotoSnap = ({ left, top, width, height }) => {
-      const snap = findAlbumPhotoSnapAmongInstances({
-        instances: activePageInstances(),
-        left,
-        top,
-        photoWidth: width,
-        photoHeight: height
-      });
-      setHighlightInstanceKey(snap?.instanceKey || '');
-      setHighlightSlotId(snap?.slotId || '');
-      return snap;
-    };
-    store.hasAlbumTemplate = (templatesRef.current || []).some((t) =>
-      Boolean(getPhotoAlbumsPageTemplate(t.id))
-    );
-    store.canDropStagedPhoto = () =>
-      activePageInstances().some((t) => Boolean(getPhotoAlbumsPageTemplate(t.id)));
-    store.returnAttachmentToStaging = (attrs) => {
-      const attachmentId = Number(attrs?.attachmentId);
-      if (!Number.isFinite(attachmentId) || attachmentId < 1 || !editor) return false;
-      let photoRect = attrs?._photoRect || null;
-      if (!photoRect) {
-        editor.state.doc.descendants((node) => {
-          if (photoRect) return false;
-          if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-          if (Number(node.attrs.attachmentId) !== attachmentId) return;
-          photoRect = photoPageRectFromAttrs(node.attrs);
-          return false;
-        });
-      }
-      // Text/emoji on the photo travel with it into the thumbnail alley.
-      const companionLabels = photoRect ? detachTextAndEmojiNearPhoto(editor, photoRect) : [];
-      let removed = false;
-      let tr = editor.state.tr;
-      editor.state.doc.descendants((node, pos) => {
-        if (removed) return false;
-        if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-        if (Number(node.attrs.attachmentId) !== attachmentId) return;
-        tr = tr.delete(pos, pos + node.nodeSize);
-        removed = true;
-        return false;
-      });
-      if (removed) editor.view.dispatch(tr);
-      const nextItem = {
-        attachmentId,
-        fileName: String(attrs?.fileName || ''),
-        fileExtension: String(attrs?.fileExtension || ''),
-        fileSizeBytes: attrs?.fileSizeBytes ?? null,
-        checksum: attrs?.checksum ? String(attrs.checksum) : null,
-        ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
-          ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
-          : null),
-        ...(companionLabels.length ? { companionLabels } : null)
-      };
-      const prev = stagedPhotosRef.current || [];
-      const next = dedupeStagingItems([...prev, nextItem]);
-      stagedPhotosRef.current = next;
-      setStagedPhotos(next);
-      requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      return true;
-    };
-    /** Add to thumbnail tray without removing a doc node (fallback when node delete is handled elsewhere). */
-    store.pushStagingPhoto = (attrs) => {
-      const attachmentId = Number(attrs?.attachmentId);
-      if (!Number.isFinite(attachmentId) || attachmentId < 1) return false;
-      const nextItem = {
-        attachmentId,
-        fileName: String(attrs?.fileName || ''),
-        fileExtension: String(attrs?.fileExtension || ''),
-        fileSizeBytes: attrs?.fileSizeBytes ?? null,
-        checksum: attrs?.checksum ? String(attrs.checksum) : null,
-        ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
-          ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
-          : null),
-        ...(Array.isArray(attrs?.companionLabels) && attrs.companionLabels.length
-          ? { companionLabels: attrs.companionLabels }
-          : null)
-      };
-      const prev = stagedPhotosRef.current || [];
-      const next = dedupeStagingItems([...prev, nextItem]);
-      stagedPhotosRef.current = next;
-      setStagedPhotos(next);
-      if (editor) requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      return true;
-    };
-    store.clearPhotoSnapHighlight = () => {
-      setHighlightInstanceKey('');
-      setHighlightSlotId('');
-    };
-    return () => {
-      store.findPhotoSnap = null;
-      store.hasAlbumTemplate = false;
-      store.canDropStagedPhoto = null;
-      store.returnAttachmentToStaging = null;
-      store.clearPhotoSnapHighlight = null;
-    };
-  }, [editor, templates, pageSize.width, albumCanvasWidthPx, albumBinderWidthPx, pageOrientation]);
-
-  // Empty slots stay grab-able; occupied ones click through so snapped photos stay interactive.
-  // Use spread-column geometry so left-page photos never mark right-page slots occupied.
-  useEffect(() => {
-    if (!editor) {
-      setOccupiedByInstance({});
-      return undefined;
-    }
-    const refresh = () => {
-      const pw =
-        albumCanvasWidthPxRef.current >= 200 ? albumCanvasWidthPxRef.current : 480;
-      const bw = albumBinderWidthPxRef.current || 0;
-      const orient = pageOrientationRef.current || 'portrait';
-      const corrected = withSpreadPageGeometry(
-        templatesRef.current || [],
-        pw,
-        bw,
-        orient
-      );
-      const next = {};
-      for (const inst of corrected) {
-        const layout = getPhotoAlbumsPageTemplate(inst.id);
-        if (!layout) continue;
-        const band = templateBand(inst, pw, orient);
-        const occupied = new Set();
-        editor.state.doc.descendants((node) => {
-          if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-          const fl = parseOptionalPx(node.attrs.frameLeft);
-          const ft = parseOptionalPx(node.attrs.frameTop);
-          const fw = parseOptionalPx(node.attrs.frameWidth);
-          const fh = parseOptionalPx(node.attrs.frameHeight);
-          if (fl == null || ft == null || fw == null || fh == null) return;
-          const cx = fl + fw / 2;
-          const cy = ft + fh / 2;
-          for (const slot of resolveAlbumTemplateSlots(layout, inst.slots)) {
-            if (slot.type !== 'photo') continue;
-            const rect = albumSlotToPx(slot, band.width, band.height);
-            const left = band.left + rect.left;
-            const top = band.top + rect.top;
-            if (cx >= left && cx <= left + rect.width && cy >= top && cy <= top + rect.height) {
-              occupied.add(slot.id);
-              break;
-            }
-          }
-        });
-        next[inst.key] = occupied;
-      }
-      setOccupiedByInstance(next);
-    };
-    refresh();
-    editor.on('update', refresh);
-    return () => editor.off('update', refresh);
-  }, [editor, templates, pageSize.width, albumCanvasWidthPx, albumBinderWidthPx, pageOrientation]);
-
-  // One framed photo per slot — evict stacked duplicates (shows as red drop bands).
-  useEffect(() => {
-    if (!editor) return undefined;
-    let timer = null;
-    const run = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        evictDuplicateFramedPhotosInSlots(editor);
-      }, 0);
-    };
-    run();
-    editor.on('update', run);
-    return () => {
-      editor.off('update', run);
-      if (timer) clearTimeout(timer);
-    };
-  }, [editor]);
-
   const persistTemplates = useCallback(
     (nextList) => {
       const list = Array.isArray(nextList) ? nextList : [];
@@ -2871,52 +1582,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     [editor, emitHtml]
   );
 
-  const handleTemplateMoveResize = useCallback(
-    (instanceKey, geom, { live } = {}) => {
-      const prev = (templatesRef.current || []).find((inst) => inst.key === instanceKey);
-      if (!prev) return;
-      const oldBand = templateBand(prev, pageSize.width || 480);
-      // Overlay layer is aligned to ProseMirror — geom x/y are PM-local (band origin).
-      const x = Math.max(0, Math.round(geom?.x ?? 0));
-      const y = Math.max(0, Math.round(geom?.y ?? 0));
-      const w = Math.max(160, Math.round(geom?.w || 0));
-      const h = Math.max(120, Math.round(geom?.h || 0));
-      const nextInst = { ...prev, x, y, w, h };
-      const newBand = templateBand(nextInst, pageSize.width || 480);
-      const next = (templatesRef.current || []).map((inst) =>
-        inst.key === instanceKey ? nextInst : inst
-      );
-      templatesRef.current = next;
-      setTemplates(next);
-      if (editor) {
-        remapFramedPhotosForTemplateResize(editor, prev.id, oldBand, newBand, prev.slots);
-        if (!live) {
-          ensureAlbumCanvasMinHeight(editor, newBand.top + newBand.height, { allowShrink: true });
-          requestAnimationFrame(() => emitHtml(editor.getHTML()));
-        }
-      }
-    },
-    [editor, emitHtml, pageSize.width]
-  );
-
-  /** Per-slot move/resize (% overrides) — empty/text slots only; occupied photos use photo pan/scale. */
+  /** Per-slot move/resize (% overrides). */
   const handleSlotGeometryChange = useCallback(
     (instanceKey, slotId, nextPct, { live } = {}) => {
       const prev = (templatesRef.current || []).find((inst) => inst.key === instanceKey);
       if (!prev || !slotId) return;
-      const layout = getPhotoAlbumsPageTemplate(prev.id);
-      if (!layout) return;
-      const band = templateBand(prev, pageSize.width || 480);
-      const resolved = resolveAlbumTemplateSlots(layout, prev.slots);
-      const before = resolved.find((s) => s.id === slotId);
-      if (!before) return;
-      const oldRect = albumSlotToPx(before, band.width, band.height);
-      const oldFrame = {
-        left: band.left + oldRect.left,
-        top: band.top + oldRect.top,
-        width: oldRect.width,
-        height: oldRect.height
-      };
       const nextInst = {
         ...prev,
         slots: {
@@ -2934,173 +1604,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       );
       templatesRef.current = next;
       setTemplates(next);
-
-      const afterSlot = {
-        ...before,
-        x: nextPct.x,
-        y: nextPct.y,
-        w: nextPct.w,
-        h: nextPct.h
-      };
-      const newRect = albumSlotToPx(afterSlot, band.width, band.height);
-      const newFrame = {
-        left: band.left + newRect.left,
-        top: band.top + newRect.top,
-        width: newRect.width,
-        height: newRect.height
-      };
-      if (editor) {
-        remapPhotoForSlotFrameChange(editor, oldFrame, newFrame);
-        if (!live) requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      }
+      if (editor && !live) requestAnimationFrame(() => emitHtml(editor.getHTML()));
     },
-    [editor, emitHtml, pageSize.width]
-  );
-
-  /** Scroll-wheel zoom of the photo inside a template slot (selected photo only). */
-  const handleSlotPhotoZoom = useCallback(
-    (instanceKey, slotId, deltaY) => {
-      if (!editor || !slotId) return;
-      const prev = (templatesRef.current || []).find((inst) => inst.key === instanceKey);
-      if (!prev) return;
-      const layout = getPhotoAlbumsPageTemplate(prev.id);
-      if (!layout) return;
-      const band = templateBand(prev, pageSize.width || 480);
-      const slot = resolveAlbumTemplateSlots(layout, prev.slots).find((s) => s.id === slotId);
-      if (!slot) return;
-      const rect = albumSlotToPx(slot, band.width, band.height);
-      const frame = {
-        left: band.left + rect.left,
-        top: band.top + rect.top,
-        width: rect.width,
-        height: rect.height
-      };
-      const hit = findFramedPhotoInFrame(editor.state, frame);
-      if (!hit) return;
-      const { selection } = editor.state;
-      if (!(selection instanceof NodeSelection) || selection.from !== hit.pos) return;
-      const factor = deltaY < 0 ? 1.08 : 1 / 1.08;
-      if (zoomPhotoInsideFrame(editor, frame, factor)) {
-        requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      }
-    },
-    [editor, emitHtml, pageSize.width]
-  );
-
-  /** Resolve absolute page frame for a slot on a template instance. */
-  const resolveSlotFrame = useCallback(
-    (instanceKey, slotId) => {
-      const prev = (templatesRef.current || []).find((inst) => inst.key === instanceKey);
-      if (!prev || !slotId) return null;
-      const layout = getPhotoAlbumsPageTemplate(prev.id);
-      if (!layout) return null;
-      const band = templateBand(prev, pageSize.width || 480);
-      const slot = resolveAlbumTemplateSlots(layout, prev.slots).find((s) => s.id === slotId);
-      if (!slot) return null;
-      const rect = albumSlotToPx(slot, band.width, band.height);
-      return {
-        left: band.left + rect.left,
-        top: band.top + rect.top,
-        width: rect.width,
-        height: rect.height
-      };
-    },
-    [pageSize.width]
-  );
-
-  /** True when the TipTap-selected photo node occupies this slot. */
-  const isSlotPhotoSelectedForInstance = useCallback(
-    (instanceKey, slotId) => {
-      if (!editor || !slotId) return false;
-      const { selection } = editor.state;
-      if (!(selection instanceof NodeSelection)) return false;
-      const node = selection.node;
-      if (node?.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return false;
-      const frame = resolveSlotFrame(instanceKey, slotId);
-      if (!frame) return false;
-      const fLeft = frame.left;
-      const fTop = frame.top;
-      const fW = Math.max(1, frame.width);
-      const fH = Math.max(1, frame.height);
-      const centerInSlot = (cx, cy) =>
-        cx >= fLeft && cx <= fLeft + fW && cy >= fTop && cy <= fTop + fH;
-
-      // Prefer the selected node's own frame / place — works for every image
-      // format (png/svg/webp/…) even when another framed node overlaps the slot.
-      const fl = parseOptionalPx(node.attrs.frameLeft);
-      const ft = parseOptionalPx(node.attrs.frameTop);
-      const fw = parseOptionalPx(node.attrs.frameWidth);
-      const fh = parseOptionalPx(node.attrs.frameHeight);
-      if (fl != null && ft != null && fw != null && fh != null) {
-        if (centerInSlot(fl + fw / 2, ft + fh / 2)) return true;
-      }
-      const pl = parseOptionalPx(node.attrs.posLeft);
-      const pt = parseOptionalPx(node.attrs.posTop);
-      if (pl != null && pt != null) {
-        const pw = parseOptionalPx(node.attrs.width) || 120;
-        const ph = parseOptionalPx(node.attrs.height) || 90;
-        if (centerInSlot(pl + pw / 2, pt + ph / 2)) return true;
-      }
-      const hit = findFramedPhotoInFrame(editor.state, frame);
-      return Boolean(hit && hit.pos === selection.from);
-    },
-    [editor, resolveSlotFrame]
-  );
-
-  /**
-   * Blue slot 9-dots → pan/scale the photo inside a fixed slot window (not the slot).
-   * `dx`/`dy` are page-coord deltas from gesture start; origin is captured once per drag.
-   */
-  const handleSlotPhotoPan = useCallback(
-    (instanceKey, slotId, dx, dy, { live } = {}) => {
-      if (!editor || !slotId) return;
-      const frame = resolveSlotFrame(instanceKey, slotId);
-      if (!frame) return;
-      const gesture = slotPhotoGestureRef.current;
-      if (!gesture || gesture.kind !== 'pan' || gesture.slotId !== slotId || gesture.instanceKey !== instanceKey) {
-        const origin = readPhotoTransformInFrame(editor, frame);
-        if (!origin) return;
-        slotPhotoGestureRef.current = { kind: 'pan', instanceKey, slotId, origin };
-      }
-      const { origin } = slotPhotoGestureRef.current;
-      setPhotoTransformInsideFrame(editor, frame, {
-        width: origin.width,
-        height: origin.height,
-        panX: origin.panX + dx,
-        panY: origin.panY + dy
-      });
-      if (!live) {
-        slotPhotoGestureRef.current = null;
-        requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      }
-    },
-    [editor, emitHtml, resolveSlotFrame]
-  );
-
-  const handleSlotPhotoScale = useCallback(
-    (instanceKey, slotId, factor, { live } = {}) => {
-      if (!editor || !slotId || !(factor > 0)) return;
-      const frame = resolveSlotFrame(instanceKey, slotId);
-      if (!frame) return;
-      const gesture = slotPhotoGestureRef.current;
-      if (
-        !gesture ||
-        gesture.kind !== 'scale' ||
-        gesture.slotId !== slotId ||
-        gesture.instanceKey !== instanceKey
-      ) {
-        const origin = readPhotoTransformInFrame(editor, frame);
-        if (!origin) return;
-        slotPhotoGestureRef.current = { kind: 'scale', instanceKey, slotId, origin };
-      }
-      const { origin } = slotPhotoGestureRef.current;
-      scalePhotoInsideFrameFromOrigin(editor, frame, origin, factor);
-      if (!live) {
-        slotPhotoGestureRef.current = null;
-        requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      }
-    },
-    [editor, emitHtml, resolveSlotFrame]
+    [editor, emitHtml]
   );
 
   const handleDeleteTemplate = useCallback(
@@ -3112,10 +1618,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
         );
         const band = templateBand(target, pw, pageOrientationRef.current);
-        returnPhotosInBandToStagingTray(editor, band);
+        removeTextLabelsInBand(editor, band);
       }
-      setHighlightSlotId('');
-      setHighlightInstanceKey('');
       const next = (templatesRef.current || []).filter((t) => t.key !== instanceKey);
       persistTemplates(next);
     },
@@ -3124,15 +1628,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   /**
    * Open Add Text styling popup. Uses selected text as the seed when present.
-   * Optional `pagePos` places the new label near a selected photo.
-   * Never treat a selected photo/attachment node as “text to replace”.
+   * Optional `pagePos` places the new label at those page coords.
    */
   const handlePlaceFloatingText = useCallback((pagePos = null) => {
     if (!editor || !effectiveEditable) return;
     const { state } = editor;
     const { from, to, empty } = state.selection;
     const isNodeSelection = state.selection instanceof NodeSelection;
-    // Photo / attachment / atom selection must not be deleted on OK — only plain text.
+    // Atom selection must not be deleted on OK — only plain text.
     const replaceableText = !empty && !isNodeSelection;
     const text = replaceableText
       ? state.doc.textBetween(from, to, ' ').replace(/\s+/g, ' ').trim()
@@ -3146,158 +1649,16 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     placeTextEditingLabelIdRef.current = null;
     placeTextEditingPosRef.current = null;
     placeTextAlbumTitleModeRef.current = false;
-    // Remember which photo is in edit mode so OK can restore the red border.
-    if (
-      isNodeSelection &&
-      state.selection.node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME
-    ) {
-      placeTextPhotoPosRef.current = from;
-    } else {
-      const pinned = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.pinnedPhotoEditPos;
-      placeTextPhotoPosRef.current = Number.isFinite(pinned) ? pinned : null;
-    }
     const left = Number(pagePos?.posLeft);
     const top = Number(pagePos?.posTop);
     placeTextPagePosRef.current =
       Number.isFinite(left) && Number.isFinite(top)
         ? { posLeft: Math.max(0, Math.round(left)), posTop: Math.max(0, Math.round(top)) }
         : null;
-    const photoPos = placeTextPhotoPosRef.current;
-    const nearLabels = collectPlaceTextLabelsNearPhoto(editor, photoPos);
-    const nearOverlays = Number.isFinite(photoPos)
-      ? listTextAndEmojiForPhotoPos(editor.state, photoPos)
-      : [];
-    const overlayCount = nearOverlays.length;
-    const seedText = resolvePlaceTextCaption({
-      explicitText: text,
-      existingOverlayCount: overlayCount,
-      editing: false
-    });
-    setPlaceTextExistingLabels(nearLabels.length >= 2 ? nearLabels : []);
-    setPlaceTextInitialExistingId(null);
     setPlaceTextStyle(null);
     setPlaceTextSeed(text);
-    setPlaceTextMediaSession(
-      Number.isFinite(photoPos)
-        ? buildPlaceTextPositionSession(
-            editor,
-            photoPos,
-            { ...PLACE_TEXT_DEFAULTS, text: seedText },
-            { existingOverlayCount: overlayCount }
-          )
-        : null
-    );
-    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (store) {
-      store.placeTextDialogOpen = Number.isFinite(photoPos);
-      if (Number.isFinite(photoPos)) {
-        store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
-        try {
-          editor.view.dispatch(
-            editor.state.tr.setMeta('paContextTutorial', store.contextTutorialTick)
-          );
-        } catch {
-          // ignore
-        }
-      }
-    }
     setPlaceTextOpen(true);
   }, [editor, effectiveEditable]);
-  handlePlaceFloatingTextRef.current = handlePlaceFloatingText;
-
-  const handlePlaceTextPhotoChromeChange = useCallback(
-    (patch) => {
-      if (!editor || !patch || typeof patch !== 'object') return;
-      const pos = placeTextPhotoPosRef.current;
-      if (!Number.isFinite(pos)) return;
-      const { panZoom, ...attrs } = patch;
-      if (Object.keys(attrs).length) {
-        editor
-          .chain()
-          .command(({ tr, dispatch }) => {
-            const node = tr.doc.nodeAt(pos);
-            if (!node || node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return false;
-            tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs });
-            if (dispatch) dispatch(tr);
-            return true;
-          })
-          .run();
-        setPlaceTextMediaSession((prev) => {
-          if (!prev) return prev;
-          const next = { ...prev, ...attrs };
-          if ('width' in attrs) next.photoW = attrs.width;
-          if ('height' in attrs) next.photoH = attrs.height;
-          if ('panX' in attrs) next.panX = attrs.panX;
-          if ('panY' in attrs) next.panY = attrs.panY;
-          return next;
-        });
-      }
-      if (typeof panZoom === 'boolean') {
-        const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-        if (store) {
-          store.dialogPanZoom = panZoom;
-          store.pinnedPhotoEditPos = pos;
-          store.contextTutorialTick = (store.contextTutorialTick || 0) + 1;
-        }
-      }
-    },
-    [editor]
-  );
-
-  const placeEmojiAtClientPoint = useCallback(
-    (emoji, clientX, clientY) => {
-      if (!editor || !editable) return;
-      const em = String(emoji || '').trim();
-      if (!em) return;
-      const zoomScale = Math.max(0.01, (Number(albumZoom) || 100) / 100);
-      const size = PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX;
-      withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-        try {
-          const pm = editor.view.dom;
-          const rect = pm.getBoundingClientRect();
-          const posLeft = Math.max(
-            0,
-            Math.round((clientX - rect.left) / zoomScale + (pm.scrollLeft || 0) - size / 2)
-          );
-          const posTop = Math.max(
-            0,
-            Math.round((clientY - rect.top) / zoomScale + (pm.scrollTop || 0) - size / 2)
-          );
-          const attrs = {
-            labelId: newLabelId(),
-            text: em,
-            color: '#000000',
-            outlineColor: '#000000',
-            outlineWidth: 0,
-            fontSize: size,
-            fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif',
-            fontWeight: 400,
-            rotationDeg: 0,
-            posLeft,
-            posTop,
-            boxWidth: size + 12,
-            boxHeight: size + 12
-          };
-          const { state, view } = editor;
-          if (state.selection instanceof NodeSelection) {
-            const near = Math.min(state.doc.content.size, state.selection.to);
-            view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(near))));
-          }
-          const insertAt = editor.state.doc.content.size;
-          editor
-            .chain()
-            .focus(null, { scrollIntoView: false })
-            .insertContentAt(insertAt, { type: PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME, attrs })
-            .run();
-          requestAnimationFrame(() => emitHtml(editor.getHTML()));
-        } catch {
-          // ignore placement errors
-        }
-      });
-    },
-    [editor, editable, albumZoom, emitHtml]
-  );
-  placeEmojiAtClientPointRef.current = placeEmojiAtClientPoint;
 
   /** Double-click an existing label — reopen Add Text with its full style. */
   const handleEditExistingTextLabel = useCallback(
@@ -3308,24 +1669,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       placeTextEditingPosRef.current = Number.isFinite(payload.pos) ? payload.pos : null;
       placeTextAlbumTitleModeRef.current = false;
       placeTextPagePosRef.current = null;
-      const { selection } = editor.state;
-      if (
-        selection instanceof NodeSelection &&
-        selection.node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME
-      ) {
-        placeTextPhotoPosRef.current = selection.from;
-      } else {
-        const pinned = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.pinnedPhotoEditPos;
-        placeTextPhotoPosRef.current = Number.isFinite(pinned) ? pinned : null;
-      }
-      const nearLabels = collectPlaceTextLabelsNearPhoto(editor, placeTextPhotoPosRef.current);
-      const photoPos = placeTextPhotoPosRef.current;
-      const nearOverlays = Number.isFinite(photoPos)
-        ? listTextAndEmojiForPhotoPos(editor.state, photoPos)
-        : [];
-      const overlayCount = nearOverlays.length;
-      setPlaceTextExistingLabels(nearLabels.length >= 2 ? nearLabels : []);
-      setPlaceTextInitialExistingId(payload.labelId || null);
       setPlaceTextSeed(String(payload.text || '').trim());
       const editStyle = {
         text: String(payload.text || '').trim(),
@@ -3337,27 +1680,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         fontWeight: payload.fontWeight
       };
       setPlaceTextStyle(editStyle);
-      setPlaceTextMediaSession(
-        Number.isFinite(photoPos)
-          ? buildPlaceTextPositionSession(editor, photoPos, editStyle, {
-              editLabelId: payload.labelId || null,
-              editPos: Number.isFinite(payload.pos) ? payload.pos : null,
-              existingOverlayCount: overlayCount
-            })
-          : null
-      );
-      const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      if (store && Number.isFinite(photoPos)) {
-        store.placeTextDialogOpen = true;
-        store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
-        try {
-          editor.view.dispatch(
-            editor.state.tr.setMeta('paContextTutorial', store.contextTutorialTick)
-          );
-        } catch {
-          // ignore
-        }
-      }
       setPlaceTextOpen(true);
     },
     [editor, effectiveEditable]
@@ -3371,33 +1693,19 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     placeTextEditingPosRef.current = null;
     placeTextAlbumTitleModeRef.current = true;
     placeTextPagePosRef.current = null;
-    setPlaceTextExistingLabels([]);
-    setPlaceTextInitialExistingId(null);
     setPlaceTextSeed(String(albumTitle || '').trim());
     setPlaceTextStyle({ ...albumTitleStyleRef.current });
-    setPlaceTextMediaSession(null);
     setPlaceTextOpen(true);
   }, [editable, albumTitle]);
 
-  /** Close Add Text → normal album (no yellow/red photo edit chrome). */
+  /** Close Add Text → drop any node selection left behind. */
   const exitPlaceTextToNormalAlbum = useCallback(() => {
     if (!editor) return;
-    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (store) {
-      store.dialogPanZoom = false;
-      store.selectedPhotoPanZoom = false;
-      store.placeTextDialogOpen = false;
-      store.contextTutorialTick = (Number(store.contextTutorialTick) || 0) + 1;
-    }
-    clearPinnedPhotoEditPos(editor);
     requestAnimationFrame(() => {
       try {
         const { state, dispatch } = editor.view;
         if (state.selection instanceof NodeSelection) {
           dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-        } else {
-          // Force node views to re-read pin/pan state after clear.
-          dispatch(state.tr.setMeta('paContextTutorial', store?.contextTutorialTick || 0));
         }
       } catch {
         // ignore
@@ -3409,8 +1717,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     (style) => {
       if (!editor || !editable) return;
       setPlaceTextOpen(false);
-      setPlaceTextExistingLabels([]);
-      setPlaceTextInitialExistingId(null);
 
       if (placeTextAlbumTitleModeRef.current) {
         placeTextAlbumTitleModeRef.current = false;
@@ -3434,37 +1740,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         requestAnimationFrame(() => emitHtml(editor.getHTML()));
         setPlaceTextStyle(null);
         setPlaceTextSeed('');
-        placeTextPhotoPosRef.current = null;
         exitPlaceTextToNormalAlbum();
         return;
       }
 
-      // Dropdown may retarget which existing label to update (or clear for new text).
-      const editingLabelId =
-        style && Object.prototype.hasOwnProperty.call(style, 'editLabelId')
-          ? style.editLabelId || null
-          : placeTextEditingLabelIdRef.current;
-      const editingPos =
-        style && Object.prototype.hasOwnProperty.call(style, 'editPos')
-          ? Number.isFinite(style.editPos)
-            ? style.editPos
-            : null
-          : placeTextEditingPosRef.current;
+      const editingLabelId = placeTextEditingLabelIdRef.current;
+      const editingPos = placeTextEditingPosRef.current;
       placeTextEditingLabelIdRef.current = null;
       placeTextEditingPosRef.current = null;
 
-      placeTextPhotoPosRef.current = null;
       placeTextSelectionRef.current = { from: 0, to: 0, empty: true, replaceableText: false };
       setPlaceTextStyle(null);
       setPlaceTextSeed('');
-      setPlaceTextMediaSession(null);
-
-      if (style?.placeTextSession) {
-        commitPlaceTextPositionSession(editor, style.placeTextSession);
-        requestAnimationFrame(() => emitHtml(editor.getHTML()));
-        exitPlaceTextToNormalAlbum();
-        return;
-      }
 
       const applyStyleAttrs = (baseAttrs) => ({
         ...baseAttrs,
@@ -3594,7 +1881,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     };
   }, [editor, handleEditExistingTextLabel]);
 
-  /** Clear page text/photos/templates → staging tray; zoom 95%; flush + stretch to edge. */
+  /** Clear page text/templates; zoom 95%; flush + stretch to edge. Tray photos are untouched. */
   const handleResetPage = useCallback(() => {
     if (!editor) return;
 
@@ -3602,14 +1889,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     pageOrientationRef.current = 'portrait';
     setAlbumPageIndex(0);
 
-    returnAllPagePhotosToStagingTray(editor);
-
     // Clear remaining text / empty the page body.
     editor.commands.setContent(EMPTY_DOC, { emitUpdate: false });
 
-    setHighlightSlotId('');
-    setHighlightInstanceKey('');
-    setOccupiedByInstance({});
     setTemplatePickerOpen(false);
     templatesRef.current = [];
     setTemplates([]);
@@ -3671,78 +1953,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       window.clearTimeout(timer);
     };
   }, [editor, pageResizeDragging, noteId]);
-
-  /**
-   * Exit photo edit / Pan&Zoom (clear NodeSelection):
-   * — single-click white page / non-photo album chrome
-   * — single-click a *different* photo (not the one currently in edit mode)
-   * Clicking the current photo keeps edit mode (drag / pan / zoom).
-   */
-  useEffect(() => {
-    if (!editor || !effectiveEditable) return undefined;
-    const onPointerDown = (event) => {
-      if (event.button != null && event.button !== 0) return;
-      const t = event.target;
-      if (!(t instanceof Element)) return;
-      if (
-        t.closest(
-          [
-            '.rv-photo-tile__actions',
-            '.rv-attachment-photo__return-x',
-            '.rv-photo-tile__zoom-bar',
-            '.rv-text-label',
-            '.MuiDialog-root',
-            '.MuiMenu-root',
-            '.MuiPopover-root',
-            'button',
-            'a',
-            'input',
-            'textarea',
-            'select'
-          ].join(',')
-        )
-      ) {
-        return;
-      }
-      const { state, view } = editor;
-      const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      const pinnedPos = store?.pinnedPhotoEditPos;
-      const hasPinned = pinnedPos != null;
-      const hasTipTapPhoto =
-        state.selection instanceof NodeSelection &&
-        state.selection.node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME;
-      if (!hasPinned && !hasTipTapPhoto) return;
-
-      const photoEl = t.closest('.rv-attachment-photo, .rv-photo-tile, .rv-photo-window');
-      if (photoEl) {
-        let selectedDom = null;
-        const focusPos = hasTipTapPhoto ? state.selection.from : pinnedPos;
-        try {
-          if (Number.isFinite(focusPos)) selectedDom = view.nodeDOM(focusPos);
-        } catch {
-          selectedDom = null;
-        }
-        const onSelected =
-          selectedDom instanceof Element &&
-          (selectedDom === photoEl ||
-            selectedDom.contains(photoEl) ||
-            photoEl.contains(selectedDom) ||
-            selectedDom.contains(t));
-        // Current photo: keep edit mode for relocate / pan / place text.
-        if (onSelected) return;
-        // Another photo: exit edit / Pan&Zoom back to View mode.
-        clearPinnedPhotoEditPos(editor);
-        view.dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-        return;
-      }
-
-      if (!t.closest('.rv-editor__album-zoom-scroll, .rv-editor__body--album')) return;
-      clearPinnedPhotoEditPos(editor);
-      view.dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-    };
-    window.addEventListener('mousedown', onPointerDown, true);
-    return () => window.removeEventListener('mousedown', onPointerDown, true);
-  }, [editor, effectiveEditable]);
 
   const handleSelectTemplate = useCallback(
     (nextId) => {
@@ -3839,38 +2049,27 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
       const current = templatesRef.current || [];
       if (!current.length) {
-        let photoCount = 0;
-        editor.state.doc.descendants((node) => {
-          if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) photoCount += 1;
+        const pw = albumPageWidthFromViewport(zoomScrollRef.current);
+        applyAlbumCanvasWidth(pw);
+        syncAlbumBinderFromViewport(zoomScrollRef.current);
+        const orient = pageOrientationRef.current;
+        const nextBlockH = albumTemplateBlockHeight(pw, orient);
+        const working = createAlbumTemplateInstance({
+          id: 't1',
+          x: 0,
+          y: 0,
+          w: pw,
+          h: nextBlockH
         });
-        const autoId =
-          photoCount >= 2 && photoCount <= 5 ? PHOTO_ALBUMS_AUTO_LAYOUT_BY_COUNT[photoCount] : null;
-        const templateId = autoId || 't1';
-        const layout = getPhotoAlbumsPageTemplate(templateId);
-        if (layout) {
-          const pw = albumPageWidthFromViewport(zoomScrollRef.current);
-          applyAlbumCanvasWidth(pw);
-          syncAlbumBinderFromViewport(zoomScrollRef.current);
-          const orient = pageOrientationRef.current;
-          const nextBlockH = albumTemplateBlockHeight(pw, orient);
-          const working = createAlbumTemplateInstance({
-            id: templateId,
-            x: 0,
-            y: 0,
-            w: pw,
-            h: nextBlockH
-          });
-          templatesRef.current = [working];
-          setTemplates([working]);
-          ensureAlbumCanvasMinHeight(editor, nextBlockH, { allowShrink: true });
-          emitHtml(editor.getHTML());
-        }
+        templatesRef.current = [working];
+        setTemplates([working]);
+        ensureAlbumCanvasMinHeight(editor, nextBlockH, { allowShrink: true });
+        emitHtml(editor.getHTML());
       }
 
       const html = withAlbumMarkers(
         editor.getHTML(),
         templatesRef.current,
-        stagedPhotosRef.current,
         pageOrientationRef.current,
         albumCanvasWidthPxRef.current,
         albumTitleStyleRef.current
@@ -3902,7 +2101,15 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         flushAlbumScrollOrigin(zoomScrollRef.current);
       });
     },
-    [editor, emitHtml, applyAlbumCanvasWidth, noteId, storageType, albumTitle]
+    [
+      editor,
+      emitHtml,
+      applyAlbumCanvasWidth,
+      syncAlbumBinderFromViewport,
+      noteId,
+      storageType,
+      albumTitle
+    ]
   );
 
   const enterAlbumFullSlide = useCallback(() => {
@@ -3937,7 +2144,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         withAlbumMarkers(
           editor?.getHTML() ?? '',
           templatesRef.current,
-          stagedPhotosRef.current,
           pageOrientationRef.current,
           albumCanvasWidthPxRef.current,
           albumTitleStyleRef.current
@@ -3949,15 +2155,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         if (!editor) return;
         suppressAutoFitUntilRef.current = Date.now() + 400;
         const list = parseAlbumTemplateInstancesFromHtml(html);
-        const staged = parseStagingItemsFromHtml(html);
         const orient = parseAlbumOrientationFromHtml(html);
         const titleStyle = parseAlbumTitleStyleFromHtml(html);
         templatesRef.current = list;
-        stagedPhotosRef.current = staged;
         pageOrientationRef.current = orient;
         albumTitleStyleRef.current = titleStyle;
         setTemplates(list);
-        setStagedPhotos(staged);
         setPageOrientation(orient);
         setAlbumTitleStyle(titleStyle);
         editor.commands.setContent(stripAlbumMarkers(html) || EMPTY_DOC, { emitUpdate: false });
@@ -3971,243 +2174,15 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         requestAnimationFrame(() => fitAlbumPageFlushToViewportRef.current?.());
         if (typeof nextEditable === 'boolean') editor.setEditable(nextEditable);
       },
-      /**
-       * Rebuild alley from vault attachments (size+checksum dedupe).
-       * Drops staging entries whose attachment was purged; keeps page-placed photos out of alley.
-       * Also removes inline page nodes whose attachments were hard-deleted as duplicates.
-       *
-       * Important: when the tray already has photos, do NOT pull in unrelated vault orphans.
-       * Auto Layout uses tray order (album_photo_seq) — silently injecting older vault photos
-       * caused "I dropped SET_BLUE photos but party/dogs appeared on the album" bugs.
-       * Orphans are only seeded when the tray is empty (open album / shared / first load).
-       */
-      syncStagingAlleyFromAttachments: (attachments) => {
-        if (!editor) return;
-        const liveById = new Map();
-        for (const a of Array.isArray(attachments) ? attachments : []) {
-          const id = Number(a?.attachment_id ?? a?.attachmentId);
-          if (!Number.isFinite(id) || id < 1) continue;
-          liveById.set(id, {
-            attachmentId: id,
-            fileName: String(a?.file_name ?? a?.fileName ?? ''),
-            fileExtension: String(a?.file_extension ?? a?.fileExtension ?? ''),
-            fileSizeBytes: a?.file_size_bytes ?? a?.fileSizeBytes ?? null,
-            checksum: a?.checksum ? String(a.checksum) : null,
-            albumPhotoSeq: attachmentAlbumPhotoSeq(a)
-          });
-        }
-
-        // Drop page tiles whose vault rows were purged as duplicates.
-        const deadPositions = [];
-        editor.state.doc.descendants((node, pos) => {
-          if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-          const id = Number(node.attrs.attachmentId);
-          if (!Number.isFinite(id) || id < 1) return;
-          if (!liveById.has(id)) deadPositions.push({ pos, size: node.nodeSize });
-        });
-        if (deadPositions.length) {
-          let tr = editor.state.tr;
-          for (let i = deadPositions.length - 1; i >= 0; i -= 1) {
-            const { pos, size } = deadPositions[i];
-            tr = tr.delete(pos, pos + size);
-          }
-          editor.view.dispatch(tr);
-        }
-
-        const onPage = new Set();
-        editor.state.doc.descendants((node) => {
-          if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-          const id = Number(node.attrs.attachmentId);
-          if (Number.isFinite(id) && id > 0) onPage.add(id);
-        });
-
-        const fromMarker = (stagedPhotosRef.current || [])
-          .map((item) => {
-            const id = Number(item.attachmentId);
-            if (!Number.isFinite(id) || id < 1) return null;
-            // Drop purged vault rows when we have a live inventory.
-            if (liveById.size > 0 && !liveById.has(id)) return null;
-            const live = liveById.get(id);
-            if (!live) return mergeStagingItemPreview(item);
-            return mergeStagingItemPreview({
-              ...live,
-              fileName: item.fileName || live.fileName,
-              fileExtension: item.fileExtension || live.fileExtension,
-              fileSizeBytes: item.fileSizeBytes ?? live.fileSizeBytes,
-              checksum: item.checksum || live.checksum,
-              albumPhotoSeq: live.albumPhotoSeq ?? item.albumPhotoSeq ?? null,
-              ...(item.localPreviewUrl ? { localPreviewUrl: String(item.localPreviewUrl) } : null)
-            });
-          })
-          .filter((item) => item && Number.isFinite(Number(item.attachmentId)))
-          .filter((item) => !onPage.has(Number(item.attachmentId)));
-
-        // Only seed vault orphans when the tray is empty — never merge them into an active tray.
-        let seed = fromMarker;
-        if (!seed.length) {
-          const extras = [];
-          for (const [id, live] of liveById) {
-            if (onPage.has(id)) continue;
-            extras.push(mergeStagingItemPreview(live));
-          }
-          seed = extras;
-        }
-
-        const next = dedupeStagingItems(seed).map((item) => mergeStagingItemPreview(item));
-        stagedPhotosRef.current = next;
-        setStagedPhotos(next);
-        syncAlbumPhotoSeqOnPage(editor, liveById);
-        requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      },
-      getStagedAttachmentIds: () =>
-        (stagedPhotosRef.current || []).map((item) => String(item.attachmentId)),
-      addStagedAttachment: (attrs) => {
-        const attachmentId = Number(attrs?.attachmentId);
-        if (!Number.isFinite(attachmentId) || attachmentId < 1) return;
-        const nextItem = {
-          attachmentId,
-          fileName: String(attrs?.fileName || ''),
-          fileExtension: String(attrs?.fileExtension || ''),
-          fileSizeBytes: attrs?.fileSizeBytes ?? null,
-          checksum: attrs?.checksum ? String(attrs.checksum) : null,
-          ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
-            ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
-            : null),
-          ...(attrs?.localPreviewUrl ? { localPreviewUrl: String(attrs.localPreviewUrl) } : null)
-        };
-        const prev = stagedPhotosRef.current || [];
-        // Preserve local preview when dedupe keeps an existing id.
-        const next = dedupeStagingItems([...prev, nextItem]).map((item) => {
-          if (Number(item.attachmentId) !== attachmentId) return mergeStagingItemPreview(item);
-          return mergeStagingItemPreview({
-            ...item,
-            ...(nextItem.localPreviewUrl ? { localPreviewUrl: nextItem.localPreviewUrl } : null)
-          });
-        });
-        stagedPhotosRef.current = next;
-        setStagedPhotos(next);
-        if (editor) requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      },
-      removeStagedAttachment: (attachmentId) => {
-        const id = Number(attachmentId);
-        const next = (stagedPhotosRef.current || []).filter((item) => Number(item.attachmentId) !== id);
-        stagedPhotosRef.current = next;
-        setStagedPhotos(next);
-        if (editor) requestAnimationFrame(() => emitHtml(editor.getHTML()));
-      },
-      returnAttachmentToStaging: (attrs) => {
-        const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-        if (typeof store?.returnAttachmentToStaging === 'function') {
-          return store.returnAttachmentToStaging(attrs);
-        }
-        return false;
-      },
       setMarkdown: (markdown, nextEditable) => {
         if (!editor) return;
         editor.commands.setContent(markdown ?? '', { emitUpdate: false });
         if (typeof nextEditable === 'boolean') editor.setEditable(nextEditable);
       },
-      setAttachmentContext: (ctx) => {
-        if (!editor) return;
-        const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-        if (!store) return;
-        Object.assign(store, ctx || {});
-        store.attachmentCtxVersion = (Number(store.attachmentCtxVersion) || 0) + 1;
-        try {
-          editor.view.dispatch(editor.state.tr.setMeta('paAttachmentCtx', store.attachmentCtxVersion));
-        } catch {
-          // ignore
-        }
-      },
-      getAttachmentIds: () => {
-        if (!editor) return [];
-        const ids = [];
-        editor.state.doc.descendants((n) => {
-          if (n.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME && n.attrs.attachmentId != null) {
-            ids.push(String(n.attrs.attachmentId));
-          }
-        });
-        return ids;
-      },
-      insertAttachmentAtCoords: (attrs, coords) => {
-        if (!editor) return;
-        let pos = null;
-        const nextAttrs = { ...(attrs || {}) };
-        if (coords && typeof coords.x === 'number' && typeof coords.y === 'number') {
-          const resolved = editor.view.posAtCoords({ left: coords.x, top: coords.y });
-          if (resolved) pos = resolved.pos;
-          try {
-            const pm = editor.view.dom;
-            const rect = pm.getBoundingClientRect();
-            let left = Math.max(0, Math.round(coords.x - rect.left + pm.scrollLeft));
-            let top = Math.max(0, Math.round(coords.y - rect.top + pm.scrollTop));
-            const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-            const snap = store?.findPhotoSnap?.({
-              left,
-              top,
-              width: Number(nextAttrs.width) || 220,
-              height: Number(nextAttrs.height) || 160
-            });
-          if (snap) {
-            const targetFrame = {
-              left: snap.left,
-              top: snap.top,
-              width: snap.width,
-              height: snap.height
-            };
-            evictFramedPhotoInFrameToStaging(editor, targetFrame);
-            Object.assign(
-              nextAttrs,
-              coverFitAttrsForSlotRect(
-                { left: 0, top: 0, width: snap.width, height: snap.height },
-                snap.left,
-                snap.top,
-                isPhotoAlbumsStagingVideoExtension(nextAttrs?.fileExtension) ? 16 / 9 : 4 / 3
-              )
-            );
-          } else {
-            nextAttrs.posLeft = left;
-            nextAttrs.posTop = top;
-          }
-          store?.clearPhotoSnapHighlight?.();
-          } catch {
-            // keep flow placement
-          }
-        }
-        if (pos == null) pos = editor.state.doc.content.size;
-        withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-          editor
-            .chain()
-            .focus(null, { scrollIntoView: false })
-            .insertContentAt(pos, { type: PHOTO_ALBUMS_ATTACHMENT_NODE_NAME, attrs: nextAttrs })
-            .run();
-          // Drop / place must not auto-select the new photo (double-click selects).
-          requestAnimationFrame(() => {
-            withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-              if (!editor?.view) return;
-              const { state, view } = editor;
-              if (!(state.selection instanceof NodeSelection)) return;
-              if (state.selection.node?.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-              const near = Math.min(state.doc.content.size, state.selection.to);
-              view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(near))));
-            });
-          });
-        });
-      },
       insertImage: (src) => {
         if (!editor || !src) return;
         withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
           editor.chain().focus(null, { scrollIntoView: false }).insertContent({ type: 'image', attrs: { src } }).run();
-        });
-      },
-      appendAttachments: (attrsList) => {
-        if (!editor || !Array.isArray(attrsList) || !attrsList.length) return;
-        const content = attrsList.map((attrs) => ({
-          type: PHOTO_ALBUMS_ATTACHMENT_NODE_NAME,
-          attrs
-        }));
-        withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-          editor.chain().insertContentAt(editor.state.doc.content.size, content).run();
         });
       },
       applySearchHighlight: (terms) => {
@@ -4277,34 +2252,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         );
         const orient = pageOrientationRef.current;
         const band = templateBand(template, pw, orient);
-        const photos = [];
         const textLabels = [];
         editor.state.doc.descendants((node) => {
-          if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
-            const fl = parseOptionalPx(node.attrs.frameLeft);
-            const ft = parseOptionalPx(node.attrs.frameTop);
-            const fw = parseOptionalPx(node.attrs.frameWidth);
-            const fh = parseOptionalPx(node.attrs.frameHeight);
-            let cx;
-            let cy;
-            if (fl != null && ft != null && fw != null && fh != null) {
-              cx = fl + fw / 2;
-              cy = ft + fh / 2;
-            } else {
-              const pl = parseOptionalPx(node.attrs.posLeft);
-              const pt = parseOptionalPx(node.attrs.posTop);
-              const pwNode = parseOptionalPx(node.attrs.width) || 120;
-              const phNode = parseOptionalPx(node.attrs.height) || 90;
-              if (pl == null || pt == null) return;
-              cx = pl + pwNode / 2;
-              cy = pt + phNode / 2;
-            }
-            if (!pointInBand(cx, cy, band)) return;
-            const attachmentId = Number(node.attrs.attachmentId);
-            if (!Number.isFinite(attachmentId) || attachmentId < 1) return;
-            photos.push({ ...node.attrs, attachmentId });
-            return;
-          }
           if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
             const pl = parseOptionalPx(node.attrs.posLeft);
             const pt = parseOptionalPx(node.attrs.posTop);
@@ -4315,12 +2264,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         });
         return {
           template: { ...template },
-          photos,
+          photos: [],
           textLabels,
           orientation: orient,
           pageWidth: pw,
           pageIndex: idx,
-          attachmentIds: photos.map((p) => Number(p.attachmentId)).filter((id) => id >= 1)
+          attachmentIds: []
         };
       },
       /** Remove one album page (template + nodes in band), then restack remaining pages. */
@@ -4337,7 +2286,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         );
         const orient = pageOrientationRef.current;
         const band = templateBand(target, pw, orient);
-        returnPhotosInBandToStagingTray(editor, band);
+        removeTextLabelsInBand(editor, band);
         const remaining = ordered.filter((_, i) => i !== idx);
         const nextList = restackTemplatesFlushToPages(
           remaining,
@@ -4348,8 +2297,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         );
         templatesRef.current = nextList;
         setTemplates(nextList);
-        setHighlightSlotId('');
-        setHighlightInstanceKey('');
         setAlbumPageIndex((prev) => {
           if (!nextList.length) return 0;
           if (prev > idx) return Math.max(0, prev - 1);
@@ -4360,500 +2307,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         return true;
       }
     }),
-    [editor, emitHtml, applyAlbumCanvasWidth, handleResizePage, pageSize.width]
+    [editor, emitHtml, handleResizePage, pageSize.width]
   );
 
-
-  const [stagingDragActive, setStagingDragActive] = useState(false);
-  const stagingDragActiveRef = useRef(false);
-  stagingDragActiveRef.current = stagingDragActive;
   const thumbRowRef = useRef(null);
   const thumbStagingPaneRef = useRef(null);
   const [thumbStagingPercent, setThumbStagingPercent] = useState(() => loadThumbRowStagingPercent());
   const thumbStagingPercentRef = useRef(thumbStagingPercent);
   thumbStagingPercentRef.current = thumbStagingPercent;
-
-  useEffect(() => {
-    const onStart = (event) => {
-      const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      if (
-        types.includes(DRAG_STAGED_ATTACHMENT) ||
-        types.includes(DRAG_STAGED_FLAG)
-      ) {
-        stagingDragActiveRef.current = true;
-        setStagingDragActive(true);
-      }
-    };
-    const clearStrayDropCursors = () => {
-      document
-        .querySelectorAll('.rv-dropcursor, .ProseMirror-dropcursor, .prosemirror-dropcursor-widget')
-        .forEach((el) => el.remove());
-    };
-    const onEnd = () => {
-      stagingDragActiveRef.current = false;
-      setStagingDragActive(false);
-      clearStrayDropCursors();
-    };
-    // Bubble phase so the thumb can setData first.
-    window.addEventListener('dragstart', onStart, false);
-    window.addEventListener('dragend', onEnd, true);
-    window.addEventListener('drop', onEnd, true);
-    return () => {
-      window.removeEventListener('dragstart', onStart, false);
-      window.removeEventListener('dragend', onEnd, true);
-      window.removeEventListener('drop', onEnd, true);
-    };
-  }, []);
-
-  const persistStagedPhotos = useCallback(
-    (nextList) => {
-      const list = dedupeStagingItems(Array.isArray(nextList) ? nextList : []);
-      stagedPhotosRef.current = list;
-      setStagedPhotos(list);
-      if (editor) requestAnimationFrame(() => emitHtml(editor.getHTML()));
-    },
-    [editor, emitHtml]
-  );
-
-  /**
-   * Auto Layout — always works in two-page spreads:
-   *   left template + right template, then fill both with tray photos.
-   * `maxSpreads: 1` (Auto Layout 1) = one open book only; omit/Infinity = all tray photos.
-   */
-  const handleAutoLayout = useCallback(
-    async ({ maxSpreads = Infinity } = {}) => {
-      if (!editor || !effectiveEditable) return;
-      const tray = sortStagingPhotosByAlbumPhotoSeq(stagedPhotosRef.current || []);
-      if (!tray.length) return;
-
-      const oneSpreadOnly = Number.isFinite(maxSpreads) && maxSpreads <= 1;
-      const modeLabel = oneSpreadOnly ? 'Auto Layout 1' : 'Auto Layout';
-      const trayTotal = tray.length;
-      const report = (percent, lines) => {
-        setAutoLayoutProgress({
-          percent: Math.max(0, Math.min(100, Math.round(Number(percent) || 0))),
-          label: [modeLabel, ...(Array.isArray(lines) ? lines : [String(lines || '')])]
-            .filter(Boolean)
-            .join('\n')
-        });
-      };
-
-      setTemplatePickerOpen(false);
-      report(1, [`Tray photos: ${trayTotal}`, 'Starting…']);
-      // Let the hourglass paint before heavy work.
-      await new Promise((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
-      });
-
-      try {
-        const binderW =
-          syncAlbumBinderFromViewport(zoomScrollRef.current) || albumBinderWidthPxRef.current || 0;
-        const pw = albumPageWidthFromViewport(zoomScrollRef.current);
-        applyAlbumCanvasWidth(pw, binderW);
-        albumBinderWidthPxRef.current = binderW;
-
-        report(3, [`Tray photos: ${trayTotal}`, 'Measuring photo sizes…']);
-        const photosWithAspect = await resolveStagingPhotoAspects(tray, {
-          noteId,
-          storageType,
-          onProgress: ({ index, total }) => {
-            const pct = 3 + Math.round((index / Math.max(1, total)) * 62);
-            report(pct, [
-              `Measuring photo ${index} of ${total}`,
-              `Tray photos: ${trayTotal}`
-            ]);
-          }
-        });
-        const orientStart = pageOrientationRef.current;
-
-        report(68, [
-          `Measured ${photosWithAspect.length} of ${trayTotal}`,
-          'Planning page templates…'
-        ]);
-
-        // Restack existing pages into left|right columns BEFORE fill/plan so occupancy
-        // and placement never confuse left-page photos with right-page slots.
-        let current = sortAlbumPagesByBand(templatesRef.current || []);
-        if (current.length) {
-          current = restackTemplatesFlushToPages(
-            current,
-            pw,
-            orientStart,
-            editor,
-            binderW
-          );
-          templatesRef.current = current;
-          setTemplates(current);
-        }
-
-        const occupiedByKey = collectOccupiedSlotsByInstanceKey(
-          editor,
-          current,
-          pw,
-          orientStart,
-          binderW
-        );
-
-        const spreadLeft = albumSpreadLeftPageIndex(albumPageIndexRef.current || 0);
-        const fillStart = oneSpreadOnly ? spreadLeft : 0;
-        const fillLimit = oneSpreadOnly ? ALBUM_SPREAD_PAGE_COUNT : Infinity;
-
-        const { fills, remainingPhotos } = planFillEmptyTemplatePages(
-          current,
-          photosWithAspect,
-          occupiedByKey,
-          { maxPages: fillLimit, startIndex: fillStart }
-        );
-
-        const pagesOnCurrentSpread = oneSpreadOnly
-          ? Math.min(ALBUM_SPREAD_PAGE_COUNT, Math.max(0, current.length - spreadLeft))
-          : 0;
-        const albumEndsOnLeftOnly = current.length % ALBUM_SPREAD_PAGE_COUNT === 1;
-        const pagesNeededOnSpread = oneSpreadOnly
-          ? Math.max(0, ALBUM_SPREAD_PAGE_COUNT - pagesOnCurrentSpread)
-          : 0;
-        const firstSpreadPageCount = oneSpreadOnly
-          ? pagesNeededOnSpread
-          : albumEndsOnLeftOnly
-            ? 1
-            : 2;
-        const appendSpreads = oneSpreadOnly
-          ? pagesNeededOnSpread > 0
-            ? 1
-            : 0
-          : maxSpreads;
-
-        const tryBothPageOrientations = current.length === 0 && fills.length === 0;
-        const { plan, pageOrientation: plannedOrient } = planAutoLayoutPages(
-          remainingPhotos,
-          pw,
-          orientStart,
-          {
-            tryBothPageOrientations,
-            maxSpreads: appendSpreads,
-            firstSpreadPageCount: firstSpreadPageCount === 1 ? 1 : 2
-          }
-        );
-
-        if (!fills.length && !plan.length) {
-          report(100, ['Nothing to place — tray unchanged']);
-          return;
-        }
-
-        const fillPhotoCount = fills.reduce(
-          (n, f) => n + (Array.isArray(f.photos) ? f.photos.length : 0),
-          0
-        );
-        const planPhotoCount = plan.reduce(
-          (n, p) => n + (Array.isArray(p.photos) ? p.photos.length : 0),
-          0
-        );
-        const placeTotal = fillPhotoCount + planPhotoCount;
-        const newPageCount = plan.length;
-
-        report(78, [
-          `Placing ${placeTotal} photo${placeTotal === 1 ? '' : 's'}`,
-          `Fill existing pages: ${fillPhotoCount}`,
-          `New pages: ${newPageCount} (${planPhotoCount} photos)`,
-          `Tray remaining after: ${Math.max(0, trayTotal - placeTotal)}`
-        ]);
-
-        if (plannedOrient !== pageOrientationRef.current) {
-          pageOrientationRef.current = plannedOrient;
-          setPageOrientation(plannedOrient);
-        }
-
-        const orient = pageOrientationRef.current;
-        const blockH = albumTemplateBlockHeight(pw, orient);
-        const newInstances = plan.map((page) =>
-          createAlbumTemplateInstance({
-            id: page.templateId,
-            x: 0,
-            y: 0,
-            w: pw,
-            h: blockH
-          })
-        );
-
-        const nextOrdered = [...current, ...newInstances];
-        const nextList = restackTemplatesFlushToPages(
-          nextOrdered,
-          pw,
-          orient,
-          editor,
-          binderW
-        );
-        // Guarantee every page has spread-column x/y/w (matches on-screen overlays).
-        const placedList = withSpreadPageGeometry(nextList, pw, binderW, orient);
-        const placedIds = new Set();
-
-        report(88, [
-          `Inserting ${placeTotal} photo${placeTotal === 1 ? '' : 's'} onto album…`,
-          `Pages in album: ${placedList.length}`
-        ]);
-
-        withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-          let tr = editor.state.tr;
-          let insertPos = editor.state.doc.content.size;
-          const nodes = [];
-
-          for (const fill of fills) {
-            const inst =
-              placedList.find((t) => t.key === fill.inst.key) || fill.inst;
-            const band = templateBand(inst, pw, orient);
-            nodes.push(
-              ...buildAutoLayoutPhotoNodes(editor, inst, fill.photos, fill.slots, band, placedIds)
-            );
-          }
-
-          for (let pi = 0; pi < plan.length; pi += 1) {
-            const pagePlan = plan[pi];
-            const inst = placedList[current.length + pi];
-            if (!inst) continue;
-            const layout = getPhotoAlbumsPageTemplate(inst.id);
-            if (!layout) continue;
-            const photoSlots = resolveAlbumTemplateSlots(layout, inst.slots).filter(
-              (s) => s.type === 'photo'
-            );
-            const band = templateBand(inst, pw, orient);
-            nodes.push(
-              ...buildAutoLayoutPhotoNodes(
-                editor,
-                inst,
-                pagePlan.photos,
-                photoSlots,
-                band,
-                placedIds
-              )
-            );
-          }
-
-          if (nodes.length) {
-            for (const node of nodes) {
-              tr = tr.insert(insertPos, node);
-              insertPos += node.nodeSize;
-            }
-            editor.view.dispatch(tr);
-          }
-        });
-
-        const seqByAttachmentId = new Map();
-        for (const photo of photosWithAspect) {
-          const id = Number(photo.attachmentId);
-          const seq = Number(photo.albumPhotoSeq);
-          if (Number.isFinite(id) && id > 0 && Number.isFinite(seq) && seq >= 1) {
-            seqByAttachmentId.set(id, { album_photo_seq: seq });
-          }
-        }
-        if (seqByAttachmentId.size) syncAlbumPhotoSeqOnPage(editor, seqByAttachmentId);
-
-        templatesRef.current = placedList;
-        setTemplates(placedList);
-        setAlbumCanvasWidth(editor, pw, binderW);
-
-        if (oneSpreadOnly) {
-          setAlbumPageIndex(spreadLeft);
-        } else if (current.length < placedList.length) {
-          setAlbumPageIndex(albumSpreadLeftPageIndex(current.length));
-        } else if (fills.length) {
-          setAlbumPageIndex(albumSpreadLeftPageIndex(fillStart));
-        }
-
-        const nextStaged = (stagedPhotosRef.current || []).filter(
-          (item) => !placedIds.has(Number(item.attachmentId))
-        );
-        persistStagedPhotos(nextStaged);
-
-        const titleBand = String(albumTitle || '').trim()
-          ? albumPageTitleBandHeightPx(albumTitleStyleRef.current)
-          : 0;
-        ensureAlbumCanvasMinHeight(editor, lowestTemplateBottom(placedList) + titleBand, {
-          allowShrink: true
-        });
-        albumAutoZoomRef.current = true;
-
-        report(96, [
-          `Placed ${placedIds.size} photo${placedIds.size === 1 ? '' : 's'}`,
-          `Album pages: ${placedList.length}`,
-          `Still in tray: ${nextStaged.length}`,
-          'Fitting page to viewport…'
-        ]);
-
-        await new Promise((resolve) => {
-          requestAnimationFrame(() => {
-            emitHtml(editor.getHTML());
-            evictDuplicateFramedPhotosInSlots(editor);
-            fitAlbumPageFlushToViewportRef.current?.();
-            requestAnimationFrame(() => {
-              fitAlbumPageFlushToViewportRef.current?.();
-              resolve();
-            });
-          });
-        });
-
-        report(100, [
-          `Done — placed ${placedIds.size} of ${trayTotal}`,
-          `Album pages: ${placedList.length}`,
-          `Remaining in tray: ${nextStaged.length}`
-        ]);
-      } finally {
-        window.setTimeout(() => setAutoLayoutProgress(null), 350);
-      }
-    },
-    [
-      editor,
-      effectiveEditable,
-      noteId,
-      storageType,
-      applyAlbumCanvasWidth,
-      syncAlbumBinderFromViewport,
-      persistStagedPhotos,
-      emitHtml,
-      albumTitle
-    ]
-  );
-
-  const placeStagedAttachmentAtClientPoint = useCallback(
-    (attrs, clientX, clientY) => {
-      if (!editor) return;
-      const attachmentId = Number(attrs?.attachmentId);
-      if (!Number.isFinite(attachmentId) || attachmentId < 1) return;
-      // Tray drops need a visible-page template slot (no template → blocked).
-      const pw =
-        albumCanvasWidthPxRef.current >= 200 ? albumCanvasWidthPxRef.current : 480;
-      const bw = albumBinderWidthPxRef.current || 0;
-      // Right-page drops need the full spread canvas — never clip at one page width.
-      setAlbumCanvasWidth(editor, pw, bw);
-      const activeOrdered = withSpreadPageGeometry(
-        templatesRef.current || [],
-        pw,
-        bw,
-        pageOrientationRef.current || 'portrait'
-      );
-      const activeSpread = activeSpreadPageInstances(
-        activeOrdered,
-        albumPageIndexRef.current || 0
-      );
-      const hasAnyTemplate = (templatesRef.current || []).some((t) =>
-        Boolean(getPhotoAlbumsPageTemplate(t.id))
-      );
-      const canDrop = activeSpread.some((t) => Boolean(getPhotoAlbumsPageTemplate(t.id)));
-      if (!canDrop) {
-        if (!hasAnyTemplate) setNeedTemplateGuideOpen(true);
-        return;
-      }
-      const zoomScale = Math.max(0.01, (Number(albumZoom) || 100) / 100);
-      withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-        try {
-          const pm = editor.view.dom;
-          // Prefer page-scale box (same transform space as template overlays / absolute photos).
-          const originEl = pageScaleRef.current || pm;
-          const rect = originEl.getBoundingClientRect();
-          let left = Math.max(
-            0,
-            Math.round((clientX - rect.left) / zoomScale + (pm.scrollLeft || 0))
-          );
-          let top = Math.max(
-            0,
-            Math.round((clientY - rect.top) / zoomScale + (pm.scrollTop || 0))
-          );
-          // Book flip uses translateY on the page-scale — add the active spread's Y shift.
-          const spreadPages = activeSpread;
-          if (spreadPages[0]) {
-            top += Math.max(0, Math.round(Number(spreadPages[0].y) || 0));
-          }
-          const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-          // Snap against spread-corrected instances (left x=0, right x=page+binder).
-          const snap =
-            findAlbumPhotoSnapAmongInstances({
-              instances: activeSpread,
-              left,
-              top,
-              photoWidth: 220,
-              photoHeight: 160
-            }) ||
-            snapAlbumPhotoSlotAtClientPoint(clientX, clientY, activeSpread);
-          if (!snap) {
-            store?.clearPhotoSnapHighlight?.();
-            return;
-          }
-          const snapInst = activeSpread.find((t) => t.key === snap.instanceKey);
-          if (!snapInst) {
-            store?.clearPhotoSnapHighlight?.();
-            return;
-          }
-          evictFramedPhotoInFrameToStaging(editor, {
-            left: snap.left,
-            top: snap.top,
-            width: snap.width,
-            height: snap.height
-          });
-          const nextAttrs = {
-            attachmentId,
-            fileName: String(attrs?.fileName || ''),
-            fileExtension: String(attrs?.fileExtension || ''),
-            fileSizeBytes: attrs?.fileSizeBytes ?? null,
-            ...(Number.isFinite(Number(attrs?.albumPhotoSeq)) && Number(attrs.albumPhotoSeq) >= 1
-              ? { albumPhotoSeq: Number(attrs.albumPhotoSeq) }
-              : null),
-            ...coverFitAttrsForSlotRect(
-              { left: 0, top: 0, width: snap.width, height: snap.height },
-              snap.left,
-              snap.top,
-              isPhotoAlbumsStagingVideoExtension(attrs?.fileExtension) ? 16 / 9 : 4 / 3
-            )
-          };
-          store?.clearPhotoSnapHighlight?.();
-
-          let pos = null;
-          const resolved = editor.view.posAtCoords({ left: clientX, top: clientY });
-          if (resolved) pos = resolved.pos;
-          if (pos == null) pos = editor.state.doc.content.size;
-          editor
-            .chain()
-            .focus(null, { scrollIntoView: false })
-            .insertContentAt(pos, { type: PHOTO_ALBUMS_ATTACHMENT_NODE_NAME, attrs: nextAttrs })
-            .run();
-          // Restore text/emoji that traveled with this photo in the thumbnail alley.
-          const stagedItem = (stagedPhotosRef.current || []).find(
-            (item) => Number(item.attachmentId) === attachmentId
-          );
-          const companions = normalizeCompanionLabels(stagedItem?.companionLabels);
-          if (companions.length) {
-            insertCompanionLabelsOnPhoto(editor, companions, {
-              left: snap.left,
-              top: snap.top,
-              width: snap.width,
-              height: snap.height
-            });
-          }
-          // Drop places the photo only — do not enter selected / blinking mode.
-          // User must double-click the photo (or slot) to select.
-          requestAnimationFrame(() => {
-            withPreservedAlbumZoomScroll(zoomScrollRef.current, () => {
-              if (!editor?.view) return;
-              const { state, view } = editor;
-              if (!(state.selection instanceof NodeSelection)) return;
-              if (state.selection.node?.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-              const near = Math.min(state.doc.content.size, state.selection.to);
-              view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(near))));
-            });
-          });
-          const next = (stagedPhotosRef.current || []).filter(
-            (item) => Number(item.attachmentId) !== attachmentId
-          );
-          persistStagedPhotos(next);
-          requestAnimationFrame(() => {
-            setAlbumCanvasWidth(editor, pw, bw);
-            evictDuplicateFramedPhotosInSlots(editor);
-          });
-        } catch {
-          // ignore placement errors
-        }
-      });
-    },
-    [editor, persistStagedPhotos, albumZoom]
-  );
 
   const handleStagingTrayOsFiles = useCallback(
     (files) => {
@@ -4865,15 +2326,27 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     [onStageOsFiles]
   );
 
-  const handleRemoveStaged = useCallback(
+  const handleRemoveTrayItem = useCallback(
     (attachmentId) => {
       const id = Number(attachmentId);
-      const next = (stagedPhotosRef.current || []).filter((item) => Number(item.attachmentId) !== id);
-      persistStagedPhotos(next);
-      onRemoveStagedAttachment?.(id);
+      if (Number.isFinite(id) && id > 0) onRemoveStagedAttachment?.(id);
     },
-    [persistStagedPhotos, onRemoveStagedAttachment]
+    [onRemoveStagedAttachment]
   );
+
+  const handleRemoveAllTrayItems = useCallback(async () => {
+    const ids = trayItems.map((item) => item.attachmentId);
+    if (!ids.length) return;
+    const n = ids.length;
+    if (
+      !(await themedConfirm(
+        `Remove all ${n} photo${n === 1 ? '' : 's'} from the thumbnail tray? This also deletes them from the album.`
+      ))
+    ) {
+      return;
+    }
+    onRemoveAllStagedAttachments?.(ids);
+  }, [trayItems, onRemoveAllStagedAttachments]);
 
   const startThumbRowResize = useCallback((event) => {
     event.preventDefault();
@@ -4941,7 +2414,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const pageLabel = `page ${idx + 1}`;
       if (
         !(await themedConfirm(
-          `Delete ${pageLabel} from this album?\n\nPhotos on that page return to the thumbnail tray.`
+          `Delete ${pageLabel} from this album?\n\nPhotos stay in the thumbnail tray.`
         ))
       ) {
         return;
@@ -4954,7 +2427,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       );
       const orient = pageOrientationRef.current;
       const band = templateBand(target, pw, orient);
-      returnPhotosInBandToStagingTray(editor, band);
+      removeTextLabelsInBand(editor, band);
       const remaining = ordered.filter((_, i) => i !== idx);
       const nextList = restackTemplatesFlushToPages(
         remaining,
@@ -4965,8 +2438,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       );
       templatesRef.current = nextList;
       setTemplates(nextList);
-      setHighlightSlotId('');
-      setHighlightInstanceKey('');
       setAlbumPageIndex((prev) => {
         if (!nextList.length) return 0;
         let next = prev;
@@ -4986,7 +2457,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     ]
   );
 
-  /** Filmstrip × All — delete every album page; photos return to the thumbnail tray. */
+  /** Filmstrip × All — delete every album page; photos stay in the thumbnail tray. */
   const handleDeleteAllAlbumPages = useCallback(async () => {
     if (!editable || orderAlbumActive) return;
     if (!editor) return;
@@ -4995,7 +2466,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     const n = ordered.length;
     if (
       !(await themedConfirm(
-        `Delete all ${n} album page${n === 1 ? '' : 's'}?\n\nPhotos on those pages return to the thumbnail tray.`
+        `Delete all ${n} album page${n === 1 ? '' : 's'}?\n\nPhotos stay in the thumbnail tray.`
       ))
     ) {
       return;
@@ -5005,57 +2476,27 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
     );
     const orient = pageOrientationRef.current;
-    // Last → first so band returns stay correct as pages/nodes are cleared.
     for (let i = ordered.length - 1; i >= 0; i -= 1) {
-      const band = templateBand(ordered[i], pw, orient);
-      returnPhotosInBandToStagingTray(editor, band);
+      removeTextLabelsInBand(editor, templateBand(ordered[i], pw, orient));
     }
     templatesRef.current = [];
     setTemplates([]);
     persistTemplates([]);
-    setHighlightSlotId('');
-    setHighlightInstanceKey('');
-    setOccupiedByInstance({});
     setAlbumPageIndex(0);
     requestAnimationFrame(() => emitHtml(editor.getHTML()));
   }, [editable, orderAlbumActive, editor, pageSize.width, persistTemplates, emitHtml]);
 
-  const handleRemoveAllStaged = useCallback(async () => {
-    const list = stagedPhotosRef.current || [];
-    if (!list.length) return;
-    const n = list.length;
-    if (
-      !(await themedConfirm(
-        `Remove all ${n} photo${n === 1 ? '' : 's'} from the thumbnail tray? This also deletes them from the album.`
-      ))
-    ) {
-      return;
-    }
-    const ids = list
-      .map((item) => Number(item.attachmentId))
-      .filter((id) => Number.isFinite(id) && id > 0);
-    persistStagedPhotos([]);
-    onRemoveAllStagedAttachments?.(ids);
-  }, [persistStagedPhotos, onRemoveAllStagedAttachments]);
-
   const handlePageDrop = useCallback(
     (event) => {
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      const stagedDrag =
-        isStagedAttachmentDrag(event.dataTransfer) || stagingDragActiveRef.current;
       const templateDrag = isAlbumTemplateDrag(event.dataTransfer);
-      if (!stagedDrag && !templateDrag && !types.includes('Files')) return;
+      if (!templateDrag && !types.includes('Files')) return;
       event.preventDefault();
       event.stopPropagation();
       if (!editable) return;
 
-      const clientX = event.clientX;
-      const clientY = event.clientY;
       const files = Array.from(event.dataTransfer?.files || []);
       const templateId = templateDrag ? readAlbumTemplateDragId(event.dataTransfer) : null;
-      const stagedMeta = stagedDrag
-        ? readStagedAttachmentDrag(event.dataTransfer, stagedPhotosRef.current)
-        : null;
 
       void (async () => {
         await runPhotoAlbumsTrafficWaitIfNeeded();
@@ -5063,16 +2504,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           handleSelectTemplate(templateId);
           return;
         }
-        if (stagedMeta) {
-          placeStagedAttachmentAtClientPoint(stagedMeta, clientX, clientY);
-          stagingDragActiveRef.current = false;
-          setStagingDragActive(false);
-          return;
-        }
         if (files.length) onStageOsFiles?.(files);
       })();
     },
-    [editable, onStageOsFiles, placeStagedAttachmentAtClientPoint, handleSelectTemplate]
+    [editable, onStageOsFiles, handleSelectTemplate]
   );
 
   const counts = useEditorState({
@@ -5086,96 +2521,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         : { characters: 0, words: 0 }
   });
 
-  /** Bumps when TipTap photo selection / pin changes so slot chrome can blink the fixed frame. */
-  const selectedPhotoPos = useEditorState({
-    editor,
-    selector: ({ editor: e }) => {
-      if (!e) return null;
-      const store = e.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      void (store?.contextTutorialTick ?? 0);
-      if (store?.pinnedPhotoEditPos != null) return store.pinnedPhotoEditPos;
-      const { selection } = e.state;
-      if (!(selection instanceof NodeSelection)) return null;
-      if (selection.node?.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return null;
-      return selection.from;
-    }
-  });
-  const photoEditActive = selectedPhotoPos != null;
-  const photoPanZoomActive = useEditorState({
-    editor,
-    selector: ({ editor: e }) => {
-      if (!e) return false;
-      const store = e.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      // Depend on tick so Pan&Zoom toggles re-render without selection changes.
-      void (store?.contextTutorialTick ?? 0);
-      const { selection } = e.state;
-      if (!(selection instanceof NodeSelection)) return false;
-      if (selection.node?.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return false;
-      return Boolean(store?.selectedPhotoPanZoom);
-    }
-  });
-  const albumPhotoCount = useEditorState({
-    editor,
-    selector: ({ editor: e }) => {
-      if (!e) return 0;
-      let n = 0;
-      e.state.doc.descendants((node) => {
-        if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) n += 1;
-      });
-      return n;
-    }
-  });
-  /** Top-left workspace mode badge (Create / View / Edit / Pan). */
-  const albumWorkspaceModeLabel = (() => {
-    if (photoEditActive) return photoPanZoomActive ? 'Album Pan Mode' : 'Album Edit Mode';
-    // ≥1 photo on the album → View; otherwise Create (even with empty template).
-    if (albumPhotoCount > 0) return 'Album View Mode';
-    return 'Album Create Mode';
-  })();
-
-  const collectPagePhotos = useCallback(() => {
-    if (!editor) return [];
-    const out = [];
-    const seen = new Set();
-    editor.state.doc.descendants((node) => {
-      if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-      const attachmentId = Number(node.attrs.attachmentId);
-      if (!Number.isFinite(attachmentId) || attachmentId < 1 || seen.has(attachmentId)) return;
-      const fileExtension = String(node.attrs.fileExtension || '').trim();
-      const fileName = String(node.attrs.fileName || '').trim();
-      const kind =
-        getPhotoAlbumsAttachmentViewKind(fileExtension) ||
-        getPhotoAlbumsAttachmentViewKind(fileName);
-      if (kind !== 'image') return;
-      seen.add(attachmentId);
-      out.push({
-        attachmentId,
-        fileName,
-        fileExtension: fileExtension || fileExtensionLower({ name: fileName })
-      });
-    });
-    return out;
-  }, [editor]);
-
-  const openPhotoFullscreen = useCallback(
-    ({ attachmentId, slideshow = false } = {}) => {
-      const photos = collectPagePhotos();
-      if (!photos.length) return;
-      setPhotoViewer({
-        photos,
-        startAttachmentId: attachmentId ?? photos[0].attachmentId,
-        slideshow: Boolean(slideshow)
-      });
-    },
-    [collectPagePhotos]
-  );
-
-  const handleSlideShow = useCallback(() => {
-    openPhotoFullscreen({ slideshow: true });
-  }, [openPhotoFullscreen]);
-
   /** Each template instance is one album page (book order). */
   const albumPagesSorted = useMemo(() => sortAlbumPagesByBand(templates), [templates]);
+
+  /** Top-left workspace mode badge. */
+  const albumWorkspaceModeLabel = albumPagesSorted.length > 0 ? 'Album View Mode' : 'Album Create Mode';
 
   const albumPageCount = Math.max(1, albumPagesSorted.length);
 
@@ -5446,15 +2796,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         const clamped = albumSpreadLeftPageIndex(raw);
         setAlbumPageIndex(clamped);
         albumPageIndexRef.current = clamped;
-        if (editor?.view) {
-          const { state, view } = editor;
-          if (
-            state.selection instanceof NodeSelection &&
-            state.selection.node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME
-          ) {
-            view.dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-          }
-        }
         flushAlbumScrollOrigin(zoomScrollRef.current);
         requestAnimationFrame(() => flushAlbumScrollOrigin(zoomScrollRef.current));
       };
@@ -5467,7 +2808,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         apply();
       })();
     },
-    [albumPagesSorted, editor]
+    [albumPagesSorted]
   );
   goToAlbumPageRef.current = goToAlbumPage;
 
@@ -5627,15 +2968,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         setAlbumCoverFace('none');
         setAlbumPageIndex(lastSpreadLeft);
         albumPageIndexRef.current = lastSpreadLeft;
-        if (editor?.view) {
-          const { state, view } = editor;
-          if (
-            state.selection instanceof NodeSelection &&
-            state.selection.node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME
-          ) {
-            view.dispatch(state.tr.setSelection(TextSelection.atStart(state.doc)));
-          }
-        }
         flushAlbumScrollOrigin(zoomScrollRef.current);
         requestAnimationFrame(() => flushAlbumScrollOrigin(zoomScrollRef.current));
       };
@@ -5646,7 +2978,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         skipCapture: true
       });
     },
-    [albumPagesSorted.length, editor, runAlbumPageFlipThen]
+    [albumPagesSorted.length, runAlbumPageFlipThen]
   );
 
   // When search finds pages, jump to the first match if the current spread is not a hit.
@@ -6149,38 +3481,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     () => ({
       activePageBand: activeAlbumPageBand,
       activePageBands: activeSpreadPageBands,
-      photoLoadBands,
-      openPhotoFullscreen
+      photoLoadBands
     }),
-    [openPhotoFullscreen, activeAlbumPageBand, activeSpreadPageBands, photoLoadBands]
+    [activeAlbumPageBand, activeSpreadPageBands, photoLoadBands]
   );
-
-  // Keep TipTap node views in sync when the active book page / load bands change.
-  // Only bump layoutLockVersion when geometry actually changes — Auto Layout + page-fit
-  // used to recreate band object identities every rAF and cancel in-flight photo loads.
-  useEffect(() => {
-    if (!editor) return;
-    const store = editor.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-    if (!store) return;
-    const nextActive = albumLayoutContextValue.activePageBands;
-    const nextLoad = albumLayoutContextValue.photoLoadBands;
-    const nextKey = JSON.stringify({
-      active: nextActive,
-      load: nextLoad,
-      legacy: albumLayoutContextValue.activePageBand
-    });
-    store.activePageBand = albumLayoutContextValue.activePageBand;
-    store.activePageBands = nextActive;
-    store.photoLoadBands = nextLoad;
-    if (store._albumLayoutBandsKey === nextKey) return;
-    store._albumLayoutBandsKey = nextKey;
-    store.layoutLockVersion = (Number(store.layoutLockVersion) || 0) + 1;
-    try {
-      editor.view.dispatch(editor.state.tr.setMeta('paLayoutLock', store.layoutLockVersion));
-    } catch {
-      // editor may be unmounting
-    }
-  }, [editor, albumLayoutContextValue]);
 
   const fullSlideAlbumTitle = String(albumTitle || '').trim() || 'Album';
 
@@ -6422,23 +3726,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         open={placeTextOpen}
         initialText={placeTextSeed}
         initialStyle={placeTextStyle}
-        existingLabels={placeTextExistingLabels}
-        initialExistingId={placeTextInitialExistingId}
-        mediaSession={placeTextMediaSession}
-        noteId={noteId}
-        storageType={storageType}
-        onPhotoChromeChange={handlePlaceTextPhotoChromeChange}
         onClose={() => {
           placeTextEditingLabelIdRef.current = null;
           placeTextEditingPosRef.current = null;
           placeTextAlbumTitleModeRef.current = false;
           placeTextPagePosRef.current = null;
-          placeTextPhotoPosRef.current = null;
           placeTextSelectionRef.current = { from: 0, to: 0, empty: true, replaceableText: false };
-          setPlaceTextExistingLabels([]);
-          setPlaceTextInitialExistingId(null);
           setPlaceTextStyle(null);
-          setPlaceTextMediaSession(null);
           setPlaceTextOpen(false);
           exitPlaceTextToNormalAlbum();
         }}
@@ -6516,38 +3810,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               minWidth: 0
             }}
           >
-            <GreenButton
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                runAfterTrafficWait(() => {
-                  void handleAutoLayout();
-                });
-              }}
-              disabled={!stagedPhotos.length || Boolean(autoLayoutProgress)}
-              aria-label="Auto Layout — create left+right page templates as spreads and fill both from the tray"
-              title="Places tray photos onto the album in two-page spreads: left template + right template, then the next spread, until the tray is empty."
-              {...guestDemoBlockProps()}
-              sx={albumTemplateBarButtonSx}
-            >
-              Auto Layout
-            </GreenButton>
-            <GreenButton
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                runAfterTrafficWait(() => {
-                  void handleAutoLayout({ maxSpreads: 1 });
-                });
-              }}
-              disabled={!stagedPhotos.length || Boolean(autoLayoutProgress)}
-              aria-label="Auto Layout 1 — create/fill one two-page spread (left + right templates) and stop"
-              title="Creates or fills one open book only: left page template + right page template, filled from the tray. Remaining photos stay in the tray."
-              {...guestDemoBlockProps()}
-              sx={albumTemplateBarButtonSx}
-            >
-              Auto Layout 1
-            </GreenButton>
             <Box
               ref={templatePickerAnchorRef}
               data-pa-album-bar-btn-wrap=""
@@ -6587,62 +3849,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 }}
               />
             </Box>
-            <ColorTemplate16PopupCenterWide
-              open={needTemplateGuideOpen}
-              onClose={() => setNeedTemplateGuideOpen(false)}
-              closeOnBackdrop
-              bodyTextAlignLeft={false}
-              centeredLeadLines={0}
-              overlaySx={{ zIndex: 21000 }}
-              closeButtonAriaLabel="Close album layout guide"
-            >
-              <ColorTemplate16PopupCenterWide.Title>Add photos to your album</ColorTemplate16PopupCenterWide.Title>
-              <ColorTemplate16PopupCenterWide.Body spacing={1.25} sx={{ textAlign: 'left' }}>
-                <Box component="ol" sx={{ m: 0, pl: 2.75, fontWeight: 700, lineHeight: 1.5 }}>
-                  <Box component="li" sx={{ mb: 1 }}>
-                    <strong>Choose a Layout:</strong> Click the Template button in the top-left corner and select your
-                    layout so photos fit the page for printing.
-                  </Box>
-                  <Box component="li" sx={{ mb: 1 }}>
-                    <strong>Add Photos:</strong> Drag photos into the layout slots.
-                    <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 2.5, fontWeight: 700 }}>
-                      <Box component="li">
-                        To change photos: with Pan&Zoom off, drag a photo back to the thumbnail alley, or onto another
-                        slot to swap (text and emoji on the photo move with it). Click the red{' '}
-                        <Box component="span" sx={{ color: 'var(--theme-error-color)' }}>
-                          X
-                        </Box>{' '}
-                        or Reset to return it (not deleted from cloud/USB storage). Release elsewhere to cancel — pan
-                        and zoom stay the same.
-                      </Box>
-                    </Box>
-                  </Box>
-                  <Box component="li" sx={{ mb: 1 }}>
-                    <strong>Edit &amp; Adjust:</strong> Double-click any photo to open Add Text — add captions,
-                    emoji, and use Pan Zoom / Rotate / Full / Zoom. With Pan&Zoom off on the page, drag to swap
-                    slots or return to the thumbnail alley.
-                  </Box>
-                  <Box component="li" sx={{ mb: 1 }}>
-                    <strong>Add Story &amp; Context:</strong> In Add Text (double-click), type details like who,
-                    where, when, and the story behind the photo.
-                  </Box>
-                </Box>
-                <Typography sx={{ fontWeight: 700, lineHeight: 1.45, mt: 0.5 }}>
-                  Note: All text you add will be searchable across all your album sets later!
-                </Typography>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-start', pt: 0.5 }}>
-                  <GreenButton
-                    type="button"
-                    onClick={() => {
-                      setNeedTemplateGuideOpen(false);
-                      setTemplatePickerOpen(true);
-                    }}
-                  >
-                    Open Template
-                  </GreenButton>
-                </Box>
-              </ColorTemplate16PopupCenterWide.Body>
-            </ColorTemplate16PopupCenterWide>
             {[
               {
                 key: 'reset',
@@ -6650,9 +3856,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 demoBlock: true,
                 onClick: handleResetPage,
                 ariaLabel:
-                  'Reset page — clear content, return photos to tray, zoom 95%, flush top-left, stretch to page edge',
+                  'Reset page — clear pages and text, zoom 95%, flush top-left, stretch to page edge',
                 title:
-                  'Clear page, return photos to the thumbnail alley, zoom 95%, flush binder top-left, stretch right edge to the dashed page edge'
+                  'Clear pages and text (tray photos are kept), zoom 95%, flush binder top-left, stretch right edge to the dashed page edge'
               },
               {
                 key: 'resize',
@@ -6748,14 +3954,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                 title: 'Add this album page to For Order (sidebar) for printing later'
               },
               {
-                key: 'slideshow',
-                label: 'Photo SlideShow',
-                onClick: handleSlideShow,
-                disabled: !collectPagePhotos().length,
-                ariaLabel: 'Photo SlideShow — full page photos, advances every 5 seconds',
-                title: 'Photo SlideShow of page photos — advances every 5 seconds'
-              },
-              {
                 key: 'fullslide',
                 label: 'Album SlideShow',
                 onClick: enterAlbumFullSlide,
@@ -6804,12 +4002,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             position: 'relative',
             zIndex: 80,
             overflow: 'visible',
-            transition: 'outline-color 0.12s ease, box-shadow 0.12s ease',
-            '&[data-rv-staging-return-hover="1"]': {
-              outline: '3px dashed #c62828',
-              outlineOffset: -3,
-              boxShadow: 'inset 0 0 0 4px rgba(198,40,40,0.22)'
-            }
           }}
         >
           <Box
@@ -6824,38 +4016,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
               overflow: 'visible'
             }}
           >
-            <PhotoAlbumsPhotoStagingTray
-              inline
-              items={stagedPhotos}
+            <PhotoAlbumsThumbnailTray
+              items={trayItems}
               noteId={noteId}
               storageType={storageType}
               editable={effectiveEditable}
               onOsFiles={handleStagingTrayOsFiles}
-              onRemove={handleRemoveStaged}
-              onRemoveAll={handleRemoveAllStaged}
-              onReturnFromPage={(attachmentId) => {
-                runAfterTrafficWait(() => {
-                // Attachment node handles return; tray drop of page mime is backup.
-                const nodeAttrs = {};
-                editor?.state.doc.descendants((node) => {
-                  if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-                  if (Number(node.attrs.attachmentId) === Number(attachmentId)) {
-                    Object.assign(nodeAttrs, node.attrs);
-                  }
-                });
-                if (nodeAttrs.attachmentId != null) {
-                  const store = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-                  store?.returnAttachmentToStaging?.({
-                    attachmentId: nodeAttrs.attachmentId,
-                    fileName: nodeAttrs.fileName,
-                    fileExtension: nodeAttrs.fileExtension,
-                    fileSizeBytes: nodeAttrs.fileSizeBytes,
-                    checksum: nodeAttrs.checksum,
-                    _photoRect: photoPageRectFromAttrs(nodeAttrs)
-                  });
-                }
-                });
-              }}
+              onRemove={handleRemoveTrayItem}
+              onRemoveAll={handleRemoveAllTrayItems}
             />
           </Box>
           <ThumbRowResizeHandle onMouseDown={startThumbRowResize} />
@@ -6871,7 +4039,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           >
             <PhotoAlbumsPageFilmstrip
               inline
-              stagingCount={stagedPhotos.length}
+              stagingCount={trayItems.length}
               pages={albumPagesSorted}
               pageIndex={orderFilmstripActive ? orderFilmstripIndex : albumPageIndex}
               pageCount={
@@ -6932,21 +4100,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         ref={zoomScrollRef}
         className="rv-editor__album-zoom-scroll"
         onDragOver={(e) => {
-          const staged = isStagedAttachmentDrag(e.dataTransfer);
           const templateDrag = isAlbumTemplateDrag(e.dataTransfer);
           const files = Array.from(e.dataTransfer?.types || []).includes('Files');
-          if (!staged && !templateDrag && !files) return;
+          if (!templateDrag && !files) return;
           e.preventDefault();
-          if (staged) {
-            const ordered = sortAlbumPagesByBand(templatesRef.current || []);
-            const activeSpread = activeSpreadPageInstances(
-              ordered,
-              albumPageIndexRef.current || 0
-            );
-            const canDrop = activeSpread.some((t) => Boolean(getPhotoAlbumsPageTemplate(t.id)));
-            e.dataTransfer.dropEffect = canDrop ? 'copy' : 'none';
-            return;
-          }
           e.dataTransfer.dropEffect = 'copy';
         }}
         onDrop={handlePageDrop}
@@ -7139,34 +4296,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                         offsetLeft={band.left}
                         offsetTop={band.top}
                         slotOverrides={inst.slots || null}
-                        highlightSlotId={
-                          highlightInstanceKey === inst.key ? highlightSlotId : ''
-                        }
-                        occupiedSlotIds={occupiedByInstance[inst.key] || null}
                         editable={effectiveEditable}
-                        stagingDragActive={stagingDragActive}
                         dragScale={Math.max(0.01, albumZoom / 100)}
                         pageKey={inst.key}
-                        onMoveResize={(geom, opts) =>
-                          handleTemplateMoveResize(inst.key, geom, opts)
-                        }
                         onSlotGeometryChange={(slotId, pct, opts) =>
                           handleSlotGeometryChange(inst.key, slotId, pct, opts)
                         }
-                        onSlotPhotoZoom={(slotId, deltaY) =>
-                          handleSlotPhotoZoom(inst.key, slotId, deltaY)
-                        }
-                        isSlotPhotoSelected={(slotId) =>
-                          isSlotPhotoSelectedForInstance(inst.key, slotId)
-                        }
-                        onSlotPhotoPan={(slotId, dx, dy, opts) =>
-                          handleSlotPhotoPan(inst.key, slotId, dx, dy, opts)
-                        }
-                        onSlotPhotoScale={(slotId, factor, opts) =>
-                          handleSlotPhotoScale(inst.key, slotId, factor, opts)
-                        }
                         onDelete={() => runAfterTrafficWait(() => handleDeleteTemplate(inst.key))}
-                        onStagedPhotoDrop={handlePageDrop}
                       />
                     );
                   })}
@@ -7432,29 +4568,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         </Box>
       ) : null}
 
-      <PhotoAlbumsPhotoFullscreenOverlay
-        open={Boolean(photoViewer)}
-        photos={photoViewer?.photos || []}
-        startAttachmentId={photoViewer?.startAttachmentId ?? null}
-        slideshow={Boolean(photoViewer?.slideshow)}
-        noteId={noteId}
-        sharedAlbumId={sharedAlbumId}
-        storageType={storageType}
-        onClose={() => setPhotoViewer(null)}
-      />
-      <BusyHourglassOverlay
-        open={Boolean(autoLayoutProgress)}
-        label="Auto Layout"
-        progressPercent={autoLayoutProgress?.percent ?? null}
-        progressLabel={autoLayoutProgress?.label || ''}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
       <PhotoAlbumsContextTutorial
         active={Boolean(effectiveEditable && !presentationMode && !albumEditorChromeHidden)}
-        photoEditActive={photoEditActive}
-        panZoomActive={Boolean(photoPanZoomActive)}
+        photoEditActive={false}
+        panZoomActive={false}
         hasPageContext={Boolean(templates?.length)}
-        hasAlbumPhotos={albumPhotoCount > 0}
+        hasAlbumPhotos={trayItems.length > 0}
         openRequestKey={contextTutorialOpenKey}
       />
     </Box>
@@ -7472,6 +4591,7 @@ PhotoAlbumsNoteEditor.propTypes = {
   noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   sharedAlbumId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   storageType: PropTypes.string,
+  trayAttachments: PropTypes.array,
   onStageOsFiles: PropTypes.func,
   onRemoveStagedAttachment: PropTypes.func,
   onRemoveAllStagedAttachments: PropTypes.func,

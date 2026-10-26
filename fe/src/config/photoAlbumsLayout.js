@@ -21,7 +21,7 @@ export const PHOTO_ALBUMS_NOTE_SCROLL_TAIL_MIN_HEIGHT = { xs: '50vh', sm: '55vh'
 /** Compact split-pane (/myPhotos dual halves) — keep note content near the top. */
 export const PHOTO_ALBUMS_NOTE_SCROLL_TAIL_COMPACT_MIN_HEIGHT = { xs: 48, sm: 64, md: 80 };
 
-/** Album / photo slideshow fullscreen shell (PhotoAlbumsNoteEditor, PhotoAlbumsPhotoFullscreenOverlay). */
+/** Album / photo slideshow fullscreen shell (PhotoAlbumsNoteEditor). */
 export const PHOTO_ALBUMS_SLIDESHOW_BASE_Z = 14000;
 /** Photo-only fullscreen slideshow overlay (above album editor fullscreen). */
 export const PHOTO_ALBUMS_PHOTO_SLIDESHOW_BASE_Z = 15000;

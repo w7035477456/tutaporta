@@ -1,8 +1,7 @@
 import { createContext, useContext } from 'react';
 
 /**
- * Album page layout context for book-flip visibility and photo loading.
- * Also hosts full-page photo viewer / slideshow opener.
+ * Album page layout context for book-flip visibility of page content (text labels).
  */
 export const PhotoAlbumsAlbumLayoutContext = createContext({
   /** @deprecated Prefer activePageBands — single left band only (legacy). */
@@ -16,8 +15,7 @@ export const PhotoAlbumsAlbumLayoutContext = createContext({
    * All album page bands — photos load with *_1000px for the whole album (no lazy unload).
    * Each blob GET is still a stateless vault API call (safe under round-robin).
    */
-  photoLoadBands: [],
-  openPhotoFullscreen: null
+  photoLoadBands: []
 });
 
 export function usePhotoAlbumsAlbumLayout() {

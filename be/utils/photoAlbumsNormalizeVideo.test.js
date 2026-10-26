@@ -8,7 +8,9 @@ import { describe, it } from 'node:test';
 
 import {
   PHOTO_ALBUMS_VIDEO_MAX_FPS,
+  PHOTO_ALBUMS_VIDEO_POSTER_MAX_EDGE_PX,
   PHOTO_ALBUMS_VIDEO_SHORT_SIDE_PX,
+  buildPhotoAlbumsVideoPosterThumbnailBuffer,
   fitPhotoAlbumsVideoSize,
   normalizePhotoAlbumsVideoBuffer,
   parseFfmpegInputProbe,
@@ -185,5 +187,59 @@ describe('normalizePhotoAlbumsVideoBuffer', () => {
     } finally {
       await fs.rm(src.dir, { recursive: true, force: true });
     }
+  });
+});
+
+function jpegSize(buf) {
+  // Walk JPEG markers to the SOF frame header (height, width).
+  let i = 2;
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) return null;
+    const marker = buf[i + 1];
+    const len = buf.readUInt16BE(i + 2);
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
+
+describe('buildPhotoAlbumsVideoPosterThumbnailBuffer', () => {
+  it('returns a ≤320px JPEG frame for a landscape clip', { timeout: 60_000 }, async () => {
+    const src = await makeSourceVideo({ width: 1280, height: 720, fps: 30, durationSec: 2 });
+    try {
+      const poster = await buildPhotoAlbumsVideoPosterThumbnailBuffer(src.buffer, { ext: 'mp4' });
+      assert.ok(Buffer.isBuffer(poster) && poster.length > 0);
+      assert.equal(poster[0], 0xff);
+      assert.equal(poster[1], 0xd8);
+      const size = jpegSize(poster);
+      assert.equal(size.width, PHOTO_ALBUMS_VIDEO_POSTER_MAX_EDGE_PX);
+      assert.equal(size.height, 180);
+    } finally {
+      await fs.rm(src.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to the first frame for clips shorter than 1s', { timeout: 60_000 }, async () => {
+    const src = await makeSourceVideo({ width: 360, height: 640, fps: 30, durationSec: 0.4 });
+    try {
+      const poster = await buildPhotoAlbumsVideoPosterThumbnailBuffer(src.buffer, { ext: 'mp4' });
+      assert.ok(poster?.length > 0);
+      const size = jpegSize(poster);
+      assert.equal(size.height, PHOTO_ALBUMS_VIDEO_POSTER_MAX_EDGE_PX);
+      assert.equal(size.width, 180);
+    } finally {
+      await fs.rm(src.dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns null for empty, non-video, or undecodable input', { timeout: 60_000 }, async () => {
+    assert.equal(await buildPhotoAlbumsVideoPosterThumbnailBuffer(Buffer.alloc(0), { ext: 'mp4' }), null);
+    assert.equal(await buildPhotoAlbumsVideoPosterThumbnailBuffer(Buffer.from('x'), { ext: 'jpg' }), null);
+    assert.equal(
+      await buildPhotoAlbumsVideoPosterThumbnailBuffer(Buffer.from('not a video at all'), { ext: 'mp4' }),
+      null
+    );
   });
 });

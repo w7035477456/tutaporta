@@ -14,6 +14,7 @@ import os from 'os';
 import path from 'path';
 
 export const FOLDER_PERMISSION_CODE = 'STORAGE_PERMISSION';
+export const STORAGE_ROOT_MISSING_CODE = 'STORAGE_ROOT_MISSING';
 export const FOLDER_PERMISSION_USER_MESSAGE =
   'Folder permission error. Please contact your admin';
 
@@ -127,6 +128,46 @@ export function tryFixStorageTreePerms(rootPath) {
   return { fixed, failed, missing: false, walked };
 }
 
+/** Roots that may live on a removable drive (TutaDrive / album vault data). */
+const MUST_ALREADY_EXIST_ENV_KEYS = new Set(['LARGE_CHEAP_STORAGE_FOLDER']);
+
+export function storageRootMustAlreadyExist(envKey) {
+  return MUST_ALREADY_EXIST_ENV_KEYS.has(String(envKey || ''));
+}
+
+/**
+ * Only a root directly inside the home folder (Mac dev default) may be auto-created.
+ * Any other root (e.g. on an external / USB drive) must already exist: if the drive is
+ * not mounted, `mkdir -p` would silently create an empty tree on the system disk and
+ * albums would look empty while uploads land on the wrong disk.
+ */
+export function storageRootMayBeCreated(rootAbs) {
+  return path.dirname(path.resolve(String(rootAbs || ''))) === path.resolve(os.homedir());
+}
+
+/** @returns {string} absolute root; throws STORAGE_ROOT_MISSING when it is not available. */
+export function assertStorageRootPresent(rootAbs, envKey = 'LARGE_CHEAP_STORAGE_FOLDER') {
+  const abs = path.resolve(String(rootAbs || ''));
+  let st = null;
+  try {
+    st = fs.statSync(abs);
+  } catch {
+    st = null;
+  }
+  if (st?.isDirectory()) return abs;
+  if (!st && storageRootMayBeCreated(abs)) {
+    fs.mkdirSync(abs, { recursive: true });
+    return abs;
+  }
+  const e = new Error(
+    `Storage folder ${abs} (${envKey}) is not available. If it is on an external / USB drive, make sure the drive is plugged in and mounted, then try again.`
+  );
+  e.code = STORAGE_ROOT_MISSING_CODE;
+  e.path = abs;
+  e.storageRoot = abs;
+  throw e;
+}
+
 function writeProbe(dirPath) {
   const dir = path.resolve(String(dirPath || ''));
   fs.mkdirSync(dir, { recursive: true });
@@ -139,10 +180,17 @@ function writeProbe(dirPath) {
  * Ensure one root is writable: mkdir, fix tree, probe write at root (+ users/ when present).
  * @returns {{ ok: true, abs: string } | { ok: false, abs: string, err: Error }}
  */
-export function ensureStorageRootWritable(rootAbs) {
+export function ensureStorageRootWritable(rootAbs, envKey) {
   const abs = path.resolve(String(rootAbs || ''));
   const usersDir = path.join(abs, 'users');
   const probeTargets = [abs];
+  if (storageRootMustAlreadyExist(envKey)) {
+    try {
+      assertStorageRootPresent(abs, envKey);
+    } catch (missingErr) {
+      return { ok: false, abs, err: missingErr };
+    }
+  }
   try {
     fs.mkdirSync(abs, { recursive: true });
     // LARGE_CHEAP / storage layout uses users/M{id}/…
@@ -223,10 +271,16 @@ export function ensureAllAppStorageFoldersWritable(opts = {}) {
   const roots = listAppStorageRoots();
   const failed = [];
   const okRoots = [];
-  for (const { abs } of roots) {
-    const result = ensureStorageRootWritable(abs);
-    if (result.ok) okRoots.push(abs);
-    else failed.push(abs);
+  for (const { envKey, abs } of roots) {
+    const result = ensureStorageRootWritable(abs, envKey);
+    if (result.ok) {
+      okRoots.push(abs);
+      continue;
+    }
+    if (result.err?.code === STORAGE_ROOT_MISSING_CODE) {
+      console.error(`[${STORAGE_ROOT_MISSING_CODE}] host=${os.hostname()} pid=${process.pid} ${result.err.message}`);
+    }
+    failed.push(abs);
   }
   if (failed.length) {
     logFolderPermissionError(failed, { route: opts.route || 'ensureAllAppStorageFoldersWritable' });
@@ -249,6 +303,9 @@ export function ensurePathWritableOrThrow(targetPath, context = {}) {
   const roots = listAppStorageRoots();
   const matching = roots.find((r) => absTarget === r.abs || absTarget.startsWith(r.abs + path.sep));
   const rootAbs = matching?.abs || absTarget;
+  if (matching && storageRootMustAlreadyExist(matching.envKey)) {
+    assertStorageRootPresent(matching.abs, matching.envKey);
+  }
 
   tryFixStorageTreePerms(rootAbs);
   try {

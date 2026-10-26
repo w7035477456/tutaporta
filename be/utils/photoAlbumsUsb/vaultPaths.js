@@ -84,16 +84,31 @@ export function atomicWriteFileSync(absPath, buffer) {
   fs.mkdirSync(dir, { recursive: true });
   const tmpPath = `${absPath}.tmp-${process.pid}-${Date.now()}`;
   fs.writeFileSync(tmpPath, buffer);
+  fsyncPathBestEffort(tmpPath);
   try {
-    fs.fsyncSync(fs.openSync(tmpPath, 'r'));
-  } catch {
-    // fsync best-effort (some FS ignore)
+    fs.renameSync(tmpPath, absPath);
+  } catch (err) {
+    fs.rmSync(tmpPath, { force: true });
+    throw err;
   }
-  fs.renameSync(tmpPath, absPath);
+  fsyncPathBestEffort(dir);
+}
+
+function fsyncPathBestEffort(p) {
+  let fd = null;
   try {
-    fs.fsyncSync(fs.openSync(dir, 'r'));
+    fd = fs.openSync(p, 'r');
+    fs.fsyncSync(fd);
   } catch {
-    // ignore
+    // fsync best-effort (some FS, e.g. exFAT dirs, refuse it)
+  } finally {
+    if (fd != null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // ignore
+      }
+    }
   }
 }
 

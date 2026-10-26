@@ -9,37 +9,12 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import GreenButton from 'ui-component/GreenButton';
-import YellowButtonTemplate from 'ui-component/YellowButtonTemplate';
 import { useAuth } from 'contexts/AuthContext';
 import { guestDemoBlockProps, isGuestDemoLogin } from 'utils/guestDemoLogin';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCenterWide';
 import { colorTemplate7PopupSliderSx, colorTemplate7PopupActionButtonSx } from 'config/colorTemplate7PopupLargeDark';
 import PhotoAlbumsFillOutlineColorPicker from './PhotoAlbumsFillOutlineColorPicker';
-import PhotoAlbumsPlaceTextMediaPreview from './PhotoAlbumsPlaceTextMediaPreview';
-import PhotoAlbumsVideoPlaybackControls from './PhotoAlbumsVideoPlaybackControls';
-import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
-import { PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX } from './photoAlbumsEmojiPalette';
-import { newLabelId } from './photoAlbumsTextLabelNode';
-import {
-  buildSeededPlaceTextSampleLabel,
-  buildSeededPlaceTextVideoLabel,
-  resolvePlaceTextCaption
-} from './photoAlbumsPlaceTextPosition';
-import {
-  SLOT_ZOOM_PCT_MAX,
-  SLOT_ZOOM_PCT_MIN,
-  centeredPan,
-  computeFramedZoomPatch,
-  coverSizeForFrame,
-  fitSizeForFrame,
-  framedZoomPercentFromWidth,
-  pickAutoSlotFitWithoutClipping,
-  PHOTO_SLOT_FIT_TRANSITION_MS,
-  slotZoomPctLabelSx,
-  slotZoomSliderRowSx,
-  slotZoomSliderSx
-} from './photoAlbumsSlotZoom';
 
 export const PLACE_TEXT_FONT_FAMILIES = [
   { label: 'Algerian', value: 'Algerian, fantasy' },
@@ -133,19 +108,10 @@ export const PLACE_TEXT_DEFAULTS = {
   rotationDeg: 0
 };
 
-export const PLACE_TEXT_MAX_CHARS = 1_073_741_823;
+export const PLACE_TEXT_MAX_CHARS = 1073741823;
 
-/** Preview vs controls split in photo Add Text dialog (0–1). */
-const PLACE_TEXT_PREVIEW_SPLIT_DEFAULT = 0.7;
-/** Video edit needs a shorter preview — playback row lives in the controls dashboard. */
-const PLACE_TEXT_VIDEO_PREVIEW_SPLIT_DEFAULT = 0.62;
-const PLACE_TEXT_PREVIEW_SPLIT_MIN = 0.22;
-const PLACE_TEXT_PREVIEW_SPLIT_MAX = 0.72;
-const PLACE_TEXT_SPLIT_HANDLE_PX = 10;
 
 const SELECT_MENU_Z = COLOR_TEMPLATE16_POPUP_Z_INDEX + 200;
-const EMOJI_PICKER_Z = COLOR_TEMPLATE16_POPUP_Z_INDEX + 300;
-const PLACE_TEXT_EMOJI_FONT = 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif';
 
 const labelSx = {
   color: 'var(--theme-yellow-color) !important',
@@ -253,26 +219,17 @@ function stylePatchFromControls({
 }
 
 /**
- * Add Text dialog — photo/video: top-half live preview + bottom-half font controls.
- * Page / album title: classic styling popup without media preview.
+ * Add Text dialog — styles a page text label or the album-wide page title.
  */
 export default function PhotoAlbumsPlaceTextDialog({
   open,
   initialText = '',
   initialStyle = null,
-  existingLabels = null,
-  initialExistingId = null,
-  mediaSession = null,
-  noteId = null,
-  storageType = null,
   onClose,
-  onConfirm,
-  /** Apply rotate / slot-fit / pan-zoom patches onto the album photo node. */
-  onPhotoChromeChange = null
+  onConfirm
 }) {
   const { user } = useAuth();
   const guestDemo = isGuestDemoLogin(user);
-  const hasMedia = Boolean(mediaSession?.photoRect);
   const [text, setText] = useState(PLACE_TEXT_DEFAULTS.text);
   const [color, setColor] = useState(PLACE_TEXT_DEFAULTS.color);
   const [outlineColor, setOutlineColor] = useState(PLACE_TEXT_DEFAULTS.outlineColor);
@@ -281,72 +238,11 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [fontSize, setFontSize] = useState(PLACE_TEXT_DEFAULTS.fontSize);
   const [outlineWidth, setOutlineWidth] = useState(PLACE_TEXT_DEFAULTS.outlineWidth);
   const [selectedPresetId, setSelectedPresetId] = useState(PLACE_TEXT_STYLE_PRESETS[0].id);
-  const [existingPick, setExistingPick] = useState('');
-  const [labels, setLabels] = useState([]);
-  const [activeKey, setActiveKey] = useState('');
-  const [emojiPickerAnchor, setEmojiPickerAnchor] = useState(null);
-  /** The preview's <video> node, so the action-row Play/Pause/seek can drive it. */
-  const [previewVideoEl, setPreviewVideoEl] = useState(null);
-  const [panEnabled, setPanEnabled] = useState(false);
-  const [photoRotationDeg, setPhotoRotationDeg] = useState(0);
-  const [photoSlotFit, setPhotoSlotFit] = useState('cover');
-  /**
-   * Natural aspect tagged with the attachment it was measured from. The dialog is not
-   * unmounted between opens, so an untagged value would still hold the previous photo's
-   * aspect on the next open and auto-fit would stretch the new photo to it.
-   */
-  const [mediaAspectEntry, setMediaAspectEntry] = useState({ key: '', aspect: 0 });
-  const skipStyleSyncRef = useRef(false);
-  const splitContainerRef = useRef(null);
-  const openSnapshotRef = useRef(null);
   const dialogInitRef = useRef(false);
-  const seedSampleOnEmptyRef = useRef(true);
-  const pendingAutoFitRef = useRef(false);
-  const autoFitMediaKeyRef = useRef('');
-  const pendingVideoSeedRef = useRef(false);
-  const photoFitAnimTimerRef = useRef(null);
-  const [previewPhotoChrome, setPreviewPhotoChrome] = useState(null);
-  const [photoFitAnimating, setPhotoFitAnimating] = useState(false);
-  const [previewSplitRatio, setPreviewSplitRatio] = useState(PLACE_TEXT_PREVIEW_SPLIT_DEFAULT);
 
-  const mediaKey = hasMedia
-    ? `${mediaSession?.attachmentId ?? ''}:${mediaSession?.fileExtension ?? ''}`
-    : '';
-  const mediaAspect = mediaAspectEntry.key === mediaKey ? mediaAspectEntry.aspect : 0;
-
-  const labelOptions = useMemo(() => {
-    const list = Array.isArray(existingLabels) ? existingLabels : [];
-    return list
-      .map((item, index) => {
-        if (!item) return null;
-        const labelId = String(item.labelId || '').trim();
-        const pos = Number.isFinite(item.pos) ? item.pos : null;
-        const key = labelId || (pos != null ? `__pos_${pos}` : `__idx_${index}`);
-        return {
-          key,
-          labelId: labelId || null,
-          pos,
-          text: String(item.text || '').trim() || 'Text',
-          color: item.color,
-          outlineColor: item.outlineColor,
-          outlineWidth: item.outlineWidth,
-          fontSize: item.fontSize,
-          fontFamily: item.fontFamily,
-          fontWeight: item.fontWeight
-        };
-      })
-      .filter(Boolean);
-  }, [existingLabels]);
-
-  const showExistingSelect = labelOptions.length >= 2;
-
-  const applyStyleFields = useCallback((next, seededText, allowSampleFallback = true) => {
-    skipStyleSyncRef.current = true;
+  const applyStyleFields = useCallback((next, seededText) => {
     const resolvedText =
-      seededText != null
-        ? String(seededText)
-        : String(next.text ?? '').trim() ||
-          (allowSampleFallback ? PLACE_TEXT_DEFAULTS.text : '');
+      seededText != null ? String(seededText) : String(next.text ?? '').trim() || PLACE_TEXT_DEFAULTS.text;
     setText(resolvedText);
     setColor(next.color || PLACE_TEXT_DEFAULTS.color);
     setOutlineColor(next.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor);
@@ -364,721 +260,27 @@ export default function PhotoAlbumsPlaceTextDialog({
         String(p.color).toLowerCase() === String(next.color || PLACE_TEXT_DEFAULTS.color).toLowerCase()
     );
     setSelectedPresetId(match?.id || PLACE_TEXT_STYLE_PRESETS[0].id);
-    requestAnimationFrame(() => {
-      skipStyleSyncRef.current = false;
-    });
   }, []);
 
   useEffect(() => {
     if (!open) {
-      setEmojiPickerAnchor(null);
-      setPanEnabled(false);
-      setLabels([]);
-      setActiveKey('');
-      setPreviewPhotoChrome(null);
-      setPhotoFitAnimating(false);
-      if (photoFitAnimTimerRef.current) {
-        clearTimeout(photoFitAnimTimerRef.current);
-        photoFitAnimTimerRef.current = null;
-      }
       dialogInitRef.current = false;
-      openSnapshotRef.current = null;
-      autoFitMediaKeyRef.current = '';
       return;
     }
-    // Seed once per open — do not re-init when mediaSession chrome updates (pan/zoom).
+    // Seed once per open.
     if (dialogInitRef.current) return;
     dialogInitRef.current = true;
-
-    const preExistingOverlayCount = Number.isFinite(Number(mediaSession?.existingOverlayCount))
-      ? Math.max(0, Number(mediaSession.existingOverlayCount))
-      : Array.isArray(mediaSession?.labels)
-        ? mediaSession.labels.filter((l) => !l.isNew).length
-        : 0;
-
-    pendingAutoFitRef.current = Boolean(hasMedia && !mediaSession?.isVideo);
-    pendingVideoSeedRef.current = Boolean(hasMedia && mediaSession?.isVideo && preExistingOverlayCount < 1);
-
-    if (hasMedia) {
-      setPreviewSplitRatio(
-        mediaSession?.isVideo
-          ? PLACE_TEXT_VIDEO_PREVIEW_SPLIT_DEFAULT
-          : PLACE_TEXT_PREVIEW_SPLIT_DEFAULT
-      );
-    }
-    const rot0 = Number(mediaSession?.rotationDeg) || 0;
-    const fit0 =
-      String(mediaSession?.slotFit || 'cover').toLowerCase() === 'contain' ? 'contain' : 'cover';
-    setPhotoRotationDeg(rot0);
-    setPhotoSlotFit(fit0);
-    setPanEnabled(false);
-
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
     const seeded = String(initialText ?? '').trim();
-    seedSampleOnEmptyRef.current = preExistingOverlayCount < 1;
-
-    let nextLabels = [];
-    let nextActiveKey = '';
-    if (hasMedia && mediaSession?.labels?.length) {
-      nextLabels = mediaSession.labels.map((l) => ({ ...l }));
-      if (preExistingOverlayCount >= 1) {
-        nextLabels = nextLabels.filter((l) => !l.isNew);
-      }
-      const preferred =
-        initialExistingId &&
-        nextLabels.find(
-          (l) =>
-            l.labelId === String(initialExistingId) ||
-            l.clientKey === String(initialExistingId)
-        );
-      const active = preferred || nextLabels[nextLabels.length - 1];
-      nextActiveKey = active?.clientKey || '';
-    }
-
-    const activeLabelText = nextActiveKey
-      ? String(nextLabels.find((l) => l.clientKey === nextActiveKey)?.text || '').trim()
-      : '';
-    const initialFieldText = resolvePlaceTextCaption({
-      explicitText:
-        seeded ||
-        activeLabelText ||
-        (preExistingOverlayCount >= 1 ? '' : next.text),
-      existingOverlayCount: preExistingOverlayCount,
-      editing: Boolean(initialExistingId)
-    });
-    applyStyleFields(next, initialFieldText, seedSampleOnEmptyRef.current);
-
-    if (hasMedia && nextLabels.length) {
-      setLabels(nextLabels);
-      setActiveKey(nextActiveKey);
-      const active = nextLabels.find((l) => l.clientKey === nextActiveKey);
-      if (active) applyStyleFields(active, active.text);
-    } else {
-      setLabels([]);
-      setActiveKey('');
-    }
-
-    let nextExistingPick = '';
-    if (showExistingSelect && initialExistingId) {
-      const match = labelOptions.find(
-        (o) => o.labelId === String(initialExistingId) || o.key === String(initialExistingId)
-      );
-      nextExistingPick = match?.key || '';
-      setExistingPick(nextExistingPick);
-    } else {
-      setExistingPick('');
-    }
-
-    openSnapshotRef.current = {
-      text: initialFieldText,
-      color: next.color || PLACE_TEXT_DEFAULTS.color,
-      outlineColor: next.outlineColor || PLACE_TEXT_DEFAULTS.outlineColor,
-      fontFamily: next.fontFamily || PLACE_TEXT_DEFAULTS.fontFamily,
-      fontWeight: Number(next.fontWeight) || PLACE_TEXT_DEFAULTS.fontWeight,
-      fontSize: Number(next.fontSize) || PLACE_TEXT_DEFAULTS.fontSize,
-      outlineWidth:
-        next.outlineWidth != null && Number.isFinite(Number(next.outlineWidth))
-          ? Number(next.outlineWidth)
-          : PLACE_TEXT_DEFAULTS.outlineWidth,
-      selectedPresetId: PLACE_TEXT_STYLE_PRESETS[0].id,
-      labels: nextLabels.map((l) => ({ ...l })),
-      activeKey: nextActiveKey,
-      existingPick: nextExistingPick,
-      panEnabled: false,
-      photoRotationDeg: rot0,
-      photoSlotFit: fit0,
-      photoChrome: {
-        rotationDeg: rot0,
-        slotFit: fit0,
-        panX: mediaSession?.panX ?? null,
-        panY: mediaSession?.panY ?? null,
-        width: mediaSession?.photoW ?? null,
-        height: mediaSession?.photoH ?? null,
-        panZoom: false
-      }
-    };
-    // Re-apply active label style into snapshot after preferred label override.
-    if (nextActiveKey) {
-      const active = nextLabels.find((l) => l.clientKey === nextActiveKey);
-      if (active) {
-        openSnapshotRef.current = {
-          ...openSnapshotRef.current,
-          text: active.text || openSnapshotRef.current.text,
-          color: active.color || openSnapshotRef.current.color,
-          outlineColor: active.outlineColor || openSnapshotRef.current.outlineColor,
-          fontFamily: active.fontFamily || openSnapshotRef.current.fontFamily,
-          fontWeight: Number(active.fontWeight) || openSnapshotRef.current.fontWeight,
-          fontSize: Number(active.fontSize) || openSnapshotRef.current.fontSize,
-          outlineWidth:
-            active.outlineWidth != null && Number.isFinite(Number(active.outlineWidth))
-              ? Number(active.outlineWidth)
-              : openSnapshotRef.current.outlineWidth
-        };
-      }
-    }
-  }, [
-    open,
-    initialText,
-    initialStyle,
-    initialExistingId,
-    showExistingSelect,
-    labelOptions,
-    hasMedia,
-    mediaSession,
-    applyStyleFields
-  ]);
+    applyStyleFields(next, seeded || next.text);
+  }, [open, initialText, initialStyle, applyStyleFields]);
 
   const selectedPreset = useMemo(
     () => PLACE_TEXT_STYLE_PRESETS.find((p) => p.id === selectedPresetId) || PLACE_TEXT_STYLE_PRESETS[0],
     [selectedPresetId]
   );
 
-  const displayText =
-    String(text || '').trim() ||
-    (seedSampleOnEmptyRef.current ? PLACE_TEXT_DEFAULTS.text : '');
-
-  const previewSession = useMemo(() => {
-    if (!mediaSession) return null;
-    const chrome = previewPhotoChrome || {};
-    return {
-      ...mediaSession,
-      rotationDeg: photoRotationDeg,
-      slotFit: photoSlotFit,
-      photoW: chrome.photoW ?? mediaSession.photoW,
-      photoH: chrome.photoH ?? mediaSession.photoH,
-      panX: chrome.panX ?? mediaSession.panX,
-      panY: chrome.panY ?? mediaSession.panY
-    };
-  }, [mediaSession, photoRotationDeg, photoSlotFit, previewPhotoChrome]);
-
-  const syncPreviewPhotoChrome = useCallback((patch) => {
-    if (!patch || typeof patch !== 'object') return;
-    setPreviewPhotoChrome((prev) => {
-      const next = { ...(prev || {}) };
-      if ('width' in patch) next.photoW = patch.width;
-      if ('height' in patch) next.photoH = patch.height;
-      if ('panX' in patch) next.panX = patch.panX;
-      if ('panY' in patch) next.panY = patch.panY;
-      return next;
-    });
-  }, []);
-
-  const applyPhotoChrome = useCallback(
-    (patch) => {
-      syncPreviewPhotoChrome(patch);
-      if (typeof onPhotoChromeChange === 'function') onPhotoChromeChange(patch);
-    },
-    [onPhotoChromeChange, syncPreviewPhotoChrome]
-  );
-
-  const triggerPhotoFitAnimation = useCallback((applyFitPatch) => {
-    if (photoFitAnimTimerRef.current) clearTimeout(photoFitAnimTimerRef.current);
-    setPhotoFitAnimating(true);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        applyFitPatch?.();
-      });
-    });
-    photoFitAnimTimerRef.current = setTimeout(() => {
-      setPhotoFitAnimating(false);
-      photoFitAnimTimerRef.current = null;
-    }, PHOTO_SLOT_FIT_TRANSITION_MS);
-  }, []);
-
-  const handleTogglePanZoom = useCallback(() => {
-    setPanEnabled((v) => {
-      const next = !v;
-      applyPhotoChrome({ panZoom: next });
-      return next;
-    });
-  }, [applyPhotoChrome]);
-
-  const handleRotatePhoto = useCallback(() => {
-    setPhotoRotationDeg((prev) => {
-      const next = (((Number(prev) || 0) + 90) % 360 + 360) % 360;
-      applyPhotoChrome({ rotationDeg: next });
-      return next;
-    });
-  }, [applyPhotoChrome]);
-
-  const handlePhotoFitFull = useCallback(() => {
-    const rect = mediaSession?.photoRect;
-    const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-    triggerPhotoFitAnimation(() => {
-      setPhotoSlotFit('contain');
-      if (rect?.width && rect?.height) {
-        const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'contain');
-        const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
-        applyPhotoChrome({
-          slotFit: 'contain',
-          width: fit.width,
-          height: fit.height,
-          panX: pan.panX,
-          panY: pan.panY
-        });
-      } else {
-        applyPhotoChrome({ slotFit: 'contain' });
-      }
-    });
-  }, [applyPhotoChrome, mediaSession, mediaAspect, triggerPhotoFitAnimation]);
-
-  const handlePhotoFitZoom = useCallback(() => {
-    const rect = mediaSession?.photoRect;
-    const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-    triggerPhotoFitAnimation(() => {
-      setPhotoSlotFit('cover');
-      if (rect?.width && rect?.height) {
-        const fit = fitSizeForFrame(aspect, rect.width, rect.height, 'cover');
-        const pan = centeredPan(fit.width, fit.height, rect.width, rect.height);
-        applyPhotoChrome({
-          slotFit: 'cover',
-          width: fit.width,
-          height: fit.height,
-          panX: pan.panX,
-          panY: pan.panY
-        });
-      } else {
-        applyPhotoChrome({ slotFit: 'cover' });
-      }
-    });
-  }, [applyPhotoChrome, mediaSession, mediaAspect, triggerPhotoFitAnimation]);
-
-  const photoZoomPct = useMemo(() => {
-    const rect = mediaSession?.photoRect;
-    if (!rect?.width || !rect?.height) return 0;
-    const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-    const cover = coverSizeForFrame(aspect, rect.width, rect.height);
-    const photoW = mediaSession?.photoW || cover.width;
-    return framedZoomPercentFromWidth(photoW, aspect, rect.width, rect.height);
-  }, [mediaSession, mediaAspect]);
-
-  const handlePhotoZoomSliderChange = useCallback(
-    (_, v) => {
-      const pct = Array.isArray(v) ? v[0] : v;
-      const rect = mediaSession?.photoRect;
-      if (!rect?.width || !rect?.height) return;
-      const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-      const patch = computeFramedZoomPatch({
-        pct,
-        aspect,
-        frameW: rect.width,
-        frameH: rect.height,
-        photoW: mediaSession?.photoW,
-        photoH: mediaSession?.photoH,
-        panX: mediaSession?.panX,
-        panY: mediaSession?.panY
-      });
-      applyPhotoChrome(patch);
-    },
-    [mediaSession, mediaAspect, applyPhotoChrome]
-  );
-
-  const handleNaturalAspectRatio = useCallback(
-    (aspect) => {
-      if (aspect > 0) setMediaAspectEntry({ key: mediaKey, aspect });
-    },
-    [mediaKey]
-  );
-
-  const resolveFramedPhotoChrome = useCallback(
-    (patch = {}) => {
-      const rect = mediaSession?.photoRect;
-      const fw = Math.max(1, Number(rect?.width) || 1);
-      const fh = Math.max(1, Number(rect?.height) || 1);
-      const aspect = mediaAspect > 0 ? mediaAspect : 4 / 3;
-      const slotFit =
-        String(patch.slotFit ?? photoSlotFit ?? 'cover').toLowerCase() === 'contain'
-          ? 'contain'
-          : 'cover';
-      const fit = fitSizeForFrame(aspect, fw, fh, slotFit);
-      const photoW =
-        Number.isFinite(Number(patch.width)) && Number(patch.width) > 0
-          ? Number(patch.width)
-          : Number.isFinite(Number(mediaSession?.photoW)) && Number(mediaSession.photoW) > 0
-            ? Number(mediaSession.photoW)
-            : fit.width;
-      const photoH =
-        Number.isFinite(Number(patch.height)) && Number(patch.height) > 0
-          ? Number(patch.height)
-          : Number.isFinite(Number(mediaSession?.photoH)) && Number(mediaSession.photoH) > 0
-            ? Number(mediaSession.photoH)
-            : Math.round(photoW / aspect);
-      const pan = centeredPan(photoW, photoH, fw, fh);
-      return {
-        photoW,
-        photoH,
-        panX: Number.isFinite(Number(patch.panX))
-          ? Number(patch.panX)
-          : Number.isFinite(Number(mediaSession?.panX))
-            ? Number(mediaSession.panX)
-            : pan.panX,
-        panY: Number.isFinite(Number(patch.panY))
-          ? Number(patch.panY)
-          : Number.isFinite(Number(mediaSession?.panY))
-            ? Number(mediaSession.panY)
-            : pan.panY
-      };
-    },
-    [mediaSession, mediaAspect, photoSlotFit]
-  );
-
-  // Swapping attachments without closing the dialog needs a fresh auto-fit.
-  useEffect(() => {
-    if (!open || !hasMedia) return;
-    if (autoFitMediaKeyRef.current === mediaKey) return;
-    autoFitMediaKeyRef.current = mediaKey;
-    pendingAutoFitRef.current = !mediaSession?.isVideo;
-  }, [open, hasMedia, mediaKey, mediaSession?.isVideo]);
-
-  useEffect(() => {
-    if (!open || !hasMedia || mediaSession?.isVideo || !pendingAutoFitRef.current) return;
-    if (!(mediaAspect > 0)) return;
-    const rect = mediaSession?.photoRect;
-    if (!rect?.width || !rect?.height) return;
-
-    pendingAutoFitRef.current = false;
-
-    const patch = pickAutoSlotFitWithoutClipping(mediaAspect, rect.width, rect.height);
-    setPhotoSlotFit(patch.slotFit);
-    applyPhotoChrome(patch);
-
-    const caption = seedSampleOnEmptyRef.current
-      ? resolvePlaceTextCaption({
-          explicitText: text,
-          existingOverlayCount: 0,
-          editing: false
-        })
-      : '';
-    let nextLabels = labels;
-    let nextActiveKey = activeKey;
-
-    if (caption) {
-      const sampleLabel = buildSeededPlaceTextSampleLabel({
-        caption,
-        style: {
-          ...PLACE_TEXT_DEFAULTS,
-          text: caption,
-          color,
-          outlineColor,
-          outlineWidth,
-          fontSize,
-          fontFamily,
-          fontWeight
-        },
-        frameW: rect.width,
-        frameH: rect.height,
-        photoW: patch.width,
-        photoH: patch.height,
-        panX: patch.panX,
-        panY: patch.panY
-      });
-      nextLabels = [...labels.filter((l) => !l.isNew), sampleLabel];
-      nextActiveKey = sampleLabel.clientKey;
-      setLabels(nextLabels);
-      setActiveKey(nextActiveKey);
-      applyStyleFields(sampleLabel, caption, true);
-    }
-
-    if (openSnapshotRef.current) {
-      openSnapshotRef.current = {
-        ...openSnapshotRef.current,
-        photoSlotFit: patch.slotFit,
-        photoChrome: {
-          rotationDeg: Number(mediaSession?.rotationDeg) || 0,
-          slotFit: patch.slotFit,
-          panX: patch.panX,
-          panY: patch.panY,
-          width: patch.width,
-          height: patch.height,
-          panZoom: false
-        },
-        ...(caption
-          ? {
-              labels: nextLabels.map((l) => ({ ...l })),
-              activeKey: nextActiveKey
-            }
-          : null)
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per open when aspect is known
-  }, [open, hasMedia, mediaSession?.isVideo, mediaAspect, mediaSession?.photoRect]);
-
-  useEffect(() => {
-    if (!open || !hasMedia || !mediaSession?.isVideo || !pendingVideoSeedRef.current) return;
-    if (!(mediaAspect > 0)) return;
-    const rect = mediaSession?.photoRect;
-    if (!rect?.width || !rect?.height) return;
-
-    pendingVideoSeedRef.current = false;
-
-    const caption = seedSampleOnEmptyRef.current
-      ? resolvePlaceTextCaption({
-          explicitText: text,
-          existingOverlayCount: 0,
-          editing: false
-        })
-      : '';
-    if (!caption) return;
-
-    const sampleLabel = buildSeededPlaceTextVideoLabel({
-      caption,
-      style: {
-        ...PLACE_TEXT_DEFAULTS,
-        text: caption,
-        color,
-        outlineColor,
-        outlineWidth,
-        fontSize,
-        fontFamily,
-        fontWeight
-      },
-      frameW: rect.width,
-      frameH: rect.height,
-      mediaAspect,
-      placement: 'below'
-    });
-    const nextLabels = [...labels.filter((l) => !l.isNew), sampleLabel];
-    const nextActiveKey = sampleLabel.clientKey;
-    setLabels(nextLabels);
-    setActiveKey(nextActiveKey);
-    applyStyleFields(sampleLabel, caption, true);
-
-    if (openSnapshotRef.current) {
-      openSnapshotRef.current = {
-        ...openSnapshotRef.current,
-        labels: nextLabels.map((l) => ({ ...l })),
-        activeKey: nextActiveKey
-      };
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per open when video metadata is known
-  }, [open, hasMedia, mediaSession?.isVideo, mediaAspect, mediaSession?.photoRect]);
-
-  const buildPreviewTextLabel = useCallback(
-    (caption, styleOverrides = {}) => {
-      const rect = mediaSession?.photoRect;
-      if (!rect?.width || !rect?.height) return null;
-      const mergedStyle = {
-        color,
-        outlineColor,
-        outlineWidth,
-        fontSize,
-        fontFamily,
-        fontWeight,
-        ...styleOverrides
-      };
-      if (mediaSession?.isVideo) {
-        return buildSeededPlaceTextVideoLabel({
-          caption,
-          style: mergedStyle,
-          frameW: rect.width,
-          frameH: rect.height,
-          mediaAspect: mediaAspect > 0 ? mediaAspect : 16 / 9,
-          placement: 'below'
-        });
-      }
-      const framed = resolveFramedPhotoChrome();
-      return buildSeededPlaceTextSampleLabel({
-        caption,
-        style: mergedStyle,
-        frameW: rect.width,
-        frameH: rect.height,
-        photoW: framed.photoW,
-        photoH: framed.photoH,
-        panX: framed.panX,
-        panY: framed.panY
-      });
-    },
-    [
-      mediaSession,
-      mediaAspect,
-      color,
-      outlineColor,
-      outlineWidth,
-      fontSize,
-      fontFamily,
-      fontWeight,
-      resolveFramedPhotoChrome
-    ]
-  );
-
-  const ensureLabelsIncludeTypedText = useCallback(
-    (currentLabels, caption, styleOverrides = {}) => {
-      const trimmed = String(caption || '').trim();
-      if (!trimmed || !hasMedia || !mediaSession?.photoRect) return currentLabels;
-      const textLabels = currentLabels.filter(
-        (l) => !l.isEmoji && !/Emoji/i.test(String(l.fontFamily || ''))
-      );
-      if (textLabels.length >= 1) {
-        if (!activeKey && textLabels.length === 1) {
-          return currentLabels.map((l) =>
-            l.clientKey === textLabels[0].clientKey ? { ...l, text: trimmed, ...styleOverrides } : l
-          );
-        }
-        if (activeKey) {
-          return currentLabels.map((l) =>
-            l.clientKey === activeKey ? { ...l, text: trimmed, ...styleOverrides } : l
-          );
-        }
-        return currentLabels;
-      }
-      const sampleLabel = buildPreviewTextLabel(trimmed, styleOverrides);
-      if (!sampleLabel) return currentLabels;
-      return [...currentLabels, sampleLabel];
-    },
-    [hasMedia, mediaSession, activeKey, buildPreviewTextLabel]
-  );
-
-  const handleReset = useCallback(() => {
-    const snap = openSnapshotRef.current;
-    if (!snap) return;
-    applyStyleFields(
-      {
-        text: snap.text,
-        color: snap.color,
-        outlineColor: snap.outlineColor,
-        fontFamily: snap.fontFamily,
-        fontWeight: snap.fontWeight,
-        fontSize: snap.fontSize,
-        outlineWidth: snap.outlineWidth
-      },
-      snap.text
-    );
-    setSelectedPresetId(snap.selectedPresetId || PLACE_TEXT_STYLE_PRESETS[0].id);
-    setLabels((snap.labels || []).map((l) => ({ ...l })));
-    setActiveKey(snap.activeKey || '');
-    setExistingPick(snap.existingPick || '');
-    setPanEnabled(Boolean(snap.panEnabled));
-    setPhotoRotationDeg(Number(snap.photoRotationDeg) || 0);
-    setPhotoSlotFit(snap.photoSlotFit === 'contain' ? 'contain' : 'cover');
-    const chrome = snap.photoChrome || {};
-    const patch = { panZoom: false };
-    if (chrome.rotationDeg != null) patch.rotationDeg = chrome.rotationDeg;
-    if (chrome.slotFit != null) patch.slotFit = chrome.slotFit;
-    if (chrome.panX != null) patch.panX = chrome.panX;
-    if (chrome.panY != null) patch.panY = chrome.panY;
-    if (chrome.width != null) patch.width = chrome.width;
-    if (chrome.height != null) patch.height = chrome.height;
-    // Clear pan/size when they were unset at open so zoom returns to cover default.
-    if (chrome.panX == null) patch.panX = null;
-    if (chrome.panY == null) patch.panY = null;
-    if (chrome.width == null) patch.width = null;
-    if (chrome.height == null) patch.height = null;
-    applyPhotoChrome(patch);
-  }, [applyStyleFields, applyPhotoChrome]);
-
-  /** Revert live photo chrome + form edits, then close without saving. */
-  const handleDiscardChanges = useCallback(() => {
-    handleReset();
-    onClose?.();
-  }, [handleReset, onClose]);
-
-  const patchActiveLabel = useCallback(
-    (patch) => {
-      if (!hasMedia || !activeKey) return;
-      setLabels((prev) =>
-        prev.map((l) => (l.clientKey === activeKey ? { ...l, ...patch } : l))
-      );
-    },
-    [hasMedia, activeKey]
-  );
-
-  const activeLabelIsEmoji = useMemo(() => {
-    const active = labels.find((l) => l.clientKey === activeKey);
-    return Boolean(
-      active &&
-        (active.isEmoji || /Emoji/i.test(String(active.fontFamily || '')))
-    );
-  }, [labels, activeKey]);
-
-  /** Keep preview labels in sync without RAF skip races from applyStyleFields. */
-  const handleFillChange = useCallback(
-    (next) => {
-      setColor(next);
-      if (!activeLabelIsEmoji) patchActiveLabel({ color: next });
-    },
-    [patchActiveLabel, activeLabelIsEmoji]
-  );
-
-  const handleOutlineChange = useCallback(
-    (next) => {
-      setOutlineColor(next);
-      if (!activeLabelIsEmoji) patchActiveLabel({ outlineColor: next });
-    },
-    [patchActiveLabel, activeLabelIsEmoji]
-  );
-
-  useEffect(() => {
-    if (!hasMedia || !activeKey || skipStyleSyncRef.current) return;
-    if (activeLabelIsEmoji) {
-      // Stickers: only size from the font-size slider (box tracks glyph size).
-      const fs = Math.max(
-        10,
-        Math.round(Number(fontSize) || PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX)
-      );
-      const pw = Math.max(1, mediaSession?.photoRect?.width || 1);
-      const ph = Math.max(1, mediaSession?.photoRect?.height || 1);
-      patchActiveLabel({
-        fontSize: fs,
-        relW: Math.max(0.06, (fs + 12) / pw),
-        relH: Math.max(0.06, (fs + 12) / ph)
-      });
-      return;
-    }
-    patchActiveLabel(
-      stylePatchFromControls({
-        text,
-        color,
-        outlineColor,
-        fontFamily,
-        fontWeight,
-        fontSize,
-        outlineWidth,
-        selectedPreset,
-        allowSampleFallback: seedSampleOnEmptyRef.current
-      })
-    );
-  }, [
-    hasMedia,
-    activeKey,
-    activeLabelIsEmoji,
-    text,
-    color,
-    outlineColor,
-    fontFamily,
-    fontWeight,
-    fontSize,
-    outlineWidth,
-    selectedPreset,
-    mediaSession,
-    patchActiveLabel
-  ]);
-
-  const activateLabel = useCallback(
-    (key) => {
-      if (!key) return;
-      setActiveKey(key);
-      const l = labels.find((item) => item.clientKey === key);
-      if (!l) return;
-      const isEmoji =
-        Boolean(l.isEmoji) || /Emoji/i.test(String(l.fontFamily || ''));
-      if (isEmoji) {
-        // Stickers: update size slider only — never replace caption Text / style samples.
-        skipStyleSyncRef.current = true;
-        setFontSize(
-          Math.max(
-            10,
-            Math.round(Number(l.fontSize) || PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX)
-          )
-        );
-        requestAnimationFrame(() => {
-          skipStyleSyncRef.current = false;
-        });
-        return;
-      }
-      applyStyleFields(l, l.text);
-    },
-    [labels, applyStyleFields]
-  );
+  const displayText = String(text || '').trim() || PLACE_TEXT_DEFAULTS.text;
 
   const applyPreset = (preset) => {
     if (!preset) return;
@@ -1089,569 +291,35 @@ export default function PhotoAlbumsPlaceTextDialog({
     setFontWeight(preset.fontWeight);
     setFontSize(preset.fontSize);
     setOutlineWidth(preset.outlineWidth);
-    if (activeLabelIsEmoji) return;
-    // Sync immediately — do not wait on the style-sync effect (skipStyleSync races).
-    patchActiveLabel({
-      color: preset.color,
-      outlineColor: preset.outlineColor,
-      fontFamily: preset.fontFamily,
-      fontWeight: preset.fontWeight,
-      fontSize: preset.fontSize,
-      outlineWidth: preset.outlineWidth
-    });
   };
-
-  const handleExistingPick = (key) => {
-    setExistingPick(key);
-    if (!key) {
-      if (!hasMedia || !mediaSession?.photoRect) {
-        applyStyleFields({ ...PLACE_TEXT_DEFAULTS, text: '' }, '', false);
-        return;
-      }
-      const pw = Math.max(1, mediaSession.photoRect.width);
-      const ph = Math.max(1, mediaSession.photoRect.height);
-      const framed = resolveFramedPhotoChrome();
-      const nextLabel = buildSeededPlaceTextSampleLabel({
-        caption: '',
-        style: {
-          color,
-          outlineColor,
-          outlineWidth,
-          fontSize,
-          fontFamily,
-          fontWeight,
-          rotationDeg: PLACE_TEXT_DEFAULTS.rotationDeg
-        },
-        frameW: pw,
-        frameH: ph,
-        photoW: framed.photoW,
-        photoH: framed.photoH,
-        panX: framed.panX,
-        panY: framed.panY
-      });
-      nextLabel.text = '';
-      const clientKey = nextLabel.clientKey;
-      setLabels((prev) => [...prev, nextLabel]);
-      setActiveKey(clientKey);
-      applyStyleFields({ ...PLACE_TEXT_DEFAULTS, text: '' }, '', false);
-      return;
-    }
-    const opt = labelOptions.find((o) => o.key === key);
-    if (!opt) return;
-    applyStyleFields(
-      {
-        color: opt.color,
-        outlineColor: opt.outlineColor,
-        outlineWidth: opt.outlineWidth,
-        fontSize: opt.fontSize,
-        fontFamily: opt.fontFamily,
-        fontWeight: opt.fontWeight
-      },
-      opt.text
-    );
-    if (hasMedia) {
-      const match = labels.find(
-        (l) =>
-          (opt.labelId && l.labelId === opt.labelId) ||
-          (opt.pos != null && l.docPos === opt.pos)
-      );
-      if (match) activateLabel(match.clientKey);
-    }
-  };
-
-  const handleLabelChange = useCallback(
-    (clientKey, patch) => {
-      setLabels((prev) =>
-        prev.map((l) => (l.clientKey === clientKey ? { ...l, ...patch } : l))
-      );
-      if (clientKey === activeKey && patch.fontSize != null) {
-        skipStyleSyncRef.current = true;
-        setFontSize(Number(patch.fontSize) || PLACE_TEXT_DEFAULTS.fontSize);
-        requestAnimationFrame(() => {
-          skipStyleSyncRef.current = false;
-        });
-      }
-    },
-    [activeKey]
-  );
-
-  const handleLabelDelete = useCallback(
-    (clientKey) => {
-      if (!clientKey) return;
-      setLabels((prev) => {
-        const next = prev.filter((l) => l.clientKey !== clientKey);
-        if (clientKey === activeKey) {
-          const fallback = next[next.length - 1] || null;
-          setActiveKey(fallback?.clientKey || '');
-          if (fallback) applyStyleFields(fallback, fallback.text);
-        }
-        return next;
-      });
-    },
-    [activeKey, applyStyleFields]
-  );
-
-  const startPreviewSplitDrag = useCallback(
-    (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const container = splitContainerRef.current;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const startY = event.clientY;
-      const startRatio = previewSplitRatio;
-
-      const onMove = (moveEvent) => {
-        const dy = moveEvent.clientY - startY;
-        const next = startRatio + dy / Math.max(1, rect.height);
-        setPreviewSplitRatio(
-          Math.min(
-            PLACE_TEXT_PREVIEW_SPLIT_MAX,
-            Math.max(PLACE_TEXT_PREVIEW_SPLIT_MIN, next)
-          )
-        );
-      };
-
-      const onUp = () => {
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        document.body.style.removeProperty('user-select');
-        document.body.style.removeProperty('cursor');
-      };
-
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'row-resize';
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    },
-    [previewSplitRatio]
-  );
 
   const handleOk = () => {
-    const style = stylePatchFromControls({
-      text,
-      color,
-      outlineColor,
-      fontFamily,
-      fontWeight,
-      fontSize,
-      outlineWidth,
-      selectedPreset,
-      allowSampleFallback: seedSampleOnEmptyRef.current
-    });
-    const picked = existingPick ? labelOptions.find((o) => o.key === existingPick) : null;
-
-    let finalLabels = labels;
-    if (hasMedia && activeKey) {
-      const active = labels.find((l) => l.clientKey === activeKey);
-      // Don't overwrite emoji stickers with the text-style form fields.
-      if (active && !active.isEmoji && !/Emoji/i.test(String(active.fontFamily || ''))) {
-        finalLabels = labels.map((l) =>
-          l.clientKey === activeKey ? { ...l, ...style } : l
-        );
-      }
-    }
-    finalLabels = ensureLabelsIncludeTypedText(finalLabels, style.text, style);
-    if (finalLabels !== labels) {
-      const created = finalLabels.find((l) => l.isNew && !labels.some((x) => x.clientKey === l.clientKey));
-      if (created) setActiveKey(created.clientKey);
-    }
-
-    onConfirm?.({
-      ...style,
-      ...(showExistingSelect
-        ? {
-            editLabelId: picked?.labelId || null,
-            editPos: picked?.pos ?? null
-          }
-        : null),
-      ...(hasMedia && mediaSession
-        ? {
-            placeTextSession: {
-              ...mediaSession,
-              labels: finalLabels
-            }
-          }
-        : null)
-    });
+    onConfirm?.(
+      stylePatchFromControls({
+        text,
+        color,
+        outlineColor,
+        fontFamily,
+        fontWeight,
+        fontSize,
+        outlineWidth,
+        selectedPreset
+      })
+    );
   };
 
   const handleDialogClose = () => {
     if (guestDemo) {
-      handleDiscardChanges();
+      onClose?.();
       return;
     }
     handleOk();
   };
 
-  const handlePlaceEmoji = useCallback(
-    (em) => {
-      const emoji = String(em || '').trim();
-      if (!emoji || !hasMedia || !mediaSession?.photoRect) return;
-      const pw = Math.max(1, mediaSession.photoRect.width);
-      const ph = Math.max(1, mediaSession.photoRect.height);
-      const size = PHOTO_ALBUMS_EMOJI_DEFAULT_SIZE_PX;
-      const clientKey = `emoji_${Date.now()}`;
-      const next = {
-        clientKey,
-        isNew: true,
-        isEmoji: true,
-        docPos: null,
-        labelId: newLabelId(),
-        text: emoji,
-        color: '#000000',
-        outlineColor: '#000000',
-        outlineWidth: 0,
-        fontSize: size,
-        fontFamily: PLACE_TEXT_EMOJI_FONT,
-        fontWeight: 400,
-        rotationDeg: 0,
-        relX: 0.38,
-        relY: 0.38,
-        relW: Math.max(0.06, (size + 12) / pw),
-        relH: Math.max(0.06, (size + 12) / ph)
-      };
-      setLabels((prev) => [...prev, next]);
-      // Select sticker for drag/resize, but do not overwrite Text / style-preset samples.
-      skipStyleSyncRef.current = true;
-      setActiveKey(clientKey);
-      requestAnimationFrame(() => {
-        skipStyleSyncRef.current = false;
-      });
-      setEmojiPickerAnchor(null);
-    },
-    [hasMedia, mediaSession]
-  );
-
-  const handleTextChange = useCallback(
-    (raw) => {
-      const next = String(raw ?? '').slice(0, PLACE_TEXT_MAX_CHARS);
-      setText(next);
-      if (!hasMedia || !mediaSession?.photoRect) return;
-      const trimmed = next.trim();
-      if (!trimmed) return;
-      setLabels((prev) => {
-        const ensured = ensureLabelsIncludeTypedText(prev, trimmed);
-        const created = ensured.find((l) => l.isNew && !prev.some((x) => x.clientKey === l.clientKey));
-        if (created) {
-          setActiveKey(created.clientKey);
-        } else if (activeKey) {
-          return ensured.map((l) => (l.clientKey === activeKey ? { ...l, text: trimmed } : l));
-        }
-        return ensured;
-      });
-    },
-    [hasMedia, mediaSession, activeKey, ensureLabelsIncludeTypedText]
-  );
-
-  const stylePresetButtons = (compact = false) => (
-    <Stack spacing={compact ? 0.35 : 0.5} sx={{ mt: compact ? 0.35 : 1, mb: 0 }}>
-      {PLACE_TEXT_STYLE_PRESETS.map((preset) => {
-        const selected = preset.id === selectedPresetId;
-        const styleForButton = selected
-          ? {
-              color,
-              outlineColor,
-              fontFamily,
-              fontWeight,
-              fontSize: Math.round(Number(fontSize) || preset.fontSize),
-              outlineWidth,
-              uppercase: preset.uppercase
-            }
-          : {
-              color: preset.color,
-              outlineColor: preset.outlineColor,
-              fontFamily: preset.fontFamily,
-              fontWeight: preset.fontWeight,
-              fontSize: preset.fontSize,
-              outlineWidth: preset.outlineWidth,
-              uppercase: preset.uppercase
-            };
-        const capSize = compact ? 22 : 28;
-        return (
-          <Box
-            key={preset.id}
-            component="button"
-            type="button"
-            aria-pressed={selected}
-            aria-label={`Style preset: ${preset.label}`}
-            title={preset.label}
-            onClick={() => applyPreset(preset)}
-            sx={{
-              display: 'block',
-              width: '100%',
-              m: 0,
-              p: compact ? (selected ? 0.35 : 0.25) : selected ? 0.65 : 0.5,
-              textAlign: 'center',
-              cursor: 'pointer',
-              bgcolor: '#fff',
-              border: selected ? (compact ? '3px solid #e53935' : '4px solid #e53935') : '2px solid #000',
-              borderRadius: 1,
-              boxShadow: selected ? '0 2px 8px rgba(229,57,53,0.35)' : '0 1px 2px rgba(0,0,0,0.15)',
-              '&:focus-visible': {
-                outline: '2px solid #ffeb3b',
-                outlineOffset: 2
-              }
-            }}
-          >
-            <span
-              style={sampleTextInlineStyle({
-                ...styleForButton,
-                fontSize: Math.min(capSize, styleForButton.fontSize)
-              })}
-            >
-              {displayText}
-            </span>
-          </Box>
-        );
-      })}
-    </Stack>
-  );
-
-  const textInputBlock = (compact = false) => (
-    <>
-      <Typography sx={{ ...labelSx, mb: 0.5 }}>Text</Typography>
-      {showExistingSelect ? (
-        <Select
-          fullWidth
-          size="small"
-          displayEmpty
-          value={existingPick}
-          onChange={(e) => handleExistingPick(e.target.value)}
-          sx={{ ...selectSx, mb: compact ? 0.5 : 1 }}
-          MenuProps={selectMenuProps}
-          inputProps={{ 'aria-label': 'Select existing text on this photo' }}
-          renderValue={(selected) => {
-            if (!selected) return 'Select';
-            const opt = labelOptions.find((o) => o.key === selected);
-            return opt?.text || 'Select';
-          }}
-        >
-          <MenuItem value="">
-            <em>New text…</em>
-          </MenuItem>
-          {labelOptions.map((opt) => (
-            <MenuItem key={opt.key} value={opt.key}>
-              {opt.text}
-            </MenuItem>
-          ))}
-        </Select>
-      ) : null}
-      <TextField
-        value={text}
-        onChange={(e) => handleTextChange(e.target.value)}
-        placeholder={PLACE_TEXT_DEFAULTS.text}
-        autoFocus={!hasMedia}
-        fullWidth
-        multiline={!compact}
-        minRows={compact ? undefined : 3}
-        maxRows={compact ? undefined : 3}
-        inputProps={{
-          maxLength: PLACE_TEXT_MAX_CHARS,
-          'aria-label': 'Add text',
-          spellCheck: true
-        }}
-        sx={{
-          width: '100%',
-          bgcolor: '#fff',
-          '& .MuiOutlinedInput-root': {
-            bgcolor: '#fff',
-            alignItems: 'stretch',
-            '& fieldset': { borderColor: '#000', borderWidth: 2 },
-            '&:hover fieldset': { borderColor: '#000' },
-            '&.Mui-focused fieldset': { borderColor: '#000' }
-          },
-          '& .MuiInputBase-input': {
-            color: '#000',
-            WebkitTextFillColor: '#000',
-            fontFamily: MAIN_FONT_FAMILY,
-            fontWeight: 600,
-            fontSize: compact ? '0.95rem' : '1rem',
-            lineHeight: 1.35,
-            py: compact ? 0.75 : 1,
-            px: 1.25,
-            resize: 'none'
-          }
-        }}
-      />
-    </>
-  );
-
-  const emojiToolbarButton = (
-    <GreenButton
-      type="button"
-      aria-haspopup="dialog"
-      aria-expanded={emojiPickerAnchor ? 'true' : undefined}
-      onClick={(e) => {
-        e.preventDefault();
-        const el = e.currentTarget;
-        setEmojiPickerAnchor((prev) => (prev ? null : el));
-      }}
-      title="Add emoji sticker on the photo or video"
-      sx={{ minWidth: 80, fontWeight: 800, flexShrink: 0 }}
-    >
-      Emoji
-    </GreenButton>
-  );
-
-  const mediaActionButtonRow = hasMedia ? (
-    <Stack
-      direction="row"
-      spacing={0.75}
-      justifyContent="space-between"
-      alignItems="center"
-      flexWrap="wrap"
-      useFlexGap
-      sx={{ mt: 0.5, mb: 0.15, flexShrink: 0, width: '100%' }}
-    >
-      <YellowButtonTemplate
-        type="button"
-        onClick={handleDiscardChanges}
-        title="Ignore all changes and exit"
-        sx={{ minWidth: 88, fontWeight: 800 }}
-      >
-        Cancel
-      </YellowButtonTemplate>
-      {mediaSession?.isVideo ? (
-        <Stack
-          direction="row"
-          spacing={0.75}
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-          sx={{ flex: '1 1 auto', minWidth: 0, justifyContent: 'center' }}
-        >
-          <PhotoAlbumsVideoPlaybackControls inline video={previewVideoEl} />
-          {emojiToolbarButton}
-        </Stack>
-      ) : (
-        <Stack
-          direction="row"
-          spacing={0.75}
-          justifyContent="center"
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-          sx={{ flex: '1 1 auto', justifyContent: 'center' }}
-        >
-          <GreenButton
-            type="button"
-            aria-pressed={panEnabled}
-            onClick={handleTogglePanZoom}
-            title="Pan & Zoom — drag the photo inside its slot on the album page"
-            sx={{
-              minWidth: 88,
-              fontWeight: 800,
-              lineHeight: 1.15,
-              whiteSpace: 'nowrap',
-              ...(panEnabled
-                ? {
-                    bgcolor: '#FFEB3B !important',
-                    color: '#000 !important',
-                    WebkitTextFillColor: '#000 !important',
-                    border: '2px solid #000 !important'
-                  }
-                : null)
-            }}
-          >
-            Pan & Zoom
-          </GreenButton>
-          <GreenButton
-            type="button"
-            onClick={handleRotatePhoto}
-            title="Rotate photo 90° clockwise"
-            sx={{ minWidth: 72, fontWeight: 800 }}
-          >
-            Rotate
-          </GreenButton>
-          <GreenButton
-            type="button"
-            aria-pressed={photoSlotFit === 'contain'}
-            onClick={handlePhotoFitFull}
-            title="Show the full photo in the slot (may leave edges)"
-            sx={{
-              minWidth: 64,
-              fontWeight: 800,
-              ...(photoSlotFit === 'contain' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
-            }}
-          >
-            Full
-          </GreenButton>
-          <GreenButton
-            type="button"
-            aria-pressed={photoSlotFit === 'cover'}
-            onClick={handlePhotoFitZoom}
-            title="Fill the slot (may clip edges)"
-            sx={{
-              minWidth: 64,
-              fontWeight: 800,
-              ...(photoSlotFit === 'cover' ? { outline: '2px solid #fff', outlineOffset: 1 } : null)
-            }}
-          >
-            Zoom
-          </GreenButton>
-          <GreenButton
-            type="button"
-            onClick={handleReset}
-            title="Restore photo and text to how this popup opened"
-            sx={{ minWidth: 72, fontWeight: 800 }}
-          >
-            Reset
-          </GreenButton>
-          {emojiToolbarButton}
-        </Stack>
-      )}
-      <GreenButton
-        type="button"
-        onClick={handleOk}
-        title="Save all changes and exit"
-        {...guestDemoBlockProps()}
-        sx={{ ...colorTemplate7PopupActionButtonSx(), minWidth: 88, fontWeight: 800 }}
-      >
-        Save
-      </GreenButton>
-    </Stack>
-  ) : null;
-
-  const emojiPickerPopover = hasMedia ? (
-    <PhotoAlbumsEmojiPickerPopover
-      open={Boolean(emojiPickerAnchor)}
-      anchorEl={emojiPickerAnchor}
-      onClose={() => setEmojiPickerAnchor(null)}
-      onPick={(em) => handlePlaceEmoji(em)}
-      zIndex={EMOJI_PICKER_Z}
-    />
-  ) : null;
-
   const sizeSliderRow = (
-    <Stack
-      direction="row"
-      spacing={hasMedia ? 0.75 : 1.5}
-      sx={{
-        mt: hasMedia ? 0.5 : 1.5,
-        flexShrink: 0,
-        width: '100%'
-      }}
-    >
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: hasMedia ? 0.5 : 1
-        }}
-      >
-        <Typography
-          sx={{
-            ...labelSx,
-            mb: 0,
-            flexShrink: 0,
-            whiteSpace: 'nowrap',
-            ...(hasMedia ? { fontSize: '0.82rem !important' } : {})
-          }}
-        >
+    <Stack direction="row" spacing={1.5} sx={{ mt: 1.5, flexShrink: 0, width: '100%' }}>
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ ...labelSx, mb: 0, flexShrink: 0, whiteSpace: 'nowrap' }}>
           Font size: {Math.round(fontSize)} pt
         </Typography>
         <Slider
@@ -1660,28 +328,12 @@ export default function PhotoAlbumsPlaceTextDialog({
           step={0.5}
           value={fontSize}
           onChange={(_, v) => setFontSize(Array.isArray(v) ? v[0] : v)}
-          sx={{ ...colorTemplate7PopupSliderSx(), flex: 1, minWidth: hasMedia ? 72 : 48, m: 0 }}
+          sx={{ ...colorTemplate7PopupSliderSx(), flex: 1, minWidth: 48, m: 0 }}
           aria-label="Font size"
         />
       </Box>
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: hasMedia ? 0.5 : 1
-        }}
-      >
-        <Typography
-          sx={{
-            ...labelSx,
-            mb: 0,
-            flexShrink: 0,
-            whiteSpace: 'nowrap',
-            ...(hasMedia ? { fontSize: '0.82rem !important' } : {})
-          }}
-        >
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ ...labelSx, mb: 0, flexShrink: 0, whiteSpace: 'nowrap' }}>
           Outline width: {Number(outlineWidth).toFixed(1)} pt
         </Typography>
         <Slider
@@ -1690,133 +342,90 @@ export default function PhotoAlbumsPlaceTextDialog({
           step={0.5}
           value={outlineWidth}
           onChange={(_, v) => setOutlineWidth(Array.isArray(v) ? v[0] : v)}
-          sx={{ ...colorTemplate7PopupSliderSx(), flex: 1, minWidth: hasMedia ? 72 : 48, m: 0 }}
+          sx={{ ...colorTemplate7PopupSliderSx(), flex: 1, minWidth: 48, m: 0 }}
           aria-label="Outline width"
         />
       </Box>
     </Stack>
   );
 
-  const controlsPanel = (
-    <Box
-      sx={{
-        flex: hasMedia ? '1 1 auto' : '0 0 auto',
-        height: hasMedia ? '100%' : 'auto',
-        minHeight: hasMedia ? 0 : undefined,
-        overflow: hasMedia ? 'hidden' : 'auto',
-        display: hasMedia ? 'flex' : 'block',
-        flexDirection: hasMedia ? 'column' : undefined
-      }}
+  return (
+    <ColorTemplate16PopupCenterWide
+      open={open}
+      onClose={handleDialogClose}
+      closeOnBackdrop={false}
+      showCloseButton
+      fillViewportHeight={false}
     >
-      <Box
-        sx={{
-          p: 1,
-          border: '2px dashed var(--theme-yellow-color, #ffd700)',
-          borderRadius: hasMedia ? 0 : 1,
-          bgcolor: 'rgba(0,0,0,0.18)',
-          flex: hasMedia ? '1 1 auto' : undefined,
-          minHeight: hasMedia ? 0 : undefined,
-          overflow: hasMedia ? 'hidden' : undefined,
-          display: hasMedia ? 'flex' : 'block',
-          flexDirection: hasMedia ? 'column' : undefined
-        }}
-      >
-        {hasMedia ? (
-          <Stack
-            direction="row"
-            spacing={1.5}
-            sx={{ flex: '1 1 auto', minHeight: 0, alignItems: 'stretch' }}
-          >
-            <Box
-              sx={{
-                flex: '0 0 34%',
-                minWidth: 200,
-                maxWidth: 360,
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0
-              }}
-            >
-              <PhotoAlbumsFillOutlineColorPicker
-                fillColor={color}
-                outlineColor={outlineColor}
-                onFillChange={handleFillChange}
-                onOutlineChange={handleOutlineChange}
-              />
-            </Box>
+      <ColorTemplate16PopupCenterWide.Title>Add Text</ColorTemplate16PopupCenterWide.Title>
+      <ColorTemplate16PopupCenterWide.Body spacing={1.5}>
+        <ColorTemplate16PopupCenterWide.SectionDescription>
+          Style your text, then OK to place it on the page (drag &amp; rotate on the page).
+        </ColorTemplate16PopupCenterWide.SectionDescription>
 
-            <Box
-              sx={{
-                flex: '1 1 auto',
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0
-              }}
-            >
-              {mediaActionButtonRow}
-              {emojiPickerPopover}
-              {sizeSliderRow}
-              {textInputBlock(true)}
-              {stylePresetButtons(true)}
-            </Box>
-
-            <Box
-              sx={{
-                flex: '0 0 17%',
-                minWidth: 128,
-                maxWidth: 180,
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0
-              }}
-            >
-              <Typography sx={labelSx}>Font family</Typography>
-              <Select
-                fullWidth
-                size="small"
-                value={fontFamily}
-                onChange={(e) => setFontFamily(e.target.value)}
-                sx={selectSx}
-                MenuProps={selectMenuProps}
-              >
-                {PLACE_TEXT_FONT_FAMILIES.map((f) => (
-                  <MenuItem key={f.value} value={f.value} sx={{ fontFamily: f.value }}>
-                    {f.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              <Box sx={{ mt: 1 }}>
-                <Typography sx={labelSx}>Font weight</Typography>
-                <Select
-                  fullWidth
-                  size="small"
-                  value={fontWeight}
-                  onChange={(e) => setFontWeight(Number(e.target.value))}
-                  sx={selectSx}
-                  MenuProps={selectMenuProps}
+        <Stack spacing={1.25} sx={{ mt: 1.5, mb: 2, py: 1.5, overflow: 'visible' }}>
+          {PLACE_TEXT_STYLE_PRESETS.map((preset) => {
+            const selected = preset.id === selectedPresetId;
+            const styleForButton = selected
+              ? {
+                  color,
+                  outlineColor,
+                  fontFamily,
+                  fontWeight,
+                  fontSize: Math.round(Number(fontSize) || preset.fontSize),
+                  outlineWidth,
+                  uppercase: preset.uppercase
+                }
+              : {
+                  color: preset.color,
+                  outlineColor: preset.outlineColor,
+                  fontFamily: preset.fontFamily,
+                  fontWeight: preset.fontWeight,
+                  fontSize: preset.fontSize,
+                  outlineWidth: preset.outlineWidth,
+                  uppercase: preset.uppercase
+                };
+            return (
+              <Box key={preset.id} sx={{ display: 'flex', justifyContent: 'center', py: selected ? 0.75 : 0 }}>
+                <Box
+                  component="button"
+                  type="button"
+                  aria-pressed={selected}
+                  aria-label={`Style preset: ${preset.label}`}
+                  onClick={() => applyPreset(preset)}
+                  sx={{
+                    display: 'block',
+                    width: selected ? '80%' : '100%',
+                    p: selected ? 1.5 : 1.15,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    bgcolor: '#fff',
+                    border: selected ? '8px solid #e53935' : '2px solid #000',
+                    borderRadius: 1
+                  }}
                 >
-                  {PLACE_TEXT_FONT_WEIGHTS.map((w) => (
-                    <MenuItem key={w.value} value={w.value}>
-                      {w.label}
-                    </MenuItem>
-                  ))}
-                </Select>
+                  <span style={sampleTextInlineStyle(styleForButton)}>{displayText}</span>
+                </Box>
               </Box>
-            </Box>
-          </Stack>
-        ) : (
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={2}
-            sx={{ alignItems: { md: 'flex-start' } }}
-          >
+            );
+          })}
+        </Stack>
+
+        <Box
+          sx={{
+            p: 1,
+            border: '2px dashed var(--theme-yellow-color, #ffd700)',
+            borderRadius: 1,
+            bgcolor: 'rgba(0,0,0,0.18)'
+          }}
+        >
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'flex-start' } }}>
             <Box sx={{ flex: '1 1 28%', minWidth: 160 }}>
               <PhotoAlbumsFillOutlineColorPicker
                 fillColor={color}
                 outlineColor={outlineColor}
-                onFillChange={handleFillChange}
-                onOutlineChange={handleOutlineChange}
+                onFillChange={setColor}
+                onOutlineChange={setOutlineColor}
               />
               {sizeSliderRow}
             </Box>
@@ -1857,235 +466,61 @@ export default function PhotoAlbumsPlaceTextDialog({
             </Box>
 
             <Box sx={{ flex: '1 1 34%', minWidth: 180 }}>
-              {textInputBlock(false)}
-              {stylePresetButtons(false)}
+              <Typography sx={{ ...labelSx, mb: 0.5 }}>Text</Typography>
+              <TextField
+                value={text}
+                onChange={(e) => setText(String(e.target.value ?? '').slice(0, PLACE_TEXT_MAX_CHARS))}
+                placeholder={PLACE_TEXT_DEFAULTS.text}
+                autoFocus
+                fullWidth
+                multiline
+                minRows={3}
+                maxRows={3}
+                inputProps={{
+                  maxLength: PLACE_TEXT_MAX_CHARS,
+                  'aria-label': 'Add text',
+                  spellCheck: true
+                }}
+                sx={{
+                  width: '100%',
+                  bgcolor: '#fff',
+                  '& .MuiOutlinedInput-root': {
+                    bgcolor: '#fff',
+                    alignItems: 'stretch',
+                    '& fieldset': { borderColor: '#000', borderWidth: 2 },
+                    '&:hover fieldset': { borderColor: '#000' },
+                    '&.Mui-focused fieldset': { borderColor: '#000' }
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#000',
+                    WebkitTextFillColor: '#000',
+                    fontFamily: MAIN_FONT_FAMILY,
+                    fontWeight: 600,
+                    fontSize: '1rem',
+                    lineHeight: 1.35,
+                    py: 1,
+                    px: 1.25,
+                    resize: 'none'
+                  }
+                }}
+              />
             </Box>
           </Stack>
-        )}
-      </Box>
-    </Box>
-  );
+        </Box>
 
-  return (
-    <ColorTemplate16PopupCenterWide
-      open={open}
-      onClose={handleDialogClose}
-      closeOnBackdrop={false}
-      showCloseButton
-      maxWidth={hasMedia ? '90vw' : undefined}
-      resizable={hasMedia}
-      fillViewportHeight={false}
-      defaultResizeHeight={hasMedia ? '90vh' : undefined}
-      maxResizeHeight={hasMedia ? '90vh' : undefined}
-      panelShellSx={
-        hasMedia
-          ? {
-              width: '90vw',
-              maxWidth: '90vw',
-              height: '90vh',
-              maxHeight: '90vh',
-              minHeight: '90vh'
-            }
-          : undefined
-      }
-      contentSx={
-        hasMedia
-          ? {
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-              minHeight: 0,
-              flex: '1 1 auto',
-              overflow: 'hidden',
-              overflowY: 'hidden',
-              pt: 0,
-              px: { xs: 0.75, sm: 1 },
-              pb: 0
-            }
-          : undefined
-      }
-      cardSx={
-        hasMedia
-          ? { display: 'flex', flexDirection: 'column', minHeight: 0, flex: '1 1 auto', height: '100%' }
-          : undefined
-      }
-    >
-      <ColorTemplate16PopupCenterWide.Title
-        sx={hasMedia ? { flexShrink: 0, py: 0.35, mb: 0 } : undefined}
-      >
-        {hasMedia ? 'Photo/Video Edit' : 'Add Text'}
-      </ColorTemplate16PopupCenterWide.Title>
-      <ColorTemplate16PopupCenterWide.Body
-        spacing={hasMedia ? 0 : 1.5}
-        sx={
-          hasMedia
-            ? {
-                flex: 1,
-                minHeight: 0,
-                height: '100%',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                pb: 0,
-                mb: 0
-              }
-            : undefined
-        }
-      >
-        {!hasMedia ? (
-          <ColorTemplate16PopupCenterWide.SectionDescription>
-            Style your text, then OK to place it on the page (drag & rotate like a photo).
-          </ColorTemplate16PopupCenterWide.SectionDescription>
-        ) : null}
-
-        {hasMedia ? (
-          <Box
-            ref={splitContainerRef}
-            sx={{
-              display: 'grid',
-              gridTemplateRows: `${Math.round(previewSplitRatio * 100)}% ${PLACE_TEXT_SPLIT_HANDLE_PX}px auto`,
-              flex: '1 1 auto',
-              minHeight: 0,
-              overflow: 'hidden'
-            }}
+        <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2, flexShrink: 0 }}>
+          <GreenButton type="button" onClick={() => onClose?.()} sx={{ minWidth: 96, fontWeight: 800 }}>
+            Cancel
+          </GreenButton>
+          <GreenButton
+            type="button"
+            onClick={handleOk}
+            {...guestDemoBlockProps()}
+            sx={{ ...colorTemplate7PopupActionButtonSx(), minWidth: 96, fontWeight: 800 }}
           >
-            <Box sx={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <Box sx={{ flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
-                <PhotoAlbumsPlaceTextMediaPreview
-                  session={previewSession}
-                  labels={labels}
-                  activeKey={activeKey}
-                  noteId={noteId}
-                  storageType={storageType}
-                  panZoomActive={panEnabled}
-                  photoFitAnimating={photoFitAnimating}
-                  onNaturalAspectRatio={handleNaturalAspectRatio}
-                  onPhotoChromeChange={applyPhotoChrome}
-                  onVideoElementChange={setPreviewVideoEl}
-                  onActivate={activateLabel}
-                  onLabelChange={handleLabelChange}
-                  onLabelDelete={handleLabelDelete}
-                  onDoubleClickLabel={activateLabel}
-                />
-              </Box>
-              {panEnabled && !mediaSession?.isVideo ? (
-                <Box sx={slotZoomSliderRowSx(true)}>
-                  <Typography component="span" sx={slotZoomPctLabelSx(true)}>
-                    {SLOT_ZOOM_PCT_MIN}%
-                  </Typography>
-                  <Slider
-                    min={SLOT_ZOOM_PCT_MIN}
-                    max={SLOT_ZOOM_PCT_MAX}
-                    step={1}
-                    value={photoZoomPct}
-                    onChange={handlePhotoZoomSliderChange}
-                    sx={slotZoomSliderSx(true)}
-                    aria-label="Photo zoom in slot"
-                  />
-                  <Typography component="span" sx={slotZoomPctLabelSx(true)}>
-                    {SLOT_ZOOM_PCT_MAX}%
-                  </Typography>
-                </Box>
-              ) : null}
-            </Box>
-            <Box
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Drag to resize photo preview and font controls"
-              aria-valuenow={Math.round(previewSplitRatio * 100)}
-              aria-valuemin={Math.round(PLACE_TEXT_PREVIEW_SPLIT_MIN * 100)}
-              aria-valuemax={Math.round(PLACE_TEXT_PREVIEW_SPLIT_MAX * 100)}
-              onMouseDown={startPreviewSplitDrag}
-              sx={{
-                cursor: 'row-resize',
-                touchAction: 'none',
-                bgcolor: 'rgba(255,235,59,0.25)',
-                borderTop: '2px solid var(--theme-yellow-color, #ffd700)',
-                borderBottom: '2px solid var(--theme-yellow-color, #ffd700)',
-                zIndex: 2,
-                '@media (hover: hover)': {
-                  '&:hover': { bgcolor: 'rgba(255,235,59,0.45)' }
-                }
-              }}
-            />
-            <Box
-              sx={{
-                minHeight: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden'
-              }}
-            >
-              {controlsPanel}
-            </Box>
-          </Box>
-        ) : (
-          <>
-            <Stack spacing={1.25} sx={{ mt: 1.5, mb: 2, py: 1.5, overflow: 'visible' }}>
-              {PLACE_TEXT_STYLE_PRESETS.map((preset) => {
-                const selected = preset.id === selectedPresetId;
-                const styleForButton = selected
-                  ? {
-                      color,
-                      outlineColor,
-                      fontFamily,
-                      fontWeight,
-                      fontSize: Math.round(Number(fontSize) || preset.fontSize),
-                      outlineWidth,
-                      uppercase: preset.uppercase
-                    }
-                  : {
-                      color: preset.color,
-                      outlineColor: preset.outlineColor,
-                      fontFamily: preset.fontFamily,
-                      fontWeight: preset.fontWeight,
-                      fontSize: preset.fontSize,
-                      outlineWidth: preset.outlineWidth,
-                      uppercase: preset.uppercase
-                    };
-                return (
-                  <Box key={preset.id} sx={{ display: 'flex', justifyContent: 'center', py: selected ? 0.75 : 0 }}>
-                    <Box
-                      component="button"
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => applyPreset(preset)}
-                      sx={{
-                        display: 'block',
-                        width: selected ? '80%' : '100%',
-                        p: selected ? 1.5 : 1.15,
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        bgcolor: '#fff',
-                        border: selected ? '8px solid #e53935' : '2px solid #000',
-                        borderRadius: 1
-                      }}
-                    >
-                      <span style={sampleTextInlineStyle(styleForButton)}>{displayText}</span>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Stack>
-            {controlsPanel}
-          </>
-        )}
-
-        {!hasMedia ? (
-          <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2, flexShrink: 0 }}>
-            <GreenButton type="button" onClick={handleDiscardChanges} sx={{ minWidth: 96, fontWeight: 800 }}>
-              Cancel
-            </GreenButton>
-            <GreenButton
-              type="button"
-              onClick={handleOk}
-              {...guestDemoBlockProps()}
-              sx={{ ...colorTemplate7PopupActionButtonSx(), minWidth: 96, fontWeight: 800 }}
-            >
-              OK
-            </GreenButton>
-          </Stack>
-        ) : null}
+            OK
+          </GreenButton>
+        </Stack>
       </ColorTemplate16PopupCenterWide.Body>
     </ColorTemplate16PopupCenterWide>
   );
@@ -2095,24 +530,6 @@ PhotoAlbumsPlaceTextDialog.propTypes = {
   open: PropTypes.bool,
   initialText: PropTypes.string,
   initialStyle: PropTypes.object,
-  existingLabels: PropTypes.arrayOf(
-    PropTypes.shape({
-      labelId: PropTypes.string,
-      pos: PropTypes.number,
-      text: PropTypes.string,
-      color: PropTypes.string,
-      outlineColor: PropTypes.string,
-      outlineWidth: PropTypes.number,
-      fontSize: PropTypes.number,
-      fontFamily: PropTypes.string,
-      fontWeight: PropTypes.number
-    })
-  ),
-  initialExistingId: PropTypes.string,
-  mediaSession: PropTypes.object,
-  noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  storageType: PropTypes.string,
   onClose: PropTypes.func,
-  onConfirm: PropTypes.func,
-  onPhotoChromeChange: PropTypes.func
+  onConfirm: PropTypes.func
 };

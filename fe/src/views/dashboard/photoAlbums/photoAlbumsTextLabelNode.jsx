@@ -4,7 +4,6 @@ import { ReactNodeViewRenderer, NodeViewWrapper, useEditorState } from '@tiptap/
 import { NodeSelection } from '@tiptap/pm/state';
 import Box from '@mui/material/Box';
 import { usePhotoAlbumsAlbumLayout, pointInAnyAlbumBand } from './photoAlbumsAlbumLayoutContext';
-import { PHOTO_ALBUMS_ATTACHMENT_NODE_NAME, photoPageRectFromAttrs } from './photoAlbumsAttachmentNode';
 import Typography from '@mui/material/Typography';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 
@@ -105,17 +104,6 @@ function attrToData(value, key) {
   return value == null || value === '' ? {} : { [key]: String(value) };
 }
 
-function rectsOverlap(a, b, pad = 0) {
-  if (!a || !b) return false;
-  const p = Math.max(0, Number(pad) || 0);
-  return !(
-    a.left + a.width + p < b.left ||
-    b.left + b.width + p < a.left ||
-    a.top + a.height + p < b.top ||
-    b.top + b.height + p < a.top
-  );
-}
-
 function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttributes, selected, getPos }) {
   const text = String(node?.attrs?.text || 'Text');
   const color = String(node?.attrs?.color || DEFAULT_COLOR);
@@ -140,121 +128,37 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
   const [liveBox, setLiveBox] = useState(null);
   const [liveFontSize, setLiveFontSize] = useState(null);
   const { activePageBand, activePageBands } = usePhotoAlbumsAlbumLayout();
-  const layoutLockVersion = useEditorState({
-    editor,
-    selector: ({ editor: ed }) =>
-      ed?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME]?.layoutLockVersion ?? 0
-  });
-  const placeTextDialogOpen = useEditorState({
-    editor,
-    selector: ({ editor: ed }) => {
-      const store = ed?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      void (store?.contextTutorialTick ?? 0);
-      return Boolean(store?.placeTextDialogOpen);
-    }
-  });
-  const pinnedPhotoEditPos = useEditorState({
-    editor,
-    selector: ({ editor: ed }) => {
-      const store = ed?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      void (store?.contextTutorialTick ?? 0);
-      return store?.pinnedPhotoEditPos ?? null;
-    }
-  });
   const labelBoxW = Math.max(1, Number(boxWidth) || 40);
   const labelBoxH = Math.max(1, Number(boxHeight) || 40);
-  const attachmentStore = editor?.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-  const pageBands = (() => {
-    const fromCtx = Array.isArray(activePageBands) ? activePageBands : [];
-    if (fromCtx.length) return fromCtx;
-    const fromStore = Array.isArray(attachmentStore?.activePageBands)
-      ? attachmentStore.activePageBands
-      : [];
-    if (fromStore.length) return fromStore;
-    const legacy = activePageBand || attachmentStore?.activePageBand || null;
-    return legacy ? [legacy] : [];
-  })();
 
-  const labelCenterInBands = useCallback(
-    (bands) => {
-      const cx = posLeft + labelBoxW / 2;
-      const cy = posTop + labelBoxH / 2;
-      return pointInAnyAlbumBand(cx, cy, bands);
-    },
-    [posLeft, posTop, labelBoxW, labelBoxH]
-  );
-
-  const canEditLayout = useEditorState({
+  /** Album editable → label can be dragged; selected label also shows resize/rotate chrome. */
+  const layoutEditable = useEditorState({
     editor,
-    selector: ({ editor: ed }) => {
-      if (!ed?.isEditable) return false;
-      const store = ed.storage?.[PHOTO_ALBUMS_ATTACHMENT_NODE_NAME];
-      void (store?.contextTutorialTick ?? 0);
-      if (store?.pinnedPhotoEditPos != null) return true;
-      const { selection } = ed.state;
-      return (
-        selection instanceof NodeSelection &&
-        selection.node?.type?.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME
-      );
-    }
+    selector: ({ editor: ed }) => Boolean(ed?.isEditable)
   });
-  const onActiveBookPage = useMemo(() => {
-    const bandsFromCtx = Array.isArray(pageBands) ? pageBands : [];
-    const bandsFromStore = Array.isArray(attachmentStore?.activePageBands)
-      ? attachmentStore.activePageBands
-      : [];
-    const bands = bandsFromCtx.length
-      ? bandsFromCtx
-      : bandsFromStore.length
-        ? bandsFromStore
-        : null;
-    const legacyBand = activePageBand || attachmentStore?.activePageBand || null;
-    if (!bands?.length && !legacyBand) return true;
-    if (bands?.length) return labelCenterInBands(bands);
-    if (!(legacyBand.height > 0)) return true;
-    const cx = posLeft + labelBoxW / 2;
-    const cy = posTop + labelBoxH / 2;
-    return (
-      cx >= legacyBand.left &&
-      cx <= legacyBand.left + legacyBand.width &&
-      cy >= legacyBand.top &&
-      cy <= legacyBand.top + legacyBand.height
-    );
-  }, [
-    pageBands,
-    layoutLockVersion,
-    labelCenterInBands,
-    attachmentStore,
-    activePageBand,
-    posLeft,
-    posTop,
-    labelBoxW,
-    labelBoxH
-  ]);
+  const canEditLayout = Boolean(layoutEditable && selected);
 
-  const hiddenForPlaceTextPreview = useMemo(() => {
-    if (!placeTextDialogOpen || !Number.isFinite(Number(pinnedPhotoEditPos))) return false;
-    const photoPos = Number(pinnedPhotoEditPos);
-    const photoNode = editor?.state?.doc?.nodeAt(photoPos);
-    if (!photoNode || photoNode.type?.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return false;
-    const photoRect = photoPageRectFromAttrs(photoNode.attrs);
-    if (!photoRect) return false;
-    return rectsOverlap(
-      photoRect,
-      { left: posLeft, top: posTop, width: labelBoxW, height: labelBoxH },
-      12
-    );
-  }, [
-    placeTextDialogOpen,
-    pinnedPhotoEditPos,
-    editor,
-    posLeft,
-    posTop,
-    labelBoxW,
-    labelBoxH
-  ]);
+  const visibleOnPage = useMemo(() => {
+    const bands = Array.isArray(activePageBands) && activePageBands.length
+      ? activePageBands
+      : activePageBand
+        ? [activePageBand]
+        : [];
+    if (!bands.length) return true;
+    return pointInAnyAlbumBand(posLeft + labelBoxW / 2, posTop + labelBoxH / 2, bands);
+  }, [activePageBands, activePageBand, posLeft, posTop, labelBoxW, labelBoxH]);
 
-  const visibleOnPage = onActiveBookPage && !hiddenForPlaceTextPreview;
+  const selectThisLabel = useCallback(() => {
+    if (typeof getPos !== 'function') return;
+    try {
+      const pos = getPos();
+      if (!Number.isFinite(pos)) return;
+      const { state, view } = editor;
+      view.dispatch(state.tr.setSelection(NodeSelection.create(state.doc, pos)));
+    } catch {
+      // ignore stale positions
+    }
+  }, [editor, getPos]);
 
   const liveLeft = dragPos?.left ?? posLeft;
   const liveTop = dragPos?.top ?? posTop;
@@ -439,7 +343,7 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
 
   const startMove = useCallback(
     (event) => {
-      if (!canEditLayout || event.button !== 0 || editing) return;
+      if (!layoutEditable || event.button !== 0 || editing) return;
       if (event.target?.closest?.('.rv-text-label__rotate')) return;
       if (event.target?.closest?.('.rv-text-label__delete')) return;
       if (event.target?.closest?.('.rv-text-label__resize')) return;
@@ -447,6 +351,7 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
 
       event.preventDefault();
       event.stopPropagation();
+      if (!selected) selectThisLabel();
 
       const wrapper = rootRef.current;
       const pm = wrapper?.closest?.('.ProseMirror');
@@ -502,7 +407,17 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [canEditLayout, editing, posLeft, posTop, liveBoxW, liveBoxH, commitAttrs]
+    [
+      layoutEditable,
+      selected,
+      selectThisLabel,
+      editing,
+      posLeft,
+      posTop,
+      liveBoxW,
+      liveBoxH,
+      commitAttrs
+    ]
   );
 
   const startRotate = useCallback(
@@ -562,9 +477,9 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
         ref={rootRef}
         className="rv-text-label__body"
         contentEditable={false}
-        onMouseDown={canEditLayout ? startMove : undefined}
+        onMouseDown={layoutEditable ? startMove : undefined}
         onDoubleClick={(e) => {
-          if (!canEditLayout) return;
+          if (!layoutEditable) return;
           e.preventDefault();
           e.stopPropagation();
           const requestEdit =
@@ -607,7 +522,7 @@ function PhotoAlbumsTextLabelNodeView({ node, editor, deleteNode, updateAttribut
           boxSizing: 'border-box',
           px: 0.75,
           py: 0.35,
-          cursor: canEditLayout ? (editing ? 'text' : 'grab') : 'default',
+          cursor: layoutEditable ? (editing ? 'text' : 'grab') : 'default',
           userSelect: editing ? 'text' : 'none',
           outline: canEditLayout ? '2px dashed #2f6fed' : 'none',
           outlineOffset: 4,

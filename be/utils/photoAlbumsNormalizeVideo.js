@@ -167,6 +167,63 @@ async function runFfmpeg(ffmpeg, args, timeoutMs) {
   }
 }
 
+export const PHOTO_ALBUMS_VIDEO_POSTER_MAX_EDGE_PX = 320;
+const POSTER_TIMEOUT_MS = 60_000;
+
+/**
+ * One JPEG frame (long edge ≤ 320px) for the thumbnail tray. Tries ~1s in, then the
+ * first frame for very short clips. Returns null when no frame can be decoded.
+ *
+ * @returns {Promise<Buffer|null>}
+ */
+export async function buildPhotoAlbumsVideoPosterThumbnailBuffer(buffer, { ext = '' } = {}) {
+  const cleanExt = String(ext || '').replace(/^\./, '').toLowerCase();
+  if (!Buffer.isBuffer(buffer) || !buffer.length) return null;
+  if (!isPhotoAlbumsStagingVideoExtension(cleanExt)) return null;
+
+  const ffmpeg = await resolveFfmpegPath();
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tutaphoto-poster-'));
+  const inputPath = path.join(tmpDir, `in.${cleanExt}`);
+  const outputPath = path.join(tmpDir, 'poster.jpg');
+  const edge = PHOTO_ALBUMS_VIDEO_POSTER_MAX_EDGE_PX;
+  try {
+    await fs.writeFile(inputPath, buffer);
+    for (const seek of ['1', '0']) {
+      try {
+        await fs.rm(outputPath, { force: true });
+        await runFfmpeg(
+          ffmpeg,
+          [
+            '-hide_banner',
+            '-loglevel',
+            'error',
+            '-y',
+            '-ss',
+            seek,
+            '-i',
+            inputPath,
+            '-frames:v',
+            '1',
+            '-vf',
+            `scale=${edge}:${edge}:force_original_aspect_ratio=decrease`,
+            '-q:v',
+            '4',
+            outputPath
+          ],
+          POSTER_TIMEOUT_MS
+        );
+        const out = await fs.readFile(outputPath).catch(() => null);
+        if (out?.length) return out;
+      } catch {
+        // try the next seek position
+      }
+    }
+    return null;
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 /**
  * @returns {Promise<{ buffer: Buffer, changed: boolean, skipped: boolean, ext: string, mimeType: string }>}
  */

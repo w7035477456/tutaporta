@@ -616,7 +616,7 @@ export async function deletePhotoAlbumsNoteAttachment(noteId, attachmentId, { st
 }
 
 /** Mac only — write attachment to temp and `open` in Word/Excel (or default app). */
-export async function openPhotoAlbumsNoteAttachmentNative(noteId, attachmentId) {
+export async function openPhotoAlbumsNoteAttachmentNative(noteId, attachmentId, { storageType } = {}) {
   const note = Number(noteId);
   const attachment = Number(attachmentId);
   if (!Number.isFinite(note) || note < 1 || !Number.isFinite(attachment) || attachment < 1) {

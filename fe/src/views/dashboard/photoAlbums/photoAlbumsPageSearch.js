@@ -1,4 +1,3 @@
-import { PHOTO_ALBUMS_ATTACHMENT_NODE_NAME } from './photoAlbumsAttachmentNode';
 import { PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME } from './photoAlbumsTextLabelNode';
 
 function normalizeTerms(terms) {
@@ -45,7 +44,7 @@ function pointInBand(cx, cy, band) {
 
 /**
  * Find album page indexes (0-based, book order) that contain any search term
- * in on-page text labels or photo file names.
+ * in on-page text labels.
  *
  * @returns {number[]} sorted unique page indexes
  */
@@ -66,31 +65,6 @@ export function findAlbumPagesMatchingSearchTerms(editor, pages, pageWidth, term
       const top = parseOptionalPx(node.attrs?.posTop) ?? 0;
       const w = parseOptionalPx(node.attrs?.boxWidth) ?? 40;
       const h = parseOptionalPx(node.attrs?.boxHeight) ?? 40;
-      const cx = left + w / 2;
-      const cy = top + h / 2;
-      bands.forEach((band, pageIndex) => {
-        if (pointInBand(cx, cy, band)) hits.add(pageIndex);
-      });
-      return;
-    }
-
-    if (node.type.name === PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) {
-      const fileName = String(node.attrs?.fileName || '');
-      if (!textMatchesAnyTerm(fileName, lowered)) return;
-
-      const frameLeft = parseOptionalPx(node.attrs?.frameLeft);
-      const frameTop = parseOptionalPx(node.attrs?.frameTop);
-      const frameWidth = parseOptionalPx(node.attrs?.frameWidth);
-      const frameHeight = parseOptionalPx(node.attrs?.frameHeight);
-      const posLeft = parseOptionalPx(node.attrs?.posLeft);
-      const posTop = parseOptionalPx(node.attrs?.posTop);
-      const width = parseOptionalPx(node.attrs?.width);
-      const height = parseOptionalPx(node.attrs?.height);
-      const left = frameLeft ?? posLeft;
-      const top = frameTop ?? posTop;
-      const w = frameWidth ?? width ?? 40;
-      const h = frameHeight ?? height ?? 40;
-      if (left == null || top == null) return;
       const cx = left + w / 2;
       const cy = top + h / 2;
       bands.forEach((band, pageIndex) => {

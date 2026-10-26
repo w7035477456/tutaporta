@@ -28,7 +28,6 @@ import { common, createLowlight } from 'lowlight';
 
 import { createSuggestionRender } from './photoAlbumsEditorSuggestion';
 import { PhotoAlbumsResizableImage } from './photoAlbumsResizableImage';
-import { PhotoAlbumsAttachmentNode } from './photoAlbumsAttachmentNode';
 import { PhotoAlbumsTextLabelNode } from './photoAlbumsTextLabelNode';
 import { PhotoAlbumsSearchHighlight } from './photoAlbumsSearchHighlight';
 
@@ -70,7 +69,7 @@ export function buildPhotoAlbumsEditorExtensions() {
       codeBlock: false, // replaced by CodeBlockLowlight for syntax highlighting
       link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },
       heading: { levels: [1, 2, 3, 4] },
-      // Album photos snap to template slots — not ProseMirror block reordering.
+      // Album pages are absolutely positioned — no ProseMirror block reordering.
       dropcursor: false
     }),
 
@@ -94,7 +93,6 @@ export function buildPhotoAlbumsEditorExtensions() {
     // Rich nodes
     CodeBlockLowlight.configure({ lowlight }),
     PhotoAlbumsResizableImage.configure({ inline: false, allowBase64: true }),
-    PhotoAlbumsAttachmentNode,
     PhotoAlbumsTextLabelNode,
     Table.configure({ resizable: true }),
     TableRow,

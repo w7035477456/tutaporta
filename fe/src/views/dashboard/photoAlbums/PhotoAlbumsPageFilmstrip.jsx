@@ -4,13 +4,10 @@ import Box from '@mui/material/Box';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
 } from 'ui-component/SliderControlButton';
-import { fetchPhotoAlbumsNoteAttachmentBlob } from 'api/photoAlbumsFe';
-import { PHOTO_ALBUMS_ATTACHMENT_NODE_NAME } from './photoAlbumsAttachmentNode';
 import {
   getPhotoAlbumsPageTemplate,
   resolveAlbumTemplateSlots
 } from './photoAlbumsPageTemplates';
-import { getPhotoAlbumsAttachmentViewKind } from 'utils/photoAlbumsFileFormats';
 import leftArrowImg from 'assets/images/leftarrow.png';
 import rightArrowImg from 'assets/images/rightarrow.png';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
@@ -24,37 +21,12 @@ const THUMB_H_PX = 96;
 const ACTIVE_BORDER = '4px solid #e53935';
 const IDLE_BORDER = '2px solid #333';
 
-function parseOptionalPx(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function templateBand(inst, pageWidthFallback = 480) {
-  const w = inst?.w > 0 ? inst.w : pageWidthFallback;
-  const h = inst?.h > 0 ? inst.h : Math.round(w * 1.2);
-  return {
-    left: inst?.x || 0,
-    top: inst?.y || 0,
-    width: w,
-    height: h
-  };
-}
-
-function pointInBand(cx, cy, band) {
-  return (
-    cx >= band.left &&
-    cx <= band.left + band.width &&
-    cy >= band.top &&
-    cy <= band.top + band.height
-  );
-}
-
 /**
- * Build lightweight page preview models (slot outlines + photo rects) for the filmstrip.
+ * Build lightweight page preview models (slot outlines) for the filmstrip.
+ * `editor` / `pageWidth` are kept in the signature for callers; pages carry no photos.
  */
 export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
   const list = Array.isArray(pages) ? pages : [];
-  const pw = Math.max(200, Math.round(Number(pageWidth) || 480));
 
   if (!list.length) {
     return [
@@ -67,182 +39,15 @@ export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
   }
 
   return list.map((inst) => {
-    const band = templateBand(inst, pw);
     const layout = getPhotoAlbumsPageTemplate(inst.id);
     const slots = layout ? resolveAlbumTemplateSlots(layout, inst.slots) : [];
-    const photos = [];
-
-    if (editor?.state?.doc) {
-      editor.state.doc.descendants((node) => {
-        if (node.type.name !== PHOTO_ALBUMS_ATTACHMENT_NODE_NAME) return;
-        const attachmentId = Number(node.attrs.attachmentId);
-        if (!Number.isFinite(attachmentId) || attachmentId < 1) return;
-
-        const frameLeft = parseOptionalPx(node.attrs.frameLeft);
-        const frameTop = parseOptionalPx(node.attrs.frameTop);
-        const frameWidth = parseOptionalPx(node.attrs.frameWidth);
-        const frameHeight = parseOptionalPx(node.attrs.frameHeight);
-        const posLeft = parseOptionalPx(node.attrs.posLeft);
-        const posTop = parseOptionalPx(node.attrs.posTop);
-        const width = parseOptionalPx(node.attrs.width);
-        const height = parseOptionalPx(node.attrs.height);
-
-        const left = frameLeft ?? posLeft;
-        const top = frameTop ?? posTop;
-        const w = frameWidth ?? width;
-        const h = frameHeight ?? height;
-        if (left == null || top == null || w == null || h == null) return;
-
-        const cx = left + w / 2;
-        const cy = top + h / 2;
-        if (!pointInBand(cx, cy, band)) return;
-
-        const ext = String(node.attrs.fileExtension || '');
-        const kind = getPhotoAlbumsAttachmentViewKind(ext);
-        const isPhoto = kind === 'image';
-        const isAlbumVideo = kind === 'video' && ext.replace(/^\./, '').toLowerCase() === 'mp4';
-        photos.push({
-          attachmentId,
-          isPhoto,
-          isAlbumVideo,
-          isAlbumMedia: isPhoto || isAlbumVideo,
-          x: ((left - band.left) / Math.max(1, band.width)) * 100,
-          y: ((top - band.top) / Math.max(1, band.height)) * 100,
-          w: (w / Math.max(1, band.width)) * 100,
-          h: (h / Math.max(1, band.height)) * 100
-        });
-      });
-    }
-
     return {
       key: String(inst.key || inst.id || 'page'),
       slots,
-      photos
+      photos: []
     };
   });
 }
-
-function FilmstripPhoto({ attachmentId, noteId, storageType, isVideo = false }) {
-  const hostRef = useRef(null);
-  const [inView, setInView] = useState(false);
-  const [url, setUrl] = useState('');
-  const objectUrlRef = useRef('');
-
-  // Path A: only fetch filmstrip thumbs that scroll into view (stateless blob GETs).
-  useEffect(() => {
-    const el = hostRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') {
-      setInView(true);
-      return undefined;
-    }
-    const root = el.closest('.rv-album-page-filmstrip__scroll');
-    const io = new IntersectionObserver(
-      (entries) => {
-        const hit = entries.some((e) => e.isIntersecting);
-        if (hit) setInView(true);
-      },
-      {
-        root: root instanceof Element ? root : null,
-        rootMargin: '120px',
-        threshold: 0.01
-      }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const nid = Number(noteId);
-    const aid = Number(attachmentId);
-    if (!inView || !Number.isFinite(aid) || aid < 1 || !Number.isFinite(nid) || nid < 1) {
-      if (!inView) {
-        setUrl('');
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current);
-          objectUrlRef.current = '';
-        }
-      }
-      return undefined;
-    }
-    (async () => {
-      try {
-        const blob = await fetchPhotoAlbumsNoteAttachmentBlob(nid, aid, {
-          inline: true,
-          storageType,
-          variant: 'thumb'
-        });
-        if (cancelled || !blob) return;
-        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-        const next = URL.createObjectURL(blob);
-        objectUrlRef.current = next;
-        setUrl(next);
-      } catch {
-        if (!cancelled) setUrl('');
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = '';
-      }
-    };
-  }, [inView, attachmentId, noteId, storageType]);
-
-  return (
-    <Box
-      ref={hostRef}
-      sx={{
-        width: '100%',
-        height: '100%',
-        bgcolor: url ? 'transparent' : '#cfd8dc'
-      }}
-    >
-      {url ? (
-        isVideo ? (
-          <Box
-            component="video"
-            src={url}
-            muted
-            playsInline
-            preload="metadata"
-            draggable={false}
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-              pointerEvents: 'none',
-              bgcolor: '#000'
-            }}
-          />
-        ) : (
-          <Box
-            component="img"
-            src={url}
-            alt=""
-            draggable={false}
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: 'block',
-              pointerEvents: 'none'
-            }}
-          />
-        )
-      ) : null}
-    </Box>
-  );
-}
-
-FilmstripPhoto.propTypes = {
-  attachmentId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
-  noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  storageType: PropTypes.string,
-  isVideo: PropTypes.bool
-};
 
 export function PageThumb({
   model,
@@ -364,29 +169,6 @@ export function PageThumb({
             }}
           />
         ))}
-        {(model.photos || []).map((photo) => (
-          <Box
-            key={`photo-${photo.attachmentId}-${Math.round(photo.x)}-${Math.round(photo.y)}`}
-            sx={{
-              position: 'absolute',
-              left: `${photo.x}%`,
-              top: `${photo.y}%`,
-              width: `${Math.max(4, photo.w)}%`,
-              height: `${Math.max(4, photo.h)}%`,
-              overflow: 'hidden',
-              bgcolor: '#90a4ae'
-            }}
-          >
-            {photo.isAlbumMedia ? (
-              <FilmstripPhoto
-                attachmentId={photo.attachmentId}
-                noteId={noteId}
-                storageType={storageType}
-                isVideo={Boolean(photo.isAlbumVideo)}
-              />
-            ) : null}
-          </Box>
-        ))}
       </Box>
       {canDelete ? (
         <Box
@@ -483,11 +265,11 @@ export default function PhotoAlbumsPageFilmstrip({
   onPageDragEnd,
   /** When set, filmstrip shows these cross-note order entries instead of current-note pages. */
   overrideEntries = null,
-  /** Photos waiting in the green thumbnail tray — included in Count= alongside on-page photos. */
+  /** Photos in the green thumbnail tray — shown in Count=. */
   stagingCount = 0,
   /** (pageIndex, entry?) => void — delete album page or ForOrder queue entry. */
   onDeletePage = null,
-  /** () => void — delete every album page (photos return to tray). */
+  /** () => void — delete every album page (tray photos are kept). */
   onDeleteAllPages = null
 }) {
   const [docTick, setDocTick] = useState(0);
@@ -523,15 +305,7 @@ export default function PhotoAlbumsPageFilmstrip({
   const effectivePageCount = hasOverride ? displayEntries.length : pageCount;
   const labelText = `Page ${Math.min(pageIndex + 1, Math.max(1, effectivePageCount))} of ${Math.max(1, effectivePageCount)}`;
 
-  const placedPhotoCount = useMemo(() => {
-    if (hasOverride) {
-      return displayEntries.reduce((sum, entry) => sum + (entry.model?.photos?.length || 0), 0);
-    }
-    return allModels.reduce((sum, model) => sum + (model.photos?.length || 0), 0);
-  }, [hasOverride, displayEntries, allModels]);
-
-  const albumImageCount =
-    Math.max(0, Math.round(Number(stagingCount) || 0)) + placedPhotoCount;
+  const albumImageCount = Math.max(0, Math.round(Number(stagingCount) || 0));
 
   const goPrev = () => {
     onGoToPage?.(pageIndex - 1);
@@ -684,7 +458,7 @@ export default function PhotoAlbumsPageFilmstrip({
       type="button"
       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
       aria-label="X All — delete all album pages"
-      title="X All — delete all album pages; photos return to the thumbnail tray"
+      title="X All — delete all album pages; photos stay in the thumbnail tray"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.preventDefault();
