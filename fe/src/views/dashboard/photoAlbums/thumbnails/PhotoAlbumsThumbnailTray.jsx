@@ -24,7 +24,7 @@ import { photoAlbumsTrayItemDisplayName } from './photoAlbumsTrayItems';
 import {
   PHOTO_DROP_TARGET_BG,
   isPagePhotoDrag,
-  readPagePhotoDragPageKey,
+  readPagePhotoDrag,
   startTrayPhotoDrag
 } from '../photoAlbumsPagePhotoDrag';
 
@@ -195,7 +195,7 @@ TrayThumb.propTypes = {
  * Thumbnail tray: shows every photo/video saved in the album vault (`items` comes from
  * `buildPhotoAlbumsTrayItems(note.attachments)`), and accepts OS / Files Explorer /
  * Mobile Upload drops to add more. Thumbs drag onto album pages; a page photo dropped
- * here is taken off its page (`onPagePhotoReturn(pageKey)`).
+ * here is taken off its page (`onPagePhotoReturn(pageKey, attachmentId)`).
  */
 export default function PhotoAlbumsThumbnailTray({
   items = [],
@@ -235,8 +235,8 @@ export default function PhotoAlbumsThumbnailTray({
     if (!editable) return;
 
     if (isPagePhotoDrag(e.dataTransfer)) {
-      const pageKey = readPagePhotoDragPageKey(e.dataTransfer);
-      if (pageKey) onPagePhotoReturn?.(pageKey);
+      const { pageKey, attachmentId } = readPagePhotoDrag(e.dataTransfer);
+      if (pageKey) onPagePhotoReturn?.(pageKey, attachmentId);
       return;
     }
 

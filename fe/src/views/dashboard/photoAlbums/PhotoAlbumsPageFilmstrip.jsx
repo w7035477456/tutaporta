@@ -13,6 +13,7 @@ import {
 } from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
 import PhotoAlbumsThumbnail from './thumbnails/PhotoAlbumsThumbnail';
+import { albumPagePhotoIds } from './photoAlbumsPages';
 
 const THUMB_H_PX = 96;
 /** Pages per open spread — every photo on the open spread is highlighted. */
@@ -21,7 +22,7 @@ const ACTIVE_BORDER = '4px solid #e53935';
 const IDLE_BORDER = '2px solid #333';
 
 /**
- * Build lightweight page preview models for the filmstrip (one photo per page via `attachmentId`).
+ * Build lightweight page preview models for the filmstrip (the page's photos via `attachmentIds`).
  * `editor` / `pageWidth` are kept in the signature for callers.
  */
 export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
@@ -32,7 +33,7 @@ export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
       {
         key: 'empty-page',
         photos: [],
-        attachmentId: null
+        attachmentIds: []
       }
     ];
   }
@@ -40,7 +41,7 @@ export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
   return list.map((inst) => ({
     key: String(inst.key || 'page'),
     photos: [],
-    attachmentId: inst.attachmentId ?? null
+    attachmentIds: albumPagePhotoIds(inst)
   }));
 }
 
@@ -65,6 +66,7 @@ export function PageThumb({
   const height = Math.max(28, Math.round(Number(heightPx) || THUMB_H_PX));
   const canDragPage = Boolean(draggablePage && onPageDragStart);
   const canDelete = typeof onDelete === 'function';
+  const photoIds = albumPagePhotoIds(model);
 
   useEffect(() => {
     if (!active || !thumbRef.current) return;
@@ -147,21 +149,25 @@ export function PageThumb({
           overflow: 'hidden',
           // Let the thumb own HTML5 drag — nested photo boxes must not steal the gesture.
           pointerEvents: 'none',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: 'grid',
+          // Same layout as the page: 1–3 photos stacked, 4 in a 2×2 grid.
+          gridTemplateColumns: photoIds.length === 4 ? '1fr 1fr' : '1fr',
+          gridAutoRows: '1fr',
+          gap: '3%',
           p: '4%',
           boxSizing: 'border-box'
         }}
       >
-        {model?.attachmentId != null ? (
-          <PhotoAlbumsThumbnail
-            noteId={noteId}
-            attachmentId={model.attachmentId}
-            storageType={storageType}
-            objectFit="contain"
-          />
-        ) : null}
+        {photoIds.map((attachmentId) => (
+          <Box key={attachmentId} sx={{ minWidth: 0, minHeight: 0, position: 'relative' }}>
+            <PhotoAlbumsThumbnail
+              noteId={noteId}
+              attachmentId={attachmentId}
+              storageType={storageType}
+              objectFit="contain"
+            />
+          </Box>
+        ))}
       </Box>
       {canDelete ? (
         <Box
@@ -217,7 +223,7 @@ PageThumb.propTypes = {
   model: PropTypes.shape({
     key: PropTypes.string,
     photos: PropTypes.array,
-    attachmentId: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
+    attachmentIds: PropTypes.arrayOf(PropTypes.number)
   }).isRequired,
   pageNumber: PropTypes.number.isRequired,
   pageIndex: PropTypes.number,
@@ -297,7 +303,7 @@ export default function PhotoAlbumsPageFilmstrip({
     // Frames are photos, not pages: blank album pages get no frame (pageIndex stays the real page).
     return allModels
       .map((model, idx) => ({ model, pageIndex: idx, pageNumber: idx + 1 }))
-      .filter((entry) => entry.model.attachmentId != null);
+      .filter((entry) => albumPagePhotoIds(entry.model).length > 0);
   }, [hasOverride, overrideEntries, allModels, orientation]);
 
   const effectivePageCount = hasOverride ? displayEntries.length : pageCount;

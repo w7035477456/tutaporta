@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  albumPagePhotoCells,
+  albumPagePhotoIds,
   parseAlbumPageInstancesFromHtml,
   readLegacyPlacedPhotoAttachmentIds,
   serializeAlbumPageInstances
@@ -13,9 +15,39 @@ const legacyPhotos = [1, 2, 3]
 
 describe('album pages', () => {
   it('round-trips page photos through the marker', () => {
-    const json = serializeAlbumPageInstances([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentId: 9 }]);
+    const json = serializeAlbumPageInstances([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentIds: [9, 4] }]);
     const pages = parseAlbumPageInstancesFromHtml(`<div data-rv-album-template="" data-album-templates="${json}"></div>`);
-    expect(pages).toEqual([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentId: 9 }]);
+    expect(pages).toEqual([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentIds: [9, 4] }]);
+  });
+
+  it('reads the single attachmentId saved before multi-photo pages', () => {
+    const json = serializeAlbumPageInstances([{ key: 'p', x: 0, y: 0, w: 500, h: 600 }]).replace(
+      '&quot;h&quot;:600',
+      '&quot;h&quot;:600,&quot;attachmentId&quot;:7'
+    );
+    const pages = parseAlbumPageInstancesFromHtml(`<div data-rv-album-template="" data-album-templates="${json}"></div>`);
+    expect(pages[0].attachmentIds).toEqual([7]);
+  });
+
+  it('caps a page at 4 unique photos', () => {
+    expect(albumPagePhotoIds({ attachmentIds: [1, 2, 2, 3, 4, 5, 'x'] })).toEqual([1, 2, 3, 4]);
+    expect(albumPagePhotoIds({})).toEqual([]);
+  });
+
+  it('lays out 1 full, 2–3 stacked, 4 as a 2×2 grid', () => {
+    const frame = { left: 0, top: 0, width: 208, height: 308 };
+    expect(albumPagePhotoCells(frame, 1, 8)).toEqual([{ left: 0, top: 0, width: 208, height: 308 }]);
+    expect(albumPagePhotoCells(frame, 2, 8)).toEqual([
+      { left: 0, top: 0, width: 208, height: 150 },
+      { left: 0, top: 158, width: 208, height: 150 }
+    ]);
+    expect(albumPagePhotoCells(frame, 3, 8).map((c) => c.top)).toEqual([0, 105, 211]);
+    expect(albumPagePhotoCells(frame, 4, 8)).toEqual([
+      { left: 0, top: 0, width: 100, height: 150 },
+      { left: 108, top: 0, width: 100, height: 150 },
+      { left: 0, top: 158, width: 100, height: 150 },
+      { left: 108, top: 158, width: 100, height: 150 }
+    ]);
   });
 
   it('reads legacy placed photo ids in document order', () => {
@@ -24,16 +56,16 @@ describe('album pages', () => {
 
   it('puts legacy placed photos one per page, adding spread pages', () => {
     const pages = parseAlbumPageInstancesFromHtml(`${twoPageMarker}<p></p>${legacyPhotos}`);
-    expect(pages.map((p) => [p.key.length > 0, p.x, p.y, p.attachmentId])).toEqual([
-      [true, 0, 0, 1],
-      [true, 662, 0, 2],
-      [true, 0, 706, 3]
+    expect(pages.map((p) => [p.key.length > 0, p.x, p.y, p.attachmentIds])).toEqual([
+      [true, 0, 0, [1]],
+      [true, 662, 0, [2]],
+      [true, 0, 706, [3]]
     ]);
   });
 
   it('ignores legacy markup once pages already hold photos', () => {
-    const json = serializeAlbumPageInstances([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentId: 5 }]);
+    const json = serializeAlbumPageInstances([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentIds: [5] }]);
     const html = `<div data-rv-album-template="" data-album-templates="${json}"></div>${legacyPhotos}`;
-    expect(parseAlbumPageInstancesFromHtml(html).map((p) => p.attachmentId)).toEqual([5]);
+    expect(parseAlbumPageInstancesFromHtml(html).map((p) => p.attachmentIds)).toEqual([[5]]);
   });
 });

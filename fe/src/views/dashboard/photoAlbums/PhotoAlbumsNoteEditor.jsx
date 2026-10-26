@@ -43,9 +43,12 @@ import {
   photoAlbumsTrayItemDisplayName
 } from './thumbnails/photoAlbumsTrayItems';
 import {
+  ALBUM_PAGE_MAX_PHOTOS,
   albumPageBlockHeight,
+  albumPagePhotoCells,
+  albumPagePhotoIds,
   createAlbumPageInstance,
-  normalizeAlbumPageAttachmentId,
+  normalizeAlbumPageAttachmentIds,
   parseAlbumPageInstancesFromHtml,
   serializeAlbumPageInstances
 } from './photoAlbumsPages';
@@ -75,7 +78,7 @@ import {
   PHOTO_DROP_TARGET_BG as ALBUM_PHOTO_DROP_TARGET_BG,
   isPagePhotoDrag,
   isTrayPhotoDrag,
-  readPagePhotoDragPageKey,
+  readPagePhotoDrag,
   readTrayPhotoDragAttachmentId,
   startPagePhotoDrag
 } from './photoAlbumsPagePhotoDrag';
@@ -304,7 +307,7 @@ function restackAlbumPagesFlush(
       y: albumPageTopForSpreadRow(spreadRow, h),
       w: pw,
       h,
-      attachmentId: inst.attachmentId
+      attachmentIds: albumPagePhotoIds(inst)
     });
     return {
       pageIndex,
@@ -883,14 +886,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const trayAttachmentIdsRef = useRef(trayAttachmentIds);
   trayAttachmentIdsRef.current = trayAttachmentIds;
   /**
-   * Photo a page actually shows, or null. A page whose photo was deleted from the album
-   * still stores the old id; it renders blank, so drops must treat it as blank too.
+   * Photos a page actually shows, top to bottom. A photo deleted from the album may still be
+   * stored on its page; it is not drawn, so drops must not count it either.
    */
-  const shownAlbumPagePhotoId = useCallback((page) => {
-    const id = page?.attachmentId;
-    if (id == null) return null;
+  const shownAlbumPagePhotoIds = useCallback((page) => {
     const ids = trayAttachmentIdsRef.current;
-    return ids && !ids.has(id) ? null : id;
+    return albumPagePhotoIds(page).filter((id) => !ids || ids.has(id));
   }, []);
   const unplacedTrayItems = useMemo(() => excludePlacedTrayItems(trayItems, albumPages), [trayItems, albumPages]);
   const [albumTitleStyle, setAlbumTitleStyle] = useState(() =>
@@ -2428,12 +2429,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     requestAnimationFrame(() => emitHtml(editor.getHTML()));
   }, [editable, orderAlbumActive, editor, pageSize.width, persistAlbumPages, emitHtml]);
 
-  /** Set page photos by page key (`null` takes the photo off the page). */
+  /** Set page photos by page key (array of ids, top to bottom; `[]` clears the page). */
   const setAlbumPagePhotos = useCallback(
-    (photoByPageKey) => {
+    (photosByPageKey) => {
       const next = (albumPagesRef.current || []).map((page) =>
-        Object.prototype.hasOwnProperty.call(photoByPageKey, page.key)
-          ? { ...page, attachmentId: normalizeAlbumPageAttachmentId(photoByPageKey[page.key]) }
+        Object.prototype.hasOwnProperty.call(photosByPageKey, page.key)
+          ? { ...page, attachmentIds: normalizeAlbumPageAttachmentIds(photosByPageKey[page.key]) }
           : page
       );
       persistAlbumPages(next);
@@ -2444,10 +2445,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   /**
    * New pages at `insertAt` (book order), one per entry of `attachmentIds` (null = blank page),
    * then show the spread holding the first one.
-   * `clearPageKey`: page whose photo moved here (left blank).
+   * `takeFrom`: `{ pageKey, attachmentId }` of a page photo that moved here (taken off that page).
    */
   const insertAlbumPagesAt = useCallback(
-    (insertAt, attachmentIds, { clearPageKey = '' } = {}) => {
+    (insertAt, attachmentIds, { takeFrom = null } = {}) => {
       if (!editor || !attachmentIds.length) return;
       const pw = albumPageWidthFromViewport(zoomScrollRef.current);
       applyAlbumCanvasWidth(pw);
@@ -2456,7 +2457,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const bw = albumBinderWidthPxRef.current;
       const blockH = albumPageBlockHeight(pw, orient);
       const ordered = sortAlbumPagesByBand(albumPagesRef.current || []).map((page) =>
-        clearPageKey && page.key === clearPageKey ? { ...page, attachmentId: null } : page
+        takeFrom && page.key === takeFrom.pageKey
+          ? { ...page, attachmentIds: albumPagePhotoIds(page).filter((id) => id !== takeFrom.attachmentId) }
+          : page
       );
       const at = Math.max(0, Math.min(ordered.length, Math.round(Number(insertAt) || 0)));
       // Start on the band of the page it pushes right, so restack keeps that page's labels with it.
@@ -2466,7 +2469,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           y: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(at + i), blockH),
           w: pw,
           h: blockH,
-          attachmentId
+          attachmentIds: attachmentId != null ? [attachmentId] : []
         })
       );
       const nextList = restackAlbumPagesFlush(
@@ -2523,10 +2526,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   /**
    * Tray photo or page photo dropped on the open spread (left / right page by pointer X).
-   * Tray photo: fills a blank page; on a page with a photo it adds a new page right after;
-   * on the empty right side it adds a page. Page photo: swaps with the target page
-   * (moves onto a blank one); on the empty right side it moves to a new page.
-   * @returns {boolean} true when the drop was a page-photo drag
+   * The photo joins the bottom of the target page (up to ALBUM_PAGE_MAX_PHOTOS); a full page
+   * gets a new page right after it, and the empty right side adds a page. A page photo
+   * leaves its old page.
+   * @returns {boolean} true when the drop was a photo drag
    */
   const handleAlbumPhotoDrop = useCallback(
     (event) => {
@@ -2539,8 +2542,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       setAlbumPhotoDragSide(null);
       if (!effectiveEditable) return true;
 
-      const attachmentId = trayDrag ? readTrayPhotoDragAttachmentId(dt) : null;
-      const sourceKey = pageDrag ? readPagePhotoDragPageKey(dt) : '';
+      const trayPhotoId = trayDrag ? readTrayPhotoDragAttachmentId(dt) : null;
+      const pagePhoto = pageDrag ? readPagePhotoDrag(dt) : null;
       const onRight = albumPhotoDropSide(event) === 'right';
 
       void (async () => {
@@ -2549,46 +2552,47 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         const leftIdx = ordered.length ? albumSpreadLeftPageIndex(albumPageIndexRef.current || 0) : 0;
         const targetIdx = onRight && ordered.length ? leftIdx + 1 : leftIdx;
         const target = targetIdx < ordered.length ? ordered[targetIdx] : null;
-        const targetPhotoId = target ? shownAlbumPagePhotoId(target) : null;
+        const targetPhotoIds = target ? shownAlbumPagePhotoIds(target) : [];
         setAlbumCoverFace('none');
         if (import.meta.env.DEV) {
           console.info('[albumPhotoDrop]', {
             kind: trayDrag ? 'tray' : 'page',
-            attachmentId,
-            sourceKey,
+            trayPhotoId,
+            pagePhoto,
             spreadLeft: leftIdx,
             targetIdx,
             targetKey: target?.key || null,
-            targetStoredPhoto: target?.attachmentId ?? null,
-            targetShownPhoto: targetPhotoId,
+            targetShownPhotos: targetPhotoIds,
             pageCount: ordered.length
           });
         }
+        const targetHasRoom = Boolean(target) && targetPhotoIds.length < ALBUM_PAGE_MAX_PHOTOS;
 
         if (trayDrag) {
-          if (!attachmentId) return;
-          if (!target) insertAlbumPageWithPhoto(ordered.length, attachmentId);
-          else if (targetPhotoId == null) setAlbumPagePhotos({ [target.key]: attachmentId });
-          else insertAlbumPageWithPhoto(targetIdx + 1, attachmentId);
+          if (!trayPhotoId) return;
+          if (!target) insertAlbumPageWithPhoto(ordered.length, trayPhotoId);
+          else if (targetHasRoom) setAlbumPagePhotos({ [target.key]: [...targetPhotoIds, trayPhotoId] });
+          else insertAlbumPageWithPhoto(targetIdx + 1, trayPhotoId);
           return;
         }
 
-        const source = ordered.find((page) => page.key === sourceKey);
-        const sourcePhotoId = source ? shownAlbumPagePhotoId(source) : null;
-        if (sourcePhotoId == null) return;
-        if (!target) {
-          insertAlbumPageWithPhoto(ordered.length, sourcePhotoId, { clearPageKey: source.key });
-          return;
-        }
-        if (target.key === source.key) return;
-        setAlbumPagePhotos({
-          [target.key]: sourcePhotoId,
-          [source.key]: targetPhotoId
-        });
+        const source = ordered.find((page) => page.key === pagePhoto?.pageKey);
+        const sourcePhotoIds = source ? shownAlbumPagePhotoIds(source) : [];
+        const movedId = pagePhoto?.attachmentId;
+        if (!source || movedId == null || !sourcePhotoIds.includes(movedId)) return;
+        if (target?.key === source.key) return;
+        const takeFrom = { pageKey: source.key, attachmentId: movedId };
+        if (!target) insertAlbumPageWithPhoto(ordered.length, movedId, { takeFrom });
+        else if (targetHasRoom) {
+          setAlbumPagePhotos({
+            [target.key]: [...targetPhotoIds, movedId],
+            [source.key]: sourcePhotoIds.filter((id) => id !== movedId)
+          });
+        } else insertAlbumPageWithPhoto(targetIdx + 1, movedId, { takeFrom });
       })();
       return true;
     },
-    [effectiveEditable, insertAlbumPageWithPhoto, setAlbumPagePhotos, albumPhotoDropSide, shownAlbumPagePhotoId]
+    [effectiveEditable, insertAlbumPageWithPhoto, setAlbumPagePhotos, albumPhotoDropSide, shownAlbumPagePhotoIds]
   );
 
   /**
@@ -2634,16 +2638,25 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     [effectiveEditable, handlePlaceFloatingText, trayItems, noteId, storageType]
   );
 
-  /** Page photo dropped on the thumbnail tray, or its × clicked: take it off the page. */
-  /** Photo dragged back to the tray: drop its page too (an album keeps at least one spread). */
+  /**
+   * Page photo dropped on the thumbnail tray, or its × clicked: take it off the page
+   * (`attachmentId` null = every photo). A page left empty is removed too
+   * (an album keeps at least one spread).
+   */
   const handleRemovePagePhoto = useCallback(
-    (pageKey) => {
+    (pageKey, attachmentId = null) => {
       if (!effectiveEditable || !pageKey) return;
       const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
       const idx = ordered.findIndex((page) => page.key === pageKey);
       if (idx < 0) return;
+      const remaining =
+        attachmentId == null ? [] : shownAlbumPagePhotoIds(ordered[idx]).filter((id) => id !== attachmentId);
+      if (remaining.length) {
+        setAlbumPagePhotos({ [pageKey]: remaining });
+        return;
+      }
       if (ordered.length <= ALBUM_SPREAD_PAGE_COUNT || !removeAlbumPageAt(idx)) {
-        setAlbumPagePhotos({ [pageKey]: null });
+        setAlbumPagePhotos({ [pageKey]: [] });
         return;
       }
       const spreadLeft = albumSpreadLeftPageIndex(
@@ -2652,7 +2665,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       albumPageIndexRef.current = spreadLeft;
       setAlbumPageIndex(spreadLeft);
     },
-    [effectiveEditable, setAlbumPagePhotos, removeAlbumPageAt]
+    [effectiveEditable, setAlbumPagePhotos, removeAlbumPageAt, shownAlbumPagePhotoIds]
   );
 
   const handlePageDrop = useCallback(
@@ -2690,11 +2703,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const filmstripAlbumPages = useMemo(
     () =>
       trayAttachmentIds
-        ? albumPagesSorted.map((page) =>
-            page.attachmentId != null && !trayAttachmentIds.has(page.attachmentId)
-              ? { ...page, attachmentId: null }
-              : page
-          )
+        ? albumPagesSorted.map((page) => ({
+            ...page,
+            attachmentIds: albumPagePhotoIds(page).filter((id) => trayAttachmentIds.has(id))
+          }))
         : albumPagesSorted,
     [albumPagesSorted, trayAttachmentIds]
   );
@@ -4427,111 +4439,120 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                     { key: 'left', band: activeAlbumPageBand, page: leftAlbumPage },
                     { key: 'right', band: activeRightAlbumPageBand, page: rightAlbumPage }
                   ].map(({ key, band, page }) => {
-                    const attachmentId = page?.attachmentId;
-                    if (!band || !attachmentId) return null;
-                    if (trayAttachmentIds && !trayAttachmentIds.has(attachmentId)) return null;
+                    if (!band || !page) return null;
+                    const photoIds = albumPagePhotoIds(page).filter(
+                      (id) => !trayAttachmentIds || trayAttachmentIds.has(id)
+                    );
+                    if (!photoIds.length) return null;
                     const inset = Math.round(Math.min(band.width, band.height) * 0.04);
-                    const pageTrayItem = trayItems.find((t) => t.attachmentId === attachmentId) || null;
-                    const pageIsVideo = Boolean(pageTrayItem?.isVideo);
-                    const frame = {
+                    const pageFrame = {
                       left: Math.round(Number(band.left) || 0) + inset,
                       top: Math.round(Number(band.top) || 0) + inset,
                       width: Math.max(1, Math.round(Number(band.width) || 0) - inset * 2),
                       height: Math.max(1, Math.round(Number(band.height) || 0) - inset * 2)
                     };
-                    return (
-                      <Box
-                        key={`photo-${key}`}
-                        className="rv-album-page-photo"
-                        data-pa-page-photo-key={page.key}
-                        draggable={effectiveEditable}
-                        onDragStart={(e) => {
-                          if (!effectiveEditable) {
+                    const cells = albumPagePhotoCells(pageFrame, photoIds.length, inset);
+                    return photoIds.map((attachmentId, photoIdx) => {
+                      const frame = cells[photoIdx];
+                      const pageTrayItem = trayItems.find((t) => t.attachmentId === attachmentId) || null;
+                      const pageIsVideo = Boolean(pageTrayItem?.isVideo);
+                      const controlPx = Math.max(22, Math.min(40, Math.round(Math.min(frame.width, frame.height) * 0.16)));
+                      return (
+                        <Box
+                          key={`photo-${key}-${attachmentId}`}
+                          className="rv-album-page-photo"
+                          data-pa-page-photo-key={page.key}
+                          draggable={effectiveEditable}
+                          onDragStart={(e) => {
+                            if (!effectiveEditable) {
+                              e.preventDefault();
+                              return;
+                            }
+                            e.stopPropagation();
+                            startPagePhotoDrag(e.dataTransfer, page.key, attachmentId);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => {
+                            if (e.target?.closest?.('button')) return;
                             e.preventDefault();
-                            return;
+                            e.stopPropagation();
+                            handlePagePhotoDoubleClick(attachmentId, frame);
+                          }}
+                          title={
+                            effectiveEditable
+                              ? 'Double-click to add text · drag to the thumbnail tray to take it off this page, or onto the other page to move it there'
+                              : 'Double-click to view full size'
                           }
-                          e.stopPropagation();
-                          startPagePhotoDrag(e.dataTransfer, page.key);
-                        }}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onDoubleClick={(e) => {
-                          if (e.target?.closest?.('button')) return;
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handlePagePhotoDoubleClick(attachmentId, frame);
-                        }}
-                        title={
-                          effectiveEditable
-                            ? 'Double-click to add text · drag to the thumbnail tray to take it off this page, or onto the other page to swap'
-                            : 'Double-click to view full size'
-                        }
-                        sx={{
-                          position: 'absolute',
-                          left: frame.left,
-                          top: frame.top,
-                          width: frame.width,
-                          height: frame.height,
-                          zIndex: 10,
-                          pointerEvents: 'auto',
-                          cursor: effectiveEditable ? 'grab' : 'default',
-                          '&:active': effectiveEditable ? { cursor: 'grabbing' } : null,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                      >
-                        <PhotoAlbumsThumbnail
-                          noteId={noteId}
-                          attachmentId={attachmentId}
-                          storageType={storageType}
-                          label={photoAlbumsTrayItemDisplayName(pageTrayItem || { attachmentId })}
-                          cache={pageIsVideo ? photoAlbumsThumbnailCache : photoAlbumsPagePhotoCache}
-                          fallbackCache={pageIsVideo ? null : photoAlbumsThumbnailCache}
-                          objectFit="contain"
-                        />
-                        {pageIsVideo ? <PhotoAlbumsVideoIndicator size={36} sx={{ top: 8, left: 8, zIndex: 3 }} /> : null}
-                        {effectiveEditable ? (
-                          <Box
-                            component="button"
-                            type="button"
-                            aria-label="Take this photo off the page"
-                            title="Take this photo off the page (it stays in the thumbnail tray)"
-                            {...guestDemoBlockProps()}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              runAfterTrafficWait(() => handleRemovePagePhoto(page.key));
-                            }}
-                            sx={{
-                              position: 'absolute',
-                              top: 4,
-                              right: 4,
-                              width: 40,
-                              height: 40,
-                              p: 0,
-                              border: '2px solid #fff',
-                              borderRadius: '4px',
-                              bgcolor: '#000',
-                              color: '#e53935',
-                              fontSize: '1.5rem',
-                              fontWeight: 900,
-                              lineHeight: 1,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              '&:hover': { bgcolor: '#111', color: '#ff1744' }
-                            }}
-                          >
-                            ×
-                          </Box>
-                        ) : null}
-                      </Box>
-                    );
+                          sx={{
+                            position: 'absolute',
+                            left: frame.left,
+                            top: frame.top,
+                            width: frame.width,
+                            height: frame.height,
+                            zIndex: 10,
+                            pointerEvents: 'auto',
+                            cursor: effectiveEditable ? 'grab' : 'default',
+                            '&:active': effectiveEditable ? { cursor: 'grabbing' } : null,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <PhotoAlbumsThumbnail
+                            noteId={noteId}
+                            attachmentId={attachmentId}
+                            storageType={storageType}
+                            label={photoAlbumsTrayItemDisplayName(pageTrayItem || { attachmentId })}
+                            cache={pageIsVideo ? photoAlbumsThumbnailCache : photoAlbumsPagePhotoCache}
+                            fallbackCache={pageIsVideo ? null : photoAlbumsThumbnailCache}
+                            objectFit="contain"
+                          />
+                          {pageIsVideo ? (
+                            <PhotoAlbumsVideoIndicator size={Math.round(controlPx * 0.9)} sx={{ top: 4, left: 4, zIndex: 3 }} />
+                          ) : null}
+                          {effectiveEditable ? (
+                            <Box
+                              component="button"
+                              type="button"
+                              aria-label="Take this photo off the page"
+                              title="Take this photo off the page (it goes back to the thumbnail tray)"
+                              {...guestDemoBlockProps()}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                runAfterTrafficWait(() => handleRemovePagePhoto(page.key, attachmentId));
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                top: 4,
+                                right: 4,
+                                width: controlPx,
+                                height: controlPx,
+                                p: 0,
+                                border: '2px solid #fff',
+                                borderRadius: '4px',
+                                bgcolor: '#000',
+                                color: '#e53935',
+                                fontSize: Math.round(controlPx * 0.6),
+                                fontWeight: 900,
+                                lineHeight: 1,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                '&:hover': { bgcolor: '#111', color: '#ff1744' }
+                              }}
+                            >
+                              ×
+                            </Box>
+                          ) : null}
+                        </Box>
+                      );
+                    });
                   })}
                   {[
                     {

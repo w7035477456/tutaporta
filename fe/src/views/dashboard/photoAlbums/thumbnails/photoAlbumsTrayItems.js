@@ -8,6 +8,7 @@ import {
   isPhotoAlbumsStagingPhotoExtension,
   isPhotoAlbumsStagingVideoExtension
 } from 'utils/photoAlbumsFileFormats';
+import { albumPagePhotoIds } from '../photoAlbumsPages';
 
 function positiveIntOrNull(value) {
   const n = Number(value);
@@ -61,13 +62,12 @@ export function buildPhotoAlbumsTrayItems(attachments) {
   return Array.from(byId.values()).sort(compareTrayItems);
 }
 
-/** Tray items not shown on any album page (`pages[].attachmentId`); same array when none are placed. */
+/** Tray items not shown on any album page (`pages[].attachmentIds`); same array when none are placed. */
 export function excludePlacedTrayItems(items, pages) {
   const list = Array.isArray(items) ? items : [];
   const placed = new Set();
   for (const page of Array.isArray(pages) ? pages : []) {
-    const id = positiveIntOrNull(page?.attachmentId);
-    if (id != null) placed.add(id);
+    for (const id of albumPagePhotoIds(page)) placed.add(id);
   }
   return placed.size ? list.filter((item) => !placed.has(item.attachmentId)) : list;
 }

@@ -6,7 +6,7 @@
 
 /** Tray thumb → album page. Payload: attachment id. */
 export const DRAG_TRAY_PHOTO = 'application/x-pa-tray-photo';
-/** Album page photo → tray / another page. Payload: page key. */
+/** Album page photo → tray / another page. Payload: `pageKey|attachmentId`. */
 export const DRAG_PAGE_PHOTO = 'application/x-pa-page-photo';
 
 /** Background of the tray / album page while a photo drag is over it (until release). */
@@ -38,9 +38,16 @@ export function readTrayPhotoDragAttachmentId(dataTransfer) {
   return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : null;
 }
 
-/** @returns {string} page key, or '' */
-export function readPagePhotoDragPageKey(dataTransfer) {
-  return readData(dataTransfer, DRAG_PAGE_PHOTO);
+/** @returns {{ pageKey: string, attachmentId: number|null }} */
+export function readPagePhotoDrag(dataTransfer) {
+  const raw = readData(dataTransfer, DRAG_PAGE_PHOTO);
+  const sep = raw.lastIndexOf('|');
+  if (sep < 0) return { pageKey: raw, attachmentId: null };
+  const n = Number(raw.slice(sep + 1));
+  return {
+    pageKey: raw.slice(0, sep),
+    attachmentId: Number.isFinite(n) && n >= 1 ? Math.trunc(n) : null
+  };
 }
 
 export function startTrayPhotoDrag(dataTransfer, attachmentId) {
@@ -49,8 +56,8 @@ export function startTrayPhotoDrag(dataTransfer, attachmentId) {
   dataTransfer.effectAllowed = 'copyMove';
 }
 
-export function startPagePhotoDrag(dataTransfer, pageKey) {
+export function startPagePhotoDrag(dataTransfer, pageKey, attachmentId) {
   if (!dataTransfer) return;
-  dataTransfer.setData(DRAG_PAGE_PHOTO, String(pageKey));
+  dataTransfer.setData(DRAG_PAGE_PHOTO, `${pageKey}|${attachmentId}`);
   dataTransfer.effectAllowed = 'move';
 }

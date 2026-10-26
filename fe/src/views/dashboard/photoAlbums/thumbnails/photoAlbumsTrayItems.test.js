@@ -86,14 +86,19 @@ describe('excludePlacedTrayItems', () => {
   const items = [{ attachmentId: 1 }, { attachmentId: 2 }, { attachmentId: 3 }];
 
   it('hides photos shown on an album page', () => {
-    const pages = [{ key: 'a', attachmentId: 2 }, { key: 'b', attachmentId: null }];
+    const pages = [{ key: 'a', attachmentIds: [2] }, { key: 'b', attachmentIds: [] }];
     expect(excludePlacedTrayItems(items, pages).map((i) => i.attachmentId)).toEqual([1, 3]);
   });
 
+  it('hides every photo on a multi-photo page', () => {
+    const pages = [{ key: 'a', attachmentIds: [1, 3] }];
+    expect(excludePlacedTrayItems(items, pages).map((i) => i.attachmentId)).toEqual([2]);
+  });
+
   it('brings a photo back once its page is cleared', () => {
-    const placed = [{ key: 'a', attachmentId: 3 }];
+    const placed = [{ key: 'a', attachmentIds: [3] }];
     expect(excludePlacedTrayItems(items, placed)).toHaveLength(2);
-    const cleared = [{ key: 'a', attachmentId: null }];
+    const cleared = [{ key: 'a', attachmentIds: [] }];
     expect(excludePlacedTrayItems(items, cleared)).toBe(items);
   });
 

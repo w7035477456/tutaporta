@@ -23,9 +23,13 @@ export function albumPageBlockHeight(pageWidth, orientation = 'portrait') {
   return Math.max(mode === 'landscape' ? 280 : 360, Math.round(pw * ratio));
 }
 
+/** Most photos one album page shows (4 = 2×2 grid). */
+export const ALBUM_PAGE_MAX_PHOTOS = 4;
+
 /**
- * `attachmentId`: the one thumbnail-tray photo shown on this page (album vault attachment), or null.
- * @typedef {{ key: string, x: number, y: number, w: number, h: number, attachmentId: number|null }} AlbumPageInstance
+ * `attachmentIds`: thumbnail-tray photos shown on this page, top to bottom (album vault
+ * attachments), at most `ALBUM_PAGE_MAX_PHOTOS`.
+ * @typedef {{ key: string, x: number, y: number, w: number, h: number, attachmentIds: number[] }} AlbumPageInstance
  */
 
 export function normalizeAlbumPageAttachmentId(value) {
@@ -33,15 +37,53 @@ export function normalizeAlbumPageAttachmentId(value) {
   return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : null;
 }
 
-export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', attachmentId = null } = {}) {
+/** Unique valid photo ids, capped at `ALBUM_PAGE_MAX_PHOTOS`. */
+export function normalizeAlbumPageAttachmentIds(values) {
+  const ids = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const id = normalizeAlbumPageAttachmentId(value);
+    if (id != null && !ids.includes(id)) ids.push(id);
+    if (ids.length >= ALBUM_PAGE_MAX_PHOTOS) break;
+  }
+  return ids;
+}
+
+/** Photo ids on a page; also reads the single `attachmentId` of albums saved before multi-photo pages. */
+export function albumPagePhotoIds(page) {
+  if (Array.isArray(page?.attachmentIds)) return normalizeAlbumPageAttachmentIds(page.attachmentIds);
+  const legacy = normalizeAlbumPageAttachmentId(page?.attachmentId);
+  return legacy == null ? [] : [legacy];
+}
+
+export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', ...photos } = {}) {
   return {
     key: String(key || `pg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
     x: Math.max(0, Math.round(Number(x) || 0)),
     y: Math.max(0, Math.round(Number(y) || 0)),
     w: Math.max(0, Math.round(Number(w) || 0)),
     h: Math.max(0, Math.round(Number(h) || 0)),
-    attachmentId: normalizeAlbumPageAttachmentId(attachmentId)
+    attachmentIds: albumPagePhotoIds(photos)
   };
+}
+
+/**
+ * Cells for `count` photos inside a frame: 1 fills it, 2–3 stack top to bottom, 4 is a 2×2 grid.
+ * @returns {{ left: number, top: number, width: number, height: number }[]}
+ */
+export function albumPagePhotoCells(frame, count, gap = 8) {
+  const n = Math.max(0, Math.min(ALBUM_PAGE_MAX_PHOTOS, Math.trunc(Number(count) || 0)));
+  if (!n) return [];
+  const { left, top, width, height } = frame;
+  const cols = n === 4 ? 2 : 1;
+  const rows = n === 4 ? 2 : n;
+  const cellW = (width - gap * (cols - 1)) / cols;
+  const cellH = (height - gap * (rows - 1)) / rows;
+  return Array.from({ length: n }, (_, i) => ({
+    left: Math.round(left + (i % cols) * (cellW + gap)),
+    top: Math.round(top + Math.floor(i / cols) * (cellH + gap)),
+    width: Math.round(cellW),
+    height: Math.round(cellH)
+  }));
 }
 
 function parseMarkerPxAttr(html, attr, min = 1) {
@@ -81,7 +123,7 @@ export function readLegacyPlacedPhotoAttachmentIds(html) {
  * photo markup. Put those photos on pages in order, adding spread pages as needed.
  */
 function withLegacyPlacedPhotoPages(pages, raw) {
-  if (pages.some((page) => page.attachmentId != null)) return pages;
+  if (pages.some((page) => page.attachmentIds.length)) return pages;
   const ids = readLegacyPlacedPhotoAttachmentIds(raw);
   if (!ids.length) return pages;
 
@@ -93,7 +135,10 @@ function withLegacyPlacedPhotoPages(pages, raw) {
   const rightPage = ordered.find((page) => page.x > 0);
   const rightX = rightPage ? rightPage.x : w;
 
-  const result = ordered.map((page, index) => ({ ...page, attachmentId: ids[index] ?? null }));
+  const result = ordered.map((page, index) => ({
+    ...page,
+    attachmentIds: ids[index] != null ? [ids[index]] : []
+  }));
   for (let index = ordered.length; index < ids.length; index += 1) {
     result.push(
       createAlbumPageInstance({
@@ -101,7 +146,7 @@ function withLegacyPlacedPhotoPages(pages, raw) {
         y: Math.floor(index / 2) * (h + ALBUM_PAGE_ROW_GAP),
         w,
         h,
-        attachmentId: ids[index]
+        attachmentIds: [ids[index]]
       })
     );
   }
@@ -127,7 +172,7 @@ function readAlbumPageMarker(raw) {
               y: item.y,
               w: item.w,
               h: item.h,
-              attachmentId: item.attachmentId
+              attachmentIds: albumPagePhotoIds(item)
             })
           );
       }
@@ -158,9 +203,9 @@ export function serializeAlbumPageInstances(instances) {
       y: item?.y,
       w: item?.w,
       h: item?.h,
-      attachmentId: item?.attachmentId
+      attachmentIds: albumPagePhotoIds(item)
     });
-    if (page.attachmentId == null) delete page.attachmentId;
+    if (!page.attachmentIds.length) delete page.attachmentIds;
     return page;
   });
   if (!list.length) return '';
