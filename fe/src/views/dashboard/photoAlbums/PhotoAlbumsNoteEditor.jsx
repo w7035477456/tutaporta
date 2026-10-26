@@ -36,10 +36,15 @@ import PhotoAlbumsPageFlipOverlay, {
 import PhotoAlbumsContextTutorial from './PhotoAlbumsContextTutorial';
 import { findAlbumPagesMatchingSearchTerms } from './photoAlbumsPageSearch';
 import PhotoAlbumsThumbnailTray from './thumbnails/PhotoAlbumsThumbnailTray';
-import { buildPhotoAlbumsTrayItems } from './thumbnails/photoAlbumsTrayItems';
+import {
+  buildPhotoAlbumsTrayItems,
+  excludePlacedTrayItems,
+  photoAlbumsTrayItemDisplayName
+} from './thumbnails/photoAlbumsTrayItems';
 import {
   albumPageBlockHeight,
   createAlbumPageInstance,
+  normalizeAlbumPageAttachmentId,
   parseAlbumPageInstancesFromHtml,
   serializeAlbumPageInstances
 } from './photoAlbumsPages';
@@ -64,6 +69,19 @@ import {
 import { DRAG_ALBUM_PAGE } from './photoAlbumsAlbumPageDrag';
 import { DRAG_CROSS_PANE } from './photoAlbumsCrossPaneDrag';
 import {
+  DRAG_PAGE_PHOTO,
+  DRAG_TRAY_PHOTO,
+  PHOTO_DROP_TARGET_BG as ALBUM_PHOTO_DROP_TARGET_BG,
+  isPagePhotoDrag,
+  isTrayPhotoDrag,
+  readPagePhotoDragPageKey,
+  readTrayPhotoDragAttachmentId,
+  startPagePhotoDrag
+} from './photoAlbumsPagePhotoDrag';
+import PhotoAlbumsThumbnail from './thumbnails/PhotoAlbumsThumbnail';
+import { photoAlbumsPagePhotoCache, photoAlbumsThumbnailCache } from './thumbnails/photoAlbumsThumbnailStore';
+import PhotoAlbumsVideoIndicator from './PhotoAlbumsVideoIndicator';
+import {
   DRAG_FILES_EXPLORER,
   DRAG_FILES_EXPLORER_FLAG,
   isFilesExplorerDrag
@@ -71,6 +89,8 @@ import {
 import { remapTextLabelAttrsToBand } from './photoAlbumsMoveAlbumPage';
 import { setPhotoAlbumsColumnResizing } from './photoAlbumsColumnResizeGate';
 import { stripLegacyAlbumPhotoMarkup } from './photoAlbumsLegacyPhotoMarkup';
+import { openPhotoAlbumsAttachmentInNewWindow } from './openPhotoAlbumsAttachmentWindow';
+import { themedAlert } from 'utils/themedDialog';
 import './photoAlbumsEditor.scss';
 
 const EMPTY_DOC = '<p></p>';
@@ -94,6 +114,8 @@ const ALBUM_FS_NAV_PAD_PX = 56;
 const ALBUM_PAGE_EDGE_GAP_FROM_SCROLLBAR_PX = 24;
 const PAGE_RESIZE_HANDLE_WIDTH = 30;
 const ALBUM_PAGE_STACK_GAP = 24;
+/** Black edge on both spread pages, empty or not; inset so it never shifts page geometry. */
+const ALBUM_PAGE_BORDER_SHADOW = 'inset 0 0 0 2px #000';
 
 const THUMB_ROW_STAGING_PERCENT_LS = 'photoAlbumsThumbRowStagingPercent_v1';
 const THUMB_ROW_RESIZE_HANDLE_PX = 30;
@@ -280,7 +302,8 @@ function restackAlbumPagesFlush(
       x: albumPageXForSpreadColumn(pageIndex, pw, bw),
       y: albumPageTopForSpreadRow(spreadRow, h),
       w: pw,
-      h
+      h,
+      attachmentId: inst.attachmentId
     });
     return {
       pageIndex,
@@ -829,6 +852,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     onAlbumPageDragEnd = null,
     /** Queue the current album page into sidebar For Order. */
     onOrderPrint = null,
+    /** Reset Album — wipe every TutaPhotos album on TutaCloud (workspace confirms + calls BE). */
+    onResetAlbum = null,
     /** Exclusive ForOrder mode: filmstrip shows queued order pages. */
     orderAlbumActive = false,
     orderFilmstripEntries = null,
@@ -848,6 +873,25 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   const [albumPages, setAlbumPages] = useState(() => parseAlbumPageInstancesFromHtml(initialContent));
   const trayItems = useMemo(() => buildPhotoAlbumsTrayItems(trayAttachments), [trayAttachments]);
+  /** Page photos whose attachment left the tray are hidden; null when the tray list is not loaded (Full screen tab). */
+  const trayAttachmentIds = useMemo(
+    () => (Array.isArray(trayAttachments) ? new Set(trayItems.map((item) => item.attachmentId)) : null),
+    [trayAttachments, trayItems]
+  );
+  /** Tray shows only photos not on any album page; taking one off a page brings it back. */
+  const trayAttachmentIdsRef = useRef(trayAttachmentIds);
+  trayAttachmentIdsRef.current = trayAttachmentIds;
+  /**
+   * Photo a page actually shows, or null. A page whose photo was deleted from the album
+   * still stores the old id; it renders blank, so drops must treat it as blank too.
+   */
+  const shownAlbumPagePhotoId = useCallback((page) => {
+    const id = page?.attachmentId;
+    if (id == null) return null;
+    const ids = trayAttachmentIdsRef.current;
+    return ids && !ids.has(id) ? null : id;
+  }, []);
+  const unplacedTrayItems = useMemo(() => excludePlacedTrayItems(trayItems, albumPages), [trayItems, albumPages]);
   const [albumTitleStyle, setAlbumTitleStyle] = useState(() =>
     parseAlbumTitleStyleFromHtml(initialContent)
   );
@@ -931,6 +975,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const [placeTextOpen, setPlaceTextOpen] = useState(false);
   const [placeTextSeed, setPlaceTextSeed] = useState('');
   const [placeTextStyle, setPlaceTextStyle] = useState(null);
+  /** Double-clicked page photo shown in Add Text: ids + its frame in page px. */
+  const [placeTextPhoto, setPlaceTextPhoto] = useState(null);
+  const placeTextPhotoRef = useRef(null);
+  placeTextPhotoRef.current = placeTextPhoto;
   const placeTextSelectionRef = useRef({ from: 0, to: 0, empty: true });
   /** When set, Add Text OK updates this label instead of inserting a new one. */
   const placeTextEditingLabelIdRef = useRef(null);
@@ -1019,6 +1067,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           types.includes(DRAG_SHORTCUT) ||
           types.includes(DRAG_ALBUM_PAGE) ||
           types.includes(DRAG_CROSS_PANE) ||
+          types.includes(DRAG_TRAY_PHOTO) ||
+          types.includes(DRAG_PAGE_PHOTO) ||
           types.includes(DRAG_FILES_EXPLORER) ||
           types.includes(DRAG_FILES_EXPLORER_FLAG)
         ) {
@@ -1655,6 +1705,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     (style) => {
       if (!editor || !editable) return;
       setPlaceTextOpen(false);
+      setPlaceTextPhoto(null);
 
       if (placeTextAlbumTitleModeRef.current) {
         placeTextAlbumTitleModeRef.current = false;
@@ -1741,7 +1792,16 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       const pm = editor.view?.dom;
       let posLeft = 80;
       let posTop = 120;
-      const anchored = placeTextPagePosRef.current;
+      const photo = placeTextPhotoRef.current;
+      const fx = Number(style?.photoAnchor?.fx);
+      const fy = Number(style?.photoAnchor?.fy);
+      const anchored =
+        photo && Number.isFinite(fx) && Number.isFinite(fy)
+          ? {
+              posLeft: Math.round(photo.frameLeft + fx * photo.frameWidth),
+              posTop: Math.round(photo.frameTop + fy * photo.frameHeight)
+            }
+          : placeTextPagePosRef.current;
       placeTextPagePosRef.current = null;
       if (anchored) {
         posLeft = anchored.posLeft;
@@ -2211,7 +2271,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   );
 
   const handleRemoveAllTrayItems = useCallback(async () => {
-    const ids = trayItems.map((item) => item.attachmentId);
+    const ids = unplacedTrayItems.map((item) => item.attachmentId);
     if (!ids.length) return;
     const n = ids.length;
     if (
@@ -2222,7 +2282,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       return;
     }
     onRemoveAllStagedAttachments?.(ids);
-  }, [trayItems, onRemoveAllStagedAttachments]);
+  }, [unplacedTrayItems, onRemoveAllStagedAttachments]);
 
   const startThumbRowResize = useCallback((event) => {
     event.preventDefault();
@@ -2362,8 +2422,224 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     requestAnimationFrame(() => emitHtml(editor.getHTML()));
   }, [editable, orderAlbumActive, editor, pageSize.width, persistAlbumPages, emitHtml]);
 
+  /** Set page photos by page key (`null` takes the photo off the page). */
+  const setAlbumPagePhotos = useCallback(
+    (photoByPageKey) => {
+      const next = (albumPagesRef.current || []).map((page) =>
+        Object.prototype.hasOwnProperty.call(photoByPageKey, page.key)
+          ? { ...page, attachmentId: normalizeAlbumPageAttachmentId(photoByPageKey[page.key]) }
+          : page
+      );
+      persistAlbumPages(next);
+    },
+    [persistAlbumPages]
+  );
+
+  /**
+   * New pages at `insertAt` (book order), one per entry of `attachmentIds` (null = blank page),
+   * then show the spread holding the first one.
+   * `clearPageKey`: page whose photo moved here (left blank).
+   */
+  const insertAlbumPagesAt = useCallback(
+    (insertAt, attachmentIds, { clearPageKey = '' } = {}) => {
+      if (!editor || !attachmentIds.length) return;
+      const pw = albumPageWidthFromViewport(zoomScrollRef.current);
+      applyAlbumCanvasWidth(pw);
+      syncAlbumBinderFromViewport(zoomScrollRef.current);
+      const orient = pageOrientationRef.current;
+      const bw = albumBinderWidthPxRef.current;
+      const blockH = albumPageBlockHeight(pw, orient);
+      const ordered = sortAlbumPagesByBand(albumPagesRef.current || []).map((page) =>
+        clearPageKey && page.key === clearPageKey ? { ...page, attachmentId: null } : page
+      );
+      const at = Math.max(0, Math.min(ordered.length, Math.round(Number(insertAt) || 0)));
+      // Start on the band of the page it pushes right, so restack keeps that page's labels with it.
+      const added = attachmentIds.map((attachmentId, i) =>
+        createAlbumPageInstance({
+          x: albumPageXForSpreadColumn(at + i, pw, bw),
+          y: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(at + i), blockH),
+          w: pw,
+          h: blockH,
+          attachmentId
+        })
+      );
+      const nextList = restackAlbumPagesFlush(
+        [...ordered.slice(0, at), ...added, ...ordered.slice(at)],
+        pw,
+        orient,
+        editor,
+        bw
+      );
+      albumPagesRef.current = nextList;
+      setAlbumPages(nextList);
+      const spreadLeft = albumSpreadLeftPageIndex(at);
+      setAlbumPageIndex(spreadLeft);
+      albumPageIndexRef.current = spreadLeft;
+      setAlbumCoverFace('none');
+      const titleBand = String(albumTitle || '').trim()
+        ? albumPageTitleBandHeightPx(albumTitleStyleRef.current)
+        : 0;
+      ensureAlbumCanvasMinHeight(editor, blockH + titleBand, { allowShrink: true });
+      albumAutoZoomRef.current = true;
+      requestAnimationFrame(() => {
+        emitHtml(editor.getHTML());
+        flushAlbumScrollOrigin(zoomScrollRef.current);
+        fitAlbumPageFlushToViewportRef.current?.();
+      });
+    },
+    [editor, emitHtml, applyAlbumCanvasWidth, syncAlbumBinderFromViewport, albumTitle]
+  );
+
+  const insertAlbumPageWithPhoto = useCallback(
+    (insertAt, attachmentId, opts) => insertAlbumPagesAt(insertAt, [attachmentId], opts),
+    [insertAlbumPagesAt]
+  );
+
+  /** Page of the open spread a photo drag is over, painted red until release: 'left' | 'right' | null. */
+  const [albumPhotoDragSide, setAlbumPhotoDragSide] = useState(null);
+
+  const albumPhotoDropSide = useCallback((event) => {
+    const rect = pageScaleRef.current?.getBoundingClientRect?.();
+    return rect && rect.width > 0 && event.clientX >= rect.left + rect.width / 2 ? 'right' : 'left';
+  }, []);
+
+  // A drag cancelled with Esc or dropped elsewhere never fires dragleave/drop here.
+  useEffect(() => {
+    if (!albumPhotoDragSide) return undefined;
+    const clear = () => setAlbumPhotoDragSide(null);
+    window.addEventListener('dragend', clear, true);
+    window.addEventListener('drop', clear, true);
+    return () => {
+      window.removeEventListener('dragend', clear, true);
+      window.removeEventListener('drop', clear, true);
+    };
+  }, [albumPhotoDragSide]);
+
+  /**
+   * Tray photo or page photo dropped on the open spread (left / right page by pointer X).
+   * Tray photo: fills a blank page; on a page with a photo it adds a new page right after;
+   * on the empty right side it adds a page. Page photo: swaps with the target page
+   * (moves onto a blank one); on the empty right side it moves to a new page.
+   * @returns {boolean} true when the drop was a page-photo drag
+   */
+  const handleAlbumPhotoDrop = useCallback(
+    (event) => {
+      const dt = event.dataTransfer;
+      const trayDrag = isTrayPhotoDrag(dt);
+      const pageDrag = isPagePhotoDrag(dt);
+      if (!trayDrag && !pageDrag) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      setAlbumPhotoDragSide(null);
+      if (!effectiveEditable) return true;
+
+      const attachmentId = trayDrag ? readTrayPhotoDragAttachmentId(dt) : null;
+      const sourceKey = pageDrag ? readPagePhotoDragPageKey(dt) : '';
+      const onRight = albumPhotoDropSide(event) === 'right';
+
+      void (async () => {
+        await runPhotoAlbumsTrafficWaitIfNeeded();
+        const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
+        const leftIdx = ordered.length ? albumSpreadLeftPageIndex(albumPageIndexRef.current || 0) : 0;
+        const targetIdx = onRight && ordered.length ? leftIdx + 1 : leftIdx;
+        const target = targetIdx < ordered.length ? ordered[targetIdx] : null;
+        const targetPhotoId = target ? shownAlbumPagePhotoId(target) : null;
+        setAlbumCoverFace('none');
+        if (import.meta.env.DEV) {
+          console.info('[albumPhotoDrop]', {
+            kind: trayDrag ? 'tray' : 'page',
+            attachmentId,
+            sourceKey,
+            spreadLeft: leftIdx,
+            targetIdx,
+            targetKey: target?.key || null,
+            targetStoredPhoto: target?.attachmentId ?? null,
+            targetShownPhoto: targetPhotoId,
+            pageCount: ordered.length
+          });
+        }
+
+        if (trayDrag) {
+          if (!attachmentId) return;
+          if (!target) insertAlbumPageWithPhoto(ordered.length, attachmentId);
+          else if (targetPhotoId == null) setAlbumPagePhotos({ [target.key]: attachmentId });
+          else insertAlbumPageWithPhoto(targetIdx + 1, attachmentId);
+          return;
+        }
+
+        const source = ordered.find((page) => page.key === sourceKey);
+        const sourcePhotoId = source ? shownAlbumPagePhotoId(source) : null;
+        if (sourcePhotoId == null) return;
+        if (!target) {
+          insertAlbumPageWithPhoto(ordered.length, sourcePhotoId, { clearPageKey: source.key });
+          return;
+        }
+        if (target.key === source.key) return;
+        setAlbumPagePhotos({
+          [target.key]: sourcePhotoId,
+          [source.key]: targetPhotoId
+        });
+      })();
+      return true;
+    },
+    [effectiveEditable, insertAlbumPageWithPhoto, setAlbumPagePhotos, albumPhotoDropSide, shownAlbumPagePhotoId]
+  );
+
+  /**
+   * Double-click a page photo. Edit mode: open Add Text with the new label placed just
+   * inside the photo's top-left corner. View-only: open the photo full size in a new tab.
+   */
+  const handlePagePhotoDoubleClick = useCallback(
+    (attachmentId, frame) => {
+      if (effectiveEditable) {
+        handlePlaceFloatingText({
+          posLeft: Math.round(frame.left + Math.max(8, frame.width * 0.08)),
+          posTop: Math.round(frame.top + Math.max(8, frame.height * 0.08))
+        });
+        setPlaceTextPhoto({
+          noteId,
+          attachmentId,
+          storageType,
+          frameLeft: frame.left,
+          frameTop: frame.top,
+          frameWidth: frame.width,
+          frameHeight: frame.height
+        });
+        return;
+      }
+      // Must open under the user gesture or the pop-up blocker eats it.
+      const win = window.open('', '_blank');
+      if (!win) {
+        void themedAlert('Pop-up blocked — allow pop-ups to view photos in a new tab');
+        return;
+      }
+      const item = trayItems.find((t) => t.attachmentId === attachmentId);
+      void openPhotoAlbumsAttachmentInNewWindow({
+        noteId,
+        attachment: {
+          attachment_id: attachmentId,
+          file_name: item?.fileName || '',
+          file_extension: item?.fileExtension || 'jpg'
+        },
+        storageType,
+        win
+      }).catch((err) => console.warn('[handlePagePhotoDoubleClick]', err?.message || err));
+    },
+    [effectiveEditable, handlePlaceFloatingText, trayItems, noteId, storageType]
+  );
+
+  /** Page photo dropped on the thumbnail tray, or its × clicked: take it off the page. */
+  const handleRemovePagePhoto = useCallback(
+    (pageKey) => {
+      if (!effectiveEditable || !pageKey) return;
+      setAlbumPagePhotos({ [pageKey]: null });
+    },
+    [effectiveEditable, setAlbumPagePhotos]
+  );
+
   const handlePageDrop = useCallback(
     (event) => {
+      if (handleAlbumPhotoDrop(event)) return;
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
       if (!types.includes('Files')) return;
       event.preventDefault();
@@ -2377,7 +2653,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         if (files.length) onStageOsFiles?.(files);
       })();
     },
-    [editable, onStageOsFiles]
+    [editable, onStageOsFiles, handleAlbumPhotoDrop]
   );
 
   const counts = useEditorState({
@@ -3060,6 +3336,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     }
     if (albumCoverFace === 'back') return;
     if (albumOnLastSpread) {
+      // Editing: Next past the last page adds two blank pages; viewing shows the back cover.
+      if (effectiveEditable && !albumFullscreen && !orderAlbumActive) {
+        void runAlbumPageFlipThen(() => {
+          const count = (albumPagesRef.current || []).length;
+          insertAlbumPagesAt(count, Array(ALBUM_SPREAD_PAGE_COUNT).fill(null));
+        }, 'next');
+        return;
+      }
       showAlbumBackCover();
       return;
     }
@@ -3075,7 +3359,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     openAlbumFromCover,
     showAlbumBackCover,
     goToAlbumPage,
-    runAlbumPageFlipThen
+    runAlbumPageFlipThen,
+    effectiveEditable,
+    albumFullscreen,
+    orderAlbumActive,
+    insertAlbumPagesAt
   ]);
 
   useEffect(() => {
@@ -3565,7 +3853,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         open={placeTextOpen}
         initialText={placeTextSeed}
         initialStyle={placeTextStyle}
+        photo={placeTextPhoto}
         onClose={() => {
+          setPlaceTextPhoto(null);
           placeTextEditingLabelIdRef.current = null;
           placeTextEditingPosRef.current = null;
           placeTextAlbumTitleModeRef.current = false;
@@ -3816,13 +4106,14 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             }}
           >
             <PhotoAlbumsThumbnailTray
-              items={trayItems}
+              items={unplacedTrayItems}
               noteId={noteId}
               storageType={storageType}
               editable={effectiveEditable}
               onOsFiles={handleStagingTrayOsFiles}
               onRemove={handleRemoveTrayItem}
               onRemoveAll={handleRemoveAllTrayItems}
+              onPagePhotoReturn={handleRemovePagePhoto}
             />
           </Box>
           <ThumbRowResizeHandle onMouseDown={startThumbRowResize} />
@@ -3838,7 +4129,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           >
             <PhotoAlbumsPageFilmstrip
               inline
-              stagingCount={trayItems.length}
+              stagingCount={unplacedTrayItems.length}
               pages={albumPagesSorted}
               pageIndex={orderFilmstripActive ? orderFilmstripIndex : albumPageIndex}
               pageCount={
@@ -3880,6 +4171,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                     }
                   : null
               }
+              onResetAlbum={
+                effectiveEditable && !sharedAlbumId && typeof onResetAlbum === 'function'
+                  ? () => runAfterTrafficWait(() => onResetAlbum())
+                  : null
+              }
             />
           </Box>
         </Box>
@@ -3899,10 +4195,22 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         ref={zoomScrollRef}
         className="rv-editor__album-zoom-scroll"
         onDragOver={(e) => {
+          if (isTrayPhotoDrag(e.dataTransfer) || isPagePhotoDrag(e.dataTransfer)) {
+            if (!effectiveEditable) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = isPagePhotoDrag(e.dataTransfer) ? 'move' : 'copy';
+            const side = albumPhotoDropSide(e);
+            setAlbumPhotoDragSide((prev) => (prev === side ? prev : side));
+            return;
+          }
           const files = Array.from(e.dataTransfer?.types || []).includes('Files');
           if (!files) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          setAlbumPhotoDragSide(null);
         }}
         onDrop={handlePageDrop}
         sx={{
@@ -4028,7 +4336,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   top: 0,
                   width: `${spreadPageWidthPx}px`,
                   height: '100%',
-                  bgcolor: 'var(--theme-daynight-color)',
+                  bgcolor:
+                    albumPhotoDragSide === 'left' ? ALBUM_PHOTO_DROP_TARGET_BG : 'var(--theme-daynight-color)',
+                  boxShadow: ALBUM_PAGE_BORDER_SHADOW,
                   zIndex: 1,
                   pointerEvents: 'none'
                 }}
@@ -4041,7 +4351,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   top: 0,
                   width: `${spreadPageWidthPx}px`,
                   height: '100%',
-                  bgcolor: 'var(--theme-daynight-color)',
+                  bgcolor:
+                    albumPhotoDragSide === 'right' ? ALBUM_PHOTO_DROP_TARGET_BG : 'var(--theme-daynight-color)',
+                  boxShadow: ALBUM_PAGE_BORDER_SHADOW,
                   zIndex: 1,
                   pointerEvents: 'none'
                 }}
@@ -4082,6 +4394,116 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                     overflow: 'visible'
                   }}
                 >
+                  {[
+                    { key: 'left', band: activeAlbumPageBand, page: leftAlbumPage },
+                    { key: 'right', band: activeRightAlbumPageBand, page: rightAlbumPage }
+                  ].map(({ key, band, page }) => {
+                    const attachmentId = page?.attachmentId;
+                    if (!band || !attachmentId) return null;
+                    if (trayAttachmentIds && !trayAttachmentIds.has(attachmentId)) return null;
+                    const inset = Math.round(Math.min(band.width, band.height) * 0.04);
+                    const pageTrayItem = trayItems.find((t) => t.attachmentId === attachmentId) || null;
+                    const pageIsVideo = Boolean(pageTrayItem?.isVideo);
+                    const frame = {
+                      left: Math.round(Number(band.left) || 0) + inset,
+                      top: Math.round(Number(band.top) || 0) + inset,
+                      width: Math.max(1, Math.round(Number(band.width) || 0) - inset * 2),
+                      height: Math.max(1, Math.round(Number(band.height) || 0) - inset * 2)
+                    };
+                    return (
+                      <Box
+                        key={`photo-${key}`}
+                        className="rv-album-page-photo"
+                        data-pa-page-photo-key={page.key}
+                        draggable={effectiveEditable}
+                        onDragStart={(e) => {
+                          if (!effectiveEditable) {
+                            e.preventDefault();
+                            return;
+                          }
+                          e.stopPropagation();
+                          startPagePhotoDrag(e.dataTransfer, page.key);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => {
+                          if (e.target?.closest?.('button')) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handlePagePhotoDoubleClick(attachmentId, frame);
+                        }}
+                        title={
+                          effectiveEditable
+                            ? 'Double-click to add text · drag to the thumbnail tray to take it off this page, or onto the other page to swap'
+                            : 'Double-click to view full size'
+                        }
+                        sx={{
+                          position: 'absolute',
+                          left: frame.left,
+                          top: frame.top,
+                          width: frame.width,
+                          height: frame.height,
+                          zIndex: 10,
+                          pointerEvents: 'auto',
+                          cursor: effectiveEditable ? 'grab' : 'default',
+                          '&:active': effectiveEditable ? { cursor: 'grabbing' } : null,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <PhotoAlbumsThumbnail
+                          noteId={noteId}
+                          attachmentId={attachmentId}
+                          storageType={storageType}
+                          label={photoAlbumsTrayItemDisplayName(pageTrayItem || { attachmentId })}
+                          cache={pageIsVideo ? photoAlbumsThumbnailCache : photoAlbumsPagePhotoCache}
+                          fallbackCache={pageIsVideo ? null : photoAlbumsThumbnailCache}
+                          objectFit="contain"
+                        />
+                        {pageIsVideo ? <PhotoAlbumsVideoIndicator size={36} sx={{ top: 8, left: 8, zIndex: 3 }} /> : null}
+                        {effectiveEditable ? (
+                          <Box
+                            component="button"
+                            type="button"
+                            aria-label="Take this photo off the page"
+                            title="Take this photo off the page (it stays in the thumbnail tray)"
+                            {...guestDemoBlockProps()}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              runAfterTrafficWait(() => handleRemovePagePhoto(page.key));
+                            }}
+                            sx={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              width: 40,
+                              height: 40,
+                              p: 0,
+                              border: '2px solid #fff',
+                              borderRadius: '4px',
+                              bgcolor: '#000',
+                              color: '#e53935',
+                              fontSize: '1.5rem',
+                              fontWeight: 900,
+                              lineHeight: 1,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              '&:hover': { bgcolor: '#111', color: '#ff1744' }
+                            }}
+                          >
+                            ×
+                          </Box>
+                        ) : null}
+                      </Box>
+                    );
+                  })}
                   {[
                     {
                       key: 'left',
@@ -4384,6 +4806,7 @@ PhotoAlbumsNoteEditor.propTypes = {
   onAlbumPageDragStart: PropTypes.func,
   onAlbumPageDragEnd: PropTypes.func,
   onOrderPrint: PropTypes.func,
+  onResetAlbum: PropTypes.func,
   orderAlbumActive: PropTypes.bool,
   orderFilmstripEntries: PropTypes.array,
   orderFilmstripIndex: PropTypes.number,

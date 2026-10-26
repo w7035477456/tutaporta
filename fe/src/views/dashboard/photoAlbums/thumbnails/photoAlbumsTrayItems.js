@@ -61,6 +61,17 @@ export function buildPhotoAlbumsTrayItems(attachments) {
   return Array.from(byId.values()).sort(compareTrayItems);
 }
 
+/** Tray items not shown on any album page (`pages[].attachmentId`); same array when none are placed. */
+export function excludePlacedTrayItems(items, pages) {
+  const list = Array.isArray(items) ? items : [];
+  const placed = new Set();
+  for (const page of Array.isArray(pages) ? pages : []) {
+    const id = positiveIntOrNull(page?.attachmentId);
+    if (id != null) placed.add(id);
+  }
+  return placed.size ? list.filter((item) => !placed.has(item.attachmentId)) : list;
+}
+
 /** Full original filename with extension, for hover labels. */
 export function photoAlbumsTrayItemDisplayName(item) {
   const attachmentId = item?.attachmentId;

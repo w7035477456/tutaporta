@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPhotoAlbumsTrayItems,
+  excludePlacedTrayItems,
   photoAlbumsTrayItemDisplayName,
   toPhotoAlbumsTrayItem
 } from './photoAlbumsTrayItems';
@@ -78,5 +79,28 @@ describe('photoAlbumsTrayItemDisplayName', () => {
     expect(photoAlbumsTrayItemDisplayName({ attachmentId: 1, fileName: 'a.jpg', fileExtension: 'jpg' })).toBe('a.jpg');
     expect(photoAlbumsTrayItemDisplayName({ attachmentId: 1, fileName: 'a', fileExtension: 'jpg' })).toBe('a.jpg');
     expect(photoAlbumsTrayItemDisplayName({ attachmentId: 8, fileName: '', fileExtension: 'png' })).toBe('photo-8.png');
+  });
+});
+
+describe('excludePlacedTrayItems', () => {
+  const items = [{ attachmentId: 1 }, { attachmentId: 2 }, { attachmentId: 3 }];
+
+  it('hides photos shown on an album page', () => {
+    const pages = [{ key: 'a', attachmentId: 2 }, { key: 'b', attachmentId: null }];
+    expect(excludePlacedTrayItems(items, pages).map((i) => i.attachmentId)).toEqual([1, 3]);
+  });
+
+  it('brings a photo back once its page is cleared', () => {
+    const placed = [{ key: 'a', attachmentId: 3 }];
+    expect(excludePlacedTrayItems(items, placed)).toHaveLength(2);
+    const cleared = [{ key: 'a', attachmentId: null }];
+    expect(excludePlacedTrayItems(items, cleared)).toBe(items);
+  });
+
+  it('handles every photo placed, string ids and missing input', () => {
+    const pages = [{ attachmentId: 1 }, { attachmentId: '2' }, { attachmentId: 3 }];
+    expect(excludePlacedTrayItems(items, pages)).toEqual([]);
+    expect(excludePlacedTrayItems(items, null)).toBe(items);
+    expect(excludePlacedTrayItems(null, pages)).toEqual([]);
   });
 });

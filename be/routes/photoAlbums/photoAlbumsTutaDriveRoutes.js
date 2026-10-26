@@ -6,6 +6,9 @@
 
 import fs from 'fs';
 import path from 'path';
+import pool from '../../db/connection.js';
+import { getDBSchema } from '../../config/envConfig.js';
+import { sharedInviteAttachmentDir } from '../../utils/photoAlbumsSharedSnapshot.js';
 import {
   getVaultSession,
   initializeVaultOnUsbWithKey,
@@ -39,6 +42,11 @@ import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload
 import { restoreTutaCloudVaultFromZipFile } from '../../utils/photoAlbumsUsb/usbVaultBackup.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
+
+function schemaTable(name) {
+  const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
+  return `"${schema}"."${name}"`;
+}
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -207,6 +215,86 @@ export async function formatPhotoAlbumsTutaDrive(req, res) {
     console.error('[formatPhotoAlbumsTutaDrive]', err?.message || err);
     return sendRecordVaultError(res, err, 'Unable to format TutaDrive', {
       route: 'formatPhotoAlbumsTutaDrive',
+      singlesId,
+      status: isStoragePermissionError(err) ? 500 : 400
+    });
+  }
+}
+
+/**
+ * POST /api/photoAlbums/tutadrive/reset-album — wipe this member's TutaPhotos on TutaCloud:
+ * vault folder (albums, pages, photos), shared-invite snapshots, and the Postgres rows
+ * that point at them. USB vault keys and other members' shares are not touched.
+ */
+export async function resetPhotoAlbumsTutaDrive(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    const { memberId } = await resolveMemberContext(singlesId);
+    await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+
+    const client = await pool.connect();
+    let inviteIds = [];
+    try {
+      await client.query('BEGIN');
+      const invites = await client.query(
+        `DELETE FROM ${schemaTable('photo_albums_invites')}
+          WHERE owner_singles_id = $1 AND storage_type = 'onedrive'
+          RETURNING invite_id`,
+        [singlesId]
+      );
+      inviteIds = invites.rows.map((row) => Number(row.invite_id)).filter((id) => id > 0);
+      const vaultKeys = await client.query(
+        `DELETE FROM ${schemaTable('photo_albums_vault')}
+          WHERE singles_id = $1 AND storage_backend = 'onedrive'`,
+        [singlesId]
+      );
+      const hasClusterState = await client.query('SELECT to_regclass($1) IS NOT NULL AS ok', [
+        schemaTable('vault_cluster_state')
+      ]);
+      const clusterState = hasClusterState.rows[0]?.ok
+        ? await client.query(
+            `DELETE FROM ${schemaTable('vault_cluster_state')}
+              WHERE product = 'photo_albums' AND singles_id = $1 AND storage_type = 'onedrive'`,
+            [singlesId]
+          )
+        : { rowCount: 0 };
+      await client.query('COMMIT');
+      console.log('[resetPhotoAlbumsTutaDrive] db cleared', {
+        singlesId,
+        invites: inviteIds.length,
+        vaultKeys: vaultKeys.rowCount,
+        clusterState: clusterState.rowCount
+      });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    for (const inviteId of inviteIds) {
+      try {
+        fs.rmSync(sharedInviteAttachmentDir(inviteId), { recursive: true, force: true });
+      } catch (err) {
+        console.warn('[resetPhotoAlbumsTutaDrive] snapshot folder not removed', {
+          inviteId,
+          error: err?.message || String(err)
+        });
+      }
+    }
+
+    wipeTutaDrivePhotoAlbumsVault(memberId);
+    return res.json({
+      success: true,
+      memberId,
+      memberFolder: `M${String(memberId).replace(/^M/i, '')}`,
+      invitesRemoved: inviteIds.length
+    });
+  } catch (err) {
+    console.error('[resetPhotoAlbumsTutaDrive]', err?.message || err);
+    return sendRecordVaultError(res, err, 'Unable to reset TutaPhotos', {
+      route: 'resetPhotoAlbumsTutaDrive',
       singlesId,
       status: isStoragePermissionError(err) ? 500 : 400
     });

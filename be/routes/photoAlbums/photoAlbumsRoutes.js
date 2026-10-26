@@ -814,7 +814,8 @@ export async function getPhotoAlbumsNoteAttachment(req, res) {
   try {
     const variant = String(req.query?.variant || req.query?.v || 'full');
     await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId, { variant });
-    if (normalizeAttachmentVariant(variant) === 'thumb') {
+    const normalizedVariant = normalizeAttachmentVariant(variant);
+    if (normalizedVariant === 'thumb' || normalizedVariant === 'display') {
       await vaultEnsureNoteAttachmentThumbnail(session, noteId, attachmentId);
     }
     const file = vaultGetNoteAttachment(session, noteId, attachmentId, { variant });

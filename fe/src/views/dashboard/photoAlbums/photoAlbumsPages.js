@@ -23,15 +23,24 @@ export function albumPageBlockHeight(pageWidth, orientation = 'portrait') {
   return Math.max(mode === 'landscape' ? 280 : 360, Math.round(pw * ratio));
 }
 
-/** @typedef {{ key: string, x: number, y: number, w: number, h: number }} AlbumPageInstance */
+/**
+ * `attachmentId`: the one thumbnail-tray photo shown on this page (album vault attachment), or null.
+ * @typedef {{ key: string, x: number, y: number, w: number, h: number, attachmentId: number|null }} AlbumPageInstance
+ */
 
-export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '' } = {}) {
+export function normalizeAlbumPageAttachmentId(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : null;
+}
+
+export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', attachmentId = null } = {}) {
   return {
     key: String(key || `pg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
     x: Math.max(0, Math.round(Number(x) || 0)),
     y: Math.max(0, Math.round(Number(y) || 0)),
     w: Math.max(0, Math.round(Number(w) || 0)),
-    h: Math.max(0, Math.round(Number(h) || 0))
+    h: Math.max(0, Math.round(Number(h) || 0)),
+    attachmentId: normalizeAlbumPageAttachmentId(attachmentId)
   };
 }
 
@@ -61,7 +70,14 @@ export function parseAlbumPageInstancesFromHtml(html) {
         return parsed
           .filter((item) => item && typeof item === 'object')
           .map((item) =>
-            createAlbumPageInstance({ key: item.key, x: item.x, y: item.y, w: item.w, h: item.h })
+            createAlbumPageInstance({
+              key: item.key,
+              x: item.x,
+              y: item.y,
+              w: item.w,
+              h: item.h,
+              attachmentId: item.attachmentId
+            })
           );
       }
     } catch {
@@ -84,9 +100,18 @@ export function parseAlbumPageInstancesFromHtml(html) {
 
 /** Serialize album pages for the hidden marker attribute. */
 export function serializeAlbumPageInstances(instances) {
-  const list = (Array.isArray(instances) ? instances : []).map((item) =>
-    createAlbumPageInstance({ key: item?.key, x: item?.x, y: item?.y, w: item?.w, h: item?.h })
-  );
+  const list = (Array.isArray(instances) ? instances : []).map((item) => {
+    const page = createAlbumPageInstance({
+      key: item?.key,
+      x: item?.x,
+      y: item?.y,
+      w: item?.w,
+      h: item?.h,
+      attachmentId: item?.attachmentId
+    });
+    if (page.attachmentId == null) delete page.attachmentId;
+    return page;
+  });
   if (!list.length) return '';
   return JSON.stringify(list).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }

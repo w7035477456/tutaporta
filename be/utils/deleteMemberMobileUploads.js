@@ -172,14 +172,6 @@ export async function deleteMemberMobileUploadsOnFactoryReset({ singlesId, membe
 
   const singlesKey = String(id);
   noteRemovedDir(
-    'photoalbums-onedrive-staging',
-    removeInsideRoot(process.env.RECORD_PHOTOALBUMS_ONEDRIVE_STAGING_ROOT, [singlesKey])
-  );
-  noteRemovedDir(
-    'notes-onedrive-staging',
-    removeInsideRoot(process.env.RECORD_NOTES_ONEDRIVE_STAGING_ROOT, [singlesKey])
-  );
-  noteRemovedDir(
     'recordvault-onedrive-tmpdir',
     removeInsideRoot(path.join(os.tmpdir(), 'recordvault-onedrive'), [singlesKey])
   );

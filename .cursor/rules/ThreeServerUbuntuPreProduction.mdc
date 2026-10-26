@@ -28,13 +28,15 @@ Both storage folders must look the same from every web server, because consecuti
 
 | Env var | Physical storage | How it is shared |
 |-----|-----|-----|
-| **`FAST_STORAGE_FOLDER`** | Local NVMe on each server, mounted under **`/mnt`** | **GlusterFS** replicated volume across **xbox1, xbox3 and xbox4**. Every node holds a full copy, so reads stay local and fast. |
-| **`LARGE_CHEAP_STORAGE_FOLDER`** | USB external enclosure attached to **xbox1** only (local mount on xbox1) | xbox1 exports it over **NFS**; **xbox3 and xbox4** mount it as NFS clients. |
+| **`FAST_STORAGE_FOLDER`** | Local NVMe on each server, under **`ROOT_FOLDER`** (mounted under **`/mnt`**) | **GlusterFS** replicated volume across **xbox1, xbox3 and xbox4**. Every node holds a full copy, so reads stay local and fast. |
+| **`LARGE_CHEAP_STORAGE_FOLDER`** | **Same NVMe as `FAST_STORAGE_FOLDER`**, also under **`ROOT_FOLDER`** (it is **not** a USB external enclosure) | Shared the same way as `FAST_STORAGE_FOLDER`. |
 
-- The web server cluster is **xbox3 + xbox4** today and may grow to **xbox5 / xbox6 / xbox7 / xbox8**. Each new web server must join the GlusterFS volume (add a replica brick on its NVMe under `/mnt`) and mount the xbox1 NFS export, before HAProxy sends it traffic.
-- Use the **same mount path on every server** so `FAST_STORAGE_FOLDER` and `LARGE_CHEAP_STORAGE_FOLDER` in the BE `.env` are identical across web servers.
+- Both folders currently live side by side on NVMe under `ROOT_FOLDER` (BE `.env` defines them as `${ROOT_FOLDER}/…`). Today "large cheap" is a separate folder, not separate hardware.
+- **Future (not now):** Andrew plans to move `LARGE_CHEAP_STORAGE_FOLDER` onto a **SAS drive**. **Do not write code, scripts, mounts or config for the SAS move now** — no SAS-specific paths, NFS exports, or fallback logic. Keep code reaching it only through the env var so the later move is an `.env` / mount change only.
+- The web server cluster is **xbox3 + xbox4** today and may grow to **xbox5 / xbox6 / xbox7 / xbox8**. Each new web server must join the GlusterFS volume (add a replica brick on its NVMe under `/mnt`) before HAProxy sends it traffic.
+- Use the **same `ROOT_FOLDER` / mount path on every server** so `FAST_STORAGE_FOLDER` and `LARGE_CHEAP_STORAGE_FOLDER` in the BE `.env` are identical across web servers.
 - Code must reach files only through these env vars, never a server-local path. Anything written to a local disk outside these mounts is invisible to the other web servers.
-- `LARGE_CHEAP_STORAGE_FOLDER` depends on xbox1 being up (single host, no replication). Treat it as slower bulk storage and handle mount / I/O errors (for example a stale NFS handle) gracefully instead of crashing.
+- Still handle storage I/O errors gracefully instead of crashing.
 
 ## What this means for code and ops
 

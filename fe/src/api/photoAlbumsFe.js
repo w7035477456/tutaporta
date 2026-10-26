@@ -926,6 +926,12 @@ export async function formatPhotoAlbumsTutaDrive() {
   return data;
 }
 
+/** Wipe this member's TutaPhotos on TutaCloud (vault folder, share snapshots, Postgres rows). */
+export async function resetPhotoAlbumsTutaDrive() {
+  const { data } = await api.post('/api/photoAlbums/tutadrive/reset-album');
+  return data;
+}
+
 export async function initPhotoAlbumsTutaDrive() {
   const { data } = await api.post('/api/photoAlbums/tutadrive/init');
   return data;

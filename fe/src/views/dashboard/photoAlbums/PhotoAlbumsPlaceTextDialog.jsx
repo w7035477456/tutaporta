@@ -15,6 +15,10 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCenterWide';
 import { colorTemplate7PopupSliderSx, colorTemplate7PopupActionButtonSx } from 'config/colorTemplate7PopupLargeDark';
 import PhotoAlbumsFillOutlineColorPicker from './PhotoAlbumsFillOutlineColorPicker';
+import PhotoAlbumsPlaceTextPhotoPreview from './PhotoAlbumsPlaceTextPhotoPreview';
+
+/** Where a new label starts on a double-clicked photo (fraction of the photo frame). */
+const PHOTO_TEXT_DEFAULT_ANCHOR = { fx: 0.08, fy: 0.08 };
 
 export const PLACE_TEXT_FONT_FAMILIES = [
   { label: 'Algerian', value: 'Algerian, fantasy' },
@@ -220,11 +224,14 @@ function stylePatchFromControls({
 
 /**
  * Add Text dialog — styles a page text label or the album-wide page title.
+ * With `photo` (double-clicked page photo) the photo shows on top and the text can be
+ * dragged on it; OK then also returns `photoAnchor` ({ fx, fy } of the photo frame).
  */
 export default function PhotoAlbumsPlaceTextDialog({
   open,
   initialText = '',
   initialStyle = null,
+  photo = null,
   onClose,
   onConfirm
 }) {
@@ -238,6 +245,7 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [fontSize, setFontSize] = useState(PLACE_TEXT_DEFAULTS.fontSize);
   const [outlineWidth, setOutlineWidth] = useState(PLACE_TEXT_DEFAULTS.outlineWidth);
   const [selectedPresetId, setSelectedPresetId] = useState(PLACE_TEXT_STYLE_PRESETS[0].id);
+  const [photoAnchor, setPhotoAnchor] = useState(PHOTO_TEXT_DEFAULT_ANCHOR);
   const dialogInitRef = useRef(false);
 
   const applyStyleFields = useCallback((next, seededText) => {
@@ -270,6 +278,7 @@ export default function PhotoAlbumsPlaceTextDialog({
     // Seed once per open.
     if (dialogInitRef.current) return;
     dialogInitRef.current = true;
+    setPhotoAnchor(PHOTO_TEXT_DEFAULT_ANCHOR);
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
     const seeded = String(initialText ?? '').trim();
     applyStyleFields(next, seeded || next.text);
@@ -294,18 +303,17 @@ export default function PhotoAlbumsPlaceTextDialog({
   };
 
   const handleOk = () => {
-    onConfirm?.(
-      stylePatchFromControls({
-        text,
-        color,
-        outlineColor,
-        fontFamily,
-        fontWeight,
-        fontSize,
-        outlineWidth,
-        selectedPreset
-      })
-    );
+    const patch = stylePatchFromControls({
+      text,
+      color,
+      outlineColor,
+      fontFamily,
+      fontWeight,
+      fontSize,
+      outlineWidth,
+      selectedPreset
+    });
+    onConfirm?.(photo ? { ...patch, photoAnchor } : patch);
   };
 
   const handleDialogClose = () => {
@@ -360,8 +368,31 @@ export default function PhotoAlbumsPlaceTextDialog({
       <ColorTemplate16PopupCenterWide.Title>Add Text</ColorTemplate16PopupCenterWide.Title>
       <ColorTemplate16PopupCenterWide.Body spacing={1.5}>
         <ColorTemplate16PopupCenterWide.SectionDescription>
-          Style your text, then OK to place it on the page (drag &amp; rotate on the page).
+          {photo
+            ? 'Style your text and drag it on the photo, then OK to place it there (you can still drag & rotate it on the page).'
+            : 'Style your text, then OK to place it on the page (drag & rotate on the page).'}
         </ColorTemplate16PopupCenterWide.SectionDescription>
+
+        {photo ? (
+          <PhotoAlbumsPlaceTextPhotoPreview
+            noteId={photo.noteId}
+            attachmentId={photo.attachmentId}
+            storageType={photo.storageType}
+            frameWidth={photo.frameWidth}
+            frameHeight={photo.frameHeight}
+            anchor={photoAnchor}
+            onAnchorChange={setPhotoAnchor}
+            text={selectedPreset?.uppercase ? displayText.toUpperCase() : displayText}
+            textStyle={{
+              color,
+              outlineColor,
+              fontFamily,
+              fontWeight,
+              fontSize,
+              outlineWidth
+            }}
+          />
+        ) : null}
 
         <Stack spacing={1.25} sx={{ mt: 1.5, mb: 2, py: 1.5, overflow: 'visible' }}>
           {PLACE_TEXT_STYLE_PRESETS.map((preset) => {
@@ -530,6 +561,13 @@ PhotoAlbumsPlaceTextDialog.propTypes = {
   open: PropTypes.bool,
   initialText: PropTypes.string,
   initialStyle: PropTypes.object,
+  photo: PropTypes.shape({
+    noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    attachmentId: PropTypes.number.isRequired,
+    storageType: PropTypes.string,
+    frameWidth: PropTypes.number.isRequired,
+    frameHeight: PropTypes.number.isRequired
+  }),
   onClose: PropTypes.func,
   onConfirm: PropTypes.func
 };

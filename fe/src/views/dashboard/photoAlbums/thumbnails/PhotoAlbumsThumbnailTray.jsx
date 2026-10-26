@@ -21,6 +21,12 @@ import PhotoAlbumsTrayCountLabel from '../PhotoAlbumsTrayCountLabel';
 import PhotoAlbumsSeqBadge from '../PhotoAlbumsSeqBadge';
 import PhotoAlbumsThumbnail from './PhotoAlbumsThumbnail';
 import { photoAlbumsTrayItemDisplayName } from './photoAlbumsTrayItems';
+import {
+  PHOTO_DROP_TARGET_BG,
+  isPagePhotoDrag,
+  readPagePhotoDragPageKey,
+  startTrayPhotoDrag
+} from '../photoAlbumsPagePhotoDrag';
 
 function isIncomingFileDrag(dataTransfer) {
   if (isFilesExplorerDrag(dataTransfer)) return true;
@@ -62,7 +68,16 @@ function TrayThumb({ item, noteId, storageType, onRemove, disabled }) {
       className="rv-album-staging__thumb"
       data-pa-tray-attachment-id={attachmentId}
       aria-label={label}
-      draggable={false}
+      title={disabled ? undefined : 'Drag onto an album page'}
+      draggable={!disabled}
+      onDragStart={(e) => {
+        if (disabled) {
+          e.preventDefault();
+          return;
+        }
+        hideHoverPlate();
+        startTrayPhotoDrag(e.dataTransfer, attachmentId);
+      }}
       onMouseEnter={showHoverPlate}
       onMouseLeave={hideHoverPlate}
       onFocus={showHoverPlate}
@@ -77,7 +92,8 @@ function TrayThumb({ item, noteId, storageType, onRemove, disabled }) {
         border: '2px solid #1976d2',
         background: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
         boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
-        userSelect: 'none'
+        userSelect: 'none',
+        cursor: disabled ? 'default' : 'grab'
       }}
     >
       {/* Portaled fixed plate — escapes tray overflow / album z-index stacking. */}
@@ -178,7 +194,8 @@ TrayThumb.propTypes = {
 /**
  * Thumbnail tray: shows every photo/video saved in the album vault (`items` comes from
  * `buildPhotoAlbumsTrayItems(note.attachments)`), and accepts OS / Files Explorer /
- * Mobile Upload drops to add more.
+ * Mobile Upload drops to add more. Thumbs drag onto album pages; a page photo dropped
+ * here is taken off its page (`onPagePhotoReturn(pageKey)`).
  */
 export default function PhotoAlbumsThumbnailTray({
   items = [],
@@ -187,17 +204,41 @@ export default function PhotoAlbumsThumbnailTray({
   editable = true,
   onOsFiles,
   onRemove,
-  onRemoveAll
+  onRemoveAll,
+  onPagePhotoReturn
 }) {
   const [fileDragOver, setFileDragOver] = useState(false);
+  /** A page photo is over the tray: whole tray turns red until release. */
+  const [pagePhotoDragOver, setPagePhotoDragOver] = useState(false);
   const [supportListOpen, setSupportListOpen] = useState(false);
   const canRemoveAll = Boolean(editable && items.length > 0 && onRemoveAll);
+  const acceptsPagePhoto = (dataTransfer) => Boolean(editable && onPagePhotoReturn && isPagePhotoDrag(dataTransfer));
+  const acceptsDrag = (dataTransfer) => isIncomingFileDrag(dataTransfer) || acceptsPagePhoto(dataTransfer);
+
+  // A drag cancelled with Esc or dropped elsewhere never fires dragleave/drop here.
+  useEffect(() => {
+    if (!pagePhotoDragOver) return undefined;
+    const clear = () => setPagePhotoDragOver(false);
+    window.addEventListener('dragend', clear, true);
+    window.addEventListener('drop', clear, true);
+    return () => {
+      window.removeEventListener('dragend', clear, true);
+      window.removeEventListener('drop', clear, true);
+    };
+  }, [pagePhotoDragOver]);
 
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setFileDragOver(false);
+    setPagePhotoDragOver(false);
     if (!editable) return;
+
+    if (isPagePhotoDrag(e.dataTransfer)) {
+      const pageKey = readPagePhotoDragPageKey(e.dataTransfer);
+      if (pageKey) onPagePhotoReturn?.(pageKey);
+      return;
+    }
 
     if (isRecordVaultMobileUploadDrag(e.dataTransfer)) {
       const stagedNames = readRecordVaultMobileUploadDragFileNames(e.dataTransfer);
@@ -233,19 +274,22 @@ export default function PhotoAlbumsThumbnailTray({
       className="rv-album-photo-staging"
       data-rv-album-staging-tray=""
       onDragEnter={(e) => {
-        if (!isIncomingFileDrag(e.dataTransfer)) return;
+        if (!acceptsDrag(e.dataTransfer)) return;
         e.preventDefault();
         setFileDragOver(true);
+        if (acceptsPagePhoto(e.dataTransfer)) setPagePhotoDragOver(true);
       }}
       onDragOver={(e) => {
-        if (!isIncomingFileDrag(e.dataTransfer)) return;
+        if (!acceptsDrag(e.dataTransfer)) return;
         e.preventDefault();
-        e.dataTransfer.dropEffect = 'copy';
+        e.dataTransfer.dropEffect = isPagePhotoDrag(e.dataTransfer) ? 'move' : 'copy';
         setFileDragOver(true);
+        if (acceptsPagePhoto(e.dataTransfer)) setPagePhotoDragOver(true);
       }}
       onDragLeave={(e) => {
         if (e.currentTarget.contains(e.relatedTarget)) return;
         setFileDragOver(false);
+        setPagePhotoDragOver(false);
       }}
       onDrop={handleDrop}
       sx={{
@@ -264,7 +308,7 @@ export default function PhotoAlbumsThumbnailTray({
         boxSizing: 'border-box',
         border: '2px dashed #1A7B02',
         borderRadius: 0,
-        bgcolor: '#B5E7A8',
+        bgcolor: pagePhotoDragOver ? PHOTO_DROP_TARGET_BG : '#B5E7A8',
         outline: fileDragOver ? '2px dashed #1A7B02' : 'none',
         outlineOffset: 2,
         '&[data-pa-explorer-drag-over="1"]': {
@@ -274,7 +318,7 @@ export default function PhotoAlbumsThumbnailTray({
         },
         /* Visible so hover filename plates can paint over the album below. */
         overflow: 'visible',
-        transition: 'outline-color 0.12s ease'
+        transition: 'outline-color 0.12s ease, background-color 0.12s ease'
       }}
     >
       <PhotoAlbumsTrayCountLabel count={items.length} sx={{ alignSelf: 'flex-start', px: 0.25 }} />
@@ -439,5 +483,6 @@ PhotoAlbumsThumbnailTray.propTypes = {
   editable: PropTypes.bool,
   onOsFiles: PropTypes.func,
   onRemove: PropTypes.func,
-  onRemoveAll: PropTypes.func
+  onRemoveAll: PropTypes.func,
+  onPagePhotoReturn: PropTypes.func
 };

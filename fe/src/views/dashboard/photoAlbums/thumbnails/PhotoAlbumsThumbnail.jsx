@@ -10,9 +10,39 @@ const MEDIA_STYLE = {
   userSelect: 'none'
 };
 
-/** One vault attachment thumbnail (image, or video poster/clip), with a filename placeholder. */
-export default function PhotoAlbumsThumbnail({ noteId, attachmentId, storageType = null, label = '' }) {
-  const { status, url, mimeType, reportBroken } = usePhotoAlbumsThumbnail({ noteId, attachmentId, storageType });
+/**
+ * One vault attachment thumbnail (image, or video poster/clip), with a filename placeholder.
+ * `fallbackCache`: tried once when `cache` cannot load this attachment.
+ */
+export default function PhotoAlbumsThumbnail({
+  noteId,
+  attachmentId,
+  storageType = null,
+  label = '',
+  cache,
+  fallbackCache = null,
+  objectFit = 'cover'
+}) {
+  const { status, url, mimeType, reportBroken } = usePhotoAlbumsThumbnail({
+    noteId,
+    attachmentId,
+    storageType,
+    ...(cache ? { cache } : null)
+  });
+  const mediaStyle = objectFit === 'cover' ? MEDIA_STYLE : { ...MEDIA_STYLE, objectFit };
+
+  if (status === 'error' && fallbackCache && fallbackCache !== cache) {
+    return (
+      <PhotoAlbumsThumbnail
+        noteId={noteId}
+        attachmentId={attachmentId}
+        storageType={storageType}
+        label={label}
+        cache={fallbackCache}
+        objectFit={objectFit}
+      />
+    );
+  }
 
   if (status === 'ready' && url) {
     if (/^video\//i.test(mimeType)) {
@@ -25,7 +55,7 @@ export default function PhotoAlbumsThumbnail({ noteId, attachmentId, storageType
           draggable={false}
           onError={reportBroken}
           data-pa-thumb-status="ready"
-          style={{ ...MEDIA_STYLE, background: '#000' }}
+          style={{ ...mediaStyle, background: '#000' }}
         />
       );
     }
@@ -40,7 +70,7 @@ export default function PhotoAlbumsThumbnail({ noteId, attachmentId, storageType
           if (img.naturalWidth < 1 || img.naturalHeight < 1) reportBroken();
         }}
         data-pa-thumb-status="ready"
-        style={MEDIA_STYLE}
+        style={mediaStyle}
       />
     );
   }
@@ -69,5 +99,9 @@ PhotoAlbumsThumbnail.propTypes = {
   noteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   attachmentId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
   storageType: PropTypes.string,
-  label: PropTypes.string
+  label: PropTypes.string,
+  /** Defaults to the shared tray thumbnail cache. */
+  cache: PropTypes.object,
+  fallbackCache: PropTypes.object,
+  objectFit: PropTypes.oneOf(['cover', 'contain'])
 };

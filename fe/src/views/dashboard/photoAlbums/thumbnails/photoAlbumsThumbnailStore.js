@@ -10,3 +10,14 @@ export const photoAlbumsThumbnailCache = createPhotoAlbumsThumbnailCache({
       variant: 'thumb'
     })
 });
+
+/** Album page photos — the vault `variant=display` (1000px) file. */
+export const photoAlbumsPagePhotoCache = createPhotoAlbumsThumbnailCache({
+  maxIdleEntries: 60,
+  fetchBlob: ({ noteId, attachmentId, storageType }) =>
+    fetchPhotoAlbumsNoteAttachmentBlob(noteId, attachmentId, {
+      inline: true,
+      storageType,
+      variant: 'display'
+    })
+});

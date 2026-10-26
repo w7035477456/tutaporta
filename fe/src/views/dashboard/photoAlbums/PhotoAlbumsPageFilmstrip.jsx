@@ -243,7 +243,9 @@ export default function PhotoAlbumsPageFilmstrip({
   /** (pageIndex, entry?) => void — delete album page or ForOrder queue entry. */
   onDeletePage = null,
   /** () => void — delete every album page (tray photos are kept). */
-  onDeleteAllPages = null
+  onDeleteAllPages = null,
+  /** () => void — Reset Album: wipe every TutaPhotos album on TutaCloud. */
+  onResetAlbum = null
 }) {
   const [docTick, setDocTick] = useState(0);
   const hasOverride = Array.isArray(overrideEntries) && overrideEntries.length > 0;
@@ -491,6 +493,47 @@ export default function PhotoAlbumsPageFilmstrip({
     </SliderControlButton>
   ) : null;
 
+  const resetAlbumBtn =
+    typeof onResetAlbum === 'function' && !hasOverride ? (
+      <SliderControlButton
+        type="button"
+        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+        aria-label="Reset Album — delete every album, page and photo in TutaPhotos on TutaCloud"
+        title="Reset Album — delete every album, page and photo in TutaPhotos on TutaCloud and start with a blank vault"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onResetAlbum?.();
+        }}
+        {...guestDemoBlockProps()}
+        sx={{
+          flexShrink: 0,
+          alignSelf: 'center',
+          px: 0.75,
+          py: 0.35,
+          minWidth: 'auto',
+          whiteSpace: 'nowrap',
+          fontSize: { xs: '0.72rem', sm: '0.82rem' },
+          fontWeight: 800,
+          lineHeight: 1.2,
+          bgcolor: '#e53935 !important',
+          color: '#fff !important',
+          WebkitTextFillColor: '#fff !important',
+          border: '2px solid #000 !important',
+          '@media (hover: hover)': {
+            '&:hover:not(.Mui-disabled)': {
+              bgcolor: '#c62828 !important',
+              color: '#fff !important',
+              WebkitTextFillColor: '#fff !important'
+            }
+          }
+        }}
+      >
+        Reset Album
+      </SliderControlButton>
+    ) : null;
+
   const headerRow = (
     <Box
       sx={{
@@ -504,8 +547,9 @@ export default function PhotoAlbumsPageFilmstrip({
         minHeight: 28
       }}
     >
-      <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <PhotoAlbumsTrayCountLabel count={albumImageCount} />
+        {resetAlbumBtn}
       </Box>
       {navRow}
       <Box
@@ -608,5 +652,6 @@ PhotoAlbumsPageFilmstrip.propTypes = {
     })
   ),
   onDeletePage: PropTypes.func,
-  onDeleteAllPages: PropTypes.func
+  onDeleteAllPages: PropTypes.func,
+  onResetAlbum: PropTypes.func
 };

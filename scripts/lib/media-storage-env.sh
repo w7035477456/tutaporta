@@ -14,7 +14,6 @@ MEDIA_FOLDER_KEYS=(
   "FAST_STORAGE_FOLDER optional"
   "LARGE_CHEAP_STORAGE_FOLDER optional"
   "TUTADATES_VIDEO_FOLDER optional"
-  "RECORD_NOTES_ONEDRIVE_STAGING_ROOT optional"
 )
 
 media_env_require_readable() {

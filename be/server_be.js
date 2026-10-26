@@ -290,6 +290,7 @@ import {
   getPhotoAlbumsTutaDriveStatus,
   initPhotoAlbumsTutaDrive,
   logoffPhotoAlbumsTutaDrive,
+  resetPhotoAlbumsTutaDrive,
   restorePhotoAlbumsTutaDriveBackupZip,
   unlockPhotoAlbumsTutaDrive
 } from './routes/photoAlbums/photoAlbumsTutaDriveRoutes.js';
@@ -1649,6 +1650,7 @@ app.get('/api/photoAlbums/tutadrive/open-progress', ...photoAlbumsVaultAuth, get
 app.post('/api/photoAlbums/tutadrive/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/init', ...photoAlbumsVaultAuth, initPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutadrive/reset-album', ...photoAlbumsVaultAuth, resetPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
 app.post(
   '/api/photoAlbums/tutadrive/restore-zip',
