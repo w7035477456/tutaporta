@@ -6,16 +6,28 @@ import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 
 /**
  * Toggle workspace focus view — hide sidebars/toolbars and use the red letterbox shell.
+ * `icon` / `ariaLabel` / `title` replace the default zoom image and wording (e.g. a second focus mode).
  */
-export default function VaultWorkspaceFocusToggleButton({ active = false, onToggle, disabled = false }) {
+export default function VaultWorkspaceFocusToggleButton({
+  active = false,
+  onToggle,
+  disabled = false,
+  icon = null,
+  ariaLabel = '',
+  title = ''
+}) {
   return (
     <Box
       component="button"
       type="button"
       disabled={disabled}
       onClick={() => onToggle?.()}
-      aria-label={active ? 'Unzoom — show menus, sidebars, and site footer' : 'Zoom — hide menus and sidebars'}
-      title={active ? 'Restore full workspace (Esc)' : 'Show note only — hide sidebars and toolbars (Esc to restore)'}
+      aria-label={
+        ariaLabel || (active ? 'Unzoom — show menus, sidebars, and site footer' : 'Zoom — hide menus and sidebars')
+      }
+      title={
+        title || (active ? 'Restore full workspace (Esc)' : 'Show note only — hide sidebars and toolbars (Esc to restore)')
+      }
       aria-pressed={active}
       className={LIGHT_SURFACE_CLASS}
       sx={{
@@ -33,7 +45,9 @@ export default function VaultWorkspaceFocusToggleButton({ active = false, onTogg
         '&:active': disabled ? undefined : { transform: 'scale(0.96)' }
       }}
     >
-      <Box component="img" src={zoomIconImg} alt="" sx={{ width: 32, height: 32, display: 'block', filter: 'brightness(0)' }} />
+      {icon || (
+        <Box component="img" src={zoomIconImg} alt="" sx={{ width: 32, height: 32, display: 'block', filter: 'brightness(0)' }} />
+      )}
     </Box>
   );
 }
@@ -41,5 +55,8 @@ export default function VaultWorkspaceFocusToggleButton({ active = false, onTogg
 VaultWorkspaceFocusToggleButton.propTypes = {
   active: PropTypes.bool,
   onToggle: PropTypes.func,
-  disabled: PropTypes.bool
+  disabled: PropTypes.bool,
+  icon: PropTypes.node,
+  ariaLabel: PropTypes.string,
+  title: PropTypes.string
 };

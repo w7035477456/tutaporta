@@ -17,7 +17,7 @@ import { MOBILE_UPLOAD_PRODUCT_TUTAPHOTO } from 'constants/mobileUploadProduct';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import PhotoAlbumsVideoIndicator from '../PhotoAlbumsVideoIndicator';
 import { PHOTO_ALBUMS_THEME_DAYNIGHT_BG } from '../photoAlbumsNoteFontTokens';
-import PhotoAlbumsTrayCountLabel from '../PhotoAlbumsTrayCountLabel';
+import { PhotoAlbumsTrayHeading } from '../PhotoAlbumsTrayCountLabel';
 import PhotoAlbumsSeqBadge from '../PhotoAlbumsSeqBadge';
 import PhotoAlbumsThumbnail from './PhotoAlbumsThumbnail';
 import { photoAlbumsTrayItemDisplayName } from './photoAlbumsTrayItems';
@@ -321,7 +321,7 @@ export default function PhotoAlbumsThumbnailTray({
         transition: 'outline-color 0.12s ease, background-color 0.12s ease'
       }}
     >
-      <PhotoAlbumsTrayCountLabel count={items.length} sx={{ alignSelf: 'flex-start', px: 0.25 }} />
+      <PhotoAlbumsTrayHeading title="Green Tray" count={items.length} sx={{ alignSelf: 'flex-start', px: 0.25 }} />
       <Box
         sx={{
           flex: '0 0 auto',
@@ -374,7 +374,7 @@ export default function PhotoAlbumsThumbnailTray({
               pointerEvents: 'none'
             }}
           >
-            Please drag and drop photos or videos (MP4, MOV, WebM, MKV, AVI, WMV, AVCHD) here to add them to this album
+            Please drag and drop photos or videos here to add them to this album
           </Typography>
         </Box>
         {canRemoveAll ? (

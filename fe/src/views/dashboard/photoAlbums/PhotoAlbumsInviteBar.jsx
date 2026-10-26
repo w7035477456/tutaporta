@@ -141,33 +141,8 @@ export default function PhotoAlbumsInviteBar({
         boxSizing: 'border-box'
       }}
     >
-      {/* Wrap (not nowrap) at every width — the Invite/Review + tutorial icons cannot
-          shrink, so wrapping is what keeps this bar from overflowing into its neighbor. */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0, minWidth: 0, width: '100%', flexWrap: 'wrap' }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.35, flexShrink: 0 }}>
-          <SliderControlButton
-            type="button"
-            variant="green"
-            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-            disabled={!canInvite || busy || (trimmedEmail.length > 0 && !emailFormatValid)}
-            onClick={() => void handleInvite()}
-            aria-label="Invite by email"
-            sx={inviteActionSx}
-          >
-            Invite
-          </SliderControlButton>
-          <SliderControlButton
-            type="button"
-            variant="yellow"
-            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-            disabled={!canInvite}
-            onClick={() => openReview(null)}
-            aria-label="Review album invites"
-            sx={inviteActionSx}
-          >
-            Review
-          </SliderControlButton>
-        </Box>
+      {/* Single row: tutorials · Invite · email · Review (the email field shrinks first). */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, width: '100%', flexWrap: 'nowrap' }}>
         <WorkspaceVideoTutorialPair
           videoTutorialUrl={watchTutorialsHref}
           onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
@@ -175,8 +150,19 @@ export default function PhotoAlbumsInviteBar({
           tutorialVariant="orange"
           tutorialAriaLabel="Open context tutorial"
           tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
-          sx={{ ml: 0.25, mr: 0.25, alignSelf: 'center' }}
+          sx={{ flexShrink: 0, alignSelf: 'center' }}
         />
+        <SliderControlButton
+          type="button"
+          variant="green"
+          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+          disabled={!canInvite || busy || (trimmedEmail.length > 0 && !emailFormatValid)}
+          onClick={() => void handleInvite()}
+          aria-label="Invite by email"
+          sx={inviteActionSx}
+        >
+          Invite
+        </SliderControlButton>
         <TextField
           variant="standard"
           value={email}
@@ -198,6 +184,17 @@ export default function PhotoAlbumsInviteBar({
           inputProps={{ 'aria-label': 'Share this album with this email', type: 'email', inputMode: 'email' }}
           sx={inviteFieldSx}
         />
+        <SliderControlButton
+          type="button"
+          variant="yellow"
+          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+          disabled={!canInvite}
+          onClick={() => openReview(null)}
+          aria-label="Review album invites"
+          sx={inviteActionSx}
+        >
+          Review
+        </SliderControlButton>
       </Box>
       {error ? (
         <Box sx={{ color: '#b71c1c', fontWeight: 700, fontSize: '0.78rem', lineHeight: 1.2, pl: 0.25 }}>

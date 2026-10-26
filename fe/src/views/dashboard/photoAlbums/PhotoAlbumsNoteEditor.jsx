@@ -27,7 +27,6 @@ import {
   stripAlbumTitleStyleMarker
 } from './photoAlbumsAlbumTitleStyle';
 import { PhotoAlbumsAlbumLayoutContext } from './photoAlbumsAlbumLayoutContext';
-import PhotoAlbumsEditorToolbar from './PhotoAlbumsEditorToolbar';
 import PhotoAlbumsAlbumZoomBar from './PhotoAlbumsAlbumZoomBar';
 import PhotoAlbumsPageFilmstrip, { buildAlbumPageFilmstripModels } from './PhotoAlbumsPageFilmstrip';
 import PhotoAlbumsPageFlipOverlay, {
@@ -841,6 +840,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     /** Zoom icon — album-only view (workspace chrome hidden, not true fullscreen). */
     albumFocusView = false,
     onAlbumFocusViewChange = null,
+    /** Menus and sidebars hidden; tray, page strip and album stay. */
+    albumEditFocusView = false,
+    onAlbumEditFocusViewChange = null,
     /** New-tab viewer: start in fullscreen chrome-off mode and fit the whole page. */
     presentationMode = false,
     presentationFullSlide = false,
@@ -1023,6 +1025,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   onAlbumFullscreenChangeRef.current = onAlbumFullscreenChange;
   const onAlbumFocusViewChangeRef = useRef(onAlbumFocusViewChange);
   onAlbumFocusViewChangeRef.current = onAlbumFocusViewChange;
+  const onAlbumEditFocusViewChangeRef = useRef(onAlbumEditFocusViewChange);
+  onAlbumEditFocusViewChangeRef.current = onAlbumEditFocusViewChange;
 
   const albumEditorChromeHidden = albumFullscreen || albumFocusView;
   const albumZoomBarHidden = albumFullscreen;
@@ -1978,6 +1982,11 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     });
   }, [albumFocusView, albumFullscreen, presentationMode]);
 
+  const toggleAlbumEditFocusView = useCallback(() => {
+    if (presentationMode || albumFullscreen) return;
+    onAlbumEditFocusViewChangeRef.current?.(!albumEditFocusView);
+  }, [albumEditFocusView, albumFullscreen, presentationMode]);
+
   /**
    * Full screen / Full Slide: open a new tab that shows the entire album page
    * (auto-fit zoom). Falls back to an in-app overlay if the popup is blocked.
@@ -2030,6 +2039,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
       // Popup blocked or storage failed — in-app overlay fallback.
       onAlbumFocusViewChangeRef.current?.(false);
+      onAlbumEditFocusViewChangeRef.current?.(false);
       setAlbumFullSlide(Boolean(opts?.fullSlide));
       setAlbumFullscreen(true);
       if (opts?.fullSlide) setAlbumCoverFace('front');
@@ -2054,26 +2064,27 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     enterAlbumFullscreen({ fullSlide: true });
   }, [enterAlbumFullscreen]);
   useEffect(() => {
-    if (!albumFullscreen && !albumFocusView) return undefined;
+    if (!albumFullscreen && !albumFocusView && !albumEditFocusView) return undefined;
     const onKey = (event) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         if (albumFullscreen) exitAlbumFullscreen();
         else if (albumFocusView) onAlbumFocusViewChangeRef.current?.(false);
+        else onAlbumEditFocusViewChangeRef.current?.(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [albumFullscreen, albumFocusView, exitAlbumFullscreen]);
+  }, [albumFullscreen, albumFocusView, albumEditFocusView, exitAlbumFullscreen]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
       fitAlbumPageFlushToViewportRef.current?.();
       flushAlbumScrollOrigin(zoomScrollRef.current);
     });
-  }, [albumFocusView]);
+  }, [albumFocusView, albumEditFocusView]);
 
   /** Remove one album page (and text labels in its band), then restack remaining pages. */
   const removeAlbumPageAt = useCallback(
@@ -2506,6 +2517,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   /** Page of the open spread a photo drag is over, painted red until release: 'left' | 'right' | null. */
   const [albumPhotoDragSide, setAlbumPhotoDragSide] = useState(null);
+  /** `pageKey|attachmentId` of the page photo a page-photo drag is over (swap target), or null. */
+  const [albumPhotoSwapTarget, setAlbumPhotoSwapTarget] = useState(null);
+  /** `pageKey|attachmentId` of the page photo being dragged (it is never its own swap target). */
+  const draggingPagePhotoRef = useRef('');
 
   const albumPhotoDropSide = useCallback((event) => {
     const rect = pageScaleRef.current?.getBoundingClientRect?.();
@@ -2514,15 +2529,41 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   // A drag cancelled with Esc or dropped elsewhere never fires dragleave/drop here.
   useEffect(() => {
-    if (!albumPhotoDragSide) return undefined;
-    const clear = () => setAlbumPhotoDragSide(null);
+    if (!albumPhotoDragSide && !albumPhotoSwapTarget) return undefined;
+    const clear = () => {
+      setAlbumPhotoDragSide(null);
+      setAlbumPhotoSwapTarget(null);
+    };
     window.addEventListener('dragend', clear, true);
     window.addEventListener('drop', clear, true);
     return () => {
       window.removeEventListener('dragend', clear, true);
       window.removeEventListener('drop', clear, true);
     };
-  }, [albumPhotoDragSide]);
+  }, [albumPhotoDragSide, albumPhotoSwapTarget]);
+
+  /** Page photo dropped on another page photo: the two trade places (same page or across pages). */
+  const swapAlbumPagePhotos = useCallback(
+    (from, to) => {
+      if (!from?.pageKey || !to?.pageKey || from.attachmentId == null || to.attachmentId == null) return;
+      if (from.attachmentId === to.attachmentId) return;
+      const pages = albumPagesRef.current || [];
+      const fromPage = pages.find((page) => page.key === from.pageKey);
+      const toPage = pages.find((page) => page.key === to.pageKey);
+      if (!fromPage || !toPage) return;
+      const fromIds = shownAlbumPagePhotoIds(fromPage);
+      const toIds = from.pageKey === to.pageKey ? fromIds : shownAlbumPagePhotoIds(toPage);
+      if (!fromIds.includes(from.attachmentId) || !toIds.includes(to.attachmentId)) return;
+      const trade = (id) =>
+        id === from.attachmentId ? to.attachmentId : id === to.attachmentId ? from.attachmentId : id;
+      setAlbumPagePhotos(
+        from.pageKey === to.pageKey
+          ? { [from.pageKey]: fromIds.map(trade) }
+          : { [from.pageKey]: fromIds.map(trade), [to.pageKey]: toIds.map(trade) }
+      );
+    },
+    [setAlbumPagePhotos, shownAlbumPagePhotoIds]
+  );
 
   /**
    * Tray photo or page photo dropped on the open spread (left / right page by pointer X).
@@ -2531,6 +2572,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
    * leaves its old page.
    * @returns {boolean} true when the drop was a photo drag
    */
+  /** True when the page under `side` of the open spread already holds ALBUM_PAGE_MAX_PHOTOS. */
+  const albumDropSidePageIsFull = useCallback(
+    (side) => {
+      const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
+      if (!ordered.length) return false;
+      const leftIdx = albumSpreadLeftPageIndex(albumPageIndexRef.current || 0);
+      const target = ordered[side === 'right' ? leftIdx + 1 : leftIdx];
+      return Boolean(target) && shownAlbumPagePhotoIds(target).length >= ALBUM_PAGE_MAX_PHOTOS;
+    },
+    [shownAlbumPagePhotoIds]
+  );
+
   const handleAlbumPhotoDrop = useCallback(
     (event) => {
       const dt = event.dataTransfer;
@@ -2572,7 +2625,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           if (!trayPhotoId) return;
           if (!target) insertAlbumPageWithPhoto(ordered.length, trayPhotoId);
           else if (targetHasRoom) setAlbumPagePhotos({ [target.key]: [...targetPhotoIds, trayPhotoId] });
-          else insertAlbumPageWithPhoto(targetIdx + 1, trayPhotoId);
           return;
         }
 
@@ -2588,7 +2640,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             [target.key]: [...targetPhotoIds, movedId],
             [source.key]: sourcePhotoIds.filter((id) => id !== movedId)
           });
-        } else insertAlbumPageWithPhoto(targetIdx + 1, movedId, { takeFrom });
+        }
       })();
       return true;
     },
@@ -3909,7 +3961,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         onConfirm={handlePlaceTextConfirm}
       />
       {!albumEditorChromeHidden ? header : null}
-      {!albumEditorChromeHidden ? <PhotoAlbumsEditorToolbar editor={editor} /> : null}
 
       {editor && effectiveEditable ? (
         <BubbleMenu editor={editor} className="rv-bubble">
@@ -4170,7 +4221,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           >
             <PhotoAlbumsPageFilmstrip
               inline
-              stagingCount={unplacedTrayItems.length}
               pages={filmstripAlbumPages}
               pageIndex={orderFilmstripActive ? orderFilmstripIndex : albumPageIndex}
               pageCount={
@@ -4205,6 +4255,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   ? (idx, entry) => handleDeleteFilmstripPage(idx, entry)
                   : null
               }
+              onDeletePhoto={
+                editable && !sharedAlbumId && !orderAlbumActive
+                  ? (pageKey, attachmentId) =>
+                      runAfterTrafficWait(() => handleRemovePagePhoto(pageKey, attachmentId))
+                  : null
+              }
               onDeleteAllPages={
                 editable && !sharedAlbumId && !orderAlbumActive
                   ? () => {
@@ -4228,6 +4284,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           onChange={handleAlbumZoomChange}
           focusViewActive={albumFocusView}
           onFocusViewToggle={toggleAlbumFocusView}
+          editFocusViewActive={albumEditFocusView}
+          onEditFocusViewToggle={toggleAlbumEditFocusView}
           showFocusToggle={!presentationMode}
         />
       ) : null}
@@ -4239,8 +4297,13 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           if (isTrayPhotoDrag(e.dataTransfer) || isPagePhotoDrag(e.dataTransfer)) {
             if (!effectiveEditable) return;
             e.preventDefault();
-            e.dataTransfer.dropEffect = isPagePhotoDrag(e.dataTransfer) ? 'move' : 'copy';
             const side = albumPhotoDropSide(e);
+            if (albumDropSidePageIsFull(side)) {
+              e.dataTransfer.dropEffect = 'none';
+              setAlbumPhotoDragSide(null);
+              return;
+            }
+            e.dataTransfer.dropEffect = isPagePhotoDrag(e.dataTransfer) ? 'move' : 'copy';
             setAlbumPhotoDragSide((prev) => (prev === side ? prev : side));
             return;
           }
@@ -4457,6 +4520,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                       const pageTrayItem = trayItems.find((t) => t.attachmentId === attachmentId) || null;
                       const pageIsVideo = Boolean(pageTrayItem?.isVideo);
                       const controlPx = Math.max(22, Math.min(40, Math.round(Math.min(frame.width, frame.height) * 0.16)));
+                      const photoSlotKey = `${page.key}|${attachmentId}`;
+                      const isSwapTarget = albumPhotoSwapTarget === photoSlotKey;
                       return (
                         <Box
                           key={`photo-${key}-${attachmentId}`}
@@ -4469,7 +4534,37 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                               return;
                             }
                             e.stopPropagation();
+                            draggingPagePhotoRef.current = photoSlotKey;
                             startPagePhotoDrag(e.dataTransfer, page.key, attachmentId);
+                          }}
+                          onDragEnd={() => {
+                            draggingPagePhotoRef.current = '';
+                          }}
+                          onDragOver={(e) => {
+                            if (!effectiveEditable || !isPagePhotoDrag(e.dataTransfer)) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.dataTransfer.dropEffect = 'move';
+                            setAlbumPhotoDragSide(null);
+                            setAlbumPhotoSwapTarget(
+                              draggingPagePhotoRef.current === photoSlotKey ? null : photoSlotKey
+                            );
+                          }}
+                          onDragLeave={(e) => {
+                            if (e.currentTarget.contains(e.relatedTarget)) return;
+                            setAlbumPhotoSwapTarget((prev) => (prev === photoSlotKey ? null : prev));
+                          }}
+                          onDrop={(e) => {
+                            if (!effectiveEditable || !isPagePhotoDrag(e.dataTransfer)) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setAlbumPhotoSwapTarget(null);
+                            setAlbumPhotoDragSide(null);
+                            draggingPagePhotoRef.current = '';
+                            const from = readPagePhotoDrag(e.dataTransfer);
+                            runAfterTrafficWait(() =>
+                              swapAlbumPagePhotos(from, { pageKey: page.key, attachmentId })
+                            );
                           }}
                           onMouseDown={(e) => e.stopPropagation()}
                           onDoubleClick={(e) => {
@@ -4480,7 +4575,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                           }}
                           title={
                             effectiveEditable
-                              ? 'Double-click to add text · drag to the thumbnail tray to take it off this page, or onto the other page to move it there'
+                              ? 'Double-click to add text · drag onto another photo to swap them, onto the other page to move it there, or to the thumbnail tray to take it off'
                               : 'Double-click to view full size'
                           }
                           sx={{
@@ -4495,7 +4590,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                             '&:active': effectiveEditable ? { cursor: 'grabbing' } : null,
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            outline: isSwapTarget ? `4px solid ${ALBUM_PHOTO_DROP_TARGET_BG}` : 'none',
+                            outlineOffset: 2
                           }}
                         >
                           <PhotoAlbumsThumbnail
@@ -4509,46 +4606,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                           />
                           {pageIsVideo ? (
                             <PhotoAlbumsVideoIndicator size={Math.round(controlPx * 0.9)} sx={{ top: 4, left: 4, zIndex: 3 }} />
-                          ) : null}
-                          {effectiveEditable ? (
-                            <Box
-                              component="button"
-                              type="button"
-                              aria-label="Take this photo off the page"
-                              title="Take this photo off the page (it goes back to the thumbnail tray)"
-                              {...guestDemoBlockProps()}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                              }}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                runAfterTrafficWait(() => handleRemovePagePhoto(page.key, attachmentId));
-                              }}
-                              sx={{
-                                position: 'absolute',
-                                top: 4,
-                                right: 4,
-                                width: controlPx,
-                                height: controlPx,
-                                p: 0,
-                                border: '2px solid #fff',
-                                borderRadius: '4px',
-                                bgcolor: '#000',
-                                color: '#e53935',
-                                fontSize: Math.round(controlPx * 0.6),
-                                fontWeight: 900,
-                                lineHeight: 1,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                '&:hover': { bgcolor: '#111', color: '#ff1744' }
-                              }}
-                            >
-                              ×
-                            </Box>
                           ) : null}
                         </Box>
                       );
@@ -4847,6 +4904,8 @@ PhotoAlbumsNoteEditor.propTypes = {
   onAlbumFullscreenChange: PropTypes.func,
   albumFocusView: PropTypes.bool,
   onAlbumFocusViewChange: PropTypes.func,
+  albumEditFocusView: PropTypes.bool,
+  onAlbumEditFocusViewChange: PropTypes.func,
   presentationMode: PropTypes.bool,
   presentationFullSlide: PropTypes.bool,
   presentationPageIndex: PropTypes.number,

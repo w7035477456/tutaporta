@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
-import { IconMinus, IconPlus } from '@tabler/icons-react';
+import { IconArrowsHorizontal, IconMinus, IconPlus } from '@tabler/icons-react';
 import {
   PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   PHOTO_ALBUMS_THEME_INVERSE_FG,
@@ -24,6 +24,8 @@ export default function PhotoAlbumsAlbumZoomBar({
   onChange,
   focusViewActive = false,
   onFocusViewToggle = null,
+  editFocusViewActive = false,
+  onEditFocusViewToggle = null,
   showFocusToggle = false
 }) {
   const zoom = Number.isFinite(value)
@@ -137,6 +139,23 @@ export default function PhotoAlbumsAlbumZoomBar({
       >
         {zoom}%
       </Typography>
+      {showFocusToggle && onEditFocusViewToggle ? (
+        <VaultWorkspaceFocusToggleButton
+          active={editFocusViewActive}
+          onToggle={onEditFocusViewToggle}
+          icon={<IconArrowsHorizontal size={32} stroke={2.5} color="#000" style={{ display: 'block' }} />}
+          ariaLabel={
+            editFocusViewActive
+              ? 'Show menus and sidebars again'
+              : 'Show only the photo tray, page strip and album'
+          }
+          title={
+            editFocusViewActive
+              ? 'Restore full workspace (Esc)'
+              : 'Show only the green photo tray, white page strip and album (Esc to restore)'
+          }
+        />
+      ) : null}
       {showFocusToggle ? (
         <VaultWorkspaceFocusToggleButton active={focusViewActive} onToggle={onFocusViewToggle} />
       ) : null}
@@ -149,5 +168,7 @@ PhotoAlbumsAlbumZoomBar.propTypes = {
   onChange: PropTypes.func,
   focusViewActive: PropTypes.bool,
   onFocusViewToggle: PropTypes.func,
+  editFocusViewActive: PropTypes.bool,
+  onEditFocusViewToggle: PropTypes.func,
   showFocusToggle: PropTypes.bool
 };

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Link from '@mui/material/Link';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PhotoAlbumsDataPlanDialog from './PhotoAlbumsDataPlanDialog';
 import { reportPhotoAlbumsOverageThrottleDepleted } from 'utils/photoAlbumsOverageThrottleUi';
@@ -12,25 +11,26 @@ import {
 } from 'utils/photoAlbumsDataPlanGate';
 import { registerPhotoAlbumsUsageRefresher } from 'utils/photoAlbumsUsageRefreshGate';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/PhotoAlbumsOverageThrottleNotice';
-import AdminEditableUsageDataAmount, {
-  formatUsageDataAmount
-} from 'ui-component/AdminEditableUsageDataAmount';
+import { formatUsageDataAmount } from 'ui-component/AdminEditableUsageDataAmount';
+import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
+import {
+  AddMoreGbLink,
+  LastClickTransferLabel,
+  ThrottleIndexLabel,
+  UsageMeter,
+  UsageStoragePill,
+  transferUsedMb
+} from '../recordVault/RecordVaultUsageBar';
+import { openPhotoAlbumsContextTutorialPopout } from './photoAlbumsContextTutorialSync';
+
+/** Fallback when site global video_tutorial_tutaphotoalbums is unset. */
+const DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL = 'https://youtu.be/dMiwcH027fM';
 
 const usageBarFontSx = {
   fontFamily: MAIN_FONT_FAMILY,
   fontSize: { xs: '0.72rem !important', sm: '0.82rem !important', md: '0.9rem !important' },
   lineHeight: 1.35,
   fontWeight: 700
-};
-
-const sessionCountSx = {
-  ...usageBarFontSx,
-  flexShrink: 0,
-  color: '#fff',
-  WebkitTextFillColor: '#fff',
-  whiteSpace: 'nowrap',
-  fontWeight: 700,
-  px: 0.25
 };
 
 const yellowTextSx = {
@@ -79,32 +79,6 @@ UsageBarShell.propTypes = {
   blackBar: PropTypes.bool
 };
 
-function UpgradeDataPlanLink({ onClick }) {
-  return (
-    <Link
-      component="button"
-      type="button"
-      onClick={onClick}
-      underline="always"
-      sx={{
-        ...yellowTextSx,
-        textDecorationColor: 'currentColor',
-        fontWeight: 800,
-        border: 0,
-        p: 0,
-        bgcolor: 'transparent',
-        cursor: 'pointer'
-      }}
-    >
-      Click Here
-    </Link>
-  );
-}
-
-UpgradeDataPlanLink.propTypes = {
-  onClick: PropTypes.func.isRequired
-};
-
 function displayRemainMb(transfer) {
   if (!transfer) return 0;
   if (transfer.refillRemainMbExact != null && Number.isFinite(Number(transfer.refillRemainMbExact))) {
@@ -113,62 +87,43 @@ function displayRemainMb(transfer) {
   return transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
 }
 
-function SessionFileCountLabel({ usbTxRx = 0, uiTxRx = 0 }) {
-  const usb = Math.max(0, Math.trunc(Number(usbTxRx) || 0));
-  const ui = Math.max(0, Math.trunc(Number(uiTxRx) || 0));
+/** MB stored on disk for this member's TutaPhotos, or null when the server did not report it. */
+function tutaPhotosStorageMb(usage) {
+  const photosBytes = Number(usage?.tutaDriveStorage?.photosBytes);
+  if (Number.isFinite(photosBytes) && photosBytes >= 0) return photosBytes / (1024 * 1024);
+  const folderMb = Number(usage?.vaultFolderMb);
+  if (Number.isFinite(folderMb) && folderMb > 0) return folderMb;
+  return null;
+}
+
+function StorageAndLastClickRow({ usage }) {
+  const storageMb = tutaPhotosStorageMb(usage);
+  const title =
+    storageMb == null
+      ? ''
+      : `TutaPhotos storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk`;
   return (
-    <Typography component="span" sx={sessionCountSx} title="Session file transfer counts (reset on next unlock)">
-      Usb tx/rx={usb}, ui tx/rx={ui}
-    </Typography>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+      {storageMb == null ? null : <UsageStoragePill storageMb={storageMb} title={title} />}
+      <LastClickTransferLabel />
+    </Box>
   );
 }
 
-SessionFileCountLabel.propTypes = {
-  usbTxRx: PropTypes.number,
-  uiTxRx: PropTypes.number
-};
-
-/** TutaDrive Total GB from notes+photos folders only (always shown in gb, 1 decimal). */
-function formatTutaDriveTotalGb(usage) {
-  const bytes = Number(usage?.tutaDriveStorage?.totalBytes);
-  if (Number.isFinite(bytes) && bytes >= 0) {
-    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}gb`;
-  }
-  const mb = Number(usage?.vaultFolderMb) || 0;
-  return `${Math.max(0, mb / 1024).toFixed(1)}gb`;
-}
-
-function TutaDriveTotalLabel({ usage }) {
-  if (!usage?.tutaDrive) return null;
-  const label = formatTutaDriveTotalGb(usage);
-  const notesMb = (Number(usage?.tutaDriveStorage?.notesBytes) || 0) / (1024 * 1024);
-  const photosMb = (Number(usage?.tutaDriveStorage?.photosBytes) || 0) / (1024 * 1024);
-  const title = `Disk Total = notes (${formatUsageDataAmount(notesMb)}) + photos (${formatUsageDataAmount(photosMb)}) under users/M####/`;
-  return (
-    <Typography component="span" sx={yellowTextSx} title={title}>
-      Total {label}.{' '}
-    </Typography>
-  );
-}
-
-TutaDriveTotalLabel.propTypes = {
+StorageAndLastClickRow.propTypes = {
   usage: PropTypes.object
 };
 
 export default function PhotoAlbumsUsageBar({
   usage,
   storageType = 'usb',
-  // Kept for call-site compatibility; video tutorial moved to Open Tutorial on invite row.
-  videoTutorialUrl: _videoTutorialUrl = '',
+  videoTutorialUrl = '',
   onPurchased,
   onGetMoreTokens,
   onRequestUsageRefresh
 }) {
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
   const transfer = usage?.transfer;
-  const sessionFileCounts = usage?.sessionFileCounts || {};
-  const usbTxRx = Number(sessionFileCounts.usbTxRx) || 0;
-  const uiTxRx = Number(sessionFileCounts.uiTxRx) || 0;
   const isOneDrive = storageType === 'tutadrive';
 
   useEffect(() => {
@@ -194,7 +149,16 @@ export default function PhotoAlbumsUsageBar({
     return reportPhotoAlbumsOverageThrottleDepleted(depleted);
   }, [transfer]);
 
-  const actions = <SessionFileCountLabel usbTxRx={usbTxRx} uiTxRx={uiTxRx} />;
+  const actions = (
+    <WorkspaceVideoTutorialPair
+      videoTutorialUrl={String(videoTutorialUrl || '').trim() || DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL}
+      onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
+      tutorialVariant="orange"
+      tutorialAriaLabel="Open context tutorial"
+      tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
+      sx={{ ml: 0 }}
+    />
+  );
 
   const dataPlanDialog = (
     <PhotoAlbumsDataPlanDialog
@@ -220,11 +184,7 @@ export default function PhotoAlbumsUsageBar({
     return (
       <>
         <UsageBarShell actions={actions}>
-          {usage?.tutaDrive ? (
-            <Typography component="div" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
-              <TutaDriveTotalLabel usage={usage} />
-            </Typography>
-          ) : null}
+          <StorageAndLastClickRow usage={usage} />
         </UsageBarShell>
         {dataPlanDialog}
       </>
@@ -243,53 +203,25 @@ export default function PhotoAlbumsUsageBar({
   return (
     <>
       <UsageBarShell actions={actions} blackBar>
-        <Typography
-          component="div"
-          sx={{
-            ...yellowTextSx,
-            whiteSpace: 'nowrap'
-          }}
-        >
-          <TutaDriveTotalLabel usage={usage} />
+        <StorageAndLastClickRow usage={usage} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, mt: 0.5 }}>
+          <UsageMeter
+            usedMb={transferUsedMb(transfer, refillBoughtMb)}
+            boughtMb={refillBoughtMb}
+            remainMb={refillRemainMb}
+            blockLabel={blockLabel}
+            depleted={depleted}
+            onOpenPlan={() => setDataPlanOpen(true)}
+            onSaved={() => onPurchased?.()}
+          />
+          <AddMoreGbLink onClick={() => setDataPlanOpen(true)} />
+          <ThrottleIndexLabel factor={Number(transfer.throttleFactor) || (depleted ? 10 : 1)} />
           {depleted ? (
-            <>
-              Data Depleted:{' '}
-              <AdminEditableUsageDataAmount
-                field="remain"
-                valueMb={refillRemainMb}
-                onSaved={() => onPurchased?.()}
-              />{' '}
-              of{' '}
-              <AdminEditableUsageDataAmount
-                field="bought"
-                valueMb={refillBoughtMb}
-                onSaved={() => onPurchased?.()}
-              />{' '}
-              (
-              <VaultOverageSpeedThrottledPhrase />
-              ). <UpgradeDataPlanLink onClick={() => setDataPlanOpen(true)} /> to Refill/Add{' '}
-              {blockLabel} blocks
-            </>
-          ) : (
-            <>
-              Data Remain{' '}
-              <AdminEditableUsageDataAmount
-                field="remain"
-                valueMb={refillRemainMb}
-                onSaved={() => onPurchased?.()}
-              />{' '}
-              of{' '}
-              <AdminEditableUsageDataAmount
-                field="bought"
-                valueMb={refillBoughtMb}
-                onSaved={() => onPurchased?.()}
-              />
-              .{' '}
-              <UpgradeDataPlanLink onClick={() => setDataPlanOpen(true)} /> to Refill/Add{' '}
-              {blockLabel} blocks
-            </>
-          )}
-        </Typography>
+            <Typography component="span" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
+              (<VaultOverageSpeedThrottledPhrase />)
+            </Typography>
+          ) : null}
+        </Box>
       </UsageBarShell>
       {dataPlanDialog}
     </>

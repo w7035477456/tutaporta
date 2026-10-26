@@ -75,7 +75,7 @@ UsageBarShell.propTypes = {
   blackBar: PropTypes.bool
 };
 
-function LastClickTransferLabel() {
+export function LastClickTransferLabel() {
   const mb = useLastClickTransferMb();
   return (
     <Typography
@@ -97,15 +97,8 @@ function tutaNotesStorageMb(usage) {
   return null;
 }
 
-/** Yellow strip above the data meter: total TutaNotes storage for this member. */
-function TutaNotesStorageBar({ usage }) {
-  const storageMb = tutaNotesStorageMb(usage);
-  if (storageMb == null) return null;
-  const photosMb = (Number(usage?.tutaDriveStorage?.photosBytes) || 0) / (1024 * 1024);
-  const title = usage?.tutaDriveStorage
-    ? `TutaNotes storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk ` +
-      `(photos ${formatUsageDataAmount(photosMb, { precisionGb: 2 })} counted separately)`
-    : `TutaNotes storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk`;
+/** Yellow "Storage 0.18gb" pill shown above the data meter. */
+export function UsageStoragePill({ storageMb, title }) {
   return (
     <Box
       title={title}
@@ -126,6 +119,23 @@ function TutaNotesStorageBar({ usage }) {
       </Box>
     </Box>
   );
+}
+
+UsageStoragePill.propTypes = {
+  storageMb: PropTypes.number.isRequired,
+  title: PropTypes.string
+};
+
+/** Total TutaNotes storage for this member. */
+function TutaNotesStorageBar({ usage }) {
+  const storageMb = tutaNotesStorageMb(usage);
+  if (storageMb == null) return null;
+  const photosMb = (Number(usage?.tutaDriveStorage?.photosBytes) || 0) / (1024 * 1024);
+  const title = usage?.tutaDriveStorage
+    ? `TutaNotes storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk ` +
+      `(photos ${formatUsageDataAmount(photosMb, { precisionGb: 2 })} counted separately)`
+    : `TutaNotes storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk`;
+  return <UsageStoragePill storageMb={storageMb} title={title} />;
 }
 
 TutaNotesStorageBar.propTypes = {
@@ -150,7 +160,7 @@ StorageAndLastClickRow.propTypes = {
  * minus Redis sub-MB pending. Every TutaNotes / TutaPhoto download / upload / restore / merge / open
  * lowers remain, so this only grows until the next purchase.
  */
-function transferUsedMb(transfer, boughtMb) {
+export function transferUsedMb(transfer, boughtMb) {
   const remainExact = Number(transfer?.refillRemainMbExact);
   const remain = Number.isFinite(remainExact) ? remainExact : Number(transfer?.refillRemainMb) || 0;
   return Math.max(0, (Number(boughtMb) || 0) - remain);
@@ -167,7 +177,7 @@ const throttleIndexSx = {
 };
 
 /** "T10" = transfers currently run 10× slower; "T1" = full speed. */
-function ThrottleIndexLabel({ factor }) {
+export function ThrottleIndexLabel({ factor }) {
   const n = Math.max(1, Math.round(Number(factor) || 1));
   const title = n > 1 ? `Data depleted — transfers are ${n}× slower. Refill to return to full speed.` : 'Full transfer speed';
   return (
@@ -200,7 +210,7 @@ const usageMeterLabelSx = {
  * (10gb bought and 4gb used → red 4gb + green 6gb).
  * Click anywhere (except an admin-editable amount) to open Refill / Add blocks.
  */
-function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPlan, onSaved }) {
+export function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, onOpenPlan, onSaved }) {
   const bought = Math.max(0, Number(boughtMb) || 0);
   const usedRaw = Math.max(0, Number(usedMb) || 0);
   const used = bought > 0 ? Math.min(usedRaw, bought) : usedRaw;
@@ -287,7 +297,7 @@ UsageMeter.propTypes = {
   onSaved: PropTypes.func
 };
 
-function AddMoreGbLink({ onClick }) {
+export function AddMoreGbLink({ onClick }) {
   return (
     <Box
       component="button"

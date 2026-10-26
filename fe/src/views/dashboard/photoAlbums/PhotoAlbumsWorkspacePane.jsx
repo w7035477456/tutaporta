@@ -4,19 +4,13 @@ import Box from '@mui/material/Box';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_50,
   SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
-import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
-import {
-  MOBILE_UPLOAD_HOVER_TOOLTIP,
-  mobileUploadHoverTooltipSlotProps
-} from 'config/mobileUploadHoverTooltip';
 import { themedAlert, themedConfirm } from 'utils/themedDialog';
 import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDownsizeMedia';
 import {
@@ -81,7 +75,7 @@ import {
   writeFilesExplorerTab
 } from 'utils/photoAlbumsFilesExplorerPreference';
 import { PageThumb } from './PhotoAlbumsPageFilmstrip';
-import PhotoAlbumsFileMenu, {
+import {
   prepareImportedHtml,
   stripYamlFrontMatter,
   pdfArrayBufferToHtml,
@@ -1852,7 +1846,9 @@ export default function PhotoAlbumsWorkspacePane({
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
   /** Zoom icon — hide sidebars/menus and show album only (not true fullscreen overlay). */
   const [albumFocusView, setAlbumFocusView] = useState(false);
-  const hideWorkspaceChrome = albumFullscreen || albumFocusView;
+  /** Edit focus: only the album editor (tray, page strip, album) — menus and sidebars hidden. */
+  const [albumEditFocusView, setAlbumEditFocusView] = useState(false);
+  const hideWorkspaceChrome = albumFullscreen || albumFocusView || albumEditFocusView;
   useEffect(() => {
     setVaultWorkspaceFocusSiteFooterSuppressed(hideWorkspaceChrome);
     return () => setVaultWorkspaceFocusSiteFooterSuppressed(false);
@@ -4580,15 +4576,6 @@ export default function PhotoAlbumsWorkspacePane({
     }
   }, []);
 
-  const openPaymentWorkspace = useCallback(() => {
-    void (async () => {
-      await flushPendingNoteSave();
-      setProfilesRecordsInitialTab('profiles');
-      setProfilesRecordsInitialTokens(null);
-      setFileWorkspaceView('payment');
-    })();
-  }, [flushPendingNoteSave]);
-
   const openPaymentTokenCheckout = useCallback(
     (tokensBuying = 1) => {
       void (async () => {
@@ -4601,28 +4588,6 @@ export default function PhotoAlbumsWorkspacePane({
     [flushPendingNoteSave]
   );
 
-  // ── File menu (Import / Export) ────────────────────────────────────────────
-  // Read the open note's body straight from the TipTap editor. markdown uses the
-  // tiptap-markdown extension serializer.
-  const getEditorHtml = useCallback(() => noteEditorApiRef.current?.getHTML() ?? '', []);
-  const getEditorMarkdown = useCallback(() => noteEditorApiRef.current?.getMarkdown() ?? '', []);
-
-  // Replace the open note's body from an imported file, then autosave. setContent /
-  // setMarkdown are applied with emitUpdate:false, so we trigger scheduleSave here.
-  const handleImportHtml = useCallback(
-    (html) => {
-      const api = noteEditorApiRef.current;
-      if (!api) return;
-      const titlePlain =
-        String(draftRef.current?.openNoteTitlePlain || openNoteTitlePlain || '').trim() ||
-        noteTitlePlainText(selectedNote?.note_name);
-      const cleaned = cleanPhotoAlbumsNoteBodyHtml(html || '<p></p>', titlePlain);
-      api.setContent(cleaned || '<p></p>');
-      scheduleSave();
-    },
-    [scheduleSave, openNoteTitlePlain, selectedNote]
-  );
-
   const updateOpenNoteTitle = useCallback(
     (nextPlain, { schedulePersist = true } = {}) => {
       if (!selectedNoteId) return;
@@ -4633,42 +4598,6 @@ export default function PhotoAlbumsWorkspacePane({
       if (schedulePersist) scheduleSave();
     },
     [selectedNoteId, patchNoteTitleInTree, scheduleSave]
-  );
-
-  const handleImportMarkdown = useCallback(
-    (markdown, meta = {}) => {
-      const api = noteEditorApiRef.current;
-      if (!api) return;
-      api.setMarkdown(markdown || '');
-      const importedTitle = String(meta?.title || '')
-        .trim()
-        .toUpperCase();
-      if (importedTitle && selectedNoteId) {
-        updateOpenNoteTitle(importedTitle, { schedulePersist: false });
-        const noteId = Number(selectedNoteId);
-        void vaultApi.updatePhotoAlbumsNote(noteId, { note_name: importedTitle }).catch(() => {
-          // Body import still succeeded; title can be fixed manually if rename fails.
-        });
-      }
-      const titleForStrip =
-        importedTitle ||
-        String(draftRef.current?.openNoteTitlePlain || openNoteTitlePlain || '').trim() ||
-        noteTitlePlainText(selectedNote?.note_name);
-      const afterMd = api.getHTML?.() || '';
-      const cleaned = cleanPhotoAlbumsNoteBodyHtml(afterMd, titleForStrip);
-      if (cleaned !== afterMd) {
-        api.setContent(cleaned || '<p></p>');
-      }
-      scheduleSave();
-    },
-    [
-      scheduleSave,
-      updateOpenNoteTitle,
-      selectedNoteId,
-      vaultApi,
-      openNoteTitlePlain,
-      selectedNote
-    ]
   );
 
   /** Classify a dropped OS file as a File→Import kind (md / html / pdf) or null. */
@@ -7535,15 +7464,6 @@ export default function PhotoAlbumsWorkspacePane({
   /** Closed menus → compact 2-letter toolbar (File / ☰ / LO / MU / BR / <=>). */
   const menuLabelsCompact = !menusOpen && !compareMode;
 
-  const row2ShowsMobileUpload = !compareMode;
-  const row2ActionSlotCount =
-    (paneStorageType === 'tutadrive' && tutaCloudOffered ? 1 : 0) +
-    (paneStorageType === 'usb' ? 1 : 0) +
-    (row2ShowsMobileUpload ? 1 : 0) +
-    (canEnterCompare ? 1 : 0);
-  const row2ButtonMaxWidth =
-    menuLabelsCompact || row2ActionSlotCount <= 0 ? 'none' : `${100 / row2ActionSlotCount}%`;
-
   /** Open menus from the hamburger (full labels), or close left+right and shrink the toolbar. */
   const handleMenuLabelsToggle = useCallback(() => {
     if (!menusOpen) {
@@ -7623,7 +7543,8 @@ export default function PhotoAlbumsWorkspacePane({
         display: 'flex',
         flexDirection: 'column',
         fontFamily: MAIN_FONT_FAMILY,
-        bgcolor: albumFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : 'var(--theme-daynight-color)',
+        bgcolor:
+          albumFocusView || albumEditFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : 'var(--theme-daynight-color)',
         overflow: 'hidden'
       }}
     >
@@ -8138,48 +8059,15 @@ export default function PhotoAlbumsWorkspacePane({
               boxSizing: 'border-box'
             }}
           >
-            {/* Section 1 of 3 — File / menus (row 1) + Backup/Restore / Mobile Upload (row 2) */}
+            {/* Section 1 of 3 — Close Menu / Backup/Restore (single row) */}
             <Box
               sx={{
                 ...headerThirdSectionSx,
-                flexDirection: 'column',
+                flex: '0 0 auto',
                 flexWrap: 'nowrap',
-                gap: 0.35
+                gap: 0.5
               }}
             >
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                  minWidth: 0
-                }}
-              >
-              {!compareMode ? (
-                <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                  <PhotoAlbumsFileMenu
-                    disabled={busy}
-                    ready={
-                      Boolean(selectedNote) &&
-                      !(
-                        noteRequiresInnerPinToView(selectedNote) &&
-                        !isInnerNoteUnlocked(selectedNote.note_id)
-                      )
-                    }
-                    noteTitle={openNoteTitlePlain}
-                    getHtml={getEditorHtml}
-                    getMarkdown={getEditorMarkdown}
-                    onImportHtml={handleImportHtml}
-                    onImportMarkdown={handleImportMarkdown}
-                    paymentActive={fileWorkspaceView === 'payment'}
-                    onSelectPayment={openPaymentWorkspace}
-                    onSelectNotes={() => setFileWorkspaceView('notes')}
-                    buttonSx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                  />
-                </Box>
-              ) : null}
               <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                 {compareMode ? (
                   <SliderControlButton
@@ -8221,27 +8109,8 @@ export default function PhotoAlbumsWorkspacePane({
                   </SliderControlButton>
                 )}
               </Box>
-              <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                <VaultExitToMallToolbarButton
-                  compact={menuLabelsCompact}
-                  onClick={() => void handleExitToMall()}
-                  disabled={busy}
-                  sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                />
-              </Box>
-              </Box>
-
               {!compareMode ? (
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                  minWidth: 0
-                }}
-              >
+                <>
               {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
@@ -8278,33 +8147,6 @@ export default function PhotoAlbumsWorkspacePane({
                   </SliderControlButton>
                 </Box>
               ) : null}
-              {row2ShowsMobileUpload ? (
-                <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                  <Tooltip
-                    title={MOBILE_UPLOAD_HOVER_TOOLTIP}
-                    arrow
-                    placement="right"
-                    enterDelay={200}
-                    slotProps={mobileUploadHoverTooltipSlotProps()}
-                  >
-                    <Box component="span" sx={{ display: 'inline-flex', width: '100%' }}>
-                      <SliderControlButton
-                        type="button"
-                        variant="yellow"
-                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                        onClick={() => {
-                          setMobileUploadOpen(true);
-                        }}
-                        disabled={mobileUploadDisabled}
-                        aria-label="Mobile Upload"
-                        sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                      >
-                        {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
-                      </SliderControlButton>
-                    </Box>
-                  </Tooltip>
-                </Box>
-              ) : null}
               {canEnterCompare ? (
                 <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                   <SliderControlButton
@@ -8324,7 +8166,7 @@ export default function PhotoAlbumsWorkspacePane({
                   </SliderControlButton>
                 </Box>
               ) : null}
-              </Box>
+                </>
               ) : null}
             </Box>
 
@@ -8382,6 +8224,7 @@ export default function PhotoAlbumsWorkspacePane({
               }
               refreshToken={mobileUploadFolderRefreshToken}
               selectable
+              onTitleClick={mobileUploadDisabled ? null : () => setMobileUploadOpen(true)}
               emptyHint="Take a photo on your phone or scan Mobile Upload QR — photos appear here. Drag a thumbnail onto the album."
               onError={(msg) => setError(String(msg || ''))}
             />
@@ -9333,7 +9176,15 @@ export default function PhotoAlbumsWorkspacePane({
                       }
                       onAlbumFullscreenChange={setAlbumFullscreen}
                       albumFocusView={albumFocusView}
-                      onAlbumFocusViewChange={setAlbumFocusView}
+                      onAlbumFocusViewChange={(next) => {
+                        if (next) setAlbumEditFocusView(false);
+                        setAlbumFocusView(next);
+                      }}
+                      albumEditFocusView={albumEditFocusView}
+                      onAlbumEditFocusViewChange={(next) => {
+                        if (next) setAlbumFocusView(false);
+                        setAlbumEditFocusView(next);
+                      }}
                       searchTerms={activeSearchTerms}
                       onSearchMatchPagesChange={handleSearchMatchPagesChange}
                       onAlbumPageDragStart={

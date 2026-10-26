@@ -11,7 +11,7 @@ import {
   PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
   PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
 } from './photoAlbumsNoteFontTokens';
-import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
+import { PhotoAlbumsTrayHeading } from './PhotoAlbumsTrayCountLabel';
 import PhotoAlbumsThumbnail from './thumbnails/PhotoAlbumsThumbnail';
 import { albumPagePhotoIds } from './photoAlbumsPages';
 
@@ -20,6 +20,7 @@ const THUMB_H_PX = 96;
 const ALBUM_SPREAD_PAGES = 2;
 const ACTIVE_BORDER = '4px solid #e53935';
 const IDLE_BORDER = '2px solid #333';
+const BLUE_TRAY_BG = '#2196F3';
 
 /**
  * Build lightweight page preview models for the filmstrip (the page's photos via `attachmentIds`).
@@ -59,7 +60,9 @@ export function PageThumb({
   onPageDragStart,
   onPageDragEnd,
   /** When set, shows a red × to delete this page (album or ForOrder queue). */
-  onDelete = null
+  onDelete = null,
+  /** One album photo per frame (white strip) instead of a whole-page preview. */
+  photoFrame = false
 }) {
   const landscape = String(orientation).toLowerCase() === 'landscape';
   const thumbRef = useRef(null);
@@ -110,12 +113,14 @@ export function PageThumb({
         onPageDragEnd?.(e);
       }}
       onClick={onSelect}
-      aria-label={`Go to page ${pageNumber}`}
+      aria-label={photoFrame ? `Photo on page ${pageNumber}` : `Go to page ${pageNumber}`}
       aria-current={active ? 'page' : undefined}
       title={
         canDragPage
           ? `Page ${pageNumber} — drag onto another album to move this page`
-          : `Page ${pageNumber}`
+          : photoFrame
+            ? `Photo on page ${pageNumber}`
+            : `Page ${pageNumber}`
       }
       sx={{
         flex: '0 0 auto',
@@ -127,7 +132,7 @@ export function PageThumb({
         cursor: canDragPage ? 'grab' : 'pointer',
         overflow: 'visible',
         height,
-        aspectRatio: landscape ? '12 / 10' : '10 / 12',
+        aspectRatio: photoFrame ? '1 / 1' : landscape ? '12 / 10' : '10 / 12',
         boxShadow: active ? '0 0 0 2px rgba(229,57,53,0.35)' : '0 1px 3px rgba(0,0,0,0.25)',
         position: 'relative',
         lineHeight: 0,
@@ -154,7 +159,7 @@ export function PageThumb({
           gridTemplateColumns: photoIds.length === 4 ? '1fr 1fr' : '1fr',
           gridAutoRows: '1fr',
           gap: '3%',
-          p: '4%',
+          p: photoFrame ? 0 : '4%',
           boxSizing: 'border-box'
         }}
       >
@@ -164,7 +169,7 @@ export function PageThumb({
               noteId={noteId}
               attachmentId={attachmentId}
               storageType={storageType}
-              objectFit="contain"
+              objectFit={photoFrame ? 'cover' : 'contain'}
             />
           </Box>
         ))}
@@ -174,8 +179,8 @@ export function PageThumb({
           component="button"
           type="button"
           className="rv-album-page-thumb__delete"
-          aria-label={`Delete page ${pageNumber}`}
-          title={`Delete page ${pageNumber}`}
+          aria-label={photoFrame ? `Remove photo from page ${pageNumber}` : `Delete page ${pageNumber}`}
+          title={photoFrame ? `Remove photo from page ${pageNumber}` : `Delete page ${pageNumber}`}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -236,7 +241,8 @@ PageThumb.propTypes = {
   draggablePage: PropTypes.bool,
   onPageDragStart: PropTypes.func,
   onPageDragEnd: PropTypes.func,
-  onDelete: PropTypes.func
+  onDelete: PropTypes.func,
+  photoFrame: PropTypes.bool
 };
 
 /**
@@ -264,10 +270,10 @@ export default function PhotoAlbumsPageFilmstrip({
   onPageDragEnd,
   /** When set, filmstrip shows these cross-note order entries instead of current-note pages. */
   overrideEntries = null,
-  /** Photos in the green thumbnail tray — shown in Count=. */
-  stagingCount = 0,
   /** (pageIndex, entry?) => void — delete album page or ForOrder queue entry. */
   onDeletePage = null,
+  /** (pageKey, attachmentId) => void — remove one photo from its album page (white strip ×). */
+  onDeletePhoto = null,
   /** () => void — delete every album page (tray photos are kept). */
   onDeleteAllPages = null,
   /** () => void — Reset Album: wipe every TutaPhotos album on TutaCloud. */
@@ -300,16 +306,21 @@ export default function PhotoAlbumsPageFilmstrip({
         orientation: entry.orientation || orientation
       }));
     }
-    // Frames are photos, not pages: blank album pages get no frame (pageIndex stays the real page).
-    return allModels
-      .map((model, idx) => ({ model, pageIndex: idx, pageNumber: idx + 1 }))
-      .filter((entry) => albumPagePhotoIds(entry.model).length > 0);
+    // One frame per album photo, like the green tray; blank pages get no frame.
+    return allModels.flatMap((model, idx) =>
+      albumPagePhotoIds(model).map((attachmentId) => ({
+        model: { key: `${model.key}#${attachmentId}`, photos: [], attachmentIds: [attachmentId] },
+        pageKey: model.key,
+        attachmentId,
+        photoFrame: true,
+        pageIndex: idx,
+        pageNumber: idx + 1
+      }))
+    );
   }, [hasOverride, overrideEntries, allModels, orientation]);
 
   const effectivePageCount = hasOverride ? displayEntries.length : pageCount;
   const labelText = `Page ${Math.min(pageIndex + 1, Math.max(1, effectivePageCount))} of ${Math.max(1, effectivePageCount)}`;
-
-  const albumImageCount = Math.max(0, Math.round(Number(stagingCount) || 0));
 
   const goPrev = () => {
     onGoToPage?.(pageIndex - 1);
@@ -448,10 +459,15 @@ export default function PhotoAlbumsPageFilmstrip({
           draggablePage={!hasOverride && draggablePages}
           onPageDragStart={onPageDragStart}
           onPageDragEnd={onPageDragEnd}
+          photoFrame={Boolean(entry.photoFrame)}
           onDelete={
-            typeof onDeletePage === 'function'
-              ? (idx) => onDeletePage(idx, entry)
-              : null
+            entry.photoFrame
+              ? typeof onDeletePhoto === 'function'
+                ? () => onDeletePhoto(entry.pageKey, entry.attachmentId)
+                : null
+              : typeof onDeletePage === 'function'
+                ? (idx) => onDeletePage(idx, entry)
+                : null
           }
         />
       ))}
@@ -581,19 +597,20 @@ export default function PhotoAlbumsPageFilmstrip({
       }}
     >
       <Box sx={{ flex: '1 1 0', minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75 }}>
-        <PhotoAlbumsTrayCountLabel count={albumImageCount} />
-        {resetAlbumBtn}
+        <PhotoAlbumsTrayHeading title="Blue Tray" count={displayEntries.length} />
       </Box>
-      {navRow}
+      {inline ? null : navRow}
       <Box
         sx={{
           flex: '1 1 0',
           minWidth: 0,
           display: 'flex',
           justifyContent: 'flex-end',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: 0.75
         }}
       >
+        {resetAlbumBtn}
         {deleteAllPagesBtn}
       </Box>
     </Box>
@@ -646,7 +663,7 @@ export default function PhotoAlbumsPageFilmstrip({
         pt: 0.5,
         pb: 0,
         minHeight: inline ? 120 : undefined,
-        bgcolor: inline ? 'var(--theme-daynight-color)' : 'var(--theme-yellow-color, #ffd700)',
+        bgcolor: inline ? BLUE_TRAY_BG : 'var(--theme-yellow-color, #ffd700)',
         border: inline ? PHOTO_ALBUMS_THEME_INVERSE_BORDER_2 : 'none',
         borderBottom: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
         overflow: 'hidden'
@@ -675,7 +692,6 @@ PhotoAlbumsPageFilmstrip.propTypes = {
   draggablePages: PropTypes.bool,
   onPageDragStart: PropTypes.func,
   onPageDragEnd: PropTypes.func,
-  stagingCount: PropTypes.number,
   overrideEntries: PropTypes.arrayOf(
     PropTypes.shape({
       model: PropTypes.object,
@@ -685,6 +701,7 @@ PhotoAlbumsPageFilmstrip.propTypes = {
     })
   ),
   onDeletePage: PropTypes.func,
+  onDeletePhoto: PropTypes.func,
   onDeleteAllPages: PropTypes.func,
   onResetAlbum: PropTypes.func
 };

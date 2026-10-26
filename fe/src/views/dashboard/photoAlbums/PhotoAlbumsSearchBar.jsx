@@ -122,8 +122,8 @@ export default function PhotoAlbumsSearchBar({
         alignSelf: 'stretch',
         display: 'flex',
         alignItems: 'stretch',
-        // Wrap so Search/Clear + input never overflow into the next header section.
-        flexWrap: headerFlush ? 'wrap' : 'nowrap',
+        // Single row: Search · input · Clear (the input shrinks first).
+        flexWrap: 'nowrap',
         gap: headerFlush ? 0 : { xs: 0.35, sm: 0.5 },
         pl: headerFlush ? 0 : { xs: 0.5, sm: 0.75 },
         pr: headerFlush ? 0 : { xs: 0.5, sm: 0.75 },
@@ -133,19 +133,10 @@ export default function PhotoAlbumsSearchBar({
         backgroundColor: bgcolor
       }}
     >
-      <Box
-        sx={{
-          flex: '0 0 auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0.35,
-          alignItems: 'flex-start',
-          flexShrink: 0,
-          justifyContent: 'center'
-        }}
-      >
+      <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', pr: 0.5 }}>
         <SliderControlButton
           type="button"
+          variant="green"
           disabled={searchBusy}
           aria-busy={searchBusy}
           hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
@@ -153,15 +144,6 @@ export default function PhotoAlbumsSearchBar({
           sx={searchActionButtonSx}
         >
           Search
-        </SliderControlButton>
-        <SliderControlButton
-          type="button"
-          disabled={clearDisabled || searchBusy}
-          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-          onClick={() => onClear?.()}
-          sx={searchActionButtonSx}
-        >
-          Clear
         </SliderControlButton>
       </Box>
       <Box
@@ -183,6 +165,17 @@ export default function PhotoAlbumsSearchBar({
           sx={headerFlush ? headerFlushSearchInputFieldSx : searchInputFieldSx}
           inputProps={{ 'aria-label': 'Search albums' }}
         />
+      </Box>
+      <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', pl: 0.5 }}>
+        <SliderControlButton
+          type="button"
+          disabled={clearDisabled || searchBusy}
+          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+          onClick={() => onClear?.()}
+          sx={searchActionButtonSx}
+        >
+          Clear
+        </SliderControlButton>
       </Box>
     </Box>
     </>

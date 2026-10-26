@@ -252,6 +252,8 @@ export default function RecordVaultMobileUploadTray({
   refreshToken = 0,
   pollIntervalMs = 0,
   titleLabel = 'Mobile Upload:',
+  /** When set, the title label is a button (e.g. open the phone QR popup). */
+  onTitleClick = null,
   layout = 'horizontal',
   plain = false,
   selectable = false,
@@ -533,6 +535,19 @@ export default function RecordVaultMobileUploadTray({
           slotProps={mobileUploadHoverTooltipSlotProps()}
         >
           <Box
+            {...(onTitleClick
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-label': 'Open Mobile Upload (phone QR)',
+                  onClick: () => onTitleClick(),
+                  onKeyDown: (e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    onTitleClick();
+                  }
+                }
+              : null)}
             sx={
               isGrid
                 ? {
@@ -545,7 +560,7 @@ export default function RecordVaultMobileUploadTray({
                     bgcolor: '#ffeb3b',
                     px: 1,
                     py: 0.5,
-                    cursor: 'help'
+                    cursor: onTitleClick ? 'pointer' : 'help'
                   }
                 : {
                     flexShrink: 0,
@@ -558,7 +573,7 @@ export default function RecordVaultMobileUploadTray({
                     px: 1,
                     py: 0.5,
                     boxSizing: 'border-box',
-                    cursor: 'help'
+                    cursor: onTitleClick ? 'pointer' : 'help'
                   }
             }
           >
@@ -607,6 +622,7 @@ RecordVaultMobileUploadTray.propTypes = {
   refreshToken: PropTypes.number,
   pollIntervalMs: PropTypes.number,
   titleLabel: PropTypes.string,
+  onTitleClick: PropTypes.func,
   layout: PropTypes.oneOf(['horizontal', 'grid']),
   plain: PropTypes.bool,
   selectable: PropTypes.bool,
