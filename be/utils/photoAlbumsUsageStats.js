@@ -20,6 +20,7 @@ function applyTutaDriveDiskTotal(result, disk) {
     memberFolder: disk.memberFolder,
     notesBytes: disk.notesBytes,
     photosBytes: disk.photosBytes,
+    photoAlbumsBytes: disk.photoAlbumsBytes,
     totalBytes: disk.totalBytes,
     usedGb: disk.usedGb
   };

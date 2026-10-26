@@ -22,7 +22,12 @@ import GreenButton from 'ui-component/GreenButton';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import ColorTemplate16InputTemplate from 'ui-component/ColorTemplate16InputTemplate';
 import GoogleSignupButton from 'ui-component/GoogleSignupButton';
-import { getDesktopIconSizeVw, getDesktopTextFontSizeHalfVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
+import {
+  getDesktopIconSizeVw,
+  getDesktopTextFontSizeHalfVw,
+  getDesktopTextFontSizeVw,
+  getDesktopTitleFontSizeHalfVw
+} from 'config/desktopFontEnv';
 import { authFormContentSx, authLinkHoverScaleSx } from '../authentication/authPageLayoutSx';
 import enterEmailImg from 'assets/images/enterEmail.png';
 import enterPasswordImg from 'assets/images/enterPassword.png';
@@ -65,7 +70,7 @@ const fieldWithRightImageInputColSx = {
 const fieldCaseHintSx = {
   mt: 0.35,
   mb: 0,
-  fontSize: { xs: '0.7rem', sm: getDesktopTextFontSizeHalfVw() },
+  fontSize: { xs: '0.7rem', sm: getDesktopTitleFontSizeHalfVw() },
   lineHeight: 1.25,
   color: 'var(--theme-primary-color)',
   fontWeight: 500

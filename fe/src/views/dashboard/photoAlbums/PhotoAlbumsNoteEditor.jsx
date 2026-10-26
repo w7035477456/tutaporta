@@ -37,6 +37,7 @@ import PhotoAlbumsContextTutorial from './PhotoAlbumsContextTutorial';
 import { findAlbumPagesMatchingSearchTerms } from './photoAlbumsPageSearch';
 import PhotoAlbumsThumbnailTray from './thumbnails/PhotoAlbumsThumbnailTray';
 import PhotoAlbumsPhotoOverlays from './PhotoAlbumsPhotoOverlays';
+import PhotoAlbumsPageColorPicker from './PhotoAlbumsPageColorPicker';
 import {
   buildPhotoAlbumsTrayItems,
   excludePlacedTrayItems,
@@ -44,11 +45,17 @@ import {
 } from './thumbnails/photoAlbumsTrayItems';
 import {
   ALBUM_PAGE_MAX_PHOTOS,
+  ALBUM_PAGE_STRETCH_MIN,
   albumPageBlockHeight,
   albumPagePhotoCells,
+  albumPageStretchFromPages,
+  normalizeAlbumPageStretch,
+  setOpenAlbumPageStretch,
   albumPagePhotoIds,
   albumPagePhotoView,
+  albumPagesSharedBgColor,
   albumPhotoViewTransform,
+  normalizeAlbumPageBgColor,
   createAlbumPageInstance,
   normalizeAlbumPageAttachmentIds,
   parseAlbumPageInstancesFromHtml,
@@ -310,7 +317,8 @@ function restackAlbumPagesFlush(
       w: pw,
       h,
       attachmentIds: albumPagePhotoIds(inst),
-      photoViews: inst.photoViews
+      photoViews: inst.photoViews,
+      bgColor: inst.bgColor
     });
     return {
       pageIndex,
@@ -691,103 +699,6 @@ function setAlbumCanvasWidth(editor, pageWidth, binderWidthPx = 0) {
   return pw;
 }
 
-/**
- * Right edge of pages + placed photos (layout px).
- * Do NOT floor to the current page/client width — that made "reduce" a no-op
- * after enlarge (originWidth stayed at the enlarged canvas size).
- */
-function measureAlbumContentWidth(editor, instances, emptyFallback = 480) {
-  let maxR = 0;
-  for (const inst of instances || []) {
-    const band = albumPageBand(inst, emptyFallback);
-    maxR = Math.max(maxR, band.left + band.width);
-  }
-  if (editor) {
-    editor.state.doc.descendants((node) => {
-      if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
-        const pl = parseOptionalPx(node.attrs.posLeft);
-        if (pl != null) maxR = Math.max(maxR, pl + 200);
-      }
-    });
-  }
-  if (maxR < 40) return Math.max(200, emptyFallback || 480);
-  return maxR;
-}
-
-/** Current white-page content width (excludes the sticky resize handle strip). */
-function readAlbumPageContentWidth(pageEl, pageSizeWidth, editor, instances) {
-  const handle = PAGE_RESIZE_HANDLE_WIDTH;
-  const fromPage = pageEl
-    ? Math.max(0, (pageEl.clientWidth || pageEl.offsetWidth || 0) - handle)
-    : 0;
-  const fromPm = editor?.view?.dom?.clientWidth || 0;
-  const fromSize = Number(pageSizeWidth) || 0;
-  const fromContent = measureAlbumContentWidth(
-    editor,
-    instances,
-    fromSize || fromPm || fromPage || 480
-  );
-  // Prefer the visible page edge (what the user is dragging), not only content bounds.
-  return Math.max(200, fromPage || fromPm || fromSize || fromContent);
-}
-
-function scalePxAttr(raw, scale, min = null) {
-  const n = parseOptionalPx(raw);
-  if (n == null) return raw;
-  const next = Math.round(n * scale);
-  if (min != null) return Math.max(min, next);
-  return next;
-}
-
-function scaleAlbumPageInstance(inst, scale) {
-  const w0 = inst.w > 0 ? inst.w : 480;
-  const h0 = inst.h > 0 ? inst.h : albumPageBlockHeight(w0, 'portrait');
-  return {
-    ...inst,
-    x: Math.max(0, Math.round((inst.x || 0) * scale)),
-    y: Math.max(0, Math.round((inst.y || 0) * scale)),
-    w: Math.max(160, Math.round(w0 * scale)),
-    h: Math.max(120, Math.round(h0 * scale))
-  };
-}
-
-function scaleTextLabelAttrs(attrs, scale) {
-  const fontSize = Number(attrs.fontSize);
-  return {
-    ...attrs,
-    posLeft: scalePxAttr(attrs.posLeft, scale),
-    posTop: scalePxAttr(attrs.posTop, scale),
-    fontSize: Number.isFinite(fontSize)
-      ? Math.max(10, Math.round(fontSize * scale))
-      : attrs.fontSize
-  };
-}
-
-/**
- * Apply a uniform page scale from origin snapshots (avoids live-drag drift).
- * Returns the next pages list.
- */
-function applyAlbumPageScaleFromOrigin(editor, originPages, scale, originTextLabelsById = null) {
-  const nextPages = (originPages || []).map((inst) => scaleAlbumPageInstance(inst, scale));
-  if (editor && originTextLabelsById?.size) {
-    const { state } = editor;
-    let tr = state.tr;
-    let changed = false;
-    state.doc.descendants((node, pos) => {
-      if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
-        const id = String(node.attrs.labelId || '');
-        const origin = originTextLabelsById?.get(id);
-        if (!origin) return;
-        const nextAttrs = scaleTextLabelAttrs(origin, scale);
-        tr = tr.setNodeMarkup(pos, undefined, nextAttrs);
-        changed = true;
-      }
-    });
-    if (changed) editor.view.dispatch(tr);
-  }
-  return nextPages;
-}
-
 const PAGE_RESIZE_BAR_YELLOW = 'var(--theme-yellow-color, #ffe600)';
 const PAGE_RESIZE_BAR_RED = '#e53935';
 
@@ -882,6 +793,15 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   onContentHeightRef.current = onContentHeightChange;
 
   const [albumPages, setAlbumPages] = useState(() => parseAlbumPageInstancesFromHtml(initialContent));
+  // Page stretch (blue edge drag) — read back from the saved page w×h before first layout.
+  useState(() =>
+    setOpenAlbumPageStretch(
+      albumPageStretchFromPages(
+        parseAlbumPageInstancesFromHtml(initialContent),
+        parseAlbumOrientationFromHtml(initialContent)
+      )
+    )
+  );
   const trayItems = useMemo(() => buildPhotoAlbumsTrayItems(trayAttachments), [trayAttachments]);
   /** Page photos whose attachment left the tray are hidden; null when the tray list is not loaded (Full screen tab). */
   const trayAttachmentIds = useMemo(
@@ -1399,9 +1319,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   }, [noteId]);
 
   /**
-   * Yellow + grey-dash page edge (matches column splitters; dash turns red on hover/drag).
-   * Drag resizes the page; pages + photos scale together.
-   * Live preview uses CSS transform (slider-smooth); geometry is baked on mouseup.
+   * Blue page edge: drag right to make the pages wider (and shorter) so the spread can fill
+   * the album area — photo cells widen with them; drag left to go back toward 10×12 / 12×10.
+   * The bar follows the pointer; pages re-fit on mouseup.
    */
   const startPageContentResize = useCallback(
     (event) => {
@@ -1409,124 +1329,66 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       event.preventDefault();
       event.stopPropagation();
 
+      const scrollEl = zoomScrollRef.current;
       const pageEl = pageRef.current;
-      const scaleEl = pageScaleRef.current;
-      if (!pageEl || !scaleEl || !editor) return;
+      const handleEl = event.currentTarget;
+      if (!scrollEl || !pageEl || !editor) return;
 
       const zoomScale = Math.max(0.01, (Number(albumZoom) || 100) / 100);
       const startX = event.clientX;
-      const originPages = (albumPagesRef.current || []).map((inst) => ({ ...inst }));
-      const originTextLabelsById = new Map();
-      editor.state.doc.descendants((node) => {
-        if (node.type.name === PHOTO_ALBUMS_TEXT_LABEL_NODE_NAME) {
-          const id = String(node.attrs.labelId || '');
-          if (!id) return;
-          originTextLabelsById.set(id, { ...node.attrs });
-        }
-      });
-      const originWidth = readAlbumPageContentWidth(
-        pageEl,
-        pageSize.width || albumCanvasWidthPx,
-        editor,
-        originPages
-      );
-      const originHeight = Math.max(
-        scaleEl.offsetHeight || 0,
-        pageEl.offsetHeight || 0,
-        lowestAlbumPageBottom(originPages) + 240
-      );
-
-      let latestScale = 1;
-      let latestWidth = originWidth;
-      let raf = 0;
-      let pendingScale = null;
+      const startW = Math.max(1, pageEl.getBoundingClientRect().width);
+      const layoutW = startW / zoomScale;
+      const orient = pageOrientationRef.current;
+      const { pageWidthPx } = resolveAlbumViewportLayout(scrollEl, 100);
+      const baseH = albumPageBlockHeight(pageWidthPx, orient, 1);
+      const cs = window.getComputedStyle(scrollEl);
+      const padY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+      const availH = Math.max(80, (scrollEl.clientHeight || 0) - padY - 2);
+      const titleBand = String(albumTitle || '').trim()
+        ? albumPageTitleBandHeightPx(albumTitleStyleRef.current)
+        : 0;
+      // Widest useful stretch: page height then exactly fits the shell at 100% zoom.
+      const maxStretch = normalizeAlbumPageStretch(baseH / Math.max(80, availH - titleBand));
+      const screenWidthForStretch = (stretch) =>
+        layoutW * Math.min(1, availH / Math.max(1, baseH / stretch + titleBand));
+      const minW = Math.min(startW, screenWidthForStretch(ALBUM_PAGE_STRETCH_MIN));
+      const maxW = Math.max(startW, screenWidthForStretch(maxStretch));
+      let targetW = startW;
 
       setPageResizeDragging(true);
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'ew-resize';
 
-      const paintPreview = (scale, width) => {
-        scaleEl.style.transformOrigin = '0 0';
-        scaleEl.style.transform = scale === 1 ? '' : `scale(${scale})`;
-        const pageW = Math.round(width) + PAGE_RESIZE_HANDLE_WIDTH;
-        pageEl.style.width = `${pageW}px`;
-        pageEl.style.minWidth = `${pageW}px`;
-        pageEl.style.maxWidth = `${pageW}px`;
-        pageEl.style.height = `${Math.round(originHeight * scale)}px`;
-        pageEl.style.minHeight = pageEl.style.height;
-      };
-
-      const flush = () => {
-        raf = 0;
-        if (pendingScale == null) return;
-        const scale = pendingScale;
-        pendingScale = null;
-        latestScale = scale;
-        latestWidth = Math.max(200, Math.round(originWidth * scale));
-        paintPreview(scale, latestWidth);
-      };
-
       const onMove = (moveEvent) => {
-        const dx = (moveEvent.clientX - startX) / zoomScale;
-        const nextW = Math.max(200, Math.round(originWidth + dx));
-        pendingScale = nextW / Math.max(1, originWidth);
-        if (!raf) raf = requestAnimationFrame(flush);
+        targetW = Math.max(minW, Math.min(maxW, startW + moveEvent.clientX - startX));
+        handleEl.style.transform = `translateX(${(targetW - startW) / zoomScale}px)`;
       };
 
       const onUp = () => {
-        cancelAnimationFrame(raf);
-        if (pendingScale != null) {
-          latestScale = pendingScale;
-          latestWidth = Math.max(200, Math.round(originWidth * latestScale));
-          pendingScale = null;
-        }
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
         document.body.style.removeProperty('user-select');
         document.body.style.removeProperty('cursor');
-
-        scaleEl.style.transform = '';
-        scaleEl.style.transformOrigin = '';
-        pageEl.style.removeProperty('height');
-        pageEl.style.removeProperty('min-height');
-
-        // Commit width to React state BEFORE re-render flags so MUI cannot wipe it.
-        applyAlbumCanvasWidth(latestWidth);
-
-        if (Math.abs(latestScale - 1) < 0.0001) {
-          setPageResizeDragging(false);
-          return;
-        }
-
-        const next = applyAlbumPageScaleFromOrigin(
-          editor,
-          originPages,
-          latestScale,
-          originTextLabelsById
-        );
-        albumPagesRef.current = next;
-        setAlbumPages(next);
-        const bottom = lowestAlbumPageBottom(next);
-        if (bottom > 0) ensureAlbumCanvasMinHeight(editor, bottom, { allowShrink: true });
+        handleEl.style.removeProperty('transform');
         setPageResizeDragging(false);
-        requestAnimationFrame(() => {
-          applyAlbumCanvasWidth(latestWidth);
-          emitHtml(editor.getHTML());
-        });
+        if (Math.abs(targetW - startW) < 2) return;
+
+        const zoomForTarget = Math.min(1, targetW / layoutW);
+        const nextStretch =
+          zoomForTarget >= 1
+            ? maxStretch
+            : normalizeAlbumPageStretch(
+                Math.min(maxStretch, baseH / Math.max(1, availH / zoomForTarget - titleBand))
+              );
+        setOpenAlbumPageStretch(nextStretch);
+        albumAutoZoomRef.current = true;
+        fitAlbumPageFlushToViewportRef.current?.();
       };
 
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [
-      effectiveEditable,
-      albumZoom,
-      editor,
-      pageSize.width,
-      albumCanvasWidthPx,
-      applyAlbumCanvasWidth,
-      emitHtml
-    ]
+    [effectiveEditable, albumZoom, editor, albumTitle]
   );
 
   useEffect(() => {
@@ -1889,25 +1751,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     };
   }, [editor, handleEditExistingTextLabel]);
 
-  /** Clear page text/pages; zoom 95%; flush + stretch to edge. Tray photos are untouched. */
-  const handleResetPage = useCallback(() => {
-    if (!editor) return;
-
-    setPageOrientation('portrait');
-    pageOrientationRef.current = 'portrait';
-    setAlbumPageIndex(0);
-
-    // Clear remaining text / empty the page body.
-    editor.commands.setContent(EMPTY_DOC, { emitUpdate: false });
-
-    albumPagesRef.current = [];
-    setAlbumPages([]);
-    persistAlbumPages([]);
-    albumAutoZoomRef.current = true;
-    fitAlbumPageFlushToViewport();
-    requestAnimationFrame(() => emitHtml(editor.getHTML()));
-  }, [editor, persistAlbumPages, emitHtml, fitAlbumPageFlushToViewport]);
-
   /** Fit entire album page into the shell (AUTO-ZOOM on) — no scrollbars. */
   const handleResizePage = useCallback(() => {
     if (!editor) return;
@@ -2150,6 +1993,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         const titleStyle = parseAlbumTitleStyleFromHtml(html);
         albumPagesRef.current = list;
         pageOrientationRef.current = orient;
+        setOpenAlbumPageStretch(albumPageStretchFromPages(list, orient));
         albumTitleStyleRef.current = titleStyle;
         setAlbumPages(list);
         setPageOrientation(orient);
@@ -2473,6 +2317,21 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     [persistAlbumPages]
   );
 
+  /** 'album': color every page; 'page': only the last page clicked. */
+  const [pageColorScope, setPageColorScope] = useState('album');
+  const [lastClickedPageKey, setLastClickedPageKey] = useState('');
+
+  const setAlbumPageBgColor = useCallback(
+    (color, scope, pageKey) => {
+      const bgColor = normalizeAlbumPageBgColor(color);
+      const next = (albumPagesRef.current || []).map((page) =>
+        scope === 'album' || page.key === pageKey ? createAlbumPageInstance({ ...page, bgColor }) : page
+      );
+      persistAlbumPages(next);
+    },
+    [persistAlbumPages]
+  );
+
   /**
    * New pages at `insertAt` (book order), one per entry of `attachmentIds` (null = blank page),
    * then show the spread holding the first one.
@@ -2493,6 +2352,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           : page
       );
       const at = Math.max(0, Math.min(ordered.length, Math.round(Number(insertAt) || 0)));
+      const albumBgColor = albumPagesSharedBgColor(ordered);
       // Start on the band of the page it pushes right, so restack keeps that page's labels with it.
       const added = attachmentIds.map((attachmentId, i) =>
         createAlbumPageInstance({
@@ -2500,7 +2360,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           y: albumPageTopForSpreadRow(albumSpreadRowForPageIndex(at + i), blockH),
           w: pw,
           h: blockH,
-          attachmentIds: attachmentId != null ? [attachmentId] : []
+          attachmentIds: attachmentId != null ? [attachmentId] : [],
+          bgColor: albumBgColor
         })
       );
       const nextList = restackAlbumPagesFlush(
@@ -2888,6 +2749,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   const leftAlbumPage = albumPagesSorted[albumSpreadLeftIndex] || albumPagesSorted[0] || null;
   const rightAlbumPage =
     albumSpreadRightIndex < albumPagesSorted.length ? albumPagesSorted[albumSpreadRightIndex] : null;
+  /** "This Page Only": last page clicked on the open spread (else its left page). */
+  const pageColorTarget =
+    [leftAlbumPage, rightAlbumPage].find((page) => page && page.key === lastClickedPageKey) || leftAlbumPage;
   const spreadPageWidthPx = albumSinglePageWidth(
     pageSize.width,
     albumCanvasWidthPx,
@@ -4060,25 +3924,6 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           >
             {[
               {
-                key: 'reset',
-                label: 'Reset Page',
-                demoBlock: true,
-                onClick: handleResetPage,
-                ariaLabel:
-                  'Reset page — clear pages and text, zoom 95%, flush top-left, stretch to page edge',
-                title:
-                  'Clear pages and text (tray photos are kept), zoom 95%, flush binder top-left, stretch right edge to the dashed page edge'
-              },
-              {
-                key: 'resize',
-                label: 'Resize Page',
-                demoBlock: true,
-                onClick: handleResizePage,
-                ariaLabel: 'Resize page — turn AUTO-ZOOM on and fit the album page in the shell',
-                title:
-                  'Turn AUTO-ZOOM back on and fit the whole binder and page (theme-primary border, no scrollbars)'
-              },
-              {
                 key: 'portrait',
                 label: 'Portrait',
                 demoBlock: true,
@@ -4321,6 +4166,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       <Box
         ref={zoomScrollRef}
         className="rv-editor__album-zoom-scroll"
+        onPointerDownCapture={(e) => {
+          if (e.target?.closest?.('[data-pa-page-color-picker]')) return;
+          if (!pageRef.current?.contains(e.target)) return;
+          const clicked = albumPhotoDropSide(e) === 'right' ? rightAlbumPage : leftAlbumPage;
+          if (clicked?.key) setLastClickedPageKey(clicked.key);
+        }}
         onDragOver={(e) => {
           if (isTrayPhotoDrag(e.dataTransfer) || isPagePhotoDrag(e.dataTransfer)) {
             if (!effectiveEditable) return;
@@ -4401,6 +4252,21 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             {albumPageSideArrow('next', 'embedded')}
           </>
         ) : null}
+        {effectiveEditable &&
+        !presentationMode &&
+        !albumEditorChromeHidden &&
+        albumCoverFace === 'none' &&
+        albumPagesSorted.length ? (
+          <PhotoAlbumsPageColorPicker
+            value={pageColorScope === 'album' ? albumPagesSharedBgColor(albumPagesSorted) : pageColorTarget?.bgColor || ''}
+            scope={pageColorScope}
+            onScopeChange={setPageColorScope}
+            onPick={(color) =>
+              runAfterTrafficWait(() => setAlbumPageBgColor(color, pageColorScope, pageColorTarget?.key))
+            }
+            sx={{ position: 'absolute', top: 8, right: 8, zIndex: 121 }}
+          />
+        ) : null}
         <Box
           className="rv-editor__album-zoom-scaler"
           sx={{
@@ -4469,7 +4335,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   width: `${spreadPageWidthPx}px`,
                   height: '100%',
                   bgcolor:
-                    albumPhotoDragSide === 'left' ? ALBUM_PHOTO_DROP_TARGET_BG : 'var(--theme-daynight-color)',
+                    albumPhotoDragSide === 'left'
+                      ? ALBUM_PHOTO_DROP_TARGET_BG
+                      : leftAlbumPage?.bgColor || 'var(--theme-daynight-color)',
                   boxShadow: ALBUM_PAGE_BORDER_SHADOW,
                   zIndex: 1,
                   pointerEvents: 'none'
@@ -4484,7 +4352,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   width: `${spreadPageWidthPx}px`,
                   height: '100%',
                   bgcolor:
-                    albumPhotoDragSide === 'right' ? ALBUM_PHOTO_DROP_TARGET_BG : 'var(--theme-daynight-color)',
+                    albumPhotoDragSide === 'right'
+                      ? ALBUM_PHOTO_DROP_TARGET_BG
+                      : (rightAlbumPage && rightAlbumPage !== leftAlbumPage ? rightAlbumPage.bgColor : '') ||
+                        'var(--theme-daynight-color)',
                   boxShadow: ALBUM_PAGE_BORDER_SHADOW,
                   zIndex: 1,
                   pointerEvents: 'none'
@@ -4871,7 +4742,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                   role="separator"
                   aria-orientation="vertical"
                   aria-label="Resize album page"
-                  title="Drag to resize the page — pages and photos scale together"
+                  title="Drag right to make the pages (and photos) wider — drag left to go back"
                   onMouseDown={startPageContentResize}
                   sx={{
                     position: 'absolute',

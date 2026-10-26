@@ -121,11 +121,16 @@ export function computeTutaDriveMemberNotesPhotosSize(memberId) {
   const photosBytes = computeDirectorySizeBytes(photosPath);
   const totalBytes = notesBytes + photosBytes;
   const totalMb = totalBytes > 0 ? totalBytes / (1024 * 1024) : 0;
+  // TutaPhotos Storage pill: the member's TutaPhotoAlbums vault folder (not part of totalBytes).
+  const photoAlbumsPath = photoAlbumsVaultRootOnMount(tutaDrivePhotoAlbumsMountPath(memberId));
+  const photoAlbumsBytes = computeDirectorySizeBytes(photoAlbumsPath);
   return {
     notesPath,
     photosPath,
+    photoAlbumsPath,
     notesBytes,
     photosBytes,
+    photoAlbumsBytes,
     totalBytes,
     totalMb,
     usedGb: parseGbFromBytes(totalBytes) ?? 0

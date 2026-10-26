@@ -606,6 +606,11 @@ export default function ProfileSection({ clusterTight = false }) {
     closeProfileMenu();
     setTutaMallBackupBusy(true);
     try {
+      if (backupApp === 'tutaphoto') {
+        // Save the open album's pending edits so the backup copies the latest vault.db.
+        const { runPhotoAlbumsLeavePrepare } = await import('utils/photoAlbumsLeavePrepare');
+        await runPhotoAlbumsLeavePrepare();
+      }
       const result = await postTutaMallBackupApp(backupApp);
       const location = formatTutaMallBackupLocation(result.backupDir);
       setTutaMallBackupStatus({
@@ -656,13 +661,8 @@ export default function ProfileSection({ clusterTight = false }) {
       const ok = await themedConfirm(`${backupUi.confirmWarning}\n\n${datedLine}`);
       if (!ok) return;
       setTutaMallBackupBusy(true);
-      const result = await postTutaMallRestoreApp(backupApp);
-      const location = formatTutaMallBackupLocation(result.backupDir);
-      await themedAlert(
-        `${backupUi.restorePrefix} completed for ${result.email}.\n\n` +
-          `${result.restored} path(s) restored from ${location || result.backupDir}`,
-        { highlightMessage: TUTA_MALL_RESTORE_REFRESH_HINT }
-      );
+      // Save + log off open vaults BEFORE restoring: saving after would write the
+      // pre-restore album / notes back over the restored vault.db.
       try {
         await flushRecordVaultSessionsOnLeave();
         const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');
@@ -670,6 +670,13 @@ export default function ProfileSection({ clusterTight = false }) {
       } catch (flushErr) {
         console.error(flushErr);
       }
+      const result = await postTutaMallRestoreApp(backupApp);
+      const location = formatTutaMallBackupLocation(result.backupDir);
+      await themedAlert(
+        `${backupUi.restorePrefix} completed for ${result.email}.\n\n` +
+          `${result.restored} path(s) restored from ${location || result.backupDir}`,
+        { highlightMessage: TUTA_MALL_RESTORE_REFRESH_HINT }
+      );
       window.location.assign('/mall');
       return;
     } catch (err) {

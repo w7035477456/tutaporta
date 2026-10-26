@@ -3,6 +3,7 @@
  */
 import {
   albumPageBlockHeight,
+  albumPageStretchFromPages,
   createAlbumPageInstance,
   parseAlbumPageInstancesFromHtml,
   serializeAlbumPageInstances
@@ -145,14 +146,15 @@ export function appendAlbumPageSnapshotToHtml(targetHtml, snapshot) {
   const snapW = Math.round(Number(snapshot?.pageWidth) || 0);
   const sourcePageW = Math.round(Number(snapshot?.page?.w) || 0);
   const pw = Math.max(200, fromHtmlW || snapW || sourcePageW || 480);
-  const blockH = albumPageBlockHeight(pw, orient);
+  const blockH = albumPageBlockHeight(pw, orient, albumPageStretchFromPages(existing, orient));
   const oldBand = albumPageBand(snapshot.page, pw, orient);
   const insertAt = existing.length;
   const newInst = createAlbumPageInstance({
     x: 0,
     y: albumPageTopForIndex(insertAt, blockH),
     w: pw,
-    h: blockH
+    h: blockH,
+    bgColor: snapshot?.page?.bgColor
   });
   const newBand = albumPageBand(newInst, pw, orient);
   const nextPages = [...existing, newInst];

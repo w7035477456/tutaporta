@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   albumPagePhotoCells,
   albumPagePhotoIds,
+  albumPageBlockHeight,
   albumPagePhotoView,
+  albumPageStretchFromPages,
+  albumPagesSharedBgColor,
   albumPhotoViewTransform,
   createAlbumPageInstance,
   createAlbumPhotoOverlay,
@@ -122,5 +125,28 @@ describe('album pages', () => {
     ]);
     const [page] = parseAlbumPageInstancesFromHtml(`<div data-rv-album-template="" data-album-templates="${json}"></div>`);
     expect(albumPagePhotoView(page, 3).overlays).toEqual(view.overlays);
+  });
+
+  it('round-trips a pastel page color and ignores other colors', () => {
+    const json = serializeAlbumPageInstances([
+      { key: 'a', x: 0, y: 0, w: 500, h: 600, bgColor: '#f7ccf5' },
+      { key: 'b', x: 600, y: 0, w: 500, h: 600, bgColor: 'red' }
+    ]);
+    const pages = parseAlbumPageInstancesFromHtml(`<div data-rv-album-template="" data-album-templates="${json}"></div>`);
+    expect(pages[0].bgColor).toBe('#F7CCF5');
+    expect(pages[1]).not.toHaveProperty('bgColor');
+    expect(albumPagesSharedBgColor(pages)).toBe('');
+    expect(albumPagesSharedBgColor([{ bgColor: '#C9F7F6' }, { bgColor: '#c9f7f6' }])).toBe('#C9F7F6');
+  });
+
+  it('stretches pages wider (shorter) and reads the stretch back from saved page size', () => {
+    expect(albumPageBlockHeight(500, 'portrait', 1)).toBe(600);
+    expect(albumPageBlockHeight(500, 'portrait', 2)).toBe(300);
+    expect(albumPageBlockHeight(600, 'landscape', 1.25)).toBe(400);
+    expect(albumPageStretchFromPages([{ w: 500, h: 600 }], 'portrait')).toBe(1);
+    expect(albumPageStretchFromPages([{ w: 500, h: 300 }], 'portrait')).toBe(2);
+    expect(albumPageStretchFromPages([{ w: 600, h: 400 }], 'landscape')).toBe(1.25);
+    expect(albumPageStretchFromPages([{ w: 500, h: 50 }], 'portrait')).toBe(3);
+    expect(albumPageStretchFromPages([], 'portrait')).toBe(1);
   });
 });

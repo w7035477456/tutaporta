@@ -33,6 +33,12 @@ export function getDesktopTitleFontSizeVw() {
   return `${n}vw`;
 }
 
+/** @returns {string} e.g. "2vw" — half of DESKTOP_FONT_SIZE_TITLE */
+export function getDesktopTitleFontSizeHalfVw() {
+  const n = readVwNumber(import.meta.env.DESKTOP_FONT_SIZE_TITLE, 4);
+  return `${n / 2}vw`;
+}
+
 /** @returns {string} e.g. "2vw" */
 export function getDesktopButtonFontSizeVw() {
   const n = readVwNumber(import.meta.env.DESKTOP_FONT_SIZE_BUTTON, 2);

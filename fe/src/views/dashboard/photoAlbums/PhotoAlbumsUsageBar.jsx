@@ -88,10 +88,10 @@ function displayRemainMb(transfer) {
   return transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
 }
 
-/** MB stored on disk for this member's TutaPhotos, or null when the server did not report it. */
+/** MB on disk in this member's TutaPhotoAlbums vault folder, or null when the server did not report it. */
 function tutaPhotosStorageMb(usage) {
-  const photosBytes = Number(usage?.tutaDriveStorage?.photosBytes);
-  if (Number.isFinite(photosBytes) && photosBytes >= 0) return photosBytes / (1024 * 1024);
+  const albumsBytes = Number(usage?.tutaDriveStorage?.photoAlbumsBytes);
+  if (Number.isFinite(albumsBytes) && albumsBytes >= 0) return albumsBytes / (1024 * 1024);
   const folderMb = Number(usage?.vaultFolderMb);
   if (Number.isFinite(folderMb) && folderMb > 0) return folderMb;
   return null;

@@ -12,15 +12,54 @@ export const ALBUM_PAGE_ASPECT_PORTRAIT_H = 12;
 export const ALBUM_PAGE_ASPECT_LANDSCAPE_W = 12;
 export const ALBUM_PAGE_ASPECT_LANDSCAPE_H = 10;
 
-/** Pixel height of one album page for a page width + orientation. */
-export function albumPageBlockHeight(pageWidth, orientation = 'portrait') {
+/**
+ * Page stretch: how much wider than its Portrait / Landscape aspect a page is (1 = 10×12 / 12×10).
+ * Dragging the blue page edge sets it; the saved page w×h carries it (see `albumPageStretchFromPages`).
+ */
+export const ALBUM_PAGE_STRETCH_MIN = 1;
+export const ALBUM_PAGE_STRETCH_MAX = 3;
+
+export function normalizeAlbumPageStretch(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.round(Math.min(ALBUM_PAGE_STRETCH_MAX, Math.max(ALBUM_PAGE_STRETCH_MIN, n)) * 1000) / 1000;
+}
+
+/** Stretch of the album open in the editor (one album editor at a time). */
+let openAlbumPageStretch = 1;
+
+export function setOpenAlbumPageStretch(value) {
+  openAlbumPageStretch = normalizeAlbumPageStretch(value);
+  return openAlbumPageStretch;
+}
+
+export function getOpenAlbumPageStretch() {
+  return openAlbumPageStretch;
+}
+
+function albumPageAspectHeightRatio(orientation) {
+  return String(orientation || 'portrait').toLowerCase() === 'landscape'
+    ? ALBUM_PAGE_ASPECT_LANDSCAPE_H / ALBUM_PAGE_ASPECT_LANDSCAPE_W
+    : ALBUM_PAGE_ASPECT_PORTRAIT_H / ALBUM_PAGE_ASPECT_PORTRAIT_W;
+}
+
+/**
+ * Pixel height of one album page for a page width + orientation, divided by the page stretch
+ * (`stretch` defaults to the open album's).
+ */
+export function albumPageBlockHeight(pageWidth, orientation = 'portrait', stretch = openAlbumPageStretch) {
   const pw = Math.max(240, Number(pageWidth) || 480);
   const mode = String(orientation || 'portrait').toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
-  const ratio =
-    mode === 'landscape'
-      ? ALBUM_PAGE_ASPECT_LANDSCAPE_H / ALBUM_PAGE_ASPECT_LANDSCAPE_W
-      : ALBUM_PAGE_ASPECT_PORTRAIT_H / ALBUM_PAGE_ASPECT_PORTRAIT_W;
-  return Math.max(mode === 'landscape' ? 280 : 360, Math.round(pw * ratio));
+  const s = normalizeAlbumPageStretch(stretch);
+  return Math.max(Math.round((mode === 'landscape' ? 280 : 360) / s), Math.round((pw * albumPageAspectHeightRatio(mode)) / s));
+}
+
+/** Stretch an album was saved with, read back from its first page's w×h (1 when unknown). */
+export function albumPageStretchFromPages(pages, orientation = 'portrait') {
+  const page = (Array.isArray(pages) ? pages : []).find((p) => Number(p?.w) > 0 && Number(p?.h) > 0);
+  if (!page) return 1;
+  const stretch = (Number(page.w) * albumPageAspectHeightRatio(orientation)) / Number(page.h);
+  return stretch < 1.02 ? 1 : normalizeAlbumPageStretch(stretch);
 }
 
 /** Most photos one album page shows (4 = 2×2 grid). */
@@ -33,6 +72,23 @@ export const ALBUM_PAGE_MAX_PHOTOS = 4;
  * the photo file itself is never changed.
  * @typedef {{ key: string, x: number, y: number, w: number, h: number, attachmentIds: number[], photoViews?: Object<string, AlbumPhotoView> }} AlbumPageInstance
  */
+
+/** Pastel page backgrounds offered beside the album (Entire Album / This Page Only). */
+export const ALBUM_PAGE_BG_COLORS = ['#C9F7F6', '#F7F5D4', '#DDF6D7', '#F7CCF5', '#F7E0CC'];
+
+/** One of `ALBUM_PAGE_BG_COLORS`, or '' (theme page color). */
+export function normalizeAlbumPageBgColor(value) {
+  const color = String(value || '').trim().toUpperCase();
+  return ALBUM_PAGE_BG_COLORS.includes(color) ? color : '';
+}
+
+/** Shared page color when every page uses the same one ('' otherwise). */
+export function albumPagesSharedBgColor(pages) {
+  const list = Array.isArray(pages) ? pages : [];
+  if (!list.length) return '';
+  const first = normalizeAlbumPageBgColor(list[0]?.bgColor);
+  return list.every((page) => normalizeAlbumPageBgColor(page?.bgColor) === first) ? first : '';
+}
 
 /** Zoom multiplier range for a page photo (same as the MyStory photo editor). */
 export const ALBUM_PHOTO_ZOOM_MIN = 0.5;
@@ -165,7 +221,16 @@ export function albumPagePhotoIds(page) {
   return legacy == null ? [] : [legacy];
 }
 
-export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', photoViews, ...photos } = {}) {
+export function createAlbumPageInstance({
+  x = 0,
+  y = 0,
+  w = 0,
+  h = 0,
+  key = '',
+  photoViews,
+  bgColor,
+  ...photos
+} = {}) {
   const attachmentIds = albumPagePhotoIds(photos);
   const page = {
     key: String(key || `pg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
@@ -177,6 +242,8 @@ export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', 
   };
   const views = normalizeAlbumPagePhotoViews(photoViews, attachmentIds);
   if (views) page.photoViews = views;
+  const color = normalizeAlbumPageBgColor(bgColor);
+  if (color) page.bgColor = color;
   return page;
 }
 
@@ -287,7 +354,8 @@ function readAlbumPageMarker(raw) {
               w: item.w,
               h: item.h,
               attachmentIds: albumPagePhotoIds(item),
-              photoViews: item.photoViews
+              photoViews: item.photoViews,
+              bgColor: item.bgColor
             })
           );
       }
@@ -319,7 +387,8 @@ export function serializeAlbumPageInstances(instances) {
       w: item?.w,
       h: item?.h,
       attachmentIds: albumPagePhotoIds(item),
-      photoViews: item?.photoViews
+      photoViews: item?.photoViews,
+      bgColor: item?.bgColor
     });
     if (!page.attachmentIds.length) delete page.attachmentIds;
     return page;

@@ -145,6 +145,7 @@ import {
   snapshotVaultSessionFileCountsToLast
 } from '../vaultSessionFileCounts.js';
 import { rvCloudWarn } from '../recordVaultCloudDebugLog.js';
+import { isUnchangedNoteTextPatch } from './unchangedNoteTextPatch.js';
 import {
   VAULT_PRODUCT_RECORD_VAULT,
   closeVaultDbLater,
@@ -1683,6 +1684,9 @@ function slotFields(slot) {
 export function vaultUpdateNote(session, noteId, patch) {
   const row = loadNote(session, noteId);
   if (!row) throw new Error('Note not found');
+  // Leaving TutaNotes always flushes the open note; an identical save must not make
+  // vault.db newer than the backup just taken ("needs backup" prompt on Exit to Mall).
+  if (isUnchangedNoteTextPatch(row, patch)) return mapNote(session, noteId);
 
   if (patch.notebook_id != null && Number(patch.notebook_id) !== Number(row.notebook_id)) {
     const targetNb = Number(patch.notebook_id);

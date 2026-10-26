@@ -1,10 +1,12 @@
 /**
  * ColorTemplate16InputTemplate — outlined auth-style input.
- * Unfocused empty: label inside at DESKTOP_FONT_SIZE_BUTTON, thick inverse-daynight border.
- * Focused or filled: label on top border at 1/2 DESKTOP_FONT_SIZE_BUTTON.
- * Input text: DESKTOP_FONT_SIZE_BUTTON on theme-daynight-color.
+ * Unfocused empty: label inside at DESKTOP_FONT_SIZE_TEXT, thick inverse-daynight border.
+ * Focused or filled: label on top border at 1/2 DESKTOP_FONT_SIZE_TITLE (phones: 1/2 MOBILE_FONT_SIZE_TEXT).
+ * Input text: DESKTOP_FONT_SIZE_TEXT on theme-daynight-color.
+ * Phones (xs) use MOBILE_FONT_SIZE_TEXT the same way.
  */
-import { buttonFontSizeHalfResponsive, buttonFontSizeResponsive } from 'config/buttonFontEnv';
+import { getDesktopTextFontSizeVw, getDesktopTitleFontSizeHalfVw } from 'config/desktopFontEnv';
+import { getMobileSinglesTextFontSizeHalfVw, getMobileSinglesTextFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { DAYNIGHT_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 
 export const COLOR_TEMPLATE16_SURFACE_BG = `var(${DAYNIGHT_VAR})`;
@@ -22,24 +24,34 @@ const colorTemplate16LabelInset = {
   sm: '1.2vw'
 };
 
+const textFontSizeResponsive = {
+  xs: getMobileSinglesTextFontSizeVw(),
+  sm: getDesktopTextFontSizeVw()
+};
+
+const borderLabelFontSizeResponsive = {
+  xs: getMobileSinglesTextFontSizeHalfVw(),
+  sm: getDesktopTitleFontSizeHalfVw()
+};
+
 const colorTemplate16FullLabelFontSx = {
-  fontSize: `${buttonFontSizeResponsive.xs} !important`,
+  fontSize: `${textFontSizeResponsive.xs} !important`,
   '@media (min-width: 600px)': {
-    fontSize: `${buttonFontSizeResponsive.sm} !important`
+    fontSize: `${textFontSizeResponsive.sm} !important`
   }
 };
 
 const colorTemplate16HalfLabelFontSx = {
-  fontSize: `${buttonFontSizeHalfResponsive.xs} !important`,
+  fontSize: `${borderLabelFontSizeResponsive.xs} !important`,
   '@media (min-width: 600px)': {
-    fontSize: `${buttonFontSizeHalfResponsive.sm} !important`
+    fontSize: `${borderLabelFontSizeResponsive.sm} !important`
   }
 };
 
 const colorTemplate16InputFontSx = {
-  fontSize: `${buttonFontSizeResponsive.xs} !important`,
+  fontSize: `${textFontSizeResponsive.xs} !important`,
   '@media (min-width: 600px)': {
-    fontSize: `${buttonFontSizeResponsive.sm} !important`
+    fontSize: `${textFontSizeResponsive.sm} !important`
   }
 };
 
@@ -48,7 +60,7 @@ const colorTemplate16BorderSx = {
   borderWidth: `${COLOR_TEMPLATE16_BORDER_WIDTH}px`
 };
 
-/** FormControl + label inside (full button font) or on top border (half button font). */
+/** FormControl + label inside (full text font) or on top border (half title font). */
 export function colorTemplate16FormControlSx(overrides = {}) {
   return {
     marginTop: 0,
