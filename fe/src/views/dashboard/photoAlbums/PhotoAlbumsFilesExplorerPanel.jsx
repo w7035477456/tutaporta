@@ -743,58 +743,28 @@ export default function PhotoAlbumsFilesExplorerPanel({
         hidden
         onChange={(e) => void onFolderInputChange(e)}
       />
-      <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, mb: 0.5 }}>
-        <SliderControlButton
-          type="button"
-          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-          onClick={() => void openFolderPicker()}
-          disabled={disabled}
-          aria-label={hasFolder ? 'Reopen last folder' : 'Open folder'}
-          {...guestDemoBlockProps()}
-          sx={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: '0.72rem',
-            py: 0.25,
-            bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
-            color: '#000 !important',
-            WebkitTextFillColor: '#000 !important',
-            '&.Mui-disabled': {
-              bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
-              color: '#000 !important',
-              WebkitTextFillColor: '#000 !important',
-              opacity: 1
-            }
-          }}
-        >
-          {hasFolder || rootHandle ? 'Reopen folder' : 'Open folder…'}
-        </SliderControlButton>
-        <SliderControlButton
-          type="button"
-          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-          onClick={() => void changeFolder()}
-          disabled={disabled}
-          aria-label="Choose a different folder"
-          {...guestDemoBlockProps()}
-          sx={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: '0.72rem',
-            py: 0.25,
-            bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
-            color: '#000 !important',
-            WebkitTextFillColor: '#000 !important',
-            '&.Mui-disabled': {
-              bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
-              color: '#000 !important',
-              WebkitTextFillColor: '#000 !important',
-              opacity: 1
-            }
-          }}
-        >
-          Change…
-        </SliderControlButton>
-      </Box>
+      <SliderControlButton
+        type="button"
+        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+        onClick={() => void openFolderPicker()}
+        disabled={disabled}
+        aria-label={hasFolder ? 'Open Folder — reopen last folder' : 'Open Folder'}
+        {...guestDemoBlockProps()}
+        sx={{ ...trayButtonSx, mb: 0.5 }}
+      >
+        Open Folder
+      </SliderControlButton>
+      <SliderControlButton
+        type="button"
+        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+        onClick={() => void changeFolder()}
+        disabled={disabled}
+        aria-label="Change Folder — choose a different folder"
+        {...guestDemoBlockProps()}
+        sx={{ ...trayButtonSx, mb: 0.5 }}
+      >
+        Change Folder
+      </SliderControlButton>
       <SliderControlButton
         type="button"
         hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}

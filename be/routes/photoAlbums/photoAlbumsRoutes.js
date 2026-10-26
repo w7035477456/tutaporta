@@ -33,6 +33,7 @@ import {
   vaultAddNoteAttachment,
   vaultCountAccountMedia,
   vaultDeleteNoteAttachment,
+  vaultRestoreSampleAlbum,
   vaultGetNoteAttachment,
   vaultReconcileAlbumPhotoSeq,
   vaultRepairMissingAttachmentVariants,
@@ -1038,6 +1039,20 @@ export async function deletePhotoAlbumsNoteAttachment(req, res) {
       return res.status(404).json({ error: message });
     }
     return res.status(500).json({ error: message });
+  }
+}
+
+/** POST /api/photoAlbums/restore-sample-album */
+export async function restorePhotoAlbumsSampleAlbum(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+  try {
+    const result = await vaultRestoreSampleAlbum(session);
+    logImpersonatedMutation(req);
+    return res.json(result);
+  } catch (err) {
+    console.error('[restorePhotoAlbumsSampleAlbum]', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Failed to restore sample album' });
   }
 }
 

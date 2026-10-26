@@ -16,6 +16,13 @@ import { COLOR_TEMPLATE16_POPUP_Z_INDEX } from 'config/colorTemplate16PopupCente
 import { colorTemplate7PopupSliderSx, colorTemplate7PopupActionButtonSx } from 'config/colorTemplate7PopupLargeDark';
 import PhotoAlbumsFillOutlineColorPicker from './PhotoAlbumsFillOutlineColorPicker';
 import PhotoAlbumsPlaceTextPhotoPreview from './PhotoAlbumsPlaceTextPhotoPreview';
+import PhotoAlbumsEmojiPickerPopover from './PhotoAlbumsEmojiPickerPopover';
+import {
+  ALBUM_PHOTO_OVERLAY_MAX,
+  ALBUM_PHOTO_VIEW_IDENTITY,
+  createAlbumPhotoOverlay,
+  normalizeAlbumPhotoView
+} from './photoAlbumsPages';
 
 /** Where a new label starts on a double-clicked photo (fraction of the photo frame). */
 const PHOTO_TEXT_DEFAULT_ANCHOR = { fx: 0.08, fy: 0.08 };
@@ -166,6 +173,22 @@ const selectMenuProps = {
   }
 };
 
+const photoStickerBtnSx = {
+  width: 64,
+  height: 64,
+  p: 0,
+  flexShrink: 0,
+  border: '2px solid #000',
+  borderRadius: 1,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'transform 0.15s ease',
+  '&:hover:not(:disabled)': { transform: 'scale(1.08)' },
+  '&:disabled': { opacity: 0.45, cursor: 'default' }
+};
+
 function sampleTextInlineStyle({
   color,
   outlineColor,
@@ -226,6 +249,8 @@ function stylePatchFromControls({
  * Add Text dialog — styles a page text label or the album-wide page title.
  * With `photo` (double-clicked page photo) the photo shows on top and the text can be
  * dragged on it; OK then also returns `photoAnchor` ({ fx, fy } of the photo frame).
+ * Crop / Original save the photo's zoom / pan / rotation on its page right away through
+ * `onPhotoViewChange`; OK saves it too.
  */
 export default function PhotoAlbumsPlaceTextDialog({
   open,
@@ -233,7 +258,8 @@ export default function PhotoAlbumsPlaceTextDialog({
   initialStyle = null,
   photo = null,
   onClose,
-  onConfirm
+  onConfirm,
+  onPhotoViewChange
 }) {
   const { user } = useAuth();
   const guestDemo = isGuestDemoLogin(user);
@@ -246,6 +272,9 @@ export default function PhotoAlbumsPlaceTextDialog({
   const [outlineWidth, setOutlineWidth] = useState(PLACE_TEXT_DEFAULTS.outlineWidth);
   const [selectedPresetId, setSelectedPresetId] = useState(PLACE_TEXT_STYLE_PRESETS[0].id);
   const [photoAnchor, setPhotoAnchor] = useState(PHOTO_TEXT_DEFAULT_ANCHOR);
+  const [photoView, setPhotoView] = useState(ALBUM_PHOTO_VIEW_IDENTITY);
+  const [selectedOverlayId, setSelectedOverlayId] = useState(null);
+  const [emojiAnchorEl, setEmojiAnchorEl] = useState(null);
   const dialogInitRef = useRef(false);
 
   const applyStyleFields = useCallback((next, seededText) => {
@@ -279,10 +308,38 @@ export default function PhotoAlbumsPlaceTextDialog({
     if (dialogInitRef.current) return;
     dialogInitRef.current = true;
     setPhotoAnchor(PHOTO_TEXT_DEFAULT_ANCHOR);
+    setPhotoView(normalizeAlbumPhotoView(photo?.view) || ALBUM_PHOTO_VIEW_IDENTITY);
+    setSelectedOverlayId(null);
+    setEmojiAnchorEl(null);
     const next = { ...PLACE_TEXT_DEFAULTS, ...(initialStyle || {}) };
     const seeded = String(initialText ?? '').trim();
     applyStyleFields(next, seeded || next.text);
-  }, [open, initialText, initialStyle, applyStyleFields]);
+  }, [open, initialText, initialStyle, applyStyleFields, photo]);
+
+  const commitPhotoView = useCallback(
+    (view) => {
+      if (!photo) return;
+      onPhotoViewChange?.(photo, normalizeAlbumPhotoView(view));
+    },
+    [photo, onPhotoViewChange]
+  );
+
+  /** Undo zoom / pan / rotation; emoji and blurs stay (remove those with their ×). */
+  const handlePhotoOriginal = useCallback(() => {
+    const next = { ...ALBUM_PHOTO_VIEW_IDENTITY, overlays: photoView.overlays || [] };
+    setPhotoView(next);
+    commitPhotoView(next);
+  }, [commitPhotoView, photoView]);
+
+  const overlayCount = Array.isArray(photoView.overlays) ? photoView.overlays.length : 0;
+  const canAddOverlay = overlayCount < ALBUM_PHOTO_OVERLAY_MAX;
+
+  const addPhotoOverlay = useCallback((kind, emoji) => {
+    const overlay = createAlbumPhotoOverlay(kind, emoji);
+    if (!overlay) return;
+    setPhotoView((prev) => ({ ...prev, overlays: [...(prev.overlays || []), overlay] }));
+    setSelectedOverlayId(overlay.id);
+  }, []);
 
   const selectedPreset = useMemo(
     () => PLACE_TEXT_STYLE_PRESETS.find((p) => p.id === selectedPresetId) || PLACE_TEXT_STYLE_PRESETS[0],
@@ -313,6 +370,7 @@ export default function PhotoAlbumsPlaceTextDialog({
       outlineWidth,
       selectedPreset
     });
+    if (photo) commitPhotoView(photoView);
     onConfirm?.(photo ? { ...patch, photoAnchor } : patch);
   };
 
@@ -382,6 +440,12 @@ export default function PhotoAlbumsPlaceTextDialog({
             frameHeight={photo.frameHeight}
             anchor={photoAnchor}
             onAnchorChange={setPhotoAnchor}
+            view={photoView}
+            onViewChange={setPhotoView}
+            onOriginal={handlePhotoOriginal}
+            onCrop={() => commitPhotoView(photoView)}
+            selectedOverlayId={selectedOverlayId}
+            onSelectOverlay={setSelectedOverlayId}
             text={selectedPreset?.uppercase ? displayText.toUpperCase() : displayText}
             textStyle={{
               color,
@@ -416,22 +480,69 @@ export default function PhotoAlbumsPlaceTextDialog({
                   outlineWidth: preset.outlineWidth,
                   uppercase: preset.uppercase
                 };
+            if (selected) {
+              return (
+                <Box
+                  key={preset.id}
+                  sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5, py: 0.75 }}
+                >
+                  <Typography
+                    component="label"
+                    htmlFor="place-text-edit-inline"
+                    sx={{
+                      flexShrink: 0,
+                      fontWeight: 900,
+                      fontSize: { xs: '1.1rem', sm: '1.35rem' },
+                      lineHeight: 1.1,
+                      textAlign: 'center',
+                      color: '#000',
+                      WebkitTextFillColor: '#000',
+                      width: '3.5em'
+                    }}
+                  >
+                    Use This
+                  </Typography>
+                  <Box
+                    component="input"
+                    id="place-text-edit-inline"
+                    type="text"
+                    value={text}
+                    placeholder={PLACE_TEXT_DEFAULTS.text}
+                    maxLength={PLACE_TEXT_MAX_CHARS}
+                    spellCheck
+                    aria-label={`Edit text (${preset.label} style)`}
+                    onChange={(e) => setText(String(e.target.value ?? '').slice(0, PLACE_TEXT_MAX_CHARS))}
+                    style={{ ...sampleTextInlineStyle(styleForButton), display: 'block' }}
+                    sx={{
+                      width: '80%',
+                      p: 1.5,
+                      textAlign: 'center',
+                      bgcolor: '#fff',
+                      border: '8px solid #e53935',
+                      borderRadius: 1,
+                      outline: 'none',
+                      '&::placeholder': { opacity: 0.45 }
+                    }}
+                  />
+                </Box>
+              );
+            }
             return (
-              <Box key={preset.id} sx={{ display: 'flex', justifyContent: 'center', py: selected ? 0.75 : 0 }}>
+              <Box key={preset.id} sx={{ display: 'flex', justifyContent: 'center' }}>
                 <Box
                   component="button"
                   type="button"
-                  aria-pressed={selected}
+                  aria-pressed={false}
                   aria-label={`Style preset: ${preset.label}`}
                   onClick={() => applyPreset(preset)}
                   sx={{
                     display: 'block',
-                    width: selected ? '80%' : '100%',
-                    p: selected ? 1.5 : 1.15,
+                    width: '100%',
+                    p: 1.15,
                     textAlign: 'center',
                     cursor: 'pointer',
-                    bgcolor: '#fff',
-                    border: selected ? '8px solid #e53935' : '2px solid #000',
+                    bgcolor: 'transparent',
+                    border: '2px solid #000',
                     borderRadius: 1
                   }}
                 >
@@ -535,6 +646,50 @@ export default function PhotoAlbumsPlaceTextDialog({
                   }
                 }}
               />
+              {photo ? (
+                <Stack direction="row" spacing={1.5} sx={{ mt: 1.5, justifyContent: 'center' }}>
+                  <Box
+                    component="button"
+                    type="button"
+                    title="Add an emoji — pick one, then drag it and resize it on the photo"
+                    aria-label="Add emoji"
+                    disabled={!canAddOverlay}
+                    onClick={(e) => setEmojiAnchorEl(e.currentTarget)}
+                    sx={{ ...photoStickerBtnSx, bgcolor: '#fff', fontSize: 44, lineHeight: 1 }}
+                  >
+                    😀
+                  </Box>
+                  <Box
+                    component="button"
+                    type="button"
+                    title="Add a round blur — drag it over a face and resize it"
+                    aria-label="Add blur"
+                    disabled={!canAddOverlay}
+                    onClick={() => addPhotoOverlay('blur')}
+                    sx={{
+                      ...photoStickerBtnSx,
+                      bgcolor: '#000',
+                      color: '#fff',
+                      WebkitTextFillColor: '#fff',
+                      fontFamily: MAIN_FONT_FAMILY,
+                      fontWeight: 800,
+                      fontSize: '1.35rem',
+                      textShadow: '0 0 6px #7CFFB2, 0 0 12px #2196F3'
+                    }}
+                  >
+                    blur
+                  </Box>
+                </Stack>
+              ) : null}
+              <PhotoAlbumsEmojiPickerPopover
+                open={Boolean(emojiAnchorEl)}
+                anchorEl={emojiAnchorEl}
+                onClose={() => setEmojiAnchorEl(null)}
+                onPick={(emoji) => {
+                  setEmojiAnchorEl(null);
+                  addPhotoOverlay('emoji', emoji);
+                }}
+              />
             </Box>
           </Stack>
         </Box>
@@ -566,8 +721,11 @@ PhotoAlbumsPlaceTextDialog.propTypes = {
     attachmentId: PropTypes.number.isRequired,
     storageType: PropTypes.string,
     frameWidth: PropTypes.number.isRequired,
-    frameHeight: PropTypes.number.isRequired
+    frameHeight: PropTypes.number.isRequired,
+    pageKey: PropTypes.string,
+    view: PropTypes.object
   }),
   onClose: PropTypes.func,
-  onConfirm: PropTypes.func
+  onConfirm: PropTypes.func,
+  onPhotoViewChange: PropTypes.func
 };

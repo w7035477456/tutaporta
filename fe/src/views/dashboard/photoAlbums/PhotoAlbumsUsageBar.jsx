@@ -13,6 +13,7 @@ import { registerPhotoAlbumsUsageRefresher } from 'utils/photoAlbumsUsageRefresh
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/PhotoAlbumsOverageThrottleNotice';
 import { formatUsageDataAmount } from 'ui-component/AdminEditableUsageDataAmount';
 import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
+import SliderControlButton, { SLIDER_CONTROL_BUTTON_HOVER_SCALE_15 } from 'ui-component/SliderControlButton';
 import {
   AddMoreGbLink,
   LastClickTransferLabel,
@@ -120,7 +121,10 @@ export default function PhotoAlbumsUsageBar({
   videoTutorialUrl = '',
   onPurchased,
   onGetMoreTokens,
-  onRequestUsageRefresh
+  onRequestUsageRefresh,
+  /** Yellow "Restore Sample Album" button left of the tutorials; hidden when null. */
+  onRestoreSampleAlbum = null,
+  restoreSampleAlbumDisabled = false
 }) {
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
   const transfer = usage?.transfer;
@@ -150,14 +154,29 @@ export default function PhotoAlbumsUsageBar({
   }, [transfer]);
 
   const actions = (
-    <WorkspaceVideoTutorialPair
+    <>
+      {typeof onRestoreSampleAlbum === 'function' ? (
+        <SliderControlButton
+          type="button"
+          variant="yellow"
+          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+          disabled={restoreSampleAlbumDisabled}
+          onClick={onRestoreSampleAlbum}
+          title="Bring back SAMPLE SET, SAMPLE ALBUM and its sample photos (your other albums are not touched)"
+          sx={{ px: 0.75, py: 0.3, whiteSpace: 'nowrap', minWidth: 'auto' }}
+        >
+          Restore Sample Album
+        </SliderControlButton>
+      ) : null}
+      <WorkspaceVideoTutorialPair
       videoTutorialUrl={String(videoTutorialUrl || '').trim() || DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL}
       onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
       tutorialVariant="orange"
       tutorialAriaLabel="Open context tutorial"
       tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
       sx={{ ml: 0 }}
-    />
+      />
+    </>
   );
 
   const dataPlanDialog = (
@@ -234,5 +253,7 @@ PhotoAlbumsUsageBar.propTypes = {
   videoTutorialUrl: PropTypes.string,
   onPurchased: PropTypes.func,
   onGetMoreTokens: PropTypes.func,
-  onRequestUsageRefresh: PropTypes.func
+  onRequestUsageRefresh: PropTypes.func,
+  onRestoreSampleAlbum: PropTypes.func,
+  restoreSampleAlbumDisabled: PropTypes.bool
 };

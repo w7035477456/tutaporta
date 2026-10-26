@@ -29,8 +29,118 @@ export const ALBUM_PAGE_MAX_PHOTOS = 4;
 /**
  * `attachmentIds`: thumbnail-tray photos shown on this page, top to bottom (album vault
  * attachments), at most `ALBUM_PAGE_MAX_PHOTOS`.
- * @typedef {{ key: string, x: number, y: number, w: number, h: number, attachmentIds: number[] }} AlbumPageInstance
+ * `photoViews`: optional zoom / pan / rotation per photo on this page (keyed by attachment id);
+ * the photo file itself is never changed.
+ * @typedef {{ key: string, x: number, y: number, w: number, h: number, attachmentIds: number[], photoViews?: Object<string, AlbumPhotoView> }} AlbumPageInstance
  */
+
+/** Zoom multiplier range for a page photo (same as the MyStory photo editor). */
+export const ALBUM_PHOTO_ZOOM_MIN = 0.5;
+export const ALBUM_PHOTO_ZOOM_MAX = 3;
+export const ALBUM_PHOTO_ROTATION_MIN = -180;
+export const ALBUM_PHOTO_ROTATION_MAX = 180;
+
+/**
+ * Emoji sticker or round blur drawn over a page photo. `fx` / `fy` is its center and `size`
+ * its width, as fractions of the photo cell (size relative to the cell width).
+ * @typedef {{ id: string, kind: 'emoji' | 'blur', emoji?: string, fx: number, fy: number, size: number }} AlbumPhotoOverlay
+ */
+export const ALBUM_PHOTO_OVERLAY_KINDS = ['emoji', 'blur'];
+export const ALBUM_PHOTO_OVERLAY_MAX = 40;
+export const ALBUM_PHOTO_OVERLAY_SIZE_MIN = 0.04;
+export const ALBUM_PHOTO_OVERLAY_SIZE_MAX = 1.5;
+
+/**
+ * Pan is a fraction of the photo cell (0.1 = 10% of its width / height), so it survives
+ * page resizes and zoom levels.
+ * @typedef {{ zoom: number, panFx: number, panFy: number, rotationDeg: number, overlays?: AlbumPhotoOverlay[] }} AlbumPhotoView
+ */
+export const ALBUM_PHOTO_VIEW_IDENTITY = Object.freeze({ zoom: 1, panFx: 0, panFy: 0, rotationDeg: 0 });
+
+function clampNumber(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function roundFraction(n) {
+  return Math.round(n * 10000) / 10000;
+}
+
+export function normalizeAlbumPhotoOverlay(overlay) {
+  if (!overlay || typeof overlay !== 'object') return null;
+  const kind = ALBUM_PHOTO_OVERLAY_KINDS.includes(overlay.kind) ? overlay.kind : null;
+  if (!kind) return null;
+  const emoji = kind === 'emoji' ? String(overlay.emoji || '').slice(0, 16) : '';
+  if (kind === 'emoji' && !emoji) return null;
+  const out = {
+    id: String(overlay.id || '').slice(0, 64) || `ov_${Math.random().toString(36).slice(2, 10)}`,
+    kind,
+    fx: roundFraction(clampNumber(overlay.fx, 0, 1, 0.5)),
+    fy: roundFraction(clampNumber(overlay.fy, 0, 1, 0.5)),
+    size: roundFraction(clampNumber(overlay.size, ALBUM_PHOTO_OVERLAY_SIZE_MIN, ALBUM_PHOTO_OVERLAY_SIZE_MAX, 0.25))
+  };
+  if (emoji) out.emoji = emoji;
+  return out;
+}
+
+export function normalizeAlbumPhotoOverlays(overlays) {
+  if (!Array.isArray(overlays)) return [];
+  return overlays.map(normalizeAlbumPhotoOverlay).filter(Boolean).slice(0, ALBUM_PHOTO_OVERLAY_MAX);
+}
+
+/** New emoji / blur in the middle of the photo. */
+export function createAlbumPhotoOverlay(kind, emoji = '') {
+  return normalizeAlbumPhotoOverlay({
+    id: `ov_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    kind,
+    emoji,
+    fx: 0.5,
+    fy: 0.5,
+    size: kind === 'blur' ? 0.3 : 0.25
+  });
+}
+
+/** Clamped view, or null when it is the untouched photo with no emoji / blur. */
+export function normalizeAlbumPhotoView(view) {
+  if (!view || typeof view !== 'object') return null;
+  const next = {
+    zoom: Math.round(clampNumber(view.zoom, ALBUM_PHOTO_ZOOM_MIN, ALBUM_PHOTO_ZOOM_MAX, 1) * 1000) / 1000,
+    panFx: Math.round(clampNumber(view.panFx, -2, 2, 0) * 10000) / 10000,
+    panFy: Math.round(clampNumber(view.panFy, -2, 2, 0) * 10000) / 10000,
+    rotationDeg: Math.round(clampNumber(view.rotationDeg, ALBUM_PHOTO_ROTATION_MIN, ALBUM_PHOTO_ROTATION_MAX, 0))
+  };
+  const overlays = normalizeAlbumPhotoOverlays(view.overlays);
+  if (overlays.length) next.overlays = overlays;
+  const identity =
+    next.zoom === 1 && next.panFx === 0 && next.panFy === 0 && next.rotationDeg === 0 && !overlays.length;
+  return identity ? null : next;
+}
+
+/** Views for photos still on the page; `undefined` when none are set. */
+function normalizeAlbumPagePhotoViews(views, attachmentIds) {
+  if (!views || typeof views !== 'object') return undefined;
+  const out = {};
+  for (const id of attachmentIds) {
+    const view = normalizeAlbumPhotoView(views[id] ?? views[String(id)]);
+    if (view) out[String(id)] = view;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** View of one photo on a page (identity when untouched). */
+export function albumPagePhotoView(page, attachmentId) {
+  const view = page?.photoViews?.[String(attachmentId)];
+  return normalizeAlbumPhotoView(view) || ALBUM_PHOTO_VIEW_IDENTITY;
+}
+
+/** CSS transform drawing a photo with `view` inside a `width` × `height` cell. */
+export function albumPhotoViewTransform(view, width, height) {
+  const v = view || ALBUM_PHOTO_VIEW_IDENTITY;
+  const dx = Math.round((Number(v.panFx) || 0) * (Number(width) || 0) * 100) / 100;
+  const dy = Math.round((Number(v.panFy) || 0) * (Number(height) || 0) * 100) / 100;
+  return `translate(${dx}px, ${dy}px) rotate(${Number(v.rotationDeg) || 0}deg) scale(${Number(v.zoom) || 1})`;
+}
 
 export function normalizeAlbumPageAttachmentId(value) {
   const n = Number(value);
@@ -55,15 +165,19 @@ export function albumPagePhotoIds(page) {
   return legacy == null ? [] : [legacy];
 }
 
-export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', ...photos } = {}) {
-  return {
+export function createAlbumPageInstance({ x = 0, y = 0, w = 0, h = 0, key = '', photoViews, ...photos } = {}) {
+  const attachmentIds = albumPagePhotoIds(photos);
+  const page = {
     key: String(key || `pg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
     x: Math.max(0, Math.round(Number(x) || 0)),
     y: Math.max(0, Math.round(Number(y) || 0)),
     w: Math.max(0, Math.round(Number(w) || 0)),
     h: Math.max(0, Math.round(Number(h) || 0)),
-    attachmentIds: albumPagePhotoIds(photos)
+    attachmentIds
   };
+  const views = normalizeAlbumPagePhotoViews(photoViews, attachmentIds);
+  if (views) page.photoViews = views;
+  return page;
 }
 
 /**
@@ -172,7 +286,8 @@ function readAlbumPageMarker(raw) {
               y: item.y,
               w: item.w,
               h: item.h,
-              attachmentIds: albumPagePhotoIds(item)
+              attachmentIds: albumPagePhotoIds(item),
+              photoViews: item.photoViews
             })
           );
       }
@@ -203,7 +318,8 @@ export function serializeAlbumPageInstances(instances) {
       y: item?.y,
       w: item?.w,
       h: item?.h,
-      attachmentIds: albumPagePhotoIds(item)
+      attachmentIds: albumPagePhotoIds(item),
+      photoViews: item?.photoViews
     });
     if (!page.attachmentIds.length) delete page.attachmentIds;
     return page;

@@ -68,6 +68,7 @@ import {
   deletePhotoAlbumsNotebook,
   deletePhotoAlbumsShortcut,
   deletePhotoAlbumsNoteAttachment,
+  restorePhotoAlbumsSampleAlbum,
   getPhotoAlbumsNoteAttachment,
   getPhotoAlbumsNoteImage,
   getPhotoAlbumsNoteExtraImage,
@@ -258,6 +259,7 @@ export function startBridgeServer({ port = DEFAULT_PORT } = {}) {
   app.get('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', getPhotoAlbumsNoteAttachment);
   app.post('/api/photoAlbums/notes/:noteId/attachments/:attachmentId/open-native', openPhotoAlbumsNoteAttachmentNative);
   app.delete('/api/photoAlbums/notes/:noteId/attachments/:attachmentId', deletePhotoAlbumsNoteAttachment);
+  app.post('/api/photoAlbums/restore-sample-album', restorePhotoAlbumsSampleAlbum);
   app.post('/api/photoAlbums/shortcuts', createPhotoAlbumsShortcut);
   app.put('/api/photoAlbums/shortcuts/reorder', reorderPhotoAlbumsShortcuts);
   app.delete('/api/photoAlbums/shortcuts/:shortcutId', deletePhotoAlbumsShortcut);

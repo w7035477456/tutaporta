@@ -615,6 +615,12 @@ export async function deletePhotoAlbumsNoteAttachment(noteId, attachmentId, { st
   return data;
 }
 
+/** Bring SAMPLE SET / SAMPLE ALBUM and its bundled photos back (same seed as a new member). */
+export async function restorePhotoAlbumsSampleAlbum({ storageType } = {}) {
+  const { data } = await rvRequest({ method: 'POST', url: '/api/photoAlbums/restore-sample-album', storageType });
+  return data;
+}
+
 /** Mac only — write attachment to temp and `open` in Word/Excel (or default app). */
 export async function openPhotoAlbumsNoteAttachmentNative(noteId, attachmentId, { storageType } = {}) {
   const note = Number(noteId);
@@ -1700,6 +1706,7 @@ export function createPhotoAlbumsPaneApi(storageType) {
     reconcilePhotoAlbumsAlbumPhotoSeq: (noteId) => reconcilePhotoAlbumsAlbumPhotoSeq(noteId, opts),
     deletePhotoAlbumsNoteAttachment: (noteId, attachmentId) =>
       deletePhotoAlbumsNoteAttachment(noteId, attachmentId, opts),
+    restorePhotoAlbumsSampleAlbum: () => restorePhotoAlbumsSampleAlbum(opts),
     searchPhotoAlbumsNotes: (query) => searchPhotoAlbumsNotes(query, opts),
     fetchPhotoAlbumsUsage: () => fetchPhotoAlbumsUsage(opts),
     logoffPhotoAlbumsStorage: (extra = {}) => logoffPhotoAlbumsStorage({ ...opts, ...extra }),

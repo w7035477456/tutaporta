@@ -137,6 +137,7 @@ export default function PhotoAlbumsSearchBar({
         <SliderControlButton
           type="button"
           variant="green"
+          forceBgcolor="#60C446"
           disabled={searchBusy}
           aria-busy={searchBusy}
           hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}

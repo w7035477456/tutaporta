@@ -101,11 +101,16 @@ function ensureAttachmentAlbumSeqColumns(db) {
   return changed;
 }
 import {
+  restorePhotoAlbumsSampleAlbumDb,
   seedPhotoAlbumsNewMemberSampleDb,
   seedPhotoAlbumsNewMemberSampleMedia
 } from '../photoAlbumsNewMemberSample/seedPhotoAlbumsNewMemberSample.js';
 import { migrateSampleAlbumTutorialLabelsDb } from '../photoAlbumsNewMemberSample/migrateSampleAlbumTutorialLabels.js';
-import { readInitializeSampleVaultBuffer, isBundledInitializeSampleAttachmentId } from '../photoAlbumsNewMemberSample/initializeSampleMedia.js';
+import {
+  readInitializeSampleVaultBuffer,
+  isBundledInitializeSampleAttachmentId,
+  linkInitializeSampleIntoVault
+} from '../photoAlbumsNewMemberSample/initializeSampleMedia.js';
 import {
   expandPhotoAlbumsBodyTextForSearch,
   normalizePhotoAlbumsKeyword,
@@ -2529,6 +2534,24 @@ function deleteAttachmentVariants(session, relativePath) {
   if (!relativePath) return;
   deleteEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'display'));
   deleteEncryptedVaultFile(session, fileRelativePathForVariant(relativePath, 'thumb'));
+}
+
+/** Restore Sample Album: SAMPLE SET / SAMPLE ALBUM + bundled photos (same seed as a new member). */
+export async function vaultRestoreSampleAlbum(session) {
+  const result = restorePhotoAlbumsSampleAlbumDb(session.db);
+  if (result.restoredAttachmentIds.length) {
+    await linkInitializeSampleIntoVault({
+      mountPath: session.mountPath,
+      key: session.key,
+      meta: session.meta,
+      db: session.db,
+      onlyAttachmentIds: result.restoredAttachmentIds
+    });
+  }
+  refreshNoteSearchText(session.db, result.noteId);
+  markDirty(session);
+  flushDbToUsb(session);
+  return { success: true, ...result };
 }
 
 export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {

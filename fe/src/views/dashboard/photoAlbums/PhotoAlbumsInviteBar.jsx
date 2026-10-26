@@ -5,15 +5,12 @@ import TextField from '@mui/material/TextField';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
 } from 'ui-component/SliderControlButton';
-import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
 import {
   sendPhotoAlbumsInvite,
   readPhotoAlbumsInviteError
 } from 'api/photoAlbumsInviteFe';
-import { openPhotoAlbumsContextTutorialPopout } from './photoAlbumsContextTutorialSync';
 
-/** Fallback when site global video_tutorial_tutaphotoalbums is unset. */
-const DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL = 'https://youtu.be/dMiwcH027fM';
+const INVITE_GREEN = '#60C446';
 
 function isValidEmailFormat(raw) {
   const value = String(raw ?? '').trim().toLowerCase();
@@ -61,8 +58,7 @@ export default function PhotoAlbumsInviteBar({
   albumSetName,
   albumName,
   onInvited,
-  onOpenReview,
-  videoTutorialUrl = ''
+  onOpenReview
 }) {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -74,8 +70,6 @@ export default function PhotoAlbumsInviteBar({
   const trimmedEmail = useMemo(() => String(email || '').trim(), [email]);
   const emailFormatValid = useMemo(() => isValidEmailFormat(trimmedEmail), [trimmedEmail]);
   const showEmailFormatError = emailTouched && trimmedEmail.length > 0 && !emailFormatValid;
-  const watchTutorialsHref =
-    String(videoTutorialUrl || '').trim() || DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL;
 
   const openReview = (sendResult) => {
     onOpenReview?.(sendResult || null);
@@ -141,20 +135,12 @@ export default function PhotoAlbumsInviteBar({
         boxSizing: 'border-box'
       }}
     >
-      {/* Single row: tutorials · Invite · email · Review (the email field shrinks first). */}
+      {/* Single row: Invite · email · Review (the email field shrinks first). */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, width: '100%', flexWrap: 'nowrap' }}>
-        <WorkspaceVideoTutorialPair
-          videoTutorialUrl={watchTutorialsHref}
-          onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
-          tutorialDisabled={disabled}
-          tutorialVariant="orange"
-          tutorialAriaLabel="Open context tutorial"
-          tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
-          sx={{ flexShrink: 0, alignSelf: 'center' }}
-        />
         <SliderControlButton
           type="button"
           variant="green"
+          forceBgcolor={INVITE_GREEN}
           hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
           disabled={!canInvite || busy || (trimmedEmail.length > 0 && !emailFormatValid)}
           onClick={() => void handleInvite()}
@@ -217,6 +203,5 @@ PhotoAlbumsInviteBar.propTypes = {
   albumSetName: PropTypes.string,
   albumName: PropTypes.string,
   onInvited: PropTypes.func,
-  onOpenReview: PropTypes.func,
-  videoTutorialUrl: PropTypes.string
+  onOpenReview: PropTypes.func
 };

@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   albumPagePhotoCells,
   albumPagePhotoIds,
+  albumPagePhotoView,
+  albumPhotoViewTransform,
+  createAlbumPageInstance,
+  createAlbumPhotoOverlay,
+  normalizeAlbumPhotoView,
   parseAlbumPageInstancesFromHtml,
   readLegacyPlacedPhotoAttachmentIds,
   serializeAlbumPageInstances
@@ -67,5 +72,55 @@ describe('album pages', () => {
     const json = serializeAlbumPageInstances([{ key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentIds: [5] }]);
     const html = `<div data-rv-album-template="" data-album-templates="${json}"></div>${legacyPhotos}`;
     expect(parseAlbumPageInstancesFromHtml(html).map((p) => p.attachmentIds)).toEqual([[5]]);
+  });
+
+  it('round-trips photo zoom / pan / rotation and drops views of photos no longer on the page', () => {
+    const view = { zoom: 1.5, panFx: 0.1, panFy: -0.2, rotationDeg: 30 };
+    const json = serializeAlbumPageInstances([
+      { key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentIds: [9], photoViews: { 9: view, 4: view } }
+    ]);
+    const [page] = parseAlbumPageInstancesFromHtml(`<div data-rv-album-template="" data-album-templates="${json}"></div>`);
+    expect(page.photoViews).toEqual({ 9: view });
+    expect(albumPagePhotoView(page, 9)).toEqual(view);
+    expect(albumPagePhotoView(page, 4)).toEqual({ zoom: 1, panFx: 0, panFy: 0, rotationDeg: 0 });
+  });
+
+  it('omits untouched photo views and clamps out-of-range ones', () => {
+    expect(normalizeAlbumPhotoView({ zoom: 1, panFx: 0, panFy: 0, rotationDeg: 0 })).toBeNull();
+    expect(normalizeAlbumPhotoView({ zoom: 9, panFx: 0, panFy: 0, rotationDeg: 400 })).toEqual({
+      zoom: 3,
+      panFx: 0,
+      panFy: 0,
+      rotationDeg: 180
+    });
+    const page = createAlbumPageInstance({ key: 'p', attachmentIds: [1], photoViews: { 1: { zoom: 1 } } });
+    expect(page).not.toHaveProperty('photoViews');
+  });
+
+  it('draws pan as a fraction of the photo cell', () => {
+    expect(albumPhotoViewTransform({ zoom: 2, panFx: 0.5, panFy: -0.25, rotationDeg: 90 }, 200, 400)).toBe(
+      'translate(100px, -100px) rotate(90deg) scale(2)'
+    );
+  });
+
+  it('keeps emoji / blur on an otherwise untouched photo and drops bad ones', () => {
+    const emoji = createAlbumPhotoOverlay('emoji', '😀');
+    const blur = createAlbumPhotoOverlay('blur');
+    expect(emoji).toMatchObject({ kind: 'emoji', emoji: '😀', fx: 0.5, fy: 0.5 });
+    expect(blur).toMatchObject({ kind: 'blur', fx: 0.5, fy: 0.5 });
+    expect(blur).not.toHaveProperty('emoji');
+    const view = normalizeAlbumPhotoView({
+      zoom: 1,
+      panFx: 0,
+      panFy: 0,
+      rotationDeg: 0,
+      overlays: [emoji, { kind: 'emoji' }, { kind: 'star' }, { ...blur, fx: 5, size: 0 }]
+    });
+    expect(view.overlays).toEqual([emoji, { ...blur, fx: 1, size: 0.04 }]);
+    const json = serializeAlbumPageInstances([
+      { key: 'p', x: 0, y: 0, w: 500, h: 600, attachmentIds: [3], photoViews: { 3: view } }
+    ]);
+    const [page] = parseAlbumPageInstancesFromHtml(`<div data-rv-album-template="" data-album-templates="${json}"></div>`);
+    expect(albumPagePhotoView(page, 3).overlays).toEqual(view.overlays);
   });
 });

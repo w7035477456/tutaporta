@@ -201,14 +201,16 @@ function queryOne(db, sql, params = []) {
  * Point vault storage paths at shared cache files via symlinks (plaintext vaults).
  * Encrypted vaults skip links — reads fall back to shared cache in readEncryptedVaultFile.
  */
-export async function linkInitializeSampleIntoVault({ mountPath, key, meta, db }) {
+export async function linkInitializeSampleIntoVault({ mountPath, key, meta, db, onlyAttachmentIds = null }) {
   await ensureInitializeSampleSharedCache();
 
   const manifest = loadInitializeSampleManifest();
   const usePlainFiles = key == null;
+  const only = Array.isArray(onlyAttachmentIds) ? new Set(onlyAttachmentIds.map(Number)) : null;
 
   for (const entry of manifest.attachments || []) {
     const attachmentId = Number(entry.attachmentId);
+    if (only && !only.has(attachmentId)) continue;
     const row = queryOne(
       db,
       `SELECT relative_path FROM note_attachments WHERE attachment_id = ? AND deleted_at IS NULL`,

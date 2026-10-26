@@ -4576,6 +4576,32 @@ export default function PhotoAlbumsWorkspacePane({
     }
   }, []);
 
+  const handleRestoreSampleAlbum = useCallback(async () => {
+    if (busy || !unlocked) return;
+    setBusy(true);
+    setError('');
+    try {
+      await flushPendingNoteSave();
+      await vaultApi.restorePhotoAlbumsSampleAlbum();
+    } catch (err) {
+      setError(readPhotoAlbumsApiError(err, 'Restore Sample Album failed'));
+      setBusy(false);
+      return;
+    }
+    // Log off and back to the open screen (same as Backup/Restore) so the reopen loads it fresh.
+    setVaultLeaving(true);
+    try {
+      await performVaultStorageLogoff();
+    } catch (err) {
+      setError(readPhotoAlbumsApiError(err, 'Logoff failed'));
+    } finally {
+      setVaultLeaving(false);
+      setVaultLeavingProgressPercent(0);
+      setVaultLeavingProgressLabel('');
+      setBusy(false);
+    }
+  }, [busy, unlocked, flushPendingNoteSave, vaultApi, performVaultStorageLogoff]);
+
   const openPaymentTokenCheckout = useCallback(
     (tokensBuying = 1) => {
       void (async () => {
@@ -8038,6 +8064,10 @@ export default function PhotoAlbumsWorkspacePane({
               onPurchased={() => refreshVaultUsageRef.current?.() ?? Promise.resolve()}
               onGetMoreTokens={openPaymentTokenCheckout}
               onRequestUsageRefresh={() => refreshVaultUsageRef.current?.()}
+              onRestoreSampleAlbum={
+                sharedAlbumView || compareMode ? null : () => void handleRestoreSampleAlbum()
+              }
+              restoreSampleAlbumDisabled={busy || !unlocked}
             />
           ) : null}
           {!hideWorkspaceChrome ? (
@@ -8198,7 +8228,6 @@ export default function PhotoAlbumsWorkspacePane({
                   storageType={paneStorageType}
                   albumSetName={activeAlbumSetName}
                   albumName={activeAlbumName}
-                  videoTutorialUrl={videoTutorialUrl}
                   onInvited={() => void refreshSharedAlbums()}
                   onOpenReview={(sendResult) => {
                     setInviteReviewSendResult(sendResult || null);

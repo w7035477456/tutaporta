@@ -36,6 +36,7 @@ import PhotoAlbumsPageFlipOverlay, {
 import PhotoAlbumsContextTutorial from './PhotoAlbumsContextTutorial';
 import { findAlbumPagesMatchingSearchTerms } from './photoAlbumsPageSearch';
 import PhotoAlbumsThumbnailTray from './thumbnails/PhotoAlbumsThumbnailTray';
+import PhotoAlbumsPhotoOverlays from './PhotoAlbumsPhotoOverlays';
 import {
   buildPhotoAlbumsTrayItems,
   excludePlacedTrayItems,
@@ -46,6 +47,8 @@ import {
   albumPageBlockHeight,
   albumPagePhotoCells,
   albumPagePhotoIds,
+  albumPagePhotoView,
+  albumPhotoViewTransform,
   createAlbumPageInstance,
   normalizeAlbumPageAttachmentIds,
   parseAlbumPageInstancesFromHtml,
@@ -306,7 +309,8 @@ function restackAlbumPagesFlush(
       y: albumPageTopForSpreadRow(spreadRow, h),
       w: pw,
       h,
-      attachmentIds: albumPagePhotoIds(inst)
+      attachmentIds: albumPagePhotoIds(inst),
+      photoViews: inst.photoViews
     });
     return {
       pageIndex,
@@ -2453,6 +2457,22 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     [persistAlbumPages]
   );
 
+  /** Zoom / pan / rotation of one page photo (null = original). */
+  const setAlbumPagePhotoView = useCallback(
+    (pageKey, attachmentId, view) => {
+      const id = String(attachmentId);
+      const next = (albumPagesRef.current || []).map((page) => {
+        if (page.key !== pageKey) return page;
+        const photoViews = { ...(page.photoViews || {}) };
+        if (view) photoViews[id] = view;
+        else delete photoViews[id];
+        return createAlbumPageInstance({ ...page, photoViews });
+      });
+      persistAlbumPages(next);
+    },
+    [persistAlbumPages]
+  );
+
   /**
    * New pages at `insertAt` (book order), one per entry of `attachmentIds` (null = blank page),
    * then show the spread holding the first one.
@@ -2652,7 +2672,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
    * inside the photo's top-left corner. View-only: open the photo full size in a new tab.
    */
   const handlePagePhotoDoubleClick = useCallback(
-    (attachmentId, frame) => {
+    (attachmentId, frame, pageKey) => {
       if (effectiveEditable) {
         handlePlaceFloatingText({
           posLeft: Math.round(frame.left + Math.max(8, frame.width * 0.08)),
@@ -2665,7 +2685,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           frameLeft: frame.left,
           frameTop: frame.top,
           frameWidth: frame.width,
-          frameHeight: frame.height
+          frameHeight: frame.height,
+          pageKey,
+          view: albumPagePhotoView(
+            (albumPagesRef.current || []).find((p) => p.key === pageKey),
+            attachmentId
+          )
         });
         return;
       }
@@ -3947,6 +3972,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         initialText={placeTextSeed}
         initialStyle={placeTextStyle}
         photo={placeTextPhoto}
+        onPhotoViewChange={(photo, view) => {
+          if (photo?.pageKey) setAlbumPagePhotoView(photo.pageKey, photo.attachmentId, view);
+        }}
         onClose={() => {
           setPlaceTextPhoto(null);
           placeTextEditingLabelIdRef.current = null;
@@ -4571,7 +4599,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                             if (e.target?.closest?.('button')) return;
                             e.preventDefault();
                             e.stopPropagation();
-                            handlePagePhotoDoubleClick(attachmentId, frame);
+                            handlePagePhotoDoubleClick(attachmentId, frame, page.key);
                           }}
                           title={
                             effectiveEditable
@@ -4592,17 +4620,40 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                             alignItems: 'center',
                             justifyContent: 'center',
                             outline: isSwapTarget ? `4px solid ${ALBUM_PHOTO_DROP_TARGET_BG}` : 'none',
-                            outlineOffset: 2
+                            outlineOffset: 2,
+                            overflow: 'hidden'
                           }}
                         >
-                          <PhotoAlbumsThumbnail
-                            noteId={noteId}
-                            attachmentId={attachmentId}
-                            storageType={storageType}
-                            label={photoAlbumsTrayItemDisplayName(pageTrayItem || { attachmentId })}
-                            cache={pageIsVideo ? photoAlbumsThumbnailCache : photoAlbumsPagePhotoCache}
-                            fallbackCache={pageIsVideo ? null : photoAlbumsThumbnailCache}
-                            objectFit="contain"
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              inset: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transform: albumPhotoViewTransform(
+                                albumPagePhotoView(page, attachmentId),
+                                frame.width,
+                                frame.height
+                              ),
+                              transformOrigin: 'center center'
+                            }}
+                          >
+                            <PhotoAlbumsThumbnail
+                              noteId={noteId}
+                              attachmentId={attachmentId}
+                              storageType={storageType}
+                              label={photoAlbumsTrayItemDisplayName(pageTrayItem || { attachmentId })}
+                              cache={pageIsVideo ? photoAlbumsThumbnailCache : photoAlbumsPagePhotoCache}
+                              fallbackCache={pageIsVideo ? null : photoAlbumsThumbnailCache}
+                              objectFit="contain"
+                            />
+                          </Box>
+                          <PhotoAlbumsPhotoOverlays
+                            overlays={albumPagePhotoView(page, attachmentId).overlays}
+                            width={frame.width}
+                            height={frame.height}
+                            zIndex={2}
                           />
                           {pageIsVideo ? (
                             <PhotoAlbumsVideoIndicator size={Math.round(controlPx * 0.9)} sx={{ top: 4, left: 4, zIndex: 3 }} />
