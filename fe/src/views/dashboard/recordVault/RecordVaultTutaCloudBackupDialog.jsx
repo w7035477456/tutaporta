@@ -661,7 +661,7 @@ export default function RecordVaultTutaCloudBackupDialog({
     onClose?.();
   };
 
-  /** Exit on the "Zip success" popup — the caller continues its Exit to Mall or Logout. */
+  /** Exit on the "Zip success" popup or "Skip backup & Exit" — the caller continues its Exit to Mall or Logout. */
   const handleExitAfterBackup = () => {
     resetDialogState();
     onClose?.('exit');
@@ -1294,8 +1294,8 @@ export default function RecordVaultTutaCloudBackupDialog({
           {backupLocked ? (
             <ColorTemplate16PopupCenterWide.ErrorBar>
               Your TutaNotes changed since the last backup. Click &quot;Backup/Encrypt TutaNote to Cloud as Zip&quot;
-              before leaving. X closes this popup and keeps you in TutaNotes; Exit to Mall or Logoff returns here
-              until the backup completes. After the backup, all buttons unlock and X continues your exit.
+              before leaving, or &quot;Skip backup &amp; Exit&quot; to leave without one. X closes this popup and keeps
+              you in TutaNotes. After the backup, all buttons unlock and X continues your exit.
             </ColorTemplate16PopupCenterWide.ErrorBar>
           ) : null}
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
@@ -1310,14 +1310,25 @@ export default function RecordVaultTutaCloudBackupDialog({
               >
                 Backup/Encrypt TutaNote to Cloud as Zip
               </GreenButton>
-              <GreenButton
-                type="button"
-                disabled={busy || backupLocked}
-                onClick={() => void handleFormat()}
-                sx={actionButtonSx}
-              >
-                Format TutaNotes Cloud
-              </GreenButton>
+              {backupLocked ? (
+                <GreenButton
+                  type="button"
+                  disabled={busy}
+                  onClick={handleExitAfterBackup}
+                  sx={formatRedButtonSx}
+                >
+                  Skip backup &amp; Exit
+                </GreenButton>
+              ) : (
+                <GreenButton
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void handleFormat()}
+                  sx={actionButtonSx}
+                >
+                  Format TutaNotes Cloud
+                </GreenButton>
+              )}
               {!tutaDriveActive && (
                 <GreenButton
                   type="button"

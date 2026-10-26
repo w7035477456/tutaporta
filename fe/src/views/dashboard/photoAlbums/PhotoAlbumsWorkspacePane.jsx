@@ -53,10 +53,7 @@ import PhotoAlbumsSearchBar from './PhotoAlbumsSearchBar';
 import PhotoAlbumsInviteBar from './PhotoAlbumsInviteBar';
 import PhotoAlbumsInviteReviewDialog from './PhotoAlbumsInviteReviewDialog';
 import { fetchPhotoAlbumsSharedAlbums, fetchPhotoAlbumsSharedAlbumContent, removePhotoAlbumsSharedAlbum, readPhotoAlbumsInviteError } from 'api/photoAlbumsInviteFe';
-import {
-  PHOTO_ALBUMS_MENU_BUTTON_FONT_REM_VAR,
-  photoAlbumsMenuButtonFontRemFromTenths
-} from 'config/photoAlbumsMenuButtonFontEnv';
+import { PHOTO_ALBUMS_MENU_BUTTON_FONT_REM_VAR } from 'config/photoAlbumsMenuButtonFontEnv';
 import { getVaultDefaultButtonFontSizeRem } from 'config/photoAlbumsDefaultButtonFontSizeEnv';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
 import { PhotoAlbumsSliderControlButtonProvider } from './PhotoAlbumsSliderControlButtonContext';
@@ -74,8 +71,7 @@ import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspace
 import { formatPhotoAlbumsSidebarAlbumLines } from './photoAlbumsAlbumTitleStyle';
 import {
   countPhotoAlbumsSidebarMediaInAttachments,
-  photoAlbumsSidebarAlbumMediaCount,
-  photoAlbumsSidebarAlbumSetCount
+  photoAlbumsSidebarAlbumMediaCount
 } from './photoAlbumsSidebarCounts';
 import {
   FILES_EXPLORER_TAB_EXPLORER,
@@ -160,7 +156,6 @@ import {
   PHOTO_ALBUMS_DEFAULT_CONTENT_BG_INDEX,
   PHOTO_ALBUMS_DEFAULT_FONT_SIZE_PT,
   PHOTO_ALBUMS_DEFAULT_FONT_STYLE_INDEX,
-  PHOTO_ALBUMS_DEFAULT_MENU_BUTTON_FONT_SIZE_TENTHS,
   PHOTO_ALBUMS_DEFAULT_TEXT_HIGHLIGHT_INDEX,
   PHOTO_ALBUMS_FONT_STYLE_COUNT,
   normalizePhotoAlbumsFontSizePt,
@@ -254,6 +249,8 @@ const MAX_SIDEBAR_WIDTH = 720;
 const MIN_RIGHT_SIDEBAR_WIDTH = 140;
 const MAX_RIGHT_SIDEBAR_WIDTH = 420;
 const MIN_MENU_COL_WIDTH = 96;
+/** Album editor width kept visible when auto-fitting the left lanes. */
+const MIN_ALBUM_EDITOR_STRIP_PX = 360;
 const DEFAULT_SHORTCUT_PANE_PERCENT = 42;
 const MIN_SHORTCUT_PANE_PERCENT = 15;
 const MAX_SHORTCUT_PANE_PERCENT = 75;
@@ -932,7 +929,7 @@ function renderMenuLabelOneWordPerLine(label) {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length <= 1) {
     return (
-      <Box component="span" sx={{ ...menuButtonWordPerLineLabelSx, display: 'block' }}>
+      <Box component="span" data-menu-label-word="" sx={{ ...menuButtonWordPerLineLabelSx, display: 'block' }}>
         {text}
       </Box>
     );
@@ -944,6 +941,7 @@ function renderMenuLabelOneWordPerLine(label) {
           // eslint-disable-next-line react/no-array-index-key
           key={`${word}-${index}`}
           component="span"
+          data-menu-label-word=""
           sx={{
             display: 'block',
             width: '100%',
@@ -957,6 +955,57 @@ function renderMenuLabelOneWordPerLine(label) {
       ))}
     </Box>
   );
+}
+
+/** Rendered width of the text inside `el` (text nodes only — ignores ripple / icon spans). */
+function measureTextWidthPx(el) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  let left = Infinity;
+  let right = -Infinity;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent.trim()) continue;
+    range.selectNodeContents(node);
+    const rect = range.getBoundingClientRect();
+    if (!rect.width) continue;
+    left = Math.min(left, rect.left);
+    right = Math.max(right, rect.right);
+  }
+  return right > left ? right - left : 0;
+}
+
+function horizontalChromePx(el) {
+  const cs = window.getComputedStyle(el);
+  return (
+    (parseFloat(cs.paddingLeft) || 0) +
+    (parseFloat(cs.paddingRight) || 0) +
+    (parseFloat(cs.borderLeftWidth) || 0) +
+    (parseFloat(cs.borderRightWidth) || 0)
+  );
+}
+
+/**
+ * Px to add to (positive) or remove from (negative) a swim lane so its widest label — one word
+ * per row in each album-set/album button (count badge on the row below), and the Add button — just fits.
+ * null = nothing to measure. Every slot's width changes 1:1 with the lane width (lock / X are fixed).
+ */
+function measureLaneFitDeltaPx(laneEl) {
+  if (!laneEl) return null;
+  let delta = null;
+  laneEl.querySelectorAll('[data-menu-label-slot]').forEach((slot) => {
+    const button = slot.firstElementChild;
+    if (!button) return;
+    const words = button.querySelectorAll('[data-menu-label-word]');
+    const textWidth = words.length
+      ? Math.max(...Array.from(words, measureTextWidthPx))
+      : measureTextWidthPx(button);
+    const badge = button.querySelector('[data-menu-label-badge]');
+    const badgeWidth = badge ? badge.getBoundingClientRect().width : 0;
+    const needed = Math.max(textWidth, badgeWidth) + horizontalChromePx(button);
+    const diff = needed - slot.clientWidth;
+    delta = delta == null ? diff : Math.max(delta, diff);
+  });
+  return delta == null ? null : Math.ceil(delta) + 2;
 }
 
 function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
@@ -1150,6 +1199,16 @@ const themeDaynightSurfaceImportantSx = {
   WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
 };
 
+/** Album label stacked one word per row, photo count badge centered on the row below. */
+const menuRowLabelWithCountSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  width: '100%',
+  minWidth: 0,
+  gap: 0.25
+};
+
 const menuRowCountBadgeSx = {
   flex: '0 0 auto',
   minWidth: 28,
@@ -1190,26 +1249,23 @@ const menuRowEditFieldSx = {
 
 /** Content-header rename field — match selected notebook/note: white + double border. */
 
-/**
- * Hard Material yellow for current album-set / album.
- * Do NOT use --theme-yellow-color — Minimal Palete remaps it to secondary (blue).
- */
-const MENU_ROW_CURRENT_YELLOW = SLIDER_CONTROL_TRUE_YELLOW;
+/** Selected notebook / note / shortcut row (hard RGB — Minimal Palete remaps the theme vars). */
+const MENU_ROW_CURRENT_GREEN = '#60C446';
 const MENU_ROW_IDLE_GREY = '#9e9e9e';
 const MENU_ROW_CURRENT_CLASS = 'pa-menu-row-current';
 const MENU_ROW_IDLE_CLASS = 'pa-menu-row-idle';
 
 /** Document-level kill switch — beats theme Button overrides + Minimal secondary remap. */
-const menuRowCurrentYellowGlobalStyles = {
+const menuRowCurrentGreenGlobalStyles = {
   [`button.${MENU_ROW_CURRENT_CLASS}, div.${MENU_ROW_CURRENT_CLASS}[role="button"]`]: {
-    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundColor: `${MENU_ROW_CURRENT_GREEN} !important`,
     backgroundImage: 'none !important',
     color: '#000000 !important',
     WebkitTextFillColor: '#000000 !important',
     border: '4px solid #000000 !important'
   },
   [`button.${MENU_ROW_CURRENT_CLASS}:hover, div.${MENU_ROW_CURRENT_CLASS}[role="button"]:hover`]: {
-    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundColor: `${MENU_ROW_CURRENT_GREEN} !important`,
     backgroundImage: 'none !important',
     color: '#000000 !important',
     WebkitTextFillColor: '#000000 !important'
@@ -1314,10 +1370,10 @@ function MenuRowButton({
   const lookSelected = selected || multiSelected;
   // Search hit on the open album: blue. Otherwise current album-set / album: yellow + black.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
-  const currentYellow = Boolean(lookSelected && !locked && !searchHitBlue);
+  const currentGreen = Boolean(lookSelected && !locked && !searchHitBlue);
   const rowClass = locked
     ? undefined
-    : currentYellow
+    : currentGreen
       ? MENU_ROW_CURRENT_CLASS
       : searchHitBlue
         ? undefined
@@ -1326,8 +1382,8 @@ function MenuRowButton({
   // Never selected={true} (theme-secondary). Never aria-pressed for color.
   const forceBg = searchHitBlue
     ? PHOTO_ALBUMS_SEARCH_HIT_BLUE
-    : currentYellow
-      ? MENU_ROW_CURRENT_YELLOW
+    : currentGreen
+      ? MENU_ROW_CURRENT_GREEN
       : !locked
         ? MENU_ROW_IDLE_GREY
         : undefined;
@@ -1335,16 +1391,16 @@ function MenuRowButton({
   return (
     <SliderControlButton
       {...rest}
-      variant={currentYellow ? 'yellow' : 'green'}
+      variant="green"
       selected={undefined}
       aria-pressed={undefined}
       forceBgcolor={forceBg}
       forceColor={forceFg}
-      data-pa-current={currentYellow ? 'true' : undefined}
+      data-pa-current={currentGreen ? 'true' : undefined}
       className={[className, rowClass].filter(Boolean).join(' ') || undefined}
       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
       disableSelectedTranslate
-      disableHoverScale={currentYellow || searchHitBlue}
+      disableHoverScale={currentGreen || searchHitBlue}
       {...(useDivDragSurface ? { component: 'div', role: 'button', tabIndex: 0 } : { type: 'button' })}
       onClick={onClick}
       onKeyDown={(event) => {
@@ -1361,7 +1417,7 @@ function MenuRowButton({
         { justifyContent: 'center' },
         searchHitBlue
           ? { border: '4px double #ffffff !important' }
-          : currentYellow && multiSelected && !selected
+          : currentGreen && multiSelected && !selected
             ? { border: '3px solid #000000 !important' }
             : null,
         locked ? photoAlbumsInnerLockedMenuSx : null,
@@ -1605,7 +1661,11 @@ function RenamableDraggableMenuRow({
       lockTitle={lockTitle}
       locked={locked}
     >
-      <Box id={domId || undefined} sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+      <Box
+        id={domId || undefined}
+        data-menu-label-slot=""
+        sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
+      >
         <MenuRowButton
           selected={selected}
           selectedBlue={selectedBlue}
@@ -1709,40 +1769,24 @@ function RenamableDraggableMenuRow({
           {locked ? (
             PHOTO_ALBUMS_INNER_LOCKED_LABEL
           ) : albumLabelLines ? (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                width: '100%',
-                minWidth: 0,
-                gap: 0.5
-              }}
-            >
-              <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>
+            <Box sx={menuRowLabelWithCountSx}>
+              <Box sx={{ width: '100%', minWidth: 0 }}>
                 <SidebarAlbumTwoLineLabel
                   titleLine={albumLabelLines.titleLine}
                   datesLine={albumLabelLines.datesLine}
                 />
               </Box>
               {sideCount != null ? (
-                <Box component="span" sx={menuRowCountBadgeSx} aria-hidden="true">
+                <Box component="span" data-menu-label-badge="" sx={menuRowCountBadgeSx} aria-hidden="true">
                   {sideCount}
                 </Box>
               ) : null}
             </Box>
           ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                width: '100%',
-                minWidth: 0,
-                gap: 0.5
-              }}
-            >
-              <Box sx={{ flex: '1 1 auto', minWidth: 0 }}>{renderMenuLabelOneWordPerLine(label)}</Box>
+            <Box sx={menuRowLabelWithCountSx}>
+              <Box sx={{ width: '100%', minWidth: 0 }}>{renderMenuLabelOneWordPerLine(label)}</Box>
               {sideCount != null ? (
-                <Box component="span" sx={menuRowCountBadgeSx} aria-hidden="true">
+                <Box component="span" data-menu-label-badge="" sx={menuRowCountBadgeSx} aria-hidden="true">
                   {sideCount}
                 </Box>
               ) : null}
@@ -1999,6 +2043,7 @@ export default function PhotoAlbumsWorkspacePane({
   );
   const leftSidebarPaneRef = useRef(null);
   const notebookColPaneRef = useRef(null);
+  const noteLaneRef = useRef(null);
   const rightSidebarPaneRef = useRef(null);
   const [shortcutPanePercent, setShortcutPanePercent] = useState(() =>
     clamp(
@@ -2027,8 +2072,14 @@ export default function PhotoAlbumsWorkspacePane({
   const editorBoxRef = useRef(null);
   const [] = useState(true);
   const [notebookColAutoFit, setNotebookColAutoFit] = useState(false);
-  const defaultMenuButtonFontRem = getVaultDefaultButtonFontSizeRem();
-  const [menuButtonFontRem, setMenuButtonFontRem] = useState(defaultMenuButtonFontRem);
+  const [menuButtonFontRem, setMenuButtonFontRem] = useState(() =>
+    getVaultDefaultButtonFontSizeRem()
+  );
+  useEffect(() => {
+    const syncButtonFont = () => setMenuButtonFontRem(getVaultDefaultButtonFontSizeRem());
+    window.addEventListener('resize', syncButtonFont);
+    return () => window.removeEventListener('resize', syncButtonFont);
+  }, []);
   const menuButtonFontSaveTimerRef = useRef(null);
   const [] = useState(null);
   const [] = useState(false);
@@ -3114,12 +3165,6 @@ export default function PhotoAlbumsWorkspacePane({
     void fetchUserCustomization()
       .then((prefs) => {
         if (cancelled) return;
-        setMenuButtonFontRem(
-          photoAlbumsMenuButtonFontRemFromTenths(
-            prefs.mynoteFontSize ?? PHOTO_ALBUMS_DEFAULT_MENU_BUTTON_FONT_SIZE_TENTHS,
-            defaultMenuButtonFontRem
-          )
-        );
         setNoteFontSizePt(
           normalizePhotoAlbumsFontSizePt(
             prefs.mynoteEditorFontSizePt ?? PHOTO_ALBUMS_DEFAULT_FONT_SIZE_PT
@@ -3161,7 +3206,7 @@ export default function PhotoAlbumsWorkspacePane({
         window.clearTimeout(mynotePrefsSaveTimerRef.current);
       }
     };
-  }, [defaultMenuButtonFontRem, scheduleSaveMynotePrefs]);
+  }, [scheduleSaveMynotePrefs]);
 
 
 
@@ -5400,6 +5445,63 @@ export default function PhotoAlbumsWorkspacePane({
     window.addEventListener('mouseup', onUp);
   }, [notebookColWidth, rightSidebarWidth, sidebarWidth, rightMenuOpen]);
 
+  /** Resize the Album-Set / Album swim lanes (wider or narrower) so the widest label just fits. */
+  const fitMenuLanesToLabels = useCallback(() => {
+    const notebookLane = notebookColPaneRef.current;
+    const noteLane = noteLaneRef.current;
+    if (!notebookLane || !noteLane) return;
+    const notebookDelta = measureLaneFitDeltaPx(notebookLane) ?? 0;
+    const noteDelta = measureLaneFitDeltaPx(noteLane) ?? 0;
+    const notebookNow = notebookLane.offsetWidth;
+    const noteNow = noteLane.offsetWidth;
+    const nextNotebookCol = Math.max(MIN_MENU_COL_WIDTH, notebookNow + notebookDelta);
+    const nextNoteCol = Math.max(MIN_MENU_COL_WIDTH, noteNow + noteDelta);
+    const sidebarDelta = nextNotebookCol - notebookNow + (nextNoteCol - noteNow);
+    if (Math.abs(sidebarDelta) < 2 && Math.abs(nextNotebookCol - notebookColWidth) < 2) return;
+    const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const maxSidebar = clamp(
+      viewportW - (rightMenuOpen ? rightSidebarWidth : 0) - MIN_ALBUM_EDITOR_STRIP_PX,
+      MIN_SIDEBAR_WIDTH,
+      MAX_SIDEBAR_WIDTH
+    );
+    const nextSidebar = clamp(sidebarWidth + sidebarDelta, MIN_SIDEBAR_WIDTH, maxSidebar);
+    setNotebookColAutoFit(false);
+    setNotebookColWidth(nextNotebookCol);
+    setSidebarWidth(nextSidebar);
+    writeStoredLayout({
+      sidebarWidth: nextSidebar,
+      notebookColWidth: nextNotebookCol,
+      rightSidebarWidth,
+      shortcutPanePercent,
+      sharedAlbumPanePercent
+    });
+  }, [
+    notebookColWidth,
+    rightMenuOpen,
+    rightSidebarWidth,
+    sharedAlbumPanePercent,
+    shortcutPanePercent,
+    sidebarWidth
+  ]);
+
+  const fitMenuLanesToLabelsRef = useRef(fitMenuLanesToLabels);
+  fitMenuLanesToLabelsRef.current = fitMenuLanesToLabels;
+  const menuLanesVisible = leftMenuOpen && !hideWorkspaceChrome;
+  const prevMenuLanesVisibleRef = useRef(menuLanesVisible);
+  useEffect(() => {
+    const wasVisible = prevMenuLanesVisibleRef.current;
+    prevMenuLanesVisibleRef.current = menuLanesVisible;
+    if (wasVisible || !menuLanesVisible) return undefined;
+    let innerFrame = 0;
+    const outerFrame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(() => fitMenuLanesToLabelsRef.current());
+    });
+    return () => {
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+    };
+  }, [menuLanesVisible]);
+
   const rightSidebarSplitRef = useRef(null);
 
   const startSharedAlbumPaneResize = useCallback((event) => {
@@ -7487,7 +7589,7 @@ export default function PhotoAlbumsWorkspacePane({
 
   return (
     <PhotoAlbumsSliderControlButtonProvider fontRem={menuButtonFontRem}>
-    <GlobalStyles styles={menuRowCurrentYellowGlobalStyles} />
+    <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
     <Box
       data-record-vault-pane
       data-record-vault-storage={paneStorageType}
@@ -8583,7 +8685,7 @@ export default function PhotoAlbumsWorkspacePane({
                     onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
                     title="Drop a folder of .html notes here to import as a new notebook"
                   >
-                    <Box sx={laneAddButtonWrapSx}>
+                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
                       <SliderControlButton
                         type="button"
                         fullWidth
@@ -8614,7 +8716,6 @@ export default function PhotoAlbumsWorkspacePane({
                           key={nb.notebook_id}
                           id={nb.notebook_id}
                           domId={`record-vault-notebook-${nb.notebook_id}`}
-                          sideCount={photoAlbumsSidebarAlbumSetCount(nb)}
                           label={
                             notebookInnerLocked
                               ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
@@ -8700,6 +8801,7 @@ export default function PhotoAlbumsWorkspacePane({
                   />
 
                   <Box
+                    ref={noteLaneRef}
                     sx={{
                       ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
                       flex: 1,
@@ -8716,7 +8818,7 @@ export default function PhotoAlbumsWorkspacePane({
                     onDragLeave={handleNoteListFileDragLeave}
                     onDrop={(e) => void handleNoteListFileDrop(e)}
                   >
-                    <Box sx={laneAddButtonWrapSx}>
+                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
                       <SliderControlButton
                         type="button"
                         fullWidth
@@ -9592,12 +9694,12 @@ export default function PhotoAlbumsWorkspacePane({
                               cursor: 'pointer',
                               border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
                               borderBottom: selected
-                                ? `2px solid ${PHOTO_ALBUMS_THEME_DAYNIGHT_BG}`
+                                ? `2px solid ${SLIDER_CONTROL_TRUE_YELLOW}`
                                 : PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
                               borderRadius: '6px 6px 0 0',
-                              bgcolor: selected ? PHOTO_ALBUMS_THEME_DAYNIGHT_BG : 'rgba(0,0,0,0.08)',
-                              color: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                              WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                              bgcolor: selected ? SLIDER_CONTROL_TRUE_YELLOW : '#fff59d',
+                              color: '#000',
+                              WebkitTextFillColor: '#000',
                               fontWeight: selected ? 800 : 600,
                               fontSize: '0.72rem',
                               lineHeight: 1.2,

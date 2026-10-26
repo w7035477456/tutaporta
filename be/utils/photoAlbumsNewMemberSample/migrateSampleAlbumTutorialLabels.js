@@ -13,15 +13,12 @@ import {
 } from '../photoAlbumsUsb/vaultPaths.js';
 import { readVaultMeta } from '../photoAlbumsUsb/usbScan.js';
 import { DEFAULT_SAMPLE_ALBUM_NAME, VAULT_SCHEMA_SQL } from '../photoAlbumsUsb/vaultSchema.js';
-import {
-  loadInitializeSampleManifest,
-  loadSampleAlbumBodyHtml
-} from './initializeSampleManifest.js';
+import { loadInitializeSampleManifest } from './initializeSampleManifest.js';
 
 /** Matches vaultSession NOTE_INNER_ENCRYPT_BODY_PREFIX — avoid circular import. */
 const NOTE_INNER_ENCRYPT_BODY_PREFIX = '\u2063RVI';
 
-const SAMPLE_TUTORIAL_LABEL_MARKER = 'tl_sample_hint_edit_1';
+const SAMPLE_TUTORIAL_LABEL_MARKER_PREFIX = 'tl_sample_hint_';
 
 let sqlJsPromise = null;
 
@@ -51,31 +48,6 @@ function queryAll(db, sql, params = []) {
   return rows;
 }
 
-function attachmentsMatchBundledSample(db, noteId, manifest) {
-  const expected = Array.isArray(manifest?.attachments) ? manifest.attachments : [];
-  if (expected.length === 0) return false;
-
-  const rows = queryAll(
-    db,
-    `SELECT attachment_id, file_name, checksum
-     FROM note_attachments
-     WHERE note_id = ? AND deleted_at IS NULL
-     ORDER BY attachment_id ASC`,
-    [noteId]
-  );
-  if (rows.length !== expected.length) return false;
-
-  for (const exp of expected) {
-    const row = rows.find((r) => Number(r.attachment_id) === Number(exp.attachmentId));
-    if (!row) return false;
-    if (String(row.file_name || '') !== String(exp.fileName || '')) return false;
-    const rowChecksum = String(row.checksum || '').trim().toLowerCase();
-    const expChecksum = String(exp.checksum || '').trim().toLowerCase();
-    if (rowChecksum !== expChecksum) return false;
-  }
-  return true;
-}
-
 function refreshSampleAlbumSearchText(db, noteId, albumName, bodyHtml) {
   const kwRows = queryAll(
     db,
@@ -100,10 +72,16 @@ function refreshSampleAlbumSearchText(db, noteId, albumName, bodyHtml) {
   ]);
 }
 
+const SAMPLE_TUTORIAL_LABEL_RE = /<div\b[^>]*\bdata-label-id="tl_sample_hint_[^"]*"[^>]*>[\s\S]*?<\/div>(?:<p><\/p>)?/g;
+
+/** Remove the retired SAMPLE ALBUM hint labels ("Double me to edit photo", video hint). */
+export function stripSampleAlbumTutorialLabels(bodyHtml) {
+  return String(bodyHtml ?? '').replace(SAMPLE_TUTORIAL_LABEL_RE, '');
+}
+
 /**
- * Replace SAMPLE ALBUM body with bundled tutorial labels when the note still
- * uses the original seven bundled attachments. Safe no-op when labels exist
- * or the album was customized.
+ * Strip the retired tutorial hint labels from SAMPLE ALBUM. Safe no-op when
+ * none are present or the body is inner-encrypted.
  *
  * @returns {{ migrated: boolean, reason?: string, noteId?: number }}
  */
@@ -125,23 +103,18 @@ export function migrateSampleAlbumTutorialLabelsDb(db) {
   }
 
   const noteId = Number(note.note_id);
-  const innerEncrypted =
-    Number(note.inner_encrypt_enabled) === 1 ||
-    String(note.body_text || '').startsWith(NOTE_INNER_ENCRYPT_BODY_PREFIX);
-  if (innerEncrypted) {
+  const body = String(note.body_text || '');
+  if (Number(note.inner_encrypt_enabled) === 1 || body.startsWith(NOTE_INNER_ENCRYPT_BODY_PREFIX)) {
     return { migrated: false, reason: 'inner_encrypted', noteId };
   }
-
-  if (!attachmentsMatchBundledSample(db, noteId, manifest)) {
-    return { migrated: false, reason: 'not_bundled_sample', noteId };
+  if (!body.includes(SAMPLE_TUTORIAL_LABEL_MARKER_PREFIX)) {
+    return { migrated: false, reason: 'no_tutorial_labels', noteId };
   }
 
-  const body = String(note.body_text || '');
-  if (body.includes(SAMPLE_TUTORIAL_LABEL_MARKER)) {
-    return { migrated: false, reason: 'already_migrated', noteId };
+  const bodyHtml = stripSampleAlbumTutorialLabels(body);
+  if (bodyHtml === body) {
+    return { migrated: false, reason: 'no_tutorial_labels', noteId };
   }
-
-  const bodyHtml = loadSampleAlbumBodyHtml();
   db.run(`UPDATE notes SET body_text = ?, updated_at = datetime('now') WHERE note_id = ?`, [
     bodyHtml,
     noteId

@@ -11,6 +11,7 @@ import { requestDesktopOnlyAppsNotice } from 'utils/desktopOnlyApps';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
 import MallRafflePanel from 'ui-component/MallRafflePanel';
 import { takeGetMyRafflePending } from 'constants/raffleRoute';
+import { useRaffleEnabled } from 'api/raffleEnableFe';
 
 import tutaMallInside from 'assets/images/tutaMallInside.png';
 import eMarketPlaceImg from 'assets/images/onlineMarketPlace.png';
@@ -213,6 +214,7 @@ export default function Landing() {
   const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
   const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
   const [raffleOpenRequest, setRaffleOpenRequest] = useState(0);
+  const raffleEnabled = useRaffleEnabled();
   const raffleWrapRef = useRef(null);
   /** Phone layout: px from the mall area's top to below the Raffle bar / panel; tiles start there. */
   const [narrowTilesTop, setNarrowTilesTop] = useState(null);
@@ -428,7 +430,7 @@ export default function Landing() {
       ro.disconnect();
       window.removeEventListener('resize', updateMallScale);
     };
-  }, [visibleDepartments.length]);
+  }, [visibleDepartments.length, raffleEnabled]);
 
   const handleTileHover = useCallback(() => {
     if (mediaVolume <= 0) return;
@@ -644,18 +646,20 @@ export default function Landing() {
           </Box>
         ))}
       </Box>
-      <Box
-        ref={raffleWrapRef}
-        sx={{
-          position: 'absolute',
-          top: { xs: 8, sm: 16 },
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 3
-        }}
-      >
-        <MallRafflePanel openRequest={raffleOpenRequest} />
-      </Box>
+      {raffleEnabled ? (
+        <Box
+          ref={raffleWrapRef}
+          sx={{
+            position: 'absolute',
+            top: { xs: 8, sm: 16 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 3
+          }}
+        >
+          <MallRafflePanel openRequest={raffleOpenRequest} />
+        </Box>
+      ) : null}
       <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
     </Box>
   );

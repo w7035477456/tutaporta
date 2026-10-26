@@ -12,14 +12,17 @@ import {
   PHOTO_ALBUMS_THEME_INVERSE_BORDER_2
 } from './photoAlbumsNoteFontTokens';
 import PhotoAlbumsTrayCountLabel from './PhotoAlbumsTrayCountLabel';
+import PhotoAlbumsThumbnail from './thumbnails/PhotoAlbumsThumbnail';
 
 const THUMB_H_PX = 96;
+/** Pages per open spread — every photo on the open spread is highlighted. */
+const ALBUM_SPREAD_PAGES = 2;
 const ACTIVE_BORDER = '4px solid #e53935';
 const IDLE_BORDER = '2px solid #333';
 
 /**
- * Build lightweight page preview models for the filmstrip.
- * `editor` / `pageWidth` are kept in the signature for callers; pages carry no photos.
+ * Build lightweight page preview models for the filmstrip (one photo per page via `attachmentId`).
+ * `editor` / `pageWidth` are kept in the signature for callers.
  */
 export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
   const list = Array.isArray(pages) ? pages : [];
@@ -28,14 +31,16 @@ export function buildAlbumPageFilmstripModels(editor, pages, pageWidth) {
     return [
       {
         key: 'empty-page',
-        photos: []
+        photos: [],
+        attachmentId: null
       }
     ];
   }
 
   return list.map((inst) => ({
     key: String(inst.key || 'page'),
-    photos: []
+    photos: [],
+    attachmentId: inst.attachmentId ?? null
   }));
 }
 
@@ -141,9 +146,23 @@ export function PageThumb({
           borderRadius: 0.75,
           overflow: 'hidden',
           // Let the thumb own HTML5 drag — nested photo boxes must not steal the gesture.
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: '4%',
+          boxSizing: 'border-box'
         }}
-      />
+      >
+        {model?.attachmentId != null ? (
+          <PhotoAlbumsThumbnail
+            noteId={noteId}
+            attachmentId={model.attachmentId}
+            storageType={storageType}
+            objectFit="contain"
+          />
+        ) : null}
+      </Box>
       {canDelete ? (
         <Box
           component="button"
@@ -197,7 +216,8 @@ export function PageThumb({
 PageThumb.propTypes = {
   model: PropTypes.shape({
     key: PropTypes.string,
-    photos: PropTypes.array
+    photos: PropTypes.array,
+    attachmentId: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
   }).isRequired,
   pageNumber: PropTypes.number.isRequired,
   pageIndex: PropTypes.number,
@@ -274,7 +294,10 @@ export default function PhotoAlbumsPageFilmstrip({
         orientation: entry.orientation || orientation
       }));
     }
-    return allModels.map((model, idx) => ({ model, pageIndex: idx, pageNumber: idx + 1 }));
+    // Frames are photos, not pages: blank album pages get no frame (pageIndex stays the real page).
+    return allModels
+      .map((model, idx) => ({ model, pageIndex: idx, pageNumber: idx + 1 }))
+      .filter((entry) => entry.model.attachmentId != null);
   }, [hasOverride, overrideEntries, allModels, orientation]);
 
   const effectivePageCount = hasOverride ? displayEntries.length : pageCount;
@@ -406,7 +429,11 @@ export default function PhotoAlbumsPageFilmstrip({
           model={entry.model}
           pageNumber={entry.pageNumber}
           pageIndex={entry.pageIndex}
-          active={entry.pageIndex === pageIndex}
+          active={
+            hasOverride
+              ? entry.pageIndex === pageIndex
+              : Math.floor(entry.pageIndex / ALBUM_SPREAD_PAGES) === Math.floor(pageIndex / ALBUM_SPREAD_PAGES)
+          }
           orientation={entry.orientation || orientation}
           noteId={entry.noteId ?? noteId}
           storageType={storageType}

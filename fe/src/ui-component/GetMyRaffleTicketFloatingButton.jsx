@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import router from 'routes';
 import { RAFFLE_HOST_PATH, RAFFLE_PATH, RAFFLE_STEPS_PATH } from 'constants/raffleRoute';
+import { useRaffleEnabled } from 'api/raffleEnableFe';
 
 /** Fixed on every theme: red label, white button, blue box. */
 const PANEL_BLUE = '#1e88e5';
@@ -16,9 +17,11 @@ const HIDDEN_PATHS = [RAFFLE_PATH, RAFFLE_HOST_PATH, RAFFLE_STEPS_PATH, '/mall']
  */
 export default function GetMyRaffleTicketFloatingButton() {
   const [pathname, setPathname] = useState(() => router.state.location.pathname);
+  const raffleEnabled = useRaffleEnabled();
 
   useEffect(() => router.subscribe((state) => setPathname(state.location.pathname)), []);
 
+  if (!raffleEnabled) return null;
   const current = pathname.toLowerCase().replace(/\/+$/, '');
   if (HIDDEN_PATHS.some((p) => current === p.toLowerCase())) return null;
 

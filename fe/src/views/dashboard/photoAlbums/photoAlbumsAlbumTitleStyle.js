@@ -63,13 +63,16 @@ export function albumTitleStyleMarkerHtml(style) {
 export const ALBUM_PAGE_TITLE_LINE_COUNT = 2;
 export const ALBUM_PAGE_TITLE_BAND_MIN_PX = 72;
 
-/** Fixed styling for the "Page N of M" footer row. */
+/** "Page N of M" font size = album title font size × this. */
+export const ALBUM_PAGE_COUNT_LINE_SCALE = 2;
+
+/** Fixed styling for the "Page N of M" footer row (solid black, no outline). */
 export const ALBUM_PAGE_COUNT_LINE_STYLE = {
   fontFamily: 'Algerian, fantasy',
-  color: '#ffffff',
-  WebkitTextFillColor: '#ffffff',
-  WebkitTextStroke: '1px #000000',
-  paintOrder: 'stroke fill',
+  color: '#000000',
+  WebkitTextFillColor: '#000000',
+  WebkitTextStroke: '0 transparent',
+  paintOrder: 'normal',
   fontWeight: 400
 };
 
@@ -79,10 +82,8 @@ export function albumPageTitleBandHeightPx(style) {
   const fs = normalized.fontSize;
   const lineHeight = 1.2;
   const pad = 10;
-  return Math.max(
-    ALBUM_PAGE_TITLE_BAND_MIN_PX,
-    Math.ceil(fs * lineHeight * ALBUM_PAGE_TITLE_LINE_COUNT + pad)
-  );
+  const lineUnits = ALBUM_PAGE_TITLE_LINE_COUNT - 1 + ALBUM_PAGE_COUNT_LINE_SCALE;
+  return Math.max(ALBUM_PAGE_TITLE_BAND_MIN_PX, Math.ceil(fs * lineHeight * lineUnits + pad));
 }
 
 /** Date suffix patterns at end of album note names (longest / most specific first). */

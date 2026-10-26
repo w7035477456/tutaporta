@@ -5,7 +5,8 @@ import Typography from '@mui/material/Typography';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
 import SliderControlButton, {
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
+  SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
+  SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
 import {
   deleteMobileUploadFile,
@@ -85,13 +86,13 @@ const trayButtonSx = {
   flexShrink: 0,
   fontSize: '0.72rem',
   py: 0.35,
-  bgcolor: 'var(--theme-primary-color) !important',
+  bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
   color: '#000 !important',
   WebkitTextFillColor: '#000 !important',
   border: '2px solid #000',
   // Always theme primary — beats SliderControlButton's grey disabled fill.
   '&.Mui-disabled': {
-    bgcolor: 'var(--theme-primary-color) !important',
+    bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
     color: '#000 !important',
     WebkitTextFillColor: '#000 !important',
     border: '2px solid #000',
@@ -315,11 +316,11 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
             minWidth: 0,
             fontSize: '0.72rem',
             py: 0.25,
-            bgcolor: 'var(--theme-primary-color) !important',
+            bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
             color: '#000 !important',
             WebkitTextFillColor: '#000 !important',
             '&.Mui-disabled': {
-              bgcolor: 'var(--theme-primary-color) !important',
+              bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
               color: '#000 !important',
               WebkitTextFillColor: '#000 !important',
               opacity: 1
@@ -340,11 +341,11 @@ export default function PhotoAlbumsMobileUploadFolderPanel({
             minWidth: 0,
             fontSize: '0.72rem',
             py: 0.25,
-            bgcolor: 'var(--theme-primary-color) !important',
+            bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
             color: '#000 !important',
             WebkitTextFillColor: '#000 !important',
             '&.Mui-disabled': {
-              bgcolor: 'var(--theme-primary-color) !important',
+              bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
               color: '#000 !important',
               WebkitTextFillColor: '#000 !important',
               opacity: 1

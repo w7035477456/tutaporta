@@ -1069,6 +1069,9 @@ app.get('/api/publicConfig', (_req, res) => {
     autoUiChatUpdate: isAutoUiChatUpdateEnabled(),
     autoUiPostUpdate: isAutoUiPostUpdateEnabled(),
     newAccountSignup,
+    raffleEnable: ['true', '1', 'yes', 'on'].includes(
+      String(process.env.RAFFLE_ENABLE ?? '').trim().toLowerCase()
+    ),
     signupDown: isSignupDownEnabled(),
     bypassSmsPhoneVerification: isBypassSmsPhoneVerificationEnabled(),
     googleSignupEnabled: isGoogleSignupOAuthConfigured(),

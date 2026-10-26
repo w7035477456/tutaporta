@@ -8,8 +8,7 @@ import Typography from '@mui/material/Typography';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50,
-  SLIDER_CONTROL_TRUE_YELLOW
+  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
@@ -1028,26 +1027,23 @@ const menuRowEditFieldSx = {
 
 /** Content-header rename field — white + double border (edit-in-place). */
 
-/**
- * Hard Material yellow for current notebook / note / Monthly / Yearly.
- * Do NOT use --theme-yellow-color — Minimal Palete remaps it to secondary (blue).
- */
-const MENU_ROW_CURRENT_YELLOW = SLIDER_CONTROL_TRUE_YELLOW;
+/** Selected notebook / note / shortcut row (hard RGB — Minimal Palete remaps the theme vars). */
+const MENU_ROW_CURRENT_GREEN = '#60C446';
 const MENU_ROW_IDLE_GREY = '#9e9e9e';
 const MENU_ROW_CURRENT_CLASS = 'rv-menu-row-current';
 const MENU_ROW_IDLE_CLASS = 'rv-menu-row-idle';
 
 /** Document-level kill switch — beats theme Button overrides + Minimal secondary remap. */
-const menuRowCurrentYellowGlobalStyles = {
+const menuRowCurrentGreenGlobalStyles = {
   [`button.${MENU_ROW_CURRENT_CLASS}, div.${MENU_ROW_CURRENT_CLASS}[role="button"]`]: {
-    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundColor: `${MENU_ROW_CURRENT_GREEN} !important`,
     backgroundImage: 'none !important',
     color: '#000000 !important',
     WebkitTextFillColor: '#000000 !important',
     border: '4px solid #000000 !important'
   },
   [`button.${MENU_ROW_CURRENT_CLASS}:hover, div.${MENU_ROW_CURRENT_CLASS}[role="button"]:hover`]: {
-    backgroundColor: `${MENU_ROW_CURRENT_YELLOW} !important`,
+    backgroundColor: `${MENU_ROW_CURRENT_GREEN} !important`,
     backgroundImage: 'none !important',
     color: '#000000 !important',
     WebkitTextFillColor: '#000000 !important'
@@ -1185,12 +1181,12 @@ function MenuRowButton({
 }) {
   const useDivDragSurface = Boolean(draggable);
   const lookSelected = selected || multiSelected;
-  // Search hit on the open note: blue. Otherwise current notebook/note/Monthly/Yearly: yellow.
+  // Search hit on the open note: blue. Otherwise current notebook/note/Monthly/Yearly: green.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
-  const currentYellow = Boolean(lookSelected && !locked && !searchHitBlue);
+  const currentGreen = Boolean(lookSelected && !locked && !searchHitBlue);
   const rowClass = locked
     ? undefined
-    : currentYellow
+    : currentGreen
       ? MENU_ROW_CURRENT_CLASS
       : searchHitBlue
         ? undefined
@@ -1199,8 +1195,8 @@ function MenuRowButton({
   // Never selected={true} (theme-secondary). Never aria-pressed for color.
   const forceBg = searchHitBlue
     ? RECORD_VAULT_SEARCH_HIT_BLUE
-    : currentYellow
-      ? MENU_ROW_CURRENT_YELLOW
+    : currentGreen
+      ? MENU_ROW_CURRENT_GREEN
       : !locked
         ? MENU_ROW_IDLE_GREY
         : undefined;
@@ -1208,16 +1204,16 @@ function MenuRowButton({
   return (
     <SliderControlButton
       {...rest}
-      variant={currentYellow ? 'yellow' : 'green'}
+      variant="green"
       selected={undefined}
       aria-pressed={undefined}
       forceBgcolor={forceBg}
       forceColor={forceFg}
-      data-rv-current={currentYellow ? 'true' : undefined}
+      data-rv-current={currentGreen ? 'true' : undefined}
       className={[className, rowClass].filter(Boolean).join(' ') || undefined}
       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
       disableSelectedTranslate
-      disableHoverScale={currentYellow || searchHitBlue}
+      disableHoverScale={currentGreen || searchHitBlue}
       {...(useDivDragSurface ? { component: 'div', role: 'button', tabIndex: 0 } : { type: 'button' })}
       onClick={onClick}
       onKeyDown={(event) => {
@@ -1234,7 +1230,7 @@ function MenuRowButton({
         { justifyContent: 'center' },
         searchHitBlue
           ? { border: '4px double #ffffff !important' }
-          : currentYellow && multiSelected && !selected
+          : currentGreen && multiSelected && !selected
             ? { border: '3px solid #000000 !important' }
             : null,
         locked ? recordVaultInnerLockedMenuSx : null,
@@ -2095,7 +2091,7 @@ export default function RecordVaultWorkspacePane({
   const activeSearchTerms = appliedSearchTerms;
 
   // Search never prunes the tree: every notebook (and every note) stays visible on
-  // the left. A match is shown by selection styling — containing notebook stays yellow
+  // the left. A match is shown by selection styling — containing notebook stays green
   // (current) and the matched note goes blue (selectedBlue) — so the user keeps their
   // full notebook list while jumping between hits.
   // Bill Schedule lives in a separate bottom box (not in displayNotebooks).
@@ -6660,7 +6656,7 @@ export default function RecordVaultWorkspacePane({
 
   return (
     <RecordVaultSliderControlButtonProvider fontRem={menuButtonFontRem}>
-    <GlobalStyles styles={menuRowCurrentYellowGlobalStyles} />
+    <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
     <Box
       data-record-vault-pane
       data-record-vault-storage={paneStorageType}

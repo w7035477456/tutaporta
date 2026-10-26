@@ -21,6 +21,7 @@ import {
   albumTitleStyleMarkerHtml,
   DEFAULT_ALBUM_TITLE_STYLE,
   formatAlbumPageTitleLines,
+  ALBUM_PAGE_COUNT_LINE_SCALE,
   ALBUM_PAGE_COUNT_LINE_STYLE,
   parseAlbumTitleStyleFromHtml,
   stripAlbumTitleStyleMarker
@@ -2073,6 +2074,44 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     });
   }, [albumFocusView]);
 
+  /** Remove one album page (and text labels in its band), then restack remaining pages. */
+  const removeAlbumPageAt = useCallback(
+    (pageIndex) => {
+      if (!editor) return false;
+      const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
+      if (!ordered.length) return false;
+      const idx = Math.max(0, Math.min(ordered.length - 1, Math.round(Number(pageIndex) || 0)));
+      const target = ordered[idx];
+      if (!target) return false;
+      const pw = Math.max(
+        200,
+        Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
+      );
+      const orient = pageOrientationRef.current;
+      const band = albumPageBand(target, pw, orient);
+      removeTextLabelsInBand(editor, band);
+      const remaining = ordered.filter((_, i) => i !== idx);
+      const nextList = restackAlbumPagesFlush(
+        remaining,
+        pw,
+        orient,
+        editor,
+        albumBinderWidthPxRef.current
+      );
+      albumPagesRef.current = nextList;
+      setAlbumPages(nextList);
+      setAlbumPageIndex((prev) => {
+        if (!nextList.length) return 0;
+        if (prev > idx) return Math.max(0, prev - 1);
+        if (prev === idx) return Math.min(prev, nextList.length - 1);
+        return prev;
+      });
+      requestAnimationFrame(() => emitHtml(editor.getHTML()));
+      return true;
+    },
+    [editor, emitHtml, pageSize.width]
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -2208,42 +2247,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           attachmentIds: []
         };
       },
-      /** Remove one album page (and nodes in its band), then restack remaining pages. */
-      removeAlbumPage: (pageIndex) => {
-        if (!editor) return false;
-        const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
-        if (!ordered.length) return false;
-        const idx = Math.max(0, Math.min(ordered.length - 1, Math.round(Number(pageIndex) || 0)));
-        const target = ordered[idx];
-        if (!target) return false;
-        const pw = Math.max(
-          200,
-          Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
-        );
-        const orient = pageOrientationRef.current;
-        const band = albumPageBand(target, pw, orient);
-        removeTextLabelsInBand(editor, band);
-        const remaining = ordered.filter((_, i) => i !== idx);
-        const nextList = restackAlbumPagesFlush(
-          remaining,
-          pw,
-          orient,
-          editor,
-          albumBinderWidthPxRef.current
-        );
-        albumPagesRef.current = nextList;
-        setAlbumPages(nextList);
-        setAlbumPageIndex((prev) => {
-          if (!nextList.length) return 0;
-          if (prev > idx) return Math.max(0, prev - 1);
-          if (prev === idx) return Math.min(prev, nextList.length - 1);
-          return prev;
-        });
-        requestAnimationFrame(() => emitHtml(editor.getHTML()));
-        return true;
-      }
+      removeAlbumPage: (pageIndex) => removeAlbumPageAt(pageIndex)
     }),
-    [editor, emitHtml, handleResizePage, pageSize.width]
+    [editor, emitHtml, handleResizePage, pageSize.width, removeAlbumPageAt]
   );
 
   const thumbRowRef = useRef(null);
@@ -2629,12 +2635,24 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
   );
 
   /** Page photo dropped on the thumbnail tray, or its × clicked: take it off the page. */
+  /** Photo dragged back to the tray: drop its page too (an album keeps at least one spread). */
   const handleRemovePagePhoto = useCallback(
     (pageKey) => {
       if (!effectiveEditable || !pageKey) return;
-      setAlbumPagePhotos({ [pageKey]: null });
+      const ordered = sortAlbumPagesByBand(albumPagesRef.current || []);
+      const idx = ordered.findIndex((page) => page.key === pageKey);
+      if (idx < 0) return;
+      if (ordered.length <= ALBUM_SPREAD_PAGE_COUNT || !removeAlbumPageAt(idx)) {
+        setAlbumPagePhotos({ [pageKey]: null });
+        return;
+      }
+      const spreadLeft = albumSpreadLeftPageIndex(
+        Math.min(albumPageIndexRef.current, Math.max(0, ordered.length - 2))
+      );
+      albumPageIndexRef.current = spreadLeft;
+      setAlbumPageIndex(spreadLeft);
     },
-    [effectiveEditable, setAlbumPagePhotos]
+    [effectiveEditable, setAlbumPagePhotos, removeAlbumPageAt]
   );
 
   const handlePageDrop = useCallback(
@@ -2669,6 +2687,17 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
 
   /** Album pages in book order. */
   const albumPagesSorted = useMemo(() => sortAlbumPagesByBand(albumPages), [albumPages]);
+  const filmstripAlbumPages = useMemo(
+    () =>
+      trayAttachmentIds
+        ? albumPagesSorted.map((page) =>
+            page.attachmentId != null && !trayAttachmentIds.has(page.attachmentId)
+              ? { ...page, attachmentId: null }
+              : page
+          )
+        : albumPagesSorted,
+    [albumPagesSorted, trayAttachmentIds]
+  );
 
   /** Top-left workspace mode badge. */
   const albumWorkspaceModeLabel = albumPagesSorted.length > 0 ? 'Album View Mode' : 'Album Create Mode';
@@ -4130,7 +4159,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
             <PhotoAlbumsPageFilmstrip
               inline
               stagingCount={unplacedTrayItems.length}
-              pages={albumPagesSorted}
+              pages={filmstripAlbumPages}
               pageIndex={orderFilmstripActive ? orderFilmstripIndex : albumPageIndex}
               pageCount={
                 orderFilmstripActive ? effectiveOrderFilmstripEntries.length : albumPageCount
@@ -4608,11 +4637,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
                             WebkitTextStroke: ALBUM_PAGE_COUNT_LINE_STYLE.WebkitTextStroke,
                             paintOrder: ALBUM_PAGE_COUNT_LINE_STYLE.paintOrder,
                             fontWeight: ALBUM_PAGE_COUNT_LINE_STYLE.fontWeight,
+                            textShadow: 'none',
                             fontSize: `${Math.max(
-                              10,
+                              20,
                               Math.round(
-                                Number(albumTitleStyle?.fontSize) ||
-                                  DEFAULT_ALBUM_TITLE_STYLE.fontSize
+                                (Number(albumTitleStyle?.fontSize) ||
+                                  DEFAULT_ALBUM_TITLE_STYLE.fontSize) * ALBUM_PAGE_COUNT_LINE_SCALE
                               )
                             )}px`
                           }}

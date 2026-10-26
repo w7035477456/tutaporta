@@ -6,7 +6,8 @@ import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 import InsertDriveFileOutlinedIcon from '@mui/icons-material/InsertDriveFileOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import SliderControlButton, {
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE_15
+  SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
+  SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
 import {
   isPhotoAlbumsFilesExplorerHiddenEntry,
@@ -706,13 +707,13 @@ export default function PhotoAlbumsFilesExplorerPanel({
     flexShrink: 0,
     fontSize: '0.72rem',
     py: 0.35,
-    bgcolor: 'var(--theme-primary-color) !important',
+    bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
     color: '#000 !important',
     WebkitTextFillColor: '#000 !important',
     border: '2px solid #000',
     // Always theme primary — beats SliderControlButton's grey disabled fill.
     '&.Mui-disabled': {
-      bgcolor: 'var(--theme-primary-color) !important',
+      bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
       color: '#000 !important',
       WebkitTextFillColor: '#000 !important',
       border: '2px solid #000',
@@ -755,11 +756,11 @@ export default function PhotoAlbumsFilesExplorerPanel({
             minWidth: 0,
             fontSize: '0.72rem',
             py: 0.25,
-            bgcolor: 'var(--theme-primary-color) !important',
+            bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
             color: '#000 !important',
             WebkitTextFillColor: '#000 !important',
             '&.Mui-disabled': {
-              bgcolor: 'var(--theme-primary-color) !important',
+              bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
               color: '#000 !important',
               WebkitTextFillColor: '#000 !important',
               opacity: 1
@@ -780,11 +781,11 @@ export default function PhotoAlbumsFilesExplorerPanel({
             minWidth: 0,
             fontSize: '0.72rem',
             py: 0.25,
-            bgcolor: 'var(--theme-primary-color) !important',
+            bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
             color: '#000 !important',
             WebkitTextFillColor: '#000 !important',
             '&.Mui-disabled': {
-              bgcolor: 'var(--theme-primary-color) !important',
+              bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
               color: '#000 !important',
               WebkitTextFillColor: '#000 !important',
               opacity: 1

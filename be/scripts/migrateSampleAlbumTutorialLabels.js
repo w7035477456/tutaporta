@@ -1,5 +1,5 @@
 /**
- * One-time backfill: apply SAMPLE ALBUM tutorial text labels to existing vaults.
+ * One-time backfill: remove the retired SAMPLE ALBUM tutorial hint labels from existing vaults.
  *
  * Plaintext TutaDrive vaults are updated on disk immediately. Encrypted vaults are
  * skipped here and migrate automatically the next time the member unlocks TutaPhoto.

@@ -1105,7 +1105,7 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
     markDirty(session);
     flushDbToUsb(session);
     console.info(
-      `[unlockVaultUsbWithKey] migrated SAMPLE ALBUM tutorial labels singles_id=${singlesId} note_id=${sampleLabelMigrate.noteId}`
+      `[unlockVaultUsbWithKey] removed SAMPLE ALBUM tutorial labels singles_id=${singlesId} note_id=${sampleLabelMigrate.noteId}`
     );
   }
 

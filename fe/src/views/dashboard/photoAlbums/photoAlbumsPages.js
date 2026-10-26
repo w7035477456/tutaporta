@@ -53,11 +53,62 @@ function parseMarkerPxAttr(html, attr, min = 1) {
 
 /**
  * Read album pages from saved HTML (`data-album-templates` JSON, or the older
- * single-page `data-template-id` marker).
+ * single-page `data-template-id` marker). Photos placed with the older
+ * `data-rv-attachment` markup become one photo per page.
  * @returns {AlbumPageInstance[]}
  */
 export function parseAlbumPageInstancesFromHtml(html) {
   const raw = String(html || '');
+  return withLegacyPlacedPhotoPages(readAlbumPageMarker(raw), raw);
+}
+
+const LEGACY_PLACED_PHOTO_TAG_RE = /<div\b[^>]*\bdata-rv-attachment\b[^>]*>/gi;
+const ALBUM_PAGE_ROW_GAP = 24;
+
+/** Attachment ids of photos placed with the older `data-rv-attachment` markup, in document order. */
+export function readLegacyPlacedPhotoAttachmentIds(html) {
+  const ids = [];
+  for (const tag of String(html || '').match(LEGACY_PLACED_PHOTO_TAG_RE) || []) {
+    const match = tag.match(/data-attachment-id=["'](\d+)["']/i);
+    const id = normalizeAlbumPageAttachmentId(match?.[1]);
+    if (id != null && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * Albums saved before one-photo-per-page (e.g. the seeded SAMPLE ALBUM) only carry placed
+ * photo markup. Put those photos on pages in order, adding spread pages as needed.
+ */
+function withLegacyPlacedPhotoPages(pages, raw) {
+  if (pages.some((page) => page.attachmentId != null)) return pages;
+  const ids = readLegacyPlacedPhotoAttachmentIds(raw);
+  if (!ids.length) return pages;
+
+  const ordered = [...pages].sort((a, b) => a.y - b.y || a.x - b.x);
+  const markerWidth = parseMarkerPxAttr(raw, 'data-album-page-width');
+  const w = ordered[0]?.w || markerWidth || 480;
+  const orientation = /data-album-orientation=["']landscape["']/i.test(raw) ? 'landscape' : 'portrait';
+  const h = ordered[0]?.h || albumPageBlockHeight(w, orientation);
+  const rightPage = ordered.find((page) => page.x > 0);
+  const rightX = rightPage ? rightPage.x : w;
+
+  const result = ordered.map((page, index) => ({ ...page, attachmentId: ids[index] ?? null }));
+  for (let index = ordered.length; index < ids.length; index += 1) {
+    result.push(
+      createAlbumPageInstance({
+        x: index % 2 === 0 ? 0 : rightX,
+        y: Math.floor(index / 2) * (h + ALBUM_PAGE_ROW_GAP),
+        w,
+        h,
+        attachmentId: ids[index]
+      })
+    );
+  }
+  return result;
+}
+
+function readAlbumPageMarker(raw) {
   const jsonMatch = raw.match(/data-album-templates=["']([^"']*)["']/i);
   if (jsonMatch) {
     try {
