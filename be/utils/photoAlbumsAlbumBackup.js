@@ -6,7 +6,7 @@ import {
   clearAlbumBackupProgress,
   setAlbumBackupProgress
 } from './photoAlbumsAlbumBackupProgress.js';
-import { flushDbToUsb, getVaultSession, vaultGetNote, vaultGetTree } from './photoAlbumsUsb/vaultSession.js';
+import { getVaultSession, vaultGetNote, vaultGetTree } from './photoAlbumsUsb/vaultSession.js';
 import {
   VAULT_DIR_NAME,
   VAULT_FILES_DIR,
@@ -115,17 +115,13 @@ export async function streamPhotoAlbumsAlbumBackupZip(
     throw new Error('TutaPhotoAlbums is not unlocked — open your album first');
   }
 
-  if (storageType === 'usb') {
-    flushDbToUsb(session);
-  }
-
-  const note = vaultGetNote(session, ids.noteId);
+  const note = await vaultGetNote(session, ids.noteId);
   if (!note) throw new Error('Album not found');
   if (Number(note.notebook_id) !== ids.notebookId) {
     throw new Error('Album does not belong to the selected album set');
   }
 
-  const tree = vaultGetTree(session);
+  const tree = await vaultGetTree(session);
   const nb = tree.notebooks.find((row) => Number(row.notebook_id) === ids.notebookId);
   const notebookName = String(nb?.notebook_name || '').trim();
 

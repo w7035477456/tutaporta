@@ -4,7 +4,6 @@ import path from 'path';
 import { Extract } from 'unzipper';
 
 import {
-  flushDbToUsb,
   getVaultSession,
   vaultAddNoteAttachment,
   vaultCreateNotebook,
@@ -119,7 +118,7 @@ export async function restorePhotoAlbumsAlbumBackupZipMerge(singlesId, storageTy
       throw new Error('Album backup manifest is missing notebookId or noteId');
     }
 
-    const tree = vaultGetTree(session);
+    const tree = await vaultGetTree(session);
     const notebookNames = tree.notebooks.map((nb) => nb.notebook_name);
     const allNoteNames = tree.notebooks.flatMap((nb) => (nb.notes || []).map((n) => n.note_name));
 
@@ -131,7 +130,7 @@ export async function restorePhotoAlbumsAlbumBackupZipMerge(singlesId, storageTy
     const targetSetName = nextAvailableAlbumDisplayName(sourceSetName, notebookNames);
     const targetAlbumName = nextAvailableAlbumDisplayName(sourceAlbumName, allNoteNames);
 
-    const notebook = vaultCreateNotebook(session, targetSetName);
+    const notebook = await vaultCreateNotebook(session, targetSetName);
     const notebookId = Number(notebook.notebook_id);
     const note = await vaultCreateNote(session, notebookId, {
       noteName: targetAlbumName,
@@ -180,8 +179,6 @@ export async function restorePhotoAlbumsAlbumBackupZipMerge(singlesId, storageTy
         restoredBytes += buffer.length;
       }
     }
-
-    flushDbToUsb(session);
 
     return {
       merged: true,

@@ -190,7 +190,7 @@ export async function createPhotoAlbumsInvite(req, res) {
     if (existing.rows[0]) {
       let snapshotRefreshed = false;
       try {
-        const snapshot = capturePhotoAlbumsInviteSnapshot(session, existing.rows[0].invite_id, noteId);
+        const snapshot = await capturePhotoAlbumsInviteSnapshot(session, existing.rows[0].invite_id, noteId);
         await pool.query(
           `UPDATE ${schemaTable('photo_albums_invites')}
            SET snapshot_html = $2,
@@ -239,7 +239,7 @@ export async function createPhotoAlbumsInvite(req, res) {
 
     let snapshotWarning = '';
     try {
-      const snapshot = capturePhotoAlbumsInviteSnapshot(session, inviteRow.invite_id, noteId);
+      const snapshot = await capturePhotoAlbumsInviteSnapshot(session, inviteRow.invite_id, noteId);
       await pool.query(
         `UPDATE ${schemaTable('photo_albums_invites')}
          SET snapshot_html = $2,

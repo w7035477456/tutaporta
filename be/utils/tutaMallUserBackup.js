@@ -95,6 +95,17 @@ const NOTES_SINGLES_COLUMNS = [
   'record_notes_onedrive_email'
 ];
 
+/** TutaPhoto album index (member row first: the rest reference it). */
+const PHOTO_ALBUM_INDEX_TABLES = [
+  'photo_albums_member_vault',
+  'photo_albums_notebooks',
+  'photo_albums_notes',
+  'photo_albums_note_keywords',
+  'photo_albums_shortcuts',
+  'photo_albums_note_attachments',
+  'photo_albums_note_extra_images'
+];
+
 const PHOTO_SINGLES_COLUMNS = [
   'record_photoalbums_onedrive_refresh_token_enc',
   'record_photoalbums_onedrive_folder_id',
@@ -429,6 +440,14 @@ async function exportTutaPhotoPostgres(pool, singlesId, destDir) {
       [singlesId]
     );
   }
+  for (const table of PHOTO_ALBUM_INDEX_TABLES) {
+    if (!(await tableExists(pool, table))) continue;
+    out[table] = await queryRows(
+      pool,
+      `SELECT * FROM ${SCHEMA}.${table} WHERE singles_id = $1`,
+      [singlesId]
+    );
+  }
   out.singles = await exportSinglesColumns(pool, singlesId, PHOTO_SINGLES_COLUMNS);
   writeJson(path.join(destDir, 'postgres.json'), out);
   return out;
@@ -759,6 +778,12 @@ async function restoreTutaPhotoPostgres(client, singlesId, backupDir) {
   );
   await deleteRows(client, 'photo_albums_vault', 'singles_id = $1', [singlesId]);
   await insertRows(client, 'photo_albums_vault', payload.photo_albums_vault);
+  // Deleting the member row cascades to every album index table. Backups made before the
+  // index moved to Postgres have none: the restored vault.db is imported on next unlock.
+  await deleteRows(client, PHOTO_ALBUM_INDEX_TABLES[0], 'singles_id = $1', [singlesId]);
+  for (const table of PHOTO_ALBUM_INDEX_TABLES) {
+    await insertRows(client, table, payload[table]);
+  }
   await insertRows(client, 'photo_albums_invites', payload.photo_albums_invites);
   await insertRows(client, 'photo_albums_shared_albums', payload.photo_albums_shared_albums);
   await restoreSinglesColumns(client, singlesId, PHOTO_SINGLES_COLUMNS, payload.singles);

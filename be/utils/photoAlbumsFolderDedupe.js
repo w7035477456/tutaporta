@@ -12,6 +12,7 @@ import {
   vaultPhotosRoot,
   vaultRootOnMount
 } from './photoAlbumsUsb/vaultPaths.js';
+import { PHOTO_ALBUMS_VAULT_TABLES as T } from './photoAlbumsUsb/vaultPgStore.js';
 
 const PROTECTED_BASENAMES = new Set([
   VAULT_META_FILE,
@@ -73,22 +74,6 @@ function collectFilesRecursive(dir, out = []) {
   return out;
 }
 
-function queryAllRows(db, sql, params = []) {
-  if (!db) return [];
-  try {
-    const stmt = db.prepare(sql);
-    stmt.bind(params);
-    const rows = [];
-    while (stmt.step()) {
-      rows.push(stmt.getAsObject());
-    }
-    stmt.free();
-    return rows;
-  } catch {
-    return [];
-  }
-}
-
 /**
  * Roots to scan for byte-identical duplicates:
  * - unlocked vault photos/ + files/ under session.mountPath
@@ -129,9 +114,11 @@ export function listPhotoAlbumsDedupeScanRoots({ session } = {}) {
   return roots;
 }
 
-function collectReferencedAbsPaths(session) {
+/** DB-referenced media paths. Query errors propagate so dedupe never runs without the reference set. */
+async function collectReferencedAbsPaths(session) {
   const referenced = new Set();
   if (!session?.db || !session?.mountPath) return referenced;
+  const sid = session.db.singlesId;
 
   const addRel = (relativePath, kind) => {
     const rel = String(relativePath || '').trim();
@@ -147,28 +134,28 @@ function collectReferencedAbsPaths(session) {
     }
   };
 
-  for (const row of queryAllRows(
-    session.db,
-    `SELECT relative_path FROM note_attachments
-     WHERE deleted_at IS NULL AND relative_path IS NOT NULL AND TRIM(relative_path) != ''`
+  for (const row of await session.db.all(
+    `SELECT relative_path FROM ${T.attachments}
+     WHERE singles_id = $1 AND deleted_at IS NULL AND relative_path IS NOT NULL AND TRIM(relative_path) <> ''`,
+    [sid]
   )) {
     addRel(row.relative_path, 'file');
   }
 
-  for (const row of queryAllRows(
-    session.db,
+  for (const row of await session.db.all(
     `SELECT image_relative_path, image_top_relative_path, image_bottom_relative_path
-     FROM notes WHERE deleted_at IS NULL`
+     FROM ${T.notes} WHERE singles_id = $1 AND deleted_at IS NULL`,
+    [sid]
   )) {
     addRel(row.image_relative_path, 'photo');
     addRel(row.image_top_relative_path, 'photo');
     addRel(row.image_bottom_relative_path, 'photo');
   }
 
-  for (const row of queryAllRows(
-    session.db,
-    `SELECT relative_path FROM note_extra_images
-     WHERE deleted_at IS NULL AND relative_path IS NOT NULL AND TRIM(relative_path) != ''`
+  for (const row of await session.db.all(
+    `SELECT relative_path FROM ${T.extraImages}
+     WHERE singles_id = $1 AND deleted_at IS NULL AND relative_path IS NOT NULL AND TRIM(relative_path) <> ''`,
+    [sid]
   )) {
     addRel(row.relative_path, 'photo');
   }
@@ -183,13 +170,13 @@ function collectReferencedAbsPaths(session) {
  * Covers folders from:
  * - the unlocked session mount (USB / TutaDrive)
  */
-export function removeDuplicateFilesInPhotoAlbumsEnvFolders({ session } = {}) {
+export async function removeDuplicateFilesInPhotoAlbumsEnvFolders({ session } = {}) {
   const roots = listPhotoAlbumsDedupeScanRoots({ session });
   if (!roots.length) {
     return { scannedRoots: [], removed: [], kept: 0, groups: 0 };
   }
 
-  const referenced = collectReferencedAbsPaths(session);
+  const referenced = await collectReferencedAbsPaths(session);
   const files = [];
   const seenFiles = new Set();
   for (const root of roots) {

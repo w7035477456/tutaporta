@@ -1,5 +1,6 @@
 import pool from '../db/connection.js';
 import { isPhotoAlbumsBridgeStandalone } from '../photoAlbumsBridge/standaloneMode.js';
+import { PHOTO_ALBUMS_VAULT_TABLES } from './photoAlbumsUsb/vaultPgStore.js';
 
 function normalizeId(singlesId) {
   const id = Math.trunc(Number(singlesId));
@@ -146,23 +147,18 @@ export async function addVaultSessionFileCounts(singlesId, { usbDelta = 0, uiDel
 }
 
 /** Count notebooks + notes in an open vault session (logical USB open transfer units). */
-export function countVaultSessionNotebooksAndNotes(session) {
+export async function countVaultSessionNotebooksAndNotes(session) {
   if (!session?.db) return 0;
-  const countSql = (sql) => {
-    const stmt = session.db.prepare(sql);
-    try {
-      if (!stmt.step()) return 0;
-      const row = stmt.getAsObject();
-      return Number(row?.c) || 0;
-    } finally {
-      stmt.free();
-    }
-  };
   try {
-    return (
-      countSql(`SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`) +
-      countSql(`SELECT COUNT(*) AS c FROM notes WHERE deleted_at IS NULL`)
+    const row = await session.db.one(
+      `SELECT
+         (SELECT COUNT(*)::int FROM ${PHOTO_ALBUMS_VAULT_TABLES.notebooks}
+           WHERE singles_id = $1 AND deleted_at IS NULL) +
+         (SELECT COUNT(*)::int FROM ${PHOTO_ALBUMS_VAULT_TABLES.notes}
+           WHERE singles_id = $1 AND deleted_at IS NULL) AS c`,
+      [session.db.singlesId]
     );
+    return Number(row?.c) || 0;
   } catch {
     return 0;
   }

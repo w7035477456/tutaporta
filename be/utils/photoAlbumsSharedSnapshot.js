@@ -33,14 +33,14 @@ function noteBodyIsInnerEncrypted(bodyText) {
  * Copy album HTML + attachment bytes from the owner's open vault session.
  * Called when an invite email is sent (owner must have vault unlocked).
  */
-export function capturePhotoAlbumsInviteSnapshot(session, inviteId, noteId) {
+export async function capturePhotoAlbumsInviteSnapshot(session, inviteId, noteId) {
   const id = Number(inviteId);
   const nid = Number(noteId);
   if (!Number.isFinite(id) || id < 1 || !Number.isFinite(nid) || nid < 1) {
     throw new Error('Invalid invite or note id');
   }
 
-  const note = vaultGetNote(session, nid);
+  const note = await vaultGetNote(session, nid);
   if (!note) throw new Error('Album not found in vault');
 
   const html = String(note.body_text ?? '');
@@ -58,7 +58,7 @@ export function capturePhotoAlbumsInviteSnapshot(session, inviteId, noteId) {
     const attachmentId = Number(row.attachment_id ?? row.attachmentId);
     if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
 
-    const file = vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'full' });
+    const file = await vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'full' });
     if (!file?.buffer?.length) continue;
 
     const storageFileName = `${attachmentId}_${sanitizeFileToken(row.file_name || file.fileName || 'file')}`;
@@ -66,12 +66,12 @@ export function capturePhotoAlbumsInviteSnapshot(session, inviteId, noteId) {
 
     let storageDisplayFileName = null;
     let storageThumbFileName = null;
-    const display = vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'display' });
+    const display = await vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'display' });
     if (display?.buffer?.length && display.variant === 'display') {
       storageDisplayFileName = `${attachmentId}_1000px.jpg`;
       fs.writeFileSync(path.join(dir, storageDisplayFileName), display.buffer);
     }
-    const thumb = vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'thumb' });
+    const thumb = await vaultGetNoteAttachment(session, nid, attachmentId, { variant: 'thumb' });
     if (thumb?.buffer?.length && thumb.variant === 'thumb') {
       storageThumbFileName = `${attachmentId}_thumbnail.jpg`;
       fs.writeFileSync(path.join(dir, storageThumbFileName), thumb.buffer);

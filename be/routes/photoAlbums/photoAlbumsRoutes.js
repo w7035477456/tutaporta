@@ -40,8 +40,7 @@ import {
   vaultRepairMissingAttachmentVariants,
   vaultAddNoteExtraImage,
   vaultDeleteNoteExtraImage,
-  vaultGetNoteExtraImage,
-  flushDbToUsb
+  vaultGetNoteExtraImage
 } from '../../utils/photoAlbumsUsb/vaultSession.js';
 import {
   canNativeOpenPhotoAlbumsExtension,
@@ -317,7 +316,7 @@ export async function getPhotoAlbumsTree(req, res) {
   const session = await requireVaultSession(req, res);
   if (!session) return;
   try {
-    const tree = vaultGetTree(session);
+    const tree = await vaultGetTree(session);
     if (!session.sessionFileCountsTreeReported) {
       session.sessionFileCountsTreeReported = true;
       const notebooks = Array.isArray(tree?.notebooks) ? tree.notebooks : [];
@@ -349,7 +348,7 @@ export async function getPhotoAlbumsNote(req, res) {
   }
 
   try {
-    const note = vaultGetNote(session, noteId);
+    const note = await vaultGetNote(session, noteId);
     if (!note) return res.status(404).json({ error: 'Note not found' });
     await addVaultSessionFileCounts(session.singlesId, { uiDelta: 1 });
     return res.json({ note });
@@ -367,10 +366,10 @@ export async function createPhotoAlbumsNotebook(req, res) {
     const requestedName = String(req.body?.notebook_name ?? '').trim();
     let name = requestedName;
     if (!name) {
-      const tree = vaultGetTree(session);
+      const tree = await vaultGetTree(session);
       name = formatDefaultPhotoAlbumsNotebookTitle(tree.notebooks.length + 1);
     }
-    const row = vaultCreateNotebook(session, name.slice(0, 120));
+    const row = await vaultCreateNotebook(session, name.slice(0, 120));
     logImpersonatedMutation(req);
     await bumpUiFileCount(session, { usb: true });
     return res.json({
@@ -404,7 +403,7 @@ export async function updatePhotoAlbumsNotebook(req, res) {
   }
 
   try {
-    const row = vaultUpdateNotebook(session, notebookId, String(notebookName).trim().slice(0, 120));
+    const row = await vaultUpdateNotebook(session, notebookId, String(notebookName).trim().slice(0, 120));
     if (!row) return res.status(404).json({ error: 'Notebook not found' });
     logImpersonatedMutation(req);
     return res.json({
@@ -433,7 +432,7 @@ export async function deletePhotoAlbumsNotebook(req, res) {
   }
 
   try {
-    vaultDeleteNotebook(session, notebookId);
+    await vaultDeleteNotebook(session, notebookId);
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_id: notebookId, soft_deleted: true });
   } catch (err) {
@@ -457,7 +456,7 @@ export async function createPhotoAlbumsNote(req, res) {
     const requestedName = String(req.body?.note_name ?? '').trim();
     let noteName = requestedName;
     if (!noteName) {
-      const tree = vaultGetTree(session);
+      const tree = await vaultGetTree(session);
       const nbIdx = tree.notebooks.findIndex((nb) => nb.notebook_id === notebookId);
       const noteCount = tree.notebooks.find((nb) => nb.notebook_id === notebookId)?.notes?.length ?? 0;
       noteName = formatDefaultPhotoAlbumsNoteTitle(nbIdx >= 0 ? nbIdx + 1 : 1, noteCount + 1);
@@ -499,7 +498,7 @@ export async function updatePhotoAlbumsNote(req, res) {
 
   try {
     const patch = buildNoteImagePatch(req);
-    const note = vaultUpdateNote(session, noteId, patch);
+    const note = await vaultUpdateNote(session, noteId, patch);
     logImpersonatedMutation(req);
     await bumpUiFileCount(session, { usb: true });
     return res.json({ note });
@@ -534,7 +533,7 @@ export async function movePhotoAlbumsNoteImage(req, res) {
   }
 
   try {
-    const result = vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSlot);
+    const result = await vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSlot);
     logImpersonatedMutation(req);
     return res.json(result);
   } catch (err) {
@@ -556,7 +555,7 @@ export async function deletePhotoAlbumsNote(req, res) {
   }
 
   try {
-    vaultDeleteNote(session, noteId);
+    await vaultDeleteNote(session, noteId);
     logImpersonatedMutation(req);
     return res.json({ success: true, note_id: noteId, soft_deleted: true });
   } catch (err) {
@@ -580,7 +579,7 @@ export async function getPhotoAlbumsNoteImage(req, res) {
 
   try {
     await vaultEnsureNotePhotoOnDisk(session, noteId, slot);
-    const image = vaultGetNoteImage(session, noteId, slot);
+    const image = await vaultGetNoteImage(session, noteId, slot);
     if (!image) return res.status(404).json({ error: 'Image file not found' });
     await bumpUiFileCount(session);
     res.setHeader('Content-Type', image.contentType);
@@ -605,7 +604,7 @@ export async function getPhotoAlbumsNoteExtraImage(req, res) {
 
   try {
     await vaultEnsureNoteExtraImageOnDisk(session, noteId, imageId);
-    const image = vaultGetNoteExtraImage(session, noteId, imageId);
+    const image = await vaultGetNoteExtraImage(session, noteId, imageId);
     if (!image) return res.status(404).json({ error: 'Image file not found' });
     await bumpUiFileCount(session);
     res.setHeader('Content-Type', image.contentType);
@@ -636,7 +635,7 @@ export async function uploadPhotoAlbumsNoteExtraImage(req, res) {
   }
 
   try {
-    const note = vaultAddNoteExtraImage(session, noteId, { buffer: parsed.buffer, ext: parsed.ext });
+    const note = await vaultAddNoteExtraImage(session, noteId, { buffer: parsed.buffer, ext: parsed.ext });
     logImpersonatedMutation(req);
     await bumpUiFileCount(session, { usb: true });
     return res.json({ note });
@@ -660,7 +659,7 @@ export async function deletePhotoAlbumsNoteExtraImage(req, res) {
   }
 
   try {
-    const note = vaultDeleteNoteExtraImage(session, noteId, imageId);
+    const note = await vaultDeleteNoteExtraImage(session, noteId, imageId);
     logImpersonatedMutation(req);
     return res.json({ note });
   } catch (err) {
@@ -689,7 +688,7 @@ export async function reorderPhotoAlbumsNotebooks(req, res) {
   }
 
   try {
-    vaultReorderNotebooks(session, notebookIds);
+    await vaultReorderNotebooks(session, notebookIds);
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_ids: notebookIds });
   } catch (err) {
@@ -719,7 +718,7 @@ export async function reorderPhotoAlbumsNotes(req, res) {
   }
 
   try {
-    vaultReorderNotes(session, notebookId, noteIds);
+    await vaultReorderNotes(session, notebookId, noteIds);
     logImpersonatedMutation(req);
     return res.json({ success: true, note_ids: noteIds });
   } catch (err) {
@@ -748,7 +747,7 @@ export async function createPhotoAlbumsShortcut(req, res) {
   }
 
   try {
-    const shortcut = vaultCreateShortcut(session, { targetType, notebookId, noteId });
+    const shortcut = await vaultCreateShortcut(session, { targetType, notebookId, noteId });
     logImpersonatedMutation(req);
     return res.json({ shortcut });
   } catch (err) {
@@ -768,7 +767,7 @@ export async function deletePhotoAlbumsShortcut(req, res) {
   }
 
   try {
-    vaultDeleteShortcut(session, shortcutId);
+    await vaultDeleteShortcut(session, shortcutId);
     logImpersonatedMutation(req);
     return res.json({ success: true, shortcut_id: shortcutId });
   } catch (err) {
@@ -793,7 +792,7 @@ export async function reorderPhotoAlbumsShortcuts(req, res) {
   }
 
   try {
-    vaultReorderShortcuts(session, shortcutIds);
+    await vaultReorderShortcuts(session, shortcutIds);
     logImpersonatedMutation(req);
     return res.json({ success: true, shortcut_ids: shortcutIds });
   } catch (err) {
@@ -820,7 +819,7 @@ export async function getPhotoAlbumsNoteAttachment(req, res) {
     if (normalizedVariant === 'thumb' || normalizedVariant === 'display') {
       await vaultEnsureNoteAttachmentThumbnail(session, noteId, attachmentId);
     }
-    const file = vaultGetNoteAttachment(session, noteId, attachmentId, { variant });
+    const file = await vaultGetNoteAttachment(session, noteId, attachmentId, { variant });
     if (!file) return res.status(404).json({ error: 'Attachment not found' });
     await bumpUiFileCount(session);
     const inline =
@@ -871,7 +870,7 @@ export async function openPhotoAlbumsNoteAttachmentNative(req, res) {
 
   try {
     await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId);
-    const file = vaultGetNoteAttachment(session, noteId, attachmentId);
+    const file = await vaultGetNoteAttachment(session, noteId, attachmentId);
     if (!file) return res.status(404).json({ error: 'Attachment not found' });
 
     const ext = String(file.fileName || '')
@@ -903,7 +902,7 @@ export async function getPhotoAlbumsMediaQuota(req, res) {
   if (!session) return;
   const quota = tutaPhotoQuotaConfig();
   try {
-    const counts = vaultCountAccountMedia(session);
+    const counts = await vaultCountAccountMedia(session);
     return res.json({ ...quota, ...counts });
   } catch (err) {
     console.error('[getPhotoAlbumsMediaQuota]', err?.message || err);
@@ -950,7 +949,7 @@ export async function uploadPhotoAlbumsNoteAttachment(req, res) {
     });
   }
   try {
-    const counts = vaultCountAccountMedia(session);
+    const counts = await vaultCountAccountMedia(session);
     const used = isVideo ? counts.videoCount : counts.imageCount;
     const maxAllowed = isVideo ? quota.maxVideosPerAccount : quota.maxImagesPerAccount;
     if (used >= maxAllowed) {
@@ -999,16 +998,15 @@ export async function reconcilePhotoAlbumsAlbumPhotoSeq(req, res) {
   }
 
   try {
-    vaultReconcileAlbumPhotoSeq(session, noteId);
+    await vaultReconcileAlbumPhotoSeq(session, noteId);
     let repair = { repaired: 0, failed: 0 };
     try {
       repair = await vaultRepairMissingAttachmentVariants(session, noteId);
     } catch (err) {
       console.warn('[reconcilePhotoAlbumsAlbumPhotoSeq] variant repair', err?.message || err);
     }
-    const attachments = vaultReconcileAlbumPhotoSeq(session, noteId);
+    const attachments = await vaultReconcileAlbumPhotoSeq(session, noteId);
     logImpersonatedMutation(req);
-    flushDbToUsb(session);
     return res.json({ success: true, attachments, repaired: repair.repaired, repairFailed: repair.failed });
   } catch (err) {
     console.error('[reconcilePhotoAlbumsAlbumPhotoSeq]', err?.message || err);
@@ -1030,7 +1028,7 @@ export async function deletePhotoAlbumsNoteAttachment(req, res) {
   }
 
   try {
-    const result = vaultDeleteNoteAttachment(session, noteId, attachmentId);
+    const result = await vaultDeleteNoteAttachment(session, noteId, attachmentId);
     logImpersonatedMutation(req);
     return res.json(result);
   } catch (err) {
@@ -1104,7 +1102,7 @@ export async function searchPhotoAlbumsNotes(req, res) {
   }
 
   try {
-    const results = vaultSearch(session, chain, evaluatePhotoAlbumsSearchChain);
+    const results = await vaultSearch(session, chain, evaluatePhotoAlbumsSearchChain);
     return res.json({ results });
   } catch (err) {
     console.error('[searchPhotoAlbumsNotes]', err?.message || err);

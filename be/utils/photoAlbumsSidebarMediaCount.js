@@ -38,14 +38,8 @@ export function isPhotoAlbumsSidebarMediaExtension(raw) {
   return ext ? PHOTO_ALBUMS_SIDEBAR_MEDIA_EXTENSIONS.has(ext) : false;
 }
 
-/** note_id → count of photo/video attachments for sidebar album rows. */
-export function loadPhotoAlbumsAlbumMediaCountByNoteId(db, queryAll) {
-  const rows = queryAll(
-    db,
-    `SELECT note_id, file_extension
-     FROM note_attachments
-     WHERE deleted_at IS NULL`
-  );
+/** note_id → count of photo/video attachments for sidebar album rows (rows: live note_id + file_extension). */
+export function countPhotoAlbumsAlbumMediaByNoteId(rows) {
   const counts = new Map();
   for (const row of rows) {
     if (!isPhotoAlbumsSidebarMediaExtension(row.file_extension)) continue;

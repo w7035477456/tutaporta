@@ -141,7 +141,8 @@ function locationEntry(mountPath, label, platform) {
   };
 }
 
-function verifyVaultStructure(mountPath) {
+/** `requireDbFile: false` — TutaCloud vaults keep their album index in Postgres, not vault.db. */
+function verifyVaultStructure(mountPath, { requireDbFile = true } = {}) {
   const root = vaultRootOnMount(mountPath);
   if (!isDirectory(root)) {
     return { ok: false, error: `Missing ${VAULT_DIR_NAME} folder on USB` };
@@ -156,7 +157,7 @@ function verifyVaultStructure(mountPath) {
       return { ok: false, error: `Missing required folder: ${rel}` };
     }
   }
-  if (!vaultHasDbFile(mountPath)) {
+  if (requireDbFile && !vaultHasDbFile(mountPath)) {
     return { ok: false, error: 'Missing required file: vault database' };
   }
   const meta = readVaultMeta(mountPath);
@@ -390,7 +391,7 @@ export function scanForPhotoAlbumsUsb() {
   return scanLinuxVolumes();
 }
 
-export function validateVaultOnMount(mountPath) {
+export function validateVaultOnMount(mountPath, options = {}) {
   if (!mountPath || typeof mountPath !== 'string') {
     return { ok: false, error: 'Mount path is required' };
   }
@@ -398,7 +399,7 @@ export function validateVaultOnMount(mountPath) {
   if (!fs.existsSync(normalized)) {
     return { ok: false, error: 'USB path not found' };
   }
-  return verifyVaultStructure(normalized);
+  return verifyVaultStructure(normalized, options);
 }
 
 export { verifyVaultStructure, readVaultMeta };

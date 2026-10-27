@@ -23,7 +23,8 @@ import {
 import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
 import { requireVaultAccessSession } from '../../utils/photoAlbumsAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/photoAlbumsUsb/usbScan.js';
-import { vaultHasDbFile, vaultMetaPath } from '../../utils/photoAlbumsUsb/vaultPaths.js';
+import { vaultMetaPath } from '../../utils/photoAlbumsUsb/vaultPaths.js';
+import { deletePhotoAlbumsMemberVault } from '../../utils/photoAlbumsUsb/vaultPgStore.js';
 import {
   ensureTutaDrivePhotoAlbumsLayout,
   getLeftSideMode,
@@ -128,13 +129,13 @@ function sessionPayload(singlesId, memberId, albumsMount) {
   };
 }
 
+/** Album index is in Postgres, so a vault folder needs only vault.meta.json + layout (no vault.db). */
 function vaultStatusFlags(albumsMount) {
   const hasMeta = fs.existsSync(vaultMetaPath(albumsMount));
-  const hasDb = vaultHasDbFile(albumsMount);
-  const check = hasMeta ? validateVaultOnMount(albumsMount) : { ok: false };
+  const check = hasMeta ? validateVaultOnMount(albumsMount, { requireDbFile: false }) : { ok: false };
   return {
-    hasVault: Boolean(hasMeta && hasDb && check.ok),
-    needsReformat: Boolean(hasMeta && (!hasDb || !check.ok)),
+    hasVault: Boolean(hasMeta && check.ok),
+    needsReformat: Boolean(hasMeta && !check.ok),
     vaultFilesystemInvalid: Boolean(hasMeta && !check.ok)
   };
 }
@@ -205,6 +206,7 @@ export async function formatPhotoAlbumsTutaDrive(req, res) {
   try {
     await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
     const { memberId } = await resolveMemberContext(singlesId);
+    await deletePhotoAlbumsMemberVault(singlesId);
     wipeTutaDrivePhotoAlbumsVault(memberId);
     return res.json({
       success: true,
@@ -259,12 +261,14 @@ export async function resetPhotoAlbumsTutaDrive(req, res) {
             [singlesId]
           )
         : { rowCount: 0 };
+      const albumIndex = await deletePhotoAlbumsMemberVault(singlesId, client);
       await client.query('COMMIT');
       console.log('[resetPhotoAlbumsTutaDrive] db cleared', {
         singlesId,
         invites: inviteIds.length,
         vaultKeys: vaultKeys.rowCount,
-        clusterState: clusterState.rowCount
+        clusterState: clusterState.rowCount,
+        albumIndex
       });
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});

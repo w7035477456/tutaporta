@@ -14,6 +14,7 @@ import {
 import { isPhotoAlbumsStagingVideoExtension } from '../photoAlbumsFileFormats.js';
 import { openVaultBuffer, sealVaultBuffer } from '../photoAlbumsUsb/vaultCrypto.js';
 import { vaultFileStoragePath } from '../photoAlbumsUsb/vaultPaths.js';
+import { PHOTO_ALBUMS_VAULT_TABLES } from '../photoAlbumsUsb/vaultPgStore.js';
 import {
   initializeSampleVariantsRoot,
   resolveInitializeSampleDir
@@ -189,32 +190,35 @@ function linkFile(targetAbs, linkAbs) {
   }
 }
 
-function queryOne(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const row = stmt.step() ? stmt.getAsObject() : null;
-  stmt.free();
-  return row;
-}
-
 /**
  * Point vault storage paths at shared cache files via symlinks (plaintext vaults).
  * Encrypted vaults skip links — reads fall back to shared cache in readEncryptedVaultFile.
+ * `db` is the member's VaultPgDb. `attachmentIdMap` maps manifest ids to the vault ids
+ * Restore Sample Album used when a manifest id was taken by another album.
  */
-export async function linkInitializeSampleIntoVault({ mountPath, key, meta, db, onlyAttachmentIds = null }) {
+export async function linkInitializeSampleIntoVault({
+  mountPath,
+  key,
+  meta,
+  db,
+  onlyAttachmentIds = null,
+  attachmentIdMap = null
+}) {
   await ensureInitializeSampleSharedCache();
 
   const manifest = loadInitializeSampleManifest();
   const usePlainFiles = key == null;
   const only = Array.isArray(onlyAttachmentIds) ? new Set(onlyAttachmentIds.map(Number)) : null;
+  const idMap = attachmentIdMap instanceof Map ? attachmentIdMap : new Map(attachmentIdMap || []);
 
   for (const entry of manifest.attachments || []) {
     const attachmentId = Number(entry.attachmentId);
-    if (only && !only.has(attachmentId)) continue;
-    const row = queryOne(
-      db,
-      `SELECT relative_path FROM note_attachments WHERE attachment_id = ? AND deleted_at IS NULL`,
-      [attachmentId]
+    const vaultAttachmentId = Number(idMap.get(attachmentId) ?? attachmentId);
+    if (only && !only.has(vaultAttachmentId)) continue;
+    const row = await db.one(
+      `SELECT relative_path FROM ${PHOTO_ALBUMS_VAULT_TABLES.attachments}
+        WHERE singles_id = $1 AND attachment_id = $2 AND deleted_at IS NULL`,
+      [db.singlesId, vaultAttachmentId]
     );
     const relativePath = row?.relative_path;
     if (!relativePath) continue;

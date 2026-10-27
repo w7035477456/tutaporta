@@ -3,9 +3,23 @@ import os from 'os';
 import path from 'path';
 import { ZipArchive } from 'archiver';
 import { Extract } from 'unzipper';
-import { getVaultSession, flushDbToUsb, logoffVaultUsb } from './vaultSession.js';
-import { vaultRootOnMount, VAULT_DIR_NAME, VAULT_META_FILE } from './vaultPaths.js';
+import { getVaultSession, logoffVaultUsb } from './vaultSession.js';
+import {
+  getVaultDbFileName,
+  vaultRootOnMount,
+  VAULT_DB_FILE_ENCRYPTED,
+  VAULT_DB_FILE_PLAIN,
+  VAULT_DIR_NAME,
+  VAULT_META_FILE
+} from './vaultPaths.js';
+import { sealVaultBuffer } from './vaultCrypto.js';
+import { deletePhotoAlbumsMemberVault, exportPhotoAlbumsMemberVaultToSqliteBuffer } from './vaultPgStore.js';
 import { buildMyPhotoAlbumsBackupZipFileName } from '../photoAlbumsBackupZipNames.js';
+
+function isVaultDbFileName(name) {
+  const base = path.basename(String(name || ''));
+  return base === VAULT_DB_FILE_PLAIN || base === VAULT_DB_FILE_ENCRYPTED;
+}
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];
@@ -58,12 +72,16 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
     throw new Error('Record Vault USB not unlocked');
   }
 
-  flushDbToUsb(session);
-
   const vaultRoot = vaultRootOnMount(session.mountPath);
   if (!fs.existsSync(vaultRoot)) {
     throw new Error(`Missing ${VAULT_DIR_NAME} folder on USB`);
   }
+
+  // Album index lives in Postgres; the zip carries a vault.db snapshot so restore can re-import it.
+  const vaultDbBuffer = sealVaultBuffer(
+    await exportPhotoAlbumsMemberVaultToSqliteBuffer(singlesId),
+    session.key
+  );
 
   const zipName = buildMyPhotoAlbumsBackupZipFileName('usb');
   const archiveRootName = VAULT_DIR_NAME;
@@ -76,7 +94,10 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
     archive.on('error', reject);
     archive.on('end', resolve);
     archive.pipe(res);
-    archive.directory(vaultRoot, archiveRootName);
+    archive.directory(vaultRoot, archiveRootName, (entry) =>
+      isVaultDbFileName(entry.name) ? false : entry
+    );
+    archive.append(vaultDbBuffer, { name: `${archiveRootName}/${getVaultDbFileName(session.meta)}` });
     void archive.finalize();
   });
 
@@ -120,6 +141,11 @@ async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storage
     fs.mkdirSync(vaultRoot, { recursive: true });
     for (const name of fs.readdirSync(sourceRoot)) {
       copyEntryRecursive(path.join(sourceRoot, name), path.join(vaultRoot, name));
+    }
+
+    // A restored vault.db replaces the Postgres album index on the next unlock.
+    if (relFiles.some((rel) => !rel.includes('/') && isVaultDbFileName(rel))) {
+      await deletePhotoAlbumsMemberVault(singlesId);
     }
 
     let restoredBytes = 0;
