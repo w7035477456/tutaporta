@@ -2140,6 +2140,11 @@ export default function PhotoAlbumsWorkspacePane({
   const persistNoteInFlightRef = useRef(false);
   /** Albums deleted in this tab — the leave-album flush / late autosave must not PATCH them (404). */
   const deletedNoteIdsRef = useRef(new Set());
+  /**
+   * Albums the server rewrote (Restore Sample Album) while this tab still holds the old body.
+   * Body saves are blocked until the note is fetched fresh, so the stale layout cannot undo it.
+   */
+  const staleNoteIdsRef = useRef(new Set());
   const draftRef = useRef({ openNoteTitlePlain: '' });
   // Snapshot of the note title when the editor title box gains focus, so a
   // duplicate name entered there can be reverted to the last good value.
@@ -2313,6 +2318,7 @@ export default function PhotoAlbumsWorkspacePane({
     if (!Number.isFinite(id) || id < 1) return null;
     const note = await vaultApi.fetchPhotoAlbumsNote(id);
     if (!note) throw new Error('Note not found');
+    staleNoteIdsRef.current.delete(id);
     setNotebooks((prev) =>
       prev.map((nb) => ({
         ...nb,
@@ -3544,7 +3550,7 @@ export default function PhotoAlbumsWorkspacePane({
       // Drop title-matching body rows (ignore [n]/[#]); leave title intact.
       const cleanedBody = cleanPhotoAlbumsNoteBodyHtml(rawBody, titlePlain);
       api.setContent(cleanedBody || '<p></p>', true);
-      if (cleanedBody !== rawBody) {
+      if (cleanedBody !== rawBody && !staleNoteIdsRef.current.has(id)) {
         patchNoteRowInTree(id, { body_text: cleanedBody, content_loaded: true });
         void vaultApi.updatePhotoAlbumsNote(id, { body_text: cleanedBody }).catch(() => {
           // Keep the cleaned editor view even if persist fails; next save retries.
@@ -4368,7 +4374,7 @@ export default function PhotoAlbumsWorkspacePane({
   const persistNote = useCallback(async () => {
     if (!selectedNote || persistNoteInFlightRef.current) return;
     const noteId = Number(selectedNote.note_id);
-    if (deletedNoteIdsRef.current.has(noteId)) return;
+    if (deletedNoteIdsRef.current.has(noteId) || staleNoteIdsRef.current.has(noteId)) return;
     // The note NAME is deliberately NOT written here. Names are saved only by the
     // explicit, uniqueness-checked commit paths (title box blur/Enter and sidebar
     // rename). Writing the name from this debounced body autosave used the shared
@@ -4561,7 +4567,11 @@ export default function PhotoAlbumsWorkspacePane({
     setError('');
     try {
       await flushPendingNoteSave();
-      await vaultApi.restorePhotoAlbumsSampleAlbum();
+      const result = await vaultApi.restorePhotoAlbumsSampleAlbum();
+      const restoredNoteId = Number(result?.noteId);
+      if (Number.isFinite(restoredNoteId) && restoredNoteId > 0) {
+        staleNoteIdsRef.current.add(restoredNoteId);
+      }
       // The server just reset SAMPLE ALBUM's layout; the open editor must not save over it on logoff.
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
