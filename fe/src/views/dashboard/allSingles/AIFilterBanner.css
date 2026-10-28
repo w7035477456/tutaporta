@@ -1,0 +1,319 @@
+/* ===== AI Filter Banner (TutaDates) ===== */
+.ai-banner {
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;              /* fill the page column */
+  max-width: none;
+  margin: 12px 0 16px;
+  padding: 16px 24px 14px;
+  container-type: inline-size;   /* layout adapts to the column width, not the window */
+  border-radius: 22px;
+  background: radial-gradient(ellipse at 15% 30%, #1d2b7a 0%, transparent 55%),
+              radial-gradient(ellipse at 85% 70%, #5b1470 0%, transparent 55%),
+              #050820;
+  box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.45), 0 0 40px rgba(0, 229, 255, 0.3),
+              0 0 80px rgba(255, 47, 179, 0.2);
+  color: #fff;
+  font-family: inherit;
+  isolation: isolate;
+}
+
+/* grid */
+.ai-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.09) 1px, transparent 1px);
+  background-size: 32px 32px;
+  z-index: -3;
+}
+
+/* scanning line */
+.ai-banner::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: 80px; top: -80px;
+  background: linear-gradient(180deg, transparent, rgba(0, 229, 255, 0.22), transparent);
+  animation: aiScan 4.5s linear infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ---------- neural network (brighter) ---------- */
+.ai-net {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -2;
+}
+.ai-net .link {
+  stroke: #00e5ff;
+  stroke-width: 2;
+  opacity: 0.55;
+  filter: drop-shadow(0 0 3px #00e5ff);
+}
+.ai-net .flow {
+  stroke: #ffffff;
+  stroke-width: 2.5;
+  stroke-dasharray: 6 40;
+  stroke-linecap: round;
+  opacity: 0.9;
+  animation: aiFlow 2.2s linear infinite;
+}
+.ai-net .flow:nth-of-type(2n) { stroke: #ff2fb3; animation-duration: 3s; }
+.ai-net .flow:nth-of-type(3n) { stroke: #ffd600; animation-duration: 2.6s; }
+.ai-net .node {
+  fill: #00e5ff;
+  filter: drop-shadow(0 0 6px #00e5ff) drop-shadow(0 0 12px #00e5ff);
+  animation: aiNode 2.6s ease-in-out infinite;
+}
+.ai-net .node.pink   { fill: #ff2fb3; filter: drop-shadow(0 0 6px #ff2fb3) drop-shadow(0 0 12px #ff2fb3); animation-delay: .7s; }
+.ai-net .node.yellow { fill: #ffd600; filter: drop-shadow(0 0 6px #ffd600) drop-shadow(0 0 12px #ffd600); animation-delay: 1.4s; }
+
+/* ---------- scattered mini chips ---------- */
+.ai-mini-chip {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  opacity: 0.75;
+  z-index: -1;
+  filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.9));
+  animation: aiFloat 5s ease-in-out infinite;
+}
+.ai-mini-chip .pin { stroke: #00e5ff; stroke-width: 3; stroke-linecap: round; }
+.ai-mini-chip .core { fill: #0a1240; stroke: #00e5ff; stroke-width: 3; }
+.ai-mini-chip .die { fill: #ff2fb3; animation: aiBlink 1.6s ease-in-out infinite; }
+.ai-mini-chip.pink .pin, .ai-mini-chip.pink .core { stroke: #ff2fb3; }
+.ai-mini-chip.pink { filter: drop-shadow(0 0 8px rgba(255, 47, 179, 0.9)); }
+.ai-mini-chip.pink .die { fill: #00e5ff; }
+
+/* ---------- layout ---------- */
+.ai-banner-inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "chip text analytics"
+    "cta  cta  cta";
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 12px;
+}
+.ai-banner-inner.no-analytics {
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "chip text" "cta cta";
+}
+.ai-analytics { grid-area: analytics; }
+.ai-chip { grid-area: chip; }
+.ai-banner-text { grid-area: text; }
+.ai-cta-row { grid-area: cta; display: flex; justify-content: center; }
+
+/* main AI chip */
+.ai-chip {
+  width: 88px;
+  height: 88px;
+  filter: drop-shadow(0 0 16px rgba(0, 229, 255, 0.9));
+  animation: aiFloat 4s ease-in-out infinite;
+}
+.ai-chip .pin { stroke: #00e5ff; stroke-width: 4; stroke-linecap: round; }
+.ai-chip .ring { fill: none; stroke: url(#aiChipGrad); stroke-width: 3; stroke-dasharray: 8 6;
+                 transform-origin: 60px 60px; animation: aiSpin 10s linear infinite; }
+.ai-chip text { font-weight: 900; font-size: 30px; fill: #fff; letter-spacing: 1px; }
+
+.ai-banner-text { min-width: 0; text-shadow: 0 2px 8px #050820, 0 0 2px #050820; }
+.ai-title { text-shadow: none; filter: drop-shadow(0 2px 6px #050820); }
+
+.ai-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #00e5ff; border: 1px solid rgba(0, 229, 255, 0.6); background: rgba(0, 229, 255, 0.08);
+}
+.ai-badge .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #00ff9d; box-shadow: 0 0 8px #00ff9d;
+  animation: aiBlink 1.4s ease-in-out infinite;
+}
+
+.ai-title {
+  margin: 6px 0 2px;
+  font-size: 1.8rem; font-weight: 900; line-height: 1.15;
+  background: linear-gradient(90deg, #00e5ff, #b46bff, #ff2fb3, #00e5ff);
+  background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: aiGradient 6s linear infinite;
+}
+
+.ai-desc { margin: 0; font-size: 1rem; color: #d3dcff; line-height: 1.5; }
+.ai-desc .typed {
+  color: #00e5ff; font-family: "Courier New", monospace; font-weight: 700;
+  border-right: 2px solid #00e5ff; padding-right: 2px;
+  animation: aiCaret 0.9s step-end infinite;
+}
+
+.ai-top-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; overflow: hidden; }
+.ai-top-row > * { flex-shrink: 0; }
+.ai-tag {
+  padding: 3px 10px; border-radius: 8px;
+  font-size: 0.78rem; font-weight: 600; color: #e6ebff;
+  background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(180, 107, 255, 0.55);
+}
+
+/* CTA: wide, grows 25% and changes color on hover */
+.ai-cta {
+  position: relative;
+  z-index: 1;
+  width: 80%;                       /* 80% x 1.25 = 100% on hover, so it never overflows */
+  display: inline-flex; align-items: center; justify-content: center; gap: 16px;
+  padding: 12px 40px; border: none; border-radius: 16px; cursor: pointer;
+  font-family: inherit; font-size: 1.55rem; font-weight: 900; letter-spacing: .5px; color: #fff;
+  background: linear-gradient(110deg, #3d5afe, #7a3cff 45%, #ff2fb3);
+  background-size: 200% 200%;
+  animation: aiGradient 5s ease infinite, aiPulse 2.4s ease-in-out infinite;
+  overflow: hidden;
+  transition: transform .35s cubic-bezier(.2,.9,.3,1.3), box-shadow .35s ease;
+}
+/* hover color layer (fades in, since gradients can't transition directly) */
+.ai-cta::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(110deg, #00e5ff, #00ff9d 50%, #ffd600);
+  opacity: 0;
+  transition: opacity .35s ease;
+}
+.ai-cta::after {
+  content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: skewX(-20deg);
+  animation: aiShimmer 3s ease-in-out infinite;
+}
+.ai-cta span, .ai-cta svg { position: relative; z-index: 1; transition: color .35s ease; }
+.ai-cta svg { width: 26px; height: 26px; }
+
+@media (hover: hover) {
+  .ai-cta:hover {
+    transform: scale(1.25);
+    z-index: 5;
+    color: #0a0f3a;
+    box-shadow: 0 0 30px rgba(0, 255, 157, .8), 0 0 70px rgba(0, 229, 255, .6);
+    animation-play-state: paused;
+  }
+  .ai-cta:hover::before { opacity: 1; }
+}
+.ai-cta:active { transform: scale(1.18); }
+.ai-cta:focus-visible { outline: 3px solid #ffd600; outline-offset: 6px; }
+
+/* ---------- analytics panel ---------- */
+.ai-analytics {
+  display: grid;
+  grid-template-columns: repeat(4, 104px);   /* all four graphs in one row */
+  gap: 8px;
+}
+.ai-card {
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(10, 18, 64, 0.72);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  box-shadow: inset 0 0 18px rgba(0, 229, 255, 0.12), 0 0 14px rgba(0, 229, 255, 0.15);
+  backdrop-filter: blur(4px);
+}
+.ai-card-label {
+  font-size: 0.62rem; font-weight: 700; letter-spacing: .6px; text-transform: uppercase;
+  color: #8fb3ff; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ai-card svg { display: block; width: 100%; height: 62px; overflow: visible; }
+
+/* gauge */
+.ai-gauge .track { fill: none; stroke: rgba(255, 255, 255, 0.12); stroke-width: 9; }
+.ai-gauge .value {
+  fill: none; stroke: url(#aiGaugeGrad); stroke-width: 9; stroke-linecap: round;
+  stroke-dasharray: 226; stroke-dashoffset: 226;
+  transform: rotate(-90deg); transform-origin: 50px 50px;
+  filter: drop-shadow(0 0 5px #ff2fb3);
+  animation: aiGauge 4s ease-in-out infinite;
+}
+.ai-gauge text { fill: #fff; font-weight: 900; font-size: 20px; }
+.ai-gauge .small { fill: #8fb3ff; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+
+/* bars */
+.ai-bars rect {
+  fill: url(#aiBarGrad);
+  transform-box: fill-box; transform-origin: bottom;
+  filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.8));
+  animation: aiBar 1.8s ease-in-out infinite;
+}
+.ai-bars rect:nth-child(2) { animation-delay: .2s; }
+.ai-bars rect:nth-child(3) { animation-delay: .4s; }
+.ai-bars rect:nth-child(4) { animation-delay: .6s; }
+.ai-bars rect:nth-child(5) { animation-delay: .8s; }
+.ai-bars rect:nth-child(6) { animation-delay: 1s; }
+.ai-bars rect:nth-child(7) { animation-delay: 1.2s; }
+
+/* line chart */
+.ai-line .grid { stroke: rgba(143, 179, 255, 0.18); stroke-width: 1; }
+.ai-line .area { fill: url(#aiAreaGrad); }
+.ai-line .stroke {
+  fill: none; stroke: #00e5ff; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round;
+  stroke-dasharray: 320; stroke-dashoffset: 320;
+  filter: drop-shadow(0 0 4px #00e5ff);
+  animation: aiDraw 4s ease-in-out infinite;
+}
+.ai-line .pt { fill: #fff; filter: drop-shadow(0 0 4px #00e5ff); }
+
+/* radar */
+.ai-radar .web { fill: none; stroke: rgba(143, 179, 255, 0.3); stroke-width: 1; }
+.ai-radar .shape {
+  fill: rgba(255, 47, 179, 0.35); stroke: #ff2fb3; stroke-width: 2;
+  filter: drop-shadow(0 0 5px #ff2fb3);
+  transform-origin: 50px 50px;
+  animation: aiRadar 3s ease-in-out infinite;
+}
+.ai-radar text { fill: #e6ebff; font-size: 9px; font-weight: 700; }
+
+/* ---------- keyframes ---------- */
+@keyframes aiScan     { to { top: 100%; } }
+@keyframes aiFlow     { to { stroke-dashoffset: -46; } }
+@keyframes aiNode     { 0%,100% { opacity: .7; r: 5; } 50% { opacity: 1; r: 9; } }
+@keyframes aiFloat    { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes aiSpin     { to { transform: rotate(360deg); } }
+@keyframes aiBlink    { 50% { opacity: .3; } }
+@keyframes aiCaret    { 50% { border-color: transparent; } }
+@keyframes aiGradient { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes aiPulse    { 0%,100% { box-shadow: 0 0 16px rgba(0,198,255,.55), 0 0 32px rgba(255,47,179,.35); }
+                        50%     { box-shadow: 0 0 28px rgba(0,198,255,.85), 0 0 52px rgba(255,47,179,.6); } }
+@keyframes aiShimmer  { 0% { left: -60%; } 60%,100% { left: 130%; } }
+@keyframes aiGauge    { 0% { stroke-dashoffset: 226; } 45%,85% { stroke-dashoffset: 18; } 100% { stroke-dashoffset: 226; } }
+@keyframes aiBar      { 0%,100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+@keyframes aiDraw     { 0% { stroke-dashoffset: 320; } 50%,90% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -320; } }
+@keyframes aiRadar    { 0%,100% { transform: scale(.85); } 50% { transform: scale(1.05); } }
+
+/* ---------- responsive (based on the banner's own width) ---------- */
+/* medium columns: keep it one row, show two graphs */
+@container (max-width: 1000px) {
+  .ai-analytics { grid-template-columns: repeat(2, 104px); }
+  .ai-analytics .ai-card:nth-child(n+4) { display: none; }
+}
+/* narrow columns: drop graphs, still a horizontal strip */
+@container (max-width: 720px) {
+  .ai-analytics { display: none; }
+  .ai-banner-inner { grid-template-columns: auto 1fr; grid-template-areas: "chip text" "cta cta"; }
+  .ai-tag { display: none; }
+}
+/* phones */
+@container (max-width: 480px) {
+  .ai-chip { width: 64px; height: 64px; }
+  .ai-title { font-size: 1.3rem; }
+  .ai-desc { font-size: .9rem; }
+  .ai-cta { font-size: 1.1rem; padding: 12px 16px; width: 90%; }
+  .ai-cta svg { width: 20px; height: 20px; }
+  .ai-mini-chip { width: 26px; height: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-banner *, .ai-banner::after { animation: none !important; }
+  .ai-gauge .value { stroke-dashoffset: 18; }
+  .ai-line .stroke { stroke-dashoffset: 0; }
+}

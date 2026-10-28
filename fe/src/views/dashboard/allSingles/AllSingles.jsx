@@ -33,6 +33,8 @@ import audioAllSinglesJessica from 'assets/sound/all_singles_instruction_Jessica
 import audioAllSinglesMichael from 'assets/sound/all_singles_instruction_Michael.m4a';
 import ColorTemplate8PhotoGallery from 'ui-component/ColorTemplate8PhotoGallery';
 import RaffleRelationshipBadge from 'ui-component/RaffleRelationshipBadge';
+import AllSinglesAiMatchmaker from './AllSinglesAiMatchmaker';
+import AIFilterBanner from './AIFilterBanner';
 import useRaffleRelationships from 'hooks/useRaffleRelationships';
 import {
   colorTemplate8PhotoGalleryWrapItemSx,
@@ -46,14 +48,8 @@ import { fetchUserCustomization, saveUserCustomization } from '../../../api/user
 import { useSinglesPreferences } from '../../../api/singlesPreferencesFe';
 import { useAuth } from 'contexts/AuthContext';
 import ServiceNoticeModal from 'ui-component/ServiceNoticeModal';
-import {
-  getDesktopTextFontSizeVw,
-  getDesktopTitleFontSizeVw
-} from 'config/desktopFontEnv';
-import {
-  getMobileSinglesTextFontSizeVw,
-  getMobileSinglesTitleFontSizeVw
-} from 'config/singlesMemberCardFontEnv';
+import { getDesktopTextFontSizeVw, getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
+import { getMobileSinglesTextFontSizeVw, getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv';
 import { isApiInfrastructureError } from 'utils/apiInfrastructureError';
 import { isToolsOnlyAdminSession } from 'utils/adminSession';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
@@ -61,8 +57,7 @@ import { formatMemberLabel, formatMemberNumber, getMemberDisplayLines } from 'ut
 import {
   ALL_SINGLES_INSTRUCTION_CONTEXT_STEP,
   ALL_SINGLES_INSTRUCTION_CONTEXT_TITLE,
-  ALL_SINGLES_INSTRUCTION_POPUP_TEXT,
-  ALL_SINGLES_WELCOME_BANNER_TEXT
+  ALL_SINGLES_INSTRUCTION_POPUP_TEXT
 } from 'constants/allSinglesInstructionText';
 // ==============================|| ALL SINGLES ||============================== //
 
@@ -70,10 +65,8 @@ const INSTRUCTION_POPUP_TEXT = ALL_SINGLES_INSTRUCTION_POPUP_TEXT;
 
 const ALL_SINGLES_INSTRUCTION_AUDIO_BY_VOICE = {
   Sora: typeof audioAllSinglesSora === 'string' ? audioAllSinglesSora : audioAllSinglesSora?.default || '',
-  Jessica:
-    typeof audioAllSinglesJessica === 'string' ? audioAllSinglesJessica : audioAllSinglesJessica?.default || '',
-  Michael:
-    typeof audioAllSinglesMichael === 'string' ? audioAllSinglesMichael : audioAllSinglesMichael?.default || ''
+  Jessica: typeof audioAllSinglesJessica === 'string' ? audioAllSinglesJessica : audioAllSinglesJessica?.default || '',
+  Michael: typeof audioAllSinglesMichael === 'string' ? audioAllSinglesMichael : audioAllSinglesMichael?.default || ''
 };
 
 const allSinglesGalleryItemSx = colorTemplate8PhotoGalleryWrapItemSx();
@@ -174,26 +167,15 @@ const FILTER_AGE_MIN = 18;
 const FILTER_AGE_MAX = 99;
 const FILTER_DISTANCE_MIN = 0;
 const FILTER_DISTANCE_MAX = 100;
-/** Edit filter stays inactive until All Singles has this many members. */
-const ALL_SINGLES_FILTER_MIN_MEMBERS = 10000;
 const FILTER_INSUFFICIENT_MEMBERS_MESSAGE = 'Insufficient members to activate Filter';
 
 /** US zip lookup: `https://api.zippopotam.us/us/{zip}` — UI accepts 5-digit zip only */
 const ZIP_DIGITS_MAX = 5;
 const ZIP_LOOKUP_COUNTRY_CODE = 'us';
 function sanitizeUsZipDigits(value) {
-  return String(value ?? '').replace(/\D/g, '').slice(0, ZIP_DIGITS_MAX);
-}
-
-function parsePlaceLabel(label) {
-  const text = String(label ?? '').trim();
-  if (!text) return { city: '', state: '' };
-  const idx = text.lastIndexOf(',');
-  if (idx === -1) return { city: text, state: '' };
-  return {
-    city: text.slice(0, idx).trim(),
-    state: text.slice(idx + 1).trim()
-  };
+  return String(value ?? '')
+    .replace(/\D/g, '')
+    .slice(0, ZIP_DIGITS_MAX);
 }
 
 function formatPlaceLabel(city, state) {
@@ -299,23 +281,14 @@ export default function AllSingles() {
     }
   }, [preferences, preferencesLoading]);
 
-  const openFilterModal = () => {
-    const totalAllSingles = Array.isArray(singles) ? singles.length : 0;
-    if (totalAllSingles < ALL_SINGLES_FILTER_MIN_MEMBERS) {
-      setFilterInsufficientOpen(true);
-      return;
-    }
-    setDraftAge([...appliedAge]);
-    setDraftDistanceMiles(appliedDistanceMiles);
-    setDraftPostcode(sanitizeUsZipDigits(appliedPostcode));
-    setDraftVettedOnly(appliedVettedOnly);
-    setDraftMember(String(searchQuery).replace(/\D/g, '').slice(0, 8));
-    const { city, state } = parsePlaceLabel(appliedPlaceLabel);
-    setDraftCity(city);
-    setDraftState(state);
-    setPostcodeLookupError('');
-    setFilterModalOpen(true);
-  };
+  /** "Filter with Advanced AI" — open the AI matchmaker panel and bring it into view. */
+  const aiMatchmakerPanelRef = useRef(null);
+  const openAiMatchmaker = useCallback(() => {
+    if (!welcomeExpanded) toggleWelcomeExpanded();
+    window.requestAnimationFrame(() => {
+      aiMatchmakerPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [toggleWelcomeExpanded, welcomeExpanded]);
 
   const runPostcodeLookup = useCallback(async () => {
     const raw = draftPostcode.trim();
@@ -453,6 +426,116 @@ export default function AllSingles() {
     setFilterModalOpen(false);
   };
 
+  /** One member card (main grid and AI Filter results). `match` adds the AI score + reason. */
+  const renderSingleCard = (personIndex_DDDDDDD, { tourMyPicks = false, match = null } = {}) => {
+    const memberLabel = formatMemberLabel({
+      alias: personIndex_DDDDDDD.alias,
+      singlesId: personIndex_DDDDDDD.singles_id,
+      prefix: personIndex_DDDDDDD.prefix,
+      memberId: personIndex_DDDDDDD.member_id
+    });
+    const memberDisplay = getMemberDisplayLines({
+      alias: personIndex_DDDDDDD.alias,
+      singlesId: personIndex_DDDDDDD.singles_id,
+      prefix: personIndex_DDDDDDD.prefix,
+      memberId: personIndex_DDDDDDD.member_id
+    });
+    let imgSrc =
+      personIndex_DDDDDDD.profile_image_url && personIndex_DDDDDDD.profile_image_url !== 'profile.jpeg'
+        ? personIndex_DDDDDDD.profile_image_url
+        : UserRound;
+    if (
+      typeof imgSrc === 'string' &&
+      imgSrc.includes('/api/photo/') &&
+      user?.singles_id != null &&
+      personIndex_DDDDDDD.singles_id === user.singles_id
+    ) {
+      const sep = imgSrc.includes('?') ? '&' : '?';
+      imgSrc = `${imgSrc}${sep}v=${profilePhotoCacheBust}`;
+    }
+    return (
+      <ColorTemplate8PhotoGallery.Item
+        key={personIndex_DDDDDDD.singles_id}
+        impersonateSinglesId={personIndex_DDDDDDD.singles_id}
+        impersonateTooltip={!toolsOnlyAdmin}
+        selected={false}
+        sx={allSinglesGalleryItemSx}
+      >
+        <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+          <ColorTemplate8PhotoGallery.Avatar
+            src={imgSrc}
+            alt={memberLabel}
+            selected={false}
+            onDoubleClick={() => openInterestedAlbum(personIndex_DDDDDDD)}
+            imgProps={{
+              onError: (e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = UserRound;
+              }
+            }}
+          />
+          {personIndex_DDDDDDD.vetted_basic_status ? (
+            <Box component="img" src={verifiedSeal} alt="Vetted" sx={allSinglesVerifiedSealSx} />
+          ) : null}
+          <RaffleRelationshipBadge
+            relationship={raffleRelationships.get(Number(personIndex_DDDDDDD.singles_id))}
+            memberLabel={memberLabel}
+          />
+        </Box>
+        <ColorTemplate8PhotoGallery.NameButton onDoubleClick={() => openInterestedAlbum(personIndex_DDDDDDD)}>
+          <ColorTemplate8PhotoGallery.Label primary={memberDisplay.primary} secondary={memberDisplay.secondary} selected={false} />
+        </ColorTemplate8PhotoGallery.NameButton>
+        {match ? (
+          <Box sx={{ textAlign: 'center', px: 0.5 }} title={match.reason || undefined}>
+            <Box
+              component="span"
+              sx={{
+                display: 'inline-block',
+                px: 1,
+                borderRadius: '10px',
+                bgcolor: '#ffeb3b',
+                color: '#000',
+                fontWeight: 800,
+                fontSize: '0.8rem',
+                border: '1px solid #000'
+              }}
+            >
+              {match.score}% match
+            </Box>
+            {match.reason ? (
+              <Typography sx={{ fontSize: '0.72rem', color: '#fff', lineHeight: 1.25, mt: 0.25 }}>{match.reason}</Typography>
+            ) : null}
+          </Box>
+        ) : null}
+        <ColorTemplate8PhotoGallery.Footer>
+          {toolsOnlyAdmin ? (
+            <ColorTemplate8PhotoGallery.ImpersonateButton targetSinglesId={personIndex_DDDDDDD.singles_id} />
+          ) : (
+            <SelectedButtonTemplate
+              fullWidth
+              data-clickable-zone="true"
+              data-vsingles-tour-my-picks={tourMyPicks ? '' : undefined}
+              disabled={markInterestedBusyId === personIndex_DDDDDDD.singles_id}
+              onClick={() => handleMarkInterested(personIndex_DDDDDDD.singles_id)}
+              sx={{
+                flex: { xs: 'none', sm: 1 },
+                minWidth: { sm: 0 },
+                zIndex: 1,
+                transformOrigin: 'center center'
+              }}
+            >
+              {markInterestedBusyId === personIndex_DDDDDDD.singles_id ? (
+                <CircularProgress size={18} sx={{ color: 'inherit' }} />
+              ) : (
+                'My Picks'
+              )}
+            </SelectedButtonTemplate>
+          )}
+        </ColorTemplate8PhotoGallery.Footer>
+      </ColorTemplate8PhotoGallery.Item>
+    );
+  };
+
   if (singlesError && isApiInfrastructureError(singlesError)) {
     return <ServiceNoticeModal onExit={() => window.close()} />;
   }
@@ -490,21 +573,13 @@ export default function AllSingles() {
         </EarnTokensPageTitle>
       }
       center={<PageVideoTextTutorialPair pageKey="allSingles" onTutorialClick={() => setInstructionOpen(true)} />}
-        secondary={<PageInstructionEarnTokensAction />}
+      secondary={<PageInstructionEarnTokensAction />}
     >
-      <AllSinglesWelcomePanel expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} downSM={downSM}>
-        <Typography
-          component="div"
-          sx={{
-            color: 'var(--theme-primary-color)',
-            fontSize: { xs: getMobileSinglesTextFontSizeVw(), sm: getDesktopTextFontSizeVw() },
-            lineHeight: 1.45,
-            whiteSpace: 'pre-line'
-          }}
-        >
-          {ALL_SINGLES_WELCOME_BANNER_TEXT}
-        </Typography>
-      </AllSinglesWelcomePanel>
+      <Box ref={aiMatchmakerPanelRef} sx={{ flexShrink: 0, scrollMarginTop: 8 }}>
+        <AllSinglesWelcomePanel expanded={welcomeExpanded} onToggle={toggleWelcomeExpanded} downSM={downSM}>
+          <AllSinglesAiMatchmaker candidates={filteredAllSingles_XXXXXXX} renderCard={renderSingleCard} />
+        </AllSinglesWelcomePanel>
+      </Box>
       <Box
         data-suppress-touch-contextmenu="true"
         sx={{
@@ -551,30 +626,12 @@ export default function AllSingles() {
                   color: 'var(--theme-primary-color)',
                   fontWeight: 700
                 }}
-              >
-                (filter disabled when total members in All Singles page is too few)
-              </Box>
+              ></Box>
             ) : null}
           </Typography>
         </Box>
-        {!toolsOnlyAdmin ? (
-          <SelectedButtonTemplate
-            fitLabelWidth
-            data-vsingles-tour-edit-filter=""
-            onClick={openFilterModal}
-            sx={{
-              flexShrink: 0,
-              alignSelf: { xs: 'stretch', sm: 'center' },
-              px: 3,
-              py: 1,
-              transformOrigin: 'center center',
-              zIndex: 1
-            }}
-          >
-            Edit filter
-          </SelectedButtonTemplate>
-        ) : null}
       </Box>
+      {!toolsOnlyAdmin ? <AIFilterBanner data-vsingles-tour-edit-filter="" onClick={openAiMatchmaker} /> : null}
 
       <PageInstructionPopup
         open={instructionOpen}
@@ -594,13 +651,8 @@ export default function AllSingles() {
             title={ALL_SINGLES_INSTRUCTION_CONTEXT_TITLE}
             contextStep={ALL_SINGLES_INSTRUCTION_CONTEXT_STEP}
           />
-          <PageInstructionPopup.BodyText sx={{ whiteSpace: 'pre-line' }}>
-            {INSTRUCTION_POPUP_TEXT}
-          </PageInstructionPopup.BodyText>
-          <FriendshipStatesDiagramZoom
-            imageSrc={friendShipStatesAllSinglesImg}
-            imageAlt="All Singles friendship states diagram"
-          />
+          <PageInstructionPopup.BodyText sx={{ whiteSpace: 'pre-line' }}>{INSTRUCTION_POPUP_TEXT}</PageInstructionPopup.BodyText>
+          <FriendshipStatesDiagramZoom imageSrc={friendShipStatesAllSinglesImg} imageAlt="All Singles friendship states diagram" />
         </PageInstructionPopup.Body>
       </PageInstructionPopup>
 
@@ -614,10 +666,7 @@ export default function AllSingles() {
           <ColorTemplate16PopupCenterWide.BodyText sx={{ textAlign: 'center', width: '100%' }}>
             {FILTER_INSUFFICIENT_MEMBERS_MESSAGE}
           </ColorTemplate16PopupCenterWide.BodyText>
-          <ColorTemplate16PopupCenterWide.ActionButton
-            type="button"
-            onClick={() => setFilterInsufficientOpen(false)}
-          >
+          <ColorTemplate16PopupCenterWide.ActionButton type="button" onClick={() => setFilterInsufficientOpen(false)}>
             OK
           </ColorTemplate16PopupCenterWide.ActionButton>
         </ColorTemplate16PopupCenterWide.Body>
@@ -638,15 +687,10 @@ export default function AllSingles() {
 
           <ColorTemplate7PopupLargeDark.FormRows>
             <ColorTemplate7PopupLargeDark.FormRow label="Vetted status">
-              <ColorTemplate7PopupLargeDark.Checkbox
-                checked={draftVettedOnly}
-                onChange={(e) => setDraftVettedOnly(e.target.checked)}
-              />
+              <ColorTemplate7PopupLargeDark.Checkbox checked={draftVettedOnly} onChange={(e) => setDraftVettedOnly(e.target.checked)} />
             </ColorTemplate7PopupLargeDark.FormRow>
 
-            <ColorTemplate7PopupLargeDark.FormRow
-              label={`Age: between ${draftAge[0]} and ${draftAge[1]} years old`}
-            >
+            <ColorTemplate7PopupLargeDark.FormRow label={`Age: between ${draftAge[0]} and ${draftAge[1]} years old`}>
               <ColorTemplate7PopupLargeDark.Slider
                 formRow
                 value={draftAge}
@@ -702,7 +746,14 @@ export default function AllSingles() {
                   <ColorTemplate7PopupLargeDark.Input
                     formRow
                     value={draftState}
-                    onChange={(e) => setDraftState(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2))}
+                    onChange={(e) =>
+                      setDraftState(
+                        e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z]/g, '')
+                          .slice(0, 2)
+                      )
+                    }
                     placeholder="State"
                     inputProps={{ 'aria-label': 'State abbreviation', maxLength: 2 }}
                     sx={{
@@ -758,7 +809,7 @@ export default function AllSingles() {
           <CircularProgress />
         </Box>
       )}
-      
+
       {markInterestedError ? (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setMarkInterestedError('')}>
           {markInterestedError}
@@ -773,7 +824,7 @@ export default function AllSingles() {
           </Box>
         </Alert>
       )}
-      
+
       {!singlesLoading && !singlesError && (
         <Box
           sx={{
@@ -793,102 +844,14 @@ export default function AllSingles() {
             sx={colorTemplate8PhotoGalleryWrapShellSx()}
             listSx={colorTemplate8PhotoGalleryWrapListSx()}
           >
-            {filteredAllSingles_XXXXXXX.map((personIndex_DDDDDDD, cardIndex) => {
-              const tourMyPicksIndex = Math.floor((filteredAllSingles_XXXXXXX.length - 1) / 2);
-              const memberLabel = formatMemberLabel({
-                alias: personIndex_DDDDDDD.alias,
-                singlesId: personIndex_DDDDDDD.singles_id,
-                prefix: personIndex_DDDDDDD.prefix,
-                memberId: personIndex_DDDDDDD.member_id
-              });
-              const memberDisplay = getMemberDisplayLines({
-                alias: personIndex_DDDDDDD.alias,
-                singlesId: personIndex_DDDDDDD.singles_id,
-                prefix: personIndex_DDDDDDD.prefix,
-                memberId: personIndex_DDDDDDD.member_id
-              });
-              let imgSrc =
-                personIndex_DDDDDDD.profile_image_url && personIndex_DDDDDDD.profile_image_url !== 'profile.jpeg'
-                  ? personIndex_DDDDDDD.profile_image_url
-                  : UserRound;
-              if (
-                typeof imgSrc === 'string' &&
-                imgSrc.includes('/api/photo/') &&
-                user?.singles_id != null &&
-                personIndex_DDDDDDD.singles_id === user.singles_id
-              ) {
-                const sep = imgSrc.includes('?') ? '&' : '?';
-                imgSrc = `${imgSrc}${sep}v=${profilePhotoCacheBust}`;
-              }
-              return (
-                <ColorTemplate8PhotoGallery.Item
-                  key={personIndex_DDDDDDD.singles_id}
-                  impersonateSinglesId={personIndex_DDDDDDD.singles_id}
-                  impersonateTooltip={!toolsOnlyAdmin}
-                  selected={false}
-                  sx={allSinglesGalleryItemSx}
-                >
-                  <Box sx={{ position: 'relative', display: 'inline-flex' }}>
-                    <ColorTemplate8PhotoGallery.Avatar
-                      src={imgSrc}
-                      alt={memberLabel}
-                      selected={false}
-                      onDoubleClick={() => openInterestedAlbum(personIndex_DDDDDDD)}
-                      imgProps={{
-                        onError: (e) => {
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = UserRound;
-                        }
-                      }}
-                    />
-                    {personIndex_DDDDDDD.vetted_basic_status ? (
-                      <Box component="img" src={verifiedSeal} alt="Vetted" sx={allSinglesVerifiedSealSx} />
-                    ) : null}
-                    <RaffleRelationshipBadge
-                      relationship={raffleRelationships.get(Number(personIndex_DDDDDDD.singles_id))}
-                      memberLabel={memberLabel}
-                    />
-                  </Box>
-                  <ColorTemplate8PhotoGallery.NameButton onDoubleClick={() => openInterestedAlbum(personIndex_DDDDDDD)}>
-                    <ColorTemplate8PhotoGallery.Label
-                      primary={memberDisplay.primary}
-                      secondary={memberDisplay.secondary}
-                      selected={false}
-                    />
-                  </ColorTemplate8PhotoGallery.NameButton>
-                  <ColorTemplate8PhotoGallery.Footer>
-                    {toolsOnlyAdmin ? (
-                      <ColorTemplate8PhotoGallery.ImpersonateButton
-                        targetSinglesId={personIndex_DDDDDDD.singles_id}
-                      />
-                    ) : (
-                      <SelectedButtonTemplate
-                        fullWidth
-                        data-clickable-zone="true"
-                        data-vsingles-tour-my-picks={cardIndex === tourMyPicksIndex ? '' : undefined}
-                        disabled={markInterestedBusyId === personIndex_DDDDDDD.singles_id}
-                        onClick={() => handleMarkInterested(personIndex_DDDDDDD.singles_id)}
-                        sx={{
-                          flex: { xs: 'none', sm: 1 },
-                          minWidth: { sm: 0 },
-                          zIndex: 1,
-                          transformOrigin: 'center center'
-                        }}
-                      >
-                        {markInterestedBusyId === personIndex_DDDDDDD.singles_id ? (
-                          <CircularProgress size={18} sx={{ color: 'inherit' }} />
-                        ) : (
-                          'My Picks'
-                        )}
-                      </SelectedButtonTemplate>
-                    )}
-                  </ColorTemplate8PhotoGallery.Footer>
-                </ColorTemplate8PhotoGallery.Item>
-              );
-            })}
+            {filteredAllSingles_XXXXXXX.map((personIndex_DDDDDDD, cardIndex) =>
+              renderSingleCard(personIndex_DDDDDDD, {
+                tourMyPicks: cardIndex === Math.floor((filteredAllSingles_XXXXXXX.length - 1) / 2)
+              })
+            )}
           </ColorTemplate8PhotoGallery>
         </Box>
       )}
-      </MainCard>
+    </MainCard>
   );
 }

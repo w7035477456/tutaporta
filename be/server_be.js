@@ -541,6 +541,7 @@ import {
   postAdminScamSuspend
 } from './routes/admin/adminScamAlerts.js';
 import { postProfileWriterGenerate } from './routes/user/profileWriter.js';
+import { getAllSinglesAiMatchCandidates, postAllSinglesAiMatch } from './routes/singles/aiMatchFilter.js';
 import {
   getGroupChatInviteCandidates,
   getGroupChatMessages,
@@ -1487,6 +1488,8 @@ app.post('/api/resendPhoneCode', resendPhoneCode);
 app.post('/api/sendRegistrationSms', sendRegistrationSms);
 app.post('/api/signup/bypass-sms-phone-verification', bypassSignupSmsVerification);
 app.get('/api/allSingles', requireAuth, getAllSingles_BBBBBBBB);
+app.get('/api/allSingles/aiMatch/candidates', requireAuth, getAllSinglesAiMatchCandidates);
+app.post('/api/allSingles/aiMatch', requireAuth, postAllSinglesAiMatch);
 app.post('/api/markInterested', requireAuth, markInterested_MMMMMMMM);
 app.post('/api/notInterested', requireAuth, notInterested_NNNNNNNN);
 app.post('/api/interested/requestInfo', requireAuth, toggleInterestedRequestInfo_OOOOOOOO);
