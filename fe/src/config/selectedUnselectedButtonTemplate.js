@@ -16,15 +16,15 @@ import {
   INVERSE_DAYNIGHT_VAR,
   isBlackColor,
   isWhiteColor,
-  PRIMARY_VAR,
-  SECONDARY_VAR
+  PRIMARY_VAR
 } from 'utils/themeConfig';
 
 export const BUTTON_TEMPLATE_CONTRAST_FLIP_WHITE = '#ffffff';
 export const BUTTON_TEMPLATE_CONTRAST_FLIP_BLACK = '#000000';
 
-/** Selected — theme secondary bg, inverse-daynight text + border. */
-export const SELECTED_BUTTON_TEMPLATE_BG = `var(${SECONDARY_VAR})`;
+/** Selected — green bg in every theme / palette, inverse-daynight text + border. */
+export const SELECTED_BUTTON_GREEN = '#60C446';
+export const SELECTED_BUTTON_TEMPLATE_BG = SELECTED_BUTTON_GREEN;
 export const SELECTED_BUTTON_TEMPLATE_TEXT = `var(${INVERSE_DAYNIGHT_VAR})`;
 export const SELECTED_BUTTON_TEMPLATE_BORDER = `1px solid var(${INVERSE_DAYNIGHT_VAR})`;
 

@@ -330,6 +330,17 @@ export async function postAdminAuditRegistrationLookup(req, res) {
  * POST /api/admin/singles/set-status
  * Body: { singlesId, status } — sets outdateddbsnapshotoct2024.singles.status and appends audit row when changed.
  */
+const SUSPEND_LOCKED_ERROR =
+  'Status is locked to Suspend from Tools → Scam Alert. Turn Suspend off there before changing status here.';
+
+async function isSinglesSuspendLocked(client, singlesId) {
+  const { rowCount } = await client.query(
+    'SELECT 1 FROM outdateddbsnapshotoct2024.singles_suspend_lock WHERE singles_id = $1',
+    [singlesId]
+  );
+  return rowCount > 0;
+}
+
 export async function postAdminSetSinglesStatus(req, res) {
   const singlesId = parseSinglesIdInput(req.body?.singlesId ?? req.body?.singles_id);
   const nextStatus = normalizeSinglesStatus(req.body?.status);
@@ -359,6 +370,11 @@ export async function postAdminSetSinglesStatus(req, res) {
     if (!row) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Singles row not found.' });
+    }
+
+    if (nextStatus !== 'suspend' && (await isSinglesSuspendLocked(client, singlesId))) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: SUSPEND_LOCKED_ERROR });
     }
 
     const currentStatus = normalizeSinglesStatus(row.status) ?? 'blank';
@@ -593,6 +609,11 @@ export async function postAdminCycleSinglesStatus(req, res) {
     if (!row) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Singles row not found.' });
+    }
+
+    if (await isSinglesSuspendLocked(client, singlesId)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: SUSPEND_LOCKED_ERROR });
     }
 
     const nextStatus = nextSinglesStatus(row.status);

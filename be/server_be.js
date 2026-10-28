@@ -528,11 +528,19 @@ import {
   getChatFriends,
   getChatHistory,
   getChatHistoryBatch,
+  getChatScamAlertHandler,
   getUnreadChatMessagesHandler,
   getUnreadChatSenderCountHandler,
   markChatVisitedHandler,
   sendChatMessage
 } from './routes/chat/chatWithFriends.js';
+import {
+  getAdminScamAlerts,
+  patchAdminScamAlert,
+  postAdminScamScan,
+  postAdminScamSuspend
+} from './routes/admin/adminScamAlerts.js';
+import { postProfileWriterGenerate } from './routes/user/profileWriter.js';
 import {
   getGroupChatInviteCandidates,
   getGroupChatMessages,
@@ -1389,6 +1397,10 @@ app.post('/api/admin/password-check/global', requireAuth, requireAdminRole, post
 app.post('/api/admin/audit-registrations/lookup', requireAuth, requireAdminRole, postAdminAuditRegistrationLookup);
 app.post('/api/admin/login-log/lookup', requireAuth, requireAdminRole, postAdminLoginLogLookup);
 app.post('/api/admin/login-log/lookup-all', requireAuth, requireAdminRole, postAdminLoginLogLookupAll);
+app.get('/api/admin/scam-alerts', requireAuth, requireAdminRole, getAdminScamAlerts);
+app.patch('/api/admin/scam-alerts/:scamAlertId', requireAuth, requireAdminRole, patchAdminScamAlert);
+app.post('/api/admin/scam-alerts/scan', requireAuth, requireAdminRole, postAdminScamScan);
+app.post('/api/admin/scam-alerts/suspend', requireAuth, requireAdminRole, postAdminScamSuspend);
 app.post('/api/admin/singles/lookup-all', requireAuth, requireAdminRole, postAdminSinglesLookupAll);
 app.post('/api/admin/singles/set-fields', requireAuth, requireAdminRole, postAdminSinglesSetFields);
 app.post('/api/admin/singles/cycle-status', requireAuth, requireAdminRole, postAdminCycleSinglesStatus);
@@ -1492,6 +1504,7 @@ app.get('/api/bioResponses/pendingCount', requireAuth, getVettedFriendsBioRespon
 app.post('/api/bioResponses/notifications/dismiss', requireAuth, dismissBioResponseNotification);
 app.post('/api/bioResponses/notifications/dismissAll', requireAuth, dismissAllBioResponseNotifications);
 app.post('/api/myPicks/posting', requireAuth, createMyPosting);
+app.post('/api/myStory/profileWriter', requireAuth, postProfileWriterGenerate);
 app.post('/api/myPicks/posting/:postId/photos', requireAuth, addMyPostingPhotos);
 app.patch('/api/myPicks/posting/:postId/visibility', requireAuth, updateMyPostingVisibility);
 app.patch('/api/myPicks/posting/:postId/content', requireAuth, updateMyPostingContent);
@@ -1835,6 +1848,7 @@ app.delete('/api/paidRecord/:id/attachments/:attachmentId', requireAuth, deleteP
 
 app.post('/api/chat/send', requireAuth, sendChatMessage);
 app.get('/api/chat/history/:targetUserId', requireAuth, getChatHistory);
+app.get('/api/chat/scamAlert/:targetUserId', requireAuth, getChatScamAlertHandler);
 app.post('/api/chat/historyBatch', requireAuth, getChatHistoryBatch);
 app.get('/api/chat/friends', requireAuth, getChatFriends);
 app.get('/api/chat/unreadMessages', requireAuth, getUnreadChatMessagesHandler);

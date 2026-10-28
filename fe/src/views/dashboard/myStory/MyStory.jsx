@@ -61,6 +61,8 @@ import {
 } from './ProfilePhotoChangeGateDialog';
 import SelfIntroVideoFlow from 'views/utilities/SelfIntroVideoFlow';
 import SelfIntroVideoCta from 'views/utilities/SelfIntroVideoCta';
+import ProfileWriterPopup from 'views/dashboard/myStory/ProfileWriterPopup';
+import HelpMeShineButton from './HelpMeShineButton';
 import SelfIntroVideoSlotsFullPopup from 'views/utilities/SelfIntroVideoSlotsFullPopup';
 import SelfIntroVideoPlaybackPopup, {
   SELF_INTRO_VIDEO_ID_MIME,
@@ -1226,6 +1228,7 @@ export default function MyStory() {
   const [profilePhotoWaitMessage, setProfilePhotoWaitMessage] = useState('');
   const [profilePhotoConfirmDialogOpen, setProfilePhotoConfirmDialogOpen] = useState(false);
   const [makeProfileBusy, setMakeProfileBusy] = useState(false);
+  const [profileWriterOpen, setProfileWriterOpen] = useState(false);
   const pendingMakeProfileRef = useRef(null);
   const [wrongFormatDialogOpen, setWrongFormatDialogOpen] = useState(false);
   const [wrongFormatAttemptFile, setWrongFormatAttemptFile] = useState('');
@@ -2809,6 +2812,44 @@ export default function MyStory() {
     refetchMyPicksFeed
   ]);
 
+  /** "Love It, Save My Profile" — post the AI-written paragraph with the current profile photo. */
+  const handleProfileWriterSave = useCallback(
+    async (text) => {
+      const profilePhotoUrl = myPhotoUrl(profilePhotoId);
+      const photoUrls = profilePhotoUrl ? [profilePhotoUrl] : [];
+      const createResult = await postMyPosting({
+        content: text,
+        photo_urls: photoUrls,
+        posting_visibility: 'public',
+        is_profile_intro: true
+      });
+      setProfileWriterOpen(false);
+      const newPostId = Number(createResult?.post_id);
+      if (Number.isFinite(newPostId) && newPostId > 0) {
+        setFeedPosts((prev) => [
+          {
+            post_id: newPostId,
+            content: text,
+            created_at: new Date().toISOString(),
+            is_profile_intro: true,
+            is_pinned: true,
+            post_owner_id: ownerSinglesId,
+            posting_visibility: 'public',
+            posting_comment_count: 0,
+            posting_like_count: 0,
+            viewer_has_liked: false,
+            photos: photoUrls.map((url, i) => ({ photo_id: `optimistic-${newPostId}-${i}`, photo_url: url, sort_order: i }))
+          },
+          ...prev.filter((p) => Number(p.post_id) !== newPostId).map((p) => (p.is_pinned ? { ...p, is_pinned: false } : p))
+        ]);
+      }
+      scrollReviewFeedToTopRef.current = true;
+      setActiveStoryTab('reviewPostings');
+      await Promise.all([refetchMyPicksFeed(), invalidateMyPicksFeedCache()]);
+    },
+    [ownerSinglesId, profilePhotoId, refetchMyPicksFeed]
+  );
+
   const postingSaveReady =
     postingDraftPhotoIds.length > 0 || postingDraftVideoIds.length > 0 || postingDraftText.trim().length > 0;
 
@@ -4001,7 +4042,18 @@ export default function MyStory() {
           >
             Make this Profile
           </UnSelectedButtonTemplate>
-          <SelfIntroVideoCta onClick={() => selfIntroVideoFlowRef.current?.startFlow()} />
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
+            <HelpMeShineButton onClick={() => setProfileWriterOpen(true)} />
+          </Box>
+          <SelfIntroVideoCta
+            onClick={() => selfIntroVideoFlowRef.current?.startFlow()}
+            sx={{ width: '75%', maxWidth: '75%' }}
+          />
+          <ProfileWriterPopup
+            open={profileWriterOpen}
+            onClose={() => setProfileWriterOpen(false)}
+            onSave={handleProfileWriterSave}
+          />
           <SelfIntroVideoFlow
             ref={selfIntroVideoFlowRef}
             hideCta

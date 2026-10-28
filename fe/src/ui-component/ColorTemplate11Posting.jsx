@@ -647,6 +647,26 @@ function ColorTemplate11PostingPost({
           </Typography>
         </Box>
       ) : null}
+      {post?.is_profile_intro ? (
+        <Box sx={{ px: 1.25, pt: 1 }}>
+          <Box
+            component="span"
+            sx={{
+              display: 'inline-block',
+              px: 1,
+              py: 0.25,
+              bgcolor: '#fff',
+              border: '1px solid #000',
+              borderRadius: 1,
+              fontWeight: 700,
+              color: '#000 !important',
+              WebkitTextFillColor: '#000 !important'
+            }}
+          >
+            {post.is_pinned ? '📌 Pinned · My Intro' : 'My Intro'}
+          </Box>
+        </Box>
+      ) : null}
       <ColorTemplate11PostingEditableBody
         content={post?.content}
         canEdit={canEditContent}

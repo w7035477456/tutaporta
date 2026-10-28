@@ -1,0 +1,70 @@
+.help-me-shine-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  max-width: 100%;
+  padding: 12px 30px 12px 15px;
+  border: 4px solid #16507f;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff, #e6f4ff);
+  color: #16507f;
+  font: inherit;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #16507f;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.help-me-shine-button:active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 #16507f;
+}
+
+.help-me-shine-button:focus-visible {
+  outline: 3px solid #c0151c;
+  outline-offset: 4px;
+}
+
+.help-me-shine-button__icon {
+  display: grid;
+  flex: none;
+  width: 60px;
+  height: 60px;
+  place-items: center;
+  border-radius: 50%;
+  background: #e21b23;
+  animation: help-me-shine-heartbeat 1.4s ease-in-out infinite;
+}
+
+.help-me-shine-button__text {
+  min-width: 0;
+}
+
+.help-me-shine-button__sub {
+  display: block;
+  color: #c0151c;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+@keyframes help-me-shine-heartbeat {
+  15%,
+  45% {
+    transform: scale(1.12);
+  }
+
+  30% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-me-shine-button,
+  .help-me-shine-button__icon {
+    animation: none;
+    transition: none;
+  }
+}

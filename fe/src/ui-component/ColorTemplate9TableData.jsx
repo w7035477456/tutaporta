@@ -56,6 +56,114 @@ const TableFrozenColumnsContext = createContext({
 
 const TableBodyRowIndexContext = createContext(0);
 
+const COLUMN_RESIZE_MIN_WIDTH_PX = 40;
+const UI_TEST_TEMPLATE_KEY = '__ui-test__';
+
+/** Drag-resized column widths for one Table: `{ templateKey, widthsPx }` or null (use caller's grid). */
+const TableColumnResizeContext = createContext(null);
+/** Header row's grid template key so header-cell handles know which rows they resize. */
+const TableHeaderRowTemplateKeyContext = createContext(null);
+
+function gridTemplateKey(gridTemplateColumns) {
+  if (gridTemplateColumns == null) return '';
+  return typeof gridTemplateColumns === 'string' ? gridTemplateColumns : JSON.stringify(gridTemplateColumns);
+}
+
+/**
+ * Rows only take the dragged widths when they share the header row's template, so
+ * full-width detail rows (`1fr`) and other layouts inside the same Table are left alone.
+ */
+function useResizedRowGridSx(templateKey) {
+  const resize = useContext(TableColumnResizeContext);
+  const resized = resize?.state && resize.state.templateKey === templateKey ? resize.state.widthsPx : null;
+  return useMemo(() => {
+    if (!resized) return null;
+    return {
+      gridTemplateColumns: resized.map((w) => `${w}px`).join(' '),
+      minWidth: 0,
+      '& > *': { overflow: 'hidden' }
+    };
+  }, [resized]);
+}
+
+const columnResizeHandleSx = {
+  position: 'absolute',
+  top: 0,
+  right: -5,
+  width: 10,
+  height: '100%',
+  cursor: 'col-resize',
+  zIndex: 3,
+  touchAction: 'none',
+  '&:hover, &[data-dragging="true"]': {
+    bgcolor: 'rgba(255, 255, 255, 0.28)'
+  }
+};
+
+function ColorTemplate9TableColumnResizeHandle() {
+  const resize = useContext(TableColumnResizeContext);
+  const templateKey = useContext(TableHeaderRowTemplateKeyContext);
+  const dragRef = useRef(null);
+  if (!resize || templateKey == null) return null;
+
+  const visibleCells = (rowEl) => Array.from(rowEl.children).filter((el) => window.getComputedStyle(el).display !== 'none');
+
+  return (
+    <Box
+      component="span"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Drag to resize column (double-click to reset)"
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        resize.setState(null);
+      }}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const cellEl = event.currentTarget.parentElement;
+        const rowEl = cellEl?.parentElement;
+        if (!rowEl) return;
+        const cells = visibleCells(rowEl);
+        const columnIndex = cells.indexOf(cellEl);
+        if (columnIndex < 0) return;
+        const startWidths = cells.map((el) => Math.round(el.getBoundingClientRect().width));
+        dragRef.current = { startX: event.clientX, startWidths, columnIndex };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        event.currentTarget.dataset.dragging = 'true';
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+        resize.setState({ templateKey, widthsPx: startWidths });
+      }}
+      onPointerMove={(event) => {
+        const drag = dragRef.current;
+        if (!drag) return;
+        const widthsPx = [...drag.startWidths];
+        widthsPx[drag.columnIndex] = Math.max(
+          COLUMN_RESIZE_MIN_WIDTH_PX,
+          Math.round(drag.startWidths[drag.columnIndex] + (event.clientX - drag.startX))
+        );
+        resize.setState({ templateKey, widthsPx });
+      }}
+      onPointerUp={(event) => {
+        dragRef.current = null;
+        delete event.currentTarget.dataset.dragging;
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
+      }}
+      onPointerCancel={(event) => {
+        dragRef.current = null;
+        delete event.currentTarget.dataset.dragging;
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
+      }}
+      sx={columnResizeHandleSx}
+    />
+  );
+}
+
 function useFrozenColumnStickySx(columnIndex, { isHeader = false } = {}) {
   const { frozenColumnCount, columnWidthsPx } = useContext(TableFrozenColumnsContext);
   const rowIndex = useContext(TableBodyRowIndexContext);
@@ -218,9 +326,7 @@ export function useColorTemplate9AutoFitColumnWidths({
   maxMeasureChars = 0,
   enabled = true
 }) {
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 1024
-  );
+  const [viewportWidth, setViewportWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1024));
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return undefined;
@@ -243,15 +349,9 @@ export function useColorTemplate9AutoFitColumnWidths({
     });
   }, [columnButtons, columnTexts, enabled, extraWidthsPx, maxMeasureChars, minWidthsPx, viewportWidth]);
 
-  const gridTemplateColumns = useMemo(
-    () => buildColorTemplate9AutoFitGridTemplateColumns(columnWidthsPx),
-    [columnWidthsPx]
-  );
+  const gridTemplateColumns = useMemo(() => buildColorTemplate9AutoFitGridTemplateColumns(columnWidthsPx), [columnWidthsPx]);
 
-  const minTableWidthPx = useMemo(
-    () => sumColorTemplate9AutoFitColumnWidths(columnWidthsPx),
-    [columnWidthsPx]
-  );
+  const minTableWidthPx = useMemo(() => sumColorTemplate9AutoFitColumnWidths(columnWidthsPx), [columnWidthsPx]);
 
   return { columnWidthsPx, gridTemplateColumns, minTableWidthPx };
 }
@@ -383,15 +483,20 @@ function ColorTemplate9TableDataTable({
   ...rest
 }) {
   const [scrollEl, setScrollEl] = useState(null);
+  const [columnResizeState, setColumnResizeState] = useState(null);
+  const columnResizeContextValue = useMemo(() => ({ state: columnResizeState, setState: setColumnResizeState }), [columnResizeState]);
+  const resizedWidthsPx = columnResizeState?.widthsPx || null;
+  const resizedTotalPx = resizedWidthsPx ? resizedWidthsPx.reduce((sum, w) => sum + w, 0) + 1 : 0;
+
   const frozenContextValue = useMemo(
     () => ({
       frozenColumnCount: Math.max(0, Math.trunc(Number(frozenColumnCount) || 0)),
-      columnWidthsPx: Array.isArray(frozenColumnWidthsPx) ? frozenColumnWidthsPx : []
+      columnWidthsPx: resizedWidthsPx || (Array.isArray(frozenColumnWidthsPx) ? frozenColumnWidthsPx : [])
     }),
-    [frozenColumnCount, frozenColumnWidthsPx]
+    [frozenColumnCount, frozenColumnWidthsPx, resizedWidthsPx]
   );
 
-  const resolvedMinWidth = minTableWidth || 0;
+  const resolvedMinWidth = resizedTotalPx || minTableWidth || 0;
   const content = (
     <Box
       sx={{
@@ -404,12 +509,11 @@ function ColorTemplate9TableDataTable({
     </Box>
   );
 
-  const useHorizontalScrollShell = autoFitColumns || frozenContextValue.frozenColumnCount > 0 || Boolean(minTableWidth);
+  const useHorizontalScrollShell =
+    autoFitColumns || frozenContextValue.frozenColumnCount > 0 || Boolean(minTableWidth) || Boolean(resizedTotalPx);
   const scrollShellSx = {
     ...(useHorizontalScrollShell
-      ? colorTemplate9TableHorizontalScrollShellSx(
-          topHorizontalScrollbar ? { borderTop: 'none' } : undefined
-        )
+      ? colorTemplate9TableHorizontalScrollShellSx(topHorizontalScrollbar ? { borderTop: 'none' } : undefined)
       : colorTemplate9TableShellSx({
           overflowX: 'auto',
           ...(topHorizontalScrollbar ? { borderTop: 'none' } : null)
@@ -418,50 +522,47 @@ function ColorTemplate9TableDataTable({
   };
 
   return (
-    <TableFrozenColumnsContext.Provider value={frozenContextValue}>
-      <Box
-        data-color-template9-table=""
-        sx={{
-          ...colorTemplate9TableDataScopeWithAlternateRowsSx(),
-          width: '100%',
-          maxWidth: '100%',
-          minWidth: 0,
-          overflow: 'visible',
-          ...(sx || {})
-        }}
-        {...rest}
-      >
-        {topHorizontalScrollbar ? (
-          <ColorTemplate9TableCustomHorizontalScrollbar
-            scrollEl={scrollEl}
-            minTableWidth={minTableWidth}
-            placement="top"
-          />
-        ) : null}
-        <Box ref={setScrollEl} sx={scrollShellSx}>
-          {content}
+    <TableColumnResizeContext.Provider value={columnResizeContextValue}>
+      <TableFrozenColumnsContext.Provider value={frozenContextValue}>
+        <Box
+          data-color-template9-table=""
+          sx={{
+            ...colorTemplate9TableDataScopeWithAlternateRowsSx(),
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            overflow: 'visible',
+            ...(sx || {})
+          }}
+          {...rest}
+        >
+          {topHorizontalScrollbar ? (
+            <ColorTemplate9TableCustomHorizontalScrollbar
+              scrollEl={scrollEl}
+              minTableWidth={resolvedMinWidth || minTableWidth}
+              placement="top"
+            />
+          ) : null}
+          <Box ref={setScrollEl} sx={scrollShellSx}>
+            {content}
+          </Box>
+          {topHorizontalScrollbar ? (
+            <ColorTemplate9TableCustomHorizontalScrollbar
+              scrollEl={scrollEl}
+              minTableWidth={resolvedMinWidth || minTableWidth}
+              placement="bottom"
+            />
+          ) : null}
         </Box>
-        {topHorizontalScrollbar ? (
-          <ColorTemplate9TableCustomHorizontalScrollbar
-            scrollEl={scrollEl}
-            minTableWidth={minTableWidth}
-            placement="bottom"
-          />
-        ) : null}
-      </Box>
-    </TableFrozenColumnsContext.Provider>
+      </TableFrozenColumnsContext.Provider>
+    </TableColumnResizeContext.Provider>
   );
 }
 
 /** Test tab table — desire mockup column widths + top/bottom horizontal scroll when narrow. */
 function ColorTemplate9TableDataUiTestTable({ sx, children, ...rest }) {
   return (
-    <ColorTemplate9TableDataTable
-      topHorizontalScrollbar
-      minTableWidth={COLOR_TEMPLATE9_UI_TEST_TABLE_MIN_WIDTH_PX}
-      sx={sx}
-      {...rest}
-    >
+    <ColorTemplate9TableDataTable topHorizontalScrollbar minTableWidth={COLOR_TEMPLATE9_UI_TEST_TABLE_MIN_WIDTH_PX} sx={sx} {...rest}>
       {children}
     </ColorTemplate9TableDataTable>
   );
@@ -473,15 +574,27 @@ function ColorTemplate9TableDataButton({ sx, variant = 'contained', ...rest }) {
 }
 
 function ColorTemplate9TableDataUiTestHeaderRow({ sx, children, ...rest }) {
+  const resizedSx = useResizedRowGridSx(UI_TEST_TEMPLATE_KEY);
   return (
-    <Box sx={{ ...colorTemplate9TableUiTestRowSx(), ...colorTemplate9TableHeaderRowSx(), ...(sx || {}) }} {...rest}>
-      {children}
-    </Box>
+    <TableHeaderRowTemplateKeyContext.Provider value={UI_TEST_TEMPLATE_KEY}>
+      <Box
+        sx={{
+          ...colorTemplate9TableUiTestRowSx(),
+          ...colorTemplate9TableHeaderRowSx(),
+          ...(sx || {}),
+          ...(resizedSx || {})
+        }}
+        {...rest}
+      >
+        {children}
+      </Box>
+    </TableHeaderRowTemplateKeyContext.Provider>
   );
 }
 
 function ColorTemplate9TableDataUiTestBodyRow({ rowIndex = 0, sx, children, ...rest }) {
   const alternate = isAlternateTableRow(rowIndex);
+  const resizedSx = useResizedRowGridSx(UI_TEST_TEMPLATE_KEY);
   return (
     <Box
       className={alternate ? COLOR_TEMPLATE9_ALTERNATE_ROW_CLASS : undefined}
@@ -489,7 +602,8 @@ function ColorTemplate9TableDataUiTestBodyRow({ rowIndex = 0, sx, children, ...r
         ...colorTemplate9TableUiTestRowSx(),
         bgcolor: colorTemplate9TableRowBg(rowIndex),
         ...(alternate ? colorTemplate9AlternateRowContentSx() : null),
-        ...(sx || {})
+        ...(sx || {}),
+        ...(resizedSx || {})
       }}
       {...rest}
     >
@@ -509,14 +623,15 @@ function ColorTemplate9TableDataUiTestCell({ action = false, name = false, sx, c
   );
 }
 
-function ColorTemplate9TableDataUiTestHeaderCell({ sx, children, ...rest }) {
+function ColorTemplate9TableDataUiTestHeaderCell({ columnResizable = true, sx, children, ...rest }) {
   return (
-    <Box sx={{ ...colorTemplate9TableUiTestHeaderCellSx(), ...(sx || {}) }} {...rest}>
+    <Box sx={{ position: 'relative', ...colorTemplate9TableUiTestHeaderCellSx(), ...(sx || {}) }} {...rest}>
       {typeof children === 'string' ? (
         <Typography sx={{ fontWeight: 'inherit', color: 'inherit', whiteSpace: 'nowrap' }}>{children}</Typography>
       ) : (
         children
       )}
+      {columnResizable ? <ColorTemplate9TableColumnResizeHandle /> : null}
     </Box>
   );
 }
@@ -530,24 +645,29 @@ function ColorTemplate9TableDataUiTestLoopValue({ sx, children, ...rest }) {
 }
 
 function ColorTemplate9TableDataHeaderRow({ gridTemplateColumns, sx, children, ...rest }) {
+  const templateKey = gridTemplateKey(gridTemplateColumns);
+  const resizedSx = useResizedRowGridSx(templateKey);
   return (
-    <Box
-      sx={{
-        ...colorTemplate9TableGridSx({ gridTemplateColumns }),
-        ...colorTemplate9TableHeaderRowSx(),
-        ...(sx || {})
-      }}
-      {...rest}
-    >
-      {children}
-    </Box>
+    <TableHeaderRowTemplateKeyContext.Provider value={templateKey}>
+      <Box
+        sx={{
+          ...colorTemplate9TableGridSx({ gridTemplateColumns }),
+          ...colorTemplate9TableHeaderRowSx(),
+          ...(sx || {}),
+          ...(resizedSx || {})
+        }}
+        {...rest}
+      >
+        {children}
+      </Box>
+    </TableHeaderRowTemplateKeyContext.Provider>
   );
 }
 
-function ColorTemplate9TableDataHeaderCell({ columnIndex, sx, children, ...rest }) {
+function ColorTemplate9TableDataHeaderCell({ columnIndex, columnResizable = true, sx, children, ...rest }) {
   const frozenSx = useFrozenColumnStickySx(columnIndex, { isHeader: true });
   return (
-    <Box sx={{ ...colorTemplate9TableCellSx(), ...frozenSx, ...(sx || {}) }} {...rest}>
+    <Box sx={{ position: 'relative', ...colorTemplate9TableCellSx(), ...frozenSx, ...(sx || {}) }} {...rest}>
       {typeof children === 'string' ? (
         <Typography
           sx={{
@@ -564,12 +684,14 @@ function ColorTemplate9TableDataHeaderCell({ columnIndex, sx, children, ...rest 
       ) : (
         children
       )}
+      {columnResizable ? <ColorTemplate9TableColumnResizeHandle /> : null}
     </Box>
   );
 }
 
 function ColorTemplate9TableDataBodyRow({ rowIndex = 0, gridTemplateColumns, sx, children, ...rest }) {
   const alternate = isAlternateTableRow(rowIndex);
+  const resizedSx = useResizedRowGridSx(gridTemplateKey(gridTemplateColumns));
   return (
     <TableBodyRowIndexContext.Provider value={rowIndex}>
       <Box
@@ -578,7 +700,8 @@ function ColorTemplate9TableDataBodyRow({ rowIndex = 0, gridTemplateColumns, sx,
           ...colorTemplate9TableGridSx({ gridTemplateColumns }),
           bgcolor: colorTemplate9TableRowBg(rowIndex),
           ...(alternate ? colorTemplate9AlternateRowContentSx() : null),
-          ...(sx || {})
+          ...(sx || {}),
+          ...(resizedSx || {})
         }}
         {...rest}
       >
@@ -690,7 +813,11 @@ ColorTemplate9TableDataUiTestCell.propTypes = {
   children: PropTypes.node
 };
 ColorTemplate9TableDataUiTestLoopValue.propTypes = { sx: PropTypes.object, children: PropTypes.node };
-ColorTemplate9TableDataUiTestHeaderCell.propTypes = { sx: PropTypes.object, children: PropTypes.node };
+ColorTemplate9TableDataUiTestHeaderCell.propTypes = {
+  columnResizable: PropTypes.bool,
+  sx: PropTypes.object,
+  children: PropTypes.node
+};
 ColorTemplate9TableDataHeaderRow.propTypes = {
   gridTemplateColumns: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
   sx: PropTypes.object,
@@ -698,6 +825,7 @@ ColorTemplate9TableDataHeaderRow.propTypes = {
 };
 ColorTemplate9TableDataHeaderCell.propTypes = {
   columnIndex: PropTypes.number,
+  columnResizable: PropTypes.bool,
   sx: PropTypes.object,
   children: PropTypes.node
 };

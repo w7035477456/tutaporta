@@ -1,6 +1,7 @@
 import pool from '../../db/connection.js';
 import { getDBSchema } from '../../config/envConfig.js';
 import { ensureChatLogQuarterlyPartitionsBeforeWrite } from '../../utils/ensureQuarterlyPartitions.js';
+import { getVictimScamAlert, scheduleChatScamScan } from '../../utils/chatScamDetect.js';
 
 const MAX_HISTORY_PER_FRIEND = 200;
 
@@ -229,6 +230,8 @@ export async function sendMessage({ senderId, targetUserId, text }) {
     [convId, low, high, me, to, cleanText, JSON.stringify(payload)]
   );
 
+  scheduleChatScamScan(convId);
+
   return {
     conversationId: convId,
     message: mapRowsToMessages(inserted.rows, me)[0]
@@ -302,6 +305,20 @@ export async function getChatHistory(req, res) {
   } catch (error) {
     console.error('[chat] getChatHistory failed:', error);
     return res.status(500).json({ error: 'Failed to fetch chat history' });
+  }
+}
+
+/** GET /api/chat/scamAlert/:targetUserId — the AI warning, only when the viewer is the victim. */
+export async function getChatScamAlertHandler(req, res) {
+  const me = toInt(req.auth?.singles_id);
+  const partnerId = toInt(req.params?.targetUserId);
+  if (!me) return res.status(401).json({ error: 'Authentication required' });
+  if (!partnerId) return res.status(400).json({ error: 'targetUserId is required' });
+  try {
+    return res.status(200).json({ alert: await getVictimScamAlert(me, partnerId) });
+  } catch (error) {
+    console.error('[chat] getChatScamAlert failed:', error);
+    return res.status(500).json({ error: 'Failed to fetch scam alert' });
   }
 }
 

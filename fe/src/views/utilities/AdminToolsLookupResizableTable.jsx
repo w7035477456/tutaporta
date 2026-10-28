@@ -65,6 +65,7 @@ export function LookupResizableHeaderCell({
 }) {
   return (
     <ColorTemplate9TableData.HeaderCell
+      columnResizable={false}
       sx={{
         position: 'relative',
         ...(resizable ? { userSelect: 'none' } : null),

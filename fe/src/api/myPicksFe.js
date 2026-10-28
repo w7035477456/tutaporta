@@ -561,6 +561,8 @@ function normalizeMyPicksFeedPayload(data) {
         post_id: Number(post.post_id),
         content: post.content ?? '',
         created_at: post.created_at ?? null,
+        is_profile_intro: post.is_profile_intro === true,
+        is_pinned: post.is_pinned === true,
         posting_visibility: normalizePostingVisibility(post.posting_visibility),
         photos: Array.isArray(post.photos)
           ? post.photos.map((photo) => ({

@@ -29,7 +29,13 @@ import {
   upsertFriendFromRequestRow
 } from 'utils/chatWithFriendsStore';
 import { formatMemberLabel } from 'utils/memberLabel';
-import { fetchChatHistoryPage, markChatVisitedApi, sendChatMessageApi, uploadChatInlineImage } from 'api/chatWithFriendsFe';
+import {
+  fetchChatHistoryPage,
+  fetchChatScamAlert,
+  markChatVisitedApi,
+  sendChatMessageApi,
+  uploadChatInlineImage
+} from 'api/chatWithFriendsFe';
 import { dispatchBellNotificationRefresh } from 'utils/notificationBellStore';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -72,6 +78,9 @@ const ALLOWED_UPLOAD_EXT = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'jfif']
 
 const CHAT_IMAGE_PATH_RE = /^\/api\/chat\/image\/[a-f0-9]{48}\.(?:jpe?g|png|gif|webp)$/i;
 const INITIAL_CHAT_MESSAGES_LIMIT = 5;
+const SCAM_ALERT_POLL_MS = 15000;
+const SCAM_ALERT_BANNER_SX = { bgcolor: '#d32f2f', px: 1, py: 0.5 };
+const SCAM_ALERT_TEXT_SX = { color: '#ffeb3b !important', fontWeight: 800, textAlign: 'center', lineHeight: 1.25 };
 
 /** fe/.env DESKTOP_ICON_SIZE — chat composer toolbar (image, camera, emoji, A+/A−) */
 const CHAT_TOOLBAR_ICON_SIZE = getDesktopIconSizeVw();
@@ -391,8 +400,10 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
   const [openFriendIds, setOpenFriendIds] = useState([]);
   const inputRefs = useRef({});
   const chatLogRefs = useRef({});
-  const skipAutoScrollRef = useRef(false);
+  // Newest message id each open chat was last scrolled to; only a new newest message snaps to the bottom.
+  const scrolledToNewestRef = useRef({});
   const [historyPagingByFriend, setHistoryPagingByFriend] = useState({});
+  const [scamAlertByFriend, setScamAlertByFriend] = useState({});
 
   const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
   const [photoUploadFriendId, setPhotoUploadFriendId] = useState(null);
@@ -433,10 +444,32 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
     });
   }, []);
 
-  const reloadChatFromServer = useCallback(async () => {
+  const refreshScamAlert = useCallback(async () => {
     if (!friendIdOk) return;
     try {
+      const alert = await fetchChatScamAlert(friendId);
+      const alertKey = (a) => (a ? `${a.message}|${(a.evidence_msg_ids || []).join(',')}` : '');
+      setScamAlertByFriend((prev) =>
+        alertKey(prev[String(friendId)]) === alertKey(alert) ? prev : { ...prev, [String(friendId)]: alert }
+      );
+    } catch (err) {
+      console.error('[VettedFriendsInlineChatPanel] failed to load scam alert', err);
+    }
+  }, [friendId, friendIdOk]);
+
+  // The AI scan runs in the background after each message, so keep checking while the chat is open.
+  useEffect(() => {
+    if (!friendIdOk) return undefined;
+    const timer = setInterval(() => void refreshScamAlert(), SCAM_ALERT_POLL_MS);
+    return () => clearInterval(timer);
+  }, [friendIdOk, refreshScamAlert]);
+
+  const reloadChatFromServer = useCallback(async () => {
+    if (!friendIdOk) return;
+    void refreshScamAlert();
+    try {
       const historyPage = await fetchChatHistoryPage(friendId, { limit: INITIAL_CHAT_MESSAGES_LIMIT });
+      delete scrolledToNewestRef.current[friendId];
       setState((prev) => {
         const nextConversations = { ...(prev?.conversations || {}) };
         const fromApi = historyPage?.messages;
@@ -456,7 +489,7 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
     } catch (err) {
       console.error('[VettedFriendsInlineChatPanel] failed to reload chat', err);
     }
-  }, [friendId, friendIdOk]);
+  }, [friendId, friendIdOk, refreshScamAlert]);
 
   const chatBodyFontSizeSx = useMemo(() => {
     const m = Math.round(BASE_MOBILE_CHAT_PX + chatFontOffsetPx);
@@ -577,14 +610,18 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
   }, [focusComposerNonce, activeFriend]);
 
   useLayoutEffect(() => {
-    if (skipAutoScrollRef.current) {
-      skipAutoScrollRef.current = false;
-      return;
-    }
+    const toScroll = openFriendIds.filter((fid) => {
+      const msgs = state.conversations?.[String(fid)];
+      const newestId = Array.isArray(msgs) && msgs.length ? String(msgs[msgs.length - 1]?.id) : '';
+      if (scrolledToNewestRef.current[fid] === newestId) return false;
+      scrolledToNewestRef.current[fid] = newestId;
+      return true;
+    });
+    if (!toScroll.length) return undefined;
     let raf1 = 0;
     let raf2 = 0;
     const scrollOpenPanels = () => {
-      for (const fid of openFriendIds) {
+      for (const fid of toScroll) {
         const el = chatLogRefs.current[fid];
         if (el) {
           el.scrollTop = el.scrollHeight;
@@ -611,10 +648,6 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
       const cursor = paging?.nextCursor;
       if (paging?.loading || !paging?.hasMore || !cursor?.sentAt || !cursor?.id) return;
 
-      const scrollEl = chatLogRefs.current[id];
-      const prevHeight = scrollEl?.scrollHeight ?? 0;
-      const prevTop = scrollEl?.scrollTop ?? 0;
-
       setHistoryPagingByFriend((prev) => ({
         ...prev,
         [String(id)]: {
@@ -630,7 +663,6 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
         });
         const older = Array.isArray(page?.messages) ? page.messages : [];
         if (older.length > 0) {
-          skipAutoScrollRef.current = true;
           setState((prev) => {
             const key = String(id);
             const existing = Array.isArray(prev?.conversations?.[key]) ? prev.conversations[key] : [];
@@ -652,11 +684,10 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
             saveChatWithFriendsState(next);
             return next;
           });
+          // Show the messages just loaded (they are at the top of the log).
           requestAnimationFrame(() => {
             const el = chatLogRefs.current[id];
-            if (!el) return;
-            const newHeight = el.scrollHeight;
-            el.scrollTop = Math.max(0, prevTop + (newHeight - prevHeight));
+            if (el) el.scrollTop = 0;
           });
         }
         setHistoryPagingByFriend((prev) => ({
@@ -917,6 +948,10 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
               Number.isFinite(Number(paging?.nextCursor?.id)) &&
               Number(paging.nextCursor.id) > 0;
             const disableLoadOlder = Boolean(paging.loading) || !canLoadOlder;
+            const scamAlert = scamAlertByFriend[String(fid)] || null;
+            const scamMsgIds = new Set((scamAlert?.evidence_msg_ids || []).map(String));
+            const isScamMsg = (msg) => Boolean(msg) && scamMsgIds.has(String(msg.id));
+            const scamMsgShown = msgs.some(isScamMsg);
             const profileSrc = friendPhoto(friend);
             const profileLoadFailed = failedProfileSrcByFriendId[fid] === profileSrc;
             const showProfileImage = Boolean(profileSrc) && !profileLoadFailed;
@@ -1258,11 +1293,30 @@ export default function VettedFriendsInlineChatPanel({ requestRow, focusComposer
                                 )}
                               </Box>
                             </Box>
+                            {isScamMsg(m) && !isScamMsg(msgs[idx + 1]) ? (
+                              <Box role="alert" sx={{ ...SCAM_ALERT_BANNER_SX, border: CHAT_THICK_BLACK_BORDER, mb: 1 }}>
+                                <Typography sx={{ ...SCAM_ALERT_TEXT_SX, fontSize: chatBodyFontSizeSx }}>{scamAlert.message}</Typography>
+                              </Box>
+                            ) : null}
                           </Box>
                         );
                       })
                     )}
                   </Box>
+                  {scamAlert && !scamMsgShown ? (
+                    <Box
+                      role="alert"
+                      sx={{
+                        ...SCAM_ALERT_BANNER_SX,
+                        flexShrink: 0,
+                        borderTop: CHAT_THICK_BLACK_BORDER,
+                        borderLeft: CHAT_THICK_BLACK_BORDER,
+                        borderRight: CHAT_THICK_BLACK_BORDER
+                      }}
+                    >
+                      <Typography sx={{ ...SCAM_ALERT_TEXT_SX, fontSize: chatBodyFontSizeSx }}>{scamAlert.message}</Typography>
+                    </Box>
+                  ) : null}
                   <Box
                     sx={{
                       borderTop: CHAT_THICK_BLACK_BORDER,

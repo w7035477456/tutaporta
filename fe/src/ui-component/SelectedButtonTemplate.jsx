@@ -19,7 +19,7 @@ import {
 import useFitButtonLabelOnResize from 'hooks/useFitButtonLabelOnResize';
 import ButtonTemplateIcon from 'ui-component/ButtonTemplateIcon';
 
-/** Selected sidebar-style button — secondary bg, inverse-daynight text + border. Label: DESKTOP_FONT_SIZE_BUTTON (sm+). */
+/** Selected sidebar-style button — green bg, inverse-daynight text + border. Label: DESKTOP_FONT_SIZE_BUTTON (sm+). */
 export function selectedButtonTemplateSx({
   hoverScale = SELECTED_UNSELECTED_BUTTON_HOVER_SCALE,
   fitLabelWidth = false,

@@ -4,7 +4,7 @@ import makeSelfIntroImg from 'assets/images/makeSelfIntro.png';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 
 /** Task 1 — marquee image CTA to start self intro video flow. */
-export default function SelfIntroVideoCta({ onClick }) {
+export default function SelfIntroVideoCta({ onClick, sx }) {
   return (
     <Box
       component="button"
@@ -36,7 +36,8 @@ export default function SelfIntroVideoCta({ onClick }) {
         '&:focus-visible': {
           outline: '2px solid var(--theme-primary-color)',
           outlineOffset: 2
-        }
+        },
+        ...(sx || {})
       }}
     >
       <Box
@@ -50,5 +51,6 @@ export default function SelfIntroVideoCta({ onClick }) {
 }
 
 SelfIntroVideoCta.propTypes = {
-  onClick: PropTypes.func.isRequired
+  onClick: PropTypes.func.isRequired,
+  sx: PropTypes.object
 };

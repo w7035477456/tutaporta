@@ -200,6 +200,26 @@ export async function fetchAdminLoginLogLookupAll() {
   return data;
 }
 
+/** Admin Tools → Scam Alert tab. `status`: '' (all) | open | confirmed | dismissed */
+export async function fetchAdminScamAlerts(status = '') {
+  const { data } = await api.get('/api/admin/scam-alerts', { params: status ? { status } : {} });
+  return Array.isArray(data?.alerts) ? data.alerts : [];
+}
+
+export async function updateAdminScamAlert(scamAlertId, { status, adminNote } = {}) {
+  const { data } = await api.patch(`/api/admin/scam-alerts/${scamAlertId}`, {
+    status,
+    admin_note: adminNote
+  });
+  return data?.alert ?? null;
+}
+
+/** Run the AI scam scan now on the chat between two members. */
+export async function scanAdminScamConversation(singlesIdA, singlesIdB) {
+  const { data } = await api.post('/api/admin/scam-alerts/scan', { singlesIdA, singlesIdB });
+  return data;
+}
+
 /** Admin Tools → Raffles tab */
 export async function fetchAdminRaffleLogEvents() {
   const { data } = await api.get('/api/admin/raffle-log/events');
@@ -226,6 +246,12 @@ export async function markAdminRaffleWinnerPaid(raffleUserId) {
 
 export async function cycleAdminSinglesStatus({ singlesId }) {
   const { data } = await api.post('/api/admin/singles/cycle-status', { singlesId });
+  return data;
+}
+
+/** Scam Alert tab: pin (suspend=true) or release the scammer's singles.status = 'suspend' lock. */
+export async function setAdminScamSuspend({ singlesId, suspend, scamAlertId }) {
+  const { data } = await api.post('/api/admin/scam-alerts/suspend', { singlesId, suspend, scamAlertId });
   return data;
 }
 

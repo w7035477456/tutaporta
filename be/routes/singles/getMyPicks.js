@@ -836,12 +836,29 @@ export async function getMyPicksFeed(req, res) {
          ON repost_src.singles_id = p.${postingRepostColumns.repostedFromSinglesId}`
       : '';
 
+    // Newest AI profile intro the viewer may see: shown first on page one, skipped on later pages.
+    const pinnedResult = await timedPicksFeed(reqId, 'pinnedIntroQuery', () =>
+      pool.query(
+        `SELECT p.post_id
+         FROM ${postingsSchema}.postings p
+         WHERE p.singles_id = $1
+           AND p.is_profile_intro
+           ${privateVisibilityFilter}
+         ORDER BY p.created_at DESC, p.post_id DESC
+         LIMIT 1`,
+        [targetSinglesId]
+      )
+    );
+    const pinnedPostId = pinnedResult.rows[0] ? Number(pinnedResult.rows[0].post_id) : null;
+
     const posts = await timedPicksFeed(reqId, 'postsQuery', () =>
       pool.query(
       `SELECT
          p.post_id,
          p.content,
          p.created_at,
+         p.is_profile_intro,
+         (p.post_id IS NOT DISTINCT FROM $6::bigint) AS is_pinned,
          ${postOwnerExpr} AS post_owner_id,
          ${repostFromSinglesExpr} AS reposted_from_singles_id,
          ${repostFromAliasExpr} AS reposted_from_alias,
@@ -881,11 +898,14 @@ export async function getMyPicksFeed(req, res) {
          AND (
            $3::timestamptz IS NULL
            OR $4::bigint IS NULL
-           OR (p.created_at, p.post_id) < ($3::timestamptz, $4::bigint)
+           OR (
+             (p.created_at, p.post_id) < ($3::timestamptz, $4::bigint)
+             AND p.post_id IS DISTINCT FROM $6::bigint
+           )
          )
-       ORDER BY p.created_at DESC, p.post_id DESC
+       ORDER BY (p.post_id IS NOT DISTINCT FROM $6::bigint) DESC, p.created_at DESC, p.post_id DESC
        LIMIT COALESCE($5::int, 1000000)`,
-      [targetSinglesId, me, beforeCreatedAtIso, beforePostId, queryLimit ? queryLimit + 1 : null]
+      [targetSinglesId, me, beforeCreatedAtIso, beforePostId, queryLimit ? queryLimit + 1 : null, pinnedPostId]
       )
     );
 
@@ -896,12 +916,12 @@ export async function getMyPicksFeed(req, res) {
       visibleRows: visibleRows.length,
       hasMore
     });
-    const lastRow = visibleRows.length ? visibleRows[visibleRows.length - 1] : null;
-    const nextCursor = hasMore && lastRow
-      ? {
-          created_at: lastRow.created_at,
-          post_id: Number(lastRow.post_id)
-        }
+    // The pinned intro sits out of date order, so page from the last regular post (or from the top).
+    const lastRegularRow = [...visibleRows].reverse().find((row) => !row.is_pinned) ?? null;
+    const nextCursor = hasMore
+      ? lastRegularRow
+        ? { created_at: lastRegularRow.created_at, post_id: Number(lastRegularRow.post_id) }
+        : { created_at: '9999-12-31T23:59:59.000Z', post_id: Number.MAX_SAFE_INTEGER }
       : null;
 
     if (myStoryPhotoDebugEnabled()) {
@@ -974,6 +994,8 @@ export async function getMyPicksFeed(req, res) {
         comments: [],
         post_id: Number(row.post_id),
         created_at: row.created_at,
+        is_profile_intro: row.is_profile_intro === true,
+        is_pinned: row.is_pinned === true,
         post_owner_id: row.post_owner_id == null ? null : Number(row.post_owner_id),
         reposted_from_singles_id:
           row.reposted_from_singles_id == null ? null : Number(row.reposted_from_singles_id),
@@ -1275,6 +1297,11 @@ export async function createMyPosting(req, res) {
       if (repostedFromPostId != null && postingRepostColumns.repostedFromPostId) {
         insertColumns.push(postingRepostColumns.repostedFromPostId);
         insertValues.push(repostedFromPostId);
+        placeholders.push(`$${insertValues.length}`);
+      }
+      if (req.body?.is_profile_intro === true && content) {
+        insertColumns.push('is_profile_intro');
+        insertValues.push(true);
         placeholders.push(`$${insertValues.length}`);
       }
       const postResult = await client.query(

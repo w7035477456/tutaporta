@@ -59,6 +59,14 @@ export async function fetchChatHistoryPage(targetUserId, options = {}) {
   };
 }
 
+/** AI scam warning for this chat — returned only when the viewer is the suspected victim. */
+export async function fetchChatScamAlert(targetUserId) {
+  const id = Number(targetUserId);
+  if (!Number.isFinite(id) || id < 1) return null;
+  const { data } = await api.get(`/api/chat/scamAlert/${id}`);
+  return data?.alert ?? null;
+}
+
 export async function sendChatMessageApi(targetUserId, text) {
   const id = Number(targetUserId);
   const payload = {

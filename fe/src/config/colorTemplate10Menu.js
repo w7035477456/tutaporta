@@ -2,9 +2,10 @@
  * colorTemplate10Menu — sidebar + tab rows.
  *
  * Unselected: theme-primary bg, theme-daynight text (+ border).
- * Selected: theme-secondary bg, theme-inverse-daynight text (+ border).
+ * Selected: green bg, theme-inverse-daynight text (+ border).
  */
 import {
+  SELECTED_BUTTON_GREEN,
   SELECTED_UNSELECTED_BUTTON_HOVER_SCALE,
   baseButtonSx,
   buttonTemplateSelectedLabelScaleSx,
@@ -14,8 +15,7 @@ import { getSidebarMenuIconSlotSx, SIDEBAR_MENU_ICON_LABEL_GAP_VW } from 'config
 import {
   DAYNIGHT_VAR,
   INVERSE_DAYNIGHT_VAR,
-  PRIMARY_VAR,
-  SECONDARY_VAR
+  PRIMARY_VAR
 } from 'utils/themeConfig';
 
 /** @deprecated use env HOVER_MAGNIFY_FACTOR; pass hoverScale={1} to disable. */
@@ -32,7 +32,7 @@ export const COLOR_TEMPLATE10_MENU_UNSELECTED_BG = `var(${PRIMARY_VAR})`;
 export const COLOR_TEMPLATE10_MENU_UNSELECTED_TEXT = `var(${DAYNIGHT_VAR})`;
 export const COLOR_TEMPLATE10_MENU_UNSELECTED_BORDER = `1px solid var(${DAYNIGHT_VAR})`;
 
-export const COLOR_TEMPLATE10_MENU_SELECTED_BG = `var(${SECONDARY_VAR})`;
+export const COLOR_TEMPLATE10_MENU_SELECTED_BG = SELECTED_BUTTON_GREEN;
 export const COLOR_TEMPLATE10_MENU_SELECTED_TEXT = `var(${INVERSE_DAYNIGHT_VAR})`;
 export const COLOR_TEMPLATE10_MENU_SELECTED_BORDER = `1px solid var(${INVERSE_DAYNIGHT_VAR})`;
 

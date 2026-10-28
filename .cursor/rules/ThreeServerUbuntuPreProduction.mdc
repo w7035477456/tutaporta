@@ -22,21 +22,41 @@ Previously all development ran on one **All-in-1** Ubuntu server, **xbox2 (`192.
 - Outter **OPT1** → **Dell S6000 40 Gb QSFP+ switch** → xbox1, xbox3 and xbox4 (40 Gb QSFP+ links). The All-in-1 setup had no switch (direct connect).
 - HAProxy on xbox1 is the public front door; it **round-robins** app traffic between the web servers on **xbox3** and **xbox4** (no session pinning / sticky sessions).
 
-## Shared storage (`FAST_STORAGE_FOLDER` / `LARGE_CHEAP_STORAGE_FOLDER`)
+## Storage layout (pre-production)
 
-Both storage folders must look the same from every web server, because consecutive requests can land on any of them.
+Postgres data and `LARGE_CHEAP_STORAGE_FOLDER` physically live on **xbox1** (Postgres Primary). `FAST_STORAGE_FOLDER` starts on xbox1's NVMe and is replicated to the web servers with GlusterFS. Every web server sees the same files no matter which one a request lands on.
 
-| Env var | Physical storage | How it is shared |
+| What | Physical storage | Shared how | Used for |
+|-----|-----|-----|-----|
+| **Postgres Primary `data_directory`** | xbox1: **fast NVMe pair, 2 × 1.6 TB Samsung PCIe NVMe, RAID 1** | Postgres replication to the Replica on xbox3 (not GlusterFS) | Postgres database files only |
+| **`FAST_STORAGE_FOLDER`** | xbox1: **same RAID 1 NVMe pair** as the Postgres `data_directory` (separate folder, not inside the Postgres data directory), plus a full copy on the NVMe of **xbox3** and **xbox4** | **GlusterFS replicated volume across xbox1, xbox3 and xbox4** | Hot / latency-sensitive app files |
+| **`LARGE_CHEAP_STORAGE_FOLDER`** | xbox1 only: **6 × 1.5 TB SAS drives, RAID 10** (~4.5 TB usable) | Exported from xbox1, network-mounted on every web server | **Images and logs** — **not** Postgres data |
+
+### `FAST_STORAGE_FOLDER` — GlusterFS replicated volume (xbox1 + xbox3 + xbox4)
+
+- Every node holds a **full copy** on its own NVMe, and **writes are synchronous**: any server can write, and all three copies are in sync before the write returns. No replication-lag problem, so a file written via xbox3 is immediately readable via xbox4.
+- Reads are served from the local copy, so they stay fast.
+- Trade-off: more to run and harder to debug than a single NFS export (brick health, self-heal, split-brain). Three nodes give a quorum; keep quorum enabled so a partitioned node can't diverge.
+- The GlusterFS brick on xbox1 shares the NVMe RAID 1 with Postgres — keep it in its own folder and watch disk I/O contention.
+- A new web server (xbox5 / xbox6 / xbox7 / xbox8) must join the volume (add a replica brick on its NVMe) before HAProxy sends it traffic.
+
+### Rules for all storage
+
+- Use the **same mount path on every web server** so `FAST_STORAGE_FOLDER` and `LARGE_CHEAP_STORAGE_FOLDER` in the BE `.env` are identical across web servers. A new web server must have both mounts in place before HAProxy sends it traffic.
+- **Never put Postgres data on the SAS RAID 10 or inside the GlusterFS volume.** Postgres stays in its own `data_directory` on the NVMe RAID 1; SAS is for images and logs only.
+- Code must reach files only through these env vars, never a server-local path. Anything written to a web server's local disk outside these mounts is invisible to the other web servers.
+- Handle storage I/O errors (mount down, GlusterFS node down, timeouts) gracefully instead of crashing.
+
+## Storage layout (Mac + All-in-1 Ubuntu development)
+
+The development machines do **not** use the pre-production split above. Everything sits on the machine's local disk; `FAST_STORAGE_FOLDER` and `LARGE_CHEAP_STORAGE_FOLDER` are both folders under **`ROOT_FOLDER`** (BE `.env` defines them as `${ROOT_FOLDER}/…`):
+
+| Machine | `ROOT_FOLDER` (holds `FAST_STORAGE_FOLDER` + `LARGE_CHEAP_STORAGE_FOLDER`) | Postgres data |
 |-----|-----|-----|
-| **`FAST_STORAGE_FOLDER`** | Local NVMe on each server, under **`ROOT_FOLDER`** (mounted under **`/mnt`**) | **GlusterFS** replicated volume across **xbox1, xbox3 and xbox4**. Every node holds a full copy, so reads stay local and fast. |
-| **`LARGE_CHEAP_STORAGE_FOLDER`** | **Same NVMe as `FAST_STORAGE_FOLDER`**, also under **`ROOT_FOLDER`** (it is **not** a USB external enclosure) | Shared the same way as `FAST_STORAGE_FOLDER`. |
+| **Ubuntu All-in-1 dev server** | **`/home/lawsen0/ubuntu_storage`** |
+| **Mac dev** | **`/Users/a/mac_storage`** | under **`/Users/a/mac_storage`** |
 
-- Both folders currently live side by side on NVMe under `ROOT_FOLDER` (BE `.env` defines them as `${ROOT_FOLDER}/…`). Today "large cheap" is a separate folder, not separate hardware.
-- **Future (not now):** Andrew plans to move `LARGE_CHEAP_STORAGE_FOLDER` onto a **SAS drive**. **Do not write code, scripts, mounts or config for the SAS move now** — no SAS-specific paths, NFS exports, or fallback logic. Keep code reaching it only through the env var so the later move is an `.env` / mount change only.
-- The web server cluster is **xbox3 + xbox4** today and may grow to **xbox5 / xbox6 / xbox7 / xbox8**. Each new web server must join the GlusterFS volume (add a replica brick on its NVMe under `/mnt`) before HAProxy sends it traffic.
-- Use the **same `ROOT_FOLDER` / mount path on every server** so `FAST_STORAGE_FOLDER` and `LARGE_CHEAP_STORAGE_FOLDER` in the BE `.env` are identical across web servers.
-- Code must reach files only through these env vars, never a server-local path. Anything written to a local disk outside these mounts is invisible to the other web servers.
-- Still handle storage I/O errors gracefully instead of crashing.
+- Same code everywhere: only the `.env` values differ between dev and pre-production, so never hard-code `/home/lawsen0/ubuntu_storage`, `/Users/a/mac_storage`, or xbox1 mount paths in code.
 
 ## What this means for code and ops
 
