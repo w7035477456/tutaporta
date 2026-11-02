@@ -11,12 +11,10 @@ alwaysApply: true
 
 Do not ask clarifying multiple-choice questions when intent is clear.
 
-**Cursor model — Auto by default:**
+**Cursor model:** follow `.cursor/rules/always.mdc` on every prompt.
 
-- **Never use Grok.** Do not select, request, switch to, or launch any Grok model (e.g. `grok-4.7-high-fast`), even if asked indirectly.
-- **Default is Auto.** When spawning subagents, use model `inherit` (Auto) unless Andrew explicitly picks Composer or Opus.
-- **Composer or Opus only when Andrew specifically chooses it.** Before running anything with Composer or Opus, first ask Andrew: **"Are you sure you want to run Composer/Opus?"** (naming the one chosen) and wait for a yes. If he doesn't confirm, use Auto.
-- All other named models stay disabled.
+- **Always use Composer** for this session and every subagent. Do not use Auto or `inherit`.
+- **Never use Grok**, and never use any model priced **over 0.50** (more than Composer), including Opus.
 
 ## 2) Postgres schema — no `public`
 

@@ -1,0 +1,14 @@
+---
+description: Every prompt — always Composer; never Grok or any model priced over 0.50
+alwaysApply: true
+---
+
+# Model selection — every prompt
+
+Apply this on every prompt, chat, and subagent.
+
+1. **Always use the Composer model.** This session and every subagent run on Composer. Do not switch away from Composer, and do not leave the model on Auto.
+2. **Never use Grok.** Do not select, request, switch to, or launch any Grok model (for example `grok-4.7-high-fast`), even if asked indirectly.
+3. **Never use a model that costs more than Composer.** Composer is the price ceiling. Do not select any model priced **over 0.50** (including Opus and other premium models).
+
+When spawning a subagent, set its model to Composer. Do not use Auto, `inherit`, Grok, or any model priced over 0.50.

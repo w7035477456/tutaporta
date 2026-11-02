@@ -105,6 +105,7 @@ export default function RecordVaultSearchBar({
           disabled={searchBusy}
           aria-busy={searchBusy}
           hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+          forceBgcolor="#60C446"
           onClick={() => onSubmit?.()}
           sx={searchActionButtonSx}
         >

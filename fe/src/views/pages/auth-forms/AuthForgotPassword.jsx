@@ -59,7 +59,10 @@ export default function AuthForgotPassword() {
       await requestPasswordReset(emailTrimmed);
       navigate('/pages/passwordResetSent');
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Request failed. Please try again.');
+      const apiError = err.response?.data?.error;
+      const apiDetails = err.response?.data?.details;
+      const combined = [apiError, apiDetails].filter(Boolean).join(' — ');
+      setError(combined || err.message || 'Request failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -87,7 +90,12 @@ export default function AuthForgotPassword() {
               sx={{
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--theme-primary-color)' },
                 '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--theme-primary-color)' },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--theme-primary-color)', borderWidth: 2 }
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--theme-primary-color)', borderWidth: 2 },
+                '& .MuiOutlinedInput-input, & .MuiOutlinedInput-input:-webkit-autofill': {
+                  color: 'var(--theme-white-color) !important',
+                  WebkitTextFillColor: 'var(--theme-white-color) !important',
+                  caretColor: 'var(--theme-white-color)'
+                }
               }}
             />
           </CustomFormControl>
