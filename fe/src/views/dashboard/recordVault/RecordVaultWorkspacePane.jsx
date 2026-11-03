@@ -152,6 +152,12 @@ import {
   removeNoteSearchIndex,
   searchIndexedNotes
 } from './recordVaultSearchIndex';
+import {
+  buildRecordVaultRecentNoteSlots,
+  recordVaultRecentScopeKey,
+  removeRecordVaultRecentNote,
+  touchRecordVaultRecentNote
+} from './recordVaultRecentNotes';
 import innerEncryptOnImg from 'assets/images/innerEncryptON.png';
 import redLockImg from 'assets/images/redlock.png';
 import greenUnlockImg from 'assets/images/unlockIcon.png';
@@ -1801,6 +1807,8 @@ export default function RecordVaultWorkspacePane({
   const [appliedSearchTerms, setAppliedSearchTerms] = useState([]);
   const [searchMessage, setSearchMessage] = useState('');
   const [searchBusy, setSearchBusy] = useState(false);
+  /** Bumps when local recent-note activity changes (see recordVaultRecentNotes.js). */
+  const [recentNotesVersion, setRecentNotesVersion] = useState(0);
   // Search-hit navigation within the open note (up/down steps through matches).
   const [searchHitCount, setSearchHitCount] = useState(0);
   const [activeHitIndex, setActiveHitIndex] = useState(-1);
@@ -2851,6 +2859,36 @@ export default function RecordVaultWorkspacePane({
     [isInnerNoteUnlocked, notebookInnerLockedForDisplay, noteRequiresInnerPinToView]
   );
 
+  const recentNotesScopeKey = useMemo(
+    () => recordVaultRecentScopeKey(paneStorageType, user?.singles_id),
+    [paneStorageType, user?.singles_id]
+  );
+
+  const bumpRecentNotes = useCallback(() => {
+    setRecentNotesVersion((v) => v + 1);
+  }, []);
+
+  const touchRecentForNote = useCallback(
+    (noteId, { title } = {}) => {
+      const id = Number(noteId);
+      if (!Number.isFinite(id) || id < 1 || isBillScheduleSystemId(id)) return;
+      const found = findNoteRowById(id);
+      if (!found?.note || !found?.notebook) return;
+      const notesInNotebook = found.notebook.notes || [];
+      if (isNoteHiddenFromSearch(found.note, notesInNotebook)) return;
+      const label =
+        String(title || '').trim() ||
+        recordVaultSearchResultTabLabel(found.note, found.notebook, notebooks, notesInNotebook);
+      touchRecordVaultRecentNote(recentNotesScopeKey, {
+        noteId: id,
+        notebookId: Number(found.notebook.notebook_id),
+        title: label
+      });
+      bumpRecentNotes();
+    },
+    [findNoteRowById, isNoteHiddenFromSearch, notebooks, recentNotesScopeKey, bumpRecentNotes]
+  );
+
   const runSearch = useCallback(async () => {
     const t1 = searchTerm1.trim();
     if (!t1) {
@@ -3617,8 +3655,10 @@ export default function RecordVaultWorkspacePane({
     setError('');
     try {
       await vaultApi.updateRecordVaultNote(noteId, { body_text: html });
-      patchNoteRowInTree(noteId, { body_text: html, content_loaded: true });
+      const touchedAt = new Date().toISOString();
+      patchNoteRowInTree(noteId, { body_text: html, content_loaded: true, updated_at: touchedAt });
       indexNoteSearchText(noteId, stripRecordVaultHtml(html), noteName);
+      touchRecentForNote(noteId, { title: noteName });
     } catch (err) {
       const message = readRecordVaultApiError(err, 'Failed to save note');
       const recentAttach = Date.now() - recentAttachOkAtRef.current < 8000;
@@ -3650,7 +3690,8 @@ export default function RecordVaultWorkspacePane({
     isInnerNoteUnlocked,
     patchNoteRowInTree,
     bumpVaultUsage,
-    vaultApi
+    vaultApi,
+    touchRecentForNote
   ]);
 
   persistNoteRef.current = persistNote;
@@ -3715,6 +3756,7 @@ export default function RecordVaultWorkspacePane({
             }
             recentAttachOkAtRef.current = Date.now();
             void persistNoteRef.current?.();
+            touchRecentForNote(noteId);
           }
         }
         return true;
@@ -3726,7 +3768,7 @@ export default function RecordVaultWorkspacePane({
         bumpVaultUsage();
       }
     },
-    [selectedNote, busy, maxUploadMb, vaultApi, bumpVaultUsage]
+    [selectedNote, busy, maxUploadMb, vaultApi, bumpVaultUsage, touchRecentForNote]
   );
 
   /**
@@ -6222,6 +6264,7 @@ export default function RecordVaultWorkspacePane({
     try {
       await vaultApi.updateRecordVaultNote(noteId, { note_name: trimmed });
       patchNoteTitleInTree(noteId, trimmed);
+      touchRecentForNote(noteId, { title: trimmed });
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Failed to rename note'));
     } finally {
@@ -6278,6 +6321,7 @@ export default function RecordVaultWorkspacePane({
     setError('');
     try {
       await vaultApi.updateRecordVaultNote(noteId, { note_name: upper });
+      touchRecentForNote(noteId, { title: upper });
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Failed to rename note'));
     }
@@ -6416,6 +6460,8 @@ export default function RecordVaultWorkspacePane({
     deletedNoteIdsRef.current.add(Number(noteId));
     try {
       await vaultApi.deleteRecordVaultNote(noteId);
+      removeRecordVaultRecentNote(recentNotesScopeKey, noteId);
+      bumpRecentNotes();
       clearInnerUnlockForNote(noteId);
       const notebookId = Number(selectedNotebookId);
       const remainingNotes = (selectedNotebook?.notes || []).filter(
@@ -6563,6 +6609,25 @@ export default function RecordVaultWorkspacePane({
     });
     return tabs;
   }, [searchActive, searchResults, notebooks, selectedNoteId, openNoteTitlePlain]);
+
+  const recentNoteSlots = useMemo(() => {
+    if (!unlocked) return null;
+    return buildRecordVaultRecentNoteSlots({
+      notebooks,
+      scopeKey: recentNotesScopeKey,
+      limit: 5,
+      isExcluded: (note, notesInNotebook) =>
+        isBillScheduleSystemId(note.note_id) || isNoteHiddenFromSearch(note, notesInNotebook),
+      getLabel: (note, notebook, notesInNotebook) =>
+        recordVaultSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
+    });
+  }, [
+    unlocked,
+    notebooks,
+    recentNotesScopeKey,
+    recentNotesVersion,
+    isNoteHiddenFromSearch
+  ]);
 
   const handleSearchResultSelect = useCallback((notebookId, noteId) => {
     setSelectedNotebookId(notebookId);
@@ -7726,6 +7791,10 @@ export default function RecordVaultWorkspacePane({
                   !isInnerNoteUnlocked(selectedNote.note_id))
               }
               refreshToken={mobileUploadTrayRefreshToken}
+              recentNoteSlots={recentNoteSlots}
+              onRecentNoteSelect={handleSearchResultSelect}
+              recentSelectedNoteId={selectedNoteId}
+              recentSelectedNotebookId={selectedNotebookId}
               onError={(msg) => setError(String(msg || ''))}
             />
           ) : null}

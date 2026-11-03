@@ -18,6 +18,7 @@ import {
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import SliderControlButton from 'ui-component/SliderControlButton';
 import {
   MOBILE_UPLOAD_PRODUCT_TUTANOTES,
   requireMobileUploadProduct
@@ -245,6 +246,131 @@ ThumbTile.propTypes = {
  * Desktop: strip under menu. Mobile upload session: grid under the popup.
  * `plain` — white background, no frame, no label.
  */
+const RECENT_NOTE_SLOT_COUNT = 5;
+const RECENT_NOTE_SELECTED_BLUE = '#1e88e5';
+
+function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSelect, disabled }) {
+  const list = Array.isArray(slots) ? [...slots] : [];
+  while (list.length < RECENT_NOTE_SLOT_COUNT) {
+    list.push(null);
+  }
+  return (
+    <Box
+      aria-label="Recent notes"
+      sx={{
+        flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        alignSelf: 'center',
+        gap: 0.5,
+        pl: 0.75,
+        ml: 0.25,
+        borderLeft: '2px solid #000',
+        boxSizing: 'border-box'
+      }}
+    >
+      <Box
+        sx={{
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          border: '3px solid #000',
+          borderRadius: 0.5,
+          bgcolor: '#4caf50',
+          px: 1,
+          py: 0.35,
+          boxSizing: 'border-box'
+        }}
+      >
+        <Typography
+          component="span"
+          sx={{
+            fontFamily: MAIN_FONT_FAMILY,
+            fontWeight: 800,
+            fontSize: { xs: '0.8rem', sm: '0.95rem' },
+            lineHeight: 1.15,
+            color: '#000',
+            WebkitTextFillColor: '#000',
+            whiteSpace: 'nowrap',
+            userSelect: 'none'
+          }}
+        >
+          Recent
+        </Typography>
+      </Box>
+      {list.slice(0, RECENT_NOTE_SLOT_COUNT).map((slot, index) => {
+        if (!slot) {
+          return (
+            <Box
+              key={`recent-empty-${index}`}
+              aria-hidden
+              sx={{
+                flexShrink: 0,
+                width: { xs: 52, sm: 72 },
+                height: 34,
+                border: '3px solid #000',
+                borderRadius: 0.5,
+                bgcolor: '#ffffff',
+                boxSizing: 'border-box'
+              }}
+            />
+          );
+        }
+        const selected =
+          Number(slot.note_id) === Number(selectedNoteId) &&
+          Number(slot.notebook_id) === Number(selectedNotebookId);
+        return (
+          <SliderControlButton
+            key={`recent-${slot.note_id}`}
+            type="button"
+            variant="yellow"
+            disableHoverScale
+            disableSelectedTranslate
+            disabled={disabled}
+            aria-pressed={selected}
+            title={slot.label}
+            onClick={() => onSelect?.(slot.notebook_id, slot.note_id)}
+            sx={{
+              flexShrink: 0,
+              minWidth: { xs: 52, sm: 72 },
+              maxWidth: { xs: 88, sm: 120 },
+              px: 0.75,
+              py: 0.35,
+              fontSize: { xs: '0.65rem', sm: '0.75rem' },
+              lineHeight: 1.1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              bgcolor: selected
+                ? `${RECENT_NOTE_SELECTED_BLUE} !important`
+                : 'var(--theme-yellow-color) !important',
+              color: selected ? '#ffffff !important' : '#000000 !important',
+              WebkitTextFillColor: selected ? '#ffffff !important' : '#000000 !important',
+              border: '3px solid #000000 !important'
+            }}
+          >
+            {slot.label}
+          </SliderControlButton>
+        );
+      })}
+    </Box>
+  );
+}
+
+RecentNoteQuickSlots.propTypes = {
+  slots: PropTypes.arrayOf(
+    PropTypes.shape({
+      note_id: PropTypes.number.isRequired,
+      notebook_id: PropTypes.number.isRequired,
+      label: PropTypes.string.isRequired
+    })
+  ),
+  selectedNoteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  selectedNotebookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  onSelect: PropTypes.func,
+  disabled: PropTypes.bool
+};
+
 export default function RecordVaultMobileUploadTray({
   product = MOBILE_UPLOAD_PRODUCT_TUTANOTES,
   active = true,
@@ -258,6 +384,10 @@ export default function RecordVaultMobileUploadTray({
   plain = false,
   selectable = false,
   emptyHint,
+  recentNoteSlots = null,
+  onRecentNoteSelect = null,
+  recentSelectedNoteId = null,
+  recentSelectedNotebookId = null,
   onError
 }) {
   const stagingProduct = requireMobileUploadProduct(product);
@@ -611,6 +741,15 @@ export default function RecordVaultMobileUploadTray({
         </ColorTemplate13DisableGreenButton>
       ) : null}
       {thumbsArea}
+      {!isGrid && recentNoteSlots ? (
+        <RecentNoteQuickSlots
+          slots={recentNoteSlots}
+          selectedNoteId={recentSelectedNoteId}
+          selectedNotebookId={recentSelectedNotebookId}
+          onSelect={onRecentNoteSelect}
+          disabled={disabled}
+        />
+      ) : null}
     </Box>
   );
 }
@@ -627,5 +766,15 @@ RecordVaultMobileUploadTray.propTypes = {
   plain: PropTypes.bool,
   selectable: PropTypes.bool,
   emptyHint: PropTypes.string,
+  recentNoteSlots: PropTypes.arrayOf(
+    PropTypes.shape({
+      note_id: PropTypes.number.isRequired,
+      notebook_id: PropTypes.number.isRequired,
+      label: PropTypes.string.isRequired
+    })
+  ),
+  onRecentNoteSelect: PropTypes.func,
+  recentSelectedNoteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  recentSelectedNotebookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   onError: PropTypes.func
 };
