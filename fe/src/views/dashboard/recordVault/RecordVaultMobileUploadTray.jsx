@@ -18,7 +18,7 @@ import {
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import SliderControlButton from 'ui-component/SliderControlButton';
+import { useRecordVaultSliderControlButtonFontRem } from './RecordVaultSliderControlButtonContext';
 import {
   MOBILE_UPLOAD_PRODUCT_TUTANOTES,
   requireMobileUploadProduct
@@ -247,26 +247,273 @@ ThumbTile.propTypes = {
  * `plain` — white background, no frame, no label.
  */
 const RECENT_NOTE_SLOT_COUNT = 5;
-const RECENT_NOTE_SELECTED_BLUE = '#1e88e5';
+/** Same selected-row green and idle grey as the Add Note / Add Notebook columns. */
+const RECENT_NOTE_SELECTED_GREEN = '#60C446';
+const RECENT_NOTE_IDLE_GREY = '#9e9e9e';
+const RECENT_DRAG_THRESHOLD_PX = 6;
 
-function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSelect, disabled }) {
+/** Yellow-bar splitter: width of the Recent pane, drag left to widen it. */
+const RECENT_PANE_WIDTH_KEY = 'recordVaultRecentPaneWidth_v1';
+const RECENT_PANE_DEFAULT_WIDTH = 560;
+const RECENT_PANE_MIN_WIDTH = 230;
+/** Never squeeze the hint/thumbnails side below this. */
+const RECENT_PANE_MIN_LEFT_PX = 120;
+
+function loadRecentPaneWidth() {
+  try {
+    const parsed = Number(localStorage.getItem(RECENT_PANE_WIDTH_KEY));
+    if (Number.isFinite(parsed) && parsed >= RECENT_PANE_MIN_WIDTH) return parsed;
+  } catch {
+    // private mode / quota
+  }
+  return RECENT_PANE_DEFAULT_WIDTH;
+}
+
+function storeRecentPaneWidth(px) {
+  try {
+    localStorage.setItem(RECENT_PANE_WIDTH_KEY, String(Math.round(px)));
+  } catch {
+    // ignore
+  }
+}
+
+function clampPx(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(Math.max(n, min), Math.max(min, max));
+}
+
+/**
+ * One row of recent-note chips. Each chip wraps its note name onto two lines
+ * inside the same button (never two rows of buttons), with the tight spacing
+ * used by the Add Note column.
+ */
+const recentNoteScrollRowSx = {
+  flex: '1 1 auto',
+  minWidth: 0,
+  maxWidth: '100%',
+  display: 'flex',
+  flexDirection: 'row',
+  alignItems: 'stretch',
+  /** Tight like the Add Note column. */
+  gap: 0.25,
+  /** `auto` so a very narrow pane scrolls instead of clipping chips. */
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  pb: 0.3,
+  cursor: 'grab',
+  userSelect: 'none',
+  scrollbarWidth: 'thin',
+  scrollbarColor: '#000 rgba(255,255,255,0.55)',
+  '&::-webkit-scrollbar': {
+    height: 7,
+    display: 'block'
+  },
+  '&::-webkit-scrollbar-thumb': {
+    backgroundColor: '#000',
+    borderRadius: 4,
+    minWidth: 24
+  },
+  '&::-webkit-scrollbar-track': {
+    backgroundColor: 'rgba(255,255,255,0.65)',
+    border: '1px solid #000',
+    borderRadius: 4
+  },
+  '&:active': {
+    cursor: 'grabbing'
+  }
+};
+
+/**
+ * Word-per-line label for the Recent chips, matching the Add Note column.
+ */
+const recentChipLabelSx = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+  whiteSpace: 'normal'
+};
+
+const recentChipWordSx = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'center',
+  lineHeight: 1.15,
+  /** One word per line; shrink an over-long word instead of splitting it. */
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+};
+
+/**
+ * Thicker chip whose label wraps onto two lines inside the same button, so the
+ * whole note name shows. Sized off the same button-slider value as the rest of
+ * TutaNotes (SliderControlButton forces its own size with `!important`, so
+ * these are plain buttons).
+ */
+function recentChipSx(selected, halfFontRem) {
+  const size = `${(halfFontRem * 0.75).toFixed(3)}rem !important`;
+  return {
+    boxSizing: 'border-box',
+    /** Hug the label like the Add Note column rows instead of stretching. */
+    flex: '0 0 auto',
+    width: 'auto',
+    minWidth: 0,
+    maxWidth: '100%',
+    /** Thick like the Add Note column buttons; grows if a name needs a 3rd line. */
+    minHeight: 56,
+    margin: 0,
+    /** Same left/right padding as the Add Note column rows (px 0.45 / 0.55). */
+    padding: { xs: '5px 7px', sm: '5px 9px' },
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: MAIN_FONT_FAMILY,
+    fontWeight: 800,
+    fontSize: size,
+    lineHeight: 1.15,
+    textTransform: 'none',
+    textAlign: 'center',
+    whiteSpace: 'normal',
+    borderRadius: 4,
+    border: selected ? '4px solid #000000' : '2px solid #000',
+    bgcolor: selected ? RECENT_NOTE_SELECTED_GREEN : RECENT_NOTE_IDLE_GREY,
+    color: '#000000',
+    WebkitTextFillColor: '#000000',
+    cursor: 'pointer',
+    '& .MuiButton-label': {
+      fontSize: size
+    }
+  };
+}
+
+/**
+ * Mirror of the Add Note column: every whitespace-delimited word gets its own
+ * line, so a Recent chip always shows the same number of lines as the sidebar row.
+ */
+function RecentChipLabel({ label }) {
+  const words = String(label ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length <= 1) {
+    return (
+      <Box component="span" sx={recentChipWordSx}>
+        {words[0] || '—'}
+      </Box>
+    );
+  }
+  return (
+    <Box component="span" sx={recentChipLabelSx}>
+      {words.map((word, index) => (
+        <Box
+          // eslint-disable-next-line react/no-array-index-key
+          key={`${word}-${index}`}
+          component="span"
+          sx={recentChipWordSx}
+        >
+          {word}
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+RecentChipLabel.propTypes = {
+  label: PropTypes.string
+};
+
+function RecentNoteQuickSlots({
+  slots,
+  selectedNoteId,
+  selectedNotebookId,
+  onSelect,
+  disabled,
+  paneWidth
+}) {
+  /** Same source SliderControlButton uses; chips render at exactly half of it. */
+  const vaultFontRem = useRecordVaultSliderControlButtonFontRem();
+  const halfFontRem = Number(vaultFontRem) > 0 ? Number(vaultFontRem) / 2 : 1;
   const list = Array.isArray(slots) ? [...slots] : [];
   while (list.length < RECENT_NOTE_SLOT_COUNT) {
     list.push(null);
   }
+  const scrollRef = useRef(null);
+  const dragRef = useRef({ active: false, moved: false, startX: 0, scrollLeft: 0 });
+
+  const onDragMove = useCallback((event) => {
+    const el = scrollRef.current;
+    const drag = dragRef.current;
+    if (!el || !drag.active) return;
+    const dx = event.clientX - drag.startX;
+    if (Math.abs(dx) > RECENT_DRAG_THRESHOLD_PX) {
+      drag.moved = true;
+    }
+    el.scrollLeft = drag.scrollLeft - dx;
+  }, []);
+
+  const endDrag = useCallback(() => {
+    dragRef.current.active = false;
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', endDrag);
+  }, [onDragMove]);
+
+  const onScrollRowMouseDown = useCallback(
+    (event) => {
+      if (event.button !== 0 || disabled) return;
+      const el = scrollRef.current;
+      if (!el) return;
+      dragRef.current = {
+        active: true,
+        moved: false,
+        startX: event.clientX,
+        scrollLeft: el.scrollLeft
+      };
+      window.addEventListener('mousemove', onDragMove);
+      window.addEventListener('mouseup', endDrag);
+    },
+    [disabled, endDrag, onDragMove]
+  );
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('mousemove', onDragMove);
+      window.removeEventListener('mouseup', endDrag);
+    },
+    [endDrag, onDragMove]
+  );
+
+  const handleChipClick = useCallback(
+    (notebookId, noteId) => {
+      if (dragRef.current.moved) {
+        dragRef.current.moved = false;
+        return;
+      }
+      onSelect?.(notebookId, noteId);
+    },
+    [onSelect]
+  );
+
   return (
     <Box
       aria-label="Recent notes"
       sx={{
-        flexShrink: 0,
-        display: 'inline-flex',
+        flex: '0 0 auto',
+        width: paneWidth,
+        minWidth: 0,
+        display: 'flex',
         alignItems: 'center',
-        alignSelf: 'center',
+        alignSelf: 'stretch',
         gap: 0.5,
         pl: 0.75,
-        ml: 0.25,
-        borderLeft: '2px solid #000',
-        boxSizing: 'border-box'
+        pr: 0.25,
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}
     >
       <Box
@@ -277,8 +524,8 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
           border: '3px solid #000',
           borderRadius: 0.5,
           bgcolor: '#4caf50',
-          px: 1,
-          py: 0.35,
+          px: 0.75,
+          py: 0.3,
           boxSizing: 'border-box'
         }}
       >
@@ -298,61 +545,51 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
           Recent
         </Typography>
       </Box>
-      {list.slice(0, RECENT_NOTE_SLOT_COUNT).map((slot, index) => {
-        if (!slot) {
+      <Box
+        ref={scrollRef}
+        role="group"
+        aria-label="Recent note shortcuts — drag horizontally to scroll"
+        onMouseDown={onScrollRowMouseDown}
+        sx={recentNoteScrollRowSx}
+      >
+        {list.slice(0, RECENT_NOTE_SLOT_COUNT).map((slot, index) => {
+          if (!slot) {
+            return (
+              <Box
+                key={`recent-empty-${index}`}
+                aria-hidden
+                sx={{
+                  flex: '0 0 auto',
+                  width: '4em',
+                  minWidth: 0,
+                  alignSelf: 'stretch',
+                  border: '2px dashed #000',
+                  borderRadius: '4px',
+                  bgcolor: '#ffffff',
+                  boxSizing: 'border-box'
+                }}
+              />
+            );
+          }
+          const selected =
+            Number(slot.note_id) === Number(selectedNoteId) &&
+            Number(slot.notebook_id) === Number(selectedNotebookId);
           return (
             <Box
-              key={`recent-empty-${index}`}
-              aria-hidden
-              sx={{
-                flexShrink: 0,
-                width: { xs: 52, sm: 72 },
-                height: 34,
-                border: '3px solid #000',
-                borderRadius: 0.5,
-                bgcolor: '#ffffff',
-                boxSizing: 'border-box'
-              }}
-            />
+              key={`recent-${slot.note_id}`}
+              component="button"
+              type="button"
+              disabled={disabled}
+              aria-pressed={selected}
+              title={slot.label}
+              onClick={() => handleChipClick(slot.notebook_id, slot.note_id)}
+              sx={recentChipSx(selected, halfFontRem)}
+            >
+              <RecentChipLabel label={slot.label} />
+            </Box>
           );
-        }
-        const selected =
-          Number(slot.note_id) === Number(selectedNoteId) &&
-          Number(slot.notebook_id) === Number(selectedNotebookId);
-        return (
-          <SliderControlButton
-            key={`recent-${slot.note_id}`}
-            type="button"
-            variant="yellow"
-            disableHoverScale
-            disableSelectedTranslate
-            disabled={disabled}
-            aria-pressed={selected}
-            title={slot.label}
-            onClick={() => onSelect?.(slot.notebook_id, slot.note_id)}
-            sx={{
-              flexShrink: 0,
-              minWidth: { xs: 52, sm: 72 },
-              maxWidth: { xs: 88, sm: 120 },
-              px: 0.75,
-              py: 0.35,
-              fontSize: { xs: '0.65rem', sm: '0.75rem' },
-              lineHeight: 1.1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              bgcolor: selected
-                ? `${RECENT_NOTE_SELECTED_BLUE} !important`
-                : 'var(--theme-yellow-color) !important',
-              color: selected ? '#ffffff !important' : '#000000 !important',
-              WebkitTextFillColor: selected ? '#ffffff !important' : '#000000 !important',
-              border: '3px solid #000000 !important'
-            }}
-          >
-            {slot.label}
-          </SliderControlButton>
-        );
-      })}
+        })}
+      </Box>
     </Box>
   );
 }
@@ -368,7 +605,8 @@ RecentNoteQuickSlots.propTypes = {
   selectedNoteId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   selectedNotebookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   onSelect: PropTypes.func,
-  disabled: PropTypes.bool
+  disabled: PropTypes.bool,
+  paneWidth: PropTypes.number
 };
 
 export default function RecordVaultMobileUploadTray({
@@ -391,6 +629,52 @@ export default function RecordVaultMobileUploadTray({
   onError
 }) {
   const stagingProduct = requireMobileUploadProduct(product);
+  /** Recent pane width inside the yellow bar — drag the divider to change it. */
+  const [recentPaneWidth, setRecentPaneWidth] = useState(loadRecentPaneWidth);
+  const trayRef = useRef(null);
+  const latestWidthRef = useRef(recentPaneWidth);
+  latestWidthRef.current = recentPaneWidth;
+  const splitDragRef = useRef({ active: false, startX: 0, startWidth: 0 });
+
+  const startRecentPaneResize = useCallback((event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const trayWidth = trayRef.current?.getBoundingClientRect?.().width || 0;
+    const maxWidth = Math.max(
+      RECENT_PANE_MIN_WIDTH,
+      trayWidth - RECENT_PANE_MIN_LEFT_PX
+    );
+    splitDragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startWidth: recentPaneWidth
+    };
+
+    const onMove = (moveEvent) => {
+      // Dragging LEFT widens the Recent pane, so subtract the delta.
+      const delta = moveEvent.clientX - splitDragRef.current.startX;
+      const next = Math.round(
+        clampPx(splitDragRef.current.startWidth - delta, RECENT_PANE_MIN_WIDTH, maxWidth)
+      );
+      latestWidthRef.current = next;
+      setRecentPaneWidth(next);
+    };
+    const onUp = () => {
+      splitDragRef.current.active = false;
+      document.body.style.removeProperty('user-select');
+      document.body.style.removeProperty('cursor');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      storeRecentPaneWidth(latestWidthRef.current);
+    };
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [recentPaneWidth]);
+
   const [files, setFiles] = useState([]);
   const [selectedNames, setSelectedNames] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
@@ -580,11 +864,12 @@ export default function RecordVaultMobileUploadTray({
     : {
         flexShrink: 0,
         display: 'flex',
-        alignItems: 'stretch',
-        gap: 1,
-        minHeight: 88,
+        alignItems: 'center',
+        gap: 0.75,
+        /** Tall enough for one row of two-line Recent chips + scrollbar. */
+        minHeight: 96,
         px: 1,
-        py: 0.75,
+        py: 0.55,
         bgcolor: '#fff59d',
         borderBottom: '2px solid #000',
         boxSizing: 'border-box',
@@ -655,7 +940,12 @@ export default function RecordVaultMobileUploadTray({
   );
 
   return (
-    <Box data-rv-mobile-upload-tray="" aria-label="Mobile Upload thumbnails" sx={shellSx}>
+    <Box
+      ref={trayRef}
+      data-rv-mobile-upload-tray=""
+      aria-label="Mobile Upload thumbnails"
+      sx={shellSx}
+    >
       {plain ? null : (
         <Tooltip
           title={MOBILE_UPLOAD_HOVER_TOOLTIP}
@@ -687,7 +977,7 @@ export default function RecordVaultMobileUploadTray({
                     alignSelf: 'flex-start',
                     border: '3px solid #000',
                     borderRadius: 0.5,
-                    bgcolor: '#ffeb3b',
+                    bgcolor: '#fff !important',
                     px: 1,
                     py: 0.5,
                     cursor: onTitleClick ? 'pointer' : 'help'
@@ -699,7 +989,7 @@ export default function RecordVaultMobileUploadTray({
                     alignItems: 'center',
                     border: '3px solid #000',
                     borderRadius: 0.5,
-                    bgcolor: '#ffeb3b',
+                    bgcolor: '#fff !important',
                     px: 1,
                     py: 0.5,
                     boxSizing: 'border-box',
@@ -742,13 +1032,35 @@ export default function RecordVaultMobileUploadTray({
       ) : null}
       {thumbsArea}
       {!isGrid && recentNoteSlots ? (
-        <RecentNoteQuickSlots
-          slots={recentNoteSlots}
-          selectedNoteId={recentSelectedNoteId}
-          selectedNotebookId={recentSelectedNotebookId}
-          onSelect={onRecentNoteSelect}
-          disabled={disabled}
-        />
+        <>
+          <Box
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize Recent notes pane"
+            title="Drag left to give Recent notes more room"
+            onMouseDown={startRecentPaneResize}
+            sx={{
+              flex: '0 0 auto',
+              alignSelf: 'stretch',
+              width: 10,
+              my: 0.5,
+              cursor: 'col-resize',
+              touchAction: 'none',
+              borderLeft: '2px solid #000',
+              bgcolor: 'rgba(0,0,0,0.18)',
+              transition: 'background-color 0.12s ease',
+              '&:hover': { bgcolor: '#000' }
+            }}
+          />
+          <RecentNoteQuickSlots
+            slots={recentNoteSlots}
+            selectedNoteId={recentSelectedNoteId}
+            selectedNotebookId={recentSelectedNotebookId}
+            onSelect={onRecentNoteSelect}
+            disabled={disabled}
+            paneWidth={recentPaneWidth}
+          />
+        </>
       ) : null}
     </Box>
   );

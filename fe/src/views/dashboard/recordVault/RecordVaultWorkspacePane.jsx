@@ -7640,7 +7640,7 @@ export default function RecordVaultWorkspacePane({
                 alignItems: 'center',
                 border: '3px solid #000',
                 borderRadius: 0.5,
-                bgcolor: '#fff',
+                bgcolor: '#fff !important',
                 px: 1,
                 py: 0.35,
                 boxSizing: 'border-box'
