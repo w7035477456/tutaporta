@@ -157,7 +157,8 @@ const BACKUP_OPERATION_STEPS = {
       ['seal', 'Encrypting with the password for this zip'],
       ['send', 'Uploading sealed zip to TutaCloud'],
       ['server', 'Server saving zip to your member folder'],
-      ['saved', 'Refreshing backup list']
+      ['saved', 'Refreshing backup list'],
+      ['save', 'Saving a local copy to the folder you chose']
     ],
     serverWaitText: 'waiting for server to write the file'
   },
@@ -300,6 +301,13 @@ function buildBackupProgressLabel(progress, nowMs) {
       break;
     case 'saved':
       if (progress.fileName) lines.push(`Saved as ${progress.fileName}`);
+      break;
+    case 'save':
+      lines.push(
+        progress.saveTarget === 'browser'
+          ? 'Zip stored in TutaCloud — downloading a copy to your browser download folder…'
+          : 'Zip stored in TutaCloud — writing a copy to the folder you chose…'
+      );
       break;
     case 'apply':
       lines.push(
@@ -682,6 +690,8 @@ export default function RecordVaultTutaCloudBackupDialog({
   const handleBackup = async () => {
     resetMessages();
     let backupInput = null;
+    /** Where the automatic local copy of the new zip goes ({ file } | null = browser downloads). */
+    let saveTarget = null;
     if (tutaDriveActive) {
       backupInput = await askBackupPassword({ mode: 'backup' });
       if (!backupInput) return;
@@ -700,6 +710,9 @@ export default function RecordVaultTutaCloudBackupDialog({
           return;
         }
       }
+      // Ask where the automatic local copy goes now, right after the user's last click: the Save
+      // dialog needs transient user activation, which is gone once the zip + upload has finished.
+      saveTarget = await acquireSaveZipFile(tutaDriveBackupFileNamePreview(backupInput.note, backupInput.dateStamp));
     }
     setBusy(true);
     try {
@@ -726,12 +739,16 @@ export default function RecordVaultTutaCloudBackupDialog({
         const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
         const noteText = result?.note ? ` Note: ${result.note}.` : '';
         await loadBackupList();
+        // Same as pressing Download on the slot that was just created: ask where to put the zip.
+        const localCopyText = await saveBackupCopyToComputer(fileName, saveTarget, progress);
         progress.update({ stage: 'done', percent: 100 });
         const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
         const sealedWith = backupInput.password
           ? 'the password you chose for this zip'
           : 'the password you use to enter TutaNotes';
-        setSuccess(`Backup sealed with ${sealedWith} and saved as ${rel}${sizeText} in ${elapsedText}.${noteText}`);
+        setSuccess(
+          `Backup sealed with ${sealedWith} and saved as ${rel}${sizeText} in ${elapsedText}.${noteText}${localCopyText}`
+        );
         setSuccessTone('backup');
         setRequiredBackupDone(true);
         setJustCreatedFileName(fileName);
@@ -928,6 +945,34 @@ export default function RecordVaultTutaCloudBackupDialog({
     } finally {
       setBusy(false);
       setActioningFile('');
+    }
+  };
+
+  /**
+   * Backup just finished: write the sealed zip we stored in TutaCloud to the user's computer —
+   * exactly the same flow as the row's Download button (Save As dialog asking where to put the zip;
+   * plain browser download when the browser has no File System Access API).
+   * The Save dialog is opened when Backup is clicked, because the picker needs that click's user
+   * activation (it has expired by the time the zip is built).
+   * @returns {Promise<string>} sentence to append to the Backup success message
+   */
+  const saveBackupCopyToComputer = async (fileName, saveTarget, progress) => {
+    if (saveTarget?.cancelled) {
+      return ' No local copy was saved because the Save dialog was cancelled — use Download in the slot row for one.';
+    }
+    progress?.update({ stage: 'save', percent: 99, saveTarget: saveTarget?.file ? 'chosen' : 'browser' });
+    try {
+      const result = await downloadRecordVaultTutaDriveStoredBackup(fileName, { targetFile: saveTarget?.file || null });
+      const savedName = result?.fileName || fileName;
+      const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
+      const sizeText = sizeLabel ? ` (${sizeLabel})` : '';
+      const destination = saveTarget?.file ? 'the folder you chose' : 'your browser download folder';
+      return ` A copy ${savedName}${sizeText} was also downloaded to ${destination}.`;
+    } catch (err) {
+      return ` The automatic download failed (${describeBackupRequestError(
+        err,
+        'Download failed'
+      )}) — use Download in the slot row to save a copy.`;
     }
   };
 
