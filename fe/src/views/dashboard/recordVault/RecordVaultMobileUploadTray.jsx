@@ -523,7 +523,8 @@ function RecentNoteQuickSlots({
           alignItems: 'center',
           border: '3px solid #000',
           borderRadius: 0.5,
-          bgcolor: '#4caf50',
+          /** Label background matches the white `Mobile Upload:` label. */
+          bgcolor: '#fff !important',
           px: 0.75,
           py: 0.3,
           boxSizing: 'border-box'

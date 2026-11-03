@@ -508,11 +508,12 @@ const menuButtonSx = {
 /** Blue used to mark the active search-result note (chip + matching sidebar row). */
 const RECORD_VAULT_SEARCH_HIT_BLUE = '#1e88e5';
 
-/** Header AI buttons (Keep model loaded + AI LLM RAG). */
-const RECORD_VAULT_AI_BUTTON_BLUE = '#2196f3';
-const RECORD_VAULT_AI_BUTTON_BLUE_HOVER = '#1e88e5';
-const RECORD_VAULT_AI_BUTTON_BLUE_OFF = '#90caf9';
-const RECORD_VAULT_AI_BUTTON_BLUE_OFF_HOVER = '#7ab8f5';
+/** Header AI buttons (Keep model loaded + AI LLM RAG) — plain yellow, same as File / Exit to Mall. */
+const RECORD_VAULT_AI_BUTTON_YELLOW = '#FFEB3B';
+const RECORD_VAULT_AI_BUTTON_BLUE = RECORD_VAULT_AI_BUTTON_YELLOW;
+const RECORD_VAULT_AI_BUTTON_BLUE_HOVER = RECORD_VAULT_AI_BUTTON_YELLOW;
+const RECORD_VAULT_AI_BUTTON_BLUE_OFF = RECORD_VAULT_AI_BUTTON_YELLOW;
+const RECORD_VAULT_AI_BUTTON_BLUE_OFF_HOVER = RECORD_VAULT_AI_BUTTON_YELLOW;
 
 /** @param {string} bg @param {string} hoverBg */
 function recordVaultAiButtonBlueSx(bg, hoverBg) {
@@ -8781,13 +8782,8 @@ export default function RecordVaultWorkspacePane({
                   >
                     <SliderControlButton
                       type="button"
-                      variant={
-                        paneStorageType === 'usb'
-                          ? usbBridgeHealthy
-                            ? 'green'
-                            : 'red'
-                          : 'yellow'
-                      }
+                      /** Same background as Add Notebook / Add Note headers. */
+                      variant="green"
                       hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                       fullWidth
                       singleLineLabel={false}
