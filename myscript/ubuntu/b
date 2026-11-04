@@ -979,6 +979,119 @@ _resticCronRuns() {
       }'
 }
 
+# Per-snapshot size accounting.
+# restic 0.16.4 does NOT record a size in the snapshot itself, so "how much did
+# this snapshot add" has to be measured as diff(previous, this):
+#   added.bytes   = new data written into the repo by this snapshot
+#   removed.bytes = data this snapshot no longer references (NOT freed until prune)
+# The very first snapshot has no predecessor, so its whole size counts as added.
+#
+#   resticsizes          # last 10 snapshots
+#   resticsizes 30       # last 30
+#   resticsizes all      # every snapshot
+_resticHuman() {
+    awk -v b="$1" 'BEGIN{
+        if (b == "" || b < 0) { print "-"; exit }
+        split("B KiB MiB GiB TiB", u, " "); i = 1
+        while (b >= 1024 && i < 5) { b /= 1024; i++ }
+        if (i == 1) printf "%d %s\n", b, u[i]
+        else printf "%.3f %s\n", b, u[i]
+    }'
+}
+
+resticsizes() {
+    local want=${1:-10}
+    local json ids id prev a_bytes r_bytes a_files first=1
+    local sum_added=0 sum_removed=0 line
+
+    case "$want" in
+        all|ALL|0) want=100000 ;;
+    esac
+    [[ "$want" =~ ^[0-9]+$ ]] || { echo "Usage: resticsizes [N|all]"; return 1; }
+
+    json=$(resticu snapshots --json 2>/dev/null)
+    if [ -z "$json" ] || ! printf '%s' "$json" | jq -e . >/dev/null 2>&1; then
+        echo "Cannot read the restic repo (needs sudo — run interactively)." >&2
+        return 1
+    fi
+
+    ids=$(printf '%s' "$json" | jq -r 'sort_by(.time) | .[].id')
+    local total_snaps
+    total_snaps=$(printf '%s\n' "$ids" | grep -c .)
+    [ "$total_snaps" -gt 0 ] || { echo "No snapshots yet — run: backupnightly"; return 0; }
+
+    # Only diff the last $want, but keep one predecessor so the first shown row
+    # is still a true delta rather than a full-size total.
+    local start=$(( total_snaps - want + 1 ))
+    [ "$start" -lt 1 ] && start=1
+
+    echo "Snapshot size accounting   repo: $RESTIC_REPOSITORY"
+    echo
+    printf '%-9s %-19s %-12s %-12s %-7s %s\n' \
+           "SNAPSHOT" "TIME (NY)" "ADDED" "REMOVED" "FILES" "NOTE"
+    printf '%-9s %-19s %-12s %-12s %-7s %s\n' \
+           "--------" "-------------------" "------------" "------------" "------" "----"
+
+    local i=0 shown=0
+    while IFS= read -r id; do
+        i=$((i + 1))
+        [ "$i" -lt "$start" ] && { prev="$id"; continue; }
+        shown=$((shown + 1))
+
+        local t note=""
+        t=$(printf '%s' "$json" | jq -r --arg id "$id" \
+             '.[] | select(.id == $id) | .time')
+
+        if [ -z "$prev" ]; then
+            # first snapshot in the *repo*: everything in it is new
+            a_bytes=$(resticu stats --json --mode raw-data "$id" 2>/dev/null \
+                      | jq -r '.total_size // 0')
+            r_bytes=0
+            a_files=$(resticu stats --json --mode restore-size "$id" 2>/dev/null \
+                      | jq -r '.total_file_count // 0')
+            note="(first: full)"
+        else
+            line=$(resticu diff --json "$prev" "$id" 2>/dev/null \
+                   | jq -r 'select(.message_type=="statistics") |
+                            [(.added.bytes // 0), (.removed.bytes // 0),
+                             (.added.files // 0)] | @tsv')
+            a_bytes=$(printf '%s' "$line" | cut -f1)
+            r_bytes=$(printf '%s' "$line" | cut -f2)
+            a_files=$(printf '%s' "$line" | cut -f3)
+            # Distinguish "delta vs previous snapshot" from "delta vs a baseline
+            # just outside the window", so numbers are never misread.
+            [ "$i" -eq "$start" ] && [ "$start" -gt 1 ] && note="(vs prior)"
+        fi
+        [ -z "$a_bytes" ] && a_bytes=0
+        [ -z "$r_bytes" ] && r_bytes=0
+        [ -z "$a_files" ] && a_files=0
+
+        sum_added=$(( sum_added + a_bytes ))
+        sum_removed=$(( sum_removed + r_bytes ))
+
+        printf '%-9s %-19s %-12s %-12s %-7s %s\n' \
+            "$(printf '%s' "$id" | cut -c1-8)" \
+            "$(TZ=America/New_York date -d "$t" '+%a %b %-d %-I:%M %p' 2>/dev/null)" \
+            "$(_resticHuman "$a_bytes")" \
+            "$(_resticHuman "$r_bytes")" \
+            "+${a_files}" \
+            "$note"
+
+        prev="$id"
+    done <<< "$ids"
+
+    echo
+    echo "Shown $shown snapshot(s).  Added total: $(_resticHuman "$sum_added")   Removed total: $(_resticHuman "$sum_removed")"
+    local repo_size
+    repo_size=$(sudo -n du -sh "$RESTIC_REPOSITORY" 2>/dev/null | cut -f1)
+    [ -n "$repo_size" ] && echo "Repo size on disk : $repo_size"
+    echo
+    echo "ADDED   = new data written by that snapshot (what actually grew the repo)."
+    echo "REMOVED = data it stopped referencing; space is NOT freed until 'restic prune'."
+    echo "The nightly job never prunes, so this repo only ever grows."
+}
+
+
 resticcron() {
     local log=/home/lawsen0/backups/backup-ubuntu.log
     local tz=America/New_York
@@ -1052,6 +1165,7 @@ resticcron() {
         total=$(sudo -n du -sh /mnt/terramaster/restic-ubuntu 2>/dev/null | cut -f1)
         [ -n "$total" ] || total="(needs sudo)"
         printf '    repo total: %s\n' "$total"
+        echo "    per-snapshot bytes added : resticsizes"
     fi
 
     # ---- 3) retime -------------------------------------------------------
