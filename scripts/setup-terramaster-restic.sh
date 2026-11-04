@@ -226,6 +226,10 @@ elif [[ "$DO_FORMAT" -eq 1 ]]; then
   #             the first restic run doesn't race background e2fsck-ish init
   #   -O ^has_journal is NOT used: we want the journal for crash safety.
   info "CLEAN SLATE: will destroy the existing ${current_fstype:-empty} filesystem on $DISK"
+  # Eager metadata init on a 7.3 TB volume writes a few GB before mkfs returns,
+  # so expect a couple of minutes (longer on a 480 Mb/s USB 2.0 link). That is
+  # one-off and buys a predictable first backup instead of lazy-init contention.
+  info "mkfs will take a few minutes (eager inode/journal init on 7.3 TB) — this is normal"
   if [[ "$DRY_RUN" -eq 0 && "$YES" -eq 0 ]]; then
     echo
     echo "This ERASES $DISK (TerraMaster enclosure). Type exactly:  ERASE-$(basename "$DISK")"
