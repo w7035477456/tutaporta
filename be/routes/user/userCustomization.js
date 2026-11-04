@@ -826,7 +826,7 @@ async function upsertCustomizationRow(me, row) {
         mynote_last_notebook_id, mynote_last_note_id, mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index,
         mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, all_singles_welcome_expanded, updated_at
       )
-      VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, ${welcomeExpandedParam}, NOW())
+      VALUES ($1, $2, $3, $4::outdateddbsnapshotoct2024.sound_preference_enum, $5::outdateddbsnapshotoct2024.vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, ${welcomeExpandedParam}, NOW())
       ON CONFLICT (singles_id) DO UPDATE SET
         chat_font_size = EXCLUDED.chat_font_size,
         mynote_font_size = EXCLUDED.mynote_font_size,
@@ -859,7 +859,7 @@ async function upsertCustomizationRow(me, row) {
           mynote_last_notebook_id, mynote_last_note_id, mynote_content_bg_index, mynote_font_color_index, mynote_text_highlight_index,
           mynote_editor_font_size, mynote_note_scroll_top, mynote_editor_caret_pos, updated_at
         )
-        VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
+        VALUES ($1, $2, $3, $4::outdateddbsnapshotoct2024.sound_preference_enum, $5::outdateddbsnapshotoct2024.vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
           mynote_font_size = EXCLUDED.mynote_font_size,
@@ -898,7 +898,7 @@ async function upsertCustomizationRow(me, row) {
       await pool.query(
         `
         INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, mynote_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url, updated_at)
-        VALUES ($1, $2, $3, $4::sound_preference_enum, $5::vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, NOW())
+        VALUES ($1, $2, $3, $4::outdateddbsnapshotoct2024.sound_preference_enum, $5::outdateddbsnapshotoct2024.vsingles_lyric_enum, ${lyricMuteParam}, $7, $8, $9, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
           mynote_font_size = EXCLUDED.mynote_font_size,
@@ -918,7 +918,7 @@ async function upsertCustomizationRow(me, row) {
       await pool.query(
         `
         INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_mute, lyric_volume, volume, custom_music_url, updated_at)
-        VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, ${sqlBooleanEnumParam('$5', 'outdateddbsnapshotoct2024')}, $6, $7, $8, NOW())
+        VALUES ($1, $2, $3::outdateddbsnapshotoct2024.sound_preference_enum, $4::outdateddbsnapshotoct2024.vsingles_lyric_enum, ${sqlBooleanEnumParam('$5', 'outdateddbsnapshotoct2024')}, $6, $7, $8, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
           sound_preference = EXCLUDED.sound_preference,
@@ -937,7 +937,7 @@ async function upsertCustomizationRow(me, row) {
       await pool.query(
         `
         INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_volume, volume, custom_music_url, updated_at)
-        VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, $5, $6, $7, NOW())
+        VALUES ($1, $2, $3::outdateddbsnapshotoct2024.sound_preference_enum, $4::outdateddbsnapshotoct2024.vsingles_lyric_enum, $5, $6, $7, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
           sound_preference = EXCLUDED.sound_preference,
@@ -955,7 +955,7 @@ async function upsertCustomizationRow(me, row) {
       await pool.query(
         `
         INSERT INTO outdateddbsnapshotoct2024.user_customization (singles_id, chat_font_size, sound_preference, vsingles_lyric, lyric_mute, volume, custom_music_url, updated_at)
-        VALUES ($1, $2, $3::sound_preference_enum, $4::vsingles_lyric_enum, ${lyricMuteParam}, $6, $7, NOW())
+        VALUES ($1, $2, $3::outdateddbsnapshotoct2024.sound_preference_enum, $4::outdateddbsnapshotoct2024.vsingles_lyric_enum, ${lyricMuteParam}, $6, $7, NOW())
         ON CONFLICT (singles_id) DO UPDATE SET
           chat_font_size = EXCLUDED.chat_font_size,
           sound_preference = EXCLUDED.sound_preference,
