@@ -1,6 +1,7 @@
 /**
  * Shared flag: TutaNotes Tx/Rx refill exhausted → NOTES_OVERLIMIT_THROTTLE_MULTIPLE is active.
  * BusyHourglassOverlay reads this so every busy icon can show the refill notice.
+ * The live multiple (e.g. "speed throttled 10x") is published by the usage bar.
  */
 
 export const VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE =
@@ -17,6 +18,29 @@ export const VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE_PARTS = {
 export const VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE =
   /Transfer Speed is being throttled|Data Transfer Refill Depleted|Remain Transfer Data exceeded|Please REFILL/i;
 
+/**
+ * Human label for the throttle multiple — "10x", "2.5x". Blank for full speed
+ * so callers can omit the suffix entirely at 1×.
+ */
+export function throttleMultipleLabel(factor) {
+  const n = Number(factor);
+  if (!Number.isFinite(n) || n <= 1) return '';
+  const rounded = Math.round(n * 10) / 10;
+  return `${rounded}x`;
+}
+
+/** "speed throttled 10x" (or just "speed throttled" when the multiple is unknown). */
+export function speedThrottledPhrase(factor) {
+  const multiple = throttleMultipleLabel(factor);
+  return multiple ? `speed throttled ${multiple}` : 'speed throttled';
+}
+
+/** "Transfer Speed is being throttled 10x" — same rule for the full notice. */
+export function transferSpeedThrottledPhrase(factor) {
+  const multiple = throttleMultipleLabel(factor);
+  return multiple ? `Transfer Speed is being throttled ${multiple}` : 'Transfer Speed is being throttled';
+}
+
 /** Same cadence as RecordVaultUsageBar depleted blink. */
 export const vaultOverageThrottleBlinkSx = {
   color: 'var(--theme-error-color)',
@@ -32,6 +56,9 @@ let overageThrottleActive = false;
 /** How many mounted usage bars currently report depleted quota. */
 let depletedHolders = 0;
 const listeners = new Set();
+
+/** 1 = full speed; >1 = current slowdown multiple from the backend. */
+let overageThrottleFactor = 1;
 
 function publish() {
   listeners.forEach((listener) => {
@@ -50,8 +77,34 @@ function setActive(next) {
   publish();
 }
 
+/** Publish the live slowdown multiple (from `transfer.throttleFactor`). */
+export function setRecordVaultOverageThrottleFactor(factor) {
+  const n = Number(factor);
+  const value = Number.isFinite(n) && n >= 1 ? n : 1;
+  if (value === overageThrottleFactor) return;
+  overageThrottleFactor = value;
+  publish();
+}
+
 export function getRecordVaultOverageThrottleActive() {
   return overageThrottleActive;
+}
+
+/** Current slowdown multiple — 1 at full speed, e.g. 10 while depleted. */
+export function getRecordVaultOverageThrottleFactor() {
+  return overageThrottleActive ? overageThrottleFactor : 1;
+}
+
+/**
+ * Subscribe to throttle state changes (depleted flag + live multiple).
+ * @returns {() => void} unsubscribe
+ */
+export function subscribeRecordVaultOverageThrottle(listener) {
+  if (typeof listener !== 'function') return () => {};
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /**
@@ -70,12 +123,4 @@ export function reportRecordVaultOverageThrottleDepleted(depleted) {
   }
   setActive(depletedHolders > 0);
   return () => {};
-}
-
-export function subscribeRecordVaultOverageThrottle(listener) {
-  if (typeof listener !== 'function') return () => {};
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
 }

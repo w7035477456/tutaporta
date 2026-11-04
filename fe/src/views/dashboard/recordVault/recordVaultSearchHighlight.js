@@ -4,18 +4,53 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 export const recordVaultSearchHighlightKey = new PluginKey('recordVaultSearchHighlight');
 
-function normalizeTerms(terms) {
+/**
+ * Two independent highlight channels share this one plugin:
+ *
+ * - `global` — the vault-wide search (Found bar / sidebar blinking chips).
+ * - `note`   — the compact Search box inside the note header, which only looks
+ *              at the note currently open in the editor ("current page").
+ *
+ * Each channel keeps its own terms / matches / active hit, so running an
+ * in-note search never disturbs the vault-wide highlights and vice versa.
+ */
+export const SEARCH_CHANNEL_GLOBAL = 'global';
+export const SEARCH_CHANNEL_NOTE = 'note';
+
+export const NOTE_SEARCH_HIT_CLASS = 'rv-note-search-hit';
+export const NOTE_SEARCH_ACTIVE_CLASS = 'rv-note-search-hit--active';
+export const NOTE_SEARCH_ACTIVE_ATTR = 'data-rv-note-search-active';
+
+const CHANNEL_STYLE = {
+  [SEARCH_CHANNEL_GLOBAL]: {
+    baseClass: 'rv-search-hit',
+    activeClass: 'rv-search-hit--active',
+    activeAttr: 'data-rv-search-active'
+  },
+  [SEARCH_CHANNEL_NOTE]: {
+    baseClass: NOTE_SEARCH_HIT_CLASS,
+    activeClass: NOTE_SEARCH_ACTIVE_CLASS,
+    activeAttr: NOTE_SEARCH_ACTIVE_ATTR
+  }
+};
+
+/** Lowercased, de-duplicated, trimmed search terms (blank terms dropped). */
+export function normalizeSearchTerms(terms) {
   if (!Array.isArray(terms)) return [];
   return Array.from(
     new Set(
       terms
-        .map((t) => String(t ?? '').trim().toLowerCase())
+        .map((t) =>
+          String(t ?? '')
+            .trim()
+            .toLowerCase()
+        )
         .filter((t) => t.length > 0)
     )
   );
 }
 
-function clampIndex(index, count) {
+export function clampSearchHitIndex(index, count) {
   if (count <= 0) return -1;
   const n = Number(index);
   if (!Number.isFinite(n)) return 0;
@@ -23,8 +58,8 @@ function clampIndex(index, count) {
 }
 
 /** Ordered list of every {from,to} range matching any active term. */
-function computeMatches(doc, terms) {
-  const lowered = normalizeTerms(terms);
+export function computeSearchMatches(doc, terms) {
+  const lowered = normalizeSearchTerms(terms);
   const matches = [];
   if (!lowered.length) return matches;
   doc.descendants((node, pos) => {
@@ -42,51 +77,102 @@ function computeMatches(doc, terms) {
   return matches;
 }
 
-function buildDecorationSet(doc, matches, activeIndex) {
-  if (!matches.length) return DecorationSet.empty;
-  const decorations = matches.map((m, i) =>
+function channelStyle(channel) {
+  return CHANNEL_STYLE[channel] || CHANNEL_STYLE[SEARCH_CHANNEL_GLOBAL];
+}
+
+function buildChannelDecorations(matches, activeIndex, channel) {
+  if (!matches.length) return [];
+  const { baseClass, activeClass, activeAttr } = channelStyle(channel);
+  return matches.map((m, i) =>
     Decoration.inline(m.from, m.to, {
-      class:
-        i === activeIndex ? 'rv-search-hit rv-search-hit--active' : 'rv-search-hit',
-      ...(i === activeIndex ? { 'data-rv-search-active': 'true' } : {})
+      class: i === activeIndex ? `${baseClass} ${activeClass}` : baseClass,
+      ...(i === activeIndex ? { [activeAttr]: 'true' } : {})
     })
   );
-  return DecorationSet.create(doc, decorations);
+}
+
+function emptyChannel() {
+  return { terms: [], matches: [], activeIndex: -1, decorations: [] };
+}
+
+function rebuildChannel(doc, channel, { terms, activeIndex } = {}) {
+  const nextTerms = terms ?? channel.terms;
+  const matches = computeSearchMatches(doc, nextTerms);
+  const rawIndex = activeIndex ?? channel.activeIndex;
+  const nextIndex = matches.length ? clampSearchHitIndex(rawIndex < 0 ? 0 : rawIndex, matches.length) : -1;
+  return {
+    terms: nextTerms,
+    matches,
+    activeIndex: nextIndex,
+    decorations: buildChannelDecorations(matches, nextIndex, channel.key)
+  };
+}
+
+function combineDecorations(doc, channels) {
+  const all = [];
+  for (const key of Object.keys(channels)) {
+    const ch = channels[key];
+    if (ch?.decorations?.length) all.push(...ch.decorations);
+  }
+  return all.length ? DecorationSet.create(doc, all) : DecorationSet.empty;
 }
 
 /**
  * Highlights the active Record Vault search terms inside the note body and
  * tracks a "current" hit so the user can step through matches (up/down). Every
- * match blinks red/yellow/green; the current one gets a distinct, faster blink.
+ * match blinks yellow with the current one blinking red — the vault-wide search
+ * and the in-note search bar use the same treatment on separate channels.
  */
 export const RecordVaultSearchHighlight = Extension.create({
   name: 'recordVaultSearchHighlight',
 
   addCommands() {
-    return {
-      setSearchHighlightTerms:
-        (terms) =>
-        ({ tr, dispatch }) => {
-          if (dispatch) {
-            dispatch(
-              tr.setMeta(recordVaultSearchHighlightKey, {
-                type: 'terms',
-                terms: normalizeTerms(terms)
-              })
-            );
-          }
-          return true;
-        },
-      setActiveSearchHit:
-        (index) =>
-        ({ tr, dispatch }) => {
-          if (dispatch) {
-            dispatch(
-              tr.setMeta(recordVaultSearchHighlightKey, { type: 'active', index })
-            );
-          }
-          return true;
+    const setTerms =
+      (channel) =>
+      (terms) =>
+      ({ tr, dispatch }) => {
+        if (dispatch) {
+          dispatch(
+            tr.setMeta(recordVaultSearchHighlightKey, {
+              type: 'terms',
+              channel,
+              terms: normalizeSearchTerms(terms)
+            })
+          );
         }
+        return true;
+      };
+
+    const setActive =
+      (channel) =>
+      (index) =>
+      ({ tr, dispatch }) => {
+        if (dispatch) {
+          dispatch(tr.setMeta(recordVaultSearchHighlightKey, { type: 'active', channel, index }));
+        }
+        return true;
+      };
+
+    const clear =
+      (channel) =>
+      () =>
+      ({ tr, dispatch }) => {
+        if (dispatch) {
+          dispatch(tr.setMeta(recordVaultSearchHighlightKey, { type: 'terms', channel, terms: [] }));
+        }
+        return true;
+      };
+
+    return {
+      /** Vault-wide search highlights (Found bar). */
+      setSearchHighlightTerms: setTerms(SEARCH_CHANNEL_GLOBAL),
+      setActiveSearchHit: setActive(SEARCH_CHANNEL_GLOBAL),
+      clearSearchHighlight: clear(SEARCH_CHANNEL_GLOBAL),
+      /** In-note ("current page only") search highlights. */
+      setNoteSearchHighlightTerms: setTerms(SEARCH_CHANNEL_NOTE),
+      setActiveNoteSearchHit: setActive(SEARCH_CHANNEL_NOTE),
+      clearNoteSearchHighlight: clear(SEARCH_CHANNEL_NOTE)
     };
   },
 
@@ -96,52 +182,41 @@ export const RecordVaultSearchHighlight = Extension.create({
         key: recordVaultSearchHighlightKey,
         state: {
           init: () => ({
-            terms: [],
-            matches: [],
-            activeIndex: -1,
+            channels: {
+              [SEARCH_CHANNEL_GLOBAL]: { ...emptyChannel(), key: SEARCH_CHANNEL_GLOBAL },
+              [SEARCH_CHANNEL_NOTE]: { ...emptyChannel(), key: SEARCH_CHANNEL_NOTE }
+            },
             decorations: DecorationSet.empty
           }),
           apply: (tr, value, _oldState, newState) => {
             const meta = tr.getMeta(recordVaultSearchHighlightKey);
+            if (!meta && !tr.docChanged) return value;
+
+            const key = meta?.channel === SEARCH_CHANNEL_NOTE ? SEARCH_CHANNEL_NOTE : SEARCH_CHANNEL_GLOBAL;
+            const current = value.channels[key] || { ...emptyChannel(), key };
+            const channels = { ...value.channels };
+
             if (meta?.type === 'terms') {
-              const matches = computeMatches(newState.doc, meta.terms);
-              const activeIndex = matches.length ? 0 : -1;
-              return {
-                terms: meta.terms,
-                matches,
-                activeIndex,
-                decorations: buildDecorationSet(newState.doc, matches, activeIndex)
-              };
+              channels[key] = rebuildChannel(newState.doc, current, { terms: meta.terms, activeIndex: 0 });
+            } else if (meta?.type === 'active') {
+              channels[key] = rebuildChannel(newState.doc, current, { activeIndex: meta.index });
+            } else if (tr.docChanged) {
+              // Live edits can add or remove matches — re-scan every active channel.
+              for (const chKey of Object.keys(channels)) {
+                const ch = channels[chKey];
+                if (!ch?.terms?.length) continue;
+                channels[chKey] = rebuildChannel(newState.doc, ch);
+              }
+            } else {
+              return value;
             }
-            if (meta?.type === 'active') {
-              const activeIndex = clampIndex(meta.index, value.matches.length);
-              return {
-                ...value,
-                activeIndex,
-                decorations: buildDecorationSet(newState.doc, value.matches, activeIndex)
-              };
-            }
-            if (tr.docChanged && value.terms.length) {
-              const matches = computeMatches(newState.doc, value.terms);
-              const activeIndex = clampIndex(
-                value.activeIndex < 0 ? 0 : value.activeIndex,
-                matches.length
-              );
-              return {
-                terms: value.terms,
-                matches,
-                activeIndex,
-                decorations: buildDecorationSet(newState.doc, matches, activeIndex)
-              };
-            }
-            return value;
+
+            return { channels, decorations: combineDecorations(newState.doc, channels) };
           }
         },
         props: {
           decorations(state) {
-            return (
-              recordVaultSearchHighlightKey.getState(state)?.decorations || DecorationSet.empty
-            );
+            return recordVaultSearchHighlightKey.getState(state)?.decorations || DecorationSet.empty;
           }
         }
       })

@@ -8,7 +8,8 @@ import Typography from '@mui/material/Typography';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_15,
-  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50
+  SLIDER_CONTROL_BUTTON_HOVER_SCALE_50,
+  SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
@@ -98,6 +99,7 @@ import {
 import RecordVaultNoteContentZoomBar, {
   NOTE_CONTENT_ZOOM_DEFAULT
 } from './RecordVaultNoteContentZoomBar';
+import RecordVaultImageRotateButton from './RecordVaultImageRotateButton';
 import VaultWorkspaceFocusToggleButton from 'ui-component/VaultWorkspaceFocusToggleButton';
 import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
 import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
@@ -199,6 +201,15 @@ import {
   isDefaultStyleRecordVaultNoteTitle,
   isLegacyShortRecordVaultNoteName
 } from 'utils/recordVaultNoteTitle';
+import {
+  RECORD_VAULT_NOTE_SORT_DEFAULT_INDEX,
+  loadStoredRecordVaultNoteSortIndex,
+  nextRecordVaultNoteSortIndex,
+  recordVaultNoteSortButtonLabel,
+  recordVaultNoteSortTitle,
+  sortRecordVaultNotes,
+  writeStoredRecordVaultNoteSortIndex
+} from './recordVaultNoteSort';
 
 const LAYOUT_LS_KEY = 'recordVaultMenuLayout_v2';
 const NOTE_FONT_STYLE_LS_KEY = 'recordVaultNoteFontStyle_v1';
@@ -460,6 +471,45 @@ const laneAddButtonWrapSx = {
   width: '100%'
 };
 
+/**
+ * Add Note header sort toggle — half-size yellow chip on the right of the
+ * Add Note button: "Create ↓" → "Create ↑" → "Date ↓" …
+ * Kept deliberately small so it never steals width from Add Note.
+ */
+const noteSortHeaderButtonSx = {
+  flex: '0 0 auto',
+  alignSelf: 'center',
+  width: 'max-content !important',
+  minWidth: 'max-content !important',
+  maxWidth: 'none !important',
+  height: '20px !important',
+  minHeight: '20px !important',
+  maxHeight: '20px !important',
+  whiteSpace: 'nowrap !important',
+  border: '2px solid #000000 !important',
+  borderRadius: 0.5,
+  bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
+  backgroundColor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
+  backgroundImage: 'none !important',
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  fontSize: '0.5rem !important',
+  lineHeight: 1,
+  px: 0.4,
+  py: 0,
+  '& .MuiButton-label': {
+    fontSize: '0.5rem !important',
+    fontWeight: 900,
+    lineHeight: 1,
+    whiteSpace: 'nowrap'
+  },
+  '&.Mui-disabled': {
+    bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
+    opacity: 0.45,
+    cursor: 'default'
+  }
+};
+
 const menuButtonWordPerLineLabelSx = {
   display: 'flex',
   flexDirection: 'column',
@@ -540,7 +590,7 @@ function recordVaultAiButtonBlueSx(bg, hoverBg) {
  * plain text when there is nothing to highlight, or an array of React nodes with
  * matches wrapped in a blinking <mark>.
  */
-function renderTitleWithSearchHighlight(title, terms) {
+function renderTitleWithSearchHighlight(title, terms, hitClassName = 'rv-search-hit') {
   const text = String(title ?? '');
   if (!text) return text;
   const escaped = (Array.isArray(terms) ? terms : [])
@@ -554,7 +604,7 @@ function renderTitleWithSearchHighlight(title, terms) {
   return parts.map((part, i) =>
     i % 2 === 1 ? (
       // eslint-disable-next-line react/no-array-index-key
-      <mark key={i} className="rv-search-hit">
+      <mark key={i} className={hitClassName}>
         {part}
       </mark>
     ) : (
@@ -1806,6 +1856,12 @@ export default function RecordVaultWorkspacePane({
   const [searchResults, setSearchResults] = useState(null);
   /** Terms from the last Search press — highlights/Found bar ignore typing until then. */
   const [appliedSearchTerms, setAppliedSearchTerms] = useState([]);
+  /** In-note search box (note title row) — searches only the open note's body. */
+  const [noteSearchTerm, setNoteSearchTerm] = useState('');
+  const [noteSearchTerms, setNoteSearchTerms] = useState([]);
+  const [noteSearchHitCount, setNoteSearchHitCount] = useState(0);
+  const [noteSearchActiveHitIndex, setNoteSearchActiveHitIndex] = useState(-1);
+  const [noteSearchSearched, setNoteSearchSearched] = useState(false);
   const [searchMessage, setSearchMessage] = useState('');
   const [searchBusy, setSearchBusy] = useState(false);
   /** Bumps when local recent-note activity changes (see recordVaultRecentNotes.js). */
@@ -1862,7 +1918,13 @@ export default function RecordVaultWorkspacePane({
   const [noteLaneFileDragActive, setNoteLaneFileDragActive] = useState(false);
   /** Bumped when the TipTap instance is created, so hydration effects can run. */
   const [editorReadyTick, setEditorReadyTick] = useState(0);
-  const handleEditorReady = useCallback(() => setEditorReadyTick((t) => t + 1), []);
+  const handleEditorReady = useCallback((editor) => {
+    setNoteEditor(editor ?? null);
+    setEditorReadyTick((t) => t + 1);
+  }, []);
+
+  /** TipTap instance exposed by the note editor (image rotate button reads its selection). */
+  const [noteEditor, setNoteEditor] = useState(null);
   /** Tracks which note/lock-state the editor currently displays (avoids re-clobbering edits). */
   const editorHydratedRef = useRef({ key: '' });
   /**
@@ -1929,6 +1991,8 @@ export default function RecordVaultWorkspacePane({
   const [dropTargetNoteId, setDropTargetNoteId] = useState(null);
   const [draggingShortcutId, setDraggingShortcutId] = useState(null);
   const [dropTargetShortcutId, setDropTargetShortcutId] = useState(null);
+  /** Add Note header button — 6-step order cycle (Create ↓ / ↑, Date ↓ / ↑, Name ↓ / ↑). */
+  const [noteSortIndex, setNoteSortIndex] = useState(() => loadStoredRecordVaultNoteSortIndex());
   const refreshVaultUsageRef = useRef(() => {});
   const bumpVaultUsageTimerRef = useRef(null);
   const saveTimerRef = useRef(null);
@@ -2098,6 +2162,22 @@ export default function RecordVaultWorkspacePane({
 
   // Terms to highlight inside the open note — from the last Search press only.
   const activeSearchTerms = appliedSearchTerms;
+
+  // In-note search terms (note-header Search box) — title highlight uses these
+  // separately so the two searches can run at the same time.
+  const noteSearchActiveTerms = noteSearchTerms;
+  const titleHighlightTerms = useMemo(
+    () => Array.from(new Set([...activeSearchTerms, ...noteSearchActiveTerms])),
+    [activeSearchTerms, noteSearchActiveTerms]
+  );
+  const titleHasHighlight =
+    !titleEditing &&
+    titleMatchesSearchTerms(openNoteTitlePlain, titleHighlightTerms) &&
+    (searchActive || noteSearchActiveTerms.length > 0);
+  // Blink the title with the in-note color when only the in-note box is active,
+  // and with the vault-search color when the vault-wide search is running.
+  const titleHighlightClass =
+    !searchActive && noteSearchActiveTerms.length > 0 ? 'rv-note-search-hit' : 'rv-search-hit';
 
   // Search never prunes the tree: every notebook (and every note) stays visible on
   // the left. A match is shown by selection styling — containing notebook stays green
@@ -3019,6 +3099,75 @@ export default function RecordVaultWorkspacePane({
     setSearchMessage('');
   }, []);
 
+  /**
+   * In-note search — scoped to the note currently open in the editor ("this
+   * page only"). No backend call: the body is already in the editor, so the
+   * match scan happens locally and only paints blinking highlights.
+   */
+  const runNoteSearch = useCallback(() => {
+    const term = noteSearchTerm.trim();
+    setNoteSearchSearched(Boolean(term));
+    if (!term) {
+      setNoteSearchTerms([]);
+      setNoteSearchHitCount(0);
+      setNoteSearchActiveHitIndex(-1);
+      noteEditorApiRef.current?.clearNoteSearchHighlight?.();
+      return;
+    }
+    setNoteSearchTerms([term]);
+    const count = noteEditorApiRef.current?.applyNoteSearchHighlight?.([term]) || 0;
+    setNoteSearchHitCount(count);
+    setNoteSearchActiveHitIndex(count > 0 ? 0 : -1);
+  }, [noteSearchTerm]);
+
+  const handleClearNoteSearch = useCallback(() => {
+    setNoteSearchTerm('');
+    setNoteSearchTerms([]);
+    setNoteSearchHitCount(0);
+    setNoteSearchActiveHitIndex(-1);
+    setNoteSearchSearched(false);
+    noteEditorApiRef.current?.clearNoteSearchHighlight?.();
+  }, []);
+
+  /** Up/Down inside the note header Search box — step through local matches. */
+  const goToNoteSearchHit = useCallback(
+    (delta) => {
+      const api = noteEditorApiRef.current;
+      if (!api?.setActiveNoteSearchHit || noteSearchHitCount <= 0) return;
+      const base = noteSearchActiveHitIndex < 0 ? 0 : noteSearchActiveHitIndex;
+      const next = Math.max(0, Math.min(noteSearchHitCount - 1, base + delta));
+      if (next === noteSearchActiveHitIndex) return;
+      setNoteSearchActiveHitIndex(next);
+      api.setActiveNoteSearchHit(next);
+    },
+    [noteSearchHitCount, noteSearchActiveHitIndex]
+  );
+
+  // Re-paint the in-note highlights when the editor (re)hydrates and a search is
+  // still running — normally the highlight plugin keeps its terms across content
+  // swaps on its own, this covers a fresh editor instance / PIN unlock.
+  useEffect(() => {
+    if (!editorReadyTick) return;
+    const api = noteEditorApiRef.current;
+    if (!api?.applyNoteSearchHighlight) return;
+    if (!noteSearchTerms.length) return;
+    const count = api.applyNoteSearchHighlight(noteSearchTerms) || 0;
+    setNoteSearchHitCount(count);
+    setNoteSearchActiveHitIndex(count > 0 ? 0 : -1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorReadyTick, innerUnlockVersion]);
+
+  // A different note is a different "page": start with a clean search box and
+  // drop the previous note's local highlights.
+  useEffect(() => {
+    setNoteSearchTerm('');
+    setNoteSearchTerms([]);
+    setNoteSearchHitCount(0);
+    setNoteSearchActiveHitIndex(-1);
+    setNoteSearchSearched(false);
+    noteEditorApiRef.current?.clearNoteSearchHighlight?.();
+  }, [selectedNoteId]);
+
   useEffect(() => {
     let cancelled = false;
     void fetchUserCustomization()
@@ -3363,7 +3512,7 @@ export default function RecordVaultWorkspacePane({
   // changes or a new search begins, so title matches are visible immediately.
   useEffect(() => {
     setTitleEditing(false);
-  }, [selectedNoteId, searchActive]);
+  }, [selectedNoteId, searchActive, noteSearchActiveTerms.length]);
 
   useEffect(() => {
     const noteId = Number(selectedNoteId);
@@ -6339,6 +6488,15 @@ export default function RecordVaultWorkspacePane({
     setCreateItemDialog('note');
   };
 
+  /** Add Note header toggle — one click per order, the 6th wraps back to Create ↓. */
+  const handleCycleNoteSort = useCallback(() => {
+    setNoteSortIndex((current) => {
+      const next = nextRecordVaultNoteSortIndex(current);
+      writeStoredRecordVaultNoteSortIndex(next);
+      return next;
+    });
+  }, []);
+
   const confirmCreateNotebook = async (rawName) => {
     const desiredName = String(rawName || '').trim().toUpperCase();
     if (!desiredName) return;
@@ -6565,6 +6723,20 @@ export default function RecordVaultWorkspacePane({
       selectedNotebook;
     return nb?.notes || [];
   }, [billScheduleNotebook, displayNotebooks, selectedNotebookId, selectedNotebook]);
+
+  /**
+   * Rows painted in the Add Note column. `notes` stays in the stored vault order
+   * (that is what drag-reorder persists); the sort cycle only changes what is drawn,
+   * and step 0 (Create ↓) draws the stored order untouched.
+   */
+  const sortedNotes = useMemo(
+    () => sortRecordVaultNotes(notes, noteSortIndex),
+    [notes, noteSortIndex]
+  );
+  const noteSortLabel = recordVaultNoteSortButtonLabel(noteSortIndex);
+  const noteSortHoverTitle = recordVaultNoteSortTitle(noteSortIndex);
+  /** Default step keeps the stored (created / drag-arranged) order — drag-reorder only makes sense there. */
+  const noteSortActive = noteSortIndex !== RECORD_VAULT_NOTE_SORT_DEFAULT_INDEX;
 
   const searchResultTabs = useMemo(() => {
     if (!searchActive || !Array.isArray(searchResults)) return [];
@@ -7597,6 +7769,7 @@ export default function RecordVaultWorkspacePane({
             </Box>
             {!compareMode ? (
             <RecordVaultSearchBar
+              searchLabel="Search All"
               term1={searchTerm1}
               onTerm1Change={setSearchTerm1}
               onSubmit={() => void runSearch()}
@@ -8127,22 +8300,50 @@ export default function RecordVaultWorkspacePane({
                     onDragLeave={handleNoteListFileDragLeave}
                     onDrop={(e) => void handleNoteListFileDrop(e)}
                   >
-                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'stretch',
+                        gap: 0.5,
+                        flexShrink: 0,
+                        mb: 1,
+                        overflow: 'visible',
+                        width: '100%'
+                      }}
+                    >
+                      <Box
+                        data-menu-label-slot=""
+                        sx={{ ...laneAddButtonWrapSx, flex: '1 1 auto', width: 'auto', mb: 0, minWidth: 0 }}
+                      >
+                        <SliderControlButton
+                          type="button"
+                          fullWidth
+                          onClick={handleAddNote}
+                          disabled={
+                            busy ||
+                            !selectedNotebookId ||
+                            notebookGateLocked ||
+                            isBillScheduleNotebookId(selectedNotebookId)
+                          }
+                          hoverScale={1.25}
+                          singleLineLabel
+                          sx={laneContainedButtonOneLineSx}
+                        >
+                          Add Note
+                        </SliderControlButton>
+                      </Box>
+                      {/* 6-step order cycle: Create ↓ / ↑ → Date ↓ / ↑ → Name ↓ / ↑ → back. */}
                       <SliderControlButton
                         type="button"
-                        fullWidth
-                        onClick={handleAddNote}
-                        disabled={
-                          busy ||
-                          !selectedNotebookId ||
-                          notebookGateLocked ||
-                          isBillScheduleNotebookId(selectedNotebookId)
-                        }
+                        onClick={handleCycleNoteSort}
+                        disabled={busy}
                         hoverScale={1.25}
                         singleLineLabel
-                        sx={laneContainedButtonOneLineSx}
+                        aria-label={`Sort notes — ${noteSortHoverTitle}`}
+                        title={noteSortHoverTitle}
+                        sx={noteSortHeaderButtonSx}
                       >
-                        Add Note
+                        {noteSortLabel}
                       </SliderControlButton>
                     </Box>
                     <Box
@@ -8153,8 +8354,9 @@ export default function RecordVaultWorkspacePane({
                       }}
                     >
                       {/* Encrypted notebook: do not reveal any note names until unlocked.
-                          Bill Schedule Monthly/Yearly live in the separate bottom box — never here. */}
-                      {(notebookGateLocked ? [] : notes)
+                          Bill Schedule Monthly/Yearly live in the separate bottom box — never here.
+                          `sortedNotes` is the same rows in the order picked by the Date/Name toggle. */}
+                      {(notebookGateLocked ? [] : sortedNotes)
                         .filter((note) => !isBillScheduleSystemId(note.note_id))
                         .map((note) => {
                         const isSystemNote = Boolean(note.is_system || isBillScheduleSystemId(note.note_id));
@@ -8263,15 +8465,27 @@ export default function RecordVaultWorkspacePane({
                           dragTitle={
                             crossPaneDropActive
                               ? 'Drop here to copy or move from the other vault'
-                              : multiSelectedNoteIds.length > 1
-                                ? `Shift-selected: ${multiSelectedNoteIds.length} notes — drag to Finder, then Choose folder for separate HTML files`
-                                : 'Shift+click to multi-select; drag to Finder to export HTML; drop on a notebook to move'
+                              : noteSortActive
+                                ? 'Sorted view — clear the sort (click until “Create ↓”) to drag-reorder notes'
+                                : multiSelectedNoteIds.length > 1
+                                  ? `Shift-selected: ${multiSelectedNoteIds.length} notes — drag to Finder, then Choose folder for separate HTML files`
+                                  : 'Shift+click to multi-select; drag to Finder to export HTML; drop on a notebook to move'
                           }
                           onDragStart={handleDragStart}
                           onDragEnd={handleDragEnd}
                           onPrefetchDrag={prefetchNoteHtmlExport}
                           onDragOver={setDropTargetNoteId}
                           onDrop={(e, toId, mime) => {
+                            if (noteSortActive) {
+                              // Sorted view: rows are not in the stored order, so a
+                              // reorder would persist a meaningless sequence. Cross-pane
+                              // copy/move transfers still work.
+                              if (tryHandleForeignCrossPaneDrop(e, { targetNotebookId: selectedNotebookId })) {
+                                return;
+                              }
+                              handleDragEnd();
+                              return;
+                            }
                             void handleDropReorder(
                               e,
                               toId,
@@ -8404,9 +8618,12 @@ export default function RecordVaultWorkspacePane({
                       header={
                         selectedNote && !lockedNow ? (
                           <Box
+                            data-rv-note-title-row
                             sx={{
                               display: 'flex',
                               alignItems: 'center',
+                              flexWrap: 'wrap',
+                              rowGap: 0.75,
                               gap: 1,
                               mx: 1,
                               mb: 0.5,
@@ -8430,9 +8647,7 @@ export default function RecordVaultWorkspacePane({
                             >
                               Title:
                             </Box>
-                            {searchActive &&
-                            !titleEditing &&
-                            titleMatchesSearchTerms(openNoteTitlePlain, activeSearchTerms) ? (
+                            {titleHasHighlight ? (
                               <Box
                                 role="textbox"
                                 tabIndex={0}
@@ -8459,7 +8674,11 @@ export default function RecordVaultWorkspacePane({
                                   textOverflow: 'ellipsis'
                                 }}
                               >
-                                {renderTitleWithSearchHighlight(openNoteTitlePlain, activeSearchTerms)}
+                                {renderTitleWithSearchHighlight(
+                                  openNoteTitlePlain,
+                                  titleHighlightTerms,
+                                  titleHighlightClass
+                                )}
                               </Box>
                             ) : (
                               <TextField
@@ -8504,6 +8723,22 @@ export default function RecordVaultWorkspacePane({
                                 }}
                               />
                             )}
+                            <RecordVaultImageRotateButton editor={noteEditor} />
+                            <RecordVaultSearchBar
+                              compact
+                              searchLabel="Search Here"
+                              term1={noteSearchTerm}
+                              onTerm1Change={setNoteSearchTerm}
+                              onSubmit={runNoteSearch}
+                              onClear={handleClearNoteSearch}
+                              clearDisabled={!noteSearchTerm.trim() && noteSearchHitCount === 0}
+                              hitCount={noteSearchHitCount}
+                              searched={noteSearchSearched}
+                              activeHitIndex={noteSearchActiveHitIndex}
+                              onPrevHit={() => goToNoteSearchHit(-1)}
+                              onNextHit={() => goToNoteSearchHit(1)}
+                              sx={{ ml: 0.5 }}
+                            />
                             <RecordVaultNoteContentZoomBar
                               value={noteContentZoom}
                               onChange={setNoteContentZoom}
@@ -8511,6 +8746,8 @@ export default function RecordVaultWorkspacePane({
                             <VaultWorkspaceFocusToggleButton
                               active={noteFocusView}
                               onToggle={() => setNoteFocusView((v) => !v)}
+                              // Note-title expand glyph at 2× so it is easy to hit next to the title.
+                              iconSize={64}
                             />
                           </Box>
                         ) : null

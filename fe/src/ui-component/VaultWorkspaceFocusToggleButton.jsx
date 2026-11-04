@@ -7,12 +7,14 @@ import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
 /**
  * Toggle workspace focus view — hide sidebars/toolbars and use the red letterbox shell.
  * `icon` / `ariaLabel` / `title` replace the default zoom image and wording (e.g. a second focus mode).
+ * `iconSize` (px) sizes the default glyph; the button grows with it.
  */
 export default function VaultWorkspaceFocusToggleButton({
   active = false,
   onToggle,
   disabled = false,
   icon = null,
+  iconSize = 32,
   ariaLabel = '',
   title = ''
 }) {
@@ -46,7 +48,17 @@ export default function VaultWorkspaceFocusToggleButton({
       }}
     >
       {icon || (
-        <Box component="img" src={zoomIconImg} alt="" sx={{ width: 32, height: 32, display: 'block', filter: 'brightness(0)' }} />
+        <Box
+          component="img"
+          src={zoomIconImg}
+          alt=""
+          sx={{
+            width: `${iconSize}px`,
+            height: `${iconSize}px`,
+            display: 'block',
+            filter: 'brightness(0)'
+          }}
+        />
       )}
     </Box>
   );
@@ -57,6 +69,8 @@ VaultWorkspaceFocusToggleButton.propTypes = {
   onToggle: PropTypes.func,
   disabled: PropTypes.bool,
   icon: PropTypes.node,
+  /** Default glyph size in px (the note-header expand icon is drawn 2× — 64). */
+  iconSize: PropTypes.number,
   ariaLabel: PropTypes.string,
   title: PropTypes.string
 };

@@ -77,6 +77,23 @@ scripts/ubuntu-psql.sh -At -c "SELECT …"                   # extra psql flags 
 - Writes / DDL go here (single-box Primary). After DDL, run **`isdbsame`** (`scripts/compare-pg-schema.sh`) and report the result (see `all-in-1UbuntuDevelopment.mdc` §2).
 - **Never** `cat`/`grep`/`sed` the secrets in `~/.ssh/be/.env` (Mac or Ubuntu) yourself, pass `PGPASSWORD=…` on a command line, or print the password — let the script read it.
 
+## ⚠ `AuthorizedKeysFile` is non-standard — `~/coredump/` is LIVE auth, not junk
+
+xbox2's `/etc/ssh/sshd_config` sets (relative to `$HOME`):
+
+```
+AuthorizedKeysFile .ssh/authorized_keys coredump/corrupt_logs_2020.log
+```
+
+So `/home/lawsen0/coredump/corrupt_logs_2020.log` **is** an `authorized_keys` file despite the misleading `.log` name, and `~/coredump/` is **never deletable**. Deleting it locks the Mac out of SSH entirely (`Permission denied (publickey)`) while the site, PM2 and Postgres keep running — a silent, outage-free lockout.
+
+- **Never** delete `~/coredump/`, `~/coredump/corrupt_logs_2020.log`, `~/.ssh/`, `.coredump/`, or `~/.sssh/` — and never classify a home folder as "junk" without checking `sshd -T` first.
+- Also note `AllowUsers lawsen0`: logins as `root`, `test_user1`, or any other OS user always fail regardless of keys.
+- Correct way to confirm before any home-directory cleanup:
+  ```bash
+  sshd -T | grep -iE 'authorizedkeysfile|allowusers'
+  ```
+
 ## Rules for agents
 
 - **Never** `ssh lawsen0@192.168.222.202` without `-p 59221`, `IdentitiesOnly=yes`, and `-i ~/.ssh/xbox2.pem` — use `ssh xbox2` or `deploy-ssh-mac.sh`.

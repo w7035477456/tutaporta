@@ -9,6 +9,10 @@ import {
   buildRecordVaultEditorExtensions
 } from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
+import {
+  NOTE_SEARCH_ACTIVE_ATTR,
+  NOTE_SEARCH_HIT_CLASS
+} from './recordVaultSearchHighlight';
 import { scoreRecordVaultLabelForAttachment } from 'utils/recordVaultRichText';
 import { themedAlert } from 'utils/themedDialog';
 import {
@@ -60,10 +64,12 @@ function prepareEditorHtml(html) {
 }
 
 /** Scroll the currently active (bold-blinking) search hit into the middle of view. */
-function scrollActiveHitIntoView(editor) {
+function scrollActiveHitIntoView(
+  editor,
+  { activeSelector = '[data-rv-search-active="true"]', hitSelector = '.rv-search-hit' } = {}
+) {
   const dom = editor?.view?.dom;
-  const active =
-    dom?.querySelector('[data-rv-search-active="true"]') || dom?.querySelector('.rv-search-hit');
+  const active = dom?.querySelector(activeSelector) || dom?.querySelector(hitSelector);
   if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
@@ -218,7 +224,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
   // Signal the parent once the TipTap instance exists so it can hydrate content
   // via the imperative ref (which is set during commit, before this effect runs).
   useEffect(() => {
-    if (editor) onReadyRef.current?.();
+    if (editor) onReadyRef.current?.(editor);
   }, [editor]);
 
   // Report the editor's natural height (chrome + full text content) so the parent
@@ -248,6 +254,8 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
     ref,
     () => ({
       getHTML: () => editor?.getHTML() ?? '',
+      /** The raw TipTap instance (e.g. for the note-header image rotate button). */
+      getEditor: () => editor ?? null,
       /** Serialize the current note body to Markdown (tiptap-markdown). */
       getMarkdown: () => editor?.storage.markdown?.getMarkdown() ?? '',
       isEmpty: () => editor?.isEmpty ?? true,
@@ -411,6 +419,45 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         if (!editor) return;
         editor.commands.setActiveSearchHit(index);
         requestAnimationFrame(() => scrollActiveHitIntoView(editor));
+      },
+      /**
+       * In-note ("this page only") search: same blinking treatment as the vault
+       * search, but on its own highlight channel so both can run at once.
+       * Returns the match count inside the open note.
+       */
+      applyNoteSearchHighlight: (terms) => {
+        if (!editor) return 0;
+        editor.commands.setNoteSearchHighlightTerms(Array.isArray(terms) ? terms : []);
+        const count = editor.view?.dom.querySelectorAll(`.${NOTE_SEARCH_HIT_CLASS}`).length ?? 0;
+        if (count > 0) {
+          editor.commands.setActiveNoteSearchHit(0);
+          requestAnimationFrame(() =>
+            scrollActiveHitIntoView(editor, {
+              activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
+              hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`
+            })
+          );
+        }
+        return count;
+      },
+      /** Number of in-note search matches highlighted in the open note. */
+      getNoteSearchHitCount: () =>
+        editor?.view?.dom.querySelectorAll(`.${NOTE_SEARCH_HIT_CLASS}`).length ?? 0,
+      /** Make the given in-note match the "current" hit and scroll it into view. */
+      setActiveNoteSearchHit: (index) => {
+        if (!editor) return;
+        editor.commands.setActiveNoteSearchHit(index);
+        requestAnimationFrame(() =>
+          scrollActiveHitIntoView(editor, {
+            activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
+            hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`
+          })
+        );
+      },
+      /** Drop every in-note search highlight (Clear button). */
+      clearNoteSearchHighlight: () => {
+        if (!editor) return;
+        editor.commands.clearNoteSearchHighlight();
       }
     }),
     [editor]

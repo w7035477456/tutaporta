@@ -27,6 +27,14 @@ import {
 } from 'api/recordVaultFe';
 import { trimSolidImageBorder } from 'utils/trimSolidImageBorder';
 import { openRecordVaultAttachmentInNewWindow } from './openRecordVaultAttachmentWindow';
+import RecordVaultRotateFrame from './RecordVaultRotateFrame';
+import {
+  IMAGE_ROTATION_STEP,
+  isRotatableAttachmentExtension,
+  normalizeImageRotation,
+  parseElementRotation,
+  rotationToHtmlAttributes
+} from './recordVaultImageRotation';
 
 export const RECORD_VAULT_ATTACHMENT_NODE_NAME = 'recordVaultAttachment';
 
@@ -115,7 +123,7 @@ function blobWithMime(blob, mime) {
  * page; other types keep the yellow bar with Launch/View + Download + Remove.
  * Runtime context is read from editor storage.
  */
-function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
+function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttributes }) {
   const attachmentId = Number(node?.attrs?.attachmentId);
   const attachment = {
     attachment_id: attachmentId,
@@ -468,6 +476,23 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
       >
         {downloading ? 'Downloading…' : 'Download'}
       </SliderControlButton>
+      {editable && viewKind === 'image' && isRotatableAttachmentExtension(ext) ? (
+        <SliderControlButton
+          type="button"
+          onClick={() =>
+            updateAttributes?.({
+              rotation: normalizeImageRotation(
+                normalizeImageRotation(node?.attrs?.rotation) + IMAGE_ROTATION_STEP
+              )
+            })
+          }
+          title="Rotate 90° clockwise"
+          aria-label={`Rotate ${label} 90 degrees`}
+          sx={{ minWidth: 0, px: 1, py: 0.35, fontSize: '0.85em !important' }}
+        >
+          ↻
+        </SliderControlButton>
+      ) : null}
       {editable ? (
         <SliderControlButton
           type="button"
@@ -537,18 +562,15 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode }) {
               />
             ) : null}
             {previewUrl && viewKind === 'image' ? (
-              <Box
-                component="img"
+              <RecordVaultRotateFrame
                 src={previewUrl}
                 alt={label}
-                sx={{
-                  width: '100%',
+                rotation={normalizeImageRotation(node?.attrs?.rotation)}
+                imgSx={{
                   maxHeight: { xs: '55vh', sm: '70vh' },
-                  objectFit: 'contain',
-                  objectPosition: 'center',
-                  display: 'block',
                   bgcolor: '#111'
                 }}
+                frameSx={{ bgcolor: '#111', overflow: 'hidden' }}
               />
             ) : null}
             {showInlineVideoFrame && videoFrameUrl ? (
@@ -670,6 +692,12 @@ export const RecordVaultAttachmentNode = Node.create({
           return Number.isFinite(n) ? n : null;
         },
         renderHTML: (attrs) => attrToData(attrs.fileSizeBytes, 'data-file-size')
+      },
+      /** 0/90/180/270 — turn a sideways scan upright in the note. */
+      rotation: {
+        default: 0,
+        parseHTML: (el) => parseElementRotation(el),
+        renderHTML: (attrs) => rotationToHtmlAttributes(attrs.rotation)
       }
     };
   },

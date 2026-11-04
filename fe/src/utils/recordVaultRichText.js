@@ -37,8 +37,24 @@ const ATTACHMENT_DIV_ATTRS = new Set([
   'data-attachment-id',
   'data-file-name',
   'data-file-extension',
-  'data-file-size'
+  'data-file-size',
+  'data-rotation'
 ]);
+
+/**
+ * Rotation for an element: `data-rotation` first, then a `rotate(Ndeg)` in the
+ * inline style. Mirrors `views/dashboard/recordVault/recordVaultImageRotation.js`
+ * — kept local so this plain util has no UI-layer imports.
+ */
+function parseRotationAttribute(element) {
+  if (!element?.getAttribute) return 0;
+  const raw =
+    element.getAttribute('data-rotation') ||
+    /rotate\(\s*(-?\d+(?:\.\d+)?)deg\s*\)/i.exec(element.getAttribute('style') || '')?.[1];
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return (((Math.round(n / 90) * 90) % 360) + 360) % 360;
+}
 
 const ALLOWED_SPAN_STYLE_PROPS = new Set([
   'color',
@@ -314,10 +330,19 @@ export function sanitizeRecordVaultHtml(html) {
       if (tag === 'div') {
         // TipTap vault file attachment atoms — keep metadata attrs for reload.
         if (child.hasAttribute('data-rv-attachment')) {
+          const rotation = parseRotationAttribute(child);
           for (const attr of Array.from(child.attributes)) {
             if (!ATTACHMENT_DIV_ATTRS.has(attr.name)) child.removeAttribute(attr.name);
           }
           child.setAttribute('data-rv-attachment', '');
+          // Rotation survives reload as data-rotation + a rotate() transform only.
+          if (rotation) {
+            child.setAttribute('data-rotation', String(rotation));
+            child.setAttribute('style', `transform: rotate(${rotation}deg);`);
+          } else {
+            child.removeAttribute('data-rotation');
+            child.removeAttribute('style');
+          }
           continue;
         }
         walk(child);
@@ -398,14 +423,21 @@ export function sanitizeRecordVaultHtml(html) {
         const alt = String(child.getAttribute('alt') ?? '').slice(0, 500);
         if (alt) child.setAttribute('alt', alt);
         else child.removeAttribute('alt');
+        // Rotation (0/90/180/270) is stored as data-rotation + a rotate() transform.
+        const rotation = parseRotationAttribute(child);
         const width = parseInt(child.getAttribute('width') || child.style?.width || '', 10);
         child.removeAttribute('style');
         if (Number.isFinite(width) && width > 0) {
           child.setAttribute('width', String(width));
-          child.setAttribute('style', `width: ${width}px; height: auto;`);
         } else {
           child.removeAttribute('width');
         }
+        const styleParts = [];
+        if (Number.isFinite(width) && width > 0) styleParts.push(`width: ${width}px`, 'height: auto');
+        if (rotation) styleParts.push(`transform: rotate(${rotation}deg)`);
+        if (styleParts.length) child.setAttribute('style', `${styleParts.join('; ')};`);
+        if (rotation) child.setAttribute('data-rotation', String(rotation));
+        else child.removeAttribute('data-rotation');
         continue;
       }
 

@@ -8,6 +8,36 @@
   color: var(--theme-inverse-daynight-color);
   border-radius: 6px;
   overflow: hidden;
+  /* Selected picture: 5× the old 2px ring, blinking between red and blue. */
+  --rv-image-selected-width: 10px;
+  --rv-image-selected-red: #e60000;
+  --rv-image-selected-blue: #1e88e5;
+}
+
+/* Selected image ring — red ⇄ blue, stepping (not fading) so it reads as a blink. */
+@keyframes rvImageSelectedBlink {
+  0%,
+  49.99% {
+    outline-color: var(--rv-image-selected-red, #e60000);
+  }
+  50%,
+  100% {
+    outline-color: var(--rv-image-selected-blue, #1e88e5);
+  }
+}
+
+/* Corner resize handles follow the same red ⇄ blue blink. */
+@keyframes rvImageSelectedBlinkHandles {
+  0%,
+  49.99% {
+    background-color: var(--rv-image-selected-red, #e60000);
+    box-shadow: 0 0 0 2px rgba(230, 0, 0, 0.35);
+  }
+  50%,
+  100% {
+    background-color: var(--rv-image-selected-blue, #1e88e5);
+    box-shadow: 0 0 0 2px rgba(30, 136, 229, 0.35);
+  }
 }
 
 /* ---------- Toolbar ---------- */
@@ -214,7 +244,9 @@
       border-radius: 4px;
 
       &.ProseMirror-selectednode {
-        outline: 2px solid #2f6fed;
+        outline: var(--rv-image-selected-width) solid var(--rv-image-selected-red);
+        outline-offset: 0;
+        animation: rvImageSelectedBlink 0.8s steps(1, end) infinite;
       }
     }
 
@@ -224,8 +256,10 @@
       margin: 6px 0;
 
       &.ProseMirror-selectednode > * {
-        outline: 2px solid #2f6fed;
+        outline: var(--rv-image-selected-width) solid var(--rv-image-selected-red);
+        outline-offset: 0;
         border-radius: 4px;
+        animation: rvImageSelectedBlink 0.8s steps(1, end) infinite;
       }
     }
 
@@ -236,25 +270,51 @@
       max-width: 100%;
       line-height: 0;
 
-      img {
-        display: block;
+      &__frame {
+        position: relative;
+        display: inline-block;
         max-width: 100%;
-        height: auto;
+        line-height: 0;
+        vertical-align: top;
+
+        img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+        }
+
+        /* Turned picture: the frame is the swapped footprint and the image is
+           centered inside it, so a sideways scan stays within the note column. */
+        &.is-turned {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+
+          img {
+            flex: 0 0 auto;
+            max-width: none;
+            max-height: none;
+          }
+        }
       }
 
       &.is-selected img {
-        outline: 2px solid #2f6fed;
+        outline: var(--rv-image-selected-width) solid var(--rv-image-selected-red);
+        outline-offset: 0;
+        animation: rvImageSelectedBlink 0.8s steps(1, end) infinite;
       }
 
       &__handle {
         position: absolute;
         width: 12px;
         height: 12px;
-        background: #2f6fed;
+        background: var(--rv-image-selected-red);
         border: 2px solid #fff;
         border-radius: 50%;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
         z-index: 2;
+        animation: rvImageSelectedBlinkHandles 0.8s steps(1, end) infinite;
 
         &--tl {
           top: -6px;
@@ -450,6 +510,28 @@
     background-color: #ffe100;
     box-shadow: 0 0 0 2px rgba(255, 225, 0, 0.6), 0 0 8px rgba(255, 225, 0, 0.75);
   }
+}
+
+/* ---------- In-note ("current page only") search hit highlight ---------- */
+/* Same yellow / red blink as the vault search, but a separate class so the
+   header Search box can highlight inside the open note without disturbing the
+   vault-wide hits. */
+.rv-editor .rv-note-search-hit {
+  border-radius: 3px;
+  padding: 0 1px;
+  font-weight: 700;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  animation: rvSearchHitBlinkYellow 0.9s steps(1, end) infinite;
+}
+
+.rv-editor .rv-note-search-hit--active {
+  font-weight: 900;
+  outline: 2px solid #000;
+  outline-offset: 1px;
+  border-radius: 2px;
+  animation-name: rvSearchHitBlinkRed;
+  animation-duration: 0.5s;
 }
 
 /* ---------- Footer ---------- */
