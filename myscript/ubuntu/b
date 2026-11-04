@@ -266,6 +266,38 @@ showsize() {
     sudo du -ah "${BASE_STORAGE}/tutamallStorageFolder_outdatedOct2021/videos" | sort -h | tail -30
 }
 
+# duscan [folder] [level] — folder defaults to /home, level defaults to 2
+# e.g. duscan            -> prompts: folder [/home], level [2]
+#      duscan /var 1     -> no prompts
+duscan() {
+    local dir="${1:-}" level="${2:-}"
+
+    if [[ -z "$dir" ]]; then
+        read -erp "Folder to scan [/home]: " dir
+        dir="${dir:-/home}"
+    fi
+    if [[ -z "$level" ]]; then
+        read -rp "Depth level [2]: " level
+        level="${level:-2}"
+    fi
+
+    dir="${dir/#\~/$HOME}"                      # expand a leading ~ (read does not)
+    if [[ "$dir" != "/" ]]; then dir="${dir%/}"; fi
+    if [[ -z "$dir" ]]; then dir="/"; fi
+
+    if [[ ! -d "$dir" ]]; then
+        echo "duscan: not a directory: $dir" >&2
+        return 1
+    fi
+    if ! [[ "$level" =~ ^[0-9]+$ ]]; then
+        echo "duscan: level must be a non-negative number (got: $level)" >&2
+        return 1
+    fi
+
+    echo "Scanning $dir (depth $level) ..." >&2
+    sudo du -h --max-depth="$level" "$dir" 2>/dev/null | sort -h
+}
+
 #------ barcode upload ------
 alias fixstoragemobileuploadMac='$HOME/code/main/scripts/fix-media-storage.sh'
 alias checkstoragemobileuploadMac='$HOME/code/main/scripts/verify-media-storage.sh'
@@ -775,14 +807,15 @@ alias cleanupdump='sudo rm -rf ~/backups/restore-ubuntu-*;sudo rm -rf ~/backups/
 alias restorenightly='clear; sudo ~/backups/scripts/restore-latest.sh ~/backups/.backup-secrets-ubuntu.env'
 alias testnightly='clear;/home/lawsen0/backups/scripts/restore-into-test-db.sh'
 alias droptestnightly='source ~/backups/.backup-secrets-ubuntu.env; TEST_DB_NAME=${TEST_DB_NAME:-vsingles_restore_test}; PGHOST=${PGHOST:-127.0.0.1}; PGPORT=${PGPORT:-50010}; PGUSER=${PGUSER:-test_user1}; dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists "$TEST_DB_NAME"'
-alias securenightly='sudo chown -R "$USER:$USER" ~/backups ~/TERRAMASTER;sudo chmod -R u=rwX,go= ~/backups ~/TERRAMASTER;sudo chmod 700 ~/backups ~/TERRAMASTER'
-alias fixrestic='sudo chown -R lawsen0:lawsen0 /home/lawsen0/TERRAMASTER /home/lawsen0/backups; chmod -R u=rwX,go= /home/lawsen0/TERRAMASTER /home/lawsen0/backups;chmod 700 /home/lawsen0/TERRAMASTER /home/lawsen0/backups'
+alias securenightly='sudo chown -R "$USER:$USER" ~/backups /mnt/terramaster;sudo chmod -R u=rwX,go= ~/backups /mnt/terramaster;sudo chmod 700 ~/backups /mnt/terramaster'
+alias fixrestic='sudo chown -R lawsen0:lawsen0 /mnt/terramaster /home/lawsen0/backups; chmod -R u=rwX,go= /mnt/terramaster /home/lawsen0/backups;chmod 700 /mnt/terramaster /home/lawsen0/backups'
 
 alias showdump='clear;ls -lht ~/backups/pgdump-ubuntu;ls -latr'
 alias showrestic='clear;sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"'
 
-alias wipebackuponly='clear;sudo rm -rf ~/TERRAMASTER/restic-ubuntu && showrestic'
-alias wipetestbackup='clear;sudo rm -rf ~/TERRAMASTER/restic-ubuntu && source ~/backups/.backup-secrets-ubuntu.env && restic init --repo $RESTIC_REPOSITORY && bash ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env && backupnightly && showrestic'
+alias wipebackuponly='clear;sudo rm -rf /mnt/terramaster/restic-ubuntu && showrestic'
+alias wipetestbackup='clear;sudo rm -rf /mnt/terramaster/restic-ubuntu && source ~/backups/.backup-secrets-ubuntu.env && restic init --repo $RESTIC_REPOSITORY && bash ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env && backupnightly && showrestic'
+alias showterramaster='clear;findmnt -T /mnt/terramaster;df -h /mnt/terramaster;echo;lsusb -t | grep -iE "mass storage|5000M|480M" | head'
 
 RESTIC_ENV_UBUNTU=/home/lawsen0/backups/.backup-secrets-ubuntu.env
 
@@ -878,10 +911,16 @@ RestoreSnapshot() {
     local backups=/home/lawsen0/backups
     local schema=outdateddbsnapshotoct2024
     local pgdump16=/usr/lib/postgresql/16/bin/pg_dump
+    # Read only the two folder paths out of the env file — do NOT source it, or
+    # RESTIC_PASSWORD / PGPASSWORD would leak into this interactive shell.
+    local _readvar
+    _readvar() { sed -n "s/^export $1=\"\{0,1\}\([^\"]*\)\"\{0,1\}[[:space:]]*$/\1/p" "$env" | tail -1 | sed 's/[[:space:]]*$//'; }
     local storage=(
-        /mnt/pgdata16/tutamallStorageFolder_outdatedOct2021
-        /mnt/pgdata16/tutamallStorageFolder_largecheapstorage_outdatedOct2021
+        "$(_readvar TUTA_PHOTO_FOLDER || true)"
+        "$(_readvar LARGE_STORAGE_FOLDER || true)"
     )
+    storage[0]="${storage[0]:-/home/lawsen0/ubuntu_storage/tutamallStorageFolder_outdatedOct2021}"
+    storage[1]="${storage[1]:-/home/lawsen0/ubuntu_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021}"
     local id ans stage dump pre d
 
     resticsnapshots || return 1
@@ -971,7 +1010,7 @@ resticCleanup() {
         return 0
     fi
 
-    echo "RestoreSnapshot leftovers in $backups (restic snapshots in ~/TERRAMASTER are NOT touched):"
+    echo "RestoreSnapshot leftovers in $backups (restic snapshots on /mnt/terramaster are NOT touched):"
     echo
     if [ "$n_stages" -gt 0 ]; then
         echo "Unpacked snapshot folders ($n_stages):"
