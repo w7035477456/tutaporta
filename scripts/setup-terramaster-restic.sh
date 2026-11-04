@@ -62,6 +62,12 @@ done
 die() { echo "ERROR: $*" >&2; exit 1; }
 info() { echo "[terramaster] $*"; }
 
+# Linux-only: relies on lsblk/findmnt/blkid/mkfs.ext4. Fail clearly instead of
+# dying later with "lsblk: command not found" on a dev Mac.
+if ! command -v lsblk >/dev/null 2>&1 || ! command -v findmnt >/dev/null 2>&1; then
+  die "this script must run on the Ubuntu host (needs lsblk/findmnt). Copy it there and run it over SSH."
+fi
+
 # Everything after a dry run needs root (mkfs, fstab, mount, chown).
 if [[ "$DRY_RUN" -eq 0 && "${EUID:-$(id -u)}" -ne 0 ]]; then
   die "must run as root: sudo $0 $*"
@@ -93,31 +99,41 @@ disk_of() {
   basename "$dev"
 }
 
-declare -A system_disks=()
+# Space-delimited list of protected disk names. Avoids `declare -A`, which
+# macOS's bash 3.2 does not have, so --dry-run also works on a dev Mac.
+system_disks=""
+add_system_disk() {
+  local d="$1"
+  [[ -z "$d" ]] && return 0
+  case " $system_disks " in
+    *" $d "*) ;;
+    *) system_disks="$system_disks $d" ;;
+  esac
+}
+is_system_disk() {
+  case " $system_disks " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
 for mp in / /boot /boot/efi /home /var /usr /opt; do
   src="$(findmnt -no SOURCE -T "$mp" 2>/dev/null || true)"
   [[ -z "$src" ]] && continue
-  d="$(disk_of "$src")"
-  [[ -n "$d" ]] && system_disks["$d"]=1
+  add_system_disk "$(disk_of "$src")"
 done
 # Anything already mounted under /mnt (Postgres data, old temp mounts) is off limits.
 while read -r src _mp; do
   [[ -z "$src" ]] && continue
-  d="$(disk_of "$src")"
-  [[ -n "$d" ]] && system_disks["$d"]=1
+  add_system_disk "$(disk_of "$src")"
 done < <(findmnt -rno SOURCE,TARGET 2>/dev/null | awk '$2 ~ /^\/mnt\//')
 
-protected_list="none"
-if [[ ${#system_disks[@]} -gt 0 ]]; then
-  protected_list="${!system_disks[*]}"
-fi
-info "system disk(s) to protect: $protected_list"
+info "system disk(s) to protect: ${system_disks:- none}"
+info "" 
 
 detect_disk() {
   local name size tran model
   while read -r name size tran model; do
     [[ -z "$name" ]] && continue
-    [[ -n "${system_disks[$name]:-}" ]] && continue
+    is_system_disk "$name" && continue
     printf '/dev/%s\t%s\t%s\t%s\n' "$name" "$size" "${tran:-unknown}" "${model:-unknown}"
   done < <(lsblk -dno NAME,SIZE,TRAN,MODEL | awk '$1 !~ /^(loop|sr|md|dm-|nbd|zd)/')
 }
@@ -158,7 +174,7 @@ else
 fi
 
 # Guard: never touch a disk that backs the running system.
-if [[ -n "${system_disks[$(basename "$DISK")]:-}" ]]; then
+if is_system_disk "$(basename "$DISK")"; then
   die "$DISK backs the running system — refusing"
 fi
 if lsblk -rno MOUNTPOINT "$DISK" | grep -qx '/'; then
@@ -321,7 +337,9 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   # This filesystem was already ext4 and carried the same UUID the old fstab
   # line pointed at, so it may hold data from before. Show it, never delete it.
   info "existing contents of $MOUNT_POINT:"
-  du -sh "$MOUNT_POINT"/* 2>/dev/null | sort -h | tail -20 | sed 's/^/    /'
+  # '|| true': a freshly formatted volume is empty, so the glob does not expand
+  # and du exits non-zero — that must not kill the script under set -e.
+  du -sh "$MOUNT_POINT"/* 2>/dev/null | sort -h | tail -20 | sed 's/^/    /' || true
   existing_repo="$MOUNT_POINT/$REPO_SUBDIR"
   if [[ -f "$existing_repo/config" ]]; then
     info "a restic repo already exists at $existing_repo — will reuse it (not re-init)"
@@ -336,7 +354,7 @@ run mkdir -p "$new_repo"
 run chown "$APP_USER:$APP_USER" "$new_repo"
 run chmod 700 "$new_repo"
 
-if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
+if [[ "$SKIP_MIGRATE" -eq 0 && "$DO_FORMAT" -eq 0 ]]; then
   if [[ -d "$old_repo" && ! -f "$new_repo/config" ]]; then
     info "migrating existing repo $old_repo -> $new_repo"
     run rsync -aHAX --info=progress2 "$old_repo"/ "$new_repo"/
@@ -345,6 +363,10 @@ if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
   elif [[ ! -d "$old_repo" ]]; then
     info "no existing repo at $old_repo — will init a fresh one"
   fi
+elif [[ "$DO_FORMAT" -eq 1 ]]; then
+  # Clean slate was requested, so do NOT copy the old snapshots onto the fresh
+  # volume. They stay untouched at ~/TERRAMASTER/... for as long as you keep it.
+  info "clean slate: NOT migrating old snapshots (they remain on the root disk)"
 fi
 
 if [[ "$DRY_RUN" -eq 0 && ! -f "$new_repo/config" ]]; then
@@ -411,7 +433,10 @@ PY
 fi
 
 # ---------------------------------------------------------------- retire fake dir
-if [[ "$DRY_RUN" -eq 0 && -d "$OLD_FAKE" && "$SKIP_MIGRATE" -eq 0 ]]; then
+# Only retire it when the snapshots were actually migrated. With --format we
+# deliberately did NOT copy them, so ~/TERRAMASTER is the only remaining copy
+# of that history and must stay put.
+if [[ "$DRY_RUN" -eq 0 && -d "$OLD_FAKE" && "$SKIP_MIGRATE" -eq 0 && "$DO_FORMAT" -eq 0 ]]; then
   retired="$OLD_FAKE-fake-OLD"
   if [[ -d "$retired" ]]; then
     info "old fake dir already retired at $retired — leaving the copy in place"
@@ -419,6 +444,9 @@ if [[ "$DRY_RUN" -eq 0 && -d "$OLD_FAKE" && "$SKIP_MIGRATE" -eq 0 ]]; then
     info "retiring fake NAS dir $OLD_FAKE -> $retired (kept as a fallback copy)"
     run mv "$OLD_FAKE" "$retired"
   fi
+elif [[ "$DRY_RUN" -eq 0 && "$DO_FORMAT" -eq 1 && -d "$OLD_FAKE" ]]; then
+  info "leaving $OLD_FAKE in place — it still holds the previous 30 snapshots"
+  info "delete it yourself once you are confident in the new volume"
 fi
 
 # ---------------------------------------------------------------- verify
