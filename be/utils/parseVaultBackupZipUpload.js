@@ -4,8 +4,14 @@ import os from 'os';
 import path from 'path';
 import { assembleChunkedUpload, discardChunkedUpload } from './chunkedUploadStaging.js';
 
-/** Max sealed/plain backup zip the parser accepts (500 MiB). */
-const MAX_BACKUP_ZIP_BYTES = 500 * 1024 * 1024;
+/** Max sealed/plain backup zip the parser accepts (1 GiB; BACKUP_ZIP_MAX_MB overrides). */
+const BACKUP_ZIP_MAX_MB_DEFAULT = 1024;
+/** Read per request so ~/.ssh/be/.env is loaded before the env var is consulted. */
+function backupZipMaxBytes() {
+  const mb = Number(process.env.BACKUP_ZIP_MAX_MB);
+  const safeMb = Number.isFinite(mb) && mb > 0 ? mb : BACKUP_ZIP_MAX_MB_DEFAULT;
+  return Math.trunc(safeMb) * 1024 * 1024;
+}
 
 function formatUploadHint(contentLength) {
   const n = contentLength ? parseInt(contentLength, 10) : NaN;
@@ -24,6 +30,7 @@ function formatUploadHint(contentLength) {
  * already sent to PUT /api/tutadrive/upload-chunk.
  */
 export function parseVaultBackupZipUpload(req) {
+  const maxZipBytes = backupZipMaxBytes();
   return new Promise((resolve, reject) => {
     const contentType = String(req.headers['content-type'] || '');
     const contentLength = req.get?.('content-length') || req.headers['content-length'] || '';
@@ -62,7 +69,7 @@ export function parseVaultBackupZipUpload(req) {
 
     const busboy = Busboy({
       headers: req.headers,
-      limits: { files: 1, fileSize: MAX_BACKUP_ZIP_BYTES }
+      limits: { files: 1, fileSize: maxZipBytes }
     });
     busboy.on('field', (fieldname, value) => {
       if (fieldname === 'note') {
@@ -110,7 +117,7 @@ export function parseVaultBackupZipUpload(req) {
       }
       if (settled) return;
       if (fileTruncated) {
-        fail(new Error(`Backup zip exceeds ${MAX_BACKUP_ZIP_BYTES / (1024 * 1024)} MiB limit`));
+        fail(new Error(`Backup zip exceeds ${maxZipBytes / (1024 * 1024)} MiB limit`));
         return;
       }
       if (!fileReceived && chunkedUploadId) {
@@ -119,7 +126,7 @@ export function parseVaultBackupZipUpload(req) {
           bytesWritten = await assembleChunkedUpload(singlesId, chunkedUploadId, {
             chunkCount,
             totalBytes: chunkedTotalBytes,
-            maxBytes: MAX_BACKUP_ZIP_BYTES,
+            maxBytes: maxZipBytes,
             destPath: zipPath
           });
           req.chunkedUploadBytes = bytesWritten;
