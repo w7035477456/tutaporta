@@ -5,12 +5,51 @@
 
 unalias -a
 
+pgdisk() {
+    local datadir
+    datadir="$(psql -h 127.0.0.1 -U test_user1 -p 50010 -d outdatedDBOct2021 -Atc "SHOW data_directory;")" || return 1
+    echo "data_directory = $datadir"
+    df -h "$datadir" /mnt/pgdata16
+    lsblk -o NAME,SIZE,MODEL,MOUNTPOINT
+}
+#------ raffle: setup_host / setup_event (add "ubuntu" to insert on Ubuntu Primary) ----
+setup_host()  { bash "$HOME/code/main/scripts/raffle-setup.sh" host  "${1:-local}"; }
+setup_event() { bash "$HOME/code/main/scripts/raffle-setup.sh" event "${1:-local}"; }
+alias pushraffle='$HOME/code/main/scripts/raffle-push-to-ubuntu.sh'
+rafflelog() { bash "$HOME/code/main/scripts/raffle-log.sh" "$@"; }
+#-----------------------
 #------- Olama RAG----
 alias testModel='curl -sS -X POST http://127.0.0.1:8765/keep-model -H "Content-Type: application/json" -d "{\"enabled\": true}" | python3 -m json.tool'
 alias testRagHealth='curl -sS http://127.0.0.1:8765/health | python3 -m json.tool'
 alias startOlama='cd ~/code/main && ./scripts/start-rag-service.sh'
 alias startaimodelbg='~/code/main/scripts/start-rag-service-bg.sh'
 alias diskspace='df -h /'
+# % of total disk used / free + total size (skips RAM, snap and overlay mounts).
+# Usage: diskstat              -> whole machine (/ + /boot + any other local fs)
+#        diskstat /mnt/foo     -> just the filesystem holding that path
+diskstat() {
+    local out
+    # GNU df (Ubuntu): let df drop pseudo/RAM filesystems.
+    if out=$(df -Pk -x tmpfs -x devtmpfs -x squashfs -x overlay \
+                     -x efivarfs -x autofs "$@" 2>/dev/null) \
+       && [[ -n $out ]]; then :; else
+        # BSD df (macOS) has no -x: filter the rows ourselves.
+        out=$(df -Pk "$@") || return 1
+        out=$(printf '%s\n' "$out" | awk 'NF>=1 && $1 !~ /^(tmpfs|devtmpfs|udev|none|shm|overlay|squashfs)$/')
+    fi
+    printf '%s\n' "$out" | awk 'NR == 1 { next }
+        $2 ~ /^[0-9]+$/ && !seen[$1]++ {          # one row per device (bind mounts / dupes)
+            size += $2; used += $3; avail += $4; n++
+        }
+        END {
+            if (!n) { print "diskstat: no filesystems matched" > "/dev/stderr"; exit 1 }
+            gb    = 1048576                       # kB -> GB
+            upct  = (size > 0) ? used / size * 100 : 0
+            printf "Total disk : %8.1f GB\n",        size  / gb
+            printf "Used       : %7.1f %%  (%8.1f GB)\n", upct,  used  / gb
+            printf "Free       : %7.1f %%  (%8.1f GB)\n", 100 - upct, avail / gb
+        }'
+}
 alias checkOlama='curl -sS http://127.0.0.1:8765/health;curl -sS http://127.0.0.1:11434/api/tags'
 
 # Ollama (:11434) + TutaNotes RAG service (:8765) in the background — AI LLM RAG and Auto Scan Emails.
@@ -875,6 +914,224 @@ backupnote() {
     [ -z "$*" ] && { echo "Usage: backupnote <note text>"; return 1; }
     clear
     sudo /home/lawsen0/backups/scripts/backup-nightly.sh "$RESTIC_ENV_UBUNTU" "$*"
+}
+
+######################## restic nightly cron: when + history + retime ########
+# resticcron — 1) shows when the nightly cron actually runs,
+#               2) last 7 runs from the backup log (time / size added / snapshot),
+#               3) offers to retime it (asks hour, then AM/PM).
+_resticCronCrontab() {
+    if [ "$(id -u)" -eq 0 ]; then crontab -l 2>/dev/null
+    else sudo crontab -l 2>/dev/null; fi || true
+}
+
+# Distinguish "sudo/crontab failed" from "crontab has no backup line".
+_resticCronCrontabOk() {
+    if [ "$(id -u)" -eq 0 ]; then crontab -l >/dev/null 2>&1
+    else sudo -n true 2>/dev/null && sudo crontab -l >/dev/null 2>&1; fi
+}
+
+_resticCronSpan() {
+    local m=$1
+    if   [ "$m" -lt 60 ]; then printf '%d min' "$m"
+    elif [ "$m" -lt 1440 ]; then printf '%dh %02dm' $((m / 60)) $((m % 60))
+    else printf '%dd %02dh' $((m / 1440)) $((m % 1440 / 60)); fi
+}
+
+# Print one tab-separated record per completed run, oldest first:
+#   start(UTC) <TAB> added <TAB> stored <TAB> snapshot <TAB> done(UTC)
+# Uses done( ) as the record boundary so a truncated or in-progress run is skipped.
+_resticCronRuns() {
+    local log=$1 want=${2:-7} raw
+    if [ -r "$log" ]; then raw=$(cat "$log" 2>/dev/null)
+    else raw=$(sudo cat "$log" 2>/dev/null); fi
+    [ -n "$raw" ] || return 0
+    printf '%s\n' "$raw" | awk -v want="$want" '
+      function emit() {
+        if (started == "") return
+        k++
+        T[k] = started; A[k] = added; S[k] = stored; I[k] = id; D[k] = dur
+        started = ""; added = ""; stored = ""; id = ""; dur = ""
+      }
+      /^\[backup:[^]]*\] start / {
+        emit()
+        started = $0; sub(/^.*\] start /, "", started); next
+      }
+      /^\[backup:[^]]*\] done / {
+        dur = $0; sub(/^.*\] done /, "", dur); emit(); next
+      }
+      /^Added to the repository:/ {
+        s = $0; sub(/^Added to the repository:[ ]*/, "", s)
+        added = s; sub(/ \(.*/, "", added)
+        stored = s; sub(/^.*\(/, "", stored); sub(/\).*/, "", stored)
+        sub(/[ ]*stored[ ]*$/, "", stored)
+        next
+      }
+      /^snapshot [0-9a-f]+ saved/ { id = $2 }
+      END {
+        emit()
+        if (k == 0) exit
+        start = (k > want) ? k - want + 1 : 1
+        for (i = start; i <= k; i++)
+          printf "%s\t%s\t%s\t%s\t%s\n", T[i], (A[i] == "" ? "-" : A[i]), \
+                 (S[i] == "" ? "-" : S[i]), (I[i] == "" ? "-" : I[i]), \
+                 (D[i] == "" ? "-" : D[i])
+      }'
+}
+
+resticcron() {
+    local log=/home/lawsen0/backups/backup-ubuntu.log
+    local tz=America/New_York
+    local script=/home/lawsen0/backups/scripts/backup-nightly.sh
+    local envf=/home/lawsen0/backups/.backup-secrets-ubuntu.env
+    local marker='# restic-nightly (retimed by resticcron)'
+    local crontab_txt line minute cur_utc cur_h now target runs ans
+    local h12 ampm h24 utc_a utc_b hours newline tmp bak
+
+    crontab_txt=$(_resticCronCrontab)
+    line=$(printf '%s\n' "$crontab_txt" | grep -F 'backup-nightly.sh' | head -1)
+
+    # clear is noise when stdout is not a terminal (ssh / piped); guard it.
+    [ -t 1 ] && clear
+    echo "=================== restic nightly cron ==================="
+
+    # ---- 1) schedule -----------------------------------------------------
+    echo
+    echo " 1) WHEN IT RUNS"
+    if [ -z "$line" ]; then
+        if ! _resticCronCrontabOk; then
+            echo "    !! cannot read root's crontab (sudo needs a password here)."
+            echo "       Run this interactively:  f2  then  source ~/b  then  resticcron"
+        else
+            echo "    !! no backup-nightly.sh line found in root's crontab"
+            echo "       (retiming below will re-create it)"
+        fi
+    else
+        minute=$(printf '%s\n' "$line" | awk '{print $1}')
+        cur_utc=$(printf '%s\n' "$line" | awk '{print $2}')
+        cur_h=$(printf '%s\n' "$line" | sed -n 's/.*date +%H)" = \([0-9][0-9]*\) ].*/\1/p')
+        if [ -n "$cur_h" ]; then
+            printf '    Daily at  : %s %s\n' \
+                "$(TZ=$tz date -d "today ${cur_h}:00" '+%-I:%M %p')" "$tz"
+        else
+            printf '    Daily at  : (cannot parse guard hour from crontab)\n'
+        fi
+        printf '    cron UTC  : minute %s, hour(s) %s\n' "$minute" "$cur_utc"
+        printf '    Why two  : UTC slots cover EDT+EST so DST never shifts a day;\n'
+        printf '                the "= %s" guard lets only the matching slot run.\n' "${cur_h:-?}"
+        printf '    Log       : %s\n' "$log"
+        if [ -n "$cur_h" ]; then
+            now=$(date +%s)
+            target=$(TZ=$tz date -d "today ${cur_h}:00" +%s 2>/dev/null)
+            [ -n "$target" ] && [ "$target" -le "$now" ] && \
+                target=$(TZ=$tz date -d "tomorrow ${cur_h}:00" +%s 2>/dev/null)
+            if [ -n "$target" ]; then
+                printf '    Next run  : %s (in %s)\n' \
+                    "$(TZ=$tz date -d "@$target" '+%a %b %-d %-I:%M %p %Z')" \
+                    "$(_resticCronSpan $(( (target - now) / 60 )))"
+            fi
+        fi
+    fi
+
+    # ---- 2) last runs ----------------------------------------------------
+    echo
+    echo " 2) LAST 7 RUNS  (times in $tz)"
+    runs=$(_resticCronRuns "$log" 7)
+    if [ -z "$runs" ]; then
+        echo "    (no completed runs in $log)"
+    else
+        printf '    %-19s %-11s %-11s %-10s %s\n' \
+               "WHEN (NY)" "ADDED" "STORED" "SNAPSHOT" "FINISHED (UTC)"
+        local ts added stored id dur localts
+        while IFS=$'\t' read -r ts added stored id dur; do
+            [ -z "$ts" ] && continue
+            localts=$(TZ=$tz date -d "$ts" '+%a %b %-d %-I:%M %p' 2>/dev/null) || localts="$ts"
+            printf '    %-19s %-11s %-11s %-10s %s\n' "$localts" "$added" "$stored" "$id" "$dur"
+        done <<< "$runs"
+        local total
+        total=$(sudo -n du -sh /mnt/terramaster/restic-ubuntu 2>/dev/null | cut -f1)
+        [ -n "$total" ] || total="(needs sudo)"
+        printf '    repo total: %s\n' "$total"
+    fi
+
+    # ---- 3) retime -------------------------------------------------------
+    echo
+    echo " 3) RETIME"
+    if [ -n "$cur_h" ]; then
+        printf '    Current  : %s daily\n' "$(TZ=$tz date -d "today ${cur_h}:00" '+%-I:%M %p')"
+    fi
+    read -r -p "    Change the daily run time? [y/N]: " ans
+    case "$ans" in
+        [Yy]*) ;;
+        *) echo "    (unchanged)"; echo; return 0 ;;
+    esac
+
+    while :; do
+        read -r -p "    Hour to run (1-12): " h12
+        [[ "$h12" =~ ^([1-9]|1[0-2])$ ]] && break
+        echo "    Please enter 1-12."
+    done
+    while :; do
+        read -r -p "    AM or PM? [AM/PM]: " ampm
+        case "${ampm^^}" in
+            AM) ampm=AM; break ;;
+            PM) ampm=PM; break ;;
+            *) echo "    Please enter AM or PM." ;;
+        esac
+    done
+
+    if [ "$ampm" = "PM" ]; then
+        if [ "$h12" -eq 12 ]; then h24=12; else h24=$((h12 + 12)); fi
+    else
+        if [ "$h12" -eq 12 ]; then h24=0; else h24=$h12; fi
+    fi
+    utc_a=$(((h24 + 4) % 24))   # EDT (summer)
+    utc_b=$(((h24 + 5) % 24))   # EST (winter)
+    if [ "$utc_a" -lt "$utc_b" ]; then hours="$utc_a,$utc_b"; else hours="$utc_b,$utc_a"; fi
+
+    newline="0 $hours * * * [ \"\$(TZ=$tz date +%H)\" = $h24 ] && $script $envf >> $log 2>&1"
+
+    echo
+    echo "    New: $h12 $ampm  ->  $(printf '%02d:00' "$h24") $tz"
+    echo "    line: $newline"
+    read -r -p "    Apply this? [y/N]: " ans
+    case "$ans" in
+        [Yy]*) ;;
+        *) echo "    (cancelled — crontab unchanged)"; echo; return 0 ;;
+    esac
+
+    bak="$HOME/backups/crontab-root.bak-$(date +%Y%m%d-%H%M%S)"
+    if printf '%s\n' "$crontab_txt" > "$bak" 2>/dev/null; then
+        echo "    Old root crontab backed up: $bak"
+    else
+        echo "    !! could not write $bak (continuing)" >&2
+    fi
+
+    tmp=$(mktemp)
+    printf '%s\n' "$crontab_txt" | awk -v marker="$marker" -v newline="$newline" '
+        /^# restic-nightly/ { next }
+        /backup-nightly\.sh/ {
+            if (!done) { print marker; print newline; done = 1 }
+            next
+        }
+        { print }
+        END { if (!done) { print marker; print newline } }
+    ' > "$tmp"
+
+    if sudo crontab "$tmp"; then
+        echo "    Installed."
+    else
+        echo "    !! failed to install crontab" >&2
+        rm -f "$tmp"; echo; return 1
+    fi
+    rm -f "$tmp"
+
+    echo
+    echo "    Verify:"
+    sudo crontab -l 2>/dev/null | grep -A1 'restic-nightly' | sed 's/^/      /'
+    echo
+    echo "    Now runs daily at $h12 $ampm $tz (cron: 0 $hours * * * UTC)."
+    echo
 }
 
 resticdiff() {
