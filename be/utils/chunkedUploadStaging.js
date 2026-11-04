@@ -10,6 +10,7 @@
  */
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { getLargeCheapStorageFolderRoot } from './tutaDriveMemberPaths.js';
 
@@ -136,16 +137,19 @@ export async function assembleChunkedUpload(singlesId, uploadId, { chunkCount, t
     throw new Error(`Uploaded chunks total ${sum} bytes but ${expected} were expected — please try again`);
   }
 
-  const out = fs.createWriteStream(destPath);
-  try {
+  /**
+   * One pipeline over a concatenated source. Do NOT call pipeline per chunk on a shared write
+   * stream: pipeline destroys its destination on completion, so the next iteration (and the final
+   * end()) fails with ERR_STREAM_DESTROYED, and each call leaks error/close/finish listeners.
+   */
+  const parts = (async function* readParts() {
     for (let i = 0; i < count; i += 1) {
-      await pipeline(fs.createReadStream(partPath(dir, i)), out, { end: false });
+      const rs = fs.createReadStream(partPath(dir, i));
+      for await (const chunk of rs) yield chunk;
     }
-  } finally {
-    await new Promise((resolve, reject) => {
-      out.end((err) => (err ? reject(err) : resolve()));
-    });
-  }
+  })();
+
+  await pipeline(Readable.from(parts), fs.createWriteStream(destPath));
   discardChunkedUpload(singlesId, uploadId);
   return sum;
 }
