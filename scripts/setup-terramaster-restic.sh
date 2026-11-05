@@ -297,7 +297,7 @@ run mkdir -p "$MOUNT_POINT"
 if findmnt -no SOURCE -T "$MOUNT_POINT" 2>/dev/null | grep -qx "$DISK"; then
   info "$MOUNT_POINT already mounted from $DISK"
 else
-  fstab_line="UUID=$current_uuid  $MOUNT_POINT  ext4  defaults,noatime,nofail,x-systemd.device-timeout=30  0  2"
+  fstab_line="UUID=$current_uuid  $MOUNT_POINT  ext4  defaults,noatime,noauto,nofail,x-systemd.device-timeout=30  0  2"
   if grep -qE "^[^#].*[[:space:]]${MOUNT_POINT}[[:space:]]" /etc/fstab; then
     if [[ "$DO_FORMAT" -eq 1 && "$DRY_RUN" -eq 0 ]]; then
       # The reformat gave the fs a new UUID; the existing fstab line would point
