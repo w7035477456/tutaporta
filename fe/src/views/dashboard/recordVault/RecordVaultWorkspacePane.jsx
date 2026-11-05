@@ -55,6 +55,7 @@ import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 import RecordVaultSearchBar from './RecordVaultSearchBar';
 import {
+  normalizeMynoteFontSizeTenths,
   recordVaultMenuButtonFontRemFromTenths,
 } from 'config/recordVaultMenuButtonFontEnv';
 import { getVaultDefaultButtonFontSizeRem } from 'config/vaultDefaultButtonFontSizeEnv';
@@ -1968,6 +1969,8 @@ export default function RecordVaultWorkspacePane({
   const [notebookColAutoFit, setNotebookColAutoFit] = useState(false);
   const defaultMenuButtonFontRem = getVaultDefaultButtonFontSizeRem();
   const [menuButtonFontRem, setMenuButtonFontRem] = useState(defaultMenuButtonFontRem);
+  /** When true, SliderControlButton uses DESKTOP_FONT_SIZE_BUTTON (vw) like the profile menu. */
+  const [menuButtonFontFollowEnvVw, setMenuButtonFontFollowEnvVw] = useState(true);
   /**
    * True once the member's own saved slider value (user_customization.mynote_font_size)
    * is applied. The default is vw-derived, so it must follow window resizes — but a
@@ -3185,8 +3188,9 @@ export default function RecordVaultWorkspacePane({
       .then((prefs) => {
         if (cancelled) return;
         // null prefs → follow the live env default (DESKTOP_FONT_SIZE_BUTTON).
-        const savedFontTenths = prefs.mynoteFontSize;
+        const savedFontTenths = normalizeMynoteFontSizeTenths(prefs.mynoteFontSize);
         menuButtonFontFromPrefsRef.current = savedFontTenths != null;
+        setMenuButtonFontFollowEnvVw(savedFontTenths == null);
         setMenuButtonFontRem(
           recordVaultMenuButtonFontRemFromTenths(savedFontTenths, defaultMenuButtonFontRem)
         );
@@ -6917,7 +6921,10 @@ export default function RecordVaultWorkspacePane({
   const paneStripColor = tutaNotesStorageStripColor(paneStorageType);
 
   return (
-    <RecordVaultSliderControlButtonProvider fontRem={menuButtonFontRem}>
+    <RecordVaultSliderControlButtonProvider
+      fontRem={menuButtonFontRem}
+      followEnvVw={menuButtonFontFollowEnvVw}
+    >
     <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
     <Box
       data-record-vault-pane

@@ -11,6 +11,22 @@ export const RECORD_VAULT_MENU_BUTTON_FONT_REM_MIN_FACTOR = 0.25;
 export const RECORD_VAULT_MENU_BUTTON_FONT_REM_MAX_FACTOR = 2;
 export const RECORD_VAULT_MENU_BUTTON_FONT_REM_STEP = 0.05;
 
+/**
+ * Old API/backfill wrote 20 (2.0 rem) for everyone who never touched the slider.
+ * That value is not a real member choice — treat it like NULL so buttons follow
+ * DESKTOP_FONT_SIZE_BUTTON (same as the profile menu).
+ */
+export const RECORD_VAULT_LEGACY_PINNED_MYNOTE_FONT_SIZE_TENTHS = 20;
+
+/** DB/API tenths-of-rem → null when unset or legacy-pinned. */
+export function normalizeMynoteFontSizeTenths(tenths) {
+  if (tenths == null || tenths === '') return null;
+  const n = Number(tenths);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (n === RECORD_VAULT_LEGACY_PINNED_MYNOTE_FONT_SIZE_TENTHS) return null;
+  return n;
+}
+
 /** @deprecated localStorage cache key — prefer user_customization.mynote_font_size */
 export const RECORD_VAULT_MENU_BUTTON_FONT_SCALE_LS_KEY = 'recordVaultMenuButtonFontScale';
 
@@ -32,10 +48,9 @@ export function clampRecordVaultMenuButtonFontRem(value, defaultRem = getVaultDe
 
 /** DB smallint tenths-of-rem → slider rem (null → env default). */
 export function recordVaultMenuButtonFontRemFromTenths(tenths, defaultRem = getVaultDefaultButtonFontSizeRem()) {
-  if (tenths == null || tenths === '') return clampRecordVaultMenuButtonFontRem(defaultRem, defaultRem);
-  const n = Number(tenths);
-  if (!Number.isFinite(n) || n <= 0) return clampRecordVaultMenuButtonFontRem(defaultRem, defaultRem);
-  return clampRecordVaultMenuButtonFontRem(n / 10, defaultRem);
+  const normalized = normalizeMynoteFontSizeTenths(tenths);
+  if (normalized == null) return clampRecordVaultMenuButtonFontRem(defaultRem, defaultRem);
+  return clampRecordVaultMenuButtonFontRem(normalized / 10, defaultRem);
 }
 
 /** Slider rem → DB smallint tenths-of-rem. */

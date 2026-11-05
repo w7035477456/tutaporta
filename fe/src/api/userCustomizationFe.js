@@ -1,5 +1,6 @@
 import api from './axios';
 import { normalizeSoundPreference, normalizeVsinglesLyric } from 'config/soundPreference';
+import { normalizeMynoteFontSizeTenths } from 'config/recordVaultMenuButtonFontEnv';
 import {
   RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
   RECORD_VAULT_DEFAULT_FONT_SIZE_PT,
@@ -28,9 +29,8 @@ function parseChatFontSize(data) {
  * default (`DESKTOP_FONT_SIZE_BUTTON`) instead of pinning a stale 2rem.
  */
 function parseMynoteFontSize(data) {
-  const n = Number(data?.mynoteFontSize);
-  if (Number.isFinite(n) && n > 0) return n;
-  return null;
+  if (data?.mynoteFontSize == null) return null;
+  return normalizeMynoteFontSizeTenths(data.mynoteFontSize);
 }
 
 function parseVolume(data) {

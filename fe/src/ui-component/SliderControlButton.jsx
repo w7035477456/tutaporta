@@ -4,8 +4,9 @@ import Button from '@mui/material/Button';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { buttonTemplateSingleLineLabelSx } from 'config/selectedUnselectedButtonTemplate';
 import { DAYNIGHT_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
-import { useRecordVaultSliderControlButtonFontRem } from 'views/dashboard/recordVault/RecordVaultSliderControlButtonContext';
-import { usePhotoAlbumsSliderControlButtonFontRem } from 'views/dashboard/photoAlbums/PhotoAlbumsSliderControlButtonContext';
+import { buttonTemplateFontSizeSx } from 'config/buttonFontEnv';
+import { useRecordVaultSliderControlButtonFontConfig } from 'views/dashboard/recordVault/RecordVaultSliderControlButtonContext';
+import { usePhotoAlbumsSliderControlButtonFontConfig } from 'views/dashboard/photoAlbums/PhotoAlbumsSliderControlButtonContext';
 import { isPhotoAlbumsRoute } from 'config/photoAlbumsLayout';
 
 /** Whole-button hover scale — 25% larger (default). Pass hoverScale for a different factor. */
@@ -153,6 +154,20 @@ function hoverSx(
 }
 
 /** Root-level forced fill — last in sx merge so it beats variant + theme secondary. */
+/** Member-chosen rem from the yellow font slider (not the live vw env default). */
+function sliderControlRemLabelFontSx(fontRem) {
+  const fontSize = `${fontRem}rem !important`;
+  const label = { fontSize, fontWeight: 700, lineHeight: 1.15 };
+  return {
+    fontSize,
+    '& .MuiButton-label': label,
+    '@media (min-width: 600px)': {
+      fontSize,
+      '& .MuiButton-label': label
+    }
+  };
+}
+
 function forceBgcolorSx(forceBgcolor, forceColor = '#000000') {
   if (!forceBgcolor) return null;
   const bg = `${forceBgcolor} !important`;
@@ -207,10 +222,10 @@ export default function SliderControlButton({
   ...rest
 }) {
   const location = useLocation();
-  const notesFontRem = useRecordVaultSliderControlButtonFontRem();
-  const albumsFontRem = usePhotoAlbumsSliderControlButtonFontRem();
-  const fontRem = isPhotoAlbumsRoute(location.pathname) ? albumsFontRem : notesFontRem;
-  const fontSize = `${fontRem}rem !important`;
+  const notesFont = useRecordVaultSliderControlButtonFontConfig();
+  const albumsFont = usePhotoAlbumsSliderControlButtonFontConfig();
+  const { fontRem, followEnvVw } = isPhotoAlbumsRoute(location.pathname) ? albumsFont : notesFont;
+  const labelFontSx = followEnvVw ? buttonTemplateFontSizeSx() : sliderControlRemLabelFontSx(fontRem);
   // forceBgcolor means we own the fill — never take the selected→secondary path.
   const effectiveSelected = forceBgcolor ? undefined : selected;
   const variantStyles = resolveVariantSx(variant, effectiveSelected);
@@ -233,8 +248,7 @@ export default function SliderControlButton({
     const baseTransform = isLifted ? selectedTransform() : 'scale(1)';
     return {
       fontFamily: MAIN_FONT_FAMILY,
-      fontSize,
-      fontWeight: 900,
+      fontWeight: 700,
       textTransform: 'none',
       lineHeight: 1.15,
       borderRadius: '12px',
@@ -245,12 +259,8 @@ export default function SliderControlButton({
       px: { xs: 0.55, sm: 0.75 },
       py: { xs: 0.35, sm: 0.45 },
       minWidth: 0,
+      ...labelFontSx,
       ...variantStyles,
-      '& .MuiButton-label': {
-        fontSize,
-        fontWeight: 900,
-        lineHeight: 1.15
-      },
       '&.Mui-disabled': {
         bgcolor: `${GREEN_DISABLED_BG} !important`,
         color: '#000000 !important',
@@ -260,10 +270,6 @@ export default function SliderControlButton({
         transform: 'none !important'
       },
       ...hoverSx(variant, disableHoverScale, isLifted, hoverScale, forceBgcolor, forceColor),
-      '@media (min-width: 600px)': {
-        fontSize,
-        '& .MuiButton-label': { fontSize, fontWeight: 900 }
-      },
       ...(singleLineLabel ? buttonTemplateSingleLineLabelSx() : null),
       ...extra,
       // Absolute last — hard yellow/grey/blue for TutaNotes current rows.

@@ -147,13 +147,11 @@ import filmBackground from 'assets/images/filmBackground.png';
 import { formatMemberCode, formatSmilesBannerName } from 'utils/memberLabel';
 import {
   getDesktopButtonFontSizeVw,
-  getDesktopTextFontSizeVw,
-  getDesktopTitleFontSizeVw
+  getDesktopTextFontSizeVw
 } from 'config/desktopFontEnv';
 import {
   getMobileSinglesButtonFontSizeVw,
-  getMobileSinglesTextFontSizeVw,
-  getMobileSinglesTitleFontSizeVw
+  getMobileSinglesTextFontSizeVw
 } from 'config/singlesMemberCardFontEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
@@ -188,33 +186,13 @@ const myStoryButtonFontSize = {
   sm: getDesktopButtonFontSizeVw()
 };
 
-/** Uploaded / Public / Private / Deleted album row titles — fe/.env MOBILE_FONT_SIZE_TITLE / DESKTOP_FONT_SIZE_TITLE */
-const myStoryAlbumTitleFontSize = {
-  xs: getMobileSinglesTitleFontSizeVw(),
-  sm: getDesktopTitleFontSizeVw()
-};
-
-function scaleResponsiveVwFontSize(fontSizeResponsive, scale) {
-  const scaleVw = (value) => {
-    const match = String(value ?? '').trim().match(/^([\d.]+)vw$/);
-    if (!match) return value;
-    const scaled = parseFloat(match[1]) * scale;
-    return `${scaled}vw`;
-  };
-  return {
-    xs: scaleVw(fontSizeResponsive.xs),
-    sm: scaleVw(fontSizeResponsive.sm)
-  };
-}
-
-/** Private album title is longer — cap 25% below other album panel titles */
-const myStoryPrivateAlbumTitleFontSize = scaleResponsiveVwFontSize(myStoryAlbumTitleFontSize, 0.75);
-
-/** "Drop photos here" — fe/.env MOBILE_FONT_SIZE_TEXT / DESKTOP_FONT_SIZE_TEXT */
-const myStoryAlbumDropHintFontSize = {
-  xs: getMobileSinglesTextFontSizeVw(),
-  sm: getDesktopTextFontSizeVw()
-};
+/**
+ * Album panel title bars + drop hints — same MOBILE_/DESKTOP_FONT_SIZE_BUTTON as the
+ * left sidebar tabs (UnSelectedButtonTemplate). Previously used TITLE/TEXT envs (2vw / 1.5vw),
+ * which made the red-bordered panels look oversized.
+ */
+const myStoryAlbumTitleFontSize = myStoryButtonFontSize;
+const myStoryAlbumDropHintFontSize = myStoryButtonFontSize;
 
 function buildMyStoryMediaFileName({ baseName, fileExtension, fallbackId }) {
   const ext = String(fileExtension || '').replace(/^\./, '').trim();
@@ -4473,11 +4451,7 @@ export default function MyStory() {
                         hoverScale={1}
                         fitLabelWidth={false}
                         shrinkLabelToFit
-                        shrinkLabelMaxFontSize={
-                          albumType === ALBUM_TYPES.private
-                            ? myStoryPrivateAlbumTitleFontSize
-                            : myStoryAlbumTitleFontSize
-                        }
+                        shrinkLabelMaxFontSize={myStoryAlbumTitleFontSize}
                         fullWidth
                         sx={{
                           ...myStoryAlbumPanelTitleButtonSx,
