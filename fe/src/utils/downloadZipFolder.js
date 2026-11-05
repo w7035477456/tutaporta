@@ -14,15 +14,38 @@ export function isSaveZipDialogSupported() {
  * @returns {Promise<{ file: FileSystemFileHandle, name: string } | { cancelled: true } | null>}
  *   null = unsupported / unavailable → caller should fall back to a normal browser download.
  */
+const ZIP_PICKER_ID = 'tutaNotesBackupZip';
+const ZIP_PICKER_TYPES = [{ description: 'Zip file', accept: { 'application/zip': ['.zip'] } }];
+
 export async function acquireSaveZipFile(suggestedName) {
   if (!isSaveZipDialogSupported()) return null;
   try {
     const file = await window.showSaveFilePicker({
-      id: 'tutaDownloadZip',
+      id: ZIP_PICKER_ID,
       startIn: 'downloads',
       suggestedName: String(suggestedName || 'download.zip'),
-      types: [{ description: 'Zip file', accept: { 'application/zip': ['.zip'] } }]
+      types: ZIP_PICKER_TYPES
     });
+    return { file, name: file.name };
+  } catch (err) {
+    if (err?.name === 'AbortError') return { cancelled: true };
+    return null;
+  }
+}
+
+/** Pick an existing backup zip — Chrome reuses the last folder from the paired Save picker (`ZIP_PICKER_ID`). */
+export async function acquireOpenZipFile() {
+  if (typeof window === 'undefined' || typeof window.showOpenFilePicker !== 'function') {
+    return null;
+  }
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      id: ZIP_PICKER_ID,
+      startIn: 'documents',
+      multiple: false,
+      types: ZIP_PICKER_TYPES
+    });
+    const file = await handle.getFile();
     return { file, name: file.name };
   } catch (err) {
     if (err?.name === 'AbortError') return { cancelled: true };

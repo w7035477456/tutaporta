@@ -418,7 +418,8 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
     const stored = storeTutaDriveEncryptedBackup(memberId, encrypted, {
       note: upload.note,
       hint: upload.hint,
-      dateStamp: upload.dateStamp
+      dateStamp: upload.dateStamp,
+      preferredFileName: upload.originalFileName
     });
     return res.json({
       success: true,

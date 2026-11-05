@@ -52,6 +52,7 @@ export function parseVaultBackupZipUpload(req) {
     let note = '';
     let hint = '';
     let dateStamp = '';
+    let originalFileName = '';
     let chunkedUploadId = '';
     let chunkCount = '';
     let chunkedTotalBytes = '';
@@ -84,12 +85,17 @@ export function parseVaultBackupZipUpload(req) {
         chunkCount = String(value || '').trim();
       } else if (fieldname === 'totalBytes') {
         chunkedTotalBytes = String(value || '').trim();
+      } else if (fieldname === 'preferredFileName') {
+        originalFileName = String(value || '').trim();
       }
     });
-    busboy.on('file', (fieldname, stream) => {
+    busboy.on('file', (fieldname, stream, info) => {
       if (fieldname !== 'backup') {
         stream.resume();
         return;
+      }
+      if (!originalFileName && info?.filename) {
+        originalFileName = String(info.filename).trim();
       }
       fileReceived = true;
       const writeStream = fs.createWriteStream(zipPath);
@@ -149,7 +155,8 @@ export function parseVaultBackupZipUpload(req) {
         bytesWritten,
         note: note.trim(),
         hint: hint.trim(),
-        dateStamp: dateStamp.trim()
+        dateStamp: dateStamp.trim(),
+        originalFileName: originalFileName.trim()
       });
     });
     req.on('error', fail);

@@ -8,11 +8,14 @@ describe('resolveVisibleThrottleFactor', () => {
     expect(resolveVisibleThrottleFactor(2.5, true)).toBe(2.5);
   });
 
-  it('falls back to the default multiple while depleted', () => {
+  it('honours backend 1× while depleted (NOTES_OVERLIMIT_THROTTLE_MULTIPLE=1)', () => {
+    expect(resolveVisibleThrottleFactor(1, true)).toBe(1);
+  });
+
+  it('falls back to the default multiple when the backend omits a factor', () => {
     expect(resolveVisibleThrottleFactor(undefined, true)).toBe(DEFAULT_VISIBLE_THROTTLE_FACTOR);
     expect(resolveVisibleThrottleFactor(null, true)).toBe(DEFAULT_VISIBLE_THROTTLE_FACTOR);
     expect(resolveVisibleThrottleFactor(0, true)).toBe(DEFAULT_VISIBLE_THROTTLE_FACTOR);
-    expect(resolveVisibleThrottleFactor(1, true)).toBe(DEFAULT_VISIBLE_THROTTLE_FACTOR);
     expect(resolveVisibleThrottleFactor('x', true)).toBe(DEFAULT_VISIBLE_THROTTLE_FACTOR);
   });
 

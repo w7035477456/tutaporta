@@ -24,6 +24,8 @@ import {
   VAULT_META_FILE
 } from './recordVaultUsb/vaultPaths.js';
 import {
+  isTutaDriveBackupFileName,
+  parseTutaDriveBackupFileNameParts,
   resolveTutaDriveBackupDateStamp,
   TUTADRIVE_BACKUP_HINT_MAX_LEN,
   TUTADRIVE_BACKUP_NAME_RE,
@@ -198,6 +200,31 @@ function todayBackupStamp() {
   const mm = String(d.getMinutes()).padStart(2, '0');
   const ss = String(d.getSeconds()).padStart(2, '0');
   return `${y}-${m}-${day}_${hh}-${mm}-${ss}`;
+}
+
+/**
+ * Pick destination path for a new backup. Uses `preferredFileName` when it is a valid,
+ * unused EncryptedTutaNotesZip_* name (e.g. re-uploading a zip from the Mac).
+ */
+function resolveTutaDriveBackupDestAbsPath(memberId, { note = '', dateStamp = '', preferredFileName = '' } = {}) {
+  const root = tutaDriveMemberRoot(memberId);
+  const preferred = String(preferredFileName || '')
+    .trim()
+    .replace(/^.*[/\\]/, '');
+
+  if (preferred && isTutaDriveBackupFileName(preferred)) {
+    const preferredAbs = path.join(root, preferred);
+    if (!fs.existsSync(preferredAbs)) return preferredAbs;
+    const parsed = parseTutaDriveBackupFileNameParts(preferred);
+    if (parsed) {
+      return tutaDriveBackupAbsPath(memberId, { dateStamp: parsed.dateStamp, note: parsed.note || note });
+    }
+  }
+
+  return tutaDriveBackupAbsPath(memberId, {
+    dateStamp: resolveTutaDriveBackupDateStamp(dateStamp),
+    note
+  });
 }
 
 /** Next free EncryptedTutaNotesZip_<date>[_note][_N].zip in the member folder (never overwrites). */
@@ -397,16 +424,27 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
  * For per-backup-password zips (TNBAK3) the hint + password check come from the file header,
  * so a downloaded zip uploaded again keeps them.
  */
-export function storeTutaDriveEncryptedBackup(memberId, encryptedBytes, { note = '', hint = '', dateStamp = '' } = {}) {
+export function storeTutaDriveEncryptedBackup(
+  memberId,
+  encryptedBytes,
+  { note = '', hint = '', dateStamp = '', preferredFileName = '' } = {}
+) {
   const buf = Buffer.isBuffer(encryptedBytes) ? encryptedBytes : Buffer.from(encryptedBytes || []);
   if (!buf.length) throw new Error('Encrypted backup is empty');
 
   const header = readTutaDriveBackupPasswordHeader(buf);
-  const shortNote = String(note || header?.note || '')
+  const parsedPreferred = parseTutaDriveBackupFileNameParts(preferredFileName);
+  const shortNote = String(note || header?.note || parsedPreferred?.note || '')
     .trim()
     .slice(0, TUTADRIVE_BACKUP_NOTE_MAX_LEN);
+  const resolvedDateStamp =
+    dateStamp || parsedPreferred?.dateStamp || resolveTutaDriveBackupDateStamp('');
   ensureTutaDriveMemberLayout(memberId);
-  const dest = tutaDriveBackupAbsPath(memberId, { dateStamp, note: shortNote });
+  const dest = resolveTutaDriveBackupDestAbsPath(memberId, {
+    dateStamp: resolvedDateStamp,
+    note: shortNote,
+    preferredFileName
+  });
   clearPreviousTutaDriveBackups(memberId, dest);
   fs.writeFileSync(dest, buf);
   const st = fs.statSync(dest);

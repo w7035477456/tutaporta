@@ -898,20 +898,24 @@ export async function restoreRecordVaultTutaDriveBackupZip(file) {
 }
 
 /**
- * TutaDrive backup: zip vault → seal in-browser with the password typed for this backup (TNBAK3),
- * or with the Encrypt Password DEK (TNBAK2) when no password was typed →
- * store as users/M{id}/EncryptedTutaNotesZip_YYYY_MM_DD[_note].zip (keeps up to 3).
- * Server keeps the salt + verifier + hint from the header so Restore / Merge can check the password.
- */
-/**
- * Progress stages (onProgress): build (0–35%) while the server streams the vault zip —
- * the stream has no Content-Length, so percent uses `estimatedTotalBytes` when given;
- * seal (35–50%), send (50–95%), server (95%), saved (98%).
+ * TutaNotes backup: server streams a vault zip → seal in-browser (TNBAK3 per-zip password or TNBAK2 DEK)
+ * → save only to the folder the member picks (Save As). Nothing is stored in a TutaCloud backup slot.
+ *
+ * Progress (onProgress): build (0–40%), seal (40–55%), save (55–100%).
  */
 export async function createRecordVaultTutaDriveEncryptedBackup(
   note = '',
-  { hint = '', dateStamp = '', password = '', onProgress, estimatedTotalBytes = 0 } = {}
+  {
+    hint = '',
+    dateStamp = '',
+    password = '',
+    onProgress,
+    estimatedTotalBytes = 0,
+    saveTarget = null,
+    suggestedFileName = ''
+  } = {}
 ) {
+  const { tutaDriveBackupFileNamePreview } = await import('utils/recordVaultBackupFileName');
   const { sealTutaDriveBackupZipWithDek, sealTutaDriveBackupZipWithPassword } = await import(
     'utils/recordVaultClientVaultCrypto'
   );
@@ -923,10 +927,10 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
     }
   }
   const report = makeBackupProgressReporter(onProgress);
-  const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutadrive/backup-zip', report, 'build', 0, 35, {
+  const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutadrive/backup-zip', report, 'build', 0, 40, {
     estimatedTotalBytes
   });
-  report('seal', 35, { totalBytes: zipBuf.length, withZipPassword });
+  report('seal', 40, { totalBytes: zipBuf.length, withZipPassword });
   let sealed;
   if (withZipPassword) {
     sealed = await sealTutaDriveBackupZipWithPassword(zipBuf, password, { hint, note });
@@ -935,27 +939,29 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
     const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
     sealed = await sealTutaDriveBackupZipWithDek(zipBuf, getRecordVaultE2eDek(), vaultKeys);
   }
-  report('seal', 50, { totalBytes: sealed.length, withZipPassword, done: true });
-  const formData = new FormData();
-  formData.append(
-    'backup',
-    new Blob([sealed], { type: 'application/octet-stream' }),
-    'EncryptedBackup.zip'
-  );
-  formData.append('note', String(note || '').trim());
-  formData.append('hint', String(hint || '').trim());
-  if (dateStamp) formData.append('dateStamp', String(dateStamp));
-  const data = await sendBackupFormWithProgress(
-    'post',
-    '/api/recordVault/tutadrive/backup',
-    formData,
-    sealed.length,
-    report,
-    50,
-    95
-  );
-  report('saved', 98, { totalBytes: sealed.length, fileName: data?.fileName });
-  return data;
+  report('seal', 55, { totalBytes: sealed.length, withZipPassword, done: true });
+
+  if (saveTarget?.cancelled) {
+    throw new Error('Backup cancelled — you closed the Save dialog.');
+  }
+
+  const outName =
+    saveTarget?.name ||
+    String(suggestedFileName || '').trim() ||
+    tutaDriveBackupFileNamePreview(note, dateStamp);
+  const blob = new Blob([sealed], { type: 'application/octet-stream' });
+  report('save', 60, { totalBytes: sealed.length, fileName: outName });
+  if (saveTarget?.file) {
+    await saveBlobToZipFile(saveTarget.file, blob);
+  } else {
+    triggerBrowserBlobDownload(blob, outName);
+  }
+  report('save', 100, { totalBytes: sealed.length, fileName: outName, done: true });
+  return {
+    fileName: outName,
+    sizeBytes: sealed.length,
+    note: String(note || '').trim()
+  };
 }
 
 export async function fetchRecordVaultTutaDriveBackupStatus() {
@@ -1155,12 +1161,16 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
   report('seal', 15, { alreadySealed, totalBytes: sealed.length, done: true });
 
   const formData = new FormData();
-  const uploadName = replaceFileName ? String(replaceFileName) : 'EncryptedBackup.zip';
+  const localName = String(file.name || '').trim();
+  const uploadName = replaceFileName ? String(replaceFileName) : localName || 'EncryptedBackup.zip';
   formData.append(
     'backup',
     new Blob([sealed], { type: 'application/octet-stream' }),
     uploadName
   );
+  if (!replaceFileName && localName) {
+    formData.append('preferredFileName', localName.replace(/^.*[/\\]/, ''));
+  }
 
   const data = replaceFileName
     ? await sendBackupFormWithProgress(

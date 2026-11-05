@@ -181,21 +181,20 @@ const throttleIndexSx = {
 
 /**
  * Fallback multiple when the backend doesn't send `throttleFactor` (older BE or
- * a stale usage payload). Matches NOTES_OVERLIMIT_THROTTLE_MULTIPLE's default.
+ * a stale usage payload). Matches NOTES_OVERLIMIT_THROTTLE_MULTIPLE's default (10).
  */
 export const DEFAULT_VISIBLE_THROTTLE_FACTOR = 10;
 
 /**
- * Display multiple for the usage bar: the backend's real slowdown when it says
- * one, otherwise the fallback while depleted, otherwise 1 (full speed).
- *
- * Preferring the backend matters — a depleted vault used to render "T1
- * (speed throttled)", which reads as a contradiction.
+ * Display multiple for the usage bar and busy-overlay copy.
+ * When depleted, trust `transfer.throttleFactor` from the backend — including `1`
+ * when NOTES_OVERLIMIT_THROTTLE_MULTIPLE=1 (refill message without "10x" / no extra sleep).
  */
 export function resolveVisibleThrottleFactor(backendFactor, depleted) {
+  if (!depleted) return 1;
   const n = Number(backendFactor);
-  if (Number.isFinite(n) && n > 1) return n;
-  return depleted ? DEFAULT_VISIBLE_THROTTLE_FACTOR : 1;
+  if (Number.isFinite(n) && n >= 1) return n;
+  return DEFAULT_VISIBLE_THROTTLE_FACTOR;
 }
 
 /** "T10" = transfers currently run 10× slower; "T1" = full speed. */

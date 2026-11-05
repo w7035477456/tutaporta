@@ -65,3 +65,40 @@ export function tutaDriveBackupFileName({ dateStamp = tutaDriveBackupDateStamp()
   const suffixSegment = suffix > 1 ? `_${suffix}` : '';
   return `${TUTADRIVE_BACKUP_FILE_PREFIX}_${dateStamp}${noteSegment}${suffixSegment}.zip`;
 }
+
+/**
+ * Parse EncryptedTutaNotesZip_YYYY_MM_DD[_note][_N].zip into date / note / suffix.
+ * Returns null for legacy EncryptedBackup_* / backup_* names.
+ */
+export function parseTutaDriveBackupFileNameParts(fileName) {
+  const base = String(fileName || '')
+    .trim()
+    .replace(/^.*[/\\]/, '');
+  if (!isTutaDriveBackupFileName(base)) return null;
+  const modern = /^EncryptedTutaNotesZip_(\d{4}_\d{2}_\d{2})(?:_(.+))?\.zip$/i.exec(base);
+  if (!modern) return null;
+
+  const dateStamp = modern[1];
+  const tail = modern[2] || '';
+  if (!tail) {
+    return { dateStamp, note: '', suffix: 1, fileName: base };
+  }
+
+  const suffixOnly = /^(\d+)$/.exec(tail);
+  if (suffixOnly) {
+    const suffix = Math.max(1, Number.parseInt(suffixOnly[1], 10));
+    return { dateStamp, note: '', suffix, fileName: base };
+  }
+
+  const noteAndSuffix = /^(.+)_(\d+)$/.exec(tail);
+  if (noteAndSuffix && Number(noteAndSuffix[2]) > 1) {
+    return {
+      dateStamp,
+      note: noteAndSuffix[1],
+      suffix: Number.parseInt(noteAndSuffix[2], 10),
+      fileName: base
+    };
+  }
+
+  return { dateStamp, note: tail, suffix: 1, fileName: base };
+}
