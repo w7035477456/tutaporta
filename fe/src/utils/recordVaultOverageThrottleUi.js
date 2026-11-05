@@ -41,6 +41,12 @@ export function transferSpeedThrottledPhrase(factor) {
   return multiple ? `Transfer Speed is being throttled ${multiple}` : 'Transfer Speed is being throttled';
 }
 
+/** Full notice sentence including the live multiple (for aria-labels). */
+export function vaultOverageThrottleAriaMessage(factor) {
+  const parts = VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE_PARTS;
+  return `${parts.before}${transferSpeedThrottledPhrase(factor)}${parts.after}`;
+}
+
 /** Same cadence as RecordVaultUsageBar depleted blink. */
 export const vaultOverageThrottleBlinkSx = {
   color: 'var(--theme-error-color)',

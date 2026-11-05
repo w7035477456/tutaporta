@@ -4,7 +4,6 @@ import {
   RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
   RECORD_VAULT_DEFAULT_FONT_SIZE_PT,
   RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX,
-  RECORD_VAULT_DEFAULT_MENU_BUTTON_FONT_SIZE_TENTHS,
   RECORD_VAULT_DEFAULT_TEXT_HIGHLIGHT_INDEX
 } from 'views/dashboard/recordVault/recordVaultNoteFontTokens';
 
@@ -23,10 +22,15 @@ function parseChatFontSize(data) {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Saved myNote button font size (tenths of rem), or `null` when the member has
+ * never touched the slider. Returning null lets the caller use the live env
+ * default (`DESKTOP_FONT_SIZE_BUTTON`) instead of pinning a stale 2rem.
+ */
 function parseMynoteFontSize(data) {
   const n = Number(data?.mynoteFontSize);
-  if (Number.isFinite(n)) return n;
-  return RECORD_VAULT_DEFAULT_MENU_BUTTON_FONT_SIZE_TENTHS;
+  if (Number.isFinite(n) && n > 0) return n;
+  return null;
 }
 
 function parseVolume(data) {

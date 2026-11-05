@@ -25,9 +25,17 @@ export const VAULT_REFILL_BLOCK_MB = (() => {
   return (Number.isFinite(gb) && gb > 0 ? Math.max(1, Math.round(gb)) : 10) * 1024;
 })();
 
-/** UI copy when NOTES_OVERLIMIT_THROTTLE_MULTIPLE is stretching transfers (line 2 under upload status). */
+/**
+ * UI copy when NOTES_OVERLIMIT_THROTTLE_MULTIPLE is stretching transfers
+ * (line 2 under upload status). Includes the live multiple, e.g. "…throttled 10x".
+ */
 export function getVaultTransferThrottleRefillLabel() {
-  return 'Data Transfer Refill Depleted. Transfer Speed is being throttled. Please REFILL to return to maximum speed.';
+  const multiple = VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR;
+  const throttled =
+    Number(multiple) > 1
+      ? `Transfer Speed is being throttled ${Math.round(Number(multiple) * 10) / 10}x`
+      : 'Transfer Speed is being throttled';
+  return `Data Transfer Refill Depleted. ${throttled}. Please REFILL to return to maximum speed.`;
 }
 
 /** One-time courtesy Tx/Rx balance for new members (default one 10GB block). */

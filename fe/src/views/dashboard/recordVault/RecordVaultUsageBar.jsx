@@ -14,7 +14,10 @@ import {
 } from './tutaNotesBranding';
 import RecordVaultDataPlanDialog from './RecordVaultDataPlanDialog';
 import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
-import { reportRecordVaultOverageThrottleDepleted } from 'utils/recordVaultOverageThrottleUi';
+import {
+  reportRecordVaultOverageThrottleDepleted,
+  setRecordVaultOverageThrottleFactor
+} from 'utils/recordVaultOverageThrottleUi';
 import { useLastClickTransferMb } from 'utils/lastClickTransferMeter';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/VaultOverageThrottleNotice';
 import AdminEditableUsageDataAmount, {
@@ -176,12 +179,31 @@ const throttleIndexSx = {
   px: 0.5
 };
 
+/**
+ * Fallback multiple when the backend doesn't send `throttleFactor` (older BE or
+ * a stale usage payload). Matches NOTES_OVERLIMIT_THROTTLE_MULTIPLE's default.
+ */
+export const DEFAULT_VISIBLE_THROTTLE_FACTOR = 10;
+
+/**
+ * Display multiple for the usage bar: the backend's real slowdown when it says
+ * one, otherwise the fallback while depleted, otherwise 1 (full speed).
+ *
+ * Preferring the backend matters — a depleted vault used to render "T1
+ * (speed throttled)", which reads as a contradiction.
+ */
+export function resolveVisibleThrottleFactor(backendFactor, depleted) {
+  const n = Number(backendFactor);
+  if (Number.isFinite(n) && n > 1) return n;
+  return depleted ? DEFAULT_VISIBLE_THROTTLE_FACTOR : 1;
+}
+
 /** "T10" = transfers currently run 10× slower; "T1" = full speed. */
 export function ThrottleIndexLabel({ factor }) {
   const n = Math.max(1, Math.round(Number(factor) || 1));
   const title = n > 1 ? `Data depleted — transfers are ${n}× slower. Refill to return to full speed.` : 'Full transfer speed';
   return (
-    <Typography component="span" sx={throttleIndexSx} title={title}>
+    <Typography component="span" sx={throttleIndexSx} title={title} aria-label={title}>
       T{n}
     </Typography>
   );
@@ -368,11 +390,17 @@ export default function RecordVaultUsageBar({
 
   useEffect(() => {
     if (!transfer) {
+      setRecordVaultOverageThrottleFactor(1);
       return reportRecordVaultOverageThrottleDepleted(false);
     }
     const refillRemainMb =
       transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
     const depleted = Boolean(transfer.overageThrottled) || refillRemainMb <= 0;
+    // Publish the live multiple so every throttle notice ("speed throttled 10x")
+    // shows the same number the backend is actually applying.
+    setRecordVaultOverageThrottleFactor(
+      resolveVisibleThrottleFactor(transfer.throttleFactor, depleted)
+    );
     return reportRecordVaultOverageThrottleDepleted(depleted);
   }, [transfer]);
 
@@ -444,6 +472,8 @@ export default function RecordVaultUsageBar({
   const refillBlockMb = Number(transfer.refillBlockMb) || 10 * 1024;
   const blockLabel = formatUsageDataAmount(refillBlockMb);
 
+  const throttleFactor = resolveVisibleThrottleFactor(transfer.throttleFactor, depleted);
+
   return (
     <>
       <UsageBarShell actions={actions} blackBar>
@@ -459,10 +489,10 @@ export default function RecordVaultUsageBar({
             onSaved={() => onPurchased?.()}
           />
           <AddMoreGbLink onClick={() => setDataPlanOpen(true)} />
-          <ThrottleIndexLabel factor={Number(transfer.throttleFactor) || (depleted ? 10 : 1)} />
+          <ThrottleIndexLabel factor={throttleFactor} />
           {depleted ? (
             <Typography component="span" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
-              (<VaultOverageSpeedThrottledPhrase />)
+              (<VaultOverageSpeedThrottledPhrase factor={throttleFactor} />)
             </Typography>
           ) : null}
         </Box>

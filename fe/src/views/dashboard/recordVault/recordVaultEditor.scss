@@ -8,8 +8,10 @@
   color: var(--theme-inverse-daynight-color);
   border-radius: 6px;
   overflow: hidden;
-  /* Selected picture: 5× the old 2px ring, blinking between red and blue. */
+  /* Selected picture: 5× the old 2px ring, blinking red ⇄ blue. */
   --rv-image-selected-width: 10px;
+  /* Drawn inside the picture so a thick ring never spills onto the text around it. */
+  --rv-image-selected-offset: -10px;
   --rv-image-selected-red: #e60000;
   --rv-image-selected-blue: #1e88e5;
 }
@@ -245,7 +247,7 @@
 
       &.ProseMirror-selectednode {
         outline: var(--rv-image-selected-width) solid var(--rv-image-selected-red);
-        outline-offset: 0;
+        outline-offset: var(--rv-image-selected-offset);
         animation: rvImageSelectedBlink 0.8s steps(1, end) infinite;
       }
     }
@@ -257,7 +259,7 @@
 
       &.ProseMirror-selectednode > * {
         outline: var(--rv-image-selected-width) solid var(--rv-image-selected-red);
-        outline-offset: 0;
+        outline-offset: var(--rv-image-selected-offset);
         border-radius: 4px;
         animation: rvImageSelectedBlink 0.8s steps(1, end) infinite;
       }
@@ -301,7 +303,7 @@
 
       &.is-selected img {
         outline: var(--rv-image-selected-width) solid var(--rv-image-selected-red);
-        outline-offset: 0;
+        outline-offset: var(--rv-image-selected-offset);
         animation: rvImageSelectedBlink 0.8s steps(1, end) infinite;
       }
 
@@ -442,6 +444,77 @@
     .tiptap-invisible-character {
       color: rgba(0, 0, 0, 0.28);
     }
+  }
+}
+
+/* ---------- Thick blinking caret ---------- */
+/* The browser caret is always 1px and cannot be widened, so the native one is
+   hidden and `recordVaultBlinkingCaret` draws a bar as a widget decoration.
+   Red ⇄ black, stepping rather than fading so it reads as a hard blink.
+
+   The hiding is scoped to `rv-custom-caret`, a class the plugin adds when it
+   mounts — so a plugin failure leaves the user with a normal browser caret
+   rather than no caret at all. */
+.rv-editor__body .ProseMirror.rv-custom-caret {
+  caret-color: transparent;
+}
+
+.rv-editor__body .ProseMirror.rv-composing {
+  /* Some WebKit builds still paint a bar during composition — hand the caret
+     back to the browser while an IME is active so candidates place correctly. */
+  caret-color: auto;
+
+  .rv-caret {
+    display: none;
+  }
+}
+
+.rv-caret {
+  /* Zero width so the caret never pushes the surrounding text sideways; the
+     visible bar is painted by ::before at the insertion point. */
+  display: inline-block;
+  position: relative;
+  width: 0;
+  height: 1.15em;
+  vertical-align: text-bottom;
+  pointer-events: none;
+  /* Pin the caret's own colour to the theme's text colour rather than letting it
+     inherit. `currentColor` would otherwise pick up whatever inline colour the
+     neighbouring span has — a caret sitting inside red text would then be red in
+     both blink phases, i.e. invisible as a blink. */
+  color: var(--theme-inverse-daynight-color, #000000);
+}
+
+.rv-caret::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  width: 4px;
+  /* Black on the default light body, near-white in the night theme, where a
+     hard-coded black bar would disappear. */
+  background-color: currentColor;
+  animation: rvCaretBlink 1s steps(1, end) infinite;
+}
+
+/* Red ⇄ text-colour on a hard step, twice a second. */
+@keyframes rvCaretBlink {
+  0%,
+  49.99% {
+    background-color: #e60000;
+  }
+  50%,
+  100% {
+    background-color: currentColor;
+  }
+}
+
+/* Respect the OS "reduce motion" setting: hold red instead of blinking. */
+@media (prefers-reduced-motion: reduce) {
+  .rv-caret::before {
+    animation: none;
+    background-color: #e60000;
   }
 }
 

@@ -12,8 +12,9 @@ import { getDesktopTextFontSizeVw, getDesktopTitleFontSizeVw } from 'config/desk
 import { isValidInnerEncryptPin } from 'utils/photoAlbumsNoteInnerCrypto';
 import {
   getPhotoAlbumsOverageThrottleActive,
+  getPhotoAlbumsOverageThrottleFactor,
   subscribePhotoAlbumsOverageThrottle,
-  VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE,
+  vaultOverageThrottleAriaMessage,
   VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE
 } from 'utils/photoAlbumsOverageThrottleUi';
 import VaultOverageThrottleNotice from 'ui-component/PhotoAlbumsOverageThrottleNotice';
@@ -291,6 +292,11 @@ export default function PhotoAlbumsNoteInnerEncryptDialog({
     getPhotoAlbumsOverageThrottleActive,
     () => false
   );
+  const overageThrottleFactor = useSyncExternalStore(
+    subscribePhotoAlbumsOverageThrottle,
+    getPhotoAlbumsOverageThrottleFactor,
+    () => 1
+  );
   const rawStatus = String(progressLabel || '').trim();
   const statusLines = rawStatus
     .split('\n')
@@ -304,7 +310,7 @@ export default function PhotoAlbumsNoteInnerEncryptDialog({
     overageThrottled || statusLines.some((line) => VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE.test(line));
   const busyAriaLabel = [
     uploadStatusLine,
-    showThrottleLine ? VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE : '',
+    showThrottleLine ? vaultOverageThrottleAriaMessage(overageThrottleFactor) : '',
     `${clampedPercent}% done`
   ]
     .filter(Boolean)
@@ -396,6 +402,7 @@ export default function PhotoAlbumsNoteInnerEncryptDialog({
               {showThrottleLine ? (
                 <VaultOverageThrottleNotice
                   component="p"
+                  factor={overageThrottleFactor}
                   sx={{
                     m: 0,
                     px: 1,

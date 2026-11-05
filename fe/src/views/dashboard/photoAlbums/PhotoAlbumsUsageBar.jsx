@@ -4,7 +4,10 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PhotoAlbumsDataPlanDialog from './PhotoAlbumsDataPlanDialog';
-import { reportPhotoAlbumsOverageThrottleDepleted } from 'utils/photoAlbumsOverageThrottleUi';
+import {
+  reportPhotoAlbumsOverageThrottleDepleted,
+  setPhotoAlbumsOverageThrottleFactor
+} from 'utils/photoAlbumsOverageThrottleUi';
 import {
   registerPhotoAlbumsDataPlanOpener,
   setPhotoAlbumsDataPlanDialogOpen
@@ -20,6 +23,7 @@ import {
   ThrottleIndexLabel,
   UsageMeter,
   UsageStoragePill,
+  resolveVisibleThrottleFactor,
   transferUsedMb
 } from '../recordVault/RecordVaultUsageBar';
 import { openPhotoAlbumsContextTutorialPopout } from './photoAlbumsContextTutorialSync';
@@ -146,10 +150,13 @@ export default function PhotoAlbumsUsageBar({
 
   useEffect(() => {
     if (!transfer) {
+      setPhotoAlbumsOverageThrottleFactor(1);
       return reportPhotoAlbumsOverageThrottleDepleted(false);
     }
     const refillRemainMb = displayRemainMb(transfer);
     const depleted = Boolean(transfer.overageThrottled) || refillRemainMb <= 0;
+    // Publish the live multiple so every throttle notice shows the same number.
+    setPhotoAlbumsOverageThrottleFactor(resolveVisibleThrottleFactor(transfer.throttleFactor, depleted));
     return reportPhotoAlbumsOverageThrottleDepleted(depleted);
   }, [transfer]);
 
@@ -218,6 +225,7 @@ export default function PhotoAlbumsUsageBar({
       : Number(transfer.refillBlockMb) || 10 * 1024;
   const refillBlockMb = Number(transfer.refillBlockMb) || 10 * 1024;
   const blockLabel = formatUsageDataAmount(refillBlockMb);
+  const throttleFactor = resolveVisibleThrottleFactor(transfer.throttleFactor, depleted);
 
   return (
     <>
@@ -234,10 +242,10 @@ export default function PhotoAlbumsUsageBar({
             onSaved={() => onPurchased?.()}
           />
           <AddMoreGbLink onClick={() => setDataPlanOpen(true)} />
-          <ThrottleIndexLabel factor={Number(transfer.throttleFactor) || (depleted ? 10 : 1)} />
+          <ThrottleIndexLabel factor={throttleFactor} />
           {depleted ? (
             <Typography component="span" sx={{ ...yellowTextSx, whiteSpace: 'nowrap' }}>
-              (<VaultOverageSpeedThrottledPhrase />)
+              (<VaultOverageSpeedThrottledPhrase factor={throttleFactor} />)
             </Typography>
           ) : null}
         </Box>

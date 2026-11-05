@@ -1,8 +1,10 @@
 /**
- * GreenButton — UnSelectedButtonTemplate with BSIZE label, green/grey states, black border + text.
- * fe/.env BSIZE (sm+) / MOBILE_FONT_SIZE_BUTTON (xs) for default label size.
+ * GreenButton — UnSelectedButtonTemplate with green/grey states, black border + text.
+ * Label size follows the same `MOBILE_`/`DESKTOP_FONT_SIZE_BUTTON` envs as every
+ * other button (the profile-menu "red box" size). `BSIZE` stays reserved for popup
+ * input heights, so changing button text never resizes forms.
  */
-import { bsizeFontSizeResponsive } from 'config/bsizeEnv';
+import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { buttonHoverMagnifyTransitionSx } from 'config/hoverMagnifyEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
@@ -23,9 +25,9 @@ export const GREEN_BUTTON_HOVER_Z_INDEX = 9999;
 const menuButtonShadow =
   '0px 3px 1px -2px rgba(0,0,0,0.2), 0px 2px 2px 0px rgba(0,0,0,0.14), 0px 1px 5px 0px rgba(0,0,0,0.12)';
 
-/** Label font — fe/.env BSIZE (sm+) / MOBILE_FONT_SIZE_BUTTON (xs). */
+/** Label font — same MOBILE_/DESKTOP_FONT_SIZE_BUTTON env as the rest of the app. */
 export function greenButtonFontSizeSx(overrides = {}) {
-  const full = bsizeFontSizeResponsive;
+  const full = buttonFontSizeResponsive;
   const fullFontSx = {
     fontSize: `${full.xs} !important`,
     '@media (min-width: 600px)': {

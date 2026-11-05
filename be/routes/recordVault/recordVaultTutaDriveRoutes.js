@@ -54,6 +54,7 @@ import {
   TUTADRIVE_BACKUP_NAME_RE
 } from '../../utils/recordVaultTutaDriveBackup.js';
 import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
+import { buildBackupDownloadHeaders } from '../../utils/backupDownloadHeaders.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
 import {
@@ -520,6 +521,14 @@ export async function downloadRecordVaultTutaDriveStoredBackup(req, res) {
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${current.fileName}"`);
     res.setHeader('Content-Length', String(current.data.length));
+    // Without Last-Modified, Chrome stamps the download with "now" and macOS
+    // Finder shows a blank/"…" date for the file. The stored zip's mtime is the
+    // real backup time, so send it (plus an ETag for cheap revalidation).
+    const downloadHeaders = buildBackupDownloadHeaders({
+      sizeBytes: current.data.length,
+      mtimeMs: current.mtimeMs
+    });
+    for (const [name, value] of Object.entries(downloadHeaders)) res.setHeader(name, value);
     return res.end(current.data);
   } catch (err) {
     console.error('[downloadRecordVaultTutaDriveStoredBackup]', err?.message || err);

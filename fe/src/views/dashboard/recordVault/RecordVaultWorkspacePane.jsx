@@ -143,7 +143,6 @@ import {
   RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
   RECORD_VAULT_DEFAULT_FONT_SIZE_PT,
   RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX,
-  RECORD_VAULT_DEFAULT_MENU_BUTTON_FONT_SIZE_TENTHS,
   RECORD_VAULT_DEFAULT_TEXT_HIGHLIGHT_INDEX,
   RECORD_VAULT_FONT_STYLE_COUNT,
   normalizeRecordVaultFontSizePt,
@@ -472,9 +471,10 @@ const laneAddButtonWrapSx = {
 };
 
 /**
- * Add Note header sort toggle — half-size yellow chip on the right of the
- * Add Note button: "Create ↓" → "Create ↑" → "Date ↓" …
- * Kept deliberately small so it never steals width from Add Note.
+ * Add Note header sort toggle — exactly HALF the Add Note button: 20px tall
+ * instead of 40px, 1rem label instead of the inherited 2rem menu font, plain
+ * yellow fill so it reads as a chip on the light-blue header row.
+ * Cycle: "Create ↓" → "Create ↑" → "Date ↓" → "Date ↑" → "Name ↓" → "Name ↑" → back.
  */
 const noteSortHeaderButtonSx = {
   flex: '0 0 auto',
@@ -493,12 +493,17 @@ const noteSortHeaderButtonSx = {
   backgroundImage: 'none !important',
   color: '#000000 !important',
   WebkitTextFillColor: '#000000 !important',
-  fontSize: '0.5rem !important',
+  fontSize: '1rem !important',
   lineHeight: 1,
-  px: 0.4,
+  px: 0.5,
   py: 0,
+  // SliderControlButton re-applies its menu font size at sm+ — keep the half size.
+  '@media (min-width: 600px)': {
+    fontSize: '1rem !important',
+    '& .MuiButton-label': { fontSize: '1rem !important' }
+  },
   '& .MuiButton-label': {
-    fontSize: '0.5rem !important',
+    fontSize: '1rem !important',
     fontWeight: 900,
     lineHeight: 1,
     whiteSpace: 'nowrap'
@@ -1963,6 +1968,12 @@ export default function RecordVaultWorkspacePane({
   const [notebookColAutoFit, setNotebookColAutoFit] = useState(false);
   const defaultMenuButtonFontRem = getVaultDefaultButtonFontSizeRem();
   const [menuButtonFontRem, setMenuButtonFontRem] = useState(defaultMenuButtonFontRem);
+  /**
+   * True once the member's own saved slider value (user_customization.mynote_font_size)
+   * is applied. The default is vw-derived, so it must follow window resizes — but a
+   * member's explicit choice must never be overwritten by a resize.
+   */
+  const menuButtonFontFromPrefsRef = useRef(false);
   const menuButtonFontSaveTimerRef = useRef(null);
   const [] = useState(null);
   const [] = useState(false);
@@ -3173,11 +3184,11 @@ export default function RecordVaultWorkspacePane({
     void fetchUserCustomization()
       .then((prefs) => {
         if (cancelled) return;
+        // null prefs → follow the live env default (DESKTOP_FONT_SIZE_BUTTON).
+        const savedFontTenths = prefs.mynoteFontSize;
+        menuButtonFontFromPrefsRef.current = savedFontTenths != null;
         setMenuButtonFontRem(
-          recordVaultMenuButtonFontRemFromTenths(
-            prefs.mynoteFontSize ?? RECORD_VAULT_DEFAULT_MENU_BUTTON_FONT_SIZE_TENTHS,
-            defaultMenuButtonFontRem
-          )
+          recordVaultMenuButtonFontRemFromTenths(savedFontTenths, defaultMenuButtonFontRem)
         );
         setNoteFontSizePt(
           normalizeRecordVaultFontSizePt(
@@ -3221,6 +3232,19 @@ export default function RecordVaultWorkspacePane({
       }
     };
   }, [defaultMenuButtonFontRem, scheduleSaveMynotePrefs]);
+
+  /**
+   * Keep the env-derived default in step with the viewport (DESKTOP_FONT_SIZE_BUTTON
+   * is vw). Skipped once the member has their own saved slider value.
+   */
+  useEffect(() => {
+    const syncButtonFont = () => {
+      if (menuButtonFontFromPrefsRef.current) return;
+      setMenuButtonFontRem(getVaultDefaultButtonFontSizeRem());
+    };
+    window.addEventListener('resize', syncButtonFont);
+    return () => window.removeEventListener('resize', syncButtonFont);
+  }, []);
 
 
 

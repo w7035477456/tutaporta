@@ -1458,7 +1458,8 @@ export async function fetchPhotoAlbumsUsage({ storageType } = {}) {
           pendingTransferBytes: Number(data.transfer.pendingTransferBytes) || 0,
           refillBoughtMb: Number(data.transfer.refillBoughtMb) || 0,
           refillBlockMb: Number(data.transfer.refillBlockMb) || 10 * 1024,
-          overageThrottled: Boolean(data.transfer.overageThrottled)
+          overageThrottled: Boolean(data.transfer.overageThrottled),
+          throttleFactor: Number(data.transfer.throttleFactor) || 1
         }
       : null,
     sessionFileCounts: {

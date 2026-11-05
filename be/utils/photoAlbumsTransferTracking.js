@@ -25,9 +25,17 @@ export const VAULT_REFILL_BLOCK_MB = (() => {
   return (Number.isFinite(gb) && gb > 0 ? Math.max(1, Math.round(gb)) : 10) * 1024;
 })();
 
-/** UI copy when PHOTOALBUMS_OVERLIMIT_THROTTLE_MULTIPLE is stretching transfers (line 2 under upload status). */
+/**
+ * UI copy when PHOTOALBUMS_OVERLIMIT_THROTTLE_MULTIPLE is stretching transfers
+ * (line 2 under upload status). Includes the live multiple, e.g. "…throttled 10x".
+ */
 export function getVaultTransferThrottleRefillLabel() {
-  return 'Data Transfer Refill Depleted. Transfer Speed is being throttled. Please REFILL to return to maximum speed.';
+  const multiple = VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR;
+  const throttled =
+    Number(multiple) > 1
+      ? `Transfer Speed is being throttled ${Math.round(Number(multiple) * 10) / 10}x`
+      : 'Transfer Speed is being throttled';
+  return `Data Transfer Refill Depleted. ${throttled}. Please REFILL to return to maximum speed.`;
 }
 
 /** One-time courtesy Tx/Rx balance for new members (default one 10GB block). */
@@ -224,7 +232,9 @@ export async function getVaultTransferStats(singlesId) {
       pendingTransferBytes: pendingBytes,
       refillBoughtMb,
       refillBlockMb: VAULT_REFILL_BLOCK_MB,
-      overageThrottled: remainBytes <= 0
+      overageThrottled: remainBytes <= 0,
+      /** Current transfer slowdown multiple: 1 at full speed, else the throttle multiple. */
+      throttleFactor: remainBytes <= 0 ? VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR : 1
     };
   } catch (err) {
     console.warn('[vault-transfer] stats unavailable:', err?.message || err);
@@ -236,7 +246,8 @@ export async function getVaultTransferStats(singlesId) {
       refillRemainMb: initialDataMb,
       refillBoughtMb: initialDataMb,
       refillBlockMb: VAULT_REFILL_BLOCK_MB,
-      overageThrottled: false
+      overageThrottled: false,
+      throttleFactor: 1
     };
   }
 }

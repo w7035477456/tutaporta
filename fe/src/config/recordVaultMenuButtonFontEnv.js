@@ -1,6 +1,8 @@
 /**
  * myNote menu / toolbar button font size — yellow slider on /myNote.
- * Default from NOTES_DEFAULT_BUTTON_FONT_SIZE_REM; user value in user_customization.mynote_font_size.
+ * Default follows fe/.env DESKTOP_FONT_SIZE_BUTTON (the same size as the rest of
+ * the app's buttons); the member's own slider value lives in
+ * user_customization.mynote_font_size (tenths of rem), so NULL → env default.
  */
 import { getVaultDefaultButtonFontSizeRem } from 'config/vaultDefaultButtonFontSizeEnv';
 

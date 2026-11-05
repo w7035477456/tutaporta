@@ -10,12 +10,14 @@ import { getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
 import { BUSY_HOURGLASS_SIZE, busyHourglassOverlayRootSx } from 'config/busyHourglassEnv';
 import {
   getRecordVaultOverageThrottleActive,
+  getRecordVaultOverageThrottleFactor,
   subscribeRecordVaultOverageThrottle,
-  VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE,
+  vaultOverageThrottleAriaMessage,
   VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE
 } from 'utils/recordVaultOverageThrottleUi';
 import {
   getPhotoAlbumsOverageThrottleActive,
+  getPhotoAlbumsOverageThrottleFactor,
   subscribePhotoAlbumsOverageThrottle
 } from 'utils/photoAlbumsOverageThrottleUi';
 import VaultOverageThrottleNotice from 'ui-component/VaultOverageThrottleNotice';
@@ -51,7 +53,22 @@ export default function BusyHourglassOverlay({
     getPhotoAlbumsOverageThrottleActive,
     () => false
   );
+  const notesOverageThrottleFactor = useSyncExternalStore(
+    subscribeRecordVaultOverageThrottle,
+    getRecordVaultOverageThrottleFactor,
+    () => 1
+  );
+  const albumsOverageThrottleFactor = useSyncExternalStore(
+    subscribePhotoAlbumsOverageThrottle,
+    getPhotoAlbumsOverageThrottleFactor,
+    () => 1
+  );
   const overageThrottled = notesOverageThrottled || albumsOverageThrottled;
+  const overageThrottleFactor = Math.max(
+    1,
+    Number(notesOverageThrottleFactor) || 1,
+    Number(albumsOverageThrottleFactor) || 1
+  );
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -74,7 +91,7 @@ export default function BusyHourglassOverlay({
     label,
     showPercent && clampedPercent != null ? `${clampedPercent}% done` : '',
     statusText,
-    showThrottleNotice ? VAULT_OVERAGE_THROTTLE_BUSY_MESSAGE : '',
+    showThrottleNotice ? vaultOverageThrottleAriaMessage(overageThrottleFactor) : '',
     showAction ? actionLabel : ''
   ]
     .filter(Boolean)
@@ -131,6 +148,7 @@ export default function BusyHourglassOverlay({
       {showThrottleNotice ? (
         <VaultOverageThrottleNotice
           component="p"
+          factor={overageThrottleFactor}
           sx={{
             ...statusParagraphSx,
             color: throttleColor,

@@ -88,6 +88,8 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
 
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+  // Streamed zip has no stored mtime — date it now so macOS shows a Date Added.
+  res.setHeader('Last-Modified', new Date().toUTCString());
 
   const archive = new ZipArchive({ zlib: { level: 6 } });
   await new Promise((resolve, reject) => {

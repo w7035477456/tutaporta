@@ -371,6 +371,9 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
   const zipName = `TutaNotes_TutaDrive_${todayBackupStamp()}.zip`;
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
+  // Streamed zip: there is no stored mtime, so date it with the build time.
+  // Without this, macOS shows a blank Date Added for the download.
+  res.setHeader('Last-Modified', new Date().toUTCString());
 
   const archive = new ZipArchive({ zlib: { level: 6 } });
   await new Promise((resolve, reject) => {

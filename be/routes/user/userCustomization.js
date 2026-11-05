@@ -16,7 +16,6 @@ import {
   MYNOTE_DEFAULT_CONTENT_BG_INDEX,
   MYNOTE_DEFAULT_EDITOR_FONT_SIZE_PT,
   MYNOTE_DEFAULT_FONT_COLOR_INDEX,
-  MYNOTE_DEFAULT_FONT_SIZE_TENTHS,
   MYNOTE_DEFAULT_TEXT_HIGHLIGHT_INDEX,
   mynotePrefsFromDbRow,
   mynotePrefsToDbRow,
@@ -286,7 +285,12 @@ function rowToPayload(row) {
   if (!row) {
     return {
       chatFontSize: null,
-      mynoteFontSize: MYNOTE_DEFAULT_FONT_SIZE_TENTHS,
+      /**
+       * null = member never moved the slider → the browser applies the live
+       * DESKTOP_FONT_SIZE_BUTTON default. Do NOT substitute a fixed rem here:
+       * doing so would silently override the env for every member.
+       */
+      mynoteFontSize: null,
       soundPreference: DEFAULT_NEW_USER_SOUND_PREFERENCE,
       vsinglesLyric: 'lyric',
       lyricMute: false,
@@ -317,7 +321,7 @@ function rowToPayload(row) {
       : Number.isFinite(Number(mynoteFontSizeRaw))
         ? Number(mynoteFontSizeRaw)
         : null;
-  const mynoteFontSize = mynoteFontSizeParsed == null ? MYNOTE_DEFAULT_FONT_SIZE_TENTHS : mynoteFontSizeParsed;
+  const mynoteFontSize = mynoteFontSizeParsed;
   const volumeRaw = row.volume;
   let volume = volumeRaw == null ? DEFAULT_NEW_USER_VOLUME : Number(volumeRaw);
   if (!Number.isFinite(volume)) volume = DEFAULT_NEW_USER_VOLUME;
@@ -440,7 +444,7 @@ async function runCustomizationSchemaDdl() {
       ADD COLUMN IF NOT EXISTS lyric_volume smallint NOT NULL DEFAULT 10,
       ADD COLUMN IF NOT EXISTS volume smallint NOT NULL DEFAULT 10,
       ADD COLUMN IF NOT EXISTS custom_music_url text NULL,
-      ADD COLUMN IF NOT EXISTS mynote_font_size smallint NULL DEFAULT 20,
+      ADD COLUMN IF NOT EXISTS mynote_font_size smallint NULL DEFAULT NULL,
       ADD COLUMN IF NOT EXISTS mynote_last_notebook_id bigint NULL,
       ADD COLUMN IF NOT EXISTS mynote_last_note_id bigint NULL,
       ADD COLUMN IF NOT EXISTS mynote_content_bg_index smallint NULL DEFAULT 1,
@@ -484,7 +488,7 @@ async function runCustomizationSchemaDdl() {
       ALTER COLUMN mynote_font_color_index SET DEFAULT 0,
       ALTER COLUMN mynote_content_bg_index SET DEFAULT 1,
       ALTER COLUMN mynote_text_highlight_index SET DEFAULT NULL,
-      ALTER COLUMN mynote_font_size SET DEFAULT 20,
+      ALTER COLUMN mynote_font_size SET DEFAULT NULL,
       ALTER COLUMN mynote_editor_font_size SET DEFAULT 20,
       ALTER COLUMN mynote_editor_font_size_pt SET DEFAULT 20
   `);
@@ -799,7 +803,7 @@ async function upsertCustomizationRow(me, row) {
   const params = [
     me,
     row.chat_font_size,
-    row.mynote_font_size ?? MYNOTE_DEFAULT_FONT_SIZE_TENTHS,
+    row.mynote_font_size ?? null,
     row.sound_preference,
     row.vsingles_lyric,
     toBooleanEnumLabel(row.lyric_mute),
@@ -887,7 +891,7 @@ async function upsertCustomizationRow(me, row) {
       const legacyParams = [
         me,
         row.chat_font_size,
-        row.mynote_font_size ?? MYNOTE_DEFAULT_FONT_SIZE_TENTHS,
+        row.mynote_font_size ?? null,
         row.sound_preference,
         row.vsingles_lyric,
         toBooleanEnumLabel(row.lyric_mute),

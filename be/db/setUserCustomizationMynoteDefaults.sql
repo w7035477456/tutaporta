@@ -6,7 +6,7 @@ ALTER TABLE outdateddbsnapshotoct2024.user_customization
   ALTER COLUMN mynote_font_color_index SET DEFAULT 0,
   ALTER COLUMN mynote_content_bg_index SET DEFAULT 1,
   ALTER COLUMN mynote_text_highlight_index SET DEFAULT NULL,
-  ALTER COLUMN mynote_font_size SET DEFAULT 20,
+  ALTER COLUMN mynote_font_size SET DEFAULT NULL,
   ALTER COLUMN mynote_editor_font_size_pt SET DEFAULT 20;
 
 -- Keep legacy alias column in sync if present (older migrations).
@@ -43,13 +43,14 @@ SET
     WHEN mynote_text_highlight_index = 1 THEN NULL
     ELSE mynote_text_highlight_index
   END,
-  mynote_font_size = COALESCE(mynote_font_size, 20),
+  -- mynote_font_size stays NULL when the member never chose a size: the browser
+  -- then applies the live DESKTOP_FONT_SIZE_BUTTON default (do not bake 20 here).
+  mynote_font_size = mynote_font_size,
   mynote_editor_font_size_pt = COALESCE(mynote_editor_font_size_pt, 20),
   updated_at = NOW()
 WHERE mynote_font_color_index IS NULL
    OR mynote_content_bg_index IS NULL
    OR mynote_text_highlight_index = 1
-   OR mynote_font_size IS NULL
    OR mynote_editor_font_size_pt IS NULL;
 
 DO $$

@@ -29,6 +29,7 @@ import { createSuggestionRender } from './recordVaultEditorSuggestion';
 import { RecordVaultResizableImage } from './recordVaultResizableImage';
 import { RecordVaultAttachmentNode } from './recordVaultAttachmentNode';
 import { RecordVaultSearchHighlight } from './recordVaultSearchHighlight';
+import { RecordVaultBlinkingCaret } from './recordVaultBlinkingCaret';
 import { RecordVaultRepeatColor } from './recordVaultRepeatColor';
 
 const lowlight = createLowlight(common);
@@ -201,6 +202,7 @@ export function buildRecordVaultEditorExtensions() {
     InvisibleCharacters.configure({ visible: false }),
     CharacterCount,
     RecordVaultSearchHighlight,
+    RecordVaultBlinkingCaret,
     Focus.configure({ className: 'has-focus', mode: 'all' }),
     Placeholder.configure({ placeholder: 'Start writing your note…' })
     // Clipboard paste (Apple Notes / Word / images) is handled in
