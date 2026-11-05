@@ -10,6 +10,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=terramaster-enclosure-power.sh
 source "$SCRIPT_DIR/terramaster-enclosure-power.sh"
+# shellcheck source=backup-postgres.sh
+source "$SCRIPT_DIR/backup-postgres.sh"
 
 source "$ENV_FILE"
 
@@ -18,7 +20,6 @@ if [[ -n "${2:-}" ]]; then NOTE_TAGS=(--tag noted --tag "note:${2//,/;}"); fi
 
 terramaster_wake_and_mount
 
-# fail fast if the external TerraMaster enclosure is not really mounted
 if ! findmnt -no SOURCE -T "$TERRAMASTER_MOUNT" >/dev/null 2>&1 \
    || [[ "$(findmnt -no SOURCE -T "$TERRAMASTER_MOUNT")" == "$(findmnt -no SOURCE -T /)" ]]; then
     echo "[backup:$HOST_TAG] ERROR: $TERRAMASTER_MOUNT is not a mounted external disk"
@@ -29,24 +30,26 @@ if [[ ! -d "$TERRAMASTER_MOUNT" ]]; then
     exit 1
 fi
 
-mkdir -p "$DUMP_DIR"
-TS="$(date +%F-%H%M%S)"
-DUMP_FILE="$DUMP_DIR/vsingles-${HOST_TAG}-${TS}.sql.zst"
-
 echo "[backup:$HOST_TAG] start $(date)"
-echo "[backup:$HOST_TAG] pg_dump -> $DUMP_FILE"
-pg_dump --no-owner --no-privileges | zstd -T0 -19 -o "$DUMP_FILE"
+backup_postgres
 
-echo "[backup:$HOST_TAG] restic backup"
-restic backup \
-    "$TUTA_PHOTO_FOLDER" \
-    "$LARGE_STORAGE_FOLDER" \
-    "$DUMP_DIR" \
-    "$PROJECT_DIR" \
+restic_paths=(
+    "$TUTA_PHOTO_FOLDER"
+    "$LARGE_STORAGE_FOLDER"
+    "$PROJECT_DIR"
+)
+if [[ ${#POSTGRES_RESTIC_PATHS[@]} -gt 0 ]]; then
+    restic_paths+=( "${POSTGRES_RESTIC_PATHS[@]}" )
+    echo "[backup:$HOST_TAG] restic backup (photos, large storage, code, postgres artifacts)"
+else
+    echo "[backup:$HOST_TAG] restic backup (photos, large storage, code — postgres chain on enclosure only)"
+fi
+restic backup "${restic_paths[@]}" \
     --exclude "$PROJECT_DIR/fe/node_modules/**" \
     --exclude "$PROJECT_DIR/be/node_modules/**" \
     --exclude=".git" \
     --exclude="**/fe/dist/**" \
+    --exclude="**/fe/logs/**" \
     --exclude="**/be/logs/**" \
     --exclude="**/EncryptedTutaNotesZip_*.zip" \
     --exclude="**/EncryptedBackup_*.zip" \
@@ -55,8 +58,10 @@ restic backup \
 
 # Keep every snapshot (several per day too): no restic forget / prune.
 
-echo "[backup:$HOST_TAG] Cleaning up local dump directory..."
-rm -rf "$DUMP_DIR"
+if [[ "${POSTGRES_BACKUP_MODE:-logical}" == "logical" ]]; then
+    echo "[backup:$HOST_TAG] Cleaning up local logical dump directory..."
+    rm -rf "$DUMP_DIR"
+fi
 
 echo "[backup:$HOST_TAG] done $(date)"
 

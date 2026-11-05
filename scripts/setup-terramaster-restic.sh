@@ -355,6 +355,11 @@ run mkdir -p "$new_repo"
 run chown "$APP_USER:$APP_USER" "$new_repo"
 run chmod 700 "$new_repo"
 
+pg_backup_dir="$MOUNT_POINT/pg-basebackup"
+run mkdir -p "$pg_backup_dir"
+run chown "$APP_USER:$APP_USER" "$pg_backup_dir"
+run chmod 700 "$pg_backup_dir"
+
 if [[ "$SKIP_MIGRATE" -eq 0 && "$DO_FORMAT" -eq 0 ]]; then
   if [[ -d "$old_repo" && ! -f "$new_repo/config" ]]; then
     info "migrating existing repo $old_repo -> $new_repo"
@@ -394,6 +399,26 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   else
     info "WARNING: no RESTIC_REPOSITORY line in $BACKUP_ENV — set it manually to $new_repo"
   fi
+
+  patch_env_kv() {
+    local key="$1" val="$2" file="$3"
+    if grep -q "^export ${key}=" "$file" 2>/dev/null; then
+      awk -v k="$key" -v v="$val" 'BEGIN { eq = "^export " k "=" }
+        $0 ~ eq { print "export " k "=\"" v "\""; next }
+        { print }
+      ' "$file" > "$file.tmp"
+    else
+      cp -a "$file" "$file.tmp"
+      printf '\nexport %s="%s"\n' "$key" "$val" >> "$file.tmp"
+    fi
+    chmod 600 "$file.tmp"
+    chown "$APP_USER:$APP_USER" "$file.tmp"
+    mv "$file.tmp" "$file"
+  }
+
+  patch_env_kv POSTGRES_BACKUP_MODE pg17-incremental "$BACKUP_ENV"
+  patch_env_kv PG_BASEBACKUP_ROOT "$pg_backup_dir" "$BACKUP_ENV"
+  info "backup env: POSTGRES_BACKUP_MODE=pg17-incremental PG_BASEBACKUP_ROOT=$pg_backup_dir"
 fi
 
 # ---------------------------------------------------------------- nightly guard

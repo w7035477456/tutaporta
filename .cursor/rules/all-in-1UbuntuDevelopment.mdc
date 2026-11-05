@@ -11,10 +11,17 @@ alwaysApply: true
 
 Do not ask clarifying multiple-choice questions when intent is clear.
 
-**Cursor model:** follow `.cursor/rules/always.mdc` on every prompt.
+**Shell init (`~/b`):** Andrew’s real bash init is **`~/b`** on each machine (Mac and Ubuntu). **Edit `~/b` in place** on that host — Mac: `/Users/a/b` (or `$HOME/b`); Ubuntu: `/home/lawsen0/b` (or `$HOME/b` on the box). Use SSH / `scripts/deploy-ssh-mac.sh` for Ubuntu when editing from the Mac.
 
-- **Always use Composer** for this session and every subagent. Do not use Auto or `inherit`.
-- **Never use Grok**, and never use any model priced **over 0.50** (more than Composer), including Opus.
+- **Never add or edit** `myscript/mac/b`, `myscript/ubuntu/b`, or any other **`myscript/**/b`** in the repo — those copies are not used; Andrew does not look at them.
+- Do not tell Andrew to “sync from myscript” for aliases or functions; change live **`~/b`** only.
+
+**Cursor model:**
+
+- Prefer **Auto** for agent work when available.
+- If Andrew selects **Composer 2.5 Fast**, use that.
+- **Never use Grok** (any Grok model).
+- If Andrew manually selects **Claude Opus 5.5**, **stop and ask** to confirm they intend to use Opus before continuing (cost / capability).
 
 ## 2) Postgres schema — no `public`
 
@@ -81,7 +88,7 @@ After a write in the same request, use Primary or tolerate replication lag for r
 
 ## 8) Mac dev workflow
 
-Bash init: **`source ~/b`** (repo copy: **`myscript/mac/b`**)
+Bash init: **`source ~/b`** — canonical file is **`~/b` on the Mac**; never edit **`myscript/mac/b`**
 
 | Alias | Purpose |
 |-------|---------|
@@ -95,7 +102,7 @@ Env: `~/.ssh/be/.env` (BE), `fe/.env` (FE). Restart after env changes.
 
 ## 9) Ubuntu production workflow
 
-Bash init: **`source ~/b`** (repo copy: **`myscript/ubuntu/b`**)
+Bash init: **`source ~/b`** — canonical file is **`~/b` on Ubuntu**; never edit **`myscript/ubuntu/b`**
 
 | Alias | Purpose |
 |-------|---------|

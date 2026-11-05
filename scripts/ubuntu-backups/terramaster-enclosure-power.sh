@@ -201,6 +201,7 @@ terramaster_spin_down_and_power_off() {
   return 1
 }
 
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 case "${1:-}" in
   wake) terramaster_wake_and_mount ;;
   sleep|off) terramaster_spin_down_and_power_off ;;
@@ -239,3 +240,4 @@ case "${1:-}" in
     exit 2
     ;;
 esac
+fi
