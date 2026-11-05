@@ -1,6 +1,13 @@
 import { attachAuthIfPresent } from './attachAuthIfPresent.js';
 import { estimateRequestBytes, patchResponseByteCounter } from './photoAlbumsTransferMeter.js';
-import { trackVaultTransferBytes } from '../utils/vaultTransferTracking.js';
+import {
+  trackVaultTransferBytes,
+  vaultTransferThrottleProgressPercent
+} from '../utils/vaultTransferTracking.js';
+import {
+  clearVaultLogoffProgress,
+  setVaultLogoffProgress
+} from '../utils/recordVaultVaultLogoffProgress.js';
 
 /** Usage / status polls — metering them would make the usage bar count itself. */
 const SKIP_EXACT = new Set([
@@ -38,12 +45,29 @@ export function recordVaultTransferMeter(req, res, next) {
   if (!Number.isFinite(singlesId) || singlesId < 1) return next();
 
   const reqBytes = estimateRequestBytes(req);
+  const startedAtMs = Date.now();
 
   patchResponseByteCounter(res, (resBytes) => {
     const chunkedBytes = Math.max(0, Number(req.chunkedUploadBytes) || 0);
     const totalBytes = reqBytes + chunkedBytes + resBytes;
     if (totalBytes <= 0) return;
-    void trackVaultTransferBytes(singlesId, totalBytes);
+    void (async () => {
+      try {
+        await trackVaultTransferBytes(singlesId, totalBytes, startedAtMs, {
+          onProgress: async (payload) => {
+            if (!payload?.throttled) return;
+            await setVaultLogoffProgress(singlesId, {
+              percent: vaultTransferThrottleProgressPercent(payload),
+              label: payload.label ? String(payload.label) : ''
+            });
+          }
+        });
+      } catch {
+        // Quota tracking must never fail the response.
+      } finally {
+        await clearVaultLogoffProgress(singlesId);
+      }
+    })();
   });
 
   next();

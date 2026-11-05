@@ -712,16 +712,26 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Allow large JSON bodies for photo upload (base64). From ~/.ssh/be/.env JSON_LIMIT_MB.
-// The ceiling must clear the largest TutaPhoto upload after base64 inflation, or a
-// video sized exactly at TUTAPHOTO_MAX_SIZE_VIDEO_UPLOAD_MB would 413 before routing.
+// Allow large JSON bodies (base64 photo/video, TutaNotes note saves with inline images).
+// ~/.ssh/be/.env JSON_LIMIT_MB — when unset, defaults to the TutaPhoto-derived minimum below.
 const JSON_LIMIT_CEILING_MB = Math.max(100, tutaPhotoRequiredJsonLimitMb());
+const JSON_LIMIT_HARD_CAP_MB = 2048;
+const envJsonLimitMb = Number(process.env.JSON_LIMIT_MB);
 const JSON_LIMIT_MB = Math.max(
   1,
-  Math.min(JSON_LIMIT_CEILING_MB, Number(process.env.JSON_LIMIT_MB) || JSON_LIMIT_CEILING_MB)
+  Number.isFinite(envJsonLimitMb) && envJsonLimitMb > 0
+    ? Math.min(JSON_LIMIT_HARD_CAP_MB, envJsonLimitMb)
+    : JSON_LIMIT_CEILING_MB
 );
 const jsonLimitBytes = JSON_LIMIT_MB * 1024 * 1024;
-console.log('[server_be] express.json body limit:', JSON_LIMIT_MB, 'MiB');
+console.log(
+  '[server_be] express.json body limit:',
+  JSON_LIMIT_MB,
+  'MiB',
+  Number.isFinite(envJsonLimitMb) && envJsonLimitMb > 0
+    ? `(JSON_LIMIT_MB=${envJsonLimitMb}; photo minimum would be ${JSON_LIMIT_CEILING_MB})`
+    : `(default from TutaPhoto minimum ${JSON_LIMIT_CEILING_MB})`
+);
 const effectiveMaxUploadMb = Math.max(0.5, Math.min(999, Number(process.env.MAX_SIZE_UPLOAD_MB) || 999));
 console.log('[server_be] photo upload max size: env MAX_SIZE_UPLOAD_MB =', JSON.stringify(process.env.MAX_SIZE_UPLOAD_MB), '→ effective', effectiveMaxUploadMb, 'MiB (restart PM2 after changing ~/.ssh/be/.env)');
 

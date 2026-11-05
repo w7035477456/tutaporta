@@ -21,6 +21,7 @@ OLD_FAKE=/home/lawsen0/TERRAMASTER
 APP_USER=lawsen0
 BACKUP_ENV=/home/lawsen0/backups/.backup-secrets-ubuntu.env
 NIGHTLY=/home/lawsen0/backups/scripts/backup-nightly.sh
+ENCLOSURE_POWER=/home/lawsen0/backups/scripts/terramaster-enclosure-power.sh
 REPO_SUBDIR=restic-ubuntu
 FS_LABEL=TERRAMASTER
 
@@ -458,7 +459,14 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   restic snapshots --latest 3
   echo
   info "done. Repo now lives on $new_repo"
+  REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+  if [[ -x "$REPO_ROOT/scripts/install-ubuntu-backup-scripts.sh" ]]; then
+    bash "$REPO_ROOT/scripts/install-ubuntu-backup-scripts.sh" "$(dirname "$NIGHTLY")"
+  elif [[ ! -x "$ENCLOSURE_POWER" ]]; then
+    info "Copy scripts/ubuntu-backups/*.sh to $(dirname "$NIGHTLY") (install-ubuntu-backup-scripts.sh)"
+  fi
   info "Run 'backupnightly' to add a snapshot, 'showrestic' to inspect."
+  info "Nightly job wakes the enclosure before backup and powers it off after success."
 else
   echo
   info "dry run complete — nothing changed"

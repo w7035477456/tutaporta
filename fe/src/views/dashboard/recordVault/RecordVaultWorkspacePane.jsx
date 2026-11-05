@@ -29,7 +29,8 @@ import {
   readRecordVaultApiError,
   readFileAsDataUrl,
   createRecordVaultPaneApi,
-  fetchRecordVaultTutaDriveNeedsBackup
+  fetchRecordVaultTutaDriveNeedsBackup,
+  fetchRecordVaultStorageLogoffProgress
 } from 'api/recordVaultFe';
 import {
   offerRecordVaultBackupBeforeExit,
@@ -64,7 +65,6 @@ import { RecordVaultSliderControlButtonProvider } from './RecordVaultSliderContr
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_NOTE_SIZE } from 'config/busyHourglassEnv';
-import RecordVaultViewVaultDialog from './RecordVaultViewVaultDialog';
 import RecordVaultTutaCloudBackupDialog from './RecordVaultTutaCloudBackupDialog';
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import RecordVaultRagDialog from './RecordVaultRagDialog';
@@ -80,7 +80,6 @@ import {
 } from 'utils/recordVaultRagKeepModel';
 import { fetchRecordVaultRagStatus, setRecordVaultRagKeepModel } from 'api/recordVaultFe';
 import { formatRagModelButtonLabel } from 'utils/recordVaultRagModelDisplay';
-import RecordVaultStorageFilesPanel from './RecordVaultStorageFilesPanel';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
@@ -101,6 +100,7 @@ import RecordVaultNoteContentZoomBar, {
   NOTE_CONTENT_ZOOM_DEFAULT
 } from './RecordVaultNoteContentZoomBar';
 import RecordVaultImageRotateButton from './RecordVaultImageRotateButton';
+import RecordVaultNoteAttachButton from './RecordVaultNoteAttachButton';
 import VaultWorkspaceFocusToggleButton from 'ui-component/VaultWorkspaceFocusToggleButton';
 import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
 import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
@@ -724,18 +724,6 @@ const columnResizeHandleSx = {
   '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }
 };
 
-const rowResizeHandleSx = {
-  flex: '0 0 auto',
-  height: 8,
-  cursor: 'ns-resize',
-  touchAction: 'none',
-  alignSelf: 'stretch',
-  bgcolor: 'var(--theme-primary-color)',
-  opacity: 0.35,
-  '&:hover': { opacity: 0.65, bgcolor: 'rgba(255,255,255,0.35)' }
-};
-
-
 function loadStoredNoteFontStyleIndex() {
   try {
     const raw = localStorage.getItem(NOTE_FONT_STYLE_LS_KEY);
@@ -968,18 +956,6 @@ function ColumnResizeHandle({ onMouseDown, sx }) {
       aria-label="Resize column"
       onMouseDown={onMouseDown}
       sx={{ ...columnResizeHandleSx, ...sx }}
-    />
-  );
-}
-
-function RowResizeHandle({ onMouseDown, sx, label = 'Resize panels' }) {
-  return (
-    <Box
-      role="separator"
-      aria-orientation="horizontal"
-      aria-label={label}
-      onMouseDown={onMouseDown}
-      sx={{ ...rowResizeHandleSx, ...sx }}
     />
   );
 }
@@ -1682,8 +1658,6 @@ export default function RecordVaultWorkspacePane({
   const [, setLocalUsbOffered] = useState(false);
   const [, setStorageConfigLoaded] = useState(false);
   const [] = useState(false);
-  const [viewVaultOpen, setViewVaultOpen] = useState(false);
-  const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
   const [tutaCloudBackupRequired, setTutaCloudBackupRequired] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
@@ -1695,7 +1669,6 @@ export default function RecordVaultWorkspacePane({
   const [ragConfiguredModel, setRagConfiguredModel] = useState('');
   const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
   const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
-  const cloudViewLabel = isTutaCloudPane ? 'View TutaDrive' : 'View TutaCloud';
   const [usbVaultFolderLabel] = useState('USB');
   const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
@@ -1876,6 +1849,9 @@ export default function RecordVaultWorkspacePane({
   const [searchHitCount, setSearchHitCount] = useState(0);
   const [activeHitIndex, setActiveHitIndex] = useState(-1);
   const [noteContentLoading, setNoteContentLoading] = useState(false);
+  /** Throttle / long cloud fetch — polled from Redis while note body loads. */
+  const [noteLoadProgressPercent, setNoteLoadProgressPercent] = useState(null);
+  const [noteLoadProgressLabel, setNoteLoadProgressLabel] = useState('');
 
   useEffect(() => {
     setVaultWorkspaceFocusSiteFooterSuppressed(noteFocusView);
@@ -3468,6 +3444,33 @@ export default function RecordVaultWorkspacePane({
     };
   }, [unlocked, selectedNoteId, selectedNote, loadNoteContent]);
 
+  useEffect(() => {
+    if (!noteContentLoading) {
+      setNoteLoadProgressPercent(null);
+      setNoteLoadProgressLabel('');
+      return undefined;
+    }
+    let stopped = false;
+    const poll = window.setInterval(() => {
+      if (stopped) return;
+      void fetchRecordVaultStorageLogoffProgress()
+        .then(({ percent, label }) => {
+          if (stopped) return;
+          const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+          const text = label ? String(label).trim() : '';
+          if (pct > 0 || text) {
+            setNoteLoadProgressPercent(pct);
+            setNoteLoadProgressLabel(text);
+          }
+        })
+        .catch(() => {});
+    }, 250);
+    return () => {
+      stopped = true;
+      window.clearInterval(poll);
+    };
+  }, [noteContentLoading]);
+
   // Push the resolved note body into the TipTap editor once per note/lock-state.
   // Guarded by a hydration key so autosave (which updates body_text in the tree)
   // never re-clobbers the caret while the user is typing.
@@ -4773,53 +4776,6 @@ export default function RecordVaultWorkspacePane({
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [notebookColWidth, rightSidebarWidth, sidebarWidth]);
-
-  const rightSidebarSplitRef = useRef(null);
-
-  const startShortcutPaneResize = useCallback((event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const container = rightSidebarSplitRef.current;
-    if (!container) return;
-
-    const onMove = (moveEvent) => {
-      const rect = container.getBoundingClientRect();
-      if (rect.height <= 0) return;
-      const next = ((moveEvent.clientY - rect.top) / rect.height) * 100;
-      setShortcutPanePercent(clamp(next, MIN_SHORTCUT_PANE_PERCENT, MAX_SHORTCUT_PANE_PERCENT));
-    };
-
-    const onUp = () => {
-      document.body.style.removeProperty('user-select');
-      document.body.style.removeProperty('cursor');
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      setSidebarWidth((w) => {
-        setNotebookColWidth((col) => {
-          setRightSidebarWidth((right) => {
-            setShortcutPanePercent((shortcutPercent) => {
-              writeStoredLayout({
-                sidebarWidth: w,
-                notebookColWidth: col,
-                rightSidebarWidth: right,
-                shortcutPanePercent: shortcutPercent
-              });
-              return shortcutPercent;
-            });
-            return right;
-          });
-          return col;
-        });
-        return w;
-      });
-    };
-
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'ns-resize';
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, []);
-
 
   useEffect(() => {
     if (!notebookColAutoFit) return undefined;
@@ -7234,13 +7190,6 @@ export default function RecordVaultWorkspacePane({
           </Stack>
         </ColorTemplate16PopupCenterWide.Body>
       </ColorTemplate16PopupCenterWide>
-      <RecordVaultViewVaultDialog
-        open={viewVaultOpen}
-        onClose={() => setViewVaultOpen(false)}
-        storageType={viewVaultStorageType}
-        folderName={viewVaultStorageType === 'tutadrive' ? tutaCloudVaultFolderName : ''}
-        tutaDrive={isTutaCloudPane}
-      />
       <RecordVaultTutaCloudBackupDialog
         open={tutaCloudBackupOpen}
         onClose={closeTutaCloudBackupDialog}
@@ -7385,6 +7334,8 @@ export default function RecordVaultWorkspacePane({
       <BusyHourglassOverlay
         open={Boolean(unlocked && noteContentLoading && vaultUiReady)}
         label={paneStorageType === 'tutadrive' ? 'Loading note from TutaCloud' : 'Loading note'}
+        progressPercent={noteLoadProgressPercent}
+        progressLabel={noteLoadProgressLabel}
         backdropSx={vaultLeavingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />
@@ -8754,7 +8705,16 @@ export default function RecordVaultWorkspacePane({
                                 }}
                               />
                             )}
-                            <RecordVaultImageRotateButton editor={noteEditor} />
+                            <RecordVaultNoteAttachButton
+                              disabled={busy || lockedNow}
+                              onFiles={async (files) => {
+                                for (const file of files) {
+                                  // eslint-disable-next-line no-await-in-loop
+                                  await uploadNoteVaultFile(file, null);
+                                }
+                              }}
+                            />
+                            <RecordVaultImageRotateButton editor={noteEditor} disabled={lockedNow} />
                             <RecordVaultSearchBar
                               compact
                               searchLabel="Search Here"
@@ -8899,7 +8859,6 @@ export default function RecordVaultWorkspacePane({
                 }}
               >
                 <Box
-                  ref={rightSidebarSplitRef}
                   sx={{
                     flex: 1,
                     minHeight: 0,
@@ -8914,7 +8873,7 @@ export default function RecordVaultWorkspacePane({
                     ref={shortcutLaneRef}
                     sx={{
                       ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
-                      flex: `${shortcutPanePercent} 1 0`,
+                      flex: '1 1 0',
                       minHeight: compact ? 64 : 100
                     }}
                     onDragOver={(e) => {
@@ -9032,66 +8991,6 @@ export default function RecordVaultWorkspacePane({
                         );
                       })}
                     </Box>
-                  </Box>
-                  <RowResizeHandle
-                    label="Resize Shortcut and Folders & Files"
-                    onMouseDown={startShortcutPaneResize}
-                  />
-                  <Box
-                    sx={{
-                      flex: `${100 - shortcutPanePercent} 1 0`,
-                      minHeight: 80,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                      gap: 0.5,
-                      bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
-                    }}
-                  >
-                    <SliderControlButton
-                      type="button"
-                      /** Same background as Add Notebook / Add Note headers. */
-                      variant="green"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      fullWidth
-                      singleLineLabel={false}
-                      onClick={() => {
-                        setViewVaultStorageType(paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb');
-                        setViewVaultOpen(true);
-                      }}
-                      disabled={busy || !unlocked}
-                      aria-label={paneStorageType === 'tutadrive' ? cloudViewLabel : 'View USB'}
-                      title={
-                        paneStorageType === 'usb'
-                          ? usbBridgeHealthy
-                            ? 'Record Vault USB Bridge connected — USB reachable'
-                            : 'Record Vault USB Bridge disconnected or USB not reachable'
-                          : undefined
-                      }
-                      sx={{
-                        flexShrink: 0,
-                        ...laneContainedButtonSx,
-                        // Stack "View" / "TutaDrive" (or USB / TutaCloud) — one word per row.
-                        display: 'inline-flex !important',
-                        flexDirection: 'column !important',
-                        height: 'auto !important',
-                        minHeight: { xs: 36, sm: 40 },
-                        whiteSpace: 'normal !important',
-                        lineHeight: '1.15 !important',
-                        py: { xs: 0.35, sm: 0.45 },
-                        '& .MuiButton-label': {
-                          ...menuButtonWordPerLineLabelSx,
-                          whiteSpace: 'normal',
-                          overflow: 'visible',
-                          textOverflow: 'clip'
-                        }
-                      }}
-                    >
-                      {renderMenuLabelOneWordPerLine(
-                        paneStorageType === 'tutadrive' ? cloudViewLabel : 'View USB'
-                      )}
-                    </SliderControlButton>
-                    <RecordVaultStorageFilesPanel storageType={paneStorageType || 'usb'} active={unlocked} />
                   </Box>
                 </Box>
               </Box>

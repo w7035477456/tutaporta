@@ -11,7 +11,11 @@ import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/recordVaultUsb/v
 import { getVaultIconRetryDelaySeconds } from '../../utils/recordVaultUsb/unlockGuard.js';
 import { logoffVaultUsb } from '../../utils/recordVaultUsb/vaultSession.js';
 import { clearRecordVaultCacheIcon, readRecordVaultCacheIcon } from '../../utils/recordVaultCacheIcon.js';
-import { getVaultLogoffProgress } from '../../utils/recordVaultVaultLogoffProgress.js';
+import {
+  clearVaultLogoffProgress,
+  getVaultLogoffProgress,
+  setVaultLogoffProgress
+} from '../../utils/recordVaultVaultLogoffProgress.js';
 import { loadGlobalVideoTutorialTutanotes } from '../../utils/globalVideoTutorialTutanotes.js';
 
 function requireSinglesId(req, res) {
@@ -87,7 +91,10 @@ export async function logoffRecordVaultStorage(req, res) {
   if (!singlesId) return;
 
   try {
-    const result = await logoffVaultUsb(singlesId);
+    await clearVaultLogoffProgress(singlesId);
+    const result = await logoffVaultUsb(singlesId, null, {
+      onProgress: (progress) => setVaultLogoffProgress(singlesId, progress)
+    });
     await clearRecordVaultCacheIcon(singlesId);
     return res.json({ ...result, cacheTutaCloudIcon: '', cacheUsbIcon: '' });
   } catch (err) {

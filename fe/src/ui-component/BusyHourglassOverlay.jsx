@@ -1,12 +1,13 @@
 import PropTypes from 'prop-types';
 import { createPortal } from 'react-dom';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Box from '@mui/material/Box';
 import BusyHourglass from 'ui-component/BusyHourglass';
 import OrangeButton from 'ui-component/OrangeButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
+import { useRecordVaultThrottleWaitProgress } from 'utils/recordVaultThrottleWaitProgress';
 import { BUSY_HOURGLASS_SIZE, busyHourglassOverlayRootSx } from 'config/busyHourglassEnv';
 import {
   getRecordVaultOverageThrottleActive,
@@ -43,11 +44,7 @@ export default function BusyHourglassOverlay({
   yellowPanel = false,
   sx
 }) {
-  const notesOverageThrottled = useSyncExternalStore(
-    subscribeRecordVaultOverageThrottle,
-    getRecordVaultOverageThrottleActive,
-    () => false
-  );
+  const notesOverageThrottled = useSyncExternalStore(subscribeRecordVaultOverageThrottle, getRecordVaultOverageThrottleActive, () => false);
   const albumsOverageThrottled = useSyncExternalStore(
     subscribePhotoAlbumsOverageThrottle,
     getPhotoAlbumsOverageThrottleActive,
@@ -64,17 +61,35 @@ export default function BusyHourglassOverlay({
     () => 1
   );
   const overageThrottled = notesOverageThrottled || albumsOverageThrottled;
-  const overageThrottleFactor = Math.max(
-    1,
-    Number(notesOverageThrottleFactor) || 1,
-    Number(albumsOverageThrottleFactor) || 1
-  );
+  const overageThrottleFactor = Math.max(1, Number(notesOverageThrottleFactor) || 1, Number(albumsOverageThrottleFactor) || 1);
+  // While the backend is stretching this request (refill depleted) it publishes how
+  // far through that sleep it is — show it even when the caller passed no percent,
+  // so a throttled upload reads "37% done" instead of a blank spinner.
+  const throttleWaitPercent = useRecordVaultThrottleWaitProgress(Boolean(open));
+
+  // Throttled requests have no byte-level total to report, so also count how long
+  // the user has been waiting — it keeps ticking even if a progress report is missed.
+  const throttledOpen = Boolean(open) && overageThrottled;
+  const [elapsedSec, setElapsedSec] = useState(0);
+  useEffect(() => {
+    if (!throttledOpen) {
+      setElapsedSec(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    setElapsedSec(0);
+    const timerId = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timerId);
+  }, [throttledOpen]);
 
   if (!open || typeof document === 'undefined') return null;
 
-  const showPercent = progressPercent != null && Number.isFinite(Number(progressPercent));
+  const callerPercent = progressPercent != null && Number.isFinite(Number(progressPercent)) ? Number(progressPercent) : null;
+  const showPercent = callerPercent != null || throttleWaitPercent != null;
   const clampedPercent = showPercent
-    ? Math.max(0, Math.min(100, Math.round(Number(progressPercent))))
+    ? Math.max(0, Math.min(100, Math.round(callerPercent != null ? callerPercent : throttleWaitPercent)))
     : null;
   // Backend may embed the REFILL line in progressLabel; keep only the upload/status
   // lines here so the yellow throttleNotice below is not duplicated.
@@ -86,12 +101,18 @@ export default function BusyHourglassOverlay({
   const statusHadThrottle = statusLines.some((line) => VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE.test(line));
   const showThrottleNotice = overageThrottled || statusHadThrottle;
   const showAction = Boolean(actionLabel) && typeof onAction === 'function';
-  const showSideText = showPercent || Boolean(statusText) || showThrottleNotice;
+  // A live throttle percent is the most useful number; otherwise, when we know the
+  // request is being throttled, at least show how long it has been waiting.
+  const waitingText = throttledOpen && elapsedSec > 0 ? `${elapsedSec}s waiting` : '';
+  const showSideText = showPercent || Boolean(statusText) || showThrottleNotice || Boolean(waitingText);
+  const percentText =
+    clampedPercent == null ? '' : callerPercent == null ? `${clampedPercent}% of throttled wait` : `${clampedPercent}% done`;
   const ariaLabel = [
     label,
-    showPercent && clampedPercent != null ? `${clampedPercent}% done` : '',
+    percentText,
     statusText,
     showThrottleNotice ? vaultOverageThrottleAriaMessage(overageThrottleFactor) : '',
+    waitingText,
     showAction ? actionLabel : ''
   ]
     .filter(Boolean)
@@ -137,7 +158,7 @@ export default function BusyHourglassOverlay({
             whiteSpace: 'nowrap'
           }}
         >
-          {clampedPercent}% done
+          {percentText}
         </Box>
       ) : null}
       {statusText ? (
@@ -156,6 +177,11 @@ export default function BusyHourglassOverlay({
             fontWeight: 800
           }}
         />
+      ) : null}
+      {waitingText ? (
+        <Box component="p" sx={{ ...statusParagraphSx, fontWeight: 800, opacity: 0.9 }}>
+          {waitingText}
+        </Box>
       ) : null}
     </Box>
   ) : null;

@@ -58,6 +58,10 @@ import { buildBackupDownloadHeaders } from '../../utils/backupDownloadHeaders.js
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 import { sendRecordVaultError } from '../../utils/recordVaultRouteErrors.js';
 import {
+  clearVaultLogoffProgress,
+  setVaultLogoffProgress
+} from '../../utils/recordVaultVaultLogoffProgress.js';
+import {
   applyTutaDriveMerge,
   cleanupTutaDriveMergeStaging,
   extractTutaDriveMergeZip,
@@ -366,7 +370,10 @@ export async function logoffRecordVaultTutaDrive(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
-    await logoffVaultUsb(singlesId, 'onedrive');
+    await clearVaultLogoffProgress(singlesId);
+    await logoffVaultUsb(singlesId, 'onedrive', {
+      onProgress: (progress) => setVaultLogoffProgress(singlesId, progress)
+    });
     return res.json({ success: true });
   } catch (err) {
     console.error('[logoffRecordVaultTutaDrive]', err?.message || err);

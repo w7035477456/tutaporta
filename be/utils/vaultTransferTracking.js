@@ -29,6 +29,15 @@ export const VAULT_REFILL_BLOCK_MB = (() => {
  * UI copy when NOTES_OVERLIMIT_THROTTLE_MULTIPLE is stretching transfers
  * (line 2 under upload status). Includes the live multiple, e.g. "…throttled 10x".
  */
+/** 1–99 while an over-quota throttle sleep is in progress (for Redis / FE polling). */
+export function vaultTransferThrottleProgressPercent({ remainingMs, totalThrottleMs } = {}) {
+  const total = Math.floor(Number(totalThrottleMs) || 0);
+  if (total <= 0) return 0;
+  const remaining = Math.max(0, Math.floor(Number(remainingMs) || 0));
+  const done = Math.round(((total - remaining) / total) * 100);
+  return Math.max(1, Math.min(99, done));
+}
+
 export function getVaultTransferThrottleRefillLabel() {
   const multiple = VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR;
   const throttled =

@@ -842,6 +842,23 @@ alias settimeout2='sudo vi /etc/profile.d/autologout.sh'
 alias vilogout='sudo vi /etc/profile.d/timeout.sh; source /etc/profile.d/timeout.sh'
 ######################
 alias backupnightly='clear; sudo ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env'
+alias waketerramaster='sudo ~/backups/scripts/terramaster-enclosure-power.sh wake'
+alias spinterramaster='sudo ~/backups/scripts/terramaster-enclosure-power.sh sleep'
+terramasterstatus() {
+    local out status
+    if ! out=$(sudo ~/backups/scripts/terramaster-enclosure-power.sh status 2>&1); then
+        printf '%s\n' "$out" >&2
+        return 1
+    fi
+    status=$(printf '%s\n' "$out" | sed -n 's/^enclosure status: \([^ (]*\).*/\1/p')
+    case "$status" in
+        active) printf 'TerraMaster enclosure: ACTIVE — disk spun up (using power)\n\n' ;;
+        spun_down) printf 'TerraMaster enclosure: SPUN DOWN — on USB, motor parked\n\n' ;;
+        offline) printf 'TerraMaster enclosure: OFFLINE — no block device (USB powered off)\n\n' ;;
+        *) printf 'TerraMaster enclosure: (status unknown — details below)\n\n' ;;
+    esac
+    printf '%s\n' "$out"
+}
 alias cleanupdump='sudo rm -rf ~/backups/restore-ubuntu-*;sudo rm -rf ~/backups/pgdump-ubuntu'
 alias restorenightly='clear; sudo ~/backups/scripts/restore-latest.sh ~/backups/.backup-secrets-ubuntu.env'
 alias testnightly='clear;/home/lawsen0/backups/scripts/restore-into-test-db.sh'
@@ -850,7 +867,7 @@ alias securenightly='sudo chown -R "$USER:$USER" ~/backups /mnt/terramaster;sudo
 alias fixrestic='sudo chown -R lawsen0:lawsen0 /mnt/terramaster /home/lawsen0/backups; chmod -R u=rwX,go= /mnt/terramaster /home/lawsen0/backups;chmod 700 /mnt/terramaster /home/lawsen0/backups'
 
 alias showdump='clear;ls -lht ~/backups/pgdump-ubuntu;ls -latr'
-alias showrestic='clear;sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"'
+alias showrestic='sudo ~/backups/scripts/terramaster-enclosure-power.sh wake; clear;sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"'
 
 alias wipebackuponly='clear;sudo rm -rf /mnt/terramaster/restic-ubuntu && showrestic'
 alias wipetestbackup='clear;sudo rm -rf /mnt/terramaster/restic-ubuntu && source ~/backups/.backup-secrets-ubuntu.env && restic init --repo $RESTIC_REPOSITORY && bash ~/backups/scripts/backup-nightly.sh ~/backups/.backup-secrets-ubuntu.env && backupnightly && showrestic'
@@ -859,12 +876,16 @@ alias showterramaster='clear;findmnt -T /mnt/terramaster;df -h /mnt/terramaster;
 RESTIC_ENV_UBUNTU=/home/lawsen0/backups/.backup-secrets-ubuntu.env
 
 resticu() {
+    sudo ~/backups/scripts/terramaster-enclosure-power.sh wake
     sudo bash -c 'source "$1"; shift; restic "$@"' _ "$RESTIC_ENV_UBUNTU" "$@"
 }
 
 restichelp() {
     cat <<'EOF'
 To activate backup manually:         backupnightly
+To wake restic disk (before restic): waketerramaster
+To park / power-off restic disk:     spinterramaster
+To show enclosure power/mount state: terramasterstatus
 To back up now with a note:          backupnote <text>
 To show all snapshots:               resticsnapshots
 To add a note to a snapshot:         resticnote <id> <text>
@@ -1133,6 +1154,7 @@ resticcron() {
         printf '    Why two  : UTC slots cover EDT+EST so DST never shifts a day;\n'
         printf '                the "= %s" guard lets only the matching slot run.\n' "${cur_h:-?}"
         printf '    Log       : %s\n' "$log"
+        printf '    Enclosure : wakes + mounts before backup; spin-down + USB power-off after success\n'
         if [ -n "$cur_h" ]; then
             now=$(date +%s)
             target=$(TZ=$tz date -d "today ${cur_h}:00" +%s 2>/dev/null)

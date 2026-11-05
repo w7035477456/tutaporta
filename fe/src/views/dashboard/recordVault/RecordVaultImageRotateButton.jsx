@@ -1,9 +1,13 @@
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import { useEditorState } from '@tiptap/react';
-import { SLIDER_CONTROL_TRUE_YELLOW } from 'ui-component/SliderControlButton';
-import { LIGHT_SURFACE_CLASS } from 'utils/themeContrast';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faRotate } from '@fortawesome/free-solid-svg-icons';
 import { IMAGE_ROTATION_STEP } from './recordVaultImageRotation';
+import {
+  RECORD_VAULT_NOTE_HEADER_ICON_BUTTON_CLASS,
+  recordVaultNoteHeaderIconButtonSx
+} from './recordVaultNoteHeaderIconButton';
 
 /**
  * Node types the rotate button can turn. `recordVaultAttachment` is an inline
@@ -48,44 +52,24 @@ export default function RecordVaultImageRotateButton({ editor, disabled = false 
     <Box
       component="button"
       type="button"
-      // Keep the editor's image selection intact while pressing the button.
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       disabled={isDisabled}
-      aria-label="Rotate selected image 90 degrees"
-      title={isDisabled ? 'Click an image in the note, then rotate it 90°' : 'Rotate the selected image 90° clockwise'}
-      className={LIGHT_SURFACE_CLASS}
-      sx={{
-        flexShrink: 0,
-        p: 0,
-        m: 0,
-        width: 32,
-        height: 32,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: '2px solid #000 !important',
-        borderRadius: 0.5,
-        bgcolor: `${SLIDER_CONTROL_TRUE_YELLOW} !important`,
-        backgroundImage: 'none !important',
-        color: '#000 !important',
-        WebkitTextFillColor: '#000 !important',
-        fontSize: '1rem',
-        fontWeight: 900,
-        lineHeight: 1,
-        cursor: isDisabled ? 'not-allowed' : 'pointer',
-        opacity: isDisabled ? 0.45 : 1,
-        '&:hover': isDisabled ? undefined : { filter: 'brightness(1.06)' },
-        '&:active': isDisabled ? undefined : { transform: 'scale(0.96)' }
-      }}
+      aria-label="Rotate selected image 90 degrees clockwise"
+      title={
+        isDisabled
+          ? 'Click an image in the note, then rotate it 90°'
+          : 'Rotate the selected image 90° clockwise'
+      }
+      className={RECORD_VAULT_NOTE_HEADER_ICON_BUTTON_CLASS}
+      sx={recordVaultNoteHeaderIconButtonSx(isDisabled)}
     >
-      ↻
+      <FontAwesomeIcon icon={faRotate} style={{ fontSize: 18 }} aria-hidden />
     </Box>
   );
 }
 
 RecordVaultImageRotateButton.propTypes = {
-  /** TipTap editor instance (null until the editor mounts). */
   editor: PropTypes.object,
   disabled: PropTypes.bool
 };
