@@ -156,6 +156,12 @@ export default function RecordVaultSearchBar({
     } else if (event.key === 'Escape') {
       event.preventDefault();
       onClear?.();
+    } else if (compact && hitCount > 0 && event.key === 'ArrowDown') {
+      event.preventDefault();
+      onNextHit?.();
+    } else if (compact && hitCount > 0 && event.key === 'ArrowUp') {
+      event.preventDefault();
+      onPrevHit?.();
     }
   };
 
@@ -202,7 +208,7 @@ export default function RecordVaultSearchBar({
           sx={compactInputFieldSx}
           inputProps={{ 'aria-label': 'Search term in this note' }}
         />
-        {hasHits ? (
+        {searched ? (
           <Box sx={compactHitNavSx}>
             <Box
               component="button"
@@ -210,7 +216,7 @@ export default function RecordVaultSearchBar({
               aria-label="Previous match in this note"
               title="Previous match in this note"
               onClick={() => onPrevHit?.()}
-              disabled={activeHitIndex <= 0}
+              disabled={!hasHits || activeHitIndex <= 0}
               sx={compactNavButtonSx}
             >
               ▲
@@ -221,14 +227,14 @@ export default function RecordVaultSearchBar({
                 fontWeight: 800,
                 fontSize: '0.66rem',
                 lineHeight: 1,
-                color: '#000',
-                WebkitTextFillColor: '#000',
+                color: hasHits ? '#000' : '#c62828',
+                WebkitTextFillColor: hasHits ? '#000' : '#c62828',
                 minWidth: 30,
                 textAlign: 'center',
                 userSelect: 'none'
               }}
             >
-              {activeHitIndex >= 0 ? activeHitIndex + 1 : 0}/{hitCount}
+              {hasHits ? (activeHitIndex >= 0 ? activeHitIndex + 1 : 1) : 0}/{hasHits ? hitCount : 0}
             </Typography>
             <Box
               component="button"
@@ -236,28 +242,12 @@ export default function RecordVaultSearchBar({
               aria-label="Next match in this note"
               title="Next match in this note"
               onClick={() => onNextHit?.()}
-              disabled={activeHitIndex >= hitCount - 1}
+              disabled={!hasHits || activeHitIndex >= hitCount - 1}
               sx={compactNavButtonSx}
             >
               ▼
             </Box>
           </Box>
-        ) : searched ? (
-          <Typography
-            component="span"
-            sx={{
-              flexShrink: 0,
-              fontWeight: 800,
-              fontSize: '0.66rem',
-              lineHeight: 1,
-              color: '#c62828',
-              WebkitTextFillColor: '#c62828',
-              whiteSpace: 'nowrap',
-              userSelect: 'none'
-            }}
-          >
-            0/0
-          </Typography>
         ) : null}
       </Box>
     );

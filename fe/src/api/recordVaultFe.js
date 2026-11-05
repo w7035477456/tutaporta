@@ -226,7 +226,11 @@ async function rvRequest(config) {
   if (storageType) {
     headers['X-Record-Vault-Storage'] = storageType;
   }
-  const nextConfig = { ...config, headers };
+  const { onDownloadProgress, ...rest } = config || {};
+  const nextConfig = { ...rest, headers };
+  if (typeof onDownloadProgress === 'function') {
+    nextConfig.onDownloadProgress = onDownloadProgress;
+  }
   const viaBridge = shouldRouteRecordVaultThroughBridge(nextConfig.url, paneStorageType);
   const result = viaBridge ? await bridgeRequest(nextConfig) : await api(nextConfig);
   maybeReportBridgeSessionFileCounts(nextConfig, result?.data, viaBridge);
@@ -376,10 +380,43 @@ export async function fetchRecordVaultTree({ storageType } = {}) {
 }
 
 /** Lazy load — full text, keywords, attachments, and extra images for one note. */
-export async function fetchRecordVaultNote(noteId, { storageType } = {}) {
+export async function fetchRecordVaultNote(noteId, { storageType, onTransferProgress } = {}) {
   const id = Number(noteId);
   if (!Number.isFinite(id) || id < 1) return null;
-  const { data } = await rvRequest({method: 'GET', url: `/api/recordVault/notes/${id}`, storageType });
+  const startedAt = Date.now();
+  const report =
+    typeof onTransferProgress === 'function'
+      ? (payload) => {
+          try {
+            onTransferProgress(payload);
+          } catch {
+            // UI progress must never fail the fetch.
+          }
+        }
+      : null;
+  if (report) {
+    report({ phase: 'download', percent: 1, loadedBytes: 0, totalBytes: 0 });
+  }
+  const { data } = await rvRequest({
+    method: 'GET',
+    url: `/api/recordVault/notes/${id}`,
+    storageType,
+    onDownloadProgress: report
+      ? (event) => {
+          const loaded = Number(event?.loaded) || 0;
+          const total = Number(event?.total) || 0;
+          const { percent, details } = transferProgressDetails(startedAt, loaded, total, 1, 90);
+          report({
+            phase: 'download',
+            percent: Math.max(1, Math.min(90, Math.round(percent))),
+            ...details
+          });
+        }
+      : undefined
+  });
+  if (report) {
+    report({ phase: 'download', percent: 90, loadedBytes: 0, totalBytes: 0, done: true });
+  }
   return data?.note ?? null;
 }
 
@@ -1793,12 +1830,7 @@ export function createRecordVaultPaneApi(storageType) {
   const rv = (config) => rvRequest({ ...config, storageType: type });
   return {
     fetchRecordVaultTree: () => fetchRecordVaultTree(opts),
-    fetchRecordVaultNote: async (noteId) => {
-      const id = Number(noteId);
-      if (!Number.isFinite(id) || id < 1) return null;
-      const { data } = await rv({ method: 'GET', url: `/api/recordVault/notes/${id}` });
-      return data?.note ?? null;
-    },
+    fetchRecordVaultNote: (noteId, progressOpts) => fetchRecordVaultNote(noteId, { ...opts, ...progressOpts }),
     createRecordVaultNotebook: (name) => createRecordVaultNotebook(name, opts),
     updateRecordVaultNotebook: (id, name) => updateRecordVaultNotebook(id, name, opts),
     deleteRecordVaultNotebook: (id) => deleteRecordVaultNotebook(id, opts),

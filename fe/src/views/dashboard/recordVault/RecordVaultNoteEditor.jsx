@@ -10,8 +10,12 @@ import {
 } from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
 import {
+  computeSearchMatches,
+  getSearchChannelMatchCount,
   NOTE_SEARCH_ACTIVE_ATTR,
-  NOTE_SEARCH_HIT_CLASS
+  NOTE_SEARCH_HIT_CLASS,
+  SEARCH_CHANNEL_GLOBAL,
+  SEARCH_CHANNEL_NOTE
 } from './recordVaultSearchHighlight';
 import { scoreRecordVaultLabelForAttachment } from 'utils/recordVaultRichText';
 import { themedAlert } from 'utils/themedDialog';
@@ -71,6 +75,13 @@ function scrollActiveHitIntoView(
   const dom = editor?.view?.dom;
   const active = dom?.querySelector(activeSelector) || dom?.querySelector(hitSelector);
   if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+/** Decorations land in the DOM after the current frame — scroll once they exist. */
+function afterSearchDecorationsPaint(editor, scrollFn) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => scrollFn());
+  });
 }
 
 /**
@@ -403,22 +414,23 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
        */
       applySearchHighlight: (terms) => {
         if (!editor) return 0;
-        editor.commands.setSearchHighlightTerms(Array.isArray(terms) ? terms : []);
-        const count = editor.view?.dom.querySelectorAll('.rv-search-hit').length ?? 0;
+        const list = Array.isArray(terms) ? terms : [];
+        const count = computeSearchMatches(editor.state.doc, list).length;
+        editor.commands.setSearchHighlightTerms(list);
         if (count > 0) {
           editor.commands.setActiveSearchHit(0);
-          requestAnimationFrame(() => scrollActiveHitIntoView(editor));
+          afterSearchDecorationsPaint(editor, () => scrollActiveHitIntoView(editor));
         }
         return count;
       },
       /** Number of highlighted search matches currently in the note body. */
       getSearchHitCount: () =>
-        editor?.view?.dom.querySelectorAll('.rv-search-hit').length ?? 0,
+        editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_GLOBAL) : 0,
       /** Make the given match index the "current" hit and scroll it into view. */
       setActiveSearchHit: (index) => {
         if (!editor) return;
         editor.commands.setActiveSearchHit(index);
-        requestAnimationFrame(() => scrollActiveHitIntoView(editor));
+        afterSearchDecorationsPaint(editor, () => scrollActiveHitIntoView(editor));
       },
       /**
        * In-note ("this page only") search: same blinking treatment as the vault
@@ -427,11 +439,12 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
        */
       applyNoteSearchHighlight: (terms) => {
         if (!editor) return 0;
-        editor.commands.setNoteSearchHighlightTerms(Array.isArray(terms) ? terms : []);
-        const count = editor.view?.dom.querySelectorAll(`.${NOTE_SEARCH_HIT_CLASS}`).length ?? 0;
+        const list = Array.isArray(terms) ? terms : [];
+        const count = computeSearchMatches(editor.state.doc, list).length;
+        editor.commands.setNoteSearchHighlightTerms(list);
         if (count > 0) {
           editor.commands.setActiveNoteSearchHit(0);
-          requestAnimationFrame(() =>
+          afterSearchDecorationsPaint(editor, () =>
             scrollActiveHitIntoView(editor, {
               activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
               hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`
@@ -442,12 +455,12 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
       },
       /** Number of in-note search matches highlighted in the open note. */
       getNoteSearchHitCount: () =>
-        editor?.view?.dom.querySelectorAll(`.${NOTE_SEARCH_HIT_CLASS}`).length ?? 0,
+        editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_NOTE) : 0,
       /** Make the given in-note match the "current" hit and scroll it into view. */
       setActiveNoteSearchHit: (index) => {
         if (!editor) return;
         editor.commands.setActiveNoteSearchHit(index);
-        requestAnimationFrame(() =>
+        afterSearchDecorationsPaint(editor, () =>
           scrollActiveHitIntoView(editor, {
             activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
             hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`

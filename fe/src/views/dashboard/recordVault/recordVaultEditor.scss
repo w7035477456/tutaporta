@@ -171,6 +171,11 @@
       margin: 0;
     }
 
+    /* Trailing empty paragraph after an image — clickable target for paste / typing. */
+    > p:last-child {
+      min-height: 1.25em;
+    }
+
     h1,
     h2,
     h3,

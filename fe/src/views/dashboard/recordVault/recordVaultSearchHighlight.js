@@ -118,6 +118,13 @@ function combineDecorations(doc, channels) {
   return all.length ? DecorationSet.create(doc, all) : DecorationSet.empty;
 }
 
+/** Match count from plugin state (do not query DOM — decorations paint after dispatch). */
+export function getSearchChannelMatchCount(state, channel = SEARCH_CHANNEL_GLOBAL) {
+  const pluginState = recordVaultSearchHighlightKey.getState(state);
+  const ch = pluginState?.channels?.[channel];
+  return ch?.matches?.length ?? 0;
+}
+
 /**
  * Highlights the active Record Vault search terms inside the note body and
  * tracks a "current" hit so the user can step through matches (up/down). Every

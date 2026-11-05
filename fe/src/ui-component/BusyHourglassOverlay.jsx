@@ -103,10 +103,21 @@ export default function BusyHourglassOverlay({
   const showAction = Boolean(actionLabel) && typeof onAction === 'function';
   // A live throttle percent is the most useful number; otherwise, when we know the
   // request is being throttled, at least show how long it has been waiting.
-  const waitingText = throttledOpen && elapsedSec > 0 ? `${elapsedSec}s waiting` : '';
+  const waitingText =
+    throttledOpen && !showPercent && elapsedSec > 0
+      ? `${elapsedSec}s waiting`
+      : throttledOpen && showPercent && elapsedSec > 0
+        ? `${elapsedSec}s elapsed`
+        : throttledOpen && elapsedSec === 0
+          ? 'Transfer in progress…'
+          : '';
   const showSideText = showPercent || Boolean(statusText) || showThrottleNotice || Boolean(waitingText);
   const percentText =
-    clampedPercent == null ? '' : callerPercent == null ? `${clampedPercent}% of throttled wait` : `${clampedPercent}% done`;
+    clampedPercent == null
+      ? ''
+      : callerPercent == null
+        ? `${clampedPercent}% of throttled wait`
+        : `${clampedPercent}% done`;
   const ariaLabel = [
     label,
     percentText,

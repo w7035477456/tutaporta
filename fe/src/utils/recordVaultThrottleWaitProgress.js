@@ -113,8 +113,9 @@ export function useRecordVaultThrottleWaitProgress(active) {
     getServerSnapshot
   );
   if (!active) return null;
+  if (livePercent != null) return livePercent;
   if (!getRecordVaultOverageThrottleActive()) return null;
-  return livePercent;
+  return null;
 }
 
 /** Test/teardown helper — forget the cached percent and stop polling. */

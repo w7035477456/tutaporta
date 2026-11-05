@@ -80,6 +80,9 @@ import {
 } from 'utils/recordVaultRagKeepModel';
 import { fetchRecordVaultRagStatus, setRecordVaultRagKeepModel } from 'api/recordVaultFe';
 import { formatRagModelButtonLabel } from 'utils/recordVaultRagModelDisplay';
+import { getRecordVaultOverageThrottleActive } from 'utils/recordVaultOverageThrottleUi';
+import { buildVaultTransferProgressLabel } from 'utils/vaultTransferProgressLabel';
+import { waitForVaultTransferThrottleTail } from 'utils/waitForVaultTransferThrottleTail';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
@@ -2179,8 +2182,24 @@ export default function RecordVaultWorkspacePane({
     const id = Number(noteId);
     if (!Number.isFinite(id) || id < 1) return;
     if (isBillScheduleSystemId(id)) return;
-    const note = await vaultApi.fetchRecordVaultNote(id);
+    const onTransferProgress = (payload) => {
+      const pct = Math.max(0, Math.min(100, Math.round(Number(payload?.percent) || 0)));
+      if (pct > 0) setNoteLoadProgressPercent(pct);
+      const text = buildVaultTransferProgressLabel(payload);
+      if (text) setNoteLoadProgressLabel(text);
+    };
+    const note = await vaultApi.fetchRecordVaultNote(id, { onTransferProgress });
     if (!note) throw new Error('Note not found');
+    if (getRecordVaultOverageThrottleActive()) {
+      await waitForVaultTransferThrottleTail({
+        onProgress: (payload) => {
+          const pct = Math.max(0, Math.min(99, Math.round(Number(payload?.percent) || 0)));
+          if (pct > 0) setNoteLoadProgressPercent(pct);
+          const text = buildVaultTransferProgressLabel(payload);
+          if (text) setNoteLoadProgressLabel(text);
+        }
+      });
+    }
     setNotebooks((prev) =>
       prev.map((nb) => ({
         ...nb,
@@ -3105,9 +3124,13 @@ export default function RecordVaultWorkspacePane({
       return;
     }
     setNoteSearchTerms([term]);
-    const count = noteEditorApiRef.current?.applyNoteSearchHighlight?.([term]) || 0;
-    setNoteSearchHitCount(count);
-    setNoteSearchActiveHitIndex(count > 0 ? 0 : -1);
+    const apply = () => {
+      const count = noteEditorApiRef.current?.applyNoteSearchHighlight?.([term]) || 0;
+      setNoteSearchHitCount(count);
+      setNoteSearchActiveHitIndex(count > 0 ? 0 : -1);
+    };
+    if (noteEditorApiRef.current?.applyNoteSearchHighlight) apply();
+    else requestAnimationFrame(apply);
   }, [noteSearchTerm]);
 
   const handleClearNoteSearch = useCallback(() => {
@@ -3457,11 +3480,10 @@ export default function RecordVaultWorkspacePane({
         .then(({ percent, label }) => {
           if (stopped) return;
           const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
-          const text = label ? String(label).trim() : '';
-          if (pct > 0 || text) {
-            setNoteLoadProgressPercent(pct);
-            setNoteLoadProgressLabel(text);
-          }
+          if (pct <= 0 && !label) return;
+          if (pct > 0) setNoteLoadProgressPercent(pct);
+          const text = buildVaultTransferProgressLabel({ phase: 'throttle', percent: pct, label });
+          if (text) setNoteLoadProgressLabel(text);
         })
         .catch(() => {});
     }, 250);
