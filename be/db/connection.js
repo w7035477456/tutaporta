@@ -366,3 +366,17 @@ if (STANDALONE) {
 
 export default poolProxy;
 export { getDBSchema, getPostgresBusyPercent };
+
+/** For overload middleware — local pool pressure on this PM2 worker. */
+export function getPgPoolStats() {
+  if (STANDALONE) {
+    return { waitingCount: 0, totalCount: 0, idleCount: 0, busyPct: 0 };
+  }
+  const pool = currentPool;
+  return {
+    waitingCount: pool?.waitingCount ?? 0,
+    totalCount: pool?.totalCount ?? 0,
+    idleCount: pool?.idleCount ?? 0,
+    busyPct: getPostgresBusyPercent(pool)
+  };
+}

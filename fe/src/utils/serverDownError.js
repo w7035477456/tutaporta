@@ -4,6 +4,8 @@ function hasAppErrorBody(data) {
   return Boolean(data && typeof data === 'object' && (data.error || data.message || data.code));
 }
 
+import { SYSTEM_OVERLOADED_CODE } from 'constants/systemOverload';
+
 /** True when the request never reached a live backend (network error, proxy / HAProxy gateway failure). */
 export function isServerDownError(error) {
   if (!error || error.code === 'ERR_CANCELED' || error.name === 'CanceledError') return false;
@@ -13,6 +15,7 @@ export function isServerDownError(error) {
   const upstreamDown =
     typeof headers.get === 'function' ? headers.get('x-tuta-upstream-down') : headers['x-tuta-upstream-down'];
   if (upstreamDown || res.data?.serverDown === true) return true;
+  if (res.status === 503 && res.data?.code === SYSTEM_OVERLOADED_CODE) return false;
   if ([502, 503, 504].includes(res.status)) return !hasAppErrorBody(res.data);
   if (res.status === 500) {
     const data = res.data;

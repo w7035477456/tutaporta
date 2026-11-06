@@ -1,0 +1,5 @@
+;; Copy to /etc/pgbouncer/userlist.txt (mode 600).
+;; Generate line: scripts/install-pgbouncer.sh --print-userlist
+;; Format: "username" "password"
+
+"test_user1" "REPLACE_WITH_DB_PASSWORD"

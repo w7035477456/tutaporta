@@ -9,6 +9,7 @@ import NavigationScroll from 'layout/NavigationScroll';
 import DatabaseConnectionGuard from 'ui-component/DatabaseConnectionGuard';
 import ThemeCustomization from 'themes';
 import TooManyRequestsModal from 'ui-component/TooManyRequestsModal';
+import SystemOverloadModal from 'ui-component/SystemOverloadModal';
 import RateWarnPopup from 'ui-component/RateWarnPopup';
 import SessionTimeoutWarning from 'ui-component/SessionTimeoutWarning';
 import BrowserZoomWarning from 'ui-component/BrowserZoomWarning';
@@ -81,6 +82,7 @@ export default function App() {
                 <RouterProvider router={router} />
                 <GetMyRaffleTicketFloatingButton />
                 <TooManyRequestsModal />
+                <SystemOverloadModal />
                 <RateWarnPopup />
                 <SessionTimeoutWarning />
                 <BrowserZoomWarning />

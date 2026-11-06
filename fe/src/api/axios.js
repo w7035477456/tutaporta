@@ -7,6 +7,19 @@ import { forceAuthLoginRedirect, shouldForceLoginRedirect } from 'utils/forceAut
 import { requestPhotoAlbumsUsageRefresh } from 'utils/photoAlbumsUsageRefreshGate';
 import { ID_INITIALIZATION_REQUIRED_CODE, notifyIdInitializationRequired } from 'utils/idInitializationRequired';
 import { isServerDownError, markServerDownError } from 'utils/serverDownError';
+import { SYSTEM_OVERLOADED_CODE, SYSTEM_OVERLOAD_MAX_RETRIES } from 'constants/systemOverload';
+import { dispatchSystemOverloadModal } from 'ui-component/SystemOverloadModal';
+
+function sleepMs(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function isSystemOverloadResponse(error) {
+  const res = error?.response;
+  return res?.status === 503 && res?.data?.code === SYSTEM_OVERLOADED_CODE;
+}
 
 function shouldRefreshPhotoAlbumsUsageAfterRequest(url) {
   const s = String(url || '');
@@ -125,10 +138,32 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
     const url = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
     if (shouldRefreshPhotoAlbumsUsageAfterRequest(url)) {
       requestPhotoAlbumsUsageRefresh();
+    }
+    if (isSystemOverloadResponse(error)) {
+      const config = error.config;
+      if (config) {
+        config.__systemOverloadRetries = (config.__systemOverloadRetries || 0) + 1;
+        if (config.__systemOverloadRetries <= SYSTEM_OVERLOAD_MAX_RETRIES) {
+          const data = error.response?.data || {};
+          let retrySec = Number(data.retryAfterSeconds);
+          if (!Number.isFinite(retrySec) || retrySec < 1) {
+            const hdr = error.response?.headers?.['retry-after'];
+            retrySec = Number(hdr) || 15;
+          }
+          dispatchSystemOverloadModal({
+            retryAfterSeconds: retrySec,
+            attempt: config.__systemOverloadRetries
+          });
+          await sleepMs(retrySec * 1000 + Math.floor(Math.random() * 400));
+          return api.request(config);
+        }
+        dispatchSystemOverloadModal({ failed: true });
+      }
+      return Promise.reject(error);
     }
     if (isServerDownError(error)) {
       return Promise.reject(markServerDownError(error));

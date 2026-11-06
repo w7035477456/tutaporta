@@ -1,6 +1,11 @@
 import './loadEnv.js'; // load ~/.ssh/be/.env first so DB_* etc. are set regardless of cwd
 import { isDuplicatePhoneAllowed } from './utils/duplicatePhonePolicy.js';
 import { drainUploadBodyBeforeResponse } from './utils/drainUploadBodyBeforeResponse.js';
+import {
+  isSystemOverloadEnabled,
+  readSystemOverloadThresholds,
+  systemOverloadMiddleware
+} from './middleware/systemOverload.js';
 import { tutaPhotoRequiredJsonLimitMb } from './utils/tutaPhotoQuotaConfig.js';
 import { isBlockMobileEnabled } from './utils/blockMobileConfig.js';
 import { isSignupDownEnabled, rejectWhenSignupDown } from './utils/signupDownConfig.js';
@@ -1055,6 +1060,19 @@ app.get('/api/rateLimitStatus', (_req, res) => {
     warnPercent: null
   });
 });
+
+// Saturated pg pool → 503 SYSTEM_OVERLOADED (FE auto-retry). Health routes above are exempt.
+app.use(systemOverloadMiddleware);
+{
+  const th = readSystemOverloadThresholds();
+  console.log(
+    '[startup] System overload gate:',
+    isSystemOverloadEnabled() ? 'on' : 'off',
+    isSystemOverloadEnabled()
+      ? `(pool waiting ≥${th.poolWaiting} or busy ≥${th.busyPct}%, Retry-After ${th.retryAfterSec}s; set SYSTEM_OVERLOAD_ENABLED=false to disable)`
+      : ''
+  );
+}
 
 // Server info: internal IP of this machine (for footer display)
 function getInternalIp() {

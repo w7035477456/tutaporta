@@ -1,0 +1,108 @@
+Implemented all **three layers** in the repo. They work together once you deploy HAProxy/PgBouncer on the servers and restart FE/BE.
+
+---
+
+## 1. PgBouncer (config + installer)
+
+| File | Purpose |
+|------|---------|
+| `configSetup/pgbouncer/pgbouncer.ini` | **Session** pool → `127.0.0.1:50010` |
+| `configSetup/pgbouncer/userlist.txt.example` | Auth template |
+| `scripts/install-pgbouncer.sh` | Mac or Ubuntu install |
+
+**Mac dev:** (Homebrew **or** MacPorts — this Intel Mac uses MacPorts; `/usr/local/bin/brew` is gone)
+
+```bash
+sudo port install pgbouncer
+./scripts/install-pgbouncer.sh --mac
+# Homebrew instead: brew install pgbouncer
+```
+
+Then in `~/.ssh/be/.env`: `DB_HOST=127.0.0.1`, `DB_PORT=6432`, restart `beall`.
+
+**Ubuntu web box:**
+
+```bash
+sudo ./scripts/install-pgbouncer.sh
+# DB_PORT=6432 in ~/.ssh/be/.env → pm2 restart tutamallPM2Process
+```
+
+PgBouncer is **not** running until you run the script on each host.
+
+---
+
+## 2. HAProxy admission (config only)
+
+Updated:
+
+- `misc_artifacts/haproxy.prod.cfg`
+- `misc_artifacts/haproxy.preprod.cfg`
+- `configSetup/all-in-1/haproxy.cfg`
+
+Changes: **`timeout queue 120s`**, **`default-server maxconn 200`**, **`fullconn`** on `be_app`.
+
+Deploy on xbox1:
+
+```
+######## DO THIS ON UBUNTU BEGIN ########
+sudo cp /home/lawsen0/code/main/misc_artifacts/haproxy.prod.cfg /etc/haproxy/haproxy.cfg
+sudo haproxy -c -f /etc/haproxy/haproxy.cfg && sudo systemctl reload haproxy
+####### END DO THIS ON UBUNTU #####
+```
+
+(Adjust path if your repo lives elsewhere on the box.)
+
+---
+
+## 3. App overload + FE auto-retry (code — active after restart)
+
+**Backend**
+
+- `be/middleware/systemOverload.js` — if local pg pool **`waitingCount ≥ 8`** (default) or **busy ≥ 88%**, returns:
+  - `503` + `code: SYSTEM_OVERLOADED` + `Retry-After`
+- Mounted after `/health` routes (health stays exempt).
+- Env: `SYSTEM_OVERLOAD_ENABLED` (default **on**), `SYSTEM_OVERLOAD_POOL_WAITING`, `SYSTEM_OVERLOAD_BUSY_PCT`, `SYSTEM_OVERLOAD_RETRY_AFTER_SEC`.
+
+**Frontend**
+
+- `SystemOverloadModal` — “System under heavy load… retrying automatically.”
+- `axios` — up to **40** auto-retries on `SYSTEM_OVERLOADED` (no click spam).
+- `serverDownError.js` — overload 503 is **not** “server down.”
+
+Restart **beall** + **feall** (or deploy) to pick this up.
+
+---
+
+## How the three work together
+
+```text
+User → HAProxy (queue / maxconn 200 per box)
+     → Node (overload 503 + JSON if DB pool saturated)
+     → PgBouncer :6432 (when installed) → Postgres :50010
+     → FE modal + auto-retry until success or max retries
+```
+
+---
+
+## What you should do locally now
+
+```
+######## DO THIS BEGIN ########
+# 1) Backend + frontend (overload gate + auto-retry)
+source ~/b
+beall   # or restart PM2 on Ubuntu
+
+feall   # or rebuild/deploy FE
+
+# 2) Optional Mac PgBouncer
+brew install pgbouncer
+cd ~/code/main && ./scripts/install-pgbouncer.sh --mac
+# Set DB_HOST=127.0.0.1 and DB_PORT=6432 in ~/.ssh/be/.env, restart beall
+
+# 3) Production: HAProxy on xbox1 + PgBouncer on each web server (scripts above)
+####### END DO THIS #####
+```
+
+**Note:** Overload middleware triggers on **per-worker** pool pressure (good for shedding); HAProxy caps **HTTP** concurrency; PgBouncer caps **Postgres** connections. None of that replaces a **job queue** for long LLM/backup work — that’s a separate follow-up.
+
+I can add a tiny **`GET /api/systemOverload/status`** for debugging thresholds, or wire **`fetch()`** (non-axios) with the same retry helper, if you want that next.
