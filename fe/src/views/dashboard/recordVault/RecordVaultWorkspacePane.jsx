@@ -3147,9 +3147,12 @@ export default function RecordVaultWorkspacePane({
     (delta) => {
       const api = noteEditorApiRef.current;
       if (!api?.setActiveNoteSearchHit || noteSearchHitCount <= 0) return;
-      const base = noteSearchActiveHitIndex < 0 ? 0 : noteSearchActiveHitIndex;
+      const liveIndex =
+        typeof api.getActiveNoteSearchHitIndex === 'function'
+          ? api.getActiveNoteSearchHitIndex()
+          : noteSearchActiveHitIndex;
+      const base = liveIndex < 0 ? 0 : liveIndex;
       const next = Math.max(0, Math.min(noteSearchHitCount - 1, base + delta));
-      if (next === noteSearchActiveHitIndex) return;
       setNoteSearchActiveHitIndex(next);
       api.setActiveNoteSearchHit(next);
     },
@@ -6833,7 +6836,6 @@ export default function RecordVaultWorkspacePane({
       if (!api?.setActiveSearchHit || searchHitCount <= 0) return;
       const base = activeHitIndex < 0 ? 0 : activeHitIndex;
       const next = Math.max(0, Math.min(searchHitCount - 1, base + delta));
-      if (next === activeHitIndex) return;
       setActiveHitIndex(next);
       api.setActiveSearchHit(next);
     },

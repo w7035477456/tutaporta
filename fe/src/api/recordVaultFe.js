@@ -33,6 +33,9 @@ function resolveRecordVaultApiStorageType(storageType) {
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
 export function readRecordVaultApiError(err, fallback = 'Request failed') {
   const data = err?.response?.data;
+  if (data?.code === 'STORAGE_DISK_FULL') {
+    return String(data?.error || 'Disk is full where TutaNotes saves files. Free space on this computer, then try again.');
+  }
   if (data?.code === 'STORAGE_PERMISSION') {
     return String(data?.error || 'Folder permission error. Please contact your admin');
   }
@@ -53,6 +56,9 @@ export function readRecordVaultApiError(err, fallback = 'Request failed') {
   const message = String(err?.message || '').trim();
   if (/permission denied|EACCES|EPERM|EROFS|Folder permission error/i.test(message)) {
     return 'Folder permission error. Please contact your admin';
+  }
+  if (/ENOSPC|no space left on device/i.test(message)) {
+    return 'Disk is full where TutaNotes saves files. Free space on this computer (not the 10GB transfer bar), then try again.';
   }
   if (message && !/^Request failed with status code \d+$/i.test(message)) return message;
   return fallback;

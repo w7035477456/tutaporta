@@ -12,8 +12,8 @@ import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
 import {
   computeSearchMatches,
   getSearchChannelMatchCount,
-  NOTE_SEARCH_ACTIVE_ATTR,
-  NOTE_SEARCH_HIT_CLASS,
+  recordVaultSearchHighlightKey,
+  scrollSearchHitIntoView,
   SEARCH_CHANNEL_GLOBAL,
   SEARCH_CHANNEL_NOTE
 } from './recordVaultSearchHighlight';
@@ -65,23 +65,6 @@ function protectPreNewlines(html) {
 /** HTML about to enter the editor: theme-following text colors, intact code blocks. */
 function prepareEditorHtml(html) {
   return protectPreNewlines(stripNeutralColorsFromHtml(html));
-}
-
-/** Scroll the currently active (bold-blinking) search hit into the middle of view. */
-function scrollActiveHitIntoView(
-  editor,
-  { activeSelector = '[data-rv-search-active="true"]', hitSelector = '.rv-search-hit' } = {}
-) {
-  const dom = editor?.view?.dom;
-  const active = dom?.querySelector(activeSelector) || dom?.querySelector(hitSelector);
-  if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
-}
-
-/** Decorations land in the DOM after the current frame — scroll once they exist. */
-function afterSearchDecorationsPaint(editor, scrollFn) {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => scrollFn());
-  });
 }
 
 /**
@@ -419,7 +402,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         editor.commands.setSearchHighlightTerms(list);
         if (count > 0) {
           editor.commands.setActiveSearchHit(0);
-          afterSearchDecorationsPaint(editor, () => scrollActiveHitIntoView(editor));
+          scrollSearchHitIntoView(editor, SEARCH_CHANNEL_GLOBAL);
         }
         return count;
       },
@@ -430,7 +413,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
       setActiveSearchHit: (index) => {
         if (!editor) return;
         editor.commands.setActiveSearchHit(index);
-        afterSearchDecorationsPaint(editor, () => scrollActiveHitIntoView(editor));
+        scrollSearchHitIntoView(editor, SEARCH_CHANNEL_GLOBAL);
       },
       /**
        * In-note ("this page only") search: same blinking treatment as the vault
@@ -444,28 +427,23 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         editor.commands.setNoteSearchHighlightTerms(list);
         if (count > 0) {
           editor.commands.setActiveNoteSearchHit(0);
-          afterSearchDecorationsPaint(editor, () =>
-            scrollActiveHitIntoView(editor, {
-              activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
-              hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`
-            })
-          );
+          scrollSearchHitIntoView(editor, SEARCH_CHANNEL_NOTE);
         }
         return count;
       },
       /** Number of in-note search matches highlighted in the open note. */
       getNoteSearchHitCount: () =>
         editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_NOTE) : 0,
+      getActiveNoteSearchHitIndex: () => {
+        if (!editor) return -1;
+        const pluginState = recordVaultSearchHighlightKey.getState(editor.state);
+        return pluginState?.channels?.[SEARCH_CHANNEL_NOTE]?.activeIndex ?? -1;
+      },
       /** Make the given in-note match the "current" hit and scroll it into view. */
       setActiveNoteSearchHit: (index) => {
         if (!editor) return;
         editor.commands.setActiveNoteSearchHit(index);
-        afterSearchDecorationsPaint(editor, () =>
-          scrollActiveHitIntoView(editor, {
-            activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
-            hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`
-          })
-        );
+        scrollSearchHitIntoView(editor, SEARCH_CHANNEL_NOTE);
       },
       /** Drop every in-note search highlight (Clear button). */
       clearNoteSearchHighlight: () => {

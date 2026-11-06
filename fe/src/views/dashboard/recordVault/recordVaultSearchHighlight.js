@@ -125,6 +125,81 @@ export function getSearchChannelMatchCount(state, channel = SEARCH_CHANNEL_GLOBA
   return ch?.matches?.length ?? 0;
 }
 
+function channelHitSelectors(channel) {
+  if (channel === SEARCH_CHANNEL_NOTE) {
+    return {
+      activeSelector: `[${NOTE_SEARCH_ACTIVE_ATTR}="true"]`,
+      hitSelector: `.${NOTE_SEARCH_HIT_CLASS}`
+    };
+  }
+  return {
+    activeSelector: '[data-rv-search-active="true"]',
+    hitSelector: '.rv-search-hit'
+  };
+}
+
+/**
+ * Scroll the active search hit into view — same behavior for Search All (global)
+ * and Search Here (note). Uses doc positions + the editor scroll pane so CSS
+ * zoom on the note body does not break scrollIntoView on decoration spans.
+ */
+export function scrollSearchHitIntoView(editor, channel = SEARCH_CHANNEL_GLOBAL) {
+  if (!editor?.view) return false;
+  const pluginState = recordVaultSearchHighlightKey.getState(editor.state);
+  const ch = pluginState?.channels?.[channel];
+  if (!ch?.matches?.length || ch.activeIndex < 0) return false;
+  const match = ch.matches[ch.activeIndex];
+  if (!match) return false;
+
+  const paintThenScroll = () => {
+    const view = editor.view;
+    if (!view?.dom?.isConnected) return false;
+
+    let coords;
+    try {
+      coords = view.coordsAtPos(match.from);
+    } catch {
+      coords = null;
+    }
+
+    try {
+      editor.commands.focus(undefined, { scrollIntoView: false });
+    } catch {
+      view.focus();
+    }
+
+    const lineMid = coords ? (coords.top + coords.bottom) / 2 : null;
+    const body = view.dom.closest('.rv-editor__body');
+    if (lineMid != null && body instanceof HTMLElement) {
+      const bodyRect = body.getBoundingClientRect();
+      const targetScrollTop = body.scrollTop + (lineMid - bodyRect.top) - body.clientHeight * 0.35;
+      body.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+    }
+
+    const { activeSelector, hitSelector } = channelHitSelectors(channel);
+    const hitEl = view.dom.querySelector(activeSelector) || view.dom.querySelector(hitSelector);
+    if (hitEl instanceof HTMLElement) {
+      hitEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    if (lineMid != null && typeof window !== 'undefined') {
+      const margin = Math.min(160, window.innerHeight * 0.22);
+      if (lineMid < margin) {
+        window.scrollBy({ top: lineMid - margin, behavior: 'smooth' });
+      } else if (lineMid > window.innerHeight - margin) {
+        window.scrollBy({ top: lineMid - (window.innerHeight - margin), behavior: 'smooth' });
+      }
+    }
+
+    return true;
+  };
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(paintThenScroll);
+  });
+  return true;
+}
+
 /**
  * Highlights the active Record Vault search terms inside the note body and
  * tracks a "current" hit so the user can step through matches (up/down). Every
