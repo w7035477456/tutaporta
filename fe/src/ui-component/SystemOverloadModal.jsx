@@ -15,6 +15,11 @@ export default function SystemOverloadModal() {
   useEffect(() => {
     const onOverload = (event) => {
       const detail = event?.detail || {};
+      if (detail.recovered) {
+        setOpen(false);
+        setFailed(false);
+        return;
+      }
       if (detail.failed) {
         setFailed(true);
         setOpen(true);
@@ -46,12 +51,12 @@ export default function SystemOverloadModal() {
     <Dialog open={open} onClose={failed ? handleClose : undefined} maxWidth="sm" fullWidth>
       <DialogContent sx={{ textAlign: 'center', py: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 2 }}>
-          {failed ? 'Still busy' : 'Please wait'}
+          {failed ? 'Still busy' : 'Thanks for your patience!'}
         </Typography>
         <Typography sx={{ mb: 2, lineHeight: 1.6 }}>
           {failed
             ? 'The system is still under heavy load. Your request could not complete automatically. Please wait a moment and try again.'
-            : 'System under heavy load. Your request will retry automatically — no need to click again.'}
+            : 'TutaMall & TutaDates are more popular than ever, and we’re seeing more visitors than expected. We’re adding more servers right now so this won’t happen again. Your request will retry automatically, so there’s no need to click again.'}
         </Typography>
         {!failed ? (
           <Box

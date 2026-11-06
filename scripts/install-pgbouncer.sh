@@ -36,7 +36,13 @@ print_userlist() {
 
 write_mac_ini() {
   mkdir -p "$(dirname "$MAC_INI")"
-  sed "s|auth_file = /etc/pgbouncer/userlist.txt|auth_file = ${HOME}/.ssh/be/pgbouncer-userlist.txt|" "$INI_SRC" > "$MAC_INI"
+  mkdir -p "${HOME}/Library/Logs"
+  {
+    sed "s|auth_file = /etc/pgbouncer/userlist.txt|auth_file = ${HOME}/.ssh/be/pgbouncer-userlist.txt|" "$INI_SRC"
+    # pgbouncer -d refuses to start without a pidfile ([pgbouncer] is the last section).
+    echo "pidfile = /tmp/pgbouncer-mac.pid"
+    echo "logfile = ${HOME}/Library/Logs/pgbouncer.log"
+  } > "$MAC_INI"
   print_userlist > "${HOME}/.ssh/be/pgbouncer-userlist.txt"
   chmod 600 "${HOME}/.ssh/be/pgbouncer-userlist.txt"
   echo "Wrote $MAC_INI and ~/.ssh/be/pgbouncer-userlist.txt"

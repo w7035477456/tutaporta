@@ -43,12 +43,17 @@ export function readSystemOverloadThresholds() {
  * instead of hanging until HAProxy/nginx times out.
  */
 export function systemOverloadMiddleware(req, res, next) {
-  if (!isSystemOverloadEnabled() || shouldSkipSystemOverload(req)) return next();
+  if (shouldSkipSystemOverload(req)) return next();
+  // Load-test switch; envConfig re-reads ~/.ssh/be/.env every 10s, so no restart is needed.
+  const fakeOverload = envBool('FAKE_LOT_OF_USERS', false);
+  if (!fakeOverload && !isSystemOverloadEnabled()) return next();
 
   const { poolWaiting, busyPct, retryAfterSec } = readSystemOverloadThresholds();
   const stats = getPgPoolStats();
   const saturated =
-    stats.waitingCount >= poolWaiting || (busyPct > 0 && stats.busyPct >= busyPct);
+    fakeOverload ||
+    stats.waitingCount >= poolWaiting ||
+    (busyPct > 0 && stats.busyPct >= busyPct);
 
   if (!saturated) return next();
 

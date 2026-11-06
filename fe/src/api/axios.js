@@ -136,12 +136,18 @@ api.interceptors.response.use(
     if (shouldRefreshPhotoAlbumsUsageAfterRequest(url)) {
       requestPhotoAlbumsUsageRefresh();
     }
+    if (response.config?.__systemOverloadRetries) {
+      dispatchSystemOverloadModal({ recovered: true });
+    }
     return response;
   },
   async (error) => {
     const url = `${error.config?.baseURL || ''}${error.config?.url || ''}`;
     if (shouldRefreshPhotoAlbumsUsageAfterRequest(url)) {
       requestPhotoAlbumsUsageRefresh();
+    }
+    if (error.config?.__systemOverloadRetries && !isSystemOverloadResponse(error)) {
+      dispatchSystemOverloadModal({ recovered: true });
     }
     if (isSystemOverloadResponse(error)) {
       const config = error.config;
@@ -154,11 +160,13 @@ api.interceptors.response.use(
             const hdr = error.response?.headers?.['retry-after'];
             retrySec = Number(hdr) || 15;
           }
+          // Spread retries over +0..50% so thousands of waiting browsers don't retry in lockstep.
+          const delayMs = retrySec * 1000 + Math.floor(Math.random() * retrySec * 500);
           dispatchSystemOverloadModal({
-            retryAfterSeconds: retrySec,
+            retryAfterSeconds: Math.ceil(delayMs / 1000),
             attempt: config.__systemOverloadRetries
           });
-          await sleepMs(retrySec * 1000 + Math.floor(Math.random() * 400));
+          await sleepMs(delayMs);
           return api.request(config);
         }
         dispatchSystemOverloadModal({ failed: true });
