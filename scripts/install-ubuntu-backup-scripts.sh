@@ -9,5 +9,8 @@ install -d -m 700 "$DEST"
 install -m 700 "$REPO_ROOT/scripts/ubuntu-backups/terramaster-enclosure-power.sh" "$DEST/"
 install -m 700 "$REPO_ROOT/scripts/ubuntu-backups/backup-postgres.sh" "$DEST/"
 install -m 700 "$REPO_ROOT/scripts/ubuntu-backups/backup-nightly.sh" "$DEST/"
+install -m 700 "$REPO_ROOT/scripts/ubuntu-backups/terramaster-idle-watchdog.sh" "$DEST/"
+install -m 700 "$REPO_ROOT/scripts/ubuntu-backups/set-terramaster-watchdog-cron.sh" "$DEST/"
 echo "Installed to $DEST:"
-ls -la "$DEST"/terramaster-enclosure-power.sh "$DEST"/backup-postgres.sh "$DEST"/backup-nightly.sh
+ls -la "$DEST"/terramaster-enclosure-power.sh "$DEST"/backup-postgres.sh "$DEST"/backup-nightly.sh \
+  "$DEST"/terramaster-idle-watchdog.sh "$DEST"/set-terramaster-watchdog-cron.sh
