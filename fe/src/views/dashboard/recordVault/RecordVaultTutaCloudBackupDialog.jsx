@@ -95,6 +95,25 @@ const BACKUP_OPERATION_STEPS = {
   }
 };
 
+/** "310mb of 1055mb done" — both sides share one unit (gb once the larger side reaches 10 GiB). */
+function buildBackupProgressBytesText(progress) {
+  if (!progress) return '';
+  const reportedTotal = Number(progress.totalBytes) || Number(progress.estimatedBytes) || 0;
+  const loaded = progress.stage === 'server' ? reportedTotal : Number(progress.loadedBytes);
+  if (progress.loadedBytes == null && progress.stage !== 'server') return '';
+  if (!Number.isFinite(loaded) || loaded < 0) return '';
+  if (!loaded && !reportedTotal) return '';
+  // An estimated total can undershoot the real zip size — grow it rather than stall at "Y of Y".
+  const total = reportedTotal > 0 ? Math.max(reportedTotal, loaded) : 0;
+  const largest = Math.max(loaded, total);
+  const MiB = 1024 * 1024;
+  const fmt = (bytes) =>
+    largest >= 10 * 1024 * MiB
+      ? `${(bytes / (1024 * MiB)).toFixed(2)}gb`
+      : `${(bytes / MiB).toFixed(largest >= 100 * MiB ? 0 : 1)}mb`;
+  return total > 0 ? `${fmt(loaded)} of ${fmt(total)} done` : `${fmt(loaded)} done`;
+}
+
 function buildBackupProgressLabel(progress, nowMs) {
   if (!progress) return '';
   const op = BACKUP_OPERATION_STEPS[progress.operation] || BACKUP_OPERATION_STEPS.backup;
@@ -370,6 +389,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         }
         progressPercent={backupProgress ? backupProgress.percent : null}
         progressLabel={buildBackupProgressLabel(backupProgress, progressNowMs)}
+        progressDetail={buildBackupProgressBytesText(backupProgress)}
         yellowPanel={Boolean(backupProgress)}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />

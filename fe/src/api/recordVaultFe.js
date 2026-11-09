@@ -1097,16 +1097,21 @@ async function readBackupFileWithProgress(file, report, fromPct, toPct) {
 
 /**
  * GET a blob (stage `stage`) within [fromPct, toPct]. When the response has no Content-Length,
- * `estimatedTotalBytes` drives the percent (capped just below toPct) and is reported as `estimatedBytes`.
+ * `estimatedTotalBytes` (or the server's `X-Estimated-Content-Length` header for streamed zips)
+ * drives the percent (capped just below toPct) and is reported as `estimatedBytes`.
  */
 async function downloadBlobWithProgress(url, report, stage, fromPct, toPct, { estimatedTotalBytes = 0 } = {}) {
   const startedAt = Date.now();
-  const estimate = Number(estimatedTotalBytes) > 0 ? Number(estimatedTotalBytes) : 0;
+  let estimate = Number(estimatedTotalBytes) > 0 ? Number(estimatedTotalBytes) : 0;
   report(stage, fromPct, { loadedBytes: 0, totalBytes: 0, estimatedBytes: estimate });
   const response = await api.get(url, {
     responseType: 'blob',
     timeout: 0,
     onDownloadProgress: (event) => {
+      if (!estimate) {
+        const headerValue = Number(event?.event?.target?.getResponseHeader?.('X-Estimated-Content-Length'));
+        if (Number.isFinite(headerValue) && headerValue > 0) estimate = headerValue;
+      }
       const loaded = Number(event?.loaded) || 0;
       const total = Number(event?.total) || 0;
       if (total > 0 || !estimate) {

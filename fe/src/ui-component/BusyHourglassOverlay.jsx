@@ -27,6 +27,7 @@ import VaultOverageThrottleNotice from 'ui-component/VaultOverageThrottleNotice'
  * Full-viewport centered spinning hourglass — site-wide busy indicator.
  * Renders via portal so it stays centered over modals and page chrome.
  * Optional progressPercent (0–100) shows "% done" plus an optional status label.
+ * Optional progressDetail (e.g. "310mb of 1055mb done") renders directly under the percent.
  * Optional actionLabel + onAction (e.g. Skip OneDrive) for long waits.
  * When TutaNotes / TutaPhotoAlbums data-limit throttle is active, appends a REFILL notice (once —
  * backend progress labels may already include the same line).
@@ -37,6 +38,7 @@ export default function BusyHourglassOverlay({
   label = 'Loading',
   progressPercent = null,
   progressLabel = '',
+  progressDetail = '',
   actionLabel = '',
   onAction,
   backdropSx,
@@ -111,6 +113,7 @@ export default function BusyHourglassOverlay({
         : throttledOpen && elapsedSec === 0
           ? 'Transfer in progress…'
           : '';
+  const detailText = showPercent ? String(progressDetail || '').trim() : '';
   const showSideText = showPercent || Boolean(statusText) || showThrottleNotice || Boolean(waitingText);
   const percentText =
     clampedPercent == null
@@ -121,6 +124,7 @@ export default function BusyHourglassOverlay({
   const ariaLabel = [
     label,
     percentText,
+    detailText,
     statusText,
     showThrottleNotice ? vaultOverageThrottleAriaMessage(overageThrottleFactor) : '',
     waitingText,
@@ -170,6 +174,11 @@ export default function BusyHourglassOverlay({
           }}
         >
           {percentText}
+        </Box>
+      ) : null}
+      {detailText ? (
+        <Box component="p" sx={{ ...statusParagraphSx, fontWeight: 800, whiteSpace: 'nowrap' }}>
+          {detailText}
         </Box>
       ) : null}
       {statusText ? (
@@ -279,6 +288,7 @@ BusyHourglassOverlay.propTypes = {
   label: PropTypes.string,
   progressPercent: PropTypes.number,
   progressLabel: PropTypes.string,
+  progressDetail: PropTypes.string,
   actionLabel: PropTypes.string,
   onAction: PropTypes.func,
   backdropSx: PropTypes.object,

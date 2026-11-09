@@ -23,6 +23,7 @@ import {
   VAULT_DIR_NAME,
   VAULT_META_FILE
 } from './recordVaultUsb/vaultPaths.js';
+import { computeDirectorySizeBytes } from './recordVaultUsb/vaultFolderSize.js';
 import {
   isTutaDriveBackupFileName,
   parseTutaDriveBackupFileNameParts,
@@ -401,6 +402,18 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
   // Streamed zip: there is no stored mtime, so date it with the build time.
   // Without this, macOS shows a blank Date Added for the download.
   res.setHeader('Last-Modified', new Date().toUTCString());
+  // Streamed zip has no Content-Length; vault files are already encrypted so the zip is
+  // about the same size as the raw files — the browser uses this for "X of Y done".
+  let estimatedBytes = computeDirectorySizeBytes(vaultRoot) + Buffer.byteLength(String(billSchedule.json || ''));
+  for (const file of billSchedule.files) {
+    try {
+      estimatedBytes += fs.statSync(file.absPath).size;
+    } catch {
+      // missing bill attachment — archive.file will surface it
+    }
+  }
+  res.setHeader('X-Estimated-Content-Length', String(estimatedBytes));
+  res.flushHeaders?.();
 
   const archive = new ZipArchive({ zlib: { level: 6 } });
   await new Promise((resolve, reject) => {
