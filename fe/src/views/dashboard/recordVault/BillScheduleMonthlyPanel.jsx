@@ -11,6 +11,7 @@ import PropTypes from 'prop-types';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
+import BillDueDayInput from './BillDueDayInput';
 import { attachDropToBillRow, billRowDropResultMessage, readBillRowDrop } from './billRowDropAttach';
 import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
 import BillReceiptsPopup from './BillReceiptsPopup';
@@ -649,23 +650,11 @@ export default function BillScheduleMonthlyPanel({
                   </Box>
                 </td>
                 <td>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    type="number"
-                    inputProps={{ min: 1, max: 31, step: 1 }}
+                  <BillDueDayInput
                     value={row.due_day ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '') {
-                        updateRow(index, { due_day: '' });
-                        return;
-                      }
-                      const n = Math.trunc(Number(v));
-                      if (!Number.isFinite(n)) return;
-                      updateRow(index, { due_day: Math.min(31, Math.max(1, n)) });
-                    }}
-                    placeholder="1–31"
+                    year={year}
+                    month={month}
+                    onChange={(day) => updateRow(index, { due_day: day })}
                     sx={inputSx}
                   />
                 </td>

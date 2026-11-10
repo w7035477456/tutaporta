@@ -1992,6 +1992,8 @@ export default function RecordVaultWorkspacePane({
   const mynotePrefsSaveTimerRef = useRef(null);
   const contentScrollRef = useRef(null);
   const pendingMynoteRestoreRef = useRef({ applied: false });
+  /** First tree load waits for saved prefs so it reopens the last note / Monthly / Yearly. */
+  const [mynotePrefsReady, setMynotePrefsReady] = useState(false);
   const noteContentBgIndexRef = useRef(RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX);
   const noteFontStyleIndexRef = useRef(RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX);
   const noteTextBgIndexRef = useRef(RECORD_VAULT_DEFAULT_TEXT_HIGHLIGHT_INDEX);
@@ -3227,6 +3229,9 @@ export default function RecordVaultWorkspacePane({
       })
       .catch(() => {
         // keep env default
+      })
+      .finally(() => {
+        if (!cancelled) setMynotePrefsReady(true);
       });
     return () => {
       cancelled = true;
@@ -3274,16 +3279,24 @@ export default function RecordVaultWorkspacePane({
       const currentNoteId = selectedNoteIdRef.current;
       const notebookId =
         preferNotebookId ??
-        (tree.some((nb) => Number(nb.notebook_id) === Number(currentNotebookId))
+        (isBillScheduleNotebookId(currentNotebookId) ||
+        tree.some((nb) => Number(nb.notebook_id) === Number(currentNotebookId))
           ? currentNotebookId
           : tree[0]?.notebook_id ?? null);
-      const notebook = tree.find((nb) => Number(nb.notebook_id) === Number(notebookId)) ?? tree[0] ?? null;
+      // Bill Schedule is a virtual notebook (not in the vault tree) — Monthly / Yearly reopen it.
+      const notebook = isBillScheduleNotebookId(notebookId)
+        ? buildBillScheduleNotebook()
+        : tree.find((nb) => Number(nb.notebook_id) === Number(notebookId)) ?? tree[0] ?? null;
       setSelectedNotebookId(notebook?.notebook_id ?? null);
 
       const notes = notebook?.notes || [];
-      const noteId =
-        preferNoteId ??
-        (notes.some((n) => Number(n.note_id) === Number(currentNoteId)) ? currentNoteId : notes[0]?.note_id ?? null);
+      const hasNote = (id) => id != null && notes.some((n) => Number(n.note_id) === Number(id));
+      // A saved / preferred note that was deleted falls back to the current note, then the first note.
+      const noteId = hasNote(preferNoteId)
+        ? preferNoteId
+        : hasNote(currentNoteId)
+          ? currentNoteId
+          : notes[0]?.note_id ?? null;
       setSelectedNoteId(noteId);
       // Refresh status-bar Usb/ui tx/rx counts after tree open / mutations.
       window.setTimeout(() => {
@@ -3427,12 +3440,14 @@ export default function RecordVaultWorkspacePane({
       return undefined;
     }
     setRecordVaultBridgeStorageType(paneStorageType);
+    if (!mynotePrefsReady) return undefined;
     const pending = pendingMynoteRestoreRef.current;
     void loadTree({
       preferNotebookId: pending?.notebookId ?? undefined,
       preferNoteId: pending?.noteId ?? undefined
     });
-  }, [unlocked, paneStorageType, loadTree]);
+    return undefined;
+  }, [unlocked, paneStorageType, loadTree, mynotePrefsReady]);
 
   useEffect(() => {
     if (!unlocked || !selectedNoteId) {

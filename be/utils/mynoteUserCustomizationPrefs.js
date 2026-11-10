@@ -20,6 +20,17 @@ function parseNullableBigint(value) {
   return Math.trunc(n);
 }
 
+/** Virtual Bill Schedule notebook / Monthly / Yearly ids (fe billScheduleConstants.js). */
+const BILL_SCHEDULE_SYSTEM_IDS = new Set([-900001, -900002, -900003]);
+
+/** Last-open notebook / note id: a real vault id (≥ 1) or a Bill Schedule system id. */
+function parseNullableVaultSelectionId(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Math.trunc(Number(value));
+  if (BILL_SCHEDULE_SYSTEM_IDS.has(n)) return n;
+  return parseNullableBigint(value);
+}
+
 function parseNullableColorIndex(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
@@ -91,8 +102,8 @@ export function mynotePrefsToDbRow(prefs = {}) {
       ? undefined
       : parseNullableEditorFontSizePt(prefs.mynoteEditorFontSizePt);
   return {
-    mynote_last_notebook_id: parseNullableBigint(prefs.mynoteLastNotebookId),
-    mynote_last_note_id: parseNullableBigint(prefs.mynoteLastNoteId),
+    mynote_last_notebook_id: parseNullableVaultSelectionId(prefs.mynoteLastNotebookId),
+    mynote_last_note_id: parseNullableVaultSelectionId(prefs.mynoteLastNoteId),
     mynote_content_bg_index:
       prefs.mynoteContentBgIndex === undefined
         ? undefined
@@ -122,8 +133,8 @@ export function mynotePrefsToDbRow(prefs = {}) {
 export function parseMynotePrefsPatch(body = {}) {
   const out = {};
   const fields = [
-    ['mynoteLastNotebookId', 'mynote_last_notebook_id', parseNullableBigint],
-    ['mynoteLastNoteId', 'mynote_last_note_id', parseNullableBigint],
+    ['mynoteLastNotebookId', 'mynote_last_notebook_id', parseNullableVaultSelectionId],
+    ['mynoteLastNoteId', 'mynote_last_note_id', parseNullableVaultSelectionId],
     ['mynoteContentBgIndex', 'mynote_content_bg_index', parseNullableColorIndex],
     ['mynoteFontColorIndex', 'mynote_font_color_index', parseNullableColorIndex],
     ['mynoteTextHighlightIndex', 'mynote_text_highlight_index', parseNullableColorIndex],

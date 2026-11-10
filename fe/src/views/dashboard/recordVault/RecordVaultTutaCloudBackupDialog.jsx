@@ -48,7 +48,8 @@ const formatRedButtonSx = {
 function formatBackupZipSizeLabel(sizeBytes) {
   const bytes = Number(sizeBytes);
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
-  return `${(bytes / (1024 * 1024)).toFixed(1)}mb`;
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB` : `${mb.toFixed(1)}mb`;
 }
 
 function describeBackupRequestError(err, fallback) {
@@ -148,6 +149,8 @@ export default function RecordVaultTutaCloudBackupDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  /** Zip saved this visit — Backup / Restore stay disabled; X closes the popup. */
+  const [backupSaved, setBackupSaved] = useState(false);
   const [tutaDriveActive, setTutaDriveActive] = useState(() => Boolean(tutaDrive));
   const [passwordDialog, setPasswordDialog] = useState(null);
   const [backupProgress, setBackupProgress] = useState(null);
@@ -160,6 +163,9 @@ export default function RecordVaultTutaCloudBackupDialog({
     if (open) {
       setRequiredBackupDone(false);
       setExitReadyOpen(false);
+      setBackupSaved(false);
+      setSuccess('');
+      setError('');
     }
   }, [open]);
 
@@ -289,9 +295,8 @@ export default function RecordVaultTutaCloudBackupDialog({
         const sizeText = formatBackupZipSizeLabel(result?.sizeBytes);
         progress.update({ stage: 'done', percent: 100, fileName: result?.fileName });
         const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
-        setSuccess(
-          `Saved ${result?.fileName || 'backup.zip'}${sizeText ? ` (${sizeText})` : ''} in ${elapsedText}.`
-        );
+        setSuccess(`${result?.fileName || 'backup.zip'}${sizeText ? ` (${sizeText})` : ''} in ${elapsedText}.`);
+        setBackupSaved(true);
       } else {
         progress.update({ stage: 'build', percent: 50 });
         const result = await downloadRecordVaultTutaDriveBackupZip();
@@ -423,18 +428,39 @@ export default function RecordVaultTutaCloudBackupDialog({
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
           {success ? (
             <ColorTemplate16PopupCenterWide.SectionDescription sx={{ textAlign: 'center', fontWeight: 700 }}>
+              {backupSaved ? (
+                <Box
+                  component="span"
+                  sx={{
+                    color: '#7CFC00',
+                    WebkitTextFillColor: '#7CFC00',
+                    WebkitTextStroke: '1.5px #000',
+                    paintOrder: 'stroke fill',
+                    fontWeight: 900,
+                    fontStyle: 'normal',
+                    mr: 1
+                  }}
+                >
+                  Saved Success
+                </Box>
+              ) : null}
               {success}
             </ColorTemplate16PopupCenterWide.SectionDescription>
           ) : null}
 
           <Stack spacing={1.5}>
             <Box sx={actionRowSx}>
-              <GreenButton type="button" disabled={busy} onClick={() => void handleBackup()} sx={actionButtonSx}>
+              <GreenButton
+                type="button"
+                disabled={busy || backupSaved}
+                onClick={() => void handleBackup()}
+                sx={actionButtonSx}
+              >
                 Backup
               </GreenButton>
               <GreenButton
                 type="button"
-                disabled={busy || backupLocked}
+                disabled={busy || backupLocked || backupSaved}
                 onClick={() => void handleRestoreClick()}
                 sx={actionButtonSx}
               >
