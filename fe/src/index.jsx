@@ -48,6 +48,10 @@ import { SiteAudioProvider } from 'contexts/SiteAudioContext';
 
 // style + assets
 import 'assets/scss/style.scss';
+import { installButtonBorderStyles } from 'config/buttonBorderEnv';
+
+// fe/.env BUTTON_BORDER_THICKNESS / BUTTON_BORDER_COLOR → every button site-wide
+installButtonBorderStyles();
 
 // google-fonts
 import '@fontsource/roboto/400.css';

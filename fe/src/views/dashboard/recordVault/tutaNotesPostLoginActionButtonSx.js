@@ -1,3 +1,4 @@
+import { BUTTON_BACKGROUND_COLOR, BUTTON_BACKGROUND_HOVER_COLOR } from 'config/buttonBackgroundEnv';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
 import { bsizeInputHeightResponsive } from 'config/bsizeEnv';
 import { ORANGE_BUTTON_ENABLED_BG } from 'config/orangeButton';
@@ -110,13 +111,13 @@ export const tutaNotesFormatPostLoginButtonSx = {
 /** Neutral gray — More Choices (Cloud login compact row). */
 export const tutaNotesMoreChoicesButtonSx = {
   ...tutaNotesPostLoginActionButtonSx,
-  bgcolor: '#9e9e9e !important',
+  bgcolor: `${BUTTON_BACKGROUND_COLOR} !important`,
   color: '#000000 !important',
   WebkitTextFillColor: '#000000 !important',
   border: '1px solid #000000 !important',
   '@media (hover: hover)': {
     '&:hover:not(.Mui-disabled)': {
-      bgcolor: '#8e8e8e !important',
+      bgcolor: `${BUTTON_BACKGROUND_HOVER_COLOR} !important`,
       color: '#000000 !important',
       WebkitTextFillColor: '#000000 !important',
       border: '1px solid #000000 !important'

@@ -175,7 +175,15 @@ const PASSPORT_CITIZENSHIP_FIELD_KEYS = new Set(['citizenship', 'placeOfBirth', 
 const PROFILE_MATCH_PAIR_BRIEF_KEYS = new Set(['profileDlPhoto', 'profileLivePhoto']);
 const OPTIONAL_PASSPORT_SECTION_BANNER = 'Beside below info (zoom in photo, citizenship, and POB) we never capture/store any other passport informations or passport ID on this server';
 const LEGAL_NAME_TABLE_BANNER = 'We never ever reveal your real name to members';
-const LEGAL_NAME_TABLE_BORDER = '16px solid #c62828';
+/**
+ * Legal-name table accent ("We never ever reveal…" banner text + thick table border):
+ * #FBE01B in every theme, except Gold Light / Gold Dark (yellow-on-gold) → #9F211E.
+ * <html data-theme-name="…"> is set by themeConfig.applyThemeByName.
+ */
+const LEGAL_NAME_ACCENT = '#FBE01B';
+const LEGAL_NAME_ACCENT_GOLD_THEME = '#9F211E';
+const GOLD_THEME_SELECTOR = 'html[data-theme-name^="Gold " i]';
+const LEGAL_NAME_TABLE_BORDER = `16px solid ${LEGAL_NAME_ACCENT}`;
 
 function expandBriefBioRows(rows) {
   return rows.map((row) => ({ ...row, legendNote: BRIEF_BIO_LEGEND[row.key] ?? null }));
@@ -297,7 +305,8 @@ const legalNameBioTableContainerSx = {
   boxShadow: 'none',
   border: LEGAL_NAME_TABLE_BORDER,
   borderRadius: 0,
-  mb: 2
+  mb: 2,
+  [`${GOLD_THEME_SELECTOR} &`]: { borderColor: LEGAL_NAME_ACCENT_GOLD_THEME }
 };
 const legalNameBannerBoxSx = {
   display: 'inline-block',
@@ -307,11 +316,18 @@ const legalNameBannerBoxSx = {
   mb: 0.75,
   borderRadius: 0.5
 };
+// 'html body &&&' outranks the dark-surface Typography color rules in CssBaseline.
 const legalNameBannerTextSx = {
-  color: 'var(--theme-error-color) !important',
-  WebkitTextFillColor: 'var(--theme-error-color) !important',
   fontWeight: 700,
-  ...tableTextSx
+  ...tableTextSx,
+  'html body &&&': {
+    color: `${LEGAL_NAME_ACCENT} !important`,
+    WebkitTextFillColor: `${LEGAL_NAME_ACCENT} !important`
+  },
+  [`${GOLD_THEME_SELECTOR} body &&&`]: {
+    color: `${LEGAL_NAME_ACCENT_GOLD_THEME} !important`,
+    WebkitTextFillColor: `${LEGAL_NAME_ACCENT_GOLD_THEME} !important`
+  }
 };
 const bioReviewPanelBgSx = {
   bgcolor: COLOR_TEMPLATE1_BG_UNSELECTED
@@ -1715,7 +1731,7 @@ export default function CheckrBioReviewPanel({
             {showLegalNameTable && legalNameRows.length ? (
               <Box sx={{ mb: 2 }}>
               <Box sx={legalNameBannerBoxSx}>
-                <Typography className="theme-red-emphasis" sx={legalNameBannerTextSx}>
+                <Typography sx={legalNameBannerTextSx}>
                   {LEGAL_NAME_TABLE_BANNER}
                 </Typography>
               </Box>
@@ -1781,7 +1797,7 @@ export default function CheckrBioReviewPanel({
               onUploadClick={onPassportUploadClick && !suppressEditActions ? onPassportUploadClick : null}
             />
             <Box sx={legalNameBannerBoxSx}>
-              <Typography className="theme-red-emphasis" sx={legalNameBannerTextSx}>
+              <Typography sx={legalNameBannerTextSx}>
                 {OPTIONAL_PASSPORT_SECTION_BANNER}
               </Typography>
             </Box>

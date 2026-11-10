@@ -9,7 +9,9 @@ import { buttonHoverMagnifyTransitionSx } from 'config/hoverMagnifyEnv';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   buttonTemplateSingleLineLabelSx,
-  SELECTED_UNSELECTED_BUTTON_BORDER_RADIUS
+  SELECTED_UNSELECTED_BUTTON_BORDER_RADIUS,
+  UNSELECTED_BUTTON_TEMPLATE_BG,
+  UNSELECTED_BUTTON_TEMPLATE_TEXT
 } from 'config/selectedUnselectedButtonTemplate';
 
 /** Full Paletes green; Minimal Palete remaps via themeConfig `--theme-action-green-color`. */
@@ -65,9 +67,30 @@ export function greenButtonHoverScaleRaiseSx(hoverOverrides = {}, options = {}) 
   };
 }
 
+/**
+ * Minimal Palete — enabled GreenButton matches the left sidebar menu buttons: theme primary bg +
+ * daynight text (Ocean light → #155181 / white, Ocean Dark → #86D9FE / black). Without this the
+ * action-green var tracks the theme secondary. Full Paletes stay green. Disabled stays grey.
+ * themeConfig sets <html data-color-palete="minimal|full">; &&& outranks the base + hover rules
+ * (and covers :hover) so the hover scale in '@media (hover: hover)' is kept.
+ */
+export const GREEN_BUTTON_MINIMAL_PALETE_BG = UNSELECTED_BUTTON_TEMPLATE_BG;
+export const GREEN_BUTTON_MINIMAL_PALETE_TEXT = UNSELECTED_BUTTON_TEMPLATE_TEXT;
+const greenButtonMinimalPaleteSx = {
+  'html[data-color-palete="minimal"] &&&:not(.Mui-disabled)': {
+    bgcolor: `${GREEN_BUTTON_MINIMAL_PALETE_BG} !important`,
+    backgroundColor: `${GREEN_BUTTON_MINIMAL_PALETE_BG} !important`,
+    backgroundImage: 'none !important',
+    color: `${GREEN_BUTTON_MINIMAL_PALETE_TEXT} !important`,
+    WebkitTextFillColor: `${GREEN_BUTTON_MINIMAL_PALETE_TEXT} !important`,
+    '& svg, & .MuiButton-startIcon': { color: `${GREEN_BUTTON_MINIMAL_PALETE_TEXT} !important` }
+  }
+};
+
 /** @returns {import('@mui/material').SxProps} */
 export function greenButtonSx({ hoverTopmost = true } = {}) {
   return {
+    ...greenButtonMinimalPaleteSx,
     fontFamily: MAIN_FONT_FAMILY,
     ...greenButtonFontSizeSx(),
     fontWeight: 600,

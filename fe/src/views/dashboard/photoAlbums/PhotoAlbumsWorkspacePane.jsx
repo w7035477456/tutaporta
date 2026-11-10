@@ -1,3 +1,4 @@
+import { BUTTON_BACKGROUND_COLOR, BUTTON_BACKGROUND_HOVER_COLOR } from 'config/buttonBackgroundEnv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
@@ -45,7 +46,12 @@ import {
 import PhotoAlbumsSearchBar from './PhotoAlbumsSearchBar';
 import PhotoAlbumsInviteBar from './PhotoAlbumsInviteBar';
 import PhotoAlbumsInviteReviewDialog from './PhotoAlbumsInviteReviewDialog';
-import { fetchPhotoAlbumsSharedAlbums, fetchPhotoAlbumsSharedAlbumContent, removePhotoAlbumsSharedAlbum, readPhotoAlbumsInviteError } from 'api/photoAlbumsInviteFe';
+import {
+  fetchPhotoAlbumsSharedAlbums,
+  fetchPhotoAlbumsSharedAlbumContent,
+  removePhotoAlbumsSharedAlbum,
+  readPhotoAlbumsInviteError
+} from 'api/photoAlbumsInviteFe';
 import { PHOTO_ALBUMS_MENU_BUTTON_FONT_REM_VAR } from 'config/photoAlbumsMenuButtonFontEnv';
 import { getVaultDefaultButtonFontSizeRem } from 'config/photoAlbumsDefaultButtonFontSizeEnv';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
@@ -62,10 +68,7 @@ import PhotoAlbumsNoteEditor from './PhotoAlbumsNoteEditor';
 import { VAULT_WORKSPACE_FOCUS_VIEW_BG } from 'config/vaultWorkspaceFocusView';
 import { setVaultWorkspaceFocusSiteFooterSuppressed } from 'utils/vaultWorkspaceFocusSiteFooter';
 import { formatPhotoAlbumsSidebarAlbumLines } from './photoAlbumsAlbumTitleStyle';
-import {
-  countPhotoAlbumsSidebarMediaInAttachments,
-  photoAlbumsSidebarAlbumMediaCount
-} from './photoAlbumsSidebarCounts';
+import { countPhotoAlbumsSidebarMediaInAttachments, photoAlbumsSidebarAlbumMediaCount } from './photoAlbumsSidebarCounts';
 import {
   FILES_EXPLORER_TAB_EXPLORER,
   FILES_EXPLORER_TAB_FOLDERS,
@@ -134,17 +137,10 @@ import {
   serializeAlbumPageDrag,
   setActiveAlbumPageDrag
 } from './photoAlbumsAlbumPageDrag';
-import {
-  DRAG_TRAY_PHOTO,
-  isTrayPhotoDrag,
-  readTrayPhotoDragAttachmentId
-} from './photoAlbumsPagePhotoDrag';
+import { DRAG_TRAY_PHOTO, isTrayPhotoDrag, readTrayPhotoDragAttachmentId } from './photoAlbumsPagePhotoDrag';
 import { commitAlbumPageMoveToNote } from './photoAlbumsMoveAlbumPage';
 import { setPhotoAlbumsColumnResizing } from './photoAlbumsColumnResizeGate';
-import {
-  photoAlbumsSourceTakenAtMs,
-  sortPhotoAlbumsFilesBySourceTakenAt
-} from './photoAlbumsSourceTakenAt';
+import { photoAlbumsSourceTakenAtMs, sortPhotoAlbumsFilesBySourceTakenAt } from './photoAlbumsSourceTakenAt';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
 import PhotoAlbumsUsageBar from './PhotoAlbumsUsageBar';
@@ -164,12 +160,7 @@ import {
   PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   photoAlbumsThemeDaynightSurfaceSx
 } from './photoAlbumsNoteFontTokens';
-import {
-  getIndexedNoteText,
-  indexNoteSearchText,
-  removeNoteSearchIndex,
-  searchIndexedNotes
-} from './photoAlbumsSearchIndex';
+import { getIndexedNoteText, indexNoteSearchText, removeNoteSearchIndex, searchIndexedNotes } from './photoAlbumsSearchIndex';
 import innerEncryptOnImg from 'assets/images/innerEncryptON.png';
 import redLockImg from 'assets/images/redlock.png';
 import greenUnlockImg from 'assets/images/unlockIcon.png';
@@ -191,11 +182,7 @@ import {
   wipeAllPersistedInnerUnlockPins
 } from 'utils/photoAlbumsNoteInnerUnlockStorage';
 import { tutaPhotoAlbumsStorageStripColor } from './tutaPhotoAlbumsBranding';
-import {
-  cleanPhotoAlbumsNoteBodyHtml,
-  photoAlbumsRichTextHasContent,
-  stripPhotoAlbumsHtml,
-} from 'utils/photoAlbumsRichText';
+import { cleanPhotoAlbumsNoteBodyHtml, photoAlbumsRichTextHasContent, stripPhotoAlbumsHtml } from 'utils/photoAlbumsRichText';
 import ThumbnailDeleteXButton from 'ui-component/ThumbnailDeleteXButton';
 import threeDashesImg from 'assets/images/threeDashes.png';
 import {
@@ -229,8 +216,7 @@ const TUTAPHOTO_QUOTA_FALLBACK = {
   videoCount: 0
 };
 
-const TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE =
-  'Auto downsize failed.  Please resize with online tools and upload again.';
+const TUTAPHOTO_DOWNSIZE_FAILED_MESSAGE = 'Auto downsize failed.  Please resize with online tools and upload again.';
 
 function tutaPhotoQuotaExceededMessage(quota) {
   return `Total image allow per user Free Tier Account is ${quota.maxImagesPerAccount}, and total video per free tier account is ${quota.maxVideosPerAccount}. Please click top left Upgrade to VIP tier to upload beyond free tier limit.`;
@@ -315,7 +301,7 @@ async function collectTopLevelHtmlFilesFromDirectoryEntry(dirEntry) {
   const files = [];
   for (const entry of entries) {
     if (!entry?.isFile || !isHtmlImportFileName(entry.name)) continue;
-    // eslint-disable-next-line no-await-in-loop
+
     files.push(await fileFromFileEntry(entry));
   }
   return files;
@@ -337,7 +323,6 @@ async function parseFolderHtmlImportsFromDataTransfer(dataTransfer) {
   if (dirEntries.length) {
     const out = [];
     for (const dir of dirEntries) {
-      // eslint-disable-next-line no-await-in-loop
       const files = await collectTopLevelHtmlFilesFromDirectoryEntry(dir);
       if (!files.length) continue;
       const folderName = String(dir.name || 'IMPORTED').trim() || 'IMPORTED';
@@ -413,8 +398,7 @@ const vaultLeavingBackdropSx = {
 };
 
 /** Scales with yellow menu-font slider so labels are not clipped (default ~2rem). */
-const menuBtnFontRemExpr = () =>
-  `var(${PHOTO_ALBUMS_MENU_BUTTON_FONT_REM_VAR}, ${getVaultDefaultButtonFontSizeRem()})`;
+const menuBtnFontRemExpr = () => `var(${PHOTO_ALBUMS_MENU_BUTTON_FONT_REM_VAR}, ${getVaultDefaultButtonFontSizeRem()})`;
 
 /** One text line + padding/border. */
 const SINGLE_LINE_MENU_BUTTON_MIN_HEIGHT = `calc((${menuBtnFontRemExpr()} * 1.45 + 0.7) * 1rem)`;
@@ -552,11 +536,12 @@ const menuToggleIconSx = {
  */
 const menuButtonSx = {
   fontFamily: MAIN_FONT_FAMILY,
-  width: 'auto !important',
+  // Every row fills the full slot between lock + X, so all rows match the widest (column width).
+  width: '100% !important',
   maxWidth: '100%',
   minWidth: 0,
-  flex: '0 1 auto',
-  alignSelf: 'center',
+  flex: '1 1 auto',
+  alignSelf: 'stretch',
   display: 'inline-flex !important',
   flexDirection: 'column !important',
   justifyContent: 'center',
@@ -645,12 +630,10 @@ function renderTitleWithSearchHighlight(title, terms) {
   if (parts.length <= 1) return text;
   return parts.map((part, i) =>
     i % 2 === 1 ? (
-      // eslint-disable-next-line react/no-array-index-key
       <mark key={i} className="rv-search-hit">
         {part}
       </mark>
     ) : (
-      // eslint-disable-next-line react/no-array-index-key
       <span key={i}>{part}</span>
     )
   );
@@ -661,7 +644,9 @@ function titleMatchesSearchTerms(title, terms) {
   const text = String(title ?? '').toLowerCase();
   if (!text) return false;
   return (Array.isArray(terms) ? terms : []).some((t) => {
-    const needle = String(t ?? '').trim().toLowerCase();
+    const needle = String(t ?? '')
+      .trim()
+      .toLowerCase();
     return needle && text.includes(needle);
   });
 }
@@ -798,7 +783,6 @@ const rowResizeHandleSx = {
   }
 };
 
-
 function loadStoredNoteFontStyleIndex() {
   try {
     const raw = localStorage.getItem(NOTE_FONT_STYLE_LS_KEY);
@@ -821,14 +805,6 @@ function loadStoredNoteFontSizePt() {
   }
   return PHOTO_ALBUMS_DEFAULT_FONT_SIZE_PT;
 }
-
-
-
-
-
-
-
-
 
 const photoAlbumsContentScrollSx = {
   flex: 1,
@@ -860,8 +836,6 @@ const photoAlbumsMenuListScrollSx = {
   borderRadius: 1,
   boxSizing: 'border-box'
 };
-
-
 
 /** One text row between title↔photo and photo↔photo (grows if the user types more). */
 
@@ -936,7 +910,6 @@ function renderMenuLabelOneWordPerLine(label) {
     <Box component="span" sx={menuButtonWordPerLineLabelSx}>
       {words.map((word, index) => (
         <Box
-          // eslint-disable-next-line react/no-array-index-key
           key={`${word}-${index}`}
           component="span"
           data-menu-label-word=""
@@ -994,9 +967,7 @@ function measureLaneFitDeltaPx(laneEl) {
     const button = slot.firstElementChild;
     if (!button) return;
     const words = button.querySelectorAll('[data-menu-label-word]');
-    const textWidth = words.length
-      ? Math.max(...Array.from(words, measureTextWidthPx))
-      : measureTextWidthPx(button);
+    const textWidth = words.length ? Math.max(...Array.from(words, measureTextWidthPx)) : measureTextWidthPx(button);
     const badge = button.querySelector('[data-menu-label-badge]');
     const badgeWidth = badge ? badge.getBoundingClientRect().width : 0;
     const needed = Math.max(textWidth, badgeWidth) + horizontalChromePx(button);
@@ -1034,19 +1005,11 @@ function computeNotebookColFitWidth(notebooks, rem = getVaultDefaultButtonFontSi
   if (!notebooks?.length) return DEFAULT_NOTEBOOK_COL_WIDTH;
   let maxWord = 0;
   for (const nb of notebooks) {
-    maxWord = Math.max(
-      maxWord,
-      measureMenuLabelLongestWordWidth(
-        photoAlbumsNotebookSidebarLabel(nb, notebooks) || 'Untitled',
-        rem
-      )
-    );
+    maxWord = Math.max(maxWord, measureMenuLabelLongestWordWidth(photoAlbumsNotebookSidebarLabel(nb, notebooks) || 'Untitled', rem));
   }
   const chromePx = 64;
   return Math.max(MIN_MENU_COL_WIDTH, Math.ceil(maxWord + chromePx));
 }
-
-
 
 function reorderById(items, fromId, toId, idKey) {
   const fromIdx = items.findIndex((item) => Number(item[idKey]) === Number(fromId));
@@ -1115,15 +1078,6 @@ function isLeftSidebarDragEvent(event) {
   return types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_NOTE);
 }
 
-
-
-
-
-
-
-
-
-
 function stripNoteHeavyFields(note) {
   if (!note) return note;
   return {
@@ -1146,17 +1100,6 @@ function photoAlbumsHtmlHasProtectableContent(html) {
   if (photoAlbumsRichTextHasContent(raw)) return true;
   return /<img\b|<iframe\b|<video\b|<audio\b|data:(?:image|video|audio|application)\//i.test(raw);
 }
-
-
-
-
-
-
-
-
-
-
-
 
 const searchNavButtonSx = {
   width: 26,
@@ -1249,7 +1192,8 @@ const menuRowEditFieldSx = {
 
 /** Selected notebook / note / shortcut row (hard RGB — Minimal Palete remaps the theme vars). */
 const MENU_ROW_CURRENT_GREEN = '#60C446';
-const MENU_ROW_IDLE_GREY = '#9e9e9e';
+/** Idle row fill — fe/.env BUTTON_BACKGROUND_COLOR (hover: BUTTON_BACKGROUND_HOVER_COLOR). */
+const MENU_ROW_IDLE_GREY = BUTTON_BACKGROUND_COLOR;
 const MENU_ROW_CURRENT_CLASS = 'pa-menu-row-current';
 const MENU_ROW_IDLE_CLASS = 'pa-menu-row-idle';
 
@@ -1279,23 +1223,17 @@ const menuRowCurrentGreenGlobalStyles = {
     WebkitTextFillColor: '#000000 !important',
     border: '4px solid #000000 !important'
   },
-  [`button.${MENU_ROW_IDLE_CLASS}:hover, div.${MENU_ROW_IDLE_CLASS}[role="button"]:hover`]: {
-    backgroundColor: `${MENU_ROW_IDLE_GREY} !important`,
-    color: '#000000 !important',
-    WebkitTextFillColor: '#000000 !important'
-  }
+  // :root + :not() lift specificity above SliderControlButton's forced-fill hover rule.
+  [`:root button.${MENU_ROW_IDLE_CLASS}:hover:not(.Mui-disabled), :root div.${MENU_ROW_IDLE_CLASS}[role="button"]:hover:not(.Mui-disabled)`]:
+    {
+      backgroundColor: `${BUTTON_BACKGROUND_HOVER_COLOR} !important`,
+      backgroundImage: 'none !important',
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important'
+    }
 };
 
-function MenuRowWithDelete({
-  onDelete,
-  deleteLabel,
-  disabled,
-  children,
-  onToggleLock,
-  lockTitle,
-  lockDisabled = false,
-  locked = false
-}) {
+function MenuRowWithDelete({ onDelete, deleteLabel, disabled, children, onToggleLock, lockTitle, lockDisabled = false, locked = false }) {
   return (
     <Box
       sx={{
@@ -1324,12 +1262,7 @@ function MenuRowWithDelete({
           onMouseDown={(e) => e.stopPropagation()}
           sx={menuRowLockButtonSx}
         >
-          <Box
-            component="img"
-            src={locked ? redLockImg : greenUnlockImg}
-            alt=""
-            sx={{ width: 27, height: 27, display: 'block' }}
-          />
+          <Box component="img" src={locked ? redLockImg : greenUnlockImg} alt="" sx={{ width: 27, height: 27, display: 'block' }} />
         </Box>
       ) : null}
       <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'visible' }}>{children}</Box>
@@ -1369,13 +1302,7 @@ function MenuRowButton({
   // Search hit on the open album: blue. Otherwise current album-set / album: yellow + black.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
   const currentGreen = Boolean(lookSelected && !locked && !searchHitBlue);
-  const rowClass = locked
-    ? undefined
-    : currentGreen
-      ? MENU_ROW_CURRENT_CLASS
-      : searchHitBlue
-        ? undefined
-        : MENU_ROW_IDLE_CLASS;
+  const rowClass = locked ? undefined : currentGreen ? MENU_ROW_CURRENT_CLASS : searchHitBlue ? undefined : MENU_ROW_IDLE_CLASS;
   // Hard RGB via forceBgcolor (last in SliderControlButton merge) + GlobalStyles class.
   // Never selected={true} (theme-secondary). Never aria-pressed for color.
   const forceBg = searchHitBlue
@@ -1499,7 +1426,7 @@ function ShortcutMenuRow({
             : undefined
         }
       >
-        {locked ? label ?? shortcut.label : renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
+        {locked ? (label ?? shortcut.label) : renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
       </MenuRowButton>
     </MenuRowWithDelete>
   );
@@ -1661,22 +1588,14 @@ function RenamableDraggableMenuRow({
       lockTitle={lockTitle}
       locked={locked}
     >
-      <Box
-        id={domId || undefined}
-        data-menu-label-slot=""
-        sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
-      >
+      <Box id={domId || undefined} data-menu-label-slot="" sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
         <MenuRowButton
           selected={selected}
           selectedBlue={selectedBlue}
           multiSelected={multiSelected}
           locked={locked}
           draggable={!disabled}
-          title={
-            locked
-              ? 'Locked — enter PIN to view'
-              : buttonTitle || dragTitle || 'Drag to reorder; double-click to rename'
-          }
+          title={locked ? 'Locked — enter PIN to view' : buttonTitle || dragTitle || 'Drag to reorder; double-click to rename'}
           onPointerDown={handleRowPointerDown}
           onPointerUp={handleRowPointerUp}
           onClick={(e) => {
@@ -1744,8 +1663,7 @@ function RenamableDraggableMenuRow({
               types.includes(DRAG_SHORTCUT) ||
               types.includes(DRAG_CROSS_PANE) ||
               albumPageDrag;
-            const isOsFile =
-              !isInternalVaultDrag && e.dataTransfer?.files && e.dataTransfer.files.length > 0;
+            const isOsFile = !isInternalVaultDrag && e.dataTransfer?.files && e.dataTransfer.files.length > 0;
             if (isOsFile && onFileDrop) {
               e.preventDefault();
               e.stopPropagation();
@@ -1773,10 +1691,7 @@ function RenamableDraggableMenuRow({
           ) : albumLabelLines ? (
             <Box sx={menuRowLabelWithCountSx}>
               <Box sx={{ width: '100%', minWidth: 0 }}>
-                <SidebarAlbumTwoLineLabel
-                  titleLine={albumLabelLines.titleLine}
-                  datesLine={albumLabelLines.datesLine}
-                />
+                <SidebarAlbumTwoLineLabel titleLine={albumLabelLines.titleLine} datesLine={albumLabelLines.datesLine} />
               </Box>
               {sideCount != null ? (
                 <Box component="span" data-menu-label-badge="" sx={menuRowCountBadgeSx} aria-hidden="true">
@@ -1801,14 +1716,6 @@ function RenamableDraggableMenuRow({
 }
 
 /** Content-pane copy of menu notebook/note buttons — click to rename; stays in sync with the menu. */
-
-
-
-
-
-
-
-
 
 /** Splits v2 / legacy notes into title↔photo / photo↔photo text segments. */
 
@@ -1922,7 +1829,7 @@ export default function PhotoAlbumsWorkspacePane({
       while (importSuccessQueueRef.current.length) {
         const next = importSuccessQueueRef.current.shift();
         setImportSuccessPopup(next.text);
-        // eslint-disable-next-line no-await-in-loop
+
         await new Promise((resolve) => {
           if (importSuccessWaitRef.current) window.clearTimeout(importSuccessWaitRef.current);
           importSuccessWaitRef.current = window.setTimeout(() => {
@@ -1997,9 +1904,8 @@ export default function PhotoAlbumsWorkspacePane({
   const [mobileTutaPhotoUploadUi, setMobileTutaPhotoUploadUi] = useState(() =>
     Boolean(
       peekMobileTutaPhotoUploadPending() ||
-        peekMobileTutaPhotoUploadSession() ||
-        (typeof window !== 'undefined' &&
-          new URLSearchParams(window.location.search).get('mobileUpload') === '1')
+      peekMobileTutaPhotoUploadSession() ||
+      (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mobileUpload') === '1')
     )
   );
   const isCompactViewport = useCompactLoginViewport();
@@ -2051,9 +1957,7 @@ export default function PhotoAlbumsWorkspacePane({
   const rightSidebarPaneRef = useRef(null);
   const [shortcutPanePercent, setShortcutPanePercent] = useState(() =>
     clamp(
-      Number.isFinite(storedLayout?.shortcutPanePercent)
-        ? storedLayout.shortcutPanePercent
-        : DEFAULT_SHORTCUT_PANE_PERCENT,
+      Number.isFinite(storedLayout?.shortcutPanePercent) ? storedLayout.shortcutPanePercent : DEFAULT_SHORTCUT_PANE_PERCENT,
       MIN_SHORTCUT_PANE_PERCENT,
       MAX_SHORTCUT_PANE_PERCENT
     )
@@ -2062,9 +1966,7 @@ export default function PhotoAlbumsWorkspacePane({
   const [mobileUploadFolderRefreshToken, setMobileUploadFolderRefreshToken] = useState(0);
   const [sharedAlbumPanePercent, setSharedAlbumPanePercent] = useState(() =>
     clamp(
-      Number.isFinite(storedLayout?.sharedAlbumPanePercent)
-        ? storedLayout.sharedAlbumPanePercent
-        : DEFAULT_SHARED_ALBUM_PANE_PERCENT,
+      Number.isFinite(storedLayout?.sharedAlbumPanePercent) ? storedLayout.sharedAlbumPanePercent : DEFAULT_SHARED_ALBUM_PANE_PERCENT,
       MIN_SHARED_ALBUM_PANE_PERCENT,
       MAX_SHARED_ALBUM_PANE_PERCENT
     )
@@ -2076,9 +1978,7 @@ export default function PhotoAlbumsWorkspacePane({
   const editorBoxRef = useRef(null);
   const [] = useState(true);
   const [notebookColAutoFit, setNotebookColAutoFit] = useState(false);
-  const [menuButtonFontRem, setMenuButtonFontRem] = useState(() =>
-    getVaultDefaultButtonFontSizeRem()
-  );
+  const [menuButtonFontRem, setMenuButtonFontRem] = useState(() => getVaultDefaultButtonFontSizeRem());
   useEffect(() => {
     const syncButtonFont = () => setMenuButtonFontRem(getVaultDefaultButtonFontSizeRem());
     window.addEventListener('resize', syncButtonFont);
@@ -2200,9 +2100,7 @@ export default function PhotoAlbumsWorkspacePane({
 
   /** Keep the ref in sync immediately (dragstart can run before the effect). */
   const replaceMultiSelectedNoteIds = useCallback((ids) => {
-    const cleaned = (Array.isArray(ids) ? ids : [])
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id) && id >= 1);
+    const cleaned = (Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id >= 1);
     multiSelectedNoteIdsRef.current = cleaned;
     setMultiSelectedNoteIds(cleaned);
   }, []);
@@ -2231,14 +2129,10 @@ export default function PhotoAlbumsWorkspacePane({
   const resolveDraggedNoteIds = useCallback(
     (draggedId) => {
       const grabbed = Number(draggedId);
-      const multi = (multiSelectedNoteIdsRef.current || [])
-        .map(Number)
-        .filter((nid) => Number.isFinite(nid) && nid >= 1);
+      const multi = (multiSelectedNoteIdsRef.current || []).map(Number).filter((nid) => Number.isFinite(nid) && nid >= 1);
       if (multi.length > 1) {
         const notes = selectedNotebook?.notes || [];
-        const ordered = notes
-          .map((n) => Number(n.note_id))
-          .filter((nid) => multi.includes(nid));
+        const ordered = notes.map((n) => Number(n.note_id)).filter((nid) => multi.includes(nid));
         return ordered.length ? ordered : multi;
       }
       if (Number.isFinite(grabbed) && grabbed >= 1) return [grabbed];
@@ -2263,33 +2157,29 @@ export default function PhotoAlbumsWorkspacePane({
     noteFontSizePtRef.current = noteFontSizePt;
   }, [noteFontSizePt]);
 
-  const scheduleSaveMynotePrefs = useCallback(
-    (partial = {}) => {
-      if (mynotePrefsSaveTimerRef.current) {
-        window.clearTimeout(mynotePrefsSaveTimerRef.current);
-      }
-      const mergedPartial = { ...partial };
-      mynotePrefsSaveTimerRef.current = window.setTimeout(() => {
-        mynotePrefsSaveTimerRef.current = null;
-        const patch = {
-          mynoteLastNotebookId: selectedNotebookIdRef.current,
-          mynoteLastNoteId: selectedNoteIdRef.current,
-          mynoteContentBgIndex: noteContentBgIndexRef.current,
-          mynoteFontColorIndex: noteFontStyleIndexRef.current,
-          mynoteTextHighlightIndex: noteTextBgIndexRef.current,
-          mynoteEditorFontSizePt: noteFontSizePtRef.current,
-          mynoteNoteScrollTop: contentScrollRef.current?.scrollTop ?? 0,
-          mynoteEditorCaretPos: null,
-          ...mergedPartial
-        };
-        void saveUserCustomization(patch).catch(() => {
-          // ignore — local UI already updated
-        });
-      }, 400);
-    },
-    []
-  );
-
+  const scheduleSaveMynotePrefs = useCallback((partial = {}) => {
+    if (mynotePrefsSaveTimerRef.current) {
+      window.clearTimeout(mynotePrefsSaveTimerRef.current);
+    }
+    const mergedPartial = { ...partial };
+    mynotePrefsSaveTimerRef.current = window.setTimeout(() => {
+      mynotePrefsSaveTimerRef.current = null;
+      const patch = {
+        mynoteLastNotebookId: selectedNotebookIdRef.current,
+        mynoteLastNoteId: selectedNoteIdRef.current,
+        mynoteContentBgIndex: noteContentBgIndexRef.current,
+        mynoteFontColorIndex: noteFontStyleIndexRef.current,
+        mynoteTextHighlightIndex: noteTextBgIndexRef.current,
+        mynoteEditorFontSizePt: noteFontSizePtRef.current,
+        mynoteNoteScrollTop: contentScrollRef.current?.scrollTop ?? 0,
+        mynoteEditorCaretPos: null,
+        ...mergedPartial
+      };
+      void saveUserCustomization(patch).catch(() => {
+        // ignore — local UI already updated
+      });
+    }, 400);
+  }, []);
 
   // Search UI (Found chips, in-note highlights) stays off until Search is pressed.
   const searchActive = searchResults !== null;
@@ -2306,36 +2196,34 @@ export default function PhotoAlbumsWorkspacePane({
   // Must be declared before any useCallback that lists `notes` in deps (TDZ).
   const notes = useMemo(() => {
     const source = searchActive ? displayNotebooks : notebooks;
-    const nb =
-      source.find((item) => Number(item.notebook_id) === Number(selectedNotebookId)) ??
-      source[0] ??
-      selectedNotebook;
+    const nb = source.find((item) => Number(item.notebook_id) === Number(selectedNotebookId)) ?? source[0] ?? selectedNotebook;
     return nb?.notes || [];
   }, [searchActive, displayNotebooks, notebooks, selectedNotebookId, selectedNotebook]);
 
-  const loadNoteContent = useCallback(async (noteId) => {
-    const id = Number(noteId);
-    if (!Number.isFinite(id) || id < 1) return null;
-    const note = await vaultApi.fetchPhotoAlbumsNote(id);
-    if (!note) throw new Error('Note not found');
-    staleNoteIdsRef.current.delete(id);
-    setNotebooks((prev) =>
-      prev.map((nb) => ({
-        ...nb,
-        notes: (nb.notes || []).map((row) => {
-          if (Number(row.note_id) === id) {
-            const merged = { ...row, ...note, content_loaded: true };
-            merged.album_media_count = countPhotoAlbumsSidebarMediaInAttachments(
-              merged.attachments
-            );
-            return merged;
-          }
-          return stripNoteHeavyFields(row);
-        })
-      }))
-    );
-    return note;
-  }, [vaultApi]);
+  const loadNoteContent = useCallback(
+    async (noteId) => {
+      const id = Number(noteId);
+      if (!Number.isFinite(id) || id < 1) return null;
+      const note = await vaultApi.fetchPhotoAlbumsNote(id);
+      if (!note) throw new Error('Note not found');
+      staleNoteIdsRef.current.delete(id);
+      setNotebooks((prev) =>
+        prev.map((nb) => ({
+          ...nb,
+          notes: (nb.notes || []).map((row) => {
+            if (Number(row.note_id) === id) {
+              const merged = { ...row, ...note, content_loaded: true };
+              merged.album_media_count = countPhotoAlbumsSidebarMediaInAttachments(merged.attachments);
+              return merged;
+            }
+            return stripNoteHeavyFields(row);
+          })
+        }))
+      );
+      return note;
+    },
+    [vaultApi]
+  );
 
   const noteHasInnerEncryption = useCallback((note) => {
     if (!note) return false;
@@ -2343,18 +2231,15 @@ export default function PhotoAlbumsWorkspacePane({
   }, []);
 
   /** Note still needs a PIN before content can be read/edited. */
-  const noteRequiresInnerPinToView = useCallback(
-    (note) => {
-      if (!note) return false;
-      const bodyEncrypted = isPhotoAlbumsInnerEncryptedBody(note.body_text);
-      const flagOn = Boolean(note.inner_encrypt_enabled);
-      if (!flagOn && !bodyEncrypted) return false;
-      // Stale flag: body already plaintext on disk — do not show locked chrome.
-      if (note.content_loaded && note.body_text != null && !bodyEncrypted) return false;
-      return flagOn || bodyEncrypted;
-    },
-    []
-  );
+  const noteRequiresInnerPinToView = useCallback((note) => {
+    if (!note) return false;
+    const bodyEncrypted = isPhotoAlbumsInnerEncryptedBody(note.body_text);
+    const flagOn = Boolean(note.inner_encrypt_enabled);
+    if (!flagOn && !bodyEncrypted) return false;
+    // Stale flag: body already plaintext on disk — do not show locked chrome.
+    if (note.content_loaded && note.body_text != null && !bodyEncrypted) return false;
+    return flagOn || bodyEncrypted;
+  }, []);
 
   const isInnerNoteUnlocked = useCallback((noteId) => {
     const id = Number(noteId);
@@ -2380,16 +2265,12 @@ export default function PhotoAlbumsWorkspacePane({
       // still needs a PIN. Locking a single note must not gate the whole notebook —
       // the other notes stay visible and only the locked note shows as *****.
       if (!notes.length) return false;
-      return notes.every(
-        (n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id, n)
-      );
+      return notes.every((n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id, n));
     },
     [isInnerNoteUnlockedForDisplay, noteRequiresInnerPinToView]
   );
 
   const bumpInnerUnlock = useCallback(() => setInnerUnlockVersion((v) => v + 1), []);
-
-
 
   const clearInnerUnlockForNote = useCallback(
     (noteId) => {
@@ -2401,7 +2282,6 @@ export default function PhotoAlbumsWorkspacePane({
     [bumpInnerUnlock]
   );
 
-
   /** Patch a single note row anywhere in the notebook tree. */
   const patchNoteRowInTree = useCallback((noteId, patch) => {
     const id = Number(noteId);
@@ -2409,9 +2289,7 @@ export default function PhotoAlbumsWorkspacePane({
     setNotebooks((prev) =>
       prev.map((nb) => ({
         ...nb,
-        notes: (nb.notes || []).map((row) =>
-          Number(row.note_id) === id ? { ...row, ...patch } : row
-        )
+        notes: (nb.notes || []).map((row) => (Number(row.note_id) === id ? { ...row, ...patch } : row))
       }))
     );
   }, []);
@@ -2453,8 +2331,7 @@ export default function PhotoAlbumsWorkspacePane({
       // get locked. Note-scope lock still requires real content to protect —
       // either body text/media OR at least one dropped file attachment (which the
       // locked view hides behind the PIN too).
-      const hasAttachments =
-        Array.isArray(noteRow?.attachments) && noteRow.attachments.length > 0;
+      const hasAttachments = Array.isArray(noteRow?.attachments) && noteRow.attachments.length > 0;
       if (!force && !hasAttachments && !photoAlbumsHtmlHasProtectableContent(plainHtml)) {
         return null;
       }
@@ -2575,19 +2452,16 @@ export default function PhotoAlbumsWorkspacePane({
     [notebooks]
   );
 
-  const openInnerEncryptDialog = useCallback(
-    (mode, scope, { noteId = null, notebookId = null } = {}) => {
-      setInnerEncryptError('');
-      setInnerEncryptDialog({
-        open: true,
-        mode,
-        scope,
-        noteId: Number(noteId) || null,
-        notebookId: Number(notebookId) || null
-      });
-    },
-    []
-  );
+  const openInnerEncryptDialog = useCallback((mode, scope, { noteId = null, notebookId = null } = {}) => {
+    setInnerEncryptError('');
+    setInnerEncryptDialog({
+      open: true,
+      mode,
+      scope,
+      noteId: Number(noteId) || null,
+      notebookId: Number(notebookId) || null
+    });
+  }, []);
 
   const closeInnerEncryptDialog = useCallback(() => {
     if (innerEncryptBusy) return;
@@ -2655,10 +2529,7 @@ export default function PhotoAlbumsWorkspacePane({
         const timedOut = /taking too long/i.test(String(syncErr?.message || ''));
         if (showErrorOnFail && !timedOut) {
           setInnerEncryptError(
-            readPhotoAlbumsApiError(
-              syncErr,
-              'Note locked locally, but Cloud sync failed. Leave this page to retry saving, then reopen.'
-            )
+            readPhotoAlbumsApiError(syncErr, 'Note locked locally, but Cloud sync failed. Leave this page to retry saving, then reopen.')
           );
           return { ok: false, timedOut: false };
         }
@@ -2683,8 +2554,7 @@ export default function PhotoAlbumsWorkspacePane({
       const id = Number(noteId);
       const notebookScope = innerEncryptDialog.scope === 'notebook';
       const scopeNotebook = notebookScope
-        ? notebooks.find((nb) => Number(nb.notebook_id) === Number(innerEncryptDialog.notebookId)) ||
-          findNoteRowById(id).notebook
+        ? notebooks.find((nb) => Number(nb.notebook_id) === Number(innerEncryptDialog.notebookId)) || findNoteRowById(id).notebook
         : null;
       const siblingNotes = notebookScope ? scopeNotebook?.notes || [] : [];
       const busyVerb = mode === 'unlock' ? 'Decrypting' : 'Encrypting';
@@ -2718,8 +2588,7 @@ export default function PhotoAlbumsWorkspacePane({
               const progressLabel = `${busyVerb} note ${i + 1} of ${lockTargets.length}: ${noteProgressName(row, rid)}`;
               // Paint "note N of M: name" at the previous % before Argon2 blocks the main thread.
               await reportInnerEncryptProgress(i, totalNotes, progressLabel, progressOpts);
-              const override =
-                rid === Number(selectedNote?.note_id) ? getCurrentNoteHtml() : null;
+              const override = rid === Number(selectedNote?.note_id) ? getCurrentNoteHtml() : null;
               // force: lock every note in the notebook (even empty ones) so all
               // note names are hidden and the whole notebook gates as one unit.
               const res = await encryptOneNoteWithPin(row, pin, override, { force: true });
@@ -2727,9 +2596,7 @@ export default function PhotoAlbumsWorkspacePane({
               await reportInnerEncryptProgress(i + 1, totalNotes, progressLabel, progressOpts);
             }
             if (!lockedAny) {
-              setInnerEncryptError(
-                'Notebook has no notes to protect. Add a note first, then try again.'
-              );
+              setInnerEncryptError('Notebook has no notes to protect. Add a note first, then try again.');
               return false;
             }
             const syncResult = await flushTutaCloudAfterInnerPin({
@@ -2744,15 +2611,10 @@ export default function PhotoAlbumsWorkspacePane({
             const targetNote = findNoteRowById(id).note || selectedNote;
             const singleLabel = `${busyVerb}: ${noteProgressName(targetNote, id)}`;
             await reportInnerEncryptProgress(0, 1, singleLabel, progressOpts);
-            const override =
-              Number(targetNote?.note_id) === Number(selectedNote?.note_id)
-                ? getCurrentNoteHtml()
-                : null;
+            const override = Number(targetNote?.note_id) === Number(selectedNote?.note_id) ? getCurrentNoteHtml() : null;
             const res = await encryptOneNoteWithPin(targetNote, pin, override);
             if (res == null) {
-              setInnerEncryptError(
-                'Note has nothing to protect. Add text, a photo, or a file first, then try again.'
-              );
+              setInnerEncryptError('Note has nothing to protect. Add text, a photo, or a file first, then try again.');
               return false;
             }
             await reportInnerEncryptProgress(1, 1, singleLabel, progressOpts);
@@ -2770,11 +2632,7 @@ export default function PhotoAlbumsWorkspacePane({
         }
 
         if (mode === 'unlock') {
-          const targetRow =
-            (notebookScope
-              ? siblingNotes.find((n) => Number(n.note_id) === id)
-              : findNoteRowById(id).note) ||
-            selectedNote;
+          const targetRow = (notebookScope ? siblingNotes.find((n) => Number(n.note_id) === id) : findNoteRowById(id).note) || selectedNote;
           const until = resolveInnerUnlockLockedUntilMs({
             storageType: paneStorageType,
             singlesId: user?.singles_id,
@@ -2784,9 +2642,7 @@ export default function PhotoAlbumsWorkspacePane({
           const waitSec = remainingInnerUnlockLockoutSeconds(until);
           if (waitSec > 0) {
             setInnerUnlockCooldownSec(waitSec);
-            setInnerEncryptError(
-              `Wait ${formatInnerUnlockLockoutLabel(waitSec)} before trying again.`
-            );
+            setInnerEncryptError(`Wait ${formatInnerUnlockLockoutLabel(waitSec)} before trying again.`);
             return false;
           }
           if (notebookScope) {
@@ -2896,9 +2752,7 @@ export default function PhotoAlbumsWorkspacePane({
       const notes = notebook.notes || [];
       const nbId = Number(notebook.notebook_id);
       if (notebookInnerLockedForDisplay(notes)) {
-        const target = notes.find(
-          (n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlocked(n.note_id)
-        );
+        const target = notes.find((n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlocked(n.note_id));
         openInnerEncryptDialog('unlock', 'notebook', {
           noteId: target?.note_id,
           notebookId: nbId
@@ -2910,76 +2764,67 @@ export default function PhotoAlbumsWorkspacePane({
         });
       }
     },
-    [
-      busy,
-      innerEncryptBusy,
-      notebookInnerLockedForDisplay,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      openInnerEncryptDialog
-    ]
+    [busy, innerEncryptBusy, notebookInnerLockedForDisplay, noteRequiresInnerPinToView, isInnerNoteUnlocked, openInnerEncryptDialog]
   );
 
   /** Red lock icon on a shortcut row: delegate to its note or notebook target. */
   const handleToggleShortcutLock = useCallback(
     (shortcut) => {
       if (!shortcut) return;
-      const nb = notebooks.find(
-        (n) => Number(n.notebook_id) === Number(shortcut.notebook_id)
-      );
+      const nb = notebooks.find((n) => Number(n.notebook_id) === Number(shortcut.notebook_id));
       if (shortcut.target_type === 'notebook') {
         if (nb) handleToggleNotebookLock(nb);
         return;
       }
-      const note = (nb?.notes || []).find(
-        (n) => Number(n.note_id) === Number(shortcut.note_id)
-      );
+      const note = (nb?.notes || []).find((n) => Number(n.note_id) === Number(shortcut.note_id));
       if (note) handleToggleNoteLock(note);
     },
     [notebooks, handleToggleNotebookLock, handleToggleNoteLock]
   );
 
-
-  const selectNoteId = useCallback((noteId, { fromNotebook = false } = {}) => {
-    const next = Number(noteId);
-    if (!Number.isFinite(next) || next < 1) return;
-    replaceMultiSelectedNoteIds([]);
-    noteMultiSelectAnchorIdRef.current = next;
-    if (Number(selectedNoteIdRef.current) === next) {
-      if (!fromNotebook) setInnerEncryptUiScope('note');
-      return;
-    }
-    void (async () => {
-      const prevNoteId = selectedNoteIdRef.current;
-      // Flush body before leaving the album.
-      if (prevNoteId) {
-        if (saveTimerRef.current) {
-          clearTimeout(saveTimerRef.current);
-          saveTimerRef.current = null;
-        }
-        try {
-          skipSaveRef.current = false;
-          await persistNoteRef.current?.();
-        } catch {
-          // allow switch even if save failed
-        }
+  const selectNoteId = useCallback(
+    (noteId, { fromNotebook = false } = {}) => {
+      const next = Number(noteId);
+      if (!Number.isFinite(next) || next < 1) return;
+      replaceMultiSelectedNoteIds([]);
+      noteMultiSelectAnchorIdRef.current = next;
+      if (Number(selectedNoteIdRef.current) === next) {
+        if (!fromNotebook) setInnerEncryptUiScope('note');
+        return;
       }
-      loadedNoteIdRef.current = null;
-      loadedDraftKeyRef.current = '';
-      loadedTitleKeyRef.current = '';
-      hydratedDraftKeyRef.current = '';
-      setEditingNoteId(null);
-      setEditingNotebookId(null);
-      setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
-      setRenameUiSurface(null);
-      setOpenNoteTitlePlain('');
-      draftRef.current = { openNoteTitlePlain: '' };
-      setSelectedSharedAlbumId(null);
-      setSharedAlbumView(null);
-      editorHydratedRef.current.key = '';
-      setSelectedNoteId(next);
-    })();
-  }, [replaceMultiSelectedNoteIds]);
+      void (async () => {
+        const prevNoteId = selectedNoteIdRef.current;
+        // Flush body before leaving the album.
+        if (prevNoteId) {
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+          }
+          try {
+            skipSaveRef.current = false;
+            await persistNoteRef.current?.();
+          } catch {
+            // allow switch even if save failed
+          }
+        }
+        loadedNoteIdRef.current = null;
+        loadedDraftKeyRef.current = '';
+        loadedTitleKeyRef.current = '';
+        hydratedDraftKeyRef.current = '';
+        setEditingNoteId(null);
+        setEditingNotebookId(null);
+        setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
+        setRenameUiSurface(null);
+        setOpenNoteTitlePlain('');
+        draftRef.current = { openNoteTitlePlain: '' };
+        setSelectedSharedAlbumId(null);
+        setSharedAlbumView(null);
+        editorHydratedRef.current.key = '';
+        setSelectedNoteId(next);
+      })();
+    },
+    [replaceMultiSelectedNoteIds]
+  );
 
   /** Shift+click range select in the current notebook's notes list (does not change the open note). */
   const handleNoteShiftSelect = useCallback(
@@ -2987,9 +2832,7 @@ export default function PhotoAlbumsWorkspacePane({
       const clicked = Number(noteId);
       if (!Number.isFinite(clicked) || clicked < 1) return;
       const notes = selectedNotebook?.notes || [];
-      const orderedIds = notes
-        .map((n) => Number(n.note_id))
-        .filter((id) => Number.isFinite(id) && id > 0);
+      const orderedIds = notes.map((n) => Number(n.note_id)).filter((id) => Number.isFinite(id) && id > 0);
 
       if (!orderedIds.length) return;
 
@@ -3014,13 +2857,6 @@ export default function PhotoAlbumsWorkspacePane({
     },
     [selectedNotebook, replaceMultiSelectedNoteIds]
   );
-
-
-
-
-
-
-
 
   const isNoteHiddenFromSearch = useCallback(
     (note, notebookNotes) => {
@@ -3096,9 +2932,7 @@ export default function PhotoAlbumsWorkspacePane({
             }
           }
         };
-        await Promise.all(
-          Array.from({ length: Math.min(CONCURRENCY, notesToIndex.length) }, indexWorker)
-        );
+        await Promise.all(Array.from({ length: Math.min(CONCURRENCY, notesToIndex.length) }, indexWorker));
       }
 
       const ids = new Set();
@@ -3148,15 +2982,7 @@ export default function PhotoAlbumsWorkspacePane({
     } finally {
       setSearchBusy(false);
     }
-  }, [
-    isNoteHiddenFromSearch,
-    noteHasInnerEncryption,
-    isInnerNoteUnlocked,
-    notebooks,
-    searchTerm1,
-    selectNoteId,
-    vaultApi
-  ]);
+  }, [isNoteHiddenFromSearch, noteHasInnerEncryption, isInnerNoteUnlocked, notebooks, searchTerm1, selectNoteId, vaultApi]);
 
   const handleClearSearch = useCallback(() => {
     setSearchTerm1('');
@@ -3175,23 +3001,12 @@ export default function PhotoAlbumsWorkspacePane({
     void fetchUserCustomization()
       .then((prefs) => {
         if (cancelled) return;
-        setNoteFontSizePt(
-          normalizePhotoAlbumsFontSizePt(
-            prefs.mynoteEditorFontSizePt ?? PHOTO_ALBUMS_DEFAULT_FONT_SIZE_PT
-          )
-        );
-        setNoteFontStyleIndex(
-          prefs.mynoteFontColorIndex ?? PHOTO_ALBUMS_DEFAULT_FONT_STYLE_INDEX
-        );
-        setNoteContentBgIndex(
-          prefs.mynoteContentBgIndex ?? PHOTO_ALBUMS_DEFAULT_CONTENT_BG_INDEX
-        );
+        setNoteFontSizePt(normalizePhotoAlbumsFontSizePt(prefs.mynoteEditorFontSizePt ?? PHOTO_ALBUMS_DEFAULT_FONT_SIZE_PT));
+        setNoteFontStyleIndex(prefs.mynoteFontColorIndex ?? PHOTO_ALBUMS_DEFAULT_FONT_STYLE_INDEX);
+        setNoteContentBgIndex(prefs.mynoteContentBgIndex ?? PHOTO_ALBUMS_DEFAULT_CONTENT_BG_INDEX);
         // Legacy default was white (1) — that painted a white “input box” around note text.
         const loadedHighlight = prefs.mynoteTextHighlightIndex;
-        const nextHighlight =
-          loadedHighlight == null || Number(loadedHighlight) === 1
-            ? null
-            : loadedHighlight;
+        const nextHighlight = loadedHighlight == null || Number(loadedHighlight) === 1 ? null : loadedHighlight;
         setNoteTextBgIndex(nextHighlight ?? PHOTO_ALBUMS_DEFAULT_TEXT_HIGHLIGHT_INDEX);
         if (Number(loadedHighlight) === 1) {
           scheduleSaveMynotePrefs({ mynoteTextHighlightIndex: null });
@@ -3218,20 +3033,9 @@ export default function PhotoAlbumsWorkspacePane({
     };
   }, [scheduleSaveMynotePrefs]);
 
-
-
-
-
-
-
-
-
-
   const leaveUnlockedWorkspace = useCallback(
     (err) => {
-      const message = err
-        ? readPhotoAlbumsOpenFailureMessage(err)
-        : PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE;
+      const message = err ? readPhotoAlbumsOpenFailureMessage(err) : PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE;
       setError('');
       setPhotoAlbumsBridgeStorageType(null);
       onSessionEnded?.(message);
@@ -3252,65 +3056,65 @@ export default function PhotoAlbumsWorkspacePane({
     });
   }, []);
 
-  const loadTree = useCallback(async ({ preferNotebookId, preferNoteId, silent = false } = {}) => {
-    if (!silent) {
-      setLoading(true);
-      setVaultUiReady(false);
-      setVaultLoadProgressPercent(0);
-      setVaultLoadProgressLabel('Loading album library…');
-    }
-    setError('');
-    if (!silent) loadedNoteIdRef.current = null;
-    try {
-      if (!silent) await reportVaultLoadProgress(8, 'Reading notebooks and albums…');
-      const { notebooks: tree, shortcuts: loadedShortcuts } = await vaultApi.fetchPhotoAlbumsTree();
+  const loadTree = useCallback(
+    async ({ preferNotebookId, preferNoteId, silent = false } = {}) => {
       if (!silent) {
-        const nbCount = Array.isArray(tree) ? tree.length : 0;
-        const albumCount = (tree || []).reduce((sum, nb) => sum + (nb.notes?.length || 0), 0);
-        await reportVaultLoadProgress(
-          72,
-          `Found ${nbCount} notebook${nbCount === 1 ? '' : 's'}, ${albumCount} album${albumCount === 1 ? '' : 's'}`
-        );
+        setLoading(true);
+        setVaultUiReady(false);
+        setVaultLoadProgressPercent(0);
+        setVaultLoadProgressLabel('Loading album library…');
       }
-      setNotebooks(tree);
-      setShortcuts(loadedShortcuts);
+      setError('');
+      if (!silent) loadedNoteIdRef.current = null;
+      try {
+        if (!silent) await reportVaultLoadProgress(8, 'Reading notebooks and albums…');
+        const { notebooks: tree, shortcuts: loadedShortcuts } = await vaultApi.fetchPhotoAlbumsTree();
+        if (!silent) {
+          const nbCount = Array.isArray(tree) ? tree.length : 0;
+          const albumCount = (tree || []).reduce((sum, nb) => sum + (nb.notes?.length || 0), 0);
+          await reportVaultLoadProgress(
+            72,
+            `Found ${nbCount} notebook${nbCount === 1 ? '' : 's'}, ${albumCount} album${albumCount === 1 ? '' : 's'}`
+          );
+        }
+        setNotebooks(tree);
+        setShortcuts(loadedShortcuts);
 
-      const currentNotebookId = selectedNotebookIdRef.current;
-      const currentNoteId = selectedNoteIdRef.current;
-      const notebookId =
-        preferNotebookId ??
-        (tree.some((nb) => Number(nb.notebook_id) === Number(currentNotebookId))
-          ? currentNotebookId
-          : tree[0]?.notebook_id ?? null);
-      const notebook = tree.find((nb) => Number(nb.notebook_id) === Number(notebookId)) ?? tree[0] ?? null;
-      setSelectedNotebookId(notebook?.notebook_id ?? null);
+        const currentNotebookId = selectedNotebookIdRef.current;
+        const currentNoteId = selectedNoteIdRef.current;
+        const notebookId =
+          preferNotebookId ??
+          (tree.some((nb) => Number(nb.notebook_id) === Number(currentNotebookId)) ? currentNotebookId : (tree[0]?.notebook_id ?? null));
+        const notebook = tree.find((nb) => Number(nb.notebook_id) === Number(notebookId)) ?? tree[0] ?? null;
+        setSelectedNotebookId(notebook?.notebook_id ?? null);
 
-      const notes = notebook?.notes || [];
-      const noteId =
-        preferNoteId ??
-        (notes.some((n) => Number(n.note_id) === Number(currentNoteId)) ? currentNoteId : notes[0]?.note_id ?? null);
-      setSelectedNoteId(noteId);
-      // Refresh status-bar Usb/ui tx/rx counts after tree open / mutations.
-      window.setTimeout(() => {
-        void refreshVaultUsageRef.current?.();
-      }, 400);
-    } catch (err) {
-      // Initial open failed — return to Cloud/USB login with the error (do not keep editor banner).
-      if (!silent || isPhotoAlbumsVaultOpenFatalError(err) || isPhotoAlbumsStorageNotUnlockedError(err)) {
-        leaveUnlockedWorkspace(err);
-        return;
+        const notes = notebook?.notes || [];
+        const noteId =
+          preferNoteId ?? (notes.some((n) => Number(n.note_id) === Number(currentNoteId)) ? currentNoteId : (notes[0]?.note_id ?? null));
+        setSelectedNoteId(noteId);
+        // Refresh status-bar Usb/ui tx/rx counts after tree open / mutations.
+        window.setTimeout(() => {
+          void refreshVaultUsageRef.current?.();
+        }, 400);
+      } catch (err) {
+        // Initial open failed — return to Cloud/USB login with the error (do not keep editor banner).
+        if (!silent || isPhotoAlbumsVaultOpenFatalError(err) || isPhotoAlbumsStorageNotUnlockedError(err)) {
+          leaveUnlockedWorkspace(err);
+          return;
+        }
+        setError(readPhotoAlbumsApiError(err, 'Failed to load Record Vault'));
+      } finally {
+        if (!silent) {
+          await reportVaultLoadProgress(100, 'Ready');
+          setLoading(false);
+          setVaultUiReady(true);
+          setVaultLoadProgressPercent(null);
+          setVaultLoadProgressLabel('');
+        }
       }
-      setError(readPhotoAlbumsApiError(err, 'Failed to load Record Vault'));
-    } finally {
-      if (!silent) {
-        await reportVaultLoadProgress(100, 'Ready');
-        setLoading(false);
-        setVaultUiReady(true);
-        setVaultLoadProgressPercent(null);
-        setVaultLoadProgressLabel('');
-      }
-    }
-  }, [vaultApi, leaveUnlockedWorkspace, reportVaultLoadProgress]);
+    },
+    [vaultApi, leaveUnlockedWorkspace, reportVaultLoadProgress]
+  );
 
   useEffect(() => {
     const onReload = (event) => {
@@ -3394,10 +3198,7 @@ export default function PhotoAlbumsWorkspacePane({
         return;
       }
       try {
-        const [status, locations] = await Promise.all([
-          fetchPhotoAlbumsUsbStatus(),
-          fetchPhotoAlbumsUsbLocations()
-        ]);
+        const [status, locations] = await Promise.all([fetchPhotoAlbumsUsbStatus(), fetchPhotoAlbumsUsbLocations()]);
         if (cancelled) return;
         const unlockedSession = Boolean(status?.session?.unlocked);
         if (!unlockedSession) {
@@ -3408,9 +3209,7 @@ export default function PhotoAlbumsWorkspacePane({
         }
         const mountPath = String(status?.session?.mountPath || '').trim();
         const mountStillPresent =
-          !mountPath ||
-          (Array.isArray(locations) &&
-            locations.some((loc) => String(loc?.mountPath || '').trim() === mountPath));
+          !mountPath || (Array.isArray(locations) && locations.some((loc) => String(loc?.mountPath || '').trim() === mountPath));
         setUsbBridgeHealthy(unlockedSession && mountStillPresent);
       } catch (err) {
         if (cancelled) return;
@@ -3503,14 +3302,7 @@ export default function PhotoAlbumsWorkspacePane({
     return () => {
       cancelled = true;
     };
-  }, [
-    unlocked,
-    selectedNoteId,
-    loadNoteContent,
-    leaveUnlockedWorkspace,
-    paneStorageType,
-    mobileTutaPhotoUploadUi
-  ]);
+  }, [unlocked, selectedNoteId, loadNoteContent, leaveUnlockedWorkspace, paneStorageType, mobileTutaPhotoUploadUi]);
 
   // Push the resolved note body into the TipTap editor once per note/lock-state.
   // Guarded by a hydration key so autosave (which updates body_text in the tree)
@@ -3535,9 +3327,7 @@ export default function PhotoAlbumsWorkspacePane({
     if (editorHydratedRef.current.key === key) return;
     editorHydratedRef.current.key = key;
     // Track which note the editor holds so switch/flush paths know a draft is live.
-    hydratedDraftKeyRef.current = locked
-      ? ''
-      : `${Number(selectedNotebookIdRef.current) || 0}:${id}`;
+    hydratedDraftKeyRef.current = locked ? '' : `${Number(selectedNotebookIdRef.current) || 0}:${id}`;
     if (locked) {
       api.setContent('<p></p>', false);
     } else {
@@ -3632,10 +3422,7 @@ export default function PhotoAlbumsWorkspacePane({
     if (!selectedNote) return undefined;
     const pending = pendingMynoteRestoreRef.current;
     if (pending.applied) return undefined;
-    if (
-      pending.notebookId != null &&
-      Number(pending.notebookId) !== Number(selectedNotebookId)
-    ) {
+    if (pending.notebookId != null && Number(pending.notebookId) !== Number(selectedNotebookId)) {
       return undefined;
     }
     if (pending.noteId != null && Number(pending.noteId) !== Number(selectedNoteId)) {
@@ -3704,26 +3491,23 @@ export default function PhotoAlbumsWorkspacePane({
    * with the VIP upgrade popup. Reserving up front keeps a single batch from
    * blowing past the cap before the server sees any of it.
    */
-  const reserveMediaQuotaSlot = useCallback(
-    async (isVideo) => {
-      const quota = mediaQuotaRef.current;
-      const used = isVideo ? quota.videoCount : quota.imageCount;
-      const maxAllowed = isVideo ? quota.maxVideosPerAccount : quota.maxImagesPerAccount;
-      if (used >= maxAllowed) {
-        const message = tutaPhotoQuotaExceededMessage(quota);
-        stagingFailureRef.current = message;
-        if (!quotaPopupShownRef.current) {
-          quotaPopupShownRef.current = true;
-          await themedAlert(message, { title: 'Free Tier Limit Reached' });
-        }
-        return false;
+  const reserveMediaQuotaSlot = useCallback(async (isVideo) => {
+    const quota = mediaQuotaRef.current;
+    const used = isVideo ? quota.videoCount : quota.imageCount;
+    const maxAllowed = isVideo ? quota.maxVideosPerAccount : quota.maxImagesPerAccount;
+    if (used >= maxAllowed) {
+      const message = tutaPhotoQuotaExceededMessage(quota);
+      stagingFailureRef.current = message;
+      if (!quotaPopupShownRef.current) {
+        quotaPopupShownRef.current = true;
+        await themedAlert(message, { title: 'Free Tier Limit Reached' });
       }
-      if (isVideo) quota.videoCount = used + 1;
-      else quota.imageCount = used + 1;
-      return true;
-    },
-    []
-  );
+      return false;
+    }
+    if (isVideo) quota.videoCount = used + 1;
+    else quota.imageCount = used + 1;
+    return true;
+  }, []);
 
   const releaseMediaQuotaSlot = useCallback((isVideo) => {
     const quota = mediaQuotaRef.current;
@@ -3739,11 +3523,6 @@ export default function PhotoAlbumsWorkspacePane({
       title: 'Downsizing Upload'
     });
   }, []);
-
-
-
-
-
 
   const reportVaultLeavingProgress = useCallback(async ({ percent, label } = {}) => {
     const next = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
@@ -3767,9 +3546,7 @@ export default function PhotoAlbumsWorkspacePane({
       console.error('[performVaultStorageLogoff] prepare', err?.message || err);
     }
     setVaultLeavingProgressPercent(2);
-    setVaultLeavingProgressLabel(
-      paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
-    );
+    setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
     await vaultApi.logoffPhotoAlbumsStorage({
       onProgress: (progress) => {
         void reportVaultLeavingProgress(progress);
@@ -3802,9 +3579,7 @@ export default function PhotoAlbumsWorkspacePane({
       setBusy(true);
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
-      setVaultLeavingProgressLabel(
-        paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
-      );
+      setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
       setError('');
       try {
         await performVaultStorageLogoff();
@@ -4044,10 +3819,7 @@ export default function PhotoAlbumsWorkspacePane({
     if (Number(selectedNoteIdRef.current) === target.noteId) {
       requestAnimationFrame(() => {
         const api = noteEditorApiRef.current;
-        if (
-          target.pageKey &&
-          api?.goToAlbumPageByKey?.(target.pageKey, { skipTrafficGate: true })
-        ) {
+        if (target.pageKey && api?.goToAlbumPageByKey?.(target.pageKey, { skipTrafficGate: true })) {
           pendingOrderPageRef.current = null;
           return;
         }
@@ -4122,9 +3894,7 @@ export default function PhotoAlbumsWorkspacePane({
       setError('');
       try {
         await removePhotoAlbumsSharedAlbum(id);
-        setSharedAlbums((prev) =>
-          (Array.isArray(prev) ? prev : []).filter((row) => Number(row.sharedAlbumId) !== id)
-        );
+        setSharedAlbums((prev) => (Array.isArray(prev) ? prev : []).filter((row) => Number(row.sharedAlbumId) !== id));
         if (Number(selectedSharedAlbumId) === id) {
           setSelectedSharedAlbumId(null);
           setSharedAlbumView(null);
@@ -4138,15 +3908,11 @@ export default function PhotoAlbumsWorkspacePane({
     [busy, selectedSharedAlbumId]
   );
 
-  const activeAlbumSetName =
-    selectedNotebook && !sharedAlbumView
-      ? photoAlbumsNotebookSidebarLabel(selectedNotebook, notebooks)
-      : '';
+  const activeAlbumSetName = selectedNotebook && !sharedAlbumView ? photoAlbumsNotebookSidebarLabel(selectedNotebook, notebooks) : '';
   const activeAlbumName = sharedAlbumView
     ? String(sharedAlbumView.displayLabel || sharedAlbumView.albumName || '').trim()
     : selectedNote
-      ? openNoteTitlePlain ||
-        photoAlbumsNoteSidebarLabel(selectedNote, selectedNotebook?.notes || [], notebooks)
+      ? openNoteTitlePlain || photoAlbumsNoteSidebarLabel(selectedNote, selectedNotebook?.notes || [], notebooks)
       : '';
 
   const handleAddCurrentPageToOrderAlbum = useCallback(async () => {
@@ -4168,14 +3934,8 @@ export default function PhotoAlbumsWorkspacePane({
       return;
     }
     const film = api?.getFilmstripModelForPage?.(pageIndex);
-    const noteName =
-      openNoteTitlePlain ||
-      photoAlbumsNoteSidebarLabel(selectedNote, selectedNotebook?.notes || [], notebooks) ||
-      'Album';
-    const pageKey =
-      snapshot?.page?.key != null
-        ? String(snapshot.page.key)
-        : film?.pageKey || film?.model?.key || null;
+    const noteName = openNoteTitlePlain || photoAlbumsNoteSidebarLabel(selectedNote, selectedNotebook?.notes || [], notebooks) || 'Album';
+    const pageKey = snapshot?.page?.key != null ? String(snapshot.page.key) : film?.pageKey || film?.model?.key || null;
     const item = {
       id: newOrderAlbumItemId(),
       kind: 'page',
@@ -4267,9 +4027,7 @@ export default function PhotoAlbumsWorkspacePane({
             id: newOrderAlbumItemId(),
             kind: 'album',
             noteId,
-            noteName:
-              photoAlbumsNoteSidebarLabel(row, selectedNotebook?.notes || notes, notebooks) ||
-              'Album',
+            noteName: photoAlbumsNoteSidebarLabel(row, selectedNotebook?.notes || notes, notebooks) || 'Album',
             albumSetName:
               photoAlbumsNotebookSidebarLabel(
                 notebooks.find((n) => Number(n.notebook_id) === Number(row.notebook_id)),
@@ -4287,15 +4045,7 @@ export default function PhotoAlbumsWorkspacePane({
       }
       persistOrderAlbumItems(next);
     },
-    [
-      orderAlbumItems,
-      shortcuts,
-      notebooks,
-      notes,
-      selectedNotebook,
-      findNoteRowById,
-      persistOrderAlbumItems
-    ]
+    [orderAlbumItems, shortcuts, notebooks, notes, selectedNotebook, findNoteRowById, persistOrderAlbumItems]
   );
 
   useEffect(() => {
@@ -4312,23 +4062,13 @@ export default function PhotoAlbumsWorkspacePane({
       const fromNotebook = notebookScopePendingRef.current;
       notebookScopePendingRef.current = false;
       // Prefer a still-locked note so notebook ***** unlock has a PIN target.
-      const preferred =
-        notes.find(
-          (n) =>
-            noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id)
-        ) || notes[0];
+      const preferred = notes.find((n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id)) || notes[0];
       selectNoteId(preferred.note_id, { fromNotebook });
     } else if (notebookScopePendingRef.current) {
       notebookScopePendingRef.current = false;
       setInnerEncryptUiScope('notebook');
     }
-  }, [
-    selectedNotebook,
-    selectedNoteId,
-    selectNoteId,
-    noteRequiresInnerPinToView,
-    isInnerNoteUnlockedForDisplay
-  ]);
+  }, [selectedNotebook, selectedNoteId, selectNoteId, noteRequiresInnerPinToView, isInnerNoteUnlockedForDisplay]);
 
   useEffect(() => {
     if (!selectedNote) {
@@ -4356,16 +4096,10 @@ export default function PhotoAlbumsWorkspacePane({
     setNotebooks((prev) =>
       prev.map((nb) => ({
         ...nb,
-        notes: (nb.notes || []).map((n) =>
-          Number(n.note_id) === id ? { ...n, note_name: plain } : n
-        )
+        notes: (nb.notes || []).map((n) => (Number(n.note_id) === id ? { ...n, note_name: plain } : n))
       }))
     );
-    setSearchResults((prev) =>
-      Array.isArray(prev)
-        ? prev.map((r) => (Number(r.note_id) === id ? { ...r, note_name: plain } : r))
-        : prev
-    );
+    setSearchResults((prev) => (Array.isArray(prev) ? prev.map((r) => (Number(r.note_id) === id ? { ...r, note_name: plain } : r)) : prev));
   }, []);
 
   // Debounced autosave for the note BODY only. The note name is handled separately
@@ -4394,9 +4128,8 @@ export default function PhotoAlbumsWorkspacePane({
     // clean-v* suffix so bumping the hydrate version does not silently disable autosave.
     const hydratedKey = String(editorHydratedRef.current.key || '');
     const editorHoldsThisNote =
-      loadedNoteIdRef.current === noteId &&
-      (hydratedKey === `${noteId}:open` || hydratedKey.startsWith(`${noteId}:open:`));
-    const html = !locked && editorHoldsThisNote ? noteEditorApiRef.current?.getHTML() ?? null : null;
+      loadedNoteIdRef.current === noteId && (hydratedKey === `${noteId}:open` || hydratedKey.startsWith(`${noteId}:open:`));
+    const html = !locked && editorHoldsThisNote ? (noteEditorApiRef.current?.getHTML() ?? null) : null;
     if (html == null) return;
     // Background autosave must not flip `busy` — that disables rename/menu clicks.
     persistNoteInFlightRef.current = true;
@@ -4411,14 +4144,7 @@ export default function PhotoAlbumsWorkspacePane({
       persistNoteInFlightRef.current = false;
       bumpVaultUsage();
     }
-  }, [
-    selectedNote,
-    noteHasInnerEncryption,
-    isInnerNoteUnlocked,
-    patchNoteRowInTree,
-    bumpVaultUsage,
-    vaultApi
-  ]);
+  }, [selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked, patchNoteRowInTree, bumpVaultUsage, vaultApi]);
 
   persistNoteRef.current = persistNote;
 
@@ -4445,9 +4171,7 @@ export default function PhotoAlbumsWorkspacePane({
             ...nb,
             notes: (nb.notes || []).map((note) => {
               if (Number(note.note_id) !== noteId) return note;
-              const attachments = (note.attachments || []).filter(
-                (entry) => Number(entry.attachment_id) !== id
-              );
+              const attachments = (note.attachments || []).filter((entry) => Number(entry.attachment_id) !== id);
               return {
                 ...note,
                 attachments,
@@ -4471,12 +4195,7 @@ export default function PhotoAlbumsWorkspacePane({
   const handleContentDragOver = useCallback((event) => {
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
     // Outgoing note HTML export also carries Files — do not treat as OS import.
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (types.includes('Files') || isRecordVaultMobileUploadDrag(event.dataTransfer)) {
@@ -4484,7 +4203,6 @@ export default function PhotoAlbumsWorkspacePane({
       event.dataTransfer.dropEffect = 'copy';
     }
   }, []);
-
 
   /** Mobile post-login / mall tile → camera/gallery; stage into Mobile Upload only (no album load). */
   useEffect(() => {
@@ -4498,8 +4216,7 @@ export default function PhotoAlbumsWorkspacePane({
     if (!unlocked || mobileDirectUploadOpen) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaPhotoUploadPending();
-    const mobileUpload =
-      mobileTutaPhotoUploadUi || fromQuery || fromFlag || peekMobileTutaPhotoUploadSession();
+    const mobileUpload = mobileTutaPhotoUploadUi || fromQuery || fromFlag || peekMobileTutaPhotoUploadSession();
     if (!mobileUpload) return undefined;
     // Do not wait for album note / photo load — open staging popup as soon as vault is unlocked.
     if (busy && !mobileTutaPhotoUploadUi) return undefined;
@@ -4512,14 +4229,7 @@ export default function PhotoAlbumsWorkspacePane({
     setMobileTutaPhotoUploadUi(true);
     setMobileDirectUploadOpen(true);
     return undefined;
-  }, [
-    unlocked,
-    busy,
-    mobileDirectUploadOpen,
-    mobileTutaPhotoUploadUi,
-    searchParams,
-    setSearchParams
-  ]);
+  }, [unlocked, busy, mobileDirectUploadOpen, mobileTutaPhotoUploadUi, searchParams, setSearchParams]);
 
   const handleMobileDirectPhotoUploadFile = useCallback(async () => {
     // Mobile TutaPhoto upload session: only stage into UPLOAD_FOLDER (dialog does that).
@@ -4625,20 +4335,10 @@ export default function PhotoAlbumsWorkspacePane({
   const classifyNoteImportDropFile = useCallback((file) => {
     const name = String(file?.name || '').toLowerCase();
     const mime = String(file?.type || '').toLowerCase();
-    if (
-      name.endsWith('.html') ||
-      name.endsWith('.htm') ||
-      mime === 'text/html' ||
-      mime === 'application/xhtml+xml'
-    ) {
+    if (name.endsWith('.html') || name.endsWith('.htm') || mime === 'text/html' || mime === 'application/xhtml+xml') {
       return 'html';
     }
-    if (
-      name.endsWith('.md') ||
-      name.endsWith('.markdown') ||
-      mime === 'text/markdown' ||
-      mime === 'text/x-markdown'
-    ) {
+    if (name.endsWith('.md') || name.endsWith('.markdown') || mime === 'text/markdown' || mime === 'text/x-markdown') {
       return 'md';
     }
     if (name.endsWith('.pdf') || mime === 'application/pdf') {
@@ -4690,9 +4390,7 @@ export default function PhotoAlbumsWorkspacePane({
    */
   const createNotesFromDroppedImportFiles = useCallback(
     async (files) => {
-      const importFiles = (Array.isArray(files) ? files : []).filter((file) =>
-        classifyNoteImportDropFile(file)
-      );
+      const importFiles = (Array.isArray(files) ? files : []).filter((file) => classifyNoteImportDropFile(file));
       if (!importFiles.length) return false;
       if (!selectedNotebookId) {
         setError('Select a notebook before importing a file.');
@@ -4702,9 +4400,7 @@ export default function PhotoAlbumsWorkspacePane({
         setError('Vault is busy — try again in a moment.');
         return true;
       }
-      const targetNotebook = notebooks.find(
-        (nb) => Number(nb.notebook_id) === Number(selectedNotebookId)
-      );
+      const targetNotebook = notebooks.find((nb) => Number(nb.notebook_id) === Number(selectedNotebookId));
       const siblingNotes = targetNotebook?.notes || [];
       if (notebookInnerLockedForDisplay(siblingNotes)) {
         setError('Unlock this notebook before importing.');
@@ -4771,9 +4467,7 @@ export default function PhotoAlbumsWorkspacePane({
             };
             setNotebooks((prev) =>
               prev.map((nb) =>
-                Number(nb.notebook_id) === Number(selectedNotebookId)
-                  ? { ...nb, notes: [...(nb.notes || []), createdRow] }
-                  : nb
+                Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb
               )
             );
             lastCreatedId = created.note_id;
@@ -4781,9 +4475,7 @@ export default function PhotoAlbumsWorkspacePane({
             selectNoteId(created.note_id);
             enqueueImportSuccessPopup(`Success Import ${fileLabel} into Note`);
           } catch (err) {
-            failures.push(
-              `${fileLabel}: ${readPhotoAlbumsApiError(err, 'import failed')}`
-            );
+            failures.push(`${fileLabel}: ${readPhotoAlbumsApiError(err, 'import failed')}`);
           }
         }
 
@@ -4792,9 +4484,7 @@ export default function PhotoAlbumsWorkspacePane({
         if (failures.length && createdCount === 0) {
           setError(failures[0]);
         } else if (failures.length) {
-          setError(
-            `Created ${createdCount} note(s); ${failures.length} file(s) failed. ${failures[0]}`
-          );
+          setError(`Created ${createdCount} note(s); ${failures.length} file(s) failed. ${failures[0]}`);
         }
       } finally {
         setBusy(false);
@@ -4895,24 +4585,14 @@ export default function PhotoAlbumsWorkspacePane({
           return true;
         }
       } catch (err) {
-        return failStaging(
-          readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`)
-        );
+        return failStaging(readPhotoAlbumsApiError(err, `Failed to upload ${file.name || 'file'}`));
       } finally {
         if (!skipBusy) setBusy(false);
         bumpVaultUsage();
       }
       return failStaging(`Vault did not accept “${file.name || 'file'}”.`);
     },
-    [
-      selectedNote,
-      vaultApi,
-      bumpVaultUsage,
-      loadNoteContent,
-      reserveMediaQuotaSlot,
-      releaseMediaQuotaSlot,
-      announceDownsizeOnce
-    ]
+    [selectedNote, vaultApi, bumpVaultUsage, loadNoteContent, reserveMediaQuotaSlot, releaseMediaQuotaSlot, announceDownsizeOnce]
   );
 
   /**
@@ -4922,12 +4602,7 @@ export default function PhotoAlbumsWorkspacePane({
     async (event) => {
       if (!selectedNote) return;
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      if (
-        types.includes(DRAG_NOTE) ||
-        types.includes(DRAG_NOTEBOOK) ||
-        types.includes(DRAG_SHORTCUT) ||
-        types.includes(DRAG_CROSS_PANE)
-      ) {
+      if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
         return;
       }
       const mobileUploadNames = isRecordVaultMobileUploadDrag(event.dataTransfer)
@@ -4949,9 +4624,8 @@ export default function PhotoAlbumsWorkspacePane({
       if (mobileUploadNames.length) {
         for (const mobileUploadName of mobileUploadNames) {
           try {
-            // eslint-disable-next-line no-await-in-loop
             const file = await materializeRecordVaultMobileUploadFile(mobileUploadName, MOBILE_UPLOAD_PRODUCT_TUTAPHOTO);
-            // eslint-disable-next-line no-await-in-loop
+
             await uploadNoteVaultFileToStaging(file);
           } catch (err) {
             setError(err?.response?.data?.error || err?.message || 'Failed to add mobile upload to album');
@@ -4979,7 +4653,6 @@ export default function PhotoAlbumsWorkspacePane({
       }
 
       for (const file of stageMedia.length ? stageMedia : attachFiles) {
-        // eslint-disable-next-line no-await-in-loop
         await uploadNoteVaultFileToStaging(file);
       }
 
@@ -4991,14 +4664,7 @@ export default function PhotoAlbumsWorkspacePane({
         setError('Staged supported files. Drop Markdown onto the Notes list to import as a new note.');
       }
     },
-    [
-      selectedNote,
-      busy,
-      uploadNoteVaultFileToStaging,
-      noteHasInnerEncryption,
-      isInnerNoteUnlocked,
-      classifyNoteImportDropFile
-    ]
+    [selectedNote, busy, uploadNoteVaultFileToStaging, noteHasInnerEncryption, isInnerNoteUnlocked, classifyNoteImportDropFile]
   );
 
   const handleStageOsFiles = useCallback(
@@ -5008,16 +4674,12 @@ export default function PhotoAlbumsWorkspacePane({
         return;
       }
       const list = Array.isArray(files) ? files : [];
-      const photoFiles = sortPhotoAlbumsFilesBySourceTakenAt(
-        list.filter((file) => isPhotoAlbumsStagingAlbumMediaFile(file))
-      );
+      const photoFiles = sortPhotoAlbumsFilesBySourceTakenAt(list.filter((file) => isPhotoAlbumsStagingAlbumMediaFile(file)));
       const rejected = list.filter((file) => !isPhotoAlbumsStagingAlbumMediaFile(file));
       if (!photoFiles.length) {
         const name = rejected[0]?.name || 'file';
         if (isMacOsMetadataFileName(name)) {
-          setError(
-            `“${name}” is macOS metadata (._ sidecar), not a photo. Drag the matching file without ._ (e.g. hike2.jpg).`
-          );
+          setError(`“${name}” is macOS metadata (._ sidecar), not a photo. Drag the matching file without ._ (e.g. hike2.jpg).`);
         } else {
           setError(
             `Cannot preview “${name}” in the photo tray. Supported album media: PNG, JPEG, SVG, WebP, GIF, AVIF, ICO, BMP, TIFF, APNG, HEIC/HEIF; videos MP4, MOV, WebM, MKV, AVI, WMV, MTS/M2TS.`
@@ -5041,7 +4703,7 @@ export default function PhotoAlbumsWorkspacePane({
             label: `Adding to Thumbnail Tray (${i + 1} of ${total})`,
             percent: Math.round((i / total) * 100)
           });
-          // eslint-disable-next-line no-await-in-loop
+
           const ok = await uploadNoteVaultFileToStaging(photoFiles[i], {
             skipBusy: true,
             skipReconcile: true
@@ -5070,9 +4732,7 @@ export default function PhotoAlbumsWorkspacePane({
               'No photos were added to the Thumbnail Tray. Select an album on the left, unlock TutaDrive, then try again.'
           );
         } else if (rejected.length) {
-          setError(
-            `Staged ${uploaded} photo(s). Skipped ${rejected.length} unsupported preview type(s) (e.g. RAW, PSD, PDF, JXL).`
-          );
+          setError(`Staged ${uploaded} photo(s). Skipped ${rejected.length} unsupported preview type(s) (e.g. RAW, PSD, PDF, JXL).`);
         }
       } finally {
         setBatchUploadProgress(null);
@@ -5108,9 +4768,7 @@ export default function PhotoAlbumsWorkspacePane({
       const noteId = Number(selectedNote.note_id);
       const ids = [
         ...new Set(
-          (Array.isArray(attachmentIds) ? attachmentIds : [])
-            .map((id) => Number(id))
-            .filter((id) => Number.isFinite(id) && id > 0)
+          (Array.isArray(attachmentIds) ? attachmentIds : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
         )
       ];
       if (!ids.length) return;
@@ -5134,9 +4792,7 @@ export default function PhotoAlbumsWorkspacePane({
                 Number(note.note_id) === noteId
                   ? {
                       ...note,
-                      attachments: (note.attachments || []).filter(
-                        (entry) => !deleted.has(Number(entry.attachment_id))
-                      )
+                      attachments: (note.attachments || []).filter((entry) => !deleted.has(Number(entry.attachment_id)))
                     }
                   : note
               )
@@ -5154,12 +4810,7 @@ export default function PhotoAlbumsWorkspacePane({
   /** Notes-list column: each md/html/pdf → its own NEW note (leave other notes alone). */
   const handleNoteListFileDragOver = useCallback((event) => {
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (!types.includes('Files')) return;
@@ -5178,12 +4829,7 @@ export default function PhotoAlbumsWorkspacePane({
     async (event) => {
       setNoteLaneFileDragActive(false);
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      if (
-        types.includes(DRAG_NOTE) ||
-        types.includes(DRAG_NOTEBOOK) ||
-        types.includes(DRAG_SHORTCUT) ||
-        types.includes(DRAG_CROSS_PANE)
-      ) {
+      if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
         return;
       }
       const isFileDrag = types.includes('Files');
@@ -5207,12 +4853,7 @@ export default function PhotoAlbumsWorkspacePane({
 
   const handleNotebookLaneFolderDragOver = useCallback((event) => {
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (!types.includes('Files')) return;
@@ -5230,12 +4871,7 @@ export default function PhotoAlbumsWorkspacePane({
   const handleNotebookLaneFolderDrop = useCallback(async (event) => {
     setNotebookLaneFolderDragActive(false);
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (!types.includes('Files')) return;
@@ -5262,138 +4898,132 @@ export default function PhotoAlbumsWorkspacePane({
     [selectedNoteId]
   );
 
-
-
   const handleNoteListTitleEditChange = useCallback(
     (next) => {
       setEditNameDraft(next);
       // While renaming from the content header, keep keystrokes only in that field.
       // Live-syncing openNoteTitlePlain made it look like typing was going into the sidebar.
-      if (
-        Number(editingNoteId) === Number(selectedNoteId) &&
-        renameUiSurface !== 'header'
-      ) {
+      if (Number(editingNoteId) === Number(selectedNoteId) && renameUiSurface !== 'header') {
         updateOpenNoteTitle(next, { schedulePersist: false });
       }
     },
     [updateOpenNoteTitle, editingNoteId, selectedNoteId, renameUiSurface]
   );
 
-
-
-
   /**
    * Column splitter drag — slider-style: rAF-coalesced live width via DOM
    * (no React re-render / album autofit thrash per mousemove). Commit state on mouseup.
    */
-  const startColumnResize = useCallback((mode, event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const startX = event.clientX;
-    const startSidebar = sidebarWidth;
-    const startNotebookCol = notebookColWidth;
-    const startRightSidebar = rightSidebarWidth;
-    // Pulling the right-edge grip when the right menu is closed opens it.
-    if (mode === 'rightSidebar' && !rightMenuOpen) {
-      setRightMenuOpen(true);
-      setLeftMenuOpen(true);
-    }
-
-    setPhotoAlbumsColumnResizing(true);
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-
-    let raf = 0;
-    let pendingWidth = null;
-    let latestWidth =
-      mode === 'sidebar' ? startSidebar : mode === 'notebookCol' ? startNotebookCol : startRightSidebar;
-    let shouldCloseRight = false;
-
-    const paintWidth = (width) => {
-      if (mode === 'sidebar') {
-        const el = leftSidebarPaneRef.current;
-        if (el) el.style.width = `${width}px`;
-      } else if (mode === 'notebookCol') {
-        const el = notebookColPaneRef.current;
-        if (el) el.style.width = `${width}px`;
-      } else {
-        const el = rightSidebarPaneRef.current;
-        if (el) el.style.width = `${width}px`;
+  const startColumnResize = useCallback(
+    (mode, event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startSidebar = sidebarWidth;
+      const startNotebookCol = notebookColWidth;
+      const startRightSidebar = rightSidebarWidth;
+      // Pulling the right-edge grip when the right menu is closed opens it.
+      if (mode === 'rightSidebar' && !rightMenuOpen) {
+        setRightMenuOpen(true);
+        setLeftMenuOpen(true);
       }
-    };
 
-    const flush = () => {
-      raf = 0;
-      if (pendingWidth == null) return;
-      latestWidth = pendingWidth;
-      pendingWidth = null;
-      paintWidth(latestWidth);
-    };
+      setPhotoAlbumsColumnResizing(true);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
 
-    const onMove = (moveEvent) => {
-      const delta = moveEvent.clientX - startX;
-      let next;
-      if (mode === 'sidebar') {
-        next = clamp(startSidebar + delta, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
-      } else if (mode === 'notebookCol') {
-        next = Math.max(MIN_MENU_COL_WIDTH, startNotebookCol + delta);
-      } else {
-        next = clamp(startRightSidebar - delta, MIN_RIGHT_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH);
-        shouldCloseRight = delta > 72 && next <= MIN_RIGHT_SIDEBAR_WIDTH + 4;
-      }
-      pendingWidth = next;
-      if (!raf) raf = requestAnimationFrame(flush);
-    };
+      let raf = 0;
+      let pendingWidth = null;
+      let latestWidth = mode === 'sidebar' ? startSidebar : mode === 'notebookCol' ? startNotebookCol : startRightSidebar;
+      let shouldCloseRight = false;
 
-    const onUp = () => {
-      cancelAnimationFrame(raf);
-      if (pendingWidth != null) {
+      const paintWidth = (width) => {
+        if (mode === 'sidebar') {
+          const el = leftSidebarPaneRef.current;
+          if (el) el.style.width = `${width}px`;
+        } else if (mode === 'notebookCol') {
+          const el = notebookColPaneRef.current;
+          if (el) el.style.width = `${width}px`;
+        } else {
+          const el = rightSidebarPaneRef.current;
+          if (el) el.style.width = `${width}px`;
+        }
+      };
+
+      const flush = () => {
+        raf = 0;
+        if (pendingWidth == null) return;
         latestWidth = pendingWidth;
         pendingWidth = null;
         paintWidth(latestWidth);
-      }
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      document.body.style.removeProperty('user-select');
-      document.body.style.removeProperty('cursor');
+      };
 
-      const nextSidebar = mode === 'sidebar' ? latestWidth : sidebarWidth;
-      const nextNotebookCol = mode === 'notebookCol' ? latestWidth : notebookColWidth;
-      const nextRight = mode === 'rightSidebar' ? latestWidth : rightSidebarWidth;
+      const onMove = (moveEvent) => {
+        const delta = moveEvent.clientX - startX;
+        let next;
+        if (mode === 'sidebar') {
+          next = clamp(startSidebar + delta, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+        } else if (mode === 'notebookCol') {
+          next = Math.max(MIN_MENU_COL_WIDTH, startNotebookCol + delta);
+        } else {
+          next = clamp(startRightSidebar - delta, MIN_RIGHT_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH);
+          shouldCloseRight = delta > 72 && next <= MIN_RIGHT_SIDEBAR_WIDTH + 4;
+        }
+        pendingWidth = next;
+        if (!raf) raf = requestAnimationFrame(flush);
+      };
 
-      if (mode === 'sidebar') {
-        setSidebarWidth(latestWidth);
-        leftSidebarPaneRef.current?.style.removeProperty('width');
-      } else if (mode === 'notebookCol') {
-        setNotebookColAutoFit(false);
-        setNotebookColWidth(latestWidth);
-        notebookColPaneRef.current?.style.removeProperty('width');
-      } else {
-        setRightSidebarWidth(latestWidth);
-        rightSidebarPaneRef.current?.style.removeProperty('width');
-        if (shouldCloseRight) setRightMenuOpen(false);
-      }
+      const onUp = () => {
+        cancelAnimationFrame(raf);
+        if (pendingWidth != null) {
+          latestWidth = pendingWidth;
+          pendingWidth = null;
+          paintWidth(latestWidth);
+        }
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
 
-      setPhotoAlbumsColumnResizing(false);
+        const nextSidebar = mode === 'sidebar' ? latestWidth : sidebarWidth;
+        const nextNotebookCol = mode === 'notebookCol' ? latestWidth : notebookColWidth;
+        const nextRight = mode === 'rightSidebar' ? latestWidth : rightSidebarWidth;
 
-      setShortcutPanePercent((shortcutPercent) => {
-        setSharedAlbumPanePercent((sharedPercent) => {
-          writeStoredLayout({
-            sidebarWidth: nextSidebar,
-            notebookColWidth: nextNotebookCol,
-            rightSidebarWidth: nextRight,
-            shortcutPanePercent: shortcutPercent,
-            sharedAlbumPanePercent: sharedPercent
+        if (mode === 'sidebar') {
+          setSidebarWidth(latestWidth);
+          leftSidebarPaneRef.current?.style.removeProperty('width');
+        } else if (mode === 'notebookCol') {
+          setNotebookColAutoFit(false);
+          setNotebookColWidth(latestWidth);
+          notebookColPaneRef.current?.style.removeProperty('width');
+        } else {
+          setRightSidebarWidth(latestWidth);
+          rightSidebarPaneRef.current?.style.removeProperty('width');
+          if (shouldCloseRight) setRightMenuOpen(false);
+        }
+
+        setPhotoAlbumsColumnResizing(false);
+
+        setShortcutPanePercent((shortcutPercent) => {
+          setSharedAlbumPanePercent((sharedPercent) => {
+            writeStoredLayout({
+              sidebarWidth: nextSidebar,
+              notebookColWidth: nextNotebookCol,
+              rightSidebarWidth: nextRight,
+              shortcutPanePercent: shortcutPercent,
+              sharedAlbumPanePercent: sharedPercent
+            });
+            return sharedPercent;
           });
-          return sharedPercent;
+          return shortcutPercent;
         });
-        return shortcutPercent;
-      });
-    };
+      };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [notebookColWidth, rightSidebarWidth, sidebarWidth, rightMenuOpen]);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [notebookColWidth, rightSidebarWidth, sidebarWidth, rightMenuOpen]
+  );
 
   /** Resize the Album-Set / Album swim lanes (wider or narrower) so the widest label just fits. */
   const fitMenuLanesToLabels = useCallback(() => {
@@ -5425,14 +5055,7 @@ export default function PhotoAlbumsWorkspacePane({
       shortcutPanePercent,
       sharedAlbumPanePercent
     });
-  }, [
-    notebookColWidth,
-    rightMenuOpen,
-    rightSidebarWidth,
-    sharedAlbumPanePercent,
-    shortcutPanePercent,
-    sidebarWidth
-  ]);
+  }, [notebookColWidth, rightMenuOpen, rightSidebarWidth, sharedAlbumPanePercent, shortcutPanePercent, sidebarWidth]);
 
   const fitMenuLanesToLabelsRef = useRef(fitMenuLanesToLabels);
   fitMenuLanesToLabelsRef.current = fitMenuLanesToLabels;
@@ -5465,9 +5088,7 @@ export default function PhotoAlbumsWorkspacePane({
       if (rect.height <= 0) return;
       // Bottom = Shared Album; dragging up grows the shared pane.
       const fromBottom = ((rect.bottom - moveEvent.clientY) / rect.height) * 100;
-      setSharedAlbumPanePercent(
-        clamp(fromBottom, MIN_SHARED_ALBUM_PANE_PERCENT, MAX_SHARED_ALBUM_PANE_PERCENT)
-      );
+      setSharedAlbumPanePercent(clamp(fromBottom, MIN_SHARED_ALBUM_PANE_PERCENT, MAX_SHARED_ALBUM_PANE_PERCENT));
     };
 
     const onUp = () => {
@@ -5553,7 +5174,6 @@ export default function PhotoAlbumsWorkspacePane({
     window.addEventListener('mouseup', onUp);
   }, []);
 
-
   useEffect(() => {
     if (!notebookColAutoFit) return undefined;
     const fitWidth = computeNotebookColFitWidth(displayNotebooks, menuButtonFontRem);
@@ -5587,72 +5207,60 @@ export default function PhotoAlbumsWorkspacePane({
    * macOS .textClipping). Separate .html files are written via folder picker
    * during dragstart (user gesture) in handleDragStart.
    */
-  const attachHtmlExportToDataTransfer = useCallback(
-    (event, exportNotes) => {
-      const list = (Array.isArray(exportNotes) ? exportNotes : []).filter(Boolean);
-      if (!list.length || !event?.dataTransfer) return { mode: 'none', files: [] };
+  const attachHtmlExportToDataTransfer = useCallback((event, exportNotes) => {
+    const list = (Array.isArray(exportNotes) ? exportNotes : []).filter(Boolean);
+    if (!list.length || !event?.dataTransfer) return { mode: 'none', files: [] };
 
-      (pendingHtmlExportRef.current.urls || []).forEach((url) => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {
-          // ignore
-        }
-      });
-
-      const htmlFiles = list.map((entry) => {
-        const title = String(entry.title || 'note').trim() || 'note';
-        const bodyHtml = String(entry.bodyHtml ?? '<p></p>');
-        const fileName = `${sanitizePhotoAlbumsExportFileName(title)}.html`;
-        const htmlDoc = buildHtmlDocument(title, bodyHtml);
-        const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        return { title, fileName, htmlDoc, blob, url };
-      });
-
-      pendingHtmlExportRef.current = {
-        urls: htmlFiles.map((f) => f.url),
-        messages: [],
-        separateFiles: htmlFiles.map((f) => ({
-          title: f.title,
-          fileName: f.fileName,
-          blob: f.blob,
-          url: f.url
-        }))
-      };
-
-      if (htmlFiles.length === 1) {
-        const only = htmlFiles[0];
-        pendingHtmlExportRef.current.messages.push(
-          `Success export NOTE "${only.title}" as ${only.fileName}`
-        );
-        try {
-          event.dataTransfer.setData(
-            'DownloadURL',
-            `text/html:${only.fileName.replace(/:/g, '-')}:${only.url}`
-          );
-        } catch {
-          // ignore
-        }
-        try {
-          event.dataTransfer.items?.add?.(
-            new File([only.blob], only.fileName, { type: 'text/html' })
-          );
-        } catch {
-          // ignore
-        }
-        return { mode: 'single', files: htmlFiles };
+    (pendingHtmlExportRef.current.urls || []).forEach((url) => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
       }
+    });
 
-      // Multi: never ZIP, never text/File drag-out (Finder turns that into one
-      // .html.textClipping). Caller writes separate .html via folder picker.
-      pendingHtmlExportRef.current.messages.push(
-        `Success export ${htmlFiles.length} notes as separate HTML files`
-      );
-      return { mode: 'multi', files: htmlFiles };
-    },
-    []
-  );
+    const htmlFiles = list.map((entry) => {
+      const title = String(entry.title || 'note').trim() || 'note';
+      const bodyHtml = String(entry.bodyHtml ?? '<p></p>');
+      const fileName = `${sanitizePhotoAlbumsExportFileName(title)}.html`;
+      const htmlDoc = buildHtmlDocument(title, bodyHtml);
+      const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      return { title, fileName, htmlDoc, blob, url };
+    });
+
+    pendingHtmlExportRef.current = {
+      urls: htmlFiles.map((f) => f.url),
+      messages: [],
+      separateFiles: htmlFiles.map((f) => ({
+        title: f.title,
+        fileName: f.fileName,
+        blob: f.blob,
+        url: f.url
+      }))
+    };
+
+    if (htmlFiles.length === 1) {
+      const only = htmlFiles[0];
+      pendingHtmlExportRef.current.messages.push(`Success export NOTE "${only.title}" as ${only.fileName}`);
+      try {
+        event.dataTransfer.setData('DownloadURL', `text/html:${only.fileName.replace(/:/g, '-')}:${only.url}`);
+      } catch {
+        // ignore
+      }
+      try {
+        event.dataTransfer.items?.add?.(new File([only.blob], only.fileName, { type: 'text/html' }));
+      } catch {
+        // ignore
+      }
+      return { mode: 'single', files: htmlFiles };
+    }
+
+    // Multi: never ZIP, never text/File drag-out (Finder turns that into one
+    // .html.textClipping). Caller writes separate .html via folder picker.
+    pendingHtmlExportRef.current.messages.push(`Success export ${htmlFiles.length} notes as separate HTML files`);
+    return { mode: 'multi', files: htmlFiles };
+  }, []);
 
   const downloadHtmlFilesSeparately = useCallback(async (files, { onProgress } = {}) => {
     const list = (Array.isArray(files) ? files : []).filter(Boolean);
@@ -5684,13 +5292,13 @@ export default function PhotoAlbumsWorkspacePane({
               label: `Saving ${name}…`
             });
           }
-          // eslint-disable-next-line no-await-in-loop
+
           const handle = await dir.getFileHandle(name, { create: true });
-          // eslint-disable-next-line no-await-in-loop
+
           const writable = await handle.createWritable();
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.write(f.blob);
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.close();
         }
         if (report) report({ percent: 100, label: 'Done' });
@@ -5773,9 +5381,7 @@ export default function PhotoAlbumsWorkspacePane({
           const noteId = Number(note?.note_id);
           if (!Number.isFinite(noteId) || noteId < 1) continue;
           if (noteRequiresInnerPinToView(note) && !isInnerNoteUnlocked(noteId)) {
-            skippedLocked.push(
-              photoAlbumsNoteSidebarLabel(note, notes, notebooks) || `Note ${noteId}`
-            );
+            skippedLocked.push(photoAlbumsNoteSidebarLabel(note, notes, notebooks) || `Note ${noteId}`);
             doneSteps += 1;
             setNotebookExportProgressPercent(Math.max(1, Math.round((doneSteps / totalSteps) * 100)));
             continue;
@@ -5783,8 +5389,7 @@ export default function PhotoAlbumsWorkspacePane({
 
           let title =
             Number(selectedNoteId) === noteId
-              ? String(openNoteTitlePlain || '').trim() ||
-                photoAlbumsNoteSidebarLabel(note, notes, notebooks)
+              ? String(openNoteTitlePlain || '').trim() || photoAlbumsNoteSidebarLabel(note, notes, notebooks)
               : photoAlbumsNoteSidebarLabel(note, notes, notebooks);
           let bodyHtml = '<p></p>';
           if (Number(selectedNoteId) === noteId) {
@@ -5798,7 +5403,6 @@ export default function PhotoAlbumsWorkspacePane({
               if (cached.title) title = cached.title;
             } else {
               try {
-                // eslint-disable-next-line no-await-in-loop
                 const fresh = await vaultApi.fetchPhotoAlbumsNote(noteId);
                 bodyHtml = String(fresh?.body_text ?? '<p></p>');
                 if (fresh?.note_name) {
@@ -5829,13 +5433,13 @@ export default function PhotoAlbumsWorkspacePane({
 
           const htmlDoc = buildHtmlDocument(title, bodyHtml);
           const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
-          // eslint-disable-next-line no-await-in-loop
+
           const handle = await noteDir.getFileHandle(fileName, { create: true });
-          // eslint-disable-next-line no-await-in-loop
+
           const writable = await handle.createWritable();
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.write(blob);
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.close();
           exportedNames.push(title);
           doneSteps += 1;
@@ -5857,14 +5461,7 @@ export default function PhotoAlbumsWorkspacePane({
         skippedLocked
       };
     },
-    [
-      notebooks,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      selectedNoteId,
-      openNoteTitlePlain,
-      vaultApi
-    ]
+    [notebooks, noteRequiresInnerPinToView, isInnerNoteUnlocked, selectedNoteId, openNoteTitlePlain, vaultApi]
   );
 
   const resolveNoteHtmlExportPayload = useCallback(
@@ -5878,8 +5475,7 @@ export default function PhotoAlbumsWorkspacePane({
       const cached = noteHtmlExportCacheRef.current.get(id);
       const title =
         Number(selectedNoteId) === id
-          ? String(openNoteTitlePlain || '').trim() ||
-            photoAlbumsNoteSidebarLabel(note, siblingNotes, notebooks)
+          ? String(openNoteTitlePlain || '').trim() || photoAlbumsNoteSidebarLabel(note, siblingNotes, notebooks)
           : photoAlbumsNoteSidebarLabel(note, siblingNotes, notebooks);
       let bodyHtml = '<p></p>';
       if (Number(selectedNoteId) === id) {
@@ -5893,14 +5489,7 @@ export default function PhotoAlbumsWorkspacePane({
       }
       return { title: title || cached?.title || 'note', bodyHtml, noteId: id };
     },
-    [
-      findNoteRowById,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      selectedNoteId,
-      openNoteTitlePlain,
-      notebooks
-    ]
+    [findNoteRowById, noteRequiresInnerPinToView, isInnerNoteUnlocked, selectedNoteId, openNoteTitlePlain, notebooks]
   );
 
   const prefetchNoteHtmlExport = useCallback(
@@ -5950,20 +5539,12 @@ export default function PhotoAlbumsWorkspacePane({
       }
       warmOne(id);
     },
-    [
-      findNoteRowById,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      selectedNoteId,
-      openNoteTitlePlain,
-      vaultApi
-    ]
+    [findNoteRowById, noteRequiresInnerPinToView, isInnerNoteUnlocked, selectedNoteId, openNoteTitlePlain, vaultApi]
   );
 
   const handleDragStart = useCallback(
     (event, id, mime, notebookIdForNote) => {
-      const draggedNoteIds =
-        mime === DRAG_NOTE ? resolveDraggedNoteIds(id) : [];
+      const draggedNoteIds = mime === DRAG_NOTE ? resolveDraggedNoteIds(id) : [];
       const multiDrag = mime === DRAG_NOTE && draggedNoteIds.length > 1;
 
       // Drag ghost: for multi-note drag show a count badge so it's obvious all
@@ -6028,8 +5609,7 @@ export default function PhotoAlbumsWorkspacePane({
       event.dataTransfer.setData(mime, String(id));
       // text/plain → macOS Finder .textClipping when dropped outside the app.
       // Multi-note and notebook HTML exports omit it; in-app drops use custom MIME.
-      const omitPlainText =
-        (mime === DRAG_NOTE && multiDrag) || mime === DRAG_NOTEBOOK;
+      const omitPlainText = (mime === DRAG_NOTE && multiDrag) || mime === DRAG_NOTEBOOK;
       if (!omitPlainText) {
         event.dataTransfer.setData('text/plain', String(id));
       }
@@ -6068,9 +5648,7 @@ export default function PhotoAlbumsWorkspacePane({
         } catch {
           // ignore custom MIME failures
         }
-        const payloads = draggedNoteIds
-          .map((nid) => resolveNoteHtmlExportPayload(nid))
-          .filter(Boolean);
+        const payloads = draggedNoteIds.map((nid) => resolveNoteHtmlExportPayload(nid)).filter(Boolean);
         if (payloads.length) attachHtmlExportToDataTransfer(event, payloads);
         // Multi export is completed via a "Choose folder" dialog on dragend
         // (needs a real click gesture). Do not put File/text payloads on the drag.
@@ -6179,10 +5757,7 @@ export default function PhotoAlbumsWorkspacePane({
           const y = event?.screenY;
           if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
           return (
-            x < window.screenX ||
-            y < window.screenY ||
-            x > window.screenX + window.outerWidth ||
-            y > window.screenY + window.outerHeight
+            x < window.screenX || y < window.screenY || x > window.screenX + window.outerWidth || y > window.screenY + window.outerHeight
           );
         } catch {
           return false;
@@ -6229,10 +5804,7 @@ export default function PhotoAlbumsWorkspacePane({
   const openCrossPaneTransfer = useCallback(
     (item, targetNotebookId = null) => {
       if (!item || busy || crossPaneBusy) return;
-      const destNb =
-        targetNotebookId != null
-          ? notebooks.find((nb) => Number(nb.notebook_id) === Number(targetNotebookId))
-          : null;
+      const destNb = targetNotebookId != null ? notebooks.find((nb) => Number(nb.notebook_id) === Number(targetNotebookId)) : null;
       setCrossPaneDuplicateError('');
       setCrossPaneTransfer({
         item,
@@ -6337,9 +5909,7 @@ export default function PhotoAlbumsWorkspacePane({
         setNotebooks(reordered);
       } else if (selectedNotebookId) {
         setNotebooks((prev) =>
-          prev.map((nb) =>
-            Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: reordered } : nb
-          )
+          prev.map((nb) => (Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: reordered } : nb))
         );
       }
 
@@ -6411,12 +5981,16 @@ export default function PhotoAlbumsWorkspacePane({
       const targetNotebook = notebooks.find((nb) => Number(nb.notebook_id) === targetId);
       for (const noteId of noteIds) {
         const movedNote = findNoteRowById(noteId).note;
-        const movedNameLc = String(movedNote?.note_name ?? '').trim().toLowerCase();
+        const movedNameLc = String(movedNote?.note_name ?? '')
+          .trim()
+          .toLowerCase();
         if (movedNameLc && targetNotebook) {
           const clash = (targetNotebook.notes || []).some(
             (n) =>
               !noteIds.includes(Number(n.note_id)) &&
-              String(n.note_name ?? '').trim().toLowerCase() === movedNameLc
+              String(n.note_name ?? '')
+                .trim()
+                .toLowerCase() === movedNameLc
           );
           if (clash) {
             setError(
@@ -6508,9 +6082,7 @@ export default function PhotoAlbumsWorkspacePane({
         return;
       }
       const targetLabel =
-        photoAlbumsNoteSidebarLabel(targetRow, notes, notebooks) ||
-        String(targetRow.note_name || 'album').trim() ||
-        'album';
+        photoAlbumsNoteSidebarLabel(targetRow, notes, notebooks) || String(targetRow.note_name || 'album').trim() || 'album';
       const what = pageNumber ? `the photo on page ${pageNumber}` : 'this photo';
       const mode = await themedChoice(`Copy or Move ${what} into album “${targetLabel}”?`, {
         choices: [
@@ -6600,9 +6172,7 @@ export default function PhotoAlbumsWorkspacePane({
         return;
       }
       if (noteHasInnerEncryption(targetRow)) {
-        setError(
-          'Cannot move a page into a PIN-protected album yet. Remove the PIN on the target album first (or copy content manually).'
-        );
+        setError('Cannot move a page into a PIN-protected album yet. Remove the PIN on the target album first (or copy content manually).');
         return;
       }
       if (noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(sourceNoteId)) {
@@ -6622,15 +6192,9 @@ export default function PhotoAlbumsWorkspacePane({
       }
 
       const targetLabel =
-        photoAlbumsNoteSidebarLabel(targetRow, notes, notebooks) ||
-        String(targetRow.note_name || 'album').trim() ||
-        'album';
+        photoAlbumsNoteSidebarLabel(targetRow, notes, notebooks) || String(targetRow.note_name || 'album').trim() || 'album';
       const pageLabel = `page ${drag.pageNumber}`;
-      if (
-        !(await themedConfirm(
-          `Move ${pageLabel} into album “${targetLabel}”?\n\nThe page will be removed from the current album.`
-        ))
-      ) {
+      if (!(await themedConfirm(`Move ${pageLabel} into album “${targetLabel}”?\n\nThe page will be removed from the current album.`))) {
         return;
       }
 
@@ -6710,9 +6274,7 @@ export default function PhotoAlbumsWorkspacePane({
         void handleMoveNoteToNotebook(event, toId);
         return;
       }
-      void handleDropReorder(event, toId, mime, notebooks, 'notebook_id', (ids) =>
-        vaultApi.reorderPhotoAlbumsNotebooks(ids)
-      );
+      void handleDropReorder(event, toId, mime, notebooks, 'notebook_id', (ids) => vaultApi.reorderPhotoAlbumsNotebooks(ids));
     },
     [draggingNoteId, handleDropReorder, handleMoveNoteToNotebook, notebooks, tryHandleForeignCrossPaneDrop, vaultApi]
   );
@@ -6761,9 +6323,7 @@ export default function PhotoAlbumsWorkspacePane({
       const newLabel =
         targetType === 'note'
           ? String(findNoteRowById(noteId).note?.note_name ?? '').trim()
-          : String(
-              notebooks.find((nb) => Number(nb.notebook_id) === notebookId)?.notebook_name ?? ''
-            ).trim();
+          : String(notebooks.find((nb) => Number(nb.notebook_id) === notebookId)?.notebook_name ?? '').trim();
       const newLabelLc = newLabel.toLowerCase();
       if (newLabelLc) {
         const clash = shortcuts.some((sc) => {
@@ -6772,12 +6332,14 @@ export default function PhotoAlbumsWorkspacePane({
             Number(sc.notebook_id) === notebookId &&
             (targetType === 'notebook' || Number(sc.note_id) === noteId);
           if (sameTarget) return false;
-          return String(sc.label ?? '').trim().toLowerCase() === newLabelLc;
+          return (
+            String(sc.label ?? '')
+              .trim()
+              .toLowerCase() === newLabelLc
+          );
         });
         if (clash) {
-          setError(
-            `A shortcut named “${newLabel}” already exists. Rename the ${targetType} first, then add the shortcut.`
-          );
+          setError(`A shortcut named “${newLabel}” already exists. Rename the ${targetType} first, then add the shortcut.`);
           handleDragEnd();
           return;
         }
@@ -6798,13 +6360,10 @@ export default function PhotoAlbumsWorkspacePane({
               (sc) =>
                 sc.target_type === created.target_type &&
                 Number(sc.notebook_id) === Number(created.notebook_id) &&
-                (created.target_type === 'notebook' ||
-                  Number(sc.note_id) === Number(created.note_id))
+                (created.target_type === 'notebook' || Number(sc.note_id) === Number(created.note_id))
             );
             if (duplicate) {
-              return prev.map((sc) =>
-                Number(sc.shortcut_id) === Number(duplicate.shortcut_id) ? { ...sc, ...created } : sc
-              );
+              return prev.map((sc) => (Number(sc.shortcut_id) === Number(duplicate.shortcut_id) ? { ...sc, ...created } : sc));
             }
             return [...prev, created];
           });
@@ -6854,28 +6413,28 @@ export default function PhotoAlbumsWorkspacePane({
     [busy, handleDragEnd, shortcuts]
   );
 
-  const handleShortcutClick = useCallback((shortcut) => {
-    if (shortcut.target_type === 'notebook') {
-      notebookScopePendingRef.current = true;
-      setInnerEncryptUiScope('notebook');
+  const handleShortcutClick = useCallback(
+    (shortcut) => {
+      if (shortcut.target_type === 'notebook') {
+        notebookScopePendingRef.current = true;
+        setInnerEncryptUiScope('notebook');
+        setSelectedNotebookId(shortcut.notebook_id);
+        return;
+      }
+      notebookScopePendingRef.current = false;
+      setInnerEncryptUiScope('note');
       setSelectedNotebookId(shortcut.notebook_id);
-      return;
-    }
-    notebookScopePendingRef.current = false;
-    setInnerEncryptUiScope('note');
-    setSelectedNotebookId(shortcut.notebook_id);
-    selectNoteId(shortcut.note_id);
-  }, [selectNoteId]);
+      selectNoteId(shortcut.note_id);
+    },
+    [selectNoteId]
+  );
 
   const isShortcutSelected = useCallback(
     (shortcut) => {
       if (shortcut.target_type === 'notebook') {
         return Number(shortcut.notebook_id) === Number(selectedNotebookId);
       }
-      return (
-        Number(shortcut.notebook_id) === Number(selectedNotebookId) &&
-        Number(shortcut.note_id) === Number(selectedNoteId)
-      );
+      return Number(shortcut.notebook_id) === Number(selectedNotebookId) && Number(shortcut.note_id) === Number(selectedNoteId);
     },
     [selectedNotebookId, selectedNoteId]
   );
@@ -6894,7 +6453,9 @@ export default function PhotoAlbumsWorkspacePane({
    */
   const vaultNameExists = useCallback(
     (candidate, { excludeNotebookId = null, excludeNoteId = null } = {}) => {
-      const target = String(candidate ?? '').trim().toLowerCase();
+      const target = String(candidate ?? '')
+        .trim()
+        .toLowerCase();
       if (!target) return false;
       for (const nb of notebooks) {
         if (Number(nb.notebook_id) !== Number(excludeNotebookId)) {
@@ -6969,7 +6530,7 @@ export default function PhotoAlbumsWorkspacePane({
         for (const folder of folders) {
           const notebookName = uniqueNotebookNameFromFolder(folder.folderName);
           setFolderImportProgressLabel(`Creating notebook “${notebookName}”…`);
-          // eslint-disable-next-line no-await-in-loop
+
           const createdNb = await vaultApi.createPhotoAlbumsNotebook(notebookName);
           const notebookId = Number(createdNb?.notebook_id);
           if (!Number.isFinite(notebookId) || notebookId < 1) {
@@ -6986,7 +6547,6 @@ export default function PhotoAlbumsWorkspacePane({
             const fileLabel = String(file?.name || 'file').trim() || 'file';
             setFolderImportProgressLabel(`Importing ${fileLabel}…`);
             try {
-              // eslint-disable-next-line no-await-in-loop
               const text = await file.text();
               let bodyHtml = prepareImportedHtml(text);
               const preferredTitle = String(file?.name || '')
@@ -6995,7 +6555,7 @@ export default function PhotoAlbumsWorkspacePane({
               const noteName = uniqueImportedNoteTitle(preferredTitle, claimedTitles);
               claimedTitles.add(noteName);
               bodyHtml = cleanPhotoAlbumsNoteBodyHtml(bodyHtml || '<p></p>', noteName);
-              // eslint-disable-next-line no-await-in-loop
+
               const created = await vaultApi.createPhotoAlbumsNote(notebookId, {
                 note_name: noteName,
                 body_text: bodyHtml || '<p></p>'
@@ -7011,9 +6571,7 @@ export default function PhotoAlbumsWorkspacePane({
               importedNoteNames.push(fileLabel);
               lastNoteId = created.note_id;
             } catch (err) {
-              setError(
-                `${fileLabel}: ${readPhotoAlbumsApiError(err, 'import failed')}`
-              );
+              setError(`${fileLabel}: ${readPhotoAlbumsApiError(err, 'import failed')}`);
             }
             reportImportProgress(`Imported ${fileLabel}`);
           }
@@ -7022,9 +6580,7 @@ export default function PhotoAlbumsWorkspacePane({
             const exists = prev.some((nb) => Number(nb.notebook_id) === notebookId);
             if (exists) {
               return prev.map((nb) =>
-                Number(nb.notebook_id) === notebookId
-                  ? { ...nb, notes: [...(nb.notes || []), ...createdNoteRows] }
-                  : nb
+                Number(nb.notebook_id) === notebookId ? { ...nb, notes: [...(nb.notes || []), ...createdNoteRows] } : nb
               );
             }
             return [
@@ -7100,7 +6656,9 @@ export default function PhotoAlbumsWorkspacePane({
 
   const commitNotebookRename = async () => {
     const notebookId = editingNotebookId;
-    const trimmed = String(editNameDraft ?? '').trim().toUpperCase();
+    const trimmed = String(editNameDraft ?? '')
+      .trim()
+      .toUpperCase();
     if (!notebookId) {
       clearRenameState();
       return;
@@ -7109,12 +6667,11 @@ export default function PhotoAlbumsWorkspacePane({
     const existing = notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId));
     const currentLabel = existing ? photoAlbumsNotebookSidebarLabel(existing, notebooks) : '';
     const currentLabelUpper = String(currentLabel).trim().toUpperCase();
-    const storedNameUpper = String(existing?.notebook_name ?? '').trim().toUpperCase();
+    const storedNameUpper = String(existing?.notebook_name ?? '')
+      .trim()
+      .toUpperCase();
     const unchanged =
-      !trimmed ||
-      currentLabelUpper === trimmed ||
-      storedNameUpper === trimmed ||
-      isDefaultStylePhotoAlbumsNotebookTitle(trimmed);
+      !trimmed || currentLabelUpper === trimmed || storedNameUpper === trimmed || isDefaultStylePhotoAlbumsNotebookTitle(trimmed);
     if (!existing || unchanged) {
       clearRenameState();
       return;
@@ -7131,13 +6688,9 @@ export default function PhotoAlbumsWorkspacePane({
     setError('');
     try {
       await vaultApi.updatePhotoAlbumsNotebook(notebookId, trimmed);
-      setNotebooks((prev) =>
-        prev.map((nb) => (Number(nb.notebook_id) === Number(notebookId) ? { ...nb, notebook_name: trimmed } : nb))
-      );
+      setNotebooks((prev) => prev.map((nb) => (Number(nb.notebook_id) === Number(notebookId) ? { ...nb, notebook_name: trimmed } : nb)));
       setShortcuts((prev) =>
-        prev.map((sc) =>
-          sc.target_type === 'notebook' && Number(sc.notebook_id) === Number(notebookId) ? { ...sc, label: trimmed } : sc
-        )
+        prev.map((sc) => (sc.target_type === 'notebook' && Number(sc.notebook_id) === Number(notebookId) ? { ...sc, label: trimmed } : sc))
       );
     } catch (err) {
       setError(readPhotoAlbumsApiError(err, 'Failed to rename notebook'));
@@ -7148,7 +6701,9 @@ export default function PhotoAlbumsWorkspacePane({
 
   const commitNoteRename = async () => {
     const noteId = editingNoteId;
-    const trimmed = String(editNameDraft ?? '').trim().toUpperCase();
+    const trimmed = String(editNameDraft ?? '')
+      .trim()
+      .toUpperCase();
     if (!noteId) {
       clearRenameState();
       return;
@@ -7156,9 +6711,7 @@ export default function PhotoAlbumsWorkspacePane({
 
     // In search mode the edited note can live in a notebook other than the selected
     // one, so resolve its real owner for the sibling/clash checks.
-    const ownerNotebook =
-      notebooks.find((nb) => (nb.notes || []).some((n) => Number(n.note_id) === Number(noteId))) ||
-      selectedNotebook;
+    const ownerNotebook = notebooks.find((nb) => (nb.notes || []).some((n) => Number(n.note_id) === Number(noteId))) || selectedNotebook;
     const siblingNotes = ownerNotebook?.notes || [];
     const isSelected = Number(noteId) === Number(selectedNoteId);
 
@@ -7169,7 +6722,9 @@ export default function PhotoAlbumsWorkspacePane({
     }
 
     const existing = siblingNotes.find((n) => Number(n.note_id) === Number(noteId));
-    const startLabelUpper = String(noteRenameStartLabelRef.current || '').trim().toUpperCase();
+    const startLabelUpper = String(noteRenameStartLabelRef.current || '')
+      .trim()
+      .toUpperCase();
     const startPersistedUpper = String(noteRenameStartPersistedRef.current || '')
       .trim()
       .toUpperCase();
@@ -7185,9 +6740,7 @@ export default function PhotoAlbumsWorkspacePane({
     if (unchanged) {
       clearRenameState();
       if (isSelected && existing) {
-        const fallback =
-          startLabelUpper ||
-          photoAlbumsNoteSidebarLabel(existing, siblingNotes, notebooks);
+        const fallback = startLabelUpper || photoAlbumsNoteSidebarLabel(existing, siblingNotes, notebooks);
         updateOpenNoteTitle(fallback, { schedulePersist: false });
       }
       return;
@@ -7224,7 +6777,9 @@ export default function PhotoAlbumsWorkspacePane({
     if (!selectedNoteId) return;
     const noteId = Number(selectedNoteId);
     const snapshot = String(noteTitleBoxSnapshotRef.current ?? '');
-    const upper = String(draftRef.current.openNoteTitlePlain ?? '').trim().toUpperCase();
+    const upper = String(draftRef.current.openNoteTitlePlain ?? '')
+      .trim()
+      .toUpperCase();
     const snapshotUpper = snapshot.trim().toUpperCase();
     const persistedAtFocusUpper = String(noteTitleBoxPersistedNameRef.current ?? '')
       .trim()
@@ -7245,10 +6800,7 @@ export default function PhotoAlbumsWorkspacePane({
 
     // Empty or a computed "NB x, Note y" style placeholder: never freeze a
     // positional label as the real name — keep the previous title.
-    const isPlaceholder =
-      !upper ||
-      isDefaultStylePhotoAlbumsNoteTitle(upper) ||
-      isLegacyShortPhotoAlbumsNoteName(upper);
+    const isPlaceholder = !upper || isDefaultStylePhotoAlbumsNoteTitle(upper) || isLegacyShortPhotoAlbumsNoteName(upper);
     if (isPlaceholder) {
       revertToSnapshot();
       return;
@@ -7328,11 +6880,7 @@ export default function PhotoAlbumsWorkspacePane({
         content_loaded: created.body_text != null
       };
       setNotebooks((prev) =>
-        prev.map((nb) =>
-          Number(nb.notebook_id) === Number(selectedNotebookId)
-            ? { ...nb, notes: [...(nb.notes || []), createdRow] }
-            : nb
-        )
+        prev.map((nb) => (Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb))
       );
       selectNoteId(created.note_id);
     } catch (err) {
@@ -7341,20 +6889,6 @@ export default function PhotoAlbumsWorkspacePane({
       setBusy(false);
     }
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   const handleDeleteNotebook = async (notebookId, notebookName) => {
     if (busy || !notebookId) return;
@@ -7366,9 +6900,9 @@ export default function PhotoAlbumsWorkspacePane({
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const doomedNoteIds = (
-      notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId))?.notes || []
-    ).map((n) => Number(n.note_id));
+    const doomedNoteIds = (notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId))?.notes || []).map((n) =>
+      Number(n.note_id)
+    );
     doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.add(id));
     try {
       await vaultApi.deletePhotoAlbumsNotebook(notebookId);
@@ -7404,19 +6938,9 @@ export default function PhotoAlbumsWorkspacePane({
       await vaultApi.deletePhotoAlbumsNote(noteId);
       clearInnerUnlockForNote(noteId);
       const notebookId = Number(selectedNotebookId);
-      const remainingNotes = (selectedNotebook?.notes || []).filter(
-        (n) => Number(n.note_id) !== Number(noteId)
-      );
-      setNotebooks((prev) =>
-        prev.map((nb) =>
-          Number(nb.notebook_id) === notebookId ? { ...nb, notes: remainingNotes } : nb
-        )
-      );
-      setShortcuts((prev) =>
-        prev.filter(
-          (sc) => !(sc.target_type === 'note' && Number(sc.note_id) === Number(noteId))
-        )
-      );
+      const remainingNotes = (selectedNotebook?.notes || []).filter((n) => Number(n.note_id) !== Number(noteId));
+      setNotebooks((prev) => prev.map((nb) => (Number(nb.notebook_id) === notebookId ? { ...nb, notes: remainingNotes } : nb)));
+      setShortcuts((prev) => prev.filter((sc) => !(sc.target_type === 'note' && Number(sc.note_id) === Number(noteId))));
       if (Number(selectedNoteId) === Number(noteId)) {
         const nextNoteId = remainingNotes[0]?.note_id ?? null;
         if (nextNoteId) selectNoteId(nextNoteId);
@@ -7449,10 +6973,10 @@ export default function PhotoAlbumsWorkspacePane({
   // innerUnlockVersion keeps this in sync when PIN unlock succeeds (unlock state lives in a ref).
   const innerNoteLocked = Boolean(
     selectedNote &&
-      noteHasInnerEncryption(selectedNote) &&
-      !isInnerNoteUnlocked(selectedNote.note_id) &&
-      !noteContentLoading &&
-      innerUnlockVersion >= 0
+    noteHasInnerEncryption(selectedNote) &&
+    !isInnerNoteUnlocked(selectedNote.note_id) &&
+    !noteContentLoading &&
+    innerUnlockVersion >= 0
   );
   // Fully PIN-locked notebook (red *****) — hide all note names/content until notebook unlock.
   const selectedNotebookInnerLocked = notebookInnerLockedForDisplay(selectedNotebook?.notes || []);
@@ -7463,9 +6987,7 @@ export default function PhotoAlbumsWorkspacePane({
     innerEncryptBusy ||
     notebookGateLocked ||
     !selectedNote ||
-    (selectedNote &&
-      noteHasInnerEncryption(selectedNote) &&
-      !isInnerNoteUnlocked(selectedNote.note_id));
+    (selectedNote && noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id));
 
   // Hold the PIN / Lock.gif panel while crypto runs — especially unlock: content must
   // stay hidden until Lock.gif finishes (even if decrypt already succeeded).
@@ -7501,17 +7023,11 @@ export default function PhotoAlbumsWorkspacePane({
   const searchResultTabs = useMemo(() => {
     if (!searchActive || !Array.isArray(searchResults)) return [];
     const tabs = searchResults.map((result) => {
-      const notebookIndex = notebooks.findIndex(
-        (nb) => Number(nb.notebook_id) === Number(result.notebook_id)
-      );
+      const notebookIndex = notebooks.findIndex((nb) => Number(nb.notebook_id) === Number(result.notebook_id));
       const notebook =
-        notebookIndex >= 0
-          ? notebooks[notebookIndex]
-          : { notebook_id: result.notebook_id, notebook_name: result.notebook_name };
+        notebookIndex >= 0 ? notebooks[notebookIndex] : { notebook_id: result.notebook_id, notebook_name: result.notebook_name };
       const notesInNotebook = notebook?.notes || [];
-      const noteIndex = notesInNotebook.findIndex(
-        (item) => Number(item.note_id) === Number(result.note_id)
-      );
+      const noteIndex = notesInNotebook.findIndex((item) => Number(item.note_id) === Number(result.note_id));
       const note =
         noteIndex >= 0
           ? notesInNotebook[noteIndex]
@@ -7530,8 +7046,7 @@ export default function PhotoAlbumsWorkspacePane({
         noteIndex: noteIndex < 0 ? Number.MAX_SAFE_INTEGER : noteIndex,
         label:
           Number(result.note_id) === Number(selectedNoteId)
-            ? openNoteTitlePlain ||
-              photoAlbumsSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
+            ? openNoteTitlePlain || photoAlbumsSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
             : photoAlbumsSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
       };
     });
@@ -7543,20 +7058,21 @@ export default function PhotoAlbumsWorkspacePane({
     return tabs;
   }, [searchActive, searchResults, notebooks, selectedNoteId, openNoteTitlePlain]);
 
-  const handleSearchResultSelect = useCallback((notebookId, noteId) => {
-    setSelectedNotebookId(notebookId);
-    selectNoteId(noteId);
-    setLeftMenuOpen(true);
-    setRightMenuOpen(true);
-  }, [selectNoteId]);
+  const handleSearchResultSelect = useCallback(
+    (notebookId, noteId) => {
+      setSelectedNotebookId(notebookId);
+      selectNoteId(noteId);
+      setLeftMenuOpen(true);
+      setRightMenuOpen(true);
+    },
+    [selectNoteId]
+  );
 
   // Index of the open note within the search-result tabs (for left/right doc nav).
   const currentSearchDocIndex = useMemo(
     () =>
       searchResultTabs.findIndex(
-        (t) =>
-          Number(t.notebook_id) === Number(selectedNotebookId) &&
-          Number(t.note_id) === Number(selectedNoteId)
+        (t) => Number(t.notebook_id) === Number(selectedNotebookId) && Number(t.note_id) === Number(selectedNoteId)
       ),
     [searchResultTabs, selectedNotebookId, selectedNoteId]
   );
@@ -7613,12 +7129,8 @@ export default function PhotoAlbumsWorkspacePane({
   useEffect(() => {
     if (!searchActive || !selectedNoteId) return undefined;
     const timerId = window.setTimeout(() => {
-      document
-        .getElementById(`record-vault-note-${selectedNoteId}`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      document
-        .getElementById(`record-vault-notebook-${selectedNotebookId}`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      document.getElementById(`record-vault-note-${selectedNoteId}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      document.getElementById(`record-vault-notebook-${selectedNotebookId}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }, 0);
     return () => window.clearTimeout(timerId);
   }, [searchActive, selectedNoteId, selectedNotebookId]);
@@ -7636,2104 +7148,1969 @@ export default function PhotoAlbumsWorkspacePane({
 
   return (
     <PhotoAlbumsSliderControlButtonProvider fontRem={menuButtonFontRem}>
-    <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
-    <Box
-      data-record-vault-pane
-      data-record-vault-storage={paneStorageType}
-      onDragEnter={(event) => {
-        if (isForeignCrossPaneDrag(event, paneStorageType)) {
+      <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
+      <Box
+        data-record-vault-pane
+        data-record-vault-storage={paneStorageType}
+        onDragEnter={(event) => {
+          if (isForeignCrossPaneDrag(event, paneStorageType)) {
+            setCrossPaneDropActive(true);
+          }
+        }}
+        onDragOver={(event) => {
+          if (!isForeignCrossPaneDrag(event, paneStorageType)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
           setCrossPaneDropActive(true);
-        }
-      }}
-      onDragOver={(event) => {
-        if (!isForeignCrossPaneDrag(event, paneStorageType)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-        setCrossPaneDropActive(true);
-      }}
-      onDragLeave={(event) => {
-        const related = event.relatedTarget;
-        if (related && event.currentTarget.contains(related)) return;
-        setCrossPaneDropActive(false);
-      }}
-      onDrop={(event) => {
-        if (tryHandleForeignCrossPaneDrop(event, { targetNotebookId: selectedNotebookId })) {
+        }}
+        onDragLeave={(event) => {
+          const related = event.relatedTarget;
+          if (related && event.currentTarget.contains(related)) return;
           setCrossPaneDropActive(false);
-        }
-      }}
-      sx={{
-        flex: 1,
-        minHeight: 0,
-        minWidth: 0,
-        width: '100%',
-        height: compact ? '100%' : '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        fontFamily: MAIN_FONT_FAMILY,
-        bgcolor:
-          albumFocusView || albumEditFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : 'var(--theme-daynight-color)',
-        overflow: 'hidden'
-      }}
-    >
-      
-      <BusyHourglassOverlay
-        open={Boolean(batchUploadProgress)}
-        label={batchUploadProgress?.label || 'Adding photos to Thumbnail Tray'}
-        progressPercent={
-          batchUploadProgress?.percent != null ? Number(batchUploadProgress.percent) : null
-        }
-        progressLabel={batchUploadProgress?.label || ''}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={Boolean(noteContentLoading) && !hideWorkspaceForMobileTutaPhotoUpload}
-        label="Loading album photos"
-        progressPercent={noteContentLoadProgressPercent}
-        progressLabel={noteContentLoadProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={crossPaneBusy}
-        label={
-          crossPaneTransfer?.item?.storageType === 'tutadrive'
-            ? paneStorageType === 'usb'
-              ? 'Copying from Cloud to USB'
-              : 'Transferring Cloud item'
-            : paneStorageType === 'tutadrive'
-              ? 'Copying from USB to Cloud'
-              : 'Transferring USB item'
-        }
-        progressPercent={crossPaneProgressPercent}
-        progressLabel={crossPaneProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={false}
-        label="Loading TutaCloud sign-in"
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={vaultLeaving}
-        label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
-        progressPercent={vaultLeavingProgressPercent}
-        progressLabel={vaultLeavingProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-
-      <PhotoAlbumsMobileUploadDialog
-        open={mobileUploadOpen}
-        onClose={() => setMobileUploadOpen(false)}
-        disabled={busy || !selectedNote}
-        onPhoneUploadComplete={(fileNameOrId, meta) => void handleMobilePhoneUploadComplete(fileNameOrId, meta)}
-      />
-
-      <RecordVaultMobileDirectUploadDialog
-        open={mobileDirectUploadOpen}
-        onClose={() => setMobileDirectUploadOpen(false)}
-        disabled={busy && !mobileTutaPhotoUploadUi}
-        title="Upload photo to TutaPhoto"
-        noteTitle={
-          mobileTutaPhotoUploadUi
-            ? 'Mobile Upload'
-            : selectedNote?.note_name || selectedNote?.title || ''
-        }
-        onPickFile={handleMobileDirectPhotoUploadFile}
-        onStaged={() => setMobileUploadFolderRefreshToken((n) => n + 1)}
-        onExitToMall={handleExitToMall}
-        product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
-      />
-
-      <PhotoAlbumsInviteReviewDialog
-        open={inviteReviewOpen}
-        onClose={() => {
-          setInviteReviewOpen(false);
-          setInviteReviewSendResult(null);
         }}
-        noteId={selectedNote ? Number(selectedNote.note_id) : null}
-        storageType={paneStorageType}
-        sendResult={inviteReviewSendResult}
-      />
-
-      <PhotoAlbumsOrderAlbumDialog
-        open={orderAlbumViewOpen}
-        items={orderAlbumItems}
-        albumName={orderAlbumName}
-        onAlbumNameChange={persistOrderAlbumName}
-        onClose={() => setOrderAlbumViewOpen(false)}
-        onRemove={(id) => {
-          persistOrderAlbumItems(orderAlbumItems.filter((item) => item.id !== id));
-        }}
-        onOpenItem={(item) => {
-          setOrderAlbumViewOpen(false);
-          if (!item) return;
-          let noteId = null;
-          let pageIndex = 0;
-          if (item.kind === 'page' || item.kind === 'album') {
-            noteId = Number(item.noteId);
-            pageIndex = item.kind === 'page' ? Math.max(0, Math.round(Number(item.pageIndex) || 0)) : 0;
-          } else if (item.kind === 'shortcut') {
-            const shortcut = shortcuts.find((s) => Number(s.shortcut_id) === Number(item.shortcutId));
-            noteId = Number(shortcut?.note_id);
-          } else if (item.kind === 'albumSet') {
-            const nb = notebooks.find((n) => Number(n.notebook_id) === Number(item.notebookId));
-            noteId = Number(nb?.notes?.[0]?.note_id);
+        onDrop={(event) => {
+          if (tryHandleForeignCrossPaneDrop(event, { targetNotebookId: selectedNotebookId })) {
+            setCrossPaneDropActive(false);
           }
-          if (!Number.isFinite(noteId) || noteId < 1) {
-            setError('That ordered item is no longer in this vault.');
-            return;
+        }}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          width: '100%',
+          height: compact ? '100%' : '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: MAIN_FONT_FAMILY,
+          bgcolor: albumFocusView || albumEditFocusView ? VAULT_WORKSPACE_FOCUS_VIEW_BG : 'var(--theme-daynight-color)',
+          overflow: 'hidden'
+        }}
+      >
+        <BusyHourglassOverlay
+          open={Boolean(batchUploadProgress)}
+          label={batchUploadProgress?.label || 'Adding photos to Thumbnail Tray'}
+          progressPercent={batchUploadProgress?.percent != null ? Number(batchUploadProgress.percent) : null}
+          progressLabel={batchUploadProgress?.label || ''}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={Boolean(noteContentLoading) && !hideWorkspaceForMobileTutaPhotoUpload}
+          label="Loading album photos"
+          progressPercent={noteContentLoadProgressPercent}
+          progressLabel={noteContentLoadProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={crossPaneBusy}
+          label={
+            crossPaneTransfer?.item?.storageType === 'tutadrive'
+              ? paneStorageType === 'usb'
+                ? 'Copying from Cloud to USB'
+                : 'Transferring Cloud item'
+              : paneStorageType === 'tutadrive'
+                ? 'Copying from USB to Cloud'
+                : 'Transferring USB item'
           }
-          const { notebook } = findNoteRowById(noteId);
-          if (!notebook) {
-            setError('That ordered album is no longer in this vault.');
-            return;
-          }
-          setSelectedNotebookId(Number(notebook.notebook_id));
-          pendingOrderPageRef.current = { noteId, pageIndex };
-          if (Number(selectedNoteId) === noteId) {
-            requestAnimationFrame(() => {
-              noteEditorApiRef.current?.goToAlbumPage?.(pageIndex, { skipTrafficGate: true });
-              pendingOrderPageRef.current = null;
-            });
-            return;
-          }
-          selectNoteId(noteId);
-        }}
-      />
+          progressPercent={crossPaneProgressPercent}
+          progressLabel={crossPaneProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={false}
+          label="Loading TutaCloud sign-in"
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={vaultLeaving}
+          label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
+          progressPercent={vaultLeavingProgressPercent}
+          progressLabel={vaultLeavingProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
 
-      <PhotoAlbumsCrossPaneTransferDialog
-        open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
-        item={crossPaneTransfer?.item || null}
-        targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
-        targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
-        busy={crossPaneBusy}
-        duplicateError={crossPaneDuplicateError}
-        onCopy={() => void runCrossPaneTransfer('copy')}
-        onMove={() => void runCrossPaneTransfer('move')}
-        onClose={() => {
-          if (crossPaneBusy) return;
-          setCrossPaneTransfer(null);
-          setCrossPaneDuplicateError('');
-        }}
-        onDismissDuplicate={() => {
-          setCrossPaneDuplicateError('');
-          setCrossPaneTransfer(null);
-        }}
-      />
-      <BusyHourglassOverlay
-        open={notebookExportBusy}
-        label={
-          notebookHtmlExportOffer?.notebookName
-            ? `Exporting notebook “${notebookHtmlExportOffer.notebookName}”`
-            : 'Exporting notebook'
-        }
-        progressPercent={notebookExportProgressPercent}
-        progressLabel={notebookExportProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={folderImportBusy}
-        label="Importing folder as notebook"
-        progressPercent={folderImportProgressPercent}
-        progressLabel={folderImportProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={multiHtmlExportBusy}
-        label="Exporting notes as HTML"
-        progressPercent={multiHtmlExportProgressPercent}
-        progressLabel={multiHtmlExportProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={Boolean(noteFileImportProgress)}
-        label="Importing notes"
-        progressPercent={noteFileImportProgress?.percent ?? 0}
-        progressLabel={noteFileImportProgress?.label || ''}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(folderImportSuccess)}
-        onClose={() => setFolderImportSuccess(null)}
-        closeOnBackdrop={false}
-        closeButtonAriaLabel="Close folder import success"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Folder import complete</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            {folderImportSuccess
-              ? `Success: Folder ${folderImportSuccess.folderName} been IMPORT to new Notebook ${folderImportSuccess.notebookPathLabel} along with these import Notes: ${(folderImportSuccess.noteNames || []).join(', ') || '(none)'}.`
-              : ''}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setFolderImportSuccess(null)}>
-              Close
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(multiHtmlExportOffer)}
-        onClose={() => {
-          if (multiHtmlExportBusy) return;
-          setMultiHtmlExportOffer(null);
-        }}
-        closeOnBackdrop={!multiHtmlExportBusy}
-        closeButtonAriaLabel="Close export HTML dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>
-            Export {multiHtmlExportOffer?.count || 0} notes as HTML
-          </ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            Chrome cannot drop multiple real files into Finder in one drag (you get a
-            .textClipping). Choose a folder and each selected note will be saved as its
-            own .html file.
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={multiHtmlExportBusy}
-              onClick={() => {
-                if (multiHtmlExportBusy) return;
-                setMultiHtmlExportOffer(null);
-              }}
-            >
-              Cancel
-            </ColorTemplate16PopupCenterWide.ActionButton>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={multiHtmlExportBusy}
-              onClick={() => {
-                if (multiHtmlExportBusy || !multiHtmlExportOffer?.files?.length) return;
-                setMultiHtmlExportBusy(true);
-                setMultiHtmlExportProgressPercent(0);
-                setMultiHtmlExportProgressLabel('Choose a folder…');
-                const offer = multiHtmlExportOffer;
-                void downloadHtmlFilesSeparately(offer.files, {
-                  onProgress: ({ percent, label }) => {
-                    setMultiHtmlExportProgressPercent(percent);
-                    if (label) setMultiHtmlExportProgressLabel(label);
-                  }
-                })
-                  .then((ok) => {
-                    if (ok) {
-                      (offer.messages || []).forEach((msg) => enqueueImportSuccessPopup(msg, 2500));
-                    }
-                  })
-                  .finally(() => {
-                    setMultiHtmlExportBusy(false);
-                    setMultiHtmlExportProgressPercent(0);
-                    setMultiHtmlExportProgressLabel('');
-                    setMultiHtmlExportOffer(null);
-                  });
-              }}
-            >
-              {multiHtmlExportBusy ? 'Saving…' : 'Choose folder'}
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(notebookHtmlExportOffer) && !notebookExportBusy && !notebookExportSuccess}
-        onClose={() => {
-          if (notebookExportBusy) return;
-          setNotebookHtmlExportOffer(null);
-        }}
-        closeOnBackdrop={!notebookExportBusy}
-        closeButtonAriaLabel="Close notebook export dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>
-            Export notebook “{notebookHtmlExportOffer?.notebookName || 'Notebook'}”
-          </ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            Choose a parent folder. A subfolder named “
-            {sanitizePhotoAlbumsExportFileName(notebookHtmlExportOffer?.notebookName || 'Notebook')}
-            ” will be created and each of the {notebookHtmlExportOffer?.noteCount ?? 0} note(s)
-            will be saved as its own .html file inside it.
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={notebookExportBusy}
-              onClick={() => setNotebookHtmlExportOffer(null)}
-            >
-              Cancel
-            </ColorTemplate16PopupCenterWide.ActionButton>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={notebookExportBusy}
-              onClick={() => {
-                if (notebookExportBusy || !notebookHtmlExportOffer?.notebookId) return;
-                const offer = notebookHtmlExportOffer;
-                void exportNotebookHtmlFolder(offer.notebookId).then((result) => {
-                  setNotebookHtmlExportOffer(null);
-                  if (result) setNotebookExportSuccess(result);
-                });
-              }}
-            >
-              Choose folder
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(notebookExportSuccess)}
-        onClose={() => setNotebookExportSuccess(null)}
-        closeOnBackdrop={false}
-        closeButtonAriaLabel="Close notebook export success"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Notebook export complete</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            {notebookExportSuccess
-              ? `Success: Notebook ${notebookExportSuccess.notebookName} been EXPORT to folder ${notebookExportSuccess.folderPath} along with these export HTML files: ${(notebookExportSuccess.noteNames || []).join(', ') || '(none)'}.${
-                  notebookExportSuccess.skippedLocked?.length
-                    ? ` Skipped locked notes: ${notebookExportSuccess.skippedLocked.join(', ')}.`
-                    : ''
-                }`
-              : ''}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setNotebookExportSuccess(null)}>
-              Close
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <PhotoAlbumsViewVaultDialog
-        open={viewVaultOpen}
-        onClose={() => setViewVaultOpen(false)}
-        storageType={viewVaultStorageType}
-        folderName={viewVaultStorageType === 'tutadrive' ? tutaCloudVaultFolderName : ''}
-        tutaDrive={isTutaCloudPane}
-      />
-      <PhotoAlbumsTutaCloudBackupDialog
-        open={tutaCloudBackupOpen}
-        onClose={() => setTutaCloudBackupOpen(false)}
-        folderName={tutaCloudVaultFolderName}
-        albumContext={albumBackupContext}
-        onOpenMyPhotoAlbums={() => setTutaCloudBackupOpen(false)}
-        onRestored={() => void handleTutaCloudVaultRestored()}
-      />
-      <PhotoAlbumsUsbBackupDialog
-        open={usbBackupOpen}
-        onClose={() => setUsbBackupOpen(false)}
-        folderLabel={usbVaultFolderLabel}
-        albumContext={albumBackupContext}
-        onOpenMyPhotoAlbums={() => setUsbBackupOpen(false)}
-        onRestored={() => handleUsbVaultRestoredOrFormatted()}
-      />
-      <ColorTemplate16PopupCenterWide
-        open={vaultFileTooLargeOpen}
-        onClose={() => setVaultFileTooLargeOpen(false)}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close file too large dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>File too large</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            {vaultFileTooLargeName} ({vaultFileTooLargeActualMb} MB) is over the {vaultFileTooLargeMaxMb} MB allowed
-            for vault uploads.
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultFileTooLargeOpen(false)}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <PhotoAlbumsCreateItemDialog
-        open={Boolean(createItemDialog)}
-        mode={createItemDialog}
-        busy={busy}
-        onClose={() => setCreateItemDialog(null)}
-        onConfirmAlbumSet={(name) => void confirmCreateAlbumSet(name)}
-        onConfirmAlbum={(name, dates) => void confirmCreateAlbum(name, dates)}
-      />
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(duplicateNamePopup)}
-        onClose={() => setDuplicateNamePopup('')}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close duplicate name dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Duplicate name</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>{duplicateNamePopup}</ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setDuplicateNamePopup('')}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(importSuccessPopup)}
-        onClose={() => setImportSuccessPopup('')}
-        closeOnBackdrop
-        showCloseButton={false}
-        closeButtonAriaLabel="Close import success"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Import</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>{importSuccessPopup}</ColorTemplate16PopupCenterWide.BodyText>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={vaultUploadErrorOpen}
-        onClose={() => setVaultUploadErrorOpen(false)}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close upload error dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>{vaultUploadErrorTitle}</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
-            {vaultUploadErrorMessage}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          {vaultUploadErrorDetail ? (
-            <ColorTemplate16PopupCenterWide.BodyText
-              sx={{ whiteSpace: 'pre-wrap', opacity: 0.9, fontSize: '0.9em', textAlign: 'left' }}
-            >
-              {vaultUploadErrorDetail}
-            </ColorTemplate16PopupCenterWide.BodyText>
-          ) : null}
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultUploadErrorOpen(false)}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      {error ? (
-        <VaultWorkspaceErrorPopup error={error} onClose={() => setError('')} />
-      ) : null}
+        <PhotoAlbumsMobileUploadDialog
+          open={mobileUploadOpen}
+          onClose={() => setMobileUploadOpen(false)}
+          disabled={busy || !selectedNote}
+          onPhoneUploadComplete={(fileNameOrId, meta) => void handleMobilePhoneUploadComplete(fileNameOrId, meta)}
+        />
 
-      <BusyHourglassOverlay
-        open={!vaultUiReady && loading && unlocked && !hideWorkspaceForMobileTutaPhotoUpload}
-        label="Loading vault"
-        progressPercent={vaultLoadProgressPercent}
-        progressLabel={vaultLoadProgressLabel}
-        backdropSx={myPhotoAlbumsLoadingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
-      />
+        <RecordVaultMobileDirectUploadDialog
+          open={mobileDirectUploadOpen}
+          onClose={() => setMobileDirectUploadOpen(false)}
+          disabled={busy && !mobileTutaPhotoUploadUi}
+          title="Upload photo to TutaPhoto"
+          noteTitle={mobileTutaPhotoUploadUi ? 'Mobile Upload' : selectedNote?.note_name || selectedNote?.title || ''}
+          onPickFile={handleMobileDirectPhotoUploadFile}
+          onStaged={() => setMobileUploadFolderRefreshToken((n) => n + 1)}
+          onExitToMall={handleExitToMall}
+          product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
+        />
 
-      {!unlocked ? (
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            flex: 1,
-            py: 6,
-            ...myPhotoAlbumsBackgroundPanelSx
+        <PhotoAlbumsInviteReviewDialog
+          open={inviteReviewOpen}
+          onClose={() => {
+            setInviteReviewOpen(false);
+            setInviteReviewSendResult(null);
+          }}
+          noteId={selectedNote ? Number(selectedNote.note_id) : null}
+          storageType={paneStorageType}
+          sendResult={inviteReviewSendResult}
+        />
+
+        <PhotoAlbumsOrderAlbumDialog
+          open={orderAlbumViewOpen}
+          items={orderAlbumItems}
+          albumName={orderAlbumName}
+          onAlbumNameChange={persistOrderAlbumName}
+          onClose={() => setOrderAlbumViewOpen(false)}
+          onRemove={(id) => {
+            persistOrderAlbumItems(orderAlbumItems.filter((item) => item.id !== id));
+          }}
+          onOpenItem={(item) => {
+            setOrderAlbumViewOpen(false);
+            if (!item) return;
+            let noteId = null;
+            let pageIndex = 0;
+            if (item.kind === 'page' || item.kind === 'album') {
+              noteId = Number(item.noteId);
+              pageIndex = item.kind === 'page' ? Math.max(0, Math.round(Number(item.pageIndex) || 0)) : 0;
+            } else if (item.kind === 'shortcut') {
+              const shortcut = shortcuts.find((s) => Number(s.shortcut_id) === Number(item.shortcutId));
+              noteId = Number(shortcut?.note_id);
+            } else if (item.kind === 'albumSet') {
+              const nb = notebooks.find((n) => Number(n.notebook_id) === Number(item.notebookId));
+              noteId = Number(nb?.notes?.[0]?.note_id);
+            }
+            if (!Number.isFinite(noteId) || noteId < 1) {
+              setError('That ordered item is no longer in this vault.');
+              return;
+            }
+            const { notebook } = findNoteRowById(noteId);
+            if (!notebook) {
+              setError('That ordered album is no longer in this vault.');
+              return;
+            }
+            setSelectedNotebookId(Number(notebook.notebook_id));
+            pendingOrderPageRef.current = { noteId, pageIndex };
+            if (Number(selectedNoteId) === noteId) {
+              requestAnimationFrame(() => {
+                noteEditorApiRef.current?.goToAlbumPage?.(pageIndex, { skipTrafficGate: true });
+                pendingOrderPageRef.current = null;
+              });
+              return;
+            }
+            selectNoteId(noteId);
           }}
         />
-      ) : hideWorkspaceForMobileTutaPhotoUpload ? (
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: '#ffffff'
+
+        <PhotoAlbumsCrossPaneTransferDialog
+          open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
+          item={crossPaneTransfer?.item || null}
+          targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
+          targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
+          busy={crossPaneBusy}
+          duplicateError={crossPaneDuplicateError}
+          onCopy={() => void runCrossPaneTransfer('copy')}
+          onMove={() => void runCrossPaneTransfer('move')}
+          onClose={() => {
+            if (crossPaneBusy) return;
+            setCrossPaneTransfer(null);
+            setCrossPaneDuplicateError('');
           }}
+          onDismissDuplicate={() => {
+            setCrossPaneDuplicateError('');
+            setCrossPaneTransfer(null);
+          }}
+        />
+        <BusyHourglassOverlay
+          open={notebookExportBusy}
+          label={
+            notebookHtmlExportOffer?.notebookName ? `Exporting notebook “${notebookHtmlExportOffer.notebookName}”` : 'Exporting notebook'
+          }
+          progressPercent={notebookExportProgressPercent}
+          progressLabel={notebookExportProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={folderImportBusy}
+          label="Importing folder as notebook"
+          progressPercent={folderImportProgressPercent}
+          progressLabel={folderImportProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={multiHtmlExportBusy}
+          label="Exporting notes as HTML"
+          progressPercent={multiHtmlExportProgressPercent}
+          progressLabel={multiHtmlExportProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={Boolean(noteFileImportProgress)}
+          label="Importing notes"
+          progressPercent={noteFileImportProgress?.percent ?? 0}
+          progressLabel={noteFileImportProgress?.label || ''}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(folderImportSuccess)}
+          onClose={() => setFolderImportSuccess(null)}
+          closeOnBackdrop={false}
+          closeButtonAriaLabel="Close folder import success"
         >
-          <RecordVaultMobileUploadTray
-            product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
-            active={unlocked}
-            disabled={false}
-            layout="grid"
-            plain
-            refreshToken={mobileUploadFolderRefreshToken}
-            onError={(msg) => setError(String(msg || ''))}
-          />
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
-          <PhotoAlbumsTrafficWaitHost />
-          {!hideWorkspaceChrome ? (
-            <PhotoAlbumsUsageBar
-              usage={vaultUsage}
-              storageType={paneStorageType}
-              videoTutorialUrl={videoTutorialUrl}
-              onPurchased={() => refreshVaultUsageRef.current?.() ?? Promise.resolve()}
-              onGetMoreTokens={openPaymentTokenCheckout}
-              onRequestUsageRefresh={() => refreshVaultUsageRef.current?.()}
-              onRestoreSampleAlbum={
-                sharedAlbumView || compareMode ? null : () => void handleRestoreSampleAlbum()
-              }
-              restoreSampleAlbumDisabled={busy || !unlocked}
-            />
-          ) : null}
-          {!hideWorkspaceChrome ? (
-          <Box
-            sx={{
-              flexShrink: 0,
-              display: 'flex',
-              width: '100%',
-              minWidth: 0,
-              overflow: 'visible',
-              borderBottom: '2px solid var(--theme-secondary-color)',
-              zIndex: 3,
-              pt: 0.35,
-              pb: 0.35,
-              alignItems: 'center',
-              bgcolor: 'var(--theme-secondary-color)',
-              gap: { xs: 0.5, sm: 0.75 },
-              px: { xs: 0.5, sm: 0.75 },
-              boxSizing: 'border-box'
-            }}
-          >
-            {/* Section 1 of 3 — Close Menu / Backup/Restore (single row) */}
-            <Box
-              sx={{
-                ...headerThirdSectionSx,
-                flex: '0 0 auto',
-                flexWrap: 'nowrap',
-                gap: 0.5
-              }}
-            >
-              <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                {compareMode ? (
-                  <SliderControlButton
-                    type="button"
-                    variant="yellow"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    aria-label="Return to single storage view"
-                    onClick={() => {
-                      onReturnFromCompare?.();
-                    }}
-                    sx={headerToggleButtonSx}
-                  >
-                    Return
-                  </SliderControlButton>
-                ) : (
-                  <SliderControlButton
-                    type="button"
-                    variant="yellow"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
-                    title={!menusOpen ? 'Open menus' : 'Close left and right menus'}
-                    onClick={handleMenuLabelsToggle}
-                    sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                  >
-                    {menusOpen ? (
-                      '< Close Menu'
-                    ) : (
-                      <Box
-                        component="img"
-                        src={threeDashesImg}
-                        alt=""
-                        aria-hidden
-                        sx={{
-                          ...menuToggleIconSx,
-                          height: { xs: 22, md: 24 }
-                        }}
-                      />
-                    )}
-                  </SliderControlButton>
-                )}
-              </Box>
-              {!compareMode ? (
-                <>
-              {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
-                <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                  <SliderControlButton
-                    type="button"
-                    variant="yellow"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    onClick={() => {
-                      setTutaCloudBackupOpen(true);
-                    }}
-                    disabled={busy}
-                    aria-label="Backup/Restore"
-                    title="Backup / Restore"
-                    sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                  >
-                    {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
-                  </SliderControlButton>
-                </Box>
-              ) : null}
-              {paneStorageType === 'usb' ? (
-                <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                  <SliderControlButton
-                    type="button"
-                    variant="yellow"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    onClick={() => {
-                      setUsbBackupOpen(true);
-                    }}
-                    disabled={busy}
-                    aria-label="Backup/Restore"
-                    title="Backup / Restore"
-                    sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                  >
-                    {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
-                  </SliderControlButton>
-                </Box>
-              ) : null}
-              {canEnterCompare ? (
-                <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                  <SliderControlButton
-                    type="button"
-                    variant="yellow"
-                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                    onClick={() => {
-                      onEnterCompare?.();
-                    }}
-                    disabled={busy}
-                    aria-label="TutaCloud to USB compare"
-                    title="Open TutaCloud and USB side by side to drag and drop notebooks and notes"
-                    {...guestDemoBlockProps()}
-                    sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                  >
-                    {menuLabelsCompact ? '<=>' : 'TutaCloud↔USB'}
-                  </SliderControlButton>
-                </Box>
-              ) : null}
-                </>
-              ) : null}
-            </Box>
-
-            {/* Section 2 of 3 — Search / Clear (header album title box removed;
-                rename an album from the sidebar row instead). */}
-            <Box sx={headerThirdSectionSx}>
-              {!compareMode ? (
-                <PhotoAlbumsSearchBar
-                  term1={searchTerm1}
-                  onTerm1Change={setSearchTerm1}
-                  onSubmit={() => void runSearch()}
-                  onClear={handleClearSearch}
-                  searchBusy={searchBusy}
-                  clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
-                  bgcolor="var(--theme-secondary-color)"
-                  fillWidth={false}
-                  headerFlush
-                />
-              ) : null}
-            </Box>
-
-            {/* Section 3 of 3 — Invite / Review + Tutorial */}
-            <Box sx={headerThirdSectionSx}>
-              {!compareMode ? (
-                <PhotoAlbumsInviteBar
-                  disabled={busy}
-                  noteId={selectedNote ? Number(selectedNote.note_id) : null}
-                  notebookId={selectedNotebookId ? Number(selectedNotebookId) : null}
-                  storageType={paneStorageType}
-                  albumSetName={activeAlbumSetName}
-                  albumName={activeAlbumName}
-                  onInvited={() => void refreshSharedAlbums()}
-                  onOpenReview={(sendResult) => {
-                    setInviteReviewSendResult(sendResult || null);
-                    setInviteReviewOpen(true);
-                  }}
-                />
-              ) : null}
-            </Box>
-          </Box>
-          ) : null}
-
-          {!hideWorkspaceChrome && !compareMode ? (
-            <RecordVaultMobileUploadTray
-            product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
-              active={unlocked}
-              disabled={
-                busy ||
-                !selectedNote ||
-                Boolean(batchUploadProgress) ||
-                (selectedNote &&
-                  noteRequiresInnerPinToView(selectedNote) &&
-                  !isInnerNoteUnlocked(selectedNote.note_id))
-              }
-              refreshToken={mobileUploadFolderRefreshToken}
-              selectable
-              onTitleClick={mobileUploadDisabled ? null : () => setMobileUploadOpen(true)}
-              emptyHint="Take a photo on your phone or scan Mobile Upload QR — photos appear here. Drag a thumbnail onto the album."
-              onError={(msg) => setError(String(msg || ''))}
-            />
-          ) : null}
-
-          {!hideWorkspaceChrome && !compareMode ? (
-          <Box
-            aria-label="Search results"
-            sx={{
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              minHeight: 44,
-              px: 1,
-              py: 0.75,
-              overflowX: 'auto',
-              bgcolor: paneStripColor,
-              borderBottom: '2px solid var(--theme-primary-color)'
-            }}
-          >
-            <Box
-              sx={{
-                flexShrink: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                border: '3px solid #000',
-                borderRadius: 0.5,
-                ...photoAlbumsThemeDaynightSurfaceSx,
-                px: 1,
-                py: 0.35,
-                boxSizing: 'border-box'
-              }}
-            >
-              <Typography
-                component="span"
-                sx={{
-                  fontFamily: MAIN_FONT_FAMILY,
-                  fontWeight: 800,
-                  fontSize: { xs: '0.9rem', sm: '1rem' },
-                  lineHeight: 1.2,
-                  color: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                  WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Folder import complete</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              {folderImportSuccess
+                ? `Success: Folder ${folderImportSuccess.folderName} been IMPORT to new Notebook ${folderImportSuccess.notebookPathLabel} along with these import Notes: ${(folderImportSuccess.noteNames || []).join(', ') || '(none)'}.`
+                : ''}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setFolderImportSuccess(null)}>
+                Close
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(multiHtmlExportOffer)}
+          onClose={() => {
+            if (multiHtmlExportBusy) return;
+            setMultiHtmlExportOffer(null);
+          }}
+          closeOnBackdrop={!multiHtmlExportBusy}
+          closeButtonAriaLabel="Close export HTML dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>
+              Export {multiHtmlExportOffer?.count || 0} notes as HTML
+            </ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              Chrome cannot drop multiple real files into Finder in one drag (you get a .textClipping). Choose a folder and each selected
+              note will be saved as its own .html file.
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton
+                disabled={multiHtmlExportBusy}
+                onClick={() => {
+                  if (multiHtmlExportBusy) return;
+                  setMultiHtmlExportOffer(null);
                 }}
               >
-                Found:
-              </Typography>
-            </Box>
-            {searchActive ? (
-              <SliderControlButton
-                type="button"
-                variant="yellow"
-                hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                onClick={handleClearSearch}
-                disabled={busy || searchBusy}
-                aria-label="Clear search"
-                sx={{
-                  flexShrink: 0,
-                  width: 'auto',
-                  minWidth: 0,
-                  px: 1,
-                  py: 0.35,
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                Clear
-              </SliderControlButton>
-            ) : null}
-            {searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.25,
-                  border: '3px solid #000',
-                  borderRadius: 0.75,
-                  bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
-                  px: 0.5,
-                  py: 0.25
-                }}
-              >
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Previous document"
-                  title="Previous found note"
-                  onClick={() => goToSearchDoc(-1)}
-                  disabled={currentSearchDocIndex <= 0}
-                  sx={searchNavButtonSx}
-                >
-                  ◀
-                </Box>
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Previous match in note"
-                  title="Previous match in this note"
-                  onClick={() => goToSearchHit(-1)}
-                  disabled={searchHitCount <= 0 || activeHitIndex <= 0}
-                  sx={searchNavButtonSx}
-                >
-                  ▲
-                </Box>
-                <Typography
-                  component="span"
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: '0.8rem',
-                    color: '#000',
-                    WebkitTextFillColor: '#000',
-                    minWidth: 44,
-                    textAlign: 'center',
-                    userSelect: 'none'
-                  }}
-                >
-                  {searchHitCount > 0 ? `${activeHitIndex + 1}/${searchHitCount}` : '0/0'}
-                </Typography>
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Next match in note"
-                  title="Next match in this note"
-                  onClick={() => goToSearchHit(1)}
-                  disabled={searchHitCount <= 0 || activeHitIndex >= searchHitCount - 1}
-                  sx={searchNavButtonSx}
-                >
-                  ▼
-                </Box>
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Next document"
-                  title="Next found note"
-                  onClick={() => goToSearchDoc(1)}
-                  disabled={currentSearchDocIndex >= searchResultTabs.length - 1}
-                  sx={searchNavButtonSx}
-                >
-                  ▶
-                </Box>
-              </Box>
-            ) : null}
-            {searchBusy ? (
-              <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
-                Searching…
-              </Typography>
-            ) : searchActive && Array.isArray(searchResults) && !searchResultTabs.length ? (
-              <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
-                {searchMessage || 'No notes match your search'}
-              </Typography>
-            ) : null}
-            {searchActive && searchFoundPages ? (
-              <Box
-                aria-label="Found album pages"
-                sx={{
-                  flex: '1 1 auto',
-                  minWidth: 120,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  overflowX: 'auto',
-                  overflowY: 'hidden',
-                  py: 0.15,
-                  px: 0.35,
-                  minHeight: 40,
-                  boxSizing: 'border-box'
-                }}
-              >
-                {(Array.isArray(searchFoundPages.matchIndexes)
-                  ? searchFoundPages.matchIndexes
-                  : []
-                ).length ? (
-                  searchFoundPages.matchIndexes.map((idx) => {
-                    const model =
-                      searchFoundPages.models?.[idx] || {
-                        key: `missing-${idx}`,
-                        photos: []
-                      };
-                    return (
-                      <PageThumb
-                        key={`found-page-${idx}-${model.key}`}
-                        model={model}
-                        pageNumber={idx + 1}
-                        active={idx === searchFoundPages.pageIndex}
-                        orientation={searchFoundPages.orientation}
-                        noteId={searchFoundPages.noteId}
-                        storageType={searchFoundPages.storageType}
-                        onSelect={() => searchFoundPages.onGoToPage?.(idx)}
-                        heightPx={40}
-                      />
-                    );
+                Cancel
+              </ColorTemplate16PopupCenterWide.ActionButton>
+              <ColorTemplate16PopupCenterWide.ActionButton
+                disabled={multiHtmlExportBusy}
+                onClick={() => {
+                  if (multiHtmlExportBusy || !multiHtmlExportOffer?.files?.length) return;
+                  setMultiHtmlExportBusy(true);
+                  setMultiHtmlExportProgressPercent(0);
+                  setMultiHtmlExportProgressLabel('Choose a folder…');
+                  const offer = multiHtmlExportOffer;
+                  void downloadHtmlFilesSeparately(offer.files, {
+                    onProgress: ({ percent, label }) => {
+                      setMultiHtmlExportProgressPercent(percent);
+                      if (label) setMultiHtmlExportProgressLabel(label);
+                    }
                   })
-                ) : (
-                  <Typography
-                    sx={{
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      color: '#b71c1c',
-                      WebkitTextFillColor: '#b71c1c',
-                      whiteSpace: 'nowrap',
-                      px: 0.5
-                    }}
-                  >
-                    No album pages contain this search text
-                  </Typography>
-                )}
-              </Box>
+                    .then((ok) => {
+                      if (ok) {
+                        (offer.messages || []).forEach((msg) => enqueueImportSuccessPopup(msg, 2500));
+                      }
+                    })
+                    .finally(() => {
+                      setMultiHtmlExportBusy(false);
+                      setMultiHtmlExportProgressPercent(0);
+                      setMultiHtmlExportProgressLabel('');
+                      setMultiHtmlExportOffer(null);
+                    });
+                }}
+              >
+                {multiHtmlExportBusy ? 'Saving…' : 'Choose folder'}
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(notebookHtmlExportOffer) && !notebookExportBusy && !notebookExportSuccess}
+          onClose={() => {
+            if (notebookExportBusy) return;
+            setNotebookHtmlExportOffer(null);
+          }}
+          closeOnBackdrop={!notebookExportBusy}
+          closeButtonAriaLabel="Close notebook export dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>
+              Export notebook “{notebookHtmlExportOffer?.notebookName || 'Notebook'}”
+            </ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              Choose a parent folder. A subfolder named “
+              {sanitizePhotoAlbumsExportFileName(notebookHtmlExportOffer?.notebookName || 'Notebook')}” will be created and each of the{' '}
+              {notebookHtmlExportOffer?.noteCount ?? 0} note(s) will be saved as its own .html file inside it.
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton disabled={notebookExportBusy} onClick={() => setNotebookHtmlExportOffer(null)}>
+                Cancel
+              </ColorTemplate16PopupCenterWide.ActionButton>
+              <ColorTemplate16PopupCenterWide.ActionButton
+                disabled={notebookExportBusy}
+                onClick={() => {
+                  if (notebookExportBusy || !notebookHtmlExportOffer?.notebookId) return;
+                  const offer = notebookHtmlExportOffer;
+                  void exportNotebookHtmlFolder(offer.notebookId).then((result) => {
+                    setNotebookHtmlExportOffer(null);
+                    if (result) setNotebookExportSuccess(result);
+                  });
+                }}
+              >
+                Choose folder
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(notebookExportSuccess)}
+          onClose={() => setNotebookExportSuccess(null)}
+          closeOnBackdrop={false}
+          closeButtonAriaLabel="Close notebook export success"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Notebook export complete</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              {notebookExportSuccess
+                ? `Success: Notebook ${notebookExportSuccess.notebookName} been EXPORT to folder ${notebookExportSuccess.folderPath} along with these export HTML files: ${(notebookExportSuccess.noteNames || []).join(', ') || '(none)'}.${
+                    notebookExportSuccess.skippedLocked?.length
+                      ? ` Skipped locked notes: ${notebookExportSuccess.skippedLocked.join(', ')}.`
+                      : ''
+                  }`
+                : ''}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setNotebookExportSuccess(null)}>
+                Close
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <PhotoAlbumsViewVaultDialog
+          open={viewVaultOpen}
+          onClose={() => setViewVaultOpen(false)}
+          storageType={viewVaultStorageType}
+          folderName={viewVaultStorageType === 'tutadrive' ? tutaCloudVaultFolderName : ''}
+          tutaDrive={isTutaCloudPane}
+        />
+        <PhotoAlbumsTutaCloudBackupDialog
+          open={tutaCloudBackupOpen}
+          onClose={() => setTutaCloudBackupOpen(false)}
+          folderName={tutaCloudVaultFolderName}
+          albumContext={albumBackupContext}
+          onOpenMyPhotoAlbums={() => setTutaCloudBackupOpen(false)}
+          onRestored={() => void handleTutaCloudVaultRestored()}
+        />
+        <PhotoAlbumsUsbBackupDialog
+          open={usbBackupOpen}
+          onClose={() => setUsbBackupOpen(false)}
+          folderLabel={usbVaultFolderLabel}
+          albumContext={albumBackupContext}
+          onOpenMyPhotoAlbums={() => setUsbBackupOpen(false)}
+          onRestored={() => handleUsbVaultRestoredOrFormatted()}
+        />
+        <ColorTemplate16PopupCenterWide
+          open={vaultFileTooLargeOpen}
+          onClose={() => setVaultFileTooLargeOpen(false)}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close file too large dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>File too large</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              {vaultFileTooLargeName} ({vaultFileTooLargeActualMb} MB) is over the {vaultFileTooLargeMaxMb} MB allowed for vault uploads.
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultFileTooLargeOpen(false)}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <PhotoAlbumsCreateItemDialog
+          open={Boolean(createItemDialog)}
+          mode={createItemDialog}
+          busy={busy}
+          onClose={() => setCreateItemDialog(null)}
+          onConfirmAlbumSet={(name) => void confirmCreateAlbumSet(name)}
+          onConfirmAlbum={(name, dates) => void confirmCreateAlbum(name, dates)}
+        />
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(duplicateNamePopup)}
+          onClose={() => setDuplicateNamePopup('')}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close duplicate name dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Duplicate name</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>{duplicateNamePopup}</ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setDuplicateNamePopup('')}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(importSuccessPopup)}
+          onClose={() => setImportSuccessPopup('')}
+          closeOnBackdrop
+          showCloseButton={false}
+          closeButtonAriaLabel="Close import success"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Import</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>{importSuccessPopup}</ColorTemplate16PopupCenterWide.BodyText>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={vaultUploadErrorOpen}
+          onClose={() => setVaultUploadErrorOpen(false)}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close upload error dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>{vaultUploadErrorTitle}</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
+              {vaultUploadErrorMessage}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            {vaultUploadErrorDetail ? (
+              <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap', opacity: 0.9, fontSize: '0.9em', textAlign: 'left' }}>
+                {vaultUploadErrorDetail}
+              </ColorTemplate16PopupCenterWide.BodyText>
             ) : null}
-          </Box>
-          ) : null}
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultUploadErrorOpen(false)}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        {error ? <VaultWorkspaceErrorPopup error={error} onClose={() => setError('')} /> : null}
 
+        <BusyHourglassOverlay
+          open={!vaultUiReady && loading && unlocked && !hideWorkspaceForMobileTutaPhotoUpload}
+          label="Loading vault"
+          progressPercent={vaultLoadProgressPercent}
+          progressLabel={vaultLoadProgressLabel}
+          backdropSx={myPhotoAlbumsLoadingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
+        />
+
+        {!unlocked ? (
           <Box
             sx={{
               display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flex: 1,
+              py: 6,
+              ...myPhotoAlbumsBackgroundPanelSx
+            }}
+          />
+        ) : hideWorkspaceForMobileTutaPhotoUpload ? (
+          <Box
+            sx={{
               flex: 1,
               minHeight: 0,
               width: '100%',
-              position: 'relative',
-              flexDirection: { xs: 'column', md: 'row' }
+              display: 'flex',
+              flexDirection: 'column',
+              bgcolor: '#ffffff'
             }}
           >
-          {fileWorkspaceView === 'payment' && !compareMode ? (
-            <Box
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                minHeight: 0,
-                overflow: 'auto',
-                bgcolor: 'var(--theme-daynight-color)',
-                p: { xs: 1, sm: 2 }
-              }}
-            >
-              <ProfilesRecordsPage
-                visibleTabs={PROFILES_RECORDS_PAYMENT_TABS}
-                embedded
-                initialTab={profilesRecordsInitialTab}
-                initialTokensBuying={profilesRecordsInitialTokens}
+            <RecordVaultMobileUploadTray
+              product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
+              active={unlocked}
+              disabled={false}
+              layout="grid"
+              plain
+              refreshToken={mobileUploadFolderRefreshToken}
+              onError={(msg) => setError(String(msg || ''))}
+            />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
+            <PhotoAlbumsTrafficWaitHost />
+            {!hideWorkspaceChrome ? (
+              <PhotoAlbumsUsageBar
+                usage={vaultUsage}
+                storageType={paneStorageType}
+                videoTutorialUrl={videoTutorialUrl}
+                onPurchased={() => refreshVaultUsageRef.current?.() ?? Promise.resolve()}
+                onGetMoreTokens={openPaymentTokenCheckout}
+                onRequestUsageRefresh={() => refreshVaultUsageRef.current?.()}
+                onRestoreSampleAlbum={sharedAlbumView || compareMode ? null : () => void handleRestoreSampleAlbum()}
+                restoreSampleAlbumDisabled={busy || !unlocked}
               />
-            </Box>
-          ) : (
-          <>
-          {leftMenuOpen && !hideWorkspaceChrome ? (
-            <>
+            ) : null}
+            {!hideWorkspaceChrome ? (
               <Box
-                ref={leftSidebarPaneRef}
                 sx={{
-                  flex: compareMode ? '1 1 0' : '0 0 auto',
-                  width: compareMode
-                    ? { xs: '100%', md: 'auto' }
-                    : { xs: '100%', md: sidebarWidth },
-                  maxWidth: compareMode
-                    ? { xs: '100%', md: '66%' }
-                    : { xs: '100%', md: '85vw' },
-                  minWidth: compareMode ? { md: 0 } : undefined,
+                  flexShrink: 0,
                   display: 'flex',
-                  flexDirection: 'column',
-                  bgcolor: 'var(--theme-daynight-color)',
-                  minHeight: compact || compareMode ? 0 : { xs: 280, md: '100%' },
-                  overflow: 'hidden',
+                  width: '100%',
+                  minWidth: 0,
+                  overflow: 'visible',
+                  borderBottom: '2px solid var(--theme-secondary-color)',
+                  zIndex: 3,
+                  pt: 0.35,
+                  pb: 0.35,
+                  alignItems: 'center',
+                  bgcolor: 'var(--theme-secondary-color)',
+                  gap: { xs: 0.5, sm: 0.75 },
+                  px: { xs: 0.5, sm: 0.75 },
                   boxSizing: 'border-box'
                 }}
               >
+                {/* Section 1 of 3 — Close Menu / Backup/Restore (single row) */}
                 <Box
-                  ref={leftSidebarSplitRef}
                   sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    p: compact ? 0.5 : 1,
-                    gap: 0,
+                    ...headerThirdSectionSx,
+                    flex: '0 0 auto',
+                    flexWrap: 'nowrap',
+                    gap: 0.5
+                  }}
+                >
+                  <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
+                    {compareMode ? (
+                      <SliderControlButton
+                        type="button"
+                        variant="yellow"
+                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                        aria-label="Return to single storage view"
+                        onClick={() => {
+                          onReturnFromCompare?.();
+                        }}
+                        sx={headerToggleButtonSx}
+                      >
+                        Return
+                      </SliderControlButton>
+                    ) : (
+                      <SliderControlButton
+                        type="button"
+                        variant="yellow"
+                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                        aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
+                        title={!menusOpen ? 'Open menus' : 'Close left and right menus'}
+                        onClick={handleMenuLabelsToggle}
+                        sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
+                      >
+                        {menusOpen ? (
+                          '< Close Menu'
+                        ) : (
+                          <Box
+                            component="img"
+                            src={threeDashesImg}
+                            alt=""
+                            aria-hidden
+                            sx={{
+                              ...menuToggleIconSx,
+                              height: { xs: 22, md: 24 }
+                            }}
+                          />
+                        )}
+                      </SliderControlButton>
+                    )}
+                  </Box>
+                  {!compareMode ? (
+                    <>
+                      {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
+                        <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            onClick={() => {
+                              setTutaCloudBackupOpen(true);
+                            }}
+                            disabled={busy}
+                            aria-label="Backup/Restore"
+                            title="Backup / Restore"
+                            sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
+                          >
+                            {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                      {paneStorageType === 'usb' ? (
+                        <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            onClick={() => {
+                              setUsbBackupOpen(true);
+                            }}
+                            disabled={busy}
+                            aria-label="Backup/Restore"
+                            title="Backup / Restore"
+                            sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
+                          >
+                            {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                      {canEnterCompare ? (
+                        <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            onClick={() => {
+                              onEnterCompare?.();
+                            }}
+                            disabled={busy}
+                            aria-label="TutaCloud to USB compare"
+                            title="Open TutaCloud and USB side by side to drag and drop notebooks and notes"
+                            {...guestDemoBlockProps()}
+                            sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
+                          >
+                            {menuLabelsCompact ? '<=>' : 'TutaCloud↔USB'}
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                    </>
+                  ) : null}
+                </Box>
+
+                {/* Section 2 of 3 — Search / Clear (header album title box removed;
+                rename an album from the sidebar row instead). */}
+                <Box sx={headerThirdSectionSx}>
+                  {!compareMode ? (
+                    <PhotoAlbumsSearchBar
+                      term1={searchTerm1}
+                      onTerm1Change={setSearchTerm1}
+                      onSubmit={() => void runSearch()}
+                      onClear={handleClearSearch}
+                      searchBusy={searchBusy}
+                      clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
+                      bgcolor="var(--theme-secondary-color)"
+                      fillWidth={false}
+                      headerFlush
+                    />
+                  ) : null}
+                </Box>
+
+                {/* Section 3 of 3 — Invite / Review + Tutorial */}
+                <Box sx={headerThirdSectionSx}>
+                  {!compareMode ? (
+                    <PhotoAlbumsInviteBar
+                      disabled={busy}
+                      noteId={selectedNote ? Number(selectedNote.note_id) : null}
+                      notebookId={selectedNotebookId ? Number(selectedNotebookId) : null}
+                      storageType={paneStorageType}
+                      albumSetName={activeAlbumSetName}
+                      albumName={activeAlbumName}
+                      onInvited={() => void refreshSharedAlbums()}
+                      onOpenReview={(sendResult) => {
+                        setInviteReviewSendResult(sendResult || null);
+                        setInviteReviewOpen(true);
+                      }}
+                    />
+                  ) : null}
+                </Box>
+              </Box>
+            ) : null}
+
+            {!hideWorkspaceChrome && !compareMode ? (
+              <RecordVaultMobileUploadTray
+                product={MOBILE_UPLOAD_PRODUCT_TUTAPHOTO}
+                active={unlocked}
+                disabled={
+                  busy ||
+                  !selectedNote ||
+                  Boolean(batchUploadProgress) ||
+                  (selectedNote && noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id))
+                }
+                refreshToken={mobileUploadFolderRefreshToken}
+                selectable
+                onTitleClick={mobileUploadDisabled ? null : () => setMobileUploadOpen(true)}
+                emptyHint="Take a photo on your phone or scan Mobile Upload QR — photos appear here. Drag a thumbnail onto the album."
+                onError={(msg) => setError(String(msg || ''))}
+              />
+            ) : null}
+
+            {!hideWorkspaceChrome && !compareMode ? (
+              <Box
+                aria-label="Search results"
+                sx={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  minHeight: 44,
+                  px: 1,
+                  py: 0.75,
+                  overflowX: 'auto',
+                  bgcolor: paneStripColor,
+                  borderBottom: '2px solid var(--theme-primary-color)'
+                }}
+              >
+                <Box
+                  sx={{
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    border: '3px solid #000',
+                    borderRadius: 0.5,
+                    ...photoAlbumsThemeDaynightSurfaceSx,
+                    px: 1,
+                    py: 0.35,
                     boxSizing: 'border-box'
                   }}
                 >
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flex: compareMode
-                      ? '1 1 auto'
-                      : `${100 - sharedAlbumPanePercent} 1 0`,
-                    minHeight: compareMode ? 0 : 120,
-                    minWidth: 0
-                  }}
-                >
-                  <Box
-                    ref={notebookColPaneRef}
+                  <Typography
+                    component="span"
                     sx={{
-                      ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                      width: notebookColWidth,
-                      flexShrink: 0,
-                      ...(notebookLaneFolderDragActive
-                        ? {
-                            outline: '3px dashed var(--theme-yellow-color)',
-                            outlineOffset: 2,
-                            bgcolor: 'rgba(255, 215, 0, 0.18)'
-                          }
-                        : null)
-                    }}
-                    onDragOver={handleNotebookLaneFolderDragOver}
-                    onDragLeave={handleNotebookLaneFolderDragLeave}
-                    onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
-                    title="Drop a folder of .html notes here to import as a new notebook"
-                  >
-                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
-                      <SliderControlButton
-                        type="button"
-                        fullWidth
-                        onClick={handleAddNotebook}
-                        disabled={busy}
-                        hoverScale={1.25}
-                        {...guestDemoBlockProps()}
-                        sx={laneContainedButtonTwoLineSx}
-                      >
-                        Add
-                        <br />
-                        Album-Set
-                      </SliderControlButton>
-                    </Box>
-                    <Box sx={photoAlbumsMenuListScrollSx}>
-                      {displayNotebooks.map((nb) => {
-                        void innerUnlockVersion;
-                        const notebookNotes = nb.notes || [];
-                        const notebookHasInner = notebookNotes.some((n) => noteHasInnerEncryption(n));
-                        const notebookInnerLocked = notebookInnerLockedForDisplay(notebookNotes);
-                        const notebookLockingUp =
-                          !notebookInnerLocked &&
-                          innerEncryptUiScope === 'notebook' &&
-                          (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
-                          Number(nb.notebook_id) === Number(selectedNotebookId);
-                        return (
-                        <RenamableDraggableMenuRow
-                          key={nb.notebook_id}
-                          id={nb.notebook_id}
-                          domId={`record-vault-notebook-${nb.notebook_id}`}
-                          label={
-                            notebookInnerLocked
-                              ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
-                              : Number(editingNotebookId) === Number(nb.notebook_id) &&
-                                  renameUiSurface === 'header'
-                                ? editNameDraft
-                                : photoAlbumsNotebookSidebarLabel(nb, notebooks)
-                          }
-                          buttonTitle={
-                            notebookInnerLocked
-                              ? 'Locked notebook — enter PIN to unlock'
-                              : notebookLockingUp
-                                ? 'Locking notebook — enter PIN'
-                                : notebookHasInner
-                                  ? 'Notebook has PIN-locked notes'
-                                  : undefined
-                          }
-                          selected={
-                            !orderAlbumActive &&
-                            Number(nb.notebook_id) === Number(selectedNotebookId)
-                          }
-                          locked={notebookInnerLocked}
-                          editing={
-                            Number(editingNotebookId) === Number(nb.notebook_id) &&
-                            renameUiSurface === 'menu' &&
-                            !notebookInnerLocked
-                          }
-                          editValue={editNameDraft}
-                          onEditValueChange={setEditNameDraft}
-                          onSelect={() => {
-                            setOrderAlbumActive(false);
-                            notebookScopePendingRef.current = true;
-                            setInnerEncryptUiScope('notebook');
-                            setSelectedNotebookId(nb.notebook_id);
-                          }}
-                          onStartEdit={() => {
-                            setEditingNoteId(null);
-                            setRenameUiSurface('menu');
-                            setEditingNotebookId(nb.notebook_id);
-                            setEditNameDraft(photoAlbumsNotebookSidebarLabel(nb, notebooks));
-                          }}
-                          onCommitEdit={() => void commitNotebookRename()}
-                          onCancelEdit={clearRenameState}
-                          dragMime={DRAG_NOTEBOOK}
-                          draggingId={draggingNotebookId}
-                          alternateDraggingId={draggingNoteId}
-                          dropTargetId={dropTargetNotebookId}
-                          dragTitle={
-                            crossPaneDropActive
-                              ? 'Drop here to copy or move from the other vault'
-                              : draggingNoteId != null
-                                ? 'Drop album here to move it into this album-set'
-                                : 'Drag to reorder; drop an album here to move it into this set'
-                          }
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={setDropTargetNotebookId}
-                          onDrop={(e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)}
-                          onDelete={() =>
-                            void handleDeleteNotebook(
-                              nb.notebook_id,
-                              photoAlbumsNotebookSidebarLabel(nb, notebooks)
-                            )
-                          }
-                          deleteLabel={`Delete notebook ${photoAlbumsNotebookSidebarLabel(nb, notebooks)}`}
-                          onToggleLock={() => handleToggleNotebookLock(nb)}
-                          lockTitle={
-                            notebookInnerLocked
-                              ? 'Unlock notebook (enter 6-digit PIN)'
-                              : 'Lock notebook with a 6-digit PIN'
-                          }
-                          disabled={busy || crossPaneBusy}
-                          acceptForeignDrop={crossPaneDropActive}
-                        />
-                        );
-                      })}
-                    </Box>
-                  </Box>
-
-                  <ColumnResizeHandle
-                    label="Slide to resize notebook and note lists"
-                    onMouseDown={(e) => startColumnResize('notebookCol', e)}
-                  />
-
-                  <Box
-                    ref={noteLaneRef}
-                    sx={{
-                      ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                      flex: 1,
-                      minWidth: MIN_MENU_COL_WIDTH,
-                      ...(noteLaneFileDragActive
-                        ? {
-                            outline: '3px dashed var(--theme-yellow-color)',
-                            outlineOffset: 2,
-                            bgcolor: 'rgba(255, 215, 0, 0.18)'
-                          }
-                        : null)
-                    }}
-                    onDragOver={handleNoteListFileDragOver}
-                    onDragLeave={handleNoteListFileDragLeave}
-                    onDrop={(e) => void handleNoteListFileDrop(e)}
-                  >
-                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
-                      <SliderControlButton
-                        type="button"
-                        fullWidth
-                        onClick={handleAddNote}
-                        disabled={busy || !selectedNotebookId || notebookGateLocked}
-                        hoverScale={1.25}
-                        {...guestDemoBlockProps()}
-                        sx={laneContainedButtonTwoLineSx}
-                      >
-                        Add
-                        <br />
-                        Album
-                      </SliderControlButton>
-                    </Box>
-                    <Box sx={photoAlbumsMenuListScrollSx}>
-                      {/* Encrypted notebook: do not reveal any note names until unlocked. */}
-                      {(notebookGateLocked ? [] : notes).map((note) => {
-                        const noteInnerLocked =
-                          noteRequiresInnerPinToView(note) &&
-                          !isInnerNoteUnlockedForDisplay(note.note_id, note);
-                        const noteLockingUp =
-                          !noteInnerLocked &&
-                          (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
-                          Number(note.note_id) === Number(selectedNoteId);
-                        // innerUnlockVersion lives in unlock refs — read so rows re-paint after PIN unlock.
-                        void innerUnlockVersion;
-                        const noteMenuLabel = noteInnerLocked
-                          ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
-                          : photoAlbumsNoteMenuLabel(note, notes, {
-                              selectedNoteId,
-                              openNoteTitlePlain,
-                              notebooks
-                            });
-                        const noteRealLabel = photoAlbumsNoteMenuLabel(note, notes, {
-                          selectedNoteId,
-                          openNoteTitlePlain,
-                          notebooks
-                        });
-                        const menuEditingThisNote =
-                          Number(editingNoteId) === Number(note.note_id) &&
-                          renameUiSurface === 'menu';
-                        const headerEditingThisNote =
-                          Number(editingNoteId) === Number(note.note_id) &&
-                          renameUiSurface === 'header';
-                        const sidebarAlbumLines =
-                          noteInnerLocked || menuEditingThisNote
-                            ? null
-                            : formatPhotoAlbumsSidebarAlbumLines(
-                                headerEditingThisNote
-                                  ? photoAlbumsNoteSidebarLabel(note, notes, notebooks)
-                                  : noteMenuLabel
-                              );
-                        return (
-                        <RenamableDraggableMenuRow
-                          key={note.note_id}
-                          id={note.note_id}
-                          domId={`record-vault-note-${note.note_id}`}
-                          sideCount={
-                            noteInnerLocked ? null : photoAlbumsSidebarAlbumMediaCount(note)
-                          }
-                          label={
-                            noteInnerLocked
-                              ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
-                              : headerEditingThisNote
-                                ? // Freeze sidebar label while the content-header field is being typed.
-                                  photoAlbumsNoteSidebarLabel(note, notes, notebooks)
-                                : menuEditingThisNote
-                                  ? editNameDraft || noteMenuLabel
-                                  : noteMenuLabel
-                          }
-                          albumLabelLines={sidebarAlbumLines}
-                          buttonTitle={
-                            noteInnerLocked
-                              ? 'Locked — enter PIN to view'
-                              : noteLockingUp
-                                ? 'Locking up — enter PIN'
-                                : noteRealLabel
-                          }
-                          selected={
-                            !orderAlbumActive &&
-                            Number(note.note_id) === Number(selectedNoteId)
-                          }
-                          selectedBlue={searchActive}
-                          multiSelected={
-                            !orderAlbumActive &&
-                            multiSelectedNoteIds.some(
-                              (id) => Number(id) === Number(note.note_id)
-                            )
-                          }
-                          locked={noteInnerLocked}
-                          editing={menuEditingThisNote && !noteInnerLocked}
-                          editValue={editNameDraft}
-                          onEditValueChange={handleNoteListTitleEditChange}
-                          onSelect={(e) => {
-                            setOrderAlbumActive(false);
-                            if (e?.shiftKey) {
-                              handleNoteShiftSelect(note.note_id);
-                              return;
-                            }
-                            selectNoteId(note.note_id);
-                          }}
-                          onStartEdit={() => {
-                            if (noteInnerLocked) return;
-                            replaceMultiSelectedNoteIds([]);
-                            noteMultiSelectAnchorIdRef.current = note.note_id;
-                            setEditingNotebookId(null);
-                            setRenameUiSurface('menu');
-                            setEditingNoteId(note.note_id);
-                            noteRenameStartPersistedRef.current = String(note.note_name ?? '').trim();
-                            noteRenameStartLabelRef.current = photoAlbumsNoteSidebarLabel(
-                              note,
-                              notes,
-                              notebooks
-                            );
-                            setEditNameDraft(
-                              Number(note.note_id) === Number(selectedNoteId)
-                                ? openNoteTitlePlain ||
-                                    photoAlbumsNoteSidebarLabel(note, notes, notebooks)
-                                : photoAlbumsNoteSidebarLabel(note, notes, notebooks)
-                            );
-                          }}
-                          onCommitEdit={() => void commitNoteRename()}
-                          onCancelEdit={clearRenameState}
-                          dragMime={DRAG_NOTE}
-                          dragNotebookId={selectedNotebookId}
-                          draggingId={draggingNoteId}
-                          dropTargetId={dropTargetNoteId}
-                          acceptForeignDrop={crossPaneDropActive}
-                          dragTitle={
-                            crossPaneDropActive
-                              ? 'Drop here to copy or move from the other vault'
-                              : draggingAlbumPage
-                                ? 'Drop here to copy or move into this album'
-                                : multiSelectedNoteIds.length > 1
-                                  ? `Shift-selected: ${multiSelectedNoteIds.length} albums — drag onto an album-set to move`
-                                  : 'Drag onto an album-set to move; drop a page thumb here to receive that page'
-                          }
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onPrefetchDrag={prefetchNoteHtmlExport}
-                          onDragOver={setDropTargetNoteId}
-                          albumPageDropActive={draggingAlbumPage}
-                          trayPhotoDropEnabled
-                          onDrop={(e, toId, mime) => {
-                            if (isTrayPhotoDrag(e.dataTransfer)) {
-                              void handleTrayPhotoDropOnNote(e, toId);
-                              return;
-                            }
-                            if (isAlbumPageDrag(e.dataTransfer) || draggingAlbumPage) {
-                              void handleMoveAlbumPageToNote(e, toId);
-                              return;
-                            }
-                            void handleDropReorder(
-                              e,
-                              toId,
-                              mime,
-                              notes,
-                              'note_id',
-                              (ids) => vaultApi.reorderPhotoAlbumsNotes(selectedNotebookId, ids)
-                            );
-                          }}
-                          onFileDrop={(e) => void handleNoteListFileDrop(e)}
-                          onDelete={() =>
-                            void handleDeleteNote(note.note_id, noteRealLabel)
-                          }
-                          deleteLabel={`Delete note ${noteRealLabel}`}
-                          onToggleLock={() => handleToggleNoteLock(note)}
-                          lockTitle={
-                            noteInnerLocked
-                              ? 'Unlock note (enter 6-digit PIN)'
-                              : 'Lock note with a 6-digit PIN'
-                          }
-                          disabled={busy || crossPaneBusy || !selectedNotebookId}
-                        />
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                </Box>
-
-                {!compareMode ? (
-                  <>
-                    <RowResizeHandle
-                      label="Drag up or down to resize Shared Album / Order Album area"
-                      onMouseDown={startSharedAlbumPaneResize}
-                    />
-                    <Box
-                      sx={{
-                        flex: `${sharedAlbumPanePercent} 1 0`,
-                        minHeight: 88,
-                        display: 'flex',
-                        minWidth: 0,
-                        borderTop: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
-                        overflow: 'hidden'
-                      }}
-                    >
-                    <Box
-                      sx={{
-                        ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                        width: notebookColWidth,
-                        flexShrink: 0,
-                        minHeight: 0,
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}
-                    >
-                      <Box sx={laneAddButtonWrapSx}>
-                        <SliderControlButton
-                          type="button"
-                          fullWidth
-                          disabled
-                          disableHoverScale
-                          tabIndex={-1}
-                          aria-hidden
-                          aria-label="Album for Order"
-                          title="Album for Order"
-                          sx={{
-                            ...laneContainedButtonTwoLineSx,
-                            pointerEvents: 'none',
-                            cursor: 'default',
-                            borderRadius: '0 !important',
-                            ...themeDaynightSurfaceImportantSx,
-                            border: 'none !important',
-                            boxShadow: 'none !important',
-                            '&.Mui-disabled': {
-                              ...themeDaynightSurfaceImportantSx,
-                              border: 'none !important',
-                              boxShadow: 'none !important',
-                              opacity: 1,
-                              transform: 'none !important',
-                              cursor: 'default !important'
-                            }
-                          }}
-                        >
-                          Album
-                          <br />
-                          for Order
-                        </SliderControlButton>
-                      </Box>
-                      <Box sx={{ ...photoAlbumsMenuListScrollSx, flex: 1, minHeight: 0 }}>
-                        <MenuRowWithDelete
-                          deleteLabel={`Clear ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME} album`}
-                          disabled={busy || !orderAlbumItems.length}
-                          onDelete={async () => {
-                            if (!orderAlbumItems.length) return;
-                            if (
-                              !(await themedConfirm(
-                                `Clear all ${orderAlbumItems.length} item${
-                                  orderAlbumItems.length === 1 ? '' : 's'
-                                } from ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME}?`
-                              ))
-                            ) {
-                              return;
-                            }
-                            persistOrderAlbumItems([]);
-                          }}
-                        >
-                          <MenuRowButton
-                            selected={orderAlbumActive}
-                            disabled={busy}
-                            onClick={handleOpenOrderAlbumPages}
-                            onDoubleClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setOrderAlbumViewOpen(true);
-                            }}
-                            onDragOver={(e) => {
-                              const types = e.dataTransfer?.types
-                                ? Array.from(e.dataTransfer.types)
-                                : [];
-                              if (
-                                !types.includes(DRAG_NOTE) &&
-                                !types.includes(DRAG_NOTE_IDS) &&
-                                !types.includes(DRAG_NOTEBOOK) &&
-                                !types.includes(DRAG_SHORTCUT)
-                              ) {
-                                return;
-                              }
-                              e.preventDefault();
-                              e.dataTransfer.dropEffect = 'copy';
-                              setOrderAlbumDropActive(true);
-                            }}
-                            onDragLeave={() => setOrderAlbumDropActive(false)}
-                            onDrop={(e) => void handleOrderAlbumDrop(e)}
-                            title={`Click to open ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME} pages. Double-click to manage the queue.`}
-                            sx={{
-                              border: `2px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER} !important`,
-                              ...(orderAlbumActive
-                                ? themeDaynightSurfaceImportantSx
-                                : null),
-                              ...(orderAlbumDropActive
-                                ? {
-                                    outline: `3px dashed ${PHOTO_ALBUMS_THEME_INVERSE_BORDER}`,
-                                    outlineOffset: 2,
-                                    bgcolor: 'rgba(255, 215, 0, 0.55) !important'
-                                  }
-                                : null)
-                            }}
-                          >
-                            {orderAlbumName || DEFAULT_ORDER_ALBUM_NAME}
-                            {orderFilmstripEntries.length
-                              ? ` (${orderFilmstripEntries.length})`
-                              : orderAlbumItems.length
-                                ? ` (${orderAlbumItems.length})`
-                                : ''}
-                          </MenuRowButton>
-                        </MenuRowWithDelete>
-                      </Box>
-                    </Box>
-                    <ColumnResizeHandle
-                      label="Shared album column resize"
-                      sx={{ visibility: 'hidden', width: 0, minWidth: 0, p: 0, border: 0 }}
-                    />
-                    <Box
-                      sx={{
-                        ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                        flex: 1,
-                        minWidth: MIN_MENU_COL_WIDTH,
-                        minHeight: 0,
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}
-                    >
-                      <Box sx={laneAddButtonWrapSx}>
-                        <SliderControlButton
-                          type="button"
-                          fullWidth
-                          disabled
-                          disableHoverScale
-                          tabIndex={-1}
-                          aria-hidden
-                          aria-label="Shared Album"
-                          title="Shared Album"
-                          sx={{
-                            ...laneContainedButtonTwoLineSx,
-                            pointerEvents: 'none',
-                            cursor: 'default',
-                            borderRadius: '0 !important',
-                            ...themeDaynightSurfaceImportantSx,
-                            border: 'none !important',
-                            boxShadow: 'none !important',
-                            '&.Mui-disabled': {
-                              ...themeDaynightSurfaceImportantSx,
-                              border: 'none !important',
-                              boxShadow: 'none !important',
-                              opacity: 1,
-                              transform: 'none !important',
-                              cursor: 'default !important'
-                            }
-                          }}
-                        >
-                          Shared
-                          <br />
-                          Album
-                        </SliderControlButton>
-                      </Box>
-                      <Box sx={{ ...photoAlbumsMenuListScrollSx, flex: 1, minHeight: 0 }}>
-                        {sharedAlbums.map((item) => {
-                          const label = item.displayLabel || `${item.albumSetName} / ${item.albumName}`;
-                          const selected = Number(selectedSharedAlbumId) === Number(item.sharedAlbumId);
-                          return (
-                            <MenuRowWithDelete
-                              key={item.sharedAlbumId}
-                              deleteLabel={`Remove ${label} from Shared Album`}
-                              disabled={busy}
-                              onDelete={() => void handleRemoveSharedAlbum(item.sharedAlbumId, label)}
-                            >
-                              <SliderControlButton
-                                type="button"
-                                fullWidth
-                                variant={selected ? 'green' : 'yellow'}
-                                hoverScale={1.15}
-                                onClick={() => void openSharedAlbum(item.sharedAlbumId)}
-                                title={
-                                  item.ownerEmail
-                                    ? `Shared by ${item.ownerEmail} — view album`
-                                    : label
-                                }
-                                sx={{
-                                  justifyContent: 'flex-start',
-                                  textAlign: 'left',
-                                  mb: 0,
-                                  px: 1,
-                                  py: 0.75,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
-                                }}
-                              >
-                                {label}
-                              </SliderControlButton>
-                            </MenuRowWithDelete>
-                          );
-                        })}
-                        {!sharedAlbums.length ? (
-                          <Typography sx={{ px: 1, py: 0.5, fontSize: '0.82rem', fontWeight: 700 }}>
-                            No shared albums yet.
-                          </Typography>
-                        ) : null}
-                      </Box>
-                    </Box>
-                    </Box>
-                  </>
-                ) : null}
-                </Box>
-              </Box>
-
-              {!compareMode ? (
-              <ColumnResizeHandle
-                label="Slide left menu wider or narrower"
-                sx={{ display: { xs: 'none', md: 'block' } }}
-                onMouseDown={(e) => startColumnResize('sidebar', e)}
-              />
-              ) : null}
-            </>
-          ) : null}
-
-          {!compareMode ? (
-          <Box
-            data-record-vault-note-content
-            ref={noteContentPaneRef}
-            // Do not make the whole album/editor pane HTML5-draggable — that dragged
-            // the entire binder as a huge translucent ghost. Export HTML from the
-            // notebook/note list on the left instead.
-            draggable={false}
-            onDragOver={handleContentDragOver}
-            onDrop={handleContentFileDrop}
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              minHeight: compact ? 0 : { xs: 360, md: '100%' },
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              overflow: 'hidden',
-              bgcolor: 'var(--theme-primary-color)'
-            }}
-          >
-            {(() => {
-              const notebookNotesForLock = selectedNotebook?.notes || [];
-              const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);
-              const openNoteLocked = Boolean(
-                selectedNote &&
-                  noteRequiresInnerPinToView(selectedNote) &&
-                  !isInnerNoteUnlocked(selectedNote.note_id)
-              );
-              const lockedNow =
-                !sharedAlbumView && (notebookGateLocked || openNoteLocked);
-              // Whole notebook locked (all notes) → "Notebook"; a single locked note → "Note".
-              const lockedEntityLabel = notebookGateLocked ? 'Notebook' : 'Note';
-              // Dropped files are now embedded inline in the note body, so the
-              // editor always fills the content pane (no separate files panel).
-              const editorBoxSx = {
-                flex: 1,
-                minHeight: 0,
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column'
-              };
-              return (
-                <>
-                  <Box ref={editorBoxRef} sx={editorBoxSx}>
-                    <PhotoAlbumsNoteEditor
-                      ref={noteEditorApiRef}
-                      onReady={handleEditorReady}
-                      onChange={sharedAlbumView ? undefined : scheduleSave}
-                      editable={!sharedAlbumView}
-                      noteId={
-                        sharedAlbumView
-                          ? Number(sharedAlbumView.vaultNoteId) || null
-                          : selectedNote
-                            ? Number(selectedNote.note_id)
-                            : null
-                      }
-                      sharedAlbumId={
-                        sharedAlbumView ? Number(sharedAlbumView.sharedAlbumId) || null : null
-                      }
-                      storageType={
-                        sharedAlbumView?.storageType || paneStorageType
-                      }
-                      albumTitle={
-                        sharedAlbumView
-                          ? String(
-                              sharedAlbumView.displayLabel ||
-                                sharedAlbumView.albumName ||
-                                ''
-                            ).trim()
-                          : String(openNoteTitlePlain || '').trim() ||
-                            noteTitlePlainText(selectedNote?.note_name) ||
-                            ''
-                      }
-                      onAlbumTitleChange={(nextTitle) => {
-                        if (sharedAlbumView || !selectedNote) return;
-                        const noteId = Number(selectedNote.note_id);
-                        const upper = String(nextTitle || '').trim().toUpperCase();
-                        if (!upper || !Number.isFinite(noteId) || noteId < 1) return;
-                        if (vaultNameExists(upper, { excludeNoteId: noteId })) {
-                          setDuplicateNamePopup(DUPLICATE_NAME_MESSAGE);
-                          return;
-                        }
-                        setOpenNoteTitlePlain(upper);
-                        draftRef.current = { ...draftRef.current, openNoteTitlePlain: upper };
-                        patchNoteTitleInTree(noteId, upper);
-                        void vaultApi
-                          .updatePhotoAlbumsNote(noteId, { note_name: upper })
-                          .catch((err) => {
-                            setError(readPhotoAlbumsApiError(err, 'Failed to rename note'));
-                          });
-                      }}
-                      trayAttachments={
-                        sharedAlbumView ? sharedAlbumView.attachments : selectedNote?.attachments
-                      }
-                      onStageOsFiles={(files) => handleStageOsFiles(files)}
-                      onRemoveStagedAttachment={(id) => void handleRemoveStagedAttachment(id)}
-                      onRemoveAllStagedAttachments={(ids) =>
-                        void handleRemoveAllStagedAttachments(ids)
-                      }
-                      onAlbumFullscreenChange={setAlbumFullscreen}
-                      albumFocusView={albumFocusView}
-                      onAlbumFocusViewChange={(next) => {
-                        if (next) setAlbumEditFocusView(false);
-                        setAlbumFocusView(next);
-                      }}
-                      albumEditFocusView={albumEditFocusView}
-                      onAlbumEditFocusViewChange={(next) => {
-                        if (next) setAlbumFocusView(false);
-                        setAlbumEditFocusView(next);
-                      }}
-                      searchTerms={activeSearchTerms}
-                      onSearchMatchPagesChange={handleSearchMatchPagesChange}
-                      onAlbumPageDragStart={
-                        sharedAlbumView ? undefined : handleAlbumPageDragStart
-                      }
-                      onAlbumPageDragEnd={sharedAlbumView ? undefined : handleAlbumPageDragEnd}
-                      onOrderPrint={
-                        sharedAlbumView ? undefined : handleAddCurrentPageToOrderAlbum
-                      }
-                      orderAlbumActive={orderAlbumActive}
-                      orderFilmstripEntries={orderAlbumActive ? orderFilmstripEntries : null}
-                      orderFilmstripIndex={orderFilmstripIndex}
-                      onOrderFilmstripSelect={(idx) => {
-                        const entry = orderFilmstripEntries[idx];
-                        if (!entry) return;
-                        navigateToOrderEntry(entry, idx);
-                      }}
-                      onOrderFilmstripDelete={(idx) => {
-                        const entry = orderFilmstripEntries[idx];
-                        if (!entry) return;
-                        const sourceKey = String(entry.sourceKey || '');
-                        const next = (orderAlbumItems || []).filter((item) => {
-                          if (sourceKey && String(item.id) === sourceKey) return false;
-                          // Fallback: match by note + page when sourceKey missing.
-                          if (
-                            item.kind === 'page' &&
-                            Number(item.noteId) === Number(entry.noteId) &&
-                            Math.max(0, Math.round(Number(item.pageIndex) || 0)) ===
-                              Math.max(0, Math.round(Number(entry.pageIndex) || 0))
-                          ) {
-                            return false;
-                          }
-                          return true;
-                        });
-                        // Prefer remove by index among page-kind items when filter matched none uniquely.
-                        if (next.length === orderAlbumItems.length) {
-                          const pageItems = orderAlbumItems
-                            .map((item, i) => ({ item, i }))
-                            .filter(({ item }) => item.kind === 'page');
-                          const hit = pageItems[idx];
-                          if (hit) {
-                            persistOrderAlbumItems(
-                              orderAlbumItems.filter((_, i) => i !== hit.i)
-                            );
-                            return;
-                          }
-                        }
-                        persistOrderAlbumItems(next);
-                      }}
-                      header={null}
-                    />
-                    {lockedNow ? (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          inset: 0,
-                          zIndex: 5,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 1.5,
-                          ...photoAlbumsThemeDaynightSurfaceSx,
-                          textAlign: 'center',
-                          px: 2
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={innerEncryptOnImg}
-                          alt=""
-                          sx={{ width: 88, height: 88, display: 'block' }}
-                        />
-                        <Typography
-                          sx={{
-                            fontWeight: 900,
-                            fontSize: { xs: '2rem', sm: '2.5rem' },
-                            lineHeight: 1.15,
-                            color: PHOTO_ALBUMS_THEME_INVERSE_FG,
-                            WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
-                          }}
-                        >
-                          This {lockedEntityLabel} is{' '}
-                          <Box
-                            component="span"
-                            sx={{ color: '#e60000', WebkitTextFillColor: '#e60000' }}
-                          >
-                            LOCKED
-                          </Box>
-                        </Typography>
-                        <Box
-                          component="button"
-                          type="button"
-                          onClick={() => {
-                            if (notebookGateLocked && selectedNotebook)
-                              handleToggleNotebookLock(selectedNotebook);
-                            else if (openNoteLocked) handleToggleNoteLock(selectedNote);
-                            else if (selectedNotebook) handleToggleNotebookLock(selectedNotebook);
-                          }}
-                          disabled={busy || innerEncryptBusy}
-                          sx={{
-                            bgcolor: '#e60000',
-                            color: 'var(--theme-yellow-color)',
-                            fontWeight: 800,
-                            fontSize: '1.1rem',
-                            border: '2px solid #000',
-                            borderRadius: 1,
-                            px: 3,
-                            py: 1,
-                            cursor: 'pointer',
-                            '&:hover': { filter: 'brightness(1.05)' }
-                          }}
-                        >
-                          Unlock now
-                        </Box>
-                      </Box>
-                    ) : null}
-                  </Box>
-                </>
-              );
-            })()}
-          </Box>
-          ) : null}
-
-          {/* Closed menus: no right-edge grab strip — reopen via the hamburger (☰). */}
-
-          <PhotoAlbumsNoteInnerEncryptDialog
-            open={innerEncryptDialog.open}
-            mode={innerEncryptDialog.mode}
-            scope={innerEncryptDialog.scope}
-            noteName={selectedNote?.note_name || ''}
-            busy={innerEncryptBusy}
-            progressPercent={innerEncryptProgressPercent}
-            progressLabel={innerEncryptProgressLabel}
-            error={innerEncryptError}
-            onSubmit={handleInnerEncryptSubmit}
-            onClose={closeInnerEncryptDialog}
-          />
-
-          {rightMenuOpen && !hideWorkspaceChrome ? (
-            <>
-              {!compareMode ? (
-              <ColumnResizeHandle
-                label="Grab and slide to resize or tuck away the right menu"
-                sx={{ display: { xs: 'none', md: 'block' } }}
-                onMouseDown={(e) => startColumnResize('rightSidebar', e)}
-              />
-              ) : null}
-              <Box
-                ref={rightSidebarPaneRef}
-                data-pa-right-swim-lane=""
-                sx={{
-                  flex: compareMode ? '1 1 0' : '0 0 auto',
-                  width: compareMode
-                    ? { xs: '100%', md: 'auto' }
-                    : { xs: '100%', md: rightSidebarWidth },
-                  maxWidth: compareMode
-                    ? { xs: '100%', md: '50%' }
-                    : { xs: '100%', md: '50vw' },
-                  minWidth: compareMode ? { md: 0 } : undefined,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  bgcolor: 'var(--theme-daynight-color)',
-                  minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
-                  borderLeft: { md: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2 },
-                  overflow: 'hidden',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <Box
-                  ref={rightSidebarSplitRef}
-                  sx={{ flex: 1, minHeight: 0, p: compact ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 0 }}
-                >
-                  <Box
-                    sx={{
-                      ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                      flex: `${shortcutPanePercent} 1 0`,
-                      minHeight: compact ? 64 : 100,
-                      bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+                      fontFamily: MAIN_FONT_FAMILY,
+                      fontWeight: 800,
+                      fontSize: { xs: '0.9rem', sm: '1rem' },
+                      lineHeight: 1.2,
                       color: PHOTO_ALBUMS_THEME_INVERSE_FG,
                       WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
                     }}
-                    onDragOver={(e) => {
-                      const fromLeft = isLeftSidebarDragEvent(e);
-                      if (fromLeft || draggingShortcutId != null) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
-                      const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
-                      const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
-                      if (!shortcutRaw && (notebookRaw || noteRaw || isLeftSidebarDragEvent(e))) {
-                        void handleShortcutDropFromLeft(e);
-                      }
+                  >
+                    Found:
+                  </Typography>
+                </Box>
+                {searchActive ? (
+                  <SliderControlButton
+                    type="button"
+                    variant="yellow"
+                    hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                    onClick={handleClearSearch}
+                    disabled={busy || searchBusy}
+                    aria-label="Clear search"
+                    sx={{
+                      flexShrink: 0,
+                      width: 'auto',
+                      minWidth: 0,
+                      px: 1,
+                      py: 0.35,
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    <SliderControlButton
-                      type="button"
-                      fullWidth
-                      tabIndex={-1}
-                      aria-hidden
-                      disabled
-                      disableHoverScale
-                      sx={{
-                        mb: 1,
-                        pointerEvents: 'none',
-                        cursor: 'default',
-                        ...laneContainedButtonSx,
-                        borderRadius: '0 !important',
-                        ...themeDaynightSurfaceImportantSx,
-                        border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
-                        '&.Mui-disabled': {
-                          ...themeDaynightSurfaceImportantSx,
-                          border: `${PHOTO_ALBUMS_THEME_INVERSE_BORDER_2} !important`
-                        }
-                      }}
-                    >
-                      Shortcut
-                    </SliderControlButton>
-                    <Typography
-                      sx={{
-                        fontSize: '0.85rem',
-                        mb: 1,
-                        color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
-                        WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
-                      }}
-                    >
-                      Drag notebooks or notes here
-                    </Typography>
-                    <Box
-                      sx={photoAlbumsMenuListScrollSx}
-                      onDragOver={(e) => {
-                        const fromLeft = isLeftSidebarDragEvent(e);
-                        if (fromLeft || draggingShortcutId != null) {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
-                        }
-                      }}
-                    >
-                      {shortcuts.map((shortcut) => {
-                        void innerUnlockVersion;
-                        let shortcutInnerLocked = false;
-                        const shortcutNotebook = notebooks.find(
-                          (nb) => Number(nb.notebook_id) === Number(shortcut.notebook_id)
-                        );
-                        if (shortcut?.target_type === 'notebook') {
-                          shortcutInnerLocked = notebookInnerLockedForDisplay(
-                            shortcutNotebook?.notes || []
-                          );
-                        } else {
-                          const linkedNote = (shortcutNotebook?.notes || []).find(
-                            (n) => Number(n.note_id) === Number(shortcut.note_id)
-                          );
-                          shortcutInnerLocked = Boolean(
-                            linkedNote &&
-                              noteRequiresInnerPinToView(linkedNote) &&
-                              !isInnerNoteUnlockedForDisplay(linkedNote.note_id, linkedNote)
-                          );
-                        }
-                        const shortcutRealLabel = photoAlbumsShortcutMenuLabel(shortcut, {
-                          selectedNoteId,
-                          openNoteTitlePlain,
-                          notebooks
-                        });
-                        const shortcutLabel = shortcutInnerLocked
-                          ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
-                          : shortcutRealLabel;
-                        return (
-                        <ShortcutMenuRow
-                          key={shortcut.shortcut_id}
-                          shortcut={shortcut}
-                          label={shortcutLabel}
-                          selected={isShortcutSelected(shortcut)}
-                          locked={shortcutInnerLocked}
-                          draggingId={draggingShortcutId}
-                          dropTargetId={dropTargetShortcutId}
-                          onSelect={() => handleShortcutClick(shortcut)}
-                          onDragStart={(e, shortcutId) => handleDragStart(e, shortcutId, DRAG_SHORTCUT)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={setDropTargetShortcutId}
-                          onDrop={(e, toId) => void handleShortcutReorderDrop(e, toId)}
-                          onDropFromLeft={(e) => void handleShortcutDropFromLeft(e)}
-                          onDelete={() => void handleRemoveShortcut(shortcut.shortcut_id, shortcutRealLabel)}
-                          deleteLabel={`Remove shortcut ${shortcutRealLabel}`}
-                          onToggleLock={() => handleToggleShortcutLock(shortcut)}
-                          lockTitle={
-                            shortcutInnerLocked
-                              ? 'Unlock (enter 6-digit PIN)'
-                              : 'Lock with a 6-digit PIN'
-                          }
-                          disabled={busy}
-                        />
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                  <RowResizeHandle
-                    label={
-                      paneStorageType === 'tutadrive'
-                        ? 'Resize Shortcut and TutaCloud Folders & Files'
-                        : 'Resize Shortcut and USB Folders & Files'
-                    }
-                    onMouseDown={startShortcutPaneResize}
-                  />
+                    Clear
+                  </SliderControlButton>
+                ) : null}
+                {searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
                   <Box
                     sx={{
-                      flex: `${100 - shortcutPanePercent} 1 0`,
-                      minHeight: 80,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
-                      gap: 0.5
+                      flexShrink: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      border: '3px solid #000',
+                      borderRadius: 0.75,
+                      bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+                      px: 0.5,
+                      py: 0.25
                     }}
                   >
                     <Box
-                      role="tablist"
-                      aria-label="Vault files and local Files Explorer"
+                      component="button"
+                      type="button"
+                      aria-label="Previous document"
+                      title="Previous found note"
+                      onClick={() => goToSearchDoc(-1)}
+                      disabled={currentSearchDocIndex <= 0}
+                      sx={searchNavButtonSx}
+                    >
+                      ◀
+                    </Box>
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Previous match in note"
+                      title="Previous match in this note"
+                      onClick={() => goToSearchHit(-1)}
+                      disabled={searchHitCount <= 0 || activeHitIndex <= 0}
+                      sx={searchNavButtonSx}
+                    >
+                      ▲
+                    </Box>
+                    <Typography
+                      component="span"
                       sx={{
-                        flexShrink: 0,
-                        display: 'flex',
-                        gap: 0.5,
-                        alignItems: 'stretch'
+                        fontWeight: 800,
+                        fontSize: '0.8rem',
+                        color: '#000',
+                        WebkitTextFillColor: '#000',
+                        minWidth: 44,
+                        textAlign: 'center',
+                        userSelect: 'none'
                       }}
                     >
-                      {[
-                        {
-                          id: FILES_EXPLORER_TAB_FOLDERS,
-                          label:
-                            paneStorageType === 'tutadrive'
-                              ? 'TutaCloud Folders & Files'
-                              : 'USB Folders & Files'
-                        },
-                        { id: FILES_EXPLORER_TAB_EXPLORER, label: 'Files Explorer' },
-                        { id: FILES_EXPLORER_TAB_MOBILE_UPLOAD, label: 'Mobile Upload' }
-                      ].map((tab) => {
-                        const selected = filesSidebarTab === tab.id;
-                        return (
-                          <Box
-                            key={tab.id}
-                            component="button"
-                            type="button"
-                            role="tab"
-                            aria-selected={selected}
-                            onClick={() => {
-                              setFilesSidebarTab(tab.id);
-                              writeFilesExplorerTab(tab.id);
-                            }}
-                            sx={{
-                              flex: 1,
-                              minWidth: 0,
-                              cursor: 'pointer',
-                              border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
-                              borderBottom: selected
-                                ? `2px solid ${SLIDER_CONTROL_TRUE_YELLOW}`
-                                : PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
-                              borderRadius: '6px 6px 0 0',
-                              bgcolor: selected ? SLIDER_CONTROL_TRUE_YELLOW : '#fff59d',
-                              color: '#000',
-                              WebkitTextFillColor: '#000',
-                              fontWeight: selected ? 800 : 600,
-                              fontSize: '0.72rem',
-                              lineHeight: 1.2,
-                              px: 0.5,
-                              py: 0.4,
-                              mb: selected ? '-2px' : 0,
-                              zIndex: selected ? 1 : 0,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}
-                          >
-                            {tab.label}
-                          </Box>
-                        );
-                      })}
+                      {searchHitCount > 0 ? `${activeHitIndex + 1}/${searchHitCount}` : '0/0'}
+                    </Typography>
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Next match in note"
+                      title="Next match in this note"
+                      onClick={() => goToSearchHit(1)}
+                      disabled={searchHitCount <= 0 || activeHitIndex >= searchHitCount - 1}
+                      sx={searchNavButtonSx}
+                    >
+                      ▼
                     </Box>
-                    {filesSidebarTab === FILES_EXPLORER_TAB_EXPLORER ? (
-                      <PhotoAlbumsFilesExplorerPanel
-                        active={unlocked && filesSidebarTab === FILES_EXPLORER_TAB_EXPLORER}
-                        disabled={busy || !unlocked || Boolean(batchUploadProgress)}
-                        onStageOsFiles={(files) => handleStageOsFiles(files)}
-                        onStageTrayBusyChange={handleStageTrayBusyChange}
-                      />
-                    ) : filesSidebarTab === FILES_EXPLORER_TAB_MOBILE_UPLOAD ? (
-                      <PhotoAlbumsMobileUploadFolderPanel
-                        active={unlocked && filesSidebarTab === FILES_EXPLORER_TAB_MOBILE_UPLOAD}
-                        disabled={busy || !unlocked || Boolean(batchUploadProgress)}
-                        refreshToken={mobileUploadFolderRefreshToken}
-                        onStageOsFiles={(files) => handleStageOsFiles(files)}
-                        onStageTrayBusyChange={handleStageTrayBusyChange}
-                      />
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Next document"
+                      title="Next found note"
+                      onClick={() => goToSearchDoc(1)}
+                      disabled={currentSearchDocIndex >= searchResultTabs.length - 1}
+                      sx={searchNavButtonSx}
+                    >
+                      ▶
+                    </Box>
+                  </Box>
+                ) : null}
+                {searchBusy ? (
+                  <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
+                    Searching…
+                  </Typography>
+                ) : searchActive && Array.isArray(searchResults) && !searchResultTabs.length ? (
+                  <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
+                    {searchMessage || 'No notes match your search'}
+                  </Typography>
+                ) : null}
+                {searchActive && searchFoundPages ? (
+                  <Box
+                    aria-label="Found album pages"
+                    sx={{
+                      flex: '1 1 auto',
+                      minWidth: 120,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
+                      overflowX: 'auto',
+                      overflowY: 'hidden',
+                      py: 0.15,
+                      px: 0.35,
+                      minHeight: 40,
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    {(Array.isArray(searchFoundPages.matchIndexes) ? searchFoundPages.matchIndexes : []).length ? (
+                      searchFoundPages.matchIndexes.map((idx) => {
+                        const model = searchFoundPages.models?.[idx] || {
+                          key: `missing-${idx}`,
+                          photos: []
+                        };
+                        return (
+                          <PageThumb
+                            key={`found-page-${idx}-${model.key}`}
+                            model={model}
+                            pageNumber={idx + 1}
+                            active={idx === searchFoundPages.pageIndex}
+                            orientation={searchFoundPages.orientation}
+                            noteId={searchFoundPages.noteId}
+                            storageType={searchFoundPages.storageType}
+                            onSelect={() => searchFoundPages.onGoToPage?.(idx)}
+                            heightPx={40}
+                          />
+                        );
+                      })
                     ) : (
-                      <PhotoAlbumsStorageFilesPanel
-                        storageType={paneStorageType || 'usb'}
-                        active={unlocked}
-                        hideTitle
-                      />
+                      <Typography
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          color: '#b71c1c',
+                          WebkitTextFillColor: '#b71c1c',
+                          whiteSpace: 'nowrap',
+                          px: 0.5
+                        }}
+                      >
+                        No album pages contain this search text
+                      </Typography>
                     )}
                   </Box>
-                </Box>
+                ) : null}
               </Box>
-            </>
-          ) : null}
-          </>
-          )}
+            ) : null}
+
+            <Box
+              sx={{
+                display: 'flex',
+                flex: 1,
+                minHeight: 0,
+                width: '100%',
+                position: 'relative',
+                flexDirection: { xs: 'column', md: 'row' }
+              }}
+            >
+              {fileWorkspaceView === 'payment' && !compareMode ? (
+                <Box
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 0,
+                    overflow: 'auto',
+                    bgcolor: 'var(--theme-daynight-color)',
+                    p: { xs: 1, sm: 2 }
+                  }}
+                >
+                  <ProfilesRecordsPage
+                    visibleTabs={PROFILES_RECORDS_PAYMENT_TABS}
+                    embedded
+                    initialTab={profilesRecordsInitialTab}
+                    initialTokensBuying={profilesRecordsInitialTokens}
+                  />
+                </Box>
+              ) : (
+                <>
+                  {leftMenuOpen && !hideWorkspaceChrome ? (
+                    <>
+                      <Box
+                        ref={leftSidebarPaneRef}
+                        sx={{
+                          flex: compareMode ? '1 1 0' : '0 0 auto',
+                          width: compareMode ? { xs: '100%', md: 'auto' } : { xs: '100%', md: sidebarWidth },
+                          maxWidth: compareMode ? { xs: '100%', md: '66%' } : { xs: '100%', md: '85vw' },
+                          minWidth: compareMode ? { md: 0 } : undefined,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          bgcolor: 'var(--theme-daynight-color)',
+                          minHeight: compact || compareMode ? 0 : { xs: 280, md: '100%' },
+                          overflow: 'hidden',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <Box
+                          ref={leftSidebarSplitRef}
+                          sx={{
+                            flex: 1,
+                            minHeight: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            p: compact ? 0.5 : 1,
+                            gap: 0,
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flex: compareMode ? '1 1 auto' : `${100 - sharedAlbumPanePercent} 1 0`,
+                              minHeight: compareMode ? 0 : 120,
+                              minWidth: 0
+                            }}
+                          >
+                            <Box
+                              ref={notebookColPaneRef}
+                              sx={{
+                                ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                                width: notebookColWidth,
+                                flexShrink: 0,
+                                ...(notebookLaneFolderDragActive
+                                  ? {
+                                      outline: '3px dashed var(--theme-yellow-color)',
+                                      outlineOffset: 2,
+                                      bgcolor: 'rgba(255, 215, 0, 0.18)'
+                                    }
+                                  : null)
+                              }}
+                              onDragOver={handleNotebookLaneFolderDragOver}
+                              onDragLeave={handleNotebookLaneFolderDragLeave}
+                              onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
+                              title="Drop a folder of .html notes here to import as a new notebook"
+                            >
+                              <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
+                                <SliderControlButton
+                                  type="button"
+                                  fullWidth
+                                  onClick={handleAddNotebook}
+                                  disabled={busy}
+                                  hoverScale={1.25}
+                                  {...guestDemoBlockProps()}
+                                  sx={laneContainedButtonTwoLineSx}
+                                >
+                                  Add
+                                  <br />
+                                  Album-Set
+                                </SliderControlButton>
+                              </Box>
+                              <Box sx={photoAlbumsMenuListScrollSx}>
+                                {displayNotebooks.map((nb) => {
+                                  void innerUnlockVersion;
+                                  const notebookNotes = nb.notes || [];
+                                  const notebookHasInner = notebookNotes.some((n) => noteHasInnerEncryption(n));
+                                  const notebookInnerLocked = notebookInnerLockedForDisplay(notebookNotes);
+                                  const notebookLockingUp =
+                                    !notebookInnerLocked &&
+                                    innerEncryptUiScope === 'notebook' &&
+                                    (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
+                                    Number(nb.notebook_id) === Number(selectedNotebookId);
+                                  return (
+                                    <RenamableDraggableMenuRow
+                                      key={nb.notebook_id}
+                                      id={nb.notebook_id}
+                                      domId={`record-vault-notebook-${nb.notebook_id}`}
+                                      label={
+                                        notebookInnerLocked
+                                          ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
+                                          : Number(editingNotebookId) === Number(nb.notebook_id) && renameUiSurface === 'header'
+                                            ? editNameDraft
+                                            : photoAlbumsNotebookSidebarLabel(nb, notebooks)
+                                      }
+                                      buttonTitle={
+                                        notebookInnerLocked
+                                          ? 'Locked notebook — enter PIN to unlock'
+                                          : notebookLockingUp
+                                            ? 'Locking notebook — enter PIN'
+                                            : notebookHasInner
+                                              ? 'Notebook has PIN-locked notes'
+                                              : undefined
+                                      }
+                                      selected={!orderAlbumActive && Number(nb.notebook_id) === Number(selectedNotebookId)}
+                                      locked={notebookInnerLocked}
+                                      editing={
+                                        Number(editingNotebookId) === Number(nb.notebook_id) &&
+                                        renameUiSurface === 'menu' &&
+                                        !notebookInnerLocked
+                                      }
+                                      editValue={editNameDraft}
+                                      onEditValueChange={setEditNameDraft}
+                                      onSelect={() => {
+                                        setOrderAlbumActive(false);
+                                        notebookScopePendingRef.current = true;
+                                        setInnerEncryptUiScope('notebook');
+                                        setSelectedNotebookId(nb.notebook_id);
+                                      }}
+                                      onStartEdit={() => {
+                                        setEditingNoteId(null);
+                                        setRenameUiSurface('menu');
+                                        setEditingNotebookId(nb.notebook_id);
+                                        setEditNameDraft(photoAlbumsNotebookSidebarLabel(nb, notebooks));
+                                      }}
+                                      onCommitEdit={() => void commitNotebookRename()}
+                                      onCancelEdit={clearRenameState}
+                                      dragMime={DRAG_NOTEBOOK}
+                                      draggingId={draggingNotebookId}
+                                      alternateDraggingId={draggingNoteId}
+                                      dropTargetId={dropTargetNotebookId}
+                                      dragTitle={
+                                        crossPaneDropActive
+                                          ? 'Drop here to copy or move from the other vault'
+                                          : draggingNoteId != null
+                                            ? 'Drop album here to move it into this album-set'
+                                            : 'Drag to reorder; drop an album here to move it into this set'
+                                      }
+                                      onDragStart={handleDragStart}
+                                      onDragEnd={handleDragEnd}
+                                      onDragOver={setDropTargetNotebookId}
+                                      onDrop={(e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)}
+                                      onDelete={() =>
+                                        void handleDeleteNotebook(nb.notebook_id, photoAlbumsNotebookSidebarLabel(nb, notebooks))
+                                      }
+                                      deleteLabel={`Delete notebook ${photoAlbumsNotebookSidebarLabel(nb, notebooks)}`}
+                                      onToggleLock={() => handleToggleNotebookLock(nb)}
+                                      lockTitle={
+                                        notebookInnerLocked ? 'Unlock notebook (enter 6-digit PIN)' : 'Lock notebook with a 6-digit PIN'
+                                      }
+                                      disabled={busy || crossPaneBusy}
+                                      acceptForeignDrop={crossPaneDropActive}
+                                    />
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+
+                            <ColumnResizeHandle
+                              label="Slide to resize notebook and note lists"
+                              onMouseDown={(e) => startColumnResize('notebookCol', e)}
+                            />
+
+                            <Box
+                              ref={noteLaneRef}
+                              sx={{
+                                ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                                flex: 1,
+                                minWidth: MIN_MENU_COL_WIDTH,
+                                ...(noteLaneFileDragActive
+                                  ? {
+                                      outline: '3px dashed var(--theme-yellow-color)',
+                                      outlineOffset: 2,
+                                      bgcolor: 'rgba(255, 215, 0, 0.18)'
+                                    }
+                                  : null)
+                              }}
+                              onDragOver={handleNoteListFileDragOver}
+                              onDragLeave={handleNoteListFileDragLeave}
+                              onDrop={(e) => void handleNoteListFileDrop(e)}
+                            >
+                              <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
+                                <SliderControlButton
+                                  type="button"
+                                  fullWidth
+                                  onClick={handleAddNote}
+                                  disabled={busy || !selectedNotebookId || notebookGateLocked}
+                                  hoverScale={1.25}
+                                  {...guestDemoBlockProps()}
+                                  sx={laneContainedButtonTwoLineSx}
+                                >
+                                  Add
+                                  <br />
+                                  Album
+                                </SliderControlButton>
+                              </Box>
+                              <Box sx={photoAlbumsMenuListScrollSx}>
+                                {/* Encrypted notebook: do not reveal any note names until unlocked. */}
+                                {(notebookGateLocked ? [] : notes).map((note) => {
+                                  const noteInnerLocked =
+                                    noteRequiresInnerPinToView(note) && !isInnerNoteUnlockedForDisplay(note.note_id, note);
+                                  const noteLockingUp =
+                                    !noteInnerLocked &&
+                                    (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
+                                    Number(note.note_id) === Number(selectedNoteId);
+                                  // innerUnlockVersion lives in unlock refs — read so rows re-paint after PIN unlock.
+                                  void innerUnlockVersion;
+                                  const noteMenuLabel = noteInnerLocked
+                                    ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
+                                    : photoAlbumsNoteMenuLabel(note, notes, {
+                                        selectedNoteId,
+                                        openNoteTitlePlain,
+                                        notebooks
+                                      });
+                                  const noteRealLabel = photoAlbumsNoteMenuLabel(note, notes, {
+                                    selectedNoteId,
+                                    openNoteTitlePlain,
+                                    notebooks
+                                  });
+                                  const menuEditingThisNote = Number(editingNoteId) === Number(note.note_id) && renameUiSurface === 'menu';
+                                  const headerEditingThisNote =
+                                    Number(editingNoteId) === Number(note.note_id) && renameUiSurface === 'header';
+                                  const sidebarAlbumLines =
+                                    noteInnerLocked || menuEditingThisNote
+                                      ? null
+                                      : formatPhotoAlbumsSidebarAlbumLines(
+                                          headerEditingThisNote ? photoAlbumsNoteSidebarLabel(note, notes, notebooks) : noteMenuLabel
+                                        );
+                                  return (
+                                    <RenamableDraggableMenuRow
+                                      key={note.note_id}
+                                      id={note.note_id}
+                                      domId={`record-vault-note-${note.note_id}`}
+                                      sideCount={noteInnerLocked ? null : photoAlbumsSidebarAlbumMediaCount(note)}
+                                      label={
+                                        noteInnerLocked
+                                          ? PHOTO_ALBUMS_INNER_LOCKED_LABEL
+                                          : headerEditingThisNote
+                                            ? // Freeze sidebar label while the content-header field is being typed.
+                                              photoAlbumsNoteSidebarLabel(note, notes, notebooks)
+                                            : menuEditingThisNote
+                                              ? editNameDraft || noteMenuLabel
+                                              : noteMenuLabel
+                                      }
+                                      albumLabelLines={sidebarAlbumLines}
+                                      buttonTitle={
+                                        noteInnerLocked
+                                          ? 'Locked — enter PIN to view'
+                                          : noteLockingUp
+                                            ? 'Locking up — enter PIN'
+                                            : noteRealLabel
+                                      }
+                                      selected={!orderAlbumActive && Number(note.note_id) === Number(selectedNoteId)}
+                                      selectedBlue={searchActive}
+                                      multiSelected={
+                                        !orderAlbumActive && multiSelectedNoteIds.some((id) => Number(id) === Number(note.note_id))
+                                      }
+                                      locked={noteInnerLocked}
+                                      editing={menuEditingThisNote && !noteInnerLocked}
+                                      editValue={editNameDraft}
+                                      onEditValueChange={handleNoteListTitleEditChange}
+                                      onSelect={(e) => {
+                                        setOrderAlbumActive(false);
+                                        if (e?.shiftKey) {
+                                          handleNoteShiftSelect(note.note_id);
+                                          return;
+                                        }
+                                        selectNoteId(note.note_id);
+                                      }}
+                                      onStartEdit={() => {
+                                        if (noteInnerLocked) return;
+                                        replaceMultiSelectedNoteIds([]);
+                                        noteMultiSelectAnchorIdRef.current = note.note_id;
+                                        setEditingNotebookId(null);
+                                        setRenameUiSurface('menu');
+                                        setEditingNoteId(note.note_id);
+                                        noteRenameStartPersistedRef.current = String(note.note_name ?? '').trim();
+                                        noteRenameStartLabelRef.current = photoAlbumsNoteSidebarLabel(note, notes, notebooks);
+                                        setEditNameDraft(
+                                          Number(note.note_id) === Number(selectedNoteId)
+                                            ? openNoteTitlePlain || photoAlbumsNoteSidebarLabel(note, notes, notebooks)
+                                            : photoAlbumsNoteSidebarLabel(note, notes, notebooks)
+                                        );
+                                      }}
+                                      onCommitEdit={() => void commitNoteRename()}
+                                      onCancelEdit={clearRenameState}
+                                      dragMime={DRAG_NOTE}
+                                      dragNotebookId={selectedNotebookId}
+                                      draggingId={draggingNoteId}
+                                      dropTargetId={dropTargetNoteId}
+                                      acceptForeignDrop={crossPaneDropActive}
+                                      dragTitle={
+                                        crossPaneDropActive
+                                          ? 'Drop here to copy or move from the other vault'
+                                          : draggingAlbumPage
+                                            ? 'Drop here to copy or move into this album'
+                                            : multiSelectedNoteIds.length > 1
+                                              ? `Shift-selected: ${multiSelectedNoteIds.length} albums — drag onto an album-set to move`
+                                              : 'Drag onto an album-set to move; drop a page thumb here to receive that page'
+                                      }
+                                      onDragStart={handleDragStart}
+                                      onDragEnd={handleDragEnd}
+                                      onPrefetchDrag={prefetchNoteHtmlExport}
+                                      onDragOver={setDropTargetNoteId}
+                                      albumPageDropActive={draggingAlbumPage}
+                                      trayPhotoDropEnabled
+                                      onDrop={(e, toId, mime) => {
+                                        if (isTrayPhotoDrag(e.dataTransfer)) {
+                                          void handleTrayPhotoDropOnNote(e, toId);
+                                          return;
+                                        }
+                                        if (isAlbumPageDrag(e.dataTransfer) || draggingAlbumPage) {
+                                          void handleMoveAlbumPageToNote(e, toId);
+                                          return;
+                                        }
+                                        void handleDropReorder(e, toId, mime, notes, 'note_id', (ids) =>
+                                          vaultApi.reorderPhotoAlbumsNotes(selectedNotebookId, ids)
+                                        );
+                                      }}
+                                      onFileDrop={(e) => void handleNoteListFileDrop(e)}
+                                      onDelete={() => void handleDeleteNote(note.note_id, noteRealLabel)}
+                                      deleteLabel={`Delete note ${noteRealLabel}`}
+                                      onToggleLock={() => handleToggleNoteLock(note)}
+                                      lockTitle={noteInnerLocked ? 'Unlock note (enter 6-digit PIN)' : 'Lock note with a 6-digit PIN'}
+                                      disabled={busy || crossPaneBusy || !selectedNotebookId}
+                                    />
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+                          </Box>
+
+                          {!compareMode ? (
+                            <>
+                              <RowResizeHandle
+                                label="Drag up or down to resize Shared Album / Order Album area"
+                                onMouseDown={startSharedAlbumPaneResize}
+                              />
+                              <Box
+                                sx={{
+                                  flex: `${sharedAlbumPanePercent} 1 0`,
+                                  minHeight: 88,
+                                  display: 'flex',
+                                  minWidth: 0,
+                                  borderTop: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+                                  overflow: 'hidden'
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                                    width: notebookColWidth,
+                                    flexShrink: 0,
+                                    minHeight: 0,
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                  }}
+                                >
+                                  <Box sx={laneAddButtonWrapSx}>
+                                    <SliderControlButton
+                                      type="button"
+                                      fullWidth
+                                      disabled
+                                      disableHoverScale
+                                      tabIndex={-1}
+                                      aria-hidden
+                                      aria-label="Album for Order"
+                                      title="Album for Order"
+                                      sx={{
+                                        ...laneContainedButtonTwoLineSx,
+                                        pointerEvents: 'none',
+                                        cursor: 'default',
+                                        borderRadius: '0 !important',
+                                        ...themeDaynightSurfaceImportantSx,
+                                        border: 'none !important',
+                                        boxShadow: 'none !important',
+                                        '&.Mui-disabled': {
+                                          ...themeDaynightSurfaceImportantSx,
+                                          border: 'none !important',
+                                          boxShadow: 'none !important',
+                                          opacity: 1,
+                                          transform: 'none !important',
+                                          cursor: 'default !important'
+                                        }
+                                      }}
+                                    >
+                                      Album
+                                      <br />
+                                      for Order
+                                    </SliderControlButton>
+                                  </Box>
+                                  <Box sx={{ ...photoAlbumsMenuListScrollSx, flex: 1, minHeight: 0 }}>
+                                    <MenuRowWithDelete
+                                      deleteLabel={`Clear ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME} album`}
+                                      disabled={busy || !orderAlbumItems.length}
+                                      onDelete={async () => {
+                                        if (!orderAlbumItems.length) return;
+                                        if (
+                                          !(await themedConfirm(
+                                            `Clear all ${orderAlbumItems.length} item${
+                                              orderAlbumItems.length === 1 ? '' : 's'
+                                            } from ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME}?`
+                                          ))
+                                        ) {
+                                          return;
+                                        }
+                                        persistOrderAlbumItems([]);
+                                      }}
+                                    >
+                                      <MenuRowButton
+                                        selected={orderAlbumActive}
+                                        disabled={busy}
+                                        onClick={handleOpenOrderAlbumPages}
+                                        onDoubleClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setOrderAlbumViewOpen(true);
+                                        }}
+                                        onDragOver={(e) => {
+                                          const types = e.dataTransfer?.types ? Array.from(e.dataTransfer.types) : [];
+                                          if (
+                                            !types.includes(DRAG_NOTE) &&
+                                            !types.includes(DRAG_NOTE_IDS) &&
+                                            !types.includes(DRAG_NOTEBOOK) &&
+                                            !types.includes(DRAG_SHORTCUT)
+                                          ) {
+                                            return;
+                                          }
+                                          e.preventDefault();
+                                          e.dataTransfer.dropEffect = 'copy';
+                                          setOrderAlbumDropActive(true);
+                                        }}
+                                        onDragLeave={() => setOrderAlbumDropActive(false)}
+                                        onDrop={(e) => void handleOrderAlbumDrop(e)}
+                                        title={`Click to open ${orderAlbumName || DEFAULT_ORDER_ALBUM_NAME} pages. Double-click to manage the queue.`}
+                                        sx={{
+                                          border: `2px solid ${PHOTO_ALBUMS_THEME_INVERSE_BORDER} !important`,
+                                          ...(orderAlbumActive ? themeDaynightSurfaceImportantSx : null),
+                                          ...(orderAlbumDropActive
+                                            ? {
+                                                outline: `3px dashed ${PHOTO_ALBUMS_THEME_INVERSE_BORDER}`,
+                                                outlineOffset: 2,
+                                                bgcolor: 'rgba(255, 215, 0, 0.55) !important'
+                                              }
+                                            : null)
+                                        }}
+                                      >
+                                        {orderAlbumName || DEFAULT_ORDER_ALBUM_NAME}
+                                        {orderFilmstripEntries.length
+                                          ? ` (${orderFilmstripEntries.length})`
+                                          : orderAlbumItems.length
+                                            ? ` (${orderAlbumItems.length})`
+                                            : ''}
+                                      </MenuRowButton>
+                                    </MenuRowWithDelete>
+                                  </Box>
+                                </Box>
+                                <ColumnResizeHandle
+                                  label="Shared album column resize"
+                                  sx={{ visibility: 'hidden', width: 0, minWidth: 0, p: 0, border: 0 }}
+                                />
+                                <Box
+                                  sx={{
+                                    ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                                    flex: 1,
+                                    minWidth: MIN_MENU_COL_WIDTH,
+                                    minHeight: 0,
+                                    display: 'flex',
+                                    flexDirection: 'column'
+                                  }}
+                                >
+                                  <Box sx={laneAddButtonWrapSx}>
+                                    <SliderControlButton
+                                      type="button"
+                                      fullWidth
+                                      disabled
+                                      disableHoverScale
+                                      tabIndex={-1}
+                                      aria-hidden
+                                      aria-label="Shared Album"
+                                      title="Shared Album"
+                                      sx={{
+                                        ...laneContainedButtonTwoLineSx,
+                                        pointerEvents: 'none',
+                                        cursor: 'default',
+                                        borderRadius: '0 !important',
+                                        ...themeDaynightSurfaceImportantSx,
+                                        border: 'none !important',
+                                        boxShadow: 'none !important',
+                                        '&.Mui-disabled': {
+                                          ...themeDaynightSurfaceImportantSx,
+                                          border: 'none !important',
+                                          boxShadow: 'none !important',
+                                          opacity: 1,
+                                          transform: 'none !important',
+                                          cursor: 'default !important'
+                                        }
+                                      }}
+                                    >
+                                      Shared
+                                      <br />
+                                      Album
+                                    </SliderControlButton>
+                                  </Box>
+                                  <Box sx={{ ...photoAlbumsMenuListScrollSx, flex: 1, minHeight: 0 }}>
+                                    {sharedAlbums.map((item) => {
+                                      const label = item.displayLabel || `${item.albumSetName} / ${item.albumName}`;
+                                      const selected = Number(selectedSharedAlbumId) === Number(item.sharedAlbumId);
+                                      return (
+                                        <MenuRowWithDelete
+                                          key={item.sharedAlbumId}
+                                          deleteLabel={`Remove ${label} from Shared Album`}
+                                          disabled={busy}
+                                          onDelete={() => void handleRemoveSharedAlbum(item.sharedAlbumId, label)}
+                                        >
+                                          <SliderControlButton
+                                            type="button"
+                                            fullWidth
+                                            variant={selected ? 'green' : 'yellow'}
+                                            hoverScale={1.15}
+                                            onClick={() => void openSharedAlbum(item.sharedAlbumId)}
+                                            title={item.ownerEmail ? `Shared by ${item.ownerEmail} — view album` : label}
+                                            sx={{
+                                              justifyContent: 'flex-start',
+                                              textAlign: 'left',
+                                              mb: 0,
+                                              px: 1,
+                                              py: 0.75,
+                                              whiteSpace: 'nowrap',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis'
+                                            }}
+                                          >
+                                            {label}
+                                          </SliderControlButton>
+                                        </MenuRowWithDelete>
+                                      );
+                                    })}
+                                    {!sharedAlbums.length ? (
+                                      <Typography sx={{ px: 1, py: 0.5, fontSize: '0.82rem', fontWeight: 700 }}>
+                                        No shared albums yet.
+                                      </Typography>
+                                    ) : null}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            </>
+                          ) : null}
+                        </Box>
+                      </Box>
+
+                      {!compareMode ? (
+                        <ColumnResizeHandle
+                          label="Slide left menu wider or narrower"
+                          sx={{ display: { xs: 'none', md: 'block' } }}
+                          onMouseDown={(e) => startColumnResize('sidebar', e)}
+                        />
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  {!compareMode ? (
+                    <Box
+                      data-record-vault-note-content
+                      ref={noteContentPaneRef}
+                      // Do not make the whole album/editor pane HTML5-draggable — that dragged
+                      // the entire binder as a huge translucent ghost. Export HTML from the
+                      // notebook/note list on the left instead.
+                      draggable={false}
+                      onDragOver={handleContentDragOver}
+                      onDrop={handleContentFileDrop}
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: compact ? 0 : { xs: 360, md: '100%' },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        bgcolor: 'var(--theme-primary-color)'
+                      }}
+                    >
+                      {(() => {
+                        const notebookNotesForLock = selectedNotebook?.notes || [];
+                        const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);
+                        const openNoteLocked = Boolean(
+                          selectedNote && noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)
+                        );
+                        const lockedNow = !sharedAlbumView && (notebookGateLocked || openNoteLocked);
+                        // Whole notebook locked (all notes) → "Notebook"; a single locked note → "Note".
+                        const lockedEntityLabel = notebookGateLocked ? 'Notebook' : 'Note';
+                        // Dropped files are now embedded inline in the note body, so the
+                        // editor always fills the content pane (no separate files panel).
+                        const editorBoxSx = {
+                          flex: 1,
+                          minHeight: 0,
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        };
+                        return (
+                          <>
+                            <Box ref={editorBoxRef} sx={editorBoxSx}>
+                              <PhotoAlbumsNoteEditor
+                                ref={noteEditorApiRef}
+                                onReady={handleEditorReady}
+                                onChange={sharedAlbumView ? undefined : scheduleSave}
+                                editable={!sharedAlbumView}
+                                noteId={
+                                  sharedAlbumView
+                                    ? Number(sharedAlbumView.vaultNoteId) || null
+                                    : selectedNote
+                                      ? Number(selectedNote.note_id)
+                                      : null
+                                }
+                                sharedAlbumId={sharedAlbumView ? Number(sharedAlbumView.sharedAlbumId) || null : null}
+                                storageType={sharedAlbumView?.storageType || paneStorageType}
+                                albumTitle={
+                                  sharedAlbumView
+                                    ? String(sharedAlbumView.displayLabel || sharedAlbumView.albumName || '').trim()
+                                    : String(openNoteTitlePlain || '').trim() || noteTitlePlainText(selectedNote?.note_name) || ''
+                                }
+                                onAlbumTitleChange={(nextTitle) => {
+                                  if (sharedAlbumView || !selectedNote) return;
+                                  const noteId = Number(selectedNote.note_id);
+                                  const upper = String(nextTitle || '')
+                                    .trim()
+                                    .toUpperCase();
+                                  if (!upper || !Number.isFinite(noteId) || noteId < 1) return;
+                                  if (vaultNameExists(upper, { excludeNoteId: noteId })) {
+                                    setDuplicateNamePopup(DUPLICATE_NAME_MESSAGE);
+                                    return;
+                                  }
+                                  setOpenNoteTitlePlain(upper);
+                                  draftRef.current = { ...draftRef.current, openNoteTitlePlain: upper };
+                                  patchNoteTitleInTree(noteId, upper);
+                                  void vaultApi.updatePhotoAlbumsNote(noteId, { note_name: upper }).catch((err) => {
+                                    setError(readPhotoAlbumsApiError(err, 'Failed to rename note'));
+                                  });
+                                }}
+                                trayAttachments={sharedAlbumView ? sharedAlbumView.attachments : selectedNote?.attachments}
+                                onStageOsFiles={(files) => handleStageOsFiles(files)}
+                                onRemoveStagedAttachment={(id) => void handleRemoveStagedAttachment(id)}
+                                onRemoveAllStagedAttachments={(ids) => void handleRemoveAllStagedAttachments(ids)}
+                                onAlbumFullscreenChange={setAlbumFullscreen}
+                                albumFocusView={albumFocusView}
+                                onAlbumFocusViewChange={(next) => {
+                                  if (next) setAlbumEditFocusView(false);
+                                  setAlbumFocusView(next);
+                                }}
+                                albumEditFocusView={albumEditFocusView}
+                                onAlbumEditFocusViewChange={(next) => {
+                                  if (next) setAlbumFocusView(false);
+                                  setAlbumEditFocusView(next);
+                                }}
+                                searchTerms={activeSearchTerms}
+                                onSearchMatchPagesChange={handleSearchMatchPagesChange}
+                                onAlbumPageDragStart={sharedAlbumView ? undefined : handleAlbumPageDragStart}
+                                onAlbumPageDragEnd={sharedAlbumView ? undefined : handleAlbumPageDragEnd}
+                                onOrderPrint={sharedAlbumView ? undefined : handleAddCurrentPageToOrderAlbum}
+                                orderAlbumActive={orderAlbumActive}
+                                orderFilmstripEntries={orderAlbumActive ? orderFilmstripEntries : null}
+                                orderFilmstripIndex={orderFilmstripIndex}
+                                onOrderFilmstripSelect={(idx) => {
+                                  const entry = orderFilmstripEntries[idx];
+                                  if (!entry) return;
+                                  navigateToOrderEntry(entry, idx);
+                                }}
+                                onOrderFilmstripDelete={(idx) => {
+                                  const entry = orderFilmstripEntries[idx];
+                                  if (!entry) return;
+                                  const sourceKey = String(entry.sourceKey || '');
+                                  const next = (orderAlbumItems || []).filter((item) => {
+                                    if (sourceKey && String(item.id) === sourceKey) return false;
+                                    // Fallback: match by note + page when sourceKey missing.
+                                    if (
+                                      item.kind === 'page' &&
+                                      Number(item.noteId) === Number(entry.noteId) &&
+                                      Math.max(0, Math.round(Number(item.pageIndex) || 0)) ===
+                                        Math.max(0, Math.round(Number(entry.pageIndex) || 0))
+                                    ) {
+                                      return false;
+                                    }
+                                    return true;
+                                  });
+                                  // Prefer remove by index among page-kind items when filter matched none uniquely.
+                                  if (next.length === orderAlbumItems.length) {
+                                    const pageItems = orderAlbumItems
+                                      .map((item, i) => ({ item, i }))
+                                      .filter(({ item }) => item.kind === 'page');
+                                    const hit = pageItems[idx];
+                                    if (hit) {
+                                      persistOrderAlbumItems(orderAlbumItems.filter((_, i) => i !== hit.i));
+                                      return;
+                                    }
+                                  }
+                                  persistOrderAlbumItems(next);
+                                }}
+                                header={null}
+                              />
+                              {lockedNow ? (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    zIndex: 5,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 1.5,
+                                    ...photoAlbumsThemeDaynightSurfaceSx,
+                                    textAlign: 'center',
+                                    px: 2
+                                  }}
+                                >
+                                  <Box component="img" src={innerEncryptOnImg} alt="" sx={{ width: 88, height: 88, display: 'block' }} />
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 900,
+                                      fontSize: { xs: '2rem', sm: '2.5rem' },
+                                      lineHeight: 1.15,
+                                      color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                                      WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
+                                    }}
+                                  >
+                                    This {lockedEntityLabel} is{' '}
+                                    <Box component="span" sx={{ color: '#e60000', WebkitTextFillColor: '#e60000' }}>
+                                      LOCKED
+                                    </Box>
+                                  </Typography>
+                                  <Box
+                                    component="button"
+                                    type="button"
+                                    onClick={() => {
+                                      if (notebookGateLocked && selectedNotebook) handleToggleNotebookLock(selectedNotebook);
+                                      else if (openNoteLocked) handleToggleNoteLock(selectedNote);
+                                      else if (selectedNotebook) handleToggleNotebookLock(selectedNotebook);
+                                    }}
+                                    disabled={busy || innerEncryptBusy}
+                                    sx={{
+                                      bgcolor: '#e60000',
+                                      color: 'var(--theme-yellow-color)',
+                                      fontWeight: 800,
+                                      fontSize: '1.1rem',
+                                      border: '2px solid #000',
+                                      borderRadius: 1,
+                                      px: 3,
+                                      py: 1,
+                                      cursor: 'pointer',
+                                      '&:hover': { filter: 'brightness(1.05)' }
+                                    }}
+                                  >
+                                    Unlock now
+                                  </Box>
+                                </Box>
+                              ) : null}
+                            </Box>
+                          </>
+                        );
+                      })()}
+                    </Box>
+                  ) : null}
+
+                  {/* Closed menus: no right-edge grab strip — reopen via the hamburger (☰). */}
+
+                  <PhotoAlbumsNoteInnerEncryptDialog
+                    open={innerEncryptDialog.open}
+                    mode={innerEncryptDialog.mode}
+                    scope={innerEncryptDialog.scope}
+                    noteName={selectedNote?.note_name || ''}
+                    busy={innerEncryptBusy}
+                    progressPercent={innerEncryptProgressPercent}
+                    progressLabel={innerEncryptProgressLabel}
+                    error={innerEncryptError}
+                    onSubmit={handleInnerEncryptSubmit}
+                    onClose={closeInnerEncryptDialog}
+                  />
+
+                  {rightMenuOpen && !hideWorkspaceChrome ? (
+                    <>
+                      {!compareMode ? (
+                        <ColumnResizeHandle
+                          label="Grab and slide to resize or tuck away the right menu"
+                          sx={{ display: { xs: 'none', md: 'block' } }}
+                          onMouseDown={(e) => startColumnResize('rightSidebar', e)}
+                        />
+                      ) : null}
+                      <Box
+                        ref={rightSidebarPaneRef}
+                        data-pa-right-swim-lane=""
+                        sx={{
+                          flex: compareMode ? '1 1 0' : '0 0 auto',
+                          width: compareMode ? { xs: '100%', md: 'auto' } : { xs: '100%', md: rightSidebarWidth },
+                          maxWidth: compareMode ? { xs: '100%', md: '50%' } : { xs: '100%', md: '50vw' },
+                          minWidth: compareMode ? { md: 0 } : undefined,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          bgcolor: 'var(--theme-daynight-color)',
+                          minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
+                          borderLeft: { md: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2 },
+                          overflow: 'hidden',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <Box
+                          ref={rightSidebarSplitRef}
+                          sx={{ flex: 1, minHeight: 0, p: compact ? 0.5 : 1, display: 'flex', flexDirection: 'column', gap: 0 }}
+                        >
+                          <Box
+                            sx={{
+                              ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                              flex: `${shortcutPanePercent} 1 0`,
+                              minHeight: compact ? 64 : 100,
+                              bgcolor: PHOTO_ALBUMS_THEME_DAYNIGHT_BG,
+                              color: PHOTO_ALBUMS_THEME_INVERSE_FG,
+                              WebkitTextFillColor: PHOTO_ALBUMS_THEME_INVERSE_FG
+                            }}
+                            onDragOver={(e) => {
+                              const fromLeft = isLeftSidebarDragEvent(e);
+                              if (fromLeft || draggingShortcutId != null) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
+                              const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
+                              const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
+                              if (!shortcutRaw && (notebookRaw || noteRaw || isLeftSidebarDragEvent(e))) {
+                                void handleShortcutDropFromLeft(e);
+                              }
+                            }}
+                          >
+                            <SliderControlButton
+                              type="button"
+                              fullWidth
+                              tabIndex={-1}
+                              aria-hidden
+                              disabled
+                              disableHoverScale
+                              sx={{
+                                mb: 1,
+                                pointerEvents: 'none',
+                                cursor: 'default',
+                                ...laneContainedButtonSx,
+                                borderRadius: '0 !important',
+                                ...themeDaynightSurfaceImportantSx,
+                                border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+                                '&.Mui-disabled': {
+                                  ...themeDaynightSurfaceImportantSx,
+                                  border: `${PHOTO_ALBUMS_THEME_INVERSE_BORDER_2} !important`
+                                }
+                              }}
+                            >
+                              Shortcut
+                            </SliderControlButton>
+                            <Typography
+                              sx={{
+                                fontSize: '0.85rem',
+                                mb: 1,
+                                color: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`,
+                                WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
+                              }}
+                            >
+                              Drag notebooks or notes here
+                            </Typography>
+                            <Box
+                              sx={photoAlbumsMenuListScrollSx}
+                              onDragOver={(e) => {
+                                const fromLeft = isLeftSidebarDragEvent(e);
+                                if (fromLeft || draggingShortcutId != null) {
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
+                                }
+                              }}
+                            >
+                              {shortcuts.map((shortcut) => {
+                                void innerUnlockVersion;
+                                let shortcutInnerLocked = false;
+                                const shortcutNotebook = notebooks.find((nb) => Number(nb.notebook_id) === Number(shortcut.notebook_id));
+                                if (shortcut?.target_type === 'notebook') {
+                                  shortcutInnerLocked = notebookInnerLockedForDisplay(shortcutNotebook?.notes || []);
+                                } else {
+                                  const linkedNote = (shortcutNotebook?.notes || []).find(
+                                    (n) => Number(n.note_id) === Number(shortcut.note_id)
+                                  );
+                                  shortcutInnerLocked = Boolean(
+                                    linkedNote &&
+                                    noteRequiresInnerPinToView(linkedNote) &&
+                                    !isInnerNoteUnlockedForDisplay(linkedNote.note_id, linkedNote)
+                                  );
+                                }
+                                const shortcutRealLabel = photoAlbumsShortcutMenuLabel(shortcut, {
+                                  selectedNoteId,
+                                  openNoteTitlePlain,
+                                  notebooks
+                                });
+                                const shortcutLabel = shortcutInnerLocked ? PHOTO_ALBUMS_INNER_LOCKED_LABEL : shortcutRealLabel;
+                                return (
+                                  <ShortcutMenuRow
+                                    key={shortcut.shortcut_id}
+                                    shortcut={shortcut}
+                                    label={shortcutLabel}
+                                    selected={isShortcutSelected(shortcut)}
+                                    locked={shortcutInnerLocked}
+                                    draggingId={draggingShortcutId}
+                                    dropTargetId={dropTargetShortcutId}
+                                    onSelect={() => handleShortcutClick(shortcut)}
+                                    onDragStart={(e, shortcutId) => handleDragStart(e, shortcutId, DRAG_SHORTCUT)}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={setDropTargetShortcutId}
+                                    onDrop={(e, toId) => void handleShortcutReorderDrop(e, toId)}
+                                    onDropFromLeft={(e) => void handleShortcutDropFromLeft(e)}
+                                    onDelete={() => void handleRemoveShortcut(shortcut.shortcut_id, shortcutRealLabel)}
+                                    deleteLabel={`Remove shortcut ${shortcutRealLabel}`}
+                                    onToggleLock={() => handleToggleShortcutLock(shortcut)}
+                                    lockTitle={shortcutInnerLocked ? 'Unlock (enter 6-digit PIN)' : 'Lock with a 6-digit PIN'}
+                                    disabled={busy}
+                                  />
+                                );
+                              })}
+                            </Box>
+                          </Box>
+                          <RowResizeHandle
+                            label={
+                              paneStorageType === 'tutadrive'
+                                ? 'Resize Shortcut and TutaCloud Folders & Files'
+                                : 'Resize Shortcut and USB Folders & Files'
+                            }
+                            onMouseDown={startShortcutPaneResize}
+                          />
+                          <Box
+                            sx={{
+                              flex: `${100 - shortcutPanePercent} 1 0`,
+                              minHeight: 80,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              overflow: 'hidden',
+                              gap: 0.5
+                            }}
+                          >
+                            <Box
+                              role="tablist"
+                              aria-label="Vault files and local Files Explorer"
+                              sx={{
+                                flexShrink: 0,
+                                display: 'flex',
+                                gap: 0.5,
+                                alignItems: 'stretch'
+                              }}
+                            >
+                              {[
+                                {
+                                  id: FILES_EXPLORER_TAB_FOLDERS,
+                                  label: paneStorageType === 'tutadrive' ? 'TutaCloud Folders & Files' : 'USB Folders & Files'
+                                },
+                                { id: FILES_EXPLORER_TAB_EXPLORER, label: 'Files Explorer' },
+                                { id: FILES_EXPLORER_TAB_MOBILE_UPLOAD, label: 'Mobile Upload' }
+                              ].map((tab) => {
+                                const selected = filesSidebarTab === tab.id;
+                                return (
+                                  <Box
+                                    key={tab.id}
+                                    component="button"
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={selected}
+                                    onClick={() => {
+                                      setFilesSidebarTab(tab.id);
+                                      writeFilesExplorerTab(tab.id);
+                                    }}
+                                    sx={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      cursor: 'pointer',
+                                      border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+                                      borderBottom: selected
+                                        ? `2px solid ${SLIDER_CONTROL_TRUE_YELLOW}`
+                                        : PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
+                                      borderRadius: '6px 6px 0 0',
+                                      bgcolor: selected ? SLIDER_CONTROL_TRUE_YELLOW : '#fff59d',
+                                      color: '#000',
+                                      WebkitTextFillColor: '#000',
+                                      fontWeight: selected ? 800 : 600,
+                                      fontSize: '0.72rem',
+                                      lineHeight: 1.2,
+                                      px: 0.5,
+                                      py: 0.4,
+                                      mb: selected ? '-2px' : 0,
+                                      zIndex: selected ? 1 : 0,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                  >
+                                    {tab.label}
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                            {filesSidebarTab === FILES_EXPLORER_TAB_EXPLORER ? (
+                              <PhotoAlbumsFilesExplorerPanel
+                                active={unlocked && filesSidebarTab === FILES_EXPLORER_TAB_EXPLORER}
+                                disabled={busy || !unlocked || Boolean(batchUploadProgress)}
+                                onStageOsFiles={(files) => handleStageOsFiles(files)}
+                                onStageTrayBusyChange={handleStageTrayBusyChange}
+                              />
+                            ) : filesSidebarTab === FILES_EXPLORER_TAB_MOBILE_UPLOAD ? (
+                              <PhotoAlbumsMobileUploadFolderPanel
+                                active={unlocked && filesSidebarTab === FILES_EXPLORER_TAB_MOBILE_UPLOAD}
+                                disabled={busy || !unlocked || Boolean(batchUploadProgress)}
+                                refreshToken={mobileUploadFolderRefreshToken}
+                                onStageOsFiles={(files) => handleStageOsFiles(files)}
+                                onStageTrayBusyChange={handleStageTrayBusyChange}
+                              />
+                            ) : (
+                              <PhotoAlbumsStorageFilesPanel storageType={paneStorageType || 'usb'} active={unlocked} hideTitle />
+                            )}
+                          </Box>
+                        </Box>
+                      </Box>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </Box>
           </Box>
-        </Box>
-      )}
-    </Box>
+        )}
+      </Box>
     </PhotoAlbumsSliderControlButtonProvider>
   );
 }
-

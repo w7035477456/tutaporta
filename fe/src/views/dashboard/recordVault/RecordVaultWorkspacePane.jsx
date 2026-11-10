@@ -1,3 +1,4 @@
+import { BUTTON_BACKGROUND_COLOR, BUTTON_BACKGROUND_HOVER_COLOR } from 'config/buttonBackgroundEnv';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
@@ -13,10 +14,7 @@ import SliderControlButton, {
 } from 'ui-component/SliderControlButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
-import {
-  MOBILE_UPLOAD_HOVER_TOOLTIP,
-  mobileUploadHoverTooltipSlotProps
-} from 'config/mobileUploadHoverTooltip';
+import { MOBILE_UPLOAD_HOVER_TOOLTIP, mobileUploadHoverTooltipSlotProps } from 'config/mobileUploadHoverTooltip';
 import {
   isRecordVaultUsbRequiredError,
   fetchRecordVaultStorageConfig,
@@ -32,19 +30,13 @@ import {
   fetchRecordVaultTutaDriveNeedsBackup,
   fetchRecordVaultStorageLogoffProgress
 } from 'api/recordVaultFe';
-import {
-  offerRecordVaultBackupBeforeExit,
-  registerRecordVaultExitBackupPrompt
-} from 'utils/recordVaultExitBackupGate';
+import { offerRecordVaultBackupBeforeExit, registerRecordVaultExitBackupPrompt } from 'utils/recordVaultExitBackupGate';
 import { useAuth } from 'contexts/AuthContext';
 import { themedAlert, themedConfirm } from 'utils/themedDialog';
 import { emptyEnexStats, enexImportSummaryMessage } from './recordVaultEnexImport';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import { fetchUploadLimits } from 'api/myPhotosFe';
-import {
-  isAllowedRecordVaultFile,
-  recordVaultUploadFileName
-} from 'utils/recordVaultFileFormats';
+import { isAllowedRecordVaultFile, recordVaultUploadFileName } from 'utils/recordVaultFileFormats';
 import {
   consumeMobileTutaNotesUploadPending,
   markMobileTutaNotesUploadSession,
@@ -55,10 +47,7 @@ import {
 import { useCompactLoginViewport } from 'config/compactLoginViewport';
 import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
 import RecordVaultSearchBar from './RecordVaultSearchBar';
-import {
-  normalizeMynoteFontSizeTenths,
-  recordVaultMenuButtonFontRemFromTenths,
-} from 'config/recordVaultMenuButtonFontEnv';
+import { normalizeMynoteFontSizeTenths, recordVaultMenuButtonFontRemFromTenths } from 'config/recordVaultMenuButtonFontEnv';
 import { getVaultDefaultButtonFontSizeRem } from 'config/vaultDefaultButtonFontSizeEnv';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
 import { RecordVaultSliderControlButtonProvider } from './RecordVaultSliderControlButtonContext';
@@ -69,15 +58,8 @@ import RecordVaultTutaCloudBackupDialog from './RecordVaultTutaCloudBackupDialog
 import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import RecordVaultRagDialog from './RecordVaultRagDialog';
 import TutaNotesRagCheckboxMark, { tutaNotesRagCheckboxButtonSx } from './TutaNotesRagCheckboxMark';
-import {
-  loadRecordVaultRagSelection,
-  saveRecordVaultRagSelection,
-  toggleRecordVaultRagSelection
-} from 'utils/recordVaultRagSelection';
-import {
-  loadRecordVaultRagKeepModelInMemory,
-  saveRecordVaultRagKeepModelInMemory
-} from 'utils/recordVaultRagKeepModel';
+import { loadRecordVaultRagSelection, saveRecordVaultRagSelection, toggleRecordVaultRagSelection } from 'utils/recordVaultRagSelection';
+import { loadRecordVaultRagKeepModelInMemory, saveRecordVaultRagKeepModelInMemory } from 'utils/recordVaultRagKeepModel';
 import { fetchRecordVaultRagStatus, setRecordVaultRagKeepModel } from 'api/recordVaultFe';
 import { formatRagModelButtonLabel } from 'utils/recordVaultRagModelDisplay';
 import { getRecordVaultOverageThrottleActive } from 'utils/recordVaultOverageThrottleUi';
@@ -99,9 +81,7 @@ import {
   isBillYearlyNoteId,
   isSelectableNoteId
 } from './billScheduleConstants';
-import RecordVaultNoteContentZoomBar, {
-  NOTE_CONTENT_ZOOM_DEFAULT
-} from './RecordVaultNoteContentZoomBar';
+import RecordVaultNoteContentZoomBar, { NOTE_CONTENT_ZOOM_DEFAULT } from './RecordVaultNoteContentZoomBar';
 import RecordVaultImageRotateButton from './RecordVaultImageRotateButton';
 import RecordVaultNoteAttachButton from './RecordVaultNoteAttachButton';
 import VaultWorkspaceFocusToggleButton from 'ui-component/VaultWorkspaceFocusToggleButton';
@@ -149,14 +129,9 @@ import {
   RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX,
   RECORD_VAULT_DEFAULT_TEXT_HIGHLIGHT_INDEX,
   RECORD_VAULT_FONT_STYLE_COUNT,
-  normalizeRecordVaultFontSizePt,
+  normalizeRecordVaultFontSizePt
 } from './recordVaultNoteFontTokens';
-import {
-  getIndexedNoteText,
-  indexNoteSearchText,
-  removeNoteSearchIndex,
-  searchIndexedNotes
-} from './recordVaultSearchIndex';
+import { getIndexedNoteText, indexNoteSearchText, removeNoteSearchIndex, searchIndexedNotes } from './recordVaultSearchIndex';
 import {
   buildRecordVaultRecentNoteSlots,
   recordVaultRecentScopeKey,
@@ -190,7 +165,7 @@ import {
   cleanRecordVaultNoteBodyHtml,
   realignBodyAttachmentBlocks,
   recordVaultRichTextHasContent,
-  stripRecordVaultHtml,
+  stripRecordVaultHtml
 } from 'utils/recordVaultRichText';
 import ThumbnailDeleteXButton from 'ui-component/ThumbnailDeleteXButton';
 import {
@@ -291,7 +266,7 @@ async function collectTopLevelHtmlFilesFromDirectoryEntry(dirEntry) {
   const files = [];
   for (const entry of entries) {
     if (!entry?.isFile || !isHtmlImportFileName(entry.name)) continue;
-    // eslint-disable-next-line no-await-in-loop
+
     files.push(await fileFromFileEntry(entry));
   }
   return files;
@@ -313,7 +288,6 @@ async function parseFolderHtmlImportsFromDataTransfer(dataTransfer) {
   if (dirEntries.length) {
     const out = [];
     for (const dir of dirEntries) {
-      // eslint-disable-next-line no-await-in-loop
       const files = await collectTopLevelHtmlFilesFromDirectoryEntry(dir);
       if (!files.length) continue;
       const folderName = String(dir.name || 'IMPORTED').trim() || 'IMPORTED';
@@ -541,11 +515,12 @@ const menuButtonWordPerLineLabelSx = {
  */
 const menuButtonSx = {
   fontFamily: MAIN_FONT_FAMILY,
-  width: 'auto !important',
+  // Every row fills the full slot between lock + X, so all rows match the widest (column width).
+  width: '100% !important',
   maxWidth: '100%',
   minWidth: 0,
-  flex: '0 1 auto',
-  alignSelf: 'center',
+  flex: '1 1 auto',
+  alignSelf: 'stretch',
   display: 'inline-flex !important',
   flexDirection: 'column !important',
   justifyContent: 'center',
@@ -612,12 +587,10 @@ function renderTitleWithSearchHighlight(title, terms, hitClassName = 'rv-search-
   if (parts.length <= 1) return text;
   return parts.map((part, i) =>
     i % 2 === 1 ? (
-      // eslint-disable-next-line react/no-array-index-key
       <mark key={i} className={hitClassName}>
         {part}
       </mark>
     ) : (
-      // eslint-disable-next-line react/no-array-index-key
       <span key={i}>{part}</span>
     )
   );
@@ -628,7 +601,9 @@ function titleMatchesSearchTerms(title, terms) {
   const text = String(title ?? '').toLowerCase();
   if (!text) return false;
   return (Array.isArray(terms) ? terms : []).some((t) => {
-    const needle = String(t ?? '').trim().toLowerCase();
+    const needle = String(t ?? '')
+      .trim()
+      .toLowerCase();
     return needle && text.includes(needle);
   });
 }
@@ -750,14 +725,6 @@ function loadStoredNoteFontSizePt() {
   return RECORD_VAULT_DEFAULT_FONT_SIZE_PT;
 }
 
-
-
-
-
-
-
-
-
 const recordVaultContentScrollSx = {
   flex: 1,
   minHeight: 0,
@@ -785,8 +752,6 @@ const recordVaultMenuListScrollSx = {
   ...recordVaultContentScrollSx,
   pr: 0.25
 };
-
-
 
 /** One text row between title↔photo and photo↔photo (grows if the user types more). */
 
@@ -860,7 +825,6 @@ function renderMenuLabelOneWordPerLine(label) {
     <Box component="span" sx={menuButtonWordPerLineLabelSx}>
       {words.map((word, index) => (
         <Box
-          // eslint-disable-next-line react/no-array-index-key
           key={`${word}-${index}`}
           component="span"
           data-menu-label-word=""
@@ -918,9 +882,7 @@ function measureLaneFitDeltaPx(laneEl) {
     const button = slot.firstElementChild;
     if (!button) return;
     const words = button.querySelectorAll('[data-menu-label-word]');
-    const textWidth = words.length
-      ? Math.max(...Array.from(words, measureTextWidthPx))
-      : measureTextWidthPx(button);
+    const textWidth = words.length ? Math.max(...Array.from(words, measureTextWidthPx)) : measureTextWidthPx(button);
     const needed = textWidth + horizontalChromePx(button);
     const diff = needed - slot.clientWidth;
     delta = delta == null ? diff : Math.max(delta, diff);
@@ -938,8 +900,6 @@ function computeNotebookColFitWidth(notebooks, rem = getVaultDefaultButtonFontSi
   const chromePx = 64;
   return Math.max(MIN_MENU_COL_WIDTH, Math.ceil(maxWord + chromePx));
 }
-
-
 
 function reorderById(items, fromId, toId, idKey) {
   const fromIdx = items.findIndex((item) => Number(item[idKey]) === Number(fromId));
@@ -968,15 +928,6 @@ function isLeftSidebarDragEvent(event) {
   return types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_NOTE);
 }
 
-
-
-
-
-
-
-
-
-
 function stripNoteHeavyFields(note) {
   if (!note) return note;
   return {
@@ -999,17 +950,6 @@ function recordVaultHtmlHasProtectableContent(html) {
   if (recordVaultRichTextHasContent(raw)) return true;
   return /<img\b|<iframe\b|<video\b|<audio\b|data:(?:image|video|audio|application)\//i.test(raw);
 }
-
-
-
-
-
-
-
-
-
-
-
 
 const searchNavButtonSx = {
   width: 26,
@@ -1071,7 +1011,8 @@ const menuRowEditFieldSx = {
 
 /** Selected notebook / note / shortcut row (hard RGB — Minimal Palete remaps the theme vars). */
 const MENU_ROW_CURRENT_GREEN = '#60C446';
-const MENU_ROW_IDLE_GREY = '#9e9e9e';
+/** Idle row fill — fe/.env BUTTON_BACKGROUND_COLOR (hover: BUTTON_BACKGROUND_HOVER_COLOR). */
+const MENU_ROW_IDLE_GREY = BUTTON_BACKGROUND_COLOR;
 const MENU_ROW_CURRENT_CLASS = 'rv-menu-row-current';
 const MENU_ROW_IDLE_CLASS = 'rv-menu-row-idle';
 
@@ -1101,11 +1042,14 @@ const menuRowCurrentGreenGlobalStyles = {
     WebkitTextFillColor: '#000000 !important',
     border: '4px solid #000000 !important'
   },
-  [`button.${MENU_ROW_IDLE_CLASS}:hover, div.${MENU_ROW_IDLE_CLASS}[role="button"]:hover`]: {
-    backgroundColor: `${MENU_ROW_IDLE_GREY} !important`,
-    color: '#000000 !important',
-    WebkitTextFillColor: '#000000 !important'
-  }
+  // :root + :not() lift specificity above SliderControlButton's forced-fill hover rule.
+  [`:root button.${MENU_ROW_IDLE_CLASS}:hover:not(.Mui-disabled), :root div.${MENU_ROW_IDLE_CLASS}[role="button"]:hover:not(.Mui-disabled)`]:
+    {
+      backgroundColor: `${BUTTON_BACKGROUND_HOVER_COLOR} !important`,
+      backgroundImage: 'none !important',
+      color: '#000000 !important',
+      WebkitTextFillColor: '#000000 !important'
+    }
 };
 
 function MenuRowWithDelete({
@@ -1171,12 +1115,7 @@ function MenuRowWithDelete({
           onMouseDown={(e) => e.stopPropagation()}
           sx={menuRowLockButtonSx}
         >
-          <Box
-            component="img"
-            src={locked ? redLockImg : greenUnlockImg}
-            alt=""
-            sx={{ width: 27, height: 27, display: 'block' }}
-          />
+          <Box component="img" src={locked ? redLockImg : greenUnlockImg} alt="" sx={{ width: 27, height: 27, display: 'block' }} />
         </Box>
       ) : null}
       <Box
@@ -1226,13 +1165,7 @@ function MenuRowButton({
   // Search hit on the open note: blue. Otherwise current notebook/note/Monthly/Yearly: green.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
   const currentGreen = Boolean(lookSelected && !locked && !searchHitBlue);
-  const rowClass = locked
-    ? undefined
-    : currentGreen
-      ? MENU_ROW_CURRENT_CLASS
-      : searchHitBlue
-        ? undefined
-        : MENU_ROW_IDLE_CLASS;
+  const rowClass = locked ? undefined : currentGreen ? MENU_ROW_CURRENT_CLASS : searchHitBlue ? undefined : MENU_ROW_IDLE_CLASS;
   // Hard RGB via forceBgcolor (last in SliderControlButton merge) + GlobalStyles class.
   // Never selected={true} (theme-secondary). Never aria-pressed for color.
   const forceBg = searchHitBlue
@@ -1316,52 +1249,49 @@ function ShortcutMenuRow({
       lockTitle={lockTitle}
       locked={locked}
     >
-      <Box
-        data-menu-label-slot=""
-        sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
-      >
-      <MenuRowButton
-        selected={selected}
-        locked={locked}
-        draggable={!disabled}
-        title={locked ? 'Locked — enter PIN to open' : 'Drag to reorder; click to open'}
-        onClick={onSelect}
-        onDragStart={(e) => {
-          if (disabled) {
+      <Box data-menu-label-slot="" sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+        <MenuRowButton
+          selected={selected}
+          locked={locked}
+          draggable={!disabled}
+          title={locked ? 'Locked — enter PIN to open' : 'Drag to reorder; click to open'}
+          onClick={onSelect}
+          onDragStart={(e) => {
+            if (disabled) {
+              e.preventDefault();
+              return;
+            }
+            onDragStart(e, id);
+          }}
+          onDragEnd={onDragEnd}
+          onDragOver={(e) => {
+            const fromLeft = isLeftSidebarDragEvent(e);
+            if (draggingId != null || fromLeft) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = draggingId != null ? 'move' : 'copy';
+              if (draggingId != null) onDragOver(id);
+            }
+          }}
+          onDrop={(e) => {
             e.preventDefault();
-            return;
+            e.stopPropagation();
+            const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
+            const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
+            const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
+            if (shortcutRaw) onDrop(e, id);
+            else if (notebookRaw || noteRaw) onDropFromLeft(e);
+          }}
+          sx={
+            isDropTarget
+              ? {
+                  outline: '2px dashed var(--theme-primary-color)',
+                  outlineOffset: 2
+                }
+              : undefined
           }
-          onDragStart(e, id);
-        }}
-        onDragEnd={onDragEnd}
-        onDragOver={(e) => {
-          const fromLeft = isLeftSidebarDragEvent(e);
-          if (draggingId != null || fromLeft) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = draggingId != null ? 'move' : 'copy';
-            if (draggingId != null) onDragOver(id);
-          }
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
-          const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
-          const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
-          if (shortcutRaw) onDrop(e, id);
-          else if (notebookRaw || noteRaw) onDropFromLeft(e);
-        }}
-        sx={
-          isDropTarget
-            ? {
-                outline: '2px dashed var(--theme-primary-color)',
-                outlineOffset: 2
-              }
-            : undefined
-        }
-      >
-        {renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
-      </MenuRowButton>
+        >
+          {renderMenuLabelOneWordPerLine(label ?? shortcut.label)}
+        </MenuRowButton>
       </Box>
     </MenuRowWithDelete>
   );
@@ -1423,12 +1353,9 @@ function RenamableDraggableMenuRow({
     return () => window.clearTimeout(timerId);
   }, [editing]);
 
-  const acceptsDrop =
-    draggingId != null || alternateDraggingId != null || noteImageDropActive || acceptForeignDrop;
+  const acceptsDrop = draggingId != null || alternateDraggingId != null || noteImageDropActive || acceptForeignDrop;
   const isDropTarget =
-    acceptsDrop &&
-    dropTargetId === id &&
-    (noteImageDropActive || acceptForeignDrop || (draggingId !== id && alternateDraggingId !== id));
+    acceptsDrop && dropTargetId === id && (noteImageDropActive || acceptForeignDrop || (draggingId !== id && alternateDraggingId !== id));
 
   const handleRenameBlur = (event) => {
     const next = event.relatedTarget;
@@ -1517,22 +1444,14 @@ function RenamableDraggableMenuRow({
       onToggleRag={onToggleRag}
       ragDisabled={ragDisabled}
     >
-      <Box
-        id={domId || undefined}
-        data-menu-label-slot=""
-        sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}
-      >
+      <Box id={domId || undefined} data-menu-label-slot="" sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
         <MenuRowButton
           selected={selected}
           selectedBlue={selectedBlue}
           multiSelected={multiSelected}
           locked={locked}
           draggable={!disabled}
-          title={
-            locked
-              ? 'Locked — enter PIN to view'
-              : buttonTitle || dragTitle || 'Drag to reorder; double-click to rename'
-          }
+          title={locked ? 'Locked — enter PIN to view' : buttonTitle || dragTitle || 'Drag to reorder; double-click to rename'}
           onPointerDown={handleRowPointerDown}
           onPointerUp={handleRowPointerUp}
           onClick={(e) => {
@@ -1580,8 +1499,7 @@ function RenamableDraggableMenuRow({
               types.includes(DRAG_NOTE) ||
               types.includes(DRAG_SHORTCUT) ||
               types.includes(DRAG_CROSS_PANE);
-            const isOsFile =
-              !isInternalVaultDrag && e.dataTransfer?.files && e.dataTransfer.files.length > 0;
+            const isOsFile = !isInternalVaultDrag && e.dataTransfer?.files && e.dataTransfer.files.length > 0;
             if (isOsFile && onFileDrop) {
               e.preventDefault();
               e.stopPropagation();
@@ -1603,11 +1521,7 @@ function RenamableDraggableMenuRow({
               : null
           }
         >
-          {locked ? (
-            RECORD_VAULT_INNER_LOCKED_LABEL
-          ) : (
-            renderMenuLabelOneWordPerLine(label)
-          )}
+          {locked ? RECORD_VAULT_INNER_LOCKED_LABEL : renderMenuLabelOneWordPerLine(label)}
         </MenuRowButton>
       </Box>
     </MenuRowWithDelete>
@@ -1615,14 +1529,6 @@ function RenamableDraggableMenuRow({
 }
 
 /** Content-pane copy of menu notebook/note buttons — click to rename; stays in sync with the menu. */
-
-
-
-
-
-
-
-
 
 /** Splits v2 / legacy notes into title↔photo / photo↔photo text segments. */
 
@@ -1741,10 +1647,7 @@ export default function RecordVaultWorkspacePane({
     };
   }, [ragUiEnabled, unlocked, paneStorageType, ragDialogOpen]);
 
-  const ragModelButtonLabel = useMemo(
-    () => formatRagModelButtonLabel(ragConfiguredModel),
-    [ragConfiguredModel]
-  );
+  const ragModelButtonLabel = useMemo(() => formatRagModelButtonLabel(ragConfiguredModel), [ragConfiguredModel]);
 
   const handleToggleRagNote = useCallback(
     (noteId, selected) => {
@@ -1768,9 +1671,7 @@ export default function RecordVaultWorkspacePane({
       saveRecordVaultRagKeepModelInMemory(prev);
       const message = readRecordVaultApiError(err, 'Keep-model toggle failed');
       console.error('[RAG keep-model]', message);
-      setRagKeepModelNotice(
-        `${message}\n\nIf you recently updated code: restart ./scripts/start-rag-service.sh and beall.`
-      );
+      setRagKeepModelNotice(`${message}\n\nIf you recently updated code: restart ./scripts/start-rag-service.sh and beall.`);
     } finally {
       setRagKeepModelBusy(false);
     }
@@ -1792,7 +1693,7 @@ export default function RecordVaultWorkspacePane({
       while (importSuccessQueueRef.current.length) {
         const next = importSuccessQueueRef.current.shift();
         setImportSuccessPopup(next.text);
-        // eslint-disable-next-line no-await-in-loop
+
         await new Promise((resolve) => {
           if (importSuccessWaitRef.current) window.clearTimeout(importSuccessWaitRef.current);
           importSuccessWaitRef.current = window.setTimeout(() => {
@@ -1933,9 +1834,7 @@ export default function RecordVaultWorkspacePane({
   );
   const [shortcutPanePercent, setShortcutPanePercent] = useState(() =>
     clamp(
-      Number.isFinite(storedLayout?.shortcutPanePercent)
-        ? storedLayout.shortcutPanePercent
-        : DEFAULT_SHORTCUT_PANE_PERCENT,
+      Number.isFinite(storedLayout?.shortcutPanePercent) ? storedLayout.shortcutPanePercent : DEFAULT_SHORTCUT_PANE_PERCENT,
       MIN_SHORTCUT_PANE_PERCENT,
       MAX_SHORTCUT_PANE_PERCENT
     )
@@ -2033,9 +1932,7 @@ export default function RecordVaultWorkspacePane({
 
   const selectedNotebook = useMemo(() => {
     if (isBillScheduleNotebookId(selectedNotebookId)) return billScheduleNotebook;
-    return (
-      displayNotebooks.find((nb) => Number(nb.notebook_id) === Number(selectedNotebookId)) ?? null
-    );
+    return displayNotebooks.find((nb) => Number(nb.notebook_id) === Number(selectedNotebookId)) ?? null;
   }, [billScheduleNotebook, displayNotebooks, selectedNotebookId]);
 
   const selectedNote = useMemo(() => {
@@ -2061,9 +1958,7 @@ export default function RecordVaultWorkspacePane({
 
   /** Keep the ref in sync immediately (dragstart can run before the effect). */
   const replaceMultiSelectedNoteIds = useCallback((ids) => {
-    const cleaned = (Array.isArray(ids) ? ids : [])
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id) && id >= 1);
+    const cleaned = (Array.isArray(ids) ? ids : []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id >= 1);
     multiSelectedNoteIdsRef.current = cleaned;
     setMultiSelectedNoteIds(cleaned);
   }, []);
@@ -2092,14 +1987,10 @@ export default function RecordVaultWorkspacePane({
   const resolveDraggedNoteIds = useCallback(
     (draggedId) => {
       const grabbed = Number(draggedId);
-      const multi = (multiSelectedNoteIdsRef.current || [])
-        .map(Number)
-        .filter((nid) => Number.isFinite(nid) && nid >= 1);
+      const multi = (multiSelectedNoteIdsRef.current || []).map(Number).filter((nid) => Number.isFinite(nid) && nid >= 1);
       if (multi.length > 1) {
         const notes = selectedNotebook?.notes || [];
-        const ordered = notes
-          .map((n) => Number(n.note_id))
-          .filter((nid) => multi.includes(nid));
+        const ordered = notes.map((n) => Number(n.note_id)).filter((nid) => multi.includes(nid));
         return ordered.length ? ordered : multi;
       }
       if (Number.isFinite(grabbed) && grabbed >= 1) return [grabbed];
@@ -2124,33 +2015,29 @@ export default function RecordVaultWorkspacePane({
     noteFontSizePtRef.current = noteFontSizePt;
   }, [noteFontSizePt]);
 
-  const scheduleSaveMynotePrefs = useCallback(
-    (partial = {}) => {
-      if (mynotePrefsSaveTimerRef.current) {
-        window.clearTimeout(mynotePrefsSaveTimerRef.current);
-      }
-      const mergedPartial = { ...partial };
-      mynotePrefsSaveTimerRef.current = window.setTimeout(() => {
-        mynotePrefsSaveTimerRef.current = null;
-        const patch = {
-          mynoteLastNotebookId: selectedNotebookIdRef.current,
-          mynoteLastNoteId: selectedNoteIdRef.current,
-          mynoteContentBgIndex: noteContentBgIndexRef.current,
-          mynoteFontColorIndex: noteFontStyleIndexRef.current,
-          mynoteTextHighlightIndex: noteTextBgIndexRef.current,
-          mynoteEditorFontSizePt: noteFontSizePtRef.current,
-          mynoteNoteScrollTop: contentScrollRef.current?.scrollTop ?? 0,
-          mynoteEditorCaretPos: null,
-          ...mergedPartial
-        };
-        void saveUserCustomization(patch).catch(() => {
-          // ignore — local UI already updated
-        });
-      }, 400);
-    },
-    []
-  );
-
+  const scheduleSaveMynotePrefs = useCallback((partial = {}) => {
+    if (mynotePrefsSaveTimerRef.current) {
+      window.clearTimeout(mynotePrefsSaveTimerRef.current);
+    }
+    const mergedPartial = { ...partial };
+    mynotePrefsSaveTimerRef.current = window.setTimeout(() => {
+      mynotePrefsSaveTimerRef.current = null;
+      const patch = {
+        mynoteLastNotebookId: selectedNotebookIdRef.current,
+        mynoteLastNoteId: selectedNoteIdRef.current,
+        mynoteContentBgIndex: noteContentBgIndexRef.current,
+        mynoteFontColorIndex: noteFontStyleIndexRef.current,
+        mynoteTextHighlightIndex: noteTextBgIndexRef.current,
+        mynoteEditorFontSizePt: noteFontSizePtRef.current,
+        mynoteNoteScrollTop: contentScrollRef.current?.scrollTop ?? 0,
+        mynoteEditorCaretPos: null,
+        ...mergedPartial
+      };
+      void saveUserCustomization(patch).catch(() => {
+        // ignore — local UI already updated
+      });
+    }, 400);
+  }, []);
 
   // Search UI (Found chips, in-note highlights) stays off until Search is pressed.
   const searchActive = searchResults !== null;
@@ -2166,13 +2053,10 @@ export default function RecordVaultWorkspacePane({
     [activeSearchTerms, noteSearchActiveTerms]
   );
   const titleHasHighlight =
-    !titleEditing &&
-    titleMatchesSearchTerms(openNoteTitlePlain, titleHighlightTerms) &&
-    (searchActive || noteSearchActiveTerms.length > 0);
+    !titleEditing && titleMatchesSearchTerms(openNoteTitlePlain, titleHighlightTerms) && (searchActive || noteSearchActiveTerms.length > 0);
   // Blink the title with the in-note color when only the in-note box is active,
   // and with the vault-search color when the vault-wide search is running.
-  const titleHighlightClass =
-    !searchActive && noteSearchActiveTerms.length > 0 ? 'rv-note-search-hit' : 'rv-search-hit';
+  const titleHighlightClass = !searchActive && noteSearchActiveTerms.length > 0 ? 'rv-note-search-hit' : 'rv-search-hit';
 
   // Search never prunes the tree: every notebook (and every note) stays visible on
   // the left. A match is shown by selection styling — containing notebook stays green
@@ -2180,38 +2064,41 @@ export default function RecordVaultWorkspacePane({
   // full notebook list while jumping between hits.
   // Bill Schedule lives in a separate bottom box (not in displayNotebooks).
 
-  const loadNoteContent = useCallback(async (noteId) => {
-    const id = Number(noteId);
-    if (!Number.isFinite(id) || id < 1) return;
-    if (isBillScheduleSystemId(id)) return;
-    const onTransferProgress = (payload) => {
-      const pct = Math.max(0, Math.min(100, Math.round(Number(payload?.percent) || 0)));
-      if (pct > 0) setNoteLoadProgressPercent(pct);
-      const text = buildVaultTransferProgressLabel(payload);
-      if (text) setNoteLoadProgressLabel(text);
-    };
-    const note = await vaultApi.fetchRecordVaultNote(id, { onTransferProgress });
-    if (!note) throw new Error('Note not found');
-    if (getRecordVaultOverageThrottleActive()) {
-      await waitForVaultTransferThrottleTail({
-        onProgress: (payload) => {
-          const pct = Math.max(0, Math.min(99, Math.round(Number(payload?.percent) || 0)));
-          if (pct > 0) setNoteLoadProgressPercent(pct);
-          const text = buildVaultTransferProgressLabel(payload);
-          if (text) setNoteLoadProgressLabel(text);
-        }
-      });
-    }
-    setNotebooks((prev) =>
-      prev.map((nb) => ({
-        ...nb,
-        notes: (nb.notes || []).map((row) => {
-          if (Number(row.note_id) === id) return { ...row, ...note, content_loaded: true };
-          return stripNoteHeavyFields(row);
-        })
-      }))
-    );
-  }, [vaultApi]);
+  const loadNoteContent = useCallback(
+    async (noteId) => {
+      const id = Number(noteId);
+      if (!Number.isFinite(id) || id < 1) return;
+      if (isBillScheduleSystemId(id)) return;
+      const onTransferProgress = (payload) => {
+        const pct = Math.max(0, Math.min(100, Math.round(Number(payload?.percent) || 0)));
+        if (pct > 0) setNoteLoadProgressPercent(pct);
+        const text = buildVaultTransferProgressLabel(payload);
+        if (text) setNoteLoadProgressLabel(text);
+      };
+      const note = await vaultApi.fetchRecordVaultNote(id, { onTransferProgress });
+      if (!note) throw new Error('Note not found');
+      if (getRecordVaultOverageThrottleActive()) {
+        await waitForVaultTransferThrottleTail({
+          onProgress: (payload) => {
+            const pct = Math.max(0, Math.min(99, Math.round(Number(payload?.percent) || 0)));
+            if (pct > 0) setNoteLoadProgressPercent(pct);
+            const text = buildVaultTransferProgressLabel(payload);
+            if (text) setNoteLoadProgressLabel(text);
+          }
+        });
+      }
+      setNotebooks((prev) =>
+        prev.map((nb) => ({
+          ...nb,
+          notes: (nb.notes || []).map((row) => {
+            if (Number(row.note_id) === id) return { ...row, ...note, content_loaded: true };
+            return stripNoteHeavyFields(row);
+          })
+        }))
+      );
+    },
+    [vaultApi]
+  );
 
   const noteHasInnerEncryption = useCallback((note) => {
     if (!note) return false;
@@ -2219,18 +2106,15 @@ export default function RecordVaultWorkspacePane({
   }, []);
 
   /** Note still needs a PIN before content can be read/edited. */
-  const noteRequiresInnerPinToView = useCallback(
-    (note) => {
-      if (!note) return false;
-      const bodyEncrypted = isRecordVaultInnerEncryptedBody(note.body_text);
-      const flagOn = Boolean(note.inner_encrypt_enabled);
-      if (!flagOn && !bodyEncrypted) return false;
-      // Stale flag: body already plaintext on disk — do not show locked chrome.
-      if (note.content_loaded && note.body_text != null && !bodyEncrypted) return false;
-      return flagOn || bodyEncrypted;
-    },
-    []
-  );
+  const noteRequiresInnerPinToView = useCallback((note) => {
+    if (!note) return false;
+    const bodyEncrypted = isRecordVaultInnerEncryptedBody(note.body_text);
+    const flagOn = Boolean(note.inner_encrypt_enabled);
+    if (!flagOn && !bodyEncrypted) return false;
+    // Stale flag: body already plaintext on disk — do not show locked chrome.
+    if (note.content_loaded && note.body_text != null && !bodyEncrypted) return false;
+    return flagOn || bodyEncrypted;
+  }, []);
 
   const isInnerNoteUnlocked = useCallback((noteId) => {
     const id = Number(noteId);
@@ -2256,16 +2140,12 @@ export default function RecordVaultWorkspacePane({
       // still needs a PIN. Locking a single note must not gate the whole notebook —
       // the other notes stay visible and only the locked note shows as *****.
       if (!notes.length) return false;
-      return notes.every(
-        (n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id, n)
-      );
+      return notes.every((n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id, n));
     },
     [isInnerNoteUnlockedForDisplay, noteRequiresInnerPinToView]
   );
 
   const bumpInnerUnlock = useCallback(() => setInnerUnlockVersion((v) => v + 1), []);
-
-
 
   const clearInnerUnlockForNote = useCallback(
     (noteId) => {
@@ -2277,7 +2157,6 @@ export default function RecordVaultWorkspacePane({
     [bumpInnerUnlock]
   );
 
-
   /** Patch a single note row anywhere in the notebook tree. */
   const patchNoteRowInTree = useCallback((noteId, patch) => {
     const id = Number(noteId);
@@ -2285,9 +2164,7 @@ export default function RecordVaultWorkspacePane({
     setNotebooks((prev) =>
       prev.map((nb) => ({
         ...nb,
-        notes: (nb.notes || []).map((row) =>
-          Number(row.note_id) === id ? { ...row, ...patch } : row
-        )
+        notes: (nb.notes || []).map((row) => (Number(row.note_id) === id ? { ...row, ...patch } : row))
       }))
     );
   }, []);
@@ -2329,8 +2206,7 @@ export default function RecordVaultWorkspacePane({
       // get locked. Note-scope lock still requires real content to protect —
       // either body text/media OR at least one dropped file attachment (which the
       // locked view hides behind the PIN too).
-      const hasAttachments =
-        Array.isArray(noteRow?.attachments) && noteRow.attachments.length > 0;
+      const hasAttachments = Array.isArray(noteRow?.attachments) && noteRow.attachments.length > 0;
       if (!force && !hasAttachments && !recordVaultHtmlHasProtectableContent(plainHtml)) {
         return null;
       }
@@ -2446,19 +2322,16 @@ export default function RecordVaultWorkspacePane({
     [notebooks]
   );
 
-  const openInnerEncryptDialog = useCallback(
-    (mode, scope, { noteId = null, notebookId = null } = {}) => {
-      setInnerEncryptError('');
-      setInnerEncryptDialog({
-        open: true,
-        mode,
-        scope,
-        noteId: Number(noteId) || null,
-        notebookId: Number(notebookId) || null
-      });
-    },
-    []
-  );
+  const openInnerEncryptDialog = useCallback((mode, scope, { noteId = null, notebookId = null } = {}) => {
+    setInnerEncryptError('');
+    setInnerEncryptDialog({
+      open: true,
+      mode,
+      scope,
+      noteId: Number(noteId) || null,
+      notebookId: Number(notebookId) || null
+    });
+  }, []);
 
   const closeInnerEncryptDialog = useCallback(() => {
     if (innerEncryptBusy) return;
@@ -2526,10 +2399,7 @@ export default function RecordVaultWorkspacePane({
         const timedOut = /taking too long/i.test(String(syncErr?.message || ''));
         if (showErrorOnFail && !timedOut) {
           setInnerEncryptError(
-            readRecordVaultApiError(
-              syncErr,
-              'Note locked locally, but Cloud sync failed. Click Log off Cloud to save, then reopen.'
-            )
+            readRecordVaultApiError(syncErr, 'Note locked locally, but Cloud sync failed. Click Log off Cloud to save, then reopen.')
           );
           return { ok: false, timedOut: false };
         }
@@ -2554,8 +2424,7 @@ export default function RecordVaultWorkspacePane({
       const id = Number(noteId);
       const notebookScope = innerEncryptDialog.scope === 'notebook';
       const scopeNotebook = notebookScope
-        ? notebooks.find((nb) => Number(nb.notebook_id) === Number(innerEncryptDialog.notebookId)) ||
-          findNoteRowById(id).notebook
+        ? notebooks.find((nb) => Number(nb.notebook_id) === Number(innerEncryptDialog.notebookId)) || findNoteRowById(id).notebook
         : null;
       const siblingNotes = notebookScope ? scopeNotebook?.notes || [] : [];
       const busyVerb = mode === 'unlock' ? 'Decrypting' : 'Encrypting';
@@ -2589,8 +2458,7 @@ export default function RecordVaultWorkspacePane({
               const progressLabel = `${busyVerb} note ${i + 1} of ${lockTargets.length}: ${noteProgressName(row, rid)}`;
               // Paint "note N of M: name" at the previous % before Argon2 blocks the main thread.
               await reportInnerEncryptProgress(i, totalNotes, progressLabel, progressOpts);
-              const override =
-                rid === Number(selectedNote?.note_id) ? getCurrentNoteHtml() : null;
+              const override = rid === Number(selectedNote?.note_id) ? getCurrentNoteHtml() : null;
               // force: lock every note in the notebook (even empty ones) so all
               // note names are hidden and the whole notebook gates as one unit.
               const res = await encryptOneNoteWithPin(row, pin, override, { force: true });
@@ -2598,9 +2466,7 @@ export default function RecordVaultWorkspacePane({
               await reportInnerEncryptProgress(i + 1, totalNotes, progressLabel, progressOpts);
             }
             if (!lockedAny) {
-              setInnerEncryptError(
-                'Notebook has no notes to protect. Add a note first, then try again.'
-              );
+              setInnerEncryptError('Notebook has no notes to protect. Add a note first, then try again.');
               return false;
             }
             const syncResult = await flushTutaCloudAfterInnerPin({
@@ -2615,15 +2481,10 @@ export default function RecordVaultWorkspacePane({
             const targetNote = findNoteRowById(id).note || selectedNote;
             const singleLabel = `${busyVerb}: ${noteProgressName(targetNote, id)}`;
             await reportInnerEncryptProgress(0, 1, singleLabel, progressOpts);
-            const override =
-              Number(targetNote?.note_id) === Number(selectedNote?.note_id)
-                ? getCurrentNoteHtml()
-                : null;
+            const override = Number(targetNote?.note_id) === Number(selectedNote?.note_id) ? getCurrentNoteHtml() : null;
             const res = await encryptOneNoteWithPin(targetNote, pin, override);
             if (res == null) {
-              setInnerEncryptError(
-                'Note has nothing to protect. Add text, a photo, or a file first, then try again.'
-              );
+              setInnerEncryptError('Note has nothing to protect. Add text, a photo, or a file first, then try again.');
               return false;
             }
             await reportInnerEncryptProgress(1, 1, singleLabel, progressOpts);
@@ -2641,11 +2502,7 @@ export default function RecordVaultWorkspacePane({
         }
 
         if (mode === 'unlock') {
-          const targetRow =
-            (notebookScope
-              ? siblingNotes.find((n) => Number(n.note_id) === id)
-              : findNoteRowById(id).note) ||
-            selectedNote;
+          const targetRow = (notebookScope ? siblingNotes.find((n) => Number(n.note_id) === id) : findNoteRowById(id).note) || selectedNote;
           const until = resolveInnerUnlockLockedUntilMs({
             storageType: paneStorageType,
             singlesId: user?.singles_id,
@@ -2655,9 +2512,7 @@ export default function RecordVaultWorkspacePane({
           const waitSec = remainingInnerUnlockLockoutSeconds(until);
           if (waitSec > 0) {
             setInnerUnlockCooldownSec(waitSec);
-            setInnerEncryptError(
-              `Wait ${formatInnerUnlockLockoutLabel(waitSec)} before trying again.`
-            );
+            setInnerEncryptError(`Wait ${formatInnerUnlockLockoutLabel(waitSec)} before trying again.`);
             return false;
           }
           if (notebookScope) {
@@ -2767,9 +2622,7 @@ export default function RecordVaultWorkspacePane({
       const notes = notebook.notes || [];
       const nbId = Number(notebook.notebook_id);
       if (notebookInnerLockedForDisplay(notes)) {
-        const target = notes.find(
-          (n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlocked(n.note_id)
-        );
+        const target = notes.find((n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlocked(n.note_id));
         openInnerEncryptDialog('unlock', 'notebook', {
           noteId: target?.note_id,
           notebookId: nbId
@@ -2781,51 +2634,74 @@ export default function RecordVaultWorkspacePane({
         });
       }
     },
-    [
-      busy,
-      innerEncryptBusy,
-      notebookInnerLockedForDisplay,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      openInnerEncryptDialog
-    ]
+    [busy, innerEncryptBusy, notebookInnerLockedForDisplay, noteRequiresInnerPinToView, isInnerNoteUnlocked, openInnerEncryptDialog]
   );
 
   /** Red lock icon on a shortcut row: delegate to its note or notebook target. */
   const handleToggleShortcutLock = useCallback(
     (shortcut) => {
       if (!shortcut) return;
-      const nb = notebooks.find(
-        (n) => Number(n.notebook_id) === Number(shortcut.notebook_id)
-      );
+      const nb = notebooks.find((n) => Number(n.notebook_id) === Number(shortcut.notebook_id));
       if (shortcut.target_type === 'notebook') {
         if (nb) handleToggleNotebookLock(nb);
         return;
       }
-      const note = (nb?.notes || []).find(
-        (n) => Number(n.note_id) === Number(shortcut.note_id)
-      );
+      const note = (nb?.notes || []).find((n) => Number(n.note_id) === Number(shortcut.note_id));
       if (note) handleToggleNoteLock(note);
     },
     [notebooks, handleToggleNotebookLock, handleToggleNoteLock]
   );
 
-
-  const selectNoteId = useCallback((noteId, { fromNotebook = false } = {}) => {
-    const next = Number(noteId);
-    if (!isSelectableNoteId(next)) return;
-    replaceMultiSelectedNoteIds([]);
-    noteMultiSelectAnchorIdRef.current = next;
-    if (Number(selectedNoteIdRef.current) === next) {
-      if (!fromNotebook) setInnerEncryptUiScope('note');
-      setNoteContentLoading(false);
-      return;
-    }
-    // Bill Schedule notes are local panels — no vault body fetch.
-    if (isBillScheduleSystemId(next)) {
+  const selectNoteId = useCallback(
+    (noteId, { fromNotebook = false } = {}) => {
+      const next = Number(noteId);
+      if (!isSelectableNoteId(next)) return;
+      replaceMultiSelectedNoteIds([]);
+      noteMultiSelectAnchorIdRef.current = next;
+      if (Number(selectedNoteIdRef.current) === next) {
+        if (!fromNotebook) setInnerEncryptUiScope('note');
+        setNoteContentLoading(false);
+        return;
+      }
+      // Bill Schedule notes are local panels — no vault body fetch.
+      if (isBillScheduleSystemId(next)) {
+        void (async () => {
+          const prevNoteId = selectedNoteIdRef.current;
+          if (prevNoteId && !isBillScheduleSystemId(prevNoteId)) {
+            if (saveTimerRef.current) {
+              clearTimeout(saveTimerRef.current);
+              saveTimerRef.current = null;
+            }
+            try {
+              skipSaveRef.current = false;
+              await persistNoteRef.current?.();
+            } catch {
+              // allow switch even if save failed
+            }
+          }
+          loadedNoteIdRef.current = next;
+          loadedDraftKeyRef.current = '';
+          loadedTitleKeyRef.current = '';
+          hydratedDraftKeyRef.current = '';
+          setEditingNoteId(null);
+          setEditingNotebookId(null);
+          setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
+          setRenameUiSurface(null);
+          setOpenNoteTitlePlain('');
+          draftRef.current = { openNoteTitlePlain: '' };
+          setNoteContentLoading(false);
+          setSelectedNoteId(next);
+        })();
+        return;
+      }
+      // TutaCloud/USB note body fetch can take seconds — show hourglass on click, not after await.
+      setNoteContentLoading(true);
       void (async () => {
         const prevNoteId = selectedNoteIdRef.current;
-        if (prevNoteId && !isBillScheduleSystemId(prevNoteId)) {
+        // Flush debounced body edits before leaving the note (typing → click PPP →
+        // back must keep what was typed). Clear the timer so a late debounce cannot
+        // PATCH after hydration refs are cleared / the next note is selected.
+        if (prevNoteId) {
           if (saveTimerRef.current) {
             clearTimeout(saveTimerRef.current);
             saveTimerRef.current = null;
@@ -2837,7 +2713,7 @@ export default function RecordVaultWorkspacePane({
             // allow switch even if save failed
           }
         }
-        loadedNoteIdRef.current = next;
+        loadedNoteIdRef.current = null;
         loadedDraftKeyRef.current = '';
         loadedTitleKeyRef.current = '';
         hydratedDraftKeyRef.current = '';
@@ -2847,43 +2723,11 @@ export default function RecordVaultWorkspacePane({
         setRenameUiSurface(null);
         setOpenNoteTitlePlain('');
         draftRef.current = { openNoteTitlePlain: '' };
-        setNoteContentLoading(false);
         setSelectedNoteId(next);
       })();
-      return;
-    }
-    // TutaCloud/USB note body fetch can take seconds — show hourglass on click, not after await.
-    setNoteContentLoading(true);
-    void (async () => {
-      const prevNoteId = selectedNoteIdRef.current;
-      // Flush debounced body edits before leaving the note (typing → click PPP →
-      // back must keep what was typed). Clear the timer so a late debounce cannot
-      // PATCH after hydration refs are cleared / the next note is selected.
-      if (prevNoteId) {
-        if (saveTimerRef.current) {
-          clearTimeout(saveTimerRef.current);
-          saveTimerRef.current = null;
-        }
-        try {
-          skipSaveRef.current = false;
-          await persistNoteRef.current?.();
-        } catch {
-          // allow switch even if save failed
-        }
-      }
-      loadedNoteIdRef.current = null;
-      loadedDraftKeyRef.current = '';
-      loadedTitleKeyRef.current = '';
-      hydratedDraftKeyRef.current = '';
-      setEditingNoteId(null);
-      setEditingNotebookId(null);
-      setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
-      setRenameUiSurface(null);
-      setOpenNoteTitlePlain('');
-      draftRef.current = { openNoteTitlePlain: '' };
-      setSelectedNoteId(next);
-    })();
-  }, [replaceMultiSelectedNoteIds]);
+    },
+    [replaceMultiSelectedNoteIds]
+  );
 
   const openBillScheduleNote = useCallback(
     (noteId) => {
@@ -2904,9 +2748,7 @@ export default function RecordVaultWorkspacePane({
       const clicked = Number(noteId);
       if (!Number.isFinite(clicked) || clicked < 1) return;
       const notes = selectedNotebook?.notes || [];
-      const orderedIds = notes
-        .map((n) => Number(n.note_id))
-        .filter((id) => Number.isFinite(id) && id > 0);
+      const orderedIds = notes.map((n) => Number(n.note_id)).filter((id) => Number.isFinite(id) && id > 0);
 
       if (!orderedIds.length) return;
 
@@ -2931,13 +2773,6 @@ export default function RecordVaultWorkspacePane({
     },
     [selectedNotebook, replaceMultiSelectedNoteIds]
   );
-
-
-
-
-
-
-
 
   const isNoteHiddenFromSearch = useCallback(
     (note, notebookNotes) => {
@@ -2968,9 +2803,7 @@ export default function RecordVaultWorkspacePane({
       if (!found?.note || !found?.notebook) return;
       const notesInNotebook = found.notebook.notes || [];
       if (isNoteHiddenFromSearch(found.note, notesInNotebook)) return;
-      const label =
-        String(title || '').trim() ||
-        recordVaultSearchResultTabLabel(found.note, found.notebook, notebooks, notesInNotebook);
+      const label = String(title || '').trim() || recordVaultSearchResultTabLabel(found.note, found.notebook, notebooks, notesInNotebook);
       touchRecordVaultRecentNote(recentNotesScopeKey, {
         noteId: id,
         notebookId: Number(found.notebook.notebook_id),
@@ -3043,9 +2876,7 @@ export default function RecordVaultWorkspacePane({
             }
           }
         };
-        await Promise.all(
-          Array.from({ length: Math.min(CONCURRENCY, notesToIndex.length) }, indexWorker)
-        );
+        await Promise.all(Array.from({ length: Math.min(CONCURRENCY, notesToIndex.length) }, indexWorker));
       }
 
       const ids = new Set();
@@ -3093,15 +2924,7 @@ export default function RecordVaultWorkspacePane({
     } finally {
       setSearchBusy(false);
     }
-  }, [
-    isNoteHiddenFromSearch,
-    noteHasInnerEncryption,
-    isInnerNoteUnlocked,
-    notebooks,
-    searchTerm1,
-    selectNoteId,
-    vaultApi
-  ]);
+  }, [isNoteHiddenFromSearch, noteHasInnerEncryption, isInnerNoteUnlocked, notebooks, searchTerm1, selectNoteId, vaultApi]);
 
   const handleClearSearch = useCallback(() => {
     setSearchTerm1('');
@@ -3150,9 +2973,7 @@ export default function RecordVaultWorkspacePane({
       const api = noteEditorApiRef.current;
       if (!api?.setActiveNoteSearchHit || noteSearchHitCount <= 0) return;
       const liveIndex =
-        typeof api.getActiveNoteSearchHitIndex === 'function'
-          ? api.getActiveNoteSearchHitIndex()
-          : noteSearchActiveHitIndex;
+        typeof api.getActiveNoteSearchHitIndex === 'function' ? api.getActiveNoteSearchHitIndex() : noteSearchActiveHitIndex;
       const base = liveIndex < 0 ? 0 : liveIndex;
       const next = Math.max(0, Math.min(noteSearchHitCount - 1, base + delta));
       setNoteSearchActiveHitIndex(next);
@@ -3195,26 +3016,13 @@ export default function RecordVaultWorkspacePane({
         const savedFontTenths = normalizeMynoteFontSizeTenths(prefs.mynoteFontSize);
         menuButtonFontFromPrefsRef.current = savedFontTenths != null;
         setMenuButtonFontFollowEnvVw(savedFontTenths == null);
-        setMenuButtonFontRem(
-          recordVaultMenuButtonFontRemFromTenths(savedFontTenths, defaultMenuButtonFontRem)
-        );
-        setNoteFontSizePt(
-          normalizeRecordVaultFontSizePt(
-            prefs.mynoteEditorFontSizePt ?? RECORD_VAULT_DEFAULT_FONT_SIZE_PT
-          )
-        );
-        setNoteFontStyleIndex(
-          prefs.mynoteFontColorIndex ?? RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX
-        );
-        setNoteContentBgIndex(
-          prefs.mynoteContentBgIndex ?? RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX
-        );
+        setMenuButtonFontRem(recordVaultMenuButtonFontRemFromTenths(savedFontTenths, defaultMenuButtonFontRem));
+        setNoteFontSizePt(normalizeRecordVaultFontSizePt(prefs.mynoteEditorFontSizePt ?? RECORD_VAULT_DEFAULT_FONT_SIZE_PT));
+        setNoteFontStyleIndex(prefs.mynoteFontColorIndex ?? RECORD_VAULT_DEFAULT_FONT_STYLE_INDEX);
+        setNoteContentBgIndex(prefs.mynoteContentBgIndex ?? RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX);
         // Legacy default was white (1) — that painted a white “input box” around note text.
         const loadedHighlight = prefs.mynoteTextHighlightIndex;
-        const nextHighlight =
-          loadedHighlight == null || Number(loadedHighlight) === 1
-            ? null
-            : loadedHighlight;
+        const nextHighlight = loadedHighlight == null || Number(loadedHighlight) === 1 ? null : loadedHighlight;
         setNoteTextBgIndex(nextHighlight ?? RECORD_VAULT_DEFAULT_TEXT_HIGHLIGHT_INDEX);
         if (Number(loadedHighlight) === 1) {
           scheduleSaveMynotePrefs({ mynoteTextHighlightIndex: null });
@@ -3257,67 +3065,56 @@ export default function RecordVaultWorkspacePane({
     return () => window.removeEventListener('resize', syncButtonFont);
   }, []);
 
+  const loadTree = useCallback(
+    async ({ preferNotebookId, preferNoteId, silent = false } = {}) => {
+      if (!silent) setLoading(true);
+      setError('');
+      if (!silent) loadedNoteIdRef.current = null;
+      try {
+        const { notebooks: tree, shortcuts: loadedShortcuts } = await vaultApi.fetchRecordVaultTree();
+        setNotebooks(tree);
+        setShortcuts(loadedShortcuts);
 
+        const currentNotebookId = selectedNotebookIdRef.current;
+        const currentNoteId = selectedNoteIdRef.current;
+        const notebookId =
+          preferNotebookId ??
+          (isBillScheduleNotebookId(currentNotebookId) || tree.some((nb) => Number(nb.notebook_id) === Number(currentNotebookId))
+            ? currentNotebookId
+            : (tree[0]?.notebook_id ?? null));
+        // Bill Schedule is a virtual notebook (not in the vault tree) — Monthly / Yearly reopen it.
+        const notebook = isBillScheduleNotebookId(notebookId)
+          ? buildBillScheduleNotebook()
+          : (tree.find((nb) => Number(nb.notebook_id) === Number(notebookId)) ?? tree[0] ?? null);
+        setSelectedNotebookId(notebook?.notebook_id ?? null);
 
-
-
-
-
-
-
-
-  const loadTree = useCallback(async ({ preferNotebookId, preferNoteId, silent = false } = {}) => {
-    if (!silent) setLoading(true);
-    setError('');
-    if (!silent) loadedNoteIdRef.current = null;
-    try {
-      const { notebooks: tree, shortcuts: loadedShortcuts } = await vaultApi.fetchRecordVaultTree();
-      setNotebooks(tree);
-      setShortcuts(loadedShortcuts);
-
-      const currentNotebookId = selectedNotebookIdRef.current;
-      const currentNoteId = selectedNoteIdRef.current;
-      const notebookId =
-        preferNotebookId ??
-        (isBillScheduleNotebookId(currentNotebookId) ||
-        tree.some((nb) => Number(nb.notebook_id) === Number(currentNotebookId))
-          ? currentNotebookId
-          : tree[0]?.notebook_id ?? null);
-      // Bill Schedule is a virtual notebook (not in the vault tree) — Monthly / Yearly reopen it.
-      const notebook = isBillScheduleNotebookId(notebookId)
-        ? buildBillScheduleNotebook()
-        : tree.find((nb) => Number(nb.notebook_id) === Number(notebookId)) ?? tree[0] ?? null;
-      setSelectedNotebookId(notebook?.notebook_id ?? null);
-
-      const notes = notebook?.notes || [];
-      const hasNote = (id) => id != null && notes.some((n) => Number(n.note_id) === Number(id));
-      // A saved / preferred note that was deleted falls back to the current note, then the first note.
-      const noteId = hasNote(preferNoteId)
-        ? preferNoteId
-        : hasNote(currentNoteId)
-          ? currentNoteId
-          : notes[0]?.note_id ?? null;
-      setSelectedNoteId(noteId);
-      // Refresh status-bar Usb/ui tx/rx counts after tree open / mutations.
-      window.setTimeout(() => {
-        void refreshVaultUsageRef.current?.();
-      }, 400);
-    } catch (err) {
-      if (isRecordVaultUsbRequiredError(err)) {
-        // Session gone (restart, bridge drop, etc.) — leave workspace and show USB/Cloud login.
-        setError('');
-        setRecordVaultBridgeStorageType(null);
-        onSessionEnded?.();
-        return;
+        const notes = notebook?.notes || [];
+        const hasNote = (id) => id != null && notes.some((n) => Number(n.note_id) === Number(id));
+        // A saved / preferred note that was deleted falls back to the current note, then the first note.
+        const noteId = hasNote(preferNoteId) ? preferNoteId : hasNote(currentNoteId) ? currentNoteId : (notes[0]?.note_id ?? null);
+        setSelectedNoteId(noteId);
+        // Refresh status-bar Usb/ui tx/rx counts after tree open / mutations.
+        window.setTimeout(() => {
+          void refreshVaultUsageRef.current?.();
+        }, 400);
+      } catch (err) {
+        if (isRecordVaultUsbRequiredError(err)) {
+          // Session gone (restart, bridge drop, etc.) — leave workspace and show USB/Cloud login.
+          setError('');
+          setRecordVaultBridgeStorageType(null);
+          onSessionEnded?.();
+          return;
+        }
+        setError(readRecordVaultApiError(err, 'Failed to load Record Vault'));
+      } finally {
+        if (!silent) {
+          setLoading(false);
+          setVaultUiReady(true);
+        }
       }
-      setError(readRecordVaultApiError(err, 'Failed to load Record Vault'));
-    } finally {
-      if (!silent) {
-        setLoading(false);
-        setVaultUiReady(true);
-      }
-    }
-  }, [vaultApi, onSessionEnded]);
+    },
+    [vaultApi, onSessionEnded]
+  );
 
   useEffect(() => {
     const onReload = (event) => {
@@ -3401,10 +3198,7 @@ export default function RecordVaultWorkspacePane({
         return;
       }
       try {
-        const [status, locations] = await Promise.all([
-          fetchRecordVaultUsbStatus(),
-          fetchRecordVaultUsbLocations()
-        ]);
+        const [status, locations] = await Promise.all([fetchRecordVaultUsbStatus(), fetchRecordVaultUsbLocations()]);
         if (cancelled) return;
         const unlockedSession = Boolean(status?.session?.unlocked);
         if (!unlockedSession) {
@@ -3415,9 +3209,7 @@ export default function RecordVaultWorkspacePane({
         }
         const mountPath = String(status?.session?.mountPath || '').trim();
         const mountStillPresent =
-          !mountPath ||
-          (Array.isArray(locations) &&
-            locations.some((loc) => String(loc?.mountPath || '').trim() === mountPath));
+          !mountPath || (Array.isArray(locations) && locations.some((loc) => String(loc?.mountPath || '').trim() === mountPath));
         setUsbBridgeHealthy(unlockedSession && mountStillPresent);
       } catch {
         if (!cancelled) setUsbBridgeHealthy(false);
@@ -3533,9 +3325,7 @@ export default function RecordVaultWorkspacePane({
     if (editorHydratedRef.current.key === key) return;
     editorHydratedRef.current.key = key;
     // Track which note the editor holds so switch/flush paths know a draft is live.
-    hydratedDraftKeyRef.current = locked
-      ? ''
-      : `${Number(selectedNotebookIdRef.current) || 0}:${id}`;
+    hydratedDraftKeyRef.current = locked ? '' : `${Number(selectedNotebookIdRef.current) || 0}:${id}`;
     if (locked) {
       api.setContent('<p></p>', false);
     } else {
@@ -3621,10 +3411,7 @@ export default function RecordVaultWorkspacePane({
     if (!selectedNote) return undefined;
     const pending = pendingMynoteRestoreRef.current;
     if (pending.applied) return undefined;
-    if (
-      pending.notebookId != null &&
-      Number(pending.notebookId) !== Number(selectedNotebookId)
-    ) {
+    if (pending.notebookId != null && Number(pending.notebookId) !== Number(selectedNotebookId)) {
       return undefined;
     }
     if (pending.noteId != null && Number(pending.noteId) !== Number(selectedNoteId)) {
@@ -3650,9 +3437,7 @@ export default function RecordVaultWorkspacePane({
         const usage = await vaultApi.fetchRecordVaultUsage();
         if (cancelled) return;
         // Server could not read Postgres — keep the last real tally instead of flashing 0gb.
-        setVaultUsage((prev) =>
-          usage?.transfer?.unavailable && prev?.transfer ? { ...usage, transfer: prev.transfer } : usage
-        );
+        setVaultUsage((prev) => (usage?.transfer?.unavailable && prev?.transfer ? { ...usage, transfer: prev.transfer } : usage));
       } catch {
         // Transient network / server error — keep showing the last numbers.
       }
@@ -3676,11 +3461,6 @@ export default function RecordVaultWorkspacePane({
     }, 2500);
   }, []);
 
-
-
-
-
-
   const reportVaultLeavingProgress = useCallback(async ({ percent, label } = {}) => {
     const next = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
     // Never jump backward while logoff is running (stale poll can still return 0).
@@ -3695,9 +3475,7 @@ export default function RecordVaultWorkspacePane({
 
   const performVaultStorageLogoff = useCallback(async () => {
     setVaultLeavingProgressPercent(1);
-    setVaultLeavingProgressLabel(
-      paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
-    );
+    setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
     await vaultApi.logoffRecordVaultStorage({
       onProgress: (progress) => {
         void reportVaultLeavingProgress(progress);
@@ -3733,9 +3511,7 @@ export default function RecordVaultWorkspacePane({
       setBusy(true);
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
-      setVaultLeavingProgressLabel(
-        paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
-      );
+      setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
       setError('');
       try {
         await performVaultStorageLogoff();
@@ -3783,11 +3559,7 @@ export default function RecordVaultWorkspacePane({
       const fromNotebook = notebookScopePendingRef.current;
       notebookScopePendingRef.current = false;
       // Prefer a still-locked note so notebook ***** unlock has a PIN target.
-      const preferred =
-        notes.find(
-          (n) =>
-            noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id)
-        ) || notes[0];
+      const preferred = notes.find((n) => noteRequiresInnerPinToView(n) && !isInnerNoteUnlockedForDisplay(n.note_id)) || notes[0];
       selectNoteId(preferred.note_id, { fromNotebook });
     } else if (notebookScopePendingRef.current) {
       notebookScopePendingRef.current = false;
@@ -3795,13 +3567,7 @@ export default function RecordVaultWorkspacePane({
       // Notebook click kept the same open note — no TutaCloud body fetch.
       setNoteContentLoading(false);
     }
-  }, [
-    selectedNotebook,
-    selectedNoteId,
-    selectNoteId,
-    noteRequiresInnerPinToView,
-    isInnerNoteUnlockedForDisplay
-  ]);
+  }, [selectedNotebook, selectedNoteId, selectNoteId, noteRequiresInnerPinToView, isInnerNoteUnlockedForDisplay]);
 
   useEffect(() => {
     if (!selectedNote) {
@@ -3829,16 +3595,10 @@ export default function RecordVaultWorkspacePane({
     setNotebooks((prev) =>
       prev.map((nb) => ({
         ...nb,
-        notes: (nb.notes || []).map((n) =>
-          Number(n.note_id) === id ? { ...n, note_name: plain } : n
-        )
+        notes: (nb.notes || []).map((n) => (Number(n.note_id) === id ? { ...n, note_name: plain } : n))
       }))
     );
-    setSearchResults((prev) =>
-      Array.isArray(prev)
-        ? prev.map((r) => (Number(r.note_id) === id ? { ...r, note_name: plain } : r))
-        : prev
-    );
+    setSearchResults((prev) => (Array.isArray(prev) ? prev.map((r) => (Number(r.note_id) === id ? { ...r, note_name: plain } : r)) : prev));
   }, []);
 
   // Debounced autosave for the note BODY only. The note name is handled separately
@@ -3867,9 +3627,8 @@ export default function RecordVaultWorkspacePane({
     // clean-v* suffix so bumping the hydrate version does not silently disable autosave.
     const hydratedKey = String(editorHydratedRef.current.key || '');
     const editorHoldsThisNote =
-      loadedNoteIdRef.current === noteId &&
-      (hydratedKey === `${noteId}:open` || hydratedKey.startsWith(`${noteId}:open:`));
-    const html = !locked && editorHoldsThisNote ? noteEditorApiRef.current?.getHTML() ?? null : null;
+      loadedNoteIdRef.current === noteId && (hydratedKey === `${noteId}:open` || hydratedKey.startsWith(`${noteId}:open:`));
+    const html = !locked && editorHoldsThisNote ? (noteEditorApiRef.current?.getHTML() ?? null) : null;
     if (html == null) return;
     // Background autosave must not flip `busy` — that disables rename/menu clicks.
     persistNoteInFlightRef.current = true;
@@ -3905,15 +3664,7 @@ export default function RecordVaultWorkspacePane({
       persistNoteInFlightRef.current = false;
       bumpVaultUsage();
     }
-  }, [
-    selectedNote,
-    noteHasInnerEncryption,
-    isInnerNoteUnlocked,
-    patchNoteRowInTree,
-    bumpVaultUsage,
-    vaultApi,
-    touchRecentForNote
-  ]);
+  }, [selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked, patchNoteRowInTree, bumpVaultUsage, vaultApi, touchRecentForNote]);
 
   persistNoteRef.current = persistNote;
 
@@ -3953,9 +3704,7 @@ export default function RecordVaultWorkspacePane({
             prev.map((nb) => ({
               ...nb,
               notes: (nb.notes || []).map((note) =>
-                Number(note.note_id) === noteId
-                  ? { ...note, attachments: [...(note.attachments || []), attachment] }
-                  : note
+                Number(note.note_id) === noteId ? { ...note, attachments: [...(note.attachments || []), attachment] } : note
               )
             }))
           );
@@ -4007,9 +3756,7 @@ export default function RecordVaultWorkspacePane({
           Number(note.note_id) === nid
             ? {
                 ...note,
-                attachments: (note.attachments || []).filter(
-                  (entry) => Number(entry.attachment_id) !== id
-                )
+                attachments: (note.attachments || []).filter((entry) => Number(entry.attachment_id) !== id)
               }
             : note
         )
@@ -4031,8 +3778,7 @@ export default function RecordVaultWorkspacePane({
         return true;
       } catch (err) {
         const message = readRecordVaultApiError(err, 'Failed to remove vault file');
-        const missing =
-          err?.response?.status === 404 || /attachment not found/i.test(String(message || ''));
+        const missing = err?.response?.status === 404 || /attachment not found/i.test(String(message || ''));
         if (missing) {
           // Orphan inline reference — drop from the note body even when the file row is gone.
           pruneAttachmentFromNoteTree(noteId, id);
@@ -4048,26 +3794,24 @@ export default function RecordVaultWorkspacePane({
     [busy, selectedNote, vaultApi, bumpVaultUsage, pruneAttachmentFromNoteTree]
   );
 
-  const handleContentDragOver = useCallback((event) => {
-    // Bill Schedule Monthly/Yearly — file drops belong to Bills/Receipts popup, not vault note attach.
-    if (isBillMonthlyNoteId(selectedNoteId) || isBillYearlyNoteId(selectedNoteId)) {
-      return;
-    }
-    const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    // Outgoing note HTML export also carries Files — do not treat as OS import.
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
-      return;
-    }
-    if (types.includes('Files') || isRecordVaultMobileUploadDrag(event.dataTransfer)) {
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'copy';
-    }
-  }, [selectedNoteId]);
+  const handleContentDragOver = useCallback(
+    (event) => {
+      // Bill Schedule Monthly/Yearly — file drops belong to Bills/Receipts popup, not vault note attach.
+      if (isBillMonthlyNoteId(selectedNoteId) || isBillYearlyNoteId(selectedNoteId)) {
+        return;
+      }
+      const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
+      // Outgoing note HTML export also carries Files — do not treat as OS import.
+      if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
+        return;
+      }
+      if (types.includes('Files') || isRecordVaultMobileUploadDrag(event.dataTransfer)) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }
+    },
+    [selectedNoteId]
+  );
 
   /** Phone QR upload → fetch album photo → insert into open note body. */
   const handleMobilePhoneUploadComplete = useCallback(async (_fileNameOrId, meta = {}) => {
@@ -4093,8 +3837,7 @@ export default function RecordVaultWorkspacePane({
     if (!isCompactViewport) return undefined;
     const fromQuery = searchParams.get('mobileUpload') === '1';
     const fromFlag = peekMobileTutaNotesUploadPending();
-    const mobileUpload =
-      mobileTutaNotesUploadUi || fromQuery || fromFlag || peekMobileTutaNotesUploadSession();
+    const mobileUpload = mobileTutaNotesUploadUi || fromQuery || fromFlag || peekMobileTutaNotesUploadSession();
     if (!mobileUpload) return undefined;
     // Do not wait for a selected note — open staging popup as soon as vault is unlocked.
     if (busy && !mobileTutaNotesUploadUi) return undefined;
@@ -4107,15 +3850,7 @@ export default function RecordVaultWorkspacePane({
     setMobileDirectUploadOpen(true);
     setMobileTutaNotesUploadUi(true);
     return undefined;
-  }, [
-    unlocked,
-    busy,
-    mobileDirectUploadOpen,
-    mobileTutaNotesUploadUi,
-    isCompactViewport,
-    searchParams,
-    setSearchParams
-  ]);
+  }, [unlocked, busy, mobileDirectUploadOpen, mobileTutaNotesUploadUi, isCompactViewport, searchParams, setSearchParams]);
 
   const handleMobileDirectUploadFile = useCallback(async () => {
     // Mobile TutaNotes upload session: only stage into UPLOAD_FOLDER (dialog does that).
@@ -4237,11 +3972,19 @@ export default function RecordVaultWorkspacePane({
     const raf = requestAnimationFrame(() => {
       const present = new Set(api.getAttachmentIds());
       const presentNames = new Set(
-        (api.getAttachmentFileNames?.() || []).map((n) => String(n || '').trim().toLowerCase()).filter(Boolean)
+        (api.getAttachmentFileNames?.() || [])
+          .map((n) =>
+            String(n || '')
+              .trim()
+              .toLowerCase()
+          )
+          .filter(Boolean)
       );
       const missing = atts.filter((a) => {
         if (present.has(String(a.attachment_id))) return false;
-        const name = String(a.file_name || '').trim().toLowerCase();
+        const name = String(a.file_name || '')
+          .trim()
+          .toLowerCase();
         // Stale inline node already shows this filename — hydrate rewrite handles id.
         if (name && presentNames.has(name)) return false;
         return true;
@@ -4249,7 +3992,13 @@ export default function RecordVaultWorkspacePane({
       if (!missing.length) return;
       const bodyHtml = String(selectedNote.body_text ?? '');
       // Body already references these ids — editor parse lag; do not duplicate at end.
-      if (bodyHtmlHasInlineAttachmentIds(bodyHtml, missing.map((a) => a.attachment_id))) return;
+      if (
+        bodyHtmlHasInlineAttachmentIds(
+          bodyHtml,
+          missing.map((a) => a.attachment_id)
+        )
+      )
+        return;
       api.insertAttachmentsNearLabels(
         missing.map((a) => ({
           attachmentId: Number(a.attachment_id),
@@ -4284,8 +4033,7 @@ export default function RecordVaultWorkspacePane({
       const api = noteEditorApiRef.current;
       if (!api) return;
       const titlePlain =
-        String(draftRef.current?.openNoteTitlePlain || openNoteTitlePlain || '').trim() ||
-        noteTitlePlainText(selectedNote?.note_name);
+        String(draftRef.current?.openNoteTitlePlain || openNoteTitlePlain || '').trim() || noteTitlePlainText(selectedNote?.note_name);
       const cleaned = cleanRecordVaultNoteBodyHtml(html || '<p></p>', titlePlain);
       api.setContent(cleaned || '<p></p>');
       scheduleSave();
@@ -4331,34 +4079,17 @@ export default function RecordVaultWorkspacePane({
       }
       scheduleSave();
     },
-    [
-      scheduleSave,
-      updateOpenNoteTitle,
-      selectedNoteId,
-      vaultApi,
-      openNoteTitlePlain,
-      selectedNote
-    ]
+    [scheduleSave, updateOpenNoteTitle, selectedNoteId, vaultApi, openNoteTitlePlain, selectedNote]
   );
 
   /** Classify a dropped OS file as a File→Import kind (md / html / pdf) or null. */
   const classifyNoteImportDropFile = useCallback((file) => {
     const name = String(file?.name || '').toLowerCase();
     const mime = String(file?.type || '').toLowerCase();
-    if (
-      name.endsWith('.html') ||
-      name.endsWith('.htm') ||
-      mime === 'text/html' ||
-      mime === 'application/xhtml+xml'
-    ) {
+    if (name.endsWith('.html') || name.endsWith('.htm') || mime === 'text/html' || mime === 'application/xhtml+xml') {
       return 'html';
     }
-    if (
-      name.endsWith('.md') ||
-      name.endsWith('.markdown') ||
-      mime === 'text/markdown' ||
-      mime === 'text/x-markdown'
-    ) {
+    if (name.endsWith('.md') || name.endsWith('.markdown') || mime === 'text/markdown' || mime === 'text/x-markdown') {
       return 'md';
     }
     if (name.endsWith('.pdf') || mime === 'application/pdf') {
@@ -4410,9 +4141,7 @@ export default function RecordVaultWorkspacePane({
    */
   const createNotesFromDroppedImportFiles = useCallback(
     async (files) => {
-      const importFiles = (Array.isArray(files) ? files : []).filter((file) =>
-        classifyNoteImportDropFile(file)
-      );
+      const importFiles = (Array.isArray(files) ? files : []).filter((file) => classifyNoteImportDropFile(file));
       if (!importFiles.length) return false;
       if (!selectedNotebookId) {
         setError('Select a notebook before importing a file.');
@@ -4422,9 +4151,7 @@ export default function RecordVaultWorkspacePane({
         setError('Vault is busy — try again in a moment.');
         return true;
       }
-      const targetNotebook = notebooks.find(
-        (nb) => Number(nb.notebook_id) === Number(selectedNotebookId)
-      );
+      const targetNotebook = notebooks.find((nb) => Number(nb.notebook_id) === Number(selectedNotebookId));
       const siblingNotes = targetNotebook?.notes || [];
       if (notebookInnerLockedForDisplay(siblingNotes)) {
         setError('Unlock this notebook before importing.');
@@ -4491,9 +4218,7 @@ export default function RecordVaultWorkspacePane({
             };
             setNotebooks((prev) =>
               prev.map((nb) =>
-                Number(nb.notebook_id) === Number(selectedNotebookId)
-                  ? { ...nb, notes: [...(nb.notes || []), createdRow] }
-                  : nb
+                Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb
               )
             );
             lastCreatedId = created.note_id;
@@ -4501,9 +4226,7 @@ export default function RecordVaultWorkspacePane({
             selectNoteId(created.note_id);
             enqueueImportSuccessPopup(`Success Import ${fileLabel} into Note`);
           } catch (err) {
-            failures.push(
-              `${fileLabel}: ${readRecordVaultApiError(err, 'import failed')}`
-            );
+            failures.push(`${fileLabel}: ${readRecordVaultApiError(err, 'import failed')}`);
           }
         }
 
@@ -4512,9 +4235,7 @@ export default function RecordVaultWorkspacePane({
         if (failures.length && createdCount === 0) {
           setError(failures[0]);
         } else if (failures.length) {
-          setError(
-            `Created ${createdCount} note(s); ${failures.length} file(s) failed. ${failures[0]}`
-          );
+          setError(`Created ${createdCount} note(s); ${failures.length} file(s) failed. ${failures[0]}`);
         }
       } finally {
         setBusy(false);
@@ -4549,12 +4270,7 @@ export default function RecordVaultWorkspacePane({
         return;
       }
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      if (
-        types.includes(DRAG_NOTE) ||
-        types.includes(DRAG_NOTEBOOK) ||
-        types.includes(DRAG_SHORTCUT) ||
-        types.includes(DRAG_CROSS_PANE)
-      ) {
+      if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
         return;
       }
       const mobileUploadName = isRecordVaultMobileUploadDrag(event.dataTransfer)
@@ -4600,7 +4316,6 @@ export default function RecordVaultWorkspacePane({
       }
 
       for (const file of attachFiles) {
-        // eslint-disable-next-line no-await-in-loop
         await uploadNoteVaultFile(file, coords);
       }
 
@@ -4608,25 +4323,13 @@ export default function RecordVaultWorkspacePane({
         setError('Attached supported files. Drop Markdown onto the Notes list to import as a new note.');
       }
     },
-    [
-      selectedNote,
-      busy,
-      uploadNoteVaultFile,
-      noteHasInnerEncryption,
-      isInnerNoteUnlocked,
-      classifyNoteImportDropFile
-    ]
+    [selectedNote, busy, uploadNoteVaultFile, noteHasInnerEncryption, isInnerNoteUnlocked, classifyNoteImportDropFile]
   );
 
   /** Notes-list column: each md/html/pdf → its own NEW note (leave other notes alone). */
   const handleNoteListFileDragOver = useCallback((event) => {
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (!types.includes('Files')) return;
@@ -4645,12 +4348,7 @@ export default function RecordVaultWorkspacePane({
     async (event) => {
       setNoteLaneFileDragActive(false);
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-      if (
-        types.includes(DRAG_NOTE) ||
-        types.includes(DRAG_NOTEBOOK) ||
-        types.includes(DRAG_SHORTCUT) ||
-        types.includes(DRAG_CROSS_PANE)
-      ) {
+      if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
         return;
       }
       const isFileDrag = types.includes('Files');
@@ -4674,12 +4372,7 @@ export default function RecordVaultWorkspacePane({
 
   const handleNotebookLaneFolderDragOver = useCallback((event) => {
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (!types.includes('Files')) return;
@@ -4697,12 +4390,7 @@ export default function RecordVaultWorkspacePane({
   const handleNotebookLaneFolderDrop = useCallback(async (event) => {
     setNotebookLaneFolderDragActive(false);
     const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-    if (
-      types.includes(DRAG_NOTE) ||
-      types.includes(DRAG_NOTEBOOK) ||
-      types.includes(DRAG_SHORTCUT) ||
-      types.includes(DRAG_CROSS_PANE)
-    ) {
+    if (types.includes(DRAG_NOTE) || types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_SHORTCUT) || types.includes(DRAG_CROSS_PANE)) {
       return;
     }
     if (!types.includes('Files')) return;
@@ -4731,91 +4419,77 @@ export default function RecordVaultWorkspacePane({
     [selectedNoteId, patchNoteTitleInTree]
   );
 
-
-
   const handleNoteListTitleEditChange = useCallback(
     (next) => {
       setEditNameDraft(next);
       // While renaming from the content header, keep keystrokes only in that field.
       // Live-syncing openNoteTitlePlain made it look like typing was going into the sidebar.
-      if (
-        Number(editingNoteId) === Number(selectedNoteId) &&
-        renameUiSurface !== 'header'
-      ) {
+      if (Number(editingNoteId) === Number(selectedNoteId) && renameUiSurface !== 'header') {
         updateOpenNoteTitle(next, { schedulePersist: false });
       }
     },
     [updateOpenNoteTitle, editingNoteId, selectedNoteId, renameUiSurface]
   );
 
+  const startColumnResize = useCallback(
+    (mode, event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startSidebar = sidebarWidth;
+      const startNotebookCol = notebookColWidth;
+      const startRightSidebar = rightSidebarWidth;
+      const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
 
+      const onMove = (moveEvent) => {
+        const delta = moveEvent.clientX - startX;
+        if (mode === 'sidebar') {
+          // Widen/narrow notebook+notes lane freely; keep a thin editor + right pane strip.
+          const maxSidebar = Math.max(MIN_SIDEBAR_WIDTH, viewportW - rightSidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2);
+          setSidebarWidth(clamp(startSidebar + delta, MIN_SIDEBAR_WIDTH, maxSidebar));
+        } else if (mode === 'notebookCol') {
+          setNotebookColAutoFit(false);
+          // Split freely inside the left lane (no character/title-length ceiling).
+          const maxCol = Math.max(MIN_MENU_COL_WIDTH, sidebarWidth - MIN_MENU_COL_WIDTH - COLUMN_RESIZE_HANDLE_PX);
+          setNotebookColWidth(clamp(startNotebookCol + delta, MIN_MENU_COL_WIDTH, maxCol));
+        } else {
+          const maxRight = Math.max(MIN_RIGHT_SIDEBAR_WIDTH, viewportW - sidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2);
+          setRightSidebarWidth(clamp(startRightSidebar - delta, MIN_RIGHT_SIDEBAR_WIDTH, maxRight));
+        }
+      };
 
-
-  const startColumnResize = useCallback((mode, event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const startX = event.clientX;
-    const startSidebar = sidebarWidth;
-    const startNotebookCol = notebookColWidth;
-    const startRightSidebar = rightSidebarWidth;
-    const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
-
-    const onMove = (moveEvent) => {
-      const delta = moveEvent.clientX - startX;
-      if (mode === 'sidebar') {
-        // Widen/narrow notebook+notes lane freely; keep a thin editor + right pane strip.
-        const maxSidebar = Math.max(
-          MIN_SIDEBAR_WIDTH,
-          viewportW - rightSidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2
-        );
-        setSidebarWidth(clamp(startSidebar + delta, MIN_SIDEBAR_WIDTH, maxSidebar));
-      } else if (mode === 'notebookCol') {
-        setNotebookColAutoFit(false);
-        // Split freely inside the left lane (no character/title-length ceiling).
-        const maxCol = Math.max(
-          MIN_MENU_COL_WIDTH,
-          sidebarWidth - MIN_MENU_COL_WIDTH - COLUMN_RESIZE_HANDLE_PX
-        );
-        setNotebookColWidth(clamp(startNotebookCol + delta, MIN_MENU_COL_WIDTH, maxCol));
-      } else {
-        const maxRight = Math.max(
-          MIN_RIGHT_SIDEBAR_WIDTH,
-          viewportW - sidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2
-        );
-        setRightSidebarWidth(clamp(startRightSidebar - delta, MIN_RIGHT_SIDEBAR_WIDTH, maxRight));
-      }
-    };
-
-    const onUp = () => {
-      document.body.style.removeProperty('user-select');
-      document.body.style.removeProperty('cursor');
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      setSidebarWidth((w) => {
-        setNotebookColWidth((col) => {
-          setRightSidebarWidth((right) => {
-            setShortcutPanePercent((shortcutPercent) => {
-              writeStoredLayout({
-                sidebarWidth: w,
-                notebookColWidth: col,
-                rightSidebarWidth: right,
-                shortcutPanePercent: shortcutPercent
+      const onUp = () => {
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        setSidebarWidth((w) => {
+          setNotebookColWidth((col) => {
+            setRightSidebarWidth((right) => {
+              setShortcutPanePercent((shortcutPercent) => {
+                writeStoredLayout({
+                  sidebarWidth: w,
+                  notebookColWidth: col,
+                  rightSidebarWidth: right,
+                  shortcutPanePercent: shortcutPercent
+                });
+                return shortcutPercent;
               });
-              return shortcutPercent;
+              return right;
             });
-            return right;
+            return col;
           });
-          return col;
+          return w;
         });
-        return w;
-      });
-    };
+      };
 
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [notebookColWidth, rightSidebarWidth, sidebarWidth]);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [notebookColWidth, rightSidebarWidth, sidebarWidth]
+  );
 
   useEffect(() => {
     if (!notebookColAutoFit) return undefined;
@@ -4856,10 +4530,7 @@ export default function RecordVaultWorkspacePane({
     const sidebarDelta = nextNotebookCol - notebookNow + (nextNoteCol - noteNow);
     if (Math.abs(sidebarDelta) < 2 && Math.abs(nextNotebookCol - notebookColWidth) < 2) return;
     const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1280;
-    const maxSidebar = Math.max(
-      MIN_SIDEBAR_WIDTH,
-      viewportW - rightSidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2
-    );
+    const maxSidebar = Math.max(MIN_SIDEBAR_WIDTH, viewportW - rightSidebarWidth - MIN_EDITOR_STRIP_PX - COLUMN_RESIZE_HANDLE_PX * 2);
     const nextSidebar = clamp(sidebarWidth + sidebarDelta, MIN_SIDEBAR_WIDTH, maxSidebar);
     setNotebookColAutoFit(false);
     setNotebookColWidth(nextNotebookCol);
@@ -4934,72 +4605,60 @@ export default function RecordVaultWorkspacePane({
    * macOS .textClipping). Separate .html files are written via folder picker
    * during dragstart (user gesture) in handleDragStart.
    */
-  const attachHtmlExportToDataTransfer = useCallback(
-    (event, exportNotes) => {
-      const list = (Array.isArray(exportNotes) ? exportNotes : []).filter(Boolean);
-      if (!list.length || !event?.dataTransfer) return { mode: 'none', files: [] };
+  const attachHtmlExportToDataTransfer = useCallback((event, exportNotes) => {
+    const list = (Array.isArray(exportNotes) ? exportNotes : []).filter(Boolean);
+    if (!list.length || !event?.dataTransfer) return { mode: 'none', files: [] };
 
-      (pendingHtmlExportRef.current.urls || []).forEach((url) => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {
-          // ignore
-        }
-      });
-
-      const htmlFiles = list.map((entry) => {
-        const title = String(entry.title || 'note').trim() || 'note';
-        const bodyHtml = String(entry.bodyHtml ?? '<p></p>');
-        const fileName = `${sanitizeRecordVaultExportFileName(title)}.html`;
-        const htmlDoc = buildHtmlDocument(title, bodyHtml);
-        const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        return { title, fileName, htmlDoc, blob, url };
-      });
-
-      pendingHtmlExportRef.current = {
-        urls: htmlFiles.map((f) => f.url),
-        messages: [],
-        separateFiles: htmlFiles.map((f) => ({
-          title: f.title,
-          fileName: f.fileName,
-          blob: f.blob,
-          url: f.url
-        }))
-      };
-
-      if (htmlFiles.length === 1) {
-        const only = htmlFiles[0];
-        pendingHtmlExportRef.current.messages.push(
-          `Success export NOTE "${only.title}" as ${only.fileName}`
-        );
-        try {
-          event.dataTransfer.setData(
-            'DownloadURL',
-            `text/html:${only.fileName.replace(/:/g, '-')}:${only.url}`
-          );
-        } catch {
-          // ignore
-        }
-        try {
-          event.dataTransfer.items?.add?.(
-            new File([only.blob], only.fileName, { type: 'text/html' })
-          );
-        } catch {
-          // ignore
-        }
-        return { mode: 'single', files: htmlFiles };
+    (pendingHtmlExportRef.current.urls || []).forEach((url) => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
       }
+    });
 
-      // Multi: never ZIP, never text/File drag-out (Finder turns that into one
-      // .html.textClipping). Caller writes separate .html via folder picker.
-      pendingHtmlExportRef.current.messages.push(
-        `Success export ${htmlFiles.length} notes as separate HTML files`
-      );
-      return { mode: 'multi', files: htmlFiles };
-    },
-    []
-  );
+    const htmlFiles = list.map((entry) => {
+      const title = String(entry.title || 'note').trim() || 'note';
+      const bodyHtml = String(entry.bodyHtml ?? '<p></p>');
+      const fileName = `${sanitizeRecordVaultExportFileName(title)}.html`;
+      const htmlDoc = buildHtmlDocument(title, bodyHtml);
+      const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      return { title, fileName, htmlDoc, blob, url };
+    });
+
+    pendingHtmlExportRef.current = {
+      urls: htmlFiles.map((f) => f.url),
+      messages: [],
+      separateFiles: htmlFiles.map((f) => ({
+        title: f.title,
+        fileName: f.fileName,
+        blob: f.blob,
+        url: f.url
+      }))
+    };
+
+    if (htmlFiles.length === 1) {
+      const only = htmlFiles[0];
+      pendingHtmlExportRef.current.messages.push(`Success export NOTE "${only.title}" as ${only.fileName}`);
+      try {
+        event.dataTransfer.setData('DownloadURL', `text/html:${only.fileName.replace(/:/g, '-')}:${only.url}`);
+      } catch {
+        // ignore
+      }
+      try {
+        event.dataTransfer.items?.add?.(new File([only.blob], only.fileName, { type: 'text/html' }));
+      } catch {
+        // ignore
+      }
+      return { mode: 'single', files: htmlFiles };
+    }
+
+    // Multi: never ZIP, never text/File drag-out (Finder turns that into one
+    // .html.textClipping). Caller writes separate .html via folder picker.
+    pendingHtmlExportRef.current.messages.push(`Success export ${htmlFiles.length} notes as separate HTML files`);
+    return { mode: 'multi', files: htmlFiles };
+  }, []);
 
   const downloadHtmlFilesSeparately = useCallback(async (files, { onProgress } = {}) => {
     const list = (Array.isArray(files) ? files : []).filter(Boolean);
@@ -5031,13 +4690,13 @@ export default function RecordVaultWorkspacePane({
               label: `Saving ${name}…`
             });
           }
-          // eslint-disable-next-line no-await-in-loop
+
           const handle = await dir.getFileHandle(name, { create: true });
-          // eslint-disable-next-line no-await-in-loop
+
           const writable = await handle.createWritable();
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.write(f.blob);
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.close();
         }
         if (report) report({ percent: 100, label: 'Done' });
@@ -5120,9 +4779,7 @@ export default function RecordVaultWorkspacePane({
           const noteId = Number(note?.note_id);
           if (!Number.isFinite(noteId) || noteId < 1) continue;
           if (noteRequiresInnerPinToView(note) && !isInnerNoteUnlocked(noteId)) {
-            skippedLocked.push(
-              recordVaultNoteSidebarLabel(note, notes, notebooks) || `Note ${noteId}`
-            );
+            skippedLocked.push(recordVaultNoteSidebarLabel(note, notes, notebooks) || `Note ${noteId}`);
             doneSteps += 1;
             setNotebookExportProgressPercent(Math.max(1, Math.round((doneSteps / totalSteps) * 100)));
             continue;
@@ -5130,8 +4787,7 @@ export default function RecordVaultWorkspacePane({
 
           let title =
             Number(selectedNoteId) === noteId
-              ? String(openNoteTitlePlain || '').trim() ||
-                recordVaultNoteSidebarLabel(note, notes, notebooks)
+              ? String(openNoteTitlePlain || '').trim() || recordVaultNoteSidebarLabel(note, notes, notebooks)
               : recordVaultNoteSidebarLabel(note, notes, notebooks);
           let bodyHtml = '<p></p>';
           if (Number(selectedNoteId) === noteId) {
@@ -5145,7 +4801,6 @@ export default function RecordVaultWorkspacePane({
               if (cached.title) title = cached.title;
             } else {
               try {
-                // eslint-disable-next-line no-await-in-loop
                 const fresh = await vaultApi.fetchRecordVaultNote(noteId);
                 bodyHtml = String(fresh?.body_text ?? '<p></p>');
                 if (fresh?.note_name) {
@@ -5176,13 +4831,13 @@ export default function RecordVaultWorkspacePane({
 
           const htmlDoc = buildHtmlDocument(title, bodyHtml);
           const blob = new Blob([htmlDoc], { type: 'text/html;charset=utf-8' });
-          // eslint-disable-next-line no-await-in-loop
+
           const handle = await noteDir.getFileHandle(fileName, { create: true });
-          // eslint-disable-next-line no-await-in-loop
+
           const writable = await handle.createWritable();
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.write(blob);
-          // eslint-disable-next-line no-await-in-loop
+
           await writable.close();
           exportedNames.push(title);
           doneSteps += 1;
@@ -5204,14 +4859,7 @@ export default function RecordVaultWorkspacePane({
         skippedLocked
       };
     },
-    [
-      notebooks,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      selectedNoteId,
-      openNoteTitlePlain,
-      vaultApi
-    ]
+    [notebooks, noteRequiresInnerPinToView, isInnerNoteUnlocked, selectedNoteId, openNoteTitlePlain, vaultApi]
   );
 
   const resolveNoteHtmlExportPayload = useCallback(
@@ -5225,8 +4873,7 @@ export default function RecordVaultWorkspacePane({
       const cached = noteHtmlExportCacheRef.current.get(id);
       const title =
         Number(selectedNoteId) === id
-          ? String(openNoteTitlePlain || '').trim() ||
-            recordVaultNoteSidebarLabel(note, siblingNotes, notebooks)
+          ? String(openNoteTitlePlain || '').trim() || recordVaultNoteSidebarLabel(note, siblingNotes, notebooks)
           : recordVaultNoteSidebarLabel(note, siblingNotes, notebooks);
       let bodyHtml = '<p></p>';
       if (Number(selectedNoteId) === id) {
@@ -5240,14 +4887,7 @@ export default function RecordVaultWorkspacePane({
       }
       return { title: title || cached?.title || 'note', bodyHtml, noteId: id };
     },
-    [
-      findNoteRowById,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      selectedNoteId,
-      openNoteTitlePlain,
-      notebooks
-    ]
+    [findNoteRowById, noteRequiresInnerPinToView, isInnerNoteUnlocked, selectedNoteId, openNoteTitlePlain, notebooks]
   );
 
   const prefetchNoteHtmlExport = useCallback(
@@ -5297,20 +4937,12 @@ export default function RecordVaultWorkspacePane({
       }
       warmOne(id);
     },
-    [
-      findNoteRowById,
-      noteRequiresInnerPinToView,
-      isInnerNoteUnlocked,
-      selectedNoteId,
-      openNoteTitlePlain,
-      vaultApi
-    ]
+    [findNoteRowById, noteRequiresInnerPinToView, isInnerNoteUnlocked, selectedNoteId, openNoteTitlePlain, vaultApi]
   );
 
   const handleDragStart = useCallback(
     (event, id, mime, notebookIdForNote) => {
-      const draggedNoteIds =
-        mime === DRAG_NOTE ? resolveDraggedNoteIds(id) : [];
+      const draggedNoteIds = mime === DRAG_NOTE ? resolveDraggedNoteIds(id) : [];
       const multiDrag = mime === DRAG_NOTE && draggedNoteIds.length > 1;
 
       // Drag ghost: for multi-note drag show a count badge so it's obvious all
@@ -5375,8 +5007,7 @@ export default function RecordVaultWorkspacePane({
       event.dataTransfer.setData(mime, String(id));
       // text/plain → macOS Finder .textClipping when dropped outside the app.
       // Multi-note and notebook HTML exports omit it; in-app drops use custom MIME.
-      const omitPlainText =
-        (mime === DRAG_NOTE && multiDrag) || mime === DRAG_NOTEBOOK;
+      const omitPlainText = (mime === DRAG_NOTE && multiDrag) || mime === DRAG_NOTEBOOK;
       if (!omitPlainText) {
         event.dataTransfer.setData('text/plain', String(id));
       }
@@ -5414,20 +5045,18 @@ export default function RecordVaultWorkspacePane({
         if (billScheduleCrossPaneKind(id)) {
           pendingHtmlExportRef.current = null;
         } else {
-        if (notebookIdForNote != null) {
-          event.dataTransfer.setData(DRAG_NOTEBOOK, String(notebookIdForNote));
-        }
-        try {
-          event.dataTransfer.setData(DRAG_NOTE_IDS, JSON.stringify(draggedNoteIds));
-        } catch {
-          // ignore custom MIME failures
-        }
-        const payloads = draggedNoteIds
-          .map((nid) => resolveNoteHtmlExportPayload(nid))
-          .filter(Boolean);
-        if (payloads.length) attachHtmlExportToDataTransfer(event, payloads);
-        // Multi export is completed via a "Choose folder" dialog on dragend
-        // (needs a real click gesture). Do not put File/text payloads on the drag.
+          if (notebookIdForNote != null) {
+            event.dataTransfer.setData(DRAG_NOTEBOOK, String(notebookIdForNote));
+          }
+          try {
+            event.dataTransfer.setData(DRAG_NOTE_IDS, JSON.stringify(draggedNoteIds));
+          } catch {
+            // ignore custom MIME failures
+          }
+          const payloads = draggedNoteIds.map((nid) => resolveNoteHtmlExportPayload(nid)).filter(Boolean);
+          if (payloads.length) attachHtmlExportToDataTransfer(event, payloads);
+          // Multi export is completed via a "Choose folder" dialog on dragend
+          // (needs a real click gesture). Do not put File/text payloads on the drag.
         }
       } else if (mime === DRAG_SHORTCUT) setDraggingShortcutId(id);
 
@@ -5547,10 +5176,7 @@ export default function RecordVaultWorkspacePane({
           const y = event?.screenY;
           if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
           return (
-            x < window.screenX ||
-            y < window.screenY ||
-            x > window.screenX + window.outerWidth ||
-            y > window.screenY + window.outerHeight
+            x < window.screenX || y < window.screenY || x > window.screenX + window.outerWidth || y > window.screenY + window.outerHeight
           );
         } catch {
           return false;
@@ -5594,10 +5220,7 @@ export default function RecordVaultWorkspacePane({
   const openCrossPaneTransfer = useCallback(
     (item, targetNotebookId = null) => {
       if (!item || busy || crossPaneBusy) return;
-      const destNb =
-        targetNotebookId != null
-          ? notebooks.find((nb) => Number(nb.notebook_id) === Number(targetNotebookId))
-          : null;
+      const destNb = targetNotebookId != null ? notebooks.find((nb) => Number(nb.notebook_id) === Number(targetNotebookId)) : null;
       setCrossPaneDuplicateError('');
       setCrossPaneTransfer({
         item,
@@ -5706,9 +5329,7 @@ export default function RecordVaultWorkspacePane({
         setNotebooks(reordered);
       } else if (selectedNotebookId) {
         setNotebooks((prev) =>
-          prev.map((nb) =>
-            Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: reordered } : nb
-          )
+          prev.map((nb) => (Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: reordered } : nb))
         );
       }
 
@@ -5780,12 +5401,16 @@ export default function RecordVaultWorkspacePane({
       const targetNotebook = notebooks.find((nb) => Number(nb.notebook_id) === targetId);
       for (const noteId of noteIds) {
         const movedNote = findNoteRowById(noteId).note;
-        const movedNameLc = String(movedNote?.note_name ?? '').trim().toLowerCase();
+        const movedNameLc = String(movedNote?.note_name ?? '')
+          .trim()
+          .toLowerCase();
         if (movedNameLc && targetNotebook) {
           const clash = (targetNotebook.notes || []).some(
             (n) =>
               !noteIds.includes(Number(n.note_id)) &&
-              String(n.note_name ?? '').trim().toLowerCase() === movedNameLc
+              String(n.note_name ?? '')
+                .trim()
+                .toLowerCase() === movedNameLc
           );
           if (clash) {
             setError(
@@ -5840,9 +5465,7 @@ export default function RecordVaultWorkspacePane({
         void handleMoveNoteToNotebook(event, toId);
         return;
       }
-      void handleDropReorder(event, toId, mime, notebooks, 'notebook_id', (ids) =>
-        vaultApi.reorderRecordVaultNotebooks(ids)
-      );
+      void handleDropReorder(event, toId, mime, notebooks, 'notebook_id', (ids) => vaultApi.reorderRecordVaultNotebooks(ids));
     },
     [draggingNoteId, handleDropReorder, handleMoveNoteToNotebook, notebooks, tryHandleForeignCrossPaneDrop, vaultApi]
   );
@@ -5891,9 +5514,7 @@ export default function RecordVaultWorkspacePane({
       const newLabel =
         targetType === 'note'
           ? String(findNoteRowById(noteId).note?.note_name ?? '').trim()
-          : String(
-              notebooks.find((nb) => Number(nb.notebook_id) === notebookId)?.notebook_name ?? ''
-            ).trim();
+          : String(notebooks.find((nb) => Number(nb.notebook_id) === notebookId)?.notebook_name ?? '').trim();
       const newLabelLc = newLabel.toLowerCase();
       if (newLabelLc) {
         const clash = shortcuts.some((sc) => {
@@ -5902,12 +5523,14 @@ export default function RecordVaultWorkspacePane({
             Number(sc.notebook_id) === notebookId &&
             (targetType === 'notebook' || Number(sc.note_id) === noteId);
           if (sameTarget) return false;
-          return String(sc.label ?? '').trim().toLowerCase() === newLabelLc;
+          return (
+            String(sc.label ?? '')
+              .trim()
+              .toLowerCase() === newLabelLc
+          );
         });
         if (clash) {
-          setError(
-            `A shortcut named “${newLabel}” already exists. Rename the ${targetType} first, then add the shortcut.`
-          );
+          setError(`A shortcut named “${newLabel}” already exists. Rename the ${targetType} first, then add the shortcut.`);
           handleDragEnd();
           return;
         }
@@ -5928,13 +5551,10 @@ export default function RecordVaultWorkspacePane({
               (sc) =>
                 sc.target_type === created.target_type &&
                 Number(sc.notebook_id) === Number(created.notebook_id) &&
-                (created.target_type === 'notebook' ||
-                  Number(sc.note_id) === Number(created.note_id))
+                (created.target_type === 'notebook' || Number(sc.note_id) === Number(created.note_id))
             );
             if (duplicate) {
-              return prev.map((sc) =>
-                Number(sc.shortcut_id) === Number(duplicate.shortcut_id) ? { ...sc, ...created } : sc
-              );
+              return prev.map((sc) => (Number(sc.shortcut_id) === Number(duplicate.shortcut_id) ? { ...sc, ...created } : sc));
             }
             return [...prev, created];
           });
@@ -5984,28 +5604,28 @@ export default function RecordVaultWorkspacePane({
     [busy, handleDragEnd, shortcuts]
   );
 
-  const handleShortcutClick = useCallback((shortcut) => {
-    if (shortcut.target_type === 'notebook') {
-      notebookScopePendingRef.current = true;
-      setInnerEncryptUiScope('notebook');
+  const handleShortcutClick = useCallback(
+    (shortcut) => {
+      if (shortcut.target_type === 'notebook') {
+        notebookScopePendingRef.current = true;
+        setInnerEncryptUiScope('notebook');
+        setSelectedNotebookId(shortcut.notebook_id);
+        return;
+      }
+      notebookScopePendingRef.current = false;
+      setInnerEncryptUiScope('note');
       setSelectedNotebookId(shortcut.notebook_id);
-      return;
-    }
-    notebookScopePendingRef.current = false;
-    setInnerEncryptUiScope('note');
-    setSelectedNotebookId(shortcut.notebook_id);
-    selectNoteId(shortcut.note_id);
-  }, [selectNoteId]);
+      selectNoteId(shortcut.note_id);
+    },
+    [selectNoteId]
+  );
 
   const isShortcutSelected = useCallback(
     (shortcut) => {
       if (shortcut.target_type === 'notebook') {
         return Number(shortcut.notebook_id) === Number(selectedNotebookId);
       }
-      return (
-        Number(shortcut.notebook_id) === Number(selectedNotebookId) &&
-        Number(shortcut.note_id) === Number(selectedNoteId)
-      );
+      return Number(shortcut.notebook_id) === Number(selectedNotebookId) && Number(shortcut.note_id) === Number(selectedNoteId);
     },
     [selectedNotebookId, selectedNoteId]
   );
@@ -6024,11 +5644,18 @@ export default function RecordVaultWorkspacePane({
    */
   const vaultNameExists = useCallback(
     (candidate, { excludeNotebookId = null, excludeNoteId = null } = {}) => {
-      const target = String(candidate ?? '').trim().toLowerCase();
+      const target = String(candidate ?? '')
+        .trim()
+        .toLowerCase();
       if (!target) return false;
       for (const nb of notebooks) {
         if (Number(nb.notebook_id) !== Number(excludeNotebookId)) {
-          if (String(nb.notebook_name ?? '').trim().toLowerCase() === target) return true;
+          if (
+            String(nb.notebook_name ?? '')
+              .trim()
+              .toLowerCase() === target
+          )
+            return true;
         }
         const notes = nb.notes || [];
         for (const n of notes) {
@@ -6099,7 +5726,7 @@ export default function RecordVaultWorkspacePane({
         for (const folder of folders) {
           const notebookName = uniqueNotebookNameFromFolder(folder.folderName);
           setFolderImportProgressLabel(`Creating notebook “${notebookName}”…`);
-          // eslint-disable-next-line no-await-in-loop
+
           const createdNb = await vaultApi.createRecordVaultNotebook(notebookName);
           const notebookId = Number(createdNb?.notebook_id);
           if (!Number.isFinite(notebookId) || notebookId < 1) {
@@ -6116,7 +5743,6 @@ export default function RecordVaultWorkspacePane({
             const fileLabel = String(file?.name || 'file').trim() || 'file';
             setFolderImportProgressLabel(`Importing ${fileLabel}…`);
             try {
-              // eslint-disable-next-line no-await-in-loop
               const text = await file.text();
               let bodyHtml = prepareImportedHtml(text);
               const preferredTitle = String(file?.name || '')
@@ -6125,7 +5751,7 @@ export default function RecordVaultWorkspacePane({
               const noteName = uniqueImportedNoteTitle(preferredTitle, claimedTitles);
               claimedTitles.add(noteName);
               bodyHtml = cleanRecordVaultNoteBodyHtml(bodyHtml || '<p></p>', noteName);
-              // eslint-disable-next-line no-await-in-loop
+
               const created = await vaultApi.createRecordVaultNote(notebookId, {
                 note_name: noteName,
                 body_text: bodyHtml || '<p></p>'
@@ -6141,9 +5767,7 @@ export default function RecordVaultWorkspacePane({
               importedNoteNames.push(fileLabel);
               lastNoteId = created.note_id;
             } catch (err) {
-              setError(
-                `${fileLabel}: ${readRecordVaultApiError(err, 'import failed')}`
-              );
+              setError(`${fileLabel}: ${readRecordVaultApiError(err, 'import failed')}`);
             }
             reportImportProgress(`Imported ${fileLabel}`);
           }
@@ -6152,9 +5776,7 @@ export default function RecordVaultWorkspacePane({
             const exists = prev.some((nb) => Number(nb.notebook_id) === notebookId);
             if (exists) {
               return prev.map((nb) =>
-                Number(nb.notebook_id) === notebookId
-                  ? { ...nb, notes: [...(nb.notes || []), ...createdNoteRows] }
-                  : nb
+                Number(nb.notebook_id) === notebookId ? { ...nb, notes: [...(nb.notes || []), ...createdNoteRows] } : nb
               );
             }
             return [
@@ -6257,10 +5879,7 @@ export default function RecordVaultWorkspacePane({
           throw new Error(`Failed to create notebook “${notebookName}”`);
         }
         const createdNotebookName = createdNb.notebook_name || notebookName;
-        setNotebooks((prev) => [
-          { ...createdNb, notebook_id: notebookId, notebook_name: createdNotebookName, notes: [] },
-          ...prev
-        ]);
+        setNotebooks((prev) => [{ ...createdNb, notebook_id: notebookId, notebook_name: createdNotebookName, notes: [] }, ...prev]);
 
         const claimedTitles = new Set();
         const importedNoteNames = [];
@@ -6271,12 +5890,11 @@ export default function RecordVaultWorkspacePane({
           setFolderImportProgressPercent(Math.max(1, Math.round((i / enexNotes.length) * 100)));
           setFolderImportProgressLabel(`Importing ${i + 1} of ${enexNotes.length}: ${label}`);
           try {
-            // eslint-disable-next-line no-await-in-loop
             const rawBody = await enexNote.toHtml(stats);
             const noteName = uniqueImportedNoteTitle(enexNote.title || 'EVERNOTE NOTE', claimedTitles);
             claimedTitles.add(noteName);
             const bodyHtml = cleanRecordVaultNoteBodyHtml(rawBody || '<p></p>', noteName);
-            // eslint-disable-next-line no-await-in-loop
+
             const created = await vaultApi.createRecordVaultNote(notebookId, {
               note_name: noteName,
               body_text: bodyHtml || '<p></p>'
@@ -6290,9 +5908,7 @@ export default function RecordVaultWorkspacePane({
               content_loaded: true
             };
             setNotebooks((prev) =>
-              prev.map((nb) =>
-                Number(nb.notebook_id) === notebookId ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb
-              )
+              prev.map((nb) => (Number(nb.notebook_id) === notebookId ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb))
             );
             importedNoteNames.push(noteName);
             lastNoteId = created.note_id;
@@ -6306,9 +5922,7 @@ export default function RecordVaultWorkspacePane({
         bumpVaultUsage();
         setSelectedNotebookId(notebookId);
         if (lastNoteId != null) selectNoteId(lastNoteId);
-        await loadTree({ preferNotebookId: notebookId, preferNoteId: lastNoteId || undefined, silent: true }).catch(
-          () => {}
-        );
+        await loadTree({ preferNotebookId: notebookId, preferNoteId: lastNoteId || undefined, silent: true }).catch(() => {});
 
         if (importedNoteNames.length) {
           setFolderImportSuccess({
@@ -6321,9 +5935,7 @@ export default function RecordVaultWorkspacePane({
           });
         }
         if (failures.length) {
-          setError(
-            `Imported ${importedNoteNames.length} of ${enexNotes.length} notes; ${failures.length} failed. ${failures[0]}`
-          );
+          setError(`Imported ${importedNoteNames.length} of ${enexNotes.length} notes; ${failures.length} failed. ${failures[0]}`);
         }
         const summary = enexImportSummaryMessage(stats);
         if (summary) await themedAlert(summary);
@@ -6351,7 +5963,9 @@ export default function RecordVaultWorkspacePane({
 
   const commitNotebookRename = async () => {
     const notebookId = editingNotebookId;
-    const trimmed = String(editNameDraft ?? '').trim().toUpperCase();
+    const trimmed = String(editNameDraft ?? '')
+      .trim()
+      .toUpperCase();
     if (!notebookId) {
       clearRenameState();
       return;
@@ -6374,13 +5988,9 @@ export default function RecordVaultWorkspacePane({
     setError('');
     try {
       await vaultApi.updateRecordVaultNotebook(notebookId, trimmed);
-      setNotebooks((prev) =>
-        prev.map((nb) => (Number(nb.notebook_id) === Number(notebookId) ? { ...nb, notebook_name: trimmed } : nb))
-      );
+      setNotebooks((prev) => prev.map((nb) => (Number(nb.notebook_id) === Number(notebookId) ? { ...nb, notebook_name: trimmed } : nb)));
       setShortcuts((prev) =>
-        prev.map((sc) =>
-          sc.target_type === 'notebook' && Number(sc.notebook_id) === Number(notebookId) ? { ...sc, label: trimmed } : sc
-        )
+        prev.map((sc) => (sc.target_type === 'notebook' && Number(sc.notebook_id) === Number(notebookId) ? { ...sc, label: trimmed } : sc))
       );
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Failed to rename notebook'));
@@ -6391,7 +6001,9 @@ export default function RecordVaultWorkspacePane({
 
   const commitNoteRename = async () => {
     const noteId = editingNoteId;
-    const trimmed = String(editNameDraft ?? '').trim().toUpperCase();
+    const trimmed = String(editNameDraft ?? '')
+      .trim()
+      .toUpperCase();
     if (!noteId) {
       clearRenameState();
       return;
@@ -6399,9 +6011,7 @@ export default function RecordVaultWorkspacePane({
 
     // In search mode the edited note can live in a notebook other than the selected
     // one, so resolve its real owner for the sibling/clash checks.
-    const ownerNotebook =
-      notebooks.find((nb) => (nb.notes || []).some((n) => Number(n.note_id) === Number(noteId))) ||
-      selectedNotebook;
+    const ownerNotebook = notebooks.find((nb) => (nb.notes || []).some((n) => Number(n.note_id) === Number(noteId))) || selectedNotebook;
     const siblingNotes = ownerNotebook?.notes || [];
     const isSelected = Number(noteId) === Number(selectedNoteId);
 
@@ -6412,9 +6022,7 @@ export default function RecordVaultWorkspacePane({
     }
 
     const existing = siblingNotes.find((n) => Number(n.note_id) === Number(noteId));
-    const currentLabel = existing
-      ? recordVaultNoteSidebarLabel(existing, siblingNotes, notebooks)
-      : '';
+    const currentLabel = existing ? recordVaultNoteSidebarLabel(existing, siblingNotes, notebooks) : '';
 
     // Empty or unchanged name: keep the stored name and just leave edit mode.
     if (!trimmed || currentLabel === trimmed) {
@@ -6456,7 +6064,9 @@ export default function RecordVaultWorkspacePane({
     if (!selectedNoteId) return;
     const noteId = Number(selectedNoteId);
     const snapshot = String(noteTitleBoxSnapshotRef.current ?? '');
-    const upper = String(draftRef.current.openNoteTitlePlain ?? '').trim().toUpperCase();
+    const upper = String(draftRef.current.openNoteTitlePlain ?? '')
+      .trim()
+      .toUpperCase();
 
     const revertToSnapshot = () => {
       setOpenNoteTitlePlain(snapshot);
@@ -6473,10 +6083,7 @@ export default function RecordVaultWorkspacePane({
 
     // Empty or a computed "NB x, Note y" style placeholder: never freeze a
     // positional label as the real name — keep the previous title.
-    const isPlaceholder =
-      !upper ||
-      isDefaultStyleRecordVaultNoteTitle(upper) ||
-      isLegacyShortRecordVaultNoteName(upper);
+    const isPlaceholder = !upper || isDefaultStyleRecordVaultNoteTitle(upper) || isLegacyShortRecordVaultNoteName(upper);
     if (isPlaceholder) {
       revertToSnapshot();
       return;
@@ -6522,7 +6129,9 @@ export default function RecordVaultWorkspacePane({
   }, []);
 
   const confirmCreateNotebook = async (rawName) => {
-    const desiredName = String(rawName || '').trim().toUpperCase();
+    const desiredName = String(rawName || '')
+      .trim()
+      .toUpperCase();
     if (!desiredName) return;
     if (vaultNameExists(desiredName)) {
       setCreateItemDialog(null);
@@ -6544,7 +6153,9 @@ export default function RecordVaultWorkspacePane({
 
   const confirmCreateNote = async (rawName) => {
     if (!selectedNotebookId) return;
-    const desiredName = String(rawName || '').trim().toUpperCase();
+    const desiredName = String(rawName || '')
+      .trim()
+      .toUpperCase();
     if (!desiredName) return;
     if (vaultNameExists(desiredName)) {
       setCreateItemDialog(null);
@@ -6564,11 +6175,7 @@ export default function RecordVaultWorkspacePane({
         content_loaded: created.body_text != null
       };
       setNotebooks((prev) =>
-        prev.map((nb) =>
-          Number(nb.notebook_id) === Number(selectedNotebookId)
-            ? { ...nb, notes: [...(nb.notes || []), createdRow] }
-            : nb
-        )
+        prev.map((nb) => (Number(nb.notebook_id) === Number(selectedNotebookId) ? { ...nb, notes: [...(nb.notes || []), createdRow] } : nb))
       );
       selectNoteId(created.note_id);
     } catch (err) {
@@ -6577,20 +6184,6 @@ export default function RecordVaultWorkspacePane({
       setBusy(false);
     }
   };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   const handleDeleteNotebook = async (notebookId, notebookName) => {
     if (isBillScheduleNotebookId(notebookId)) return;
@@ -6604,9 +6197,9 @@ export default function RecordVaultWorkspacePane({
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    const doomedNoteIds = (
-      notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId))?.notes || []
-    ).map((n) => Number(n.note_id));
+    const doomedNoteIds = (notebooks.find((nb) => Number(nb.notebook_id) === Number(notebookId))?.notes || []).map((n) =>
+      Number(n.note_id)
+    );
     doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.add(id));
     try {
       await vaultApi.deleteRecordVaultNotebook(notebookId);
@@ -6647,19 +6240,9 @@ export default function RecordVaultWorkspacePane({
       bumpRecentNotes();
       clearInnerUnlockForNote(noteId);
       const notebookId = Number(selectedNotebookId);
-      const remainingNotes = (selectedNotebook?.notes || []).filter(
-        (n) => Number(n.note_id) !== Number(noteId)
-      );
-      setNotebooks((prev) =>
-        prev.map((nb) =>
-          Number(nb.notebook_id) === notebookId ? { ...nb, notes: remainingNotes } : nb
-        )
-      );
-      setShortcuts((prev) =>
-        prev.filter(
-          (sc) => !(sc.target_type === 'note' && Number(sc.note_id) === Number(noteId))
-        )
-      );
+      const remainingNotes = (selectedNotebook?.notes || []).filter((n) => Number(n.note_id) !== Number(noteId));
+      setNotebooks((prev) => prev.map((nb) => (Number(nb.notebook_id) === notebookId ? { ...nb, notes: remainingNotes } : nb)));
+      setShortcuts((prev) => prev.filter((sc) => !(sc.target_type === 'note' && Number(sc.note_id) === Number(noteId))));
       if (Number(selectedNoteId) === Number(noteId)) {
         const nextNoteId = remainingNotes[0]?.note_id ?? null;
         if (nextNoteId) selectNoteId(nextNoteId);
@@ -6695,10 +6278,10 @@ export default function RecordVaultWorkspacePane({
   // innerUnlockVersion keeps this in sync when PIN unlock succeeds (unlock state lives in a ref).
   const innerNoteLocked = Boolean(
     selectedNote &&
-      noteHasInnerEncryption(selectedNote) &&
-      !isInnerNoteUnlocked(selectedNote.note_id) &&
-      !noteContentLoading &&
-      innerUnlockVersion >= 0
+    noteHasInnerEncryption(selectedNote) &&
+    !isInnerNoteUnlocked(selectedNote.note_id) &&
+    !noteContentLoading &&
+    innerUnlockVersion >= 0
   );
   // Fully PIN-locked notebook (red *****) — hide all note names/content until notebook unlock.
   const selectedNotebookInnerLocked = notebookInnerLockedForDisplay(selectedNotebook?.notes || []);
@@ -6734,17 +6317,12 @@ export default function RecordVaultWorkspacePane({
     innerUnlockVersion
   ]);
 
-
-
-
   const notes = useMemo(() => {
     if (isBillScheduleNotebookId(selectedNotebookId)) {
       return billScheduleNotebook.notes || [];
     }
     const nb =
-      displayNotebooks.find((item) => Number(item.notebook_id) === Number(selectedNotebookId)) ??
-      displayNotebooks[0] ??
-      selectedNotebook;
+      displayNotebooks.find((item) => Number(item.notebook_id) === Number(selectedNotebookId)) ?? displayNotebooks[0] ?? selectedNotebook;
     return nb?.notes || [];
   }, [billScheduleNotebook, displayNotebooks, selectedNotebookId, selectedNotebook]);
 
@@ -6753,10 +6331,7 @@ export default function RecordVaultWorkspacePane({
    * (that is what drag-reorder persists); the sort cycle only changes what is drawn,
    * and step 0 (Create ↓) draws the stored order untouched.
    */
-  const sortedNotes = useMemo(
-    () => sortRecordVaultNotes(notes, noteSortIndex),
-    [notes, noteSortIndex]
-  );
+  const sortedNotes = useMemo(() => sortRecordVaultNotes(notes, noteSortIndex), [notes, noteSortIndex]);
   const noteSortLabel = recordVaultNoteSortButtonLabel(noteSortIndex);
   const noteSortHoverTitle = recordVaultNoteSortTitle(noteSortIndex);
   /** Default step keeps the stored (created / drag-arranged) order — drag-reorder only makes sense there. */
@@ -6765,17 +6340,11 @@ export default function RecordVaultWorkspacePane({
   const searchResultTabs = useMemo(() => {
     if (!searchActive || !Array.isArray(searchResults)) return [];
     const tabs = searchResults.map((result) => {
-      const notebookIndex = notebooks.findIndex(
-        (nb) => Number(nb.notebook_id) === Number(result.notebook_id)
-      );
+      const notebookIndex = notebooks.findIndex((nb) => Number(nb.notebook_id) === Number(result.notebook_id));
       const notebook =
-        notebookIndex >= 0
-          ? notebooks[notebookIndex]
-          : { notebook_id: result.notebook_id, notebook_name: result.notebook_name };
+        notebookIndex >= 0 ? notebooks[notebookIndex] : { notebook_id: result.notebook_id, notebook_name: result.notebook_name };
       const notesInNotebook = notebook?.notes || [];
-      const noteIndex = notesInNotebook.findIndex(
-        (item) => Number(item.note_id) === Number(result.note_id)
-      );
+      const noteIndex = notesInNotebook.findIndex((item) => Number(item.note_id) === Number(result.note_id));
       const note =
         noteIndex >= 0
           ? notesInNotebook[noteIndex]
@@ -6794,8 +6363,7 @@ export default function RecordVaultWorkspacePane({
         noteIndex: noteIndex < 0 ? Number.MAX_SAFE_INTEGER : noteIndex,
         label:
           Number(result.note_id) === Number(selectedNoteId)
-            ? openNoteTitlePlain ||
-              recordVaultSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
+            ? openNoteTitlePlain || recordVaultSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
             : recordVaultSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
       };
     });
@@ -6813,33 +6381,26 @@ export default function RecordVaultWorkspacePane({
       notebooks,
       scopeKey: recentNotesScopeKey,
       limit: 5,
-      isExcluded: (note, notesInNotebook) =>
-        isBillScheduleSystemId(note.note_id) || isNoteHiddenFromSearch(note, notesInNotebook),
-      getLabel: (note, notebook, notesInNotebook) =>
-        recordVaultSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
+      isExcluded: (note, notesInNotebook) => isBillScheduleSystemId(note.note_id) || isNoteHiddenFromSearch(note, notesInNotebook),
+      getLabel: (note, notebook, notesInNotebook) => recordVaultSearchResultTabLabel(note, notebook, notebooks, notesInNotebook)
     });
-  }, [
-    unlocked,
-    notebooks,
-    recentNotesScopeKey,
-    recentNotesVersion,
-    isNoteHiddenFromSearch
-  ]);
+  }, [unlocked, notebooks, recentNotesScopeKey, recentNotesVersion, isNoteHiddenFromSearch]);
 
-  const handleSearchResultSelect = useCallback((notebookId, noteId) => {
-    setSelectedNotebookId(notebookId);
-    selectNoteId(noteId);
-    setLeftMenuOpen(true);
-    setRightMenuOpen(true);
-  }, [selectNoteId]);
+  const handleSearchResultSelect = useCallback(
+    (notebookId, noteId) => {
+      setSelectedNotebookId(notebookId);
+      selectNoteId(noteId);
+      setLeftMenuOpen(true);
+      setRightMenuOpen(true);
+    },
+    [selectNoteId]
+  );
 
   // Index of the open note within the search-result tabs (for left/right doc nav).
   const currentSearchDocIndex = useMemo(
     () =>
       searchResultTabs.findIndex(
-        (t) =>
-          Number(t.notebook_id) === Number(selectedNotebookId) &&
-          Number(t.note_id) === Number(selectedNoteId)
+        (t) => Number(t.notebook_id) === Number(selectedNotebookId) && Number(t.note_id) === Number(selectedNoteId)
       ),
     [searchResultTabs, selectedNotebookId, selectedNoteId]
   );
@@ -6894,12 +6455,8 @@ export default function RecordVaultWorkspacePane({
   useEffect(() => {
     if (!searchActive || !selectedNoteId) return undefined;
     const timerId = window.setTimeout(() => {
-      document
-        .getElementById(`record-vault-note-${selectedNoteId}`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      document
-        .getElementById(`record-vault-notebook-${selectedNotebookId}`)
-        ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      document.getElementById(`record-vault-note-${selectedNoteId}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      document.getElementById(`record-vault-notebook-${selectedNotebookId}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }, 0);
     return () => window.clearTimeout(timerId);
   }, [searchActive, selectedNoteId, selectedNotebookId]);
@@ -6916,2132 +6473,2019 @@ export default function RecordVaultWorkspacePane({
   const paneStripColor = tutaNotesStorageStripColor(paneStorageType);
 
   return (
-    <RecordVaultSliderControlButtonProvider
-      fontRem={menuButtonFontRem}
-      followEnvVw={menuButtonFontFollowEnvVw}
-    >
-    <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
-    <Box
-      data-record-vault-pane
-      data-record-vault-storage={paneStorageType}
-      onDragEnter={(event) => {
-        if (isForeignCrossPaneDrag(event, paneStorageType)) {
+    <RecordVaultSliderControlButtonProvider fontRem={menuButtonFontRem} followEnvVw={menuButtonFontFollowEnvVw}>
+      <GlobalStyles styles={menuRowCurrentGreenGlobalStyles} />
+      <Box
+        data-record-vault-pane
+        data-record-vault-storage={paneStorageType}
+        onDragEnter={(event) => {
+          if (isForeignCrossPaneDrag(event, paneStorageType)) {
+            setCrossPaneDropActive(true);
+          }
+        }}
+        onDragOver={(event) => {
+          if (!isForeignCrossPaneDrag(event, paneStorageType)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'copy';
           setCrossPaneDropActive(true);
-        }
-      }}
-      onDragOver={(event) => {
-        if (!isForeignCrossPaneDrag(event, paneStorageType)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-        setCrossPaneDropActive(true);
-      }}
-      onDragLeave={(event) => {
-        const related = event.relatedTarget;
-        if (related && event.currentTarget.contains(related)) return;
-        setCrossPaneDropActive(false);
-      }}
-      onDrop={(event) => {
-        if (tryHandleForeignCrossPaneDrop(event, { targetNotebookId: selectedNotebookId })) {
+        }}
+        onDragLeave={(event) => {
+          const related = event.relatedTarget;
+          if (related && event.currentTarget.contains(related)) return;
           setCrossPaneDropActive(false);
-        }
-      }}
-      sx={{
-        flex: 1,
-        minHeight: 0,
-        minWidth: 0,
-        width: '100%',
-        height: compact ? '100%' : '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        fontFamily: MAIN_FONT_FAMILY,
-        bgcolor: workspaceShellBg,
-        overflow: 'hidden'
-      }}
-    >
-      
-      <BusyHourglassOverlay
-        open={Boolean(batchUploadProgress)}
-        label={batchUploadProgress?.label || 'Uploading files'}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={Boolean(busy && busyLabel)}
-        label={busyLabel || 'Working'}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={crossPaneBusy}
-        label={
-          crossPaneTransfer?.item?.storageType === 'tutadrive'
-            ? paneStorageType === 'usb'
-              ? 'Copying from Cloud to USB'
-              : 'Transferring Cloud item'
-            : paneStorageType === 'tutadrive'
-              ? 'Copying from USB to Cloud'
-              : 'Transferring USB item'
-        }
-        progressPercent={crossPaneProgressPercent}
-        progressLabel={crossPaneProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={false}
-        label="Loading TutaCloud sign-in"
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={vaultLeaving}
-        label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
-        progressPercent={vaultLeavingProgressPercent}
-        progressLabel={vaultLeavingProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-
-      <RecordVaultMobileUploadDialog
-        open={mobileUploadOpen}
-        onClose={() => setMobileUploadOpen(false)}
-        disabled={busy}
-        onPhoneUploadComplete={(fileNameOrId, meta) =>
-          void handleMobilePhoneUploadComplete(fileNameOrId, meta)
-        }
-      />
-
-      <RecordVaultMobileDirectUploadDialog
-        open={mobileDirectUploadOpen}
-        onClose={() => setMobileDirectUploadOpen(false)}
-        disabled={busy && !mobileTutaNotesUploadUi}
-        noteTitle={
-          mobileTutaNotesUploadUi
-            ? 'Mobile Upload'
-            : selectedNote?.note_name || selectedNote?.title || ''
-        }
-        onPickFile={handleMobileDirectUploadFile}
-        onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
-        onExitToMall={handleExitToMall}
-        product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
-      />
-
-      <RecordVaultCrossPaneTransferDialog
-        open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
-        item={crossPaneTransfer?.item || null}
-        targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
-        targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
-        busy={crossPaneBusy}
-        duplicateError={crossPaneDuplicateError}
-        onCopy={() => void runCrossPaneTransfer('copy')}
-        onMove={() => void runCrossPaneTransfer('move')}
-        onClose={() => {
-          if (crossPaneBusy) return;
-          setCrossPaneTransfer(null);
-          setCrossPaneDuplicateError('');
         }}
-        onDismissDuplicate={() => {
-          setCrossPaneDuplicateError('');
-          setCrossPaneTransfer(null);
+        onDrop={(event) => {
+          if (tryHandleForeignCrossPaneDrop(event, { targetNotebookId: selectedNotebookId })) {
+            setCrossPaneDropActive(false);
+          }
         }}
-      />
-      <BusyHourglassOverlay
-        open={notebookExportBusy}
-        label={
-          notebookHtmlExportOffer?.notebookName
-            ? `Exporting notebook “${notebookHtmlExportOffer.notebookName}”`
-            : 'Exporting notebook'
-        }
-        progressPercent={notebookExportProgressPercent}
-        progressLabel={notebookExportProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={folderImportBusy}
-        label="Importing notebook"
-        progressPercent={folderImportProgressPercent}
-        progressLabel={folderImportProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={multiHtmlExportBusy}
-        label="Exporting notes as HTML"
-        progressPercent={multiHtmlExportProgressPercent}
-        progressLabel={multiHtmlExportProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={Boolean(noteFileImportProgress)}
-        label="Importing notes"
-        progressPercent={noteFileImportProgress?.percent ?? 0}
-        progressLabel={noteFileImportProgress?.label || ''}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(folderImportSuccess)}
-        onClose={() => setFolderImportSuccess(null)}
-        closeOnBackdrop={false}
-        closeButtonAriaLabel="Close folder import success"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>
-            {folderImportSuccess?.sourceLabel ? 'Import complete' : 'Folder import complete'}
-          </ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            {folderImportSuccess
-              ? `Success: ${folderImportSuccess.sourceLabel || `Folder ${folderImportSuccess.folderName}`} been IMPORT to new Notebook ${folderImportSuccess.notebookPathLabel} along with these import Notes: ${(folderImportSuccess.noteNames || []).join(', ') || '(none)'}.`
-              : ''}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setFolderImportSuccess(null)}>
-              Close
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(multiHtmlExportOffer)}
-        onClose={() => {
-          if (multiHtmlExportBusy) return;
-          setMultiHtmlExportOffer(null);
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          width: '100%',
+          height: compact ? '100%' : '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          fontFamily: MAIN_FONT_FAMILY,
+          bgcolor: workspaceShellBg,
+          overflow: 'hidden'
         }}
-        closeOnBackdrop={!multiHtmlExportBusy}
-        closeButtonAriaLabel="Close export HTML dialog"
       >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>
-            Export {multiHtmlExportOffer?.count || 0} notes as HTML
-          </ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            Chrome cannot drop multiple real files into Finder in one drag (you get a
-            .textClipping). Choose a folder and each selected note will be saved as its
-            own .html file.
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={multiHtmlExportBusy}
-              onClick={() => {
-                if (multiHtmlExportBusy) return;
-                setMultiHtmlExportOffer(null);
-              }}
-            >
-              Cancel
-            </ColorTemplate16PopupCenterWide.ActionButton>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={multiHtmlExportBusy}
-              onClick={() => {
-                if (multiHtmlExportBusy || !multiHtmlExportOffer?.files?.length) return;
-                setMultiHtmlExportBusy(true);
-                setMultiHtmlExportProgressPercent(0);
-                setMultiHtmlExportProgressLabel('Choose a folder…');
-                const offer = multiHtmlExportOffer;
-                void downloadHtmlFilesSeparately(offer.files, {
-                  onProgress: ({ percent, label }) => {
-                    setMultiHtmlExportProgressPercent(percent);
-                    if (label) setMultiHtmlExportProgressLabel(label);
-                  }
-                })
-                  .then((ok) => {
-                    if (ok) {
-                      (offer.messages || []).forEach((msg) => enqueueImportSuccessPopup(msg, 2500));
-                    }
-                  })
-                  .finally(() => {
-                    setMultiHtmlExportBusy(false);
-                    setMultiHtmlExportProgressPercent(0);
-                    setMultiHtmlExportProgressLabel('');
-                    setMultiHtmlExportOffer(null);
-                  });
-              }}
-            >
-              {multiHtmlExportBusy ? 'Saving…' : 'Choose folder'}
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(notebookHtmlExportOffer) && !notebookExportBusy && !notebookExportSuccess}
-        onClose={() => {
-          if (notebookExportBusy) return;
-          setNotebookHtmlExportOffer(null);
-        }}
-        closeOnBackdrop={!notebookExportBusy}
-        closeButtonAriaLabel="Close notebook export dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>
-            Export notebook “{notebookHtmlExportOffer?.notebookName || 'Notebook'}”
-          </ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            Choose a parent folder. A subfolder named “
-            {sanitizeRecordVaultExportFileName(notebookHtmlExportOffer?.notebookName || 'Notebook')}
-            ” will be created and each of the {notebookHtmlExportOffer?.noteCount ?? 0} note(s)
-            will be saved as its own .html file inside it.
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={notebookExportBusy}
-              onClick={() => setNotebookHtmlExportOffer(null)}
-            >
-              Cancel
-            </ColorTemplate16PopupCenterWide.ActionButton>
-            <ColorTemplate16PopupCenterWide.ActionButton
-              disabled={notebookExportBusy}
-              onClick={() => {
-                if (notebookExportBusy || !notebookHtmlExportOffer?.notebookId) return;
-                const offer = notebookHtmlExportOffer;
-                void exportNotebookHtmlFolder(offer.notebookId).then((result) => {
-                  setNotebookHtmlExportOffer(null);
-                  if (result) setNotebookExportSuccess(result);
-                });
-              }}
-            >
-              Choose folder
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(notebookExportSuccess)}
-        onClose={() => setNotebookExportSuccess(null)}
-        closeOnBackdrop={false}
-        closeButtonAriaLabel="Close notebook export success"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Notebook export complete</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            {notebookExportSuccess
-              ? `Success: Notebook ${notebookExportSuccess.notebookName} been EXPORT to folder ${notebookExportSuccess.folderPath} along with these export HTML files: ${(notebookExportSuccess.noteNames || []).join(', ') || '(none)'}.${
-                  notebookExportSuccess.skippedLocked?.length
-                    ? ` Skipped locked notes: ${notebookExportSuccess.skippedLocked.join(', ')}.`
-                    : ''
-                }`
-              : ''}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setNotebookExportSuccess(null)}>
-              Close
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <RecordVaultTutaCloudBackupDialog
-        open={tutaCloudBackupOpen}
-        onClose={closeTutaCloudBackupDialog}
-        folderName={tutaCloudVaultFolderName}
-        tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
-        onRestored={() => void handleTutaCloudVaultRestored()}
-        requireBackupBeforeClose={tutaCloudBackupRequired}
-      />
-      <RecordVaultUsbBackupDialog
-        open={usbBackupOpen}
-        onClose={() => setUsbBackupOpen(false)}
-        folderLabel={usbVaultFolderLabel}
-        onOpenMyNote={() => setUsbBackupOpen(false)}
-        onRestored={() => handleUsbVaultRestoredOrFormatted()}
-      />
-      <RecordVaultRagDialog
-        open={ragDialogOpen}
-        onClose={() => setRagDialogOpen(false)}
-        selectedNoteIds={ragSelectedNoteIds}
-        storageType={paneStorageType}
-        keepModelInMemory={ragKeepModelInMemory}
-        disabled={busy || !unlocked}
-      />
-      <BillScheduleInstructionPopup
-        open={billScheduleTutorialOpen}
-        onClose={() => setBillScheduleTutorialOpen(false)}
-      />
-      <RecordVaultCreateItemDialog
-        open={Boolean(createItemDialog)}
-        mode={createItemDialog}
-        busy={busy}
-        noteNamePlaceholder={formatDefaultRecordVaultNoteTitle(
-          notebookNumberFromList(notebooks, selectedNotebookId),
-          (selectedNotebook?.notes || []).length + 1
-        ).toUpperCase()}
-        onClose={() => setCreateItemDialog(null)}
-        onConfirmNotebook={(name) => void confirmCreateNotebook(name)}
-        onConfirmNote={(name) => void confirmCreateNote(name)}
-      />
-      <ColorTemplate16PopupCenterWide
-        open={vaultFileTooLargeOpen}
-        onClose={() => setVaultFileTooLargeOpen(false)}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close file too large dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>File too large</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>
-            {vaultFileTooLargeName} ({vaultFileTooLargeActualMb} MB) is over the {vaultFileTooLargeMaxMb} MB allowed
-            for vault uploads.
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultFileTooLargeOpen(false)}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(ragKeepModelNotice)}
-        onClose={() => setRagKeepModelNotice('')}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close keep model dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>
-            {`Keep ${ragModelButtonLabel || 'Model'} Loaded`}
-          </ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
-            {ragKeepModelNotice}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setRagKeepModelNotice('')}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(duplicateNamePopup)}
-        onClose={() => setDuplicateNamePopup('')}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close duplicate name dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Duplicate name</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>{duplicateNamePopup}</ColorTemplate16PopupCenterWide.BodyText>
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setDuplicateNamePopup('')}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={Boolean(importSuccessPopup)}
-        onClose={() => setImportSuccessPopup('')}
-        closeOnBackdrop
-        showCloseButton={false}
-        closeButtonAriaLabel="Close import success"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>Import</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText>{importSuccessPopup}</ColorTemplate16PopupCenterWide.BodyText>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      <ColorTemplate16PopupCenterWide
-        open={vaultUploadErrorOpen}
-        onClose={() => setVaultUploadErrorOpen(false)}
-        closeOnBackdrop
-        closeButtonAriaLabel="Close upload error dialog"
-      >
-        <ColorTemplate16PopupCenterWide.Body spacing={2}>
-          <ColorTemplate16PopupCenterWide.Title>{vaultUploadErrorTitle}</ColorTemplate16PopupCenterWide.Title>
-          <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
-            {vaultUploadErrorMessage}
-          </ColorTemplate16PopupCenterWide.BodyText>
-          {vaultUploadErrorDetail ? (
-            <ColorTemplate16PopupCenterWide.BodyText
-              sx={{ whiteSpace: 'pre-wrap', opacity: 0.9, fontSize: '0.9em', textAlign: 'left' }}
-            >
-              {vaultUploadErrorDetail}
-            </ColorTemplate16PopupCenterWide.BodyText>
-          ) : null}
-          <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
-            <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultUploadErrorOpen(false)}>
-              OK
-            </ColorTemplate16PopupCenterWide.ActionButton>
-          </Stack>
-        </ColorTemplate16PopupCenterWide.Body>
-      </ColorTemplate16PopupCenterWide>
-      {error ? (
-        <VaultWorkspaceErrorPopup error={error} onClose={() => setError('')} />
-      ) : null}
+        <BusyHourglassOverlay
+          open={Boolean(batchUploadProgress)}
+          label={batchUploadProgress?.label || 'Uploading files'}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={Boolean(busy && busyLabel)}
+          label={busyLabel || 'Working'}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={crossPaneBusy}
+          label={
+            crossPaneTransfer?.item?.storageType === 'tutadrive'
+              ? paneStorageType === 'usb'
+                ? 'Copying from Cloud to USB'
+                : 'Transferring Cloud item'
+              : paneStorageType === 'tutadrive'
+                ? 'Copying from USB to Cloud'
+                : 'Transferring USB item'
+          }
+          progressPercent={crossPaneProgressPercent}
+          progressLabel={crossPaneProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={false}
+          label="Loading TutaCloud sign-in"
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={vaultLeaving}
+          label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
+          progressPercent={vaultLeavingProgressPercent}
+          progressLabel={vaultLeavingProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
 
-      <BusyHourglassOverlay
-        open={!vaultUiReady && loading && unlocked}
-        label="Loading vault"
-        backdropSx={myNoteLoadingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
-      <BusyHourglassOverlay
-        open={Boolean(unlocked && noteContentLoading && vaultUiReady)}
-        label={paneStorageType === 'tutadrive' ? 'Loading note from TutaCloud' : 'Loading note'}
-        progressPercent={noteLoadProgressPercent}
-        progressLabel={noteLoadProgressLabel}
-        backdropSx={vaultLeavingBackdropSx}
-        fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
-      />
+        <RecordVaultMobileUploadDialog
+          open={mobileUploadOpen}
+          onClose={() => setMobileUploadOpen(false)}
+          disabled={busy}
+          onPhoneUploadComplete={(fileNameOrId, meta) => void handleMobilePhoneUploadComplete(fileNameOrId, meta)}
+        />
 
-      {!unlocked ? (
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            flex: 1,
-            py: 6,
-            ...myNoteBackgroundPanelSx
+        <RecordVaultMobileDirectUploadDialog
+          open={mobileDirectUploadOpen}
+          onClose={() => setMobileDirectUploadOpen(false)}
+          disabled={busy && !mobileTutaNotesUploadUi}
+          noteTitle={mobileTutaNotesUploadUi ? 'Mobile Upload' : selectedNote?.note_name || selectedNote?.title || ''}
+          onPickFile={handleMobileDirectUploadFile}
+          onStaged={() => setMobileUploadTrayRefreshToken((n) => n + 1)}
+          onExitToMall={handleExitToMall}
+          product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
+        />
+
+        <RecordVaultCrossPaneTransferDialog
+          open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
+          item={crossPaneTransfer?.item || null}
+          targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
+          targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
+          busy={crossPaneBusy}
+          duplicateError={crossPaneDuplicateError}
+          onCopy={() => void runCrossPaneTransfer('copy')}
+          onMove={() => void runCrossPaneTransfer('move')}
+          onClose={() => {
+            if (crossPaneBusy) return;
+            setCrossPaneTransfer(null);
+            setCrossPaneDuplicateError('');
+          }}
+          onDismissDuplicate={() => {
+            setCrossPaneDuplicateError('');
+            setCrossPaneTransfer(null);
           }}
         />
-      ) : hideWorkspaceForMobileTutaNotesUpload ? (
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: '#ffffff'
-          }}
+        <BusyHourglassOverlay
+          open={notebookExportBusy}
+          label={
+            notebookHtmlExportOffer?.notebookName ? `Exporting notebook “${notebookHtmlExportOffer.notebookName}”` : 'Exporting notebook'
+          }
+          progressPercent={notebookExportProgressPercent}
+          progressLabel={notebookExportProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={folderImportBusy}
+          label="Importing notebook"
+          progressPercent={folderImportProgressPercent}
+          progressLabel={folderImportProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={multiHtmlExportBusy}
+          label="Exporting notes as HTML"
+          progressPercent={multiHtmlExportProgressPercent}
+          progressLabel={multiHtmlExportProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={Boolean(noteFileImportProgress)}
+          label="Importing notes"
+          progressPercent={noteFileImportProgress?.percent ?? 0}
+          progressLabel={noteFileImportProgress?.label || ''}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(folderImportSuccess)}
+          onClose={() => setFolderImportSuccess(null)}
+          closeOnBackdrop={false}
+          closeButtonAriaLabel="Close folder import success"
         >
-          <RecordVaultMobileUploadTray
-            product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
-            active={unlocked}
-            disabled={false}
-            layout="grid"
-            plain
-            refreshToken={mobileUploadTrayRefreshToken}
-            onError={(msg) => setError(String(msg || ''))}
-          />
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
-          {!hideWorkspaceChrome ? (
-          <RecordVaultUsageBar
-            usage={vaultUsage}
-            storageType={paneStorageType}
-            videoTutorialUrl={videoTutorialUrl}
-            onPurchased={() => refreshVaultUsageRef.current?.()}
-            onGetMoreTokens={openPaymentTokenCheckout}
-          />
-          ) : null}
-          {!hideWorkspaceChrome ? (
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>
+              {folderImportSuccess?.sourceLabel ? 'Import complete' : 'Folder import complete'}
+            </ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              {folderImportSuccess
+                ? `Success: ${folderImportSuccess.sourceLabel || `Folder ${folderImportSuccess.folderName}`} been IMPORT to new Notebook ${folderImportSuccess.notebookPathLabel} along with these import Notes: ${(folderImportSuccess.noteNames || []).join(', ') || '(none)'}.`
+                : ''}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setFolderImportSuccess(null)}>
+                Close
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(multiHtmlExportOffer)}
+          onClose={() => {
+            if (multiHtmlExportBusy) return;
+            setMultiHtmlExportOffer(null);
+          }}
+          closeOnBackdrop={!multiHtmlExportBusy}
+          closeButtonAriaLabel="Close export HTML dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>
+              Export {multiHtmlExportOffer?.count || 0} notes as HTML
+            </ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              Chrome cannot drop multiple real files into Finder in one drag (you get a .textClipping). Choose a folder and each selected
+              note will be saved as its own .html file.
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton
+                disabled={multiHtmlExportBusy}
+                onClick={() => {
+                  if (multiHtmlExportBusy) return;
+                  setMultiHtmlExportOffer(null);
+                }}
+              >
+                Cancel
+              </ColorTemplate16PopupCenterWide.ActionButton>
+              <ColorTemplate16PopupCenterWide.ActionButton
+                disabled={multiHtmlExportBusy}
+                onClick={() => {
+                  if (multiHtmlExportBusy || !multiHtmlExportOffer?.files?.length) return;
+                  setMultiHtmlExportBusy(true);
+                  setMultiHtmlExportProgressPercent(0);
+                  setMultiHtmlExportProgressLabel('Choose a folder…');
+                  const offer = multiHtmlExportOffer;
+                  void downloadHtmlFilesSeparately(offer.files, {
+                    onProgress: ({ percent, label }) => {
+                      setMultiHtmlExportProgressPercent(percent);
+                      if (label) setMultiHtmlExportProgressLabel(label);
+                    }
+                  })
+                    .then((ok) => {
+                      if (ok) {
+                        (offer.messages || []).forEach((msg) => enqueueImportSuccessPopup(msg, 2500));
+                      }
+                    })
+                    .finally(() => {
+                      setMultiHtmlExportBusy(false);
+                      setMultiHtmlExportProgressPercent(0);
+                      setMultiHtmlExportProgressLabel('');
+                      setMultiHtmlExportOffer(null);
+                    });
+                }}
+              >
+                {multiHtmlExportBusy ? 'Saving…' : 'Choose folder'}
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(notebookHtmlExportOffer) && !notebookExportBusy && !notebookExportSuccess}
+          onClose={() => {
+            if (notebookExportBusy) return;
+            setNotebookHtmlExportOffer(null);
+          }}
+          closeOnBackdrop={!notebookExportBusy}
+          closeButtonAriaLabel="Close notebook export dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>
+              Export notebook “{notebookHtmlExportOffer?.notebookName || 'Notebook'}”
+            </ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              Choose a parent folder. A subfolder named “
+              {sanitizeRecordVaultExportFileName(notebookHtmlExportOffer?.notebookName || 'Notebook')}” will be created and each of the{' '}
+              {notebookHtmlExportOffer?.noteCount ?? 0} note(s) will be saved as its own .html file inside it.
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton disabled={notebookExportBusy} onClick={() => setNotebookHtmlExportOffer(null)}>
+                Cancel
+              </ColorTemplate16PopupCenterWide.ActionButton>
+              <ColorTemplate16PopupCenterWide.ActionButton
+                disabled={notebookExportBusy}
+                onClick={() => {
+                  if (notebookExportBusy || !notebookHtmlExportOffer?.notebookId) return;
+                  const offer = notebookHtmlExportOffer;
+                  void exportNotebookHtmlFolder(offer.notebookId).then((result) => {
+                    setNotebookHtmlExportOffer(null);
+                    if (result) setNotebookExportSuccess(result);
+                  });
+                }}
+              >
+                Choose folder
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(notebookExportSuccess)}
+          onClose={() => setNotebookExportSuccess(null)}
+          closeOnBackdrop={false}
+          closeButtonAriaLabel="Close notebook export success"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Notebook export complete</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              {notebookExportSuccess
+                ? `Success: Notebook ${notebookExportSuccess.notebookName} been EXPORT to folder ${notebookExportSuccess.folderPath} along with these export HTML files: ${(notebookExportSuccess.noteNames || []).join(', ') || '(none)'}.${
+                    notebookExportSuccess.skippedLocked?.length
+                      ? ` Skipped locked notes: ${notebookExportSuccess.skippedLocked.join(', ')}.`
+                      : ''
+                  }`
+                : ''}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setNotebookExportSuccess(null)}>
+                Close
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <RecordVaultTutaCloudBackupDialog
+          open={tutaCloudBackupOpen}
+          onClose={closeTutaCloudBackupDialog}
+          folderName={tutaCloudVaultFolderName}
+          tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
+          onRestored={() => void handleTutaCloudVaultRestored()}
+          requireBackupBeforeClose={tutaCloudBackupRequired}
+        />
+        <RecordVaultUsbBackupDialog
+          open={usbBackupOpen}
+          onClose={() => setUsbBackupOpen(false)}
+          folderLabel={usbVaultFolderLabel}
+          onOpenMyNote={() => setUsbBackupOpen(false)}
+          onRestored={() => handleUsbVaultRestoredOrFormatted()}
+        />
+        <RecordVaultRagDialog
+          open={ragDialogOpen}
+          onClose={() => setRagDialogOpen(false)}
+          selectedNoteIds={ragSelectedNoteIds}
+          storageType={paneStorageType}
+          keepModelInMemory={ragKeepModelInMemory}
+          disabled={busy || !unlocked}
+        />
+        <BillScheduleInstructionPopup open={billScheduleTutorialOpen} onClose={() => setBillScheduleTutorialOpen(false)} />
+        <RecordVaultCreateItemDialog
+          open={Boolean(createItemDialog)}
+          mode={createItemDialog}
+          busy={busy}
+          noteNamePlaceholder={formatDefaultRecordVaultNoteTitle(
+            notebookNumberFromList(notebooks, selectedNotebookId),
+            (selectedNotebook?.notes || []).length + 1
+          ).toUpperCase()}
+          onClose={() => setCreateItemDialog(null)}
+          onConfirmNotebook={(name) => void confirmCreateNotebook(name)}
+          onConfirmNote={(name) => void confirmCreateNote(name)}
+        />
+        <ColorTemplate16PopupCenterWide
+          open={vaultFileTooLargeOpen}
+          onClose={() => setVaultFileTooLargeOpen(false)}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close file too large dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>File too large</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>
+              {vaultFileTooLargeName} ({vaultFileTooLargeActualMb} MB) is over the {vaultFileTooLargeMaxMb} MB allowed for vault uploads.
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultFileTooLargeOpen(false)}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(ragKeepModelNotice)}
+          onClose={() => setRagKeepModelNotice('')}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close keep model dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>{`Keep ${ragModelButtonLabel || 'Model'} Loaded`}</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
+              {ragKeepModelNotice}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setRagKeepModelNotice('')}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(duplicateNamePopup)}
+          onClose={() => setDuplicateNamePopup('')}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close duplicate name dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Duplicate name</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>{duplicateNamePopup}</ColorTemplate16PopupCenterWide.BodyText>
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setDuplicateNamePopup('')}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={Boolean(importSuccessPopup)}
+          onClose={() => setImportSuccessPopup('')}
+          closeOnBackdrop
+          showCloseButton={false}
+          closeButtonAriaLabel="Close import success"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>Import</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText>{importSuccessPopup}</ColorTemplate16PopupCenterWide.BodyText>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        <ColorTemplate16PopupCenterWide
+          open={vaultUploadErrorOpen}
+          onClose={() => setVaultUploadErrorOpen(false)}
+          closeOnBackdrop
+          closeButtonAriaLabel="Close upload error dialog"
+        >
+          <ColorTemplate16PopupCenterWide.Body spacing={2}>
+            <ColorTemplate16PopupCenterWide.Title>{vaultUploadErrorTitle}</ColorTemplate16PopupCenterWide.Title>
+            <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
+              {vaultUploadErrorMessage}
+            </ColorTemplate16PopupCenterWide.BodyText>
+            {vaultUploadErrorDetail ? (
+              <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap', opacity: 0.9, fontSize: '0.9em', textAlign: 'left' }}>
+                {vaultUploadErrorDetail}
+              </ColorTemplate16PopupCenterWide.BodyText>
+            ) : null}
+            <Stack direction="row" spacing={1.5} justifyContent="center" flexWrap="wrap" sx={{ width: '100%' }}>
+              <ColorTemplate16PopupCenterWide.ActionButton onClick={() => setVaultUploadErrorOpen(false)}>
+                OK
+              </ColorTemplate16PopupCenterWide.ActionButton>
+            </Stack>
+          </ColorTemplate16PopupCenterWide.Body>
+        </ColorTemplate16PopupCenterWide>
+        {error ? <VaultWorkspaceErrorPopup error={error} onClose={() => setError('')} /> : null}
+
+        <BusyHourglassOverlay
+          open={!vaultUiReady && loading && unlocked}
+          label="Loading vault"
+          backdropSx={myNoteLoadingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+        <BusyHourglassOverlay
+          open={Boolean(unlocked && noteContentLoading && vaultUiReady)}
+          label={paneStorageType === 'tutadrive' ? 'Loading note from TutaCloud' : 'Loading note'}
+          progressPercent={noteLoadProgressPercent}
+          progressLabel={noteLoadProgressLabel}
+          backdropSx={vaultLeavingBackdropSx}
+          fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
+        />
+
+        {!unlocked ? (
           <Box
             sx={{
-              flexShrink: 0,
               display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flex: 1,
+              py: 6,
+              ...myNoteBackgroundPanelSx
+            }}
+          />
+        ) : hideWorkspaceForMobileTutaNotesUpload ? (
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
               width: '100%',
-              minWidth: 0,
-              overflow: 'visible',
-              borderBottom: '2px solid var(--theme-primary-color)',
-              zIndex: 3,
-              pt: '2vh',
-              alignItems: 'stretch',
-              bgcolor: 'var(--theme-secondary-color)'
+              display: 'flex',
+              flexDirection: 'column',
+              bgcolor: '#ffffff'
             }}
           >
-            <Box
-              {...guestDemoAllowProps()}
-              sx={{
-                flex: '0 0 auto',
-                display: 'flex',
-                flexDirection: 'column',
-                bgcolor: 'transparent',
-                // Keep a stable minimum when menus are open (align with notebook sidebar),
-                // but allow the rail to grow so File / Close Menu / Exit never spill into Search.
-                minWidth: {
-                  xs: menuLabelsCompact ? 0 : 148,
-                  md: compareMode ? 220 : menuLabelsCompact ? 0 : sidebarWidth
-                },
-                maxWidth: {
-                  xs: '100%',
-                  md: compareMode ? 280 : menuLabelsCompact ? 'fit-content' : 'none'
-                },
-                width: menuLabelsCompact ? 'auto' : undefined,
-                overflow: 'visible',
-                boxSizing: 'border-box'
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
-                {!compareMode ? (
-                  <Box
-                    sx={{
-                      ...menuRailButtonCellSx,
-                      flex: '0 0 auto',
-                      width: 'auto',
-                      minWidth: 0,
-                      overflow: 'visible'
-                    }}
-                  >
-                    <RecordVaultFileMenu
-                      disabled={busy}
-                      ready={
-                        Boolean(selectedNote) &&
-                        !(
-                          noteRequiresInnerPinToView(selectedNote) &&
-                          !isInnerNoteUnlocked(selectedNote.note_id)
-                        )
-                      }
-                      noteTitle={openNoteTitlePlain}
-                      getHtml={getEditorHtml}
-                      getMarkdown={getEditorMarkdown}
-                      onImportHtml={handleImportHtml}
-                      onImportMarkdown={handleImportMarkdown}
-                      onImportEnexNotebook={importEnexNotesAsNotebook}
-                      paymentActive={fileWorkspaceView === 'payment'}
-                      onSelectPayment={openPaymentWorkspace}
-                      onSelectNotes={() => setFileWorkspaceView('notes')}
-                      buttonSx={headerToggleButtonSx}
-                    />
-                  </Box>
-                ) : null}
+            <RecordVaultMobileUploadTray
+              product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
+              active={unlocked}
+              disabled={false}
+              layout="grid"
+              plain
+              refreshToken={mobileUploadTrayRefreshToken}
+              onError={(msg) => setError(String(msg || ''))}
+            />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', flexDirection: 'column' }}>
+            {!hideWorkspaceChrome ? (
+              <RecordVaultUsageBar
+                usage={vaultUsage}
+                storageType={paneStorageType}
+                videoTutorialUrl={videoTutorialUrl}
+                onPurchased={() => refreshVaultUsageRef.current?.()}
+                onGetMoreTokens={openPaymentTokenCheckout}
+              />
+            ) : null}
+            {!hideWorkspaceChrome ? (
+              <Box
+                sx={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  width: '100%',
+                  minWidth: 0,
+                  overflow: 'visible',
+                  borderBottom: '2px solid var(--theme-primary-color)',
+                  zIndex: 3,
+                  pt: '2vh',
+                  alignItems: 'stretch',
+                  bgcolor: 'var(--theme-secondary-color)'
+                }}
+              >
                 <Box
+                  {...guestDemoAllowProps()}
                   sx={{
-                    ...menuRailButtonCellSx,
                     flex: '0 0 auto',
-                    width: 'auto',
-                    minWidth: 0,
-                    overflow: 'visible'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    bgcolor: 'transparent',
+                    // Keep a stable minimum when menus are open (align with notebook sidebar),
+                    // but allow the rail to grow so File / Close Menu / Exit never spill into Search.
+                    minWidth: {
+                      xs: menuLabelsCompact ? 0 : 148,
+                      md: compareMode ? 220 : menuLabelsCompact ? 0 : sidebarWidth
+                    },
+                    maxWidth: {
+                      xs: '100%',
+                      md: compareMode ? 280 : menuLabelsCompact ? 'fit-content' : 'none'
+                    },
+                    width: menuLabelsCompact ? 'auto' : undefined,
+                    overflow: 'visible',
+                    boxSizing: 'border-box'
                   }}
                 >
-                  {compareMode ? (
-                    <SliderControlButton
-                      type="button"
-                      variant="yellow"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      aria-label="Return to single storage view"
-                      onClick={() => onReturnFromCompare?.()}
-                      sx={headerToggleButtonSx}
-                    >
-                      Return
-                    </SliderControlButton>
-                  ) : (
-                    <SliderControlButton
-                      type="button"
-                      variant="yellow"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
-                      title={!menusOpen ? 'Open left and right menus' : 'Close left and right menus'}
-                      onClick={handleMenuLabelsToggle}
-                      sx={headerToggleButtonSx}
-                    >
-                      {menusOpen ? '< Close Menu' : 'Open Menu >'}
-                    </SliderControlButton>
-                  )}
-                </Box>
-                <Box
-                  sx={{
-                    ...menuRailButtonCellSx,
-                    flex: '0 0 auto',
-                    width: 'auto',
-                    minWidth: 0,
-                    maxWidth: 'none',
-                    overflow: 'visible'
-                  }}
-                >
-                  <VaultExitToMallToolbarButton
-                    compact={menuLabelsCompact}
-                    data-guest-demo-allow="true"
-                    onClick={() => void handleExitToMall()}
-                    disabled={busy}
-                    sx={headerToggleButtonSx}
-                  />
-                </Box>
-                {!compareMode && ragUiEnabled ? (
-                  <Box
-                    sx={{
-                      ...menuRailButtonCellSx,
-                      flex: '0 1 auto',
-                      width: 'auto',
-                      minWidth: 0,
-                      overflow: 'visible'
-                    }}
-                  >
-                    <SliderControlButton
-                      type="button"
-                      variant="green"
-                      hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                      aria-pressed={ragKeepModelInMemory}
-                      aria-label={
-                        ragKeepModelInMemory
-                          ? `Keep ${ragConfiguredModel || 'model'} loaded ON — Ollama stays in memory`
-                          : `Keep ${ragConfiguredModel || 'model'} loaded OFF — Ollama default timeout (~5 min)`
-                      }
-                      title={
-                        ragKeepModelInMemory
-                          ? 'Model pinned in RAM (click to use default ~5 min keep-alive)'
-                          : 'Click to load and keep Ollama model in memory'
-                      }
-                      disabled={busy || ragKeepModelBusy || !unlocked}
-                      onClick={() => void handleToggleRagKeepModel()}
-                      sx={{
-                        ...headerToggleButtonSx,
-                        width: 'auto',
-                        minWidth: 0,
-                        flexShrink: 1,
-                        whiteSpace: 'normal',
-                        lineHeight: 1.05,
-                        ...(ragKeepModelInMemory
-                          ? recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE, RECORD_VAULT_AI_BUTTON_BLUE_HOVER)
-                          : recordVaultAiButtonBlueSx(
-                              RECORD_VAULT_AI_BUTTON_BLUE_OFF,
-                              RECORD_VAULT_AI_BUTTON_BLUE_OFF_HOVER
-                            ))
-                      }}
-                    >
-                      {ragKeepModelBusy
-                        ? 'Loading…'
-                        : menuLabelsCompact
-                          ? 'Model'
-                          : `Keep ${ragModelButtonLabel || 'Model'} Loaded`}
-                    </SliderControlButton>
-                  </Box>
-                ) : null}
-              </Box>
-              {!compareMode ? (
-                <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
-                  {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
+                  <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
+                    {!compareMode ? (
+                      <Box
+                        sx={{
+                          ...menuRailButtonCellSx,
+                          flex: '0 0 auto',
+                          width: 'auto',
+                          minWidth: 0,
+                          overflow: 'visible'
+                        }}
+                      >
+                        <RecordVaultFileMenu
+                          disabled={busy}
+                          ready={
+                            Boolean(selectedNote) &&
+                            !(noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id))
+                          }
+                          noteTitle={openNoteTitlePlain}
+                          getHtml={getEditorHtml}
+                          getMarkdown={getEditorMarkdown}
+                          onImportHtml={handleImportHtml}
+                          onImportMarkdown={handleImportMarkdown}
+                          onImportEnexNotebook={importEnexNotesAsNotebook}
+                          paymentActive={fileWorkspaceView === 'payment'}
+                          onSelectPayment={openPaymentWorkspace}
+                          onSelectNotes={() => setFileWorkspaceView('notes')}
+                          buttonSx={headerToggleButtonSx}
+                        />
+                      </Box>
+                    ) : null}
                     <Box
                       sx={{
                         ...menuRailButtonCellSx,
-                        flex: '1 1 0',
+                        flex: '0 0 auto',
                         width: 'auto',
                         minWidth: 0,
-                        maxWidth: canEnterCompare ? '33%' : '50%',
                         overflow: 'visible'
                       }}
                     >
-                      <SliderControlButton
-                        type="button"
-                        variant="yellow"
-                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                        fullWidth
-                        onClick={() => setTutaCloudBackupOpen(true)}
-                        disabled={busy}
-                        aria-label="Backup/Restore"
-                        title="Backup / Restore"
-                        sx={headerFullWidthButtonSx}
-                      >
-                        Backup/Restore
-                      </SliderControlButton>
-                    </Box>
-                  ) : null}
-                  {paneStorageType === 'usb' ? (
-                    <Box
-                      sx={{
-                        ...menuRailButtonCellSx,
-                        flex: '1 1 0',
-                        width: 'auto',
-                        minWidth: 0,
-                        maxWidth: canEnterCompare ? '33%' : '50%',
-                        overflow: 'visible'
-                      }}
-                    >
-                      <SliderControlButton
-                        type="button"
-                        variant="yellow"
-                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                        fullWidth
-                        onClick={() => setUsbBackupOpen(true)}
-                        disabled={busy}
-                        aria-label="Backup/Restore"
-                        title="Backup / Restore USB"
-                        sx={headerFullWidthButtonSx}
-                      >
-                        Backup/Restore
-                      </SliderControlButton>
-                    </Box>
-                  ) : null}
-                  <Box
-                    sx={{
-                      ...menuRailButtonCellSx,
-                      flex: '1 1 0',
-                      width: 'auto',
-                      minWidth: 0,
-                      maxWidth: canEnterCompare
-                        ? '33%'
-                        : paneStorageType === 'usb' || (paneStorageType === 'tutadrive' && tutaCloudOffered)
-                          ? '50%'
-                          : '100%',
-                      overflow: 'visible'
-                    }}
-                  >
-                    <Tooltip
-                      title={MOBILE_UPLOAD_HOVER_TOOLTIP}
-                      arrow
-                      placement="right"
-                      enterDelay={200}
-                      slotProps={mobileUploadHoverTooltipSlotProps()}
-                    >
-                      <Box component="span" sx={{ display: 'block', width: '100%' }}>
+                      {compareMode ? (
                         <SliderControlButton
                           type="button"
                           variant="yellow"
                           hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                          fullWidth
-                          data-guest-demo-allow="true"
-                          onClick={() => setMobileUploadOpen(true)}
-                          disabled={busy || innerEncryptBusy}
-                          aria-label="Mobile Upload"
-                          sx={headerFullWidthButtonSx}
+                          aria-label="Return to single storage view"
+                          onClick={() => onReturnFromCompare?.()}
+                          sx={headerToggleButtonSx}
                         >
-                          {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
+                          Return
                         </SliderControlButton>
-                      </Box>
-                    </Tooltip>
-                  </Box>
-                  {canEnterCompare ? (
-                    <Box
-                      sx={{
-                        ...menuRailButtonCellSx,
-                        flex: '1 1 0',
-                        width: 'auto',
-                        minWidth: 0,
-                        maxWidth: '33%',
-                        overflow: 'visible'
-                      }}
-                    >
-                      <SliderControlButton
-                        type="button"
-                        variant="yellow"
-                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                        fullWidth
-                        onClick={() => onEnterCompare?.()}
-                        disabled={busy}
-                        aria-label="TutaCloud to USB compare"
-                        title="Open TutaCloud and USB side by side to drag and drop notebooks and notes"
-                        sx={headerFullWidthButtonSx}
-                      >
-                        TutaCloud↔USB
-                      </SliderControlButton>
+                      ) : (
+                        <SliderControlButton
+                          type="button"
+                          variant="yellow"
+                          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                          aria-label={!menusOpen ? 'Open menus' : 'Close menus'}
+                          title={!menusOpen ? 'Open left and right menus' : 'Close left and right menus'}
+                          onClick={handleMenuLabelsToggle}
+                          sx={headerToggleButtonSx}
+                        >
+                          {menusOpen ? '< Close Menu' : 'Open Menu >'}
+                        </SliderControlButton>
+                      )}
                     </Box>
-                  ) : null}
-                  {ragUiEnabled ? (
                     <Box
                       sx={{
                         ...menuRailButtonCellSx,
-                        flex: '1 1 0',
+                        flex: '0 0 auto',
                         width: 'auto',
                         minWidth: 0,
-                        maxWidth: canEnterCompare ? '25%' : '33%',
+                        maxWidth: 'none',
                         overflow: 'visible'
                       }}
                     >
-                      <SliderControlButton
-                        type="button"
-                        variant="yellow"
-                        hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                        fullWidth
+                      <VaultExitToMallToolbarButton
+                        compact={menuLabelsCompact}
                         data-guest-demo-allow="true"
-                        onClick={() => setRagDialogOpen(true)}
-                        disabled={busy || !unlocked}
-                        aria-label={
-                          ragModelButtonLabel
-                            ? `AI LLM RAG question and answer — model ${ragConfiguredModel}`
-                            : 'AI LLM RAG question and answer'
-                        }
-                        title={
-                          ragConfiguredModel
-                            ? `Ask about yellow-checked notes (model: ${ragConfiguredModel})`
-                            : 'Ask questions about notes with the yellow RAG checkbox checked'
-                        }
-                        sx={{
-                          ...headerFullWidthButtonSx,
-                          whiteSpace: 'normal',
-                          lineHeight: 1.05,
-                          py: { xs: 0.25, sm: 0.3 },
-                          ...recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE, RECORD_VAULT_AI_BUTTON_BLUE_HOVER)
-                        }}
-                      >
-                        <Box
-                          component="span"
-                          sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '100%',
-                            minWidth: 0,
-                            gap: 0.1
-                          }}
-                        >
-                          <Box component="span" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
-                            AI LLM RAG
-                          </Box>
-                          {ragModelButtonLabel ? (
-                            <Box
-                              component="span"
-                              sx={{
-                                fontSize: '0.52em',
-                                fontWeight: 600,
-                                lineHeight: 1.05,
-                                maxWidth: '100%',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              {ragModelButtonLabel}
-                            </Box>
-                          ) : null}
-                        </Box>
-                      </SliderControlButton>
-                    </Box>
-                  ) : null}
-                </Box>
-              ) : null}
-            </Box>
-            {!compareMode ? (
-            <RecordVaultSearchBar
-              searchLabel="Search All"
-              term1={searchTerm1}
-              onTerm1Change={setSearchTerm1}
-              onSubmit={() => void runSearch()}
-              onClear={handleClearSearch}
-              searchBusy={searchBusy}
-              clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
-              bgcolor="var(--theme-secondary-color)"
-              sx={{
-                // Clear of Exit / left chrome — search zone starts after the button rail.
-                ml: { xs: 0.75, sm: 1 },
-                pl: { xs: 0.75, sm: 1 },
-                borderLeft: '2px solid rgba(255,255,255,0.35)',
-                boxSizing: 'border-box'
-              }}
-            />
-            ) : (
-              <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'var(--theme-secondary-color)' }} aria-hidden />
-            )}
-          </Box>
-          ) : null}
-
-          {!hideWorkspaceChrome && !compareMode ? (
-          <Box
-            aria-label="Search results"
-            sx={{
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              minHeight: 44,
-              px: 1,
-              py: 0.75,
-              overflowX: 'auto',
-              bgcolor: paneStripColor,
-              borderBottom: '2px solid var(--theme-primary-color)'
-            }}
-          >
-            <Box
-              sx={{
-                flexShrink: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                border: '3px solid #000',
-                borderRadius: 0.5,
-                bgcolor: '#fff !important',
-                px: 1,
-                py: 0.35,
-                boxSizing: 'border-box'
-              }}
-            >
-              <Typography
-                component="span"
-                sx={{
-                  fontFamily: MAIN_FONT_FAMILY,
-                  fontWeight: 800,
-                  fontSize: { xs: '0.9rem', sm: '1rem' },
-                  lineHeight: 1.2,
-                  color: '#000',
-                  WebkitTextFillColor: '#000'
-                }}
-              >
-                Found:
-              </Typography>
-            </Box>
-            {searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
-              <Box
-                sx={{
-                  flexShrink: 0,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.25,
-                  border: '3px solid #000',
-                  borderRadius: 0.75,
-                  bgcolor: '#fff',
-                  px: 0.5,
-                  py: 0.25
-                }}
-              >
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Previous document"
-                  title="Previous found note"
-                  onClick={() => goToSearchDoc(-1)}
-                  disabled={currentSearchDocIndex <= 0}
-                  sx={searchNavButtonSx}
-                >
-                  ◀
-                </Box>
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Previous match in note"
-                  title="Previous match in this note"
-                  onClick={() => goToSearchHit(-1)}
-                  disabled={searchHitCount <= 0 || activeHitIndex <= 0}
-                  sx={searchNavButtonSx}
-                >
-                  ▲
-                </Box>
-                <Typography
-                  component="span"
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: '0.8rem',
-                    color: '#000',
-                    WebkitTextFillColor: '#000',
-                    minWidth: 44,
-                    textAlign: 'center',
-                    userSelect: 'none'
-                  }}
-                >
-                  {searchHitCount > 0 ? `${activeHitIndex + 1}/${searchHitCount}` : '0/0'}
-                </Typography>
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Next match in note"
-                  title="Next match in this note"
-                  onClick={() => goToSearchHit(1)}
-                  disabled={searchHitCount <= 0 || activeHitIndex >= searchHitCount - 1}
-                  sx={searchNavButtonSx}
-                >
-                  ▼
-                </Box>
-                <Box
-                  component="button"
-                  type="button"
-                  aria-label="Next document"
-                  title="Next found note"
-                  onClick={() => goToSearchDoc(1)}
-                  disabled={currentSearchDocIndex >= searchResultTabs.length - 1}
-                  sx={searchNavButtonSx}
-                >
-                  ▶
-                </Box>
-              </Box>
-            ) : null}
-            {searchBusy ? (
-              <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
-                Searching…
-              </Typography>
-            ) : searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
-              searchResultTabs.map((tab) => {
-                const selected =
-                  Number(tab.notebook_id) === Number(selectedNotebookId) &&
-                  Number(tab.note_id) === Number(selectedNoteId);
-                return (
-                  <SliderControlButton
-                    key={`search-tab-${tab.note_id}`}
-                    type="button"
-                    variant="yellow"
-                    disableHoverScale
-                    disableSelectedTranslate
-                    aria-pressed={selected}
-                    onClick={() => handleSearchResultSelect(tab.notebook_id, tab.note_id)}
-                    sx={{
-                      flexShrink: 0,
-                      px: 1.25,
-                      py: 0.5,
-                      whiteSpace: 'nowrap',
-                      bgcolor: selected
-                        ? `${RECORD_VAULT_SEARCH_HIT_BLUE} !important`
-                        : 'var(--theme-yellow-color) !important',
-                      color: selected ? '#ffffff !important' : '#000000 !important',
-                      WebkitTextFillColor: selected ? '#ffffff !important' : '#000000 !important',
-                      border: '4px solid #000000 !important'
-                    }}
-                  >
-                    {tab.label}
-                  </SliderControlButton>
-                );
-              })
-            ) : searchActive && Array.isArray(searchResults) && !searchResultTabs.length ? (
-              <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
-                {searchMessage || 'No notes match your search'}
-              </Typography>
-            ) : null}
-          </Box>
-          ) : null}
-
-          {!hideWorkspaceChrome && !compareMode ? (
-            <RecordVaultMobileUploadTray
-            product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
-              active={unlocked}
-              disabled={
-                busy ||
-                innerEncryptBusy ||
-                !selectedNote ||
-                isBillScheduleSystemId(selectedNote?.note_id) ||
-                (selectedNote &&
-                  noteHasInnerEncryption(selectedNote) &&
-                  !isInnerNoteUnlocked(selectedNote.note_id))
-              }
-              refreshToken={mobileUploadTrayRefreshToken}
-              recentNoteSlots={recentNoteSlots}
-              onRecentNoteSelect={handleSearchResultSelect}
-              recentSelectedNoteId={selectedNoteId}
-              recentSelectedNotebookId={selectedNotebookId}
-              onError={(msg) => setError(String(msg || ''))}
-            />
-          ) : null}
-
-          <Box
-            sx={{
-              display: 'flex',
-              flex: 1,
-              minHeight: 0,
-              width: '100%',
-              position: 'relative',
-              flexDirection: { xs: 'column', md: 'row' }
-            }}
-          >
-          {fileWorkspaceView === 'payment' && !compareMode ? (
-            <Box
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                minHeight: 0,
-                overflow: 'auto',
-                bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
-                p: { xs: 1, sm: 2 }
-              }}
-            >
-              <ProfilesRecordsPage
-                visibleTabs={PROFILES_RECORDS_PAYMENT_TABS}
-                embedded
-                initialTab={profilesRecordsInitialTab}
-                initialTokensBuying={profilesRecordsInitialTokens}
-              />
-            </Box>
-          ) : (
-          <>
-          {leftMenuOpen && !hideWorkspaceChrome ? (
-            <>
-              <Box
-                {...guestDemoAllowProps()}
-                sx={{
-                  flex: compareMode ? '1 1 0' : '0 0 auto',
-                  width: compareMode
-                    ? { xs: '100%', md: 'auto' }
-                    : { xs: '100%', md: sidebarWidth },
-                  maxWidth: compareMode
-                    ? { xs: '100%', md: '66%' }
-                    : { xs: '100%', md: 'none' },
-                  minWidth: compareMode ? { md: 0 } : undefined,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  bgcolor: workspaceShellBg,
-                  minHeight: compact || compareMode ? 0 : { xs: 280, md: '100%' },
-                  overflow: 'hidden',
-                  boxSizing: 'border-box'
-                }}
-              >
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flex: 1,
-                    minHeight: 0,
-                    flexDirection: 'column',
-                    p: compact ? 0.5 : 1,
-                    gap: compact ? 0.75 : 1
-                  }}
-                >
-                {/* Bill Schedule: separate box above the two swim lanes (label + Monthly/Yearly) + tutorial pair. */}
-                <Box
-                  sx={{
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 1,
-                    maxWidth: '100%'
-                  }}
-                >
-                <Box
-                  sx={{
-                    flexShrink: 0,
-                    alignSelf: 'center',
-                    width: notebookColWidth,
-                    maxWidth: '100%',
-                    border: '2px solid var(--theme-primary-color)',
-                    borderRadius: 1,
-                    bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
-                    p: compact ? 0.75 : 1,
-                    boxSizing: 'border-box',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.75
-                  }}
-                  onDragOver={(e) => {
-                    if (!crossPaneDropActive) return;
-                    if (!isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                  onDrop={(e) => {
-                    if (
-                      tryHandleForeignCrossPaneDrop(e, {
-                        targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
-                      })
-                    ) {
-                      return;
-                    }
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontWeight: 800,
-                      textAlign: 'center',
-                      fontFamily: MAIN_FONT_FAMILY,
-                      fontSize: '0.95rem',
-                      lineHeight: 1.2,
-                      userSelect: 'none'
-                    }}
-                  >
-                    Bill Schedule
-                  </Typography>
-                  {(billScheduleNotebook.notes || []).map((note) => (
-                      <Box key={note.note_id} sx={{ width: '100%', flexShrink: 0 }}>
-                        <RenamableDraggableMenuRow
-                          id={note.note_id}
-                          domId={`record-vault-note-${note.note_id}`}
-                          label={note.note_name}
-                          buttonTitle={`${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`}
-                          selected={Number(note.note_id) === Number(selectedNoteId)}
-                          editing={false}
-                          editValue=""
-                          onEditValueChange={() => {}}
-                          onSelect={() => openBillScheduleNote(note.note_id)}
-                          onStartEdit={() => {}}
-                          onCommitEdit={() => {}}
-                          onCancelEdit={() => {}}
-                          dragMime={DRAG_NOTE}
-                          dragNotebookId={BILL_SCHEDULE_NOTEBOOK_ID}
-                          draggingId={draggingNoteId}
-                          dropTargetId={dropTargetNoteId}
-                          acceptForeignDrop={
-                            crossPaneDropActive &&
-                            isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)
-                          }
-                          dragTitle={`Drag ${note.note_name} to the other vault to copy or move`}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={() => {}}
-                          onDrop={(e) => {
-                            if (
-                              tryHandleForeignCrossPaneDrop(e, {
-                                targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
-                              })
-                            ) {
-                              return;
-                            }
-                          }}
-                          disabled={busy || crossPaneBusy}
-                        />
-                      </Box>
-                  ))}
-                </Box>
-                <WorkspaceVideoTutorialPair
-                  videoTutorialUrl={videoTutorialUrl}
-                  onTutorialClick={() => setBillScheduleTutorialOpen(true)}
-                  tutorialVariant="orange"
-                  tutorialAriaLabel="Open Bill Schedule tutorial"
-                  tutorialTitle="Open Bill Schedule tutorial"
-                  sx={{ ml: 0 }}
-                />
-                </Box>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flex: 1,
-                    minHeight: 0,
-                    gap: 0
-                  }}
-                >
-                  <Box
-                    ref={notebookLaneRef}
-                    sx={{
-                      ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                      width: notebookColWidth,
-                      flexShrink: 0,
-                      ...(notebookLaneFolderDragActive
-                        ? {
-                            outline: '3px dashed var(--theme-yellow-color)',
-                            outlineOffset: 2,
-                            bgcolor: 'rgba(255, 215, 0, 0.18)'
-                          }
-                        : null)
-                    }}
-                    onDragOver={handleNotebookLaneFolderDragOver}
-                    onDragLeave={handleNotebookLaneFolderDragLeave}
-                    onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
-                    title="Drop a folder of .html notes here to import as a new notebook"
-                  >
-                    <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
-                      <SliderControlButton
-                        type="button"
-                        fullWidth
-                        onClick={handleAddNotebook}
+                        onClick={() => void handleExitToMall()}
                         disabled={busy}
-                        hoverScale={1.25}
-                        singleLineLabel
-                        sx={laneContainedButtonOneLineSx}
-                      >
-                        Add Notebook
-                      </SliderControlButton>
+                        sx={headerToggleButtonSx}
+                      />
                     </Box>
-                    <Box
-                      sx={{
-                        ...recordVaultMenuListScrollSx,
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}
-                    >
-                      {displayNotebooks.map((nb) => {
-                        void innerUnlockVersion;
-                        const notebookNotes = nb.notes || [];
-                        const notebookHasInner = notebookNotes.some((n) => noteHasInnerEncryption(n));
-                        const notebookInnerLocked = notebookInnerLockedForDisplay(notebookNotes);
-                        const notebookLockingUp =
-                          !notebookInnerLocked &&
-                          innerEncryptUiScope === 'notebook' &&
-                          (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
-                          Number(nb.notebook_id) === Number(selectedNotebookId);
-                        return (
-                        <Box
-                          key={nb.notebook_id}
-                          sx={{
-                            width: '100%',
-                            flexShrink: 0
-                          }}
-                        >
-                        <RenamableDraggableMenuRow
-                          id={nb.notebook_id}
-                          domId={`record-vault-notebook-${nb.notebook_id}`}
-                          label={
-                            notebookInnerLocked
-                              ? RECORD_VAULT_INNER_LOCKED_LABEL
-                              : Number(editingNotebookId) === Number(nb.notebook_id) &&
-                                  renameUiSurface === 'header'
-                                ? editNameDraft
-                                : nb.notebook_name
-                          }
-                          buttonTitle={
-                            notebookInnerLocked
-                              ? 'Locked notebook — enter PIN to unlock'
-                              : notebookLockingUp
-                                ? 'Locking notebook — enter PIN'
-                                : notebookHasInner
-                                  ? 'Notebook has PIN-locked notes'
-                                  : undefined
-                          }
-                          selected={Number(nb.notebook_id) === Number(selectedNotebookId)}
-                          locked={notebookInnerLocked}
-                          editing={
-                            Number(editingNotebookId) === Number(nb.notebook_id) &&
-                            renameUiSurface === 'menu' &&
-                            !notebookInnerLocked
-                          }
-                          editValue={editNameDraft}
-                          onEditValueChange={setEditNameDraft}
-                          onSelect={() => {
-                            if (Number(nb.notebook_id) === Number(selectedNotebookId)) return;
-                            notebookScopePendingRef.current = true;
-                            setInnerEncryptUiScope('notebook');
-                            // Immediate feedback — note body may still be loading from TutaCloud.
-                            setNoteContentLoading(true);
-                            setSelectedNotebookId(nb.notebook_id);
-                          }}
-                          onStartEdit={() => {
-                            setEditingNoteId(null);
-                            setRenameUiSurface('menu');
-                            setEditingNotebookId(nb.notebook_id);
-                            setEditNameDraft(nb.notebook_name || '');
-                          }}
-                          onCommitEdit={() => void commitNotebookRename()}
-                          onCancelEdit={clearRenameState}
-                          dragMime={DRAG_NOTEBOOK}
-                          draggingId={draggingNotebookId}
-                          alternateDraggingId={draggingNoteId}
-                          dropTargetId={dropTargetNotebookId}
-                          dragTitle={
-                            crossPaneDropActive
-                              ? 'Drop here to copy or move from the other vault'
-                              : draggingNoteId != null
-                                ? 'Drop note here to move into this notebook'
-                                : 'Drag to reorder; drag to Finder to export notebook folder + HTML notes'
-                          }
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={setDropTargetNotebookId}
-                          onDrop={(e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)}
-                          onDelete={() => void handleDeleteNotebook(nb.notebook_id, nb.notebook_name)}
-                          deleteLabel={`Delete notebook ${nb.notebook_name}`}
-                          onToggleLock={() => handleToggleNotebookLock(nb)}
-                          lockTitle={
-                            notebookInnerLocked
-                              ? 'Unlock notebook (enter 6-digit PIN)'
-                              : 'Lock notebook with a 6-digit PIN'
-                          }
-                          disabled={busy || crossPaneBusy}
-                          acceptForeignDrop={crossPaneDropActive}
-                        />
-                        </Box>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-
-                  <ColumnResizeHandle onMouseDown={(e) => startColumnResize('notebookCol', e)} />
-
-                  <Box
-                    ref={noteLaneRef}
-                    sx={{
-                      ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
-                      flex: 1,
-                      minWidth: MIN_MENU_COL_WIDTH,
-                      ...(noteLaneFileDragActive
-                        ? {
-                            outline: '3px dashed var(--theme-yellow-color)',
-                            outlineOffset: 2,
-                            bgcolor: 'rgba(255, 215, 0, 0.18)'
-                          }
-                        : null)
-                    }}
-                    onDragOver={handleNoteListFileDragOver}
-                    onDragLeave={handleNoteListFileDragLeave}
-                    onDrop={(e) => void handleNoteListFileDrop(e)}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'stretch',
-                        gap: 0.5,
-                        flexShrink: 0,
-                        mb: 1,
-                        overflow: 'visible',
-                        width: '100%'
-                      }}
-                    >
+                    {!compareMode && ragUiEnabled ? (
                       <Box
-                        data-menu-label-slot=""
-                        sx={{ ...laneAddButtonWrapSx, flex: '1 1 auto', width: 'auto', mb: 0, minWidth: 0 }}
+                        sx={{
+                          ...menuRailButtonCellSx,
+                          flex: '0 1 auto',
+                          width: 'auto',
+                          minWidth: 0,
+                          overflow: 'visible'
+                        }}
                       >
                         <SliderControlButton
                           type="button"
-                          fullWidth
-                          onClick={handleAddNote}
-                          disabled={
-                            busy ||
-                            !selectedNotebookId ||
-                            notebookGateLocked ||
-                            isBillScheduleNotebookId(selectedNotebookId)
+                          variant="green"
+                          hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                          aria-pressed={ragKeepModelInMemory}
+                          aria-label={
+                            ragKeepModelInMemory
+                              ? `Keep ${ragConfiguredModel || 'model'} loaded ON — Ollama stays in memory`
+                              : `Keep ${ragConfiguredModel || 'model'} loaded OFF — Ollama default timeout (~5 min)`
                           }
-                          hoverScale={1.25}
-                          singleLineLabel
-                          sx={laneContainedButtonOneLineSx}
+                          title={
+                            ragKeepModelInMemory
+                              ? 'Model pinned in RAM (click to use default ~5 min keep-alive)'
+                              : 'Click to load and keep Ollama model in memory'
+                          }
+                          disabled={busy || ragKeepModelBusy || !unlocked}
+                          onClick={() => void handleToggleRagKeepModel()}
+                          sx={{
+                            ...headerToggleButtonSx,
+                            width: 'auto',
+                            minWidth: 0,
+                            flexShrink: 1,
+                            whiteSpace: 'normal',
+                            lineHeight: 1.05,
+                            ...(ragKeepModelInMemory
+                              ? recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE, RECORD_VAULT_AI_BUTTON_BLUE_HOVER)
+                              : recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE_OFF, RECORD_VAULT_AI_BUTTON_BLUE_OFF_HOVER))
+                          }}
                         >
-                          Add Note
+                          {ragKeepModelBusy ? 'Loading…' : menuLabelsCompact ? 'Model' : `Keep ${ragModelButtonLabel || 'Model'} Loaded`}
                         </SliderControlButton>
-                      </Box>
-                      {/* 6-step order cycle: Create ↓ / ↑ → Date ↓ / ↑ → Name ↓ / ↑ → back. */}
-                      <SliderControlButton
-                        type="button"
-                        onClick={handleCycleNoteSort}
-                        disabled={busy}
-                        hoverScale={1.25}
-                        singleLineLabel
-                        aria-label={`Sort notes — ${noteSortHoverTitle}`}
-                        title={noteSortHoverTitle}
-                        sx={noteSortHeaderButtonSx}
-                      >
-                        {noteSortLabel}
-                      </SliderControlButton>
-                    </Box>
-                    <Box
-                      sx={{
-                        ...recordVaultMenuListScrollSx,
-                        display: 'flex',
-                        flexDirection: 'column'
-                      }}
-                    >
-                      {/* Encrypted notebook: do not reveal any note names until unlocked.
-                          Bill Schedule Monthly/Yearly live in the separate bottom box — never here.
-                          `sortedNotes` is the same rows in the order picked by the Date/Name toggle. */}
-                      {(notebookGateLocked ? [] : sortedNotes)
-                        .filter((note) => !isBillScheduleSystemId(note.note_id))
-                        .map((note) => {
-                        const isSystemNote = Boolean(note.is_system || isBillScheduleSystemId(note.note_id));
-                        const noteInnerLocked =
-                          !isSystemNote &&
-                          noteRequiresInnerPinToView(note) &&
-                          !isInnerNoteUnlockedForDisplay(note.note_id, note);
-                        const noteLockingUp =
-                          !isSystemNote &&
-                          !noteInnerLocked &&
-                          (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
-                          Number(note.note_id) === Number(selectedNoteId);
-                        // innerUnlockVersion lives in unlock refs — read so rows re-paint after PIN unlock.
-                        void innerUnlockVersion;
-                        const noteMenuLabel = isSystemNote
-                          ? note.note_name
-                          : noteInnerLocked
-                          ? RECORD_VAULT_INNER_LOCKED_LABEL
-                          : recordVaultNoteMenuLabel(note, notes, {
-                              selectedNoteId,
-                              openNoteTitlePlain,
-                              notebooks
-                            });
-                        const noteRealLabel = isSystemNote
-                          ? note.note_name
-                          : recordVaultNoteMenuLabel(note, notes, {
-                              selectedNoteId,
-                              openNoteTitlePlain,
-                              notebooks
-                            });
-                        const menuEditingThisNote =
-                          !isSystemNote &&
-                          Number(editingNoteId) === Number(note.note_id) &&
-                          renameUiSurface === 'menu';
-                        const headerEditingThisNote =
-                          !isSystemNote &&
-                          Number(editingNoteId) === Number(note.note_id) &&
-                          renameUiSurface === 'header';
-                        return (
-                        <Box
-                          key={note.note_id}
-                          sx={{
-                            width: '100%',
-                            flexShrink: 0
-                          }}
-                        >
-                        <RenamableDraggableMenuRow
-                          id={note.note_id}
-                          domId={`record-vault-note-${note.note_id}`}
-                          label={
-                            noteInnerLocked
-                              ? RECORD_VAULT_INNER_LOCKED_LABEL
-                              : headerEditingThisNote
-                                ? // Freeze sidebar label while the content-header field is being typed.
-                                  recordVaultNoteSidebarLabel(note, notes, notebooks)
-                                : menuEditingThisNote
-                                  ? editNameDraft || noteMenuLabel
-                                  : noteMenuLabel
-                          }
-                          buttonTitle={
-                            noteInnerLocked
-                              ? 'Locked — enter PIN to view'
-                              : noteLockingUp
-                                ? 'Locking up — enter PIN'
-                                : noteRealLabel
-                          }
-                          selected={Number(note.note_id) === Number(selectedNoteId)}
-                          selectedBlue={searchActive}
-                          multiSelected={
-                            multiSelectedNoteIds.some(
-                              (id) => Number(id) === Number(note.note_id)
-                            )
-                          }
-                          locked={noteInnerLocked}
-                          editing={menuEditingThisNote && !noteInnerLocked}
-                          editValue={editNameDraft}
-                          onEditValueChange={handleNoteListTitleEditChange}
-                          onSelect={(e) => {
-                            if (e?.shiftKey) {
-                              handleNoteShiftSelect(note.note_id);
-                              return;
-                            }
-                            selectNoteId(note.note_id);
-                          }}
-                          onStartEdit={() => {
-                            if (noteInnerLocked) return;
-                            replaceMultiSelectedNoteIds([]);
-                            noteMultiSelectAnchorIdRef.current = note.note_id;
-                            setEditingNotebookId(null);
-                            setRenameUiSurface('menu');
-                            setEditingNoteId(note.note_id);
-                            setEditNameDraft(
-                              Number(note.note_id) === Number(selectedNoteId)
-                                ? openNoteTitlePlain ||
-                                    recordVaultNoteSidebarLabel(note, notes, notebooks)
-                                : recordVaultNoteSidebarLabel(note, notes, notebooks)
-                            );
-                          }}
-                          onCommitEdit={() => void commitNoteRename()}
-                          onCancelEdit={clearRenameState}
-                          dragMime={DRAG_NOTE}
-                          dragNotebookId={selectedNotebookId}
-                          draggingId={draggingNoteId}
-                          dropTargetId={dropTargetNoteId}
-                          acceptForeignDrop={crossPaneDropActive}
-                          dragTitle={
-                            crossPaneDropActive
-                              ? 'Drop here to copy or move from the other vault'
-                              : noteSortActive
-                                ? 'Sorted view — clear the sort (click until “Create ↓”) to drag-reorder notes'
-                                : multiSelectedNoteIds.length > 1
-                                  ? `Shift-selected: ${multiSelectedNoteIds.length} notes — drag to Finder, then Choose folder for separate HTML files`
-                                  : 'Shift+click to multi-select; drag to Finder to export HTML; drop on a notebook to move'
-                          }
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onPrefetchDrag={prefetchNoteHtmlExport}
-                          onDragOver={setDropTargetNoteId}
-                          onDrop={(e, toId, mime) => {
-                            if (noteSortActive) {
-                              // Sorted view: rows are not in the stored order, so a
-                              // reorder would persist a meaningless sequence. Cross-pane
-                              // copy/move transfers still work.
-                              if (tryHandleForeignCrossPaneDrop(e, { targetNotebookId: selectedNotebookId })) {
-                                return;
-                              }
-                              handleDragEnd();
-                              return;
-                            }
-                            void handleDropReorder(
-                              e,
-                              toId,
-                              mime,
-                              notes.filter((n) => !isBillScheduleSystemId(n.note_id)),
-                              'note_id',
-                              (ids) => vaultApi.reorderRecordVaultNotes(selectedNotebookId, ids)
-                            );
-                          }}
-                          onFileDrop={(e) => void handleNoteListFileDrop(e)}
-                          onDelete={() => void handleDeleteNote(note.note_id, noteRealLabel)}
-                          deleteLabel={`Delete note ${noteRealLabel}`}
-                          onToggleLock={() => handleToggleNoteLock(note)}
-                          lockTitle={
-                            noteInnerLocked
-                              ? 'Unlock note (enter 6-digit PIN)'
-                              : 'Lock note with a 6-digit PIN'
-                          }
-                          ragSelected={ragSelectedNoteIds.some(
-                            (id) => Number(id) === Number(note.note_id)
-                          )}
-                          onToggleRag={
-                            isSystemNote || noteInnerLocked
-                              ? undefined
-                              : () => {
-                                  const selected = !ragSelectedNoteIds.some(
-                                    (id) => Number(id) === Number(note.note_id)
-                                  );
-                                  handleToggleRagNote(note.note_id, selected);
-                                }
-                          }
-                          ragDisabled={isSystemNote || noteInnerLocked}
-                          disabled={busy || crossPaneBusy || !selectedNotebookId || isBillScheduleView}
-                        />
-                        </Box>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                </Box>
-                </Box>
-              </Box>
-
-              {!compareMode ? (
-              <ColumnResizeHandle
-                sx={{ display: { xs: 'none', md: 'block' }, bgcolor: 'var(--theme-primary-color)', opacity: 0.35 }}
-                onMouseDown={(e) => startColumnResize('sidebar', e)}
-              />
-              ) : null}
-            </>
-          ) : null}
-
-          {!compareMode ? (
-          <Box
-            data-record-vault-note-content
-            ref={noteContentPaneRef}
-            // Do not make the whole editor pane HTML5-draggable — that steals click-drag
-            // from text selection and drags a huge translucent ghost. Export HTML from
-            // the notebook/note list on the left instead (PhotoAlbums uses the same rule).
-            draggable={false}
-            onDragOver={isBillMonthlyView || isBillYearlyView ? undefined : handleContentDragOver}
-            onDrop={isBillMonthlyView || isBillYearlyView ? undefined : handleContentFileDrop}
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              minHeight: compact ? 0 : { xs: 360, md: '100%' },
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              overflow: 'hidden',
-              bgcolor: workspaceContentBg
-            }}
-          >
-            {(() => {
-              const billFocusToggle = (
-                <VaultWorkspaceFocusToggleButton
-                  active={noteFocusView}
-                  onToggle={() => setNoteFocusView((v) => !v)}
-                />
-              );
-              if (isBillMonthlyView) {
-                return (
-                  <BillScheduleMonthlyPanel
-                    storageType={paneStorageType}
-                    videoTutorialUrl={videoTutorialUrl}
-                    onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
-                    headerRightAction={billFocusToggle}
-                  />
-                );
-              }
-              if (isBillYearlyView) {
-                return (
-                  <BillScheduleYearlyPanel
-                    storageType={paneStorageType}
-                    videoTutorialUrl={videoTutorialUrl}
-                    onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
-                    headerRightAction={billFocusToggle}
-                  />
-                );
-              }
-              const notebookNotesForLock = selectedNotebook?.notes || [];
-              const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);
-              const openNoteLocked = Boolean(
-                selectedNote &&
-                  noteRequiresInnerPinToView(selectedNote) &&
-                  !isInnerNoteUnlocked(selectedNote.note_id)
-              );
-              const lockedNow = notebookGateLocked || openNoteLocked;
-              // Whole notebook locked (all notes) → "Notebook"; a single locked note → "Note".
-              const lockedEntityLabel = notebookGateLocked ? 'Notebook' : 'Note';
-              // Dropped files are now embedded inline in the note body, so the
-              // editor always fills the content pane (no separate files panel).
-              const editorBoxSx = {
-                flex: 1,
-                minHeight: 0,
-                position: 'relative',
-                display: 'flex',
-                flexDirection: 'column',
-                bgcolor: workspaceContentBg
-              };
-              return (
-                <>
-                  <Box ref={editorBoxRef} sx={editorBoxSx}>
-                    <RecordVaultNoteEditor
-                      ref={noteEditorApiRef}
-                      onReady={handleEditorReady}
-                      onChange={scheduleSave}
-                      contentZoom={noteContentZoom}
-                      editorChromeHidden={noteFocusView}
-                      header={
-                        selectedNote && !lockedNow ? (
-                          <Box
-                            data-rv-note-title-row
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                              rowGap: 0.75,
-                              gap: 1,
-                              mx: 1,
-                              mb: 0.5,
-                              px: 1.5,
-                              py: 1,
-                              border: '2px solid #000',
-                              borderRadius: 1,
-                              bgcolor: '#fff',
-                              flex: '0 0 auto'
-                            }}
-                          >
-                            <Box
-                              component="label"
-                              htmlFor="rv-note-title-input"
-                              sx={{
-                                fontWeight: 800,
-                                color: '#000',
-                                fontSize: '1.15rem',
-                                flex: '0 0 auto'
-                              }}
-                            >
-                              Title:
-                            </Box>
-                            {titleHasHighlight ? (
-                              <Box
-                                role="textbox"
-                                tabIndex={0}
-                                title="Click to edit title"
-                                onClick={() => {
-                                  setTitleEditing(true);
-                                  setTimeout(() => {
-                                    const el = document.getElementById('rv-note-title-input');
-                                    if (el) {
-                                      el.focus();
-                                      el.select?.();
-                                    }
-                                  }, 0);
-                                }}
-                                sx={{
-                                  flex: 1,
-                                  minWidth: 0,
-                                  fontSize: '1.15rem',
-                                  fontWeight: 600,
-                                  color: '#000',
-                                  cursor: 'text',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis'
-                                }}
-                              >
-                                {renderTitleWithSearchHighlight(
-                                  openNoteTitlePlain,
-                                  titleHighlightTerms,
-                                  titleHighlightClass
-                                )}
-                              </Box>
-                            ) : (
-                              <TextField
-                                id="rv-note-title-input"
-                                variant="standard"
-                                fullWidth
-                                value={openNoteTitlePlain}
-                                onChange={(e) => handleNoteTitleBoxChange(e.target.value)}
-                                onFocus={() => {
-                                  noteTitleBoxSnapshotRef.current = String(
-                                    draftRef.current.openNoteTitlePlain ?? ''
-                                  );
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    e.currentTarget.blur();
-                                  } else if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setOpenNoteTitlePlain(noteTitleBoxSnapshotRef.current);
-                                    draftRef.current = {
-                                      ...draftRef.current,
-                                      openNoteTitlePlain: noteTitleBoxSnapshotRef.current
-                                    };
-                                    setTitleEditing(false);
-                                    e.currentTarget.blur();
-                                  }
-                                }}
-                                onBlur={commitNoteTitleBox}
-                                placeholder="Untitled note"
-                                InputProps={{ disableUnderline: true }}
-                                inputProps={{ 'aria-label': 'Note title', maxLength: 200 }}
-                                sx={{
-                                  flex: 1,
-                                  minWidth: 0,
-                                  '& .MuiInputBase-input': {
-                                    fontSize: '1.15rem',
-                                    fontWeight: 600,
-                                    color: '#000',
-                                    p: 0
-                                  }
-                                }}
-                              />
-                            )}
-                            <RecordVaultNoteAttachButton
-                              disabled={busy || lockedNow}
-                              onFiles={async (files) => {
-                                for (const file of files) {
-                                  // eslint-disable-next-line no-await-in-loop
-                                  await uploadNoteVaultFile(file, null);
-                                }
-                              }}
-                            />
-                            <RecordVaultImageRotateButton editor={noteEditor} disabled={lockedNow} />
-                            <RecordVaultSearchBar
-                              compact
-                              searchLabel="Search Here"
-                              term1={noteSearchTerm}
-                              onTerm1Change={setNoteSearchTerm}
-                              onSubmit={runNoteSearch}
-                              onClear={handleClearNoteSearch}
-                              clearDisabled={!noteSearchTerm.trim() && noteSearchHitCount === 0}
-                              hitCount={noteSearchHitCount}
-                              searched={noteSearchSearched}
-                              activeHitIndex={noteSearchActiveHitIndex}
-                              onPrevHit={() => goToNoteSearchHit(-1)}
-                              onNextHit={() => goToNoteSearchHit(1)}
-                              sx={{ ml: 0.5 }}
-                            />
-                            <RecordVaultNoteContentZoomBar
-                              value={noteContentZoom}
-                              onChange={setNoteContentZoom}
-                            />
-                            <VaultWorkspaceFocusToggleButton
-                              active={noteFocusView}
-                              onToggle={() => setNoteFocusView((v) => !v)}
-                              // Note-title expand glyph at 2× so it is easy to hit next to the title.
-                              iconSize={64}
-                            />
-                          </Box>
-                        ) : null
-                      }
-                    />
-                    {lockedNow ? (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          inset: 0,
-                          zIndex: 5,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 1.5,
-                          bgcolor: '#fff',
-                          textAlign: 'center',
-                          px: 2
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={innerEncryptOnImg}
-                          alt=""
-                          sx={{ width: 88, height: 88, display: 'block' }}
-                        />
-                        <Typography
-                          sx={{
-                            fontWeight: 900,
-                            fontSize: { xs: '2rem', sm: '2.5rem' },
-                            lineHeight: 1.15,
-                            color: '#000',
-                            WebkitTextFillColor: '#000'
-                          }}
-                        >
-                          This {lockedEntityLabel} is{' '}
-                          <Box
-                            component="span"
-                            sx={{ color: '#e60000', WebkitTextFillColor: '#e60000' }}
-                          >
-                            LOCKED
-                          </Box>
-                        </Typography>
-                        <Box
-                          component="button"
-                          type="button"
-                          onClick={() => {
-                            if (notebookGateLocked && selectedNotebook)
-                              handleToggleNotebookLock(selectedNotebook);
-                            else if (openNoteLocked) handleToggleNoteLock(selectedNote);
-                            else if (selectedNotebook) handleToggleNotebookLock(selectedNotebook);
-                          }}
-                          disabled={busy || innerEncryptBusy}
-                          sx={{
-                            bgcolor: '#e60000',
-                            color: 'var(--theme-yellow-color)',
-                            fontWeight: 800,
-                            fontSize: '1.1rem',
-                            border: '2px solid #000',
-                            borderRadius: 1,
-                            px: 3,
-                            py: 1,
-                            cursor: 'pointer',
-                            '&:hover': { filter: 'brightness(1.05)' }
-                          }}
-                        >
-                          Unlock now
-                        </Box>
                       </Box>
                     ) : null}
                   </Box>
-                </>
-              );
-            })()}
-          </Box>
-          ) : null}
+                  {!compareMode ? (
+                    <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
+                      {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
+                        <Box
+                          sx={{
+                            ...menuRailButtonCellSx,
+                            flex: '1 1 0',
+                            width: 'auto',
+                            minWidth: 0,
+                            maxWidth: canEnterCompare ? '33%' : '50%',
+                            overflow: 'visible'
+                          }}
+                        >
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            fullWidth
+                            onClick={() => setTutaCloudBackupOpen(true)}
+                            disabled={busy}
+                            aria-label="Backup/Restore"
+                            title="Backup / Restore"
+                            sx={headerFullWidthButtonSx}
+                          >
+                            Backup/Restore
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                      {paneStorageType === 'usb' ? (
+                        <Box
+                          sx={{
+                            ...menuRailButtonCellSx,
+                            flex: '1 1 0',
+                            width: 'auto',
+                            minWidth: 0,
+                            maxWidth: canEnterCompare ? '33%' : '50%',
+                            overflow: 'visible'
+                          }}
+                        >
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            fullWidth
+                            onClick={() => setUsbBackupOpen(true)}
+                            disabled={busy}
+                            aria-label="Backup/Restore"
+                            title="Backup / Restore USB"
+                            sx={headerFullWidthButtonSx}
+                          >
+                            Backup/Restore
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                      <Box
+                        sx={{
+                          ...menuRailButtonCellSx,
+                          flex: '1 1 0',
+                          width: 'auto',
+                          minWidth: 0,
+                          maxWidth: canEnterCompare
+                            ? '33%'
+                            : paneStorageType === 'usb' || (paneStorageType === 'tutadrive' && tutaCloudOffered)
+                              ? '50%'
+                              : '100%',
+                          overflow: 'visible'
+                        }}
+                      >
+                        <Tooltip
+                          title={MOBILE_UPLOAD_HOVER_TOOLTIP}
+                          arrow
+                          placement="right"
+                          enterDelay={200}
+                          slotProps={mobileUploadHoverTooltipSlotProps()}
+                        >
+                          <Box component="span" sx={{ display: 'block', width: '100%' }}>
+                            <SliderControlButton
+                              type="button"
+                              variant="yellow"
+                              hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                              fullWidth
+                              data-guest-demo-allow="true"
+                              onClick={() => setMobileUploadOpen(true)}
+                              disabled={busy || innerEncryptBusy}
+                              aria-label="Mobile Upload"
+                              sx={headerFullWidthButtonSx}
+                            >
+                              {menuLabelsCompact ? 'MU' : 'Mobile Upload'}
+                            </SliderControlButton>
+                          </Box>
+                        </Tooltip>
+                      </Box>
+                      {canEnterCompare ? (
+                        <Box
+                          sx={{
+                            ...menuRailButtonCellSx,
+                            flex: '1 1 0',
+                            width: 'auto',
+                            minWidth: 0,
+                            maxWidth: '33%',
+                            overflow: 'visible'
+                          }}
+                        >
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            fullWidth
+                            onClick={() => onEnterCompare?.()}
+                            disabled={busy}
+                            aria-label="TutaCloud to USB compare"
+                            title="Open TutaCloud and USB side by side to drag and drop notebooks and notes"
+                            sx={headerFullWidthButtonSx}
+                          >
+                            TutaCloud↔USB
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                      {ragUiEnabled ? (
+                        <Box
+                          sx={{
+                            ...menuRailButtonCellSx,
+                            flex: '1 1 0',
+                            width: 'auto',
+                            minWidth: 0,
+                            maxWidth: canEnterCompare ? '25%' : '33%',
+                            overflow: 'visible'
+                          }}
+                        >
+                          <SliderControlButton
+                            type="button"
+                            variant="yellow"
+                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
+                            fullWidth
+                            data-guest-demo-allow="true"
+                            onClick={() => setRagDialogOpen(true)}
+                            disabled={busy || !unlocked}
+                            aria-label={
+                              ragModelButtonLabel
+                                ? `AI LLM RAG question and answer — model ${ragConfiguredModel}`
+                                : 'AI LLM RAG question and answer'
+                            }
+                            title={
+                              ragConfiguredModel
+                                ? `Ask about yellow-checked notes (model: ${ragConfiguredModel})`
+                                : 'Ask questions about notes with the yellow RAG checkbox checked'
+                            }
+                            sx={{
+                              ...headerFullWidthButtonSx,
+                              whiteSpace: 'normal',
+                              lineHeight: 1.05,
+                              py: { xs: 0.25, sm: 0.3 },
+                              ...recordVaultAiButtonBlueSx(RECORD_VAULT_AI_BUTTON_BLUE, RECORD_VAULT_AI_BUTTON_BLUE_HOVER)
+                            }}
+                          >
+                            <Box
+                              component="span"
+                              sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '100%',
+                                minWidth: 0,
+                                gap: 0.1
+                              }}
+                            >
+                              <Box component="span" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
+                                AI LLM RAG
+                              </Box>
+                              {ragModelButtonLabel ? (
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    fontSize: '0.52em',
+                                    fontWeight: 600,
+                                    lineHeight: 1.05,
+                                    maxWidth: '100%',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {ragModelButtonLabel}
+                                </Box>
+                              ) : null}
+                            </Box>
+                          </SliderControlButton>
+                        </Box>
+                      ) : null}
+                    </Box>
+                  ) : null}
+                </Box>
+                {!compareMode ? (
+                  <RecordVaultSearchBar
+                    searchLabel="Search All"
+                    term1={searchTerm1}
+                    onTerm1Change={setSearchTerm1}
+                    onSubmit={() => void runSearch()}
+                    onClear={handleClearSearch}
+                    searchBusy={searchBusy}
+                    clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
+                    bgcolor="var(--theme-secondary-color)"
+                    sx={{
+                      // Clear of Exit / left chrome — search zone starts after the button rail.
+                      ml: { xs: 0.75, sm: 1 },
+                      pl: { xs: 0.75, sm: 1 },
+                      borderLeft: '2px solid rgba(255,255,255,0.35)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                ) : (
+                  <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'var(--theme-secondary-color)' }} aria-hidden />
+                )}
+              </Box>
+            ) : null}
 
-          <RecordVaultNoteInnerEncryptDialog
-            open={innerEncryptDialog.open}
-            mode={innerEncryptDialog.mode}
-            scope={innerEncryptDialog.scope}
-            noteName={selectedNote?.note_name || ''}
-            busy={innerEncryptBusy}
-            progressPercent={innerEncryptProgressPercent}
-            progressLabel={innerEncryptProgressLabel}
-            error={innerEncryptError}
-            onSubmit={handleInnerEncryptSubmit}
-            onClose={closeInnerEncryptDialog}
-          />
-
-          {rightMenuOpen && !hideWorkspaceChrome ? (
-            <>
-              {!compareMode ? (
-              <ColumnResizeHandle
-                sx={{ display: { xs: 'none', md: 'block' }, bgcolor: 'var(--theme-primary-color)', opacity: 0.35 }}
-                onMouseDown={(e) => startColumnResize('rightSidebar', e)}
-              />
-              ) : null}
+            {!hideWorkspaceChrome && !compareMode ? (
               <Box
-                {...guestDemoAllowProps()}
+                aria-label="Search results"
                 sx={{
-                  flex: compareMode ? '1 1 0' : '0 0 auto',
-                  width: compareMode
-                    ? { xs: '100%', md: 'auto' }
-                    : { xs: '100%', md: rightSidebarWidth },
-                  maxWidth: compareMode
-                    ? { xs: '100%', md: '50%' }
-                    : { xs: '100%', md: 'none' },
-                  minWidth: compareMode ? { md: 0 } : undefined,
+                  flexShrink: 0,
                   display: 'flex',
-                  flexDirection: 'column',
-                  bgcolor: workspaceContentBg,
-                  minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
-                  borderLeft: { md: '2px solid var(--theme-primary-color)' },
-                  overflow: 'hidden',
-                  boxSizing: 'border-box'
+                  alignItems: 'center',
+                  gap: 0.75,
+                  minHeight: 44,
+                  px: 1,
+                  py: 0.75,
+                  overflowX: 'auto',
+                  bgcolor: paneStripColor,
+                  borderBottom: '2px solid var(--theme-primary-color)'
                 }}
               >
                 <Box
                   sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    p: compact ? 0.5 : 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0,
-                    bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    border: '3px solid #000',
+                    borderRadius: 0.5,
+                    bgcolor: '#fff !important',
+                    px: 1,
+                    py: 0.35,
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <Box
-                    ref={shortcutLaneRef}
+                  <Typography
+                    component="span"
                     sx={{
-                      ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
-                      flex: '1 1 0',
-                      minHeight: compact ? 64 : 100
-                    }}
-                    onDragOver={(e) => {
-                      const fromLeft = isLeftSidebarDragEvent(e);
-                      if (fromLeft || draggingShortcutId != null) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
-                      const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
-                      const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
-                      if (!shortcutRaw && (notebookRaw || noteRaw || isLeftSidebarDragEvent(e))) {
-                        void handleShortcutDropFromLeft(e);
-                      }
+                      fontFamily: MAIN_FONT_FAMILY,
+                      fontWeight: 800,
+                      fontSize: { xs: '0.9rem', sm: '1rem' },
+                      lineHeight: 1.2,
+                      color: '#000',
+                      WebkitTextFillColor: '#000'
                     }}
                   >
-                    <Box data-menu-label-slot="" sx={{ width: '100%', mb: 1 }}>
-                    <SliderControlButton
+                    Found:
+                  </Typography>
+                </Box>
+                {searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
+                  <Box
+                    sx={{
+                      flexShrink: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      border: '3px solid #000',
+                      borderRadius: 0.75,
+                      bgcolor: '#fff',
+                      px: 0.5,
+                      py: 0.25
+                    }}
+                  >
+                    <Box
+                      component="button"
                       type="button"
-                      fullWidth
-                      tabIndex={-1}
-                      aria-hidden
-                      disabled
-                      disableHoverScale
+                      aria-label="Previous document"
+                      title="Previous found note"
+                      onClick={() => goToSearchDoc(-1)}
+                      disabled={currentSearchDocIndex <= 0}
+                      sx={searchNavButtonSx}
+                    >
+                      ◀
+                    </Box>
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Previous match in note"
+                      title="Previous match in this note"
+                      onClick={() => goToSearchHit(-1)}
+                      disabled={searchHitCount <= 0 || activeHitIndex <= 0}
+                      sx={searchNavButtonSx}
+                    >
+                      ▲
+                    </Box>
+                    <Typography
+                      component="span"
                       sx={{
-                        pointerEvents: 'none',
-                        cursor: 'default',
-                        ...laneContainedButtonSx,
-                        borderRadius: '0 !important',
-                        bgcolor: '#ffffff !important',
-                        color: '#000000 !important',
-                        WebkitTextFillColor: '#000000 !important',
-                        border: '2px solid #000000 !important',
-                        '&.Mui-disabled': {
-                          bgcolor: '#ffffff !important',
-                          color: '#000000 !important',
-                          WebkitTextFillColor: '#000000 !important',
-                          border: '2px solid #000000 !important'
-                        }
+                        fontWeight: 800,
+                        fontSize: '0.8rem',
+                        color: '#000',
+                        WebkitTextFillColor: '#000',
+                        minWidth: 44,
+                        textAlign: 'center',
+                        userSelect: 'none'
                       }}
                     >
-                      Shortcut
-                    </SliderControlButton>
-                    </Box>
-                    <Typography sx={{ fontSize: '0.85rem', mb: 1, opacity: 0.85 }}>
-                      Drag notebooks or notes here
+                      {searchHitCount > 0 ? `${activeHitIndex + 1}/${searchHitCount}` : '0/0'}
                     </Typography>
                     <Box
-                      sx={recordVaultMenuListScrollSx}
-                      onDragOver={(e) => {
-                        const fromLeft = isLeftSidebarDragEvent(e);
-                        if (fromLeft || draggingShortcutId != null) {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
-                        }
-                      }}
+                      component="button"
+                      type="button"
+                      aria-label="Next match in note"
+                      title="Next match in this note"
+                      onClick={() => goToSearchHit(1)}
+                      disabled={searchHitCount <= 0 || activeHitIndex >= searchHitCount - 1}
+                      sx={searchNavButtonSx}
                     >
-                      {shortcuts.map((shortcut) => {
-                        void innerUnlockVersion;
-                        let shortcutInnerLocked = false;
-                        const shortcutNotebook = notebooks.find(
-                          (nb) => Number(nb.notebook_id) === Number(shortcut.notebook_id)
-                        );
-                        if (shortcut?.target_type === 'notebook') {
-                          shortcutInnerLocked = notebookInnerLockedForDisplay(
-                            shortcutNotebook?.notes || []
-                          );
-                        } else {
-                          const linkedNote = (shortcutNotebook?.notes || []).find(
-                            (n) => Number(n.note_id) === Number(shortcut.note_id)
-                          );
-                          shortcutInnerLocked = Boolean(
-                            linkedNote &&
-                              noteRequiresInnerPinToView(linkedNote) &&
-                              !isInnerNoteUnlockedForDisplay(linkedNote.note_id, linkedNote)
-                          );
-                        }
-                        const shortcutRealLabel = recordVaultShortcutMenuLabel(shortcut, {
-                          selectedNoteId,
-                          openNoteTitlePlain,
-                          notebooks
-                        });
-                        const shortcutLabel = shortcutInnerLocked
-                          ? RECORD_VAULT_INNER_LOCKED_LABEL
-                          : shortcutRealLabel;
-                        return (
-                        <ShortcutMenuRow
-                          key={shortcut.shortcut_id}
-                          shortcut={shortcut}
-                          label={shortcutLabel}
-                          selected={isShortcutSelected(shortcut)}
-                          locked={shortcutInnerLocked}
-                          draggingId={draggingShortcutId}
-                          dropTargetId={dropTargetShortcutId}
-                          onSelect={() => handleShortcutClick(shortcut)}
-                          onDragStart={(e, shortcutId) => handleDragStart(e, shortcutId, DRAG_SHORTCUT)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={setDropTargetShortcutId}
-                          onDrop={(e, toId) => void handleShortcutReorderDrop(e, toId)}
-                          onDropFromLeft={(e) => void handleShortcutDropFromLeft(e)}
-                          onDelete={() => void handleRemoveShortcut(shortcut.shortcut_id, shortcutRealLabel)}
-                          deleteLabel={`Remove shortcut ${shortcutRealLabel}`}
-                          onToggleLock={() => handleToggleShortcutLock(shortcut)}
-                          lockTitle={
-                            shortcutInnerLocked
-                              ? 'Unlock (enter 6-digit PIN)'
-                              : 'Lock with a 6-digit PIN'
-                          }
-                          disabled={busy}
-                        />
-                        );
-                      })}
+                      ▼
+                    </Box>
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Next document"
+                      title="Next found note"
+                      onClick={() => goToSearchDoc(1)}
+                      disabled={currentSearchDocIndex >= searchResultTabs.length - 1}
+                      sx={searchNavButtonSx}
+                    >
+                      ▶
                     </Box>
                   </Box>
-                </Box>
+                ) : null}
+                {searchBusy ? (
+                  <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
+                    Searching…
+                  </Typography>
+                ) : searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
+                  searchResultTabs.map((tab) => {
+                    const selected =
+                      Number(tab.notebook_id) === Number(selectedNotebookId) && Number(tab.note_id) === Number(selectedNoteId);
+                    return (
+                      <SliderControlButton
+                        key={`search-tab-${tab.note_id}`}
+                        type="button"
+                        variant="yellow"
+                        disableHoverScale
+                        disableSelectedTranslate
+                        aria-pressed={selected}
+                        onClick={() => handleSearchResultSelect(tab.notebook_id, tab.note_id)}
+                        sx={{
+                          flexShrink: 0,
+                          px: 1.25,
+                          py: 0.5,
+                          whiteSpace: 'nowrap',
+                          bgcolor: selected ? `${RECORD_VAULT_SEARCH_HIT_BLUE} !important` : 'var(--theme-yellow-color) !important',
+                          color: selected ? '#ffffff !important' : '#000000 !important',
+                          WebkitTextFillColor: selected ? '#ffffff !important' : '#000000 !important',
+                          border: '4px solid #000000 !important'
+                        }}
+                      >
+                        {tab.label}
+                      </SliderControlButton>
+                    );
+                  })
+                ) : searchActive && Array.isArray(searchResults) && !searchResultTabs.length ? (
+                  <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
+                    {searchMessage || 'No notes match your search'}
+                  </Typography>
+                ) : null}
               </Box>
-            </>
-          ) : null}
-          </>
-          )}
+            ) : null}
+
+            {!hideWorkspaceChrome && !compareMode ? (
+              <RecordVaultMobileUploadTray
+                product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
+                active={unlocked}
+                disabled={
+                  busy ||
+                  innerEncryptBusy ||
+                  !selectedNote ||
+                  isBillScheduleSystemId(selectedNote?.note_id) ||
+                  (selectedNote && noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id))
+                }
+                refreshToken={mobileUploadTrayRefreshToken}
+                recentNoteSlots={recentNoteSlots}
+                onRecentNoteSelect={handleSearchResultSelect}
+                recentSelectedNoteId={selectedNoteId}
+                recentSelectedNotebookId={selectedNotebookId}
+                onError={(msg) => setError(String(msg || ''))}
+              />
+            ) : null}
+
+            <Box
+              sx={{
+                display: 'flex',
+                flex: 1,
+                minHeight: 0,
+                width: '100%',
+                position: 'relative',
+                flexDirection: { xs: 'column', md: 'row' }
+              }}
+            >
+              {fileWorkspaceView === 'payment' && !compareMode ? (
+                <Box
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 0,
+                    overflow: 'auto',
+                    bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
+                    p: { xs: 1, sm: 2 }
+                  }}
+                >
+                  <ProfilesRecordsPage
+                    visibleTabs={PROFILES_RECORDS_PAYMENT_TABS}
+                    embedded
+                    initialTab={profilesRecordsInitialTab}
+                    initialTokensBuying={profilesRecordsInitialTokens}
+                  />
+                </Box>
+              ) : (
+                <>
+                  {leftMenuOpen && !hideWorkspaceChrome ? (
+                    <>
+                      <Box
+                        {...guestDemoAllowProps()}
+                        sx={{
+                          flex: compareMode ? '1 1 0' : '0 0 auto',
+                          width: compareMode ? { xs: '100%', md: 'auto' } : { xs: '100%', md: sidebarWidth },
+                          maxWidth: compareMode ? { xs: '100%', md: '66%' } : { xs: '100%', md: 'none' },
+                          minWidth: compareMode ? { md: 0 } : undefined,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          bgcolor: workspaceShellBg,
+                          minHeight: compact || compareMode ? 0 : { xs: 280, md: '100%' },
+                          overflow: 'hidden',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            flex: 1,
+                            minHeight: 0,
+                            flexDirection: 'column',
+                            p: compact ? 0.5 : 1,
+                            gap: compact ? 0.75 : 1
+                          }}
+                        >
+                          {/* Bill Schedule: separate box above the two swim lanes (label + Monthly/Yearly) + tutorial pair. */}
+                          <Box
+                            sx={{
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 1,
+                              maxWidth: '100%'
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                flexShrink: 0,
+                                alignSelf: 'center',
+                                width: notebookColWidth,
+                                maxWidth: '100%',
+                                border: '2px solid var(--theme-primary-color)',
+                                borderRadius: 1,
+                                bgcolor: TUTANOTES_WORKSPACE_PANEL_BG,
+                                p: compact ? 0.75 : 1,
+                                boxSizing: 'border-box',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 0.75
+                              }}
+                              onDragOver={(e) => {
+                                if (!crossPaneDropActive) return;
+                                if (!isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onDrop={(e) => {
+                                if (
+                                  tryHandleForeignCrossPaneDrop(e, {
+                                    targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
+                                  })
+                                ) {
+                                  return;
+                                }
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontWeight: 800,
+                                  textAlign: 'center',
+                                  fontFamily: MAIN_FONT_FAMILY,
+                                  fontSize: '0.95rem',
+                                  lineHeight: 1.2,
+                                  userSelect: 'none'
+                                }}
+                              >
+                                Bill Schedule
+                              </Typography>
+                              {(billScheduleNotebook.notes || []).map((note) => (
+                                <Box key={note.note_id} sx={{ width: '100%', flexShrink: 0 }}>
+                                  <RenamableDraggableMenuRow
+                                    id={note.note_id}
+                                    domId={`record-vault-note-${note.note_id}`}
+                                    label={note.note_name}
+                                    buttonTitle={`${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`}
+                                    selected={Number(note.note_id) === Number(selectedNoteId)}
+                                    editing={false}
+                                    editValue=""
+                                    onEditValueChange={() => {}}
+                                    onSelect={() => openBillScheduleNote(note.note_id)}
+                                    onStartEdit={() => {}}
+                                    onCommitEdit={() => {}}
+                                    onCancelEdit={() => {}}
+                                    dragMime={DRAG_NOTE}
+                                    dragNotebookId={BILL_SCHEDULE_NOTEBOOK_ID}
+                                    draggingId={draggingNoteId}
+                                    dropTargetId={dropTargetNoteId}
+                                    acceptForeignDrop={crossPaneDropActive && isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)}
+                                    dragTitle={`Drag ${note.note_name} to the other vault to copy or move`}
+                                    onDragStart={handleDragStart}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={() => {}}
+                                    onDrop={(e) => {
+                                      if (
+                                        tryHandleForeignCrossPaneDrop(e, {
+                                          targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
+                                        })
+                                      ) {
+                                        return;
+                                      }
+                                    }}
+                                    disabled={busy || crossPaneBusy}
+                                  />
+                                </Box>
+                              ))}
+                            </Box>
+                            <WorkspaceVideoTutorialPair
+                              videoTutorialUrl={videoTutorialUrl}
+                              onTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                              tutorialVariant="orange"
+                              tutorialAriaLabel="Open Bill Schedule tutorial"
+                              tutorialTitle="Open Bill Schedule tutorial"
+                              sx={{ ml: 0 }}
+                            />
+                          </Box>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              flex: 1,
+                              minHeight: 0,
+                              gap: 0
+                            }}
+                          >
+                            <Box
+                              ref={notebookLaneRef}
+                              sx={{
+                                ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                                width: notebookColWidth,
+                                flexShrink: 0,
+                                ...(notebookLaneFolderDragActive
+                                  ? {
+                                      outline: '3px dashed var(--theme-yellow-color)',
+                                      outlineOffset: 2,
+                                      bgcolor: 'rgba(255, 215, 0, 0.18)'
+                                    }
+                                  : null)
+                              }}
+                              onDragOver={handleNotebookLaneFolderDragOver}
+                              onDragLeave={handleNotebookLaneFolderDragLeave}
+                              onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
+                              title="Drop a folder of .html notes here to import as a new notebook"
+                            >
+                              <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
+                                <SliderControlButton
+                                  type="button"
+                                  fullWidth
+                                  onClick={handleAddNotebook}
+                                  disabled={busy}
+                                  hoverScale={1.25}
+                                  singleLineLabel
+                                  sx={laneContainedButtonOneLineSx}
+                                >
+                                  Add Notebook
+                                </SliderControlButton>
+                              </Box>
+                              <Box
+                                sx={{
+                                  ...recordVaultMenuListScrollSx,
+                                  display: 'flex',
+                                  flexDirection: 'column'
+                                }}
+                              >
+                                {displayNotebooks.map((nb) => {
+                                  void innerUnlockVersion;
+                                  const notebookNotes = nb.notes || [];
+                                  const notebookHasInner = notebookNotes.some((n) => noteHasInnerEncryption(n));
+                                  const notebookInnerLocked = notebookInnerLockedForDisplay(notebookNotes);
+                                  const notebookLockingUp =
+                                    !notebookInnerLocked &&
+                                    innerEncryptUiScope === 'notebook' &&
+                                    (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
+                                    Number(nb.notebook_id) === Number(selectedNotebookId);
+                                  return (
+                                    <Box
+                                      key={nb.notebook_id}
+                                      sx={{
+                                        width: '100%',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <RenamableDraggableMenuRow
+                                        id={nb.notebook_id}
+                                        domId={`record-vault-notebook-${nb.notebook_id}`}
+                                        label={
+                                          notebookInnerLocked
+                                            ? RECORD_VAULT_INNER_LOCKED_LABEL
+                                            : Number(editingNotebookId) === Number(nb.notebook_id) && renameUiSurface === 'header'
+                                              ? editNameDraft
+                                              : nb.notebook_name
+                                        }
+                                        buttonTitle={
+                                          notebookInnerLocked
+                                            ? 'Locked notebook — enter PIN to unlock'
+                                            : notebookLockingUp
+                                              ? 'Locking notebook — enter PIN'
+                                              : notebookHasInner
+                                                ? 'Notebook has PIN-locked notes'
+                                                : undefined
+                                        }
+                                        selected={Number(nb.notebook_id) === Number(selectedNotebookId)}
+                                        locked={notebookInnerLocked}
+                                        editing={
+                                          Number(editingNotebookId) === Number(nb.notebook_id) &&
+                                          renameUiSurface === 'menu' &&
+                                          !notebookInnerLocked
+                                        }
+                                        editValue={editNameDraft}
+                                        onEditValueChange={setEditNameDraft}
+                                        onSelect={() => {
+                                          if (Number(nb.notebook_id) === Number(selectedNotebookId)) return;
+                                          notebookScopePendingRef.current = true;
+                                          setInnerEncryptUiScope('notebook');
+                                          // Immediate feedback — note body may still be loading from TutaCloud.
+                                          setNoteContentLoading(true);
+                                          setSelectedNotebookId(nb.notebook_id);
+                                        }}
+                                        onStartEdit={() => {
+                                          setEditingNoteId(null);
+                                          setRenameUiSurface('menu');
+                                          setEditingNotebookId(nb.notebook_id);
+                                          setEditNameDraft(nb.notebook_name || '');
+                                        }}
+                                        onCommitEdit={() => void commitNotebookRename()}
+                                        onCancelEdit={clearRenameState}
+                                        dragMime={DRAG_NOTEBOOK}
+                                        draggingId={draggingNotebookId}
+                                        alternateDraggingId={draggingNoteId}
+                                        dropTargetId={dropTargetNotebookId}
+                                        dragTitle={
+                                          crossPaneDropActive
+                                            ? 'Drop here to copy or move from the other vault'
+                                            : draggingNoteId != null
+                                              ? 'Drop note here to move into this notebook'
+                                              : 'Drag to reorder; drag to Finder to export notebook folder + HTML notes'
+                                        }
+                                        onDragStart={handleDragStart}
+                                        onDragEnd={handleDragEnd}
+                                        onDragOver={setDropTargetNotebookId}
+                                        onDrop={(e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)}
+                                        onDelete={() => void handleDeleteNotebook(nb.notebook_id, nb.notebook_name)}
+                                        deleteLabel={`Delete notebook ${nb.notebook_name}`}
+                                        onToggleLock={() => handleToggleNotebookLock(nb)}
+                                        lockTitle={
+                                          notebookInnerLocked ? 'Unlock notebook (enter 6-digit PIN)' : 'Lock notebook with a 6-digit PIN'
+                                        }
+                                        disabled={busy || crossPaneBusy}
+                                        acceptForeignDrop={crossPaneDropActive}
+                                      />
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+
+                            <ColumnResizeHandle onMouseDown={(e) => startColumnResize('notebookCol', e)} />
+
+                            <Box
+                              ref={noteLaneRef}
+                              sx={{
+                                ...(compact ? menuColumnShellCompactSx : menuColumnShellSx),
+                                flex: 1,
+                                minWidth: MIN_MENU_COL_WIDTH,
+                                ...(noteLaneFileDragActive
+                                  ? {
+                                      outline: '3px dashed var(--theme-yellow-color)',
+                                      outlineOffset: 2,
+                                      bgcolor: 'rgba(255, 215, 0, 0.18)'
+                                    }
+                                  : null)
+                              }}
+                              onDragOver={handleNoteListFileDragOver}
+                              onDragLeave={handleNoteListFileDragLeave}
+                              onDrop={(e) => void handleNoteListFileDrop(e)}
+                            >
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'stretch',
+                                  gap: 0.5,
+                                  flexShrink: 0,
+                                  mb: 1,
+                                  overflow: 'visible',
+                                  width: '100%'
+                                }}
+                              >
+                                <Box
+                                  data-menu-label-slot=""
+                                  sx={{ ...laneAddButtonWrapSx, flex: '1 1 auto', width: 'auto', mb: 0, minWidth: 0 }}
+                                >
+                                  <SliderControlButton
+                                    type="button"
+                                    fullWidth
+                                    onClick={handleAddNote}
+                                    disabled={
+                                      busy || !selectedNotebookId || notebookGateLocked || isBillScheduleNotebookId(selectedNotebookId)
+                                    }
+                                    hoverScale={1.25}
+                                    singleLineLabel
+                                    sx={laneContainedButtonOneLineSx}
+                                  >
+                                    Add Note
+                                  </SliderControlButton>
+                                </Box>
+                                {/* 6-step order cycle: Create ↓ / ↑ → Date ↓ / ↑ → Name ↓ / ↑ → back. */}
+                                <SliderControlButton
+                                  type="button"
+                                  onClick={handleCycleNoteSort}
+                                  disabled={busy}
+                                  hoverScale={1.25}
+                                  singleLineLabel
+                                  aria-label={`Sort notes — ${noteSortHoverTitle}`}
+                                  title={noteSortHoverTitle}
+                                  sx={noteSortHeaderButtonSx}
+                                >
+                                  {noteSortLabel}
+                                </SliderControlButton>
+                              </Box>
+                              <Box
+                                sx={{
+                                  ...recordVaultMenuListScrollSx,
+                                  display: 'flex',
+                                  flexDirection: 'column'
+                                }}
+                              >
+                                {/* Encrypted notebook: do not reveal any note names until unlocked.
+                          Bill Schedule Monthly/Yearly live in the separate bottom box — never here.
+                          `sortedNotes` is the same rows in the order picked by the Date/Name toggle. */}
+                                {(notebookGateLocked ? [] : sortedNotes)
+                                  .filter((note) => !isBillScheduleSystemId(note.note_id))
+                                  .map((note) => {
+                                    const isSystemNote = Boolean(note.is_system || isBillScheduleSystemId(note.note_id));
+                                    const noteInnerLocked =
+                                      !isSystemNote &&
+                                      noteRequiresInnerPinToView(note) &&
+                                      !isInnerNoteUnlockedForDisplay(note.note_id, note);
+                                    const noteLockingUp =
+                                      !isSystemNote &&
+                                      !noteInnerLocked &&
+                                      (inlineInnerPinMode === 'enable' || inlineInnerPinMode === 'lock') &&
+                                      Number(note.note_id) === Number(selectedNoteId);
+                                    // innerUnlockVersion lives in unlock refs — read so rows re-paint after PIN unlock.
+                                    void innerUnlockVersion;
+                                    const noteMenuLabel = isSystemNote
+                                      ? note.note_name
+                                      : noteInnerLocked
+                                        ? RECORD_VAULT_INNER_LOCKED_LABEL
+                                        : recordVaultNoteMenuLabel(note, notes, {
+                                            selectedNoteId,
+                                            openNoteTitlePlain,
+                                            notebooks
+                                          });
+                                    const noteRealLabel = isSystemNote
+                                      ? note.note_name
+                                      : recordVaultNoteMenuLabel(note, notes, {
+                                          selectedNoteId,
+                                          openNoteTitlePlain,
+                                          notebooks
+                                        });
+                                    const menuEditingThisNote =
+                                      !isSystemNote && Number(editingNoteId) === Number(note.note_id) && renameUiSurface === 'menu';
+                                    const headerEditingThisNote =
+                                      !isSystemNote && Number(editingNoteId) === Number(note.note_id) && renameUiSurface === 'header';
+                                    return (
+                                      <Box
+                                        key={note.note_id}
+                                        sx={{
+                                          width: '100%',
+                                          flexShrink: 0
+                                        }}
+                                      >
+                                        <RenamableDraggableMenuRow
+                                          id={note.note_id}
+                                          domId={`record-vault-note-${note.note_id}`}
+                                          label={
+                                            noteInnerLocked
+                                              ? RECORD_VAULT_INNER_LOCKED_LABEL
+                                              : headerEditingThisNote
+                                                ? // Freeze sidebar label while the content-header field is being typed.
+                                                  recordVaultNoteSidebarLabel(note, notes, notebooks)
+                                                : menuEditingThisNote
+                                                  ? editNameDraft || noteMenuLabel
+                                                  : noteMenuLabel
+                                          }
+                                          buttonTitle={
+                                            noteInnerLocked
+                                              ? 'Locked — enter PIN to view'
+                                              : noteLockingUp
+                                                ? 'Locking up — enter PIN'
+                                                : noteRealLabel
+                                          }
+                                          selected={Number(note.note_id) === Number(selectedNoteId)}
+                                          selectedBlue={searchActive}
+                                          multiSelected={multiSelectedNoteIds.some((id) => Number(id) === Number(note.note_id))}
+                                          locked={noteInnerLocked}
+                                          editing={menuEditingThisNote && !noteInnerLocked}
+                                          editValue={editNameDraft}
+                                          onEditValueChange={handleNoteListTitleEditChange}
+                                          onSelect={(e) => {
+                                            if (e?.shiftKey) {
+                                              handleNoteShiftSelect(note.note_id);
+                                              return;
+                                            }
+                                            selectNoteId(note.note_id);
+                                          }}
+                                          onStartEdit={() => {
+                                            if (noteInnerLocked) return;
+                                            replaceMultiSelectedNoteIds([]);
+                                            noteMultiSelectAnchorIdRef.current = note.note_id;
+                                            setEditingNotebookId(null);
+                                            setRenameUiSurface('menu');
+                                            setEditingNoteId(note.note_id);
+                                            setEditNameDraft(
+                                              Number(note.note_id) === Number(selectedNoteId)
+                                                ? openNoteTitlePlain || recordVaultNoteSidebarLabel(note, notes, notebooks)
+                                                : recordVaultNoteSidebarLabel(note, notes, notebooks)
+                                            );
+                                          }}
+                                          onCommitEdit={() => void commitNoteRename()}
+                                          onCancelEdit={clearRenameState}
+                                          dragMime={DRAG_NOTE}
+                                          dragNotebookId={selectedNotebookId}
+                                          draggingId={draggingNoteId}
+                                          dropTargetId={dropTargetNoteId}
+                                          acceptForeignDrop={crossPaneDropActive}
+                                          dragTitle={
+                                            crossPaneDropActive
+                                              ? 'Drop here to copy or move from the other vault'
+                                              : noteSortActive
+                                                ? 'Sorted view — clear the sort (click until “Create ↓”) to drag-reorder notes'
+                                                : multiSelectedNoteIds.length > 1
+                                                  ? `Shift-selected: ${multiSelectedNoteIds.length} notes — drag to Finder, then Choose folder for separate HTML files`
+                                                  : 'Shift+click to multi-select; drag to Finder to export HTML; drop on a notebook to move'
+                                          }
+                                          onDragStart={handleDragStart}
+                                          onDragEnd={handleDragEnd}
+                                          onPrefetchDrag={prefetchNoteHtmlExport}
+                                          onDragOver={setDropTargetNoteId}
+                                          onDrop={(e, toId, mime) => {
+                                            if (noteSortActive) {
+                                              // Sorted view: rows are not in the stored order, so a
+                                              // reorder would persist a meaningless sequence. Cross-pane
+                                              // copy/move transfers still work.
+                                              if (tryHandleForeignCrossPaneDrop(e, { targetNotebookId: selectedNotebookId })) {
+                                                return;
+                                              }
+                                              handleDragEnd();
+                                              return;
+                                            }
+                                            void handleDropReorder(
+                                              e,
+                                              toId,
+                                              mime,
+                                              notes.filter((n) => !isBillScheduleSystemId(n.note_id)),
+                                              'note_id',
+                                              (ids) => vaultApi.reorderRecordVaultNotes(selectedNotebookId, ids)
+                                            );
+                                          }}
+                                          onFileDrop={(e) => void handleNoteListFileDrop(e)}
+                                          onDelete={() => void handleDeleteNote(note.note_id, noteRealLabel)}
+                                          deleteLabel={`Delete note ${noteRealLabel}`}
+                                          onToggleLock={() => handleToggleNoteLock(note)}
+                                          lockTitle={noteInnerLocked ? 'Unlock note (enter 6-digit PIN)' : 'Lock note with a 6-digit PIN'}
+                                          ragSelected={ragSelectedNoteIds.some((id) => Number(id) === Number(note.note_id))}
+                                          onToggleRag={
+                                            isSystemNote || noteInnerLocked
+                                              ? undefined
+                                              : () => {
+                                                  const selected = !ragSelectedNoteIds.some((id) => Number(id) === Number(note.note_id));
+                                                  handleToggleRagNote(note.note_id, selected);
+                                                }
+                                          }
+                                          ragDisabled={isSystemNote || noteInnerLocked}
+                                          disabled={busy || crossPaneBusy || !selectedNotebookId || isBillScheduleView}
+                                        />
+                                      </Box>
+                                    );
+                                  })}
+                              </Box>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {!compareMode ? (
+                        <ColumnResizeHandle
+                          sx={{ display: { xs: 'none', md: 'block' }, bgcolor: 'var(--theme-primary-color)', opacity: 0.35 }}
+                          onMouseDown={(e) => startColumnResize('sidebar', e)}
+                        />
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  {!compareMode ? (
+                    <Box
+                      data-record-vault-note-content
+                      ref={noteContentPaneRef}
+                      // Do not make the whole editor pane HTML5-draggable — that steals click-drag
+                      // from text selection and drags a huge translucent ghost. Export HTML from
+                      // the notebook/note list on the left instead (PhotoAlbums uses the same rule).
+                      draggable={false}
+                      onDragOver={isBillMonthlyView || isBillYearlyView ? undefined : handleContentDragOver}
+                      onDrop={isBillMonthlyView || isBillYearlyView ? undefined : handleContentFileDrop}
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        minHeight: compact ? 0 : { xs: 360, md: '100%' },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        bgcolor: workspaceContentBg
+                      }}
+                    >
+                      {(() => {
+                        const billFocusToggle = (
+                          <VaultWorkspaceFocusToggleButton active={noteFocusView} onToggle={() => setNoteFocusView((v) => !v)} />
+                        );
+                        if (isBillMonthlyView) {
+                          return (
+                            <BillScheduleMonthlyPanel
+                              storageType={paneStorageType}
+                              videoTutorialUrl={videoTutorialUrl}
+                              onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                              headerRightAction={billFocusToggle}
+                            />
+                          );
+                        }
+                        if (isBillYearlyView) {
+                          return (
+                            <BillScheduleYearlyPanel
+                              storageType={paneStorageType}
+                              videoTutorialUrl={videoTutorialUrl}
+                              onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                              headerRightAction={billFocusToggle}
+                            />
+                          );
+                        }
+                        const notebookNotesForLock = selectedNotebook?.notes || [];
+                        const notebookGateLocked = notebookInnerLockedForDisplay(notebookNotesForLock);
+                        const openNoteLocked = Boolean(
+                          selectedNote && noteRequiresInnerPinToView(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id)
+                        );
+                        const lockedNow = notebookGateLocked || openNoteLocked;
+                        // Whole notebook locked (all notes) → "Notebook"; a single locked note → "Note".
+                        const lockedEntityLabel = notebookGateLocked ? 'Notebook' : 'Note';
+                        // Dropped files are now embedded inline in the note body, so the
+                        // editor always fills the content pane (no separate files panel).
+                        const editorBoxSx = {
+                          flex: 1,
+                          minHeight: 0,
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          bgcolor: workspaceContentBg
+                        };
+                        return (
+                          <>
+                            <Box ref={editorBoxRef} sx={editorBoxSx}>
+                              <RecordVaultNoteEditor
+                                ref={noteEditorApiRef}
+                                onReady={handleEditorReady}
+                                onChange={scheduleSave}
+                                contentZoom={noteContentZoom}
+                                editorChromeHidden={noteFocusView}
+                                header={
+                                  selectedNote && !lockedNow ? (
+                                    <Box
+                                      data-rv-note-title-row
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap',
+                                        rowGap: 0.75,
+                                        gap: 1,
+                                        mx: 1,
+                                        mb: 0.5,
+                                        px: 1.5,
+                                        py: 1,
+                                        border: '2px solid #000',
+                                        borderRadius: 1,
+                                        bgcolor: '#fff',
+                                        flex: '0 0 auto'
+                                      }}
+                                    >
+                                      <Box
+                                        component="label"
+                                        htmlFor="rv-note-title-input"
+                                        sx={{
+                                          fontWeight: 800,
+                                          color: '#000',
+                                          fontSize: '1.15rem',
+                                          flex: '0 0 auto'
+                                        }}
+                                      >
+                                        Title:
+                                      </Box>
+                                      {titleHasHighlight ? (
+                                        <Box
+                                          role="textbox"
+                                          tabIndex={0}
+                                          title="Click to edit title"
+                                          onClick={() => {
+                                            setTitleEditing(true);
+                                            setTimeout(() => {
+                                              const el = document.getElementById('rv-note-title-input');
+                                              if (el) {
+                                                el.focus();
+                                                el.select?.();
+                                              }
+                                            }, 0);
+                                          }}
+                                          sx={{
+                                            flex: 1,
+                                            minWidth: 0,
+                                            fontSize: '1.15rem',
+                                            fontWeight: 600,
+                                            color: '#000',
+                                            cursor: 'text',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                          }}
+                                        >
+                                          {renderTitleWithSearchHighlight(openNoteTitlePlain, titleHighlightTerms, titleHighlightClass)}
+                                        </Box>
+                                      ) : (
+                                        <TextField
+                                          id="rv-note-title-input"
+                                          variant="standard"
+                                          fullWidth
+                                          value={openNoteTitlePlain}
+                                          onChange={(e) => handleNoteTitleBoxChange(e.target.value)}
+                                          onFocus={() => {
+                                            noteTitleBoxSnapshotRef.current = String(draftRef.current.openNoteTitlePlain ?? '');
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              e.currentTarget.blur();
+                                            } else if (e.key === 'Escape') {
+                                              e.preventDefault();
+                                              setOpenNoteTitlePlain(noteTitleBoxSnapshotRef.current);
+                                              draftRef.current = {
+                                                ...draftRef.current,
+                                                openNoteTitlePlain: noteTitleBoxSnapshotRef.current
+                                              };
+                                              setTitleEditing(false);
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          onBlur={commitNoteTitleBox}
+                                          placeholder="Untitled note"
+                                          InputProps={{ disableUnderline: true }}
+                                          inputProps={{ 'aria-label': 'Note title', maxLength: 200 }}
+                                          sx={{
+                                            flex: 1,
+                                            minWidth: 0,
+                                            '& .MuiInputBase-input': {
+                                              fontSize: '1.15rem',
+                                              fontWeight: 600,
+                                              color: '#000',
+                                              p: 0
+                                            }
+                                          }}
+                                        />
+                                      )}
+                                      <RecordVaultNoteAttachButton
+                                        disabled={busy || lockedNow}
+                                        onFiles={async (files) => {
+                                          for (const file of files) {
+                                            await uploadNoteVaultFile(file, null);
+                                          }
+                                        }}
+                                      />
+                                      <RecordVaultImageRotateButton editor={noteEditor} disabled={lockedNow} />
+                                      <RecordVaultSearchBar
+                                        compact
+                                        searchLabel="Search Here"
+                                        term1={noteSearchTerm}
+                                        onTerm1Change={setNoteSearchTerm}
+                                        onSubmit={runNoteSearch}
+                                        onClear={handleClearNoteSearch}
+                                        clearDisabled={!noteSearchTerm.trim() && noteSearchHitCount === 0}
+                                        hitCount={noteSearchHitCount}
+                                        searched={noteSearchSearched}
+                                        activeHitIndex={noteSearchActiveHitIndex}
+                                        onPrevHit={() => goToNoteSearchHit(-1)}
+                                        onNextHit={() => goToNoteSearchHit(1)}
+                                        sx={{ ml: 0.5 }}
+                                      />
+                                      <RecordVaultNoteContentZoomBar value={noteContentZoom} onChange={setNoteContentZoom} />
+                                      <VaultWorkspaceFocusToggleButton
+                                        active={noteFocusView}
+                                        onToggle={() => setNoteFocusView((v) => !v)}
+                                        // Note-title expand glyph at 2× so it is easy to hit next to the title.
+                                        iconSize={64}
+                                      />
+                                    </Box>
+                                  ) : null
+                                }
+                              />
+                              {lockedNow ? (
+                                <Box
+                                  sx={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    zIndex: 5,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 1.5,
+                                    bgcolor: '#fff',
+                                    textAlign: 'center',
+                                    px: 2
+                                  }}
+                                >
+                                  <Box component="img" src={innerEncryptOnImg} alt="" sx={{ width: 88, height: 88, display: 'block' }} />
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 900,
+                                      fontSize: { xs: '2rem', sm: '2.5rem' },
+                                      lineHeight: 1.15,
+                                      color: '#000',
+                                      WebkitTextFillColor: '#000'
+                                    }}
+                                  >
+                                    This {lockedEntityLabel} is{' '}
+                                    <Box component="span" sx={{ color: '#e60000', WebkitTextFillColor: '#e60000' }}>
+                                      LOCKED
+                                    </Box>
+                                  </Typography>
+                                  <Box
+                                    component="button"
+                                    type="button"
+                                    onClick={() => {
+                                      if (notebookGateLocked && selectedNotebook) handleToggleNotebookLock(selectedNotebook);
+                                      else if (openNoteLocked) handleToggleNoteLock(selectedNote);
+                                      else if (selectedNotebook) handleToggleNotebookLock(selectedNotebook);
+                                    }}
+                                    disabled={busy || innerEncryptBusy}
+                                    sx={{
+                                      bgcolor: '#e60000',
+                                      color: 'var(--theme-yellow-color)',
+                                      fontWeight: 800,
+                                      fontSize: '1.1rem',
+                                      border: '2px solid #000',
+                                      borderRadius: 1,
+                                      px: 3,
+                                      py: 1,
+                                      cursor: 'pointer',
+                                      '&:hover': { filter: 'brightness(1.05)' }
+                                    }}
+                                  >
+                                    Unlock now
+                                  </Box>
+                                </Box>
+                              ) : null}
+                            </Box>
+                          </>
+                        );
+                      })()}
+                    </Box>
+                  ) : null}
+
+                  <RecordVaultNoteInnerEncryptDialog
+                    open={innerEncryptDialog.open}
+                    mode={innerEncryptDialog.mode}
+                    scope={innerEncryptDialog.scope}
+                    noteName={selectedNote?.note_name || ''}
+                    busy={innerEncryptBusy}
+                    progressPercent={innerEncryptProgressPercent}
+                    progressLabel={innerEncryptProgressLabel}
+                    error={innerEncryptError}
+                    onSubmit={handleInnerEncryptSubmit}
+                    onClose={closeInnerEncryptDialog}
+                  />
+
+                  {rightMenuOpen && !hideWorkspaceChrome ? (
+                    <>
+                      {!compareMode ? (
+                        <ColumnResizeHandle
+                          sx={{ display: { xs: 'none', md: 'block' }, bgcolor: 'var(--theme-primary-color)', opacity: 0.35 }}
+                          onMouseDown={(e) => startColumnResize('rightSidebar', e)}
+                        />
+                      ) : null}
+                      <Box
+                        {...guestDemoAllowProps()}
+                        sx={{
+                          flex: compareMode ? '1 1 0' : '0 0 auto',
+                          width: compareMode ? { xs: '100%', md: 'auto' } : { xs: '100%', md: rightSidebarWidth },
+                          maxWidth: compareMode ? { xs: '100%', md: '50%' } : { xs: '100%', md: 'none' },
+                          minWidth: compareMode ? { md: 0 } : undefined,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          bgcolor: workspaceContentBg,
+                          minHeight: compact || compareMode ? 0 : { xs: 220, md: '100%' },
+                          borderLeft: { md: '2px solid var(--theme-primary-color)' },
+                          overflow: 'hidden',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            flex: 1,
+                            minHeight: 0,
+                            p: compact ? 0.5 : 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 0,
+                            bgcolor: TUTANOTES_WORKSPACE_CONTENT_BG
+                          }}
+                        >
+                          <Box
+                            ref={shortcutLaneRef}
+                            sx={{
+                              ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
+                              flex: '1 1 0',
+                              minHeight: compact ? 64 : 100
+                            }}
+                            onDragOver={(e) => {
+                              const fromLeft = isLeftSidebarDragEvent(e);
+                              if (fromLeft || draggingShortcutId != null) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
+                              const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
+                              const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
+                              if (!shortcutRaw && (notebookRaw || noteRaw || isLeftSidebarDragEvent(e))) {
+                                void handleShortcutDropFromLeft(e);
+                              }
+                            }}
+                          >
+                            <Box data-menu-label-slot="" sx={{ width: '100%', mb: 1 }}>
+                              <SliderControlButton
+                                type="button"
+                                fullWidth
+                                tabIndex={-1}
+                                aria-hidden
+                                disabled
+                                disableHoverScale
+                                sx={{
+                                  pointerEvents: 'none',
+                                  cursor: 'default',
+                                  ...laneContainedButtonSx,
+                                  borderRadius: '0 !important',
+                                  bgcolor: '#ffffff !important',
+                                  color: '#000000 !important',
+                                  WebkitTextFillColor: '#000000 !important',
+                                  border: '2px solid #000000 !important',
+                                  '&.Mui-disabled': {
+                                    bgcolor: '#ffffff !important',
+                                    color: '#000000 !important',
+                                    WebkitTextFillColor: '#000000 !important',
+                                    border: '2px solid #000000 !important'
+                                  }
+                                }}
+                              >
+                                Shortcut
+                              </SliderControlButton>
+                            </Box>
+                            <Typography sx={{ fontSize: '0.85rem', mb: 1, opacity: 0.85 }}>Drag notebooks or notes here</Typography>
+                            <Box
+                              sx={recordVaultMenuListScrollSx}
+                              onDragOver={(e) => {
+                                const fromLeft = isLeftSidebarDragEvent(e);
+                                if (fromLeft || draggingShortcutId != null) {
+                                  e.preventDefault();
+                                  e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
+                                }
+                              }}
+                            >
+                              {shortcuts.map((shortcut) => {
+                                void innerUnlockVersion;
+                                let shortcutInnerLocked = false;
+                                const shortcutNotebook = notebooks.find((nb) => Number(nb.notebook_id) === Number(shortcut.notebook_id));
+                                if (shortcut?.target_type === 'notebook') {
+                                  shortcutInnerLocked = notebookInnerLockedForDisplay(shortcutNotebook?.notes || []);
+                                } else {
+                                  const linkedNote = (shortcutNotebook?.notes || []).find(
+                                    (n) => Number(n.note_id) === Number(shortcut.note_id)
+                                  );
+                                  shortcutInnerLocked = Boolean(
+                                    linkedNote &&
+                                    noteRequiresInnerPinToView(linkedNote) &&
+                                    !isInnerNoteUnlockedForDisplay(linkedNote.note_id, linkedNote)
+                                  );
+                                }
+                                const shortcutRealLabel = recordVaultShortcutMenuLabel(shortcut, {
+                                  selectedNoteId,
+                                  openNoteTitlePlain,
+                                  notebooks
+                                });
+                                const shortcutLabel = shortcutInnerLocked ? RECORD_VAULT_INNER_LOCKED_LABEL : shortcutRealLabel;
+                                return (
+                                  <ShortcutMenuRow
+                                    key={shortcut.shortcut_id}
+                                    shortcut={shortcut}
+                                    label={shortcutLabel}
+                                    selected={isShortcutSelected(shortcut)}
+                                    locked={shortcutInnerLocked}
+                                    draggingId={draggingShortcutId}
+                                    dropTargetId={dropTargetShortcutId}
+                                    onSelect={() => handleShortcutClick(shortcut)}
+                                    onDragStart={(e, shortcutId) => handleDragStart(e, shortcutId, DRAG_SHORTCUT)}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={setDropTargetShortcutId}
+                                    onDrop={(e, toId) => void handleShortcutReorderDrop(e, toId)}
+                                    onDropFromLeft={(e) => void handleShortcutDropFromLeft(e)}
+                                    onDelete={() => void handleRemoveShortcut(shortcut.shortcut_id, shortcutRealLabel)}
+                                    deleteLabel={`Remove shortcut ${shortcutRealLabel}`}
+                                    onToggleLock={() => handleToggleShortcutLock(shortcut)}
+                                    lockTitle={shortcutInnerLocked ? 'Unlock (enter 6-digit PIN)' : 'Lock with a 6-digit PIN'}
+                                    disabled={busy}
+                                  />
+                                );
+                              })}
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </>
+                  ) : null}
+                </>
+              )}
+            </Box>
           </Box>
-        </Box>
-      )}
-    </Box>
+        )}
+      </Box>
     </RecordVaultSliderControlButtonProvider>
   );
 }
-

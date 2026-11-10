@@ -127,6 +127,7 @@ export default defineConfig(({ mode }) => {
       // ALL_SINGLES_ / PICKS_ / ACQUAINT*_ / MYALBUM_ / … — page Video Tutorials URLs (pageVideoTutorialEnv.js)
       // SPEEDDATING — sidebar Speed Dating item (speedDatingEnv.js); mirrored from ~/.ssh/be/.env
       // LEFT_SIDE / RIGHT_SIDE — TutaNotes panels (leftSideEnv.js, rightSideEnv.js); from ~/.ssh/be/.env
+      // BUTTON_ — BUTTON_BORDER_THICKNESS / BUTTON_BORDER_COLOR site-wide (see config/buttonBorderEnv.js)
       envPrefix: [
       'VITE_',
       'FE_',
@@ -177,7 +178,8 @@ export default defineConfig(({ mode }) => {
       'LEFT_',
       'RIGHT_',
       'SKIP_',
-      'BSIZE'
+      'BSIZE',
+      'BUTTON_'
     ],
     server: {
       // this ensures that the browser opens upon server start

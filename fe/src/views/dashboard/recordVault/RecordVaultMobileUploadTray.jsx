@@ -1,3 +1,4 @@
+import { BUTTON_BACKGROUND_COLOR, BUTTON_BACKGROUND_HOVER_COLOR } from 'config/buttonBackgroundEnv';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
@@ -5,24 +6,14 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
-import {
-  deleteMobileUploadFile,
-  fetchMobileUploadFileBlob,
-  listMobileUploadFiles
-} from 'api/photoAlbumsMobileUploadFolderFe';
+import { deleteMobileUploadFile, fetchMobileUploadFileBlob, listMobileUploadFiles } from 'api/photoAlbumsMobileUploadFolderFe';
 import { getScanForPhoneUploadMs } from 'config/phoneUploadScanEnv';
-import {
-  MOBILE_UPLOAD_HOVER_TOOLTIP,
-  mobileUploadHoverTooltipSlotProps
-} from 'config/mobileUploadHoverTooltip';
+import { MOBILE_UPLOAD_HOVER_TOOLTIP, mobileUploadHoverTooltipSlotProps } from 'config/mobileUploadHoverTooltip';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import { useRecordVaultSliderControlButtonFontRem } from './RecordVaultSliderControlButtonContext';
-import {
-  MOBILE_UPLOAD_PRODUCT_TUTANOTES,
-  requireMobileUploadProduct
-} from 'constants/mobileUploadProduct';
+import { MOBILE_UPLOAD_PRODUCT_TUTANOTES, requireMobileUploadProduct } from 'constants/mobileUploadProduct';
 
 /** HTML5 drag payload: file name under UPLOAD_FOLDER. */
 export const RV_MOBILE_UPLOAD_DRAG_MIME = 'application/x-rv-mobile-upload';
@@ -56,9 +47,7 @@ export function readRecordVaultMobileUploadDragFileNames(dataTransfer) {
 
 function stripMobileUploadNamePrefix(name) {
   const raw = String(name || '');
-  return (
-    raw.replace(/^\d+_(?:tutaphoto|tutanotes|tutadates)_/, '').replace(/^\d+_/, '') || raw
-  );
+  return raw.replace(/^\d+_(?:tutaphoto|tutanotes|tutadates)_/, '').replace(/^\d+_/, '') || raw;
 }
 
 /** Build a File from a staged mobile-upload name (for vault attach). */
@@ -75,30 +64,14 @@ function isVideoContentType(contentType, name) {
   const ct = String(contentType || '').toLowerCase();
   if (ct.startsWith('video/')) return true;
   const lower = String(name || '').toLowerCase();
-  return (
-    lower.endsWith('.mp4') ||
-    lower.endsWith('.mov') ||
-    lower.endsWith('.webm') ||
-    lower.endsWith('.mkv') ||
-    lower.endsWith('.avi')
-  );
+  return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm') || lower.endsWith('.mkv') || lower.endsWith('.avi');
 }
 
 function displayName(name) {
   return stripMobileUploadNamePrefix(name);
 }
 
-function ThumbTile({
-  entry,
-  thumb,
-  disabled,
-  onRemove,
-  selectable = false,
-  selected = false,
-  onToggleSelect,
-  getDragNames,
-  onDragDone
-}) {
+function ThumbTile({ entry, thumb, disabled, onRemove, selectable = false, selected = false, onToggleSelect, getDragNames, onDragDone }) {
   const name = entry.name;
   const video = isVideoContentType(entry.contentType, name);
   return (
@@ -249,7 +222,8 @@ ThumbTile.propTypes = {
 const RECENT_NOTE_SLOT_COUNT = 5;
 /** Same selected-row green and idle grey as the Add Note / Add Notebook columns. */
 const RECENT_NOTE_SELECTED_GREEN = '#60C446';
-const RECENT_NOTE_IDLE_GREY = '#9e9e9e';
+/** fe/.env BUTTON_BACKGROUND_COLOR / BUTTON_BACKGROUND_HOVER_COLOR. */
+const RECENT_NOTE_IDLE_GREY = BUTTON_BACKGROUND_COLOR;
 const RECENT_DRAG_THRESHOLD_PX = 6;
 
 /** Yellow-bar splitter: width of the Recent pane, drag left to widen it. */
@@ -386,6 +360,7 @@ function recentChipSx(selected, halfFontRem) {
     color: '#000000',
     WebkitTextFillColor: '#000000',
     cursor: 'pointer',
+    ...(selected ? null : { '&:hover:not(:disabled)': { bgcolor: BUTTON_BACKGROUND_HOVER_COLOR } }),
     '& .MuiButton-label': {
       fontSize: size
     }
@@ -411,12 +386,7 @@ function RecentChipLabel({ label }) {
   return (
     <Box component="span" sx={recentChipLabelSx}>
       {words.map((word, index) => (
-        <Box
-          // eslint-disable-next-line react/no-array-index-key
-          key={`${word}-${index}`}
-          component="span"
-          sx={recentChipWordSx}
-        >
+        <Box key={`${word}-${index}`} component="span" sx={recentChipWordSx}>
           {word}
         </Box>
       ))}
@@ -428,14 +398,7 @@ RecentChipLabel.propTypes = {
   label: PropTypes.string
 };
 
-function RecentNoteQuickSlots({
-  slots,
-  selectedNoteId,
-  selectedNotebookId,
-  onSelect,
-  disabled,
-  paneWidth
-}) {
+function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSelect, disabled, paneWidth }) {
   /** Same source SliderControlButton uses; chips render at exactly half of it. */
   const vaultFontRem = useRecordVaultSliderControlButtonFontRem();
   const halfFontRem = Number(vaultFontRem) > 0 ? Number(vaultFontRem) / 2 : 1;
@@ -572,9 +535,7 @@ function RecentNoteQuickSlots({
               />
             );
           }
-          const selected =
-            Number(slot.note_id) === Number(selectedNoteId) &&
-            Number(slot.notebook_id) === Number(selectedNotebookId);
+          const selected = Number(slot.note_id) === Number(selectedNoteId) && Number(slot.notebook_id) === Number(selectedNotebookId);
           return (
             <Box
               key={`recent-${slot.note_id}`}
@@ -637,44 +598,42 @@ export default function RecordVaultMobileUploadTray({
   latestWidthRef.current = recentPaneWidth;
   const splitDragRef = useRef({ active: false, startX: 0, startWidth: 0 });
 
-  const startRecentPaneResize = useCallback((event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const trayWidth = trayRef.current?.getBoundingClientRect?.().width || 0;
-    const maxWidth = Math.max(
-      RECENT_PANE_MIN_WIDTH,
-      trayWidth - RECENT_PANE_MIN_LEFT_PX
-    );
-    splitDragRef.current = {
-      active: true,
-      startX: event.clientX,
-      startWidth: recentPaneWidth
-    };
+  const startRecentPaneResize = useCallback(
+    (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const trayWidth = trayRef.current?.getBoundingClientRect?.().width || 0;
+      const maxWidth = Math.max(RECENT_PANE_MIN_WIDTH, trayWidth - RECENT_PANE_MIN_LEFT_PX);
+      splitDragRef.current = {
+        active: true,
+        startX: event.clientX,
+        startWidth: recentPaneWidth
+      };
 
-    const onMove = (moveEvent) => {
-      // Dragging LEFT widens the Recent pane, so subtract the delta.
-      const delta = moveEvent.clientX - splitDragRef.current.startX;
-      const next = Math.round(
-        clampPx(splitDragRef.current.startWidth - delta, RECENT_PANE_MIN_WIDTH, maxWidth)
-      );
-      latestWidthRef.current = next;
-      setRecentPaneWidth(next);
-    };
-    const onUp = () => {
-      splitDragRef.current.active = false;
-      document.body.style.removeProperty('user-select');
-      document.body.style.removeProperty('cursor');
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      storeRecentPaneWidth(latestWidthRef.current);
-    };
+      const onMove = (moveEvent) => {
+        // Dragging LEFT widens the Recent pane, so subtract the delta.
+        const delta = moveEvent.clientX - splitDragRef.current.startX;
+        const next = Math.round(clampPx(splitDragRef.current.startWidth - delta, RECENT_PANE_MIN_WIDTH, maxWidth));
+        latestWidthRef.current = next;
+        setRecentPaneWidth(next);
+      };
+      const onUp = () => {
+        splitDragRef.current.active = false;
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        storeRecentPaneWidth(latestWidthRef.current);
+      };
 
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [recentPaneWidth]);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [recentPaneWidth]
+  );
 
   const [files, setFiles] = useState([]);
   const [selectedNames, setSelectedNames] = useState(() => new Set());
@@ -698,8 +657,7 @@ export default function RecordVaultMobileUploadTray({
   }, []);
 
   const loadFiles = useCallback(async () => {
-    const hadFiles =
-      filesRef.current.length > 0 || Object.keys(thumbUrlsRef.current || {}).length > 0;
+    const hadFiles = filesRef.current.length > 0 || Object.keys(thumbUrlsRef.current || {}).length > 0;
     // Only show "Loading…" on the first empty pass — avoid blanking thumbs every poll.
     if (!hadFiles) setLoading(true);
     try {
@@ -713,15 +671,7 @@ export default function RecordVaultMobileUploadTray({
       if (!sameList) setFiles(listed);
 
       // Unchanged folder + thumbs already cached → skip blob work (stops poll blink).
-      if (
-        sameList &&
-        listed.every(
-          (e) =>
-            !e?.name ||
-            thumbUrlsRef.current[e.name] ||
-            isVideoContentType(e.contentType, e.name)
-        )
-      ) {
+      if (sameList && listed.every((e) => !e?.name || thumbUrlsRef.current[e.name] || isVideoContentType(e.contentType, e.name))) {
         return;
       }
 
@@ -764,9 +714,7 @@ export default function RecordVaultMobileUploadTray({
       }
     } catch (err) {
       // Keep existing thumbs on transient poll errors — clearing them caused the blink.
-      onErrorRef.current?.(
-        err?.response?.data?.error || err?.message || 'Failed to list mobile uploads'
-      );
+      onErrorRef.current?.(err?.response?.data?.error || err?.message || 'Failed to list mobile uploads');
     } finally {
       setLoading(false);
     }
@@ -905,9 +853,7 @@ export default function RecordVaultMobileUploadTray({
             }
       }
     >
-      {loading && !files.length ? (
-        <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#333' }}>Loading…</Typography>
-      ) : null}
+      {loading && !files.length ? <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#333' }}>Loading…</Typography> : null}
       {!loading && !files.length ? (
         <Typography
           sx={{
@@ -941,20 +887,9 @@ export default function RecordVaultMobileUploadTray({
   );
 
   return (
-    <Box
-      ref={trayRef}
-      data-rv-mobile-upload-tray=""
-      aria-label="Mobile Upload thumbnails"
-      sx={shellSx}
-    >
+    <Box ref={trayRef} data-rv-mobile-upload-tray="" aria-label="Mobile Upload thumbnails" sx={shellSx}>
       {plain ? null : (
-        <Tooltip
-          title={MOBILE_UPLOAD_HOVER_TOOLTIP}
-          arrow
-          placement="top"
-          enterDelay={200}
-          slotProps={mobileUploadHoverTooltipSlotProps()}
-        >
+        <Tooltip title={MOBILE_UPLOAD_HOVER_TOOLTIP} arrow placement="top" enterDelay={200} slotProps={mobileUploadHoverTooltipSlotProps()}>
           <Box
             {...(onTitleClick
               ? {
@@ -1020,11 +955,7 @@ export default function RecordVaultMobileUploadTray({
           type="button"
           disabled={disabled || !files.length}
           aria-label={allSelected ? 'Unselect all mobile upload thumbnails' : 'Select all mobile upload thumbnails'}
-          title={
-            allSelected
-              ? 'Unselect all thumbnails'
-              : 'Select all thumbnails, then drag any selected one onto the Thumbnail Tray'
-          }
+          title={allSelected ? 'Unselect all thumbnails' : 'Select all thumbnails, then drag any selected one onto the Thumbnail Tray'}
           onClick={toggleSelectAll}
           sx={{ flexShrink: 0, alignSelf: 'center', whiteSpace: 'nowrap' }}
         >

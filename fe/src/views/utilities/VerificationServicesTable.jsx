@@ -14,31 +14,48 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import GreenButton from 'ui-component/GreenButton';
 import { SIDEBAR_MOBILE_CLOSE_MEDIA } from 'config/sidebarMobileCloseEnv';
 import { COLOR_TEMPLATE1_BORDER_UNSELECTED, colorTemplate1ButtonSx } from 'config/colorTemplate1';
-import {
-  SELECTED_BUTTON_TEMPLATE_BG,
-  SELECTED_BUTTON_TEMPLATE_TEXT
-} from 'config/selectedUnselectedButtonTemplate';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { getDesktopButtonFontSizeVw, getDesktopTextFontSizeVw } from 'config/desktopFontEnv';
 import { getMobileSinglesButtonFontSizeVw } from 'config/singlesMemberCardFontEnv';
-import { INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
+import { DAYNIGHT_VAR, INVERSE_DAYNIGHT_VAR, PRIMARY_VAR, SECONDARY_VAR } from 'utils/themeConfig';
 import { BIO_TABLE_COL_WIDTHS_NO_MATCH_NOTE, BIO_TABLE_COL_WIDTHS_NO_MATCH_NOTE_MOBILE } from 'utils/checkrBioTableLayout';
 import { formatVerificationDateSuffix, isVerificationServiceActionEnabled } from 'utils/profilePhotoChangeGate';
 import { VETTING_STATUS_DOT_SIZE_PX } from 'utils/vettingStatusDisplay';
 
-const VERIFICATION_TABLE_BG = 'var(--theme-secondary-color)';
+/**
+ * Theme mapping (follows every palette):
+ * - body rows  → theme primary (= left sidebar menu button bg) + daynight text
+ * - header row + enabled Action buttons → theme secondary (= the "We never reveal…" box below)
+ *   + inverse-daynight text
+ */
+const VERIFICATION_TABLE_BG = `var(${PRIMARY_VAR})`;
+const VERIFICATION_TABLE_TEXT = `var(${DAYNIGHT_VAR})`;
+const VERIFICATION_ACCENT_BG = `var(${SECONDARY_VAR})`;
+const VERIFICATION_ACCENT_TEXT = `var(${INVERSE_DAYNIGHT_VAR})`;
+
+/** Enabled Action buttons — secondary. Outranks GreenButton's Minimal-palete rule; disabled stays grey. */
+const verificationActionButtonSx = {
+  'html[data-color-palete="minimal"] &&&&:not(.Mui-disabled)': {
+    bgcolor: `${VERIFICATION_ACCENT_BG} !important`,
+    backgroundColor: `${VERIFICATION_ACCENT_BG} !important`,
+    backgroundImage: 'none !important',
+    color: `${VERIFICATION_ACCENT_TEXT} !important`,
+    WebkitTextFillColor: `${VERIFICATION_ACCENT_TEXT} !important`,
+    '& svg, & .MuiButton-startIcon': { color: `${VERIFICATION_ACCENT_TEXT} !important` }
+  }
+};
 
 const tableTextFontSize = { xs: '0.9rem', sm: getDesktopTextFontSizeVw() };
 const tableButtonFontSize = { xs: getMobileSinglesButtonFontSizeVw(), sm: getDesktopButtonFontSizeVw() };
 
-/** Column labels only — match selected template colors, no hover scale. */
+/** Column labels only — theme secondary bg + inverse-daynight text, no hover scale. */
 const verificationTableHeaderCellSx = {
   fontFamily: MAIN_FONT_FAMILY,
   fontWeight: 700,
   fontSize: tableTextFontSize,
-  bgcolor: `${SELECTED_BUTTON_TEMPLATE_BG} !important`,
-  color: `${SELECTED_BUTTON_TEMPLATE_TEXT} !important`,
-  WebkitTextFillColor: `${SELECTED_BUTTON_TEMPLATE_TEXT} !important`,
+  bgcolor: `${VERIFICATION_ACCENT_BG} !important`,
+  color: `${VERIFICATION_ACCENT_TEXT} !important`,
+  WebkitTextFillColor: `${VERIFICATION_ACCENT_TEXT} !important`,
   borderBottom: COLOR_TEMPLATE1_BORDER_UNSELECTED,
   py: 1.25,
   textAlign: 'center',
@@ -47,8 +64,8 @@ const verificationTableHeaderCellSx = {
   transition: 'none',
   '@media (hover: hover)': {
     '&:hover': {
-      bgcolor: `${SELECTED_BUTTON_TEMPLATE_BG} !important`,
-      color: `${SELECTED_BUTTON_TEMPLATE_TEXT} !important`,
+      bgcolor: `${VERIFICATION_ACCENT_BG} !important`,
+      color: `${VERIFICATION_ACCENT_TEXT} !important`,
       transform: 'none !important',
       filter: 'none'
     }
@@ -64,8 +81,8 @@ const bodyCellSx = {
   fontFamily: MAIN_FONT_FAMILY,
   fontSize: tableTextFontSize,
   bgcolor: VERIFICATION_TABLE_BG,
-  color: 'var(--theme-primary-color)',
-  borderColor: 'var(--theme-primary-color)',
+  color: VERIFICATION_TABLE_TEXT,
+  borderColor: VERIFICATION_ACCENT_BG,
   verticalAlign: 'middle',
   py: 1.5
 };
@@ -97,6 +114,9 @@ const stepChipSx = {
   py: { xs: 1.25, sm: 1.5 },
   minWidth: { xs: 72, sm: 120 },
   boxShadow: 'none',
+  bgcolor: 'transparent !important',
+  color: `${VERIFICATION_TABLE_TEXT} !important`,
+  WebkitTextFillColor: `${VERIFICATION_TABLE_TEXT} !important`,
   cursor: 'default',
   pointerEvents: 'none',
   '@media (hover: hover)': {
@@ -106,7 +126,7 @@ const stepChipSx = {
   }
 };
 
-const STATUS_TEXT_COLOR = `var(${INVERSE_DAYNIGHT_VAR})`;
+const STATUS_TEXT_COLOR = VERIFICATION_TABLE_TEXT;
 
 function normalizeStatusKey(status) {
   return String(status ?? 'notstarted')
@@ -323,7 +343,8 @@ export default function VerificationServicesTable({
                         width: '100%',
                         minWidth: '100%',
                         maxWidth: '100%',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        ...verificationActionButtonSx
                       }}
                     >
                       {loading || statusSaving ? `${row.label}…` : row.label}
