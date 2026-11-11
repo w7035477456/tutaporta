@@ -220,6 +220,12 @@ export async function scanAdminScamConversation(singlesIdA, singlesIdB) {
   return data;
 }
 
+/** Admin Tools → Restic tab. → { envFile, snapshots: [{ id, fullId, time, host, tags, paths }] } */
+export async function fetchAdminResticSnapshots() {
+  const { data } = await api.get('/api/admin/restic/snapshots');
+  return data;
+}
+
 /** Admin Tools → Raffles tab */
 export async function fetchAdminRaffleLogEvents() {
   const { data } = await api.get('/api/admin/raffle-log/events');

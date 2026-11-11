@@ -1,16 +1,20 @@
+/** Fixed yellow — `var(--theme-yellow-color)` maps to the (blue) secondary color in the minimal palette. */
+const SCROLLBAR_THUMB_YELLOW = '#FFEB3B';
+const SCROLLBAR_TRACK_BLACK = '#000000';
+
 /** TutaNotes scrollbars: yellow thumb on a black track (vertical and horizontal). */
 export const recordVaultYellowScrollbarSx = {
   scrollbarWidth: 'thin',
-  scrollbarColor: 'var(--theme-yellow-color) rgba(0,0,0,0.4)',
+  scrollbarColor: `${SCROLLBAR_THUMB_YELLOW} ${SCROLLBAR_TRACK_BLACK}`,
   '&::-webkit-scrollbar': {
     width: 14,
     height: 14
   },
   '&::-webkit-scrollbar-track': {
-    bgcolor: 'rgba(0,0,0,0.4)'
+    bgcolor: SCROLLBAR_TRACK_BLACK
   },
   '&::-webkit-scrollbar-thumb': {
-    bgcolor: 'var(--theme-yellow-color)',
+    bgcolor: SCROLLBAR_THUMB_YELLOW,
     borderRadius: 7,
     border: '2px solid #000'
   },

@@ -19,11 +19,13 @@ utc_a=$(((H24 + 4) % 24))
 utc_b=$(((H24 + 5) % 24))
 if [[ "$utc_a" -lt "$utc_b" ]]; then hours="$utc_a,$utc_b"; else hours="$utc_b,$utc_a"; fi
 
-newline="0 $hours * * * [ \"\$(TZ=$TZ date +%H)\" = $H24 ] && $SCRIPT $ENVF >> $LOG 2>&1"
+# cron turns an unescaped % into a newline, so date's format must be \%H.
+newline="0 $hours * * * [ \"\$(TZ=$TZ date +\\%H)\" = $(printf '%02d' "$H24") ] && $SCRIPT $ENVF >> $LOG 2>&1"
 
 crontab_txt="$(crontab -l 2>/dev/null || true)"
 tmp="$(mktemp)"
-printf '%s\n' "$crontab_txt" | awk -v marker="$MARKER" -v newline="$newline" '
+printf '%s\n' "$crontab_txt" | MARKER="$MARKER" NEWLINE="$newline" awk '
+  BEGIN { marker = ENVIRON["MARKER"]; newline = ENVIRON["NEWLINE"] }
   /^# restic-nightly/ { next }
   /backup-nightly\.sh/ {
     if (!done) { print marker; print newline; done = 1 }
@@ -34,6 +36,12 @@ printf '%s\n' "$crontab_txt" | awk -v marker="$MARKER" -v newline="$newline" '
 ' > "$tmp"
 crontab "$tmp"
 rm -f "$tmp"
+
+# The BE (Admin Tools → Restic) runs as lawsen0 and cannot read root's crontab.
+LINE_FILE="$(dirname "$ENVF")/restic-cron.line"
+printf '%s\n' "$newline" > "$LINE_FILE"
+chown lawsen0:lawsen0 "$LINE_FILE" 2>/dev/null || true
+chmod 644 "$LINE_FILE"
 
 echo "Installed daily backup at $(printf '%02d:00' "$H24") $TZ"
 crontab -l | grep -A1 restic-nightly

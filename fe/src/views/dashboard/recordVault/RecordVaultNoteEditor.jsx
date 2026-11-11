@@ -5,9 +5,7 @@ import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import 'katex/dist/katex.min.css';
 
-import {
-  buildRecordVaultEditorExtensions
-} from './recordVaultEditorExtensions';
+import { buildRecordVaultEditorExtensions } from './recordVaultEditorExtensions';
 import { RECORD_VAULT_ATTACHMENT_NODE_NAME } from './recordVaultAttachmentNode';
 import {
   computeSearchMatches,
@@ -26,16 +24,11 @@ import {
   recordVaultPasteSignature,
   shouldHandleRecordVaultPaste
 } from './recordVaultPasteFromClipboard';
-import {
-  isRecordVaultMobileUploadDrag,
-  RV_MOBILE_UPLOAD_DRAG_MIME
-} from './RecordVaultMobileUploadTray';
-import {
-  RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX,
-  recordVaultThemeDaynightShellSx
-} from './recordVaultNoteFontTokens';
+import { isRecordVaultMobileUploadDrag, RV_MOBILE_UPLOAD_DRAG_MIME } from './RecordVaultMobileUploadTray';
+import { RECORD_VAULT_DEFAULT_CONTENT_BG_INDEX, recordVaultThemeDaynightShellSx } from './recordVaultNoteFontTokens';
 import RecordVaultEditorToolbar from './RecordVaultEditorToolbar';
 import { stripNeutralColorsFromHtml } from './recordVaultNeutralColors';
+import { recordVaultYellowScrollbarSx } from './recordVaultYellowScrollbarSx';
 import './recordVaultEditor.scss';
 
 const EMPTY_DOC = '<p></p>';
@@ -45,9 +38,7 @@ function isRecordVaultDragJunkPlain(plain) {
   const t = String(plain || '').trim();
   if (!t || t.length > 240) return false;
   if (/\s/.test(t)) return false;
-  return /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?|mp4|mov|webm|mkv|avi|pdf|docx?|xlsx?|pptx?|txt|html?|md)$/i.test(
-    t
-  );
+  return /\.(jpe?g|png|gif|webp|heic|heif|avif|bmp|tiff?|mp4|mov|webm|mkv|avi|pdf|docx?|xlsx?|pptx?|txt|html?|md)$/i.test(t);
 }
 
 /**
@@ -57,9 +48,7 @@ function isRecordVaultDragJunkPlain(plain) {
  * DOM parser turns them back into real newlines.
  */
 function protectPreNewlines(html) {
-  return String(html || '').replace(/<pre\b[^>]*>[\s\S]*?<\/pre>/gi, (block) =>
-    block.replace(/\r?\n/g, '&#10;')
-  );
+  return String(html || '').replace(/<pre\b[^>]*>[\s\S]*?<\/pre>/gi, (block) => block.replace(/\r?\n/g, '&#10;'));
 }
 
 /** HTML about to enter the editor: theme-following text colors, intact code blocks. */
@@ -127,10 +116,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         // One Ctrl-V can fire paste twice on Mac Safari/Chrome; ignore repeats of the same payload.
         const now = Date.now();
         const sig = recordVaultPasteSignature(cd);
-        if (
-          pasteInFlightRef.current ||
-          (now - lastPasteAtRef.current < 2500 && lastPasteSigRef.current === sig)
-        ) {
+        if (pasteInFlightRef.current || (now - lastPasteAtRef.current < 2500 && lastPasteSigRef.current === sig)) {
           event.preventDefault();
           event.stopPropagation();
           return true;
@@ -314,20 +300,12 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
           if (resolved) pos = resolved.pos;
         }
         if (pos == null) pos = editor.state.doc.content.size;
-        editor
-          .chain()
-          .focus()
-          .insertContentAt(pos, { type: RECORD_VAULT_ATTACHMENT_NODE_NAME, attrs })
-          .run();
+        editor.chain().focus().insertContentAt(pos, { type: RECORD_VAULT_ATTACHMENT_NODE_NAME, attrs }).run();
       },
       /** Insert a phone/album photo (data URL) at the cursor; emits update for autosave. */
       insertImage: (src) => {
         if (!editor || !src) return;
-        editor
-          .chain()
-          .focus()
-          .insertContent({ type: 'image', attrs: { src } })
-          .run();
+        editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
       },
       /** Append vault file nodes to the end of the body (used to backfill legacy files). */
       appendAttachments: (attrsList) => {
@@ -336,10 +314,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
           type: RECORD_VAULT_ATTACHMENT_NODE_NAME,
           attrs
         }));
-        editor
-          .chain()
-          .insertContentAt(editor.state.doc.content.size, content)
-          .run();
+        editor.chain().insertContentAt(editor.state.doc.content.size, content).run();
       },
       /**
        * Insert missing vault files near label paragraphs that mention the file
@@ -380,15 +355,10 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
           });
 
           const insertPos =
-            bestScore >= 40 && bestPos != null
-              ? bestPos + editor.state.doc.nodeAt(bestPos).nodeSize
-              : editor.state.doc.content.size;
+            bestScore >= 40 && bestPos != null ? bestPos + editor.state.doc.nodeAt(bestPos).nodeSize : editor.state.doc.content.size;
           if (bestKey) claimedLabelKeys.add(bestKey);
 
-          editor
-            .chain()
-            .insertContentAt(insertPos, { type: RECORD_VAULT_ATTACHMENT_NODE_NAME, attrs })
-            .run();
+          editor.chain().insertContentAt(insertPos, { type: RECORD_VAULT_ATTACHMENT_NODE_NAME, attrs }).run();
         }
       },
       /**
@@ -407,8 +377,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         return count;
       },
       /** Number of highlighted search matches currently in the note body. */
-      getSearchHitCount: () =>
-        editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_GLOBAL) : 0,
+      getSearchHitCount: () => (editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_GLOBAL) : 0),
       /** Make the given match index the "current" hit and scroll it into view. */
       setActiveSearchHit: (index) => {
         if (!editor) return;
@@ -432,8 +401,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
         return count;
       },
       /** Number of in-note search matches highlighted in the open note. */
-      getNoteSearchHitCount: () =>
-        editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_NOTE) : 0,
+      getNoteSearchHitCount: () => (editor ? getSearchChannelMatchCount(editor.state, SEARCH_CHANNEL_NOTE) : 0),
       getActiveNoteSearchHitIndex: () => {
         if (!editor) return -1;
         const pluginState = recordVaultSearchHighlightKey.getState(editor.state);
@@ -480,11 +448,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
           <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleUnderline().run()}>
             <u>U</u>
           </button>
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.chain().focus().toggleHighlight().run()}
-          >
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().toggleHighlight().run()}>
             ✎
           </button>
         </BubbleMenu>
@@ -492,7 +456,7 @@ const RecordVaultNoteEditor = forwardRef(function RecordVaultNoteEditor(
 
       {header}
 
-      <Box className="rv-editor__body">
+      <Box className="rv-editor__body" sx={{ overflowY: 'scroll', ...recordVaultYellowScrollbarSx }}>
         <Box
           className="rv-editor__body-zoom"
           sx={{

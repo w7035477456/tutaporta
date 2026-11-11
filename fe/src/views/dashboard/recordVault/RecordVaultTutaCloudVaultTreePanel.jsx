@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import { fetchRecordVaultTutaDriveVaultTree, fetchRecordVaultUsbVaultTree } from 'api/recordVaultFe';
+import { recordVaultYellowScrollbarSx } from './recordVaultYellowScrollbarSx';
 
 const VAULT_TREE_INDENT_PX = 18;
 const VAULT_TREE_LINE_COLOR = 'var(--theme-yellow-color)';
@@ -20,22 +21,7 @@ const vaultTreeScrollSx = (maxHeight) => ({
   fontFamily: 'monospace',
   fontSize: '0.92rem',
   lineHeight: 1.45,
-  scrollbarWidth: 'thin',
-  scrollbarColor: 'var(--theme-yellow-color) rgba(0,0,0,0.4)',
-  '&::-webkit-scrollbar': {
-    width: 14
-  },
-  '&::-webkit-scrollbar-track': {
-    bgcolor: 'rgba(0,0,0,0.4)'
-  },
-  '&::-webkit-scrollbar-thumb': {
-    bgcolor: 'var(--theme-yellow-color)',
-    borderRadius: 7,
-    border: '2px solid #000'
-  },
-  '&::-webkit-scrollbar-thumb:hover': {
-    filter: 'brightness(1.08)'
-  }
+  ...recordVaultYellowScrollbarSx
 });
 
 const vaultTreeRowSx = {
@@ -171,9 +157,7 @@ export default function RecordVaultTutaCloudVaultTreePanel({
   const [tree, setTree] = useState(null);
   const isUsb = storageType === 'usb';
   const storageLabel = isUsb ? 'USB' : 'TutaCloud';
-  const storageFolderHint = isUsb
-    ? 'your USB vault folder'
-    : `your TutaCloud vault folder${folderName ? ` (${folderName})` : ''}`;
+  const storageFolderHint = isUsb ? 'your USB vault folder' : `your TutaCloud vault folder${folderName ? ` (${folderName})` : ''}`;
 
   useEffect(() => {
     if (!active) {
@@ -216,16 +200,16 @@ export default function RecordVaultTutaCloudVaultTreePanel({
       {showDescriptions ? (
         <>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0 }}>
-            All folders and encrypted files stored in {storageFolderHint} ({storageLabel}). It is never stored on our
-            server or anywhere else.
+            All folders and encrypted files stored in {storageFolderHint} ({storageLabel}). It is never stored on our server or anywhere
+            else.
           </ColorTemplate16PopupCenterWide.SectionDescription>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, fontStyle: 'italic' }}>
-            All *.enc are encrypted at rest and only this website can decrypt, just momentarily only, for you to view,
-            after 3 layers of security are verified.
+            All *.enc are encrypted at rest and only this website can decrypt, just momentarily only, for you to view, after 3 layers of
+            security are verified.
           </ColorTemplate16PopupCenterWide.SectionDescription>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0 }}>
-            All text is saved in vault.db.enc. Encryption keys are hashed and not kept on {storageLabel}. Periodic key
-            rotation and hash protection and triple layers verification give MyNote iron clad impenetrable privacy.
+            All text is saved in vault.db.enc. Encryption keys are hashed and not kept on {storageLabel}. Periodic key rotation and hash
+            protection and triple layers verification give MyNote iron clad impenetrable privacy.
           </ColorTemplate16PopupCenterWide.SectionDescription>
         </>
       ) : null}

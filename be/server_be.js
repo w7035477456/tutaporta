@@ -427,6 +427,7 @@ import {
   postGraphicalTestRunStop
 } from './routes/adminUiTestRecordings.js';
 import { getAdminStatistics } from './routes/adminStatistics.js';
+import { getAdminResticSnapshots } from './routes/adminRestic.js';
 import {
   getAdminTables,
   postAdminTableCascadeDelete,
@@ -1396,6 +1397,7 @@ app.post('/api/admin/ui-test-recordings/:recordingId/run/loop-complete', require
 app.get('/api/admin/ui-test-recordings/logs', requireAuth, requireAdminRole, getGraphicalTestLogs);
 app.post('/api/admin/ui-test-recordings/logs/reset', requireAuth, requireAdminRole, postGraphicalTestLogsReset);
 app.get('/api/admin/statistics', requireAuth, requireAdminRole, getAdminStatistics);
+app.get('/api/admin/restic/snapshots', requireAuth, requireAdminRole, getAdminResticSnapshots);
 app.get('/api/admin/tables', requireAuth, requireAdminRole, getAdminTables);
 app.post('/api/admin/tables/:tableKey/truncate', requireAuth, requireAdminRole, postAdminTableTruncate);
 app.post('/api/admin/tables/:tableKey/cascade-delete', requireAuth, requireAdminRole, postAdminTableCascadeDelete);

@@ -26,6 +26,7 @@ import AdminToolsWipeByIdTab from './AdminToolsWipeByIdTab';
 import AdminToolsLoginLogTab from './AdminToolsLoginLogTab';
 import AdminToolsRafflesTab from './AdminToolsRafflesTab';
 import AdminToolsScamAlertTab from './AdminToolsScamAlertTab';
+import AdminToolsResticTab from './AdminToolsResticTab';
 import AllSingles from 'views/dashboard/allSingles/AllSingles';
 
 const ADMIN_TOOLS_TABS = [
@@ -41,20 +42,21 @@ const ADMIN_TOOLS_TABS = [
   { value: 'wipe-by-id', label: 'DeleteById' },
   { value: 'all-singles', label: 'All Singles' },
   { value: 'raffles', label: 'Raffles' },
-  { value: 'scam-alert', label: 'Scam Alert' }
+  { value: 'scam-alert', label: 'Scam Alert' },
+  { value: 'restic', label: 'Restic' }
 ];
 
 function resolveAdminToolsTab(tabParam) {
-  const tab = String(tabParam ?? '').trim().toLowerCase();
+  const tab = String(tabParam ?? '')
+    .trim()
+    .toLowerCase();
   return ADMIN_TOOLS_TABS.some((t) => t.value === tab) ? tab : null;
 }
 
 const THUMB_COL_PX = 56;
 
 function listRowGridSx(showChecksum) {
-  const desktopCols = showChecksum
-    ? `${THUMB_COL_PX}px 2fr 1.4fr 0.8fr 1.6fr 1fr`
-    : `${THUMB_COL_PX}px 2fr 1.4fr 0.8fr 1fr`;
+  const desktopCols = showChecksum ? `${THUMB_COL_PX}px 2fr 1.4fr 0.8fr 1.6fr 1fr` : `${THUMB_COL_PX}px 2fr 1.4fr 0.8fr 1fr`;
   return {
     xs: `${THUMB_COL_PX}px 1fr`,
     sm: desktopCols
@@ -80,14 +82,10 @@ function FileListHeader({ showChecksum = false, onRemoveDup, removeDupBusy = fal
           'File Name'
         )}
       </ColorTemplate9TableData.HeaderCell>
-      <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-        Date Modified
-      </ColorTemplate9TableData.HeaderCell>
+      <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>Date Modified</ColorTemplate9TableData.HeaderCell>
       <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>Size</ColorTemplate9TableData.HeaderCell>
       {showChecksum ? (
-        <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-          Checksum
-        </ColorTemplate9TableData.HeaderCell>
+        <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>Checksum</ColorTemplate9TableData.HeaderCell>
       ) : null}
       <ColorTemplate9TableData.HeaderCell sx={{ display: { xs: 'none', sm: 'flex' } }}>Kind</ColorTemplate9TableData.HeaderCell>
     </ColorTemplate9TableData.HeaderRow>
@@ -130,9 +128,7 @@ function FileListRow({ file, rowIndex, showChecksum = false }) {
       <ColorTemplate9TableData.BodyCell>
         <FileThumbnail fileName={file.fileName} />
       </ColorTemplate9TableData.BodyCell>
-      <ColorTemplate9TableData.BodyCell
-        sx={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}
-      >
+      <ColorTemplate9TableData.BodyCell sx={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
         <ColorTemplate9TableData.BodyText sx={{ fontWeight: 600, wordBreak: 'break-all' }}>
           {file.fileName}
         </ColorTemplate9TableData.BodyText>
@@ -187,9 +183,7 @@ function FileListPanel({ files, emptyMessage, showChecksum = false, onRemoveDup,
 export default function AdminToolsPage() {
   const { user, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(
-    () => resolveAdminToolsTab(searchParams.get('tab')) ?? 'statistic'
-  );
+  const [activeTab, setActiveTab] = useState(() => resolveAdminToolsTab(searchParams.get('tab')) ?? 'statistic');
   const [folder, setFolder] = useState('');
   const [backupFiles, setBackupFiles] = useState([]);
   const [duplicateGroups, setDuplicateGroups] = useState([]);
@@ -213,9 +207,7 @@ export default function AdminToolsPage() {
       }
     }
     const message =
-      typeof messageOrErr === 'string'
-        ? messageOrErr
-        : messageOrErr?.response?.data?.error || messageOrErr?.message || 'Request failed';
+      typeof messageOrErr === 'string' ? messageOrErr : messageOrErr?.response?.data?.error || messageOrErr?.message || 'Request failed';
     setError(message);
   }, []);
 
@@ -338,9 +330,7 @@ export default function AdminToolsPage() {
         <ColorTemplate9TableData.PanelDivider />
         <ColorTemplate9TableData.Content>
           {activeTab !== 'test' && activeTab !== 'all-singles' && folder ? (
-            <ColorTemplate9TableData.BodyText sx={{ mb: 1, wordBreak: 'break-all' }}>
-              Folder: {folder}
-            </ColorTemplate9TableData.BodyText>
+            <ColorTemplate9TableData.BodyText sx={{ mb: 1, wordBreak: 'break-all' }}>Folder: {folder}</ColorTemplate9TableData.BodyText>
           ) : null}
           {error ? (
             <Alert severity="error" sx={{ mb: 1 }}>
@@ -353,26 +343,17 @@ export default function AdminToolsPage() {
             </Box>
           ) : null}
           {!loading && activeTab === 'backup' ? (
-            <FileListPanel
-              files={backupFiles}
-              emptyMessage="No image files found in TUTADATES_PHOTO_FOLDER."
-              showChecksum={false}
-            />
+            <FileListPanel files={backupFiles} emptyMessage="No image files found in TUTADATES_PHOTO_FOLDER." showChecksum={false} />
           ) : null}
-          {!loading && activeTab === 'test' ? (
-            <AdminToolsTestTab onError={handleToolsError} />
-          ) : null}
-          {!loading && activeTab === 'statistic' ? (
-            <AdminToolsStatisticTab onError={handleToolsError} />
-          ) : null}
-          {!loading && activeTab === 'password-check' ? (
-            <AdminToolsPasswordCheckTab onError={handleToolsError} />
-          ) : null}
+          {!loading && activeTab === 'test' ? <AdminToolsTestTab onError={handleToolsError} /> : null}
+          {!loading && activeTab === 'statistic' ? <AdminToolsStatisticTab onError={handleToolsError} /> : null}
+          {!loading && activeTab === 'password-check' ? <AdminToolsPasswordCheckTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'all-singles' ? <AllSingles /> : null}
           {!loading && activeTab === 'lookup' ? <AdminToolsLookupTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'login-log' ? <AdminToolsLoginLogTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'raffles' ? <AdminToolsRafflesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'scam-alert' ? <AdminToolsScamAlertTab onError={handleToolsError} /> : null}
+          {!loading && activeTab === 'restic' ? <AdminToolsResticTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'asn' ? <AdminToolsAsnTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'tables' ? <AdminToolsTablesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'wipe-by-id' ? <AdminToolsWipeByIdTab onError={handleToolsError} /> : null}

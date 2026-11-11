@@ -13,6 +13,7 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import { useRecordVaultSliderControlButtonFontRem } from './RecordVaultSliderControlButtonContext';
+import { recordVaultYellowScrollbarSx } from './recordVaultYellowScrollbarSx';
 import { MOBILE_UPLOAD_PRODUCT_TUTANOTES, requireMobileUploadProduct } from 'constants/mobileUploadProduct';
 
 /** HTML5 drag payload: file name under UPLOAD_FOLDER. */
@@ -898,9 +899,10 @@ export default function RecordVaultMobileUploadTray({
               overflowX: 'auto',
               overflowY: 'hidden',
               py: 0.25,
-              scrollbarWidth: 'thin',
+              ...recordVaultYellowScrollbarSx,
               ...(inline
                 ? {
+                    overflowX: 'scroll',
                     alignSelf: 'stretch',
                     px: 0.75,
                     border: '3px solid #000',
