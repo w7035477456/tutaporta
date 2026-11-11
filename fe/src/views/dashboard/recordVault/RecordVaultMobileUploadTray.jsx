@@ -277,22 +277,27 @@ const recentNoteScrollRowSx = {
   pb: 0.3,
   cursor: 'grab',
   userSelect: 'none',
-  scrollbarWidth: 'thin',
-  scrollbarColor: '#000 rgba(255,255,255,0.55)',
-  '&::-webkit-scrollbar': {
-    height: 7,
-    display: 'block'
-  },
-  '&::-webkit-scrollbar-thumb': {
-    backgroundColor: '#000',
-    borderRadius: 4,
-    minWidth: 24
-  },
-  '&::-webkit-scrollbar-track': {
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    border: '1px solid #000',
-    borderRadius: 4
-  },
+  ...recordVaultYellowScrollbarSx,
+  '&:active': {
+    cursor: 'grabbing'
+  }
+};
+
+/** Vertical stack of recent-note chips for the right sidebar (under Shortcut). */
+const recentNoteScrollColumnSx = {
+  flex: '1 1 auto',
+  minHeight: 0,
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'stretch',
+  gap: 0.5,
+  overflowX: 'hidden',
+  overflowY: 'scroll',
+  pr: 0.25,
+  cursor: 'grab',
+  userSelect: 'none',
+  ...recordVaultYellowScrollbarSx,
   '&:active': {
     cursor: 'grabbing'
   }
@@ -329,13 +334,13 @@ const recentChipWordSx = {
  * TutaNotes (SliderControlButton forces its own size with `!important`, so
  * these are plain buttons).
  */
-function recentChipSx(selected, halfFontRem) {
-  const size = `${(halfFontRem * 0.75).toFixed(3)}rem !important`;
+function recentChipSx(selected, halfFontRem, vertical = false) {
+  const size = `${(halfFontRem * (vertical ? 1 : 0.75)).toFixed(3)}rem !important`;
   return {
     boxSizing: 'border-box',
     /** Hug the label like the Add Note column rows instead of stretching. */
     flex: '0 0 auto',
-    width: 'auto',
+    width: vertical ? '100%' : 'auto',
     minWidth: 0,
     maxWidth: '100%',
     /** Thick like the Add Note column buttons; grows if a name needs a 3rd line. */
@@ -398,7 +403,17 @@ RecentChipLabel.propTypes = {
   label: PropTypes.string
 };
 
-function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSelect, disabled, paneWidth }) {
+export function RecentNoteQuickSlots({
+  slots,
+  selectedNoteId,
+  selectedNotebookId,
+  onSelect,
+  disabled,
+  paneWidth,
+  orientation = 'horizontal',
+  sx = null
+}) {
+  const vertical = orientation === 'vertical';
   /** Same source SliderControlButton uses; chips render at exactly half of it. */
   const vaultFontRem = useRecordVaultSliderControlButtonFontRem();
   const halfFontRem = Number(vaultFontRem) > 0 ? Number(vaultFontRem) / 2 : 1;
@@ -407,18 +422,22 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
     list.push(null);
   }
   const scrollRef = useRef(null);
-  const dragRef = useRef({ active: false, moved: false, startX: 0, scrollLeft: 0 });
+  const dragRef = useRef({ active: false, moved: false, startPos: 0, scrollPos: 0 });
 
-  const onDragMove = useCallback((event) => {
-    const el = scrollRef.current;
-    const drag = dragRef.current;
-    if (!el || !drag.active) return;
-    const dx = event.clientX - drag.startX;
-    if (Math.abs(dx) > RECENT_DRAG_THRESHOLD_PX) {
-      drag.moved = true;
-    }
-    el.scrollLeft = drag.scrollLeft - dx;
-  }, []);
+  const onDragMove = useCallback(
+    (event) => {
+      const el = scrollRef.current;
+      const drag = dragRef.current;
+      if (!el || !drag.active) return;
+      const delta = (vertical ? event.clientY : event.clientX) - drag.startPos;
+      if (Math.abs(delta) > RECENT_DRAG_THRESHOLD_PX) {
+        drag.moved = true;
+      }
+      if (vertical) el.scrollTop = drag.scrollPos - delta;
+      else el.scrollLeft = drag.scrollPos - delta;
+    },
+    [vertical]
+  );
 
   const endDrag = useCallback(() => {
     dragRef.current.active = false;
@@ -434,13 +453,13 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
       dragRef.current = {
         active: true,
         moved: false,
-        startX: event.clientX,
-        scrollLeft: el.scrollLeft
+        startPos: vertical ? event.clientY : event.clientX,
+        scrollPos: vertical ? el.scrollTop : el.scrollLeft
       };
       window.addEventListener('mousemove', onDragMove);
       window.addEventListener('mouseup', endDrag);
     },
-    [disabled, endDrag, onDragMove]
+    [disabled, endDrag, onDragMove, vertical]
   );
 
   useEffect(
@@ -466,24 +485,35 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
     <Box
       aria-label="Recent notes"
       sx={{
-        flex: '0 0 auto',
-        width: paneWidth,
+        ...(vertical
+          ? {
+              width: '100%',
+              minHeight: 0,
+              flexDirection: 'column',
+              alignItems: 'stretch'
+            }
+          : {
+              flex: '0 0 auto',
+              width: paneWidth,
+              alignItems: 'center',
+              alignSelf: 'stretch',
+              pl: 0.75,
+              pr: 0.25
+            }),
         minWidth: 0,
         display: 'flex',
-        alignItems: 'center',
-        alignSelf: 'stretch',
         gap: 0.5,
-        pl: 0.75,
-        pr: 0.25,
         boxSizing: 'border-box',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        ...(sx || null)
       }}
     >
       <Box
         sx={{
           flexShrink: 0,
-          display: 'inline-flex',
+          display: vertical ? 'flex' : 'inline-flex',
           alignItems: 'center',
+          justifyContent: 'center',
           border: '3px solid #000',
           borderRadius: 0.5,
           /** Label background matches the white `Mobile Upload:` label. */
@@ -498,7 +528,7 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
           sx={{
             fontFamily: MAIN_FONT_FAMILY,
             fontWeight: 800,
-            fontSize: { xs: '0.8rem', sm: '0.95rem' },
+            fontSize: vertical ? { xs: '0.95rem', sm: '1.15rem' } : { xs: '0.8rem', sm: '0.95rem' },
             lineHeight: 1.15,
             color: '#000',
             WebkitTextFillColor: '#000',
@@ -512,9 +542,9 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
       <Box
         ref={scrollRef}
         role="group"
-        aria-label="Recent note shortcuts — drag horizontally to scroll"
+        aria-label={`Recent note shortcuts — drag ${vertical ? 'vertically' : 'horizontally'} to scroll`}
         onMouseDown={onScrollRowMouseDown}
-        sx={recentNoteScrollRowSx}
+        sx={vertical ? recentNoteScrollColumnSx : recentNoteScrollRowSx}
       >
         {list.slice(0, RECENT_NOTE_SLOT_COUNT).map((slot, index) => {
           if (!slot) {
@@ -524,9 +554,8 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
                 aria-hidden
                 sx={{
                   flex: '0 0 auto',
-                  width: '4em',
+                  ...(vertical ? { width: '100%', height: 40 } : { width: '4em', alignSelf: 'stretch' }),
                   minWidth: 0,
-                  alignSelf: 'stretch',
                   border: '2px dashed #000',
                   borderRadius: '4px',
                   bgcolor: '#ffffff',
@@ -545,7 +574,7 @@ function RecentNoteQuickSlots({ slots, selectedNoteId, selectedNotebookId, onSel
               aria-pressed={selected}
               title={slot.label}
               onClick={() => handleChipClick(slot.notebook_id, slot.note_id)}
-              sx={recentChipSx(selected, halfFontRem)}
+              sx={recentChipSx(selected, halfFontRem, vertical)}
             >
               <RecentChipLabel label={slot.label} />
             </Box>
@@ -568,7 +597,9 @@ RecentNoteQuickSlots.propTypes = {
   selectedNotebookId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   onSelect: PropTypes.func,
   disabled: PropTypes.bool,
-  paneWidth: PropTypes.number
+  paneWidth: PropTypes.number,
+  orientation: PropTypes.oneOf(['horizontal', 'vertical']),
+  sx: PropTypes.object
 };
 
 export default function RecordVaultMobileUploadTray({
@@ -581,6 +612,10 @@ export default function RecordVaultMobileUploadTray({
   /** When set, the title label is a button (e.g. open the phone QR popup). */
   onTitleClick = null,
   layout = 'horizontal',
+  /** Horizontal only: sit inside another toolbar (no yellow bar, thumbnails boxed in black). */
+  inline = false,
+  /** Rendered before the title label (e.g. the phone-upload QR code). */
+  leading = null,
   plain = false,
   selectable = false,
   emptyHint,
@@ -810,20 +845,34 @@ export default function RecordVaultMobileUploadTray({
         boxSizing: 'border-box',
         overflow: 'hidden'
       }
-    : {
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0.75,
-        /** Tall enough for one row of two-line Recent chips + scrollbar. */
-        minHeight: 96,
-        px: 1,
-        py: 0.55,
-        bgcolor: '#fff59d',
-        borderBottom: '2px solid #000',
-        boxSizing: 'border-box',
-        overflow: 'hidden'
-      };
+    : inline
+      ? {
+          flex: '1 1 0',
+          minWidth: 0,
+          alignSelf: 'stretch',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.75,
+          px: 1,
+          py: 0.5,
+          bgcolor: 'var(--theme-secondary-color)',
+          boxSizing: 'border-box',
+          overflow: 'hidden'
+        }
+      : {
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.75,
+          /** Tall enough for one row of two-line Recent chips + scrollbar. */
+          minHeight: 96,
+          px: 1,
+          py: 0.55,
+          bgcolor: '#fff59d',
+          borderBottom: '2px solid #000',
+          boxSizing: 'border-box',
+          overflow: 'hidden'
+        };
 
   const thumbsArea = (
     <Box
@@ -849,7 +898,17 @@ export default function RecordVaultMobileUploadTray({
               overflowX: 'auto',
               overflowY: 'hidden',
               py: 0.25,
-              scrollbarWidth: 'thin'
+              scrollbarWidth: 'thin',
+              ...(inline
+                ? {
+                    alignSelf: 'stretch',
+                    px: 0.75,
+                    border: '3px solid #000',
+                    borderRadius: 0.5,
+                    bgcolor: '#fff',
+                    boxSizing: 'border-box'
+                  }
+                : null)
             }
       }
     >
@@ -888,6 +947,7 @@ export default function RecordVaultMobileUploadTray({
 
   return (
     <Box ref={trayRef} data-rv-mobile-upload-tray="" aria-label="Mobile Upload thumbnails" sx={shellSx}>
+      {leading}
       {plain ? null : (
         <Tooltip title={MOBILE_UPLOAD_HOVER_TOOLTIP} arrow placement="top" enterDelay={200} slotProps={mobileUploadHoverTooltipSlotProps()}>
           <Box
@@ -1007,6 +1067,8 @@ RecordVaultMobileUploadTray.propTypes = {
   titleLabel: PropTypes.string,
   onTitleClick: PropTypes.func,
   layout: PropTypes.oneOf(['horizontal', 'grid']),
+  inline: PropTypes.bool,
+  leading: PropTypes.node,
   plain: PropTypes.bool,
   selectable: PropTypes.bool,
   emptyHint: PropTypes.string,

@@ -101,9 +101,12 @@ import RecordVaultMobileDirectUploadDialog from './RecordVaultMobileDirectUpload
 import RecordVaultMobileUploadTray, {
   isRecordVaultMobileUploadDrag,
   materializeRecordVaultMobileUploadFile,
-  readRecordVaultMobileUploadDragFileName
+  readRecordVaultMobileUploadDragFileName,
+  RecentNoteQuickSlots
 } from './RecordVaultMobileUploadTray';
 import { MOBILE_UPLOAD_PRODUCT_TUTANOTES } from 'constants/mobileUploadProduct';
+import ProfilePhotoUploadQrPanel from 'components/ProfilePhotoUploadQrPanel';
+import { recordVaultYellowScrollbarSx } from './recordVaultYellowScrollbarSx';
 import RecordVaultCrossPaneTransferDialog from './RecordVaultCrossPaneTransferDialog';
 import {
   clearActiveCrossPaneDrag,
@@ -729,22 +732,7 @@ const recordVaultContentScrollSx = {
   flex: 1,
   minHeight: 0,
   overflowY: 'scroll',
-  scrollbarWidth: 'thin',
-  scrollbarColor: 'var(--theme-yellow-color) rgba(0,0,0,0.4)',
-  '&::-webkit-scrollbar': {
-    width: 14
-  },
-  '&::-webkit-scrollbar-track': {
-    bgcolor: 'rgba(0,0,0,0.4)'
-  },
-  '&::-webkit-scrollbar-thumb': {
-    bgcolor: 'var(--theme-yellow-color)',
-    borderRadius: 7,
-    border: '2px solid #000'
-  },
-  '&::-webkit-scrollbar-thumb:hover': {
-    filter: 'brightness(1.08)'
-  }
+  ...recordVaultYellowScrollbarSx
 };
 
 /** Notebook / Note / Shortcut list panels — always show a vertical scrollbar (TutaCloud + USB). */
@@ -7326,6 +7314,32 @@ export default function RecordVaultWorkspacePane({
                       boxSizing: 'border-box'
                     }}
                   />
+                ) : null}
+                {!compareMode ? (
+                  <RecordVaultMobileUploadTray
+                    inline
+                    leading={
+                      unlocked ? (
+                        <ProfilePhotoUploadQrPanel
+                          variant="qrOnly"
+                          purpose="tutanotes"
+                          qrSize={64}
+                          onPhoneUploadComplete={(fileNameOrId, meta) => void handleMobilePhoneUploadComplete(fileNameOrId, meta)}
+                        />
+                      ) : null
+                    }
+                    product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
+                    active={unlocked}
+                    disabled={
+                      busy ||
+                      innerEncryptBusy ||
+                      !selectedNote ||
+                      isBillScheduleSystemId(selectedNote?.note_id) ||
+                      (selectedNote && noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id))
+                    }
+                    refreshToken={mobileUploadTrayRefreshToken}
+                    onError={(msg) => setError(String(msg || ''))}
+                  />
                 ) : (
                   <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'var(--theme-secondary-color)' }} aria-hidden />
                 )}
@@ -7487,26 +7501,6 @@ export default function RecordVaultWorkspacePane({
                   </Typography>
                 ) : null}
               </Box>
-            ) : null}
-
-            {!hideWorkspaceChrome && !compareMode ? (
-              <RecordVaultMobileUploadTray
-                product={MOBILE_UPLOAD_PRODUCT_TUTANOTES}
-                active={unlocked}
-                disabled={
-                  busy ||
-                  innerEncryptBusy ||
-                  !selectedNote ||
-                  isBillScheduleSystemId(selectedNote?.note_id) ||
-                  (selectedNote && noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(selectedNote.note_id))
-                }
-                refreshToken={mobileUploadTrayRefreshToken}
-                recentNoteSlots={recentNoteSlots}
-                onRecentNoteSelect={handleSearchResultSelect}
-                recentSelectedNoteId={selectedNoteId}
-                recentSelectedNotebookId={selectedNotebookId}
-                onError={(msg) => setError(String(msg || ''))}
-              />
             ) : null}
 
             <Box
@@ -8476,6 +8470,23 @@ export default function RecordVaultWorkspacePane({
                               })}
                             </Box>
                           </Box>
+                          {recentNoteSlots && !compareMode ? (
+                            <RecentNoteQuickSlots
+                              orientation="vertical"
+                              slots={recentNoteSlots}
+                              selectedNoteId={selectedNoteId}
+                              selectedNotebookId={selectedNotebookId}
+                              onSelect={handleSearchResultSelect}
+                              disabled={busy || innerEncryptBusy}
+                              sx={{
+                                ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
+                                flex: '1 1 0',
+                                minHeight: compact ? 64 : 100,
+                                mt: 1,
+                                overflow: 'hidden'
+                              }}
+                            />
+                          ) : null}
                         </Box>
                       </Box>
                     </>

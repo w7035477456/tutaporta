@@ -5,10 +5,7 @@ import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import { QRCodeSVG } from 'qrcode.react';
-import {
-  createMobilePhotoUploadSession,
-  fetchMobilePhotoUploadSessionStatus
-} from 'api/mobilePhotoUploadFe';
+import { createMobilePhotoUploadSession, fetchMobilePhotoUploadSessionStatus } from 'api/mobilePhotoUploadFe';
 import { mobilePhotoUploadDebugLog } from 'utils/mobilePhotoUploadDebug';
 import { getScanForPhoneUploadMs } from 'config/phoneUploadScanEnv';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
@@ -21,8 +18,7 @@ export const PROFILE_PHOTO_UPLOAD_QR_MESSAGE =
 
 export const PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE = 'Scan to upload from your phone';
 
-export const PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE =
-  'Receiving photo from your phone — please wait…';
+export const PROFILE_PHOTO_UPLOAD_QR_BUSY_MESSAGE = 'Receiving photo from your phone — please wait…';
 
 export const PROFILE_PHOTO_UPLOAD_QR_WAIT_MESSAGE =
   'After clicking Phone Barcode Upload, please wait up to 30 seconds for your photo to appear.';
@@ -65,12 +61,12 @@ export default function ProfilePhotoUploadQrPanel({
   const inline = variant === 'inline';
   const qrSize = qrSizeProp ?? (inline ? 156 : 168);
   const message = messageOverride || PROFILE_PHOTO_UPLOAD_QR_MESSAGE;
-  const uploadPurpose = String(purpose || 'profile').trim().toLowerCase() || 'profile';
+  const uploadPurpose =
+    String(purpose || 'profile')
+      .trim()
+      .toLowerCase() || 'profile';
   const isStagingFolderPurpose =
-    uploadPurpose === 'photo_albums' ||
-    uploadPurpose === 'tutaphoto' ||
-    uploadPurpose === 'tutanotes' ||
-    uploadPurpose === 'tutadates';
+    uploadPurpose === 'photo_albums' || uploadPurpose === 'tutaphoto' || uploadPurpose === 'tutanotes' || uploadPurpose === 'tutadates';
   const isBillReceiptPurpose = uploadPurpose === 'bill_receipt';
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -82,43 +78,40 @@ export default function ProfilePhotoUploadQrPanel({
   const lastDeliveredKeyRef = useRef(null);
   const autoRefreshingRef = useRef(false);
 
-  const loadSession = useCallback(async ({ resetDelivery = true, keepCheckMessage = false } = {}) => {
-    setLoading(true);
-    setError('');
-    if (!keepCheckMessage) setCheckMessage('');
-    setWatchingUpload(false);
-    setPhoneUploadBusy(false);
-    setRemainingMs(null);
-    if (resetDelivery) lastDeliveredKeyRef.current = null;
-    try {
-      const data = await createMobilePhotoUploadSession({
-        ...(isStagingFolderPurpose ? { purpose: uploadPurpose } : {}),
-        ...(isBillReceiptPurpose
-          ? { purpose: 'bill_receipt', paidRecordId: Number(paidRecordId) }
-          : {})
-      });
-      mobilePhotoUploadDebugLog('desktop QR session created', {
-        purpose: data?.purpose,
-        expiresAt: data?.expiresAt,
-        mobileUrl: data?.mobileUrl
-      });
-      setSession(data);
-    } catch (err) {
-      setSession(null);
-      const errMsg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err?.message ||
-        'Could not create phone upload link.';
-      mobilePhotoUploadDebugLog('desktop QR session FAIL', {
-        message: errMsg,
-        status: err?.response?.status
-      });
-      setError(errMsg);
-    } finally {
-      setLoading(false);
-    }
-  }, [isStagingFolderPurpose, isBillReceiptPurpose, paidRecordId, uploadPurpose]);
+  const loadSession = useCallback(
+    async ({ resetDelivery = true, keepCheckMessage = false } = {}) => {
+      setLoading(true);
+      setError('');
+      if (!keepCheckMessage) setCheckMessage('');
+      setWatchingUpload(false);
+      setPhoneUploadBusy(false);
+      setRemainingMs(null);
+      if (resetDelivery) lastDeliveredKeyRef.current = null;
+      try {
+        const data = await createMobilePhotoUploadSession({
+          ...(isStagingFolderPurpose ? { purpose: uploadPurpose } : {}),
+          ...(isBillReceiptPurpose ? { purpose: 'bill_receipt', paidRecordId: Number(paidRecordId) } : {})
+        });
+        mobilePhotoUploadDebugLog('desktop QR session created', {
+          purpose: data?.purpose,
+          expiresAt: data?.expiresAt,
+          mobileUrl: data?.mobileUrl
+        });
+        setSession(data);
+      } catch (err) {
+        setSession(null);
+        const errMsg = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Could not create phone upload link.';
+        mobilePhotoUploadDebugLog('desktop QR session FAIL', {
+          message: errMsg,
+          status: err?.response?.status
+        });
+        setError(errMsg);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isStagingFolderPurpose, isBillReceiptPurpose, paidRecordId, uploadPurpose]
+  );
 
   useEffect(() => {
     if (disabled) return;
@@ -159,7 +152,9 @@ export default function ProfilePhotoUploadQrPanel({
         setPhoneUploadBusy(false);
       }
 
-      const statusPurpose = String(status?.purpose || uploadPurpose).trim().toLowerCase();
+      const statusPurpose = String(status?.purpose || uploadPurpose)
+        .trim()
+        .toLowerCase();
       const stagingFlow =
         isStagingFolderPurpose ||
         statusPurpose === 'photo_albums' ||
@@ -173,9 +168,7 @@ export default function ProfilePhotoUploadQrPanel({
           const deliveryKey = `${billFlow ? 'bill' : 'staging'}:${status?.fileName || status?.completedAt || 'done'}`;
           if (lastDeliveredKeyRef.current !== deliveryKey) {
             lastDeliveredKeyRef.current = deliveryKey;
-            setCheckMessage(
-              billFlow ? 'Receipt received from your phone.' : 'Photo received from your phone.'
-            );
+            setCheckMessage(billFlow ? 'Receipt received from your phone.' : 'Photo received from your phone.');
             await onPhoneUploadComplete?.(status?.fileName || status?.photosId, {
               purpose: billFlow ? 'bill_receipt' : statusPurpose || uploadPurpose || 'photo_albums',
               fileName: status?.fileName || null,
@@ -273,13 +266,51 @@ export default function ProfilePhotoUploadQrPanel({
   }, [checkUploadStatus, disabled, loading, session?.token]);
 
   const countdownLabel =
-    remainingMs !== null
-      ? `New barcode in ${formatCountdown(remainingMs)}`
-      : loading && session?.expiresAt
-        ? 'New barcode in 0:00'
-        : null;
+    remainingMs !== null ? `New barcode in ${formatCountdown(remainingMs)}` : loading && session?.expiresAt ? 'New barcode in 0:00' : null;
 
   if (disabled) return null;
+
+  if (variant === 'qrOnly') {
+    const qrOnlyTitle = error || [PROFILE_PHOTO_UPLOAD_QR_INLINE_MESSAGE, countdownLabel].filter(Boolean).join(' — ');
+    return (
+      <Box
+        title={qrOnlyTitle}
+        sx={{
+          position: 'relative',
+          flex: '0 0 auto',
+          width: qrSize,
+          height: qrSize,
+          p: '3px',
+          bgcolor: '#fff',
+          border: '2px solid #000',
+          borderRadius: 0.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          lineHeight: 0,
+          boxSizing: 'content-box',
+          ...sx
+        }}
+      >
+        {loading && !session?.mobileUrl ? (
+          <CircularProgress size={Math.round(qrSize / 2)} sx={{ color: '#000' }} />
+        ) : error ? (
+          <Typography sx={{ fontSize: '0.6rem', fontWeight: 800, color: '#c62828', lineHeight: 1.1, textAlign: 'center' }}>
+            QR error
+          </Typography>
+        ) : session?.mobileUrl ? (
+          <Box sx={{ lineHeight: 0, opacity: phoneUploadBusy ? 0.35 : 1 }}>
+            <QRCodeSVG value={session.mobileUrl} size={qrSize} level="M" role="img" aria-label="QR code to upload from your phone" />
+          </Box>
+        ) : null}
+        {phoneUploadBusy ? (
+          <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CircularProgress size={Math.round(qrSize / 2)} sx={{ color: '#000' }} />
+          </Box>
+        ) : null}
+      </Box>
+    );
+  }
 
   if (inline) {
     return (
@@ -370,9 +401,7 @@ export default function ProfilePhotoUploadQrPanel({
             borderTop: '2px solid var(--theme-inverse-daynight-color)'
           }}
         >
-          {countdownLabel ? (
-            <Typography sx={{ ...scanPanelTextSx, width: '100%' }}>{countdownLabel}</Typography>
-          ) : null}
+          {countdownLabel ? <Typography sx={{ ...scanPanelTextSx, width: '100%' }}>{countdownLabel}</Typography> : null}
           {session?.mobileUrl && !error ? (
             <Typography sx={{ ...scanPanelTextSx, mt: 0.5, width: '100%', fontWeight: 600 }}>
               {PROFILE_PHOTO_UPLOAD_QR_WAIT_MESSAGE}
@@ -510,7 +539,7 @@ ProfilePhotoUploadQrPanel.propTypes = {
   messageSx: PropTypes.object,
   onPhoneUploadComplete: PropTypes.func,
   disabled: PropTypes.bool,
-  variant: PropTypes.oneOf(['default', 'inline']),
+  variant: PropTypes.oneOf(['default', 'inline', 'qrOnly']),
   qrSize: PropTypes.number,
   purpose: PropTypes.string,
   paidRecordId: PropTypes.number,
