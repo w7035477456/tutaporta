@@ -160,7 +160,8 @@ export async function listResticSnapshots() {
     const enclosure = getTerramasterEnclosureStatus();
     const enclosureHint = enclosure.status === 'not_configured' ? '' : ` — TerraMaster: ${enclosure.label}`;
     const err = new Error(`restic snapshots failed: ${detail}${enclosureHint}`);
-    err.statusCode = 502;
+    // Not 502/504: Cloudflare swaps those origin responses for its own page, hiding this JSON.
+    err.statusCode = 503;
     err.schedule = schedule;
     throw err;
   }
