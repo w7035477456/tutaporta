@@ -28,8 +28,9 @@ describe('parseResticSnapshotsJson', () => {
           short_id: '583663f8',
           time: '2026-11-05T13:22:20.5-05:00',
           hostname: 'xbox2',
-          tags: ['nightly', 'db'],
-          paths: ['/home/lawsen0/code/main', '/home/lawsen0/ubuntu_storage']
+          tags: ['nightly', 'db', 'users_dates:39', 'users_notes:6', 'users_photos:4'],
+          paths: ['/home/lawsen0/code/main', '/home/lawsen0/ubuntu_storage'],
+          summary: { data_added: 1066605, total_bytes_processed: 2369160320 }
         },
         { id: '4fe1b19d00001111', time: '2026-11-05T13:38:20-05:00', hostname: 'xbox2' }
       ])
@@ -41,9 +42,26 @@ describe('parseResticSnapshotsJson', () => {
         time: '2026-11-05 13:22:20',
         host: 'xbox2',
         tags: ['nightly', 'db'],
-        paths: ['/home/lawsen0/code/main', '/home/lawsen0/ubuntu_storage']
+        usersDates: 39,
+        usersNotes: 6,
+        usersPhotos: 4,
+        paths: ['/home/lawsen0/code/main', '/home/lawsen0/ubuntu_storage'],
+        incBytes: 1066605,
+        totalBytes: 2369160320
       },
-      { id: '4fe1b19d', fullId: '4fe1b19d00001111', time: '2026-11-05 13:38:20', host: 'xbox2', tags: [], paths: [] }
+      {
+        id: '4fe1b19d',
+        fullId: '4fe1b19d00001111',
+        time: '2026-11-05 13:38:20',
+        host: 'xbox2',
+        tags: [],
+        usersDates: null,
+        usersNotes: null,
+        usersPhotos: null,
+        paths: [],
+        incBytes: null,
+        totalBytes: null
+      }
     ]);
   });
 

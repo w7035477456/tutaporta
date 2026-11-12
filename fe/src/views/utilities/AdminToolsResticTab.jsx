@@ -5,9 +5,29 @@ import CircularProgress from '@mui/material/CircularProgress';
 import ColorTemplate9TableData from 'ui-component/ColorTemplate9TableData';
 import { fetchAdminResticSnapshots } from 'api/adminToolsFe';
 
-/** Same columns as `showrestic` → `restic snapshots`: ID, Time, Host, Tags, Paths. */
-const RESTIC_GRID_COLUMNS = '110px 190px 110px minmax(220px, 1.2fr) minmax(360px, 2fr)';
-const RESTIC_MIN_TABLE_WIDTH = 1000;
+/** Same columns as `showrestic` → `restic snapshots`: ID, Time, Host, Tags, Paths, plus added / total size. */
+const RESTIC_GRID_COLUMNS = '110px 190px 110px minmax(220px, 1.2fr) minmax(360px, 2fr) 110px 110px 100px 100px 100px';
+const RESTIC_MIN_TABLE_WIDTH = 1520;
+
+/** Users at backup time (from `users_*` snapshot tags); `—` for snapshots made before counting existed. */
+const RESTIC_USER_COUNT_COLUMNS = [
+  ['TutaDates', 'usersDates'],
+  ['TutaNotes', 'usersNotes'],
+  ['TutaPhoto', 'usersPhotos']
+];
+
+/** Bytes → `1.02 MB` / `2.21 GB` (binary units, like restic). */
+function formatResticBytes(bytes) {
+  if (!Number.isFinite(bytes)) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit === 0 ? value : value.toFixed(2)} ${units[unit]}`;
+}
 
 const monoTextSx = {
   fontFamily: 'monospace',
@@ -111,6 +131,11 @@ export default function AdminToolsResticTab({ onError }) {
             <ColorTemplate9TableData.HeaderCell>Host</ColorTemplate9TableData.HeaderCell>
             <ColorTemplate9TableData.HeaderCell>Tags</ColorTemplate9TableData.HeaderCell>
             <ColorTemplate9TableData.HeaderCell>Paths</ColorTemplate9TableData.HeaderCell>
+            <ColorTemplate9TableData.HeaderCell>Inc Size</ColorTemplate9TableData.HeaderCell>
+            <ColorTemplate9TableData.HeaderCell>Total Size</ColorTemplate9TableData.HeaderCell>
+            {RESTIC_USER_COUNT_COLUMNS.map(([label]) => (
+              <ColorTemplate9TableData.HeaderCell key={label}>{label}</ColorTemplate9TableData.HeaderCell>
+            ))}
           </ColorTemplate9TableData.HeaderRow>
           {snapshots.map((snap, index) => (
             <ColorTemplate9TableData.BodyRow key={snap.fullId || snap.id} rowIndex={index} gridTemplateColumns={RESTIC_GRID_COLUMNS}>
@@ -135,6 +160,19 @@ export default function AdminToolsResticTab({ onError }) {
                   </ColorTemplate9TableData.BodyText>
                 ))}
               </ColorTemplate9TableData.BodyCell>
+              <ColorTemplate9TableData.BodyCell>
+                <ColorTemplate9TableData.BodyText sx={monoTextSx}>{formatResticBytes(snap.incBytes)}</ColorTemplate9TableData.BodyText>
+              </ColorTemplate9TableData.BodyCell>
+              <ColorTemplate9TableData.BodyCell>
+                <ColorTemplate9TableData.BodyText sx={monoTextSx}>{formatResticBytes(snap.totalBytes)}</ColorTemplate9TableData.BodyText>
+              </ColorTemplate9TableData.BodyCell>
+              {RESTIC_USER_COUNT_COLUMNS.map(([label, key]) => (
+                <ColorTemplate9TableData.BodyCell key={label}>
+                  <ColorTemplate9TableData.BodyText sx={monoTextSx}>
+                    {Number.isFinite(snap[key]) ? snap[key].toLocaleString() : '—'}
+                  </ColorTemplate9TableData.BodyText>
+                </ColorTemplate9TableData.BodyCell>
+              ))}
             </ColorTemplate9TableData.BodyRow>
           ))}
         </ColorTemplate9TableData.Table>

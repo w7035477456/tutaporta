@@ -44,6 +44,14 @@ if [[ ${#POSTGRES_RESTIC_PATHS[@]} -gt 0 ]]; then
 else
     echo "[backup:$HOST_TAG] restic backup (photos, large storage, code — postgres chain on enclosure only)"
 fi
+# Per-app user counts as tags (Admin Tools → Restic columns); a failed count never blocks the backup.
+USER_COUNT_TAGS=()
+if counts="$(psql -X -At -F ' ' -c "SELECT (SELECT count(*) FROM outdateddbsnapshotoct2024.singles), (SELECT count(DISTINCT singles_id) FROM outdateddbsnapshotoct2024.notes_vault), (SELECT count(DISTINCT singles_id) FROM outdateddbsnapshotoct2024.photo_albums_vault)" 2>/dev/null)"; then
+    read -r users_dates users_notes users_photos <<<"$counts"
+    USER_COUNT_TAGS=(--tag "users_dates:$users_dates" --tag "users_notes:$users_notes" --tag "users_photos:$users_photos")
+    echo "[backup:$HOST_TAG] users: TutaDates $users_dates, TutaNotes $users_notes, TutaPhoto $users_photos"
+fi
+
 restic backup "${restic_paths[@]}" \
     --exclude "$PROJECT_DIR/fe/node_modules/**" \
     --exclude "$PROJECT_DIR/be/node_modules/**" \
@@ -54,7 +62,7 @@ restic backup "${restic_paths[@]}" \
     --exclude="**/EncryptedTutaNotesZip_*.zip" \
     --exclude="**/EncryptedBackup_*.zip" \
     --exclude="**/backup_*.zip" \
-    --tag nightly --tag db --tag photos --tag code --tag "$HOST_TAG" "${NOTE_TAGS[@]}"
+    --tag nightly --tag db --tag photos --tag code --tag "$HOST_TAG" "${NOTE_TAGS[@]}" "${USER_COUNT_TAGS[@]}"
 
 # Keep every snapshot (several per day too): no restic forget / prune.
 

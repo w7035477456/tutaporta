@@ -124,13 +124,26 @@ export function parseResticSnapshotsJson(jsonText) {
   if (!Array.isArray(parsed)) return [];
   return parsed.map((snap) => {
     const fullId = String(snap?.id ?? '');
+    const allTags = Array.isArray(snap?.tags) ? snap.tags.map(String) : [];
+    const userCounts = { dates: null, notes: null, photos: null };
+    const tags = allTags.filter((tag) => {
+      const m = tag.match(/^users_(dates|notes|photos):(\d+)$/);
+      if (m) userCounts[m[1]] = Number(m[2]);
+      return !m;
+    });
     return {
       id: String(snap?.short_id ?? '') || fullId.slice(0, 8),
       fullId,
       time: formatResticSnapshotTime(snap?.time),
       host: String(snap?.hostname ?? ''),
-      tags: Array.isArray(snap?.tags) ? snap.tags.map(String) : [],
-      paths: Array.isArray(snap?.paths) ? snap.paths.map(String) : []
+      tags,
+      usersDates: userCounts.dates,
+      usersNotes: userCounts.notes,
+      usersPhotos: userCounts.photos,
+      paths: Array.isArray(snap?.paths) ? snap.paths.map(String) : [],
+      // `summary` exists only for snapshots made by restic >= 0.17.
+      incBytes: Number.isFinite(snap?.summary?.data_added) ? snap.summary.data_added : null,
+      totalBytes: Number.isFinite(snap?.summary?.total_bytes_processed) ? snap.summary.total_bytes_processed : null
     };
   });
 }
