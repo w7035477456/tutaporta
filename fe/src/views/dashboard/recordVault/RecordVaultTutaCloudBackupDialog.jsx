@@ -16,13 +16,22 @@ import {
 } from 'api/recordVaultFe';
 import { tutaNotesPostLoginActionButtonSx } from './tutaNotesPostLoginActionButtonSx';
 import { themedAlert } from 'utils/themedDialog';
-import { acquireOpenZipFile, acquireSaveZipFile } from 'utils/downloadZipFolder';
+import {
+  acquireBackupFolderZip,
+  acquireOpenZipFile,
+  countPrefixedZips,
+  keepLatestButtonEnabled,
+  keepLatestZipsInFolder
+} from 'utils/downloadZipFolder';
+import { GREEN_BUTTON_ENABLED_BG, greenButtonPinnedColorSx } from 'config/greenButton';
 import {
   ensureEncryptPasswordForBackupSeal,
   prepareBackupDecryptWithPassword
 } from 'utils/recordVaultBackupDecryptPrompt';
 import RecordVaultBackupPasswordDialog from './RecordVaultBackupPasswordDialog';
-import { tutaDriveBackupFileNamePreview } from 'utils/recordVaultBackupFileName';
+import { TUTADRIVE_BACKUP_FILE_PREFIX, tutaDriveBackupFileNamePreview } from 'utils/recordVaultBackupFileName';
+
+const KEEP_LATEST_BACKUP_ZIPS = 3;
 
 const actionRowSx = {
   display: 'flex',
@@ -43,6 +52,20 @@ const formatRedButtonSx = {
   ...actionButtonSx,
   bgcolor: 'var(--theme-error-color, #d32f2f) !important',
   color: '#fff !important'
+};
+
+const keepLatestButtonSx = {
+  ...actionButtonSx,
+  ...greenButtonPinnedColorSx(GREEN_BUTTON_ENABLED_BG, '#000000')
+};
+
+const exitRedButtonSx = {
+  ...actionButtonSx,
+  bgcolor: 'var(--theme-error-color, #d32f2f) !important',
+  color: '#000000 !important',
+  WebkitTextFillColor: '#000000 !important',
+  fontWeight: 800,
+  ...greenButtonPinnedColorSx('var(--theme-error-color, #d32f2f)', '#000000')
 };
 
 function formatBackupZipSizeLabel(sizeBytes) {
@@ -133,7 +156,7 @@ function buildBackupProgressLabel(progress, nowMs) {
 }
 
 /**
- * Backup & Restore — encrypted zip on the member's computer only (Save As / Open file).
+ * Backup & Restore — encrypted zip on the member's computer only (folder / Open file).
  * Vault data still lives on the server; this dialog no longer keeps backup slots in TutaCloud.
  */
 export default function RecordVaultTutaCloudBackupDialog({
@@ -157,6 +180,11 @@ export default function RecordVaultTutaCloudBackupDialog({
   const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
   const [requiredBackupDone, setRequiredBackupDone] = useState(false);
   const [exitReadyOpen, setExitReadyOpen] = useState(false);
+  /** Zip just written, and the folder it was saved in (so Keep 3 can count and delete). */
+  const savedZipHandleRef = useRef(null);
+  const backupDirRef = useRef(null);
+  /** Backup zips in that folder after this save. null = folder not readable, button stays clickable. */
+  const [backupZipCount, setBackupZipCount] = useState(null);
   const backupLocked = requireBackupBeforeClose && !requiredBackupDone;
 
   useEffect(() => {
@@ -164,6 +192,9 @@ export default function RecordVaultTutaCloudBackupDialog({
       setRequiredBackupDone(false);
       setExitReadyOpen(false);
       setBackupSaved(false);
+      setBackupZipCount(null);
+      savedZipHandleRef.current = null;
+      backupDirRef.current = null;
       setSuccess('');
       setError('');
     }
@@ -248,6 +279,36 @@ export default function RecordVaultTutaCloudBackupDialog({
     onClose?.('exit');
   };
 
+  const handleKeepLatest = async () => {
+    if (busy || !keepLatestButtonEnabled(backupZipCount, KEEP_LATEST_BACKUP_ZIPS)) return;
+    setError('');
+    let result;
+    try {
+      result = await keepLatestZipsInFolder({
+        prefix: TUTADRIVE_BACKUP_FILE_PREFIX,
+        keep: KEEP_LATEST_BACKUP_ZIPS,
+        directory: backupDirRef.current || undefined,
+        startIn: savedZipHandleRef.current || undefined
+      });
+    } catch (err) {
+      setError(err?.message || 'Unable to remove old backup zips');
+      return;
+    }
+    if (result?.cancelled) return;
+    if (!result) {
+      setError('This browser cannot delete files. Use Chrome or Edge, or delete old zips in Finder.');
+      return;
+    }
+    if (result.directory) backupDirRef.current = result.directory;
+    setBackupZipCount(result.kept.length);
+    await themedAlert(
+      result.removed.length
+        ? `Removed ${result.removed.length} old zip(s):\n${result.removed.join('\n')}\n\nKept:\n${result.kept.join('\n')}`
+        : `Nothing to remove — ${result.kept.length} backup zip(s) in that folder.`,
+      { title: `Keep ${KEEP_LATEST_BACKUP_ZIPS}` }
+    );
+  };
+
   const announceRestoreSuccessThenRedirect = async (zipFileName, result) => {
     setBusy(false);
     setBackupProgress(null);
@@ -271,9 +332,14 @@ export default function RecordVaultTutaCloudBackupDialog({
           return;
         }
       }
-      saveTarget = await acquireSaveZipFile(
-        tutaDriveBackupFileNamePreview(backupInput.note, backupInput.dateStamp)
-      );
+      try {
+        saveTarget = await acquireBackupFolderZip(
+          tutaDriveBackupFileNamePreview(backupInput.note, backupInput.dateStamp)
+        );
+      } catch (err) {
+        setError(err?.message || 'Unable to choose a backup folder');
+        return;
+      }
       if (saveTarget?.cancelled) return;
     }
 
@@ -296,6 +362,17 @@ export default function RecordVaultTutaCloudBackupDialog({
         progress.update({ stage: 'done', percent: 100, fileName: result?.fileName });
         const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
         setSuccess(`${result?.fileName || 'backup.zip'}${sizeText ? ` (${sizeText})` : ''} in ${elapsedText}.`);
+        savedZipHandleRef.current = saveTarget?.file || null;
+        backupDirRef.current = saveTarget?.directory || null;
+        let zipCount = null;
+        if (saveTarget?.directory) {
+          try {
+            zipCount = await countPrefixedZips(saveTarget.directory, TUTADRIVE_BACKUP_FILE_PREFIX);
+          } catch {
+            zipCount = null;
+          }
+        }
+        setBackupZipCount(zipCount);
         setBackupSaved(true);
       } else {
         progress.update({ stage: 'build', percent: 50 });
@@ -304,7 +381,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         setSuccess(`Downloaded ${result?.fileName || 'backup.zip'} to your browser download folder.`);
       }
       setRequiredBackupDone(true);
-      if (requireBackupBeforeClose) setExitReadyOpen(true);
+      if (requireBackupBeforeClose && !tutaDriveActive) setExitReadyOpen(true);
     } catch (err) {
       setError(describeBackupRequestError(err, 'Backup failed'));
     } finally {
@@ -416,7 +493,7 @@ export default function RecordVaultTutaCloudBackupDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
             Backup saves an encrypted zip to a folder you choose. Restore loads a zip you pick from your computer.
-            Your browser remembers the last folder when it supports Save As / Open file dialogs.
+            Your browser remembers the last folder.
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
           {backupLocked ? (
@@ -466,6 +543,23 @@ export default function RecordVaultTutaCloudBackupDialog({
               >
                 Restore
               </GreenButton>
+              {backupSaved ? (
+                <>
+                  <GreenButton
+                    type="button"
+                    disabled={busy || !keepLatestButtonEnabled(backupZipCount, KEEP_LATEST_BACKUP_ZIPS)}
+                    onClick={() => void handleKeepLatest()}
+                    sx={keepLatestButtonSx}
+                  >
+                    Keep {KEEP_LATEST_BACKUP_ZIPS}
+                    <br />
+                    (remove the rest)
+                  </GreenButton>
+                  <GreenButton type="button" disabled={busy} onClick={handleExitAfterBackup} sx={exitRedButtonSx}>
+                    Exit
+                  </GreenButton>
+                </>
+              ) : null}
               {backupLocked ? (
                 <GreenButton type="button" disabled={busy} onClick={handleExitAfterBackup} sx={formatRedButtonSx}>
                   Skip backup &amp; Exit

@@ -5,7 +5,8 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import pool from '../../db/connection.js';
 import { sqlPhotoTypeParam } from '../../utils/pgEnumTypes.js';
-import { appendPhotoThumbnailToInsert } from '../../utils/photoThumbnail.js';
+import { resolvePhotoThumbnailColumn } from '../../utils/photoThumbnail.js';
+import { enqueuePhotoThumbnail } from '../../lib/photoThumbnailQueue.js';
 import {
   debugMobilePhotoUpload,
   formatMobileUploadBytes,
@@ -538,6 +539,7 @@ export async function uploadPhoto(req, res) {
 
     const client = await pool.connect();
     let photosId;
+    let thumbnailJob = null;
     try {
       const albumTypeColumn = await resolveAlbumTypeColumn(client);
       const photoFileNameColumn = await resolvePhotoFileNameColumn(client);
@@ -593,13 +595,9 @@ export async function uploadPhoto(req, res) {
         optionalColumns.push('created_at');
         optionalValues.push(activityAt.toISOString());
       }
-      ({ optionalColumns, optionalValues } = await appendPhotoThumbnailToInsert(client, {
-        optionalColumns,
-        optionalValues,
-        buffer,
-        fileNameBase,
-        outputDir: filePathDir
-      }));
+      if (await resolvePhotoThumbnailColumn(client)) {
+        thumbnailJob = { fullPath, fileNameBase, outputDir: filePathDir, buffer };
+      }
       const insertColumns = ['photos_id', 'singles_id', 'display_order', 'file_path', 'file_extension', ...optionalColumns];
       const insertValues = [photosId, singlesId, photoFolder, ext, ...optionalValues];
       const valuePlaceholders = ['$1', '$2', '(SELECT COALESCE(MAX(display_order), -1) + 1 FROM outdateddbsnapshotoct2024.photos WHERE singles_id = $2)', '$3', '$4'];
@@ -625,6 +623,11 @@ export async function uploadPhoto(req, res) {
       await client.query(insertSql, insertValues);
     } finally {
       client.release();
+    }
+
+    if (thumbnailJob) {
+      const thumbResult = await enqueuePhotoThumbnail({ photosId, ...thumbnailJob });
+      console.log('[uploadPhoto] thumbnail', thumbResult, 'for photos_id =', photosId);
     }
 
     logPhotoDirStats('end of uploadPhoto handler');

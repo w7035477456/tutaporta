@@ -225,10 +225,11 @@ export default function RecordVaultBackupPasswordDialog({
         {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
 
         <Stack direction="row" spacing={1.5} justifyContent="flex-start" flexWrap="wrap" sx={{ width: '100%', pt: 0.5 }}>
-          <ColorTemplate16PopupCenterWide.ActionButton type="button" disabled={verifying} onClick={cancel}>
+          <ColorTemplate16PopupCenterWide.ActionButton tone="cancel" type="button" disabled={verifying} onClick={cancel}>
             Cancel
           </ColorTemplate16PopupCenterWide.ActionButton>
           <ColorTemplate16PopupCenterWide.ActionButton
+            tone="confirm"
             type="button"
             disabled={verifying || (!isBackup && !password)}
             onClick={() => void confirm()}

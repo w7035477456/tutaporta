@@ -87,6 +87,23 @@ const greenButtonMinimalPaleteSx = {
   }
 };
 
+/**
+ * Fixed colors that every palette keeps (popup close X = red, Cancel = red, confirm = green).
+ * One more `&` than greenButtonMinimalPaleteSx so it outranks the Minimal Palete remap.
+ */
+export function greenButtonPinnedColorSx(bg, text = GREEN_BUTTON_TEXT) {
+  return {
+    'html[data-color-palete] &&&&:not(.Mui-disabled)': {
+      bgcolor: `${bg} !important`,
+      backgroundColor: `${bg} !important`,
+      backgroundImage: 'none !important',
+      color: `${text} !important`,
+      WebkitTextFillColor: `${text} !important`,
+      '& svg, & .MuiButton-startIcon': { color: `${text} !important` }
+    }
+  };
+}
+
 /** @returns {import('@mui/material').SxProps} */
 export function greenButtonSx({ hoverTopmost = true } = {}) {
   return {

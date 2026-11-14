@@ -1,5 +1,5 @@
 #!/bin/bash
-# xbox3 192.168.202.203 — Web server (FE/BE :40000) + Postgres REPLICA + Redis.
+# xbox3 192.168.202.203 — Web server (FE/BE :40000) + Postgres REPLICA.
 # Install: sudo install -m 755 setupufw /usr/local/bin/setupufw && sudo setupufw
 # Resets all UFW rules. Run from the Mac (192.168.44.104) SSH session, or locally on the console.
 set -euo pipefail
@@ -23,7 +23,7 @@ ufw allow from $MAC to any port 59221 proto tcp
 ufw deny 22/tcp
 echo "SSH secured on port 59221 for trusted IP."
 
-# 4. Loopback (BE → local Redis :6379 and local replica :50010)
+# 4. Loopback (BE → local replica :50010; Redis is outbound to xbox1:6379)
 ufw allow in on lo
 ufw allow out on lo
 

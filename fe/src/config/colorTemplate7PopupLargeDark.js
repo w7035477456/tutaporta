@@ -8,7 +8,7 @@ import { getDesktopIconFontSizeVw, getDesktopTextFontSizeVw } from 'config/deskt
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { colorTemplate2PopupPanelWidth } from 'config/colorTemplate2Popup';
 import { bsizeInputHeightResponsive } from 'config/bsizeEnv';
-import { greenButtonSx } from 'config/greenButton';
+import { greenButtonPinnedColorSx, greenButtonSx } from 'config/greenButton';
 import { requiredLabelSuffixYellowSx } from 'config/requiredLabelSuffix';
 import { ERROR_VAR, INVERSE_DAYNIGHT_VAR } from 'utils/themeConfig';
 
@@ -335,6 +335,31 @@ export function colorTemplate7PopupActionButtonSx(overrides = {}) {
   };
 }
 
+/** ActionButton tone="cancel" — red bg, black text (every palette). */
+export function colorTemplate7PopupCancelButtonSx(overrides = {}) {
+  return colorTemplate7PopupActionButtonSx({
+    bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
+    '@media (hover: hover)': {
+      '&:hover:not(.Mui-disabled)': {
+        bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
+        color: '#000000 !important',
+        WebkitTextFillColor: '#000000 !important',
+        border: '1px solid #000000 !important'
+      }
+    },
+    ...greenButtonPinnedColorSx(COLOR_TEMPLATE7_POPUP_CLOSE_BG, '#000000'),
+    ...overrides
+  });
+}
+
+/** ActionButton tone="confirm" — green bg, black text (every palette). */
+export function colorTemplate7PopupConfirmButtonSx(overrides = {}) {
+  return colorTemplate7PopupActionButtonSx({
+    ...greenButtonPinnedColorSx(COLOR_TEMPLATE7_POPUP_ACTION_GREEN, '#000000'),
+    ...overrides
+  });
+}
+
 /** Age / distance sliders — red knobs + active bar (matches popup input text). */
 export function colorTemplate7PopupSliderSx(overrides = {}) {
   const accent = COLOR_TEMPLATE7_POPUP_INPUT_TEXT;
@@ -513,6 +538,7 @@ export function colorTemplate7PopupCloseSx(overrides = {}) {
       filter: 'brightness(0.85)',
       transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
     },
+    ...greenButtonPinnedColorSx(COLOR_TEMPLATE7_POPUP_CLOSE_BG, COLOR_TEMPLATE7_POPUP_CLOSE_TEXT),
     ...overrides
   };
 }

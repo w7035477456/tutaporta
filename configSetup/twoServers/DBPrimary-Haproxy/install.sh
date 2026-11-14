@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# xbox1 192.168.202.201 — HAProxy + Nginx + Postgres PRIMARY
+# xbox1 192.168.202.201 — HAProxy + Nginx + Postgres PRIMARY + central Redis
 # Run ON xbox1 from the repo checkout:
 #   cd ~/code/main/configSetup/twoServers/DBPrimary-Haproxy && sudo ./install.sh
 # Prereqs (one time): sudo apt install haproxy nginx postgresql-16
@@ -49,6 +49,22 @@ if [[ "$(sudo -u postgres psql -p 50010 -Atc "SELECT rolpassword IS NULL FROM pg
   echo "Set the replicator password (you will type it again on xbox3 in setupReplica.sh):"
   sudo -u postgres psql -p 50010 -c "\password replicator"
 fi
+
+echo "== Redis (central; every web server uses REDIS_URL=redis://:<password>@192.168.202.201:6379)"
+command -v redis-server >/dev/null || apt-get install -y redis-server
+install -m 640 -o redis -g redis redis-tutamall.conf /etc/redis/redis-tutamall.conf
+if [[ ! -s /etc/redis/redis-tutamall-auth.conf ]]; then
+  read -rsp "Set the Redis password (the same value goes in REDIS_URL on every web server): " REDIS_PW; echo
+  [[ -n "$REDIS_PW" ]] || { echo "Empty Redis password"; exit 1; }
+  ( umask 027; printf 'requirepass %s\n' "$REDIS_PW" > /etc/redis/redis-tutamall-auth.conf )
+  chown redis:redis /etc/redis/redis-tutamall-auth.conf
+  unset REDIS_PW
+fi
+grep -qxF 'include /etc/redis/redis-tutamall.conf' /etc/redis/redis.conf \
+  || echo 'include /etc/redis/redis-tutamall.conf' >> /etc/redis/redis.conf
+systemctl enable redis-server
+systemctl restart redis-server
+systemctl is-active redis-server
 
 echo "== Firewall"
 install -m 755 setupufw /usr/local/bin/setupufw

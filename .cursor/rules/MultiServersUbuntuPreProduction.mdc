@@ -11,7 +11,7 @@ Previously all development ran on one **All-in-1** Ubuntu server, **xbox2 (`192.
 
 | Server | IP | Holds |
 |--------|----|-------|
-| **xbox1** | `192.168.202.201` | 1) **Postgres DB, Primary** 2) **HAProxy / Nginx** |
+| **xbox1** | `192.168.202.201` | 1) **Postgres DB, Primary** 2) **HAProxy / Nginx** 3) **Central Redis** `:6379` (caches + photo thumbnail queue; every web server's `REDIS_URL=redis://:<password>@192.168.202.201:6379`) |
 | **xbox3** | `192.168.202.203` | 1) **Postgres DB, Replica** 2) **Webserver, FE & BE** |
 | **xbox4** | `192.168.202.204` | 1) **Webserver, FE & BE** (second web server, same role as xbox3) 2) **Two NVIDIA P100 GPUs for running LLMs** |
 | ~~xbox2~~ | ~~`192.168.222.202`~~ | **Shut off** (All-in-1 development box retired) |
@@ -66,6 +66,7 @@ The development machines do **not** use the pre-production split above. Everythi
   - **Writes / DDL → Primary on xbox1.** **Reads → local Replica on xbox3.** Tolerate replication lag or read Primary for read-your-writes.
   - `vault_cluster_state` is read **and** written on Primary (xbox1).
   - **Deploys go to both web servers** (xbox3 and xbox4) so they always run the same FE/BE build.
+  - **Redis is one central instance on xbox1**, never on a web server (web servers are cloned, so a local Redis would split the cache and the photo thumbnail queue). A new web server needs a UFW `6379` allow line in xbox1's `setupufw` before HAProxy sends it traffic.
   - **LLM workloads run on xbox4** (two P100 GPUs). xbox3 has no GPU, so LLM requests landing on xbox3 must be forwarded to xbox4 rather than run locally.
 - **Schema parity:** DDL is applied on the Primary (xbox1); the Replica (xbox3) follows via replication. Mac ↔ Ubuntu parity checks (`isdbsame`) compare against the Primary.
 - **SSH:** same hardening as `ssh.mdc` (port `59221`, `IdentitiesOnly`, `~/.ssh/xbox2.pem` key unless Andrew provides new keys). Scripts / aliases that still hard-code `192.168.222.202` (xbox2) must be pointed at xbox1 / xbox3 / xbox4 as the cutover happens — ask Andrew which host before changing deploy targets.

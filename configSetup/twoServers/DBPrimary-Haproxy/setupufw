@@ -1,5 +1,5 @@
 #!/bin/bash
-# xbox1 192.168.202.201 — HAProxy + Nginx + Postgres PRIMARY.
+# xbox1 192.168.202.201 — HAProxy + Nginx + Postgres PRIMARY + central Redis.
 # Install: sudo install -m 755 setupufw /usr/local/bin/setupufw && sudo setupufw
 # Resets all UFW rules. Run from the Mac (192.168.44.104) SSH session, or locally on the console.
 set -euo pipefail
@@ -40,7 +40,11 @@ ufw allow from $WEB1 to any port 50010 proto tcp
 #    Mac DBeaver
 ufw allow from $MAC to any port 50010 proto tcp
 
-# 7. Enable
+# 7. Central Redis :6379 — web servers only (caches + photo thumbnail queue).
+#    Add a line per new web server (xbox4, xbox5 …) before HAProxy sends it traffic.
+ufw allow from $WEB1 to any port 6379 proto tcp
+
+# 8. Enable
 ufw --force enable
 ufw status verbose
 echo "UFW secured and active for xbox1 (HAProxy + Postgres Primary)."

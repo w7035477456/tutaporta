@@ -1,5 +1,5 @@
 import pool from '../db/connection.js';
-import { enrichMailOptions } from './emailHtml.js';
+import { EMAIL_LOGO_CID, enrichMailOptions } from './emailHtml.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -73,7 +73,49 @@ export async function addAltEmailCopies(mailOptions) {
   return { ...mailOptions, cc: [...toArrayField(mailOptions.cc), ...additions] };
 }
 
-/** Single send path for all transactional mail: inline logo + alt_email copies. */
-export async function sendOutboundMail(transporter, mailOptions) {
-  return transporter.sendMail(await addAltEmailCopies(enrichMailOptions(mailOptions)));
+/** EMAIL_QUEUE_ENABLED=0 in ~/.ssh/be/.env sends inline (old behavior); default queues. */
+export function isEmailQueueEnabled() {
+  return String(process.env.EMAIL_QUEUE_ENABLED ?? '1').trim() !== '0';
+}
+
+/** Attachments go into jsonb — Buffers become base64; the inline logo is re-added at send time. */
+function toQueueableMailOptions(mailOptions) {
+  const attachments = toArrayField(mailOptions.attachments)
+    .filter((a) => a?.cid !== EMAIL_LOGO_CID)
+    .map((a) =>
+      Buffer.isBuffer(a?.content) ? { ...a, content: a.content.toString('base64'), encoding: 'base64' } : a
+    );
+  const { attachments: _drop, ...rest } = mailOptions;
+  return attachments.length ? { ...rest, attachments } : rest;
+}
+
+/**
+ * Queue one email in outdateddbsnapshotoct2024.email_outbox (Primary).
+ * @param {object} mailOptions nodemailer options
+ * @param {{ client?: import('pg').PoolClient, dedupeKey?: string, runAt?: Date }} [opts]
+ *   client — enqueue inside the caller's transaction; dedupeKey — skip if already queued.
+ * @returns {Promise<{ queued: boolean, id: number | null }>}
+ */
+export async function enqueueOutboundMail(mailOptions, { client, dedupeKey, runAt } = {}) {
+  const withAlt = await addAltEmailCopies(mailOptions);
+  const db = client || pool;
+  const { rows } = await db.query(
+    `INSERT INTO outdateddbsnapshotoct2024.email_outbox (mail_options, dedupe_key, run_at)
+     VALUES ($1::jsonb, $2, COALESCE($3::timestamptz, now()))
+     ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
+     RETURNING id`,
+    [JSON.stringify(toQueueableMailOptions(withAlt)), dedupeKey || null, runAt || null]
+  );
+  return { queued: rows.length > 0, id: rows[0]?.id ?? null };
+}
+
+/**
+ * Single send path for all transactional mail. Queues to email_outbox (sent by
+ * emailOutboxWorker on any web server); `transporter` is only used when the queue is disabled.
+ */
+export async function sendOutboundMail(transporter, mailOptions, opts) {
+  if (!isEmailQueueEnabled()) {
+    return transporter.sendMail(await addAltEmailCopies(enrichMailOptions(mailOptions)));
+  }
+  return enqueueOutboundMail(mailOptions, opts);
 }

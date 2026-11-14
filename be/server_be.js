@@ -584,6 +584,12 @@ import {
   postEmailScanRun
 } from './routes/recordVault/emailScanRoutes.js';
 import { startEmailScanPoller } from './utils/emailScan.js';
+import { startEmailOutboxWorker, stopEmailOutboxWorker } from './lib/emailOutboxWorker.js';
+import {
+  setPhotoThumbnailQueueRedis,
+  startPhotoThumbnailQueueWorker,
+  stopPhotoThumbnailQueueWorker
+} from './lib/photoThumbnailQueue.js';
 import {
   postPaidRecordEnsure,
   getPaidRecord,
@@ -965,6 +971,7 @@ if (useRedis) {
   });
   setMobilePhotoUploadRedis(redisClient);
   setSingleLoginRedis(redisClient);
+  setPhotoThumbnailQueueRedis(redisClient);
 }
 console.log(
   '[startup] Redis single-login store: v1:session:{singles_id}:mobile|desktop (legacy v1:session:{singles_id}; JWT-only when Redis unavailable)'
@@ -2079,6 +2086,16 @@ httpServer.listen(PORT, () => {
   } catch (err) {
     console.error('[startup] email scan poller failed:', err?.message ?? err);
   }
+  try {
+    startEmailOutboxWorker();
+  } catch (err) {
+    console.error('[startup] email outbox worker failed:', err?.message ?? err);
+  }
+  try {
+    startPhotoThumbnailQueueWorker();
+  } catch (err) {
+    console.error('[startup] photo thumbnail queue worker failed:', err?.message ?? err);
+  }
 });
 
 /** Keep below PM2 kill_timeout (ecosystem.config.cjs) so in-flight requests finish before SIGKILL. */
@@ -2087,6 +2104,8 @@ let shuttingDown = false;
 function gracefulShutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
+  stopEmailOutboxWorker();
+  stopPhotoThumbnailQueueWorker();
   console.error(`[shutdown] ${signal} — no new connections; finishing in-flight requests (max ${GRACEFUL_SHUTDOWN_MS}ms)`);
   httpServer.close(() => process.exit(0));
   httpServer.closeIdleConnections?.();

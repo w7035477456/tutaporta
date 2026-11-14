@@ -7,8 +7,10 @@ DB_HOST=192.168.202.201
     (read-only copy / failover) until the BE gets a separate read pool.
 DB_PORT=50010
     unchanged
-REDIS_URL=redis://127.0.0.1:6379
-    Redis runs on xbox3 next to the BE (install.sh). If REDIS_HOST is set, use 127.0.0.1.
+REDIS_URL=redis://:<redis password>@192.168.202.201:6379
+    Central Redis on xbox1, shared by every web server (xbox3, xbox4, clones) for caches and
+    the photo thumbnail queue. Every web server must use this same value. The password is the
+    one typed into xbox1 install.sh (/etc/redis/redis-tutamall-auth.conf on xbox1).
 
 Unchanged (same public hostname, FE+BE same origin behind HAProxy):
     PUBLIC_APP_URL, FRONTEND_PUBLIC_URL, ALLOWED_ORIGINS, EMAIL_LINK_BASE_URL,

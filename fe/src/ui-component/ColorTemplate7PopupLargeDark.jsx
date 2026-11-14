@@ -20,6 +20,8 @@ import {
   COLOR_TEMPLATE7_POPUP_INPUT_MAX_CHARS,
   COLOR_TEMPLATE7_POPUP_PANEL_BG,
   colorTemplate7PopupActionButtonSx,
+  colorTemplate7PopupCancelButtonSx,
+  colorTemplate7PopupConfirmButtonSx,
   colorTemplate7PopupBodySx,
   colorTemplate7PopupBodyTextSx,
   colorTemplate7PopupCheckboxCheckedMarkSx,
@@ -65,7 +67,7 @@ function popupTextColorSx(textColor) {
 
 /**
  * Large dark-theme gallery popup (ColorTemplate7PopupLargeDark).
- * Secondary panel, inverse-daynight copy, white inputs, GreenButton actions, top-right green square close X.
+ * Secondary panel, inverse-daynight copy, white inputs, GreenButton actions, top-right red square close X.
  * Default width fills the menu-aware gallery column; pass maxWidth only to cap narrower than gallery.
  *
  * Usage:
@@ -161,13 +163,19 @@ function ColorTemplate7PopupLargeDarkInput({
   );
 }
 
-function ColorTemplate7PopupLargeDarkActionButton({ children, sx, thickBlackBorder = false, type = 'button', ...props }) {
+const ACTION_BUTTON_TONE_SX = {
+  cancel: colorTemplate7PopupCancelButtonSx,
+  confirm: colorTemplate7PopupConfirmButtonSx
+};
+
+function ColorTemplate7PopupLargeDarkActionButton({ children, sx, thickBlackBorder = false, tone, type = 'button', ...props }) {
+  const toneSx = ACTION_BUTTON_TONE_SX[tone] ?? colorTemplate7PopupActionButtonSx;
   return (
     <GreenButton
       type={type}
       className="color-template7-popup-action"
       sx={{
-        ...colorTemplate7PopupActionButtonSx(),
+        ...toneSx(),
         ...(thickBlackBorder ? { border: `${BUTTON_TEMPLATE_THICK_BLACK_BORDER} !important` } : null),
         ...(sx || {})
       }}
@@ -675,7 +683,8 @@ ColorTemplate7PopupLargeDarkInput.propTypes = {
 ColorTemplate7PopupLargeDarkActionButton.propTypes = {
   children: PropTypes.node,
   sx: PropTypes.object,
-  thickBlackBorder: PropTypes.bool
+  thickBlackBorder: PropTypes.bool,
+  tone: PropTypes.oneOf(['cancel', 'confirm'])
 };
 
 ColorTemplate7PopupLargeDarkSlider.propTypes = {
