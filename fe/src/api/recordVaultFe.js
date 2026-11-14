@@ -2,21 +2,7 @@ import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { prepareLargeBackupFormData } from './chunkedBackupUploadFe';
 import { saveBlobToZipFile } from 'utils/downloadZipFolder';
-import {
-  normalizeUsbBridgeInstallerUrl,
-  USB_BRIDGE_INSTALLER_API
-} from 'utils/usbBridgeInstallerDownloadUrl';
 import { rvCloudAxiosError, rvCloudLog } from 'utils/recordVaultCloudDebugLog';
-import {
-  bridgeFetchBlob,
-  bridgeFetchBlobDownload,
-  bridgeRequest,
-  bridgeUploadFormData,
-  getRecordVaultBridgeBaseUrl,
-  isRecordVaultBridgeActive,
-  setRecordVaultBridgeStorageType,
-  shouldRouteRecordVaultThroughBridge
-} from './recordVaultBridgeFe';
 import {
   isVaultCloudPaneStorageType,
   normalizeVaultPaneStorageType,
@@ -27,7 +13,7 @@ import {
 /** Map pane id (`tutadrive`) → backend session slot header (`onedrive`). */
 function resolveRecordVaultApiStorageType(storageType) {
   if (storageType == null || String(storageType).trim() === '') return null;
-  return isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
+  return vaultCloudBackendStorageSlot();
 }
 
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
@@ -70,14 +56,6 @@ export async function fetchRecordVaultSessionStorageType() {
     const status = await fetchRecordVaultTutaDriveStatus();
     if (status?.session?.unlocked) {
       return normalizeVaultPaneStorageType(status.session.storageType);
-    }
-  } catch {
-    // ignore
-  }
-  try {
-    const { data } = await api.get('/api/recordVault/usb/status');
-    if (data?.session?.unlocked) {
-      return normalizeVaultPaneStorageType(data.session.storageType || 'usb');
     }
   } catch {
     // ignore
@@ -167,64 +145,6 @@ function sessionCountPathOnly(url) {
   return String(url || '').split('?')[0];
 }
 
-/**
- * Bridge has no Postgres — FE reports USB open + browser hops to the website API.
- * Website BE already counts TutaCloud/in-process USB; skip when not via bridge.
- */
-function maybeReportBridgeSessionFileCounts(config, responseData, viaBridge) {
-  if (!viaBridge) return;
-  const url = sessionCountPathOnly(config?.url);
-  const method = String(config?.method || 'GET').toUpperCase();
-  const storageType = isVaultCloudPaneStorageType(config?.storageType) ? VAULT_CLOUD_STORAGE_TYPE : 'usb';
-
-  if (method === 'POST' && /\/api\/recordVault\/usb\/(unlock|init)/.test(url)) {
-    sessionTreeCounted.usb = false;
-    void reportRecordVaultSessionFileCounts({ reset: true });
-    const openCount =
-      Number(responseData?.session?.sessionOpenItemCount ?? responseData?.sessionOpenItemCount) || 0;
-    if (openCount > 0) {
-      void reportRecordVaultSessionFileCounts({ usbDelta: openCount });
-    }
-    return;
-  }
-
-  if (method === 'GET' && url === '/api/recordVault') {
-    if (sessionTreeCounted[storageType]) return;
-    sessionTreeCounted[storageType] = true;
-    const n = countTreeNotebooksAndNotes(responseData);
-    if (n > 0) {
-      // Unlock already added usbDelta for notebooks+notes; tree is the UI hop only.
-      // If unlock did not return open count (older bridge), include usb here once.
-      void reportRecordVaultSessionFileCounts({ uiDelta: n });
-    }
-    return;
-  }
-
-  if (method === 'GET' && /\/api\/recordVault\/notes\/\d+$/.test(url)) {
-    void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
-    return;
-  }
-  if (
-    method === 'GET' &&
-    (/\/api\/recordVault\/notes\/\d+\/image/.test(url) ||
-      /\/api\/recordVault\/notes\/\d+\/extra-images\/\d+/.test(url) ||
-      /\/api\/recordVault\/notes\/\d+\/attachments\/\d+/.test(url))
-  ) {
-    void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
-    return;
-  }
-
-  if (
-    (method === 'POST' || method === 'PATCH') &&
-    (/\/api\/recordVault\/notebooks/.test(url) || /\/api\/recordVault\/notes/.test(url))
-  ) {
-    void reportRecordVaultSessionFileCounts({
-      uiDelta: 1,
-      usbDelta: storageType === 'usb' ? 1 : 0
-    });
-  }
-}
-
 async function rvRequest(config) {
   const paneStorageType = config?.storageType ?? null;
   const storageType = resolveRecordVaultApiStorageType(paneStorageType);
@@ -237,14 +157,11 @@ async function rvRequest(config) {
   if (typeof onDownloadProgress === 'function') {
     nextConfig.onDownloadProgress = onDownloadProgress;
   }
-  const viaBridge = shouldRouteRecordVaultThroughBridge(nextConfig.url, paneStorageType);
-  const result = viaBridge ? await bridgeRequest(nextConfig) : await api(nextConfig);
-  maybeReportBridgeSessionFileCounts(nextConfig, result?.data, viaBridge);
-  return result;
+  return api(nextConfig);
 }
 
 function recordVaultMediaBaseUrl() {
-  return isRecordVaultBridgeActive() ? getRecordVaultBridgeBaseUrl() : getApiBaseUrl();
+  return getApiBaseUrl();
 }
 
 export function recordVaultNoteImageUrl(noteId, slot = 'center') {
@@ -279,13 +196,6 @@ export async function fetchRecordVaultNoteAttachmentBlob(noteId, attachmentId, {
   }
 
   const path = `/api/recordVault/notes/${note}/attachments/${attachment}`;
-  const query = inline ? '?inline=1' : '';
-  if (shouldRouteRecordVaultThroughBridge(path, storageType)) {
-    const blob = await bridgeFetchBlob(`${path}${query}`);
-    void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
-    return blob;
-  }
-
   const headerSlot = resolveRecordVaultApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
@@ -311,15 +221,6 @@ function recordVaultNoteImageApiPath(noteId, slot = 'center') {
 export async function fetchRecordVaultNoteImageBlob(noteId, slot = 'center', { cacheBust, storageType = null } = {}) {
   const path = recordVaultNoteImageApiPath(noteId, slot);
   if (!path) throw new Error('Invalid note id');
-  const query =
-    cacheBust != null && String(cacheBust).trim() !== ''
-      ? `?v=${encodeURIComponent(String(cacheBust))}`
-      : '';
-  if (shouldRouteRecordVaultThroughBridge(path, storageType)) {
-    const blob = await bridgeFetchBlob(`${path}${query}`);
-    void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
-    return blob;
-  }
   const headerSlot = resolveRecordVaultApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
@@ -340,15 +241,6 @@ export async function fetchRecordVaultNoteExtraImageBlob(noteId, imageId, { cach
     throw new Error('Invalid note or image id');
   }
   const path = `/api/recordVault/notes/${note}/extra-images/${image}`;
-  const query =
-    cacheBust != null && String(cacheBust).trim() !== ''
-      ? `?v=${encodeURIComponent(String(cacheBust))}`
-      : '';
-  if (shouldRouteRecordVaultThroughBridge(path, storageType)) {
-    const blob = await bridgeFetchBlob(`${path}${query}`);
-    void reportRecordVaultSessionFileCounts({ uiDelta: 1 });
-    return blob;
-  }
   const headerSlot = resolveRecordVaultApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
@@ -565,138 +457,6 @@ export async function searchRecordVaultNotes(query, { storageType } = {}) {
   return Array.isArray(data?.results) ? data.results : [];
 }
 
-export async function fetchRecordVaultUsbStatus() {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/recordVault/usb/status',
-    storageType: 'usb'
-  });
-  return {
-    usbMode: Boolean(data?.usbMode),
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
-    session: data?.session || { unlocked: false }
-  };
-}
-
-export async function scanRecordVaultUsb() {
-  const { data } = await rvRequest({ method: 'GET', url: '/api/recordVault/usb/scan' });
-  return {
-    detected: Array.isArray(data?.detected) ? data.detected : [],
-    session: data?.session || { unlocked: false }
-  };
-}
-
-export async function fetchRecordVaultUsbLocations() {
-  const { data } = await rvRequest({ method: 'GET', url: '/api/recordVault/usb/locations' });
-  return Array.isArray(data?.locations) ? data.locations : [];
-}
-
-export async function browseRecordVaultUsbPath(folderPath) {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/recordVault/usb/browse',
-    params: { path: folderPath }
-  });
-  return data;
-}
-
-export async function fetchRecordVaultUsbUnlockGuard(mountPath) {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/recordVault/usb/unlock-guard',
-    params: { mountPath }
-  });
-  return data;
-}
-
-async function fetchRecordVaultUsbEnvDerivedKey(opts = {}) {
-  const { data } = await api.post('/api/recordVault/usb/icon-derived-key', {
-    forInit: Boolean(opts.forInit),
-    kdfSalt: opts.kdfSalt || undefined
-  });
-  return data;
-}
-
-export async function unlockRecordVaultUsb({ mountPath, backupMountPath = null }) {
-  if (isRecordVaultBridgeActive()) {
-    let kdfSalt;
-    try {
-      const guard = await fetchRecordVaultUsbUnlockGuard(mountPath);
-      kdfSalt = guard?.kdfSalt || undefined;
-    } catch {
-      kdfSalt = undefined;
-    }
-    const derived = await fetchRecordVaultUsbEnvDerivedKey({ kdfSalt });
-    const { data } = await bridgeRequest({
-      method: 'POST',
-      url: '/api/recordVault/usb/unlock',
-      storageType: 'usb',
-      data: {
-        mountPath,
-        keyB64: derived?.keyB64,
-        backupMountPath: backupMountPath || undefined
-      }
-    });
-    sessionTreeCounted.usb = false;
-    void reportRecordVaultSessionFileCounts({
-      reset: true,
-      usbDelta: Number(data?.session?.sessionOpenItemCount ?? data?.sessionOpenItemCount) || 0
-    });
-    return data;
-  }
-  const { data } = await api.post('/api/recordVault/usb/unlock', {
-    mountPath,
-    backupMountPath: backupMountPath || undefined
-  });
-  sessionTreeCounted.usb = false;
-  return data;
-}
-
-export async function initRecordVaultUsb({ mountPath, backupMountPath = null }) {
-  if (isRecordVaultBridgeActive()) {
-    const derived = await fetchRecordVaultUsbEnvDerivedKey({ forInit: true });
-    const { data } = await bridgeRequest({
-      method: 'POST',
-      url: '/api/recordVault/usb/init',
-      storageType: 'usb',
-      data: {
-        mountPath,
-        keyB64: derived?.keyB64,
-        kdf: derived?.kdf,
-        kdfSalt: derived?.kdfSalt,
-        kdfMemory: derived?.kdfMemory,
-        kdfIterations: derived?.kdfIterations,
-        kdfParallelism: derived?.kdfParallelism,
-        backupMountPath: backupMountPath || undefined
-      }
-    });
-    sessionTreeCounted.usb = false;
-    void reportRecordVaultSessionFileCounts({ reset: true });
-    return data;
-  }
-  const { data } = await api.post('/api/recordVault/usb/init', {
-    mountPath,
-    backupMountPath: backupMountPath || undefined
-  });
-  sessionTreeCounted.usb = false;
-  return data;
-}
-
-export async function formatRecordVaultUsb(mountPath) {
-  const { data } = await rvRequest({
-    method: 'POST',
-    url: '/api/recordVault/usb/format',
-    storageType: 'usb',
-    data: mountPath ? { mountPath } : {}
-  });
-  return data;
-}
-
-export async function logoffRecordVaultUsb() {
-  const { data } = await rvRequest({ method: 'POST', url: '/api/recordVault/usb/logoff' });
-  return data;
-}
-
 export async function fetchRecordVaultStorageConfig() {
   const { data } = await api.get('/api/recordVault/storage/config');
   const mapChoice = (choice) => ({
@@ -727,58 +487,8 @@ export async function fetchRecordVaultStorageConfig() {
       : data?.cacheOneDriveIcon
         ? String(data.cacheOneDriveIcon).trim()
         : '',
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
-    videoTutorialTutanotes: data?.videoTutorialTutanotes ? String(data.videoTutorialTutanotes).trim() : '',
-    usbBridgeInstallers: {
-      mac: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.mac, 'mac'),
-      win: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.win, 'win')
-    }
+    videoTutorialTutanotes: data?.videoTutorialTutanotes ? String(data.videoTutorialTutanotes).trim() : ''
   };
-}
-
-/** Download USB Bridge installer via API (reads USB_DMG_EXE on server). */
-export async function downloadUsbBridgeInstaller(platform = 'mac') {
-  const apiPath =
-    platform === 'win' ? USB_BRIDGE_INSTALLER_API.win : USB_BRIDGE_INSTALLER_API.mac;
-  try {
-    const response = await api.get(apiPath, { responseType: 'blob' });
-    const blob = response.data;
-    const defaultName = platform === 'win' ? 'usbBridgeV3.exe' : 'usbBridgeV3.dmg';
-    let filename = defaultName;
-    const disposition = String(response.headers?.['content-disposition'] || '');
-    const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
-    if (match?.[1]) {
-      try {
-        filename = decodeURIComponent(match[1].replace(/"/g, ''));
-      } catch {
-        filename = match[1].replace(/"/g, '');
-      }
-    }
-    const objectUrl = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    anchor.rel = 'noopener';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.URL.revokeObjectURL(objectUrl);
-  } catch (err) {
-    const data = err?.response?.data;
-    if (data instanceof Blob) {
-      const text = await data.text();
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed?.error) throw new Error(String(parsed.error));
-      } catch (parseErr) {
-        if (parseErr instanceof Error && parseErr.message && parseErr.message !== text) {
-          throw parseErr;
-        }
-      }
-      if (text.trim()) throw new Error(text.trim());
-    }
-    throw err;
-  }
 }
 
 export async function fetchRecordVaultTutaDriveVaultTree() {
@@ -786,20 +496,6 @@ export async function fetchRecordVaultTutaDriveVaultTree() {
   return {
     folderName: data?.folderName ? String(data.folderName) : '',
     tree: data?.tree && typeof data.tree === 'object' ? data.tree : null
-  };
-}
-
-export async function fetchRecordVaultUsbVaultTree() {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/recordVault/usb/vault-tree',
-    storageType: 'usb'
-  });
-  return {
-    path: data?.path ? String(data.path) : '',
-    label: data?.label ? String(data.label) : '',
-    tree: data?.tree && typeof data.tree === 'object' ? data.tree : null,
-    entries: Array.isArray(data?.entries) ? data.entries : []
   };
 }
 
@@ -1361,46 +1057,6 @@ export async function applyRecordVaultTutaDriveMerge(mergeId, decisions) {
   return data;
 }
 
-/** Zip the unlocked USB `.recordvault` folder and save to the browser download folder. */
-export async function downloadRecordVaultUsbBackupZip() {
-  try {
-    if (isRecordVaultBridgeActive()) {
-      const { blob, fileName: headerName } = await bridgeFetchBlobDownload('/api/recordVault/usb/backup-zip');
-      const fileName = headerName || buildMyNoteBackupZipFileNameClient('usb');
-      triggerBrowserBlobDownload(blob, fileName);
-      return { fileName, sizeBytes: blob?.size ?? 0 };
-    }
-    const response = await api.get('/api/recordVault/usb/backup-zip', {
-      responseType: 'blob',
-      headers: { 'X-Record-Vault-Storage': 'usb' }
-    });
-    const fileName =
-      parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyNoteBackupZipFileNameClient('usb');
-    triggerBrowserBlobDownload(response.data, fileName);
-    return { fileName, sizeBytes: response.data?.size ?? 0 };
-  } catch (err) {
-    throw await normalizeRecordVaultBlobFetchError(err);
-  }
-}
-
-/** Upload a MyNote backup zip and restore files onto the unlocked USB vault. */
-export async function restoreRecordVaultUsbBackupZip(file) {
-  if (!file) throw new Error('Choose a backup zip file first');
-  const formData = new FormData();
-  formData.append('backup', file);
-  if (shouldRouteRecordVaultThroughBridge('/api/recordVault/usb/restore-zip', 'usb')) {
-    const { data } = await bridgeUploadFormData('/api/recordVault/usb/restore-zip', formData);
-    return data;
-  }
-  const { data } = await api.post('/api/recordVault/usb/restore-zip', formData, {
-    headers: {
-      'X-Record-Vault-Storage': 'usb'
-    }
-  });
-  return data;
-}
-
 /** Poll Redis-backed logoff percent while Cloud/USB logoff POST runs. */
 export async function fetchRecordVaultStorageLogoffProgress() {
   const { data } = await api.get('/api/recordVault/storage/logoff-progress');
@@ -1410,16 +1066,9 @@ export async function fetchRecordVaultStorageLogoffProgress() {
   };
 }
 
-/**
- * Cloud or USB logoff with honest 0–100% via short polling (cluster-safe; no streaming).
- */
-async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
-  const isCloud = isVaultCloudPaneStorageType(storageType);
+async function logoffRecordVaultStorageWithProgress(_storageType, onProgress) {
   if (typeof onProgress === 'function') {
-    onProgress({
-      percent: 1,
-      label: isCloud ? 'Saving notes to TutaCloud…' : 'Logging off USB…'
-    });
+    onProgress({ percent: 1, label: 'Saving notes to TutaCloud…' });
   }
   let stopped = false;
   const poll = window.setInterval(() => {
@@ -1429,14 +1078,10 @@ async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
         if (stopped || typeof onProgress !== 'function') return;
         onProgress(progress);
       })
-      .catch(() => {
-        // Ignore poll blips; logoff POST is the source of truth for success/failure.
-      });
+      .catch(() => {});
   }, 250);
   try {
-    const { data } = isCloud
-      ? await api.post('/api/recordVault/tutadrive/logoff')
-      : await rvRequest({ method: 'POST', url: '/api/recordVault/usb/logoff', storageType: 'usb' });
+    const { data } = await api.post('/api/recordVault/tutadrive/logoff');
     if (typeof onProgress === 'function') {
       onProgress({ percent: 100, label: 'Done' });
     }
@@ -1447,25 +1092,19 @@ async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
   }
 }
 
+/** TutaCloud logoff with optional progress polling (cluster-safe). */
 export async function logoffRecordVaultStorage({ storageType, onProgress } = {}) {
   let data;
   const normalized = normalizeVaultPaneStorageType(storageType);
-  if (normalized === VAULT_CLOUD_STORAGE_TYPE) {
+  if (normalized === VAULT_CLOUD_STORAGE_TYPE || normalized === 'tutadrive') {
     if (typeof onProgress === 'function') {
       data = await logoffRecordVaultStorageWithProgress(VAULT_CLOUD_STORAGE_TYPE, onProgress);
     } else {
       ({ data } = await api.post('/api/recordVault/tutadrive/logoff'));
     }
-  } else if (normalized === 'usb') {
-    if (typeof onProgress === 'function') {
-      data = await logoffRecordVaultStorageWithProgress('usb', onProgress);
-    } else {
-      ({ data } = await rvRequest({ method: 'POST', url: '/api/recordVault/usb/logoff', storageType: 'usb' }));
-    }
   } else {
     ({ data } = await api.post('/api/recordVault/storage/logoff'));
   }
-  // USB bridge has no Postgres — always freeze counts on the website after logoff.
   await snapshotRecordVaultSessionFileCounts();
   return data;
 }
@@ -1496,31 +1135,10 @@ export async function flushRecordVaultSessionsOnLeave({ onProgress } = {}) {
   beginRecordVaultLeaveBusy({
     title: 'Saving vault',
     percent: 1,
-    label: 'Logging off USB and Cloud…'
+    label: 'Saving notes to TutaCloud…'
   });
 
   try {
-    try {
-      await logoffRecordVaultStorage({
-        storageType: 'usb',
-        onProgress: ({ percent, label } = {}) => {
-          const p = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
-          report({
-            title: 'Logging off USB',
-            percent: Math.round(p * 0.35),
-            label: label || 'Saving USB vault…'
-          });
-        }
-      });
-    } catch (err) {
-      console.error('[flushRecordVaultSessionsOnLeave] usb', err?.message || err);
-      report({
-        title: 'Logging off USB',
-        percent: 35,
-        label: 'USB logoff finished with errors — continuing…'
-      });
-    }
-
     try {
       await logoffRecordVaultStorage({
         storageType: VAULT_CLOUD_STORAGE_TYPE,
@@ -1549,11 +1167,6 @@ export async function flushRecordVaultSessionsOnLeave({ onProgress } = {}) {
     });
   } finally {
     endRecordVaultLeaveBusy();
-    try {
-      setRecordVaultBridgeStorageType(null);
-    } catch {
-      // ignore
-    }
   }
 }
 
@@ -1575,11 +1188,7 @@ export async function fetchRecordVaultActiveStorageDisplay() {
   } catch {
     // ignore
   }
-  const { data } = await api.get('/api/recordVault/usb/status');
-  const session = data?.session || {};
-  if (!session.unlocked) return '';
-  const label = String(session.label || '').trim();
-  return label ? `Storage: ${label}` : 'Storage: USB';
+  return '';
 }
 
 export async function fetchRecordVaultUsage({ storageType } = {}) {
@@ -1645,8 +1254,12 @@ export async function purchaseRecordVaultRefill(tokens) {
   return data;
 }
 
-export function isRecordVaultUsbRequiredError(err) {
-  return err?.response?.status === 428 && err?.response?.data?.code === 'RECORD_VAULT_USB_REQUIRED';
+export function isRecordVaultUsbRequiredError() {
+  return false;
+}
+
+export async function probeRecordVaultBridge() {
+  return { ok: false, error: '' };
 }
 
 export function isRecordVaultAccessRequiredError(err) {
@@ -1870,12 +1483,3 @@ export function createRecordVaultPaneApi(storageType) {
   };
 }
 
-export {
-  probeRecordVaultBridge,
-  isRecordVaultBridgeActive,
-  isRecordVaultBridgeAvailable,
-  setRecordVaultBridgeSinglesId,
-  setRecordVaultBridgeStorageType,
-  setRecordVaultBridgeEnabled,
-  getRecordVaultBridgeBaseUrl
-} from './recordVaultBridgeFe';

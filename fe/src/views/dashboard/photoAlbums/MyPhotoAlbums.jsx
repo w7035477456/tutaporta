@@ -12,16 +12,12 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import {
   fetchPhotoAlbumsStorageConfig,
   fetchPhotoAlbumsTutaDriveStatus,
-  fetchPhotoAlbumsUsbStatus,
   logoffPhotoAlbumsStorage,
   readPhotoAlbumsApiError,
-  setPhotoAlbumsBridgeSinglesId,
-  setPhotoAlbumsBridgeStorageType
 } from 'api/photoAlbumsFe';
 import { useAuth } from 'contexts/AuthContext';
 import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { clearPhotoAlbumsE2eSession } from 'utils/photoAlbumsClientSession';
-import { readPhotoAlbumsLastUsbLocation } from 'utils/photoAlbumsUsbPreference';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
 import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
@@ -323,9 +319,7 @@ export default function MyPhotoAlbums() {
   const [tutaCloudUnlocked, setTutaCloudUnlocked] = useState(false);
   const [usbUnlocked, setUsbUnlocked] = useState(false);
   /** Volume name from USB radio / last mount — shown as `TutaPhotoAlbums on USB: (TutaUSB-1)`. */
-  const [usbVolumeLabel, setUsbVolumeLabel] = useState(
-    () => String(readPhotoAlbumsLastUsbLocation()?.label || '').trim()
-  );
+  const [usbVolumeLabel, setUsbVolumeLabel] = useState('');
   const usbTabLabel = formatUsbWorkspaceTitle(usbVolumeLabel);
   const [sessionChecking, setSessionChecking] = useState(true);
   const [sessionProgressPercent, setSessionProgressPercent] = useState(null);
@@ -478,7 +472,7 @@ export default function MyPhotoAlbums() {
                 setSessionProgressPercent(15);
                 setSessionProgressLabel('Checking USB session…');
               }
-              return fetchPhotoAlbumsUsbStatus().catch(() => null);
+              return Promise.resolve(null).catch(() => null);
             })()
           : Promise.resolve(null)
       ]);
@@ -560,8 +554,7 @@ export default function MyPhotoAlbums() {
   }, []);
 
   useEffect(() => {
-    setPhotoAlbumsBridgeSinglesId(user?.singles_id ?? null);
-  }, [user?.singles_id]);
+      }, [user?.singles_id]);
 
   useEffect(() => {
     if (!storageConfigLoaded) return;
@@ -587,7 +580,7 @@ export default function MyPhotoAlbums() {
     setError('');
     void (async () => {
       try {
-        const usbStatus = await fetchPhotoAlbumsUsbStatus();
+        const usbStatus = await Promise.resolve(null);
         if (usbStatus?.session?.unlocked) {
           setUsbUnlocked(true);
         }
@@ -688,8 +681,7 @@ export default function MyPhotoAlbums() {
         console.error('[MyPhotoAlbums dual Log off USB] prepare', err?.message || err);
       }
       await logoffPhotoAlbumsStorage({ storageType: 'usb' });
-      setPhotoAlbumsBridgeStorageType(null);
-      handleUsbSessionEnded();
+            handleUsbSessionEnded();
     } catch (err) {
       setError(readPhotoAlbumsApiError(err, 'Log off USB failed'));
     } finally {

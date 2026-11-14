@@ -1,5 +1,5 @@
 import pool from '../db/connection.js';
-import { isRecordVaultBridgeStandalone } from '../recordVaultBridge/standaloneMode.js';
+import { isRecordVaultBridgeStandalone } from './vaultBridgeStandaloneRetired.js';
 
 function normalizeId(singlesId) {
   const id = Math.trunc(Number(singlesId));

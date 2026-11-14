@@ -347,10 +347,11 @@ async function copyMobileUploadStaging(singlesId, destDir, summary) {
   }
 }
 
+/** Legacy pre–TutaDrive notes under FAST_STORAGE_FOLDER/notes/{singles_id} (env var removed). */
 function optionalRecordNotesFolder(singlesId) {
-  const root = expandHome(process.env.RECORD_NOTES_FOLDER);
-  if (!root) return null;
-  const candidate = path.join(root, String(singlesId));
+  const fast = expandHome(process.env.FAST_STORAGE_FOLDER);
+  if (!fast) return null;
+  const candidate = path.join(fast, 'notes', String(singlesId));
   return fs.existsSync(candidate) ? candidate : null;
 }
 

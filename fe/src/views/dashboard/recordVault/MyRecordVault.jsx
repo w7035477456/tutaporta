@@ -14,8 +14,6 @@ import {
   fetchRecordVaultTutaDriveStatus,
   logoffRecordVaultStorage,
   readRecordVaultApiError,
-  setRecordVaultBridgeSinglesId,
-  setRecordVaultBridgeStorageType
 } from 'api/recordVaultFe';
 import { useAuth } from 'contexts/AuthContext';
 import { clearRecordVaultE2eSession, isRecordVaultE2eUnlocked } from 'utils/recordVaultClientSession';
@@ -368,12 +366,10 @@ export default function MyRecordVault() {
         // ignore
       }
       try {
-        if (localUsbOffered) await logoffRecordVaultStorage({ storageType: 'usb' });
       } catch {
         // ignore
       }
       setTutaCloudUnlocked(false);
-      setUsbUnlocked(false);
       accessUnlockedRef.current = false;
     })();
   }, [isCompactViewport, mobileTutaNotesUploadSession, tutaCloudOffered, localUsbOffered]);
@@ -416,27 +412,16 @@ export default function MyRecordVault() {
     setSessionChecking(true);
     setError('');
     try {
-      const [oneDriveStatus, usbStatus] = await Promise.all([
-        tutaCloudOffered
-          ? (tutaDriveMode
+      const oneDriveStatus = await (tutaDriveMode
               ? fetchRecordVaultTutaDriveStatus()
               : fetchRecordVaultTutaDriveStatus()
-            ).catch(() => null)
-          : Promise.resolve(null),
-        localUsbOffered ? fetchRecordVaultUsbStatus().catch(() => null) : Promise.resolve(null)
-      ]);
+            ).catch(() => null);
       // Server session outlives this tab's DEK (reload / revisit) — re-ask the Encrypt Password so
       // Backup can seal with it instead of prompting again.
       setTutaCloudUnlocked(Boolean(oneDriveStatus?.session?.unlocked) && isRecordVaultE2eUnlocked());
-      setUsbUnlocked(Boolean(usbStatus?.session?.unlocked));
-      const sessionUsbLabel = String(usbStatus?.session?.label || '').trim();
-      if (usbStatus?.session?.unlocked && sessionUsbLabel && sessionUsbLabel !== 'OneDrive') {
-        setUsbVolumeLabel((prev) => prev || sessionUsbLabel);
-      }
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Unable to read vault storage sessions'));
       setTutaCloudUnlocked(false);
-      setUsbUnlocked(false);
     } finally {
       setSessionChecking(false);
     }
@@ -499,9 +484,6 @@ export default function MyRecordVault() {
     };
   }, []);
 
-  useEffect(() => {
-    setRecordVaultBridgeSinglesId(user?.singles_id ?? null);
-  }, [user?.singles_id]);
 
   useEffect(() => {
     if (!storageConfigLoaded) return;
@@ -526,7 +508,7 @@ export default function MyRecordVault() {
     setError('');
     void (async () => {
       try {
-        const usbStatus = await fetchRecordVaultUsbStatus();
+        void 0;
         if (usbStatus?.session?.unlocked) {
           setUsbUnlocked(true);
         }
@@ -613,7 +595,6 @@ export default function MyRecordVault() {
     setError('');
     try {
       await logoffRecordVaultStorage({ storageType: 'usb' });
-      setRecordVaultBridgeStorageType(null);
       handleUsbSessionEnded();
     } catch (err) {
       setError(readRecordVaultApiError(err, 'Log off USB failed'));

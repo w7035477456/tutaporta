@@ -26,7 +26,7 @@
  */
 import crypto from 'crypto';
 import pool from '../db/connection.js';
-import { isRecordVaultBridgeStandalone } from '../recordVaultBridge/standaloneMode.js';
+import { isRecordVaultBridgeStandalone } from './vaultBridgeStandaloneRetired.js';
 
 export const VAULT_PRODUCT_PHOTO_ALBUMS = 'photo_albums';
 export const VAULT_PRODUCT_RECORD_VAULT = 'record_vault';

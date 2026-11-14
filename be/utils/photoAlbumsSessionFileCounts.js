@@ -1,5 +1,5 @@
 import pool from '../db/connection.js';
-import { isPhotoAlbumsBridgeStandalone } from '../photoAlbumsBridge/standaloneMode.js';
+import { isPhotoAlbumsBridgeStandalone } from './vaultBridgeStandaloneRetired.js';
 import { PHOTO_ALBUMS_VAULT_TABLES } from './photoAlbumsUsb/vaultPgStore.js';
 
 function normalizeId(singlesId) {

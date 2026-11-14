@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import { fetchPhotoAlbumsTutaDriveVaultTree, fetchPhotoAlbumsUsbVaultTree } from 'api/photoAlbumsFe';
+import { fetchPhotoAlbumsTutaDriveVaultTree } from 'api/photoAlbumsFe';
 
 const VAULT_TREE_INDENT_PX = 18;
 const VAULT_TREE_LINE_COLOR = 'var(--theme-yellow-color)';
@@ -187,7 +187,7 @@ export default function PhotoAlbumsTutaCloudVaultTreePanel({
     setLoading(true);
     setError('');
 
-    const load = isUsb ? fetchPhotoAlbumsUsbVaultTree() : fetchPhotoAlbumsTutaDriveVaultTree();
+    const load = fetchPhotoAlbumsTutaDriveVaultTree();
     void load
       .then((result) => {
         if (cancelled) return;

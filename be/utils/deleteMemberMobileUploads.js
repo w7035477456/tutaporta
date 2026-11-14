@@ -175,7 +175,13 @@ export async function deleteMemberMobileUploadsOnFactoryReset({ singlesId, membe
     'recordvault-onedrive-tmpdir',
     removeInsideRoot(path.join(os.tmpdir(), 'recordvault-onedrive'), [singlesKey])
   );
-  noteRemovedDir('record-notes-folder', removeInsideRoot(process.env.RECORD_NOTES_FOLDER, [singlesKey]));
+  const fastRoot = expandEnvPath(process.env.FAST_STORAGE_FOLDER);
+  if (fastRoot) {
+    noteRemovedDir(
+      'record-notes-folder',
+      removeInsideRoot(path.join(fastRoot, 'notes'), [singlesKey])
+    );
+  }
 
   let folderName = '';
   const memberPart = memberId == null ? '' : String(memberId).trim();

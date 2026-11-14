@@ -23,9 +23,6 @@ import tutaNotesImg from 'assets/images/tutaNotes.png';
 import { MY_RECORD_VAULT_PATH } from 'constants/myRecordVaultRoute';
 import { MY_PHOTO_ALBUMS_PATH } from 'constants/myPhotoAlbumsRoute';
 import { TUTADATES_PATH } from 'constants/tutaDatesRoute';
-import { isOnenoteUsbUpgrade } from 'config/onenoteUsbUpgradeEnv';
-import { fetchOnenoteUsbUpgradeBlocked } from 'api/onenoteUsbUpgradeFe';
-import TutaOnenoteUsbUpgradePopup from 'views/dashboard/landing/TutaOnenoteUsbUpgradePopup';
 import { canChangeTutaDatesOptIn, tutaDatesOptInBlockedMessage, tutaDatesStatusBlockMessage } from 'utils/singlesStatus';
 import { themedAlert } from 'utils/themedDialog';
 import { FIRST_LOGIN_ONBOARDING_CONGRATS_MESSAGE } from 'config/firstLoginAutoPopupsEnv';
@@ -35,7 +32,6 @@ import { isImpersonationSession, isToolsOnlyAdminSession } from 'utils/adminSess
 
 // ==============================|| LANDING PAGE ||============================== //
 
-const ONENOTE_USB_UPGRADE_TILE_IDS = new Set(['photoAlbums', 'recordVault']);
 
 /** Compact/mobile: these mall tiles stay on desktop — show a notice instead of opening the app. */
 const DESKTOP_ONLY_TILE_IDS = new Set(['vsingles', 'photoAlbums', 'recordVault']);
@@ -211,8 +207,6 @@ export default function Landing() {
   const mallAreaRef = useRef(null);
   const [mallScale, setMallScale] = useState(1);
   const [mallGrid, setMallGrid] = useState(() => getMallStageSize(3, 2));
-  const [upgradePopupOpen, setUpgradePopupOpen] = useState(false);
-  const [blockOnenoteUsbTiles, setBlockOnenoteUsbTiles] = useState(() => isOnenoteUsbUpgrade());
   const [raffleOpenRequest, setRaffleOpenRequest] = useState(0);
   const raffleEnabled = useRaffleEnabled();
   const raffleWrapRef = useRef(null);
@@ -236,15 +230,6 @@ export default function Landing() {
     tutaAlbumsEnabled: true
   });
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchOnenoteUsbUpgradeBlocked().then((blocked) => {
-      if (!cancelled) setBlockOnenoteUsbTiles(blocked);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -320,12 +305,6 @@ export default function Landing() {
     },
     [tutaDatesBlockMessage]
   );
-
-  const openUpgradePopup = useCallback((event) => {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    setUpgradePopupOpen(true);
-  }, []);
 
   const openEnrollmentToEnableApp = useCallback((tileId, event) => {
     event?.preventDefault?.();
@@ -511,30 +490,22 @@ export default function Landing() {
             {rowDepts.map((d) => {
               const enrollmentFlag = ENROLLMENT_TILE_TO_FLAG[d.id];
               const demoOnPhoneApp = guestDemo && isCompact && DESKTOP_ONLY_TILE_IDS.has(d.id);
-              const gateUpgrade =
-                !demoOnPhoneApp && blockOnenoteUsbTiles && ONENOTE_USB_UPGRADE_TILE_IDS.has(d.id);
               const gateTutaDatesStatus =
-                !demoOnPhoneApp && !gateUpgrade && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
-              const gateEnrollment = !demoOnPhoneApp && !gateUpgrade && !gateTutaDatesStatus && !isTileEnrolled(d.id);
+                !demoOnPhoneApp && d.id === 'vsingles' && Boolean(tutaDatesBlockMessage);
+              const gateEnrollment = !demoOnPhoneApp && !gateTutaDatesStatus && !isTileEnrolled(d.id);
               const gateDesktopOnly =
-                !gateUpgrade &&
-                !gateTutaDatesStatus &&
-                !gateEnrollment &&
-                isCompact &&
-                DESKTOP_ONLY_TILE_IDS.has(d.id);
+                !gateTutaDatesStatus && !gateEnrollment && isCompact && DESKTOP_ONLY_TILE_IDS.has(d.id);
               const tileDisabled = DISABLED_TILE_IDS.has(d.id);
               const tileActivatesPopup =
-                !tileDisabled && (gateUpgrade || gateTutaDatesStatus || gateEnrollment || gateDesktopOnly);
+                !tileDisabled && (gateTutaDatesStatus || gateEnrollment || gateDesktopOnly);
               const isLink = Boolean(d.url) && !tileActivatesPopup && !tileDisabled;
-              const onTileActivate = gateUpgrade
-                ? openUpgradePopup
-                : gateTutaDatesStatus
-                  ? openTutaDatesStatusBlocked
-                  : gateEnrollment
-                    ? (event) => openEnrollmentToEnableApp(d.id, event)
-                    : gateDesktopOnly
-                      ? (event) => openDesktopOnlyApp(d.id, event)
-                      : undefined;
+              const onTileActivate = gateTutaDatesStatus
+                ? openTutaDatesStatusBlocked
+                : gateEnrollment
+                  ? (event) => openEnrollmentToEnableApp(d.id, event)
+                  : gateDesktopOnly
+                    ? (event) => openDesktopOnlyApp(d.id, event)
+                    : undefined;
 
               return (
                 <Box
@@ -660,7 +631,6 @@ export default function Landing() {
           <MallRafflePanel openRequest={raffleOpenRequest} />
         </Box>
       ) : null}
-      <TutaOnenoteUsbUpgradePopup open={upgradePopupOpen} onClose={() => setUpgradePopupOpen(false)} />
     </Box>
   );
 }

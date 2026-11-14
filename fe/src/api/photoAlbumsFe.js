@@ -1,24 +1,7 @@
 import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { prepareLargeBackupFormData } from './chunkedBackupUploadFe';
-import {
-  normalizeUsbBridgeInstallerUrl,
-  USB_BRIDGE_INSTALLER_API
-} from 'utils/usbBridgeInstallerDownloadUrl';
 import { rvCloudAxiosError, rvCloudLog } from 'utils/photoAlbumsCloudDebugLog';
-import {
-  bridgeFetchBlob,
-  bridgeFetchBlobDownload,
-  bridgeRequest,
-  bridgeUploadFormData,
-  getPhotoAlbumsBridgeBaseUrl,
-  isPhotoAlbumsBridgeActive,
-  isPhotoAlbumsBridgeAvailable,
-  isPhotoAlbumsBridgeHostContext,
-  probePhotoAlbumsBridge,
-  setPhotoAlbumsBridgeStorageType,
-  shouldRoutePhotoAlbumsThroughBridge
-} from './photoAlbumsBridgeFe';
 import {
   isVaultCloudPaneStorageType,
   normalizeVaultPaneStorageType,
@@ -28,7 +11,7 @@ import {
 
 function resolvePhotoAlbumsApiStorageType(storageType) {
   if (storageType == null || String(storageType).trim() === '') return null;
-  return isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
+  return vaultCloudBackendStorageSlot();
 }
 
 /** Prefer backend `{ error }` over axios/bridge generic status text. */
@@ -56,14 +39,6 @@ export async function fetchPhotoAlbumsSessionStorageType() {
     const status = await fetchPhotoAlbumsTutaDriveStatus();
     if (status?.session?.unlocked) {
       return normalizeVaultPaneStorageType(status.session.storageType);
-    }
-  } catch {
-    // ignore
-  }
-  try {
-    const { data } = await api.get('/api/photoAlbums/usb/status');
-    if (data?.session?.unlocked) {
-      return normalizeVaultPaneStorageType(data.session.storageType || 'usb');
     }
   } catch {
     // ignore
@@ -165,64 +140,6 @@ function sessionCountPathOnly(url) {
   return String(url || '').split('?')[0];
 }
 
-/**
- * Bridge has no Postgres — FE reports USB open + browser hops to the website API.
- * Website BE already counts OneDrive/in-process USB; skip when not via bridge.
- */
-function maybeReportBridgeSessionFileCounts(config, responseData, viaBridge) {
-  if (!viaBridge) return;
-  const url = sessionCountPathOnly(config?.url);
-  const method = String(config?.method || 'GET').toUpperCase();
-  const storageType = isVaultCloudPaneStorageType(config?.storageType) ? VAULT_CLOUD_STORAGE_TYPE : 'usb';
-
-  if (method === 'POST' && /\/api\/photoAlbums\/usb\/(unlock|init)/.test(url)) {
-    sessionTreeCounted.usb = false;
-    void reportPhotoAlbumsSessionFileCounts({ reset: true });
-    const openCount =
-      Number(responseData?.session?.sessionOpenItemCount ?? responseData?.sessionOpenItemCount) || 0;
-    if (openCount > 0) {
-      void reportPhotoAlbumsSessionFileCounts({ usbDelta: openCount });
-    }
-    return;
-  }
-
-  if (method === 'GET' && url === '/api/photoAlbums') {
-    if (sessionTreeCounted[storageType]) return;
-    sessionTreeCounted[storageType] = true;
-    const n = countTreeNotebooksAndNotes(responseData);
-    if (n > 0) {
-      // Unlock already added usbDelta for notebooks+notes; tree is the UI hop only.
-      // If unlock did not return open count (older bridge), include usb here once.
-      void reportPhotoAlbumsSessionFileCounts({ uiDelta: n });
-    }
-    return;
-  }
-
-  if (method === 'GET' && /\/api\/photoAlbums\/notes\/\d+$/.test(url)) {
-    void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
-    return;
-  }
-  if (
-    method === 'GET' &&
-    (/\/api\/photoAlbums\/notes\/\d+\/image/.test(url) ||
-      /\/api\/photoAlbums\/notes\/\d+\/extra-images\/\d+/.test(url) ||
-      /\/api\/photoAlbums\/notes\/\d+\/attachments\/\d+/.test(url))
-  ) {
-    void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
-    return;
-  }
-
-  if (
-    (method === 'POST' || method === 'PATCH') &&
-    (/\/api\/photoAlbums\/notebooks/.test(url) || /\/api\/photoAlbums\/notes/.test(url))
-  ) {
-    void reportPhotoAlbumsSessionFileCounts({
-      uiDelta: 1,
-      usbDelta: storageType === 'usb' ? 1 : 0
-    });
-  }
-}
-
 async function rvRequest(config) {
   const paneStorageType = config?.storageType ?? null;
   const storageType = resolvePhotoAlbumsApiStorageType(paneStorageType);
@@ -231,101 +148,11 @@ async function rvRequest(config) {
     headers['X-Record-Vault-Storage'] = storageType;
   }
   const nextConfig = { ...config, headers };
-  const viaBridge = shouldRoutePhotoAlbumsThroughBridge(nextConfig.url, paneStorageType);
-  const result = viaBridge ? await bridgeRequest(nextConfig) : await api(nextConfig);
-  maybeReportBridgeSessionFileCounts(nextConfig, result?.data, viaBridge);
-  return result;
-}
-
-/** Express default 404 when an older local bridge only registered the Record Vault USB paths. */
-function isBridgeUsbPathNotFound(err, path) {
-  const status = err?.response?.status;
-  if (status === 404) return true;
-  const message = readPhotoAlbumsApiError(err, '');
-  const normalizedPath = String(path || '').split('?')[0].trim();
-  if (!normalizedPath) return false;
-  const escaped = normalizedPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`cannot get ${escaped}`, 'i').test(message);
-}
-
-/**
- * Packaged usbBridgeV3 older than TutaPhotoAlbums — health OK but `/api/photoAlbums/*` 404s.
- * Locations may still work via legacy `/api/recordVault/usb/locations` fallback.
- */
-export function isPhotoAlbumsBridgeRouteMissingError(err) {
-  const message = readPhotoAlbumsApiError(err, '');
-  if (/cannot\s+get\s+\/api\/photoAlbums/i.test(message)) return true;
-  if (/cannot\s+post\s+\/api\/photoAlbums/i.test(message)) return true;
-  if (err?.response?.data?.code === 'PHOTO_ALBUMS_BRIDGE_OUTDATED') return true;
-  const status = err?.response?.status;
-  if (status === 404 && /\/api\/photoAlbums/i.test(message)) return true;
-  return false;
-}
-
-export const PHOTO_ALBUMS_OUTDATED_BRIDGE_MESSAGE =
-  'USB Bridge is outdated — missing TutaPhotoAlbums routes. Quit usbBridgeV3, update/reinstall the bridge, then open TutaPhotoAlbums USB again.';
-
-function throwPhotoAlbumsOutdatedBridgeError(cause) {
-  const error = new Error(PHOTO_ALBUMS_OUTDATED_BRIDGE_MESSAGE);
-  error.response = {
-    status: 404,
-    data: {
-      error: PHOTO_ALBUMS_OUTDATED_BRIDGE_MESSAGE,
-      code: 'PHOTO_ALBUMS_BRIDGE_OUTDATED'
-    }
-  };
-  if (cause) error.cause = cause;
-  throw error;
-}
-
-/** True when local bridge is up but does not serve TutaPhotoAlbums USB APIs. */
-export async function probePhotoAlbumsBridgeSupportsPhotoAlbums() {
-  const probe = await probePhotoAlbumsBridge();
-  if (!probe.ok) {
-    return { ok: false, outdated: false, error: probe.error || 'USB Bridge unreachable' };
-  }
-  try {
-    await bridgeRequest({
-      method: 'GET',
-      url: '/api/photoAlbums/usb/status',
-      storageType: 'usb'
-    });
-    return { ok: true, outdated: false, error: '' };
-  } catch (err) {
-    if (isPhotoAlbumsBridgeRouteMissingError(err)) {
-      return { ok: false, outdated: true, error: PHOTO_ALBUMS_OUTDATED_BRIDGE_MESSAGE };
-    }
-    // 401 / 428 prove the route exists (auth or vault session missing).
-    if (err?.response?.status === 401 || err?.response?.status === 428) {
-      return { ok: true, outdated: false, error: '' };
-    }
-    if (/not unlocked/i.test(readPhotoAlbumsApiError(err, ''))) {
-      return { ok: true, outdated: false, error: '' };
-    }
-    return { ok: true, outdated: false, error: '' };
-  }
-}
-
-/**
- * Shared USB bridge installers predated TutaPhotoAlbums routes — fall back to the
- * equivalent Record Vault path on the same local bridge / API process.
- */
-async function rvRequestWithLegacyUsbBridgeFallback(primaryUrl, fallbackUrl, config = {}) {
-  try {
-    return await rvRequest({ ...config, url: primaryUrl });
-  } catch (err) {
-    if (!isBridgeUsbPathNotFound(err, primaryUrl)) throw err;
-    const storageType = config?.storageType ?? null;
-    const viaBridge = shouldRoutePhotoAlbumsThroughBridge(primaryUrl, storageType);
-    if (viaBridge) {
-      return await bridgeRequest({ ...config, url: fallbackUrl, storageType });
-    }
-    return await rvRequest({ ...config, url: fallbackUrl });
-  }
+  return api(nextConfig);
 }
 
 function photoAlbumsMediaBaseUrl() {
-  return isPhotoAlbumsBridgeActive() ? getPhotoAlbumsBridgeBaseUrl() : getApiBaseUrl();
+  return getApiBaseUrl();
 }
 
 export function photoAlbumsNoteImageUrl(noteId, slot = 'center') {
@@ -373,15 +200,6 @@ export async function fetchPhotoAlbumsNoteAttachmentBlob(
   if (inline) params.inline = 1;
   const v = String(variant || 'full').trim().toLowerCase();
   if (v && v !== 'full') params.variant = v;
-  const query = Object.keys(params).length
-    ? `?${new URLSearchParams(params).toString()}`
-    : '';
-  if (shouldRoutePhotoAlbumsThroughBridge(path, storageType)) {
-    const blob = await bridgeFetchBlob(`${path}${query}`);
-    void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
-    return blob;
-  }
-
   const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
@@ -407,15 +225,6 @@ function photoAlbumsNoteImageApiPath(noteId, slot = 'center') {
 export async function fetchPhotoAlbumsNoteImageBlob(noteId, slot = 'center', { cacheBust, storageType = null } = {}) {
   const path = photoAlbumsNoteImageApiPath(noteId, slot);
   if (!path) throw new Error('Invalid note id');
-  const query =
-    cacheBust != null && String(cacheBust).trim() !== ''
-      ? `?v=${encodeURIComponent(String(cacheBust))}`
-      : '';
-  if (shouldRoutePhotoAlbumsThroughBridge(path, storageType)) {
-    const blob = await bridgeFetchBlob(`${path}${query}`);
-    void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
-    return blob;
-  }
   const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
@@ -436,15 +245,6 @@ export async function fetchPhotoAlbumsNoteExtraImageBlob(noteId, imageId, { cach
     throw new Error('Invalid note or image id');
   }
   const path = `/api/photoAlbums/notes/${note}/extra-images/${image}`;
-  const query =
-    cacheBust != null && String(cacheBust).trim() !== ''
-      ? `?v=${encodeURIComponent(String(cacheBust))}`
-      : '';
-  if (shouldRoutePhotoAlbumsThroughBridge(path, storageType)) {
-    const blob = await bridgeFetchBlob(`${path}${query}`);
-    void reportPhotoAlbumsSessionFileCounts({ uiDelta: 1 });
-    return blob;
-  }
   const headerSlot = resolvePhotoAlbumsApiStorageType(storageType);
   try {
     const { data } = await api.get(path, {
@@ -660,169 +460,6 @@ export async function searchPhotoAlbumsNotes(query, { storageType } = {}) {
   return Array.isArray(data?.results) ? data.results : [];
 }
 
-export async function fetchPhotoAlbumsUsbStatus() {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/photoAlbums/usb/status',
-    storageType: 'usb'
-  });
-  return {
-    usbMode: Boolean(data?.usbMode),
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
-    session: data?.session || { unlocked: false }
-  };
-}
-
-export async function scanPhotoAlbumsUsb() {
-  const { data } = await rvRequest({ method: 'GET', url: '/api/photoAlbums/usb/scan' });
-  return {
-    detected: Array.isArray(data?.detected) ? data.detected : [],
-    session: data?.session || { unlocked: false }
-  };
-}
-
-export async function fetchPhotoAlbumsUsbLocations() {
-  const { data } = await rvRequestWithLegacyUsbBridgeFallback(
-    '/api/photoAlbums/usb/locations',
-    '/api/recordVault/usb/locations'
-  );
-  return Array.isArray(data?.locations) ? data.locations : [];
-}
-
-export async function browsePhotoAlbumsUsbPath(folderPath) {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/photoAlbums/usb/browse',
-    params: { path: folderPath }
-  });
-  return data;
-}
-
-export async function fetchPhotoAlbumsUsbUnlockGuard(mountPath) {
-  const { data } = await rvRequestWithLegacyUsbBridgeFallback(
-    '/api/photoAlbums/usb/unlock-guard',
-    '/api/recordVault/usb/unlock-guard',
-    { params: { mountPath } }
-  );
-  return data;
-}
-
-async function fetchPhotoAlbumsUsbEnvDerivedKey(opts = {}) {
-  const { data } = await api.post('/api/photoAlbums/usb/icon-derived-key', {
-    forInit: Boolean(opts.forInit),
-    kdfSalt: opts.kdfSalt || undefined
-  });
-  return data;
-}
-
-export async function unlockPhotoAlbumsUsb({ mountPath, backupMountPath = null }) {
-  // If a local bridge is reachable, USB session MUST live there (CRUD routes through bridge).
-  // Unlocking on the main API while an old bridge answers /api/photoAlbums* with 404 causes
-  // "Cannot GET /api/photoAlbums" in the workspace.
-  await probePhotoAlbumsBridge();
-  const bridgeReachable = isPhotoAlbumsBridgeAvailable() || isPhotoAlbumsBridgeHostContext();
-  if (bridgeReachable) {
-    if (!isPhotoAlbumsBridgeActive()) {
-      throw new Error(
-        'USB Bridge is connected but the page session is not ready. Refresh and try Open TutaPhotoAlbums USB again.'
-      );
-    }
-    let kdfSalt;
-    try {
-      const guard = await fetchPhotoAlbumsUsbUnlockGuard(mountPath);
-      kdfSalt = guard?.kdfSalt || undefined;
-    } catch (err) {
-      if (isPhotoAlbumsBridgeRouteMissingError(err)) throwPhotoAlbumsOutdatedBridgeError(err);
-      kdfSalt = undefined;
-    }
-    const derived = await fetchPhotoAlbumsUsbEnvDerivedKey({ kdfSalt });
-    try {
-      const { data } = await bridgeRequest({
-        method: 'POST',
-        url: '/api/photoAlbums/usb/unlock',
-        storageType: 'usb',
-        data: {
-          mountPath,
-          keyB64: derived?.keyB64,
-          backupMountPath: backupMountPath || undefined
-        }
-      });
-      sessionTreeCounted.usb = false;
-      void reportPhotoAlbumsSessionFileCounts({
-        reset: true,
-        usbDelta: Number(data?.session?.sessionOpenItemCount ?? data?.sessionOpenItemCount) || 0
-      });
-      return data;
-    } catch (err) {
-      if (isPhotoAlbumsBridgeRouteMissingError(err)) throwPhotoAlbumsOutdatedBridgeError(err);
-      throw err;
-    }
-  }
-  const { data } = await api.post('/api/photoAlbums/usb/unlock', {
-    mountPath,
-    backupMountPath: backupMountPath || undefined
-  });
-  sessionTreeCounted.usb = false;
-  return data;
-}
-
-export async function initPhotoAlbumsUsb({ mountPath, backupMountPath = null }) {
-  await probePhotoAlbumsBridge();
-  const bridgeReachable = isPhotoAlbumsBridgeAvailable() || isPhotoAlbumsBridgeHostContext();
-  if (bridgeReachable) {
-    if (!isPhotoAlbumsBridgeActive()) {
-      throw new Error(
-        'USB Bridge is connected but the page session is not ready. Refresh and try Open TutaPhotoAlbums USB again.'
-      );
-    }
-    const derived = await fetchPhotoAlbumsUsbEnvDerivedKey({ forInit: true });
-    try {
-      const { data } = await bridgeRequest({
-        method: 'POST',
-        url: '/api/photoAlbums/usb/init',
-        storageType: 'usb',
-        data: {
-          mountPath,
-          keyB64: derived?.keyB64,
-          kdf: derived?.kdf,
-          kdfSalt: derived?.kdfSalt,
-          kdfMemory: derived?.kdfMemory,
-          kdfIterations: derived?.kdfIterations,
-          kdfParallelism: derived?.kdfParallelism,
-          backupMountPath: backupMountPath || undefined
-        }
-      });
-      sessionTreeCounted.usb = false;
-      void reportPhotoAlbumsSessionFileCounts({ reset: true });
-      return data;
-    } catch (err) {
-      if (isPhotoAlbumsBridgeRouteMissingError(err)) throwPhotoAlbumsOutdatedBridgeError(err);
-      throw err;
-    }
-  }
-  const { data } = await api.post('/api/photoAlbums/usb/init', {
-    mountPath,
-    backupMountPath: backupMountPath || undefined
-  });
-  sessionTreeCounted.usb = false;
-  return data;
-}
-
-export async function formatPhotoAlbumsUsb(mountPath) {
-  const { data } = await rvRequest({
-    method: 'POST',
-    url: '/api/photoAlbums/usb/format',
-    storageType: 'usb',
-    data: mountPath ? { mountPath } : {}
-  });
-  return data;
-}
-
-export async function logoffPhotoAlbumsUsb() {
-  const { data } = await rvRequest({ method: 'POST', url: '/api/photoAlbums/usb/logoff' });
-  return data;
-}
-
 export async function fetchPhotoAlbumsStorageConfig() {
   const { data } = await api.get('/api/photoAlbums/storage/config');
   const mapChoice = (choice) => ({
@@ -854,12 +491,7 @@ export async function fetchPhotoAlbumsStorageConfig() {
       : data?.cacheOneDriveIcon
         ? String(data.cacheOneDriveIcon).trim()
         : '',
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
-    videoTutorialTutaphotoalbums: data?.videoTutorialTutaphotoalbums ? String(data.videoTutorialTutaphotoalbums).trim() : '',
-    usbBridgeInstallers: {
-      mac: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.mac, 'mac'),
-      win: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.win, 'win')
-    }
+    videoTutorialTutaphotoalbums: data?.videoTutorialTutaphotoalbums ? String(data.videoTutorialTutaphotoalbums).trim() : ''
   };
 }
 
@@ -959,65 +591,6 @@ export async function logoffPhotoAlbumsTutaDrive() {
   return data;
 }
 
-/** Download USB Bridge installer via API (reads USB_DMG_EXE on server). */
-export async function downloadUsbBridgeInstaller(platform = 'mac') {
-  const apiPath =
-    platform === 'win' ? USB_BRIDGE_INSTALLER_API.win : USB_BRIDGE_INSTALLER_API.mac;
-  try {
-    const response = await api.get(apiPath, { responseType: 'blob' });
-    const blob = response.data;
-    const defaultName = platform === 'win' ? 'usbBridgeV3.exe' : 'usbBridgeV3.dmg';
-    let filename = defaultName;
-    const disposition = String(response.headers?.['content-disposition'] || '');
-    const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
-    if (match?.[1]) {
-      try {
-        filename = decodeURIComponent(match[1].replace(/"/g, ''));
-      } catch {
-        filename = match[1].replace(/"/g, '');
-      }
-    }
-    const objectUrl = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = filename;
-    anchor.rel = 'noopener';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.URL.revokeObjectURL(objectUrl);
-  } catch (err) {
-    const data = err?.response?.data;
-    if (data instanceof Blob) {
-      const text = await data.text();
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed?.error) throw new Error(String(parsed.error));
-      } catch (parseErr) {
-        if (parseErr instanceof Error && parseErr.message && parseErr.message !== text) {
-          throw parseErr;
-        }
-      }
-      if (text.trim()) throw new Error(text.trim());
-    }
-    throw err;
-  }
-}
-
-export async function fetchPhotoAlbumsUsbVaultTree() {
-  const { data } = await rvRequest({
-    method: 'GET',
-    url: '/api/photoAlbums/usb/vault-tree',
-    storageType: 'usb'
-  });
-  return {
-    path: data?.path ? String(data.path) : '',
-    label: data?.label ? String(data.label) : '',
-    tree: data?.tree && typeof data.tree === 'object' ? data.tree : null,
-    entries: Array.isArray(data?.entries) ? data.entries : []
-  };
-}
-
 /** TutaCloud vault flush without logoff (no-op when BE has no sync route). */
 export async function syncPhotoAlbumsTutaDrive({ onProgress } = {}) {
   if (typeof onProgress === 'function') {
@@ -1079,13 +652,11 @@ function triggerBrowserBlobDownload(blob, fileName) {
 }
 
 /** Poll Redis-backed album backup percent while album zip GET runs. */
-export async function fetchPhotoAlbumsAlbumBackupProgress(storageType = VAULT_CLOUD_STORAGE_TYPE) {
-  const path = '/api/photoAlbums/usb/album-backup-progress';
-  const isUsb = normalizeVaultPaneStorageType(storageType) === 'usb';
-  const config = isUsb
-    ? { headers: { 'X-Record-Vault-Storage': 'usb' } }
-    : { headers: { 'X-Record-Vault-Storage': vaultCloudBackendStorageSlot() } };
-  const { data } = await api.get(path, config);
+export async function fetchPhotoAlbumsAlbumBackupProgress(_storageType = VAULT_CLOUD_STORAGE_TYPE) {
+  const path = '/api/photoAlbums/tutadrive/album-backup-progress';
+  const { data } = await api.get(path, {
+    headers: { 'X-Record-Vault-Storage': vaultCloudBackendStorageSlot() }
+  });
   return {
     percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
     label: data?.label ? String(data.label) : '',
@@ -1115,8 +686,7 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
   const label = String(albumLabel || '').trim();
   if (label) params.set('albumLabel', label);
   const qs = params.toString();
-  const isUsb = normalizeVaultPaneStorageType(storageType) === 'usb';
-  const path = `/api/photoAlbums/usb/album-backup-zip?${qs}`;
+  const path = `/api/photoAlbums/tutadrive/album-backup-zip?${qs}`;
 
   let pollId = null;
   let stopped = false;
@@ -1139,24 +709,15 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
   }
 
   try {
-    if (isUsb && isPhotoAlbumsBridgeActive()) {
-      const { blob, fileName: headerName } = await bridgeFetchBlobDownload(path);
-      const fileName = headerName || buildMyPhotoAlbumsBackupZipFileNameClient('usb');
-      triggerBrowserBlobDownload(blob, fileName);
-      if (typeof onProgress === 'function') {
-        onProgress({ percent: 100, label: 'Done', fileIndex: 0, fileTotal: 0, bytesDone: blob?.size ?? 0 });
-      }
-      return { fileName, sizeBytes: blob?.size ?? 0 };
-    }
     const response = await api.get(path, {
       responseType: 'blob',
       headers: {
-        'X-Record-Vault-Storage': isUsb ? 'usb' : vaultCloudBackendStorageSlot()
+        'X-Record-Vault-Storage': vaultCloudBackendStorageSlot()
       }
     });
     const fileName =
       parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyPhotoAlbumsBackupZipFileNameClient(isUsb ? 'usb' : 'cloud');
+      buildMyPhotoAlbumsBackupZipFileNameClient('cloud');
     triggerBrowserBlobDownload(response.data, fileName);
     const sizeBytes = response.data?.size ?? 0;
     if (typeof onProgress === 'function') {
@@ -1168,29 +729,6 @@ export async function downloadPhotoAlbumsAlbumBackupZip({
   } finally {
     stopped = true;
     if (pollId != null) window.clearInterval(pollId);
-  }
-}
-
-/** Zip the unlocked USB `.recordvault` folder and save to the browser download folder. */
-export async function downloadPhotoAlbumsUsbBackupZip() {
-  try {
-    if (isPhotoAlbumsBridgeActive()) {
-      const { blob, fileName: headerName } = await bridgeFetchBlobDownload('/api/photoAlbums/usb/backup-zip');
-      const fileName = headerName || buildMyPhotoAlbumsBackupZipFileNameClient('usb');
-      triggerBrowserBlobDownload(blob, fileName);
-      return { fileName, sizeBytes: blob?.size ?? 0 };
-    }
-    const response = await api.get('/api/photoAlbums/usb/backup-zip', {
-      responseType: 'blob',
-      headers: { 'X-Record-Vault-Storage': 'usb' }
-    });
-    const fileName =
-      parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyPhotoAlbumsBackupZipFileNameClient('usb');
-    triggerBrowserBlobDownload(response.data, fileName);
-    return { fileName, sizeBytes: response.data?.size ?? 0 };
-  } catch (err) {
-    throw await normalizePhotoAlbumsBlobFetchError(err);
   }
 }
 
@@ -1232,65 +770,29 @@ export async function restorePhotoAlbumsTutaDriveBackupZip(file) {
   return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutadrive/restore-zip', file, { chunkLargeFile: true });
 }
 
-/** Upload a MyPhotoAlbums backup zip and restore files onto the unlocked USB vault. */
-export async function restorePhotoAlbumsUsbBackupZip(file) {
-  if (shouldRoutePhotoAlbumsThroughBridge('/api/photoAlbums/usb/restore-zip', 'usb')) {
-    const formData = new FormData();
-    formData.append('backup', file, file.name || 'backup.zip');
-    const { data } = await bridgeUploadFormData('/api/photoAlbums/usb/restore-zip', formData);
-    return data;
-  }
-  return postPhotoAlbumsRestoreZip('/api/photoAlbums/usb/restore-zip', file, {
-    extraHeaders: { 'X-Record-Vault-Storage': 'usb' }
-  });
-}
-
-/**
- * Cloud or USB logoff with optional progress callbacks (TutaCloud has no poll endpoint yet).
- */
-async function logoffPhotoAlbumsStorageWithProgress(storageType, onProgress) {
-  const isCloud = isVaultCloudPaneStorageType(storageType);
+async function logoffPhotoAlbumsStorageWithProgress(_storageType, onProgress) {
   if (typeof onProgress === 'function') {
-    onProgress({
-      percent: 1,
-      label: isCloud ? 'Saving albums to TutaCloud…' : 'Logging off USB…'
-    });
+    onProgress({ percent: 1, label: 'Saving albums to TutaCloud…' });
   }
-  try {
-    const { data } = isCloud
-      ? await api.post('/api/photoAlbums/tutadrive/logoff')
-      : await rvRequest({ method: 'POST', url: '/api/photoAlbums/usb/logoff', storageType: 'usb' });
-    if (typeof onProgress === 'function') {
-      onProgress({ percent: 100, label: 'Done' });
-    }
-    return data;
-  } catch (err) {
-    if (typeof onProgress === 'function') {
-      onProgress({ percent: 100, label: 'Done' });
-    }
-    throw err;
+  const { data } = await api.post('/api/photoAlbums/tutadrive/logoff');
+  if (typeof onProgress === 'function') {
+    onProgress({ percent: 100, label: 'Done' });
   }
+  return data;
 }
 
 export async function logoffPhotoAlbumsStorage({ storageType, onProgress } = {}) {
   let data;
   const normalized = normalizeVaultPaneStorageType(storageType);
-  if (normalized === VAULT_CLOUD_STORAGE_TYPE) {
+  if (normalized === VAULT_CLOUD_STORAGE_TYPE || normalized === 'tutadrive') {
     if (typeof onProgress === 'function') {
       data = await logoffPhotoAlbumsStorageWithProgress(VAULT_CLOUD_STORAGE_TYPE, onProgress);
     } else {
       ({ data } = await api.post('/api/photoAlbums/tutadrive/logoff'));
     }
-  } else if (normalized === 'usb') {
-    if (typeof onProgress === 'function') {
-      data = await logoffPhotoAlbumsStorageWithProgress('usb', onProgress);
-    } else {
-      ({ data } = await rvRequest({ method: 'POST', url: '/api/photoAlbums/usb/logoff', storageType: 'usb' }));
-    }
   } else {
     ({ data } = await api.post('/api/photoAlbums/storage/logoff'));
   }
-  // USB bridge has no Postgres — always freeze counts on the website after logoff.
   await snapshotPhotoAlbumsSessionFileCounts();
   return data;
 }
@@ -1334,31 +836,10 @@ export async function flushPhotoAlbumsSessionsOnLeave({ onProgress } = {}) {
   report({
     title: 'Saving vault',
     percent: 2,
-    label: 'Logging off USB and Cloud…'
+    label: 'Saving albums to TutaCloud…'
   });
 
   try {
-    try {
-      await logoffPhotoAlbumsStorage({
-        storageType: 'usb',
-        onProgress: ({ percent, label } = {}) => {
-          const p = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
-          report({
-            title: 'Logging off USB',
-            percent: Math.round(p * 0.35),
-            label: label || 'Saving USB vault…'
-          });
-        }
-      });
-    } catch (err) {
-      console.error('[flushPhotoAlbumsSessionsOnLeave] usb', err?.message || err);
-      report({
-        title: 'Logging off USB',
-        percent: 35,
-        label: 'USB logoff finished with errors — continuing…'
-      });
-    }
-
     try {
       await logoffPhotoAlbumsStorage({
         storageType: VAULT_CLOUD_STORAGE_TYPE,
@@ -1366,7 +847,7 @@ export async function flushPhotoAlbumsSessionsOnLeave({ onProgress } = {}) {
           const p = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
           report({
             title: 'Saving to Cloud',
-            percent: 35 + Math.round(p * 0.65),
+            percent: Math.round(p * 0.98) + 2,
             label: label || 'Saving albums to TutaCloud…'
           });
         }
@@ -1387,11 +868,6 @@ export async function flushPhotoAlbumsSessionsOnLeave({ onProgress } = {}) {
     });
   } finally {
     endPhotoAlbumsLeaveBusy();
-    try {
-      setPhotoAlbumsBridgeStorageType(null);
-    } catch {
-      // ignore
-    }
   }
 }
 
@@ -1413,11 +889,7 @@ export async function fetchPhotoAlbumsActiveStorageDisplay() {
   } catch {
     // ignore
   }
-  const { data } = await api.get('/api/photoAlbums/usb/status');
-  const session = data?.session || {};
-  if (!session.unlocked) return '';
-  const label = String(session.label || '').trim();
-  return label ? `Storage: ${label}` : 'Storage: USB';
+  return '';
 }
 
 export async function fetchPhotoAlbumsUsage({ storageType } = {}) {
@@ -1485,13 +957,20 @@ export async function purchasePhotoAlbumsRefill(tokens) {
 
 export const PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE = 'Record Vault storage not unlocked';
 
-export function isPhotoAlbumsUsbRequiredError(err) {
-  return err?.response?.status === 428 && err?.response?.data?.code === 'PHOTO_ALBUMS_USB_REQUIRED';
+export function isPhotoAlbumsUsbRequiredError() {
+  return false;
 }
 
-/** Vault session missing — show on Cloud/USB login, not in the workspace editor. */
+export function isPhotoAlbumsBridgeRouteMissingError() {
+  return false;
+}
+
+export async function probePhotoAlbumsBridge() {
+  return { ok: false, error: '' };
+}
+
+/** Vault session missing — show on Cloud login, not in the workspace editor. */
 export function isPhotoAlbumsStorageNotUnlockedError(err) {
-  if (isPhotoAlbumsBridgeRouteMissingError(err)) return true;
   if (isPhotoAlbumsUsbRequiredError(err)) return true;
   if (err?.response?.status === 428) {
     const code = String(err?.response?.data?.code || '');
@@ -1501,9 +980,6 @@ export function isPhotoAlbumsStorageNotUnlockedError(err) {
 }
 
 export function readPhotoAlbumsStorageNotUnlockedMessage(err) {
-  if (isPhotoAlbumsBridgeRouteMissingError(err)) {
-    return PHOTO_ALBUMS_OUTDATED_BRIDGE_MESSAGE;
-  }
   const msg = readPhotoAlbumsApiError(err, '').trim();
   if (/not unlocked/i.test(msg)) return msg;
   return PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE;
@@ -1511,9 +987,6 @@ export function readPhotoAlbumsStorageNotUnlockedMessage(err) {
 
 /** Message for bounce-to-login after open/load failure (keep real FS errors like EACCES). */
 export function readPhotoAlbumsOpenFailureMessage(err) {
-  if (isPhotoAlbumsBridgeRouteMissingError(err)) {
-    return PHOTO_ALBUMS_OUTDATED_BRIDGE_MESSAGE;
-  }
   const msg = readPhotoAlbumsApiError(err, '').trim();
   if (msg) return msg;
   return PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE;
@@ -1522,7 +995,6 @@ export function readPhotoAlbumsOpenFailureMessage(err) {
 /** Fatal open/load errors — leave workspace and show on Cloud/USB login (not editor banner). */
 export function isPhotoAlbumsVaultOpenFatalError(err) {
   if (isPhotoAlbumsStorageNotUnlockedError(err)) return true;
-  if (isPhotoAlbumsBridgeRouteMissingError(err)) return true;
   const msg = readPhotoAlbumsApiError(err, '');
   return /EACCES|EPERM|EROFS|ENOENT|permission denied|Cannot create TutaPhotoAlbums|read-only|not a real USB|mkdir/i.test(
     msg
@@ -1728,12 +1200,3 @@ export function createPhotoAlbumsPaneApi(storageType) {
   };
 }
 
-export {
-  probePhotoAlbumsBridge,
-  isPhotoAlbumsBridgeActive,
-  isPhotoAlbumsBridgeAvailable,
-  setPhotoAlbumsBridgeSinglesId,
-  setPhotoAlbumsBridgeStorageType,
-  setPhotoAlbumsBridgeEnabled,
-  getPhotoAlbumsBridgeBaseUrl
-} from './photoAlbumsBridgeFe';

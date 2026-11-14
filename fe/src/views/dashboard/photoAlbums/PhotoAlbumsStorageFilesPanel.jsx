@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {
   fetchPhotoAlbumsTutaDriveVaultTree,
-  fetchPhotoAlbumsUsbVaultTree,
   readPhotoAlbumsApiError
 } from 'api/photoAlbumsFe';
 import VaultWorkspaceErrorPopup from 'ui-component/VaultWorkspaceErrorPopup';
@@ -256,19 +255,11 @@ export default function PhotoAlbumsStorageFilesPanel({ storageType, active = tru
         setErrorPopupOpen(false);
       }
       try {
-        if (isOneDrive) {
-          const result = await fetchPhotoAlbumsTutaDriveVaultTree();
-          if (cancelled) return;
-          setTree(result.tree || null);
-          setError('');
-          setErrorPopupOpen(false);
-        } else {
-          const result = await fetchPhotoAlbumsUsbVaultTree();
-          if (cancelled) return;
-          setTree(usbListingToTree(result));
-          setError('');
-          setErrorPopupOpen(false);
-        }
+        const result = await fetchPhotoAlbumsTutaDriveVaultTree();
+        if (cancelled) return;
+        setTree(result.tree || null);
+        setError('');
+        setErrorPopupOpen(false);
       } catch (err) {
         if (cancelled) return;
         // Silent refresh must not re-open the popup every poll.

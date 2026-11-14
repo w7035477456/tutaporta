@@ -41,6 +41,8 @@ import {
 } from '../../utils/photoAlbumsVaultOpenProgress.js';
 import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
 import { restoreTutaCloudVaultFromZipFile } from '../../utils/photoAlbumsUsb/usbVaultBackup.js';
+import { getAlbumBackupProgress } from '../../utils/photoAlbumsAlbumBackupProgress.js';
+import { streamPhotoAlbumsAlbumBackupZip } from '../../utils/photoAlbumsAlbumBackup.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
 
@@ -418,6 +420,44 @@ export async function restorePhotoAlbumsTutaDriveBackupZip(req, res) {
   } finally {
     if (upload?.tmpDir) {
       fs.rmSync(upload.tmpDir, { recursive: true, force: true });
+    }
+  }
+}
+
+/** GET /api/photoAlbums/tutadrive/album-backup-progress */
+export async function getPhotoAlbumsTutaDriveAlbumBackupProgress(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    const progress = await getAlbumBackupProgress(singlesId);
+    return res.json(progress);
+  } catch (err) {
+    console.error('[getPhotoAlbumsTutaDriveAlbumBackupProgress]', err?.message || err);
+    return res.status(500).json({ error: err?.message || 'Unable to read album backup progress' });
+  }
+}
+
+/** GET /api/photoAlbums/tutadrive/album-backup-zip */
+export async function downloadPhotoAlbumsTutaDriveAlbumBackupZip(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    await streamPhotoAlbumsAlbumBackupZip(
+      singlesId,
+      'onedrive',
+      {
+        noteId: req.query?.noteId,
+        notebookId: req.query?.notebookId,
+        albumLabel: req.query?.albumLabel
+      },
+      res
+    );
+  } catch (err) {
+    console.error('[downloadPhotoAlbumsTutaDriveAlbumBackupZip]', err?.message || err);
+    const message = err?.message || 'Unable to download album backup';
+    const status = /not unlocked/i.test(message) ? 428 : 400;
+    if (!res.headersSent) {
+      return res.status(status).json({ error: message });
     }
   }
 }

@@ -17,14 +17,8 @@ import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDowns
 import {
   isPhotoAlbumsStorageNotUnlockedError,
   isPhotoAlbumsVaultOpenFatalError,
-  isPhotoAlbumsBridgeRouteMissingError,
   PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE,
   fetchPhotoAlbumsStorageConfig,
-  fetchPhotoAlbumsUsbStatus,
-  fetchPhotoAlbumsUsbLocations,
-  probePhotoAlbumsBridge,
-  setPhotoAlbumsBridgeSinglesId,
-  setPhotoAlbumsBridgeStorageType,
   readPhotoAlbumsApiError,
   readPhotoAlbumsOpenFailureMessage,
   readFileAsDataUrl,
@@ -61,7 +55,6 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE } from 'config/busyHourglassEnv';
 import PhotoAlbumsViewVaultDialog from './PhotoAlbumsViewVaultDialog';
 import PhotoAlbumsTutaCloudBackupDialog from './PhotoAlbumsTutaCloudBackupDialog';
-import PhotoAlbumsUsbBackupDialog from './PhotoAlbumsUsbBackupDialog';
 import PhotoAlbumsStorageFilesPanel from './PhotoAlbumsStorageFilesPanel';
 import PhotoAlbumsFilesExplorerPanel from './PhotoAlbumsFilesExplorerPanel';
 import PhotoAlbumsNoteEditor from './PhotoAlbumsNoteEditor';
@@ -1749,13 +1742,10 @@ export default function PhotoAlbumsWorkspacePane({
   const [vaultUsage, setVaultUsage] = useState(null);
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
   const [tutaCloudOffered, setTutaCloudOffered] = useState(false);
-  const [, setLocalUsbOffered] = useState(false);
   const [, setStorageConfigLoaded] = useState(false);
-  const [] = useState(false);
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
   const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
-  const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
   const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
@@ -1768,8 +1758,6 @@ export default function PhotoAlbumsWorkspacePane({
     setVaultWorkspaceFocusSiteFooterSuppressed(hideWorkspaceChrome);
     return () => setVaultWorkspaceFocusSiteFooterSuppressed(false);
   }, [hideWorkspaceChrome]);
-  const [usbVaultFolderLabel] = useState('USB');
-  const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
   const [crossPaneTransfer, setCrossPaneTransfer] = useState(null);
   const [crossPaneBusy, setCrossPaneBusy] = useState(false);
@@ -3037,8 +3025,7 @@ export default function PhotoAlbumsWorkspacePane({
     (err) => {
       const message = err ? readPhotoAlbumsOpenFailureMessage(err) : PHOTO_ALBUMS_STORAGE_NOT_UNLOCKED_MESSAGE;
       setError('');
-      setPhotoAlbumsBridgeStorageType(null);
-      onSessionEnded?.(message);
+            onSessionEnded?.(message);
       // Best-effort logoff so a half-open USB/Cloud session does not stick.
       void vaultApi.logoffPhotoAlbumsStorage().catch(() => {});
     },
@@ -3137,7 +3124,6 @@ export default function PhotoAlbumsWorkspacePane({
         const cfg = await fetchPhotoAlbumsStorageConfig();
         if (cancelled) return;
         setTutaCloudOffered(Boolean(cfg.oneDrive?.visible && cfg.oneDrive?.enabled));
-        setLocalUsbOffered(Boolean(cfg.localUsb?.visible && cfg.localUsb?.enabled));
         setVideoTutorialUrl(String(cfg?.videoTutorialTutaphotoalbums || '').trim());
         if (cfg.oneDrive?.visible && cfg.oneDrive?.enabled) {
           if (cfg.tutaDrive) {
@@ -3158,7 +3144,6 @@ export default function PhotoAlbumsWorkspacePane({
         const status = Number(err?.response?.status);
         if (status === 404) {
           setTutaCloudOffered(true);
-          setLocalUsbOffered(true);
           return;
         }
         setTutaCloudOffered(false);
@@ -3170,66 +3155,6 @@ export default function PhotoAlbumsWorkspacePane({
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    setPhotoAlbumsBridgeSinglesId(user?.singles_id ?? null);
-  }, [user?.singles_id]);
-
-  useEffect(() => {
-    void probePhotoAlbumsBridge();
-    const timerId = window.setInterval(() => {
-      void probePhotoAlbumsBridge();
-    }, 5000);
-    return () => window.clearInterval(timerId);
-  }, []);
-
-  /** View USB: green when local bridge is up and the unlocked USB mount is still reachable. */
-  useEffect(() => {
-    if (!unlocked || paneStorageType !== 'usb') {
-      setUsbBridgeHealthy(false);
-      return undefined;
-    }
-    let cancelled = false;
-    const refreshUsbBridgeHealth = async () => {
-      const probe = await probePhotoAlbumsBridge();
-      if (cancelled) return;
-      if (!probe.ok) {
-        setUsbBridgeHealthy(false);
-        return;
-      }
-      try {
-        const [status, locations] = await Promise.all([fetchPhotoAlbumsUsbStatus(), fetchPhotoAlbumsUsbLocations()]);
-        if (cancelled) return;
-        const unlockedSession = Boolean(status?.session?.unlocked);
-        if (!unlockedSession) {
-          setUsbBridgeHealthy(false);
-          setPhotoAlbumsBridgeStorageType(null);
-          leaveUnlockedWorkspace();
-          return;
-        }
-        const mountPath = String(status?.session?.mountPath || '').trim();
-        const mountStillPresent =
-          !mountPath || (Array.isArray(locations) && locations.some((loc) => String(loc?.mountPath || '').trim() === mountPath));
-        setUsbBridgeHealthy(unlockedSession && mountStillPresent);
-      } catch (err) {
-        if (cancelled) return;
-        if (isPhotoAlbumsBridgeRouteMissingError(err) || isPhotoAlbumsStorageNotUnlockedError(err)) {
-          setUsbBridgeHealthy(false);
-          leaveUnlockedWorkspace(err);
-          return;
-        }
-        setUsbBridgeHealthy(false);
-      }
-    };
-    void refreshUsbBridgeHealth();
-    const timerId = window.setInterval(() => {
-      void refreshUsbBridgeHealth();
-    }, 4000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timerId);
-    };
-  }, [unlocked, paneStorageType, leaveUnlockedWorkspace]);
 
   useEffect(() => {
     if (!unlocked) {
@@ -3246,8 +3171,7 @@ export default function PhotoAlbumsWorkspacePane({
       setNoteContentLoadProgressLabel('');
       return undefined;
     }
-    setPhotoAlbumsBridgeStorageType(paneStorageType);
-    const pending = pendingMynoteRestoreRef.current;
+        const pending = pendingMynoteRestoreRef.current;
     void loadTree({
       preferNotebookId: pending?.notebookId ?? undefined,
       preferNoteId: pending?.noteId ?? undefined
@@ -3554,8 +3478,7 @@ export default function PhotoAlbumsWorkspacePane({
     });
     setVaultLeavingProgressPercent(100);
     setVaultLeavingProgressLabel('Done');
-    setPhotoAlbumsBridgeStorageType(null);
-    setNotebooks([]);
+        setNotebooks([]);
     setShortcuts([]);
     setSelectedNotebookId(null);
     setSelectedNoteId(null);
@@ -7518,14 +7441,6 @@ export default function PhotoAlbumsWorkspacePane({
           onOpenMyPhotoAlbums={() => setTutaCloudBackupOpen(false)}
           onRestored={() => void handleTutaCloudVaultRestored()}
         />
-        <PhotoAlbumsUsbBackupDialog
-          open={usbBackupOpen}
-          onClose={() => setUsbBackupOpen(false)}
-          folderLabel={usbVaultFolderLabel}
-          albumContext={albumBackupContext}
-          onOpenMyPhotoAlbums={() => setUsbBackupOpen(false)}
-          onRestored={() => handleUsbVaultRestoredOrFormatted()}
-        />
         <ColorTemplate16PopupCenterWide
           open={vaultFileTooLargeOpen}
           onClose={() => setVaultFileTooLargeOpen(false)}
@@ -7740,24 +7655,6 @@ export default function PhotoAlbumsWorkspacePane({
                             hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                             onClick={() => {
                               setTutaCloudBackupOpen(true);
-                            }}
-                            disabled={busy}
-                            aria-label="Backup/Restore"
-                            title="Backup / Restore"
-                            sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                          >
-                            {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
-                          </SliderControlButton>
-                        </Box>
-                      ) : null}
-                      {paneStorageType === 'usb' ? (
-                        <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                          <SliderControlButton
-                            type="button"
-                            variant="yellow"
-                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                            onClick={() => {
-                              setUsbBackupOpen(true);
                             }}
                             disabled={busy}
                             aria-label="Backup/Restore"

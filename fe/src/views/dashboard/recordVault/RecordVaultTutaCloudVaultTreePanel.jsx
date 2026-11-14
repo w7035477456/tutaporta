@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
-import { fetchRecordVaultTutaDriveVaultTree, fetchRecordVaultUsbVaultTree } from 'api/recordVaultFe';
+import { fetchRecordVaultTutaDriveVaultTree } from 'api/recordVaultFe';
 import { recordVaultYellowScrollbarSx } from './recordVaultYellowScrollbarSx';
 
 const VAULT_TREE_INDENT_PX = 18;
@@ -171,7 +171,7 @@ export default function RecordVaultTutaCloudVaultTreePanel({
     setLoading(true);
     setError('');
 
-    const load = isUsb ? fetchRecordVaultUsbVaultTree() : fetchRecordVaultTutaDriveVaultTree();
+    const load = fetchRecordVaultTutaDriveVaultTree();
     void load
       .then((result) => {
         if (cancelled) return;

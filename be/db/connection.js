@@ -4,7 +4,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { getDBConfig, getDBSchema } from '../config/envConfig.js';
 import { recordPgQueryError, setPgQueryErrorCountsPool } from './pgQueryErrorCounts.js';
-import { isRecordVaultBridgeStandalone } from '../recordVaultBridge/standaloneMode.js';
+import { isRecordVaultBridgeStandalone } from '../utils/vaultBridgeStandaloneRetired.js';
 import { loadHomeEnvExpanded } from '../utils/expandHomeEnv.js';
 
 const STANDALONE = isRecordVaultBridgeStandalone();

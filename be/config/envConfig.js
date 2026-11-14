@@ -11,7 +11,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { isRecordVaultBridgeStandalone } from '../recordVaultBridge/standaloneMode.js';
+import { isRecordVaultBridgeStandalone } from '../utils/vaultBridgeStandaloneRetired.js';
 import { loadHomeEnvExpanded } from '../utils/expandHomeEnv.js';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));

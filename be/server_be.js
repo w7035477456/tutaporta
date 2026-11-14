@@ -230,7 +230,6 @@ import {
 import { putTutaDriveUploadChunk } from './routes/recordVault/tutaDriveUploadChunkRoute.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
 import { getRecordVaultRagConfig } from './utils/recordVaultRagConfig.js';
-import { isIncludeUsbDmgExeEnabled } from './utils/includeUsbDmgExeConfig.js';
 import {
   getRecordVaultStorageConfig,
   getRecordVaultStorageLogoffProgress,
@@ -241,7 +240,6 @@ import {
   getRecordVaultUsage,
   postRecordVaultSessionFileCounts
 } from './routes/recordVault/recordVaultUsageRoutes.js';
-import { isVaultLocalUsbOffered } from './utils/recordVaultStorageFlags.js';
 
 // ---- Photo Albums (independent clone) ----
 import {
@@ -292,7 +290,9 @@ import {
 } from './routes/photoAlbums/photoAlbumsE2eRoutes.js';
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
+  downloadPhotoAlbumsTutaDriveAlbumBackupZip,
   formatPhotoAlbumsTutaDrive,
+  getPhotoAlbumsTutaDriveAlbumBackupProgress,
   getPhotoAlbumsTutaDriveOpenProgress,
   getPhotoAlbumsTutaDriveStatus,
   initPhotoAlbumsTutaDrive,
@@ -1125,14 +1125,10 @@ app.get('/api/publicConfig', (_req, res) => {
     linkedInEnabled: isLinkedInOAuthConfigured(),
     blockMobile: isBlockMobileEnabled(),
     duplicatePhoneAllow: isDuplicatePhoneAllowed('ANYMEMBER'),
-    onenoteUsbUpgrade: ['true', '1', 'yes', 'on'].includes(
-      String(process.env.ONENOTE_USB_UPGRADE ?? '').trim().toLowerCase()
-    ),
-    // TutaNotes panels: LEFT_SIDE=TutaDrive|None, RIGHT_SIDE=USB|None (~/.ssh/be/.env)
+    // TutaNotes panels: LEFT_SIDE=TutaDrive|None (~/.ssh/be/.env)
     leftSide: getLeftSideMode(),
     tutaDrive: isLeftSideTutaDrive(),
-    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
-    includeUsbDmgExe: isIncludeUsbDmgExeEnabled(),
+    rightSide: 'None',
     ragUiEnabled: getRecordVaultRagConfig().ragUiEnabled
   });
 });
@@ -1716,6 +1712,16 @@ app.post('/api/photoAlbums/tutadrive/init', ...photoAlbumsVaultAuth, initPhotoAl
 app.post('/api/photoAlbums/tutadrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/reset-album', ...photoAlbumsVaultAuth, resetPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutadrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
+app.get(
+  '/api/photoAlbums/tutadrive/album-backup-progress',
+  ...photoAlbumsVaultAuth,
+  getPhotoAlbumsTutaDriveAlbumBackupProgress
+);
+app.get(
+  '/api/photoAlbums/tutadrive/album-backup-zip',
+  ...photoAlbumsVaultAuth,
+  downloadPhotoAlbumsTutaDriveAlbumBackupZip
+);
 app.post(
   '/api/photoAlbums/tutadrive/restore-zip',
   ...photoAlbumsVaultAuth,

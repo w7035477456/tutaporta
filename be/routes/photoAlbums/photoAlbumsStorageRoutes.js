@@ -1,9 +1,4 @@
-import {
-  buildVaultStorageChoice,
-  isVaultBackupUsbEnabled,
-  isVaultLocalUsbOffered,
-  isVaultTutaCloudOffered
-} from '../../utils/photoAlbumsStorageFlags.js';
+import { buildVaultStorageChoice, isVaultTutaCloudOffered } from '../../utils/photoAlbumsStorageFlags.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
 import { isVaultE2eYellow } from '../../utils/photoAlbumsE2eYellowConfig.js';
 import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
@@ -28,16 +23,10 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
   if (!singlesId) return;
   // Legacy DB/Redis slot name `onedrive` — Tuta cloud workspace session icon.
   let cacheTutaCloudIcon = null;
-  let cacheUsbIcon = null;
   try {
     cacheTutaCloudIcon = await readPhotoAlbumsCacheIcon(singlesId, 'onedrive');
   } catch {
     cacheTutaCloudIcon = null;
-  }
-  try {
-    cacheUsbIcon = await readPhotoAlbumsCacheIcon(singlesId, 'usb');
-  } catch {
-    cacheUsbIcon = null;
   }
 
   const videoTutorialTutaphotoalbums = await loadGlobalVideoTutorialPhotoAlbums();
@@ -51,18 +40,16 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
   return res.json({
     leftSide,
     tutaDrive,
-    rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
+    rightSide: 'None',
     tutaCloud,
-    localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
-    backupUsbEnabled: isVaultBackupUsbEnabled(),
+    localUsb: buildVaultStorageChoice(false, true),
+    backupUsbEnabled: false,
     iconEncryptionRequired: isPhotoAlbumsIconEncryptionEnabled(),
     encryptPhotoAndDb: isVaultPhotoAndDbEncryptionEnabled(),
     iconRetryDelaySeconds: getVaultIconRetryDelaySeconds(),
     cacheTutaCloudIcon,
-    cacheUsbIcon,
+    cacheUsbIcon: '',
     videoTutorialTutaphotoalbums,
-    includeUsbDmgExe: false,
-    usbBridgeInstallers: { mac: null, win: null },
     e2eYellow: isVaultE2eYellow()
   });
 }

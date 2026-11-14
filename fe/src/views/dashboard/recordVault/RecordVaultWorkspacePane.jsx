@@ -16,14 +16,8 @@ import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButto
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { MOBILE_UPLOAD_HOVER_TOOLTIP, mobileUploadHoverTooltipSlotProps } from 'config/mobileUploadHoverTooltip';
 import {
-  isRecordVaultUsbRequiredError,
   fetchRecordVaultStorageConfig,
-  fetchRecordVaultUsbStatus,
-  fetchRecordVaultUsbLocations,
   fetchRecordVaultTutaDriveStatus,
-  probeRecordVaultBridge,
-  setRecordVaultBridgeSinglesId,
-  setRecordVaultBridgeStorageType,
   readRecordVaultApiError,
   readFileAsDataUrl,
   createRecordVaultPaneApi,
@@ -55,7 +49,6 @@ import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_NOTE_SIZE } from 'config/busyHourglassEnv';
 import RecordVaultTutaCloudBackupDialog from './RecordVaultTutaCloudBackupDialog';
-import RecordVaultUsbBackupDialog from './RecordVaultUsbBackupDialog';
 import RecordVaultRagDialog from './RecordVaultRagDialog';
 import TutaNotesRagCheckboxMark, { tutaNotesRagCheckboxButtonSx } from './TutaNotesRagCheckboxMark';
 import { loadRecordVaultRagSelection, saveRecordVaultRagSelection, toggleRecordVaultRagSelection } from 'utils/recordVaultRagSelection';
@@ -1552,12 +1545,10 @@ export default function RecordVaultWorkspacePane({
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
   const [billScheduleTutorialOpen, setBillScheduleTutorialOpen] = useState(false);
   const [tutaCloudOffered, setTutaCloudOffered] = useState(false);
-  const [, setLocalUsbOffered] = useState(false);
   const [, setStorageConfigLoaded] = useState(false);
   const [] = useState(false);
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
   const [tutaCloudBackupRequired, setTutaCloudBackupRequired] = useState(false);
-  const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [ragDialogOpen, setRagDialogOpen] = useState(false);
   const [ragSelectedNoteIds, setRagSelectedNoteIds] = useState([]);
   const [ragKeepModelInMemory, setRagKeepModelInMemory] = useState(() => loadRecordVaultRagKeepModelInMemory());
@@ -1566,8 +1557,6 @@ export default function RecordVaultWorkspacePane({
   const [ragConfiguredModel, setRagConfiguredModel] = useState('');
   const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
   const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
-  const [usbVaultFolderLabel] = useState('USB');
-  const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
   const [crossPaneTransfer, setCrossPaneTransfer] = useState(null);
   const [crossPaneBusy, setCrossPaneBusy] = useState(false);
@@ -3086,13 +3075,6 @@ export default function RecordVaultWorkspacePane({
           void refreshVaultUsageRef.current?.();
         }, 400);
       } catch (err) {
-        if (isRecordVaultUsbRequiredError(err)) {
-          // Session gone (restart, bridge drop, etc.) — leave workspace and show USB/Cloud login.
-          setError('');
-          setRecordVaultBridgeStorageType(null);
-          onSessionEnded?.();
-          return;
-        }
         setError(readRecordVaultApiError(err, 'Failed to load Record Vault'));
       } finally {
         if (!silent) {
@@ -3125,7 +3107,6 @@ export default function RecordVaultWorkspacePane({
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
         setTutaCloudOffered(Boolean(cfg.oneDrive?.visible && cfg.oneDrive?.enabled));
-        setLocalUsbOffered(Boolean(cfg.localUsb?.visible && cfg.localUsb?.enabled));
         setVideoTutorialUrl(String(cfg?.videoTutorialTutanotes || '').trim());
         if (cfg.oneDrive?.visible && cfg.oneDrive?.enabled) {
           if (cfg.tutaDrive) {
@@ -3146,7 +3127,6 @@ export default function RecordVaultWorkspacePane({
         const status = Number(err?.response?.status);
         if (status === 404) {
           setTutaCloudOffered(true);
-          setLocalUsbOffered(true);
           return;
         }
         setTutaCloudOffered(false);
@@ -3160,66 +3140,11 @@ export default function RecordVaultWorkspacePane({
   }, []);
 
   useEffect(() => {
-    setRecordVaultBridgeSinglesId(user?.singles_id ?? null);
-  }, [user?.singles_id]);
-
-  useEffect(() => {
-    void probeRecordVaultBridge();
-    const timerId = window.setInterval(() => {
-      void probeRecordVaultBridge();
-    }, 5000);
-    return () => window.clearInterval(timerId);
-  }, []);
-
-  /** View USB: green when local bridge is up and the unlocked USB mount is still reachable. */
-  useEffect(() => {
-    if (!unlocked || paneStorageType !== 'usb') {
-      setUsbBridgeHealthy(false);
-      return undefined;
-    }
-    let cancelled = false;
-    const refreshUsbBridgeHealth = async () => {
-      const probe = await probeRecordVaultBridge();
-      if (cancelled) return;
-      if (!probe.ok) {
-        setUsbBridgeHealthy(false);
-        return;
-      }
-      try {
-        const [status, locations] = await Promise.all([fetchRecordVaultUsbStatus(), fetchRecordVaultUsbLocations()]);
-        if (cancelled) return;
-        const unlockedSession = Boolean(status?.session?.unlocked);
-        if (!unlockedSession) {
-          setUsbBridgeHealthy(false);
-          setRecordVaultBridgeStorageType(null);
-          onSessionEnded?.();
-          return;
-        }
-        const mountPath = String(status?.session?.mountPath || '').trim();
-        const mountStillPresent =
-          !mountPath || (Array.isArray(locations) && locations.some((loc) => String(loc?.mountPath || '').trim() === mountPath));
-        setUsbBridgeHealthy(unlockedSession && mountStillPresent);
-      } catch {
-        if (!cancelled) setUsbBridgeHealthy(false);
-      }
-    };
-    void refreshUsbBridgeHealth();
-    const timerId = window.setInterval(() => {
-      void refreshUsbBridgeHealth();
-    }, 4000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timerId);
-    };
-  }, [unlocked, paneStorageType, onSessionEnded]);
-
-  useEffect(() => {
     if (!unlocked) {
       setLoading(false);
       setVaultUiReady(true);
       return undefined;
     }
-    setRecordVaultBridgeStorageType(paneStorageType);
     if (!mynotePrefsReady) return undefined;
     const pending = pendingMynoteRestoreRef.current;
     void loadTree({
@@ -3471,8 +3396,7 @@ export default function RecordVaultWorkspacePane({
     });
     setVaultLeavingProgressPercent(100);
     setVaultLeavingProgressLabel('Done');
-    setRecordVaultBridgeStorageType(null);
-    setNotebooks([]);
+        setNotebooks([]);
     setShortcuts([]);
     setSelectedNotebookId(null);
     setSelectedNoteId(null);
@@ -3480,10 +3404,6 @@ export default function RecordVaultWorkspacePane({
   }, [onSessionEnded, vaultApi, reportVaultLeavingProgress, paneStorageType]);
 
   const handleTutaCloudVaultRestored = useCallback(async () => {
-    await performVaultStorageLogoff();
-  }, [performVaultStorageLogoff]);
-
-  const handleUsbVaultRestoredOrFormatted = useCallback(async () => {
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
 
@@ -3499,7 +3419,7 @@ export default function RecordVaultWorkspacePane({
       setBusy(true);
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
-      setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
+      setVaultLeavingProgressLabel('Saving notes to TutaCloud…');
       setError('');
       try {
         await performVaultStorageLogoff();
@@ -6765,13 +6685,6 @@ export default function RecordVaultWorkspacePane({
           onRestored={() => void handleTutaCloudVaultRestored()}
           requireBackupBeforeClose={tutaCloudBackupRequired}
         />
-        <RecordVaultUsbBackupDialog
-          open={usbBackupOpen}
-          onClose={() => setUsbBackupOpen(false)}
-          folderLabel={usbVaultFolderLabel}
-          onOpenMyNote={() => setUsbBackupOpen(false)}
-          onRestored={() => handleUsbVaultRestoredOrFormatted()}
-        />
         <RecordVaultRagDialog
           open={ragDialogOpen}
           onClose={() => setRagDialogOpen(false)}
@@ -7131,32 +7044,6 @@ export default function RecordVaultWorkspacePane({
                           </SliderControlButton>
                         </Box>
                       ) : null}
-                      {paneStorageType === 'usb' ? (
-                        <Box
-                          sx={{
-                            ...menuRailButtonCellSx,
-                            flex: '1 1 0',
-                            width: 'auto',
-                            minWidth: 0,
-                            maxWidth: canEnterCompare ? '33%' : '50%',
-                            overflow: 'visible'
-                          }}
-                        >
-                          <SliderControlButton
-                            type="button"
-                            variant="yellow"
-                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                            fullWidth
-                            onClick={() => setUsbBackupOpen(true)}
-                            disabled={busy}
-                            aria-label="Backup/Restore"
-                            title="Backup / Restore USB"
-                            sx={headerFullWidthButtonSx}
-                          >
-                            Backup/Restore
-                          </SliderControlButton>
-                        </Box>
-                      ) : null}
                       <Box
                         sx={{
                           ...menuRailButtonCellSx,
@@ -7165,7 +7052,7 @@ export default function RecordVaultWorkspacePane({
                           minWidth: 0,
                           maxWidth: canEnterCompare
                             ? '33%'
-                            : paneStorageType === 'usb' || (paneStorageType === 'tutadrive' && tutaCloudOffered)
+                            : paneStorageType === 'tutadrive' && tutaCloudOffered
                               ? '50%'
                               : '100%',
                           overflow: 'visible'

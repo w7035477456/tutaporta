@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { getJWTConfig } from './config/envConfig.js';
-import { isRecordVaultBridgeStandalone } from './recordVaultBridge/standaloneMode.js';
+import { isRecordVaultBridgeStandalone } from './utils/vaultBridgeStandaloneRetired.js';
 
 const REFRESH_MS = 60 * 1000;
 const STANDALONE = isRecordVaultBridgeStandalone();

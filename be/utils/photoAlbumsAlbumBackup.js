@@ -128,7 +128,7 @@ export async function streamPhotoAlbumsAlbumBackupZip(
   const resolvedLabel =
     String(albumLabel || note.note_name || '').trim() ||
     `Set ${ids.notebookId}/Album ${ids.noteId}`;
-  const zipName = buildPhotoAlbumsAlbumBackupZipFileName(resolvedLabel, storageType === 'usb' ? 'usb' : 'cloud');
+  const zipName = buildPhotoAlbumsAlbumBackupZipFileName(resolvedLabel, 'cloud');
 
   await clearAlbumBackupProgress(singlesId);
   await reportProgress(singlesId, {
