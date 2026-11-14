@@ -428,6 +428,7 @@ import {
 } from './routes/adminUiTestRecordings.js';
 import { getAdminStatistics } from './routes/adminStatistics.js';
 import { getAdminResticSnapshots } from './routes/adminRestic.js';
+import { getAdminStorageTree, getAdminStorageTreeFile, getAdminStorageTreeFiles } from './routes/adminStorageTree.js';
 import {
   getAdminTables,
   postAdminTableCascadeDelete,
@@ -1398,6 +1399,9 @@ app.get('/api/admin/ui-test-recordings/logs', requireAuth, requireAdminRole, get
 app.post('/api/admin/ui-test-recordings/logs/reset', requireAuth, requireAdminRole, postGraphicalTestLogsReset);
 app.get('/api/admin/statistics', requireAuth, requireAdminRole, getAdminStatistics);
 app.get('/api/admin/restic/snapshots', requireAuth, requireAdminRole, getAdminResticSnapshots);
+app.get('/api/admin/storage-tree', requireAuth, requireAdminRole, getAdminStorageTree);
+app.get('/api/admin/storage-tree/files', requireAuth, requireAdminRole, getAdminStorageTreeFiles);
+app.get('/api/admin/storage-tree/file', requireAuth, requireAdminRole, getAdminStorageTreeFile);
 app.get('/api/admin/tables', requireAuth, requireAdminRole, getAdminTables);
 app.post('/api/admin/tables/:tableKey/truncate', requireAuth, requireAdminRole, postAdminTableTruncate);
 app.post('/api/admin/tables/:tableKey/cascade-delete', requireAuth, requireAdminRole, postAdminTableCascadeDelete);

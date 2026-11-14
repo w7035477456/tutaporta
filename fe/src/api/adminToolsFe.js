@@ -226,6 +226,33 @@ export async function fetchAdminResticSnapshots() {
   return data;
 }
 
+/** Admin Tools → Tree tab. → { largeCheap, fast }, each { rootKey, envVar, root, tree, totalLabel, truncated, error? } */
+export async function fetchAdminStorageTree() {
+  const { data } = await api.get('/api/admin/storage-tree');
+  return data;
+}
+
+/** Files directly inside one tree folder. rootKey: 'large' | 'fast'. → [{ name, size, sizeLabel, modified, kind }] */
+export async function fetchAdminStorageTreeFiles(rootKey, relPath) {
+  const { data } = await api.get('/api/admin/storage-tree/files', { params: { root: rootKey, path: relPath } });
+  return Array.isArray(data?.files) ? data.files : [];
+}
+
+export function adminStorageTreeFileUrl(rootKey, relPath) {
+  const params = new URLSearchParams({ root: rootKey, path: relPath });
+  return `${getApiBaseUrl()}/api/admin/storage-tree/file?${params}`;
+}
+
+/** First `maxBytes` of a tree file as raw bytes (text / hex preview). */
+export async function fetchAdminStorageTreeFileHead(rootKey, relPath, maxBytes = 256 * 1024) {
+  const { data } = await api.get('/api/admin/storage-tree/file', {
+    params: { root: rootKey, path: relPath },
+    responseType: 'arraybuffer',
+    headers: { Range: `bytes=0-${maxBytes - 1}` }
+  });
+  return new Uint8Array(data);
+}
+
 /** Admin Tools → Raffles tab */
 export async function fetchAdminRaffleLogEvents() {
   const { data } = await api.get('/api/admin/raffle-log/events');

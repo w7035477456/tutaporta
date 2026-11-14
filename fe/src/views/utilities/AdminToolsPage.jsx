@@ -27,6 +27,7 @@ import AdminToolsLoginLogTab from './AdminToolsLoginLogTab';
 import AdminToolsRafflesTab from './AdminToolsRafflesTab';
 import AdminToolsScamAlertTab from './AdminToolsScamAlertTab';
 import AdminToolsResticTab from './AdminToolsResticTab';
+import AdminToolsTreeTab from './AdminToolsTreeTab';
 import AllSingles from 'views/dashboard/allSingles/AllSingles';
 
 const ADMIN_TOOLS_TABS = [
@@ -43,7 +44,8 @@ const ADMIN_TOOLS_TABS = [
   { value: 'all-singles', label: 'All Singles' },
   { value: 'raffles', label: 'Raffles' },
   { value: 'scam-alert', label: 'Scam Alert' },
-  { value: 'restic', label: 'Restic' }
+  { value: 'restic', label: 'Restic' },
+  { value: 'tree', label: 'Tree' }
 ];
 
 function resolveAdminToolsTab(tabParam) {
@@ -354,6 +356,7 @@ export default function AdminToolsPage() {
           {!loading && activeTab === 'raffles' ? <AdminToolsRafflesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'scam-alert' ? <AdminToolsScamAlertTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'restic' ? <AdminToolsResticTab onError={handleToolsError} /> : null}
+          {!loading && activeTab === 'tree' ? <AdminToolsTreeTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'asn' ? <AdminToolsAsnTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'tables' ? <AdminToolsTablesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'wipe-by-id' ? <AdminToolsWipeByIdTab onError={handleToolsError} /> : null}
