@@ -152,9 +152,13 @@ export default function PhotoAlbumsTutaDriveGate({
     <>
       <BusyHourglassOverlay
         open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
-        label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
+        label={busy ? busyLabel || 'Opening TutaDrive Cloud' : 'Opening TutaDrive Cloud'}
         progressPercent={busyProgressPercent}
-        progressLabel={busyLabel}
+        progressLabel={
+          busy
+            ? `${busyLabel || 'Opening TutaDrive Cloud'}\nUnlocking your photo albums vault on the server…\nLoading album sets from Postgres (media files stay on disk)…`
+            : 'Preparing to open TutaDrive Cloud…\nConfirming Encrypt Password session, then unlocking the member photo folder…'
+        }
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       {showLoginChrome ? (

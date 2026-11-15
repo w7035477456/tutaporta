@@ -28,17 +28,18 @@ import {
 } from 'utils/photoAlbumsOverageThrottleUi';
 import VaultOverageThrottleNotice from 'ui-component/VaultOverageThrottleNotice';
 
+function formatElapsed(sec) {
+  const n = Math.max(0, Math.floor(Number(sec) || 0));
+  if (n < 60) return `${n}s elapsed`;
+  const m = Math.floor(n / 60);
+  const s = n % 60;
+  return `${m}m ${String(s).padStart(2, '0')}s elapsed`;
+}
+
 /**
  * Full-viewport centered spinning hourglass — site-wide busy indicator.
- * Renders via portal so it stays centered over modals and page chrome.
- * Always shows remaining % counting down toward 0% (then done when parent closes).
- * progressPercent from callers is "% complete" (0–100 ascending); display is 100−that.
- * With no progressPercent, runs an estimated countdown (never hits 0 until closed).
- * Optional progressDetail (e.g. "310mb of 1055mb done") renders directly under the percent.
- * Optional actionLabel + onAction (e.g. Skip OneDrive) for long waits.
- * When TutaNotes / TutaPhotoAlbums data-limit throttle is active, appends a REFILL notice (once —
- * backend progress labels may already include the same line).
- * yellowPanel: hourglass + % + status sit on a rounded yellow panel with dark text.
+ * Always shows remaining % plus verbose status: title (label), optional progressLabel,
+ * elapsed time, and a short hint for estimated vs real vs throttled waits.
  */
 export default function BusyHourglassOverlay({
   open = false,
@@ -71,17 +72,11 @@ export default function BusyHourglassOverlay({
   );
   const overageThrottled = notesOverageThrottled || albumsOverageThrottled;
   const overageThrottleFactor = Math.max(1, Number(notesOverageThrottleFactor) || 1, Number(albumsOverageThrottleFactor) || 1);
-  // While the backend is stretching this request (refill depleted) it publishes how
-  // far through that sleep it is — show it even when the caller passed no percent,
-  // so a throttled upload reads "37% done" instead of a blank spinner.
   const throttleWaitPercent = useRecordVaultThrottleWaitProgress(Boolean(open));
 
-  // Throttled requests have no byte-level total to report, so also count how long
-  // the user has been waiting — it keeps ticking even if a progress report is missed.
-  const throttledOpen = Boolean(open) && overageThrottled;
   const [elapsedSec, setElapsedSec] = useState(0);
   useEffect(() => {
-    if (!throttledOpen) {
+    if (!open) {
       setElapsedSec(0);
       return undefined;
     }
@@ -91,12 +86,11 @@ export default function BusyHourglassOverlay({
       setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
     }, 1000);
     return () => clearInterval(timerId);
-  }, [throttledOpen]);
+  }, [open]);
 
   const callerPercent = progressPercent != null && Number.isFinite(Number(progressPercent)) ? Number(progressPercent) : null;
   const hasRealProgress = callerPercent != null || throttleWaitPercent != null;
 
-  // No caller/throttle progress: animate remaining % 100 → floor while open (hits 0 only when closed).
   const [indeterminateRemaining, setIndeterminateRemaining] = useState(100);
   useEffect(() => {
     if (!open) {
@@ -116,43 +110,54 @@ export default function BusyHourglassOverlay({
 
   if (!open || typeof document === 'undefined') return null;
 
-  // Callers pass "% complete" ascending; UI shows remaining counting down to 0%.
   const donePercent = hasRealProgress
     ? Math.max(0, Math.min(100, Math.round(callerPercent != null ? callerPercent : throttleWaitPercent)))
     : null;
   const remainingPercent =
     donePercent != null ? Math.max(0, Math.min(100, 100 - donePercent)) : indeterminateRemaining;
-  const showPercent = true;
   const clampedPercent = remainingPercent;
-  // Backend may embed the REFILL line in progressLabel; keep only the upload/status
-  // lines here so the yellow throttleNotice below is not duplicated.
+
   const statusLines = String(progressLabel || '')
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
-  const statusText = statusLines.filter((line) => !VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE.test(line)).join('\n');
+  const callerStatusText = statusLines.filter((line) => !VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE.test(line)).join('\n');
   const statusHadThrottle = statusLines.some((line) => VAULT_OVERAGE_THROTTLE_STATUS_LINE_RE.test(line));
-  const showThrottleNotice = overageThrottled || statusHadThrottle;
-  const showAction = Boolean(actionLabel) && typeof onAction === 'function';
-  // A live throttle percent is the most useful number; otherwise, when we know the
-  // request is being throttled, at least show how long it has been waiting.
-  const waitingText =
-    throttledOpen && elapsedSec > 0
-      ? `${elapsedSec}s elapsed`
-      : throttledOpen && elapsedSec === 0
-        ? 'Transfer in progress…'
-        : '';
+  const showThrottleNotice = overageThrottled || statusHadThrottle || throttleWaitPercent != null;
+
+  const titleText = String(label || 'Loading').trim() || 'Loading';
+  // Avoid duplicating the title when progressLabel already starts with it.
+  const callerLower = callerStatusText.toLowerCase();
+  const titleAlreadyInStatus =
+    Boolean(callerStatusText) &&
+    (callerLower === titleText.toLowerCase() || callerLower.startsWith(`${titleText.toLowerCase()}\n`));
+  const showTitle = Boolean(titleText) && !titleAlreadyInStatus;
+
   const detailText = String(progressDetail || '').trim();
-  const showSideText = showPercent || Boolean(statusText) || showThrottleNotice || Boolean(waitingText);
-  const percentText =
-    remainingPercent <= 0 ? '0% — done' : `${remainingPercent}%`;
+
+  let modeHint = '';
+  if (throttleWaitPercent != null || (overageThrottled && !hasRealProgress)) {
+    modeHint =
+      'Data transfer refill is empty — this wait is stretched on purpose. REFILL in the usage bar restores full speed.';
+  } else if (callerPercent != null) {
+    modeHint = `About ${Math.round(donePercent)}% complete — ${remainingPercent}% left.`;
+  } else {
+    modeHint =
+      'Still working… percentage is an estimate of remaining wait (it will not hit 0% until this step finishes).';
+  }
+
+  const elapsedText = formatElapsed(elapsedSec);
+  const showAction = Boolean(actionLabel) && typeof onAction === 'function';
+
+  const percentText = remainingPercent <= 0 ? '0% — done' : `${remainingPercent}%`;
   const ariaLabel = [
-    label,
+    titleText,
     percentText,
     detailText,
-    statusText,
+    callerStatusText,
+    modeHint,
+    elapsedText,
     showThrottleNotice ? vaultOverageThrottleAriaMessage(overageThrottleFactor) : '',
-    waitingText,
     showAction ? actionLabel : ''
   ]
     .filter(Boolean)
@@ -166,27 +171,41 @@ export default function BusyHourglassOverlay({
       xs: '0.95rem',
       sm: '1.15rem'
     },
-    lineHeight: 1.25,
+    lineHeight: 1.3,
     color: yellowPanel ? '#000' : '#fff',
     WebkitTextFillColor: yellowPanel ? '#000' : undefined,
     textAlign: 'left',
     textShadow: yellowPanel ? 'none' : '0 1px 0 #000',
-    maxWidth: { xs: '70vw', sm: '36rem' },
+    maxWidth: { xs: '78vw', sm: '40rem' },
     whiteSpace: 'pre-line'
+  };
+  const titleSx = {
+    ...statusParagraphSx,
+    fontWeight: 900,
+    fontSize: { xs: '1.05rem', sm: '1.35rem' }
+  };
+  const hintSx = {
+    ...statusParagraphSx,
+    fontWeight: 600,
+    opacity: 0.95,
+    fontSize: { xs: '0.85rem', sm: '1rem' }
   };
   const throttleColor = yellowPanel ? '#b00020' : 'var(--theme-yellow-color)';
 
-  const statusColumn = showSideText ? (
+  const statusColumn = (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5, minWidth: 0 }}>
-      {showPercent ? (
-        <Box
-          component="p"
-          sx={{
-            ...busyHourglassPercentSx,
-            fontFamily: MAIN_FONT_FAMILY
-          }}
-        >
-          {percentText}
+      <Box
+        component="p"
+        sx={{
+          ...busyHourglassPercentSx,
+          fontFamily: MAIN_FONT_FAMILY
+        }}
+      >
+        {percentText}
+      </Box>
+      {showTitle ? (
+        <Box component="p" sx={titleSx}>
+          {titleText}
         </Box>
       ) : null}
       {detailText ? (
@@ -194,11 +213,17 @@ export default function BusyHourglassOverlay({
           {detailText}
         </Box>
       ) : null}
-      {statusText ? (
+      {callerStatusText ? (
         <Box component="p" sx={statusParagraphSx}>
-          {statusText}
+          {callerStatusText}
         </Box>
       ) : null}
+      <Box component="p" sx={hintSx}>
+        {modeHint}
+      </Box>
+      <Box component="p" sx={{ ...statusParagraphSx, fontWeight: 800, opacity: 0.95 }}>
+        {elapsedText}
+      </Box>
       {showThrottleNotice ? (
         <VaultOverageThrottleNotice
           component="p"
@@ -211,13 +236,8 @@ export default function BusyHourglassOverlay({
           }}
         />
       ) : null}
-      {waitingText ? (
-        <Box component="p" sx={{ ...statusParagraphSx, fontWeight: 800, opacity: 0.9 }}>
-          {waitingText}
-        </Box>
-      ) : null}
     </Box>
-  ) : null;
+  );
 
   const actionButton = showAction ? (
     <OrangeButton
@@ -259,20 +279,16 @@ export default function BusyHourglassOverlay({
       role="status"
       aria-live="polite"
       aria-label={ariaLabel}
-      {...(showPercent
-        ? {
-            'aria-valuemin': 0,
-            'aria-valuemax': 100,
-            'aria-valuenow': clampedPercent
-          }
-        : null)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={clampedPercent}
     >
       <Box
         sx={{
           display: 'flex',
-          flexDirection: showSideText ? 'row' : 'column',
+          flexDirection: 'row',
           alignItems: 'center',
-          gap: showSideText ? 2 : 1.5,
+          gap: 2,
           ...(yellowPanel
             ? {
                 bgcolor: '#ffeb3b',
@@ -281,7 +297,7 @@ export default function BusyHourglassOverlay({
                 boxShadow: '0 6px 24px rgba(0, 0, 0, 0.55)',
                 px: { xs: 2, sm: 3 },
                 py: { xs: 1.5, sm: 2 },
-                maxWidth: '92vw',
+                maxWidth: '94vw',
                 boxSizing: 'border-box'
               }
             : null)

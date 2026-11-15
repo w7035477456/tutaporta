@@ -716,6 +716,17 @@ export default function RecordVaultAccessGate({
                 ? 'Verifying Encrypt Password…'
                 : 'Setting Encrypt Password…'
         }
+        progressLabel={
+          checking || demoAutoUnlocking
+            ? guestDemo
+              ? 'Guest demo: unlocking Encrypt Password automatically…'
+              : 'Loading Full Disk Encryption status for this member…\nChecking whether an Encrypt Password is already set…'
+            : changePasswordOpen
+              ? 'Deriving new keys with Argon2id (CPU-heavy — can take several seconds)…\nUpdating wrapped vault keys on the server…'
+              : configured
+                ? 'Verifying Encrypt Password with Argon2id on this device…\nThis step is intentionally slow for security — please wait…'
+                : 'Creating Encrypt Password keys (Argon2id)…\nSaving vault key material to the server…'
+        }
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <ColorTemplate16PopupCenterWide

@@ -930,10 +930,13 @@ export default function MyPhotoAlbums() {
       <>
       <BusyHourglassOverlay
         open={!storageConfigLoaded || sessionChecking}
-        label="Loading vault"
+        label="Loading TutaPhotoAlbums"
         progressPercent={!storageConfigLoaded ? 5 : sessionProgressPercent}
         progressLabel={
-          !storageConfigLoaded ? 'Loading TutaPhotoAlbums configuration…' : sessionProgressLabel
+          !storageConfigLoaded
+            ? 'Loading TutaPhotoAlbums configuration…\nChecking whether TutaCloud or USB is already unlocked…'
+            : sessionProgressLabel ||
+              'Checking your photo vault session…\nPreparing the TutaPhotoAlbums workspace…'
         }
         backdropSx={myPhotoAlbumsLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}
@@ -946,6 +949,11 @@ export default function MyPhotoAlbums() {
               ? 'Logging off TutaDrive'
               : 'Logging off OneDrive'
             : 'Logging off USB'
+        }
+        progressLabel={
+          tutaCloudDualLogoffBusy
+            ? 'Saving transfer totals and locking the TutaCloud photo vault session…'
+            : 'Saving transfer totals and locking the USB photo vault session…'
         }
         backdropSx={myPhotoAlbumsLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE}

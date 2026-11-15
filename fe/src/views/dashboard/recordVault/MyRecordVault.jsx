@@ -844,13 +844,23 @@ export default function MyRecordVault() {
       <>
       <BusyHourglassOverlay
         open={!storageConfigLoaded || sessionChecking}
-        label="Loading vault"
+        label="Loading TutaNotes"
+        progressLabel={
+          !storageConfigLoaded
+            ? 'Reading storage settings…\nChecking whether TutaCloud or USB is already unlocked on this server…'
+            : 'Checking your vault session…\nPreparing the TutaNotes workspace…'
+        }
         backdropSx={myNoteLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />
       <BusyHourglassOverlay
         open={usbDualLogoffBusy || tutaCloudDualLogoffBusy}
-        label={tutaCloudDualLogoffBusy ? 'Logging off OneDrive' : 'Logging off USB'}
+        label={tutaCloudDualLogoffBusy ? 'Logging off TutaCloud' : 'Logging off USB'}
+        progressLabel={
+          tutaCloudDualLogoffBusy
+            ? 'Saving transfer totals and locking the TutaCloud vault session…\nYou can safely wait — the workspace closes when logoff finishes.'
+            : 'Saving transfer totals and locking the USB vault session…\nYou can safely wait — the workspace closes when logoff finishes.'
+        }
         backdropSx={myNoteLoadingBackdropSx}
         fontSize={BUSY_HOURGLASS_MY_NOTE_SIZE}
       />

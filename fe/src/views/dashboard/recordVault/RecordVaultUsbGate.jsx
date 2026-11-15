@@ -1079,6 +1079,9 @@ export default function RecordVaultUsbGate({
         <BusyHourglassOverlay
           open={Boolean(open) && busy}
           label="Opening TutaNotes USB…"
+          progressLabel={
+            'Unlocking the USB vault on this Mac / server…\nLoading notebooks and note text…\nFiles stay on the USB drive under TutaNotes/files and photos.'
+          }
           fontSize={BUSY_HOURGLASS_MODAL_SIZE}
         />
         <RecordVaultViewVaultDialog
@@ -1171,6 +1174,9 @@ export default function RecordVaultUsbGate({
       <BusyHourglassOverlay
         open={Boolean(open) && busy}
         label="Opening TutaNotes USB…"
+        progressLabel={
+          'Unlocking the USB vault on this Mac / server…\nLoading notebooks and note text…\nFiles stay on the USB drive under TutaNotes/files and photos.'
+        }
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <ColorTemplate7PopupLargeDark

@@ -149,7 +149,12 @@ export default function RecordVaultTutaDriveGate({
       />
       <BusyHourglassOverlay
         open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
-        label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
+        label={busy ? busyLabel || 'Opening TutaDrive Cloud' : 'Opening TutaDrive Cloud'}
+        progressLabel={
+          busy
+            ? `${busyLabel || 'Opening TutaDrive Cloud'}\nUnlocking your notes vault on the server…\nLoading notebooks and note text from Postgres (files stay on disk)…\nFirst open after a large vault can take several minutes while the server finishes setup.`
+            : 'Preparing to open TutaDrive Cloud…\nConfirming Encrypt Password session, then unlocking the member notes folder…'
+        }
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       {showLoginChrome ? (

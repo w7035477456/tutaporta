@@ -1121,7 +1121,10 @@ export default function PhotoAlbumsUsbGate({
       <Box sx={{ width: '100%' }}>
         <BusyHourglassOverlay
           open={Boolean(open) && busy}
-          label="Opening…"
+          label="Opening TutaPhotoAlbums USB…"
+          progressLabel={
+            'Unlocking the USB photo vault…\nLoading album sets from Postgres…\nPhotos and videos stay on the USB under TutaPhotoAlbums/files.'
+          }
           fontSize={BUSY_HOURGLASS_MODAL_SIZE}
         />
         {loginErrorPopup}
@@ -1214,7 +1217,10 @@ export default function PhotoAlbumsUsbGate({
     <>
       <BusyHourglassOverlay
         open={Boolean(open) && busy}
-        label="Opening…"
+        label="Opening TutaPhotoAlbums USB…"
+        progressLabel={
+          'Unlocking the USB photo vault…\nLoading album sets from Postgres…\nPhotos and videos stay on the USB under TutaPhotoAlbums/files.'
+        }
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
       />
       <ColorTemplate7PopupLargeDark
