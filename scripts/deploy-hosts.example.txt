@@ -4,7 +4,7 @@
 #   cp scripts/deploy-hosts.example.txt scripts/deploy-hosts.txt
 #
 # --- Mac controller → remote Ubuntu solo ---
-# lawsen0@192.168.222.202
+# lawsen0@192.168.222.200   # xbox0 ALL-IN-ONE
 #
 # --- On Ubuntu solo (deploy on same box, no SSH) ---
 # localhost

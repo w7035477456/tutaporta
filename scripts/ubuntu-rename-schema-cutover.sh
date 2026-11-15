@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
-HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.202}"
+HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.200}"
 
 echo "=== 1/4 rename schema on Ubuntu Postgres ==="
 "$SCRIPT_DIR/ubuntu-psql.sh" -f "$REPO/be/db/renameSchemaToOutdatedDbSnapshotOct2024.sql"

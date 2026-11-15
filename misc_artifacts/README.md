@@ -1,10 +1,10 @@
-# HAProxy (xbox2)
+# HAProxy (xbox0 ALL-IN-ONE)
 
 Two configs — copy the one matching the deployment to `/etc/haproxy/haproxy.cfg`:
 
 | File | Deployment | Backend `be_app` |
 |---|---|---|
-| `haproxy.preprod.cfg` | Pre-production all-in-one **xbox2** (192.168.222.202): HAProxy + Node + Postgres Primary/Replica + Redis on one box | `127.0.0.1:40000` |
+| `haproxy.preprod.cfg` | Pre-production all-in-one **xbox0** (192.168.222.200): HAProxy + Node + Postgres Primary/Replica + Redis on one box | `127.0.0.1:40000` |
 | `haproxy.prod.cfg` | Final production: standalone HAProxy box → web cluster (Node + local replica each) → standalone Postgres Primary | xbox3–xbox9 `:40000` (edit IPs) |
 
 Both: Cloudflare-only on :80/:443, every non-canonical host → `https://tutamall.com` 301, `/health` checks, no sticky sessions, optional Nginx basic-auth gate (`be_nginx_gate` → Nginx :41000 → `fe_web` 127.0.0.1:50000 → `be_app`), stats on :9900 limited to localhost + 192.168.44.104.
@@ -40,11 +40,11 @@ Config uses:
 
 - `stats socket /run/haproxy/admin.sock`
 
-On some systems the path is `/var/run/haproxy/admin.sock` (symlink to `/run`). Use the path that exists on xbox2.
+On some systems the path is `/var/run/haproxy/admin.sock` (symlink to `/run`). Use the path that exists on xbox0.
 
 ## Show backend status (hashow)
 
-Source this on xbox2 (or add to `~/.bashrc`) to show backend server state. Socket path must match the server (e.g. `/run/haproxy/admin.sock` or `/var/run/haproxy/admin.sock`):
+Source this on xbox0 (or add to `~/.bashrc`) to show backend server state. Socket path must match the server (e.g. `/run/haproxy/admin.sock` or `/var/run/haproxy/admin.sock`):
 
 ```bash
 hashow() {

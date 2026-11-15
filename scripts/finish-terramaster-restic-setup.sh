@@ -11,8 +11,8 @@ scp -o IdentitiesOnly=yes -i "${DEPLOY_SSH_KEY:-$HOME/.ssh/xbox2.pem}" -P "${DEP
   "$ROOT/scripts/ubuntu-backups/backup-postgres.sh" \
   "$ROOT/scripts/ubuntu-backups/terramaster-enclosure-power.sh" \
   "$ROOT/scripts/ubuntu-backups/apply-terramaster-default-offline.sh" \
-  lawsen0@192.168.222.202:~/backups/scripts/
-bash "$ROOT/scripts/deploy-ssh-mac.sh" lawsen0@192.168.222.202 \
+  lawsen0@192.168.222.200:~/backups/scripts/
+bash "$ROOT/scripts/deploy-ssh-mac.sh" lawsen0@192.168.222.200 \
   'chmod 700 ~/backups/scripts/backup-nightly.sh ~/backups/scripts/terramaster-enclosure-power.sh ~/backups/scripts/apply-terramaster-default-offline.sh'
 
 echo "== apply-terramaster-default-offline (fstab noauto + boot soft-park unit) =="
@@ -23,11 +23,11 @@ echo "== Cron line (root) =="
 
 echo "== Wake / mount self-test =="
 "$SUDO" bash ~/backups/scripts/terramaster-enclosure-power.sh wake
-bash "$ROOT/scripts/deploy-ssh-mac.sh" lawsen0@192.168.222.202 'findmnt /mnt/terramaster; lsblk -o NAME,SIZE,MOUNTPOINT | grep sd'
+bash "$ROOT/scripts/deploy-ssh-mac.sh" lawsen0@192.168.222.200 'findmnt /mnt/terramaster; lsblk -o NAME,SIZE,MOUNTPOINT | grep sd'
 
 echo "== Soft spin-down self-test =="
 "$SUDO" bash ~/backups/scripts/terramaster-enclosure-power.sh sleep
-bash "$ROOT/scripts/deploy-ssh-mac.sh" lawsen0@192.168.222.202 \
+bash "$ROOT/scripts/deploy-ssh-mac.sh" lawsen0@192.168.222.200 \
   'lsblk -o NAME,SIZE,MOUNTPOINT | grep sd; test -b /dev/sdb && echo "sdb still present (good for auto-wake)" || echo "WARNING: sdb missing"'
 
 echo "== Done. Nightly cron uses backup-nightly.sh (wake → backup → soft park). =="

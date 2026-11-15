@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/pg-env.sh
 . "${SCRIPT_DIR}/lib/pg-env.sh"
 
-UBUNTU_HOST="${COMPARE_SCHEMA_UBUNTU_HOST:-lawsen0@192.168.222.202}"
+UBUNTU_HOST="${COMPARE_SCHEMA_UBUNTU_HOST:-lawsen0@192.168.222.200}"
 SSH_BIN="${COMPARE_SCHEMA_SSH_BIN:-${SCRIPT_DIR}/deploy-ssh-mac.sh}"
 VERBOSE=0
 
@@ -31,7 +31,7 @@ SSH defaults (same as f2 / isdbsame): port 59221, IdentitiesOnly, ~/.ssh/xbox2.p
 Override: COMPARE_SCHEMA_SSH_BIN, DEPLOY_SSH_KEY, DEPLOY_SSH_PORT (see deploy-ssh-mac.sh).
 
 Environment:
-  COMPARE_SCHEMA_UBUNTU_HOST   SSH target (default lawsen0@192.168.222.202)
+  COMPARE_SCHEMA_UBUNTU_HOST   SSH target (default lawsen0@192.168.222.200)
   COMPARE_SCHEMA_CHECK_VPN     1 = run checkVpn first if available (default 1)
   BE_ENV_FILE                  Mac env file (default ~/.ssh/be/.env)
 EOF

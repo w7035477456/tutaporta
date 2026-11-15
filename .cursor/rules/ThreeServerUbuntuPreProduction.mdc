@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Three-server Ubuntu pre-production (xbox1 + xbox3 + xbox4)
 
-Previously all development ran on one **All-in-1** Ubuntu server, **xbox2 (`192.168.222.202`)** — HAProxy/Nginx, Postgres Primary, and the web server (FE + BE) on one box, no switch, to keep power usage down (see `all-in-1UbuntuDevelopment.mdc`).
+Previously all development ran on one **All-in-1** Ubuntu server, **xbox0 (`192.168.222.200`)** — formerly called xbox2 — HAProxy/Nginx, Postgres Primary, and the web server (FE + BE) on one box, no switch, to keep power usage down (see `all-in-1UbuntuDevelopment.mdc`).
 
 **Andrew is now transitioning to semi-production-ready, using three Ubuntu servers:**
 
@@ -14,7 +14,7 @@ Previously all development ran on one **All-in-1** Ubuntu server, **xbox2 (`192.
 | **xbox1** | `192.168.202.201` | 1) **Postgres DB, Primary** 2) **HAProxy / Nginx** |
 | **xbox3** | `192.168.202.203` | 1) **Postgres DB, Replica** 2) **Webserver, FE & BE** |
 | **xbox4** | `192.168.202.204` | 1) **Webserver, FE & BE** (second web server, same role as xbox3) 2) **Two NVIDIA P100 GPUs for running LLMs** |
-| ~~xbox2~~ | ~~`192.168.222.202`~~ | **Shut off** (All-in-1 development box retired) |
+| ~~xbox0 (ex-xbox2)~~ | ~~`192.168.222.200`~~ | **Shut off** (All-in-1 development box retired) |
 
 ## Network layout
 
@@ -68,5 +68,5 @@ The development machines do **not** use the pre-production split above. Everythi
   - **Deploys go to both web servers** (xbox3 and xbox4) so they always run the same FE/BE build.
   - **LLM workloads run on xbox4** (two P100 GPUs). xbox3 has no GPU, so LLM requests landing on xbox3 must be forwarded to xbox4 rather than run locally.
 - **Schema parity:** DDL is applied on the Primary (xbox1); the Replica (xbox3) follows via replication. Mac ↔ Ubuntu parity checks (`isdbsame`) compare against the Primary.
-- **SSH:** same hardening as `ssh.mdc` (port `59221`, `IdentitiesOnly`, `~/.ssh/xbox2.pem` key unless Andrew provides new keys). Scripts / aliases that still hard-code `192.168.222.202` (xbox2) must be pointed at xbox1 / xbox3 / xbox4 as the cutover happens — ask Andrew which host before changing deploy targets.
+- **SSH:** same hardening as `ssh.mdc` (port `59221`, `IdentitiesOnly`, `~/.ssh/xbox2.pem` key unless Andrew provides new keys). Scripts / aliases that still hard-code `192.168.222.200` (xbox2) must be pointed at xbox1 / xbox3 / xbox4 as the cutover happens — ask Andrew which host before changing deploy targets.
 - **Config files** listed in `ubuntu_config_files.mdc` now split by role: HAProxy, Nginx and Postgres Primary configs on xbox1; FE/BE `.env` on both xbox3 and xbox4 (kept in sync); Postgres Replica configs on xbox3.

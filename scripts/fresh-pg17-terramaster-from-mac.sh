@@ -9,7 +9,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SSH="$ROOT/scripts/deploy-ssh-mac.sh"
 SUDO="$ROOT/scripts/ubuntu-sudo.sh"
-HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.202}"
+HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.200}"
 
 SKIP_PG=0
 SKIP_FORMAT=0

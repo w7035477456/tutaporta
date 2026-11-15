@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mac → Ubuntu hardened SSH (same options as f2 alias / ~/.ssh/config Host xbox2).
+# Mac → Ubuntu hardened SSH (same options as f0/f2 alias / ~/.ssh/config Host xbox0).
 # Used by deploy-all.sh when DEPLOY_SSH_BIN points here.
 #
 # Override key/port if needed:
@@ -17,7 +17,7 @@ ASKPASS="$(cd "$(dirname "$0")" && pwd)/deploy-ssh-askpass.sh"
 
 if [[ ! -r "$KEY" ]]; then
   echo "deploy-ssh-mac: key not readable: $KEY" >&2
-  echo "Copy the xbox2 private key to ~/.ssh/xbox2.pem (chmod 600) or set DEPLOY_SSH_KEY." >&2
+  echo "Copy the ALL-IN-ONE private key to ~/.ssh/xbox2.pem (filename kept) (chmod 600) or set DEPLOY_SSH_KEY." >&2
   exit 1
 fi
 

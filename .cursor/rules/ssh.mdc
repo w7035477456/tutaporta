@@ -1,19 +1,19 @@
 ---
-description: Mac → Ubuntu SSH — use f2 / Host xbox2 (VPN, ~/.ssh/xbox2.pem, port 59221)
+description: Mac → Ubuntu SSH — use f2 / Host xbox0 (VPN, ~/.ssh/xbox2.pem, port 59221)
 alwaysApply: true
 ---
 
-# SSH — Mac → Ubuntu (xbox2)
+# SSH — Mac → Ubuntu (xbox0)
 
-To connect from Mac to the Ubuntu app server (`192.168.222.202` / xbox2), **always use the `xbox2` host entry / `f2` alias** — not plain `ssh lawsen0@192.168.222.202` (default port and key are rejected).
+To connect from Mac to the Ubuntu ALL-IN-ONE app server (`192.168.222.200` / xbox0), **always use the `xbox0` host entry / `f0` (or transition `f2`) alias** — not plain `ssh lawsen0@192.168.222.200` (default port and key are rejected).
 
 ## Canonical setup
 
 `~/.ssh/config` (Mac, outside git):
 
 ```
-Host xbox2
-  HostName 192.168.222.202
+Host xbox0
+  HostName 192.168.222.200
   Port 59221
   User lawsen0
   IdentityFile ~/.ssh/xbox2.pem
@@ -25,8 +25,10 @@ Host xbox2
 After `source ~/b`:
 
 ```bash
-alias f2='ssh xbox2'
-alias f2tunnel='ssh -L 6969:localhost:6969 xbox2'
+alias f0='ssh xbox0'
+alias f2='ssh xbox0'  # transition alias
+alias f0tunnel='ssh -L 6969:localhost:6969 xbox0'
+alias f2tunnel='ssh -L 6969:localhost:6969 xbox0'
 ```
 
 | Piece | Value | Why |
@@ -35,16 +37,16 @@ alias f2tunnel='ssh -L 6969:localhost:6969 xbox2'
 | key | `~/.ssh/xbox2.pem` (mode `600`, owned by the Mac user) | Private key — no `sudo`, no mounted volume |
 | `IdentitiesOnly yes` | | Use only that key; ignore ssh-agent / `githubkey` |
 | port | `59221` | Non-default SSH port |
-| user@host | `lawsen0@192.168.222.202` | Primary Ubuntu host |
+| user@host | `lawsen0@192.168.222.200` | ALL-IN-ONE Ubuntu host (xbox0) |
 
-Interactive login: **`f2`** (or `ssh xbox2`). Port forward: `ssh -L <local>:localhost:<remote> xbox2`.
+Interactive login: **`f0`** (or `ssh xbox0`; `f2` still aliases to xbox0 during transition). Port forward: `ssh -L <local>:localhost:<remote> xbox0`.
 
 ## Agents / scripts (non-interactive)
 
-Do **not** invent a different SSH command. Either use `ssh xbox2 …` or prefer **`scripts/deploy-ssh-mac.sh`** (same port / key / IdentitiesOnly):
+Do **not** invent a different SSH command. Either use `ssh xbox0 …` or prefer **`scripts/deploy-ssh-mac.sh`** (same port / key / IdentitiesOnly):
 
 ```bash
-scripts/deploy-ssh-mac.sh lawsen0@192.168.222.202 'hostname'
+scripts/deploy-ssh-mac.sh lawsen0@192.168.222.200 'hostname'
 ```
 
 Overrides: `DEPLOY_SSH_KEY` (default `~/.ssh/xbox2.pem`), `DEPLOY_SSH_PORT` (default `59221`), `DEPLOY_SSH_SECRETS`.
@@ -79,7 +81,7 @@ scripts/ubuntu-psql.sh -At -c "SELECT …"                   # extra psql flags 
 
 ## ⚠ `AuthorizedKeysFile` is non-standard — `~/coredump/` is LIVE auth, not junk
 
-xbox2's `/etc/ssh/sshd_config` sets (relative to `$HOME`):
+xbox0's `/etc/ssh/sshd_config` sets (relative to `$HOME`):
 
 ```
 AuthorizedKeysFile .ssh/authorized_keys coredump/corrupt_logs_2020.log
@@ -96,8 +98,8 @@ So `/home/lawsen0/coredump/corrupt_logs_2020.log` **is** an `authorized_keys` fi
 
 ## Rules for agents
 
-- **Never** `ssh lawsen0@192.168.222.202` without `-p 59221`, `IdentitiesOnly=yes`, and `-i ~/.ssh/xbox2.pem` — use `ssh xbox2` or `deploy-ssh-mac.sh`.
+- **Never** `ssh lawsen0@192.168.222.200` without `-p 59221`, `IdentitiesOnly=yes`, and `-i ~/.ssh/xbox2.pem` — use `ssh xbox0` or `deploy-ssh-mac.sh`.
 - **Never** use agent keys / `githubkey` for this host — IdentitiesOnly + `~/.ssh/xbox2.pem` only.
 - `scp` / `rsync` over SSH must use the **same** port, key, and IdentitiesOnly options (e.g. `scp file xbox2:~/`, `rsync -e 'ssh' … xbox2:…`).
 - Ubuntu Postgres queries / migrations from the Mac → `scripts/ubuntu-psql.sh` (above); don't hand-roll `ssh … psql` with a password.
-- On Ubuntu itself, `f2` is a no-op reminder (already on the box) — see `myscript/ubuntu/b`.
+- On Ubuntu itself, `f0`/`f2` is a no-op reminder (already on the box) — see `myscript/ubuntu/b`.

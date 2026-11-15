@@ -18,7 +18,7 @@ if [[ "${1:-}" == ubuntu ]]; then
   shift
   args=""
   for a in "$@"; do args+=" $(printf '%q' "$a")"; done
-  exec "$SCRIPT_DIR/deploy-ssh-mac.sh" "${UBUNTU_SSH_HOST:-lawsen0@192.168.222.202}" \
+  exec "$SCRIPT_DIR/deploy-ssh-mac.sh" "${UBUNTU_SSH_HOST:-lawsen0@192.168.222.200}" \
     "bash \$HOME/code/main/scripts/raffle-log.sh$args"
 fi
 

@@ -13,7 +13,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SECRETS="${DEPLOY_SSH_SECRETS:-$HOME/.ssh/be/.env}"
-SSH_HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.202}"
+SSH_HOST="${UBUNTU_SSH_HOST:-lawsen0@192.168.222.200}"
 
 if [[ $# -lt 1 ]]; then
   sed -n '2,10p' "$0" >&2
