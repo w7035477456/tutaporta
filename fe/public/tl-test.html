@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>tutalink test — source &amp; count</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, sans-serif; color: #1a1a1a; }
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+    p.sub { color: #555; margin: 0 0 1.25rem; font-size: 0.95rem; }
+    label { display: block; font-size: 0.8rem; color: #444; margin: 0.6rem 0 0.2rem; }
+    input, button { font: inherit; }
+    input { width: 100%; box-sizing: border-box; padding: 0.45rem 0.55rem; border: 1px solid #ccc; border-radius: 4px; }
+    .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.85rem; }
+    button { padding: 0.45rem 0.85rem; border: 1px solid #333; background: #111; color: #fff; border-radius: 4px; cursor: pointer; }
+    button.secondary { background: #fff; color: #111; }
+    button.fb { background: #1877f2; border-color: #166fe5; color: #fff; }
+    button.gg { background: #ea4335; border-color: #d33828; color: #fff; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    pre { background: #f4f4f4; padding: 0.75rem; overflow: auto; font-size: 0.8rem; border-radius: 4px; }
+    .ok { color: #0a7a2f; }
+    .err { color: #b00020; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+    @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
+    .card { border: 1px solid #ddd; border-radius: 6px; padding: 0.75rem; }
+    .card h2 { font-size: 0.9rem; margin: 0 0 0.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    td, th { text-align: left; padding: 0.2rem 0.3rem; border-bottom: 1px solid #eee; }
+    .big { font-size: 2rem; font-weight: 700; }
+    .fb-num { color: #1877f2; }
+    .gg-num { color: #ea4335; }
+  </style>
+</head>
+<body>
+  <h1>tutalink — source &amp; count</h1>
+  <p class="sub">Create a short link, simulate Facebook/Google ad clicks (<code>utm_source</code>), then read counts. Served by tl on :4100 (or via Vite proxy from main).</p>
+
+  <label>API key (X-API-Key) — kept in sessionStorage only</label>
+  <input id="apiKey" type="password" autocomplete="off" placeholder="from ~/.ssh/tutalink/.env TUTALINK_API_KEY" />
+
+  <label>Destination URL (source)</label>
+  <input id="url" value="https://tutamall.com/mall" />
+
+  <label>Custom code (optional)</label>
+  <input id="code" value="tldev" placeholder="3–32 chars [a-zA-Z0-9_-]" />
+
+  <label>utm_campaign for click</label>
+  <input id="utmCampaign" value="spring" />
+
+  <div class="row">
+    <button id="btnCreate" type="button">1. Create short link</button>
+    <button id="btnFb" class="fb" type="button">Simulate Facebook Click</button>
+    <button id="btnGg" class="gg" type="button">Simulate Google Click</button>
+    <button id="btnStats" class="secondary" type="button">Refresh stats / count</button>
+  </div>
+
+  <p id="msg" class="sub"></p>
+  <p id="short" class="sub"></p>
+
+  <div class="stats">
+    <div class="card">
+      <h2>Total clicks</h2>
+      <div class="big" id="total">—</div>
+    </div>
+    <div class="card">
+      <h2>Facebook clicks</h2>
+      <div class="big fb-num" id="fbCount">—</div>
+    </div>
+    <div class="card">
+      <h2>Google clicks</h2>
+      <div class="big gg-num" id="ggCount">—</div>
+    </div>
+    <div class="card">
+      <h2>Top utm_source</h2>
+      <div id="sources"><em>none yet</em></div>
+    </div>
+    <div class="card">
+      <h2>Top utm_campaign</h2>
+      <div id="campaigns"><em>none yet</em></div>
+    </div>
+    <div class="card">
+      <h2>Top referrers</h2>
+      <div id="referrers"><em>none yet</em></div>
+    </div>
+  </div>
+
+  <label style="margin-top:1.25rem">Raw JSON</label>
+  <pre id="raw">{}</pre>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const KEY_STORE = 'tutalink.test.apiKey';
+    const CODE_STORE = 'tutalink.test.code';
+
+    $('apiKey').value = sessionStorage.getItem(KEY_STORE) || '';
+    $('code').value = sessionStorage.getItem(CODE_STORE) || $('code').value;
+
+    function apiBase() {
+      if (location.port === '4100' || location.pathname.includes('tl-test')) {
+        return '';
+      }
+      return 'http://127.0.0.1:4100';
+    }
+
+    function key() {
+      const k = $('apiKey').value.trim();
+      sessionStorage.setItem(KEY_STORE, k);
+      return k;
+    }
+
+    function activeCode() {
+      const c = $('code').value.trim();
+      sessionStorage.setItem(CODE_STORE, c);
+      return c;
+    }
+
+    function setMsg(text, ok) {
+      $('msg').textContent = text;
+      $('msg').className = ok ? 'ok' : 'err';
+    }
+
+    function namedTable(list) {
+      if (!list || !list.length) return '<em>none</em>';
+      const rows = list.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td>${r.count}</td></tr>`).join('');
+      return `<table><thead><tr><th>name</th><th>count</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function countForSource(list, name) {
+      if (!list) return 0;
+      const hit = list.find((r) => String(r.name).toLowerCase() === name.toLowerCase());
+      return hit ? hit.count : 0;
+    }
+
+    function renderStats(stats) {
+      $('total').textContent = stats.totalClicks ?? '—';
+      $('fbCount').textContent = countForSource(stats.topUtmSources, 'facebook');
+      $('ggCount').textContent = countForSource(stats.topUtmSources, 'google');
+      $('sources').innerHTML = namedTable(stats.topUtmSources);
+      $('campaigns').innerHTML = namedTable(stats.topUtmCampaigns);
+      $('referrers').innerHTML = namedTable(stats.topReferrers);
+      $('raw').textContent = JSON.stringify(stats, null, 2);
+    }
+
+    async function createLink() {
+      const k = key();
+      if (!k) { setMsg('API key required', false); return; }
+      const body = { url: $('url').value.trim() };
+      const code = activeCode();
+      if (code) body.customCode = code;
+      const res = await fetch(`${apiBase()}/tutalink/api/links`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': k },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+      $('raw').textContent = JSON.stringify(data, null, 2);
+      if (!res.ok) { setMsg(`Create failed: ${res.status}`, false); return; }
+      $('code').value = data.code;
+      sessionStorage.setItem(CODE_STORE, data.code);
+      $('short').innerHTML = `Short URL: <a href="${escapeHtml(data.shortUrl)}" target="_blank" rel="noopener">${escapeHtml(data.shortUrl)}</a>`;
+      setMsg(`Created ${data.code}`, true);
+      await refreshStats();
+    }
+
+    async function simulateClick(utmSource) {
+      const code = activeCode();
+      if (!code) { setMsg('Set a code first', false); return; }
+      const qs = new URLSearchParams({
+        utm_source: utmSource,
+        utm_campaign: $('utmCampaign').value.trim() || 'spring'
+      });
+      const res = await fetch(`${apiBase()}/l/${encodeURIComponent(code)}?${qs}`, {
+        method: 'GET',
+        redirect: 'manual'
+      });
+      if (res.status === 302 || res.status === 0 || res.type === 'opaqueredirect') {
+        setMsg(`${utmSource} click recorded for ${code} — loading counts…`, true);
+        await new Promise((r) => setTimeout(r, 600));
+        await refreshStats();
+      } else {
+        setMsg(`Unexpected click response: ${res.status}`, false);
+      }
+    }
+
+    async function refreshStats() {
+      const k = key();
+      const code = activeCode();
+      if (!k || !code) { setMsg('API key and code required', false); return; }
+      const res = await fetch(`${apiBase()}/tutalink/api/links/${encodeURIComponent(code)}/stats`, {
+        headers: { 'X-API-Key': k }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(`Stats failed: ${res.status}`, false);
+        $('raw').textContent = JSON.stringify(data, null, 2);
+        return;
+      }
+      renderStats(data);
+      const fb = countForSource(data.topUtmSources, 'facebook');
+      const gg = countForSource(data.topUtmSources, 'google');
+      setMsg(`Stats for ${code}: total ${data.totalClicks} · facebook ${fb} · google ${gg}`, true);
+    }
+
+    $('btnCreate').onclick = () => createLink().catch((e) => setMsg(String(e), false));
+    $('btnFb').onclick = () => simulateClick('facebook').catch((e) => setMsg(String(e), false));
+    $('btnGg').onclick = () => simulateClick('google').catch((e) => setMsg(String(e), false));
+    $('btnStats').onclick = () => refreshStats().catch((e) => setMsg(String(e), false));
+  </script>
+</body>
+</html>

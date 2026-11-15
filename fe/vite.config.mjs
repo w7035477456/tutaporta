@@ -109,7 +109,16 @@ export default defineConfig(({ mode }) => {
           res.end(JSON.stringify({ serverDown: true }));
         });
       }
-    }
+    },
+
+  '/l': {
+    target: 'http://127.0.0.1:4100',
+    changeOrigin: true
+  },
+  '/tutalink': {
+    target: 'http://127.0.0.1:4100',
+    changeOrigin: true
+  },
   };
 
   return {

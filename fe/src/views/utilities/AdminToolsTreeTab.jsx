@@ -73,16 +73,18 @@ function filePath(folderPath, name) {
   return folderPath ? `${folderPath}/${name}` : name;
 }
 
-function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onOpenFile, onLoadFiles, isRoot = false, totalLabel = '' }) {
+function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onOpenFile, onLoadFiles, isRoot = false }) {
   const isOpen = expanded.has(node.path);
   const hasContent = node.children.length > 0 || node.fileCount > 0;
   const files = filesByPath[node.path];
   const marker = hasContent ? (isOpen ? '▾' : '▸') : ' ';
+  const folderTotal = node.totalLabel || '';
+  const showTotal = folderTotal && (isRoot || (node.totalBytes || 0) > 0);
   return (
     <>
       <Box sx={{ ...rowSx, pl: `${depth * INDENT_CH}ch` }} onClick={() => onToggle(rootKey, node)}>
         {`${marker} ${isRoot ? '' : '|-- '}${node.name}/`}
-        {isRoot && totalLabel ? `  (${totalLabel})` : ''}
+        {showTotal ? `  (total=${folderTotal})` : ''}
         {node.fileCount > 0 ? `  (${node.fileCount} files)` : ''}
       </Box>
       {isOpen ? (
@@ -132,6 +134,8 @@ const treeNodeShape = PropTypes.shape({
   name: PropTypes.string,
   path: PropTypes.string,
   fileCount: PropTypes.number,
+  totalBytes: PropTypes.number,
+  totalLabel: PropTypes.string,
   children: PropTypes.array
 });
 
@@ -144,8 +148,7 @@ FolderNode.propTypes = {
   filesByPath: PropTypes.object.isRequired,
   onOpenFile: PropTypes.func.isRequired,
   onLoadFiles: PropTypes.func.isRequired,
-  isRoot: PropTypes.bool,
-  totalLabel: PropTypes.string
+  isRoot: PropTypes.bool
 };
 
 function TreePanel({ data, expanded, onToggle, filesByPath, onOpenFile, onLoadFiles, onExpandAll, onCollapseAll }) {
@@ -179,7 +182,6 @@ function TreePanel({ data, expanded, onToggle, filesByPath, onOpenFile, onLoadFi
             onOpenFile={onOpenFile}
             onLoadFiles={onLoadFiles}
             isRoot
-            totalLabel={data.totalLabel}
           />
         ) : null}
         {data?.truncated ? <Box sx={{ color: '#fc0' }}>{`... stopped after ${data.maxFolders} folders`}</Box> : null}

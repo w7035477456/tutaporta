@@ -131,8 +131,9 @@ export async function resolveStoragePath(rootKey, relPath) {
 }
 
 /**
- * Folder tree (folders only, with per-folder file count) for one storage root.
- * Node: { name, path, fileCount, children }. `path` is relative to the root ('' for the root).
+ * Folder tree (folders only, with per-folder file count + recursive size) for one storage root.
+ * Node: { name, path, fileCount, totalBytes, totalLabel, children }.
+ * `path` is relative to the root ('' for the root). `totalBytes` / `totalLabel` include nested files.
  */
 async function buildTree(rootKey) {
   const envVar = STORAGE_ROOT_ENV[rootKey];
@@ -144,12 +145,11 @@ async function buildTree(rootKey) {
     return { rootKey, envVar, root: root || null, tree: null, totalBytes: 0, truncated: false, error: err?.message || String(err) };
   }
 
-  let totalBytes = 0;
   let folders = 0;
   let truncated = false;
 
   async function walk(dir, rel, name) {
-    const node = { name, path: rel, fileCount: 0, children: [] };
+    const node = { name, path: rel, fileCount: 0, totalBytes: 0, totalLabel: '0B', children: [] };
     let entries;
     try {
       entries = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -166,7 +166,8 @@ async function buildTree(rootKey) {
           .catch(() => 0)
       )
     );
-    for (const size of sizes) totalBytes += size;
+    let bytes = 0;
+    for (const size of sizes) bytes += size;
 
     const subdirs = entries
       .filter((e) => e.isDirectory())
@@ -178,13 +179,26 @@ async function buildTree(rootKey) {
         break;
       }
       folders += 1;
-      node.children.push(await walk(path.join(dir, sub), rel ? `${rel}/${sub}` : sub, sub));
+      const child = await walk(path.join(dir, sub), rel ? `${rel}/${sub}` : sub, sub);
+      node.children.push(child);
+      bytes += child.totalBytes;
     }
+    node.totalBytes = bytes;
+    node.totalLabel = formatTreeBytes(bytes);
     return node;
   }
 
   const tree = await walk(root, '', path.basename(root));
-  return { rootKey, envVar, root, tree, totalBytes, totalLabel: formatTreeBytes(totalBytes), truncated, maxFolders: MAX_TREE_FOLDERS };
+  return {
+    rootKey,
+    envVar,
+    root,
+    tree,
+    totalBytes: tree.totalBytes,
+    totalLabel: tree.totalLabel,
+    truncated,
+    maxFolders: MAX_TREE_FOLDERS
+  };
 }
 
 export async function buildStorageTrees() {

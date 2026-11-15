@@ -6,9 +6,14 @@ import BusyHourglass from 'ui-component/BusyHourglass';
 import OrangeButton from 'ui-component/OrangeButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { buttonFontSizeResponsive } from 'config/buttonFontEnv';
-import { getDesktopTitleFontSizeVw } from 'config/desktopFontEnv';
 import { useRecordVaultThrottleWaitProgress } from 'utils/recordVaultThrottleWaitProgress';
-import { BUSY_HOURGLASS_SIZE, busyHourglassOverlayRootSx } from 'config/busyHourglassEnv';
+import {
+  BUSY_HOURGLASS_COUNTDOWN_FLOOR,
+  BUSY_HOURGLASS_COUNTDOWN_MS,
+  BUSY_HOURGLASS_SIZE,
+  busyHourglassOverlayRootSx,
+  busyHourglassPercentSx
+} from 'config/busyHourglassEnv';
 import {
   getRecordVaultOverageThrottleActive,
   getRecordVaultOverageThrottleFactor,
@@ -26,7 +31,9 @@ import VaultOverageThrottleNotice from 'ui-component/VaultOverageThrottleNotice'
 /**
  * Full-viewport centered spinning hourglass — site-wide busy indicator.
  * Renders via portal so it stays centered over modals and page chrome.
- * Optional progressPercent (0–100) shows "% done" plus an optional status label.
+ * Always shows remaining % counting down toward 0% (then done when parent closes).
+ * progressPercent from callers is "% complete" (0–100 ascending); display is 100−that.
+ * With no progressPercent, runs an estimated countdown (never hits 0 until closed).
  * Optional progressDetail (e.g. "310mb of 1055mb done") renders directly under the percent.
  * Optional actionLabel + onAction (e.g. Skip OneDrive) for long waits.
  * When TutaNotes / TutaPhotoAlbums data-limit throttle is active, appends a REFILL notice (once —
@@ -86,13 +93,37 @@ export default function BusyHourglassOverlay({
     return () => clearInterval(timerId);
   }, [throttledOpen]);
 
+  const callerPercent = progressPercent != null && Number.isFinite(Number(progressPercent)) ? Number(progressPercent) : null;
+  const hasRealProgress = callerPercent != null || throttleWaitPercent != null;
+
+  // No caller/throttle progress: animate remaining % 100 → floor while open (hits 0 only when closed).
+  const [indeterminateRemaining, setIndeterminateRemaining] = useState(100);
+  useEffect(() => {
+    if (!open) {
+      setIndeterminateRemaining(100);
+      return undefined;
+    }
+    if (hasRealProgress) return undefined;
+    const startedAt = Date.now();
+    setIndeterminateRemaining(100);
+    const timerId = setInterval(() => {
+      const t = Math.max(0, (Date.now() - startedAt) / BUSY_HOURGLASS_COUNTDOWN_MS);
+      const remaining = Math.max(BUSY_HOURGLASS_COUNTDOWN_FLOOR, Math.round(100 * Math.exp(-2.2 * t)));
+      setIndeterminateRemaining(remaining);
+    }, 200);
+    return () => clearInterval(timerId);
+  }, [open, hasRealProgress]);
+
   if (!open || typeof document === 'undefined') return null;
 
-  const callerPercent = progressPercent != null && Number.isFinite(Number(progressPercent)) ? Number(progressPercent) : null;
-  const showPercent = callerPercent != null || throttleWaitPercent != null;
-  const clampedPercent = showPercent
+  // Callers pass "% complete" ascending; UI shows remaining counting down to 0%.
+  const donePercent = hasRealProgress
     ? Math.max(0, Math.min(100, Math.round(callerPercent != null ? callerPercent : throttleWaitPercent)))
     : null;
+  const remainingPercent =
+    donePercent != null ? Math.max(0, Math.min(100, 100 - donePercent)) : indeterminateRemaining;
+  const showPercent = true;
+  const clampedPercent = remainingPercent;
   // Backend may embed the REFILL line in progressLabel; keep only the upload/status
   // lines here so the yellow throttleNotice below is not duplicated.
   const statusLines = String(progressLabel || '')
@@ -106,21 +137,15 @@ export default function BusyHourglassOverlay({
   // A live throttle percent is the most useful number; otherwise, when we know the
   // request is being throttled, at least show how long it has been waiting.
   const waitingText =
-    throttledOpen && !showPercent && elapsedSec > 0
-      ? `${elapsedSec}s waiting`
-      : throttledOpen && showPercent && elapsedSec > 0
-        ? `${elapsedSec}s elapsed`
-        : throttledOpen && elapsedSec === 0
-          ? 'Transfer in progress…'
-          : '';
-  const detailText = showPercent ? String(progressDetail || '').trim() : '';
+    throttledOpen && elapsedSec > 0
+      ? `${elapsedSec}s elapsed`
+      : throttledOpen && elapsedSec === 0
+        ? 'Transfer in progress…'
+        : '';
+  const detailText = String(progressDetail || '').trim();
   const showSideText = showPercent || Boolean(statusText) || showThrottleNotice || Boolean(waitingText);
   const percentText =
-    clampedPercent == null
-      ? ''
-      : callerPercent == null
-        ? `${clampedPercent}% of throttled wait`
-        : `${clampedPercent}% done`;
+    remainingPercent <= 0 ? '0% — done' : `${remainingPercent}%`;
   const ariaLabel = [
     label,
     percentText,
@@ -149,7 +174,6 @@ export default function BusyHourglassOverlay({
     maxWidth: { xs: '70vw', sm: '36rem' },
     whiteSpace: 'pre-line'
   };
-  const percentColor = yellowPanel ? '#000' : 'var(--theme-yellow-color)';
   const throttleColor = yellowPanel ? '#b00020' : 'var(--theme-yellow-color)';
 
   const statusColumn = showSideText ? (
@@ -158,19 +182,8 @@ export default function BusyHourglassOverlay({
         <Box
           component="p"
           sx={{
-            m: 0,
-            fontFamily: MAIN_FONT_FAMILY,
-            fontWeight: 800,
-            fontSize: {
-              xs: '1.35rem',
-              sm: getDesktopTitleFontSizeVw()
-            },
-            lineHeight: 1.2,
-            color: percentColor,
-            WebkitTextFillColor: percentColor,
-            textAlign: 'left',
-            textShadow: yellowPanel ? 'none' : '0 1px 0 #000',
-            whiteSpace: 'nowrap'
+            ...busyHourglassPercentSx,
+            fontFamily: MAIN_FONT_FAMILY
           }}
         >
           {percentText}

@@ -5,6 +5,6 @@ alwaysApply: true
 
 # Model selection — every prompt
 
-Use DeepSeek V4.1 Flash 1017 high ONLY.
+Use Auto model only.
 
 Do not use any other models.

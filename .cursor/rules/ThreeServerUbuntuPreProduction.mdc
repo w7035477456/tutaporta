@@ -1,5 +1,5 @@
 ---
-description: Ubuntu pre-production (xbox1 + xbox3 + xbox4, Dell S6000 40 Gb switch) — replaces the All-in-1 xbox2 development box
+description: Ubuntu pre-production (xbox1 + xbox2 + xbox3, Dell S6000 40 Gb switch) — replaces the All-in-1 xbox0 development box
 alwaysApply: true
 ---
 
@@ -12,9 +12,9 @@ Previously all development ran on one **All-in-1** Ubuntu server, **xbox0 (`192.
 | Server | IP | Holds |
 |--------|----|-------|
 | **xbox1** | `192.168.202.201` | 1) **Postgres DB, Primary** 2) **HAProxy / Nginx** |
-| **xbox3** | `192.168.202.203` | 1) **Postgres DB, Replica** 2) **Webserver, FE & BE** |
-| **xbox4** | `192.168.202.204` | 1) **Webserver, FE & BE** (second web server, same role as xbox3) 2) **Two NVIDIA P100 GPUs for running LLMs** |
-| ~~xbox0 (ex-xbox2)~~ | ~~`192.168.222.200`~~ | **Shut off** (All-in-1 development box retired) |
+| **xbox2** | `192.168.202.202` | 1) **Postgres DB, Replica** 2) **Webserver, FE & BE** |
+| **xbox3** | `192.168.202.203` | 1) **Webserver, FE & BE** (second web server, same role as xbox3) 2) **Two NVIDIA P100 GPUs for running LLMs** |
+| ~~xbox0 ~~ | ~~`192.168.222.200`~~ | **Shut off** (All-in-1 development box retired) |
 
 ## Network layout
 
