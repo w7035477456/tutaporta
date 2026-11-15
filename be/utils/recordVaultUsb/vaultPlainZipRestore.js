@@ -8,6 +8,7 @@ import {
   VAULT_DIR_NAME,
   VAULT_META_FILE
 } from './vaultPaths.js';
+import { deleteNotesMemberVault } from './vaultPgStore.js';
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];
@@ -56,8 +57,9 @@ export function resolveVaultRootFromExtractedDir(extractDir) {
 /**
  * Drop the live TutaNotes vault so restore can copy into a clean tree.
  * Unlink photos/ first when it is a symlink (do not follow it and wipe sibling photos/).
+ * When `singlesId` is set, clear the Postgres notes index so the next unlock re-imports vault.db.
  */
-export function wipeVaultForPlainZipRestore(mountPath) {
+export async function wipeVaultForPlainZipRestore(mountPath, { singlesId = null } = {}) {
   const vaultRoot = vaultRootOnMount(mountPath);
   const photosRoot = vaultPhotosRoot(mountPath);
   try {
@@ -67,13 +69,16 @@ export function wipeVaultForPlainZipRestore(mountPath) {
     if (err?.code !== 'ENOENT') throw err;
   }
   removeDirRecursive(vaultRoot);
+  if (singlesId != null) {
+    await deleteNotesMemberVault(singlesId);
+  }
 }
 
 /**
  * Extract a plain vault zip into mountPath (parent of TutaNotes/).
  * @returns {{ restoredFiles: number, restoredBytes: number }}
  */
-export async function restorePlainVaultZipToMount(mountPath, zipFilePath) {
+export async function restorePlainVaultZipToMount(mountPath, zipFilePath, { singlesId = null } = {}) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-vault-restore-'));
   const extractDir = path.join(tmpRoot, 'extract');
   fs.mkdirSync(extractDir, { recursive: true });
@@ -90,7 +95,7 @@ export async function restorePlainVaultZipToMount(mountPath, zipFilePath) {
       throw new Error('Vault zip is empty');
     }
 
-    wipeVaultForPlainZipRestore(mountPath);
+    await wipeVaultForPlainZipRestore(mountPath, { singlesId });
     const vaultRoot = vaultRootOnMount(mountPath);
     fs.mkdirSync(vaultRoot, { recursive: true });
     for (const name of fs.readdirSync(sourceRoot)) {

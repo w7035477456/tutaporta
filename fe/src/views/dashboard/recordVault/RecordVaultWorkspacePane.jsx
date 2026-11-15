@@ -1893,7 +1893,16 @@ export default function RecordVaultWorkspacePane({
   const selectedNoteIdRef = useRef(null);
   const loadedNoteIdRef = useRef(null);
   const persistNoteRef = useRef(null);
-  const persistNoteInFlightRef = useRef(false);
+  /** Fire-and-forget leave-note body save (set after voidPersistOutgoingNote is defined). */
+  const voidPersistOutgoingNoteRef = useRef(null);
+  /** noteIds with a body PATCH currently in flight (allows concurrent saves for different notes). */
+  const persistNoteInFlightIdsRef = useRef(new Set());
+  /**
+   * Per-note generation bumped when a leave-note snapshot is taken. A completed PATCH only
+   * updates the tree when its generation is still current — prevents a slower older save from
+   * overwriting a newer background save for the same note after A→B→A rapid switches.
+   */
+  const persistNoteGenerationRef = useRef(new Map());
   /** Notes deleted in this tab — the leave-note flush / late autosave must not PATCH them (404). */
   const deletedNoteIdsRef = useRef(new Set());
   /** Suppress false "Note not found" popup right after a successful mobile/OS attach. */
@@ -2651,57 +2660,15 @@ export default function RecordVaultWorkspacePane({
         setNoteContentLoading(false);
         return;
       }
+      const prevNoteId = selectedNoteIdRef.current;
+      // Priority 3: capture outgoing body sync, save in background — never block note-click
+      // on the full persistNote round-trip. Exit/logoff still awaits via leave-prepare.
+      if (prevNoteId && Number(prevNoteId) !== next) {
+        voidPersistOutgoingNoteRef.current?.(prevNoteId);
+      }
       // Bill Schedule notes are local panels — no vault body fetch.
       if (isBillScheduleSystemId(next)) {
-        void (async () => {
-          const prevNoteId = selectedNoteIdRef.current;
-          if (prevNoteId && !isBillScheduleSystemId(prevNoteId)) {
-            if (saveTimerRef.current) {
-              clearTimeout(saveTimerRef.current);
-              saveTimerRef.current = null;
-            }
-            try {
-              skipSaveRef.current = false;
-              await persistNoteRef.current?.();
-            } catch {
-              // allow switch even if save failed
-            }
-          }
-          loadedNoteIdRef.current = next;
-          loadedDraftKeyRef.current = '';
-          loadedTitleKeyRef.current = '';
-          hydratedDraftKeyRef.current = '';
-          setEditingNoteId(null);
-          setEditingNotebookId(null);
-          setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
-          setRenameUiSurface(null);
-          setOpenNoteTitlePlain('');
-          draftRef.current = { openNoteTitlePlain: '' };
-          setNoteContentLoading(false);
-          setSelectedNoteId(next);
-        })();
-        return;
-      }
-      // TutaCloud/USB note body fetch can take seconds — show hourglass on click, not after await.
-      setNoteContentLoading(true);
-      void (async () => {
-        const prevNoteId = selectedNoteIdRef.current;
-        // Flush debounced body edits before leaving the note (typing → click PPP →
-        // back must keep what was typed). Clear the timer so a late debounce cannot
-        // PATCH after hydration refs are cleared / the next note is selected.
-        if (prevNoteId) {
-          if (saveTimerRef.current) {
-            clearTimeout(saveTimerRef.current);
-            saveTimerRef.current = null;
-          }
-          try {
-            skipSaveRef.current = false;
-            await persistNoteRef.current?.();
-          } catch {
-            // allow switch even if save failed
-          }
-        }
-        loadedNoteIdRef.current = null;
+        loadedNoteIdRef.current = next;
         loadedDraftKeyRef.current = '';
         loadedTitleKeyRef.current = '';
         hydratedDraftKeyRef.current = '';
@@ -2711,8 +2678,23 @@ export default function RecordVaultWorkspacePane({
         setRenameUiSurface(null);
         setOpenNoteTitlePlain('');
         draftRef.current = { openNoteTitlePlain: '' };
+        setNoteContentLoading(false);
         setSelectedNoteId(next);
-      })();
+        return;
+      }
+      // TutaCloud/USB note body fetch can take seconds — show hourglass on click, not after await.
+      setNoteContentLoading(true);
+      loadedNoteIdRef.current = null;
+      loadedDraftKeyRef.current = '';
+      loadedTitleKeyRef.current = '';
+      hydratedDraftKeyRef.current = '';
+      setEditingNoteId(null);
+      setEditingNotebookId(null);
+      setInnerEncryptUiScope(fromNotebook ? 'notebook' : 'note');
+      setRenameUiSurface(null);
+      setOpenNoteTitlePlain('');
+      draftRef.current = { openNoteTitlePlain: '' };
+      setSelectedNoteId(next);
     },
     [replaceMultiSelectedNoteIds]
   );
@@ -3589,72 +3571,136 @@ export default function RecordVaultWorkspacePane({
     setSearchResults((prev) => (Array.isArray(prev) ? prev.map((r) => (Number(r.note_id) === id ? { ...r, note_name: plain } : r)) : prev));
   }, []);
 
-  // Debounced autosave for the note BODY only. The note name is handled separately
-  // by the rename commit paths (see comment below). Guarded so it can never write an
-  // empty/un-hydrated editor over real content.
-  const persistNote = useCallback(async () => {
-    if (!selectedNote || persistNoteInFlightRef.current) return;
-    const noteId = Number(selectedNote.note_id);
-    if (deletedNoteIdsRef.current.has(noteId)) return;
-    // The note NAME is deliberately NOT written here. Names are saved only by the
-    // explicit, uniqueness-checked commit paths (title box blur/Enter and sidebar
-    // rename). Writing the name from this debounced body autosave used the shared
-    // `openNoteTitlePlain` state, which can lag behind the selected note during
-    // quick navigation (several setSelectedNoteId call sites don't reset it) — so
-    // one note's title got copied onto another, and it skipped the duplicate-name
-    // check. Body-only autosave removes that whole class of "same title" bugs.
-    const noteName = String(selectedNote.note_name ?? '');
-    // Never overwrite an encrypted body while it is locked (would destroy ciphertext).
-    const locked = noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(noteId);
-    // CRITICAL: only save the body when the editor is actually showing THIS note's
-    // loaded content. An un-hydrated editor returns an empty "<p></p>" from getHTML(),
-    // so saving that would wipe real text — e.g. a debounced autosave firing during a
-    // rename before the body finished loading. The hydration key is the single source
-    // of truth for "the editor currently holds note N's loaded body".
-    // Key format is `${noteId}:open:clean-vN` (see editor hydrate effect) — accept any
-    // clean-v* suffix so bumping the hydrate version does not silently disable autosave.
-    const hydratedKey = String(editorHydratedRef.current.key || '');
-    const editorHoldsThisNote =
-      loadedNoteIdRef.current === noteId && (hydratedKey === `${noteId}:open` || hydratedKey.startsWith(`${noteId}:open:`));
-    const html = !locked && editorHoldsThisNote ? (noteEditorApiRef.current?.getHTML() ?? null) : null;
-    if (html == null) return;
-    // Background autosave must not flip `busy` — that disables rename/menu clicks.
-    persistNoteInFlightRef.current = true;
-    setError('');
-    try {
-      await vaultApi.updateRecordVaultNote(noteId, { body_text: html });
-      const touchedAt = new Date().toISOString();
-      patchNoteRowInTree(noteId, { body_text: html, content_loaded: true, updated_at: touchedAt });
-      indexNoteSearchText(noteId, stripRecordVaultHtml(html), noteName);
-      touchRecentForNote(noteId, { title: noteName });
-    } catch (err) {
-      const message = readRecordVaultApiError(err, 'Failed to save note');
-      const recentAttach = Date.now() - recentAttachOkAtRef.current < 8000;
-      if (recentAttach && /note not found/i.test(String(message || ''))) {
-        // Attach already succeeded and is visible; a transient 404 on body save
-        // must not scare the user. Retry once, then stay quiet if still failing.
-        if (!attachPersistRetryRef.current) {
-          attachPersistRetryRef.current = true;
-          window.setTimeout(() => {
-            void (async () => {
-              try {
-                await persistNoteRef.current?.();
-              } finally {
-                attachPersistRetryRef.current = false;
-              }
-            })();
-          }, 500);
-        }
+  /**
+   * Sync-capture the editor body for `noteId` if the editor still holds that note.
+   * Used when leaving a note so the HTML is frozen before hydration refs are cleared
+   * and the next note is selected (Priority 3: note-click must not await the PATCH).
+   */
+  const captureNoteBodySnapshot = useCallback(
+    (noteId) => {
+      const id = Number(noteId);
+      if (!Number.isFinite(id) || id < 1 || deletedNoteIdsRef.current.has(id)) return null;
+      if (isBillScheduleSystemId(id)) return null;
+      const row = findNoteRowById(id).note;
+      const noteName = String(row?.note_name ?? selectedNote?.note_name ?? '');
+      const locked =
+        (row && noteHasInnerEncryption(row) && !isInnerNoteUnlocked(id)) ||
+        (!row && selectedNote && Number(selectedNote.note_id) === id && noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(id));
+      if (locked) return null;
+      const hydratedKey = String(editorHydratedRef.current.key || '');
+      const editorHoldsThisNote =
+        loadedNoteIdRef.current === id && (hydratedKey === `${id}:open` || hydratedKey.startsWith(`${id}:open:`));
+      if (!editorHoldsThisNote) return null;
+      const html = noteEditorApiRef.current?.getHTML() ?? null;
+      if (html == null) return null;
+      const generation = (persistNoteGenerationRef.current.get(id) || 0) + 1;
+      persistNoteGenerationRef.current.set(id, generation);
+      return { noteId: id, html, noteName, generation };
+    },
+    [findNoteRowById, selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked]
+  );
+
+  /**
+   * Body-only PATCH for a frozen snapshot (or the currently selected note).
+   * The note NAME is deliberately NOT written here — rename commit paths own that.
+   * Concurrent in-flight saves for different noteIds are allowed; same-note older
+   * generations do not patch the tree after a newer leave-snapshot was taken.
+   */
+  const persistNote = useCallback(
+    async (snapshot = null) => {
+      let noteId;
+      let noteName;
+      let html;
+      let generation;
+      if (snapshot?.html != null && Number.isFinite(Number(snapshot.noteId))) {
+        noteId = Number(snapshot.noteId);
+        noteName = String(snapshot.noteName ?? '');
+        html = snapshot.html;
+        generation = Number(snapshot.generation) || 0;
+      } else {
+        if (!selectedNote) return;
+        noteId = Number(selectedNote.note_id);
+        if (deletedNoteIdsRef.current.has(noteId)) return;
+        if (persistNoteInFlightIdsRef.current.has(noteId)) return;
+        noteName = String(selectedNote.note_name ?? '');
+        const locked = noteHasInnerEncryption(selectedNote) && !isInnerNoteUnlocked(noteId);
+        const hydratedKey = String(editorHydratedRef.current.key || '');
+        const editorHoldsThisNote =
+          loadedNoteIdRef.current === noteId &&
+          (hydratedKey === `${noteId}:open` || hydratedKey.startsWith(`${noteId}:open:`));
+        html = !locked && editorHoldsThisNote ? (noteEditorApiRef.current?.getHTML() ?? null) : null;
+        if (html == null) return;
+        generation = (persistNoteGenerationRef.current.get(noteId) || 0) + 1;
+        persistNoteGenerationRef.current.set(noteId, generation);
+      }
+      if (deletedNoteIdsRef.current.has(noteId)) return;
+      if (persistNoteInFlightIdsRef.current.has(noteId)) {
+        // Another PATCH for this note is already running — bump generation so that
+        // in-flight older save will not clobber tree state when it finishes; queue a
+        // follow-up with this snapshot after a short delay.
+        const follow = { noteId, html, noteName, generation };
+        window.setTimeout(() => {
+          void persistNoteRef.current?.(follow);
+        }, 120);
         return;
       }
-      setError(message);
-    } finally {
-      persistNoteInFlightRef.current = false;
-      bumpVaultUsage();
-    }
-  }, [selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked, patchNoteRowInTree, bumpVaultUsage, vaultApi, touchRecentForNote]);
+      // Background autosave must not flip `busy` — that disables rename/menu clicks.
+      persistNoteInFlightIdsRef.current.add(noteId);
+      setError('');
+      try {
+        await vaultApi.updateRecordVaultNote(noteId, { body_text: html });
+        const stillCurrent = (persistNoteGenerationRef.current.get(noteId) || 0) === generation;
+        if (stillCurrent) {
+          const touchedAt = new Date().toISOString();
+          patchNoteRowInTree(noteId, { body_text: html, content_loaded: true, updated_at: touchedAt });
+          indexNoteSearchText(noteId, stripRecordVaultHtml(html), noteName);
+          touchRecentForNote(noteId, { title: noteName });
+        }
+      } catch (err) {
+        const message = readRecordVaultApiError(err, 'Failed to save note');
+        const recentAttach = Date.now() - recentAttachOkAtRef.current < 8000;
+        if (recentAttach && /note not found/i.test(String(message || ''))) {
+          if (!attachPersistRetryRef.current) {
+            attachPersistRetryRef.current = true;
+            window.setTimeout(() => {
+              void (async () => {
+                try {
+                  await persistNoteRef.current?.({ noteId, html, noteName, generation });
+                } finally {
+                  attachPersistRetryRef.current = false;
+                }
+              })();
+            }, 500);
+          }
+          return;
+        }
+        setError(message);
+      } finally {
+        persistNoteInFlightIdsRef.current.delete(noteId);
+        bumpVaultUsage();
+      }
+    },
+    [selectedNote, noteHasInnerEncryption, isInnerNoteUnlocked, patchNoteRowInTree, bumpVaultUsage, vaultApi, touchRecentForNote]
+  );
 
   persistNoteRef.current = persistNote;
+
+  /** Capture outgoing body and fire-and-forget PATCH (note-click must not await). */
+  const queuePersistOutgoingNote = useCallback(
+    (prevNoteId) => {
+      if (!prevNoteId || isBillScheduleSystemId(prevNoteId)) return;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      skipSaveRef.current = false;
+      const snapshot = captureNoteBodySnapshot(prevNoteId);
+      if (!snapshot) return;
+      void persistNoteRef.current?.(snapshot);
+    },
+    [captureNoteBodySnapshot]
+  );
+  voidPersistOutgoingNoteRef.current = queuePersistOutgoingNote;
 
   /**
    * Upload one dropped file to the selected note and embed it inline in the note

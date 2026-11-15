@@ -106,6 +106,17 @@ const PHOTO_ALBUM_INDEX_TABLES = [
   'photo_albums_note_extra_images'
 ];
 
+/** TutaNotes vault index (member row first: the rest reference it). */
+const NOTES_VAULT_INDEX_TABLES = [
+  'notes_member_vault',
+  'notes_notebooks',
+  'notes_notes',
+  'notes_note_keywords',
+  'notes_shortcuts',
+  'notes_note_attachments',
+  'notes_note_extra_images'
+];
+
 const PHOTO_SINGLES_COLUMNS = [
   'record_photoalbums_onedrive_refresh_token_enc',
   'record_photoalbums_onedrive_folder_id',
@@ -401,6 +412,15 @@ async function exportTutaNotesPostgres(pool, singlesId, destDir) {
         WHERE vault_id = ANY($1::bigint[])
         ORDER BY file_id`,
       [vaultIds]
+    );
+  }
+  // Notes index (notebooks/notes/…) — member row first; absent in pre-Postgres backups.
+  for (const table of NOTES_VAULT_INDEX_TABLES) {
+    if (!(await tableExists(pool, table))) continue;
+    out[table] = await queryRows(
+      pool,
+      `SELECT * FROM ${SCHEMA}.${table} WHERE singles_id = $1`,
+      [singlesId]
     );
   }
   out.singles = await exportSinglesColumns(pool, singlesId, NOTES_SINGLES_COLUMNS);
@@ -755,6 +775,12 @@ async function restoreTutaNotesPostgres(client, singlesId, backupDir) {
   await insertRows(client, 'notes_vault', payload.notes_vault);
   await insertVaultItems(client, payload.record_vault_item);
   await insertRows(client, 'record_vault_file', payload.record_vault_file);
+  // Deleting the member row cascades to every notes index table. Pre-Postgres backups
+  // have none: a restored vault.db is imported on next unlock.
+  await deleteRows(client, NOTES_VAULT_INDEX_TABLES[0], 'singles_id = $1', [singlesId]);
+  for (const table of NOTES_VAULT_INDEX_TABLES) {
+    await insertRows(client, table, payload[table]);
+  }
   await restoreSinglesColumns(client, singlesId, NOTES_SINGLES_COLUMNS, payload.singles);
   await resetSerialSequence(client, 'notes_vault', 'vault_id');
   await resetSerialSequence(client, 'record_vault_item', 'item_id');

@@ -23,12 +23,7 @@ import {
 import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
 import { requireVaultAccessSession } from '../../utils/recordVaultAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/recordVaultUsb/usbScan.js';
-import {
-  listVaultDbFileNames,
-  vaultHasDbFile,
-  vaultMetaPath,
-  vaultRootOnMount
-} from '../../utils/recordVaultUsb/vaultPaths.js';
+import { listVaultDbFileNames, vaultMetaPath, vaultRootOnMount } from '../../utils/recordVaultUsb/vaultPaths.js';
 import pool from '../../db/connection.js';
 import {
   getVaultClusterUnlockState,
@@ -42,6 +37,7 @@ import {
   tutaDriveNotesMountPath,
   wipeTutaDriveMemberVault
 } from '../../utils/tutaDriveMemberPaths.js';
+import { deleteNotesMemberVault } from '../../utils/recordVaultUsb/vaultPgStore.js';
 import {
   deleteTutaDriveBackupByName,
   listTutaDriveBackups,
@@ -157,13 +153,13 @@ function sessionPayload(singlesId, memberId, notesMount) {
   };
 }
 
+/** Notes index is in Postgres; vault folder needs only vault.meta.json + layout (no vault.db). */
 function vaultStatusFlags(notesMount) {
   const hasMeta = fs.existsSync(vaultMetaPath(notesMount));
-  const hasDb = vaultHasDbFile(notesMount);
-  const check = hasMeta ? validateVaultOnMount(notesMount) : { ok: false };
+  const check = hasMeta ? validateVaultOnMount(notesMount, { requireDbFile: false }) : { ok: false };
   return {
-    hasVault: Boolean(hasMeta && hasDb && check.ok),
-    needsReformat: Boolean(hasMeta && (!hasDb || !check.ok)),
+    hasVault: Boolean(hasMeta && check.ok),
+    needsReformat: Boolean(hasMeta && !check.ok),
     vaultFilesystemInvalid: Boolean(hasMeta && !check.ok)
   };
 }
@@ -235,6 +231,7 @@ export async function formatRecordVaultTutaDrive(req, res) {
     await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
     const { memberId } = await resolveMemberContext(singlesId);
     wipeTutaDriveMemberVault(memberId);
+    await deleteNotesMemberVault(singlesId);
     return res.json({
       success: true,
       memberId,
@@ -347,7 +344,7 @@ export async function syncRecordVaultTutaDrive(req, res) {
 
   try {
     const session = getVaultSession(singlesId, 'onedrive');
-    if (!session?.unlocked || !session?.mountPath) {
+    if (!session?.mountPath) {
       return res.status(428).json({
         error: 'TutaCloud vault not unlocked',
         code: 'RECORD_VAULT_CLOUD_REQUIRED'

@@ -55,6 +55,184 @@ const rowSx = {
 
 const fileRowSx = { ...rowSx, color: '#9ef', '&:hover': { bgcolor: '#123' } };
 
+/** Alternating block colors for adjacent folders under `users/`. */
+const USER_STRIPE_SX = [
+  {
+    bgcolor: 'rgba(20, 70, 20, 0.35)',
+    color: '#3f3',
+    borderLeft: '2px solid #2a2',
+    my: 0.25,
+    py: 0.15
+  },
+  {
+    bgcolor: 'rgba(20, 45, 90, 0.4)',
+    color: '#6cf',
+    borderLeft: '2px solid #48a',
+    my: 0.25,
+    py: 0.15
+  }
+];
+
+/** Per-panel cycle: original order → largest users first → smallest users first. */
+const USER_SORT_MODES = ['orig', 'desc', 'asc'];
+const USER_SORT_LABEL = { orig: 'Size', desc: 'Size Desc', asc: 'Size Asc' };
+const USER_SORT_TITLE = {
+  orig: 'Original order — click for largest users first',
+  desc: 'Largest users first — click for smallest users first',
+  asc: 'Smallest users first — click for original order'
+};
+
+function nextUserSortMode(mode) {
+  const i = USER_SORT_MODES.indexOf(mode);
+  return USER_SORT_MODES[(i < 0 ? 0 : i + 1) % USER_SORT_MODES.length];
+}
+
+function sortedUserChildren(children, mode) {
+  if (!children?.length || mode === 'orig') return children || [];
+  const copy = [...children];
+  copy.sort((a, b) => {
+    const diff = (a.totalBytes || 0) - (b.totalBytes || 0);
+    return mode === 'asc' ? diff : -diff;
+  });
+  return copy;
+}
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const DEFAULT_PAGE_SIZE = 10;
+
+function findUsersNode(node) {
+  if (!node) return null;
+  if (node.name === 'users') return node;
+  for (const child of node.children || []) {
+    const found = findUsersNode(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+function usersPageCount(total, pageSize) {
+  return Math.max(1, Math.ceil((total || 0) / pageSize));
+}
+
+function visiblePageNumbers(page, pageCount, maxButtons = 5) {
+  if (pageCount <= maxButtons) return Array.from({ length: pageCount }, (_, i) => i + 1);
+  let start = Math.max(1, page - Math.floor(maxButtons / 2));
+  let end = start + maxButtons - 1;
+  if (end > pageCount) {
+    end = pageCount;
+    start = Math.max(1, end - maxButtons + 1);
+  }
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
+
+const pagerBtnSx = {
+  minHeight: 22,
+  minWidth: 28,
+  py: 0.15,
+  px: 0.6,
+  fontSize: '0.65rem',
+  lineHeight: 1.2
+};
+
+const pagerBtnActiveSx = {
+  ...pagerBtnSx,
+  bgcolor: '#1a4a9a !important',
+  color: '#fff !important',
+  borderColor: '#48f !important'
+};
+
+function PageNavButtons({ keyPrefix, pages, safePage, pageCount, onPageChange }) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+      {pages.map((n) => (
+        <ColorTemplate9TableData.Button
+          key={`${keyPrefix}${n}`}
+          type="button"
+          onClick={() => onPageChange(n)}
+          sx={safePage === n ? pagerBtnActiveSx : pagerBtnSx}
+        >
+          {n}
+        </ColorTemplate9TableData.Button>
+      ))}
+      <ColorTemplate9TableData.Button
+        type="button"
+        disabled={safePage >= pageCount}
+        onClick={() => onPageChange(safePage + 1)}
+        sx={pagerBtnSx}
+      >
+        &gt;
+      </ColorTemplate9TableData.Button>
+      <ColorTemplate9TableData.Button
+        type="button"
+        disabled={safePage >= pageCount}
+        onClick={() => onPageChange(pageCount)}
+        sx={pagerBtnSx}
+      >
+        LAST
+      </ColorTemplate9TableData.Button>
+    </Box>
+  );
+}
+
+PageNavButtons.propTypes = {
+  keyPrefix: PropTypes.string.isRequired,
+  pages: PropTypes.arrayOf(PropTypes.number).isRequired,
+  safePage: PropTypes.number.isRequired,
+  pageCount: PropTypes.number.isRequired,
+  onPageChange: PropTypes.func.isRequired
+};
+
+function UsersPager({ totalUsers, page, pageSize, onPageChange, onPageSizeChange }) {
+  if (!totalUsers) return null;
+  const pageCount = usersPageCount(totalUsers, pageSize);
+  const safePage = Math.min(Math.max(1, page), pageCount);
+  const pages = visiblePageNumbers(safePage, pageCount);
+  const from = (safePage - 1) * pageSize + 1;
+  const to = Math.min(safePage * pageSize, totalUsers);
+  const navProps = { pages, safePage, pageCount, onPageChange };
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 1,
+        flexWrap: 'wrap',
+        minHeight: 28,
+        width: '100%'
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', minWidth: 0 }}>
+        <ColorTemplate9TableData.BodyText sx={{ ...pathLabelSx, opacity: 0.75, fontSize: '0.65rem' }}>
+          {from}–{to} of {totalUsers} users · page {safePage}/{pageCount}
+        </ColorTemplate9TableData.BodyText>
+        <PageNavButtons keyPrefix="L" {...navProps} />
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, ml: 'auto' }}>
+        <PageNavButtons keyPrefix="R" {...navProps} />
+        {PAGE_SIZE_OPTIONS.map((n) => (
+          <ColorTemplate9TableData.Button
+            key={n}
+            type="button"
+            onClick={() => onPageSizeChange(n)}
+            sx={pageSize === n ? pagerBtnActiveSx : pagerBtnSx}
+          >
+            {n}
+          </ColorTemplate9TableData.Button>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+UsersPager.propTypes = {
+  totalUsers: PropTypes.number.isRequired,
+  page: PropTypes.number.isRequired,
+  pageSize: PropTypes.number.isRequired,
+  onPageChange: PropTypes.func.isRequired,
+  onPageSizeChange: PropTypes.func.isRequired
+};
+
 function collectDefaultExpanded(node, depth, out) {
   if (!node) return out;
   if (depth < DEFAULT_EXPAND_DEPTH) out.add(node.path);
@@ -73,14 +251,37 @@ function filePath(folderPath, name) {
   return folderPath ? `${folderPath}/${name}` : name;
 }
 
-function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onOpenFile, onLoadFiles, isRoot = false }) {
+function FolderNode({
+  node,
+  depth,
+  rootKey,
+  expanded,
+  onToggle,
+  filesByPath,
+  onOpenFile,
+  onLoadFiles,
+  isRoot = false,
+  userStripeIndex = null,
+  userSortMode = 'orig',
+  userPage = 1,
+  userPageSize = DEFAULT_PAGE_SIZE
+}) {
   const isOpen = expanded.has(node.path);
   const hasContent = node.children.length > 0 || node.fileCount > 0;
   const files = filesByPath[node.path];
   const marker = hasContent ? (isOpen ? '▾' : '▸') : ' ';
   const folderTotal = node.totalLabel || '';
   const showTotal = folderTotal && (isRoot || (node.totalBytes || 0) > 0);
-  return (
+  const stripeSx = userStripeIndex == null ? null : USER_STRIPE_SX[userStripeIndex % 2];
+  let childList = node.children;
+  if (node.name === 'users') {
+    const sorted = sortedUserChildren(node.children, userSortMode);
+    const pageCount = usersPageCount(sorted.length, userPageSize);
+    const safePage = Math.min(Math.max(1, userPage), pageCount);
+    const start = (safePage - 1) * userPageSize;
+    childList = sorted.slice(start, start + userPageSize);
+  }
+  const content = (
     <>
       <Box sx={{ ...rowSx, pl: `${depth * INDENT_CH}ch` }} onClick={() => onToggle(rootKey, node)}>
         {`${marker} ${isRoot ? '' : '|-- '}${node.name}/`}
@@ -89,7 +290,7 @@ function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onO
       </Box>
       {isOpen ? (
         <>
-          {node.children.map((child) => (
+          {childList.map((child, i) => (
             <FolderNode
               key={child.path}
               node={child}
@@ -100,6 +301,10 @@ function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onO
               filesByPath={filesByPath}
               onOpenFile={onOpenFile}
               onLoadFiles={onLoadFiles}
+              userStripeIndex={node.name === 'users' ? i : null}
+              userSortMode={userSortMode}
+              userPage={userPage}
+              userPageSize={userPageSize}
             />
           ))}
           {node.fileCount > 0 && files === undefined ? (
@@ -128,6 +333,7 @@ function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onO
       ) : null}
     </>
   );
+  return stripeSx ? <Box sx={stripeSx}>{content}</Box> : content;
 }
 
 const treeNodeShape = PropTypes.shape({
@@ -148,10 +354,32 @@ FolderNode.propTypes = {
   filesByPath: PropTypes.object.isRequired,
   onOpenFile: PropTypes.func.isRequired,
   onLoadFiles: PropTypes.func.isRequired,
-  isRoot: PropTypes.bool
+  isRoot: PropTypes.bool,
+  userStripeIndex: PropTypes.number,
+  userSortMode: PropTypes.oneOf(USER_SORT_MODES),
+  userPage: PropTypes.number,
+  userPageSize: PropTypes.number
 };
 
-function TreePanel({ data, expanded, onToggle, filesByPath, onOpenFile, onLoadFiles, onExpandAll, onCollapseAll }) {
+function TreePanel({
+  data,
+  expanded,
+  onToggle,
+  filesByPath,
+  onOpenFile,
+  onLoadFiles,
+  onExpandAll,
+  onCollapseAll,
+  userSortMode,
+  onCycleUserSort,
+  userPage,
+  userPageSize,
+  onUserPageChange,
+  onUserPageSizeChange
+}) {
+  const btnSx = { minHeight: 24, py: 0.25, px: 1, fontSize: '0.7rem' };
+  const usersNode = findUsersNode(data?.tree);
+  const totalUsers = usersNode?.children?.length || 0;
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: 0, gap: 0.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
@@ -160,15 +388,25 @@ function TreePanel({ data, expanded, onToggle, filesByPath, onOpenFile, onLoadFi
         </ColorTemplate9TableData.BodyText>
         {data?.tree ? (
           <>
-            <ColorTemplate9TableData.Button type="button" onClick={onExpandAll} sx={{ minHeight: 24, py: 0.25, px: 1, fontSize: '0.7rem' }}>
+            <ColorTemplate9TableData.Button type="button" onClick={onCycleUserSort} title={USER_SORT_TITLE[userSortMode]} sx={btnSx}>
+              {USER_SORT_LABEL[userSortMode]}
+            </ColorTemplate9TableData.Button>
+            <ColorTemplate9TableData.Button type="button" onClick={onExpandAll} sx={btnSx}>
               Expand all
             </ColorTemplate9TableData.Button>
-            <ColorTemplate9TableData.Button type="button" onClick={onCollapseAll} sx={{ minHeight: 24, py: 0.25, px: 1, fontSize: '0.7rem' }}>
+            <ColorTemplate9TableData.Button type="button" onClick={onCollapseAll} sx={btnSx}>
               Collapse all
             </ColorTemplate9TableData.Button>
           </>
         ) : null}
       </Box>
+      <UsersPager
+        totalUsers={totalUsers}
+        page={userPage}
+        pageSize={userPageSize}
+        onPageChange={onUserPageChange}
+        onPageSizeChange={onUserPageSizeChange}
+      />
       <Box sx={terminalSx}>
         {data?.error ? <Box sx={{ color: '#f66' }}>{data.error}</Box> : null}
         {data?.tree ? (
@@ -182,6 +420,9 @@ function TreePanel({ data, expanded, onToggle, filesByPath, onOpenFile, onLoadFi
             onOpenFile={onOpenFile}
             onLoadFiles={onLoadFiles}
             isRoot
+            userSortMode={userSortMode}
+            userPage={userPage}
+            userPageSize={userPageSize}
           />
         ) : null}
         {data?.truncated ? <Box sx={{ color: '#fc0' }}>{`... stopped after ${data.maxFolders} folders`}</Box> : null}
@@ -207,7 +448,13 @@ TreePanel.propTypes = {
   onOpenFile: PropTypes.func.isRequired,
   onLoadFiles: PropTypes.func.isRequired,
   onExpandAll: PropTypes.func.isRequired,
-  onCollapseAll: PropTypes.func.isRequired
+  onCollapseAll: PropTypes.func.isRequired,
+  userSortMode: PropTypes.oneOf(USER_SORT_MODES).isRequired,
+  onCycleUserSort: PropTypes.func.isRequired,
+  userPage: PropTypes.number.isRequired,
+  userPageSize: PropTypes.number.isRequired,
+  onUserPageChange: PropTypes.func.isRequired,
+  onUserPageSizeChange: PropTypes.func.isRequired
 };
 
 function looksLikeText(bytes) {
@@ -343,6 +590,11 @@ export default function AdminToolsTreeTab({ onError }) {
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState({ large: new Set(), fast: new Set() });
   const [files, setFiles] = useState({ large: {}, fast: {} });
+  const [userSort, setUserSort] = useState({ large: 'orig', fast: 'orig' });
+  const [userPaging, setUserPaging] = useState({
+    large: { page: 1, pageSize: DEFAULT_PAGE_SIZE },
+    fast: { page: 1, pageSize: DEFAULT_PAGE_SIZE }
+  });
   const [preview, setPreview] = useState(null);
 
   const load = useCallback(async () => {
@@ -356,6 +608,11 @@ export default function AdminToolsTreeTab({ onError }) {
         fast: collectDefaultExpanded(data?.fast?.tree, 0, new Set())
       });
       setFiles({ large: {}, fast: {} });
+      setUserSort({ large: 'orig', fast: 'orig' });
+      setUserPaging({
+        large: { page: 1, pageSize: DEFAULT_PAGE_SIZE },
+        fast: { page: 1, pageSize: DEFAULT_PAGE_SIZE }
+      });
     } catch (err) {
       onError?.(err);
       setTrees(null);
@@ -402,7 +659,16 @@ export default function AdminToolsTreeTab({ onError }) {
     onOpenFile,
     onLoadFiles: loadFiles,
     onExpandAll: () => setExpanded((prev) => ({ ...prev, [rootKey]: collectAllPaths(data?.tree, new Set()) })),
-    onCollapseAll: () => setExpanded((prev) => ({ ...prev, [rootKey]: new Set() }))
+    onCollapseAll: () => setExpanded((prev) => ({ ...prev, [rootKey]: new Set() })),
+    userSortMode: userSort[rootKey],
+    onCycleUserSort: () => {
+      setUserSort((prev) => ({ ...prev, [rootKey]: nextUserSortMode(prev[rootKey]) }));
+      setUserPaging((prev) => ({ ...prev, [rootKey]: { ...prev[rootKey], page: 1 } }));
+    },
+    userPage: userPaging[rootKey].page,
+    userPageSize: userPaging[rootKey].pageSize,
+    onUserPageChange: (page) => setUserPaging((prev) => ({ ...prev, [rootKey]: { ...prev[rootKey], page } })),
+    onUserPageSizeChange: (pageSize) => setUserPaging((prev) => ({ ...prev, [rootKey]: { page: 1, pageSize } }))
   });
 
   return (
@@ -420,7 +686,7 @@ export default function AdminToolsTreeTab({ onError }) {
           <CircularProgress />
         </Box>
       ) : trees ? (
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2.5 }}>
           <TreePanel {...panelProps('large', trees.largeCheap)} />
           <TreePanel {...panelProps('fast', trees.fast)} />
         </Box>

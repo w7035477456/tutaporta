@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { vaultFileStoragePath } from '../recordVaultUsb/vaultPaths.js';
+import { NOTES_VAULT_TABLES as T } from '../recordVaultUsb/vaultPgStore.js';
 import {
   listRecordVaultSampleAttachmentDefs,
   loadRecordVaultNewMemberSampleManifest,
@@ -92,35 +93,21 @@ function linkFile(targetAbs, linkAbs) {
   }
 }
 
-function queryAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
 /**
  * Optional plaintext vault convenience: symlink View TutaDrive paths at shared media.
  * Encrypted vaults skip materialization — reads use shared store via shared_content_key.
  */
-export function linkRecordVaultSharedSamplesIntoVault({ mountPath, key, meta, db }) {
+export async function linkRecordVaultSharedSamplesIntoVault({ mountPath, key, meta, db }) {
   const usePlainFiles = key == null;
   if (!usePlainFiles) return false;
+  if (!db?.singlesId) return false;
 
-  const hasSharedCol = queryAll(db, `PRAGMA table_info(note_attachments)`).some(
-    (row) => String(row.name || '') === 'shared_content_key'
-  );
-  if (!hasSharedCol) return false;
-
-  const rows = queryAll(
-    db,
+  const rows = await db.all(
     `SELECT attachment_id, relative_path, shared_content_key, checksum, file_name
-     FROM note_attachments
-     WHERE deleted_at IS NULL AND shared_content_key IS NOT NULL AND TRIM(shared_content_key) != ''`
+       FROM ${T.attachments}
+      WHERE singles_id = $1 AND deleted_at IS NULL
+        AND shared_content_key IS NOT NULL AND TRIM(shared_content_key) != ''`,
+    [db.singlesId]
   );
   let linked = 0;
   for (const row of rows) {

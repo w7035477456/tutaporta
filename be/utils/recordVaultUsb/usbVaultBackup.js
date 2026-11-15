@@ -3,9 +3,23 @@ import os from 'os';
 import path from 'path';
 import { ZipArchive } from 'archiver';
 import { Extract } from 'unzipper';
-import { getVaultSession, flushDbToUsb, logoffVaultUsb } from './vaultSession.js';
-import { vaultRootOnMount, VAULT_DIR_NAME, VAULT_META_FILE } from './vaultPaths.js';
+import { getVaultSession, logoffVaultUsb } from './vaultSession.js';
+import {
+  getVaultDbFileName,
+  vaultRootOnMount,
+  VAULT_DB_FILE_ENCRYPTED,
+  VAULT_DB_FILE_PLAIN,
+  VAULT_DIR_NAME,
+  VAULT_META_FILE
+} from './vaultPaths.js';
+import { sealVaultBuffer } from './vaultCrypto.js';
+import { deleteNotesMemberVault, exportNotesMemberVaultToSqliteBuffer } from './vaultPgStore.js';
 import { buildMyNoteBackupZipFileName } from '../recordVaultBackupZipNames.js';
+
+function isVaultDbFileName(name) {
+  const base = path.basename(String(name || ''));
+  return base === VAULT_DB_FILE_PLAIN || base === VAULT_DB_FILE_ENCRYPTED;
+}
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];
@@ -58,12 +72,16 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
     throw new Error('Record Vault USB not unlocked');
   }
 
-  flushDbToUsb(session);
-
   const vaultRoot = vaultRootOnMount(session.mountPath);
   if (!fs.existsSync(vaultRoot)) {
     throw new Error(`Missing ${VAULT_DIR_NAME} folder on USB`);
   }
+
+  // Notes index lives in Postgres; the zip carries a vault.db snapshot so restore can re-import it.
+  const vaultDbBuffer = sealVaultBuffer(
+    await exportNotesMemberVaultToSqliteBuffer(singlesId),
+    session.key
+  );
 
   const zipName = buildMyNoteBackupZipFileName('usb');
   const archiveRootName = VAULT_DIR_NAME;
@@ -78,7 +96,10 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
     archive.on('error', reject);
     archive.on('end', resolve);
     archive.pipe(res);
-    archive.directory(vaultRoot, archiveRootName);
+    archive.directory(vaultRoot, archiveRootName, (entry) =>
+      isVaultDbFileName(entry.name) ? false : entry
+    );
+    archive.append(vaultDbBuffer, { name: `${archiveRootName}/${getVaultDbFileName(session.meta)}` });
     void archive.finalize();
   });
 
@@ -89,15 +110,17 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
  * Restore USB `.recordvault` from a local zip (closes session first so files are not locked).
  * Caller must re-unlock with the security icon afterward.
  */
-export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
-  const session = getVaultSession(singlesId, 'usb');
+async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storageType) {
+  const session = getVaultSession(singlesId, storageType);
   if (!session?.mountPath) {
-    throw new Error('Record Vault USB not unlocked');
+    throw new Error(
+      storageType === 'usb' ? 'Record Vault USB not unlocked' : 'TutaNotes TutaCloud vault not unlocked'
+    );
   }
   const mountPath = session.mountPath;
   const label = path.basename(mountPath);
 
-  await logoffVaultUsb(singlesId, 'usb');
+  await logoffVaultUsb(singlesId, storageType);
 
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-usb-restore-'));
   const extractDir = path.join(tmpRoot, 'extract');
@@ -122,6 +145,11 @@ export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
       copyEntryRecursive(path.join(sourceRoot, name), path.join(vaultRoot, name));
     }
 
+    // A restored vault.db replaces the Postgres notes index on the next unlock.
+    if (relFiles.some((rel) => !rel.includes('/') && isVaultDbFileName(rel))) {
+      await deleteNotesMemberVault(singlesId);
+    }
+
     let restoredBytes = 0;
     for (const rel of relFiles) {
       try {
@@ -141,4 +169,14 @@ export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
+}
+
+/** Restore USB `.recordvault` from a local zip (closes session first). */
+export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
+  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'usb');
+}
+
+/** Restore TutaCloud notes vault from zip (internal session slot `onedrive`). */
+export async function restoreTutaCloudVaultFromZipFile(singlesId, zipFilePath) {
+  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'onedrive');
 }

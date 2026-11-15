@@ -1,5 +1,6 @@
 import pool from '../db/connection.js';
 import { isRecordVaultBridgeStandalone } from '../recordVaultBridge/standaloneMode.js';
+import { NOTES_VAULT_TABLES } from './recordVaultUsb/vaultPgStore.js';
 
 function normalizeId(singlesId) {
   const id = Math.trunc(Number(singlesId));
@@ -146,8 +147,25 @@ export async function addVaultSessionFileCounts(singlesId, { usbDelta = 0, uiDel
 }
 
 /** Count notebooks + notes in an open vault session (logical USB open transfer units). */
-export function countVaultSessionNotebooksAndNotes(session) {
+export async function countVaultSessionNotebooksAndNotes(session) {
   if (!session?.db) return 0;
+  // Postgres VaultPgDb (notes index in outdateddbsnapshotoct2024.notes_*).
+  if (typeof session.db.one === 'function' && session.db.singlesId != null) {
+    try {
+      const row = await session.db.one(
+        `SELECT
+           (SELECT COUNT(*)::int FROM ${NOTES_VAULT_TABLES.notebooks}
+             WHERE singles_id = $1 AND deleted_at IS NULL) +
+           (SELECT COUNT(*)::int FROM ${NOTES_VAULT_TABLES.notes}
+             WHERE singles_id = $1 AND deleted_at IS NULL) AS c`,
+        [session.db.singlesId]
+      );
+      return Number(row?.c) || 0;
+    } catch {
+      return 0;
+    }
+  }
+  // Legacy sql.js vault.db (until vaultSession finishes the Postgres cutover).
   const countSql = (sql) => {
     const stmt = session.db.prepare(sql);
     try {
