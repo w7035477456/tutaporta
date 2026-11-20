@@ -490,6 +490,16 @@ export async function updateRecordVaultNote(noteId, payload = {}, { storageType 
   return data?.note;
 }
 
+/** Move inline data:image base64 out of body_text into TutaNotes/files/ (unlocked vault). */
+export async function extractRecordVaultInlineImages({ storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: '/api/recordVault/extract-inline-images',
+    storageType
+  });
+  return data;
+}
+
 export async function uploadRecordVaultNoteExtraImage(noteId, payload = {}, { storageType } = {}) {
   const { data } = await rvRequest({method: 'POST',
     url: `/api/recordVault/notes/${noteId}/extra-images`,
@@ -997,7 +1007,7 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
   const outName =
     saveTarget?.name ||
     String(suggestedFileName || '').trim() ||
-    tutaDriveBackupFileNamePreview(note, dateStamp);
+    tutaDriveBackupFileNamePreview(note, dateStamp, encryptAllowed);
   const blob = new Blob([sealed], { type: 'application/octet-stream' });
   report('save', 60, { totalBytes: sealed.length, fileName: outName });
   if (saveTarget?.file) {
@@ -1289,15 +1299,22 @@ async function unsealRecordVaultTutaDriveStoredBackupBytes(
   const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked, takeRecordVaultBackupDecryptPassword } = await import(
     'utils/recordVaultClientSession'
   );
-  const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  const { isTutaDriveSealedBackupBytes, unsealTutaDriveBackupZipWithDek } = await import(
+    'utils/recordVaultClientVaultCrypto'
+  );
+  const sealedBytes = file
+    ? await readBackupFileWithProgress(file, report, fetchRange[0], fetchRange[1])
+    : await downloadStoredBackupWithProgress(fileName, report, fetchRange[0], fetchRange[1]);
+  // Plain vault zip (TUTANOTES_ENCRYPT_ALLOWED=false backups): no TNBAK header — return as-is.
+  if (!isTutaDriveSealedBackupBytes(sealedBytes)) {
+    report('decrypt', decryptRange[1], { totalBytes: sealedBytes.length, plaintext: true, done: true });
+    return sealedBytes;
+  }
   const password = takeRecordVaultBackupDecryptPassword();
   if (!password && !isRecordVaultE2eUnlocked()) {
     throw new Error(missingPasswordMessage);
   }
   const dek = getRecordVaultE2eDek();
-  const sealedBytes = file
-    ? await readBackupFileWithProgress(file, report, fetchRange[0], fetchRange[1])
-    : await downloadStoredBackupWithProgress(fileName, report, fetchRange[0], fetchRange[1]);
   report('decrypt', decryptRange[0], { totalBytes: sealedBytes.length, withZipPassword: Boolean(password) });
   const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
   report('decrypt', decryptRange[1], {
@@ -1863,6 +1880,7 @@ export function createRecordVaultPaneApi(storageType) {
     reorderRecordVaultShortcuts: (ids) => reorderRecordVaultShortcuts(ids, opts),
     createRecordVaultNote: (notebookId, payload) => createRecordVaultNote(notebookId, payload, opts),
     updateRecordVaultNote: (noteId, payload) => updateRecordVaultNote(noteId, payload, opts),
+    extractRecordVaultInlineImages: () => extractRecordVaultInlineImages(opts),
     deleteRecordVaultNote: (id) => deleteRecordVaultNote(id, opts),
     uploadRecordVaultNoteExtraImage: (noteId, payload) => uploadRecordVaultNoteExtraImage(noteId, payload, opts),
     deleteRecordVaultNoteExtraImage: (noteId, imageId) => deleteRecordVaultNoteExtraImage(noteId, imageId, opts),

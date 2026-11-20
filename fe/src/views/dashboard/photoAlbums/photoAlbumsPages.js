@@ -221,6 +221,60 @@ export function albumPagePhotoIds(page) {
   return legacy == null ? [] : [legacy];
 }
 
+/** At most this many blank pages may follow the last page that has photos. */
+export const ALBUM_MAX_TRAILING_BLANK_PAGES = 2;
+
+/** True when the page has no photos (blank book page). */
+export function isAlbumPageBlank(page) {
+  return albumPagePhotoIds(page).length === 0;
+}
+
+/** Book order: top-to-bottom Y, then left-to-right X. */
+export function sortAlbumPagesByBandOrder(pages) {
+  return [...(pages || [])].sort((a, b) => {
+    const dy = (Number(a.y) || 0) - (Number(b.y) || 0);
+    if (dy !== 0) return dy;
+    return (Number(a.x) || 0) - (Number(b.x) || 0);
+  });
+}
+
+/** How many blank pages sit after the last page that has photos. */
+export function countTrailingBlankAlbumPages(pages) {
+  const ordered = sortAlbumPagesByBandOrder(pages);
+  let n = 0;
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    if (!isAlbumPageBlank(ordered[i])) break;
+    n += 1;
+  }
+  return n;
+}
+
+/**
+ * Drop excess blank pages after the last page that has photos.
+ * Keeps at most `maxTrailingBlank` blank pages at the end (default 2 = one empty spread).
+ * When every page is blank, still keeps `minPages` (default 2) so one spread remains.
+ */
+export function trimTrailingBlankAlbumPages(
+  pages,
+  { maxTrailingBlank = ALBUM_MAX_TRAILING_BLANK_PAGES, minPages = 2 } = {}
+) {
+  const ordered = sortAlbumPagesByBandOrder(pages);
+  if (!ordered.length) return ordered;
+  const maxBlank = Math.max(0, Math.trunc(Number(maxTrailingBlank)) || 0);
+  const minKeep = Math.max(0, Math.trunc(Number(minPages)) || 0);
+  let lastContent = -1;
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    if (!isAlbumPageBlank(ordered[i])) {
+      lastContent = i;
+      break;
+    }
+  }
+  const keepFromContent = lastContent < 0 ? 0 : lastContent + 1 + maxBlank;
+  const targetLen = Math.min(ordered.length, Math.max(minKeep, keepFromContent));
+  if (targetLen >= ordered.length) return ordered;
+  return ordered.slice(0, targetLen);
+}
+
 export function createAlbumPageInstance({
   x = 0,
   y = 0,

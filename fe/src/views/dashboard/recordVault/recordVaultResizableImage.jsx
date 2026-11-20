@@ -119,6 +119,21 @@ export const RecordVaultResizableImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      /** Vault file pointer — bytes live under TutaNotes/files/, not in body_text. */
+      fileId: {
+        default: null,
+        parseHTML: (element) => {
+          const raw =
+            element.getAttribute('data-file-id') || element.getAttribute('data-attachment-id');
+          const n = Number(raw);
+          return Number.isFinite(n) && n >= 1 ? n : null;
+        },
+        renderHTML: (attributes) => {
+          const id = Number(attributes.fileId);
+          if (!Number.isFinite(id) || id < 1) return {};
+          return { 'data-file-id': String(id) };
+        }
+      },
       width: {
         default: null,
         parseHTML: (element) => parseWidthValue(element.getAttribute('width')) || parseWidthValue(element.style?.width),

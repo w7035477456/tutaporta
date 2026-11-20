@@ -1,7 +1,8 @@
 /**
- * TutaDrive sealed-backup file names (users/M{id}/…).
+ * TutaDrive backup file names (users/M{id}/…).
  *
- * Current:  EncryptedTutaNotesZip_YYYY_MM_DD[_<note>][_N].zip
+ * Encrypted: EncryptedTutaNotesZip_YYYY_MM_DD[_<note>][_N].zip
+ * Plaintext (TUTANOTES_ENCRYPT_ALLOWED=false): TutaNotesZip_YYYY_MM_DD[_<note>][_N].zip
  * Legacy:   EncryptedBackup_YYYY-MM-DD[_HH-MM-SS].zip, backup_YYYY-MM-DD[_HH-MM-SS].zip
  *
  * Name characters are limited to [A-Za-z0-9_-] so a name can never contain a path separator or "..".
@@ -9,13 +10,14 @@
  */
 
 export const TUTADRIVE_BACKUP_FILE_PREFIX = 'EncryptedTutaNotesZip';
+export const TUTADRIVE_BACKUP_FILE_PREFIX_PLAIN = 'TutaNotesZip';
 
 /** Note typed in the Backup popup — fewer than 20 characters (it is appended to the zip name). */
 export const TUTADRIVE_BACKUP_NOTE_MAX_LEN = 19;
 export const TUTADRIVE_BACKUP_HINT_MAX_LEN = 100;
 
 export const TUTADRIVE_BACKUP_NAME_RE =
-  /^(?:EncryptedTutaNotesZip_\d{4}_\d{2}_\d{2}(?:_[A-Za-z0-9_-]{1,40})?|(?:EncryptedBackup|backup)_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?)\.zip$/i;
+  /^(?:(?:Encrypted)?TutaNotesZip_\d{4}_\d{2}_\d{2}(?:_[A-Za-z0-9_-]{1,40})?|(?:EncryptedBackup|backup)_\d{4}-\d{2}-\d{2}(?:_\d{2}-\d{2}-\d{2})?)\.zip$/i;
 
 const DATE_STAMP_RE = /^(\d{4})_(\d{2})_(\d{2})$/;
 
@@ -59,15 +61,21 @@ export function resolveTutaDriveBackupDateStamp(requested, now = new Date()) {
   return `${y}_${m}_${d}`;
 }
 
-export function tutaDriveBackupFileName({ dateStamp = tutaDriveBackupDateStamp(), note = '', suffix = 0 } = {}) {
+export function tutaDriveBackupFileName({
+  dateStamp = tutaDriveBackupDateStamp(),
+  note = '',
+  suffix = 0,
+  encrypted = true
+} = {}) {
   const slug = tutaDriveBackupNoteSlug(note);
   const noteSegment = slug ? `_${slug}` : '';
   const suffixSegment = suffix > 1 ? `_${suffix}` : '';
-  return `${TUTADRIVE_BACKUP_FILE_PREFIX}_${dateStamp}${noteSegment}${suffixSegment}.zip`;
+  const prefix = encrypted ? TUTADRIVE_BACKUP_FILE_PREFIX : TUTADRIVE_BACKUP_FILE_PREFIX_PLAIN;
+  return `${prefix}_${dateStamp}${noteSegment}${suffixSegment}.zip`;
 }
 
 /**
- * Parse EncryptedTutaNotesZip_YYYY_MM_DD[_note][_N].zip into date / note / suffix.
+ * Parse EncryptedTutaNotesZip_ / TutaNotesZip_YYYY_MM_DD[_note][_N].zip into date / note / suffix.
  * Returns null for legacy EncryptedBackup_* / backup_* names.
  */
 export function parseTutaDriveBackupFileNameParts(fileName) {
@@ -75,7 +83,7 @@ export function parseTutaDriveBackupFileNameParts(fileName) {
     .trim()
     .replace(/^.*[/\\]/, '');
   if (!isTutaDriveBackupFileName(base)) return null;
-  const modern = /^EncryptedTutaNotesZip_(\d{4}_\d{2}_\d{2})(?:_(.+))?\.zip$/i.exec(base);
+  const modern = /^(?:Encrypted)?TutaNotesZip_(\d{4}_\d{2}_\d{2})(?:_(.+))?\.zip$/i.exec(base);
   if (!modern) return null;
 
   const dateStamp = modern[1];

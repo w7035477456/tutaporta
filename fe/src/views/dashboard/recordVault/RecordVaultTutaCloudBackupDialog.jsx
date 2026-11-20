@@ -21,6 +21,7 @@ import {
   ensureEncryptPasswordForBackupSeal,
   prepareBackupDecryptWithPassword
 } from 'utils/recordVaultBackupDecryptPrompt';
+import { isRecordVaultEncryptAllowed } from 'utils/recordVaultClientSession';
 import RecordVaultBackupPasswordDialog from './RecordVaultBackupPasswordDialog';
 import { tutaDriveBackupFileNamePreview } from 'utils/recordVaultBackupFileName';
 
@@ -272,7 +273,11 @@ export default function RecordVaultTutaCloudBackupDialog({
         }
       }
       saveTarget = await acquireSaveZipFile(
-        tutaDriveBackupFileNamePreview(backupInput.note, backupInput.dateStamp)
+        tutaDriveBackupFileNamePreview(
+          backupInput.note,
+          backupInput.dateStamp,
+          isRecordVaultEncryptAllowed()
+        )
       );
       if (saveTarget?.cancelled) return;
     }
@@ -280,7 +285,12 @@ export default function RecordVaultTutaCloudBackupDialog({
     setBusy(true);
     const progress = startBackupProgress(
       'backup',
-      saveTarget?.name || tutaDriveBackupFileNamePreview(backupInput?.note, backupInput?.dateStamp),
+      saveTarget?.name ||
+        tutaDriveBackupFileNamePreview(
+          backupInput?.note,
+          backupInput?.dateStamp,
+          isRecordVaultEncryptAllowed()
+        ),
       0
     );
     try {
@@ -317,24 +327,52 @@ export default function RecordVaultTutaCloudBackupDialog({
     if (!file) return;
     resetMessages();
 
+    // Filename "EncryptedTutaNotesZip_…" is only a label — with TUTANOTES_ENCRYPT_ALLOWED=false
+    // backups are plaintext zip bytes (no TNBAK seal). Detect the real format from the header.
+    let sealedBackup = false;
+    let sealedFormat = null;
+    let sealedHeader = null;
+    let passwordCheck = null;
     if (tutaDriveActive) {
       try {
-        const { readTutaDriveBackupHeader, tutaDriveBackupPasswordCheckFromHeader } = await import(
-          'utils/recordVaultClientVaultCrypto'
-        );
+        const {
+          isTutaDriveSealedBackupBytes,
+          readTutaDriveBackupHeader,
+          tutaDriveBackupPasswordCheckFromHeader
+        } = await import('utils/recordVaultClientVaultCrypto');
         const head = new Uint8Array(await file.slice(0, 64 * 1024 + 16).arrayBuffer());
-        const parsed = readTutaDriveBackupHeader(head);
-        const header = parsed?.format === 'TNBAK3' ? parsed.header : null;
-        const result = await askBackupPassword({
-          mode: 'restore',
-          fileName: file.name,
-          note: String(header?.note || ''),
-          hint: String(header?.hint || ''),
-          passwordCheck: tutaDriveBackupPasswordCheckFromHeader(header),
-          warning: 'Restore replaces your current vault. Open TutaNotes again afterward.'
-        });
-        if (!result) return;
-        await prepareBackupDecryptWithPassword(result.password, 'restore');
+        sealedBackup = isTutaDriveSealedBackupBytes(head);
+        if (sealedBackup) {
+          const parsed = readTutaDriveBackupHeader(head);
+          sealedFormat = parsed?.format || null;
+          sealedHeader = parsed?.format === 'TNBAK3' ? parsed.header : null;
+          passwordCheck = tutaDriveBackupPasswordCheckFromHeader(sealedHeader);
+        }
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Unable to read backup file');
+        return;
+      }
+    }
+
+    if (tutaDriveActive && sealedBackup) {
+      try {
+        if (sealedFormat === 'TNBAK3' || isRecordVaultEncryptAllowed()) {
+          const result = await askBackupPassword({
+            mode: 'restore',
+            fileName: file.name,
+            note: String(sealedHeader?.note || ''),
+            hint: String(sealedHeader?.hint || ''),
+            passwordCheck,
+            warning: 'Restore replaces your current vault. Open TutaNotes again afterward.'
+          });
+          if (!result) return;
+          await prepareBackupDecryptWithPassword(result.password, 'restore');
+        } else {
+          setError(
+            'This backup was sealed with Encrypt Password, but TutaNotes encryption is disabled. Re-enable TUTANOTES_ENCRYPT_ALLOWED temporarily, or restore a plaintext zip created while encryption was off.'
+          );
+          return;
+        }
       } catch (err) {
         setError(err?.response?.data?.error || err?.message || 'Unable to unlock backup password');
         return;
@@ -344,13 +382,14 @@ export default function RecordVaultTutaCloudBackupDialog({
     setBusy(true);
     const progress = startBackupProgress('restoreLocal', file.name, file.size);
     try {
-      if (tutaDriveActive) {
+      if (tutaDriveActive && sealedBackup) {
         const result = await restoreRecordVaultTutaDriveEncryptedBackup(file, undefined, {
           onProgress: progress.update
         });
         progress.update({ stage: 'done', percent: 100 });
         await announceRestoreSuccessThenRedirect(file.name, result);
       } else {
+        // Plain zip (encryption off, or non-sealed file named EncryptedTutaNotesZip_…).
         const result = await restoreRecordVaultTutaDriveBackupZip(file);
         progress.update({ stage: 'done', percent: 100 });
         setSuccess(

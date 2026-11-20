@@ -1,9 +1,12 @@
 /**
  * TutaDrive backup zip name preview — keep in sync with be/utils/tutaDriveBackupNames.js.
- * EncryptedTutaNotesZip_YYYY_MM_DD[_<note>].zip (server adds _2, _3 … if that name already exists).
+ * Encrypted: EncryptedTutaNotesZip_YYYY_MM_DD[_<note>].zip
+ * Plaintext (TUTANOTES_ENCRYPT_ALLOWED=false): TutaNotesZip_YYYY_MM_DD[_<note>].zip
+ * (server adds _2, _3 … if that name already exists).
  */
 
 export const TUTADRIVE_BACKUP_FILE_PREFIX = 'EncryptedTutaNotesZip';
+export const TUTADRIVE_BACKUP_FILE_PREFIX_PLAIN = 'TutaNotesZip';
 export const TUTADRIVE_BACKUP_NOTE_MAX_LEN = 19;
 export const TUTADRIVE_BACKUP_HINT_MAX_LEN = 100;
 
@@ -22,7 +25,13 @@ export function tutaDriveBackupDateStamp(date = new Date()) {
   return `${y}_${m}_${d}`;
 }
 
-export function tutaDriveBackupFileNamePreview(note, dateStamp = tutaDriveBackupDateStamp()) {
+/** @param {boolean} [encrypted=true] — false when TUTANOTES_ENCRYPT_ALLOWED=false (plaintext zip). */
+export function tutaDriveBackupFileNamePreview(
+  note,
+  dateStamp = tutaDriveBackupDateStamp(),
+  encrypted = true
+) {
   const slug = tutaDriveBackupNoteSlug(note);
-  return `${TUTADRIVE_BACKUP_FILE_PREFIX}_${dateStamp}${slug ? `_${slug}` : ''}.zip`;
+  const prefix = encrypted ? TUTADRIVE_BACKUP_FILE_PREFIX : TUTADRIVE_BACKUP_FILE_PREFIX_PLAIN;
+  return `${prefix}_${dateStamp}${slug ? `_${slug}` : ''}.zip`;
 }

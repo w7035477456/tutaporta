@@ -44,6 +44,7 @@ import {
   photoAlbumsTrayItemDisplayName
 } from './thumbnails/photoAlbumsTrayItems';
 import {
+  ALBUM_MAX_TRAILING_BLANK_PAGES,
   ALBUM_PAGE_MAX_PHOTOS,
   ALBUM_PAGE_STRETCH_MIN,
   albumPageBlockHeight,
@@ -55,11 +56,13 @@ import {
   albumPagePhotoView,
   albumPagesSharedBgColor,
   albumPhotoViewTransform,
+  countTrailingBlankAlbumPages,
   normalizeAlbumPageBgColor,
   createAlbumPageInstance,
   normalizeAlbumPageAttachmentIds,
   parseAlbumPageInstancesFromHtml,
-  serializeAlbumPageInstances
+  serializeAlbumPageInstances,
+  trimTrailingBlankAlbumPages
 } from './photoAlbumsPages';
 import { MY_PHOTO_ALBUMS_VIEW_PATH } from 'constants/myPhotoAlbumsRoute';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
@@ -1952,6 +1955,43 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     });
   }, [albumFocusView, albumEditFocusView]);
 
+  /**
+   * Drop excess trailing blank pages (keep at most one empty spread after the last photo).
+   * Cleans text labels on removed bands and clamps the open spread.
+   */
+  const trimTrailingBlankPagesNow = useCallback(() => {
+    if (!editor) return false;
+    const before = sortAlbumPagesByBand(albumPagesRef.current || []);
+    const trimmed = trimTrailingBlankAlbumPages(before);
+    if (trimmed.length >= before.length) return false;
+    const pw = Math.max(
+      200,
+      Math.round(Number(pageSize.width) || Number(albumCanvasWidthPxRef.current) || 480)
+    );
+    const orient = pageOrientationRef.current;
+    for (let i = trimmed.length; i < before.length; i += 1) {
+      removeTextLabelsInBand(editor, albumPageBand(before[i], pw, orient));
+    }
+    albumPagesRef.current = trimmed;
+    setAlbumPages(trimmed);
+    setAlbumPageIndex((prev) => {
+      if (!trimmed.length) return 0;
+      return albumSpreadLeftPageIndex(Math.min(prev, trimmed.length - 1));
+    });
+    const bottom = lowestAlbumPageBottom(trimmed);
+    if (bottom > 0) ensureAlbumCanvasMinHeight(editor, bottom, { allowShrink: true });
+    requestAnimationFrame(() => emitHtml(editor.getHTML()));
+    return true;
+  }, [editor, emitHtml, pageSize.width]);
+
+  // Collapse excess trailing blanks whenever the page list grows past the allowed empty spread
+  // (e.g. albums already open after a hot reload, or older saves with many Next-added blanks).
+  useEffect(() => {
+    if (countTrailingBlankAlbumPages(albumPages) > ALBUM_MAX_TRAILING_BLANK_PAGES) {
+      trimTrailingBlankPagesNow();
+    }
+  }, [albumPages, trimTrailingBlankPagesNow]);
+
   /** Remove one album page (and text labels in its band), then restack remaining pages. */
   const removeAlbumPageAt = useCallback(
     (pageIndex) => {
@@ -1985,9 +2025,10 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         return prev;
       });
       requestAnimationFrame(() => emitHtml(editor.getHTML()));
+      trimTrailingBlankPagesNow();
       return true;
     },
-    [editor, emitHtml, pageSize.width]
+    [editor, emitHtml, pageSize.width, trimTrailingBlankPagesNow]
   );
 
   useImperativeHandle(
@@ -2007,7 +2048,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       setContent: (html, nextEditable) => {
         if (!editor) return;
         suppressAutoFitUntilRef.current = Date.now() + 400;
-        const list = parseAlbumPageInstancesFromHtml(html);
+        const parsed = parseAlbumPageInstancesFromHtml(html);
+        const list = trimTrailingBlankAlbumPages(parsed);
         const orient = parseAlbumOrientationFromHtml(html);
         const titleStyle = parseAlbumTitleStyleFromHtml(html);
         albumPagesRef.current = list;
@@ -2018,7 +2060,21 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         setPageOrientation(orient);
         setAlbumTitleStyle(titleStyle);
         editor.commands.setContent(stripAlbumMarkers(html) || EMPTY_DOC, { emitUpdate: false });
-        if (purgeAlbumDragJunkFromEditor(editor)) {
+        let shouldEmit = purgeAlbumDragJunkFromEditor(editor);
+        if (list.length < parsed.length) {
+          const pw = Math.max(
+            200,
+            Math.round(Number(albumCanvasWidthPxRef.current) || Number(list[0]?.w) || 480)
+          );
+          for (let i = list.length; i < parsed.length; i += 1) {
+            removeTextLabelsInBand(editor, albumPageBand(parsed[i], pw, orient));
+          }
+          setAlbumPageIndex((prev) =>
+            list.length ? albumSpreadLeftPageIndex(Math.min(prev, list.length - 1)) : 0
+          );
+          shouldEmit = true;
+        }
+        if (shouldEmit) {
           requestAnimationFrame(() => emitHtml(editor.getHTML()));
         }
         const bottom = lowestAlbumPageBottom(list);
@@ -2268,6 +2324,7 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
         return albumSpreadLeftPageIndex(next);
       });
       requestAnimationFrame(() => emitHtml(editor.getHTML()));
+      trimTrailingBlankPagesNow();
     },
     [
       editable,
@@ -2275,7 +2332,8 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       onOrderFilmstripDelete,
       editor,
       pageSize.width,
-      emitHtml
+      emitHtml,
+      trimTrailingBlankPagesNow
     ]
   );
 
@@ -2317,8 +2375,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
           : page
       );
       persistAlbumPages(next);
+      trimTrailingBlankPagesNow();
     },
-    [persistAlbumPages]
+    [persistAlbumPages, trimTrailingBlankPagesNow]
   );
 
   /** Zoom / pan / rotation of one page photo (null = original). */
@@ -3340,11 +3399,18 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     }
     if (albumCoverFace === 'back') return;
     if (albumOnLastSpread) {
-      // Editing: Next past the last page adds two blank pages; viewing shows the back cover.
+      // Editing: Next past the last page may add blank pages (at most one empty spread);
+      // viewing — or when trailing blanks are already maxed — shows the back cover.
       if (effectiveEditable && !albumFullscreen && !orderAlbumActive) {
+        const trailing = countTrailingBlankAlbumPages(albumPagesRef.current || []);
+        if (trailing >= ALBUM_MAX_TRAILING_BLANK_PAGES) {
+          showAlbumBackCover();
+          return;
+        }
+        const toAdd = Math.max(1, ALBUM_MAX_TRAILING_BLANK_PAGES - trailing);
         void runAlbumPageFlipThen(() => {
           const count = (albumPagesRef.current || []).length;
-          insertAlbumPagesAt(count, Array(ALBUM_SPREAD_PAGE_COUNT).fill(null));
+          insertAlbumPagesAt(count, Array(toAdd).fill(null));
         }, 'next');
         return;
       }

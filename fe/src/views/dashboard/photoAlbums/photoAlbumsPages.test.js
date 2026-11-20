@@ -7,12 +7,15 @@ import {
   albumPageStretchFromPages,
   albumPagesSharedBgColor,
   albumPhotoViewTransform,
+  countTrailingBlankAlbumPages,
   createAlbumPageInstance,
   createAlbumPhotoOverlay,
+  isAlbumPageBlank,
   normalizeAlbumPhotoView,
   parseAlbumPageInstancesFromHtml,
   readLegacyPlacedPhotoAttachmentIds,
-  serializeAlbumPageInstances
+  serializeAlbumPageInstances,
+  trimTrailingBlankAlbumPages
 } from './photoAlbumsPages';
 
 const twoPageMarker =
@@ -148,5 +151,30 @@ describe('album pages', () => {
     expect(albumPageStretchFromPages([{ w: 600, h: 400 }], 'landscape')).toBe(1.25);
     expect(albumPageStretchFromPages([{ w: 500, h: 50 }], 'portrait')).toBe(3);
     expect(albumPageStretchFromPages([], 'portrait')).toBe(1);
+  });
+
+  it('trims trailing blank pages down to at most two after the last photo', () => {
+    const pages = [
+      createAlbumPageInstance({ key: '1', x: 0, y: 0, w: 100, h: 120, attachmentIds: [1] }),
+      createAlbumPageInstance({ key: '2', x: 110, y: 0, w: 100, h: 120, attachmentIds: [2] }),
+      createAlbumPageInstance({ key: '3', x: 0, y: 140, w: 100, h: 120, attachmentIds: [3] }),
+      createAlbumPageInstance({ key: '4', x: 110, y: 140, w: 100, h: 120, attachmentIds: [4] }),
+      ...Array.from({ length: 10 }, (_, i) =>
+        createAlbumPageInstance({ key: `b${i}`, x: i % 2 === 0 ? 0 : 110, y: 280 + Math.floor(i / 2) * 140, w: 100, h: 120 })
+      )
+    ];
+    expect(pages).toHaveLength(14);
+    expect(isAlbumPageBlank(pages[4])).toBe(true);
+    expect(countTrailingBlankAlbumPages(pages)).toBe(10);
+    const trimmed = trimTrailingBlankAlbumPages(pages);
+    expect(trimmed.map((p) => p.key)).toEqual(['1', '2', '3', '4', 'b0', 'b1']);
+    expect(countTrailingBlankAlbumPages(trimmed)).toBe(2);
+  });
+
+  it('keeps one blank spread when every page is blank', () => {
+    const blanks = Array.from({ length: 8 }, (_, i) =>
+      createAlbumPageInstance({ key: `e${i}`, x: i % 2 === 0 ? 0 : 110, y: Math.floor(i / 2) * 140, w: 100, h: 120 })
+    );
+    expect(trimTrailingBlankAlbumPages(blanks)).toHaveLength(2);
   });
 });

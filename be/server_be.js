@@ -181,6 +181,7 @@ import {
   reorderRecordVaultNotes,
   reorderRecordVaultShortcuts,
   searchRecordVaultNotes,
+  extractRecordVaultInlineImages,
   updateRecordVaultNotebook,
   updateRecordVaultNote,
   moveRecordVaultNoteImage
@@ -1584,6 +1585,7 @@ const photoAlbumsVaultAuth = [
 app.use('/api/recordVault', ...recordVaultTransferMeterStack);
 app.get('/api/recordVault', ...recordVaultVaultAuth, getRecordVaultTree);
 app.get('/api/recordVault/search', ...recordVaultVaultAuth, searchRecordVaultNotes);
+app.post('/api/recordVault/extract-inline-images', ...recordVaultVaultAuth, extractRecordVaultInlineImages);
 app.get('/api/recordVault/rag/status', ...recordVaultVaultAuth, getRecordVaultRagStatus);
 app.post('/api/recordVault/rag/keep-model', requireAuth, postRecordVaultRagKeepModel);
 app.post('/api/recordVault/rag/query', ...recordVaultVaultAuth, postRecordVaultRagQuery);
@@ -1604,6 +1606,8 @@ app.get('/api/recordVault/notes/:noteId/extra-images/:imageId', ...recordVaultVa
 app.post('/api/recordVault/notes/:noteId/extra-images', ...recordVaultVaultAuth, uploadRecordVaultNoteExtraImage);
 app.delete('/api/recordVault/notes/:noteId/extra-images/:imageId', ...recordVaultVaultAuth, deleteRecordVaultNoteExtraImage);
 app.get('/api/recordVault/notes/:noteId/attachments/:attachmentId', ...recordVaultVaultAuth, getRecordVaultNoteAttachment);
+// Unified name: data-file-id → /files/{fileId} (same bytes as attachments)
+app.get('/api/recordVault/notes/:noteId/files/:attachmentId', ...recordVaultVaultAuth, getRecordVaultNoteAttachment);
 app.post(
   '/api/recordVault/notes/:noteId/attachments/:attachmentId/open-native',
   ...recordVaultVaultAuth,

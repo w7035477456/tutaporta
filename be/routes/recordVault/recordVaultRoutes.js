@@ -32,7 +32,8 @@ import {
   vaultGetNoteAttachment,
   vaultAddNoteExtraImage,
   vaultDeleteNoteExtraImage,
-  vaultGetNoteExtraImage
+  vaultGetNoteExtraImage,
+  vaultExtractAllInlineDataImages
 } from '../../utils/recordVaultUsb/vaultSession.js';
 import {
   canNativeOpenRecordVaultExtension,
@@ -962,6 +963,25 @@ export async function deleteRecordVaultNoteAttachment(req, res) {
     }
     return sendRecordVaultError(res, err, 'Failed to delete attachment', {
       route: 'deleteRecordVaultNoteAttachment',
+      singlesId: req.auth?.singles_id
+    });
+  }
+}
+
+/**
+ * POST /api/recordVault/extract-inline-images
+ * One-shot: move every data:image;base64,… in this vault into TutaNotes/files/
+ * and rewrite body_text to <img data-file-id="…"> pointers.
+ */
+export async function extractRecordVaultInlineImages(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+  try {
+    const result = await vaultExtractAllInlineDataImages(session);
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    return sendRecordVaultError(res, err, 'Failed to extract inline images', {
+      route: 'extractRecordVaultInlineImages',
       singlesId: req.auth?.singles_id
     });
   }

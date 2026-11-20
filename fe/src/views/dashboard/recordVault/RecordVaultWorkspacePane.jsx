@@ -67,6 +67,10 @@ import { getRecordVaultOverageThrottleActive } from 'utils/recordVaultOverageThr
 import { buildVaultTransferProgressLabel } from 'utils/vaultTransferProgressLabel';
 import { waitForVaultTransferThrottleTail } from 'utils/waitForVaultTransferThrottleTail';
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
+import {
+  resolveRecordVaultFileIdsInHtml,
+  stripResolvedFileSrcFromHtml
+} from './recordVaultResolveFileIdsInHtml';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
 import BillScheduleInstructionPopup from './BillScheduleInstructionPopup';
@@ -3045,6 +3049,9 @@ export default function RecordVaultWorkspacePane({
     return () => window.removeEventListener('resize', syncButtonFont);
   }, []);
 
+  /** One background pass per unlock: move data:image base64 out of body_text into files/. */
+  const inlineExtractStartedRef = useRef(false);
+
   const loadTree = useCallback(
     async ({ preferNotebookId, preferNoteId, silent = false } = {}) => {
       if (!silent) setLoading(true);
@@ -3054,6 +3061,12 @@ export default function RecordVaultWorkspacePane({
         const { notebooks: tree, shortcuts: loadedShortcuts } = await vaultApi.fetchRecordVaultTree();
         setNotebooks(tree);
         setShortcuts(loadedShortcuts);
+        if (!inlineExtractStartedRef.current && typeof vaultApi.extractRecordVaultInlineImages === 'function') {
+          inlineExtractStartedRef.current = true;
+          void vaultApi.extractRecordVaultInlineImages().catch((err) => {
+            console.warn('[TutaNotes] extract-inline-images failed', err?.message || err);
+          });
+        }
 
         const currentNotebookId = selectedNotebookIdRef.current;
         const currentNoteId = selectedNoteIdRef.current;
@@ -3319,7 +3332,9 @@ export default function RecordVaultWorkspacePane({
       const realignedBody = realignBodyAttachmentBlocks(rawBody, atts);
       // Drop title-matching body rows (ignore [n]/[#]); leave title intact.
       const cleanedBody = cleanRecordVaultNoteBodyHtml(realignedBody, titlePlain);
-      api.setContent(cleanedBody || '<p></p>', true);
+      // data-file-id → attachment URL for display; Postgres keeps pointers only.
+      const displayBody = resolveRecordVaultFileIdsInHtml(cleanedBody, id);
+      api.setContent(displayBody || '<p></p>', true);
       if (realignedBody !== rawBody || cleanedBody !== rawBody) {
         patchNoteRowInTree(id, { body_text: cleanedBody, content_loaded: true });
         void vaultApi.updateRecordVaultNote(id, { body_text: cleanedBody }).catch(() => {
@@ -3464,6 +3479,7 @@ export default function RecordVaultWorkspacePane({
     setVaultLeavingProgressPercent(100);
     setVaultLeavingProgressLabel('Done');
     setRecordVaultBridgeStorageType(null);
+    inlineExtractStartedRef.current = false;
     setNotebooks([]);
     setShortcuts([]);
     setSelectedNotebookId(null);
@@ -3658,13 +3674,28 @@ export default function RecordVaultWorkspacePane({
       persistNoteInFlightIdsRef.current.add(noteId);
       setError('');
       try {
-        await vaultApi.updateRecordVaultNote(noteId, { body_text: html });
+        const bodyForSave = stripResolvedFileSrcFromHtml(html);
+        const updated = await vaultApi.updateRecordVaultNote(noteId, { body_text: bodyForSave });
         const stillCurrent = (persistNoteGenerationRef.current.get(noteId) || 0) === generation;
         if (stillCurrent) {
           const touchedAt = new Date().toISOString();
-          patchNoteRowInTree(noteId, { body_text: html, content_loaded: true, updated_at: touchedAt });
-          indexNoteSearchText(noteId, stripRecordVaultHtml(html), noteName);
+          // Prefer server body (inline data:images may have been extracted to files).
+          const savedBody =
+            updated?.body_text != null ? String(updated.body_text) : bodyForSave;
+          patchNoteRowInTree(noteId, { body_text: savedBody, content_loaded: true, updated_at: touchedAt });
+          indexNoteSearchText(noteId, stripRecordVaultHtml(savedBody), noteName);
           touchRecentForNote(noteId, { title: noteName });
+          if (
+            noteEditorApiRef.current &&
+            loadedNoteIdRef.current === noteId &&
+            savedBody !== bodyForSave &&
+            /data-file-id=/i.test(savedBody)
+          ) {
+            noteEditorApiRef.current.setContent(
+              resolveRecordVaultFileIdsInHtml(savedBody, noteId) || '<p></p>',
+              true
+            );
+          }
         }
       } catch (err) {
         const message = readRecordVaultApiError(err, 'Failed to save note');

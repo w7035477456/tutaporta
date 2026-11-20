@@ -88,6 +88,10 @@ import {
   snapshotVaultSessionFileCountsToLast
 } from '../vaultSessionFileCounts.js';
 import { rvCloudWarn } from '../recordVaultCloudDebugLog.js';
+import {
+  bodyHasInlineDataImage,
+  rewriteInlineDataImages
+} from './extractInlineDataImages.js';
 import { isUnchangedNoteTextPatch } from './unchangedNoteTextPatch.js';
 import { markVaultSessionClusterState } from '../vaultClusterCoherence.js';
 
@@ -380,6 +384,68 @@ async function refreshNoteSearchText(db, noteId) {
     `UPDATE ${T.notes} SET search_text = $3, updated_at = NOW() WHERE singles_id = $1 AND note_id = $2`,
     [sid, noteId, searchText]
   );
+}
+
+/**
+ * Move inline `data:image;base64,…` out of body_text into TutaNotes/files/{nb}/{note}/{id}.ext
+ * and leave `<img data-file-id="{id}">` pointers. No-op when none / inner-encrypted.
+ * @returns {{ bodyText: string, extracted: number, failed: number }}
+ */
+export async function materializeInlineDataImagesInNoteBody(session, noteId, bodyText) {
+  const raw = String(bodyText ?? '');
+  if (!bodyHasInlineDataImage(raw)) {
+    return { bodyText: raw, extracted: 0, failed: 0 };
+  }
+  const note = await loadNote(session.db, noteId);
+  if (!note) throw new Error('Note not found');
+  const notebookId = Number(note.notebook_id);
+
+  const { html, extracted, failed } = await rewriteInlineDataImages(raw, async (decoded, index) => {
+    const attachment = await vaultAddNoteAttachment(session, noteId, {
+      buffer: decoded.buffer,
+      fileName: `inline_${noteId}_${index + 1}.${decoded.ext}`,
+      ext: decoded.ext,
+      mimeType: decoded.mimeType
+    });
+    const fileId = Number(attachment?.attachment_id);
+    if (!Number.isFinite(fileId) || fileId < 1) return null;
+    // notebookId unused here — path comes from vaultAddNoteAttachment via fileRelativePath
+    void notebookId;
+    return { fileId };
+  });
+
+  if (extracted > 0 && html !== raw) {
+    await session.db.run(
+      `UPDATE ${T.notes} SET body_text = $3, updated_at = NOW() WHERE singles_id = $1 AND note_id = $2`,
+      [session.db.singlesId, noteId, html]
+    );
+    await refreshNoteSearchText(session.db, noteId);
+  }
+  return { bodyText: html, extracted, failed };
+}
+
+/** Extract inline images for every note that still has data: URLs (unlocked vault). */
+export async function vaultExtractAllInlineDataImages(session) {
+  const rows = await session.db.all(
+    `SELECT note_id FROM ${T.notes}
+      WHERE singles_id = $1 AND deleted_at IS NULL
+        AND body_text LIKE '%data:image%'
+      ORDER BY note_id ASC`,
+    [session.db.singlesId]
+  );
+  let notesTouched = 0;
+  let imagesExtracted = 0;
+  let imagesFailed = 0;
+  for (const row of rows) {
+    const noteId = Number(row.note_id);
+    const note = await loadNote(session.db, noteId);
+    if (!note?.body_text) continue;
+    const result = await materializeInlineDataImagesInNoteBody(session, noteId, note.body_text);
+    if (result.extracted > 0) notesTouched += 1;
+    imagesExtracted += result.extracted;
+    imagesFailed += result.failed;
+  }
+  return { notesScanned: rows.length, notesTouched, imagesExtracted, imagesFailed };
 }
 
 
@@ -1212,6 +1278,10 @@ async function mapNote(db, noteId) {
 }
 
 export async function vaultGetNote(session, noteId) {
+  const row = await loadNote(session.db, noteId);
+  if (row?.body_text && bodyHasInlineDataImage(row.body_text)) {
+    await materializeInlineDataImagesInNoteBody(session, noteId, row.body_text);
+  }
   return mapNote(session.db, noteId);
 }
 
@@ -1441,6 +1511,9 @@ export async function vaultCreateNote(
     }
     return id;
   });
+  if (bodyHasInlineDataImage(bodyText ?? '')) {
+    await materializeInlineDataImagesInNoteBody(session, noteId, bodyText);
+  }
   return mapNote(session.db, noteId);
 }
 
@@ -1512,6 +1585,8 @@ export async function vaultUpdateNote(session, noteId, patch) {
       await updateNoteColumn(tx, noteId, 'note_name', patch.note_name);
     }
     if (patch.body_text != null) {
+      // Store raw first; materializeInlineDataImagesInNoteBody runs after the tx
+      // (needs vaultAddNoteAttachment / disk writes outside this transaction).
       await updateNoteColumn(tx, noteId, 'body_text', patch.body_text);
     }
     if (patch.inner_encrypt_enabled != null) {
@@ -1569,6 +1644,9 @@ export async function vaultUpdateNote(session, noteId, patch) {
       await refreshNoteSearchText(tx, noteId);
     }
   });
+  if (patch.body_text != null && bodyHasInlineDataImage(patch.body_text)) {
+    await materializeInlineDataImagesInNoteBody(session, noteId, patch.body_text);
+  }
   return mapNote(session.db, noteId);
 }
 

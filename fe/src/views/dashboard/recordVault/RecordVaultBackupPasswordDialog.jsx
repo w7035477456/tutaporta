@@ -12,6 +12,7 @@ import {
   tutaDriveBackupDateStamp,
   tutaDriveBackupFileNamePreview
 } from 'utils/recordVaultBackupFileName';
+import { isRecordVaultEncryptAllowed } from 'utils/recordVaultClientSession';
 
 const MODE_CONFIRM_LABEL = { backup: 'Backup', restore: 'Restore', merge: 'Merge', open: 'Open' };
 const MODE_TITLE = { backup: 'Backup note', restore: 'Restore backup', merge: 'Merge backup', open: 'Open backup' };
@@ -154,10 +155,17 @@ export default function RecordVaultBackupPasswordDialog({
 
           <ColorTemplate16PopupCenterWide.FormRow label={isBackup ? 'Zip file output:' : 'Zip file:'}>
             <ColorTemplate16PopupCenterWide.BodyText sx={readOnlyValueSx}>
-              {isBackup ? tutaDriveBackupFileNamePreview(noteValue, dateStamp) : fileName}
+              {isBackup
+                ? tutaDriveBackupFileNamePreview(noteValue, dateStamp, isRecordVaultEncryptAllowed())
+                : fileName}
             </ColorTemplate16PopupCenterWide.BodyText>
           </ColorTemplate16PopupCenterWide.FormRow>
 
+          {isBackup && !isRecordVaultEncryptAllowed() ? (
+            <ColorTemplate16PopupCenterWide.BodyText sx={helperTextSx}>
+              Encryption is off (TUTANOTES_ENCRYPT_ALLOWED=false) — this backup is a plain zip (no Encrypt Password).
+            </ColorTemplate16PopupCenterWide.BodyText>
+          ) : (
           <ColorTemplate16PopupCenterWide.FormRow label="Encrypt Password:">
             <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
               <ColorTemplate16PopupCenterWide.Input
@@ -203,6 +211,7 @@ export default function RecordVaultBackupPasswordDialog({
               ) : null}
             </Box>
           </ColorTemplate16PopupCenterWide.FormRow>
+          )}
 
           <ColorTemplate16PopupCenterWide.FormRow label="Hint:">
             {isBackup ? (

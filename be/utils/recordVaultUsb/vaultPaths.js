@@ -214,10 +214,13 @@ export function extraPhotoRelativePath(notebookId, noteId, imageId, ext = 'jpg')
   return `${notebookId}/${noteId}_e${imageId}.${cleanExt}`;
 }
 
-/** Relative path inside files/: {notebookId}/{noteId}/att_{attachmentId}.{ext} */
+/**
+ * Relative path inside files/: {notebookId}/{noteId}/{attachmentId}.{ext}
+ * (legacy rows may still use att_{id}.{ext} — relative_path in DB is source of truth).
+ */
 export function fileRelativePath(notebookId, noteId, attachmentId, ext = 'bin') {
   const cleanExt = String(ext || 'bin').replace(/^\./, '').toLowerCase();
-  return `${notebookId}/${noteId}/att_${attachmentId}.${cleanExt}`;
+  return `${notebookId}/${noteId}/${attachmentId}.${cleanExt}`;
 }
 
 /** Minimal TutaNotes vault layout: meta + photos/ + files/ (db checked separately). */
