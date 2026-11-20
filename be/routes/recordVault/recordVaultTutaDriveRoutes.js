@@ -20,9 +20,10 @@ import {
   createEnvVaultKeyMaterial,
   listEnvVaultUnlockKeys
 } from '../../utils/recordVaultIconKeys.js';
-import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
+import { vaultMetaUsesPlaintextStorage } from '../../utils/recordVaultIconEncryption.js';
 import { requireVaultAccessSession } from '../../utils/recordVaultAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/recordVaultUsb/usbScan.js';
+import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/recordVaultUsb/vaultCrypto.js';
 import { listVaultDbFileNames, vaultMetaPath, vaultRootOnMount } from '../../utils/recordVaultUsb/vaultPaths.js';
 import pool from '../../db/connection.js';
 import {
@@ -165,13 +166,16 @@ function vaultStatusFlags(notesMount) {
 }
 
 async function resolveTutaDriveKeyMaterial() {
-  if (!isRecordVaultIconEncryptionEnabled()) return null;
+  // At-rest encrypt follows NOTES_ENCRYPT_PHOTO_AND_DB (not NOTES_ICON_ENCRYPTION).
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return null;
   return createEnvVaultKeyMaterial(TUTADRIVE_ENV_KEY_TYPE);
 }
 
 async function resolveTutaDriveUnlockKey(notesMount) {
-  if (!isRecordVaultIconEncryptionEnabled()) return null;
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return null;
   const meta = readVaultMeta(notesMount);
+  // Plaintext vaults migrate to encrypted on unlock (fresh Argon2id salt).
+  if (vaultMetaUsesPlaintextStorage(meta)) return null;
   const keys = await listEnvVaultUnlockKeys(TUTADRIVE_ENV_KEY_TYPE, meta);
   return keys[0]?.key ?? null;
 }
@@ -767,7 +771,7 @@ export async function listRecordVaultTutaDriveBackupTree(req, res) {
     const staging = await extractTutaDriveMergeZip(memberId, singlesId, upload.zipPath);
     stagingRoot = staging.stagingRoot;
     let key = getVaultSession(singlesId, 'onedrive')?.key ?? null;
-    if (!key && isRecordVaultIconEncryptionEnabled()) {
+    if (!key && isVaultPhotoAndDbEncryptionEnabled()) {
       key = await resolveTutaDriveUnlockKey(staging.mountPath);
     }
     const tree = await listTutaDriveBackupNotebookTree(staging.mountPath, key);

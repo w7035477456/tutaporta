@@ -20,6 +20,7 @@ import {
 import { useAuth } from 'contexts/AuthContext';
 import {
   clearRecordVaultE2eSession,
+  getRecordVaultE2eDek,
   isRecordVaultE2eUnlocked,
   isRecordVaultEncryptAllowed,
   setRecordVaultEncryptAllowed
@@ -479,7 +480,12 @@ export default function MyRecordVault() {
               setRagUiEnabled(Boolean(pub.ragUiEnabled));
             }
             if (pub.tutaNotesEncryptAllowed != null) {
-              setRecordVaultEncryptAllowed(Boolean(pub.tutaNotesEncryptAllowed));
+              const allowed = Boolean(pub.tutaNotesEncryptAllowed);
+              setRecordVaultEncryptAllowed(allowed);
+              // If admin re-enabled encryption after a skip-open, force Encrypt Password UI again.
+              if (allowed && !getRecordVaultE2eDek()) {
+                accessUnlockedRef.current = false;
+              }
             }
           }
         }
@@ -490,7 +496,11 @@ export default function MyRecordVault() {
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
         applyPanelSides(cfg);
-        setRecordVaultEncryptAllowed(cfg.encryptAllowed !== false);
+        const allowed = cfg.encryptAllowed !== false;
+        setRecordVaultEncryptAllowed(allowed);
+        if (allowed && !getRecordVaultE2eDek()) {
+          accessUnlockedRef.current = false;
+        }
         setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
         setLocalUsbOffered(false);
       } catch {
@@ -651,15 +661,18 @@ export default function MyRecordVault() {
 
   // Open TutaNotes Cloud / USB share one vault-password popup (Step 1), then resume icon unlock.
   // Mobile upload uses a separate sheet and never reaches these handlers.
-  // TUTANOTES_ENCRYPT_ALLOWED=false: skip Encrypt Password UI entirely.
+  // TUTANOTES_ENCRYPT_ALLOWED=true → show Encrypt Password UI (Set / Verify).
+  // TUTANOTES_ENCRYPT_ALLOWED=false → skip Encrypt Password UI entirely.
   const handleTutaCloudOpenClicked = useCallback(() => {
-    if (accessUnlockedRef.current) return false;
     if (!isRecordVaultEncryptAllowed()) {
       clearRecordVaultE2eSession();
       accessUnlockedRef.current = true;
       setTutaCloudProceedOpenToken((n) => n + 1);
       return true;
     }
+    // Encryption allowed: require Encrypt Password gate unless this tab already unlocked DEK.
+    if (accessUnlockedRef.current && getRecordVaultE2eDek()) return false;
+    accessUnlockedRef.current = false;
     pendingOpenRef.current = { storageType: 'tutadrive' };
     setAccessGateStorageType('tutadrive');
     setAccessGateUsbMountPath('');
@@ -668,7 +681,6 @@ export default function MyRecordVault() {
   }, []);
 
   const handleUsbOpenClicked = useCallback((opts = {}) => {
-    if (accessUnlockedRef.current) return false;
     const mountPath = String(opts?.mountPath ?? '').trim();
     if (!isRecordVaultEncryptAllowed()) {
       clearRecordVaultE2eSession();
@@ -677,6 +689,8 @@ export default function MyRecordVault() {
       setUsbProceedOpenToken((n) => n + 1);
       return true;
     }
+    if (accessUnlockedRef.current && getRecordVaultE2eDek()) return false;
+    accessUnlockedRef.current = false;
     pendingOpenRef.current = { storageType: 'usb', mountPath };
     setAccessGateStorageType('usb');
     setAccessGateUsbMountPath(mountPath);
