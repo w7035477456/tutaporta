@@ -10,6 +10,7 @@ import {
 import { removeDuplicateFilesInPhotoAlbumsEnvFolders } from '../photoAlbumsFolderDedupe.js';
 import { countPhotoAlbumsAlbumMediaByNoteId } from '../photoAlbumsSidebarMediaCount.js';
 import {
+  createEnvVaultKeyMaterial,
   createIconVaultKeyMaterial,
   iconVaultKdfMetaFields,
   listIconVaultUnlockKeys,
@@ -548,6 +549,150 @@ async function migrateSessionIconVaultToArgon2id(session, iconName) {
 }
 
 /**
+ * One-time: seal plaintext photos/ + files/ and flip vault.meta to aes-256-gcm-icon-key.
+ * Runs on unlock when PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB (and TUTAPHOTO_ENCRYPT_ALLOWED) are on
+ * but the vault was created as encryption:none.
+ */
+async function migratePlaintextVaultToEncrypted(session, options = {}) {
+  if (!session || !vaultMetaUsesPlaintextStorage(session.meta)) return false;
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return false;
+
+  let material = options?.keyMaterial?.key ? options.keyMaterial : null;
+  if (!material) {
+    const iconName = String(options?.iconName || '').trim();
+    try {
+      if (iconName) {
+        material = await createIconVaultKeyMaterial(iconName);
+      } else {
+        const envType =
+          String(session.storageType || options?.storageType || '').toLowerCase() === 'usb'
+            ? 'usb'
+            : 'tutadrive';
+        material = await createEnvVaultKeyMaterial(envType);
+      }
+    } catch (err) {
+      console.warn(
+        '[migratePlaintextVaultToEncrypted] no key material; leaving vault plaintext',
+        err?.message || err
+      );
+      return false;
+    }
+  }
+  if (!material?.key || isPlaintextVaultKey(material.key)) return false;
+
+  const newKey = material.key;
+  let sealedCount = 0;
+  let skippedCount = 0;
+
+  function sealPlainFile(absPath) {
+    if (!fs.existsSync(absPath)) return;
+    let st;
+    try {
+      st = fs.lstatSync(absPath);
+    } catch {
+      return;
+    }
+    if (!st.isFile()) return;
+    // Skip temp / already-.enc names that may appear mid-write.
+    const base = path.basename(absPath);
+    if (base.startsWith('.') || base.includes('.tmp-')) return;
+
+    let plain;
+    try {
+      plain = fs.readFileSync(absPath);
+    } catch (err) {
+      console.warn('[migratePlaintextVaultToEncrypted] read failed', absPath, err?.message || err);
+      skippedCount += 1;
+      return;
+    }
+    if (!plain?.length) {
+      skippedCount += 1;
+      return;
+    }
+
+    const sealed = sealVaultBuffer(plain, newKey);
+    const dest = absPath.endsWith('.enc') ? absPath : `${absPath}.enc`;
+    try {
+      atomicWriteFileSync(dest, sealed);
+      if (dest !== absPath && fs.existsSync(absPath)) {
+        try {
+          fs.unlinkSync(absPath);
+        } catch (unlinkErr) {
+          console.warn(
+            '[migratePlaintextVaultToEncrypted] could not remove plaintext',
+            absPath,
+            unlinkErr?.message || unlinkErr
+          );
+        }
+      }
+      sealedCount += 1;
+    } catch (err) {
+      console.warn('[migratePlaintextVaultToEncrypted] seal failed', absPath, err?.message || err);
+      skippedCount += 1;
+    }
+  }
+
+  function walkAndSeal(dir) {
+    if (!fs.existsSync(dir)) return;
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      if (name.startsWith('.')) continue;
+      const abs = path.join(dir, name);
+      let st;
+      try {
+        st = fs.lstatSync(abs);
+      } catch {
+        continue;
+      }
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) walkAndSeal(abs);
+      else sealPlainFile(abs);
+    }
+  }
+
+  const startedAt = Date.now();
+  walkAndSeal(vaultPhotosRoot(session.mountPath));
+  walkAndSeal(vaultFilesRoot(session.mountPath));
+
+  session.key = newKey;
+  session.meta = {
+    ...session.meta,
+    version: 2,
+    encryption: 'aes-256-gcm-icon-key',
+    ...iconVaultKdfMetaFields(material)
+  };
+  fs.writeFileSync(vaultMetaPath(session.mountPath), JSON.stringify(session.meta, null, 2));
+
+  if (session.backupMountPath && isVaultMountPathPresent(session.backupMountPath)) {
+    try {
+      walkAndSeal(vaultPhotosRoot(session.backupMountPath));
+      walkAndSeal(vaultFilesRoot(session.backupMountPath));
+      fs.writeFileSync(
+        vaultMetaPath(session.backupMountPath),
+        JSON.stringify(session.meta, null, 2)
+      );
+    } catch (err) {
+      console.warn('[migratePlaintextVaultToEncrypted] backup mirror failed', err?.message || err);
+    }
+  }
+
+  console.log('[migratePlaintextVaultToEncrypted] sealed plaintext photo albums vault at rest', {
+    singlesId: session.singlesId,
+    storageType: session.storageType,
+    vaultId: session.meta?.vaultId,
+    sealedCount,
+    skippedCount,
+    ms: Date.now() - startedAt
+  });
+  return true;
+}
+
+/**
  * TutaDrive album vaults live under LARGE_CHEAP_STORAGE_FOLDER. After that folder moves
  * the absolute mount persisted in vault_cluster_state can still point at the old copy;
  * reopening it there would read/write the wrong disk.
@@ -928,6 +1073,22 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
       await migrateSessionIconVaultToArgon2id(session, migrateIconName);
     } catch (migErr) {
       console.error('[unlockVaultUsbWithKey] Argon2id KDF migrate failed', migErr?.message || migErr);
+    }
+  }
+
+  // Plaintext vault + at-rest encrypt enabled → seal files/photos and flip vault.meta.
+  if (vaultMetaUsesPlaintextStorage(session.meta) && isVaultPhotoAndDbEncryptionEnabled()) {
+    try {
+      await migratePlaintextVaultToEncrypted(session, {
+        iconName: migrateIconName,
+        keyMaterial: options?.encryptKeyMaterial || null,
+        storageType: targetStorageType
+      });
+    } catch (migErr) {
+      console.error(
+        '[unlockVaultUsbWithKey] plaintext→encrypted migrate failed',
+        migErr?.message || migErr
+      );
     }
   }
 

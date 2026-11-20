@@ -1,0 +1,31 @@
+---
+description: Prefer high-visibility file paths in chat; note Cursor paints auto-linked paths blue
+alwaysApply: true
+---
+
+# Chat file paths — visibility on dark background
+
+## Why HTML yellow often fails
+
+Cursor’s agent chat **auto-detects** repo-looking paths and turns them into clickable `.md-clickable-code` links colored with `--cursor-text-link` (dark blue on black). That styling **overrides** agent-emitted `<span style="color:#FFEB3B">…</span>`, and `workbench.colorCustomizations` `textLink.foreground` does **not** change those chat links.
+
+So an `.mdc` rule alone cannot force yellow file links in chat.
+
+## What agents should still do
+
+When listing changed files, prefer a short “Changes” list with full relative paths (no backticks if possible — backticks also get theme colors). Do not promise yellow HTML will render.
+
+## Real fix (user UI, once)
+
+Install the **Custom UI Style** extension, then in Cursor `settings.json`:
+
+```json
+"custom-ui-style.stylesheet": {
+  ".md-clickable-code": "color: #FFEB3B !important;",
+  ".markdown-root .md-clickable-code": "color: #FFEB3B !important;",
+  ".markdown-root a": "color: #FFEB3B !important;",
+  "a.ui-citation-link": "color: #FFEB3B !important;"
+}
+```
+
+Then run **Custom UI Style: Reload**. After that, chat file paths (including auto-linked ones) show bright yellow.
