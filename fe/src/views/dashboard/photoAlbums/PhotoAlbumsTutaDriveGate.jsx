@@ -75,7 +75,9 @@ export default function PhotoAlbumsTutaDriveGate({
     let cancelled = false;
     void (async () => {
       try {
-        await fetchPhotoAlbumsStorageConfig();
+        const cfg = await fetchPhotoAlbumsStorageConfig();
+        const { setPhotoAlbumsEncryptAllowed } = await import('utils/photoAlbumsClientSession');
+        setPhotoAlbumsEncryptAllowed(cfg?.encryptAllowed !== false);
       } catch {
         // optional
       }

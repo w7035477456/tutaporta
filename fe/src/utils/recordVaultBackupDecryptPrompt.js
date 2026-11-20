@@ -2,6 +2,7 @@ import { themedPrompt } from 'utils/themedDialog';
 import { fetchRecordVaultE2eKeys, unlockRecordVaultTutaDrive } from 'api/recordVaultFe';
 import { unlockVaultWithPassword } from 'utils/recordVaultClientVaultCrypto';
 import {
+  isRecordVaultEncryptAllowed,
   isRecordVaultE2eUnlocked,
   setRecordVaultBackupDecryptPassword,
   setRecordVaultE2eSession
@@ -47,6 +48,8 @@ export async function prepareBackupDecryptWithPassword(password, purpose = 'rest
  * @returns {Promise<boolean>} true if unlocked; false if user cancelled
  */
 export async function ensureEncryptPasswordForBackupSeal(purpose = 'backup') {
+  // Admin override: no Encrypt Password / no seal.
+  if (!isRecordVaultEncryptAllowed()) return true;
   if (isRecordVaultE2eUnlocked()) return true;
   const password = await themedPrompt(
     purpose === 'upload'

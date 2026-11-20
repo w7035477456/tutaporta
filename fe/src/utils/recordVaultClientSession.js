@@ -7,6 +7,16 @@ let dekRawBytes = null;
 let vaultMeta = null;
 /** Encrypt Password typed in the backup Decrypt prompt — consumed by the next backup unseal only. */
 let pendingBackupDecryptPassword = null;
+/** From TUTANOTES_ENCRYPT_ALLOWED — when false, no DEK / Encrypt Password is required. */
+let encryptAllowed = true;
+
+export function setRecordVaultEncryptAllowed(allowed) {
+  encryptAllowed = allowed !== false;
+}
+
+export function isRecordVaultEncryptAllowed() {
+  return encryptAllowed;
+}
 
 export function setRecordVaultBackupDecryptPassword(password) {
   pendingBackupDecryptPassword = password ? String(password) : null;
@@ -31,6 +41,8 @@ export function getRecordVaultE2eVaultMeta() {
 }
 
 export function isRecordVaultE2eUnlocked() {
+  // Admin override: encryption disabled — treat as unlocked without a DEK.
+  if (!encryptAllowed) return true;
   return Boolean(dekCryptoKey);
 }
 

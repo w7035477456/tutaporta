@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { isRecordVaultIconEncryptionEnabled } from '../recordVaultIconEncryption.js';
+import { isTutaNotesEncryptAllowed } from '../tutaEncryptAllowed.js';
 
 const ALGO = 'aes-256-gcm';
 const IV_LEN = 12;
@@ -16,8 +17,10 @@ function parseEnvBool(raw, defaultValue = true) {
 /**
  * NOTES_ENCRYPT_PHOTO_AND_DB=false => plaintext bytes + plain filenames (vault.db, 1.jpg).
  * When unset: follows NOTES_ICON_ENCRYPTION (default false = plaintext v3 vault).
+ * TUTANOTES_ENCRYPT_ALLOWED=false forces plaintext (overrides both).
  */
 export function isVaultPhotoAndDbEncryptionEnabled() {
+  if (!isTutaNotesEncryptAllowed()) return false;
   const raw = process.env.NOTES_ENCRYPT_PHOTO_AND_DB;
   if (raw === undefined || String(raw).trim() === '') {
     return isRecordVaultIconEncryptionEnabled();

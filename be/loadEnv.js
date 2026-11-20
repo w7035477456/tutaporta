@@ -145,7 +145,9 @@ if (fs.existsSync(feEnvPath)) {
 console.log('[loadEnv] Record Vault env:', {
   NOTES_ICON_ENCRYPTION: process.env.NOTES_ICON_ENCRYPTION ?? '(unset)',
   NOTES_ENCRYPT_PHOTO_AND_DB: process.env.NOTES_ENCRYPT_PHOTO_AND_DB ?? '(unset)',
-  NOTES_ICON_RETRY_DELAY_SEC: process.env.NOTES_ICON_RETRY_DELAY_SEC ?? '(unset, default 300 seconds)'
+  NOTES_ICON_RETRY_DELAY_SEC: process.env.NOTES_ICON_RETRY_DELAY_SEC ?? '(unset, default 300 seconds)',
+  TUTANOTES_ENCRYPT_ALLOWED: process.env.TUTANOTES_ENCRYPT_ALLOWED ?? '(unset, default true)',
+  TUTAPHOTO_ENCRYPT_ALLOWED: process.env.TUTAPHOTO_ENCRYPT_ALLOWED ?? '(unset, default true)'
 });
 if (!globalThis.__vsinglesProcessGuardsInstalled) {
   globalThis.__vsinglesProcessGuardsInstalled = true;

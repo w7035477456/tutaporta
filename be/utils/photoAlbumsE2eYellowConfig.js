@@ -1,5 +1,7 @@
 /** ~/.ssh/be/.env PHOTOALBUMS_E2E_YELLOW — client KEK/DEK; Postgres stores salt + wrapped DEK only. */
 
+import { isTutaPhotoEncryptAllowed } from './tutaEncryptAllowed.js';
+
 function parseEnvBool(raw, defaultValue = true) {
   const value = String(raw ?? '').trim().toLowerCase();
   if (!value) return defaultValue;
@@ -8,7 +10,8 @@ function parseEnvBool(raw, defaultValue = true) {
   return defaultValue;
 }
 
-/** Yellow E2E path (default true). Password/KEK/DEK never on webservers. */
+/** Yellow E2E path (default true). Password/KEK/DEK never on webservers. Forced off when TUTAPHOTO_ENCRYPT_ALLOWED=false. */
 export function isVaultE2eYellow() {
+  if (!isTutaPhotoEncryptAllowed()) return false;
   return parseEnvBool(process.env.PHOTOALBUMS_E2E_YELLOW, true);
 }

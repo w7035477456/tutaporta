@@ -8,6 +8,7 @@ import {
   upsertVaultKeys
 } from '../../utils/photoAlbumsE2e/vaultE2eKeyStore.js';
 import { isVaultE2eYellow } from '../../utils/photoAlbumsE2eYellowConfig.js';
+import { isTutaPhotoEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -24,9 +25,11 @@ export async function getPhotoAlbumsE2eKeys(req, res) {
   if (!singlesId) return;
 
   try {
-    const vault = await getAnyVaultKey(singlesId);
+    const encryptAllowed = isTutaPhotoEncryptAllowed();
+    const vault = encryptAllowed ? await getAnyVaultKey(singlesId) : null;
     return res.json({
       e2eYellow: isVaultE2eYellow(),
+      encryptAllowed,
       configured: Boolean(vault?.wrappedDekB64 && vault?.kdfSaltB64),
       vault: vault || null
     });
@@ -40,6 +43,13 @@ export async function getPhotoAlbumsE2eKeys(req, res) {
 export async function putPhotoAlbumsE2eKeys(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
+
+  if (!isTutaPhotoEncryptAllowed()) {
+    return res.status(403).json({
+      error: 'TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)',
+      encryptAllowed: false
+    });
+  }
 
   try {
     const result = await upsertVaultKeys(singlesId, req.body || {});
@@ -59,6 +69,13 @@ export async function putPhotoAlbumsE2eKeys(req, res) {
 export async function updatePhotoAlbumsE2eKeys(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
+
+  if (!isTutaPhotoEncryptAllowed()) {
+    return res.status(403).json({
+      error: 'TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)',
+      encryptAllowed: false
+    });
+  }
 
   try {
     const existing = await getAnyVaultKey(singlesId);

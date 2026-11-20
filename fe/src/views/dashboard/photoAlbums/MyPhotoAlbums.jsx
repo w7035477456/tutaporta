@@ -20,7 +20,11 @@ import {
 } from 'api/photoAlbumsFe';
 import { useAuth } from 'contexts/AuthContext';
 import { guestDemoAllowProps, guestDemoBlockProps } from 'utils/guestDemoLogin';
-import { clearPhotoAlbumsE2eSession } from 'utils/photoAlbumsClientSession';
+import {
+  clearPhotoAlbumsE2eSession,
+  isPhotoAlbumsEncryptAllowed,
+  setPhotoAlbumsEncryptAllowed
+} from 'utils/photoAlbumsClientSession';
 import { readPhotoAlbumsLastUsbLocation } from 'utils/photoAlbumsUsbPreference';
 import { isLeftSideOfferedFromVite, isLeftSideTutaDriveFromVite, parseLeftSideMode } from 'config/leftSideEnv';
 import { isRightSideUsbFromVite, parseRightSideMode } from 'config/rightSideEnv';
@@ -533,6 +537,9 @@ export default function MyPhotoAlbums() {
           const pub = await pubRes.json();
           if (!cancelled) {
             applyPanelSides(pub);
+            if (pub.tutaPhotoEncryptAllowed != null) {
+              setPhotoAlbumsEncryptAllowed(Boolean(pub.tutaPhotoEncryptAllowed));
+            }
           }
         }
       } catch {
@@ -542,6 +549,7 @@ export default function MyPhotoAlbums() {
         const cfg = await fetchPhotoAlbumsStorageConfig();
         if (cancelled) return;
         applyPanelSides(cfg);
+        setPhotoAlbumsEncryptAllowed(cfg.encryptAllowed !== false);
         setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
         setLocalUsbOffered(false);
       } catch {
@@ -717,10 +725,17 @@ export default function MyPhotoAlbums() {
     }
   }, [tutaCloudDualLogoffBusy, tutaCloudUnlocked, handleTutaCloudSessionEnded, tutaDriveMode]);
 
-  // Always show Full Disk Encryption before Open Cloud/USB (user may set password or Skip).
+  // Always show Full Disk Encryption before Open Cloud/USB (user may set password or Skip),
+  // unless TUTAPHOTO_ENCRYPT_ALLOWED=false (admin override — skip Encrypt Password UI).
   // Mobile upload uses a separate sheet and never reaches these handlers.
   const handleTutaCloudOpenClicked = useCallback(() => {
     if (accessUnlockedRef.current) return false;
+    if (!isPhotoAlbumsEncryptAllowed()) {
+      clearPhotoAlbumsE2eSession();
+      accessUnlockedRef.current = true;
+      setTutaCloudProceedOpenToken((n) => n + 1);
+      return true;
+    }
     pendingOpenRef.current = { storageType: 'tutadrive' };
     setAccessGateStorageType('tutadrive');
     setAccessGateUsbMountPath('');
@@ -735,6 +750,13 @@ export default function MyPhotoAlbums() {
   const handleUsbOpenClicked = useCallback((opts = {}) => {
     if (accessUnlockedRef.current) return false;
     const mountPath = String(opts?.mountPath ?? '').trim();
+    if (!isPhotoAlbumsEncryptAllowed()) {
+      clearPhotoAlbumsE2eSession();
+      accessUnlockedRef.current = true;
+      pendingOpenRef.current = { storageType: 'usb', mountPath };
+      setUsbProceedOpenToken((n) => n + 1);
+      return true;
+    }
     pendingOpenRef.current = { storageType: 'usb', mountPath };
     setAccessGateStorageType('usb');
     setAccessGateUsbMountPath(mountPath);

@@ -5,6 +5,16 @@
 let dekCryptoKey = null;
 let dekRawBytes = null;
 let vaultMeta = null;
+/** From TUTAPHOTO_ENCRYPT_ALLOWED — when false, no DEK / Encrypt Password is required. */
+let encryptAllowed = true;
+
+export function setPhotoAlbumsEncryptAllowed(allowed) {
+  encryptAllowed = allowed !== false;
+}
+
+export function isPhotoAlbumsEncryptAllowed() {
+  return encryptAllowed;
+}
 
 export function getPhotoAlbumsE2eDek() {
   return dekCryptoKey;
@@ -19,6 +29,8 @@ export function getPhotoAlbumsE2eVaultMeta() {
 }
 
 export function isPhotoAlbumsE2eUnlocked() {
+  // Admin override: encryption disabled — treat as unlocked without a DEK.
+  if (!encryptAllowed) return true;
   return Boolean(dekCryptoKey);
 }
 

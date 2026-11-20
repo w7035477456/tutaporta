@@ -8,6 +8,7 @@ import {
   clusterRedisSet
 } from './clusterRedisState.js';
 import { isVaultE2eYellow } from './photoAlbumsE2eYellowConfig.js';
+import { isTutaPhotoEncryptAllowed } from './tutaEncryptAllowed.js';
 
 const ACCESS_UNLOCK_PREFIX = 'v1:photo_albums:access_unlock:';
 const ACCESS_UNLOCK_TTL_SEC = 24 * 60 * 60;
@@ -64,11 +65,14 @@ export async function getVaultAccessStatus(singlesId) {
   const enabled = Boolean(row?.photoalbums_access_password_enabled);
   const unlocked = await isVaultAccessUnlocked(id);
 
+  const encryptAllowed = isTutaPhotoEncryptAllowed();
   return {
-    enabled,
+    enabled: encryptAllowed ? enabled : false,
     configured: Boolean(hash),
-    unlocked,
-    hint: hint || null
+    unlocked: encryptAllowed ? unlocked : true,
+    hint: hint || null,
+    skipPasswordCheck: !encryptAllowed,
+    encryptAllowed
   };
 }
 
@@ -94,6 +98,9 @@ export async function verifyVaultAccessPassword(singlesId, plainPassword) {
 }
 
 export async function setVaultAccessPassword(singlesId, plainPassword, hint = '') {
+  if (!isTutaPhotoEncryptAllowed()) {
+    throw new Error('TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)');
+  }
   const validation = validateNewPasswordRequirements(plainPassword);
   if (!validation.ok) {
     throw new Error(validation.error || 'Invalid Encrypt Password');
@@ -124,6 +131,9 @@ export async function setVaultAccessPassword(singlesId, plainPassword, hint = ''
 }
 
 export async function changeVaultAccessPassword(singlesId, currentPassword, newPassword, hint) {
+  if (!isTutaPhotoEncryptAllowed()) {
+    throw new Error('TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)');
+  }
   const ok = await verifyVaultAccessPassword(singlesId, currentPassword);
   if (!ok) {
     throw new Error('Current Encrypt Password is incorrect');
@@ -174,11 +184,21 @@ export async function setVaultAccessPasswordEnabled(singlesId, enabled, options 
   const id = Number(singlesId);
   const nextEnabled = Boolean(enabled);
 
+  if (nextEnabled && !isTutaPhotoEncryptAllowed()) {
+    throw new Error('TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)');
+  }
+
   if (!nextEnabled) {
     const row = await loadVaultAccessRow(id);
     const hash = String(row?.photoalbums_access_password_hash ?? '').trim();
     const currentlyEnabled = Boolean(row?.photoalbums_access_password_enabled);
-    if (hash && currentlyEnabled && !(await isVaultAccessUnlocked(id))) {
+    // Admin override: allow turning encryption off without the Encrypt Password.
+    if (
+      isTutaPhotoEncryptAllowed() &&
+      hash &&
+      currentlyEnabled &&
+      !(await isVaultAccessUnlocked(id))
+    ) {
       const password = String(options.password ?? '').trim();
       if (!password) {
         throw new Error('Encrypt Password required to turn off Encrypt Password protection');
@@ -216,6 +236,10 @@ export async function requireVaultAccessSession(req, res) {
   if (!Number.isFinite(singlesId) || singlesId < 1) {
     res.status(401).json({ error: 'Authentication required' });
     return null;
+  }
+
+  if (!isTutaPhotoEncryptAllowed()) {
+    return singlesId;
   }
 
   // Yellow E2E: Encrypt Password / DEK live only in the browser tab — no server unlock session.

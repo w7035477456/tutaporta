@@ -843,6 +843,9 @@ export async function fetchPhotoAlbumsStorageConfig() {
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
     iconEncryptionRequired: data?.iconEncryptionRequired !== false,
+    encryptPhotoAndDb: data?.encryptPhotoAndDb === true,
+    encryptAllowed: data?.encryptAllowed !== false,
+    e2eYellow: data?.e2eYellow !== false,
     iconRetryDelaySeconds: Number(data?.iconRetryDelaySeconds) || 300,
     cacheTutaCloudIcon: data?.cacheTutaCloudIcon
       ? String(data.cacheTutaCloudIcon).trim()

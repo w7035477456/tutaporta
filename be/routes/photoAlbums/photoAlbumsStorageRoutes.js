@@ -8,6 +8,7 @@ import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMembe
 import { isVaultE2eYellow } from '../../utils/photoAlbumsE2eYellowConfig.js';
 import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
 import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/photoAlbumsUsb/vaultCrypto.js';
+import { isTutaPhotoEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
 import { getVaultIconRetryDelaySeconds } from '../../utils/photoAlbumsUsb/unlockGuard.js';
 import { logoffVaultUsb } from '../../utils/photoAlbumsUsb/vaultSession.js';
 import { clearPhotoAlbumsCacheIcon, readPhotoAlbumsCacheIcon } from '../../utils/photoAlbumsCacheIcon.js';
@@ -57,6 +58,7 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
     backupUsbEnabled: isVaultBackupUsbEnabled(),
     iconEncryptionRequired: isPhotoAlbumsIconEncryptionEnabled(),
     encryptPhotoAndDb: isVaultPhotoAndDbEncryptionEnabled(),
+    encryptAllowed: isTutaPhotoEncryptAllowed(),
     iconRetryDelaySeconds: getVaultIconRetryDelaySeconds(),
     cacheTutaCloudIcon,
     cacheUsbIcon,

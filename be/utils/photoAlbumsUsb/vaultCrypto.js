@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { isPhotoAlbumsIconEncryptionEnabled } from '../photoAlbumsIconEncryption.js';
+import { isTutaPhotoEncryptAllowed } from '../tutaEncryptAllowed.js';
 
 const ALGO = 'aes-256-gcm';
 const IV_LEN = 12;
@@ -16,8 +17,10 @@ function parseEnvBool(raw, defaultValue = true) {
 /**
  * PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB=false => plaintext bytes + plain filenames (vault.db, 1.jpg).
  * When unset: follows PHOTOALBUMS_ICON_ENCRYPTION (default false = plaintext v3 vault).
+ * TUTAPHOTO_ENCRYPT_ALLOWED=false forces plaintext (overrides both).
  */
 export function isVaultPhotoAndDbEncryptionEnabled() {
+  if (!isTutaPhotoEncryptAllowed()) return false;
   const raw = process.env.PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB;
   if (raw === undefined || String(raw).trim() === '') {
     return isPhotoAlbumsIconEncryptionEnabled();

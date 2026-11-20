@@ -14,6 +14,7 @@ import SliderControlButton, {
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { themedAlert, themedChoice, themedConfirm } from 'utils/themedDialog';
 import { downsizeImageFileToMaxMb, bytesToMbLabel } from 'utils/photoAlbumsDownsizeMedia';
+import { isPhotoAlbumsEncryptAllowed } from 'utils/photoAlbumsClientSession';
 import {
   isPhotoAlbumsStorageNotUnlockedError,
   isPhotoAlbumsVaultOpenFatalError,
@@ -2740,6 +2741,8 @@ export default function PhotoAlbumsWorkspacePane({
       if (busy || innerEncryptBusy || !noteRow) return;
       const id = Number(noteRow.note_id);
       const locked = noteRequiresInnerPinToView(noteRow) && !isInnerNoteUnlocked(id);
+      // TUTAPHOTO_ENCRYPT_ALLOWED=false: never enable new inner encryption (unlock of legacy still ok).
+      if (!locked && !isPhotoAlbumsEncryptAllowed()) return;
       openInnerEncryptDialog(locked ? 'unlock' : 'enable', 'note', { noteId: id });
     },
     [busy, innerEncryptBusy, noteRequiresInnerPinToView, isInnerNoteUnlocked, openInnerEncryptDialog]
@@ -2758,6 +2761,7 @@ export default function PhotoAlbumsWorkspacePane({
           notebookId: nbId
         });
       } else {
+        if (!isPhotoAlbumsEncryptAllowed()) return;
         openInnerEncryptDialog('enable', 'notebook', {
           noteId: notes[0]?.note_id,
           notebookId: nbId
@@ -8225,7 +8229,11 @@ export default function PhotoAlbumsWorkspacePane({
                                         void handleDeleteNotebook(nb.notebook_id, photoAlbumsNotebookSidebarLabel(nb, notebooks))
                                       }
                                       deleteLabel={`Delete notebook ${photoAlbumsNotebookSidebarLabel(nb, notebooks)}`}
-                                      onToggleLock={() => handleToggleNotebookLock(nb)}
+                                      onToggleLock={
+                                        notebookInnerLocked || isPhotoAlbumsEncryptAllowed()
+                                          ? () => handleToggleNotebookLock(nb)
+                                          : undefined
+                                      }
                                       lockTitle={
                                         notebookInnerLocked ? 'Unlock notebook (enter 6-digit PIN)' : 'Lock notebook with a 6-digit PIN'
                                       }
@@ -8401,7 +8409,11 @@ export default function PhotoAlbumsWorkspacePane({
                                       onFileDrop={(e) => void handleNoteListFileDrop(e)}
                                       onDelete={() => void handleDeleteNote(note.note_id, noteRealLabel)}
                                       deleteLabel={`Delete note ${noteRealLabel}`}
-                                      onToggleLock={() => handleToggleNoteLock(note)}
+                                      onToggleLock={
+                                        noteInnerLocked || isPhotoAlbumsEncryptAllowed()
+                                          ? () => handleToggleNoteLock(note)
+                                          : undefined
+                                      }
                                       lockTitle={noteInnerLocked ? 'Unlock note (enter 6-digit PIN)' : 'Lock note with a 6-digit PIN'}
                                       disabled={busy || crossPaneBusy || !selectedNotebookId}
                                     />
@@ -8997,7 +9009,11 @@ export default function PhotoAlbumsWorkspacePane({
                                     onDropFromLeft={(e) => void handleShortcutDropFromLeft(e)}
                                     onDelete={() => void handleRemoveShortcut(shortcut.shortcut_id, shortcutRealLabel)}
                                     deleteLabel={`Remove shortcut ${shortcutRealLabel}`}
-                                    onToggleLock={() => handleToggleShortcutLock(shortcut)}
+                                    onToggleLock={
+                                      shortcutInnerLocked || isPhotoAlbumsEncryptAllowed()
+                                        ? () => handleToggleShortcutLock(shortcut)
+                                        : undefined
+                                    }
                                     lockTitle={shortcutInnerLocked ? 'Unlock (enter 6-digit PIN)' : 'Lock with a 6-digit PIN'}
                                     disabled={busy}
                                   />

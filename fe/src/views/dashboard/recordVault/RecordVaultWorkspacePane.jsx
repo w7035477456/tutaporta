@@ -15,6 +15,7 @@ import SliderControlButton, {
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { MOBILE_UPLOAD_HOVER_TOOLTIP, mobileUploadHoverTooltipSlotProps } from 'config/mobileUploadHoverTooltip';
+import { isRecordVaultEncryptAllowed } from 'utils/recordVaultClientSession';
 import {
   isRecordVaultUsbRequiredError,
   fetchRecordVaultStorageConfig,
@@ -2613,6 +2614,8 @@ export default function RecordVaultWorkspacePane({
       if (busy || innerEncryptBusy || !noteRow) return;
       const id = Number(noteRow.note_id);
       const locked = noteRequiresInnerPinToView(noteRow) && !isInnerNoteUnlocked(id);
+      // TUTANOTES_ENCRYPT_ALLOWED=false: never enable new inner encryption (unlock of legacy still ok).
+      if (!locked && !isRecordVaultEncryptAllowed()) return;
       openInnerEncryptDialog(locked ? 'unlock' : 'enable', 'note', { noteId: id });
     },
     [busy, innerEncryptBusy, noteRequiresInnerPinToView, isInnerNoteUnlocked, openInnerEncryptDialog]
@@ -2631,6 +2634,7 @@ export default function RecordVaultWorkspacePane({
           notebookId: nbId
         });
       } else {
+        if (!isRecordVaultEncryptAllowed()) return;
         openInnerEncryptDialog('enable', 'notebook', {
           noteId: notes[0]?.note_id,
           notebookId: nbId
@@ -7846,7 +7850,11 @@ export default function RecordVaultWorkspacePane({
                                         onDrop={(e, toId, mime) => void handleNotebookRowDrop(e, toId, mime)}
                                         onDelete={() => void handleDeleteNotebook(nb.notebook_id, nb.notebook_name)}
                                         deleteLabel={`Delete notebook ${nb.notebook_name}`}
-                                        onToggleLock={() => handleToggleNotebookLock(nb)}
+                                        onToggleLock={
+                                          notebookInnerLocked || isRecordVaultEncryptAllowed()
+                                            ? () => handleToggleNotebookLock(nb)
+                                            : undefined
+                                        }
                                         lockTitle={
                                           notebookInnerLocked ? 'Unlock notebook (enter 6-digit PIN)' : 'Lock notebook with a 6-digit PIN'
                                         }
@@ -8065,7 +8073,11 @@ export default function RecordVaultWorkspacePane({
                                           onFileDrop={(e) => void handleNoteListFileDrop(e)}
                                           onDelete={() => void handleDeleteNote(note.note_id, noteRealLabel)}
                                           deleteLabel={`Delete note ${noteRealLabel}`}
-                                          onToggleLock={() => handleToggleNoteLock(note)}
+                                          onToggleLock={
+                                            noteInnerLocked || isRecordVaultEncryptAllowed()
+                                              ? () => handleToggleNoteLock(note)
+                                              : undefined
+                                          }
                                           lockTitle={noteInnerLocked ? 'Unlock note (enter 6-digit PIN)' : 'Lock note with a 6-digit PIN'}
                                           ragSelected={ragSelectedNoteIds.some((id) => Number(id) === Number(note.note_id))}
                                           onToggleRag={
@@ -8524,7 +8536,11 @@ export default function RecordVaultWorkspacePane({
                                     onDropFromLeft={(e) => void handleShortcutDropFromLeft(e)}
                                     onDelete={() => void handleRemoveShortcut(shortcut.shortcut_id, shortcutRealLabel)}
                                     deleteLabel={`Remove shortcut ${shortcutRealLabel}`}
-                                    onToggleLock={() => handleToggleShortcutLock(shortcut)}
+                                    onToggleLock={
+                                      shortcutInnerLocked || isRecordVaultEncryptAllowed()
+                                        ? () => handleToggleShortcutLock(shortcut)
+                                        : undefined
+                                    }
                                     lockTitle={shortcutInnerLocked ? 'Unlock (enter 6-digit PIN)' : 'Lock with a 6-digit PIN'}
                                     disabled={busy}
                                   />

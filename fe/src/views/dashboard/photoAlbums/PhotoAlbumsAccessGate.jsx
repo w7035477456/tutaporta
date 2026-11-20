@@ -24,7 +24,8 @@ import {
 } from 'utils/photoAlbumsClientVaultCrypto';
 import {
   clearPhotoAlbumsE2eSession,
-  setPhotoAlbumsE2eSession
+  setPhotoAlbumsE2eSession,
+  setPhotoAlbumsEncryptAllowed
 } from 'utils/photoAlbumsClientSession';
 import PhotoAlbumsZeroKnowledgeNotice from './PhotoAlbumsZeroKnowledgeNotice';
 import ColorTemplate12Underline from 'ui-component/ColorTemplate12Underline';
@@ -271,6 +272,20 @@ export default function PhotoAlbumsAccessGate({
           fetchPhotoAlbumsAccessFailStatus(side).catch(() => null)
         ]);
         if (cancelled) return;
+        const encryptAllowed =
+          e2e?.encryptAllowed !== false && accessStatus?.encryptAllowed !== false;
+        setPhotoAlbumsEncryptAllowed(encryptAllowed);
+        // Admin override: never show Encrypt Password UI; open vault without encryption.
+        if (!encryptAllowed) {
+          clearPhotoAlbumsE2eSession();
+          await setPhotoAlbumsAccessPasswordEnabled(false).catch(() => null);
+          if (!cancelled) {
+            setEncryptionEnabled(false);
+            setChecking(false);
+            onUnlocked?.();
+          }
+          return;
+        }
         setEncryptionEnabled(accessStatus?.enabled !== false);
         setConfigured(Boolean(e2e.configured));
         setVaultRow(e2e.vault || null);

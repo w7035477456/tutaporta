@@ -8,6 +8,7 @@ import {
   clusterRedisSet
 } from './clusterRedisState.js';
 import { isVaultE2eYellow } from './vaultE2eYellowConfig.js';
+import { isTutaNotesEncryptAllowed } from './tutaEncryptAllowed.js';
 
 const ACCESS_UNLOCK_PREFIX = 'v1:record_vault:access_unlock:';
 const ACCESS_UNLOCK_TTL_SEC = 24 * 60 * 60;
@@ -65,13 +66,15 @@ export async function getVaultAccessStatus(singlesId) {
   const enabled = Boolean(row?.notes_access_password_enabled);
   const unlocked = await isVaultAccessUnlocked(id);
 
-  // NOTES_SKIP_PASSWORD_CHECK is ignored — Encrypt Password always applies when enabled.
+  const encryptAllowed = isTutaNotesEncryptAllowed();
+  // NOTES_SKIP_PASSWORD_CHECK is ignored — Encrypt Password always applies when enabled (unless admin override).
   return {
-    enabled,
+    enabled: encryptAllowed ? enabled : false,
     configured: Boolean(hash),
-    unlocked,
+    unlocked: encryptAllowed ? unlocked : true,
     hint: hint || null,
-    skipPasswordCheck: false,
+    skipPasswordCheck: !encryptAllowed,
+    encryptAllowed,
     lockTutaNotes: Boolean(row?.lock_tuta_notes)
   };
 }
@@ -98,6 +101,9 @@ export async function verifyVaultAccessPassword(singlesId, plainPassword) {
 }
 
 export async function setVaultAccessPassword(singlesId, plainPassword, hint = '') {
+  if (!isTutaNotesEncryptAllowed()) {
+    throw new Error('TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)');
+  }
   const validation = validateNewPasswordRequirements(plainPassword);
   if (!validation.ok) {
     throw new Error(validation.error || 'Invalid Encrypt Password');
@@ -128,6 +134,9 @@ export async function setVaultAccessPassword(singlesId, plainPassword, hint = ''
 }
 
 export async function changeVaultAccessPassword(singlesId, currentPassword, newPassword, hint) {
+  if (!isTutaNotesEncryptAllowed()) {
+    throw new Error('TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)');
+  }
   const ok = await verifyVaultAccessPassword(singlesId, currentPassword);
   if (!ok) {
     throw new Error('Current Encrypt Password is incorrect');
@@ -178,11 +187,21 @@ export async function setVaultAccessPasswordEnabled(singlesId, enabled, options 
   const id = Number(singlesId);
   const nextEnabled = Boolean(enabled);
 
+  if (nextEnabled && !isTutaNotesEncryptAllowed()) {
+    throw new Error('TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)');
+  }
+
   if (!nextEnabled) {
     const row = await loadVaultAccessRow(id);
     const hash = String(row?.notes_access_password_hash ?? '').trim();
     const currentlyEnabled = Boolean(row?.notes_access_password_enabled);
-    if (hash && currentlyEnabled && !(await isVaultAccessUnlocked(id))) {
+    // Admin override: allow turning encryption off without the Encrypt Password.
+    if (
+      isTutaNotesEncryptAllowed() &&
+      hash &&
+      currentlyEnabled &&
+      !(await isVaultAccessUnlocked(id))
+    ) {
       const password = String(options.password ?? '').trim();
       if (!password) {
         throw new Error('Encrypt Password required to turn off Encrypt Password protection');
@@ -220,6 +239,10 @@ export async function requireVaultAccessSession(req, res) {
   if (!Number.isFinite(singlesId) || singlesId < 1) {
     res.status(401).json({ error: 'Authentication required' });
     return null;
+  }
+
+  if (!isTutaNotesEncryptAllowed()) {
+    return singlesId;
   }
 
   // Yellow E2E: Encrypt Password / DEK live only in the browser tab — no server unlock session.

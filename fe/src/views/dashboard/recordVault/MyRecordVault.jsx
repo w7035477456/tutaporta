@@ -18,7 +18,12 @@ import {
   setRecordVaultBridgeStorageType
 } from 'api/recordVaultFe';
 import { useAuth } from 'contexts/AuthContext';
-import { clearRecordVaultE2eSession, isRecordVaultE2eUnlocked } from 'utils/recordVaultClientSession';
+import {
+  clearRecordVaultE2eSession,
+  isRecordVaultE2eUnlocked,
+  isRecordVaultEncryptAllowed,
+  setRecordVaultEncryptAllowed
+} from 'utils/recordVaultClientSession';
 import { guestDemoAllowProps } from 'utils/guestDemoLogin';
 import RecordVaultAccessGate from './RecordVaultAccessGate';
 import RecordVaultTutaDriveGate from './RecordVaultTutaDriveGate';
@@ -473,6 +478,9 @@ export default function MyRecordVault() {
             if (pub.ragUiEnabled != null) {
               setRagUiEnabled(Boolean(pub.ragUiEnabled));
             }
+            if (pub.tutaNotesEncryptAllowed != null) {
+              setRecordVaultEncryptAllowed(Boolean(pub.tutaNotesEncryptAllowed));
+            }
           }
         }
       } catch {
@@ -482,6 +490,7 @@ export default function MyRecordVault() {
         const cfg = await fetchRecordVaultStorageConfig();
         if (cancelled) return;
         applyPanelSides(cfg);
+        setRecordVaultEncryptAllowed(cfg.encryptAllowed !== false);
         setTutaCloudOffered(Boolean(cfg.tutaCloud?.visible));
         setLocalUsbOffered(false);
       } catch {
@@ -642,8 +651,15 @@ export default function MyRecordVault() {
 
   // Open TutaNotes Cloud / USB share one vault-password popup (Step 1), then resume icon unlock.
   // Mobile upload uses a separate sheet and never reaches these handlers.
+  // TUTANOTES_ENCRYPT_ALLOWED=false: skip Encrypt Password UI entirely.
   const handleTutaCloudOpenClicked = useCallback(() => {
     if (accessUnlockedRef.current) return false;
+    if (!isRecordVaultEncryptAllowed()) {
+      clearRecordVaultE2eSession();
+      accessUnlockedRef.current = true;
+      setTutaCloudProceedOpenToken((n) => n + 1);
+      return true;
+    }
     pendingOpenRef.current = { storageType: 'tutadrive' };
     setAccessGateStorageType('tutadrive');
     setAccessGateUsbMountPath('');
@@ -654,6 +670,13 @@ export default function MyRecordVault() {
   const handleUsbOpenClicked = useCallback((opts = {}) => {
     if (accessUnlockedRef.current) return false;
     const mountPath = String(opts?.mountPath ?? '').trim();
+    if (!isRecordVaultEncryptAllowed()) {
+      clearRecordVaultE2eSession();
+      accessUnlockedRef.current = true;
+      pendingOpenRef.current = { storageType: 'usb', mountPath };
+      setUsbProceedOpenToken((n) => n + 1);
+      return true;
+    }
     pendingOpenRef.current = { storageType: 'usb', mountPath };
     setAccessGateStorageType('usb');
     setAccessGateUsbMountPath(mountPath);

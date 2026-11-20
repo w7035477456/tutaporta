@@ -1,5 +1,7 @@
 /** When true, vault DB/photos/files use icon-key encryption; when false, stored unencrypted. */
 
+import { isTutaNotesEncryptAllowed } from './tutaEncryptAllowed.js';
+
 function parseEnvBool(raw, defaultValue = false) {
   const value = String(raw ?? '').trim().toLowerCase();
   if (!value) return defaultValue;
@@ -9,6 +11,7 @@ function parseEnvBool(raw, defaultValue = false) {
 }
 
 export function isRecordVaultIconEncryptionEnabled() {
+  if (!isTutaNotesEncryptAllowed()) return false;
   return parseEnvBool(process.env.NOTES_ICON_ENCRYPTION, false);
 }
 

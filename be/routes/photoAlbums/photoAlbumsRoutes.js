@@ -8,6 +8,7 @@ import {
 } from '../../utils/photoAlbumsDefaultTitle.js';
 import { logImpersonatedMutation } from '../../utils/adminAuth.js';
 import { requireVaultAccessSession } from '../../utils/photoAlbumsAccessPassword.js';
+import { isTutaPhotoEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
 import {
   requireVaultSession,
   vaultCreateNotebook,
@@ -270,7 +271,13 @@ function buildNoteImagePatch(req) {
   if (req.body?.body_text != null) patch.body_text = String(req.body.body_text);
   if (req.body?.keywords != null) patch.keywords = req.body.keywords;
   if (req.body?.inner_encrypt_enabled != null) {
-    patch.inner_encrypt_enabled = Boolean(req.body.inner_encrypt_enabled);
+    const next = Boolean(req.body.inner_encrypt_enabled);
+    if (next && !isTutaPhotoEncryptAllowed()) {
+      const err = new Error('TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)');
+      err.status = 403;
+      throw err;
+    }
+    patch.inner_encrypt_enabled = next;
   }
   // Salt is non-secret KDF material (or null for v2 embedded-in-body). Never a PIN.
   if (req.body?.inner_pin_salt !== undefined) {
@@ -465,13 +472,20 @@ export async function createPhotoAlbumsNote(req, res) {
     if (parsedImage && !ALLOWED_IMAGE_EXTENSIONS.has(parsedImage.ext)) {
       return res.status(400).json({ error: 'Unsupported image type' });
     }
+    const wantInnerEncrypt = Boolean(req.body?.inner_encrypt_enabled);
+    if (wantInnerEncrypt && !isTutaPhotoEncryptAllowed()) {
+      return res.status(403).json({
+        error: 'TutaPhoto encryption is disabled by admin (TUTAPHOTO_ENCRYPT_ALLOWED=false)',
+        encryptAllowed: false
+      });
+    }
     const note = await vaultCreateNote(session, notebookId, {
       noteName: noteName.slice(0, 120),
       bodyText: String(req.body?.body_text ?? DEFAULT_BODY_TEXT),
       keywords: req.body?.keywords,
       imageBuffer: parsedImage?.buffer,
       imageExt: parsedImage?.ext,
-      innerEncryptEnabled: Boolean(req.body?.inner_encrypt_enabled),
+      innerEncryptEnabled: wantInnerEncrypt,
       innerPinSalt: req.body?.inner_pin_salt
     });
     logImpersonatedMutation(req);
@@ -505,6 +519,9 @@ export async function updatePhotoAlbumsNote(req, res) {
   } catch (err) {
     console.error('[updatePhotoAlbumsNote]', err?.message || err);
     const message = err?.message || 'Failed to update note';
+    if (Number(err?.status) === 403) {
+      return res.status(403).json({ error: message, encryptAllowed: false });
+    }
     if (message === 'Note not found') {
       return res.status(404).json({ error: message });
     }

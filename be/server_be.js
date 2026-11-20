@@ -229,6 +229,7 @@ import {
 } from './routes/recordVault/recordVaultTutaDriveRoutes.js';
 import { putTutaDriveUploadChunk } from './routes/recordVault/tutaDriveUploadChunkRoute.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from './utils/tutaDriveMemberPaths.js';
+import { isTutaNotesEncryptAllowed, isTutaPhotoEncryptAllowed } from './utils/tutaEncryptAllowed.js';
 import { getRecordVaultRagConfig } from './utils/recordVaultRagConfig.js';
 import { isIncludeUsbDmgExeEnabled } from './utils/includeUsbDmgExeConfig.js';
 import {
@@ -1127,7 +1128,10 @@ app.get('/api/publicConfig', (_req, res) => {
     tutaDrive: isLeftSideTutaDrive(),
     rightSide: isVaultLocalUsbOffered() ? 'USB' : 'None',
     includeUsbDmgExe: isIncludeUsbDmgExeEnabled(),
-    ragUiEnabled: getRecordVaultRagConfig().ragUiEnabled
+    ragUiEnabled: getRecordVaultRagConfig().ragUiEnabled,
+    // Admin override: false = never encrypt / never show Encrypt Password UI
+    tutaNotesEncryptAllowed: isTutaNotesEncryptAllowed(),
+    tutaPhotoEncryptAllowed: isTutaPhotoEncryptAllowed()
   });
 });
 

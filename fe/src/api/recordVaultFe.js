@@ -716,6 +716,9 @@ export async function fetchRecordVaultStorageConfig() {
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
     iconEncryptionRequired: data?.iconEncryptionRequired !== false,
+    encryptPhotoAndDb: data?.encryptPhotoAndDb === true,
+    encryptAllowed: data?.encryptAllowed !== false,
+    e2eYellow: data?.e2eYellow !== false,
     iconRetryDelaySeconds: Number(data?.iconRetryDelaySeconds) || 300,
     cacheTutaCloudIcon: data?.cacheTutaCloudIcon
       ? String(data.cacheTutaCloudIcon).trim()
@@ -962,23 +965,26 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
   const { sealTutaDriveBackupZipWithDek, sealTutaDriveBackupZipWithPassword } = await import(
     'utils/recordVaultClientVaultCrypto'
   );
-  const withZipPassword = Boolean(String(password || ''));
-  if (!withZipPassword) {
-    const { isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
-    if (!isRecordVaultE2eUnlocked()) {
-      throw new Error('Unlock with your Encrypt Password first, then Backup again');
-    }
+  const { isRecordVaultEncryptAllowed, isRecordVaultE2eUnlocked, getRecordVaultE2eDek } = await import(
+    'utils/recordVaultClientSession'
+  );
+  const encryptAllowed = isRecordVaultEncryptAllowed();
+  const withZipPassword = encryptAllowed && Boolean(String(password || ''));
+  // TUTANOTES_ENCRYPT_ALLOWED=false: save plaintext vault zip (no TNBAK seal).
+  if (encryptAllowed && !withZipPassword && !isRecordVaultE2eUnlocked()) {
+    throw new Error('Unlock with your Encrypt Password first, then Backup again');
   }
   const report = makeBackupProgressReporter(onProgress);
   const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutadrive/backup-zip', report, 'build', 0, 40, {
     estimatedTotalBytes
   });
-  report('seal', 40, { totalBytes: zipBuf.length, withZipPassword });
+  report('seal', 40, { totalBytes: zipBuf.length, withZipPassword, encryptAllowed });
   let sealed;
-  if (withZipPassword) {
+  if (!encryptAllowed) {
+    sealed = zipBuf instanceof Uint8Array ? zipBuf : new Uint8Array(zipBuf);
+  } else if (withZipPassword) {
     sealed = await sealTutaDriveBackupZipWithPassword(zipBuf, password, { hint, note });
   } else {
-    const { getRecordVaultE2eDek } = await import('utils/recordVaultClientSession');
     const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
     sealed = await sealTutaDriveBackupZipWithDek(zipBuf, getRecordVaultE2eDek(), vaultKeys);
   }
@@ -1199,12 +1205,17 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
   const alreadySealed = isTutaDriveSealedBackupBytes(rawBytes);
   report('seal', 10, { alreadySealed, totalBytes: rawBytes.length });
   if (!alreadySealed) {
-    const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked } = await import('utils/recordVaultClientSession');
-    if (!isRecordVaultE2eUnlocked()) {
-      throw new Error('Unlock with your Encrypt Password first, then upload again');
+    const { getRecordVaultE2eDek, isRecordVaultE2eUnlocked, isRecordVaultEncryptAllowed } = await import(
+      'utils/recordVaultClientSession'
+    );
+    // TUTANOTES_ENCRYPT_ALLOWED=false: upload plaintext zip as-is.
+    if (isRecordVaultEncryptAllowed()) {
+      if (!isRecordVaultE2eUnlocked()) {
+        throw new Error('Unlock with your Encrypt Password first, then upload again');
+      }
+      const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
+      sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek(), vaultKeys);
     }
-    const { vault: vaultKeys } = await fetchRecordVaultE2eKeys();
-    sealed = await sealTutaDriveBackupZipWithDek(rawBytes, getRecordVaultE2eDek(), vaultKeys);
   }
   report('seal', 15, { alreadySealed, totalBytes: sealed.length, done: true });
 

@@ -8,6 +8,7 @@ import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMembe
 import { isVaultE2eYellow } from '../../utils/vaultE2eYellowConfig.js';
 import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
 import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/recordVaultUsb/vaultCrypto.js';
+import { isTutaNotesEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
 import { getVaultIconRetryDelaySeconds } from '../../utils/recordVaultUsb/unlockGuard.js';
 import { logoffVaultUsb } from '../../utils/recordVaultUsb/vaultSession.js';
 import { clearRecordVaultCacheIcon, readRecordVaultCacheIcon } from '../../utils/recordVaultCacheIcon.js';
@@ -62,6 +63,7 @@ export async function getRecordVaultStorageConfig(req, res) {
     backupUsbEnabled: isVaultBackupUsbEnabled(),
     iconEncryptionRequired: isRecordVaultIconEncryptionEnabled(),
     encryptPhotoAndDb: isVaultPhotoAndDbEncryptionEnabled(),
+    encryptAllowed: isTutaNotesEncryptAllowed(),
     iconRetryDelaySeconds: getVaultIconRetryDelaySeconds(),
     cacheTutaCloudIcon,
     cacheUsbIcon,

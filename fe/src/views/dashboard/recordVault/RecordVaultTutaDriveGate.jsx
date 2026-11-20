@@ -13,7 +13,7 @@ import {
   readRecordVaultApiError,
   unlockRecordVaultTutaDrive
 } from 'api/recordVaultFe';
-import { isRecordVaultE2eUnlocked } from 'utils/recordVaultClientSession';
+import { isRecordVaultE2eUnlocked, setRecordVaultEncryptAllowed } from 'utils/recordVaultClientSession';
 import TutaNotesBrandTitle from './TutaNotesBrandTitle';
 import {
   TUTANOTES_CLOUD_LOGO,
@@ -78,7 +78,8 @@ export default function RecordVaultTutaDriveGate({
     let cancelled = false;
     void (async () => {
       try {
-        await fetchRecordVaultStorageConfig();
+        const cfg = await fetchRecordVaultStorageConfig();
+        setRecordVaultEncryptAllowed(cfg?.encryptAllowed !== false);
       } catch {
         // optional
       }

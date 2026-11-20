@@ -13,6 +13,7 @@ import {
   fetchRecordVaultE2eKeys,
   recordRecordVaultAccessFail,
   saveRecordVaultE2eKeys,
+  setRecordVaultAccessPasswordEnabled,
   setRecordVaultAccessPasswordHint,
   updateRecordVaultE2eKeys
 } from 'api/recordVaultFe';
@@ -23,7 +24,8 @@ import {
 } from 'utils/recordVaultClientVaultCrypto';
 import {
   clearRecordVaultE2eSession,
-  setRecordVaultE2eSession
+  setRecordVaultE2eSession,
+  setRecordVaultEncryptAllowed
 } from 'utils/recordVaultClientSession';
 import { formatRecordVaultUnlockCountdown } from 'utils/recordVaultUnlockCountdown';
 import { failAttemptWarning, FAIL_LOCK_AT_ATTEMPT } from 'utils/failAttemptPolicy';
@@ -255,6 +257,19 @@ export default function RecordVaultAccessGate({
           fetchRecordVaultAccessFailStatus(side).catch(() => null)
         ]);
         if (cancelled) return;
+        const encryptAllowed =
+          e2e?.encryptAllowed !== false && accessStatus?.encryptAllowed !== false;
+        setRecordVaultEncryptAllowed(encryptAllowed);
+        // Admin override: never show Encrypt Password UI; open vault without encryption.
+        if (!encryptAllowed) {
+          clearRecordVaultE2eSession();
+          await setRecordVaultAccessPasswordEnabled(false).catch(() => null);
+          if (!cancelled) {
+            setChecking(false);
+            onUnlockedRef.current?.();
+          }
+          return;
+        }
         setConfigured(Boolean(e2e.configured));
         setVaultRow(e2e.vault || null);
         setHint(accessStatus?.hint || '');
