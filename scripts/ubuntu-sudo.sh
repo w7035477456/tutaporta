@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Run a command on Ubuntu xbox2 as root via sudo, without interactive tty.
 #
-#   scripts/ubuntu-sudo.sh bash ~/backups/scripts/apply-terramaster-default-offline.sh
-#   scripts/ubuntu-sudo.sh ~/backups/scripts/terramaster-enclosure-power.sh wake
+#   scripts/ubuntu-sudo.sh bash ~/i/resticBackup/scripts/apply-terramaster-default-offline.sh
+#   scripts/ubuntu-sudo.sh ~/i/resticBackup/scripts/terramaster-enclosure-power.sh wake
 #
 # Password: UBUNTU_SUDO_PASSWORD in ~/.ssh/be/.env (Mac, outside git). Sent as the first
 # line of SSH stdin and read into sudo -S remotely — never in argv or tool output.

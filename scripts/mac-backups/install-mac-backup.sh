@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # One-time / re-runnable Mac restic setup (no sudo):
-#   - ~/backups/scripts/backup-nightly.sh   (what the `backupnightly` alias runs)
-#   - ~/backups/.backup-secrets-mac.env     (created once with a random RESTIC_PASSWORD; never overwritten)
+#   - ~/i/resticBackup/scripts/backup-nightly.sh   (what the `backupnightly` alias runs)
+#   - ~/i/resticBackup/.backup-secrets-mac.env     (created once with a random RESTIC_PASSWORD; never overwritten)
 #   - restic repo on the external drive     (restic init if missing)
 #   - LaunchAgent com.tutamall.restic-nightly → daily at HOUR:00 local time (default 13)
-#   - ~/backups/restic-cron.line            (schedule shown in Admin Tools → Restic)
+#   - ~/i/resticBackup/restic-cron.line            (schedule shown in Admin Tools → Restic)
 #
 #   scripts/mac-backups/install-mac-backup.sh [hour-24]
 set -euo pipefail
@@ -14,7 +14,7 @@ H24="${1:-13}"
 [[ "$H24" =~ ^([0-9]|1[0-9]|2[0-3])$ ]] || { echo "Usage: $0 [hour-24, e.g. 13]" >&2; exit 2; }
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BACKUPS="$HOME/backups"
+BACKUPS="$HOME/i/resticBackup"
 SCRIPT="$BACKUPS/scripts/backup-nightly.sh"
 ENVF="$BACKUPS/.backup-secrets-mac.env"
 LOG="$BACKUPS/backup-mac.log"
@@ -39,8 +39,8 @@ if [[ ! -f "$ENVF" ]]; then
     echo "export PGDATABASE=outdatedDBOct2021"
     echo "export PGUSER=test_user1"
     echo "export DUMP_DIR=$BACKUPS/pg-dump-tmp"
-    echo "export TUTA_PHOTO_FOLDER=$HOME/mac_storage/tutamallStorageFolder_outdatedOct2021"
-    echo "export LARGE_STORAGE_FOLDER=$HOME/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021"
+    echo "export TUTA_PHOTO_FOLDER=$HOME/i/mac_storage/tutamallStorageFolder_outdatedOct2021"
+    echo "export LARGE_STORAGE_FOLDER=$HOME/i/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021"
     echo "export PROJECT_DIR=$HOME/code/main"
     echo "export HOST_TAG=mac"
   } > "$ENVF"

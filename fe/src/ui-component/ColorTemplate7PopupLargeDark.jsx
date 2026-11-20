@@ -10,6 +10,7 @@ import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
 import AuthCardWrapper from 'views/pages/authentication/AuthCardWrapper';
 import GreenButton from 'ui-component/GreenButton';
+import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import useColorTemplate7PopupLargeDarkLayout from 'hooks/useColorTemplate7PopupLargeDarkLayout';
 import { BUTTON_TEMPLATE_THICK_BLACK_BORDER } from 'config/selectedUnselectedButtonTemplate';
 import { greenButtonSx } from 'config/greenButton';
@@ -25,7 +26,6 @@ import {
   colorTemplate7PopupCheckboxCheckedMarkSx,
   colorTemplate7PopupCheckboxRootSx,
   colorTemplate7PopupCheckboxShellSx,
-  colorTemplate7PopupClosePositionSx,
   colorTemplate7PopupCloseSx,
   colorTemplate7PopupClearXSx,
   colorTemplate7PopupErrorBarSx,
@@ -65,7 +65,7 @@ function popupTextColorSx(textColor) {
 
 /**
  * Large dark-theme gallery popup (ColorTemplate7PopupLargeDark).
- * Secondary panel, inverse-daynight copy, white inputs, GreenButton actions, top-right green square close X.
+ * Secondary panel, inverse-daynight copy, white inputs, GreenButton actions, top-right red square close X.
  * Default width fills the menu-aware gallery column; pass maxWidth only to cap narrower than gallery.
  *
  * Usage:
@@ -339,20 +339,13 @@ function ColorTemplate7PopupLargeDarkFormRow({ label, children, labelSx, control
 
 function ColorTemplate7PopupLargeDarkClose({ onClose, sx, disabled = false, 'aria-label': ariaLabel = 'Close popup' }) {
   return (
-    <GreenButton
-      type="button"
-      aria-label={ariaLabel}
+    <ColorTemplate6CloseX
+      onClose={onClose}
       disabled={disabled}
-      onClick={onClose}
+      aria-label={ariaLabel}
       className="color-template7-popup-close"
-      sx={{
-        ...colorTemplate7PopupClosePositionSx(),
-        ...colorTemplate7PopupCloseSx(),
-        ...(sx || {})
-      }}
-    >
-      X
-    </GreenButton>
+      sx={sx}
+    />
   );
 }
 
@@ -523,8 +516,7 @@ export default function ColorTemplate7PopupLargeDark({
                   ...greenButtonSx(),
                   ...colorTemplate7PopupActionButtonSx()
                 },
-                '& .MuiButton-root.color-template7-popup-close': {
-                  ...greenButtonSx(),
+                '& .color-template7-popup-close': {
                   ...colorTemplate7PopupCloseSx()
                 },
                 '& .MuiButton-root.color-template7-popup-clear-x': {

@@ -4,7 +4,7 @@
  *
  * Usage (Ubuntu / Mac, from repo root):
  *   node be/scripts/backupUserAll.js --email=dm0@gmail.com
- *   node be/scripts/backupUserAll.js --email=… --backup-root=~/tutamallBackup/dm0
+ *   node be/scripts/backupUserAll.js --email=… --backup-root=~/i/tutamallBackup/dm0
  *   node be/scripts/backupUserAll.js --email=… --dry-run
  */
 import '../loadEnv.js';
@@ -32,9 +32,9 @@ function printHelp() {
 
 Usage:
   node be/scripts/backupUserAll.js --email=<member@email>
-  node be/scripts/backupUserAll.js --email=… --backup-root=~/tutamallBackup/dm0
+  node be/scripts/backupUserAll.js --email=… --backup-root=~/i/tutamallBackup/dm0
 
-Default backup folder: ~/tutamallBackup/{email-prefix}/`);
+Default backup folder: ~/i/tutamallBackup/{email-prefix}/`);
 }
 
 async function exitCli(code) {

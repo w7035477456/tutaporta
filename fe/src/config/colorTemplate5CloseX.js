@@ -12,16 +12,20 @@ export const COLOR_TEMPLATE5_CLOSE_X_BG = 'var(--theme-error-color)';
 export const COLOR_TEMPLATE5_CLOSE_X_BORDER = '2px solid #000000';
 
 export function colorTemplate5CloseXSx(overrides = {}) {
+  const redBg = {
+    bgcolor: `${COLOR_TEMPLATE5_CLOSE_X_BG} !important`,
+    backgroundColor: `${COLOR_TEMPLATE5_CLOSE_X_BG} !important`,
+    backgroundImage: 'none !important',
+    color: `${COLOR_TEMPLATE5_CLOSE_X_TEXT} !important`,
+    WebkitTextFillColor: `${COLOR_TEMPLATE5_CLOSE_X_TEXT} !important`,
+    border: `${COLOR_TEMPLATE5_CLOSE_X_BORDER} !important`
+  };
   return {
     fontFamily: MAIN_FONT_FAMILY,
     fontSize: buttonFontSizeResponsive,
     fontWeight: 800,
     lineHeight: 1,
-    color: COLOR_TEMPLATE5_CLOSE_X_TEXT,
-    WebkitTextFillColor: COLOR_TEMPLATE5_CLOSE_X_TEXT,
-    border: COLOR_TEMPLATE5_CLOSE_X_BORDER,
     borderRadius: 0,
-    bgcolor: COLOR_TEMPLATE5_CLOSE_X_BG,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -33,13 +37,13 @@ export function colorTemplate5CloseXSx(overrides = {}) {
     minHeight: { xs: '1.75em', sm: '1.75em' },
     p: 0,
     m: 0,
+    ...redBg,
+    '&&&': redBg,
+    'html[data-color-palete="minimal"] &&&:not(.Mui-disabled)': redBg,
     ...templateButtonMagnifySx({ baseFontSize: buttonFontSizeResponsive }),
     '@media (hover: hover)': {
       '&:hover': {
-        bgcolor: COLOR_TEMPLATE5_CLOSE_X_BG,
-        color: COLOR_TEMPLATE5_CLOSE_X_TEXT,
-        WebkitTextFillColor: COLOR_TEMPLATE5_CLOSE_X_TEXT,
-        border: COLOR_TEMPLATE5_CLOSE_X_BORDER,
+        ...redBg,
         opacity: 0.92
       }
     },

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 24x7 website uptime monitor — independent of PM2 (tutamallPM2Process).
-# Curls a few public URLs; on failure, SMS +17035477456 and a USB-speaker
-# tone that runs until the site is healthy again.
+# Curls local app health (default http://127.0.0.1:40000 — not public Cloudflare URLs,
+# which 403 from this box). On failure: SMS +17035477456 (Twilio Messages, real body)
+# and a USB-speaker tone until healthy again.
 #
 # SERVERDOWN_TEXT in ~/.ssh/be/.env (or SITE_UPTIME_SERVERDOWN_TEXT):
 #   ALL — 3 texts every 10 min, then 3 hourly, then once a day (default)
@@ -24,7 +25,9 @@ FAST_SMS_COUNT="${SITE_UPTIME_FAST_SMS_COUNT:-3}"
 HOURLY_SMS_SEC="${SITE_UPTIME_HOURLY_SMS_SEC:-3600}"
 HOURLY_SMS_COUNT="${SITE_UPTIME_HOURLY_SMS_COUNT:-3}"
 DAILY_SMS_SEC="${SITE_UPTIME_DAILY_SMS_SEC:-86400}"
-BASE_URL="${SITE_UPTIME_BASE_URL:-https://tutamall.com}"
+# Default to local PM2 (HAProxy:40000). Public https://tutamall.com returns Cloudflare
+# 403/"Just a moment..." when curled from the origin box, which false-alarms.
+BASE_URL="${SITE_UPTIME_BASE_URL:-http://127.0.0.1:40000}"
 ALARM_ENABLE="${SITE_UPTIME_ALARM:-1}"
 ALARM_DEVICE="${SITE_UPTIME_ALARM_DEVICE:-auto}"
 ALARM_HZ="${SITE_UPTIME_ALARM_HZ:-880}"
@@ -63,9 +66,13 @@ read_env_value() {
 
 TWILIO_ACCOUNT_SID="$(read_env_value TWILIO_ACCOUNT_SID "$ENV_FILE")"
 TWILIO_AUTH_TOKEN="$(read_env_value TWILIO_AUTH_TOKEN "$ENV_FILE")"
-TWILIO_SERVICE_SID="$(read_env_value TWILIO_SERVICE_SID "$ENV_FILE")"
-if [[ -z "$TWILIO_SERVICE_SID" ]]; then
-  TWILIO_SERVICE_SID="$(read_env_value TWILIO_ServiceSID "$ENV_FILE")"
+# Messages API "From" (custom body). Prefer dedicated uptime From, then TWILIO_PHONE_NUMBER.
+TWILIO_FROM="${SITE_UPTIME_TWILIO_FROM:-$(read_env_value SITE_UPTIME_TWILIO_FROM "$ENV_FILE")}"
+if [[ -z "$TWILIO_FROM" ]]; then
+  TWILIO_FROM="$(read_env_value TWILIO_PHONE_NUMBER "$ENV_FILE")"
+fi
+if [[ -z "$TWILIO_FROM" ]]; then
+  TWILIO_FROM="$(read_env_value TWILIO_FROM_NUMBER "$ENV_FILE")"
 fi
 SMS_TO="${SITE_UPTIME_SMS_TO:-$(read_env_value SITE_UPTIME_SMS_TO "$ENV_FILE")}"
 if [[ -z "$SMS_TO" ]]; then
@@ -369,21 +376,22 @@ json_field() {
 
 send_sms() {
   local body="$1"
-  if [[ -z "$TWILIO_ACCOUNT_SID" || -z "$TWILIO_AUTH_TOKEN" || -z "$TWILIO_SERVICE_SID" ]]; then
-    log_sms "SMS NOT SENT (Twilio Verify env missing in ${ENV_FILE}) sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} verify_sid_len=${#TWILIO_SERVICE_SID} to=${SMS_TO} body=${body}"
+  # Use Twilio Messages API so the SMS body is the real down alert
+  # ("TutaMall DOWN …"), not Twilio Verify's "Your TutaMall verification code is: ######".
+  if [[ -z "$TWILIO_ACCOUNT_SID" || -z "$TWILIO_AUTH_TOKEN" || -z "$TWILIO_FROM" ]]; then
+    log_sms "SMS NOT SENT (Twilio Messages env missing in ${ENV_FILE}) sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} from_len=${#TWILIO_FROM} to=${SMS_TO} body=${body}"
     return 1
   fi
   local resp http
   resp="$(mktemp)"
-  # Same Twilio Verify path as signup SMS (To + Channel only).
-  # Do NOT send CustomFriendlyName — Twilio error 60204 unless Sales enables it.
   http="$(
     curl -sS -o "$resp" -w '%{http_code}' \
       --max-time 20 \
-      -X POST "https://verify.twilio.com/v2/Services/${TWILIO_SERVICE_SID}/Verifications" \
+      -X POST "https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json" \
       --user "${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}" \
       --data-urlencode "To=${SMS_TO}" \
-      --data-urlencode "Channel=sms" \
+      --data-urlencode "From=${TWILIO_FROM}" \
+      --data-urlencode "Body=${body}" \
       || true
   )"
   local sid status err_msg err_code snippet
@@ -393,11 +401,11 @@ send_sms() {
   err_code="$(json_field code "$resp")"
   snippet="$(tr '\n' ' ' <"$resp" | sed 's/[[:space:]]\+/ /g' | cut -c1-400)"
   rm -f "$resp"
-  if [[ "$http" =~ ^2[0-9][0-9]$ && "$sid" =~ ^VE ]]; then
-    log_sms "SMS SENT (Twilio Verify / signup-style) to=${SMS_TO} twilio_http=${http} status=${status:-?} sid=${sid} note=${body}"
+  if [[ "$http" =~ ^2[0-9][0-9]$ && "$sid" =~ ^SM ]]; then
+    log_sms "SMS SENT (Twilio Messages) to=${SMS_TO} from=${TWILIO_FROM} twilio_http=${http} status=${status:-?} sid=${sid} body=${body}"
     return 0
   fi
-  log_sms "SMS FAILED (Twilio Verify) to=${SMS_TO} twilio_http=${http:-000} status=${status:-?} code=${err_code:-?} error=${err_msg:-unknown} note=${body} raw=${snippet}"
+  log_sms "SMS FAILED (Twilio Messages) to=${SMS_TO} from=${TWILIO_FROM} twilio_http=${http:-000} status=${status:-?} code=${err_code:-?} error=${err_msg:-unknown} body=${body} raw=${snippet}"
   return 1
 }
 
@@ -446,7 +454,7 @@ fi
 
 if [[ "${1:-}" == "--test-sms" || "${1:-}" == "test-sms" ]]; then
   clear_sms_state
-  log_monitor "TEST-SMS (Twilio Verify) env=${ENV_FILE} to=${SMS_TO} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} verify_sid_len=${#TWILIO_SERVICE_SID}"
+  log_monitor "TEST-SMS (Twilio Messages) env=${ENV_FILE} to=${SMS_TO} from=${TWILIO_FROM} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} from_len=${#TWILIO_FROM}"
   send_sms "TutaMall uptime monitor test at $(ts)"
   exit $?
 fi
@@ -456,7 +464,7 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT INT TERM
 
-log_monitor "START v7 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} verify_sid_len=${#TWILIO_SERVICE_SID} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} SERVERDOWN_TEXT=${SERVERDOWN_TEXT} schedule=$(sms_schedule_label) immediate_on_new_outage=1 no_custom_friendly_name=1 alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ} alarm_usb_vol=${ALARM_USB_VOL}%"
+log_monitor "START v8 interval=${INTERVAL_SEC}s urls=${URLS[*]} sms_to=${SMS_TO} from_len=${#TWILIO_FROM} sid_len=${#TWILIO_ACCOUNT_SID} token_len=${#TWILIO_AUTH_TOKEN} SERVERDOWN_TEXT=${SERVERDOWN_TEXT} schedule=$(sms_schedule_label) immediate_on_new_outage=1 sms=TwilioMessages alarm=${ALARM_ENABLE} alarm_device=${ALARM_DEVICE} alarm_hz=${ALARM_HZ} alarm_usb_vol=${ALARM_USB_VOL}%"
 
 DOWN=0
 while true; do

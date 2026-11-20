@@ -911,9 +911,13 @@ function ColumnResizeHandle({ onMouseDown, sx }) {
   );
 }
 
-function isLeftSidebarDragEvent(event) {
+function isLeftSidebarDragEvent(event, activeDrag = null) {
   const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
-  return types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_NOTE);
+  if (types.includes(DRAG_NOTEBOOK) || types.includes(DRAG_NOTE)) return true;
+  // MIME types can be hidden mid-drag when a Finder File payload is attached;
+  // fall back to the sync in-memory drag (same pattern as cross-pane).
+  const kind = activeDrag?.kind;
+  return kind === DRAG_NOTEBOOK || kind === DRAG_NOTE;
 }
 
 function stripNoteHeavyFields(note) {
@@ -1267,7 +1271,7 @@ function ShortcutMenuRow({
             const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
             const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
             if (shortcutRaw) onDrop(e, id);
-            else if (notebookRaw || noteRaw) onDropFromLeft(e);
+            else if (notebookRaw || noteRaw || isLeftSidebarDragEvent(e)) onDropFromLeft(e);
           }}
           sx={
             isDropTarget
@@ -1475,7 +1479,9 @@ function RenamableDraggableMenuRow({
             }
             // OS files without a row handler: let the event bubble to the column drop zone.
             if (isOsFile) return;
-            if (!acceptsDrop) return;
+            // Allow reorder as soon as MIME types are present — do not wait for
+            // React draggingId state (setState is async; first dragover can race it).
+            if (!acceptsDrop && !isInternalVaultDrag) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = acceptForeignDrop ? 'copy' : 'move';
             onDragOver(id);
@@ -5347,7 +5353,11 @@ export default function RecordVaultWorkspacePane({
       if (tryHandleForeignCrossPaneDrop(event, { targetNotebookId: selectedNotebookId })) {
         return;
       }
-      const raw = event.dataTransfer.getData(mime) || event.dataTransfer.getData('text/plain');
+      let raw = event.dataTransfer.getData(mime) || event.dataTransfer.getData('text/plain');
+      if (!raw) {
+        const active = activeDragRef.current;
+        if (active?.kind === mime) raw = String(active.id ?? '');
+      }
       const fromId = Number(raw);
       if (!Number.isFinite(fromId) || fromId === toId || busy) {
         handleDragEnd();
@@ -6825,6 +6835,7 @@ export default function RecordVaultWorkspacePane({
           storageType={paneStorageType}
           keepModelInMemory={ragKeepModelInMemory}
           disabled={busy || !unlocked}
+          onBeforeAsk={flushPendingNoteSave}
         />
         <BillScheduleInstructionPopup open={billScheduleTutorialOpen} onClose={() => setBillScheduleTutorialOpen(false)} />
         <RecordVaultCreateItemDialog
@@ -7284,7 +7295,9 @@ export default function RecordVaultWorkspacePane({
                             hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                             fullWidth
                             data-guest-demo-allow="true"
-                            onClick={() => setRagDialogOpen(true)}
+                            onClick={() => {
+                              void flushPendingNoteSave().finally(() => setRagDialogOpen(true));
+                            }}
                             disabled={busy || !unlocked}
                             aria-label={
                               ragModelButtonLabel
@@ -8413,7 +8426,7 @@ export default function RecordVaultWorkspacePane({
                               minHeight: compact ? 64 : 100
                             }}
                             onDragOver={(e) => {
-                              const fromLeft = isLeftSidebarDragEvent(e);
+                              const fromLeft = isLeftSidebarDragEvent(e, activeDragRef.current);
                               if (fromLeft || draggingShortcutId != null) {
                                 e.preventDefault();
                                 e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
@@ -8425,7 +8438,10 @@ export default function RecordVaultWorkspacePane({
                               const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
                               const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
                               const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
-                              if (!shortcutRaw && (notebookRaw || noteRaw || isLeftSidebarDragEvent(e))) {
+                              if (
+                                !shortcutRaw &&
+                                (notebookRaw || noteRaw || isLeftSidebarDragEvent(e, activeDragRef.current))
+                              ) {
                                 void handleShortcutDropFromLeft(e);
                               }
                             }}
@@ -8462,7 +8478,7 @@ export default function RecordVaultWorkspacePane({
                             <Box
                               sx={recordVaultMenuListScrollSx}
                               onDragOver={(e) => {
-                                const fromLeft = isLeftSidebarDragEvent(e);
+                                const fromLeft = isLeftSidebarDragEvent(e, activeDragRef.current);
                                 if (fromLeft || draggingShortcutId != null) {
                                   e.preventDefault();
                                   e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';

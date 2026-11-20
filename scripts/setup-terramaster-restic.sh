@@ -19,9 +19,9 @@ set -euo pipefail
 MOUNT_POINT=/mnt/terramaster
 OLD_FAKE=/home/lawsen0/TERRAMASTER
 APP_USER=lawsen0
-BACKUP_ENV=/home/lawsen0/backups/.backup-secrets-ubuntu.env
-NIGHTLY=/home/lawsen0/backups/scripts/backup-nightly.sh
-ENCLOSURE_POWER=/home/lawsen0/backups/scripts/terramaster-enclosure-power.sh
+BACKUP_ENV=/home/lawsen0/i/resticBackup/.backup-secrets-ubuntu.env
+NIGHTLY=/home/lawsen0/i/resticBackup/scripts/backup-nightly.sh
+ENCLOSURE_POWER=/home/lawsen0/i/resticBackup/scripts/terramaster-enclosure-power.sh
 REPO_SUBDIR=restic-ubuntu
 FS_LABEL=TERRAMASTER
 

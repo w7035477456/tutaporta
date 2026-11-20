@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLI: restore TutaNotes + TutaPhoto + TutaDates for one member from ~/tutamallBackup/{prefix}/.
+ * CLI: restore TutaNotes + TutaPhoto + TutaDates for one member from ~/i/tutamallBackup/{prefix}/.
  *
  * Usage (Ubuntu / Mac, from repo root):
  *   node be/scripts/restoreUserAll.js --email=dm0@gmail.com
@@ -35,7 +35,7 @@ Usage:
   node be/scripts/restoreUserAll.js --email=… --dry-run
   node be/scripts/restoreUserAll.js --email=… --yes
 
-Default restore folder: ~/tutamallBackup/{email-prefix}/`);
+Default restore folder: ~/i/tutamallBackup/{email-prefix}/`);
 }
 
 async function exitCli(code) {

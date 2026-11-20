@@ -1,6 +1,6 @@
 /**
  * Full-member backup/restore for TutaNotes, TutaPhotoAlbums, and TutaDates.
- * Server-side archive under ~/tutamallBackup/{emailPrefix}/.
+ * Server-side archive under ~/i/tutamallBackup/{emailPrefix}/.
  */
 import fs from 'fs';
 import path from 'path';
@@ -145,7 +145,7 @@ export function emailPrefixFromAddress(email) {
 }
 
 export function defaultBackupRootForEmail(email) {
-  return path.join(os.homedir(), 'tutamallBackup', emailPrefixFromAddress(email));
+  return path.join(os.homedir(), 'i', 'tutamallBackup', emailPrefixFromAddress(email));
 }
 
 export async function resolveUserByEmail(pool, email) {

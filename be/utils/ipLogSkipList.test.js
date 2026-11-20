@@ -84,7 +84,7 @@ describe('TutaMall backup / restore log protection', () => {
     assert.throws(() => backup.assertNotProtectedLogPath(path.join(beDir, 'demolog.log')), /protected log location/);
     assert.throws(() => backup.assertNotProtectedLogPath(tmpHome), /protected log location/);
     assert.throws(() => backup.assertNotProtectedLogPath('/'), /protected log location/);
-    assert.doesNotThrow(() => backup.assertNotProtectedLogPath(path.join(tmpHome, 'tutamallBackup', 'a2')));
+    assert.doesNotThrow(() => backup.assertNotProtectedLogPath(path.join(tmpHome, 'i', 'tutamallBackup', 'a2')));
   });
 
   it('refuses to delete login_log rows', () => {

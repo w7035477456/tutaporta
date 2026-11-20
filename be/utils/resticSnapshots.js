@@ -19,7 +19,7 @@ export function resolveResticSecretsEnvFile(env = process.env, platform = proces
   const configured = String(env.RESTIC_SECRETS_ENV_FILE ?? '').trim();
   if (configured) return configured;
   const hostSuffix = platform === 'darwin' ? 'mac' : 'ubuntu';
-  return path.join(homeDir, 'backups', `.backup-secrets-${hostSuffix}.env`);
+  return path.join(homeDir, 'i', 'resticBackup', `.backup-secrets-${hostSuffix}.env`);
 }
 
 const RESTIC_CRON_TZ = 'America/New_York';

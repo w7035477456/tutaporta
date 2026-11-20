@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { postSupportMessage } from 'api/supportMessageFe';
+import { askTechSupport } from 'api/techSupportFe';
 import { useAuth } from 'contexts/AuthContext';
 import { formatAliasWithMemberCode } from 'utils/memberLabel';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
@@ -16,6 +17,7 @@ import {
 const MAX_FILES = 2;
 const MAX_FILE_BYTES = 7 * 1024 * 1024;
 const MAX_FILE_ERROR = '7mb max per file';
+const ASK_QUESTION_MAX = 4000;
 
 function isImageFile(file) {
   if (file?.type?.startsWith('image/')) return true;
@@ -47,8 +49,12 @@ export default function SupportMessageDialog({ open, onClose }) {
   const [message, setMessage] = useState('');
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [askAnswer, setAskAnswer] = useState('');
+  const [conversationId, setConversationId] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const busy = sending || asking;
 
   const imagePreviewUrls = useMemo(
     () => files.map((file) => (isImageFile(file) ? URL.createObjectURL(file) : null)),
@@ -68,6 +74,8 @@ export default function SupportMessageDialog({ open, onClose }) {
     if (!open) return;
     setError('');
     setSuccess('');
+    setAskAnswer('');
+    setConversationId(null);
     const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim();
     const defaultName =
       formatAliasWithMemberCode({
@@ -82,7 +90,7 @@ export default function SupportMessageDialog({ open, onClose }) {
   }, [open, user]);
 
   const handleClose = () => {
-    if (sending) return;
+    if (busy) return;
     onClose();
   };
 
@@ -114,6 +122,35 @@ export default function SupportMessageDialog({ open, onClose }) {
 
   const handleRemoveFile = (index) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAsk = async () => {
+    setError('');
+    setSuccess('');
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      setError('Please enter a question in “How can we help you?”.');
+      return;
+    }
+    if (trimmedMessage.length > ASK_QUESTION_MAX) {
+      setError(`Question is too long (max ${ASK_QUESTION_MAX} characters).`);
+      return;
+    }
+
+    setAsking(true);
+    setAskAnswer('');
+    try {
+      const data = await askTechSupport({
+        question: trimmedMessage,
+        conversationId: conversationId || undefined
+      });
+      if (data?.conversationId) setConversationId(data.conversationId);
+      setAskAnswer(String(data?.answer ?? '').trim() || 'No answer returned.');
+    } catch (err) {
+      setError(err?.message || 'Failed to get an answer.');
+    } finally {
+      setAsking(false);
+    }
   };
 
   const handleSend = async () => {
@@ -150,9 +187,9 @@ export default function SupportMessageDialog({ open, onClose }) {
   return (
     <ColorTemplate7PopupLargeDark
       open={open}
-      onClose={sending ? undefined : handleClose}
-      closeOnBackdrop={!sending}
-      showCloseButton={!sending}
+      onClose={busy ? undefined : handleClose}
+      closeOnBackdrop={!busy}
+      showCloseButton={!busy}
       closeButtonAriaLabel="Close support message"
       panelBg={PAGE_INSTRUCTION_TOOLTIP_BG}
       textColor={PAGE_INSTRUCTION_TOOLTIP_TEXT}
@@ -169,7 +206,7 @@ export default function SupportMessageDialog({ open, onClose }) {
               placeholder="Your name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              disabled={sending}
+              disabled={busy}
             />
           </ColorTemplate7PopupLargeDark.FormRow>
 
@@ -180,7 +217,7 @@ export default function SupportMessageDialog({ open, onClose }) {
               placeholder="From Email & CC Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={sending}
+              disabled={busy}
             />
           </ColorTemplate7PopupLargeDark.FormRow>
         </ColorTemplate7PopupLargeDark.FormRows>
@@ -198,17 +235,28 @@ export default function SupportMessageDialog({ open, onClose }) {
             minRows={10}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={sending}
+            disabled={busy}
             inputProps={{ maxLength: 10000 }}
           />
         </Box>
+
+        {askAnswer || asking ? (
+          <Box sx={{ width: '100%' }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.75 }}>
+              Answer
+            </Typography>
+            <ColorTemplate7PopupLargeDark.BodyText sx={{ whiteSpace: 'pre-wrap' }}>
+              {asking ? 'Thinking…' : askAnswer}
+            </ColorTemplate7PopupLargeDark.BodyText>
+          </Box>
+        ) : null}
 
         <ColorTemplate7PopupLargeDark.FormRows>
           <ColorTemplate7PopupLargeDark.FormRow label="Attachments">
             <ColorTemplate7PopupLargeDark.ActionButton
               type="button"
               onClick={handlePickFiles}
-              disabled={sending || files.length >= MAX_FILES}
+              disabled={busy || files.length >= MAX_FILES}
             >
               <AttachFileIcon />
               {files.length} Add up to {MAX_FILES} files
@@ -229,7 +277,7 @@ export default function SupportMessageDialog({ open, onClose }) {
                 <ColorTemplate7PopupLargeDark.ActionButton
                   type="button"
                   onClick={() => handleRemoveFile(index)}
-                  disabled={sending}
+                  disabled={busy}
                 >
                   Remove
                 </ColorTemplate7PopupLargeDark.ActionButton>
@@ -242,7 +290,10 @@ export default function SupportMessageDialog({ open, onClose }) {
         {success ? <ColorTemplate7PopupLargeDark.BodyText>{success}</ColorTemplate7PopupLargeDark.BodyText> : null}
 
         <Stack direction="row" spacing={1.5} justifyContent="flex-end" flexWrap="wrap">
-          <ColorTemplate7PopupLargeDark.ActionButton type="button" onClick={handleSend} disabled={sending}>
+          <ColorTemplate7PopupLargeDark.ActionButton type="button" onClick={handleAsk} disabled={busy}>
+            {asking ? 'Asking…' : 'Ask'}
+          </ColorTemplate7PopupLargeDark.ActionButton>
+          <ColorTemplate7PopupLargeDark.ActionButton type="button" onClick={handleSend} disabled={busy}>
             {sending ? 'Sending…' : 'Send'}
           </ColorTemplate7PopupLargeDark.ActionButton>
         </Stack>

@@ -98,7 +98,7 @@ const PROFILE_MENU_POPPER_OFFSET_PX = 14;
 /** Popper overflow padding + Paper border so the scaled panel clears the screen bottom. */
 const PROFILE_MENU_MOBILE_BOTTOM_RESERVE_PX = 18;
 
-/** Show ~/tutamallBackup/{prefix} as /tutamallBackup/{prefix} (hide OS home path). */
+/** Show ~/i/tutamallBackup/{prefix} as /tutamallBackup/{prefix} (hide OS home path). */
 function formatTutaMallBackupLocation(backupDir) {
   const raw = String(backupDir || '')
     .trim()

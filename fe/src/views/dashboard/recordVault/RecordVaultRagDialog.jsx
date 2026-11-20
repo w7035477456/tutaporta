@@ -145,7 +145,9 @@ export default function RecordVaultRagDialog({
   selectedNoteIds = [],
   storageType = 'onedrive',
   keepModelInMemory = false,
-  disabled = false
+  disabled = false,
+  /** Flush open-note autosave before Ask so RAG reads the latest body from Postgres. */
+  onBeforeAsk
 }) {
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -237,6 +239,9 @@ export default function RecordVaultRagDialog({
     setError('');
     const startedAt = performance.now();
     try {
+      if (typeof onBeforeAsk === 'function') {
+        await onBeforeAsk();
+      }
       const data = await queryRecordVaultRag({
         noteIds: selectedNoteIds,
         prompt: question,
@@ -277,7 +282,7 @@ export default function RecordVaultRagDialog({
     } finally {
       setBusy(false);
     }
-  }, [noteCount, prompt, selectedNoteIds, storageType, keepModelInMemory]);
+  }, [noteCount, prompt, selectedNoteIds, storageType, keepModelInMemory, onBeforeAsk]);
 
   const handleClose = () => {
     if (busy) return;
@@ -476,5 +481,6 @@ RecordVaultRagDialog.propTypes = {
   selectedNoteIds: PropTypes.arrayOf(PropTypes.number),
   storageType: PropTypes.string,
   keepModelInMemory: PropTypes.bool,
-  disabled: PropTypes.bool
+  disabled: PropTypes.bool,
+  onBeforeAsk: PropTypes.func
 };

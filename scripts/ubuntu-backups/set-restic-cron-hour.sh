@@ -10,9 +10,9 @@ if [[ ! "$H24" =~ ^([0-9]|1[0-9]|2[0-3])$ ]]; then
 fi
 
 TZ=America/New_York
-SCRIPT=/home/lawsen0/backups/scripts/backup-nightly.sh
-ENVF=/home/lawsen0/backups/.backup-secrets-ubuntu.env
-LOG=/home/lawsen0/backups/backup-ubuntu.log
+SCRIPT=/home/lawsen0/i/resticBackup/scripts/backup-nightly.sh
+ENVF=/home/lawsen0/i/resticBackup/.backup-secrets-ubuntu.env
+LOG=/home/lawsen0/i/resticBackup/backup-ubuntu.log
 MARKER='# restic-nightly (retimed by set-restic-cron-hour.sh)'
 
 utc_a=$(((H24 + 4) % 24))

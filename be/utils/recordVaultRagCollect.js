@@ -3,10 +3,11 @@ import { expandRecordVaultBodyTextForSearch } from './recordVaultSearch.js';
 
 /**
  * Load note bodies + attachment bytes for RAG. Skips missing notes; rejects inner-encrypted notes.
+ * Must await vaultGetNote / vaultGetNoteAttachment (Postgres vaultSession is async).
  * @param {import('./recordVaultUsb/vaultSession.js').VaultSession} session
  * @param {number[]} noteIds
  */
-export function collectRecordVaultNotesForRag(session, noteIds) {
+export async function collectRecordVaultNotesForRag(session, noteIds) {
   const ids = [...new Set((noteIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0))];
   if (!ids.length) {
     const err = new Error('Select at least one note using the RAG checkboxes.');
@@ -16,11 +17,12 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
 
   const notes = [];
   const skipped = [];
+  const emptyBodyTitles = [];
   let pdfAttachmentCount = 0;
   let pdfBytesTotal = 0;
 
   for (const noteId of ids) {
-    const note = vaultGetNote(session, noteId);
+    const note = await vaultGetNote(session, noteId);
     if (!note) {
       skipped.push({ noteId, reason: 'not_found' });
       continue;
@@ -37,7 +39,7 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
     for (const att of note.attachments || []) {
       const attachmentId = Number(att.attachment_id);
       if (!Number.isFinite(attachmentId) || attachmentId < 1) continue;
-      const got = vaultGetNoteAttachment(session, noteId, attachmentId);
+      const got = await vaultGetNoteAttachment(session, noteId, attachmentId);
       if (!got?.buffer?.length) continue;
       let ext = String(att.file_extension || '').toLowerCase().replace(/^\./, '');
       const fileName = String(att.file_name || got.fileName || 'attachment');
@@ -53,11 +55,23 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
       }
     }
 
+    const resolvedNoteId = Number(note.note_id);
+    if (!Number.isFinite(resolvedNoteId) || resolvedNoteId < 1) {
+      skipped.push({ noteId, reason: 'invalid_note_id' });
+      continue;
+    }
+
+    const title = String(note.note_name || `Note ${resolvedNoteId}`);
+    const textContent = String(expandRecordVaultBodyTextForSearch(note.body_text || '') || '').trim();
+    if (!textContent && !attachments.length) {
+      emptyBodyTitles.push(title);
+    }
+
     notes.push({
-      note_id: Number(note.note_id),
-      title: String(note.note_name || `Note ${note.note_id}`),
+      note_id: resolvedNoteId,
+      title,
       // Match editor/search: unwrap v2 segmented bodies and strip HTML tags.
-      text_content: expandRecordVaultBodyTextForSearch(note.body_text || ''),
+      text_content: textContent,
       attachments
     });
   }
@@ -68,12 +82,29 @@ export function collectRecordVaultNotesForRag(session, noteIds) {
     throw err;
   }
 
+  const hasAnyReadable = notes.some(
+    (n) => String(n.text_content || '').trim() || (Array.isArray(n.attachments) && n.attachments.length)
+  );
+  if (!hasAnyReadable) {
+    const listed = emptyBodyTitles.slice(0, 6).map((name) => `“${name}”`).join(', ');
+    const more = emptyBodyTitles.length > 6 ? ` (+${emptyBodyTitles.length - 6} more)` : '';
+    const err = new Error(
+      `Selected notes have no saved body text${listed ? `: ${listed}${more}` : ''}. ` +
+        'Type in the note editor and wait a moment for autosave (or click another note), ' +
+        'or check the yellow RAG box on notes that already show saved content. ' +
+        'Empty duplicate note names will not work.'
+    );
+    err.code = 'RAG_EMPTY_BODY';
+    throw err;
+  }
+
   return {
     notes,
     skipped,
     meta: {
       pdfAttachmentCount,
-      pdfBytesTotal
+      pdfBytesTotal,
+      emptyBodyTitles
     }
   };
 }

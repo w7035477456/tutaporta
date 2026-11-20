@@ -7,7 +7,7 @@ set -euo pipefail
 
 MOUNT_POINT=/mnt/terramaster
 FSTAB=/etc/fstab
-POWER=/home/lawsen0/backups/scripts/terramaster-enclosure-power.sh
+POWER=/home/lawsen0/i/resticBackup/scripts/terramaster-enclosure-power.sh
 UNIT=/etc/systemd/system/terramaster-default-offline.service
 
 [[ "${EUID:-$(id -u)}" -eq 0 ]] || { echo "Run as root (sudo)." >&2; exit 1; }

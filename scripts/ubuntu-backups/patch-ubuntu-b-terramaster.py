@@ -9,11 +9,11 @@ if "terramasterstatus()" in text:
     print("terramasterstatus already present — no change")
     raise SystemExit(0)
 
-block = r"""alias waketerramaster='sudo ~/backups/scripts/terramaster-enclosure-power.sh wake'
-alias spinterramaster='sudo ~/backups/scripts/terramaster-enclosure-power.sh sleep'
+block = r"""alias waketerramaster='sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh wake'
+alias spinterramaster='sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh sleep'
 terramasterstatus() {
     local out status
-    if ! out=$(sudo ~/backups/scripts/terramaster-enclosure-power.sh status 2>&1); then
+    if ! out=$(sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh status 2>&1); then
         printf '%s\n' "$out" >&2
         return 1
     fi
@@ -29,8 +29,8 @@ terramasterstatus() {
 """
 
 needle = (
-    "alias backupnightly='clear; sudo ~/backups/scripts/backup-nightly.sh "
-    "~/backups/.backup-secrets-ubuntu.env'"
+    "alias backupnightly='clear; sudo ~/i/resticBackup/scripts/backup-nightly.sh "
+    "~/i/resticBackup/.backup-secrets-ubuntu.env'"
 )
 if needle not in text:
     raise SystemExit("backupnightly line not found — manual edit needed")

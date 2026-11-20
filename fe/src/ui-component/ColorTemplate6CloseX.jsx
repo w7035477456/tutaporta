@@ -10,6 +10,7 @@ export default function ColorTemplate6CloseX({
   sx,
   positionSx,
   label = 'X',
+  disabled = false,
   'aria-label': ariaLabel = 'Close popup',
   ...props
 }) {
@@ -18,10 +19,18 @@ export default function ColorTemplate6CloseX({
       component="button"
       type="button"
       aria-label={ariaLabel}
-      onClick={onClose}
+      disabled={disabled}
+      onClick={disabled ? undefined : onClose}
       sx={{
         ...colorTemplate6CloseXPositionSx(positionSx),
         ...colorTemplate6CloseXSx(),
+        ...(disabled
+          ? {
+              opacity: 0.55,
+              cursor: 'not-allowed',
+              pointerEvents: 'none'
+            }
+          : null),
         ...(sx || {})
       }}
       {...props}
@@ -36,5 +45,6 @@ ColorTemplate6CloseX.propTypes = {
   sx: PropTypes.object,
   positionSx: PropTypes.object,
   label: PropTypes.string,
+  disabled: PropTypes.bool,
   'aria-label': PropTypes.string
 };

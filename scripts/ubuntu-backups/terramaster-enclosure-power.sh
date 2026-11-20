@@ -11,7 +11,7 @@ TERRAMASTER_WAKE_WAIT_SEC="${TERRAMASTER_WAKE_WAIT_SEC:-180}"
 # Set TERRAMASTER_HARD_POWER_OFF=1 (or "sleep hard") for udisks USB power-off — on many
 # TerraMaster bridges the disk will NOT reappear until you press enclosure power or replug USB.
 TERRAMASTER_HARD_POWER_OFF="${TERRAMASTER_HARD_POWER_OFF:-0}"
-TERRAMASTER_USB_ID_FILE="${TERRAMASTER_USB_ID_FILE:-/home/lawsen0/backups/terramaster-usb-bridge.id}"
+TERRAMASTER_USB_ID_FILE="${TERRAMASTER_USB_ID_FILE:-/home/lawsen0/i/resticBackup/terramaster-usb-bridge.id}"
 
 _terramaster_log() { echo "[terramaster] $*"; }
 _terramaster_die() { echo "[terramaster] ERROR: $*" >&2; exit 1; }

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Mac nightly restic backup (Mac counterpart of scripts/ubuntu-backups/backup-nightly.sh).
-# Installed as ~/backups/scripts/backup-nightly.sh by install-mac-backup.sh; run by the
+# Installed as ~/i/resticBackup/scripts/backup-nightly.sh by install-mac-backup.sh; run by the
 # `backupnightly` alias and the com.tutamall.restic-nightly LaunchAgent (1:00 PM daily).
 #
-#   backup-nightly.sh ~/backups/.backup-secrets-mac.env [optional snapshot note]
+#   backup-nightly.sh ~/i/resticBackup/.backup-secrets-mac.env [optional snapshot note]
 set -euo pipefail
 
 # launchd starts jobs with a minimal PATH (restic in ~/.local/bin, pg_dump/zstd in MacPorts).

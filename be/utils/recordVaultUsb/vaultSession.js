@@ -1954,6 +1954,17 @@ export async function vaultGetNoteAttachment(session, noteId, attachmentId) {
 }
 
 
+function mapShortcutRow(row) {
+  return {
+    shortcut_id: Number(row.shortcut_id),
+    target_type: row.target_type,
+    notebook_id: Number(row.notebook_id),
+    note_id: row.note_id != null ? Number(row.note_id) : null,
+    label: row.label || '',
+    display_order: Number(row.display_order ?? 0)
+  };
+}
+
 export async function vaultCreateShortcut(session, { targetType, notebookId, noteId }) {
   return session.db.tx(async (tx) => {
     const sid = tx.singlesId;

@@ -236,7 +236,7 @@ export function colorTemplate7PopupTextCascadeSx(overrides = {}) {
         fontSize: `${colorTemplate7PopupButtonFontSizeResponsive.sm} !important`
       }
     },
-    '& .MuiButton-root.color-template7-popup-close': {
+    '& .color-template7-popup-close': {
       ...colorTemplate7PopupCloseSx(),
       fontSize: `${colorTemplate7PopupButtonFontSizeResponsive.xs} !important`,
       '@media (min-width: 600px)': {
@@ -473,10 +473,17 @@ export function colorTemplate7PopupFormRowInputStretchSx(overrides = {}, inputHe
   );
 }
 
-/** Compact square — top-right close X (red bg, black X, black border). */
+/** Compact square — top-right close X (red bg, black X, black border). Never inherit GreenButton colors. */
 export function colorTemplate7PopupCloseSx(overrides = {}) {
+  const redBg = {
+    bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
+    backgroundColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
+    backgroundImage: 'none !important',
+    color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
+    WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
+    border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`
+  };
   return {
-    ...greenButtonSx(),
     fontWeight: 800,
     lineHeight: 1,
     boxSizing: 'border-box',
@@ -491,25 +498,19 @@ export function colorTemplate7PopupCloseSx(overrides = {}) {
     justifyContent: 'center',
     cursor: 'pointer',
     m: 0,
-    bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
-    color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-    WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-    border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`,
+    ...redBg,
+    // Outrank GreenButton + Minimal-palette `&&&` when this sx is merged onto a MuiButton (ClearX).
+    '&&&': redBg,
+    'html[data-color-palete="minimal"] &&&:not(.Mui-disabled)': redBg,
     '@media (hover: hover)': {
       '&:hover:not(.Mui-disabled)': {
-        bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
-        color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-        WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-        border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`,
+        ...redBg,
         filter: 'brightness(0.92)',
         transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE})`
       }
     },
     '&:active:not(.Mui-disabled)': {
-      bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
-      color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-      WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-      border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`,
+      ...redBg,
       filter: 'brightness(0.85)',
       transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
     },
@@ -517,7 +518,7 @@ export function colorTemplate7PopupCloseSx(overrides = {}) {
   };
 }
 
-/** Inline clear "X" — compact GreenButton square. */
+/** Inline clear "X" — same red square as dialog close (not green). */
 export function colorTemplate7PopupClearXSx(overrides = {}) {
   return {
     ...colorTemplate7PopupCloseSx(),

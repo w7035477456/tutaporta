@@ -53,10 +53,10 @@ The development machines do **not** use the pre-production split above. Everythi
 
 | Machine | `ROOT_FOLDER` (holds `FAST_STORAGE_FOLDER` + `LARGE_CHEAP_STORAGE_FOLDER`) | Postgres data |
 |-----|-----|-----|
-| **Ubuntu All-in-1 dev server** | **`/home/lawsen0/ubuntu_storage`** |
-| **Mac dev** | **`/Users/a/mac_storage`** | under **`/Users/a/mac_storage`** |
+| **Ubuntu All-in-1 dev server** | **`/home/lawsen0/i/ubuntu_storage`** |
+| **Mac dev** | **`/Users/a/i/mac_storage`** | under **`/Users/a/i/mac_storage`** |
 
-- Same code everywhere: only the `.env` values differ between dev and pre-production, so never hard-code `/home/lawsen0/ubuntu_storage`, `/Users/a/mac_storage`, or xbox1 mount paths in code.
+- Same code everywhere: only the `.env` values differ between dev and pre-production, so never hard-code `/home/lawsen0/i/ubuntu_storage`, `/Users/a/i/mac_storage`, or xbox1 mount paths in code.
 
 ## What this means for code and ops
 

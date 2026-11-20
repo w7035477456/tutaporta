@@ -26,11 +26,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "== Sync backup scripts =="
-"$SSH" "$HOST" 'mkdir -p ~/backups/scripts ~/code/main/scripts/ubuntu-backups'
+"$SSH" "$HOST" 'mkdir -p ~/i/resticBackup/scripts ~/code/main/scripts/ubuntu-backups'
 scp -o IdentitiesOnly=yes -i "${DEPLOY_SSH_KEY:-$HOME/.ssh/xbox2.pem}" -P "${DEPLOY_SSH_PORT:-59221}" \
   "$ROOT/scripts/ubuntu-backups/"*.sh \
-  "$HOST:~/backups/scripts/"
-"$SSH" "$HOST" 'chmod 700 ~/backups/scripts/*.sh'
+  "$HOST:~/i/resticBackup/scripts/"
+"$SSH" "$HOST" 'chmod 700 ~/i/resticBackup/scripts/*.sh'
 
 if [[ "$SKIP_PG" -eq 0 ]]; then
   echo "== Postgres 16 -> 17 on Ubuntu =="
@@ -47,19 +47,19 @@ scp -o IdentitiesOnly=yes -i "${DEPLOY_SSH_KEY:-$HOME/.ssh/xbox2.pem}" -P "${DEP
 "$SUDO" bash /tmp/setup-terramaster-restic.sh "${SETUP_ARGS[@]}"
 
 echo "== Default offline + cron 1 PM Eastern =="
-"$SUDO" bash /home/lawsen0/backups/scripts/apply-terramaster-default-offline.sh 2>/dev/null || \
+"$SUDO" bash /home/lawsen0/i/resticBackup/scripts/apply-terramaster-default-offline.sh 2>/dev/null || \
   "$SUDO" bash "$ROOT/scripts/ubuntu-backups/apply-terramaster-default-offline.sh" || true
 scp -o IdentitiesOnly=yes -i "${DEPLOY_SSH_KEY:-$HOME/.ssh/xbox2.pem}" -P "${DEPLOY_SSH_PORT:-59221}" \
   "$ROOT/scripts/ubuntu-backups/set-restic-cron-hour.sh" "$HOST:/tmp/set-restic-cron-hour.sh"
 "$SUDO" bash /tmp/set-restic-cron-hour.sh 13
 
 echo "== First nightly: full pg_basebackup + restic baseline =="
-"$SUDO" env POSTGRES_BASE_FORCE_FULL=1 bash /home/lawsen0/backups/scripts/backup-nightly.sh \
-  /home/lawsen0/backups/.backup-secrets-ubuntu.env "pg17-fresh-baseline"
+"$SUDO" env POSTGRES_BASE_FORCE_FULL=1 bash /home/lawsen0/i/resticBackup/scripts/backup-nightly.sh \
+  /home/lawsen0/i/resticBackup/.backup-secrets-ubuntu.env "pg17-fresh-baseline"
 
 echo "== Verify =="
 "$SSH" "$HOST" 'pg_lsclusters -h; pg_basebackup --version; sudo crontab -l | grep -A1 restic-nightly; ls -la /mnt/terramaster/'
-"$SUDO" bash -c 'source /home/lawsen0/backups/.backup-secrets-ubuntu.env; restic snapshots --latest 3'
+"$SUDO" bash -c 'source /home/lawsen0/i/resticBackup/.backup-secrets-ubuntu.env; restic snapshots --latest 3'
 
 echo "== Mac: run locally when ready: scripts/pg17-upgrade-mac.sh =="
 echo "Done."

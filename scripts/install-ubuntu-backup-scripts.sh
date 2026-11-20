@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Copy repo backup scripts to ~/backups/scripts on the Ubuntu host (run on the box or via deploy-ssh-mac.sh).
+# Copy repo backup scripts to ~/i/resticBackup/scripts on the Ubuntu host (run on the box or via deploy-ssh-mac.sh).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST="${1:-/home/lawsen0/backups/scripts}"
+DEST="${1:-/home/lawsen0/i/resticBackup/scripts}"
 
 install -d -m 700 "$DEST"
 install -m 700 "$REPO_ROOT/scripts/ubuntu-backups/terramaster-enclosure-power.sh" "$DEST/"

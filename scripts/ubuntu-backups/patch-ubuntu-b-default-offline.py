@@ -11,28 +11,28 @@ HELPER = """
 _terramaster_restic_begin() { export TERRAMASTER_KEEP_AWAKE=1; }
 _terramaster_restic_end() {
     unset TERRAMASTER_KEEP_AWAKE
-    sudo ~/backups/scripts/terramaster-enclosure-power.sh sleep 2>/dev/null || true
+    sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh sleep 2>/dev/null || true
 }
 """
 
 SHOWRESTIC_FN = """
 showrestic() {
     clear
-    sudo ~/backups/scripts/terramaster-enclosure-power.sh wake || return $?
-    sudo -E bash -c "source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"
+    sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh wake || return $?
+    sudo -E bash -c "source ~/i/resticBackup/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest"
     local rc=$?
-    sudo ~/backups/scripts/terramaster-enclosure-power.sh sleep 2>/dev/null || true
+    sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh sleep 2>/dev/null || true
     return $rc
 }
 """
 
 RESTICU_FN = """
 resticu() {
-    sudo ~/backups/scripts/terramaster-enclosure-power.sh wake || return $?
+    sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh wake || return $?
     sudo bash -c 'source "$1"; shift; restic "$@"' _ "$RESTIC_ENV_UBUNTU" "$@"
     local rc=$?
     if [[ -z "${TERRAMASTER_KEEP_AWAKE:-}" ]]; then
-        sudo ~/backups/scripts/terramaster-enclosure-power.sh sleep 2>/dev/null || true
+        sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh sleep 2>/dev/null || true
     fi
     return $rc
 }
@@ -43,7 +43,7 @@ def ensure_helpers():
     global text
     if "_terramaster_restic_begin" in text:
         return
-    anchor = "RESTIC_ENV_UBUNTU=/home/lawsen0/backups/.backup-secrets-ubuntu.env"
+    anchor = "RESTIC_ENV_UBUNTU=/home/lawsen0/i/resticBackup/.backup-secrets-ubuntu.env"
     if anchor not in text:
         sys.exit("anchor RESTIC_ENV_UBUNTU not found in ~/b")
     text = text.replace(anchor, anchor + "\n" + HELPER.strip() + "\n", 1)
@@ -60,9 +60,9 @@ def replace_showrestic():
             flags=re.DOTALL,
         )
         return
-    old = "alias showrestic='sudo ~/backups/scripts/terramaster-enclosure-power.sh wake; clear;sudo -E bash -c \"source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest\"'"
+    old = "alias showrestic='sudo ~/i/resticBackup/scripts/terramaster-enclosure-power.sh wake; clear;sudo -E bash -c \"source ~/i/resticBackup/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest\"'"
     if old not in text:
-        old2 = "alias showrestic='clear;sudo -E bash -c \"source ~/backups/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest\"'"
+        old2 = "alias showrestic='clear;sudo -E bash -c \"source ~/i/resticBackup/.backup-secrets-ubuntu.env; restic check; restic snapshots; restic ls latest\"'"
         if old2 not in text:
             sys.exit("showrestic alias not found")
         text = text.replace(old2, SHOWRESTIC_FN.strip() + "\n", 1)

@@ -34,26 +34,27 @@ export function colorTemplate16PopupVerticalHalfPanelSx(_verticalHalf) {
 
 /** Top-right close X — red square, black X, black border. */
 export function colorTemplate16PopupCloseSx(overrides = {}) {
-  return {
+  const redBg = {
     bgcolor: 'var(--theme-error-color) !important',
+    backgroundColor: 'var(--theme-error-color) !important',
+    backgroundImage: 'none !important',
     border: '2px solid #000 !important',
     color: '#000 !important',
-    WebkitTextFillColor: '#000 !important',
+    WebkitTextFillColor: '#000 !important'
+  };
+  return {
+    ...redBg,
+    '&&&': redBg,
+    'html[data-color-palete="minimal"] &&&:not(.Mui-disabled)': redBg,
     '@media (hover: hover)': {
       '&:hover:not(.Mui-disabled)': {
-        bgcolor: 'var(--theme-error-color) !important',
-        color: '#000 !important',
-        WebkitTextFillColor: '#000 !important',
-        border: '2px solid #000 !important',
+        ...redBg,
         filter: 'brightness(0.92)',
         transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE})`
       }
     },
     '&:active:not(.Mui-disabled)': {
-      bgcolor: 'var(--theme-error-color) !important',
-      color: '#000 !important',
-      WebkitTextFillColor: '#000 !important',
-      border: '2px solid #000 !important',
+      ...redBg,
       filter: 'brightness(0.85)',
       transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
     },

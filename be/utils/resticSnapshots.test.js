@@ -29,7 +29,7 @@ describe('parseResticSnapshotsJson', () => {
           time: '2026-11-05T13:22:20.5-05:00',
           hostname: 'xbox2',
           tags: ['nightly', 'db', 'users_dates:39', 'users_notes:6', 'users_photos:4'],
-          paths: ['/home/lawsen0/code/main', '/home/lawsen0/ubuntu_storage'],
+          paths: ['/home/lawsen0/code/main', '/home/lawsen0/i/ubuntu_storage'],
           summary: { data_added: 1066605, total_bytes_processed: 2369160320 }
         },
         { id: '4fe1b19d00001111', time: '2026-11-05T13:38:20-05:00', hostname: 'xbox2' }
@@ -45,7 +45,7 @@ describe('parseResticSnapshotsJson', () => {
         usersDates: 39,
         usersNotes: 6,
         usersPhotos: 4,
-        paths: ['/home/lawsen0/code/main', '/home/lawsen0/ubuntu_storage'],
+        paths: ['/home/lawsen0/code/main', '/home/lawsen0/i/ubuntu_storage'],
         incBytes: 1066605,
         totalBytes: 2369160320
       },
@@ -77,14 +77,14 @@ describe('resolveResticSecretsEnvFile', () => {
   });
 
   it('defaults to the showrestic secrets file per host', () => {
-    expect(resolveResticSecretsEnvFile({}, 'linux', '/home/u')).toBe('/home/u/backups/.backup-secrets-ubuntu.env');
-    expect(resolveResticSecretsEnvFile({}, 'darwin', '/Users/a')).toBe('/Users/a/backups/.backup-secrets-mac.env');
+    expect(resolveResticSecretsEnvFile({}, 'linux', '/home/u')).toBe('/home/u/i/resticBackup/.backup-secrets-ubuntu.env');
+    expect(resolveResticSecretsEnvFile({}, 'darwin', '/Users/a')).toBe('/Users/a/i/resticBackup/.backup-secrets-mac.env');
   });
 });
 
 const CRON_LINE =
-  '0 17,18 * * * [ "$(TZ=America/New_York date +\\%H)" = 13 ] && /home/lawsen0/backups/scripts/backup-nightly.sh ' +
-  '/home/lawsen0/backups/.backup-secrets-ubuntu.env >> /home/lawsen0/backups/backup-ubuntu.log 2>&1';
+  '0 17,18 * * * [ "$(TZ=America/New_York date +\\%H)" = 13 ] && /home/lawsen0/i/resticBackup/scripts/backup-nightly.sh ' +
+  '/home/lawsen0/i/resticBackup/.backup-secrets-ubuntu.env >> /home/lawsen0/i/resticBackup/backup-ubuntu.log 2>&1';
 
 describe('parseResticCronLine', () => {
   it('reads minute, UTC hours, guard hour and log like resticcron', () => {
@@ -94,7 +94,7 @@ describe('parseResticCronLine', () => {
       guardHour: 13,
       timeZone: 'America/New_York',
       dailyAt: '1:00 PM America/New_York',
-      log: '/home/lawsen0/backups/backup-ubuntu.log'
+      log: '/home/lawsen0/i/resticBackup/backup-ubuntu.log'
     });
   });
 

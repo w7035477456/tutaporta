@@ -4,8 +4,8 @@
 #        sudo set-terramaster-watchdog-cron.sh remove   # uninstall
 set -euo pipefail
 
-SCRIPT=/home/lawsen0/backups/scripts/terramaster-idle-watchdog.sh
-LOG=/home/lawsen0/backups/terramaster-watchdog.log
+SCRIPT=/home/lawsen0/i/resticBackup/scripts/terramaster-idle-watchdog.sh
+LOG=/home/lawsen0/i/resticBackup/terramaster-watchdog.log
 MARKER='# terramaster-idle-watchdog (set-terramaster-watchdog-cron.sh)'
 newline="*/10 * * * * $SCRIPT >> $LOG 2>&1"
 
