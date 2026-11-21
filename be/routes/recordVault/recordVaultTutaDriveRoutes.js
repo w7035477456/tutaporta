@@ -2,7 +2,7 @@
  * TutaDrive Cloud — left-panel workspace when LEFT_SIDE=TutaDrive.
  * Vault under ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{member_id}/notes (encrypted at rest).
  * Photos under …/photos (symlinked from vault photos when possible).
- * Reuses the 'onedrive' session slot (workspace pane); no Microsoft sync.
+ * Reuses the 'tutaCloud' session slot (workspace pane); no Microsoft sync.
  */
 
 import fs from 'fs';
@@ -19,16 +19,12 @@ import { RecordVaultUnlockError } from '../../utils/recordVaultUsb/unlockGuard.j
 import {
   createEnvVaultKeyMaterial,
   listEnvVaultUnlockKeys
-} from '../../utils/recordVaultIconKeys.js';
-import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
+} from '../../utils/vaultKeys.js';
+import { vaultMetaUsesPlaintextStorage } from '../../utils/recordVaultIconEncryption.js';
 import { requireVaultAccessSession } from '../../utils/recordVaultAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/recordVaultUsb/usbScan.js';
-import {
-  listVaultDbFileNames,
-  vaultHasDbFile,
-  vaultMetaPath,
-  vaultRootOnMount
-} from '../../utils/recordVaultUsb/vaultPaths.js';
+import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/recordVaultUsb/vaultCrypto.js';
+import { vaultMetaPath } from '../../utils/recordVaultUsb/vaultPaths.js';
 import pool from '../../db/connection.js';
 import {
   getVaultClusterUnlockState,
@@ -39,9 +35,9 @@ import {
   getLeftSideMode,
   isLeftSideTutaDrive,
   loadMemberIdForSingles,
-  tutaDriveNotesMountPath,
   wipeTutaDriveMemberVault
 } from '../../utils/tutaDriveMemberPaths.js';
+import { deleteNotesMemberVault, NOTES_VAULT_TABLES } from '../../utils/recordVaultUsb/vaultPgStore.js';
 import {
   deleteTutaDriveBackupByName,
   listTutaDriveBackups,
@@ -70,7 +66,7 @@ import {
   previewTutaDriveMerge
 } from '../../utils/recordVaultTutaDriveMerge.js';
 
-const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
+const TUTADRIVE_ENV_KEY_TYPE = 'tutaCloud';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -123,10 +119,10 @@ async function resolveMemberContext(singlesId) {
 
 /**
  * Drop a leftover cloud-session slot so writes go to TutaDrive M{id} path.
- * Same 'onedrive' session slot is reused for TutaDrive.
+ * Same 'tutaCloud' session slot is reused for TutaDrive.
  */
 async function dropStaleCloudSessionIfWrongMount(singlesId, notesMount) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   if (!session?.mountPath) return;
   const expected = path.resolve(notesMount);
   const actual = path.resolve(String(session.mountPath));
@@ -138,17 +134,17 @@ async function dropStaleCloudSessionIfWrongMount(singlesId, notesMount) {
   console.warn(
     `[tutaDrive] clearing stale cloud session mount ${actual} (expected ${expected})`
   );
-  await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+  await logoffVaultUsb(singlesId, 'tutaCloud').catch(() => {});
 }
 
 function sessionPayload(singlesId, memberId, notesMount) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   const expected = path.resolve(notesMount);
   const actual = session?.mountPath ? path.resolve(String(session.mountPath)) : null;
   const unlocked = Boolean(session && actual === expected);
   return {
     unlocked,
-    storageType: 'onedrive',
+    storageType: 'tutaCloud',
     tutaDrive: true,
     memberId,
     memberFolder: `M${String(memberId).replace(/^M/i, '')}`,
@@ -157,31 +153,34 @@ function sessionPayload(singlesId, memberId, notesMount) {
   };
 }
 
+/** Notes index is in Postgres; vault folder needs only vault.meta.json + layout (no vault.db). */
 function vaultStatusFlags(notesMount) {
   const hasMeta = fs.existsSync(vaultMetaPath(notesMount));
-  const hasDb = vaultHasDbFile(notesMount);
   const check = hasMeta ? validateVaultOnMount(notesMount) : { ok: false };
   return {
-    hasVault: Boolean(hasMeta && hasDb && check.ok),
-    needsReformat: Boolean(hasMeta && (!hasDb || !check.ok)),
+    hasVault: Boolean(hasMeta && check.ok),
+    needsReformat: Boolean(hasMeta && !check.ok),
     vaultFilesystemInvalid: Boolean(hasMeta && !check.ok)
   };
 }
 
 async function resolveTutaDriveKeyMaterial() {
-  if (!isRecordVaultIconEncryptionEnabled()) return null;
+  // At-rest encrypt follows NOTES_ENCRYPT_PHOTO_AND_DB (not NOTES_ICON_ENCRYPTION).
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return null;
   return createEnvVaultKeyMaterial(TUTADRIVE_ENV_KEY_TYPE);
 }
 
 async function resolveTutaDriveUnlockKey(notesMount) {
-  if (!isRecordVaultIconEncryptionEnabled()) return null;
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return null;
   const meta = readVaultMeta(notesMount);
+  // Plaintext vaults migrate to encrypted on unlock (fresh Argon2id salt).
+  if (vaultMetaUsesPlaintextStorage(meta)) return null;
   const keys = await listEnvVaultUnlockKeys(TUTADRIVE_ENV_KEY_TYPE, meta);
   return keys[0]?.key ?? null;
 }
 
 function tagSessionAsTutaDrive(singlesId) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   if (session) {
     session.driveSinglesId = null;
     session.tutaDrive = true;
@@ -190,7 +189,7 @@ function tagSessionAsTutaDrive(singlesId) {
   return session;
 }
 
-/** GET /api/recordVault/tutadrive/status */
+/** GET /api/recordVault/tutaCloud/status */
 export async function getRecordVaultTutaDriveStatus(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
@@ -198,7 +197,7 @@ export async function getRecordVaultTutaDriveStatus(req, res) {
     if (!isLeftSideTutaDrive()) {
       return res.json({
         leftSide: getLeftSideMode(),
-        tutadrive: { enabled: false },
+        tutaCloud: { enabled: false },
         session: { unlocked: false }
       });
     }
@@ -207,7 +206,7 @@ export async function getRecordVaultTutaDriveStatus(req, res) {
     const flags = vaultStatusFlags(notesMount);
     return res.json({
       leftSide: 'TutaDrive',
-      tutadrive: {
+      tutaCloud: {
         enabled: true,
         memberId,
         memberFolder: memberFolder || `M${String(memberId).replace(/^M/i, '')}`,
@@ -227,14 +226,15 @@ export async function getRecordVaultTutaDriveStatus(req, res) {
   }
 }
 
-/** POST /api/recordVault/tutadrive/format — wipe member notes vault only. */
+/** POST /api/recordVault/tutaCloud/format — wipe member notes vault only. */
 export async function formatRecordVaultTutaDrive(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
-    await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+    await logoffVaultUsb(singlesId, 'tutaCloud').catch(() => {});
     const { memberId } = await resolveMemberContext(singlesId);
     wipeTutaDriveMemberVault(memberId);
+    await deleteNotesMemberVault(singlesId);
     return res.json({
       success: true,
       memberId,
@@ -250,7 +250,7 @@ export async function formatRecordVaultTutaDrive(req, res) {
   }
 }
 
-/** POST /api/recordVault/tutadrive/init */
+/** POST /api/recordVault/tutaCloud/init */
 export async function initRecordVaultTutaDrive(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
@@ -274,7 +274,7 @@ export async function initRecordVaultTutaDrive(req, res) {
 }
 
 /**
- * POST /api/recordVault/tutadrive/unlock
+ * POST /api/recordVault/tutaCloud/unlock
  * Requires Encrypt Password session (same as Open TutaNotes Cloud).
  */
 export async function unlockRecordVaultTutaDrive(req, res) {
@@ -296,7 +296,7 @@ export async function unlockRecordVaultTutaDrive(req, res) {
 
     const key = await resolveTutaDriveUnlockKey(notesMount);
     await unlockVaultUsbWithKey(singlesId, notesMount, key, {
-      storageType: 'onedrive',
+      storageType: 'tutaCloud',
       skipBackup: true
     });
     tagSessionAsTutaDrive(singlesId);
@@ -320,7 +320,7 @@ export async function unlockRecordVaultTutaDrive(req, res) {
   }
 }
 
-/** GET /api/recordVault/tutadrive/vault-tree — nested listing of unlocked TutaCloud vault folder. */
+/** GET /api/recordVault/tutaCloud/vault-tree — nested listing of unlocked TutaCloud vault folder. */
 export async function getRecordVaultTutaDriveVaultTree(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
@@ -340,14 +340,14 @@ export async function getRecordVaultTutaDriveVaultTree(req, res) {
   }
 }
 
-/** POST /api/recordVault/tutadrive/sync — flush vault DB to local TutaCloud storage (no cloud upload). */
+/** POST /api/recordVault/tutaCloud/sync — flush vault DB to local TutaCloud storage (no cloud upload). */
 export async function syncRecordVaultTutaDrive(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
 
   try {
-    const session = getVaultSession(singlesId, 'onedrive');
-    if (!session?.unlocked || !session?.mountPath) {
+    const session = getVaultSession(singlesId, 'tutaCloud');
+    if (!session?.mountPath) {
       return res.status(428).json({
         error: 'TutaCloud vault not unlocked',
         code: 'RECORD_VAULT_CLOUD_REQUIRED'
@@ -365,13 +365,13 @@ export async function syncRecordVaultTutaDrive(req, res) {
   }
 }
 
-/** POST /api/recordVault/tutadrive/logoff */
+/** POST /api/recordVault/tutaCloud/logoff */
 export async function logoffRecordVaultTutaDrive(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
     await clearVaultLogoffProgress(singlesId);
-    await logoffVaultUsb(singlesId, 'onedrive', {
+    await logoffVaultUsb(singlesId, 'tutaCloud', {
       onProgress: (progress) => setVaultLogoffProgress(singlesId, progress)
     });
     return res.json({ success: true });
@@ -381,7 +381,7 @@ export async function logoffRecordVaultTutaDrive(req, res) {
   }
 }
 
-/** GET /api/recordVault/tutadrive/backup-zip — plain vault zip for client Encrypt-Password seal. */
+/** GET /api/recordVault/tutaCloud/backup-zip — plain vault zip for client Encrypt-Password seal. */
 export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
@@ -403,7 +403,7 @@ export async function downloadRecordVaultTutaDriveBackupZip(req, res) {
 }
 
 /**
- * POST /api/recordVault/tutadrive/backup
+ * POST /api/recordVault/tutaCloud/backup
  * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK2, or legacy TNBAK1).
  * Optional fields: `note` (<20 chars, appended to the zip name), `hint` (password hint), `dateStamp` (YYYY_MM_DD).
  * Stores as users/M{id}/EncryptedTutaNotesZip_YYYY_MM_DD[_note].zip (keeps up to 3 zips).
@@ -452,7 +452,7 @@ export async function storeRecordVaultTutaDriveBackup(req, res) {
 }
 
 /**
- * PUT /api/recordVault/tutadrive/backup/:fileName
+ * PUT /api/recordVault/tutaCloud/backup/:fileName
  * Multipart field `backup` = Encrypt-Password-sealed bytes (TNBAK2, or legacy TNBAK1).
  * Replaces that specific EncryptedBackup_* / legacy backup_* zip in the member folder.
  */
@@ -509,7 +509,7 @@ export async function replaceRecordVaultTutaDriveBackup(req, res) {
   }
 }
 
-/** GET /api/recordVault/tutadrive/backup — download the sealed backup file (if any). */
+/** GET /api/recordVault/tutaCloud/backup — download the sealed backup file (if any). */
 export async function downloadRecordVaultTutaDriveStoredBackup(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
@@ -548,7 +548,7 @@ export async function downloadRecordVaultTutaDriveStoredBackup(req, res) {
   }
 }
 
-/** GET /api/recordVault/tutadrive/backup/status — list current single backup. */
+/** GET /api/recordVault/tutaCloud/backup/status — list current single backup. */
 export async function getRecordVaultTutaDriveBackupStatus(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
@@ -587,20 +587,23 @@ export async function getRecordVaultTutaDriveBackupStatus(req, res) {
   }
 }
 
-/** Unlock may run one-off DB migrations that rewrite vault.db just after unlocked_at. */
+/** Unlock may run one-off index migrations (sample seed, label fixes) just after unlocked_at. */
 const NEEDS_BACKUP_UNLOCK_GRACE_MS = 15_000;
 
-function newestVaultDbMtimeMs(notesMount) {
-  const vaultRoot = vaultRootOnMount(notesMount);
-  let newest = 0;
-  for (const name of listVaultDbFileNames()) {
-    try {
-      newest = Math.max(newest, fs.statSync(path.join(vaultRoot, name)).mtimeMs);
-    } catch {
-      /* missing variant */
-    }
-  }
-  return newest;
+async function newestNotesIndexChangeMs(singlesId) {
+  const { rows } = await pool.query(
+    `SELECT GREATEST(
+       (SELECT MAX(GREATEST(created_at, updated_at, deleted_at)) FROM ${NOTES_VAULT_TABLES.notebooks} WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, updated_at, deleted_at)) FROM ${NOTES_VAULT_TABLES.notes} WHERE singles_id = $1),
+       (SELECT MAX(created_at) FROM ${NOTES_VAULT_TABLES.keywords} WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, updated_at)) FROM ${NOTES_VAULT_TABLES.shortcuts} WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, deleted_at)) FROM ${NOTES_VAULT_TABLES.attachments} WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, deleted_at)) FROM ${NOTES_VAULT_TABLES.extraImages} WHERE singles_id = $1)
+     ) AS newest`,
+    [singlesId]
+  );
+  const newest = rows[0]?.newest;
+  return newest ? new Date(newest).getTime() : 0;
 }
 
 async function newestBillScheduleChangeMs(singlesId) {
@@ -617,8 +620,8 @@ async function newestBillScheduleChangeMs(singlesId) {
 }
 
 /**
- * GET /api/recordVault/tutadrive/backup/needs-backup
- * True when TutaNotes (vault.db) or the bill schedule changed after this unlock and after the newest backup.
+ * GET /api/recordVault/tutaCloud/backup/needs-backup
+ * True when the TutaNotes index or the bill schedule changed after this unlock and after the newest backup.
  */
 export async function getRecordVaultTutaDriveNeedsBackup(req, res) {
   const singlesId = requireSinglesId(req, res);
@@ -627,16 +630,15 @@ export async function getRecordVaultTutaDriveNeedsBackup(req, res) {
     if (!isLeftSideTutaDrive()) return res.json({ needsBackup: false });
     const memberId = await loadMemberIdForSingles(singlesId);
     if (!memberId) return res.json({ needsBackup: false });
-    const session = getVaultSession(singlesId, 'onedrive');
-    const clusterState = await getVaultClusterUnlockState(VAULT_PRODUCT_RECORD_VAULT, singlesId, 'onedrive');
+    const session = getVaultSession(singlesId, 'tutaCloud');
+    const clusterState = await getVaultClusterUnlockState(VAULT_PRODUCT_RECORD_VAULT, singlesId, 'tutaCloud');
     if (!session && !clusterState) return res.json({ needsBackup: false });
 
-    const notesMount = tutaDriveNotesMountPath(memberId);
     const newestBackupMs = listTutaDriveBackups(memberId)[0]?.mtimeMs || 0;
     const unlockedAtMs = Number(clusterState?.unlockedAt) || 0;
     const since = Math.max(newestBackupMs, unlockedAtMs ? unlockedAtMs + NEEDS_BACKUP_UNLOCK_GRACE_MS : 0);
     const lastChangeMs = Math.max(
-      newestVaultDbMtimeMs(notesMount),
+      await newestNotesIndexChangeMs(singlesId),
       await newestBillScheduleChangeMs(singlesId)
     );
     const pendingFlush = Boolean(session?.dirty);
@@ -657,7 +659,7 @@ export async function getRecordVaultTutaDriveNeedsBackup(req, res) {
 }
 
 /**
- * POST /api/recordVault/tutadrive/restore-zip
+ * POST /api/recordVault/tutaCloud/restore-zip
  * Multipart field `backup` = plaintext vault zip (client already decrypted with Encrypt Password).
  */
 export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
@@ -691,7 +693,7 @@ export async function restoreRecordVaultTutaDriveBackupZip(req, res) {
 
 /** Live TutaDrive vault session on this app server (getVaultSession already excludes locked). */
 function getLiveTutaDriveSession(singlesId, notesMount) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   if (!session?.mountPath) return null;
   const expected = path.resolve(notesMount);
   const actual = path.resolve(String(session.mountPath));
@@ -722,7 +724,7 @@ async function ensureUnlockedTutaDriveSession(req, res, singlesId) {
     }
     const key = await resolveTutaDriveUnlockKey(notesMount);
     await unlockVaultUsbWithKey(singlesId, notesMount, key, {
-      storageType: 'onedrive',
+      storageType: 'tutaCloud',
       skipBackup: true
     });
     tagSessionAsTutaDrive(singlesId);
@@ -749,7 +751,7 @@ async function ensureUnlockedTutaDriveSession(req, res, singlesId) {
 }
 
 /**
- * POST /api/recordVault/tutadrive/backup-tree
+ * POST /api/recordVault/tutaCloud/backup-tree
  * Multipart field `backup` = plain vault zip (client unsealed with Encrypt Password).
  * Returns notebook → note title tree for browse-only Open TutaNotes on a backup row.
  */
@@ -769,11 +771,7 @@ export async function listRecordVaultTutaDriveBackupTree(req, res) {
     upload = await parseVaultBackupZipUpload(req);
     const staging = await extractTutaDriveMergeZip(memberId, singlesId, upload.zipPath);
     stagingRoot = staging.stagingRoot;
-    let key = getVaultSession(singlesId, 'onedrive')?.key ?? null;
-    if (!key && isRecordVaultIconEncryptionEnabled()) {
-      key = await resolveTutaDriveUnlockKey(staging.mountPath);
-    }
-    const tree = await listTutaDriveBackupNotebookTree(staging.mountPath, key);
+    const tree = await listTutaDriveBackupNotebookTree(staging);
     return res.json({ success: true, ...tree });
   } catch (err) {
     console.error('[listRecordVaultTutaDriveBackupTree]', err?.message || err);
@@ -801,7 +799,7 @@ export async function listRecordVaultTutaDriveBackupTree(req, res) {
 }
 
 /**
- * POST /api/recordVault/tutadrive/merge/preview
+ * POST /api/recordVault/tutaCloud/merge/preview
  * Multipart field `backup` = plain vault zip (client unsealed with Encrypt Password).
  */
 export async function previewRecordVaultTutaDriveMerge(req, res) {
@@ -841,7 +839,7 @@ export async function previewRecordVaultTutaDriveMerge(req, res) {
 }
 
 /**
- * POST /api/recordVault/tutadrive/merge/apply
+ * POST /api/recordVault/tutaCloud/merge/apply
  * Body: { mergeId, decisions: { [backupNoteId]: 'add'|'overwrite'|'skip' } }
  */
 export async function applyRecordVaultTutaDriveMerge(req, res) {
@@ -886,7 +884,7 @@ export async function applyRecordVaultTutaDriveMerge(req, res) {
 }
 
 /**
- * DELETE /api/recordVault/tutadrive/backup/:fileName
+ * DELETE /api/recordVault/tutaCloud/backup/:fileName
  * Deletes a specific EncryptedBackup_YYYY-MM-DD[_HH-MM-SS].zip (or legacy backup_*) by name.
  */
 export async function deleteRecordVaultTutaDriveBackupByName(req, res) {

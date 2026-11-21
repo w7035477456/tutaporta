@@ -242,7 +242,7 @@ function clearBrokenVaultPhotosSymlink(notesMount) {
 /**
  * Ensure per-member TutaDrive tree for the current user:
  *   ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{id}/
- *     notes/TutaNotes/{files,photos,vault.db,…}
+ *     notes/TutaNotes/{files,photos,vault.meta.json}
  *     photos/   (sibling; vault photos/ usually symlinks here)
  *
  * Called on every TutaDrive status/unlock/init for that singles session.

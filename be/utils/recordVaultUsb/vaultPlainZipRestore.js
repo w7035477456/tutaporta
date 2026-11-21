@@ -8,6 +8,15 @@ import {
   VAULT_DIR_NAME,
   VAULT_META_FILE
 } from './vaultPaths.js';
+import { deleteNotesMemberVault, importNotesMemberVaultIndex, isNotesVaultIndex } from './vaultPgStore.js';
+import { openVaultBuffer } from './vaultCrypto.js';
+import {
+  findVaultIndexBackupFile,
+  isVaultIndexBackupFileName,
+  listVaultIndexBackupKeys,
+  readVaultIndexBackupFile,
+  TUTANOTES_INDEX_BACKUP_FILE
+} from '../vaultIndexBackup.js';
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];
@@ -56,8 +65,9 @@ export function resolveVaultRootFromExtractedDir(extractDir) {
 /**
  * Drop the live TutaNotes vault so restore can copy into a clean tree.
  * Unlink photos/ first when it is a symlink (do not follow it and wipe sibling photos/).
+ * When `singlesId` is set, also clear the member's Postgres notes index.
  */
-export function wipeVaultForPlainZipRestore(mountPath) {
+export async function wipeVaultForPlainZipRestore(mountPath, { singlesId = null } = {}) {
   const vaultRoot = vaultRootOnMount(mountPath);
   const photosRoot = vaultPhotosRoot(mountPath);
   try {
@@ -67,13 +77,17 @@ export function wipeVaultForPlainZipRestore(mountPath) {
     if (err?.code !== 'ENOENT') throw err;
   }
   removeDirRecursive(vaultRoot);
+  if (singlesId != null) {
+    await deleteNotesMemberVault(singlesId);
+  }
 }
 
 /**
- * Extract a plain vault zip into mountPath (parent of TutaNotes/).
+ * Extract a plain vault zip into mountPath (parent of TutaNotes/). With `singlesId`, the zip's
+ * notes index (Postgres export at the zip root) replaces the member's index.
  * @returns {{ restoredFiles: number, restoredBytes: number }}
  */
-export async function restorePlainVaultZipToMount(mountPath, zipFilePath) {
+export async function restorePlainVaultZipToMount(mountPath, zipFilePath, { singlesId = null } = {}) {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-vault-restore-'));
   const extractDir = path.join(tmpRoot, 'extract');
   fs.mkdirSync(extractDir, { recursive: true });
@@ -85,16 +99,41 @@ export async function restorePlainVaultZipToMount(mountPath, zipFilePath) {
       .promise();
 
     const sourceRoot = resolveVaultRootFromExtractedDir(extractDir);
-    const relFiles = walkLocalFiles(sourceRoot);
+    const relFiles = walkLocalFiles(sourceRoot).filter(
+      (rel) => !isVaultIndexBackupFileName(rel, TUTANOTES_INDEX_BACKUP_FILE)
+    );
     if (!relFiles.length) {
       throw new Error('Vault zip is empty');
     }
+    let backupMeta = null;
+    try {
+      backupMeta = JSON.parse(fs.readFileSync(path.join(sourceRoot, VAULT_META_FILE), 'utf8'));
+    } catch {
+      backupMeta = null;
+    }
+    const indexPath = findVaultIndexBackupFile(
+      [extractDir, path.dirname(sourceRoot), sourceRoot],
+      TUTANOTES_INDEX_BACKUP_FILE
+    );
+    const index =
+      singlesId != null && indexPath
+        ? readVaultIndexBackupFile(indexPath, await listVaultIndexBackupKeys(backupMeta), openVaultBuffer, isNotesVaultIndex)
+            .index
+        : null;
 
-    wipeVaultForPlainZipRestore(mountPath);
+    await wipeVaultForPlainZipRestore(mountPath, { singlesId });
     const vaultRoot = vaultRootOnMount(mountPath);
     fs.mkdirSync(vaultRoot, { recursive: true });
     for (const name of fs.readdirSync(sourceRoot)) {
+      if (isVaultIndexBackupFileName(name, TUTANOTES_INDEX_BACKUP_FILE)) continue;
       copyEntryRecursive(path.join(sourceRoot, name), path.join(vaultRoot, name));
+    }
+    if (index) {
+      await importNotesMemberVaultIndex(singlesId, index, {
+        vaultId: backupMeta?.vaultId ?? null,
+        source: 'restore',
+        importedFromPath: path.basename(indexPath)
+      });
     }
 
     let restoredBytes = 0;

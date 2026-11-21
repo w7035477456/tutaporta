@@ -143,7 +143,7 @@ export default function RecordVaultRagDialog({
   open,
   onClose,
   selectedNoteIds = [],
-  storageType = 'onedrive',
+  storageType = 'tutaCloud',
   keepModelInMemory = false,
   disabled = false
 }) {

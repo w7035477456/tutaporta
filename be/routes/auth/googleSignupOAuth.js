@@ -34,8 +34,7 @@ const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const SIGNUP_TOKEN_MAX_AGE_MS = 30 * 60 * 1000;
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
-                seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
-                (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
+                seeded_demo_buddies_boolean, gender_self_report, over_18_verified
          FROM outdateddbsnapshotoct2024.singles s`;
 
 function normalizeOrigin(value) {

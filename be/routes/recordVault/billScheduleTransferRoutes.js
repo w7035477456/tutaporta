@@ -97,7 +97,7 @@ function storageSideLabel(backend) {
 
 function emptySourceMessage(kind, source, otherHasData) {
   const srcLabel = storageSideLabel(source);
-  const otherLabel = storageSideLabel(source === 'usb' ? 'onedrive' : 'usb');
+  const otherLabel = storageSideLabel(source === 'usb' ? 'tutaCloud' : 'usb');
   const what =
     kind === 'bill_monthly'
       ? 'Monthly Bill Schedule'
@@ -138,7 +138,7 @@ export async function transferBillSchedule(req, res) {
 
       const srcMonthlyBefore = doMonthly ? await countMonthly(client, singlesId, source) : 0;
       const srcYearlyBefore = doYearly ? await countYearly(client, singlesId, source) : 0;
-      const other = source === 'usb' ? 'onedrive' : 'usb';
+      const other = source === 'usb' ? 'tutaCloud' : 'usb';
       const otherMonthly = doMonthly ? await countMonthly(client, singlesId, other) : 0;
       const otherYearly = doYearly ? await countYearly(client, singlesId, other) : 0;
       const otherHas =

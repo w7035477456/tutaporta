@@ -5,14 +5,14 @@
 --   psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -f be/db/alterBillScheduleStorageBackend.sql
 
 ALTER TABLE outdateddbsnapshotoct2024.monthly_bill
-  ADD COLUMN IF NOT EXISTS storage_backend text NOT NULL DEFAULT 'onedrive';
+  ADD COLUMN IF NOT EXISTS storage_backend text NOT NULL DEFAULT 'tutaCloud';
 
 ALTER TABLE outdateddbsnapshotoct2024.monthly_bill
   DROP CONSTRAINT IF EXISTS monthly_bill_storage_backend_check;
 
 ALTER TABLE outdateddbsnapshotoct2024.monthly_bill
   ADD CONSTRAINT monthly_bill_storage_backend_check
-  CHECK (storage_backend IN ('onedrive', 'usb'));
+  CHECK (storage_backend IN ('tutaCloud', 'usb'));
 
 ALTER TABLE outdateddbsnapshotoct2024.monthly_bill
   DROP CONSTRAINT IF EXISTS monthly_bill_singles_ym_row_uniq;
@@ -26,14 +26,14 @@ CREATE INDEX IF NOT EXISTS idx_monthly_bill_singles_storage_ym
   ON outdateddbsnapshotoct2024.monthly_bill (singles_id, storage_backend, bill_year DESC, bill_month DESC);
 
 ALTER TABLE outdateddbsnapshotoct2024.yearly_bill
-  ADD COLUMN IF NOT EXISTS storage_backend text NOT NULL DEFAULT 'onedrive';
+  ADD COLUMN IF NOT EXISTS storage_backend text NOT NULL DEFAULT 'tutaCloud';
 
 ALTER TABLE outdateddbsnapshotoct2024.yearly_bill
   DROP CONSTRAINT IF EXISTS yearly_bill_storage_backend_check;
 
 ALTER TABLE outdateddbsnapshotoct2024.yearly_bill
   ADD CONSTRAINT yearly_bill_storage_backend_check
-  CHECK (storage_backend IN ('onedrive', 'usb'));
+  CHECK (storage_backend IN ('tutaCloud', 'usb'));
 
 -- yearly unique name may differ — drop common variants then add scoped unique
 ALTER TABLE outdateddbsnapshotoct2024.yearly_bill

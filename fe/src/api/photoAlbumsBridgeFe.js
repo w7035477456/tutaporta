@@ -16,7 +16,7 @@ let bridgeAvailable = false;
 let bridgeEnabled = true;
 let bridgeSinglesId = null;
 let bridgeUserGestureGranted = false;
-/** @type {'usb' | 'tutadrive' | 'onedrive' | null} */
+/** @type {'usb' | 'tutaCloud' | 'tutaCloud' | null} */
 let bridgeVaultStorageType = null;
 
 /** Production site cannot list USB on the server — always use the local bridge for drive paths. */
@@ -127,7 +127,7 @@ export function setPhotoAlbumsBridgeSinglesId(singlesId) {
 export function setPhotoAlbumsBridgeStorageType(storageType) {
   const normalized = String(storageType ?? '').trim().toLowerCase();
   bridgeVaultStorageType =
-    normalized === 'tutadrive' || normalized === 'onedrive' || normalized === 'usb' ? normalized : null;
+    normalized === 'tutacloud' || normalized === 'tutacloud' || normalized === 'usb' ? normalized : null;
 }
 
 export function getPhotoAlbumsBridgeStorageType() {

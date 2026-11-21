@@ -8,7 +8,7 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.photo_albums_invites (
   invite_id SERIAL PRIMARY KEY,
   owner_singles_id INTEGER NOT NULL REFERENCES outdateddbsnapshotoct2024.singles(singles_id) ON DELETE CASCADE,
-  storage_type TEXT NOT NULL CHECK (storage_type IN ('usb', 'onedrive')),
+  storage_type TEXT NOT NULL CHECK (storage_type IN ('usb', 'tutaCloud')),
   vault_notebook_id INTEGER NOT NULL,
   vault_note_id INTEGER NOT NULL,
   album_set_name TEXT NOT NULL DEFAULT '',
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.photo_albums_shared_albums 
   invite_id INTEGER NOT NULL REFERENCES outdateddbsnapshotoct2024.photo_albums_invites(invite_id) ON DELETE CASCADE,
   recipient_singles_id INTEGER NOT NULL REFERENCES outdateddbsnapshotoct2024.singles(singles_id) ON DELETE CASCADE,
   owner_singles_id INTEGER NOT NULL REFERENCES outdateddbsnapshotoct2024.singles(singles_id) ON DELETE CASCADE,
-  storage_type TEXT NOT NULL CHECK (storage_type IN ('usb', 'onedrive')),
+  storage_type TEXT NOT NULL CHECK (storage_type IN ('usb', 'tutaCloud')),
   vault_notebook_id INTEGER NOT NULL,
   vault_note_id INTEGER NOT NULL,
   album_set_name TEXT NOT NULL DEFAULT '',

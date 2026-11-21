@@ -5,6 +5,7 @@ import {
 import { formatDefaultRecordVaultNoteTitle } from '../../utils/recordVaultDefaultTitle.js';
 import { logImpersonatedMutation } from '../../utils/adminAuth.js';
 import { requireVaultAccessSession } from '../../utils/recordVaultAccessPassword.js';
+import { isTutaNotesEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
 import {
   requireVaultSession,
   vaultCreateNotebook,
@@ -31,7 +32,8 @@ import {
   vaultGetNoteAttachment,
   vaultAddNoteExtraImage,
   vaultDeleteNoteExtraImage,
-  vaultGetNoteExtraImage
+  vaultGetNoteExtraImage,
+  vaultExtractAllInlineDataImages
 } from '../../utils/recordVaultUsb/vaultSession.js';
 import {
   canNativeOpenRecordVaultExtension,
@@ -52,7 +54,7 @@ async function bumpUiFileCount(session, { usb = false } = {}) {
   if (!session?.singlesId) return;
   await addVaultSessionFileCounts(session.singlesId, {
     uiDelta: 1,
-    usbDelta: usb && session.storageType !== 'onedrive' ? 1 : 0
+    usbDelta: usb && session.storageType !== 'tutaCloud' ? 1 : 0
   });
 }
 const ALLOWED_IMAGE_EXTENSIONS = new Set([
@@ -231,7 +233,13 @@ function buildNoteImagePatch(req) {
   if (req.body?.body_text != null) patch.body_text = String(req.body.body_text);
   if (req.body?.keywords != null) patch.keywords = req.body.keywords;
   if (req.body?.inner_encrypt_enabled != null) {
-    patch.inner_encrypt_enabled = Boolean(req.body.inner_encrypt_enabled);
+    const next = Boolean(req.body.inner_encrypt_enabled);
+    if (next && !isTutaNotesEncryptAllowed()) {
+      const err = new Error('TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)');
+      err.status = 403;
+      throw err;
+    }
+    patch.inner_encrypt_enabled = next;
   }
   // Salt is non-secret KDF material (or null for v2 embedded-in-body). Never a PIN.
   if (req.body?.inner_pin_salt !== undefined) {
@@ -277,7 +285,7 @@ export async function getRecordVaultTree(req, res) {
   const session = await requireVaultSession(req, res);
   if (!session) return;
   try {
-    const tree = vaultGetTree(session);
+    const tree = await vaultGetTree(session);
     if (!session.sessionFileCountsTreeReported) {
       session.sessionFileCountsTreeReported = true;
       const notebooks = Array.isArray(tree?.notebooks) ? tree.notebooks : [];
@@ -311,7 +319,7 @@ export async function getRecordVaultNote(req, res) {
   }
 
   try {
-    const note = vaultGetNote(session, noteId);
+    const note = await vaultGetNote(session, noteId);
     if (!note) return res.status(404).json({ error: 'Note not found' });
     await addVaultSessionFileCounts(session.singlesId, { uiDelta: 1 });
     return res.json({ note });
@@ -329,7 +337,7 @@ export async function createRecordVaultNotebook(req, res) {
   if (!session) return;
   try {
     const name = String(req.body?.notebook_name ?? '').trim() || 'New Notebook';
-    const row = vaultCreateNotebook(session, name.slice(0, 120));
+    const row = await vaultCreateNotebook(session, name.slice(0, 120));
     logImpersonatedMutation(req);
     await bumpUiFileCount(session, { usb: true });
     return res.json({
@@ -365,7 +373,7 @@ export async function updateRecordVaultNotebook(req, res) {
   }
 
   try {
-    const row = vaultUpdateNotebook(session, notebookId, String(notebookName).trim().slice(0, 120));
+    const row = await vaultUpdateNotebook(session, notebookId, String(notebookName).trim().slice(0, 120));
     if (!row) return res.status(404).json({ error: 'Notebook not found' });
     logImpersonatedMutation(req);
     return res.json({
@@ -396,7 +404,7 @@ export async function deleteRecordVaultNotebook(req, res) {
   }
 
   try {
-    vaultDeleteNotebook(session, notebookId);
+    await vaultDeleteNotebook(session, notebookId);
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_id: notebookId, soft_deleted: true });
   } catch (err) {
@@ -422,7 +430,7 @@ export async function createRecordVaultNote(req, res) {
     const requestedName = String(req.body?.note_name ?? '').trim();
     let noteName = requestedName;
     if (!noteName) {
-      const tree = vaultGetTree(session);
+      const tree = await vaultGetTree(session);
       const nbIdx = tree.notebooks.findIndex((nb) => nb.notebook_id === notebookId);
       const noteCount = tree.notebooks.find((nb) => nb.notebook_id === notebookId)?.notes?.length ?? 0;
       noteName = formatDefaultRecordVaultNoteTitle(nbIdx >= 0 ? nbIdx + 1 : 1, noteCount + 1);
@@ -431,13 +439,20 @@ export async function createRecordVaultNote(req, res) {
     if (parsedImage && !ALLOWED_IMAGE_EXTENSIONS.has(parsedImage.ext)) {
       return res.status(400).json({ error: 'Unsupported image type' });
     }
+    const wantInnerEncrypt = Boolean(req.body?.inner_encrypt_enabled);
+    if (wantInnerEncrypt && !isTutaNotesEncryptAllowed()) {
+      return res.status(403).json({
+        error: 'TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)',
+        encryptAllowed: false
+      });
+    }
     const note = await vaultCreateNote(session, notebookId, {
       noteName: noteName.slice(0, 120),
       bodyText: String(req.body?.body_text ?? DEFAULT_BODY_TEXT),
       keywords: req.body?.keywords,
       imageBuffer: parsedImage?.buffer,
       imageExt: parsedImage?.ext,
-      innerEncryptEnabled: Boolean(req.body?.inner_encrypt_enabled),
+      innerEncryptEnabled: wantInnerEncrypt,
       innerPinSalt: req.body?.inner_pin_salt
     });
     logImpersonatedMutation(req);
@@ -467,13 +482,16 @@ export async function updateRecordVaultNote(req, res) {
 
   try {
     const patch = buildNoteImagePatch(req);
-    const note = vaultUpdateNote(session, noteId, patch);
+    const note = await vaultUpdateNote(session, noteId, patch);
     logImpersonatedMutation(req);
     await bumpUiFileCount(session, { usb: true });
     return res.json({ note });
   } catch (err) {
     console.error('[updateRecordVaultNote]', err?.message || err);
     const message = err?.message || 'Failed to update note';
+    if (Number(err?.status) === 403) {
+      return res.status(403).json({ error: message, encryptAllowed: false });
+    }
     if (message === 'Note not found') {
       return res.status(404).json({ error: message });
     }
@@ -505,7 +523,7 @@ export async function moveRecordVaultNoteImage(req, res) {
   }
 
   try {
-    const result = vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSlot);
+    const result = await vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSlot);
     logImpersonatedMutation(req);
     return res.json(result);
   } catch (err) {
@@ -530,7 +548,7 @@ export async function deleteRecordVaultNote(req, res) {
   }
 
   try {
-    vaultDeleteNote(session, noteId);
+    await vaultDeleteNote(session, noteId);
     logImpersonatedMutation(req);
     return res.json({ success: true, note_id: noteId, soft_deleted: true });
   } catch (err) {
@@ -557,7 +575,7 @@ export async function getRecordVaultNoteImage(req, res) {
 
   try {
     await vaultEnsureNotePhotoOnDisk(session, noteId, slot);
-    const image = vaultGetNoteImage(session, noteId, slot);
+    const image = await vaultGetNoteImage(session, noteId, slot);
     if (!image) return res.status(404).json({ error: 'Image file not found' });
     await bumpUiFileCount(session);
     res.setHeader('Content-Type', image.contentType);
@@ -584,7 +602,7 @@ export async function getRecordVaultNoteExtraImage(req, res) {
 
   try {
     await vaultEnsureNoteExtraImageOnDisk(session, noteId, imageId);
-    const image = vaultGetNoteExtraImage(session, noteId, imageId);
+    const image = await vaultGetNoteExtraImage(session, noteId, imageId);
     if (!image) return res.status(404).json({ error: 'Image file not found' });
     await bumpUiFileCount(session);
     res.setHeader('Content-Type', image.contentType);
@@ -617,7 +635,7 @@ export async function uploadRecordVaultNoteExtraImage(req, res) {
   }
 
   try {
-    const note = vaultAddNoteExtraImage(session, noteId, { buffer: parsed.buffer, ext: parsed.ext });
+    const note = await vaultAddNoteExtraImage(session, noteId, { buffer: parsed.buffer, ext: parsed.ext });
     logImpersonatedMutation(req);
     await bumpUiFileCount(session, { usb: true });
     return res.json({ note });
@@ -644,7 +662,7 @@ export async function deleteRecordVaultNoteExtraImage(req, res) {
   }
 
   try {
-    const note = vaultDeleteNoteExtraImage(session, noteId, imageId);
+    const note = await vaultDeleteNoteExtraImage(session, noteId, imageId);
     logImpersonatedMutation(req);
     return res.json({ note });
   } catch (err) {
@@ -676,7 +694,7 @@ export async function reorderRecordVaultNotebooks(req, res) {
   }
 
   try {
-    vaultReorderNotebooks(session, notebookIds);
+    await vaultReorderNotebooks(session, notebookIds);
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_ids: notebookIds });
   } catch (err) {
@@ -708,7 +726,7 @@ export async function reorderRecordVaultNotes(req, res) {
   }
 
   try {
-    vaultReorderNotes(session, notebookId, noteIds);
+    await vaultReorderNotes(session, notebookId, noteIds);
     logImpersonatedMutation(req);
     return res.json({ success: true, note_ids: noteIds });
   } catch (err) {
@@ -739,7 +757,7 @@ export async function createRecordVaultShortcut(req, res) {
   }
 
   try {
-    const shortcut = vaultCreateShortcut(session, { targetType, notebookId, noteId });
+    const shortcut = await vaultCreateShortcut(session, { targetType, notebookId, noteId });
     logImpersonatedMutation(req);
     return res.json({ shortcut });
   } catch (err) {
@@ -761,7 +779,7 @@ export async function deleteRecordVaultShortcut(req, res) {
   }
 
   try {
-    vaultDeleteShortcut(session, shortcutId);
+    await vaultDeleteShortcut(session, shortcutId);
     logImpersonatedMutation(req);
     return res.json({ success: true, shortcut_id: shortcutId });
   } catch (err) {
@@ -788,7 +806,7 @@ export async function reorderRecordVaultShortcuts(req, res) {
   }
 
   try {
-    vaultReorderShortcuts(session, shortcutIds);
+    await vaultReorderShortcuts(session, shortcutIds);
     logImpersonatedMutation(req);
     return res.json({ success: true, shortcut_ids: shortcutIds });
   } catch (err) {
@@ -812,7 +830,7 @@ export async function getRecordVaultNoteAttachment(req, res) {
 
   try {
     await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId);
-    const file = vaultGetNoteAttachment(session, noteId, attachmentId);
+    const file = await vaultGetNoteAttachment(session, noteId, attachmentId);
     if (!file) return res.status(404).json({ error: 'Attachment not found' });
     await bumpUiFileCount(session);
     const inline =
@@ -852,7 +870,7 @@ export async function openRecordVaultNoteAttachmentNative(req, res) {
 
   try {
     await vaultEnsureNoteAttachmentOnDisk(session, noteId, attachmentId);
-    const file = vaultGetNoteAttachment(session, noteId, attachmentId);
+    const file = await vaultGetNoteAttachment(session, noteId, attachmentId);
     if (!file) return res.status(404).json({ error: 'Attachment not found' });
 
     const ext = String(file.fileName || '')
@@ -902,7 +920,7 @@ export async function uploadRecordVaultNoteAttachment(req, res) {
   }
 
   try {
-    const attachment = vaultAddNoteAttachment(session, noteId, {
+    const attachment = await vaultAddNoteAttachment(session, noteId, {
       buffer: parsed.buffer,
       fileName: parsed.fileName,
       ext: parsed.ext,
@@ -934,7 +952,7 @@ export async function deleteRecordVaultNoteAttachment(req, res) {
   }
 
   try {
-    const result = vaultDeleteNoteAttachment(session, noteId, attachmentId);
+    const result = await vaultDeleteNoteAttachment(session, noteId, attachmentId);
     logImpersonatedMutation(req);
     return res.json(result);
   } catch (err) {
@@ -945,6 +963,25 @@ export async function deleteRecordVaultNoteAttachment(req, res) {
     }
     return sendRecordVaultError(res, err, 'Failed to delete attachment', {
       route: 'deleteRecordVaultNoteAttachment',
+      singlesId: req.auth?.singles_id
+    });
+  }
+}
+
+/**
+ * POST /api/recordVault/extract-inline-images
+ * One-shot: move every data:image;base64,… in this vault into TutaNotes/files/
+ * and rewrite body_text to <img data-file-id="…"> pointers.
+ */
+export async function extractRecordVaultInlineImages(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+  try {
+    const result = await vaultExtractAllInlineDataImages(session);
+    return res.json({ ok: true, ...result });
+  } catch (err) {
+    return sendRecordVaultError(res, err, 'Failed to extract inline images', {
+      route: 'extractRecordVaultInlineImages',
       singlesId: req.auth?.singles_id
     });
   }
@@ -967,7 +1004,7 @@ export async function searchRecordVaultNotes(req, res) {
   }
 
   try {
-    const results = vaultSearch(session, chain, evaluateRecordVaultSearchChain);
+    const results = await vaultSearch(session, chain, evaluateRecordVaultSearchChain);
     return res.json({ results });
   } catch (err) {
     return sendRecordVaultError(res, err, 'Search failed', {

@@ -56,13 +56,13 @@ export async function buildPhotoAlbumsUsageStats(singlesId, storageType = null) 
     tutaDriveStorage: null
   };
 
-  if (tutaDriveSession && activeStorageType === 'onedrive') {
+  if (tutaDriveSession && activeStorageType === 'tutaCloud') {
     const disk = await loadTutaDriveMemberNotesPhotosSizeForSingles(singlesId);
     applyTutaDriveDiskTotal(result, disk);
     return result;
   }
 
-  if (activeStorageType === 'onedrive' && session?.unlocked && session.mountPath) {
+  if (activeStorageType === 'tutaCloud' && session?.unlocked && session.mountPath) {
     result.vaultFolderMb = vaultFolderMbFromBytes(computeVaultFolderSizeBytes(session.mountPath));
   }
 

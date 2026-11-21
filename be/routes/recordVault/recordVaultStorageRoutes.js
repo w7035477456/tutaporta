@@ -6,11 +6,10 @@ import {
 } from '../../utils/recordVaultStorageFlags.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
 import { isVaultE2eYellow } from '../../utils/vaultE2eYellowConfig.js';
-import { isRecordVaultIconEncryptionEnabled } from '../../utils/recordVaultIconEncryption.js';
 import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/recordVaultUsb/vaultCrypto.js';
-import { getVaultIconRetryDelaySeconds } from '../../utils/recordVaultUsb/unlockGuard.js';
+import { isTutaNotesEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
+import { getVaultUnlockRetryDelaySeconds } from '../../utils/recordVaultUsb/unlockGuard.js';
 import { logoffVaultUsb } from '../../utils/recordVaultUsb/vaultSession.js';
-import { clearRecordVaultCacheIcon, readRecordVaultCacheIcon } from '../../utils/recordVaultCacheIcon.js';
 import {
   clearVaultLogoffProgress,
   getVaultLogoffProgress,
@@ -31,20 +30,6 @@ function requireSinglesId(req, res) {
 export async function getRecordVaultStorageConfig(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
-  // Legacy DB/Redis slot name `onedrive` — Tuta cloud workspace session icon.
-  let cacheTutaCloudIcon = null;
-  let cacheUsbIcon = null;
-  try {
-    cacheTutaCloudIcon = await readRecordVaultCacheIcon(singlesId, 'onedrive');
-  } catch {
-    cacheTutaCloudIcon = null;
-  }
-  try {
-    cacheUsbIcon = await readRecordVaultCacheIcon(singlesId, 'usb');
-  } catch {
-    cacheUsbIcon = null;
-  }
-
   const videoTutorialTutanotes = await loadGlobalVideoTutorialTutanotes();
   const leftSide = getLeftSideMode();
   const tutaDrive = isLeftSideTutaDrive();
@@ -60,11 +45,9 @@ export async function getRecordVaultStorageConfig(req, res) {
     tutaCloud,
     localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
     backupUsbEnabled: isVaultBackupUsbEnabled(),
-    iconEncryptionRequired: isRecordVaultIconEncryptionEnabled(),
     encryptPhotoAndDb: isVaultPhotoAndDbEncryptionEnabled(),
-    iconRetryDelaySeconds: getVaultIconRetryDelaySeconds(),
-    cacheTutaCloudIcon,
-    cacheUsbIcon,
+    encryptAllowed: isTutaNotesEncryptAllowed(),
+    unlockRetryDelaySeconds: getVaultUnlockRetryDelaySeconds(),
     videoTutorialTutanotes,
     includeUsbDmgExe: false,
     usbBridgeInstallers: { mac: null, win: null },
@@ -95,8 +78,7 @@ export async function logoffRecordVaultStorage(req, res) {
     const result = await logoffVaultUsb(singlesId, null, {
       onProgress: (progress) => setVaultLogoffProgress(singlesId, progress)
     });
-    await clearRecordVaultCacheIcon(singlesId);
-    return res.json({ ...result, cacheTutaCloudIcon: '', cacheUsbIcon: '' });
+    return res.json(result);
   } catch (err) {
     console.error('[logoffRecordVaultStorage]', err?.message || err);
     return res.status(400).json({ error: err?.message || 'Logoff failed' });

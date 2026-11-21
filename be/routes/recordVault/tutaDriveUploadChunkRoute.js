@@ -2,7 +2,7 @@ import { receiveUploadChunk } from '../../utils/chunkedUploadStaging.js';
 import { isStoragePermissionError } from '../../utils/storagePermissionError.js';
 
 /**
- * PUT /api/tutadrive/upload-chunk?uploadId=…&index=N
+ * PUT /api/tutaCloud/upload-chunk?uploadId=…&index=N
  * Body: application/octet-stream — one piece of a backup zip too large for a single request.
  */
 export async function putTutaDriveUploadChunk(req, res) {

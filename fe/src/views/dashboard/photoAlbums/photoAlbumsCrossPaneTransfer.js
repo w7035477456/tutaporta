@@ -212,8 +212,8 @@ export async function transferPhotoAlbumsItem({
   onProgress = null
 }) {
   if (mode !== 'copy' && mode !== 'move') throw new Error('Invalid transfer mode');
-  const sourceType = item.storageType === 'tutadrive' ? 'onedrive' : 'usb';
-  const targetType = targetStorageType === 'tutadrive' ? 'onedrive' : 'usb';
+  const sourceType = item.storageType === 'tutaCloud' ? 'tutaCloud' : 'usb';
+  const targetType = targetStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb';
   if (sourceType === targetType) throw new Error('Source and destination must differ');
 
   const sourceApi = createPhotoAlbumsPaneApi(sourceType);

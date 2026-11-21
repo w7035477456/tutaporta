@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.monthly_bill (
   monthly_bill_id bigserial PRIMARY KEY,
   singles_id bigint NOT NULL
     REFERENCES outdateddbsnapshotoct2024.singles (singles_id) ON DELETE CASCADE,
-  storage_backend text NOT NULL DEFAULT 'onedrive'
-    CHECK (storage_backend IN ('onedrive', 'usb')),
+  storage_backend text NOT NULL DEFAULT 'tutaCloud'
+    CHECK (storage_backend IN ('tutaCloud', 'usb')),
   bill_year integer NOT NULL
     CHECK (bill_year >= 2000 AND bill_year <= 2100),
   bill_month integer NOT NULL

@@ -42,11 +42,14 @@ import { colorTemplate1WallColorByTheme } from 'config/colorTemplate1';
 import { useAuth } from 'contexts/AuthContext';
 import { isAdminImpersonationBypassSession, isAdminSession, isImpersonationSession } from 'utils/adminSession';
 import NicknamePickerDialog from './NicknamePickerDialog';
-import SecurityIconPickerDialog from './SecurityIconPickerDialog';
 import SeedBuddiesPostingPopup from './SeedBuddiesPostingPopup';
 import GenderSelfReportPopup from 'ui-component/GenderSelfReportPopup';
 import { FIRST_LOGIN_AUTO_POPUPS_ENABLED } from 'config/firstLoginAutoPopupsEnv';
-import { hasGenderSelfReport, isIdInitializationIncomplete } from 'utils/firstLoginOnboarding';
+import {
+  getFirstLoginOnboardingPhase,
+  hasGenderSelfReport,
+  isIdInitializationIncomplete
+} from 'utils/firstLoginOnboarding';
 import {
   PROFILE_PHOTO_NOT_REAL_ACK_EVENT,
   PROFILE_PHOTO_NOT_REAL_MESSAGE,
@@ -1146,7 +1149,7 @@ export default function MyStory() {
   const isCompactViewport = useCompactLoginViewport();
   /** Camera/gallery takeover is phones only. iPad Mini (768) and other tablets keep the desktop page. */
   const isMobileUpload = isCompactViewport;
-  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname, updateSessionDemoBuddyFlags, updateSessionHasSecretIcon } = useAuth();
+  const { user, profilePhotoCacheBust, bumpProfilePhotoCache, updateSessionProfilePhoto, refreshAuthProfilePhoto, updateSessionNickname, updateSessionDemoBuddyFlags } = useAuth();
   const { photos, myPhotosLoading, refetchMyPhotos } = useMyPhotos(user?.singles_id);
   const { albumVideos, refetchMyAlbumVideos } = useMyAlbumVideos(user?.singles_id);
   const ownerSinglesId = user?.singles_id ?? null;
@@ -1190,14 +1193,11 @@ export default function MyStory() {
   const profilePhotoId = user?.profile_image_fk ?? null;
   const didInitSelectionRef = useRef(false);
   const userClearedAliasRef = useRef(false);
-  const userDismissedSecurityIconRef = useRef(false);
   const [showFirstPhotoDialog, setShowFirstPhotoDialog] = useState(false);
   const [showGenderDialog, setShowGenderDialog] = useState(false);
   const [showSeedBuddiesPostingPopup, setShowSeedBuddiesPostingPopup] = useState(false);
   const pendingRefereeAfterSeedBuddiesRef = useRef(false);
   const [showNicknameDialog, setShowNicknameDialog] = useState(false);
-  const [showSecurityIconDialog, setShowSecurityIconDialog] = useState(false);
-  const [hasSecretIcon, setHasSecretIcon] = useState(false);
   const [suggestListOpen, setSuggestListOpen] = useState(false);
   const [pendingAutoMakeProfile, setPendingAutoMakeProfile] = useState(false);
   const [maxUploadMb, setMaxUploadMb] = useState(2);
@@ -1370,7 +1370,6 @@ export default function MyStory() {
           member_id: data?.member_id ?? '',
           alias: data?.alias ?? ''
         });
-        setHasSecretIcon(Boolean(data?.has_secret_icon));
       } catch {
         if (!mounted) return;
         setProfileBasics({
@@ -1740,7 +1739,7 @@ export default function MyStory() {
   }, [searchParams, user]);
 
   /**
-   * Phone: ID initialization (profile photo, gender, nickname, security icon) stays here.
+   * Phone: ID initialization (profile photo, gender, nickname) stays here.
    * After that, My Album is the TutaDates workspace and stays on desktop.
    */
   useEffect(() => {
@@ -2018,77 +2017,31 @@ export default function MyStory() {
       }
       return;
     }
-    if (!hasSecretIcon) {
-      setShowSecurityIconDialog(true);
-      return;
-    }
     markSignupIdentificationVerificationRequired();
     navigate(SELF_REPORT_BIOGRAPHY_PATH, {
       state: { openIdentificationVerification: true }
     });
-  }, [navigate, profileBasics.alias, user?.alias, user?.gender_self_report, hasSecretIcon]);
+  }, [navigate, profileBasics.alias, user?.alias, user?.gender_self_report]);
 
   const handleNicknameSaved = useCallback(
     (nickname) => {
       const next = String(nickname ?? '').trim();
+      const isOnboardingNicknameStep = getFirstLoginOnboardingPhase(user) === 'alias';
       if (next) userClearedAliasRef.current = false;
       setProfileBasics((prev) => ({ ...prev, alias: next }));
       updateSessionNickname(next);
       setShowNicknameDialog(false);
       setSuggestListOpen(false);
       setProfileBasicsMessage(next ? 'Nickname saved.' : 'Nickname removed.');
-      if (next && !hasSecretIcon) {
-        setShowSecurityIconDialog(true);
+      if (next && isOnboardingNicknameStep && FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
+        markSignupIdentificationVerificationRequired();
+        navigate(SELF_REPORT_BIOGRAPHY_PATH, {
+          state: { openIdentificationVerification: true }
+        });
       }
     },
-    [updateSessionNickname, hasSecretIcon]
+    [navigate, updateSessionNickname, user]
   );
-
-  const handleSecretIconSaved = useCallback(() => {
-    const isFirstSecurityIconSave = !hasSecretIcon;
-    userDismissedSecurityIconRef.current = false;
-    setHasSecretIcon(true);
-    updateSessionHasSecretIcon?.(true);
-    setShowSecurityIconDialog(false);
-    setProfileBasicsMessage('Security icon saved.');
-    if (isFirstSecurityIconSave && FIRST_LOGIN_AUTO_POPUPS_ENABLED) {
-      markSignupIdentificationVerificationRequired();
-      navigate(SELF_REPORT_BIOGRAPHY_PATH, {
-        state: { openIdentificationVerification: true }
-      });
-    }
-  }, [navigate, hasSecretIcon, updateSessionHasSecretIcon]);
-
-  const handleSecurityIconDialogClose = useCallback(() => {
-    userDismissedSecurityIconRef.current = true;
-    setShowSecurityIconDialog(false);
-  }, []);
-
-  useEffect(() => {
-    if (!FIRST_LOGIN_AUTO_POPUPS_ENABLED) return;
-    if (userDismissedSecurityIconRef.current) return;
-    if (
-      profileBasicsLoading ||
-      showGenderDialog ||
-      showNicknameDialog ||
-      suggestListOpen ||
-      showSecurityIconDialog ||
-      showSeedBuddiesPostingPopup
-    ) {
-      return;
-    }
-    if (!hasNickname || hasSecretIcon) return;
-    setShowSecurityIconDialog(true);
-  }, [
-    profileBasicsLoading,
-    hasNickname,
-    hasSecretIcon,
-    showGenderDialog,
-    showNicknameDialog,
-    suggestListOpen,
-    showSecurityIconDialog,
-    showSeedBuddiesPostingPopup
-  ]);
 
   const openNicknameEditor = useCallback(() => {
     setProfileBasicsMessage('');
@@ -3498,12 +3451,6 @@ export default function MyStory() {
           setSuggestListOpen(false);
           setShowNicknameDialog(false);
         }}
-      />
-      <SecurityIconPickerDialog
-        open={showSecurityIconDialog}
-        onSaved={handleSecretIconSaved}
-        dismissible={hasSecretIcon}
-        onClose={hasSecretIcon ? handleSecurityIconDialogClose : undefined}
       />
       <ColorTemplate7PopupLargeDark
         open={showFirstPhotoDialog}

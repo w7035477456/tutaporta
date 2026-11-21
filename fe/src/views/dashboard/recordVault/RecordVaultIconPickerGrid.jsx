@@ -5,14 +5,14 @@ import Tooltip from '@mui/material/Tooltip';
 import { getFontAwesome5ObjectIconDefinition, getFontAwesome5ObjectIconNames } from 'utils/fontAwesome5ObjectIcons';
 import { formatIconDisplayName } from 'utils/formatIconDisplayName';
 import { isBillCompositeIconName } from 'utils/billCompositeIcons';
-import RecordVaultSecurityIconGlyph, { RECORD_VAULT_HOURGLASS_ICON_NAME } from './RecordVaultSecurityIconGlyph';
+import RecordVaultIconGlyph, { RECORD_VAULT_HOURGLASS_ICON_NAME } from './RecordVaultIconGlyph';
 
 /** Fixed column count — icon decrypt grids always show 10 icons per row. */
 export const RECORD_VAULT_ICON_PICKER_COLUMNS = 10;
 export const RECORD_VAULT_ICON_PICKER_CELL_PX = 44;
 export const RECORD_VAULT_ICON_PICKER_GAP_PX = 8;
 
-const securityIconTooltipSlotProps = {
+const iconTooltipSlotProps = {
   tooltip: {
     sx: {
       bgcolor: 'var(--theme-yellow-color)',
@@ -40,7 +40,7 @@ export default function RecordVaultIconPickerGrid({
   onSelectIcon,
   disabled = false,
   maxHeight = null,
-  ariaLabelPrefix = 'Select security icon',
+  ariaLabelPrefix = 'Select icon',
   pinnedIcons = null,
   cellScale = 1,
   fillIcons = null
@@ -79,7 +79,7 @@ export default function RecordVaultIconPickerGrid({
           // Fill icons reach almost to the 2px border; the rest keep the normal icon-to-box ratio.
           const glyphPx = fillIcons?.includes(iconName) ? cellPx - 10 : Math.round(24 * cellScale);
           return (
-            <Tooltip key={iconName} title={label} placement="bottom" arrow slotProps={securityIconTooltipSlotProps}>
+            <Tooltip key={iconName} title={label} placement="bottom" arrow slotProps={iconTooltipSlotProps}>
               <Box
                 component="button"
                 type="button"
@@ -105,7 +105,7 @@ export default function RecordVaultIconPickerGrid({
                   p: 0
                 }}
               >
-                <RecordVaultSecurityIconGlyph iconName={iconName} sizePx={glyphPx} />
+                <RecordVaultIconGlyph iconName={iconName} sizePx={glyphPx} />
               </Box>
             </Tooltip>
           );

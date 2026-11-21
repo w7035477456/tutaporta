@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import RecordVaultIconPickerGrid from './RecordVaultIconPickerGrid';
-import RecordVaultSecurityIconGlyph from './RecordVaultSecurityIconGlyph';
+import RecordVaultIconGlyph from './RecordVaultIconGlyph';
 import { BILL_SCHEDULE_INK } from './billScheduleTheme';
 
 /** Common bill icons — the first 10 fill row 1 of the Bill Icon tray, the next 10 fill row 2, then row 3 leads with the rest. */
@@ -89,7 +89,7 @@ export function BillIconCell({ iconName, disabled = false, onClick }) {
         '&:hover:not(:disabled)': { transform: 'scale(1.2)' }
       }}
     >
-      {iconName ? <RecordVaultSecurityIconGlyph iconName={iconName} sizePx={glyphPx} /> : '?'}
+      {iconName ? <RecordVaultIconGlyph iconName={iconName} sizePx={glyphPx} /> : '?'}
     </Box>
   );
 }
@@ -100,7 +100,7 @@ BillIconCell.propTypes = {
   onClick: PropTypes.func
 };
 
-/** Tray of the security icon set — picking one applies it to the bill row and closes. */
+/** Tray of the bill icon set — picking one applies it to the bill row and closes. */
 export function BillIconPickerDialog({ open, selectedIcon, onSelect, onClose }) {
   return (
     <ColorTemplate7PopupLargeDark open={open} onClose={onClose} closeOnBackdrop>

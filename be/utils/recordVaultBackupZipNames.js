@@ -20,7 +20,7 @@ function formatMyNoteBackupZipStamp(date = new Date()) {
   return `${y}-${mo}-${d}_${hh}-${mi}-${ss}_${tt}_${tz}`;
 }
 
-/** @param {'cloud' | 'onedrive' | 'usb'} kind — `onedrive` kept for legacy backup zips */
+/** @param {'cloud' | 'tutaCloud' | 'usb'} kind — `tutaCloud` kept for legacy backup zips */
 export function buildMyNoteBackupZipFileName(kind = 'cloud') {
   const prefix = kind === 'usb' ? 'MyNote_USB' : 'MyNote_TutaCloud';
   return `${prefix}_${formatMyNoteBackupZipStamp()}.zip`;

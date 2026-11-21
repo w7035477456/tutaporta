@@ -1,7 +1,5 @@
 import fs from 'fs';
-import path from 'path';
 
-import { vaultFileStoragePath } from '../recordVaultUsb/vaultPaths.js';
 import {
   listRecordVaultSampleAttachmentDefs,
   loadRecordVaultNewMemberSampleManifest,
@@ -79,66 +77,6 @@ export function readRecordVaultSharedSampleForAttachmentRow(row) {
   });
   if (!key) return null;
   return readRecordVaultSharedSampleBuffer(key);
-}
-
-function linkFile(targetAbs, linkAbs) {
-  fs.mkdirSync(path.dirname(linkAbs), { recursive: true });
-  if (fs.existsSync(linkAbs)) return true;
-  try {
-    fs.symlinkSync(path.resolve(targetAbs), linkAbs, 'file');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function queryAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
-/**
- * Optional plaintext vault convenience: symlink View TutaDrive paths at shared media.
- * Encrypted vaults skip materialization — reads use shared store via shared_content_key.
- */
-export function linkRecordVaultSharedSamplesIntoVault({ mountPath, key, meta, db }) {
-  const usePlainFiles = key == null;
-  if (!usePlainFiles) return false;
-
-  const hasSharedCol = queryAll(db, `PRAGMA table_info(note_attachments)`).some(
-    (row) => String(row.name || '') === 'shared_content_key'
-  );
-  if (!hasSharedCol) return false;
-
-  const rows = queryAll(
-    db,
-    `SELECT attachment_id, relative_path, shared_content_key, checksum, file_name
-     FROM note_attachments
-     WHERE deleted_at IS NULL AND shared_content_key IS NOT NULL AND TRIM(shared_content_key) != ''`
-  );
-  let linked = 0;
-  for (const row of rows) {
-    const keyName = resolveRecordVaultSharedContentKey({
-      sharedContentKey: row.shared_content_key,
-      checksum: row.checksum,
-      fileName: row.file_name
-    });
-    if (!keyName) continue;
-    const def = SHARED_DEF_BY_KEY.get(keyName);
-    const sharedAbs = recordVaultSampleMediaPath(def?.sourceFile || def?.fileName);
-    if (!sharedAbs || !fs.existsSync(sharedAbs)) continue;
-    const rel = String(row.relative_path || '').trim();
-    if (!rel) continue;
-    const vaultAbs = vaultFileStoragePath(mountPath, rel, meta);
-    if (linkFile(sharedAbs, vaultAbs)) linked += 1;
-  }
-  return linked > 0;
 }
 
 export function recordVaultNewMemberSampleSeedMarker() {

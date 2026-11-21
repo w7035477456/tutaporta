@@ -1753,11 +1753,11 @@ export default function PhotoAlbumsWorkspacePane({
   const [, setStorageConfigLoaded] = useState(false);
   const [] = useState(false);
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
-  const [viewVaultStorageType, setViewVaultStorageType] = useState('tutadrive');
+  const [viewVaultStorageType, setViewVaultStorageType] = useState('tutaCloud');
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
   const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
-  const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
+  const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutacloud';
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
   /** Zoom icon — hide sidebars/menus and show album only (not true fullscreen overlay). */
   const [albumFocusView, setAlbumFocusView] = useState(false);
@@ -2487,13 +2487,13 @@ export default function PhotoAlbumsWorkspacePane({
   }, []);
 
   /**
-   * TutaCloud vault.db flush after PIN work. Uses 85→99% while uploading; 100% only when finished.
+   * TutaCloud save after PIN work. Uses 85→99% while uploading; 100% only when finished.
    * Must not block the busy dialog forever — axios has no default timeout and Cloud upload can hang.
    * Notes are already on disk; background upload + logoff still retry.
    */
   const flushTutaCloudAfterInnerPin = useCallback(
     async ({ showErrorOnFail = false, startPercent = 85 } = {}) => {
-      if (paneStorageType !== 'tutadrive') return { ok: true, timedOut: false };
+      if (paneStorageType !== 'tutaCloud') return { ok: true, timedOut: false };
       const floor = Math.max(0, Math.min(98, Math.round(Number(startPercent) || 85)));
       const mapCloudPercent = (p) => {
         const cloud = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
@@ -2565,7 +2565,7 @@ export default function PhotoAlbumsWorkspacePane({
         return Number.isFinite(idNum) && idNum >= 1 ? `Note ${idNum}` : 'note';
       };
       // TutaCloud: keep 0–85% for local PIN work; Cloud sync owns 85–100%.
-      const localMaxPercent = paneStorageType === 'tutadrive' ? 85 : 100;
+      const localMaxPercent = paneStorageType === 'tutaCloud' ? 85 : 100;
       const progressOpts = { maxPercent: localMaxPercent };
       setInnerEncryptError('');
       setInnerEncryptBusy(true);
@@ -3546,7 +3546,7 @@ export default function PhotoAlbumsWorkspacePane({
       console.error('[performVaultStorageLogoff] prepare', err?.message || err);
     }
     setVaultLeavingProgressPercent(2);
-    setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
+    setVaultLeavingProgressLabel(paneStorageType === 'tutaCloud' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
     await vaultApi.logoffPhotoAlbumsStorage({
       onProgress: (progress) => {
         void reportVaultLeavingProgress(progress);
@@ -3579,7 +3579,7 @@ export default function PhotoAlbumsWorkspacePane({
       setBusy(true);
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
-      setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
+      setVaultLeavingProgressLabel(paneStorageType === 'tutaCloud' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
       setError('');
       try {
         await performVaultStorageLogoff();
@@ -5675,7 +5675,7 @@ export default function PhotoAlbumsWorkspacePane({
         const payload = {
           kind: mime === DRAG_NOTEBOOK ? 'notebook' : 'note',
           id: Number(id),
-          storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
+          storageType: paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb',
           name,
           notebookId: Number.isFinite(notebookId) ? notebookId : null,
           noteIds: mime === DRAG_NOTE && draggedNoteIds.length > 1 ? draggedNoteIds : undefined
@@ -5819,7 +5819,7 @@ export default function PhotoAlbumsWorkspacePane({
     (event, { targetNotebookId = null } = {}) => {
       const foreign = readCrossPaneDragFromEvent(event);
       if (!foreign) return false;
-      const pane = paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb';
+      const pane = paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb';
       if (foreign.storageType === pane) return false;
       event.preventDefault();
       event.stopPropagation();
@@ -6051,7 +6051,7 @@ export default function PhotoAlbumsWorkspacePane({
         pageNumber,
         instanceKey,
         attachmentId: Number(meta?.attachmentId) >= 1 ? Number(meta.attachmentId) : null,
-        storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'
+        storageType: paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb'
       };
       setActiveAlbumPageDrag(payload);
       setDraggingAlbumPage(true);
@@ -6211,7 +6211,7 @@ export default function PhotoAlbumsWorkspacePane({
         await commitAlbumPageMoveToNote({
           snapshot,
           targetNoteId: targetId,
-          storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
+          storageType: paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb',
           removeFromSource: () => {
             api?.removeAlbumPage?.(drag.pageIndex);
           }
@@ -7205,11 +7205,11 @@ export default function PhotoAlbumsWorkspacePane({
         <BusyHourglassOverlay
           open={crossPaneBusy}
           label={
-            crossPaneTransfer?.item?.storageType === 'tutadrive'
+            crossPaneTransfer?.item?.storageType === 'tutaCloud'
               ? paneStorageType === 'usb'
                 ? 'Copying from Cloud to USB'
                 : 'Transferring Cloud item'
-              : paneStorageType === 'tutadrive'
+              : paneStorageType === 'tutaCloud'
                 ? 'Copying from USB to Cloud'
                 : 'Transferring USB item'
           }
@@ -7226,7 +7226,7 @@ export default function PhotoAlbumsWorkspacePane({
         />
         <BusyHourglassOverlay
           open={vaultLeaving}
-          label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
+          label={paneStorageType === 'tutaCloud' ? 'Saving to Cloud' : 'Logging off USB'}
           progressPercent={vaultLeavingProgressPercent}
           progressLabel={vaultLeavingProgressLabel}
           backdropSx={vaultLeavingBackdropSx}
@@ -7312,7 +7312,7 @@ export default function PhotoAlbumsWorkspacePane({
         <PhotoAlbumsCrossPaneTransferDialog
           open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
           item={crossPaneTransfer?.item || null}
-          targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
+          targetStorageType={paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb'}
           targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
           busy={crossPaneBusy}
           duplicateError={crossPaneDuplicateError}
@@ -7507,7 +7507,7 @@ export default function PhotoAlbumsWorkspacePane({
           open={viewVaultOpen}
           onClose={() => setViewVaultOpen(false)}
           storageType={viewVaultStorageType}
-          folderName={viewVaultStorageType === 'tutadrive' ? tutaCloudVaultFolderName : ''}
+          folderName={viewVaultStorageType === 'tutaCloud' ? tutaCloudVaultFolderName : ''}
           tutaDrive={isTutaCloudPane}
         />
         <PhotoAlbumsTutaCloudBackupDialog
@@ -7732,7 +7732,7 @@ export default function PhotoAlbumsWorkspacePane({
                   </Box>
                   {!compareMode ? (
                     <>
-                      {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
+                      {paneStorageType === 'tutaCloud' && tutaCloudOffered ? (
                         <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
                           <SliderControlButton
                             type="button"
@@ -9007,7 +9007,7 @@ export default function PhotoAlbumsWorkspacePane({
                           </Box>
                           <RowResizeHandle
                             label={
-                              paneStorageType === 'tutadrive'
+                              paneStorageType === 'tutaCloud'
                                 ? 'Resize Shortcut and TutaCloud Folders & Files'
                                 : 'Resize Shortcut and USB Folders & Files'
                             }
@@ -9036,7 +9036,7 @@ export default function PhotoAlbumsWorkspacePane({
                               {[
                                 {
                                   id: FILES_EXPLORER_TAB_FOLDERS,
-                                  label: paneStorageType === 'tutadrive' ? 'TutaCloud Folders & Files' : 'USB Folders & Files'
+                                  label: paneStorageType === 'tutaCloud' ? 'TutaCloud Folders & Files' : 'USB Folders & Files'
                                 },
                                 { id: FILES_EXPLORER_TAB_EXPLORER, label: 'Files Explorer' },
                                 { id: FILES_EXPLORER_TAB_MOBILE_UPLOAD, label: 'Mobile Upload' }

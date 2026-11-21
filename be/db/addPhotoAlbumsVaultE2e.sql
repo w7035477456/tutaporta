@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.photo_albums_vault (
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (singles_id, storage_backend),
-  CONSTRAINT photo_albums_vault_storage_backend_chk CHECK (storage_backend IN ('onedrive', 'usb')),
+  CONSTRAINT photo_albums_vault_storage_backend_chk CHECK (storage_backend IN ('tutaCloud', 'usb')),
   CONSTRAINT photo_albums_vault_kdf_algo_chk CHECK (kdf_algo IN ('argon2id')),
   CONSTRAINT photo_albums_vault_access_failed_attempts_chk CHECK (access_failed_attempts >= 0)
 );
@@ -54,7 +54,7 @@ SELECT
   wrapped_dek, crypto_version, 0, NULL,
   created_at, updated_at
 FROM outdateddbsnapshotoct2024.notes_vault nv
-WHERE nv.storage_backend IN ('onedrive', 'usb')
+WHERE nv.storage_backend IN ('tutaCloud', 'usb')
   AND NOT EXISTS (
   SELECT 1
     FROM outdateddbsnapshotoct2024.photo_albums_vault pav

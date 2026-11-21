@@ -30,7 +30,7 @@ best_month AS (
   SELECT m.bill_year, m.bill_month
     FROM outdateddbsnapshotoct2024.monthly_bill m
     JOIN source s ON m.singles_id = s.singles_id
-   WHERE m.storage_backend = 'onedrive'
+   WHERE m.storage_backend = 'tutaCloud'
    GROUP BY m.bill_year, m.bill_month
    ORDER BY COUNT(*) DESC, m.bill_year DESC, m.bill_month DESC
    LIMIT 1
@@ -45,7 +45,7 @@ SELECT
   FROM outdateddbsnapshotoct2024.monthly_bill m
   JOIN source s ON m.singles_id = s.singles_id
   JOIN best_month b ON b.bill_year = m.bill_year AND b.bill_month = m.bill_month
- WHERE m.storage_backend = 'onedrive'
+ WHERE m.storage_backend = 'tutaCloud'
  ORDER BY m.row_index;
 
 DO $$
@@ -64,7 +64,7 @@ best_year AS (
   SELECT m.bill_year
     FROM outdateddbsnapshotoct2024.yearly_bill m
     JOIN source s ON m.singles_id = s.singles_id
-   WHERE m.storage_backend = 'onedrive'
+   WHERE m.storage_backend = 'tutaCloud'
    GROUP BY m.bill_year
    ORDER BY COUNT(*) DESC, m.bill_year DESC
    LIMIT 1
@@ -80,7 +80,7 @@ SELECT
   FROM outdateddbsnapshotoct2024.yearly_bill m
   JOIN source s ON m.singles_id = s.singles_id
   JOIN best_year b ON b.bill_year = m.bill_year
- WHERE m.storage_backend = 'onedrive'
+ WHERE m.storage_backend = 'tutaCloud'
  ORDER BY m.row_index;
 
 DO $$
@@ -116,7 +116,7 @@ SELECT
   t.action,
   NULL
   FROM outdateddbsnapshotoct2024.singles tgt
- CROSS JOIN (VALUES ('onedrive'), ('usb')) AS sb(storage_backend)
+ CROSS JOIN (VALUES ('tutaCloud'), ('usb')) AS sb(storage_backend)
  CROSS JOIN monthly_template t
  WHERE NOT EXISTS (
          SELECT 1
@@ -151,7 +151,7 @@ SELECT
   t.action,
   NULL
   FROM outdateddbsnapshotoct2024.singles tgt
- CROSS JOIN (VALUES ('onedrive'), ('usb')) AS sb(storage_backend)
+ CROSS JOIN (VALUES ('tutaCloud'), ('usb')) AS sb(storage_backend)
  CROSS JOIN yearly_template t
  WHERE NOT EXISTS (
          SELECT 1

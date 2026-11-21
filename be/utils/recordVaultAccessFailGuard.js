@@ -37,7 +37,7 @@ export function getVaultAccessRetryDelaySeconds() {
 }
 
 function normalizeStorageType(storageType) {
-  return storageType === 'usb' ? 'usb' : 'onedrive';
+  return storageType === 'usb' ? 'usb' : 'tutaCloud';
 }
 
 function remainingLockSeconds(lockedUntil, nowMs = Date.now()) {
@@ -69,7 +69,7 @@ function buildTutaNotesLockedStatus(storageType, failedAttempts = VAULT_ACCESS_M
   };
 }
 
-export async function getVaultAccessFailStatus(singlesId, storageType = 'onedrive') {
+export async function getVaultAccessFailStatus(singlesId, storageType = 'tutaCloud') {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) {
     return {
@@ -113,7 +113,7 @@ export async function getVaultAccessFailStatus(singlesId, storageType = 'onedriv
   };
 }
 
-export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedrive') {
+export async function clearVaultAccessFailStatus(singlesId, storageType = 'tutaCloud') {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return;
   await pool.query(
@@ -131,7 +131,7 @@ export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedr
  * Record a wrong vault-password attempt for the pending open side.
  * 3rd consecutive fail → retry cooldown; 6th → singles.lock_tuta_notes (admin must clear).
  */
-export async function recordVaultAccessFail(singlesId, storageType = 'onedrive', { mountPath } = {}) {
+export async function recordVaultAccessFail(singlesId, storageType = 'tutaCloud', { mountPath } = {}) {
   const id = Number(singlesId);
   const side = normalizeStorageType(storageType);
   if (!Number.isFinite(id) || id < 1) {
@@ -218,7 +218,7 @@ export async function recordVaultAccessFail(singlesId, storageType = 'onedrive',
   if (failAttemptLocks(nextAttempts)) {
     try {
       await lockTutaNotesForSingles(id);
-      await clearVaultAccessFailStatus(id, 'onedrive');
+      await clearVaultAccessFailStatus(id, 'tutaCloud');
       await clearVaultAccessFailStatus(id, 'usb');
     } catch (err) {
       console.error('[recordVaultAccessFail] TutaNotes lock failed:', err?.message || err);

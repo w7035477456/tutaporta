@@ -26,7 +26,7 @@ function shouldRefreshPhotoAlbumsUsageAfterRequest(url) {
   if (!s.includes('/api/photoAlbums')) return false;
   if (s.includes('/api/photoAlbums/usage')) return false;
   if (s.includes('/api/photoAlbums/transfer-bytes')) return false;
-  if (s.includes('/api/photoAlbums/tutadrive/open-progress')) return false;
+  if (s.includes('/api/photoAlbums/tutaCloud/open-progress')) return false;
   return true;
 }
 

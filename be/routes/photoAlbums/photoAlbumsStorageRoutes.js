@@ -6,11 +6,9 @@ import {
 } from '../../utils/photoAlbumsStorageFlags.js';
 import { getLeftSideMode, isLeftSideTutaDrive } from '../../utils/tutaDriveMemberPaths.js';
 import { isVaultE2eYellow } from '../../utils/photoAlbumsE2eYellowConfig.js';
-import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
 import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/photoAlbumsUsb/vaultCrypto.js';
-import { getVaultIconRetryDelaySeconds } from '../../utils/photoAlbumsUsb/unlockGuard.js';
+import { getVaultUnlockRetryDelaySeconds } from '../../utils/photoAlbumsUsb/unlockGuard.js';
 import { logoffVaultUsb } from '../../utils/photoAlbumsUsb/vaultSession.js';
-import { clearPhotoAlbumsCacheIcon, readPhotoAlbumsCacheIcon } from '../../utils/photoAlbumsCacheIcon.js';
 import { loadGlobalVideoTutorialPhotoAlbums } from '../../utils/globalVideoTutorialPhotoAlbums.js';
 
 function requireSinglesId(req, res) {
@@ -26,20 +24,6 @@ function requireSinglesId(req, res) {
 export async function getPhotoAlbumsStorageConfig(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
-  // Legacy DB/Redis slot name `onedrive` — Tuta cloud workspace session icon.
-  let cacheTutaCloudIcon = null;
-  let cacheUsbIcon = null;
-  try {
-    cacheTutaCloudIcon = await readPhotoAlbumsCacheIcon(singlesId, 'onedrive');
-  } catch {
-    cacheTutaCloudIcon = null;
-  }
-  try {
-    cacheUsbIcon = await readPhotoAlbumsCacheIcon(singlesId, 'usb');
-  } catch {
-    cacheUsbIcon = null;
-  }
-
   const videoTutorialTutaphotoalbums = await loadGlobalVideoTutorialPhotoAlbums();
   const leftSide = getLeftSideMode();
   const tutaDrive = isLeftSideTutaDrive();
@@ -55,11 +39,8 @@ export async function getPhotoAlbumsStorageConfig(req, res) {
     tutaCloud,
     localUsb: buildVaultStorageChoice(isVaultLocalUsbOffered(), true),
     backupUsbEnabled: isVaultBackupUsbEnabled(),
-    iconEncryptionRequired: isPhotoAlbumsIconEncryptionEnabled(),
     encryptPhotoAndDb: isVaultPhotoAndDbEncryptionEnabled(),
-    iconRetryDelaySeconds: getVaultIconRetryDelaySeconds(),
-    cacheTutaCloudIcon,
-    cacheUsbIcon,
+    unlockRetryDelaySeconds: getVaultUnlockRetryDelaySeconds(),
     videoTutorialTutaphotoalbums,
     includeUsbDmgExe: false,
     usbBridgeInstallers: { mac: null, win: null },
@@ -74,8 +55,7 @@ export async function logoffPhotoAlbumsStorage(req, res) {
 
   try {
     const result = await logoffVaultUsb(singlesId);
-    await clearPhotoAlbumsCacheIcon(singlesId);
-    return res.json({ ...result, cacheTutaCloudIcon: '', cacheUsbIcon: '' });
+    return res.json(result);
   } catch (err) {
     console.error('[logoffPhotoAlbumsStorage]', err?.message || err);
     return res.status(400).json({ error: err?.message || 'Logoff failed' });

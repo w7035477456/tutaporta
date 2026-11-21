@@ -29,9 +29,17 @@ function parseDump(text) {
     while (body.length && (!body[body.length - 1].trim() || body[body.length - 1] === '--')) body.pop();
     while (body.length && !body[0].trim()) body.shift();
     cur.body = body.join('\n');
+    // Drop internal Postgres 17.12+ pg_attver options — old pg_dump emits them;
+    // they are not real schema drift across minor versions.
     cur.norm = body
       .map((l) => l.replace(/\s+$/, ''))
-      .filter((l) => l.trim() && !/^--/.test(l))
+      .filter(
+        (l) =>
+          l.trim() &&
+          !/^--/.test(l) &&
+          !/ALTER COLUMN\s+\S+\s+SET \(pg_attver=/.test(l) &&
+          !/ALTER COLUMN\s+\S+\s+RESET \(pg_attver\)/.test(l)
+      )
       .join('\n');
     cur.key = `${cur.type}|${cur.schema}|${cur.name}`;
     cur.order = objects.length;

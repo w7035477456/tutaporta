@@ -96,7 +96,7 @@ export default function BillReceiptsPopup({
   onCancel,
   onChanged,
   ensurePayload,
-  storageType = 'onedrive'
+  storageType = 'tutaCloud'
 }) {
   const notesTimerRef = useRef(null);
   const skipToastTimerRef = useRef(null);
@@ -759,5 +759,5 @@ BillReceiptsPopup.propTypes = {
   onCancel: PropTypes.func,
   onChanged: PropTypes.func,
   ensurePayload: PropTypes.object,
-  storageType: PropTypes.oneOf(['tutadrive', 'usb'])
+  storageType: PropTypes.oneOf(['tutaCloud', 'usb'])
 };

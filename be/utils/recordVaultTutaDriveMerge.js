@@ -1,25 +1,19 @@
 /**
  * Merge notes from a plain TutaNotes vault zip into the live unlocked TutaDrive session.
- * New note titles are added; duplicate titles require overwrite/skip (resolved in FE).
+ * The backup's notes index is the Postgres export at the zip root (read in memory); the live
+ * vault is the member's Postgres index. New note titles are added; duplicate titles require
+ * overwrite/skip (resolved in FE).
  */
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import initSqlJs from 'sql.js';
 import { tutaDriveMemberRoot } from './tutaDriveMemberPaths.js';
 import { resolveVaultRootFromExtractedDir } from './recordVaultUsb/vaultPlainZipRestore.js';
 import { openVaultBuffer } from './recordVaultUsb/vaultCrypto.js';
-import { readVaultMeta } from './recordVaultUsb/usbScan.js';
+import { resolveVaultFileStoragePath, resolveVaultPhotoStoragePath } from './recordVaultUsb/vaultPaths.js';
+import { NOTES_VAULT_TABLES as T } from './recordVaultUsb/vaultPgStore.js';
+import { readTutaNotesBackupIndex } from './recordVaultTutaDriveBackup.js';
 import {
-  isSqliteVaultDbBuffer,
-  listVaultDbFileNamesForRead,
-  resolveVaultDbPath,
-  resolveVaultFileStoragePath,
-  resolveVaultPhotoStoragePath,
-  vaultRootOnMount
-} from './recordVaultUsb/vaultPaths.js';
-import {
-  flushDbToUsb,
   vaultAddNoteAttachment,
   vaultAddNoteExtraImage,
   vaultCreateNotebook,
@@ -33,31 +27,6 @@ import { Extract } from 'unzipper';
 
 const MERGE_STAGING_DIR = '.merge_staging';
 const MERGE_STAGING_TTL_MS = 4 * 60 * 60 * 1000;
-
-let sqlJsPromise = null;
-
-function getSqlJs() {
-  if (!sqlJsPromise) sqlJsPromise = initSqlJs();
-  return sqlJsPromise;
-}
-
-function queryAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
-}
-
-function queryOne(db, sql, params = []) {
-  return queryAll(db, sql, params)[0] || null;
-}
-
-function tableExists(db, name) {
-  const row = queryOne(db, `SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, [name]);
-  return Boolean(row?.name);
-}
 
 function mergeStagingRoot(memberId) {
   return path.join(tutaDriveMemberRoot(memberId), MERGE_STAGING_DIR);
@@ -99,76 +68,57 @@ function purgeExpiredMergeStaging(memberId) {
   }
 }
 
-async function openBackupVaultDb(mountPath, key) {
-  const vaultRoot = vaultRootOnMount(mountPath);
-  const meta = readVaultMeta(mountPath);
-  const candidates = [];
-  const primary = resolveVaultDbPath(mountPath);
-  candidates.push(primary);
-  for (const name of listVaultDbFileNamesForRead(meta)) {
-    const abs = path.join(vaultRoot, name);
-    if (!candidates.includes(abs)) candidates.push(abs);
-  }
-  let openErr = null;
-  for (const dbPath of candidates) {
-    if (!fs.existsSync(dbPath)) continue;
-    const enc = fs.readFileSync(dbPath);
-    try {
-      const plain = openVaultBuffer(enc, key);
-      if (!isSqliteVaultDbBuffer(plain)) continue;
-      const SQL = await getSqlJs();
-      return { db: new SQL.Database(plain), meta, mountPath };
-    } catch (err) {
-      openErr = err;
-    }
-  }
-  throw openErr || new Error('Unable to open backup vault database');
+const isLive = (row) => row?.deleted_at == null;
+const byOrder = (idCol) => (x, y) =>
+  (Number(x.display_order) || 0) - (Number(y.display_order) || 0) || Number(x[idCol]) - Number(y[idCol]);
+
+/** Backup notes index (in memory) + the key that opens the backup's media files. */
+async function openBackupIndex(staging) {
+  const extractDir = path.join(staging.stagingRoot, 'extract');
+  const sourceRoot = staging.backupVaultRoot || resolveVaultRootFromExtractedDir(extractDir);
+  const { index, key } = await readTutaNotesBackupIndex(extractDir, sourceRoot);
+  const tables = index.tables || {};
+  const list = (name) => (Array.isArray(tables[name]) ? tables[name] : []);
+  return {
+    mountPath: staging.mountPath,
+    key,
+    notebooks: list('notebooks').filter(isLive).sort(byOrder('notebook_id')),
+    notes: list('notes').filter(isLive),
+    keywords: list('keywords'),
+    attachments: list('attachments').filter(isLive),
+    extraImages: list('extraImages').filter(isLive)
+  };
 }
 
-/** Notebook → notes title tree from an extracted backup mount (read-only). */
-export async function listTutaDriveBackupNotebookTree(mountPath, key) {
-  const backupCtx = await openBackupVaultDb(mountPath, key);
-  try {
-    const notebooks = queryAll(
-      backupCtx.db,
-      `SELECT notebook_id, notebook_name, display_order
-       FROM notebooks
-       WHERE deleted_at IS NULL
-       ORDER BY display_order ASC, notebook_id ASC`
-    );
-    const notes = listBackupNotes(backupCtx);
-    const notesByNotebook = new Map();
-    for (const row of notes) {
-      const notebookId = Number(row.notebook_id);
-      if (!notesByNotebook.has(notebookId)) notesByNotebook.set(notebookId, []);
-      notesByNotebook.get(notebookId).push({
-        noteId: Number(row.note_id),
-        noteName: String(row.note_name || '').trim() || 'Untitled'
-      });
-    }
-    return {
-      notebooks: notebooks.map((nb) => {
-        const notebookId = Number(nb.notebook_id);
-        return {
-          notebookId,
-          notebookName: String(nb.notebook_name || '').trim() || 'Notebook',
-          notes: notesByNotebook.get(notebookId) || []
-        };
-      })
-    };
-  } finally {
-    backupCtx.db.close();
+/** Notebook → notes title tree from an extracted backup (read-only). */
+export async function listTutaDriveBackupNotebookTree(staging) {
+  const backupCtx = await openBackupIndex(staging);
+  const notesByNotebook = new Map();
+  for (const row of listBackupNotes(backupCtx)) {
+    const notebookId = Number(row.notebook_id);
+    if (!notesByNotebook.has(notebookId)) notesByNotebook.set(notebookId, []);
+    notesByNotebook.get(notebookId).push({
+      noteId: Number(row.note_id),
+      noteName: String(row.note_name || '').trim() || 'Untitled'
+    });
   }
+  return {
+    notebooks: backupCtx.notebooks.map((nb) => {
+      const notebookId = Number(nb.notebook_id);
+      return {
+        notebookId,
+        notebookName: String(nb.notebook_name || '').trim() || 'Notebook',
+        notes: notesByNotebook.get(notebookId) || []
+      };
+    })
+  };
 }
 
-/**
- * Extract plain vault zip → notebook/note title tree → cleanup staging.
- * @param {Buffer|null} key vault AES key (env/icon); null when vault DB is plaintext
- */
-export async function listTutaDriveBackupNotebookTreeFromZip(memberId, singlesId, zipFilePath, key) {
+/** Extract plain vault zip → notebook/note title tree → cleanup staging. */
+export async function listTutaDriveBackupNotebookTreeFromZip(memberId, singlesId, zipFilePath) {
   const staging = await extractTutaDriveMergeZip(memberId, singlesId, zipFilePath);
   try {
-    return await listTutaDriveBackupNotebookTree(staging.mountPath, key);
+    return await listTutaDriveBackupNotebookTree(staging);
   } finally {
     cleanupTutaDriveMergeStaging(staging.stagingRoot);
   }
@@ -187,89 +137,64 @@ function readBackupBytes(mountPath, key, relativePath, kind = 'photo') {
 }
 
 function listBackupNotes(backupCtx) {
-  const { db } = backupCtx;
-  return queryAll(
-    db,
-    `SELECT n.note_id, n.notebook_id, n.note_name, nb.notebook_name, n.display_order, nb.display_order AS notebook_order,
-            n.updated_at
-     FROM notes n
-     INNER JOIN notebooks nb ON nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
-     WHERE n.deleted_at IS NULL
-     ORDER BY nb.display_order ASC, nb.notebook_id ASC, n.display_order ASC, n.note_id ASC`
+  const notebookById = new Map(backupCtx.notebooks.map((nb, i) => [Number(nb.notebook_id), { nb, order: i }]));
+  return backupCtx.notes
+    .filter((n) => notebookById.has(Number(n.notebook_id)))
+    .map((n) => ({ ...n, notebook_name: notebookById.get(Number(n.notebook_id)).nb.notebook_name }))
+    .sort(
+      (x, y) =>
+        notebookById.get(Number(x.notebook_id)).order - notebookById.get(Number(y.notebook_id)).order ||
+        byOrder('note_id')(x, y)
+    );
+}
+
+async function findLiveNoteByTitle(liveSession, noteName) {
+  return liveSession.db.one(
+    `SELECT note_id, updated_at FROM ${T.notes}
+      WHERE singles_id = $1 AND deleted_at IS NULL AND lower(note_name) = lower($2)
+      ORDER BY note_id ASC LIMIT 1`,
+    [liveSession.db.singlesId, String(noteName || '').trim()]
   );
 }
 
-function findLiveNoteByTitle(liveSession, noteName) {
-  return queryOne(
-    liveSession.db,
-    `SELECT note_id, updated_at FROM notes WHERE deleted_at IS NULL AND lower(note_name) = lower(?) ORDER BY note_id ASC LIMIT 1`,
-    [String(noteName || '').trim()]
-  );
-}
-
-function findLiveNoteIdByTitle(liveSession, noteName) {
-  const row = findLiveNoteByTitle(liveSession, noteName);
+async function findLiveNoteIdByTitle(liveSession, noteName) {
+  const row = await findLiveNoteByTitle(liveSession, noteName);
   return row ? Number(row.note_id) : null;
 }
 
-/** SQLite datetime('now') text is UTC without a zone ("YYYY-MM-DD HH:MM:SS") → ISO string, or null. */
-function sqliteUtcToIso(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  const hasZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(raw);
-  const ms = Date.parse(hasZone ? raw.replace(' ', 'T') : `${raw.replace(' ', 'T')}Z`);
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+function toIsoOrNull(value) {
+  if (value == null || value === '') return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function findLiveNotebookIdByName(liveSession, notebookName) {
-  const row = queryOne(
-    liveSession.db,
-    `SELECT notebook_id FROM notebooks WHERE deleted_at IS NULL AND lower(notebook_name) = lower(?) ORDER BY notebook_id ASC LIMIT 1`,
-    [String(notebookName || '').trim()]
+async function findLiveNotebookIdByName(liveSession, notebookName) {
+  const row = await liveSession.db.one(
+    `SELECT notebook_id FROM ${T.notebooks}
+      WHERE singles_id = $1 AND deleted_at IS NULL AND lower(notebook_name) = lower($2)
+      ORDER BY notebook_id ASC LIMIT 1`,
+    [liveSession.db.singlesId, String(notebookName || '').trim()]
   );
   return row ? Number(row.notebook_id) : null;
 }
 
 function loadBackupNoteRow(backupCtx, noteId) {
-  return queryOne(
-    backupCtx.db,
-    `SELECT * FROM notes WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteId]
-  );
+  return backupCtx.notes.find((n) => Number(n.note_id) === Number(noteId)) || null;
 }
 
 function loadBackupKeywords(backupCtx, noteId) {
-  if (!tableExists(backupCtx.db, 'note_keywords')) return [];
-  return queryAll(
-    backupCtx.db,
-    `SELECT keyword FROM note_keywords WHERE note_id = ? ORDER BY note_keyword_id ASC`,
-    [noteId]
-  ).map((row) => row.keyword);
+  return backupCtx.keywords
+    .filter((k) => Number(k.note_id) === Number(noteId))
+    .sort((x, y) => Number(x.note_keyword_id) - Number(y.note_keyword_id))
+    .map((k) => k.keyword);
 }
 
 function loadBackupExtraImages(backupCtx, noteId) {
-  if (!tableExists(backupCtx.db, 'note_extra_images')) return [];
-  return queryAll(
-    backupCtx.db,
-    `SELECT image_id, file_extension, relative_path, display_order
-     FROM note_extra_images
-     WHERE note_id = ? AND deleted_at IS NULL
-     ORDER BY display_order ASC, image_id ASC`,
-    [noteId]
-  );
+  return backupCtx.extraImages.filter((r) => Number(r.note_id) === Number(noteId)).sort(byOrder('image_id'));
 }
 
 function loadBackupAttachments(backupCtx, noteId) {
-  if (!tableExists(backupCtx.db, 'note_attachments')) return [];
-  return queryAll(
-    backupCtx.db,
-    `SELECT attachment_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type,
-            display_order, shared_content_key
-     FROM note_attachments
-     WHERE note_id = ? AND deleted_at IS NULL
-     ORDER BY display_order ASC, attachment_id ASC`,
-    [noteId]
-  );
+  return backupCtx.attachments.filter((r) => Number(r.note_id) === Number(noteId)).sort(byOrder('attachment_id'));
 }
 
 async function copySlotImage(liveSession, backupCtx, backupNote, liveNoteId, slot) {
@@ -290,7 +215,7 @@ async function copySlotImage(liveSession, backupCtx, backupNote, liveNoteId, slo
           };
   const relative = backupNote[fields.rel];
   if (!relative) return;
-  const buffer = readBackupBytes(backupCtx.mountPath, liveSession.key, relative, 'photo');
+  const buffer = readBackupBytes(backupCtx.mountPath, backupCtx.key, relative, 'photo');
   if (!buffer?.length) return;
   const ext = String(backupNote[fields.ext] || 'jpg').replace(/^\./, '');
   const patch =
@@ -299,29 +224,27 @@ async function copySlotImage(liveSession, backupCtx, backupNote, liveNoteId, slo
       : slot === 'bottom'
         ? { image_bottomParsed: { buffer, ext } }
         : { imageParsed: { buffer, ext } };
-  vaultUpdateNote(liveSession, liveNoteId, patch);
+  await vaultUpdateNote(liveSession, liveNoteId, patch);
 }
 
 async function clearLiveNoteMedia(liveSession, noteId) {
   for (const slot of ['center', 'top', 'bottom']) {
     const clearKey = slot === 'top' ? 'clear_image_top' : slot === 'bottom' ? 'clear_image_bottom' : 'clear_image';
-    vaultUpdateNote(liveSession, noteId, { [clearKey]: true });
+    await vaultUpdateNote(liveSession, noteId, { [clearKey]: true });
   }
-  const extraRows = queryAll(
-    liveSession.db,
-    `SELECT image_id FROM note_extra_images WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteId]
+  const extraRows = await liveSession.db.all(
+    `SELECT image_id FROM ${T.extraImages} WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [liveSession.db.singlesId, noteId]
   );
   for (const row of extraRows) {
-    vaultDeleteNoteExtraImage(liveSession, noteId, Number(row.image_id));
+    await vaultDeleteNoteExtraImage(liveSession, noteId, Number(row.image_id));
   }
-  const attachmentRows = queryAll(
-    liveSession.db,
-    `SELECT attachment_id FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteId]
+  const attachmentRows = await liveSession.db.all(
+    `SELECT attachment_id FROM ${T.attachments} WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [liveSession.db.singlesId, noteId]
   );
   for (const row of attachmentRows) {
-    vaultDeleteNoteAttachment(liveSession, noteId, Number(row.attachment_id));
+    await vaultDeleteNoteAttachment(liveSession, noteId, Number(row.attachment_id));
   }
 }
 
@@ -334,9 +257,9 @@ async function copyNoteMediaAndKeywords(liveSession, backupCtx, backupNoteId, li
   await copySlotImage(liveSession, backupCtx, backupNote, liveNoteId, 'bottom');
 
   for (const img of loadBackupExtraImages(backupCtx, backupNoteId)) {
-    const buffer = readBackupBytes(backupCtx.mountPath, liveSession.key, img.relative_path, 'photo');
+    const buffer = readBackupBytes(backupCtx.mountPath, backupCtx.key, img.relative_path, 'photo');
     if (!buffer?.length) continue;
-    vaultAddNoteExtraImage(liveSession, liveNoteId, {
+    await vaultAddNoteExtraImage(liveSession, liveNoteId, {
       buffer,
       ext: String(img.file_extension || 'jpg').replace(/^\./, '')
     });
@@ -349,31 +272,36 @@ async function copyNoteMediaAndKeywords(liveSession, backupCtx, backupNoteId, li
       fileName: att.file_name
     });
     if (sharedKey) {
-      const orderRow = queryOne(
-        liveSession.db,
-        `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM note_attachments WHERE note_id = ?`,
-        [liveNoteId]
-      );
-      liveSession.db.run(
-        `INSERT INTO note_attachments
-          (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order, shared_content_key)
-         VALUES (?, ?, ?, '', ?, ?, ?, ?, ?)`,
-        [
-          liveNoteId,
-          att.file_name,
-          att.file_extension,
-          Number(att.file_size_bytes) || 0,
-          att.checksum || null,
-          att.mime_type || null,
-          Number(orderRow?.next_order ?? 0),
-          sharedKey
-        ]
-      );
+      await liveSession.db.tx(async (tx) => {
+        const orderRow = await tx.one(
+          `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order
+             FROM ${T.attachments} WHERE singles_id = $1 AND note_id = $2`,
+          [tx.singlesId, liveNoteId]
+        );
+        await tx.run(
+          `INSERT INTO ${T.attachments}
+            (singles_id, attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes,
+             checksum, mime_type, display_order, shared_content_key)
+           VALUES ($1, $2, $3, $4, $5, '', $6, $7, $8, $9, $10)`,
+          [
+            tx.singlesId,
+            await tx.nextId('attachments'),
+            liveNoteId,
+            att.file_name || '',
+            att.file_extension || '',
+            Number(att.file_size_bytes) || 0,
+            att.checksum || null,
+            att.mime_type || null,
+            Number(orderRow?.next_order ?? 0),
+            sharedKey
+          ]
+        );
+      });
       continue;
     }
-    const buffer = readBackupBytes(backupCtx.mountPath, liveSession.key, att.relative_path, 'file');
+    const buffer = readBackupBytes(backupCtx.mountPath, backupCtx.key, att.relative_path, 'file');
     if (!buffer?.length) continue;
-    vaultAddNoteAttachment(liveSession, liveNoteId, {
+    await vaultAddNoteAttachment(liveSession, liveNoteId, {
       buffer,
       fileName: att.file_name,
       ext: att.file_extension,
@@ -383,7 +311,7 @@ async function copyNoteMediaAndKeywords(liveSession, backupCtx, backupNoteId, li
 
   const keywords = loadBackupKeywords(backupCtx, backupNoteId);
   if (keywords.length) {
-    vaultUpdateNote(liveSession, liveNoteId, { keywords: keywords.join(', ') });
+    await vaultUpdateNote(liveSession, liveNoteId, { keywords: keywords.join(', ') });
   }
 }
 
@@ -392,9 +320,9 @@ async function addBackupNoteToLive(liveSession, backupCtx, backupNoteRow) {
   const backupNote = loadBackupNoteRow(backupCtx, backupNoteId);
   if (!backupNote) throw new Error('Backup note not found');
 
-  let notebookId = findLiveNotebookIdByName(liveSession, backupNoteRow.notebook_name);
+  let notebookId = await findLiveNotebookIdByName(liveSession, backupNoteRow.notebook_name);
   if (!notebookId) {
-    const created = vaultCreateNotebook(liveSession, String(backupNoteRow.notebook_name || 'Imported'));
+    const created = await vaultCreateNotebook(liveSession, String(backupNoteRow.notebook_name || 'Imported'));
     notebookId = Number(created.notebook_id);
   }
 
@@ -414,14 +342,14 @@ async function overwriteLiveNoteFromBackup(liveSession, backupCtx, liveNoteId, b
   const backupNote = loadBackupNoteRow(backupCtx, backupNoteId);
   if (!backupNote) throw new Error('Backup note not found');
 
-  let notebookId = findLiveNotebookIdByName(liveSession, backupNoteRow.notebook_name);
+  let notebookId = await findLiveNotebookIdByName(liveSession, backupNoteRow.notebook_name);
   if (!notebookId) {
-    const created = vaultCreateNotebook(liveSession, String(backupNoteRow.notebook_name || 'Imported'));
+    const created = await vaultCreateNotebook(liveSession, String(backupNoteRow.notebook_name || 'Imported'));
     notebookId = Number(created.notebook_id);
   }
 
   await clearLiveNoteMedia(liveSession, liveNoteId);
-  vaultUpdateNote(liveSession, liveNoteId, {
+  await vaultUpdateNote(liveSession, liveNoteId, {
     notebook_id: notebookId,
     note_name: backupNote.note_name,
     body_text: backupNote.body_text,
@@ -469,61 +397,46 @@ export function cleanupTutaDriveMergeStaging(stagingRoot) {
 }
 
 export async function previewTutaDriveMerge(liveSession, stagingManifest) {
-  const backupCtx = await openBackupVaultDb(stagingManifest.mountPath, liveSession.key);
-  try {
-    const notes = listBackupNotes(backupCtx).map((row) => {
-      const noteName = String(row.note_name || '').trim();
-      const live = findLiveNoteByTitle(liveSession, noteName);
-      return {
-        backupNoteId: Number(row.note_id),
-        noteName,
-        notebookName: String(row.notebook_name || '').trim(),
-        conflict: Boolean(live),
-        backupUpdatedAt: sqliteUtcToIso(row.updated_at),
-        liveUpdatedAt: live ? sqliteUtcToIso(live.updated_at) : null
-      };
+  const backupCtx = await openBackupIndex(stagingManifest);
+  const notes = [];
+  for (const row of listBackupNotes(backupCtx)) {
+    const noteName = String(row.note_name || '').trim();
+    const live = await findLiveNoteByTitle(liveSession, noteName);
+    notes.push({
+      backupNoteId: Number(row.note_id),
+      noteName,
+      notebookName: String(row.notebook_name || '').trim(),
+      conflict: Boolean(live),
+      backupUpdatedAt: toIsoOrNull(row.updated_at),
+      liveUpdatedAt: live ? toIsoOrNull(live.updated_at) : null
     });
-    return { notes };
-  } finally {
-    backupCtx.db.close();
   }
+  return { notes };
 }
 
 export async function applyTutaDriveMerge(liveSession, stagingManifest, decisions = {}) {
-  const backupCtx = await openBackupVaultDb(stagingManifest.mountPath, liveSession.key);
+  const backupCtx = await openBackupIndex(stagingManifest);
   const summary = { added: 0, overwritten: 0, skipped: 0, errors: [] };
-  try {
-    const notes = listBackupNotes(backupCtx);
-    for (const row of notes) {
-      const backupNoteId = String(Number(row.note_id));
-      const noteName = String(row.note_name || '').trim();
-      const conflict = Boolean(findLiveNoteIdByTitle(liveSession, noteName));
-      const action = decisions[backupNoteId] || (conflict ? 'skip' : 'add');
-      if (action === 'skip') {
-        summary.skipped += 1;
-        continue;
-      }
-      try {
-        if (action === 'overwrite') {
-          const liveNoteId = findLiveNoteIdByTitle(liveSession, noteName);
-          if (!liveNoteId) {
-            await addBackupNoteToLive(liveSession, backupCtx, row);
-            summary.added += 1;
-          } else {
-            await overwriteLiveNoteFromBackup(liveSession, backupCtx, liveNoteId, row);
-            summary.overwritten += 1;
-          }
-        } else if (action === 'add') {
-          await addBackupNoteToLive(liveSession, backupCtx, row);
-          summary.added += 1;
-        }
-      } catch (err) {
-        summary.errors.push({ noteName, message: err?.message || String(err) });
-      }
+  for (const row of listBackupNotes(backupCtx)) {
+    const backupNoteId = String(Number(row.note_id));
+    const noteName = String(row.note_name || '').trim();
+    const liveNoteId = await findLiveNoteIdByTitle(liveSession, noteName);
+    const action = decisions[backupNoteId] || (liveNoteId ? 'skip' : 'add');
+    if (action === 'skip') {
+      summary.skipped += 1;
+      continue;
     }
-    flushDbToUsb(liveSession);
-    return summary;
-  } finally {
-    backupCtx.db.close();
+    try {
+      if (action === 'overwrite' && liveNoteId) {
+        await overwriteLiveNoteFromBackup(liveSession, backupCtx, liveNoteId, row);
+        summary.overwritten += 1;
+      } else if (action === 'overwrite' || action === 'add') {
+        await addBackupNoteToLive(liveSession, backupCtx, row);
+        summary.added += 1;
+      }
+    } catch (err) {
+      summary.errors.push({ noteName, message: err?.message || String(err) });
+    }
   }
+  return summary;
 }

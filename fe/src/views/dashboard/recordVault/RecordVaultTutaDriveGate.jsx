@@ -56,7 +56,7 @@ export default function RecordVaultTutaDriveGate({
   const refreshStatus = useCallback(async () => {
     try {
       const status = await fetchRecordVaultTutaDriveStatus();
-      setMemberFolder(String(status?.tutadrive?.memberFolder || '').trim());
+      setMemberFolder(String(status?.tutaCloud?.memberFolder || '').trim());
       if (status?.session?.unlocked && isRecordVaultE2eUnlocked()) {
         onUnlocked?.();
       }

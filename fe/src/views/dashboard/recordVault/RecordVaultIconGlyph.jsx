@@ -8,8 +8,8 @@ import { billCompositeIconSvgMarkup, isBillCompositeIconName } from 'utils/billC
 
 export const RECORD_VAULT_HOURGLASS_ICON_NAME = 'hourglass';
 
-/** Security icon glyph — hourglass uses colorful hourglass4.png; others use Font Awesome. */
-export default function RecordVaultSecurityIconGlyph({ iconName, sizePx }) {
+/** Icon glyph — hourglass uses colorful hourglass4.png; others use Font Awesome. */
+export default function RecordVaultIconGlyph({ iconName, sizePx }) {
   const instanceId = useId();
   const name = String(iconName ?? '')
     .trim()
@@ -76,7 +76,7 @@ export default function RecordVaultSecurityIconGlyph({ iconName, sizePx }) {
   );
 }
 
-RecordVaultSecurityIconGlyph.propTypes = {
+RecordVaultIconGlyph.propTypes = {
   iconName: PropTypes.string,
   sizePx: PropTypes.number.isRequired
 };

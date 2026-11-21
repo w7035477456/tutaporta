@@ -14,8 +14,8 @@ const USB_WIPE_CONSEQUENCE = 'security-wipe clean the USB';
 /** Default: 5 minutes expressed in seconds. */
 const DEFAULT_PHOTOALBUMS_ICON_RETRY_DELAY_SEC = 300;
 
-/** Seconds to wait after the 3rd wrong security icon in a row — env PHOTOALBUMS_ICON_RETRY_DELAY_SEC (default 300). */
-export function getVaultIconRetryDelaySeconds() {
+/** Seconds to wait after the 3rd failed unlock in a row — env PHOTOALBUMS_ICON_RETRY_DELAY_SEC (default 300). */
+export function getVaultUnlockRetryDelaySeconds() {
   const raw = process.env.PHOTOALBUMS_ICON_RETRY_DELAY_SEC;
   if (raw === undefined || String(raw).trim() === '') return DEFAULT_PHOTOALBUMS_ICON_RETRY_DELAY_SEC;
   const seconds = Number(raw);
@@ -23,16 +23,16 @@ export function getVaultIconRetryDelaySeconds() {
   return seconds;
 }
 
-export function getVaultIconUnlockLockoutMs() {
-  return getVaultIconRetryDelaySeconds() * 1000;
+export function getVaultUnlockLockoutMs() {
+  return getVaultUnlockRetryDelaySeconds() * 1000;
 }
 
-/** @deprecated Use getVaultIconUnlockLockoutMs() — kept for imports expecting a constant name. */
-export const UNLOCK_LOCKOUT_MS = getVaultIconUnlockLockoutMs();
+/** @deprecated Use getVaultUnlockLockoutMs() — kept for imports expecting a constant name. */
+export const UNLOCK_LOCKOUT_MS = getVaultUnlockLockoutMs();
 
-export const UNLOCK_MISMATCH_ERROR = 'Incorrect security icon or corrupt vault data';
+export const UNLOCK_MISMATCH_ERROR = 'Unable to decrypt vault (wrong server key or corrupt vault data)';
 
-export function formatVaultIconRetryDelayLabel(totalSeconds) {
+export function formatVaultUnlockRetryDelayLabel(totalSeconds) {
   const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
   if (seconds === 1) return '1 second';
   if (seconds < 60) return `${seconds} seconds`;
@@ -46,14 +46,14 @@ export function formatVaultIconRetryDelayLabel(totalSeconds) {
   return `${minPart} ${secPart}`;
 }
 
-export function vaultIconUnlockPolicyHint() {
-  const delayLabel = formatVaultIconRetryDelayLabel(getVaultIconRetryDelaySeconds());
+export function vaultUnlockPolicyHint() {
+  const delayLabel = formatVaultUnlockRetryDelayLabel(getVaultUnlockRetryDelaySeconds());
   return `3 wrong guesses in a row start a ${delayLabel} retry cooldown, and 3 more wrong guesses after that will security-wipe clean the USB.`;
 }
 
-export const UNLOCK_POLICY_HINT = vaultIconUnlockPolicyHint();
+export const UNLOCK_POLICY_HINT = vaultUnlockPolicyHint();
 export const UNLOCK_WIPED_MESSAGE =
-  'Six incorrect security icons in a row. This USB vault has been security-wiped clean.';
+  'Six failed unlock attempts in a row. This USB vault has been security-wiped clean.';
 
 export class PhotoAlbumsUnlockError extends Error {
   constructor(message, details = {}) {
@@ -113,7 +113,7 @@ export function getUnlockGuardStatusFromMeta(meta, notFoundError = 'No vault fou
     remainingSeconds,
     failedAttempts: guard.failedAttempts,
     maxFailedAttempts: UNLOCK_MAX_FAILED_ATTEMPTS,
-    lockoutSeconds: getVaultIconRetryDelaySeconds(),
+    lockoutSeconds: getVaultUnlockRetryDelaySeconds(),
     kdf: meta.kdf || null,
     kdfSalt: meta.kdfSalt || null
   };
@@ -141,7 +141,7 @@ export function assertUnlockNotLocked(mountPath, meta) {
 function formatLockoutSecondary(remainingSeconds, failedAttempts) {
   const warning = failAttemptWarning(failedAttempts, USB_WIPE_CONSEQUENCE);
   if (remainingSeconds <= 0) return `Wrong guess ${failedAttempts} of ${UNLOCK_MAX_FAILED_ATTEMPTS}. ${warning}`;
-  const delayLabel = formatVaultIconRetryDelayLabel(getVaultIconRetryDelaySeconds());
+  const delayLabel = formatVaultUnlockRetryDelayLabel(getVaultUnlockRetryDelaySeconds());
   return `You must wait ${delayLabel} to retry (${formatCountdown(remainingSeconds)} remaining). ${warning}`;
 }
 
@@ -173,7 +173,7 @@ export function recordFailedUnlockAttempt(mountPath, meta) {
   }
 
   const lockedUntil = failAttemptStartsCooldown(nextAttempts)
-    ? new Date(Date.now() + getVaultIconUnlockLockoutMs()).toISOString()
+    ? new Date(Date.now() + getVaultUnlockLockoutMs()).toISOString()
     : null;
   const nextGuard = {
     failedAttempts: nextAttempts,

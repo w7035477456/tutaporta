@@ -42,7 +42,7 @@ export function readAlbumPageDrag(dataTransfer) {
       pageNumber: Number(parsed.pageNumber) || pageIndex + 1,
       instanceKey: String(parsed.instanceKey || ''),
       attachmentId: Number(parsed.attachmentId) >= 1 ? Math.trunc(Number(parsed.attachmentId)) : null,
-      storageType: parsed.storageType === 'tutadrive' ? 'onedrive' : 'usb'
+      storageType: parsed.storageType === 'tutaCloud' ? 'tutaCloud' : 'usb'
     };
   } catch {
     return null;
@@ -56,6 +56,6 @@ export function serializeAlbumPageDrag(payload) {
     pageNumber: Number(payload.pageNumber) || Number(payload.pageIndex) + 1,
     instanceKey: String(payload.instanceKey || ''),
     attachmentId: Number(payload.attachmentId) >= 1 ? Math.trunc(Number(payload.attachmentId)) : null,
-    storageType: payload.storageType === 'tutadrive' ? 'onedrive' : 'usb'
+    storageType: payload.storageType === 'tutaCloud' ? 'tutaCloud' : 'usb'
   });
 }

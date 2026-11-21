@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.notes_vault (
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (singles_id, storage_backend),
-  CONSTRAINT notes_vault_storage_backend_chk CHECK (storage_backend IN ('postgres', 'onedrive', 'usb')),
+  CONSTRAINT notes_vault_storage_backend_chk CHECK (storage_backend IN ('postgres', 'tutaCloud', 'usb')),
   CONSTRAINT notes_vault_kdf_algo_chk CHECK (kdf_algo IN ('argon2id')),
   CONSTRAINT notes_vault_access_failed_attempts_chk CHECK (access_failed_attempts >= 0)
 );

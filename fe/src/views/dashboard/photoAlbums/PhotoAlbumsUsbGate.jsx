@@ -71,9 +71,9 @@ import PhotoAlbumsUsbBridgeStatusPanel from './PhotoAlbumsUsbBridgeStatusPanel';
 const ASSIGNED_USB_STATS_REFRESH_MS = 2500;
 
 function pickDefaultStorageBackend(cfg) {
-  if (cfg?.tutaCloud?.visible) return 'tutadrive';
+  if (cfg?.tutaCloud?.visible) return 'tutaCloud';
   if (cfg?.localUsb?.visible) return 'usb';
-  return 'tutadrive';
+  return 'tutaCloud';
 }
 
 function buildPrivacyStorageLabel(cfg) {
@@ -132,7 +132,7 @@ export default function PhotoAlbumsUsbGate({
   const [tutaCloudNeedsReformat, setTutaCloudNeedsReformat] = useState(false);
   const [tutaCloudLegacyPinVault, setTutaCloudLegacyPinVault] = useState(false);
   const [tutaCloudBusy, setTutaCloudBusy] = useState(false);
-  const [storageBackend, setStorageBackend] = useState(usbOnly ? 'usb' : 'tutadrive');
+  const [storageBackend, setStorageBackend] = useState(usbOnly ? 'usb' : 'tutaCloud');
   const [localUsbVisible, setLocalUsbVisible] = useState(usbOnly);
   const [backupUsbEnabled, setBackupUsbEnabled] = useState(false);
   const [videoTutorialUrl, setVideoTutorialUrl] = useState('');
@@ -379,7 +379,7 @@ export default function PhotoAlbumsUsbGate({
         return;
       }
       const status = await fetchPhotoAlbumsTutaDriveStatus();
-      const flags = status?.tutadrive || {};
+      const flags = status?.tutaCloud || {};
       setTutaCloudConnected(true);
       setTutaCloudEmail('');
       setTutaCloudHasVault(Boolean(flags.hasVault));
@@ -421,7 +421,7 @@ export default function PhotoAlbumsUsbGate({
       setError('');
       setUnlockGuard(null);
       setPreferredMountPath('');
-      setStorageBackend(usbOnly ? 'usb' : 'tutadrive');
+      setStorageBackend(usbOnly ? 'usb' : 'tutaCloud');
       setTutaCloudVisible(false);
       setLocalUsbVisible(usbOnly);
       setTutaCloudEmail('');
@@ -619,7 +619,7 @@ export default function PhotoAlbumsUsbGate({
 
   const unlockOrInitUsbVault = async ({ backend, location, setup } = {}) => {
     const activeBackend = backend || storageBackend;
-    if (activeBackend === 'tutadrive') {
+    if (activeBackend === 'tutaCloud') {
       if (!tutaCloudEnabled) {
         setError('TutaCloud is not available');
         return;
@@ -852,7 +852,7 @@ export default function PhotoAlbumsUsbGate({
   );
 
   const legacyPinVault =
-    storageBackend === 'tutadrive'
+    storageBackend === 'tutaCloud'
       ? tutaCloudLegacyPinVault
       : Boolean(selectedPrimary?.legacyPinVault);
   const usbSelected =
@@ -1185,7 +1185,7 @@ export default function PhotoAlbumsUsbGate({
                   <PhotoAlbumsTutaDriveGate
                     embedded
                     open={open}
-                    onUnlocked={() => onUnlocked?.('tutadrive')}
+                    onUnlocked={() => onUnlocked?.('tutaCloud')}
                   />
                 </Box>
                 {usbStorageColumn}
@@ -1198,7 +1198,7 @@ export default function PhotoAlbumsUsbGate({
                     <PhotoAlbumsTutaDriveGate
                       embedded
                       open={open}
-                      onUnlocked={() => onUnlocked?.('tutadrive')}
+                      onUnlocked={() => onUnlocked?.('tutaCloud')}
                     />
                   </Box>
                 ) : null}
@@ -1242,7 +1242,7 @@ export default function PhotoAlbumsUsbGate({
                   <PhotoAlbumsTutaDriveGate
                     embedded
                     open={open}
-                    onUnlocked={() => onUnlocked?.('tutadrive')}
+                    onUnlocked={() => onUnlocked?.('tutaCloud')}
                   />
                 </Box>
                 {usbStorageColumn}
@@ -1255,7 +1255,7 @@ export default function PhotoAlbumsUsbGate({
                     <PhotoAlbumsTutaDriveGate
                       embedded
                       open={open}
-                      onUnlocked={() => onUnlocked?.('tutadrive')}
+                      onUnlocked={() => onUnlocked?.('tutaCloud')}
                     />
                   </Box>
                 ) : null}

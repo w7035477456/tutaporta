@@ -2,7 +2,7 @@
  * Chunked uploads for large backup zips.
  *
  * Cloudflare (Free plan) rejects any request body over 100 MB with a bare HTML 413, so the browser
- * sends big zips as several smaller `PUT /api/tutadrive/upload-chunk` requests. Each chunk is
+ * sends big zips as several smaller `PUT /api/tutaCloud/upload-chunk` requests. Each chunk is
  * written to its own part file under LARGE_CHEAP_STORAGE_FOLDER (shared storage, not process
  * memory), so any app server in the round-robin pool can receive any chunk. The final
  * multipart request carries `chunkedUploadId` instead of the file, and

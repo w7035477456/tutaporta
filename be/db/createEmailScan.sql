@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.email_scan_inbox (
   -- Random, unguessable; forms bills+<inbox_token>@tutamall.com
   inbox_token text NOT NULL UNIQUE
     CHECK (inbox_token ~ '^[a-z0-9]{8,32}$'),
-  storage_backend text NOT NULL DEFAULT 'onedrive'
-    CHECK (storage_backend IN ('onedrive', 'usb')),
+  storage_backend text NOT NULL DEFAULT 'tutaCloud'
+    CHECK (storage_backend IN ('tutaCloud', 'usb')),
   enabled boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()

@@ -64,7 +64,7 @@ async function bumpUiFileCount(session, { usb = false } = {}) {
   if (!session?.singlesId) return;
   await addVaultSessionFileCounts(session.singlesId, {
     uiDelta: 1,
-    usbDelta: usb && session.storageType !== 'onedrive' ? 1 : 0
+    usbDelta: usb && session.storageType !== 'tutaCloud' ? 1 : 0
   });
 }
 const ALLOWED_IMAGE_EXTENSIONS = new Set([

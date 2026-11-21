@@ -38,6 +38,23 @@ import {
   exportBillScheduleForBackup,
   restoreBillScheduleFromBackup
 } from './billScheduleBackup.js';
+import { readVaultMeta } from './recordVaultUsb/usbScan.js';
+import { openVaultBuffer, sealVaultBuffer } from './recordVaultUsb/vaultCrypto.js';
+import { vaultMetaUsesPlaintextStorage } from './recordVaultIconEncryption.js';
+import {
+  exportNotesMemberVaultIndex,
+  importNotesMemberVaultIndex,
+  isNotesVaultIndex
+} from './recordVaultUsb/vaultPgStore.js';
+import { listEnvVaultUnlockKeys } from './vaultKeys.js';
+import {
+  buildVaultIndexBackupEntry,
+  findVaultIndexBackupFile,
+  isVaultIndexBackupFileName,
+  listVaultIndexBackupKeys,
+  readVaultIndexBackupFile,
+  TUTANOTES_INDEX_BACKUP_FILE
+} from './vaultIndexBackup.js';
 
 export { TUTADRIVE_BACKUP_NAME_RE };
 const BACKUP_NAME_RE = TUTADRIVE_BACKUP_NAME_RE;
@@ -368,6 +385,39 @@ function resolveVaultRootFromExtractedDir(extractDir) {
   throw new Error(`Backup zip must contain a ${VAULT_DIR_NAME} folder with ${VAULT_META_FILE}`);
 }
 
+/** Live vault at-rest key (null for plaintext vaults) — seals the index in the backup zip. */
+async function resolveLiveNotesVaultKey(notesMount) {
+  const meta = readVaultMeta(notesMount);
+  if (!meta || vaultMetaUsesPlaintextStorage(meta)) return null;
+  return (await listEnvVaultUnlockKeys('tutaCloud', meta))[0]?.key ?? null;
+}
+
+/**
+ * Notes index from an extracted backup (Postgres export at the zip root). Throws when the
+ * backup has none — media alone cannot rebuild notebooks / notes.
+ */
+export async function readTutaNotesBackupIndex(extractDir, sourceRoot) {
+  const indexPath = findVaultIndexBackupFile(
+    [extractDir, path.dirname(sourceRoot), sourceRoot],
+    TUTANOTES_INDEX_BACKUP_FILE
+  );
+  if (!indexPath) {
+    throw new Error(
+      'This backup has no notes index (it only holds media files), so it cannot be restored or merged. Your current notes were not changed.'
+    );
+  }
+  const backupMeta = (() => {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(sourceRoot, VAULT_META_FILE), 'utf8'));
+    } catch {
+      return null;
+    }
+  })();
+  const keys = await listVaultIndexBackupKeys(backupMeta);
+  const { index, key } = readVaultIndexBackupFile(indexPath, keys, openVaultBuffer, isNotesVaultIndex);
+  return { index, key, backupMeta, indexPath };
+}
+
 async function resolveMemberNotesMount(singlesId) {
   const memberId = await loadMemberIdForSingles(singlesId);
   if (!memberId) throw new Error('Your member number is not set; cannot backup TutaDrive.');
@@ -380,7 +430,7 @@ async function resolveMemberNotesMount(singlesId) {
  */
 export async function streamTutaDriveVaultBackupZip(singlesId, res) {
   const { memberId, notesMount } = await resolveMemberNotesMount(singlesId);
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   if (session?.mountPath) {
     const expected = path.resolve(notesMount);
     const actual = path.resolve(String(session.mountPath));
@@ -395,6 +445,12 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
   }
 
   const billSchedule = await exportBillScheduleForBackup(singlesId, notesMount);
+  const indexEntry = buildVaultIndexBackupEntry(
+    await exportNotesMemberVaultIndex(singlesId),
+    await resolveLiveNotesVaultKey(notesMount),
+    TUTANOTES_INDEX_BACKUP_FILE,
+    sealVaultBuffer
+  );
 
   const zipName = `TutaNotes_TutaDrive_${todayBackupStamp()}.zip`;
   res.setHeader('Content-Type', 'application/zip');
@@ -404,7 +460,8 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
   res.setHeader('Last-Modified', new Date().toUTCString());
   // Streamed zip has no Content-Length; vault files are already encrypted so the zip is
   // about the same size as the raw files — the browser uses this for "X of Y done".
-  let estimatedBytes = computeDirectorySizeBytes(vaultRoot) + Buffer.byteLength(String(billSchedule.json || ''));
+  let estimatedBytes =
+    computeDirectorySizeBytes(vaultRoot) + Buffer.byteLength(String(billSchedule.json || '')) + indexEntry.buffer.length;
   for (const file of billSchedule.files) {
     try {
       estimatedBytes += fs.statSync(file.absPath).size;
@@ -421,6 +478,7 @@ export async function streamTutaDriveVaultBackupZip(singlesId, res) {
     archive.on('end', resolve);
     archive.pipe(res);
     archive.directory(vaultRoot, VAULT_DIR_NAME);
+    archive.append(indexEntry.buffer, { name: indexEntry.name });
     archive.append(billSchedule.json, { name: BILL_SCHEDULE_BACKUP_FILE });
     for (const file of billSchedule.files) {
       archive.file(file.absPath, { name: file.zipPath });
@@ -533,7 +591,7 @@ export function readTutaDriveEncryptedBackup(memberId, fileName = null) {
  */
 export async function restoreTutaDriveVaultFromZipFile(singlesId, zipFilePath) {
   const { memberId, notesMount } = await resolveMemberNotesMount(singlesId);
-  await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+  await logoffVaultUsb(singlesId, 'tutaCloud').catch(() => {});
 
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rv-tutadrive-restore-'));
   const extractDir = path.join(tmpRoot, 'extract');
@@ -546,17 +604,26 @@ export async function restoreTutaDriveVaultFromZipFile(singlesId, zipFilePath) {
       .promise();
 
     const sourceRoot = resolveVaultRootFromExtractedDir(extractDir);
-    const relFiles = walkLocalFiles(sourceRoot);
+    const relFiles = walkLocalFiles(sourceRoot).filter(
+      (rel) => !isVaultIndexBackupFileName(rel, TUTANOTES_INDEX_BACKUP_FILE)
+    );
     if (!relFiles.length) {
       throw new Error('Backup zip is empty');
     }
+    const { index, backupMeta, indexPath } = await readTutaNotesBackupIndex(extractDir, sourceRoot);
 
     const vaultRoot = vaultRootOnMount(notesMount);
     wipeTutaDriveVaultForRestore(notesMount);
     fs.mkdirSync(vaultRoot, { recursive: true });
     for (const name of fs.readdirSync(sourceRoot)) {
+      if (isVaultIndexBackupFileName(name, TUTANOTES_INDEX_BACKUP_FILE)) continue;
       copyEntryRecursive(path.join(sourceRoot, name), path.join(vaultRoot, name));
     }
+    const indexCounts = await importNotesMemberVaultIndex(singlesId, index, {
+      vaultId: backupMeta?.vaultId ?? null,
+      source: 'restore',
+      importedFromPath: path.basename(indexPath)
+    });
 
     let restoredBytes = 0;
     for (const rel of relFiles) {
@@ -577,6 +644,7 @@ export async function restoreTutaDriveVaultFromZipFile(singlesId, zipFilePath) {
       memberId,
       notesMount,
       billSchedule,
+      indexCounts,
       requiresReunlock: true
     };
   } finally {

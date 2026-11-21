@@ -159,7 +159,7 @@ function VaultTreeNode({ node, depth = 0, isLast = true, ancestorHasNext = [] })
 /** Shared vault folder descriptions + live tree (View TutaCloud / View USB / Backup & Restore). */
 export default function PhotoAlbumsTutaCloudVaultTreePanel({
   active = true,
-  storageType = 'tutadrive',
+  storageType = 'tutaCloud',
   folderName = '',
   refreshToken = 0,
   maxHeight = '58vh',
@@ -224,7 +224,7 @@ export default function PhotoAlbumsTutaCloudVaultTreePanel({
             after 3 layers of security are verified.
           </ColorTemplate16PopupCenterWide.SectionDescription>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0 }}>
-            All text is saved in vault.db.enc. Encryption keys are hashed and not kept on {storageLabel}. Periodic key
+            All text is kept in the encrypted website database, never on {storageLabel}. Encryption keys are hashed and not kept on {storageLabel}. Periodic key
             rotation and hash protection and triple layers verification give MyPhotoAlbums iron clad impenetrable privacy.
           </ColorTemplate16PopupCenterWide.SectionDescription>
         </>

@@ -607,7 +607,7 @@ export default function ProfileSection({ clusterTight = false }) {
     setTutaMallBackupBusy(true);
     try {
       if (backupApp === 'tutaphoto') {
-        // Save the open album's pending edits so the backup copies the latest vault.db.
+        // Save the open album's pending edits so the backup copies the latest album index.
         const { runPhotoAlbumsLeavePrepare } = await import('utils/photoAlbumsLeavePrepare');
         await runPhotoAlbumsLeavePrepare();
       }
@@ -662,7 +662,7 @@ export default function ProfileSection({ clusterTight = false }) {
       if (!ok) return;
       setTutaMallBackupBusy(true);
       // Save + log off open vaults BEFORE restoring: saving after would write the
-      // pre-restore album / notes back over the restored vault.db.
+      // pre-restore album / notes back over the restored index.
       try {
         await flushRecordVaultSessionsOnLeave();
         const { flushPhotoAlbumsSessionsOnLeave } = await import('api/photoAlbumsFe');

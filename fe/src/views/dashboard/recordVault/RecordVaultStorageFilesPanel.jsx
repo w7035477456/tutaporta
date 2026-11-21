@@ -225,7 +225,7 @@ function usbListingToTree(listing) {
 }
 
 export default function RecordVaultStorageFilesPanel({ storageType, active = true }) {
-  const isOneDrive = storageType === 'tutadrive';
+  const isOneDrive = storageType === 'tutaCloud';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [errorPopupOpen, setErrorPopupOpen] = useState(false);
@@ -336,6 +336,6 @@ export default function RecordVaultStorageFilesPanel({ storageType, active = tru
 }
 
 RecordVaultStorageFilesPanel.propTypes = {
-  storageType: PropTypes.oneOf(['tutadrive', 'usb']).isRequired,
+  storageType: PropTypes.oneOf(['tutaCloud', 'usb']).isRequired,
   active: PropTypes.bool
 };

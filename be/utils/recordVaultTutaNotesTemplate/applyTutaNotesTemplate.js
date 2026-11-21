@@ -23,9 +23,34 @@ function readStoredTemplateVersion(mountPath) {
 function vaultHasStarterContent(mountPath) {
   const vaultRoot = vaultRootOnMount(mountPath);
   const metaPath = path.join(vaultRoot, 'vault.meta.json');
-  const dbPlain = path.join(vaultRoot, 'vault.db');
-  const dbEnc = path.join(vaultRoot, 'vault.db.enc');
-  return fs.existsSync(metaPath) && (fs.existsSync(dbPlain) || fs.existsSync(dbEnc));
+  if (!fs.existsSync(metaPath)) return false;
+  const filesDir = path.join(vaultRoot, 'files');
+  try {
+    if (fs.existsSync(filesDir) && fs.readdirSync(filesDir).length > 0) return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+/** Bundled asset must be a plain zip; TNBAK* sealed backups cannot be applied server-side. */
+function isPlainZipTemplate(zipPath) {
+  try {
+    const fd = fs.openSync(zipPath, 'r');
+    try {
+      const buf = Buffer.alloc(8);
+      const n = fs.readSync(fd, buf, 0, 8, 0);
+      if (n < 4) return false;
+      const head = buf.slice(0, 6).toString('utf8');
+      if (head.startsWith('TNBAK')) return false;
+      // Local file header / empty zip / spanned zip
+      return buf[0] === 0x50 && buf[1] === 0x4b;
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -61,7 +86,7 @@ function stampTemplateVersionOnMeta(mountPath, version) {
  * Unzip tutaNotes_template.zip into mountPath (full vault restore).
  * @returns {Promise<{ applied: boolean, reason?: string, restoredFiles?: number }>}
  */
-export async function applyTutaNotesTemplate(mountPath, options = {}) {
+export async function applyTutaNotesTemplate(mountPath, options = {}, { singlesId = null } = {}) {
   if (!shouldApplyTutaNotesTemplate(mountPath, options)) {
     return { applied: false, reason: 'not_needed' };
   }
@@ -69,8 +94,11 @@ export async function applyTutaNotesTemplate(mountPath, options = {}) {
   if (!fs.existsSync(zipPath)) {
     return { applied: false, reason: 'zip_missing' };
   }
+  if (!isPlainZipTemplate(zipPath)) {
+    return { applied: false, reason: 'zip_not_plain' };
+  }
 
-  const result = await restorePlainVaultZipToMount(mountPath, zipPath);
+  const result = await restorePlainVaultZipToMount(mountPath, zipPath, { singlesId });
   stampTemplateVersionOnMeta(mountPath, bundledTutaNotesTemplateVersion());
   return { applied: true, ...result };
 }

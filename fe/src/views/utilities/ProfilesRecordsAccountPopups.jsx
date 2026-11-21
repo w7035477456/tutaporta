@@ -29,7 +29,6 @@ import {
   verifySettingsChangePhoneEmailCode,
   verifySettingsChangePhoneSms
 } from 'api/settingsAccountFe';
-import SecurityIconPickerDialog from 'views/dashboard/myStory/SecurityIconPickerDialog';
 import { formatPhoneNumber } from 'utils/signupParams';
 import {
   getPasswordRequirementChecks,
@@ -1074,8 +1073,6 @@ ChangeEmailPopup.propTypes = {
 };
 
 export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone = '' }) {
-  const [showSecurityIcon, setShowSecurityIcon] = useState(true);
-  const [verifiedIconName, setVerifiedIconName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [confirmPhone, setConfirmPhone] = useState('');
@@ -1096,7 +1093,6 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const emailCodeSlotRefs = useRef([]);
   const verificationSlotRefs = useRef([]);
-  const verifiedIconNameRef = useRef('');
 
   const [resolvedAccountEmail, setResolvedAccountEmail] = useState('');
   const accountEmailNorm = resolvedAccountEmail || String(email ?? '').trim().toLowerCase();
@@ -1128,7 +1124,6 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
   const isClearSmsCodeEnabled = isSmsCodeEntryEnabled && hasAnySmsDigit;
   const isVerifySmsEnabled = isSmsCodeEntryEnabled && isVerificationCodeFormatValid;
   const canSubmitPhoneForm =
-    Boolean(verifiedIconNameRef.current || verifiedIconName) &&
     phonesMatch &&
     newPhoneIsDifferent &&
     currentEmailMatchesAccount &&
@@ -1145,9 +1140,6 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
 
   useEffect(() => {
     if (!open) return;
-    setShowSecurityIcon(true);
-    setVerifiedIconName('');
-    verifiedIconNameRef.current = '';
     setCurrentPassword('');
     setNewPhone('');
     setConfirmPhone('');
@@ -1331,7 +1323,6 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
     setSubmitting(true);
     try {
       await submitSettingsChangePhone({
-        iconName: verifiedIconNameRef.current || verifiedIconName,
         currentPassword,
         newPhone,
         confirmPhone,
@@ -1347,7 +1338,7 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
     } finally {
       setSubmitting(false);
     }
-  }, [canSubmitPhoneForm, confirmPhone, currentEmail, currentPassword, newPhone, verifiedIconName]);
+  }, [canSubmitPhoneForm, confirmPhone, currentEmail, currentPassword, newPhone]);
 
   const handleVerifyEmailCode = useCallback(async () => {
     if (!isVerifyEmailCodeEnabled || isVerifyingEmailCode) return;
@@ -1431,19 +1422,8 @@ export function ChangePhonePopup({ open, onClose, onSuccess, email = '', phone =
 
   return (
     <>
-      <SecurityIconPickerDialog
-        open={open && showSecurityIcon}
-        mode="verify"
-        dismissible
-        onClose={handleClose}
-        onVerified={(iconName) => {
-          verifiedIconNameRef.current = iconName;
-          setVerifiedIconName(iconName);
-          setShowSecurityIcon(false);
-        }}
-      />
       <ColorTemplate7PopupLargeDark
-        open={open && !showSecurityIcon}
+        open={open}
         onClose={handleClose}
         closeOnBackdrop={!submitting && !isSendingSms && !isVerifyingSms && !isVerifyingEmailCode}
         showCloseButton={!submitting && !isSendingSms && !isVerifyingSms && !isVerifyingEmailCode}

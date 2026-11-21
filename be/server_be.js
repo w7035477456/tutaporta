@@ -324,13 +324,11 @@ import {
   postPhotoAlbumsSessionFileCounts,
   postPhotoAlbumsTransferBytes
 } from './routes/photoAlbums/photoAlbumsUsageRoutes.js';
-import { clearPhotoAlbumsCacheIcon } from './utils/photoAlbumsCacheIcon.js';
 import {
   logoffVaultUsb as logoffPhotoAlbumsUsbSession,
   vaultClusterHooks as photoAlbumsVaultClusterHooks
 } from './utils/photoAlbumsUsb/vaultSession.js';
 import { updateMyVideoType } from './routes/videos/updateMyVideoType.js';
-import { clearRecordVaultCacheIcon, RECORD_VAULT_CACHE_ICON_KEY_PREFIX } from './utils/recordVaultCacheIcon.js';
 import { logoffVaultUsb, vaultClusterHooks as recordVaultVaultClusterHooks } from './utils/recordVaultUsb/vaultSession.js';
 import {
   createVaultClusterCoherenceMiddleware,
@@ -606,7 +604,6 @@ import { initMobilePhotoUploadSchema, setMobilePhotoUploadRedis } from './utils/
 import { mobilePhotoUploadTraceMiddleware } from './middleware/mobilePhotoUploadTrace.js';
 import { setSingleLoginRedis, endSingleLoginSessionIfMatches } from './utils/singleLoginSession.js';
 import { saveOnlineNickname } from './routes/singles/saveOnlineNickname.js';
-import { saveSecretIcon, verifySecretIcon } from './routes/singles/saveSecretIcon.js';
 import {
   googleSignupStart,
   googleSignupCallback,
@@ -852,7 +849,7 @@ app.use((req, res, next) => {
   }
   if (
     req.method === 'POST' &&
-    (req.path === '/api/photoAlbums/tutadrive/restore-zip')
+    (req.path === '/api/photoAlbums/tutaCloud/restore-zip')
   ) {
     const cl = req.get('content-length');
     const n = cl ? parseInt(cl, 10) : NaN;
@@ -866,11 +863,11 @@ app.use((req, res, next) => {
   }
   if (
     (req.method === 'POST' &&
-      (req.path === '/api/recordVault/tutadrive/backup' ||
-        req.path === '/api/recordVault/tutadrive/restore-zip' ||
-        req.path === '/api/recordVault/tutadrive/backup-tree' ||
-        req.path === '/api/recordVault/tutadrive/merge/preview')) ||
-    (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutadrive/backup/'))
+      (req.path === '/api/recordVault/tutaCloud/backup' ||
+        req.path === '/api/recordVault/tutaCloud/restore-zip' ||
+        req.path === '/api/recordVault/tutaCloud/backup-tree' ||
+        req.path === '/api/recordVault/tutaCloud/merge/preview')) ||
+    (req.method === 'PUT' && req.path.startsWith('/api/recordVault/tutaCloud/backup/'))
   ) {
     const cl = req.get('content-length');
     const n = cl ? parseInt(cl, 10) : NaN;
@@ -886,17 +883,17 @@ app.use((req, res, next) => {
 });
 
 const LARGE_MULTIPART_UPLOAD_POST_PATHS = new Set([
-  '/api/recordVault/tutadrive/backup',
-  '/api/recordVault/tutadrive/restore-zip',
-  '/api/recordVault/tutadrive/backup-tree',
-  '/api/recordVault/tutadrive/merge/preview',
-  '/api/photoAlbums/tutadrive/restore-zip'
+  '/api/recordVault/tutaCloud/backup',
+  '/api/recordVault/tutaCloud/restore-zip',
+  '/api/recordVault/tutaCloud/backup-tree',
+  '/api/recordVault/tutaCloud/merge/preview',
+  '/api/photoAlbums/tutaCloud/restore-zip'
 ]);
 app.use((req, res, next) => {
   const isLargeUpload =
     (req.method === 'POST' && LARGE_MULTIPART_UPLOAD_POST_PATHS.has(req.path)) ||
     (req.method === 'PUT' &&
-      (req.path.startsWith('/api/recordVault/tutadrive/backup/') || req.path === '/api/tutadrive/upload-chunk'));
+      (req.path.startsWith('/api/recordVault/tutaCloud/backup/') || req.path === '/api/tutaCloud/upload-chunk'));
   if (!isLargeUpload) return next();
   return drainUploadBodyBeforeResponse(req, res, next);
 });
@@ -969,9 +966,6 @@ if (useRedis) {
 }
 console.log(
   '[startup] Redis single-login store: v1:session:{singles_id}:mobile|desktop (legacy v1:session:{singles_id}; JWT-only when Redis unavailable)'
-);
-console.log(
-  `[startup] Redis record-vault cache icons: ${RECORD_VAULT_CACHE_ICON_KEY_PREFIX}{onedrive|usb}:{singles_id} (shared across web servers; falls back to Postgres when Redis unavailable)`
 );
 console.log(
   '[startup] Cluster state (signup, vault unlock, transfer bytes): Redis keys v1:* (in-memory fallback when Redis unavailable)'
@@ -1186,8 +1180,7 @@ app.get('/api/me', async (req, res) => {
         seeded_demo_buddies_boolean,
         gender_self_report,
         over_18_verified,
-        id_initialization_completed,
-        (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
+        id_initialization_completed
        FROM outdateddbsnapshotoct2024.singles 
        WHERE singles_id = $1`,
       [decoded.singles_id]
@@ -1211,8 +1204,7 @@ app.get('/api/me', async (req, res) => {
     // Re-read flags after possible seed on /api/me
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
-              id_initialization_completed, profile_livescan_match, profile_dl_match,
-              (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
+              id_initialization_completed, profile_livescan_match, profile_dl_match
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
       [row.singles_id]
@@ -1242,10 +1234,6 @@ app.get('/api/me', async (req, res) => {
       ),
       id_seal_earned: computeIdSealEarned(flags),
       optinout_bitmap: normalizeOptinoutBitmap(flags.optinout_bitmap),
-      has_secret_icon:
-        flags.has_secret_icon === true ||
-        String(flags.has_secret_icon ?? '').trim().toLowerCase() === 'true' ||
-        row.has_secret_icon === true,
       guest_demo_login: decoded.guest_demo_login === true
     };
     const mallDepartmentMode = getMallDepartmentMode(user.member_category);
@@ -1295,12 +1283,12 @@ app.get('/api/me/session-status', requireAuth, async (req, res) => {
   }
 });
 
-// Logout endpoint — also nulls singles.cache_onedrive_icon / cache_usb_icon
+// Logout endpoint
 app.post('/api/logout', async (req, res) => {
   try {
     const token = getAuthTokenFromCookies(req.cookies);
     if (token) {
-      // Accept expired JWT so idle auto-logout still clears cache icons.
+      // Accept expired JWT so idle auto-logout still closes vault sessions.
       const decoded = jwt.verify(token, getPublicKey(), {
         algorithms: ['RS256'],
         ignoreExpiration: true
@@ -1331,17 +1319,6 @@ app.post('/api/logout', async (req, res) => {
           await logoffPhotoAlbumsUsbSession(singlesId);
         } catch (err) {
           console.error('[logout] logoffPhotoAlbumsUsbSession', err?.message || err);
-        }
-        // Always clear MyNote / Photo Albums icon cache on logout / auto-logout.
-        try {
-          await clearRecordVaultCacheIcon(singlesId);
-        } catch (err) {
-          console.error('[logout] clearRecordVaultCacheIcon', err?.message || err);
-        }
-        try {
-          await clearPhotoAlbumsCacheIcon(singlesId);
-        } catch (err) {
-          console.error('[logout] clearPhotoAlbumsCacheIcon', err?.message || err);
         }
       }
       try {
@@ -1629,25 +1606,25 @@ app.get('/api/recordVault/storage/logoff-progress', ...recordVaultVaultAuth, get
 app.get('/api/recordVault/usage', ...recordVaultVaultAuth, getRecordVaultUsage);
 app.get('/api/recordVault/session-file-counts', requireAuth, getRecordVaultSessionFileCounts);
 app.post('/api/recordVault/session-file-counts', requireAuth, postRecordVaultSessionFileCounts);
-app.get('/api/recordVault/tutadrive/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveStatus);
-app.get('/api/recordVault/tutadrive/vault-tree', ...recordVaultVaultAuth, getRecordVaultTutaDriveVaultTree);
-app.post('/api/recordVault/tutadrive/sync', ...recordVaultVaultAuth, syncRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/unlock', ...recordVaultVaultAuth, unlockRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/init', ...recordVaultVaultAuth, initRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/format', ...recordVaultVaultAuth, formatRecordVaultTutaDrive);
-app.post('/api/recordVault/tutadrive/logoff', ...recordVaultVaultAuth, logoffRecordVaultTutaDrive);
-app.get('/api/recordVault/tutadrive/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveBackupZip);
-app.post('/api/recordVault/tutadrive/backup', ...recordVaultVaultAuth, storeRecordVaultTutaDriveBackup);
-app.put('/api/recordVault/tutadrive/backup/:fileName', ...recordVaultVaultAuth, replaceRecordVaultTutaDriveBackup);
-app.get('/api/recordVault/tutadrive/backup', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveStoredBackup);
-app.get('/api/recordVault/tutadrive/backup/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveBackupStatus);
-app.get('/api/recordVault/tutadrive/backup/needs-backup', ...recordVaultVaultAuth, getRecordVaultTutaDriveNeedsBackup);
-app.delete('/api/recordVault/tutadrive/backup/:fileName', ...recordVaultVaultAuth, deleteRecordVaultTutaDriveBackupByName);
-app.post('/api/recordVault/tutadrive/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultTutaDriveBackupZip);
-app.post('/api/recordVault/tutadrive/backup-tree', ...recordVaultVaultAuth, listRecordVaultTutaDriveBackupTree);
-app.post('/api/recordVault/tutadrive/merge/preview', ...recordVaultVaultAuth, previewRecordVaultTutaDriveMerge);
-app.post('/api/recordVault/tutadrive/merge/apply', ...recordVaultVaultAuth, applyRecordVaultTutaDriveMerge);
-app.put('/api/tutadrive/upload-chunk', requireAuth, putTutaDriveUploadChunk);
+app.get('/api/recordVault/tutaCloud/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveStatus);
+app.get('/api/recordVault/tutaCloud/vault-tree', ...recordVaultVaultAuth, getRecordVaultTutaDriveVaultTree);
+app.post('/api/recordVault/tutaCloud/sync', ...recordVaultVaultAuth, syncRecordVaultTutaDrive);
+app.post('/api/recordVault/tutaCloud/unlock', ...recordVaultVaultAuth, unlockRecordVaultTutaDrive);
+app.post('/api/recordVault/tutaCloud/init', ...recordVaultVaultAuth, initRecordVaultTutaDrive);
+app.post('/api/recordVault/tutaCloud/format', ...recordVaultVaultAuth, formatRecordVaultTutaDrive);
+app.post('/api/recordVault/tutaCloud/logoff', ...recordVaultVaultAuth, logoffRecordVaultTutaDrive);
+app.get('/api/recordVault/tutaCloud/backup-zip', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutaCloud/backup', ...recordVaultVaultAuth, storeRecordVaultTutaDriveBackup);
+app.put('/api/recordVault/tutaCloud/backup/:fileName', ...recordVaultVaultAuth, replaceRecordVaultTutaDriveBackup);
+app.get('/api/recordVault/tutaCloud/backup', ...recordVaultVaultAuth, downloadRecordVaultTutaDriveStoredBackup);
+app.get('/api/recordVault/tutaCloud/backup/status', ...recordVaultVaultAuth, getRecordVaultTutaDriveBackupStatus);
+app.get('/api/recordVault/tutaCloud/backup/needs-backup', ...recordVaultVaultAuth, getRecordVaultTutaDriveNeedsBackup);
+app.delete('/api/recordVault/tutaCloud/backup/:fileName', ...recordVaultVaultAuth, deleteRecordVaultTutaDriveBackupByName);
+app.post('/api/recordVault/tutaCloud/restore-zip', ...recordVaultVaultAuth, restoreRecordVaultTutaDriveBackupZip);
+app.post('/api/recordVault/tutaCloud/backup-tree', ...recordVaultVaultAuth, listRecordVaultTutaDriveBackupTree);
+app.post('/api/recordVault/tutaCloud/merge/preview', ...recordVaultVaultAuth, previewRecordVaultTutaDriveMerge);
+app.post('/api/recordVault/tutaCloud/merge/apply', ...recordVaultVaultAuth, applyRecordVaultTutaDriveMerge);
+app.put('/api/tutaCloud/upload-chunk', requireAuth, putTutaDriveUploadChunk);
 
 // ---- Photo Albums API (independent clone of Record Vault / Notes) ----
 app.use('/api/photoAlbums', ...photoAlbumsTransferMeterStack);
@@ -1706,15 +1683,15 @@ app.get('/api/photoAlbums/e2e/keys', requireAuth, getPhotoAlbumsE2eKeys);
 app.post('/api/photoAlbums/e2e/keys', requireAuth, putPhotoAlbumsE2eKeys);
 app.put('/api/photoAlbums/e2e/keys', requireAuth, updatePhotoAlbumsE2eKeys);
 app.get('/api/photoAlbums/storage/config', ...photoAlbumsVaultAuth, getPhotoAlbumsStorageConfig);
-app.get('/api/photoAlbums/tutadrive/status', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveStatus);
-app.get('/api/photoAlbums/tutadrive/open-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveOpenProgress);
-app.post('/api/photoAlbums/tutadrive/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/init', ...photoAlbumsVaultAuth, initPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/reset-album', ...photoAlbumsVaultAuth, resetPhotoAlbumsTutaDrive);
-app.post('/api/photoAlbums/tutadrive/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
+app.get('/api/photoAlbums/tutaCloud/status', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveStatus);
+app.get('/api/photoAlbums/tutaCloud/open-progress', ...photoAlbumsVaultAuth, getPhotoAlbumsTutaDriveOpenProgress);
+app.post('/api/photoAlbums/tutaCloud/unlock', ...photoAlbumsVaultAuth, unlockPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutaCloud/init', ...photoAlbumsVaultAuth, initPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutaCloud/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutaCloud/reset-album', ...photoAlbumsVaultAuth, resetPhotoAlbumsTutaDrive);
+app.post('/api/photoAlbums/tutaCloud/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
 app.post(
-  '/api/photoAlbums/tutadrive/restore-zip',
+  '/api/photoAlbums/tutaCloud/restore-zip',
   ...photoAlbumsVaultAuth,
   restorePhotoAlbumsTutaDriveBackupZip
 );
@@ -1762,8 +1739,6 @@ app.post('/api/tutaMall/backup', requireAuth, postTutaMallBackupApp);
 app.post('/api/tutaMall/restore-all', requireAuth, postTutaMallRestoreAll);
 app.post('/api/tutaMall/restore', requireAuth, postTutaMallRestoreApp);
 app.post('/api/settings/nickname', requireAuth, saveOnlineNickname);
-app.post('/api/settings/secretIcon', requireAuth, saveSecretIcon);
-app.post('/api/settings/secretIcon/verify', requireAuth, verifySecretIcon);
 app.post('/api/settings/changePassword', requireAuth, changeSettingsPassword);
 app.post('/api/settings/changePassword/sendSms', requireAuth, sendSettingsChangePasswordSms);
 app.post('/api/settings/changePassword/verifySms', requireAuth, verifySettingsChangePasswordSms);

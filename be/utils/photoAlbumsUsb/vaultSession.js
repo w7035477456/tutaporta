@@ -9,14 +9,10 @@ import {
 } from './vaultCrypto.js';
 import { removeDuplicateFilesInPhotoAlbumsEnvFolders } from '../photoAlbumsFolderDedupe.js';
 import { countPhotoAlbumsAlbumMediaByNoteId } from '../photoAlbumsSidebarMediaCount.js';
-import {
-  createIconVaultKeyMaterial,
-  iconVaultKdfMetaFields,
-  listIconVaultUnlockKeys,
-  vaultMetaUsesArgon2idKdf
-} from '../photoAlbumsIconKeys.js';
+import { createEnvVaultKeyMaterial, listEnvVaultUnlockKeys, vaultKdfMetaFields } from '../vaultKeys.js';
 import { isVaultBackupUsbEnabled } from '../photoAlbumsStorageFlags.js';
 import { buildVaultFolderListing } from '../vaultFolderTreeListing.js';
+import { findSealedVaultSampleFile, sealPlaintextVaultTree } from '../vaultAtRestSeal.js';
 import { vaultMetaUsesPlaintextStorage } from '../photoAlbumsIconEncryption.js';
 import {
   fileRelativePath,
@@ -29,12 +25,8 @@ import {
   vaultPhotoStoragePath,
   vaultPhotosRoot,
   vaultRootOnMount,
-  listVaultDbFileNamesForRead,
-  isSqliteVaultDbBuffer,
   atomicWriteFileSync,
-  resolveVaultDbPath,
   resolveVaultPhotoStoragePath,
-  VAULT_DB_FILE_ENCRYPTED,
   resolveVaultFileStoragePath,
   ensureVaultLayoutDirs
 } from './vaultPaths.js';
@@ -49,9 +41,7 @@ import {
   PHOTO_ALBUMS_VAULT_TABLES as T,
   VaultPgDb,
   createPhotoAlbumsMemberVault,
-  importSqliteVaultIntoPostgres,
   loadPhotoAlbumsMemberVault,
-  openLegacySqliteVaultBuffer,
   setPhotoAlbumsMemberVaultId
 } from './vaultPgStore.js';
 import {
@@ -101,7 +91,6 @@ import {
   getVaultClusterUnlock,
   isVaultMountPathPresent
 } from '../photoAlbumsClusterSession.js';
-import { readPhotoAlbumsCacheIcon } from '../photoAlbumsCacheIcon.js';
 import { flushVaultTransferBytes } from '../photoAlbumsTransferTracking.js';
 import {
   addVaultSessionFileCounts,
@@ -120,18 +109,13 @@ const sessionsByKey = new Map();
 
 export const PHOTO_ALBUMS_STORAGE_HEADER = 'x-record-vault-storage';
 
-export function normalizeVaultStorageType(raw, fallback = 'usb') {
-  const value = String(raw ?? fallback).trim().toLowerCase();
-  if (
-    value === 'onedrive' ||
-    value === 'tutadrive' ||
-    value === 'tutacloud' ||
-    value === 'cloud'
-  ) {
-    return 'onedrive';
-  }
-  return 'usb';
-}
+export {
+  VAULT_CLOUD_STORAGE_TYPE,
+  VAULT_USB_STORAGE_TYPE,
+  normalizeVaultStorageType,
+  isVaultCloudStorageType
+} from '../vaultStorageType.js';
+import { normalizeVaultStorageType } from '../vaultStorageType.js';
 
 function vaultSessionKey(singlesId, storageType = 'usb') {
   return `${Number(singlesId)}:${normalizeVaultStorageType(storageType)}`;
@@ -369,7 +353,7 @@ export function getVaultSession(singlesId, storageType = null) {
   }
   const usbSession = sessionsByKey.get(vaultSessionKey(id, 'usb'));
   if (usbSession && !usbSession.locked) return usbSession;
-  const oneDriveSession = sessionsByKey.get(vaultSessionKey(id, 'onedrive'));
+  const oneDriveSession = sessionsByKey.get(vaultSessionKey(id, 'tutaCloud'));
   if (oneDriveSession && !oneDriveSession.locked) return oneDriveSession;
   return null;
 }
@@ -377,7 +361,7 @@ export function getVaultSession(singlesId, storageType = null) {
 export function listVaultSessions(singlesId) {
   const id = Number(singlesId);
   const out = [];
-  for (const storageType of ['usb', 'onedrive']) {
+  for (const storageType of ['usb', 'tutaCloud']) {
     const session = getVaultSession(id, storageType);
     if (session) out.push(session);
   }
@@ -436,9 +420,9 @@ export async function requireVaultSession(req, res) {
   if (!usbSession) {
     usbSession = await tryRehydrateVaultSession(singlesId, 'usb');
   }
-  let oneDriveSession = getVaultSession(singlesId, 'onedrive');
+  let oneDriveSession = getVaultSession(singlesId, 'tutaCloud');
   if (!oneDriveSession) {
-    oneDriveSession = await tryRehydrateVaultSession(singlesId, 'onedrive');
+    oneDriveSession = await tryRehydrateVaultSession(singlesId, 'tutaCloud');
   }
   if (usbSession && oneDriveSession) {
     res.status(400).json({
@@ -460,8 +444,6 @@ export async function requireVaultSession(req, res) {
 }
 
 async function resolveVaultUnlockKey(singlesId, storageType, mountPathHint = null) {
-  const iconName = await readPhotoAlbumsCacheIcon(singlesId, storageType);
-  if (!iconName) return null;
   let mountPath = mountPathHint ? String(mountPathHint).trim() : '';
   if (!mountPath) {
     const cluster = await getVaultClusterUnlock(Number(singlesId), normalizeVaultStorageType(storageType));
@@ -470,81 +452,12 @@ async function resolveVaultUnlockKey(singlesId, storageType, mountPathHint = nul
   if (!mountPath || !isVaultMountPathPresent(mountPath)) return null;
   try {
     const meta = readVaultMeta(mountPath);
-    const keys = await listIconVaultUnlockKeys(iconName, meta);
+    if (!meta || vaultMetaUsesPlaintextStorage(meta)) return null;
+    const keys = await listEnvVaultUnlockKeys('tutaCloud', meta);
     return keys[0]?.key ?? null;
   } catch {
     return null;
   }
-}
-
-/**
- * Re-seal photos/ + files/ under a new AES key and write Argon2id kdf meta.
- * Used once when unlocking a legacy SHA-256 icon vault.
- */
-async function migrateSessionIconVaultToArgon2id(session, iconName) {
-  if (!session || isPlaintextVaultKey(session.key) || vaultMetaUsesPlaintextStorage(session.meta)) {
-    return false;
-  }
-  if (vaultMetaUsesArgon2idKdf(session.meta)) return false;
-
-  const material = await createIconVaultKeyMaterial(iconName);
-  const oldKey = session.key;
-  const newKey = material.key;
-
-  function resealFile(absPath) {
-    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) return;
-    const enc = fs.readFileSync(absPath);
-    try {
-      const plain = openVaultBuffer(enc, oldKey);
-      fs.writeFileSync(absPath, sealVaultBuffer(plain, newKey));
-    } catch (err) {
-      // Skip files that were not encrypted with the old icon key (corrupt / already plaintext).
-      console.warn('[migrateSessionIconVaultToArgon2id] skip file', absPath, err?.message || err);
-    }
-  }
-
-  function walkAndReseal(dir) {
-    if (!fs.existsSync(dir)) return;
-    for (const name of fs.readdirSync(dir)) {
-      if (name.startsWith('.')) continue;
-      const abs = path.join(dir, name);
-      const st = fs.statSync(abs);
-      if (st.isDirectory()) walkAndReseal(abs);
-      else resealFile(abs);
-    }
-  }
-
-  walkAndReseal(vaultPhotosRoot(session.mountPath));
-  walkAndReseal(vaultFilesRoot(session.mountPath));
-
-  session.key = newKey;
-  session.meta = {
-    ...session.meta,
-    version: 2,
-    encryption: 'aes-256-gcm-icon-key',
-    ...iconVaultKdfMetaFields(material)
-  };
-  fs.writeFileSync(vaultMetaPath(session.mountPath), JSON.stringify(session.meta, null, 2));
-
-  if (session.backupMountPath && isVaultMountPathPresent(session.backupMountPath)) {
-    try {
-      walkAndReseal(vaultPhotosRoot(session.backupMountPath));
-      walkAndReseal(vaultFilesRoot(session.backupMountPath));
-      fs.writeFileSync(
-        vaultMetaPath(session.backupMountPath),
-        JSON.stringify(session.meta, null, 2)
-      );
-    } catch (err) {
-      console.warn('[migrateSessionIconVaultToArgon2id] backup mirror failed', err?.message || err);
-    }
-  }
-
-  console.log('[migrateSessionIconVaultToArgon2id] upgraded vault icon KDF to Argon2id', {
-    singlesId: session.singlesId,
-    storageType: session.storageType,
-    vaultId: session.meta?.vaultId
-  });
-  return true;
 }
 
 /**
@@ -562,6 +475,8 @@ async function isCurrentTutaDriveAlbumsMount(singlesId, mountPath) {
     return false;
   }
 }
+
+const VAULT_KEY_MISMATCH = 'VAULT_KEY_MISMATCH';
 
 /** In-flight rehydrates per session key — parallel requests must not open the vault twice. */
 const rehydrateInFlight = new Map();
@@ -591,7 +506,7 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   if (!isVaultMountPathPresent(mountPath)) {
     return null;
   }
-  if (normalizedType === 'onedrive' && !(await isCurrentTutaDriveAlbumsMount(id, mountPath))) {
+  if (normalizedType === 'tutaCloud' && !(await isCurrentTutaDriveAlbumsMount(id, mountPath))) {
     rvCloudWarn('Vault', 'cluster rehydrate skipped: stale TutaDrive mount path', {
       singlesId: id,
       mountPath
@@ -602,11 +517,10 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   const key = await resolveVaultUnlockKey(id, normalizedType, mountPath);
   try {
     await unlockVaultUsbWithKey(id, mountPath, key, {
-      skipBackup: normalizedType === 'onedrive' || !cluster.backupMountPath,
+      skipBackup: normalizedType === 'tutaCloud' || !cluster.backupMountPath,
       backupMountPath: cluster.backupMountPath || null,
       storageType: normalizedType,
-      skipClusterRegister: true,
-      iconName: await readPhotoAlbumsCacheIcon(id, normalizedType)
+      skipClusterRegister: true
     });
   } catch (err) {
     rvCloudWarn('Vault', 'cluster rehydrate unlock failed', {
@@ -619,18 +533,13 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
 
   const session = getVaultSession(id, normalizedType);
   if (session) markVaultSessionClusterState(session, cluster);
-  if (session && normalizedType === 'onedrive') {
+  if (session && normalizedType === 'tutaCloud') {
     session.driveSinglesId = null;
     session.driveFolderId = null;
     session.tutaDrive = true;
     session.label = 'TutaDrive';
   }
   return session;
-}
-
-export async function initializeVaultOnUsb(mountPath, iconName) {
-  const material = await createIconVaultKeyMaterial(iconName);
-  return initializeVaultOnUsbWithKey(mountPath, material.key, material);
 }
 
 /**
@@ -658,70 +567,42 @@ export async function initializeVaultOnUsbWithKey(mountPath, key, kdfMaterial = 
     vaultId: crypto.randomUUID(),
     encryption: plaintextStorage ? 'none' : 'aes-256-gcm-icon-key',
     createdAt: new Date().toISOString(),
-    ...(plaintextStorage ? {} : iconVaultKdfMetaFields(kdfMaterial))
+    ...(plaintextStorage ? {} : vaultKdfMetaFields(kdfMaterial))
   };
   if (!plaintextStorage && !meta.kdfSalt) {
     throw new Error(
-      'Encrypted vault init requires Argon2id kdf material (kdfSalt). Use initializeVaultOnUsb(iconName) or pass createIconVaultKeyMaterial().'
+      'Encrypted vault init requires Argon2id kdf material (kdfSalt). Pass createEnvVaultKeyMaterial().'
     );
   }
   fs.writeFileSync(vaultMetaPath(normalized), JSON.stringify(meta, null, 2));
   return meta;
 }
 
-export async function unlockVaultUsb(singlesId, mountPath, iconName, options = {}) {
-  const meta = readVaultMeta(mountPath);
-  const keys = await listIconVaultUnlockKeys(iconName, meta);
-  const key = keys[0]?.key;
-  return unlockVaultUsbWithKey(singlesId, mountPath, key, {
-    ...options,
-    iconName,
-    unlockKdf: keys[0]?.kdf || null
-  });
-}
-
-/** Legacy vault.db / vault.db.enc files still in the vault folder (pre-Postgres vaults, restored zips). */
-function listLegacyVaultDbPaths(mountPath, meta) {
-  const vaultRoot = vaultRootOnMount(mountPath);
-  const out = [];
-  const candidates = [
-    resolveVaultDbPath(mountPath),
-    ...listVaultDbFileNamesForRead(meta).map((name) => path.join(vaultRoot, name))
-  ];
-  for (const abs of candidates) {
-    if (abs && !out.includes(abs) && fs.existsSync(abs)) out.push(abs);
-  }
-  return out;
-}
-
-/** Imported vault.db files are renamed (kept as a fallback copy) so they are never imported twice. */
-function retireLegacyVaultDbFiles(paths) {
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-  for (const abs of paths) {
-    const suffix = abs.endsWith('.enc') ? '.db.enc' : '.db';
-    try {
-      fs.renameSync(abs, path.join(path.dirname(abs), `vault-imported-to-postgres-${stamp}${suffix}`));
-    } catch (err) {
-      // Another worker unlocking at the same moment may have renamed it first.
-      if (err?.code !== 'ENOENT') {
-        console.warn('[photoAlbumsUsb] could not rename imported vault db', abs, err?.message || err);
-      }
-    }
+/** Wrong server key → VAULT_KEY_MISMATCH (counts toward the unlock guard). */
+function assertKeyOpensVault(mountPath, key) {
+  if (key == null || isPlaintextVaultKey(key)) return;
+  const sample = findSealedVaultSampleFile(vaultFilesRoot(mountPath));
+  if (!sample) return;
+  try {
+    openVaultBuffer(fs.readFileSync(sample), key);
+  } catch (err) {
+    const keyErr = new Error('Unable to decrypt vault (wrong server key or corrupt vault data)');
+    keyErr.code = VAULT_KEY_MISMATCH;
+    keyErr.cause = err;
+    throw keyErr;
   }
 }
 
 /**
  * Make sure the member's album index for this vault folder is in Postgres.
- * - index present for this vaultId → use it (a stale vault.db next to it is renamed, not imported)
- * - vault.db present otherwise → import it (replaces any older index)
- * - nothing anywhere → create an empty index (`created: true`, caller seeds the sample album)
+ * - index present → use it (vault folder id re-pointed if it changed)
+ * - none → create an empty index (caller seeds the sample album)
  */
-async function ensureVaultIndexInPostgres({ singlesId, mountPath, meta, unlockKeys, defaultKey, retried = false }) {
+async function ensureVaultIndexInPostgres({ singlesId, mountPath, meta, key }) {
+  assertKeyOpensVault(mountPath, key);
   const vaultId = meta?.vaultId ? String(meta.vaultId) : null;
   const existing = await loadPhotoAlbumsMemberVault(singlesId);
-  const legacyPaths = listLegacyVaultDbPaths(mountPath, meta);
-
-  if (existing && (existing.vault_id === vaultId || !legacyPaths.length)) {
+  if (existing) {
     if (vaultId && existing.vault_id !== vaultId) {
       console.warn('[photoAlbumsUsb] vault folder id changed; keeping the Postgres album index', {
         singlesId,
@@ -730,74 +611,66 @@ async function ensureVaultIndexInPostgres({ singlesId, mountPath, meta, unlockKe
       });
       await setPhotoAlbumsMemberVaultId(singlesId, vaultId);
     }
-    if (legacyPaths.length) retireLegacyVaultDbFiles(legacyPaths);
-    return { effectiveKey: defaultKey, created: false, imported: false };
+    return { created: false };
   }
-
-  if (legacyPaths.length) {
-    let openErr = null;
-    for (const dbPath of legacyPaths) {
-      let enc;
-      try {
-        enc = fs.readFileSync(dbPath);
-      } catch (err) {
-        // Another worker imported + renamed it a moment ago; its rows are in Postgres now.
-        if (err?.code === 'ENOENT' && !retried) {
-          return ensureVaultIndexInPostgres({ singlesId, mountPath, meta, unlockKeys, defaultKey, retried: true });
-        }
-        throw err;
-      }
-      for (const tryKey of unlockKeys) {
-        let plain;
-        try {
-          plain = openVaultBuffer(enc, tryKey);
-        } catch (err) {
-          openErr = err;
-          continue;
-        }
-        if (!isSqliteVaultDbBuffer(plain)) continue;
-        const sqliteDb = await openLegacySqliteVaultBuffer(plain);
-        try {
-          const counts = await importSqliteVaultIntoPostgres(singlesId, sqliteDb, {
-            vaultId,
-            source: existing ? 'restore' : 'import',
-            importedFromPath: dbPath
-          });
-          console.info('[photoAlbumsUsb] imported vault.db into Postgres', { singlesId, dbPath, counts });
-        } finally {
-          sqliteDb.close();
-        }
-        retireLegacyVaultDbFiles(legacyPaths);
-        return { effectiveKey: tryKey, created: false, imported: true };
-      }
-    }
-    throw openErr || new Error('Vault database is missing or unreadable');
-  }
-
   await new VaultPgDb(singlesId).tx((tx) => createPhotoAlbumsMemberVault(tx, { vaultId, source: 'seed' }));
-  return { effectiveKey: defaultKey, created: true, imported: false };
+  return { created: true };
 }
 
 /**
- * Bulk migration (no session): import the legacy vault.db in a vault folder into Postgres.
- * `key` is the vault's unlock key (null for plaintext vaults). Folders without vault.db are skipped.
+ * One-time: seal plaintext photos/ + files/ with a fresh Argon2id server key and flip
+ * vault.meta to encrypted. Runs on unlock when PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB is on but the
+ * vault was created as encryption:none.
  */
-export async function importLegacyPhotoAlbumsVaultDb(singlesId, mountPath, key = null) {
-  const meta = readVaultMeta(mountPath);
-  if (!meta?.vaultId || !listLegacyVaultDbPaths(mountPath, meta).length) {
-    return { imported: false, reason: 'no_vault_db' };
+async function migratePlaintextVaultToEncrypted(session) {
+  if (!session || !vaultMetaUsesPlaintextStorage(session.meta)) return false;
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return false;
+  let material;
+  try {
+    material = await createEnvVaultKeyMaterial('tutaCloud');
+  } catch (err) {
+    console.warn('[photoAlbums migratePlaintextVaultToEncrypted] no key material; leaving vault plaintext', err?.message || err);
+    return false;
   }
-  const hasIconKey = key != null && !isPlaintextVaultKey(key);
-  const unlockKeys = vaultMetaUsesPlaintextStorage(meta) ? [null, ...(hasIconKey ? [key] : [])] : hasIconKey ? [key] : [];
-  if (!unlockKeys.length) return { imported: false, reason: 'key_required' };
-  const result = await ensureVaultIndexInPostgres({
-    singlesId: Number(singlesId),
-    mountPath,
-    meta,
-    unlockKeys,
-    defaultKey: null
+  if (!material?.key || isPlaintextVaultKey(material.key)) return false;
+
+  const startedAt = Date.now();
+  const counts = sealPlaintextVaultTree(
+    [{ dir: vaultPhotosRoot(session.mountPath) }, { dir: vaultFilesRoot(session.mountPath), removeSymlinks: true }],
+    {
+      key: material.key,
+      sealVaultBuffer,
+      atomicWriteFileSync,
+      logPrefix: '[photoAlbums migratePlaintextVaultToEncrypted]'
+    }
+  );
+  session.key = material.key;
+  session.meta = {
+    ...session.meta,
+    version: 2,
+    encryption: 'aes-256-gcm-icon-key',
+    ...vaultKdfMetaFields(material)
+  };
+  fs.writeFileSync(vaultMetaPath(session.mountPath), JSON.stringify(session.meta, null, 2));
+  console.log('[photoAlbums migratePlaintextVaultToEncrypted] sealed plaintext vault at rest', {
+    singlesId: session.singlesId,
+    vaultId: session.meta?.vaultId,
+    ...counts,
+    ms: Date.now() - startedAt
   });
-  return { imported: result.imported, reason: result.imported ? 'imported' : 'already_in_postgres' };
+  return true;
+}
+
+/** Encrypted vault: seal stray plaintext files and drop symlinks under files/ so only .enc remains. */
+function sealStrayVaultFiles(session) {
+  if (!session?.key || vaultMetaUsesPlaintextStorage(session.meta)) return;
+  const counts = sealPlaintextVaultTree(
+    [{ dir: vaultPhotosRoot(session.mountPath) }, { dir: vaultFilesRoot(session.mountPath), removeSymlinks: true }],
+    { key: session.key, sealVaultBuffer, atomicWriteFileSync, logPrefix: '[photoAlbums sealStrayVaultFiles]' }
+  );
+  if (counts.sealed || counts.unlinked) {
+    console.log('[photoAlbums sealStrayVaultFiles] cleaned vault folder', { singlesId: session.singlesId, ...counts });
+  }
 }
 
 export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options = {}) {
@@ -806,7 +679,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     throw new Error('TutaPhotoAlbums on USB is retired. Use TutaCloud.');
   }
   ensureVaultLayoutDirs(mountPath);
-  const check = validateVaultOnMount(mountPath, { requireDbFile: false });
+  const check = validateVaultOnMount(mountPath);
   if (!check.ok) {
     throw new Error(check.error || 'Invalid vault folder');
   }
@@ -816,14 +689,12 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
       'This vault uses the retired 6-digit PIN format. Create a new vault in a different folder.'
     );
   }
-  const vaultRoot = vaultRootOnMount(mountPath);
-  const hasEncryptedDbFile = fs.existsSync(path.join(vaultRoot, VAULT_DB_FILE_ENCRYPTED));
   const metaSaysPlaintext = vaultMetaUsesPlaintextStorage(meta);
-  const hasIconKey = key != null && !isPlaintextVaultKey(key);
-  const treatAsEncryptedVault = !metaSaysPlaintext || hasEncryptedDbFile;
+  const hasKey = key != null && !isPlaintextVaultKey(key);
+  const treatAsEncryptedVault = !metaSaysPlaintext;
 
-  if (treatAsEncryptedVault && !hasIconKey) {
-    throw new Error('Security icon is required to unlock this vault');
+  if (treatAsEncryptedVault && !hasKey) {
+    throw new Error('Vault key is required to unlock this vault');
   }
   if (treatAsEncryptedVault) {
     assertUnlockNotLocked(mountPath, meta);
@@ -833,44 +704,22 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
       ? null
       : assertBackupMountPath(mountPath, options?.backupMountPath, meta?.vaultId || null);
 
-  const unlockKeys = [];
-  if (!metaSaysPlaintext) {
-    if (hasIconKey) unlockKeys.push(key);
-  } else {
-    unlockKeys.push(null);
-    if (hasIconKey && hasEncryptedDbFile) unlockKeys.push(key);
-  }
-
-  let effectiveKey = null;
+  const effectiveKey = metaSaysPlaintext ? null : key;
   let didSeedNewMemberSample = false;
   const db = new VaultPgDb(singlesId);
   try {
-    const loaded = await ensureVaultIndexInPostgres({
-      singlesId: Number(singlesId),
-      mountPath,
-      meta,
-      unlockKeys,
-      defaultKey: metaSaysPlaintext ? null : key
-    });
-    effectiveKey = loaded.effectiveKey;
+    await ensureVaultIndexInPostgres({ singlesId: Number(singlesId), mountPath, meta, key: effectiveKey });
     didSeedNewMemberSample = await seedPhotoAlbumsNewMemberSampleDb(db);
   } catch (err) {
     if (err?.name === 'PhotoAlbumsUnlockError') throw err;
-    if (treatAsEncryptedVault) {
+    // Only a key that cannot decrypt the vault counts toward the wipe-after-6 guard.
+    if (treatAsEncryptedVault && err?.code === VAULT_KEY_MISMATCH) {
       recordFailedUnlockAttempt(mountPath, meta);
     }
     throw err;
   }
 
-  let clearedMeta = clearUnlockGuard(mountPath, meta);
-  if (metaSaysPlaintext && effectiveKey != null && !isPlaintextVaultKey(effectiveKey)) {
-    clearedMeta = {
-      ...clearedMeta,
-      version: 2,
-      encryption: 'aes-256-gcm-icon-key'
-    };
-    fs.writeFileSync(vaultMetaPath(mountPath), JSON.stringify(clearedMeta, null, 2));
-  }
+  const clearedMeta = clearUnlockGuard(mountPath, meta);
 
   const existing = getVaultSession(singlesId, targetStorageType);
   if (existing) {
@@ -910,25 +759,17 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     });
     if (clusterState) markVaultSessionClusterState(session, clusterState);
   }
+  // Plaintext vault + at-rest encrypt enabled → seal files/photos and flip vault.meta.
+  try {
+    if (!(await migratePlaintextVaultToEncrypted(session))) sealStrayVaultFiles(session);
+  } catch (migErr) {
+    console.error('[unlockVaultUsbWithKey] vault at-rest seal failed', migErr?.message || migErr);
+  }
   const sampleLabelMigrate = await migrateSampleAlbumTutorialLabelsDb(session.db);
   if (sampleLabelMigrate.migrated) {
     console.info(
       `[unlockVaultUsbWithKey] removed SAMPLE ALBUM tutorial labels singles_id=${singlesId} note_id=${sampleLabelMigrate.noteId}`
     );
-  }
-
-  const migrateIconName = String(options?.iconName || '').trim();
-  if (
-    migrateIconName &&
-    treatAsEncryptedVault &&
-    !isPlaintextVaultKey(session.key) &&
-    !vaultMetaUsesArgon2idKdf(session.meta)
-  ) {
-    try {
-      await migrateSessionIconVaultToArgon2id(session, migrateIconName);
-    } catch (migErr) {
-      console.error('[unlockVaultUsbWithKey] Argon2id KDF migrate failed', migErr?.message || migErr);
-    }
   }
 
   fs.mkdirSync(vaultFilesRoot(session.mountPath), { recursive: true });
@@ -940,7 +781,7 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
   // Do not reset on cluster rehydrate, or when the other vault pane is already unlocked.
   const skipSessionCountReset = Boolean(options?.skipClusterRegister);
   if (!skipSessionCountReset) {
-    const otherType = targetStorageType === 'onedrive' ? 'usb' : 'onedrive';
+    const otherType = targetStorageType === 'tutaCloud' ? 'usb' : 'tutaCloud';
     const otherOpen =
       Boolean(getVaultSession(session.singlesId, otherType)) ||
       Boolean(await getVaultClusterUnlock(session.singlesId, otherType));
@@ -990,7 +831,7 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
 
   if (!storageType) {
     await logoffVaultUsb(id, 'usb', opts);
-    await logoffVaultUsb(id, 'onedrive', opts);
+    await logoffVaultUsb(id, 'tutaCloud', opts);
     return { success: true };
   }
 
@@ -1013,12 +854,12 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
 }
 
 /** Album index writes commit to Postgres immediately; nothing to flush. */
-export async function flushAndAwaitCloudSync(_singlesId, _storageType = 'onedrive', _opts = {}) {
+export async function flushAndAwaitCloudSync(_singlesId, _storageType = 'tutaCloud', _opts = {}) {
   return { success: true, synced: false };
 }
 
 /** Close the vault on every worker without logoff side effects (e.g. after restore from zip). */
-export async function discardVaultSessionWithoutCloudSync(singlesId, storageType = 'onedrive') {
+export async function discardVaultSessionWithoutCloudSync(singlesId, storageType = 'tutaCloud') {
   const normalizedType = normalizeVaultStorageType(storageType);
   const id = Number(singlesId);
   const session = getVaultSession(id, normalizedType);
@@ -2644,14 +2485,14 @@ export async function vaultUsbStatus(singlesId, storageType = null) {
     session = await tryRehydrateVaultSession(id, storageType);
   } else if (!session) {
     session =
-      (await tryRehydrateVaultSession(id, 'usb')) || (await tryRehydrateVaultSession(id, 'onedrive'));
+      (await tryRehydrateVaultSession(id, 'usb')) || (await tryRehydrateVaultSession(id, 'tutaCloud'));
   }
   return {
     unlocked: Boolean(session),
     storageType: session?.storageType || null,
     mountPath: session?.mountPath || null,
     label:
-      session?.storageType === 'onedrive'
+      session?.storageType === 'tutaCloud'
         ? session?.label || 'TutaDrive'
         : session
           ? path.basename(session.mountPath)
@@ -2669,9 +2510,9 @@ export function listUsbVaultFolderListing(singlesId, { maxDepth = 8 } = {}) {
   return buildVaultFolderListing(session, vaultRootOnMount, { maxDepth });
 }
 
-/** TutaDrive uses the 'onedrive' session slot with a local mount (LEFT_SIDE=TutaDrive). */
+/** TutaDrive uses the 'tutaCloud' session slot with a local mount (LEFT_SIDE=TutaDrive). */
 export function listTutaDriveVaultFolderListing(singlesId, { maxDepth = 8 } = {}) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   return buildVaultFolderListing(session, vaultRootOnMount, { maxDepth });
 }
 

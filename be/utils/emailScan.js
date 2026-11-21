@@ -506,7 +506,7 @@ export async function processParsedEmail(client, parsed, cfg = getEmailScanConfi
   try {
     const added = await addPendingBillRow(client, {
       singlesId,
-      storageBackend: inbox.storage_backend === 'usb' ? 'usb' : 'onedrive',
+      storageBackend: inbox.storage_backend === 'usb' ? 'usb' : 'tutaCloud',
       cadence,
       extract
     });

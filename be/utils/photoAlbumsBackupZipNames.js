@@ -20,13 +20,13 @@ function formatMyPhotoAlbumsBackupZipStamp(date = new Date()) {
   return `${y}-${mo}-${d}_${hh}-${mi}-${ss}_${tt}_${tz}`;
 }
 
-/** @param {'cloud' | 'onedrive' | 'usb'} kind — `onedrive` kept for legacy backup zips */
+/** @param {'cloud' | 'tutaCloud' | 'usb'} kind — `tutaCloud` kept for legacy backup zips */
 export function buildMyPhotoAlbumsBackupZipFileName(kind = 'cloud') {
   const prefix = kind === 'usb' ? 'MyPhotoAlbums_USB' : 'MyPhotoAlbums_TutaCloud';
   return `${prefix}_${formatMyPhotoAlbumsBackupZipStamp()}.zip`;
 }
 
-/** @param {'cloud' | 'onedrive' | 'usb'} kind */
+/** @param {'cloud' | 'tutaCloud' | 'usb'} kind */
 export function buildPhotoAlbumsAlbumBackupZipFileName(albumLabel, kind = 'cloud') {
   const prefix = kind === 'usb' ? 'MyPhotoAlbums_USB' : 'MyPhotoAlbums_TutaCloud';
   const cleaned = String(albumLabel || 'Album')

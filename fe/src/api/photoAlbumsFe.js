@@ -145,11 +145,11 @@ export async function snapshotPhotoAlbumsSessionFileCounts() {
 }
 
 /** Per-tab: tree open already counted for this storage type after unlock. */
-const sessionTreeCounted = { usb: false, tutadrive: false };
+const sessionTreeCounted = { usb: false, tutaCloud: false };
 
 export function resetPhotoAlbumsSessionTreeCountFlags() {
   sessionTreeCounted.usb = false;
-  sessionTreeCounted.tutadrive = false;
+  sessionTreeCounted.tutaCloud = false;
 }
 
 function countTreeNotebooksAndNotes(tree) {
@@ -668,7 +668,6 @@ export async function fetchPhotoAlbumsUsbStatus() {
   });
   return {
     usbMode: Boolean(data?.usbMode),
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
     session: data?.session || { unlocked: false }
   };
 }
@@ -842,19 +841,6 @@ export async function fetchPhotoAlbumsStorageConfig() {
     oneDrive: tutaCloud,
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
-    iconEncryptionRequired: data?.iconEncryptionRequired !== false,
-    iconRetryDelaySeconds: Number(data?.iconRetryDelaySeconds) || 300,
-    cacheTutaCloudIcon: data?.cacheTutaCloudIcon
-      ? String(data.cacheTutaCloudIcon).trim()
-      : data?.cacheOneDriveIcon
-        ? String(data.cacheOneDriveIcon).trim()
-        : '',
-    cacheOneDriveIcon: data?.cacheTutaCloudIcon
-      ? String(data.cacheTutaCloudIcon).trim()
-      : data?.cacheOneDriveIcon
-        ? String(data.cacheOneDriveIcon).trim()
-        : '',
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
     videoTutorialTutaphotoalbums: data?.videoTutorialTutaphotoalbums ? String(data.videoTutorialTutaphotoalbums).trim() : '',
     usbBridgeInstallers: {
       mac: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.mac, 'mac'),
@@ -868,29 +854,22 @@ function normalizePhotoAlbumsTutaDriveStatusPayload(data) {
   if (session.unlocked) {
     session.storageType = normalizeVaultPaneStorageType(session.storageType || vaultCloudBackendStorageSlot());
   }
-  const cacheIcon = data?.cacheTutaCloudIcon
-    ? String(data.cacheTutaCloudIcon).trim()
-    : data?.cacheIcon
-      ? String(data.cacheIcon).trim()
-      : '';
   return {
     ...data,
-    enabled: Boolean(data?.tutadrive?.enabled),
-    cacheIcon,
-    cacheTutaCloudIcon: cacheIcon,
+    enabled: Boolean(data?.tutaCloud?.enabled),
     session
   };
 }
 
 export async function fetchPhotoAlbumsTutaDriveStatus() {
-  const { data } = await api.get('/api/photoAlbums/tutadrive/status');
+  const { data } = await api.get('/api/photoAlbums/tutaCloud/status');
   return normalizePhotoAlbumsTutaDriveStatusPayload(data);
 }
 
 /** Live TutaCloud vault folder listing (minimal tree when BE has no vault-tree route). */
 export async function fetchPhotoAlbumsTutaDriveVaultTree() {
   const status = await fetchPhotoAlbumsTutaDriveStatus();
-  const memberFolder = String(status?.tutadrive?.memberFolder || '').trim();
+  const memberFolder = String(status?.tutaCloud?.memberFolder || '').trim();
   const rootName = memberFolder || 'TutaCloud';
   return {
     folderName: rootName,
@@ -900,7 +879,7 @@ export async function fetchPhotoAlbumsTutaDriveVaultTree() {
 
 /** Poll Redis-backed open percent while TutaDrive unlock POST runs. */
 export async function fetchPhotoAlbumsTutaDriveOpenProgress() {
-  const { data } = await api.get('/api/photoAlbums/tutadrive/open-progress');
+  const { data } = await api.get('/api/photoAlbums/tutaCloud/open-progress');
   return {
     percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
     label: data?.label ? String(data.label) : ''
@@ -912,7 +891,7 @@ export async function fetchPhotoAlbumsTutaDriveOpenProgress() {
  */
 export async function unlockPhotoAlbumsTutaDrive({ onProgress } = {}) {
   if (typeof onProgress !== 'function') {
-    const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
+    const { data } = await api.post('/api/photoAlbums/tutaCloud/unlock');
     return data;
   }
   onProgress({ percent: 0, label: 'Opening TutaPhotos on TutaCloud' });
@@ -929,7 +908,7 @@ export async function unlockPhotoAlbumsTutaDrive({ onProgress } = {}) {
       });
   }, 250);
   try {
-    const { data } = await api.post('/api/photoAlbums/tutadrive/unlock');
+    const { data } = await api.post('/api/photoAlbums/tutaCloud/unlock');
     onProgress({ percent: 100, label: 'Done' });
     return data;
   } finally {
@@ -939,23 +918,23 @@ export async function unlockPhotoAlbumsTutaDrive({ onProgress } = {}) {
 }
 
 export async function formatPhotoAlbumsTutaDrive() {
-  const { data } = await api.post('/api/photoAlbums/tutadrive/format');
+  const { data } = await api.post('/api/photoAlbums/tutaCloud/format');
   return data;
 }
 
 /** Wipe this member's TutaPhotos on TutaCloud (vault folder, share snapshots, Postgres rows). */
 export async function resetPhotoAlbumsTutaDrive() {
-  const { data } = await api.post('/api/photoAlbums/tutadrive/reset-album');
+  const { data } = await api.post('/api/photoAlbums/tutaCloud/reset-album');
   return data;
 }
 
 export async function initPhotoAlbumsTutaDrive() {
-  const { data } = await api.post('/api/photoAlbums/tutadrive/init');
+  const { data } = await api.post('/api/photoAlbums/tutaCloud/init');
   return data;
 }
 
 export async function logoffPhotoAlbumsTutaDrive() {
-  const { data } = await api.post('/api/photoAlbums/tutadrive/logoff');
+  const { data } = await api.post('/api/photoAlbums/tutaCloud/logoff');
   return data;
 }
 
@@ -1229,7 +1208,7 @@ async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {}, chunkL
 
 /** Upload a MyPhotoAlbums backup zip and restore files to TutaCloud (when server route is enabled). */
 export async function restorePhotoAlbumsTutaDriveBackupZip(file) {
-  return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutadrive/restore-zip', file, { chunkLargeFile: true });
+  return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutaCloud/restore-zip', file, { chunkLargeFile: true });
 }
 
 /** Upload a MyPhotoAlbums backup zip and restore files onto the unlocked USB vault. */
@@ -1258,7 +1237,7 @@ async function logoffPhotoAlbumsStorageWithProgress(storageType, onProgress) {
   }
   try {
     const { data } = isCloud
-      ? await api.post('/api/photoAlbums/tutadrive/logoff')
+      ? await api.post('/api/photoAlbums/tutaCloud/logoff')
       : await rvRequest({ method: 'POST', url: '/api/photoAlbums/usb/logoff', storageType: 'usb' });
     if (typeof onProgress === 'function') {
       onProgress({ percent: 100, label: 'Done' });
@@ -1279,7 +1258,7 @@ export async function logoffPhotoAlbumsStorage({ storageType, onProgress } = {})
     if (typeof onProgress === 'function') {
       data = await logoffPhotoAlbumsStorageWithProgress(VAULT_CLOUD_STORAGE_TYPE, onProgress);
     } else {
-      ({ data } = await api.post('/api/photoAlbums/tutadrive/logoff'));
+      ({ data } = await api.post('/api/photoAlbums/tutaCloud/logoff'));
     }
   } else if (normalized === 'usb') {
     if (typeof onProgress === 'function') {
@@ -1407,7 +1386,7 @@ export async function fetchPhotoAlbumsActiveStorageDisplay() {
   try {
     const status = await fetchPhotoAlbumsTutaDriveStatus();
     if (status?.session?.unlocked) {
-      const folder = String(status?.tutadrive?.memberFolder || '').trim();
+      const folder = String(status?.tutaCloud?.memberFolder || '').trim();
       return folder ? `Storage: TutaCloud (${folder})` : 'Storage: TutaCloud';
     }
   } catch {

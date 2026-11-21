@@ -1,4 +1,4 @@
-/** Body / name autosave that matches what is stored (would only touch updated_at + vault.db mtime). */
+/** Body / name autosave that matches what is stored (would only touch updated_at). */
 export function isUnchangedNoteTextPatch(row, patch) {
   const keys = Object.keys(patch || {}).filter((key) => patch[key] !== undefined);
   if (!keys.length || keys.some((key) => key !== 'body_text' && key !== 'note_name')) return false;

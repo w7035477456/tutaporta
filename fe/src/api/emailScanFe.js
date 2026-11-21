@@ -1,7 +1,7 @@
 import api from './axios';
 
 function storageParam(storageType) {
-  return String(storageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
+  return String(storageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
 }
 
 function rethrow(err, fallback) {

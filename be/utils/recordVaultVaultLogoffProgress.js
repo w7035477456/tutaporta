@@ -5,7 +5,7 @@
 
 import { clusterRedisDel, clusterRedisGetJson, clusterRedisSetJson } from './clusterRedisState.js';
 
-const KEY_PREFIX = 'v1:record_vault:onedrive:logoff_progress:';
+const KEY_PREFIX = 'v1:record_vault:tutaCloud:logoff_progress:';
 const TTL_SEC = 180;
 
 function progressKey(singlesId) {

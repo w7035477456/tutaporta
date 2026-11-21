@@ -5,7 +5,7 @@
 import pool from '../../db/connection.js';
 import { getDBSchema } from '../../config/envConfig.js';
 
-const ALLOWED_BACKENDS = new Set(['usb', 'onedrive', 'postgres']);
+const ALLOWED_BACKENDS = new Set(['usb', 'tutaCloud', 'postgres']);
 
 function schema() {
   return String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
@@ -39,16 +39,31 @@ function mapVaultRow(row) {
   };
 }
 
+function normalizeBackendId(raw) {
+  const v = String(raw || '').trim();
+  const lower = v.toLowerCase();
+  if (lower === 'postgres') return 'postgres';
+  if (lower === 'usb') return 'usb';
+  if (
+    lower === 'tutacloud' ||
+    lower === 'tutadrive' ||
+    lower === 'onedrive' ||
+    lower === 'cloud' ||
+    v === 'tutaCloud'
+  ) {
+    return 'tutaCloud';
+  }
+  return null;
+}
+
 function normalizeBackends(raw) {
-  const list = Array.isArray(raw) ? raw : ['usb', 'onedrive'];
+  const list = Array.isArray(raw) ? raw : ['usb', 'tutaCloud'];
   const out = [];
   for (const item of list) {
-    const backend = String(item || '')
-      .trim()
-      .toLowerCase();
-    if (ALLOWED_BACKENDS.has(backend) && !out.includes(backend)) out.push(backend);
+    const backend = normalizeBackendId(item);
+    if (backend && ALLOWED_BACKENDS.has(backend) && !out.includes(backend)) out.push(backend);
   }
-  return out.length ? out : ['usb', 'onedrive'];
+  return out.length ? out : ['usb', 'tutaCloud'];
 }
 
 function parseKeyPayload(payload) {
@@ -77,7 +92,7 @@ export async function getAnyVaultKey(singlesId) {
       WHERE singles_id = $1
       ORDER BY CASE storage_backend
         WHEN 'usb' THEN 0
-        WHEN 'onedrive' THEN 1
+        WHEN 'tutaCloud' THEN 1
         ELSE 2
       END
       LIMIT 1`,
@@ -87,10 +102,8 @@ export async function getAnyVaultKey(singlesId) {
 }
 
 export async function getVaultKey(singlesId, storageBackend) {
-  const backend = String(storageBackend || '')
-    .trim()
-    .toLowerCase();
-  if (!ALLOWED_BACKENDS.has(backend)) {
+  let backend = normalizeBackendId(storageBackend);
+  if (!backend || !ALLOWED_BACKENDS.has(backend)) {
     throw Object.assign(new Error('Invalid storage_backend'), { status: 400 });
   }
   const s = schema();

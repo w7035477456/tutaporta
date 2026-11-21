@@ -41,7 +41,7 @@ export function getVaultAccessRetryDelaySeconds() {
 }
 
 function normalizeStorageType(storageType) {
-  return storageType === 'usb' ? 'usb' : 'onedrive';
+  return storageType === 'usb' ? 'usb' : 'tutaCloud';
 }
 
 function remainingLockSeconds(lockedUntil, nowMs = Date.now()) {
@@ -100,7 +100,7 @@ function buildFailResponse({
   };
 }
 
-export async function getVaultAccessFailStatus(singlesId, storageType = 'onedrive') {
+export async function getVaultAccessFailStatus(singlesId, storageType = 'tutaCloud') {
   const id = Number(singlesId);
   const side = normalizeStorageType(storageType);
   if (!Number.isFinite(id) || id < 1) {
@@ -148,7 +148,7 @@ export async function getVaultAccessFailStatus(singlesId, storageType = 'onedriv
   };
 }
 
-export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedrive') {
+export async function clearVaultAccessFailStatus(singlesId, storageType = 'tutaCloud') {
   const id = Number(singlesId);
   if (!Number.isFinite(id) || id < 1) return;
   await pool.query(
@@ -168,7 +168,7 @@ export async function clearVaultAccessFailStatus(singlesId, storageType = 'onedr
  */
 export async function photoAlbumsAccessFail(
   singlesId,
-  storageType = 'onedrive',
+  storageType = 'tutaCloud',
   { wrongPasswordError = PHOTO_ALBUMS_WRONG_PASSWORD_ERROR } = {}
 ) {
   const id = Number(singlesId);
@@ -250,7 +250,7 @@ export async function photoAlbumsAccessFail(
   if (failAttemptLocks(nextAttempts)) {
     try {
       await lockTutaPhotosForSingles(id);
-      await clearVaultAccessFailStatus(id, 'onedrive');
+      await clearVaultAccessFailStatus(id, 'tutaCloud');
       await clearVaultAccessFailStatus(id, 'usb');
     } catch (err) {
       console.error('[photoAlbumsAccessFail] TutaPhotos lock failed:', err?.message || err);

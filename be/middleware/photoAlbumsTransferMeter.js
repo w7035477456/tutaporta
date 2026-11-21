@@ -12,9 +12,9 @@ const SKIP_EXACT = new Set([
 
 /** High-frequency progress polls — skip to avoid drowning real work. */
 const SKIP_PREFIXES = [
-  '/api/photoAlbums/onedrive/open-progress',
-  '/api/photoAlbums/onedrive/sync-progress',
-  '/api/photoAlbums/onedrive/logoff-progress'
+  '/api/photoAlbums/tutaCloud/open-progress',
+  '/api/photoAlbums/tutaCloud/sync-progress',
+  '/api/photoAlbums/tutaCloud/logoff-progress'
 ];
 
 function requestPath(req) {

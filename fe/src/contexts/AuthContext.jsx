@@ -61,7 +61,6 @@ function normalizeUserShape(rawUser, authMeta = {}) {
     over_18_verified: normalizeOver18Verified(rawUser.over_18_verified),
     id_initialization_completed: normalizeIdInitializationCompleted(rawUser.id_initialization_completed),
     id_seal_earned: rawUser.id_seal_earned === true,
-    has_secret_icon: rawUser.has_secret_icon === true || rawUser.has_secret_icon === 'true',
     role: String(rawUser.role ?? authMeta.role ?? 'user').trim() || 'user',
     tools_only: Boolean(rawUser.tools_only ?? authMeta.tools_only),
     impersonated_by_admin_id: impersonatedByAdminId,
@@ -147,16 +146,6 @@ export const AuthProvider = ({ children }) => {
     setUser((prev) => {
       if (!prev || prev.optinout_bitmap === value) return prev;
       return normalizeUserShape({ ...prev, optinout_bitmap: value });
-    });
-  }, []);
-
-  const updateSessionHasSecretIcon = useCallback((value) => {
-    setUser((prev) => {
-      if (!prev) return prev;
-      return normalizeUserShape({
-        ...prev,
-        has_secret_icon: Boolean(value)
-      });
     });
   }, []);
 
@@ -469,8 +458,7 @@ export const AuthProvider = ({ children }) => {
         updateSessionDemoBuddyFlags,
         updateSessionOver18Verified,
         updateSessionIdInitializationCompleted,
-        updateSessionOptinoutBitmap,
-        updateSessionHasSecretIcon
+        updateSessionOptinoutBitmap
       }}
     >
       {children}

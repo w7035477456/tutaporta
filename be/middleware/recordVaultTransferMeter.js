@@ -16,9 +16,9 @@ const SKIP_EXACT = new Set([
   '/api/recordVault/access/status',
   '/api/recordVault/access/fail-status',
   '/api/recordVault/rag/status',
-  '/api/recordVault/tutadrive/status',
-  '/api/recordVault/tutadrive/backup/status',
-  '/api/recordVault/tutadrive/backup/needs-backup'
+  '/api/recordVault/tutaCloud/status',
+  '/api/recordVault/tutaCloud/backup/status',
+  '/api/recordVault/tutaCloud/backup/needs-backup'
 ]);
 
 function requestPath(req) {
@@ -34,7 +34,7 @@ function shouldMeterRecordVaultTransfer(path) {
 
 /**
  * Count every Tx/Rx byte for authenticated /api/recordVault/* traffic (TutaNotes usage bar total),
- * including backup Download / Upload / Restore / Merge / Open. Zips sent as PUT /api/tutadrive/upload-chunk
+ * including backup Download / Upload / Restore / Merge / Open. Zips sent as PUT /api/tutaCloud/upload-chunk
  * pieces are counted on the final request via `req.chunkedUploadBytes` (set by parseVaultBackupZipUpload).
  */
 export function recordVaultTransferMeter(req, res, next) {

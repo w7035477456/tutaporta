@@ -53,7 +53,7 @@ export default function PhotoAlbumsTutaDriveGate({
   const refreshStatus = useCallback(async () => {
     try {
       const status = await fetchPhotoAlbumsTutaDriveStatus();
-      setMemberFolder(String(status?.tutadrive?.memberFolder || '').trim());
+      setMemberFolder(String(status?.tutaCloud?.memberFolder || '').trim());
       if (status?.session?.unlocked) {
         onUnlocked?.();
       }

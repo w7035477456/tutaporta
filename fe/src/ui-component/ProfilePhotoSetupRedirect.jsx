@@ -12,7 +12,7 @@ import { MY_STORY_PATH } from 'utils/profilePhotoSetup';
 import { isIdentificationVerificationLockActive } from 'utils/signupIdentificationVerification';
 
 /**
- * First-login gate (photo / gender / nickname / secret icon): until ID initialization
+ * First-login gate (photo / gender / nickname): until ID initialization
  * completes, every route except My Story redirects back to My Story.
  */
 export default function ProfilePhotoSetupRedirect() {

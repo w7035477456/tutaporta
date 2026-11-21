@@ -478,7 +478,7 @@ export async function createVaultKeyMaterial(password) {
       kdfParallelism: VAULT_E2E_KDF.parallelism,
       wrappedDekB64,
       cryptoVersion: VAULT_E2E_CRYPTO_VERSION,
-      backends: ['usb', 'onedrive']
+      backends: ['usb', 'tutaCloud']
     }
   };
 }

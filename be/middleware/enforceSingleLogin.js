@@ -1,6 +1,5 @@
 import { isAdminImpersonationSession, isToolsOnlyAdminJwt } from '../utils/adminAuth.js';
 import { validateSingleLoginSession } from '../utils/singleLoginSession.js';
-import { clearRecordVaultCacheIcon } from '../utils/recordVaultCacheIcon.js';
 
 function shouldSkipSingleLogin(auth, decoded) {
   if (!auth) return true;
@@ -41,14 +40,6 @@ export async function enforceSingleLoginSession(req, res, decoded) {
     deviceClass: decoded?.session_device_class
   });
   if (!result.ok) {
-    // Idle / Redis session expiry — same as logout: drop remembered MyNote icons.
-    if (result.code === 'sessionExpired') {
-      try {
-        await clearRecordVaultCacheIcon(singlesId);
-      } catch (err) {
-        console.error('[enforceSingleLogin] clearRecordVaultCacheIcon', err?.message || err);
-      }
-    }
     return {
       ok: false,
       status: 401,

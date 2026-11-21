@@ -49,8 +49,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
   try {
     const flagsRes = await pool.query(
       `SELECT seeded_demo_buddies_boolean, gender_self_report, over_18_verified, optinout_bitmap,
-              id_initialization_completed, profile_livescan_match, profile_dl_match,
-              (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
+              id_initialization_completed, profile_livescan_match, profile_dl_match
        FROM outdateddbsnapshotoct2024.singles
        WHERE singles_id = $1`,
       [user.singles_id]
@@ -61,7 +60,6 @@ export async function issueUserLoginSession(res, user, options = {}) {
       userWithoutPassword.gender_self_report = flagsRes.rows[0].gender_self_report;
       userWithoutPassword.over_18_verified = flagsRes.rows[0].over_18_verified;
       userWithoutPassword.optinout_bitmap = flagsRes.rows[0].optinout_bitmap;
-      userWithoutPassword.has_secret_icon = flagsRes.rows[0].has_secret_icon;
       userWithoutPassword.id_initialization_completed = flagsRes.rows[0].id_initialization_completed;
     }
   } catch (err) {
@@ -127,11 +125,6 @@ export async function issueUserLoginSession(res, user, options = {}) {
     .toUpperCase();
   const genderSelfReport = genderRaw === 'M' || genderRaw === 'F' ? genderRaw : null;
   const over18Verified = normalizeOver18Verified(userWithoutPassword.over_18_verified);
-  const hasSecretIcon =
-    userWithoutPassword.has_secret_icon === true ||
-    String(userWithoutPassword.has_secret_icon ?? '')
-      .trim()
-      .toLowerCase() === 'true';
 
   return {
     success: true,
@@ -145,8 +138,7 @@ export async function issueUserLoginSession(res, user, options = {}) {
       over_18_verified: over18Verified,
       id_initialization_completed: normalizeIdInitializationCompleted(userWithoutPassword.id_initialization_completed),
       id_seal_earned: userWithoutPassword.id_seal_earned === true,
-      optinout_bitmap: normalizeOptinoutBitmap(userWithoutPassword.optinout_bitmap),
-      has_secret_icon: hasSecretIcon
+      optinout_bitmap: normalizeOptinoutBitmap(userWithoutPassword.optinout_bitmap)
     },
     requiresPasswordUpgrade: Boolean(requiresPasswordUpgrade)
   };

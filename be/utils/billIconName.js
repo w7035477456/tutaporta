@@ -1,4 +1,4 @@
-/** Bill Schedule row icon (security icon set name, e.g. 'car') → stored value, or null for "?". */
+/** Bill Schedule row icon (icon set name, e.g. 'car') → stored value, or null for "?". */
 export function normalizeBillIcon(raw) {
   const name = String(raw ?? '')
     .trim()

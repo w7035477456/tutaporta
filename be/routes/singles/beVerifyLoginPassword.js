@@ -17,8 +17,7 @@ import { createLoginLogSessionToken } from '../../utils/loginLog.js';
 import { issueUserLoginSession } from '../../utils/issueUserLoginSession.js';
 
 const USER_SELECT = `SELECT singles_id, prefix, member_id, alias, email, profile_image_fk, password_hash, member_category, status,
-                seeded_demo_buddies_boolean, gender_self_report, over_18_verified,
-                (NULLIF(BTRIM(COALESCE(secret_icon::text, '')), '') IS NOT NULL) AS has_secret_icon
+                seeded_demo_buddies_boolean, gender_self_report, over_18_verified
          FROM outdateddbsnapshotoct2024.singles s`;
 
 function parseRememberMe(raw) {

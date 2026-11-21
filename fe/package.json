@@ -86,6 +86,7 @@
     "react-router": "7.9.6",
     "react-router-dom": "7.9.6",
     "read-excel-file": "^9.2.0",
+    "sass": "1.94.2",
     "saxen": "^11.0.2",
     "simplebar-react": "3.3.2",
     "slick-carousel": "1.8.1",
@@ -148,7 +149,6 @@
     "playwright": "latest",
     "prettier": "3.7.3",
     "prop-types": "latest",
-    "sass": "1.94.2",
     "storybook": "^10.5.10",
     "vitest": "latest"
   }

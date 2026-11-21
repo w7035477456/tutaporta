@@ -382,7 +382,7 @@ export default function RecordVaultUsageBar({
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const transfer = usage?.transfer;
-  const isOneDrive = storageType === 'tutadrive';
+  const isOneDrive = storageType === 'tutaCloud';
   const tutorialDetail = isOneDrive
     ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL
     : TUTANOTES_USB_VIDEO_TUTORIAL_LABEL;
@@ -510,7 +510,7 @@ export default function RecordVaultUsageBar({
 
 RecordVaultUsageBar.propTypes = {
   usage: PropTypes.object,
-  storageType: PropTypes.oneOf(['usb', 'onedrive']),
+  storageType: PropTypes.oneOf(['usb', 'tutaCloud']),
   videoTutorialUrl: PropTypes.string,
   onPurchased: PropTypes.func,
   onGetMoreTokens: PropTypes.func

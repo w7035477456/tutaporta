@@ -29,7 +29,7 @@ const tmpDirs = [];
 async function makeSession() {
   const mountPath = await fs.mkdtemp(path.join(os.tmpdir(), 'tutaphoto-thumb-test-'));
   tmpDirs.push(mountPath);
-  return { db: member.db, key: crypto.randomBytes(32), mountPath, meta: {}, storageType: 'onedrive' };
+  return { db: member.db, key: crypto.randomBytes(32), mountPath, meta: {}, storageType: 'tutaCloud' };
 }
 
 async function addAttachment(session, { id, noteId = 1, ext, deleted = false }) {

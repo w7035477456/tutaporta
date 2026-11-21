@@ -151,7 +151,7 @@ function vaultPasswordReady(password, confirm) {
 }
 
 function normalizeStorageType(storageType) {
-  return storageType === 'usb' ? 'usb' : 'onedrive';
+  return storageType === 'usb' ? 'usb' : 'tutaCloud';
 }
 
 const PHOTO_ALBUMS_WRONG_PASSWORD_ERROR = 'Incorrect Encrypt password, please try again';
@@ -178,7 +178,7 @@ export default function PhotoAlbumsAccessGate({
   open,
   onUnlocked,
   onClose,
-  storageType = 'onedrive',
+  storageType = 'tutaCloud',
   usbMountPath = '',
   onVaultFormatted: _onVaultFormatted
 }) {
@@ -452,7 +452,7 @@ export default function PhotoAlbumsAccessGate({
         const keyPayload = await rewrapDekForNewPassword(dekRaw, nextPassword);
         const result = await updatePhotoAlbumsE2eKeys({
           ...keyPayload,
-          backends: ['usb', 'onedrive']
+          backends: ['usb', 'tutaCloud']
         });
         const nextVault = result?.vault || vaultRow;
         setVaultRow(nextVault);

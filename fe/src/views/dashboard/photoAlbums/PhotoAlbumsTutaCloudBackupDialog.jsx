@@ -170,7 +170,7 @@ export default function PhotoAlbumsTutaCloudBackupDialog({
     setBusy(true);
     try {
       const result = await downloadPhotoAlbumsAlbumBackupZip({
-        storageType: 'onedrive',
+        storageType: 'tutaCloud',
         notebookId: albumContext.notebookId,
         noteId: albumContext.noteId,
         albumLabel,

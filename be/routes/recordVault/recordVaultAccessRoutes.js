@@ -28,8 +28,8 @@ function readStorageType(req) {
     req.body?.storage_type ??
     req.query?.storageType ??
     req.query?.storage_type ??
-    'onedrive';
-  return String(raw).trim().toLowerCase() === 'usb' ? 'usb' : 'onedrive';
+    'tutaCloud';
+  return String(raw).trim().toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
 }
 
 /** GET /api/recordVault/access/status */
@@ -159,7 +159,7 @@ export async function getRecordVaultAccessFailStatus(req, res) {
 
 /**
  * POST /api/recordVault/access/fail
- * Body: { storageType: 'onedrive'|'usb', mountPath? }
+ * Body: { storageType: 'tutaCloud'|'usb', mountPath? }
  * Call after client-side vault-password verify fails (password never sent here).
  */
 export async function postRecordVaultAccessFail(req, res) {

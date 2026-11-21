@@ -235,8 +235,8 @@ export default function BillScheduleYearlyPanel({
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const storageKey =
-    String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
-  const peerKey = storageKey === 'usb' ? 'onedrive' : 'usb';
+    String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
+  const peerKey = storageKey === 'usb' ? 'tutaCloud' : 'usb';
   const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
   const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
 
@@ -1081,7 +1081,7 @@ export default function BillScheduleYearlyPanel({
 }
 
 BillScheduleYearlyPanel.propTypes = {
-  storageType: PropTypes.oneOf(['tutadrive', 'usb']),
+  storageType: PropTypes.oneOf(['tutaCloud', 'usb']),
   videoTutorialUrl: PropTypes.string,
   onBillScheduleTutorialClick: PropTypes.func,
   headerRightAction: PropTypes.node

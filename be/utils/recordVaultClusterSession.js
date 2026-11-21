@@ -18,7 +18,11 @@ const UNLOCK_TTL_SEC = 24 * 60 * 60;
 
 export function vaultClusterUnlockKey(singlesId, storageType) {
   const id = Math.trunc(Number(singlesId));
-  const type = String(storageType || 'usb').trim().toLowerCase() === 'onedrive' ? 'onedrive' : 'usb';
+  const v = String(storageType || 'usb').trim().toLowerCase();
+  const type =
+    v === 'tutacloud' || v === 'tutadrive' || v === 'onedrive' || v === 'cloud' || String(storageType || '').trim() === 'tutaCloud'
+      ? 'tutaCloud'
+      : 'usb';
   return `${UNLOCK_PREFIX}${id}:${type}`;
 }
 
@@ -47,7 +51,8 @@ export async function registerVaultClusterUnlock({
     vaultClusterUnlockKey(id, storageType),
     {
       singlesId: id,
-      storageType: String(storageType || 'usb').trim().toLowerCase() === 'onedrive' ? 'onedrive' : 'usb',
+      storageType:
+        String(storageType || 'usb').trim().toLowerCase() === 'usb' ? 'usb' : 'tutaCloud',
       mountPath: mount,
       backupMountPath: backupMountPath ? String(backupMountPath).trim() : null,
       driveFolderId: driveFolderId ? String(driveFolderId).trim() : null,
@@ -66,7 +71,7 @@ export async function clearVaultClusterUnlock(singlesId, storageType) {
     return;
   }
   if (!storageType) {
-    await clusterRedisDel(vaultClusterUnlockKey(id, 'usb'), vaultClusterUnlockKey(id, 'onedrive'));
+    await clusterRedisDel(vaultClusterUnlockKey(id, 'usb'), vaultClusterUnlockKey(id, 'tutaCloud'));
     return;
   }
   await clusterRedisDel(vaultClusterUnlockKey(id, storageType));

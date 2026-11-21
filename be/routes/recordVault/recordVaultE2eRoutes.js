@@ -8,6 +8,7 @@ import {
   upsertVaultKeys
 } from '../../utils/recordVaultE2e/vaultE2eKeyStore.js';
 import { isVaultE2eYellow } from '../../utils/vaultE2eYellowConfig.js';
+import { isTutaNotesEncryptAllowed } from '../../utils/tutaEncryptAllowed.js';
 
 function requireSinglesId(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -24,9 +25,11 @@ export async function getRecordVaultE2eKeys(req, res) {
   if (!singlesId) return;
 
   try {
-    const vault = await getAnyVaultKey(singlesId);
+    const encryptAllowed = isTutaNotesEncryptAllowed();
+    const vault = encryptAllowed ? await getAnyVaultKey(singlesId) : null;
     return res.json({
       e2eYellow: isVaultE2eYellow(),
+      encryptAllowed,
       configured: Boolean(vault?.wrappedDekB64 && vault?.kdfSaltB64),
       vault: vault || null
     });
@@ -40,6 +43,13 @@ export async function getRecordVaultE2eKeys(req, res) {
 export async function putRecordVaultE2eKeys(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
+
+  if (!isTutaNotesEncryptAllowed()) {
+    return res.status(403).json({
+      error: 'TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)',
+      encryptAllowed: false
+    });
+  }
 
   try {
     const result = await upsertVaultKeys(singlesId, req.body || {});
@@ -60,6 +70,13 @@ export async function updateRecordVaultE2eKeys(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
 
+  if (!isTutaNotesEncryptAllowed()) {
+    return res.status(403).json({
+      error: 'TutaNotes encryption is disabled by admin (TUTANOTES_ENCRYPT_ALLOWED=false)',
+      encryptAllowed: false
+    });
+  }
+
   try {
     const existing = await getAnyVaultKey(singlesId);
     if (!existing) {
@@ -67,7 +84,7 @@ export async function updateRecordVaultE2eKeys(req, res) {
     }
     const result = await updateVaultKeys(singlesId, {
       ...(req.body || {}),
-      backends: req.body?.backends || ['usb', 'onedrive']
+      backends: req.body?.backends || ['usb', 'tutaCloud']
     });
     return res.json({
       success: true,

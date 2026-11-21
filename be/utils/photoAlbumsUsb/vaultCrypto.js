@@ -14,7 +14,7 @@ function parseEnvBool(raw, defaultValue = true) {
 }
 
 /**
- * PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB=false => plaintext bytes + plain filenames (vault.db, 1.jpg).
+ * PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB=false => plaintext bytes + plain filenames (1.jpg).
  * When unset: follows PHOTOALBUMS_ICON_ENCRYPTION (default false = plaintext v3 vault).
  */
 export function isVaultPhotoAndDbEncryptionEnabled() {

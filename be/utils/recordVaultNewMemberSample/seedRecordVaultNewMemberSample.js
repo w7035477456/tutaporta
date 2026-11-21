@@ -1,4 +1,5 @@
 import { fileRelativePath } from '../recordVaultUsb/vaultPaths.js';
+import { NOTES_VAULT_TABLES as T } from '../recordVaultUsb/vaultPgStore.js';
 import {
   loadRecordVaultNewMemberSampleManifest,
   loadRecordVaultSampleNoteBodyHtml,
@@ -6,10 +7,7 @@ import {
   listRecordVaultSampleNotebooks,
   listRecordVaultSampleNoteDefs
 } from './sampleManifest.js';
-import {
-  linkRecordVaultSharedSamplesIntoVault,
-  recordVaultNewMemberSampleSeedMarker
-} from './sharedSampleMedia.js';
+import { recordVaultNewMemberSampleSeedMarker } from './sharedSampleMedia.js';
 
 /** Prior v2 dm1 placeholder set (single SAMPLE NOTEBOOK 1 + SAMPLE NOTE1/2). */
 const GARBAGE_V2_MARKER = 'rv-new-member-sample-v2';
@@ -35,40 +33,9 @@ const GARBAGE_V1_CHECKSUMS = new Set([
   '9a74391ab25a4f510091eebe9593a2feef13b707f0f16ea4e905806f82a3f8f2'
 ]);
 
-function queryOne(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const row = stmt.step() ? stmt.getAsObject() : null;
-  stmt.free();
-  return row;
-}
-
-function queryAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
-function attachmentHasSharedContentKeyColumn(db) {
-  return queryAll(db, `PRAGMA table_info(note_attachments)`).some(
-    (row) => String(row.name || '') === 'shared_content_key'
-  );
-}
-
-/** Ensure note_attachments.shared_content_key exists (pointer to shared sample bytes). */
-export function ensureRecordVaultSharedContentKeyColumn(db) {
-  if (attachmentHasSharedContentKeyColumn(db)) return false;
-  try {
-    db.run(`ALTER TABLE note_attachments ADD COLUMN shared_content_key TEXT`);
-    return true;
-  } catch {
-    return false;
-  }
+/** Postgres notes_note_attachments always has shared_content_key — kept for older callers. */
+export async function ensureRecordVaultSharedContentKeyColumn(_db) {
+  return false;
 }
 
 function buildSearchText(noteName, bodyHtml, attachments) {
@@ -113,22 +80,15 @@ function noteLooksLikeCanonicalSample(bodyText) {
   // Legacy v2 dm1 welcome / formats copy.
   if (body.includes('rv-new-member-sample-v2')) return true;
   if (body.includes('Flexible Organization')) return true;
-  if (body.includes('Formats the code can')) return true;
   return false;
 }
 
-/** @deprecated alias */
-function noteLooksLikeCanonicalDm1(bodyText) {
-  return noteLooksLikeCanonicalSample(bodyText);
-}
-
-function noteLooksLikeGarbageV1(db, noteRow) {
+async function noteLooksLikeGarbageV1(db, noteRow) {
   const body = String(noteRow?.body_text || '');
-  const atts = queryAll(
-    db,
-    `SELECT checksum, shared_content_key FROM note_attachments
-     WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteRow.note_id]
+  const atts = await db.all(
+    `SELECT checksum, shared_content_key FROM ${T.attachments}
+      WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [db.singlesId, noteRow.note_id]
   );
   if (atts.length) {
     let garbageHits = 0;
@@ -149,23 +109,13 @@ function noteLooksLikeGarbageV1(db, noteRow) {
   return false;
 }
 
-/**
- * Revive soft-deleted canonical SAMPLE RECEIPTS — disabled.
- * Registration samples are seeded once; user deletes must stick.
- * @returns {number} always 0
- */
-function reviveSoftDeletedCanonicalSampleNotes(_db) {
-  return 0;
-}
-
-function noteHasCanonicalDm1Attachments(db, noteId, expectedAttachments) {
+async function noteHasCanonicalDm1Attachments(db, noteId, expectedAttachments) {
   const expected = Array.isArray(expectedAttachments) ? expectedAttachments : [];
   if (!expected.length) return true;
-  const rows = queryAll(
-    db,
-    `SELECT checksum, shared_content_key, file_name FROM note_attachments
-     WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteId]
+  const rows = await db.all(
+    `SELECT checksum, shared_content_key, file_name FROM ${T.attachments}
+      WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [db.singlesId, noteId]
   );
   if (rows.length < expected.length) return false;
   const byChecksum = new Set(
@@ -185,62 +135,58 @@ function noteHasCanonicalDm1Attachments(db, noteId, expectedAttachments) {
   });
 }
 
-function findLiveNoteByName(db, noteName) {
-  const name = String(noteName || '')
+function upperName(raw) {
+  return String(raw || '')
     .trim()
     .toUpperCase();
+}
+
+async function findLiveNoteByName(db, noteName) {
+  const name = upperName(noteName);
   if (!name) return null;
-  return queryOne(
-    db,
-    `SELECT note_id, note_name, body_text, notebook_id FROM notes
-     WHERE deleted_at IS NULL AND upper(trim(note_name)) = ?
-     ORDER BY note_id ASC LIMIT 1`,
-    [name]
+  return db.one(
+    `SELECT note_id, note_name, body_text, notebook_id FROM ${T.notes}
+      WHERE singles_id = $1 AND deleted_at IS NULL AND upper(trim(note_name)) = $2
+      ORDER BY note_id ASC LIMIT 1`,
+    [db.singlesId, name]
   );
 }
 
 /** Soft-deleted row with this notebook name (user removed it intentionally). */
-function findSoftDeletedNotebookByName(db, notebookName) {
-  const name = String(notebookName || '')
-    .trim()
-    .toUpperCase();
+async function findSoftDeletedNotebookByName(db, notebookName) {
+  const name = upperName(notebookName);
   if (!name) return null;
-  return queryOne(
-    db,
-    `SELECT notebook_id, notebook_name, deleted_at FROM notebooks
-     WHERE deleted_at IS NOT NULL AND upper(trim(notebook_name)) = ?
-     ORDER BY notebook_id ASC LIMIT 1`,
-    [name]
+  return db.one(
+    `SELECT notebook_id, notebook_name, deleted_at FROM ${T.notebooks}
+      WHERE singles_id = $1 AND deleted_at IS NOT NULL AND upper(trim(notebook_name)) = $2
+      ORDER BY notebook_id ASC LIMIT 1`,
+    [db.singlesId, name]
   );
 }
 
 /** Soft-deleted note with this name (user removed it intentionally). */
-function findSoftDeletedNoteByName(db, noteName) {
-  const name = String(noteName || '')
-    .trim()
-    .toUpperCase();
+async function findSoftDeletedNoteByName(db, noteName) {
+  const name = upperName(noteName);
   if (!name) return null;
-  return queryOne(
-    db,
-    `SELECT note_id, note_name, deleted_at FROM notes
-     WHERE deleted_at IS NOT NULL AND upper(trim(note_name)) = ?
-     ORDER BY note_id ASC LIMIT 1`,
-    [name]
+  return db.one(
+    `SELECT note_id, note_name, deleted_at FROM ${T.notes}
+      WHERE singles_id = $1 AND deleted_at IS NOT NULL AND upper(trim(note_name)) = $2
+      ORDER BY note_id ASC LIMIT 1`,
+    [db.singlesId, name]
   );
 }
 
-function vaultAlreadyHasNewMemberSample(db) {
+async function vaultAlreadyHasNewMemberSample(db) {
   const marker = recordVaultNewMemberSampleSeedMarker();
   const noteDefs = listRecordVaultSampleNoteDefs();
 
   for (const noteDef of noteDefs) {
-    const noteName = String(noteDef.noteName || '').trim();
-    const row = findLiveNoteByName(db, noteName);
+    const row = await findLiveNoteByName(db, String(noteDef.noteName || '').trim());
     if (!row) return false;
-    if (noteLooksLikeGarbageV1(db, row)) return false;
+    if (await noteLooksLikeGarbageV1(db, row)) return false;
     const body = String(row.body_text || '');
     if (!noteLooksLikeCanonicalSample(body) && !body.includes(marker)) return false;
-    if (!noteHasCanonicalDm1Attachments(db, row.note_id, noteDef.attachments || [])) return false;
+    if (!(await noteHasCanonicalDm1Attachments(db, row.note_id, noteDef.attachments || []))) return false;
   }
   return noteDefs.length > 0;
 }
@@ -249,61 +195,65 @@ function vaultAlreadyHasNewMemberSample(db) {
  * True when the member previously had the registration sample set and soft-deleted it.
  * Soft-deleted rows mean "seed once already happened; do not recreate."
  */
-function userRemovedNewMemberSample(db) {
+async function userRemovedNewMemberSample(db) {
   const manifest = loadRecordVaultNewMemberSampleManifest();
   for (const nbDef of listRecordVaultSampleNotebooks(manifest)) {
     const notebookName = String(nbDef.notebookName || '').trim();
-    if (notebookName && findSoftDeletedNotebookByName(db, notebookName)) return true;
+    if (notebookName && (await findSoftDeletedNotebookByName(db, notebookName))) return true;
     for (const noteDef of nbDef.notes || []) {
       const noteName = String(noteDef.noteName || '').trim();
-      if (noteName && findSoftDeletedNoteByName(db, noteName)) return true;
+      if (noteName && (await findSoftDeletedNoteByName(db, noteName))) return true;
     }
   }
   return false;
 }
 
-/** Pre-sample starter notebook name (legacy registration default). */
-function isLegacyDefaultNotebook1Name(notebookName) {
-  return String(notebookName || '')
-    .trim()
-    .toUpperCase() === 'NOTEBOOK 1';
+async function softDeleteNoteRows(db, noteId) {
+  const sid = db.singlesId;
+  await db.run(
+    `UPDATE ${T.attachments} SET deleted_at = NOW()
+      WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [sid, noteId]
+  );
+  await db.run(`DELETE FROM ${T.shortcuts} WHERE singles_id = $1 AND note_id = $2`, [sid, noteId]);
+  await db.run(
+    `UPDATE ${T.notes} SET deleted_at = NOW(), updated_at = NOW() WHERE singles_id = $1 AND note_id = $2`,
+    [sid, noteId]
+  );
+}
+
+async function softDeleteNotebookRow(db, notebookId) {
+  const sid = db.singlesId;
+  await db.run(`DELETE FROM ${T.shortcuts} WHERE singles_id = $1 AND notebook_id = $2`, [sid, notebookId]);
+  await db.run(
+    `UPDATE ${T.notebooks} SET deleted_at = NOW(), updated_at = NOW() WHERE singles_id = $1 AND notebook_id = $2`,
+    [sid, notebookId]
+  );
+}
+
+async function liveNotebooks(db) {
+  return db.all(
+    `SELECT notebook_id, notebook_name FROM ${T.notebooks} WHERE singles_id = $1 AND deleted_at IS NULL`,
+    [db.singlesId]
+  );
 }
 
 /**
  * Soft-delete legacy registration default "Notebook 1" / "NOTEBOOK 1" (+ its notes).
  * Does not touch SAMPLE NOTEBOOK / SAMPLE NOTEBOOK 1.
- * @returns {number} notebooks removed
+ * @returns {Promise<number>} notebooks removed
  */
-export function purgeLegacyDefaultNotebook1(db) {
-  const rows = queryAll(
-    db,
-    `SELECT notebook_id, notebook_name FROM notebooks WHERE deleted_at IS NULL`
-  );
+export async function purgeLegacyDefaultNotebook1(db) {
   let removed = 0;
-  for (const row of rows) {
-    if (!isLegacyDefaultNotebook1Name(row.notebook_name)) continue;
+  for (const row of await liveNotebooks(db)) {
+    if (upperName(row.notebook_name) !== 'NOTEBOOK 1') continue;
     const notebookId = Number(row.notebook_id);
-    const notes = queryAll(
-      db,
-      `SELECT note_id FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
-      [notebookId]
+    const notes = await db.all(
+      `SELECT note_id FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [db.singlesId, notebookId]
     );
-    for (const note of notes) {
-      db.run(
-        `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
-        [note.note_id]
-      );
-      db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [note.note_id]);
-      db.run(
-        `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE note_id = ?`,
-        [note.note_id]
-      );
-    }
-    db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
-    db.run(
-      `UPDATE notebooks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE notebook_id = ?`,
-      [notebookId]
-    );
+    for (const note of notes) await softDeleteNoteRows(db, note.note_id);
+    await softDeleteNotebookRow(db, notebookId);
     removed += 1;
   }
   return removed;
@@ -311,78 +261,43 @@ export function purgeLegacyDefaultNotebook1(db) {
 
 /**
  * Soft-delete legacy v2 sample set (SAMPLE NOTEBOOK 1 + SAMPLE NOTE1/2) when upgrading to v3.
- * @returns {number} notebooks removed
+ * @returns {Promise<number>} notebooks removed
  */
-export function purgeLegacyV2SampleSet(db) {
-  const rows = queryAll(
-    db,
-    `SELECT notebook_id, notebook_name FROM notebooks WHERE deleted_at IS NULL`
-  );
+export async function purgeLegacyV2SampleSet(db) {
   let removed = 0;
-  for (const row of rows) {
-    const nbName = String(row.notebook_name || '')
-      .trim()
-      .toUpperCase();
-    if (!LEGACY_V2_NOTEBOOK_NAMES.has(nbName)) continue;
+  for (const row of await liveNotebooks(db)) {
+    if (!LEGACY_V2_NOTEBOOK_NAMES.has(upperName(row.notebook_name))) continue;
     const notebookId = Number(row.notebook_id);
-    const notes = queryAll(
-      db,
-      `SELECT note_id, note_name, body_text FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
-      [notebookId]
+    const notes = await db.all(
+      `SELECT note_id, note_name, body_text FROM ${T.notes}
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [db.singlesId, notebookId]
     );
     if (!notes.length) continue;
-    const allLegacyNotes = notes.every((n) => {
-      const name = String(n.note_name || '')
-        .trim()
-        .toUpperCase();
-      return LEGACY_V2_NOTE_NAMES.has(name) || String(n.body_text || '').includes(GARBAGE_V2_MARKER);
-    });
-    if (!allLegacyNotes) continue;
-    for (const note of notes) {
-      db.run(
-        `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
-        [note.note_id]
-      );
-      db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [note.note_id]);
-      db.run(
-        `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE note_id = ?`,
-        [note.note_id]
-      );
-    }
-    db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
-    db.run(
-      `UPDATE notebooks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE notebook_id = ?`,
-      [notebookId]
+    const allLegacyNotes = notes.every(
+      (n) => LEGACY_V2_NOTE_NAMES.has(upperName(n.note_name)) || String(n.body_text || '').includes(GARBAGE_V2_MARKER)
     );
+    if (!allLegacyNotes) continue;
+    for (const note of notes) await softDeleteNoteRows(db, note.note_id);
+    await softDeleteNotebookRow(db, notebookId);
     removed += 1;
   }
   return removed;
 }
 
 /** Soft-delete live notes stuck on a deleted notebook (legacy v2 purge leftovers). */
-function purgeOrphanedLegacySampleNotes(db) {
-  const rows = queryAll(
-    db,
-    `SELECT n.note_id, n.note_name, n.notebook_id
-     FROM notes n
-     INNER JOIN notebooks nb ON nb.notebook_id = n.notebook_id
-     WHERE n.deleted_at IS NULL AND nb.deleted_at IS NOT NULL`
+async function purgeOrphanedLegacySampleNotes(db) {
+  const rows = await db.all(
+    `SELECT n.note_id, n.note_name
+       FROM ${T.notes} n
+       JOIN ${T.notebooks} nb ON nb.singles_id = n.singles_id AND nb.notebook_id = n.notebook_id
+      WHERE n.singles_id = $1 AND n.deleted_at IS NULL AND nb.deleted_at IS NOT NULL`,
+    [db.singlesId]
   );
   let removed = 0;
   for (const row of rows) {
-    const name = String(row.note_name || '')
-      .trim()
-      .toUpperCase();
-    if (!LEGACY_V2_NOTE_NAMES.has(name)) continue;
-    db.run(
-      `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
-      [row.note_id]
-    );
-    db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [row.note_id]);
-    db.run(
-      `UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE note_id = ?`,
-      [row.note_id]
-    );
+    if (!LEGACY_V2_NOTE_NAMES.has(upperName(row.note_name))) continue;
+    await softDeleteNoteRows(db, row.note_id);
     removed += 1;
   }
   return removed;
@@ -390,67 +305,47 @@ function purgeOrphanedLegacySampleNotes(db) {
 
 /**
  * Soft-delete prior garbage v1 placeholder SAMPLE NOTE1/2 (+ empty sample notebook).
- * @returns {number} notes removed
+ * @returns {Promise<number>} notes removed
  */
-export function purgeGarbageRecordVaultV1SampleNotes(db) {
-  ensureRecordVaultSharedContentKeyColumn(db);
-  const rows = queryAll(
-    db,
-    `SELECT note_id, notebook_id, note_name, body_text FROM notes WHERE deleted_at IS NULL`
+export async function purgeGarbageRecordVaultV1SampleNotes(db) {
+  const sid = db.singlesId;
+  const rows = await db.all(
+    `SELECT note_id, notebook_id, note_name, body_text FROM ${T.notes} WHERE singles_id = $1 AND deleted_at IS NULL`,
+    [sid]
   );
   let removed = 0;
   const touchedNotebooks = new Set();
   for (const row of rows) {
-    const name = String(row.note_name || '')
-      .trim()
-      .toUpperCase();
+    const name = upperName(row.note_name);
+    const hasMarker = String(row.body_text || '').includes(GARBAGE_V1_MARKER);
     const isSampleName = name === 'SAMPLE NOTE1' || name === 'SAMPLE NOTE2';
-    if (!isSampleName && !String(row.body_text || '').includes(GARBAGE_V1_MARKER)) continue;
-    if (!noteLooksLikeGarbageV1(db, row) && !String(row.body_text || '').includes(GARBAGE_V1_MARKER)) {
-      continue;
-    }
-    db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`, [
-      row.note_id
-    ]);
-    db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [row.note_id]);
-    db.run(`UPDATE notes SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE note_id = ?`, [
-      row.note_id
-    ]);
+    if (!isSampleName && !hasMarker) continue;
+    if (!hasMarker && !(await noteLooksLikeGarbageV1(db, row))) continue;
+    await softDeleteNoteRows(db, row.note_id);
     touchedNotebooks.add(Number(row.notebook_id));
     removed += 1;
   }
 
   for (const notebookId of touchedNotebooks) {
-    const left = queryOne(
-      db,
-      `SELECT COUNT(*) AS c FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
-      [notebookId]
+    const left = await db.one(
+      `SELECT COUNT(*)::int AS c FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [sid, notebookId]
     );
     if (Number(left?.c || 0) > 0) continue;
-    const nb = queryOne(
-      db,
-      `SELECT notebook_name FROM notebooks WHERE notebook_id = ? AND deleted_at IS NULL`,
-      [notebookId]
+    const nb = await db.one(
+      `SELECT notebook_name FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [sid, notebookId]
     );
-    const nbName = String(nb?.notebook_name || '')
-      .trim()
-      .toUpperCase();
+    const nbName = upperName(nb?.notebook_name);
     if (nbName === 'SAMPLE NOTEBOOK' || nbName === 'SAMPLE NOTEBOOK 1') {
-      db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
-      db.run(
-        `UPDATE notebooks SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE notebook_id = ?`,
-        [notebookId]
-      );
+      await softDeleteNotebookRow(db, notebookId);
     }
   }
   return removed;
 }
 
-/**
- * Point existing dm1-checksum attachments at shared_content_key (no byte copy).
- */
-function relinkCanonicalAttachmentsToSharedKeys(db) {
-  ensureRecordVaultSharedContentKeyColumn(db);
+/** Point existing dm1-checksum attachments at shared_content_key (no byte copy). */
+async function relinkCanonicalAttachmentsToSharedKeys(db) {
   const byChecksum = new Map();
   for (const att of listRecordVaultSampleAttachmentDefs()) {
     const sum = String(att.checksum || '')
@@ -459,22 +354,24 @@ function relinkCanonicalAttachmentsToSharedKeys(db) {
     if (sum) byChecksum.set(sum, String(att.sharedKey || '').trim());
   }
   if (!byChecksum.size) return 0;
-  const rows = queryAll(
-    db,
-    `SELECT attachment_id, checksum, shared_content_key FROM note_attachments WHERE deleted_at IS NULL`
+  const rows = await db.all(
+    `SELECT attachment_id, checksum, shared_content_key FROM ${T.attachments}
+      WHERE singles_id = $1 AND deleted_at IS NULL`,
+    [db.singlesId]
   );
   let updated = 0;
   for (const row of rows) {
-    const sum = String(row.checksum || '')
-      .trim()
-      .toLowerCase();
-    const key = byChecksum.get(sum);
+    const key = byChecksum.get(
+      String(row.checksum || '')
+        .trim()
+        .toLowerCase()
+    );
     if (!key) continue;
     if (String(row.shared_content_key || '').trim() === key) continue;
-    db.run(`UPDATE note_attachments SET shared_content_key = ? WHERE attachment_id = ?`, [
-      key,
-      row.attachment_id
-    ]);
+    await db.run(
+      `UPDATE ${T.attachments} SET shared_content_key = $3 WHERE singles_id = $1 AND attachment_id = $2`,
+      [db.singlesId, row.attachment_id, key]
+    );
     updated += 1;
   }
   return updated;
@@ -488,9 +385,7 @@ function isBundledDefaultSampleNoteRow(row, noteDef) {
   if (body.includes('rv-new-member-sample-v4')) return true;
   if (body.includes('rv-new-member-sample-v5')) return true;
   if (noteKey && body.includes(`note=${noteKey}`)) return true;
-  const name = String(noteDef?.noteName || '')
-    .trim()
-    .toUpperCase();
+  const name = upperName(noteDef?.noteName);
   if (name === 'SAMPLE RECEIPTS') {
     return (
       body.includes('search for') ||
@@ -509,121 +404,119 @@ function isBundledDefaultSampleNoteRow(row, noteDef) {
 /**
  * Refresh bundled default sample note bodies + search_text from manifest HTML
  * (e.g. receipt label copy fixes) without touching member-edited notes.
- * @returns {number} notes updated
+ * @returns {Promise<number>} notes updated
  */
-function upgradeCanonicalSampleNoteBodies(db) {
+async function upgradeCanonicalSampleNoteBodies(db) {
   let updated = 0;
   for (const noteDef of listRecordVaultSampleNoteDefs()) {
-    const row = findLiveNoteByName(db, noteDef.noteName);
+    const row = await findLiveNoteByName(db, noteDef.noteName);
     if (!row || !isBundledDefaultSampleNoteRow(row, noteDef)) continue;
     const canonicalBody = loadRecordVaultSampleNoteBodyHtml(noteDef.bodyHtmlFile);
     if (!canonicalBody || canonicalBody === String(row.body_text || '')) continue;
-    const attachments = queryAll(
-      db,
-      `SELECT file_name FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL ORDER BY display_order`,
-      [row.note_id]
+    const attachments = await db.all(
+      `SELECT file_name FROM ${T.attachments}
+        WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL ORDER BY display_order`,
+      [db.singlesId, row.note_id]
     );
     const searchText = buildSearchText(
       noteDef.noteName,
       canonicalBody,
       attachments.map((a) => ({ fileName: a.file_name }))
     );
-    db.run(
-      `UPDATE notes SET body_text = ?, search_text = ?, updated_at = datetime('now') WHERE note_id = ?`,
-      [canonicalBody, searchText, row.note_id]
+    await db.run(
+      `UPDATE ${T.notes} SET body_text = $3, search_text = $4, updated_at = NOW()
+        WHERE singles_id = $1 AND note_id = $2`,
+      [db.singlesId, row.note_id, canonicalBody, searchText]
     );
     updated += 1;
   }
   return updated;
 }
 
-function insertSampleAttachments(db, { notebookId, noteId, attachments, startAttachmentId }) {
-  ensureRecordVaultSharedContentKeyColumn(db);
-  let nextId = Number(startAttachmentId) || 1;
-  const maxRow = queryOne(db, `SELECT COALESCE(MAX(attachment_id), 0) AS m FROM note_attachments`);
-  nextId = Math.max(nextId, Number(maxRow?.m || 0) + 1);
-
-  (attachments || []).forEach((att, index) => {
+/** Inside db.tx(). Keeps the manifest attachment id when it is free for this member. */
+async function insertSampleAttachments(tx, { notebookId, noteId, attachments }) {
+  for (const [index, att] of (attachments || []).entries()) {
     const preferredId = Number(att.attachmentId);
     const preferredFree =
       Number.isFinite(preferredId) &&
       preferredId >= 1 &&
-      !queryOne(db, `SELECT attachment_id FROM note_attachments WHERE attachment_id = ?`, [
+      !(await tx.one(`SELECT 1 AS ok FROM ${T.attachments} WHERE singles_id = $1 AND attachment_id = $2`, [
+        tx.singlesId,
         preferredId
-      ]);
-    let attachmentId;
-    if (preferredFree) {
-      attachmentId = preferredId;
-    } else {
-      attachmentId = nextId;
-      nextId += 1;
-    }
-    if (attachmentId >= nextId) nextId = attachmentId + 1;
-
+      ]));
+    const attachmentId = preferredFree ? preferredId : await tx.nextId('attachments');
     const ext = String(att.fileExtension || 'bin').replace(/^\./, '').toLowerCase();
-    const relativePath = fileRelativePath(notebookId, noteId, attachmentId, ext);
-    const sharedKey = String(att.sharedKey || '').trim() || null;
-    db.run(
-      `INSERT INTO note_attachments (
-         attachment_id, note_id, file_name, file_extension, relative_path,
+    await tx.run(
+      `INSERT INTO ${T.attachments} (
+         singles_id, attachment_id, note_id, file_name, file_extension, relative_path,
          file_size_bytes, checksum, mime_type, display_order, shared_content_key
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
+        tx.singlesId,
         attachmentId,
         noteId,
         att.fileName,
         ext,
-        relativePath,
+        fileRelativePath(notebookId, noteId, attachmentId, ext),
         Number(att.fileSizeBytes) || 0,
         att.checksum || null,
         att.mimeType || null,
         index,
-        sharedKey
+        String(att.sharedKey || '').trim() || null
       ]
     );
-  });
-  return nextId;
+  }
 }
 
-function insertSampleNote(db, { notebookId, noteDef, nextAttachmentId }) {
+/** Inside db.tx(). */
+async function insertSampleNote(tx, { notebookId, noteDef }) {
   const bodyHtml = loadRecordVaultSampleNoteBodyHtml(noteDef.bodyHtmlFile);
   const attachments = Array.isArray(noteDef.attachments) ? noteDef.attachments : [];
   const noteName = String(noteDef.noteName || 'SAMPLE NOTE').trim() || 'SAMPLE NOTE';
-  const searchText = buildSearchText(noteName, bodyHtml, attachments);
-  db.run(
-    `INSERT INTO notes (notebook_id, note_name, body_text, display_order, search_text)
-     VALUES (?, ?, ?, ?, ?)`,
-    [notebookId, noteName, bodyHtml, Number(noteDef.displayOrder) || 0, searchText]
+  const noteId = await tx.nextId('notes');
+  await tx.run(
+    `INSERT INTO ${T.notes} (singles_id, note_id, notebook_id, note_name, body_text, display_order, search_text)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      tx.singlesId,
+      noteId,
+      notebookId,
+      noteName,
+      bodyHtml,
+      Number(noteDef.displayOrder) || 0,
+      buildSearchText(noteName, bodyHtml, attachments)
+    ]
   );
-  const noteId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
-  const afterId = insertSampleAttachments(db, {
-    notebookId,
-    noteId,
-    attachments,
-    startAttachmentId: nextAttachmentId
-  });
+  await insertSampleAttachments(tx, { notebookId, noteId, attachments });
   if (noteDef.shortcut) {
-    const orderRow = queryOne(db, `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM shortcuts`);
-    db.run(
-      `INSERT INTO shortcuts (target_type, notebook_id, note_id, display_order) VALUES (?, ?, ?, ?)`,
-      ['note', notebookId, noteId, Number(orderRow?.next_order ?? 0)]
+    const orderRow = await tx.one(
+      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM ${T.shortcuts} WHERE singles_id = $1`,
+      [tx.singlesId]
+    );
+    const shortcutId = await tx.nextId('shortcuts');
+    await tx.run(
+      `INSERT INTO ${T.shortcuts} (singles_id, shortcut_id, target_type, notebook_id, note_id, display_order)
+       VALUES ($1, $2, 'note', $3, $4, $5)`,
+      [tx.singlesId, shortcutId, notebookId, noteId, Number(orderRow?.next_order ?? 0)]
     );
   }
-  return { noteId, nextAttachmentId: afterId };
+  return noteId;
 }
 
-function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
-  ensureRecordVaultSharedContentKeyColumn(db);
+/** Inside db.tx(). */
+async function seedSampleNotebooksIntoDb(tx, { onlyWhenEmpty = false } = {}) {
+  const sid = tx.singlesId;
   if (onlyWhenEmpty) {
-    const countRow = queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`);
+    const countRow = await tx.one(
+      `SELECT COUNT(*)::int AS c FROM ${T.notebooks} WHERE singles_id = $1 AND deleted_at IS NULL`,
+      [sid]
+    );
     if (Number(countRow?.c ?? 0) > 0) return false;
   }
   // Never recreate sample notebooks/notes the member already soft-deleted.
-  if (userRemovedNewMemberSample(db)) return false;
+  if (await userRemovedNewMemberSample(tx)) return false;
 
   const manifest = loadRecordVaultNewMemberSampleManifest();
-  let nextAttachmentId =
-    Number(queryOne(db, `SELECT COALESCE(MAX(attachment_id), 0) AS m FROM note_attachments`)?.m || 0) + 1;
   let insertedAny = false;
 
   for (const nbDef of listRecordVaultSampleNotebooks(manifest)) {
@@ -631,26 +524,26 @@ function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
     if (!notebookName) continue;
 
     // Soft-deleted SAMPLE notebook = user removed it; do not insert a new one.
-    if (findSoftDeletedNotebookByName(db, notebookName)) continue;
+    if (await findSoftDeletedNotebookByName(tx, notebookName)) continue;
 
-    let notebookRow = queryOne(
-      db,
-      `SELECT notebook_id FROM notebooks
-       WHERE deleted_at IS NULL AND upper(trim(notebook_name)) = upper(trim(?))
-       ORDER BY notebook_id ASC LIMIT 1`,
-      [notebookName]
+    const notebookRow = await tx.one(
+      `SELECT notebook_id FROM ${T.notebooks}
+        WHERE singles_id = $1 AND deleted_at IS NULL AND upper(trim(notebook_name)) = $2
+        ORDER BY notebook_id ASC LIMIT 1`,
+      [sid, upperName(notebookName)]
     );
     let notebookId = notebookRow ? Number(notebookRow.notebook_id) : null;
     if (!notebookId) {
-      const orderRow = queryOne(
-        db,
-        `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM notebooks WHERE deleted_at IS NULL`
+      const orderRow = await tx.one(
+        `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order
+           FROM ${T.notebooks} WHERE singles_id = $1 AND deleted_at IS NULL`,
+        [sid]
       );
-      db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [
-        notebookName,
-        Number(nbDef.displayOrder ?? orderRow?.next_order ?? 0)
-      ]);
-      notebookId = Number(queryOne(db, `SELECT last_insert_rowid() AS id`).id);
+      notebookId = await tx.nextId('notebooks');
+      await tx.run(
+        `INSERT INTO ${T.notebooks} (singles_id, notebook_id, notebook_name, display_order) VALUES ($1, $2, $3, $4)`,
+        [sid, notebookId, notebookName, Number(nbDef.displayOrder ?? orderRow?.next_order ?? 0)]
+      );
       insertedAny = true;
     }
 
@@ -658,91 +551,69 @@ function seedSampleNotebooksIntoDb(db, { onlyWhenEmpty = false } = {}) {
       const noteName = String(noteDef.noteName || '').trim();
       if (!noteName) continue;
       // Soft-deleted sample note = user removed it; do not recreate.
-      if (findSoftDeletedNoteByName(db, noteName)) continue;
-      const existing = findLiveNoteByName(db, noteName);
+      if (await findSoftDeletedNoteByName(tx, noteName)) continue;
+      const existing = await findLiveNoteByName(tx, noteName);
       if (existing) {
-        if (noteLooksLikeGarbageV1(db, existing)) {
-          db.run(
-            `UPDATE note_attachments SET deleted_at = datetime('now') WHERE note_id = ? AND deleted_at IS NULL`,
-            [existing.note_id]
-          );
-          db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [existing.note_id]);
-          db.run(`UPDATE notes SET deleted_at = datetime('now') WHERE note_id = ?`, [existing.note_id]);
-        } else {
-          continue;
-        }
+        if (!(await noteLooksLikeGarbageV1(tx, existing))) continue;
+        await softDeleteNoteRows(tx, existing.note_id);
       }
-      const result = insertSampleNote(db, { notebookId, noteDef, nextAttachmentId });
-      nextAttachmentId = result.nextAttachmentId;
+      await insertSampleNote(tx, { notebookId, noteDef });
       insertedAny = true;
     }
   }
-  relinkCanonicalAttachmentsToSharedKeys(db);
+  await relinkCanonicalAttachmentsToSharedKeys(tx);
   return insertedAny;
 }
 
 /**
  * Fresh empty vault: SAMPLE MISC + SAMPLE TAX RECORDS and four sample notes (shared attachment pointers).
- * @returns {boolean} true when seed rows were inserted
+ * @param {import('../recordVaultUsb/vaultPgStore.js').VaultPgDb} db
+ * @returns {Promise<boolean>} true when seed rows were inserted
  */
-export function seedRecordVaultNewMemberSampleDb(db) {
-  return seedSampleNotebooksIntoDb(db, { onlyWhenEmpty: true });
+export async function seedRecordVaultNewMemberSampleDb(db) {
+  return db.tx((tx) => seedSampleNotebooksIntoDb(tx, { onlyWhenEmpty: true }));
 }
 
 /**
  * Existing vaults: purge garbage v1 placeholders / legacy sets.
  * Registration SAMPLE MISC + SAMPLE TAX RECORDS are seeded once (empty vault only).
  * Soft-deleted or previously seeded (meta / hard-deleted) samples are never recreated.
+ * @param {import('../recordVaultUsb/vaultPgStore.js').VaultPgDb} db
  * @param {{ allowSeed?: boolean }} [options] allowSeed=false when vault.meta already marked seeded
- * @returns {'inserted'|'present'|'upgraded'|'skipped'}
+ * @returns {Promise<'inserted'|'present'|'upgraded'|'skipped'>}
  */
-export function ensureRecordVaultNewMemberSampleDb(db, { allowSeed = true } = {}) {
-  ensureRecordVaultSharedContentKeyColumn(db);
-  const purgedLegacyNb1 = purgeLegacyDefaultNotebook1(db);
-  const purgedV2 = purgeLegacyV2SampleSet(db);
-  const purgedOrphans = purgeOrphanedLegacySampleNotes(db);
-  const purged = purgeGarbageRecordVaultV1SampleNotes(db);
-  const revived = reviveSoftDeletedCanonicalSampleNotes(db);
-  const relinked = relinkCanonicalAttachmentsToSharedKeys(db);
-  const bodiesSynced = upgradeCanonicalSampleNoteBodies(db);
-  const changedMeta =
-    purgedLegacyNb1 > 0 ||
-    purgedV2 > 0 ||
-    purgedOrphans > 0 ||
-    purged > 0 ||
-    revived > 0 ||
-    relinked > 0 ||
-    bodiesSynced > 0;
+export async function ensureRecordVaultNewMemberSampleDb(db, { allowSeed = true } = {}) {
+  return db.tx(async (tx) => {
+    const purgedLegacyNb1 = await purgeLegacyDefaultNotebook1(tx);
+    const purgedV2 = await purgeLegacyV2SampleSet(tx);
+    const purgedOrphans = await purgeOrphanedLegacySampleNotes(tx);
+    const purged = await purgeGarbageRecordVaultV1SampleNotes(tx);
+    const relinked = await relinkCanonicalAttachmentsToSharedKeys(tx);
+    const bodiesSynced = await upgradeCanonicalSampleNoteBodies(tx);
+    const purgedAny = purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0;
+    const changedMeta = purgedAny || relinked > 0 || bodiesSynced > 0;
+    const unchanged = changedMeta ? 'upgraded' : 'present';
 
-  if (vaultAlreadyHasNewMemberSample(db)) {
-    return changedMeta ? 'upgraded' : 'present';
-  }
+    if (await vaultAlreadyHasNewMemberSample(tx)) return unchanged;
+    // Member already deleted the registration samples — leave them gone.
+    if (await userRemovedNewMemberSample(tx)) return unchanged;
+    // Meta stamp / prior seed — do not recreate after hard delete.
+    if (!allowSeed) return unchanged;
 
-  // Member already deleted the registration samples — leave them gone.
-  if (userRemovedNewMemberSample(db)) {
-    return changedMeta ? 'upgraded' : 'present';
-  }
-
-  // Meta stamp / prior seed — do not recreate after hard delete.
-  if (!allowSeed) {
-    return changedMeta ? 'upgraded' : 'present';
-  }
-
-  const notebookCount = Number(
-    queryOne(db, `SELECT COUNT(*) AS c FROM notebooks WHERE deleted_at IS NULL`)?.c ?? 0
-  );
-  // Seed only into a truly empty vault (first open / new registration).
-  if (notebookCount === 0) {
-    const seeded = seedRecordVaultNewMemberSampleDb(db);
+    const notebookCount = Number(
+      (
+        await tx.one(
+          `SELECT COUNT(*)::int AS c FROM ${T.notebooks} WHERE singles_id = $1 AND deleted_at IS NULL`,
+          [tx.singlesId]
+        )
+      )?.c ?? 0
+    );
+    // Seed only into a truly empty vault (first open / new registration).
+    if (notebookCount !== 0) return unchanged;
+    const seeded = await seedSampleNotebooksIntoDb(tx, { onlyWhenEmpty: true });
     if (!seeded) return changedMeta ? 'upgraded' : 'skipped';
-    return purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0 ? 'upgraded' : 'inserted';
-  }
-
-  return changedMeta ? 'upgraded' : 'present';
-}
-
-export async function seedRecordVaultNewMemberSampleMedia(args) {
-  return linkRecordVaultSharedSamplesIntoVault(args);
+    return purgedAny ? 'upgraded' : 'inserted';
+  });
 }
 
 export { canonicalChecksumSet };

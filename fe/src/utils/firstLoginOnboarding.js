@@ -17,7 +17,7 @@ import { isSinglesStatusNew } from 'utils/singlesStatus';
 const MY_STORY_PATH = '/myStory';
 const CONGRATS_PENDING_KEY = 'firstLoginOnboardingCongratsPending';
 
-/** TutaNotes / TutaPhotos — never gated by dating profile photo, nickname, or secret icon. */
+/** TutaNotes / TutaPhotos — never gated by dating profile photo or nickname. */
 export function isMallNotesOrPhotosPath(pathname) {
   const p = String(pathname ?? '');
   if (p === MY_PHOTO_ALBUMS_PATH || p.startsWith(`${MY_PHOTO_ALBUMS_PATH}/`)) return true;
@@ -52,10 +52,6 @@ export function hasAliasNickname(user) {
   return Boolean(String(user?.alias ?? '').trim());
 }
 
-export function hasSecretIconSet(user) {
-  return user?.has_secret_icon === true || user?.has_secret_icon === 'true';
-}
-
 /**
  * singles.id_initialization_completed from /api/me, login, or /api/me/session-status.
  * @returns {boolean | null} null when the session payload has not loaded the flag yet.
@@ -67,7 +63,7 @@ export function getIdInitializationCompleted(user) {
 }
 
 /**
- * @returns {'profile_photo' | 'gender' | 'alias_secret' | 'id_verification' | 'done'}
+ * @returns {'profile_photo' | 'gender' | 'alias' | 'id_verification' | 'done'}
  */
 export function getFirstLoginOnboardingPhase(user) {
   if (isFirstLoginOnboardingExempt(user)) return 'done';
@@ -75,7 +71,7 @@ export function getFirstLoginOnboardingPhase(user) {
   if (idInitializationCompleted === true) return 'done';
   if (!hasProfilePhotoFk(user)) return 'profile_photo';
   if (!hasGenderSelfReport(user)) return 'gender';
-  if (!hasAliasNickname(user) || !hasSecretIconSet(user)) return 'alias_secret';
+  if (!hasAliasNickname(user)) return 'alias';
   if (idInitializationCompleted === false) return 'id_verification';
   if (isSinglesStatusNew(user?.status) || isOver18VerificationPending(user?.over_18_verified)) {
     return 'id_verification';
@@ -90,7 +86,7 @@ export function isIdInitializationIncomplete(user) {
 
 export function needsMyStoryFirstLoginSetup(user) {
   const phase = getFirstLoginOnboardingPhase(user);
-  return phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret';
+  return phase === 'profile_photo' || phase === 'gender' || phase === 'alias';
 }
 
 export function needsIdentificationVerificationFirstLogin(user) {
@@ -100,7 +96,7 @@ export function needsIdentificationVerificationFirstLogin(user) {
 /** Until ID initialization completes, only the current onboarding page is reachable (no /mall, Notes, Photos). */
 export function isPathAllowedDuringFirstLoginPhase(pathname, phase) {
   const path = String(pathname ?? '');
-  if (phase === 'profile_photo' || phase === 'gender' || phase === 'alias_secret') {
+  if (phase === 'profile_photo' || phase === 'gender' || phase === 'alias') {
     return path === MY_STORY_PATH;
   }
   if (phase === 'id_verification') {

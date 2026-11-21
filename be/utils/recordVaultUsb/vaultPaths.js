@@ -8,13 +8,8 @@ export const VAULT_DIR_NAME = 'TutaNotes';
 /** Older USB folder name — still opened if present; new formats use VAULT_DIR_NAME. */
 export const LEGACY_VAULT_DIR_NAMES = ['OMNotes'];
 export const VAULT_META_FILE = 'vault.meta.json';
-export const VAULT_DB_FILE_ENCRYPTED = 'vault.db.enc';
-export const VAULT_DB_FILE_PLAIN = 'vault.db';
 export const VAULT_PHOTOS_DIR = 'photos';
 export const VAULT_FILES_DIR = 'files';
-
-/** @deprecated Use getVaultDbFileName() — kept for imports that expect a string symbol. */
-export const VAULT_DB_FILE = VAULT_DB_FILE_ENCRYPTED;
 
 function readVaultMetaFromMount(mountPath) {
   try {
@@ -30,52 +25,6 @@ function readVaultMetaFromMount(mountPath) {
 export function useEncryptedVaultFilenames(meta = null) {
   if (meta && vaultMetaUsesPlaintextStorage(meta)) return false;
   return isVaultPhotoAndDbEncryptionEnabled();
-}
-
-export function getVaultDbFileName(meta = null) {
-  return useEncryptedVaultFilenames(meta) ? VAULT_DB_FILE_ENCRYPTED : VAULT_DB_FILE_PLAIN;
-}
-
-export function listVaultDbFileNames() {
-  return [VAULT_DB_FILE_ENCRYPTED, VAULT_DB_FILE_PLAIN];
-}
-
-/** Download order — prefer vault.meta.json naming (plain vs .enc) over legacy default. */
-export function listVaultDbFileNamesForRead(meta = null) {
-  const preferred = getVaultDbFileName(meta);
-  const alternate =
-    preferred === VAULT_DB_FILE_PLAIN ? VAULT_DB_FILE_ENCRYPTED : VAULT_DB_FILE_PLAIN;
-  return [preferred, alternate];
-}
-
-export function isSqliteVaultDbBuffer(buf) {
-  return Buffer.isBuffer(buf) && buf.length >= 16 && buf.slice(0, 15).toString('utf8') === 'SQLite format 3';
-}
-
-/** Header-only SQLite check — avoids reading multi‑MB vault.db into memory. */
-export function isSqliteVaultDbFile(absPath) {
-  let fd;
-  try {
-    fd = fs.openSync(absPath, 'r');
-    const buf = Buffer.alloc(16);
-    const n = fs.readSync(fd, buf, 0, 16, 0);
-    return isSqliteVaultDbBuffer(n >= 16 ? buf : buf.subarray(0, n));
-  } catch {
-    return false;
-  } finally {
-    if (fd != null) {
-      try {
-        fs.closeSync(fd);
-      } catch {
-        // ignore
-      }
-    }
-  }
-}
-
-export function isVaultDbRelativePath(relativePath) {
-  const base = path.basename(String(relativePath || ''));
-  return base === VAULT_DB_FILE_PLAIN || base === VAULT_DB_FILE_ENCRYPTED;
 }
 
 /** Atomic write — temp file + rename + fsync. */
@@ -120,30 +69,6 @@ export function vaultMetaPath(mountPath) {
   return path.join(vaultRootOnMount(mountPath), VAULT_META_FILE);
 }
 
-export function vaultDbPath(mountPath, meta = null) {
-  const resolvedMeta = meta ?? readVaultMetaFromMount(mountPath);
-  return path.join(vaultRootOnMount(mountPath), getVaultDbFileName(resolvedMeta));
-}
-
-/** Alias — vault DB path (encrypted or plain filename per env). */
-export function vaultDbEncPath(mountPath) {
-  return vaultDbPath(mountPath);
-}
-
-export function resolveVaultDbPath(mountPath) {
-  const root = vaultRootOnMount(mountPath);
-  const plain = path.join(root, VAULT_DB_FILE_PLAIN);
-  const enc = path.join(root, VAULT_DB_FILE_ENCRYPTED);
-  if (fs.existsSync(plain)) return plain;
-  if (fs.existsSync(enc)) return enc;
-  return vaultDbPath(mountPath);
-}
-
-export function vaultHasDbFile(mountPath) {
-  const root = vaultRootOnMount(mountPath);
-  return listVaultDbFileNames().some((name) => fs.existsSync(path.join(root, name)));
-}
-
 export function vaultPhotosRoot(mountPath) {
   return path.join(vaultRootOnMount(mountPath), VAULT_PHOTOS_DIR);
 }
@@ -172,13 +97,16 @@ export function vaultFileStoragePath(mountPath, relativePath, meta = null) {
   return path.join(vaultFilesRoot(mountPath), vaultFileStorageRelativePath(relativePath, resolvedMeta));
 }
 
-/** Read path — prefers current env naming, falls back to legacy .enc (or plain) on disk. */
+/**
+ * Read path — prefer *.enc when present.
+ * Plain sample-album symlinks must not win over a sealed sibling (decrypt would auth-fail).
+ */
 export function resolveVaultPhotoStoragePath(mountPath, relativePath) {
   const rel = String(relativePath || '').replace(/^\/+/, '');
   const plain = path.join(vaultPhotosRoot(mountPath), rel);
   const enc = path.join(vaultPhotosRoot(mountPath), `${rel}.enc`);
-  if (fs.existsSync(plain)) return plain;
   if (fs.existsSync(enc)) return enc;
+  if (fs.existsSync(plain)) return plain;
   return vaultPhotoStoragePath(mountPath, rel);
 }
 
@@ -186,8 +114,8 @@ export function resolveVaultFileStoragePath(mountPath, relativePath) {
   const rel = String(relativePath || '').replace(/^\/+/, '');
   const plain = path.join(vaultFilesRoot(mountPath), rel);
   const enc = path.join(vaultFilesRoot(mountPath), `${rel}.enc`);
-  if (fs.existsSync(plain)) return plain;
   if (fs.existsSync(enc)) return enc;
+  if (fs.existsSync(plain)) return plain;
   return vaultFileStoragePath(mountPath, rel);
 }
 
@@ -214,10 +142,13 @@ export function extraPhotoRelativePath(notebookId, noteId, imageId, ext = 'jpg')
   return `${notebookId}/${noteId}_e${imageId}.${cleanExt}`;
 }
 
-/** Relative path inside files/: {notebookId}/{noteId}/att_{attachmentId}.{ext} */
+/**
+ * Relative path inside files/: {notebookId}/{noteId}/{attachmentId}.{ext}
+ * (legacy rows may still use att_{id}.{ext} — relative_path in DB is source of truth).
+ */
 export function fileRelativePath(notebookId, noteId, attachmentId, ext = 'bin') {
   const cleanExt = String(ext || 'bin').replace(/^\./, '').toLowerCase();
-  return `${notebookId}/${noteId}/att_${attachmentId}.${cleanExt}`;
+  return `${notebookId}/${noteId}/${attachmentId}.${cleanExt}`;
 }
 
 /** Minimal TutaNotes vault layout: meta + photos/ + files/ (db checked separately). */
@@ -250,13 +181,6 @@ export function ensureVaultLayoutDirs(mountPath) {
 export function normalizeVaultStagingFilenames(mountPath) {
   const meta = readVaultMetaFromMount(mountPath);
   if (useEncryptedVaultFilenames(meta)) return;
-
-  const root = vaultRootOnMount(mountPath);
-  const encDb = path.join(root, VAULT_DB_FILE_ENCRYPTED);
-  const plainDb = path.join(root, VAULT_DB_FILE_PLAIN);
-  if (fs.existsSync(encDb) && !fs.existsSync(plainDb)) {
-    fs.renameSync(encDb, plainDb);
-  }
 
   const renameEncFilesInTree = (dir) => {
     if (!fs.existsSync(dir)) return;

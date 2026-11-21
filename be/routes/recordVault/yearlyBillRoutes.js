@@ -226,7 +226,7 @@ export async function getYearlyBill(req, res) {
       await client.query('BEGIN');
       const cloneInfo = await ensureYearCloned(client, singlesId, year, storageBackend);
       const rows = await listYearRows(client, singlesId, year, storageBackend);
-      const peer = storageBackend === 'usb' ? 'onedrive' : 'usb';
+      const peer = storageBackend === 'usb' ? 'tutaCloud' : 'usb';
       const { rows: peerCountRows } = await client.query(
         `SELECT COUNT(*)::int AS c
            FROM outdateddbsnapshotoct2024.yearly_bill

@@ -359,7 +359,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttribu
       setViewingId(attachmentId);
       setViewerLoading(true);
       try {
-        await openRecordVaultNoteAttachmentNative(noteId, attachmentId);
+        await openRecordVaultNoteAttachmentNative(noteId, attachmentId, { storageType: ctx.storageType });
         await new Promise((resolve) => setTimeout(resolve, LAUNCH_BUSY_HOLD_MS));
         return;
       } catch (err) {

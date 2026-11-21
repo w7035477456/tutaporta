@@ -111,7 +111,7 @@ npm run record-vault-bridge:desktop
 2. On **tutamall.com**, open Record Vault USB **or** Photo Albums USB and click **Connect local USB** (Chrome requires a click before it will allow the site to reach your computer).
 3. When Chrome asks, choose **Allow** for local network access.
 4. The site routes USB + vault data API calls to the bridge (`/api/recordVault/*` and `/api/photoAlbums/*`).
-5. When you pick a security icon, the **server** returns a derived key (requires login).
+5. On unlock the **server** supplies the vault key (requires login).
 6. Bridge unlocks the vault folder on your USB locally.
 
 ## Environment (optional)

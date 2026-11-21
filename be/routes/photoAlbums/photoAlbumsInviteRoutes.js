@@ -114,8 +114,8 @@ export async function listPhotoAlbumsInvites(req, res) {
     if (!Number.isFinite(noteId) || noteId < 1) {
       return res.status(400).json({ error: 'noteId is required' });
     }
-    if (storageType !== 'usb' && storageType !== 'onedrive') {
-      return res.status(400).json({ error: 'storageType must be usb or onedrive' });
+    if (storageType !== 'usb' && storageType !== 'tutaCloud') {
+      return res.status(400).json({ error: 'storageType must be usb or tutaCloud' });
     }
 
     const { rows } = await pool.query(
@@ -157,8 +157,8 @@ export async function createPhotoAlbumsInvite(req, res) {
     if (!Number.isFinite(noteId) || noteId < 1 || !Number.isFinite(notebookId) || notebookId < 1) {
       return res.status(400).json({ error: 'notebookId and noteId are required' });
     }
-    if (storageType !== 'usb' && storageType !== 'onedrive') {
-      return res.status(400).json({ error: 'storageType must be usb or onedrive' });
+    if (storageType !== 'usb' && storageType !== 'tutaCloud') {
+      return res.status(400).json({ error: 'storageType must be usb or tutaCloud' });
     }
 
     const session = await requireVaultSession(

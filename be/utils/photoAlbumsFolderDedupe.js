@@ -3,8 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { appLog } from '../logger.js';
 import {
-  VAULT_DB_FILE_ENCRYPTED,
-  VAULT_DB_FILE_PLAIN,
   VAULT_META_FILE,
   resolveVaultFileStoragePath,
   resolveVaultPhotoStoragePath,
@@ -16,8 +14,6 @@ import { PHOTO_ALBUMS_VAULT_TABLES as T } from './photoAlbumsUsb/vaultPgStore.js
 
 const PROTECTED_BASENAMES = new Set([
   VAULT_META_FILE,
-  VAULT_DB_FILE_PLAIN,
-  VAULT_DB_FILE_ENCRYPTED,
   '.DS_Store',
   'Thumbs.db',
   'desktop.ini'
@@ -165,7 +161,7 @@ async function collectReferencedAbsPaths(session) {
 
 /**
  * Size-first, then SHA-256 checksum. Keep DB-referenced files; among orphans keep oldest.
- * Never deletes vault.meta.json / vault.db.
+ * Never deletes vault.meta.json.
  *
  * Covers folders from:
  * - the unlocked session mount (USB / TutaDrive)

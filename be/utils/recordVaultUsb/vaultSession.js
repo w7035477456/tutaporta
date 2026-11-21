@@ -1,46 +1,30 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import initSqlJs from 'sql.js';
 import {
   sealVaultBuffer,
   openVaultBuffer,
   isPlaintextVaultKey,
   isVaultPhotoAndDbEncryptionEnabled
 } from './vaultCrypto.js';
-import {
-  createIconVaultKeyMaterial,
-  iconVaultKdfMetaFields,
-  listIconVaultUnlockKeys,
-  vaultMetaUsesArgon2idKdf
-} from '../recordVaultIconKeys.js';
+import { createEnvVaultKeyMaterial, listEnvVaultUnlockKeys, vaultKdfMetaFields } from '../vaultKeys.js';
 import { isVaultBackupUsbEnabled } from '../recordVaultStorageFlags.js';
 import { buildVaultFolderListing } from '../vaultFolderTreeListing.js';
+import { findSealedVaultSampleFile, sealPlaintextVaultTree } from '../vaultAtRestSeal.js';
 import { vaultMetaUsesPlaintextStorage } from '../recordVaultIconEncryption.js';
 import {
   fileRelativePath,
   extraPhotoRelativePath,
   photoRelativePath,
-  vaultDbPath,
   vaultFileStoragePath,
-  vaultFileStorageRelativePath,
   vaultFilesRoot,
   vaultMetaPath,
   vaultPhotoStoragePath,
-  vaultPhotoStorageRelativePath,
   vaultPhotosRoot,
   vaultRootOnMount,
-  getVaultDbFileName,
-  listVaultDbFileNamesForRead,
-  isSqliteVaultDbBuffer,
   atomicWriteFileSync,
-  resolveVaultDbPath,
   resolveVaultPhotoStoragePath,
-  VAULT_DB_FILE_ENCRYPTED,
   resolveVaultFileStoragePath,
-  VAULT_FILES_DIR,
-  VAULT_PHOTOS_DIR,
-  VAULT_META_FILE,
   ensureVaultLayoutDirs
 } from './vaultPaths.js';
 import { readVaultMeta, validateVaultOnMount, resolveVolumeRootMountPath } from './usbScan.js';
@@ -49,23 +33,49 @@ import {
   clearUnlockGuard,
   recordFailedUnlockAttempt
 } from './unlockGuard.js';
+import { DEFAULT_BODY_TEXT } from './vaultSchema.js';
 import {
-  DEFAULT_BODY_TEXT,
-  NOTE_EXTRA_IMAGES_MIGRATION_SQL,
-  VAULT_SCHEMA_SQL
-} from './vaultSchema.js';
-import {
-  ensureRecordVaultNewMemberSampleDb,
-  ensureRecordVaultSharedContentKeyColumn,
-  seedRecordVaultNewMemberSampleDb,
-  seedRecordVaultNewMemberSampleMedia
-} from '../recordVaultNewMemberSample/seedRecordVaultNewMemberSample.js';
+  NOTES_VAULT_TABLES as T,
+  VaultPgDb,
+  createNotesMemberVault,
+  deleteNotesMemberVault,
+  loadNotesMemberVault,
+  setNotesMemberVaultId
+} from './vaultPgStore.js';
+import { ensureRecordVaultNewMemberSampleDb } from '../recordVaultNewMemberSample/seedRecordVaultNewMemberSample.js';
 import {
   readRecordVaultSharedSampleForAttachmentRow,
   resolveRecordVaultSharedContentKey
 } from '../recordVaultNewMemberSample/sharedSampleMedia.js';
 import { applyTutaNotesTemplate } from '../recordVaultTutaNotesTemplate/applyTutaNotesTemplate.js';
 import { tutaNotesTemplateZipAvailable } from '../recordVaultTutaNotesTemplate/templatePaths.js';
+import {
+  expandRecordVaultBodyTextForSearch,
+  normalizeRecordVaultKeyword,
+  noteMatchesRecordVaultSearchTerm
+} from '../recordVaultSearch.js';
+import { requireVaultAccessSession } from '../recordVaultAccessPassword.js';
+import { mimeTypeForRecordVaultExtension } from '../recordVaultFileFormats.js';
+import {
+  registerVaultClusterUnlock,
+  clearVaultClusterUnlock,
+  getVaultClusterUnlock,
+  isVaultMountPathPresent
+} from '../recordVaultClusterSession.js';
+import { flushVaultTransferBytes } from '../vaultTransferTracking.js';
+import {
+  addVaultSessionFileCounts,
+  countVaultSessionNotebooksAndNotes,
+  resetVaultSessionFileCounts,
+  snapshotVaultSessionFileCountsToLast
+} from '../vaultSessionFileCounts.js';
+import { rvCloudWarn } from '../recordVaultCloudDebugLog.js';
+import {
+  bodyHasInlineDataImage,
+  rewriteInlineDataImages
+} from './extractInlineDataImages.js';
+import { isUnchangedNoteTextPatch } from './unchangedNoteTextPatch.js';
+import { markVaultSessionClusterState } from '../vaultClusterCoherence.js';
 
 /** vault.meta.json — samples seeded once; hard-delete must not recreate them. */
 export const NEW_MEMBER_SAMPLE_SEEDED_META_KEY = 'newMemberSampleSeeded';
@@ -74,7 +84,6 @@ function readNewMemberSampleSeededStamp(mountPath) {
   try {
     const meta = readVaultMeta(mountPath) || {};
     if (meta[NEW_MEMBER_SAMPLE_SEEDED_META_KEY]) return true;
-    // Template zip also delivered SAMPLE notebooks once.
     if (String(meta.tutaNotesTemplateVersion || '').trim()) return true;
   } catch {
     // ignore
@@ -99,91 +108,24 @@ function stampNewMemberSampleSeeded(mountPath) {
   }
 }
 
+
+const VAULT_KEY_MISMATCH = 'VAULT_KEY_MISMATCH';
+
 /** Prefix for FE inner-layer ciphertext stored in notes.body_text (Argon2id + AES-256-GCM). */
 export const NOTE_INNER_ENCRYPT_BODY_PREFIX = '\u2063RVI';
-
-function noteColumnExists(db, columnName) {
-  const rows = queryAll(db, `PRAGMA table_info(notes)`);
-  return rows.some((row) => String(row.name || row.Name || '') === columnName);
-}
-
-function ensureNoteInnerEncryptColumns(db) {
-  let changed = false;
-  if (!noteColumnExists(db, 'inner_encrypt_enabled')) {
-    db.run(`ALTER TABLE notes ADD COLUMN inner_encrypt_enabled INTEGER NOT NULL DEFAULT 0`);
-    changed = true;
-  }
-  if (!noteColumnExists(db, 'inner_pin_salt')) {
-    db.run(`ALTER TABLE notes ADD COLUMN inner_pin_salt TEXT`);
-    changed = true;
-  }
-  if (!noteColumnExists(db, 'inner_unlock_locked_until')) {
-    db.run(`ALTER TABLE notes ADD COLUMN inner_unlock_locked_until TEXT`);
-    changed = true;
-  }
-  return changed;
-}
-import {
-  expandRecordVaultBodyTextForSearch,
-  normalizeRecordVaultKeyword,
-  noteMatchesRecordVaultSearchTerm
-} from '../recordVaultSearch.js';
-import { requireVaultAccessSession } from '../recordVaultAccessPassword.js';
-import { mimeTypeForRecordVaultExtension } from '../recordVaultFileFormats.js';
-import {
-  registerVaultClusterUnlock,
-  clearVaultClusterUnlock,
-  getVaultClusterUnlock,
-  isVaultMountPathPresent
-} from '../recordVaultClusterSession.js';
-import { readRecordVaultCacheIcon } from '../recordVaultCacheIcon.js';
-import { flushVaultTransferBytes } from '../vaultTransferTracking.js';
-import {
-  addVaultSessionFileCounts,
-  countVaultSessionNotebooksAndNotes,
-  resetVaultSessionFileCounts,
-  snapshotVaultSessionFileCountsToLast
-} from '../vaultSessionFileCounts.js';
-import { rvCloudWarn } from '../recordVaultCloudDebugLog.js';
-import { isUnchangedNoteTextPatch } from './unchangedNoteTextPatch.js';
-import {
-  VAULT_PRODUCT_RECORD_VAULT,
-  closeVaultDbLater,
-  commitVaultSessionWithClusterLock,
-  isVaultClusterCoherenceEnabled,
-  isVaultClusterLockHeld,
-  markVaultSessionClusterState,
-  scheduleVaultSessionClusterCommit
-} from '../vaultClusterCoherence.js';
-
-const VAULT_PRODUCT = VAULT_PRODUCT_RECORD_VAULT;
-
-let sqlJsPromise = null;
-
-function getSqlJs() {
-  if (!sqlJsPromise) {
-    sqlJsPromise = initSqlJs();
-  }
-  return sqlJsPromise;
-}
 
 /** @type {Map<string, VaultSession>} */
 const sessionsByKey = new Map();
 
 export const RECORD_VAULT_STORAGE_HEADER = 'x-record-vault-storage';
 
-export function normalizeVaultStorageType(raw, fallback = 'usb') {
-  const value = String(raw ?? fallback).trim().toLowerCase();
-  if (
-    value === 'onedrive' ||
-    value === 'tutadrive' ||
-    value === 'tutacloud' ||
-    value === 'cloud'
-  ) {
-    return 'onedrive';
-  }
-  return 'usb';
-}
+export {
+  VAULT_CLOUD_STORAGE_TYPE,
+  VAULT_USB_STORAGE_TYPE,
+  normalizeVaultStorageType,
+  isVaultCloudStorageType
+} from '../vaultStorageType.js';
+import { normalizeVaultStorageType } from '../vaultStorageType.js';
 
 function vaultSessionKey(singlesId, storageType = 'usb') {
   return `${Number(singlesId)}:${normalizeVaultStorageType(storageType)}`;
@@ -196,6 +138,11 @@ export function readRequestedVaultStorageType(req) {
   return raw ? normalizeVaultStorageType(raw) : null;
 }
 
+/**
+ * One unlocked vault on this worker. The notes index lives in Postgres (session.db is a
+ * VaultPgDb scoped to the member), so every worker reads the same rows — nothing to reload
+ * or persist between requests. Media files stay under the vault folder on shared storage.
+ */
 class VaultSession {
   constructor({ singlesId, mountPath, backupMountPath = null, db, key, meta }) {
     this.singlesId = singlesId;
@@ -204,6 +151,7 @@ class VaultSession {
     this.db = db;
     this.key = key;
     this.meta = meta;
+    /** Always false: writes commit to Postgres immediately (read by vaultClusterCoherence). */
     this.dirty = false;
     this.locked = false;
     this.storageType = 'usb';
@@ -211,18 +159,11 @@ class VaultSession {
     this.driveFolderId = null;
     /** FE/BE: tree open already counted toward session ui/usb tx/rx. */
     this.sessionFileCountsTreeReported = false;
-    /** vault_cluster_state unlock_generation / db_version this in-memory copy matches. */
+    /** vault_cluster_state unlock_generation / db_version this session was opened at. */
     this.clusterGeneration = null;
     this.clusterDbVersion = null;
-    /** vault.db written to disk since the last db_version publish. */
     this.clusterFlushedSinceCommit = false;
-    /** Initial unlock may write vault.db before the cluster lock/registry exist. */
-    this.allowDirectFlush = false;
   }
-}
-
-function scheduleCloudRelativeSync(_session, _relativePath) {
-  // Tuta cloud workspace is local-only (no remote sync).
 }
 
 function getMirrorMountPaths(session) {
@@ -305,126 +246,6 @@ function writeToMirrorPaths(session, writer) {
   if (primaryError) throw primaryError;
 }
 
-function vaultTableExists(db, tableName) {
-  const row = queryOne(
-    db,
-    `SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1`,
-    [tableName]
-  );
-  return Boolean(row?.ok);
-}
-
-function ensureNoteExtraImagesTable(db) {
-  if (vaultTableExists(db, 'note_extra_images')) return false;
-  db.exec(NOTE_EXTRA_IMAGES_MIGRATION_SQL);
-  return true;
-}
-
-function runSchema(db) {
-  db.exec(VAULT_SCHEMA_SQL);
-  ensureNoteExtraImagesTable(db);
-  ensureNoteInnerEncryptColumns(db);
-}
-
-function exportDb(db) {
-  return Buffer.from(db.export());
-}
-
-function writeVaultDbToMirror(session, plainBuffer) {
-  if (vaultMetaUsesPlaintextStorage(session.meta) && !isSqliteVaultDbBuffer(plainBuffer)) {
-    throw new Error('Vault database export is not valid SQLite — aborting save');
-  }
-  const sealed = sealVaultBuffer(plainBuffer, session.key);
-  writeToMirrorPaths(session, (mountPath) => {
-    atomicWriteFileSync(vaultDbPath(mountPath, session.meta), sealed);
-  });
-}
-
-/**
- * vault.db may only be written while this process holds the member's cluster lock
- * (or during the initial unlock); otherwise another worker's newer copy would be clobbered.
- */
-function canWriteVaultDbNow(session) {
-  if (!isVaultClusterCoherenceEnabled()) return true;
-  return Boolean(
-    session.allowDirectFlush ||
-      isVaultClusterLockHeld(VAULT_PRODUCT, session.singlesId, session.storageType)
-  );
-}
-
-function writeSessionDbToDisk(session) {
-  const plain = exportDb(session.db);
-  writeVaultDbToMirror(session, plain);
-  session.dirty = false;
-  session.clusterFlushedSinceCommit = true;
-}
-
-/** Export in-memory DB to staging disk when dirty (logoff / pre-cloud-sync). */
-export function forcePersistVaultDb(session) {
-  cancelScheduledFlushDbToUsb(session);
-  if (!session?.db || session.locked || !session.dirty) return;
-  if (!canWriteVaultDbNow(session)) {
-    scheduleVaultSessionClusterCommit(VAULT_PRODUCT, vaultClusterHooks, session);
-    return;
-  }
-  writeSessionDbToDisk(session);
-}
-
-function persistSessionDbNow(session) {
-  cancelScheduledFlushDbToUsb(session);
-  if (!session?.db || session.locked) return;
-  writeSessionDbToDisk(session);
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(session, getVaultDbFileName(session.meta));
-  }
-}
-
-export function flushDbToUsb(session) {
-  if (!session || session.locked) return;
-  if (!session.dirty) return;
-  if (!canWriteVaultDbNow(session)) {
-    scheduleVaultSessionClusterCommit(VAULT_PRODUCT, vaultClusterHooks, session);
-    return;
-  }
-  persistSessionDbNow(session);
-}
-
-/**
- * Coalesce rapid vault DB writes (multi-image drop) so USB/cloud staging is not rewritten on every file.
- * Photo/attachment bytes still hit disk immediately via writeEncrypted*.
- */
-function scheduleFlushDbToUsb(session, delayMs = null) {
-  markDirty(session);
-  if (!session) return;
-  const waitMs =
-    delayMs != null
-      ? delayMs
-      : session.storageType === 'onedrive'
-        ? 800
-        : 500;
-  if (session._flushDbTimer) {
-    clearTimeout(session._flushDbTimer);
-  }
-  session._flushDbTimer = setTimeout(() => {
-    session._flushDbTimer = null;
-    try {
-      flushDbToUsb(session);
-    } catch (err) {
-      console.error('[scheduleFlushDbToUsb]', err?.message || err);
-    }
-  }, waitMs);
-}
-
-function cancelScheduledFlushDbToUsb(session) {
-  if (!session?._flushDbTimer) return;
-  clearTimeout(session._flushDbTimer);
-  session._flushDbTimer = null;
-}
-
-function markDirty(session) {
-  session.dirty = true;
-}
-
 export function writeEncryptedPhoto(session, relativePath, buffer) {
   const enc = sealVaultBuffer(buffer, session.key);
   writeToMirrorPaths(session, (mountPath) => {
@@ -432,12 +253,6 @@ export function writeEncryptedPhoto(session, relativePath, buffer) {
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     fs.writeFileSync(abs, enc);
   });
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(
-      session,
-      `${VAULT_PHOTOS_DIR}/${vaultPhotoStorageRelativePath(relativePath, session.meta)}`
-    );
-  }
 }
 
 export function readEncryptedPhoto(session, relativePath) {
@@ -461,27 +276,14 @@ export function deleteEncryptedPhoto(session, relativePath) {
       }
     }
   });
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(
-      session,
-      `${VAULT_PHOTOS_DIR}/${vaultPhotoStorageRelativePath(relativePath, session.meta)}`
-    );
-  }
 }
 
 export function writeEncryptedVaultFile(session, relativePath, buffer) {
   const enc = sealVaultBuffer(buffer, session.key);
   writeToMirrorPaths(session, (mountPath) => {
-    const abs = vaultFileStoragePath(mountPath, relativePath, session.meta);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, enc);
+    // Atomic: an interrupted write never leaves a truncated file under the final name.
+    atomicWriteFileSync(vaultFileStoragePath(mountPath, relativePath, session.meta), enc);
   });
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(
-      session,
-      `${VAULT_FILES_DIR}/${vaultFileStorageRelativePath(relativePath, session.meta)}`
-    );
-  }
 }
 
 export function readEncryptedVaultFile(session, relativePath) {
@@ -492,7 +294,7 @@ export function readEncryptedVaultFile(session, relativePath) {
       const opened = openVaultBuffer(enc, session.key);
       if (opened?.length) return opened;
     } catch {
-      // fall through to shared sample pointer
+      // fall through
     }
   }
   return null;
@@ -523,30 +325,28 @@ export function deleteEncryptedVaultFile(session, relativePath) {
       }
     }
   });
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(
-      session,
-      `${VAULT_FILES_DIR}/${vaultFileStorageRelativePath(relativePath, session.meta)}`
-    );
-  }
 }
 
-function refreshNoteSearchText(db, noteId) {
-  const note = queryOne(
-    db,
-    `SELECT note_name, body_text, inner_encrypt_enabled FROM notes WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteId]
+/** Notes index commits to Postgres immediately — keep exported names as no-ops. */
+export function forcePersistVaultDb(_session) {}
+
+export function flushDbToUsb(_session) {}
+
+async function refreshNoteSearchText(db, noteId) {
+  const sid = db.singlesId;
+  const note = await db.one(
+    `SELECT note_name, body_text, inner_encrypt_enabled FROM ${T.notes}
+      WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [sid, noteId]
   );
   if (!note) return;
-  const kwRows = queryAll(
-    db,
-    `SELECT keyword FROM note_keywords WHERE note_id = ? ORDER BY keyword_normalized ASC`,
-    [noteId]
+  const kwRows = await db.all(
+    `SELECT keyword FROM ${T.keywords} WHERE singles_id = $1 AND note_id = $2 ORDER BY keyword_normalized ASC`,
+    [sid, noteId]
   );
-  const attRows = queryAll(
-    db,
-    `SELECT file_name FROM note_attachments WHERE note_id = ? AND deleted_at IS NULL`,
-    [noteId]
+  const attRows = await db.all(
+    `SELECT file_name FROM ${T.attachments} WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [sid, noteId]
   );
   const innerEncrypted =
     Number(note.inner_encrypt_enabled) === 1 ||
@@ -559,46 +359,74 @@ function refreshNoteSearchText(db, noteId) {
     .join(' ')
     .toLowerCase()
     .replace(/\s+/g, ' ');
-  db.run(`UPDATE notes SET search_text = ?, updated_at = datetime('now') WHERE note_id = ?`, [searchText, noteId]);
+  await db.run(
+    `UPDATE ${T.notes} SET search_text = $3, updated_at = NOW() WHERE singles_id = $1 AND note_id = $2`,
+    [sid, noteId, searchText]
+  );
 }
 
-function seedEmptyVault(db) {
-  return seedRecordVaultNewMemberSampleDb(db);
-}
-
-async function openDbFromBuffer(buffer) {
-  const SQL = await getSqlJs();
-  const db = new SQL.Database(buffer);
-  runSchema(db);
-  ensureNoteExtraImagesTable(db);
-  ensureRecordVaultSharedContentKeyColumn(db);
-  return db;
-}
-
-async function createFreshDb() {
-  const SQL = await getSqlJs();
-  const db = new SQL.Database();
-  runSchema(db);
-  ensureRecordVaultSharedContentKeyColumn(db);
-  seedEmptyVault(db);
-  return db;
-}
-
-function queryAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
+/**
+ * Move inline `data:image;base64,…` out of body_text into TutaNotes/files/{nb}/{note}/{id}.ext
+ * and leave `<img data-file-id="{id}">` pointers. No-op when none / inner-encrypted.
+ * @returns {{ bodyText: string, extracted: number, failed: number }}
+ */
+export async function materializeInlineDataImagesInNoteBody(session, noteId, bodyText) {
+  const raw = String(bodyText ?? '');
+  if (!bodyHasInlineDataImage(raw)) {
+    return { bodyText: raw, extracted: 0, failed: 0 };
   }
-  stmt.free();
-  return rows;
+  const note = await loadNote(session.db, noteId);
+  if (!note) throw new Error('Note not found');
+  const notebookId = Number(note.notebook_id);
+
+  const { html, extracted, failed } = await rewriteInlineDataImages(raw, async (decoded, index) => {
+    const attachment = await vaultAddNoteAttachment(session, noteId, {
+      buffer: decoded.buffer,
+      fileName: `inline_${noteId}_${index + 1}.${decoded.ext}`,
+      ext: decoded.ext,
+      mimeType: decoded.mimeType
+    });
+    const fileId = Number(attachment?.attachment_id);
+    if (!Number.isFinite(fileId) || fileId < 1) return null;
+    // notebookId unused here — path comes from vaultAddNoteAttachment via fileRelativePath
+    void notebookId;
+    return { fileId };
+  });
+
+  if (extracted > 0 && html !== raw) {
+    await session.db.run(
+      `UPDATE ${T.notes} SET body_text = $3, updated_at = NOW() WHERE singles_id = $1 AND note_id = $2`,
+      [session.db.singlesId, noteId, html]
+    );
+    await refreshNoteSearchText(session.db, noteId);
+  }
+  return { bodyText: html, extracted, failed };
 }
 
-function queryOne(db, sql, params = []) {
-  const rows = queryAll(db, sql, params);
-  return rows[0] || null;
+/** Extract inline images for every note that still has data: URLs (unlocked vault). */
+export async function vaultExtractAllInlineDataImages(session) {
+  const rows = await session.db.all(
+    `SELECT note_id FROM ${T.notes}
+      WHERE singles_id = $1 AND deleted_at IS NULL
+        AND body_text LIKE '%data:image%'
+      ORDER BY note_id ASC`,
+    [session.db.singlesId]
+  );
+  let notesTouched = 0;
+  let imagesExtracted = 0;
+  let imagesFailed = 0;
+  for (const row of rows) {
+    const noteId = Number(row.note_id);
+    const note = await loadNote(session.db, noteId);
+    if (!note?.body_text) continue;
+    const result = await materializeInlineDataImagesInNoteBody(session, noteId, note.body_text);
+    if (result.extracted > 0) notesTouched += 1;
+    imagesExtracted += result.extracted;
+    imagesFailed += result.failed;
+  }
+  return { notesScanned: rows.length, notesTouched, imagesExtracted, imagesFailed };
 }
+
 
 export function getVaultSession(singlesId, storageType = null) {
   const id = Number(singlesId);
@@ -610,7 +438,7 @@ export function getVaultSession(singlesId, storageType = null) {
   }
   const usbSession = sessionsByKey.get(vaultSessionKey(id, 'usb'));
   if (usbSession && !usbSession.locked) return usbSession;
-  const oneDriveSession = sessionsByKey.get(vaultSessionKey(id, 'onedrive'));
+  const oneDriveSession = sessionsByKey.get(vaultSessionKey(id, 'tutaCloud'));
   if (oneDriveSession && !oneDriveSession.locked) return oneDriveSession;
   return null;
 }
@@ -618,47 +446,20 @@ export function getVaultSession(singlesId, storageType = null) {
 export function listVaultSessions(singlesId) {
   const id = Number(singlesId);
   const out = [];
-  for (const storageType of ['usb', 'onedrive']) {
+  for (const storageType of ['usb', 'tutaCloud']) {
     const session = getVaultSession(id, storageType);
     if (session) out.push(session);
   }
   return out;
 }
 
-/** Forget this worker's copy without saving (logged off / re-unlocked on another worker). */
+/** Forget this worker's session (logged off / re-unlocked on another worker). */
 function dropLocalVaultSession(singlesId, storageType) {
   const key = vaultSessionKey(singlesId, storageType);
   const session = sessionsByKey.get(key);
   if (!session) return;
   sessionsByKey.delete(key);
-  cancelScheduledFlushDbToUsb(session);
   session.locked = true;
-  session.dirty = false;
-  closeVaultDbLater(session.db);
-}
-
-/** Re-read vault.db after another worker committed a newer db_version. */
-async function reloadVaultSessionDbFromDisk(session) {
-  if (!session || session.locked) return;
-  const vaultRoot = vaultRootOnMount(session.mountPath);
-  const candidates = [resolveVaultDbPath(session.mountPath)];
-  for (const name of listVaultDbFileNamesForRead(session.meta)) {
-    const abs = path.join(vaultRoot, name);
-    if (!candidates.includes(abs)) candidates.push(abs);
-  }
-  for (const dbPath of candidates) {
-    if (!dbPath || !fs.existsSync(dbPath)) continue;
-    const plain = openVaultBuffer(fs.readFileSync(dbPath), session.key);
-    if (!isSqliteVaultDbBuffer(plain)) continue;
-    const next = await openDbFromBuffer(plain);
-    const prev = session.db;
-    cancelScheduledFlushDbToUsb(session);
-    session.db = next;
-    session.dirty = false;
-    closeVaultDbLater(prev);
-    return;
-  }
-  throw new Error('Vault database is missing or unreadable');
 }
 
 /** Hooks for be/utils/vaultClusterCoherence.js (multi-worker / multi-server coherence). */
@@ -667,8 +468,9 @@ export const vaultClusterHooks = {
   getLocalSession: (singlesId, storageType) => getVaultSession(singlesId, storageType),
   dropLocalSession: dropLocalVaultSession,
   rehydrateSession: (singlesId, storageType) => tryRehydrateVaultSession(singlesId, storageType),
-  reloadSessionDb: reloadVaultSessionDbFromDisk,
-  persistSessionNow: persistSessionDbNow
+  // Notes index is in Postgres: every worker already sees the latest rows.
+  reloadSessionDb: async () => {},
+  persistSessionNow: () => {}
 };
 
 let resolveVaultAccessSession = async (req, res) => requireVaultAccessSession(req, res);
@@ -703,9 +505,9 @@ export async function requireVaultSession(req, res) {
   if (!usbSession) {
     usbSession = await tryRehydrateVaultSession(singlesId, 'usb');
   }
-  let oneDriveSession = getVaultSession(singlesId, 'onedrive');
+  let oneDriveSession = getVaultSession(singlesId, 'tutaCloud');
   if (!oneDriveSession) {
-    oneDriveSession = await tryRehydrateVaultSession(singlesId, 'onedrive');
+    oneDriveSession = await tryRehydrateVaultSession(singlesId, 'tutaCloud');
   }
   if (usbSession && oneDriveSession) {
     res.status(400).json({
@@ -727,101 +529,111 @@ export async function requireVaultSession(req, res) {
 }
 
 async function resolveVaultUnlockKey(singlesId, storageType, mountPathHint = null) {
-  const iconName = await readRecordVaultCacheIcon(singlesId, storageType);
-  if (!iconName) return null;
+  const normalizedType = normalizeVaultStorageType(storageType);
   let mountPath = mountPathHint ? String(mountPathHint).trim() : '';
   if (!mountPath) {
-    const cluster = await getVaultClusterUnlock(Number(singlesId), normalizeVaultStorageType(storageType));
+    const cluster = await getVaultClusterUnlock(Number(singlesId), normalizedType);
     mountPath = String(cluster?.mountPath || '').trim();
   }
   if (!mountPath || !isVaultMountPathPresent(mountPath)) return null;
+
+  let meta = null;
   try {
-    const meta = readVaultMeta(mountPath);
-    const keys = await listIconVaultUnlockKeys(iconName, meta);
-    return keys[0]?.key ?? null;
+    meta = readVaultMeta(mountPath);
   } catch {
-    return null;
+    meta = null;
   }
+
+  // TutaDrive at-rest key from TEMPKEY_TUTADRIVE when photo/db encrypt is on.
+  if (
+    normalizedType === 'tutaCloud' &&
+    isVaultPhotoAndDbEncryptionEnabled() &&
+    meta &&
+    !vaultMetaUsesPlaintextStorage(meta)
+  ) {
+    try {
+      const keys = await listEnvVaultUnlockKeys('tutaCloud', meta);
+      return keys[0]?.key ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
- * Re-seal vault.db + photos/ + files/ under a new AES key and write Argon2id kdf meta.
- * Used once when unlocking a legacy SHA-256 icon vault.
+ * One-time: seal plaintext photos/ + files/ and flip vault.meta to aes-256-gcm-icon-key.
+ * Runs on unlock when NOTES_ENCRYPT_PHOTO_AND_DB (and TUTANOTES_ENCRYPT_ALLOWED) are on
+ * but the vault was created as encryption:none.
  */
-async function migrateSessionIconVaultToArgon2id(session, iconName) {
-  if (!session || isPlaintextVaultKey(session.key) || vaultMetaUsesPlaintextStorage(session.meta)) {
-    return false;
-  }
-  if (vaultMetaUsesArgon2idKdf(session.meta)) return false;
+async function migratePlaintextVaultToEncrypted(session, options = {}) {
+  if (!session || !vaultMetaUsesPlaintextStorage(session.meta)) return false;
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return false;
 
-  const material = await createIconVaultKeyMaterial(iconName);
-  const oldKey = session.key;
-  const newKey = material.key;
-
-  function resealFile(absPath) {
-    if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) return;
-    const enc = fs.readFileSync(absPath);
+  let material = options?.keyMaterial?.key ? options.keyMaterial : null;
+  if (!material) {
     try {
-      const plain = openVaultBuffer(enc, oldKey);
-      fs.writeFileSync(absPath, sealVaultBuffer(plain, newKey));
+      const envType =
+        String(session.storageType || options?.storageType || '').toLowerCase() === 'usb'
+          ? 'usb'
+          : 'tutaCloud';
+      material = await createEnvVaultKeyMaterial(envType);
     } catch (err) {
-      // Skip files that were not encrypted with the old icon key (corrupt / already plaintext).
-      console.warn('[migrateSessionIconVaultToArgon2id] skip file', absPath, err?.message || err);
+      console.warn(
+        '[migratePlaintextVaultToEncrypted] no key material; leaving vault plaintext',
+        err?.message || err
+      );
+      return false;
     }
   }
+  if (!material?.key || isPlaintextVaultKey(material.key)) return false;
 
-  function walkAndReseal(dir) {
-    if (!fs.existsSync(dir)) return;
-    for (const name of fs.readdirSync(dir)) {
-      if (name.startsWith('.')) continue;
-      const abs = path.join(dir, name);
-      const st = fs.statSync(abs);
-      if (st.isDirectory()) walkAndReseal(abs);
-      else resealFile(abs);
-    }
-  }
+  const newKey = material.key;
+  const sealOpts = {
+    key: newKey,
+    sealVaultBuffer,
+    atomicWriteFileSync,
+    logPrefix: '[migratePlaintextVaultToEncrypted]'
+  };
+  const vaultTreeRoots = (mountPath) => [
+    { dir: vaultPhotosRoot(mountPath) },
+    { dir: vaultFilesRoot(mountPath), removeSymlinks: true }
+  ];
 
-  walkAndReseal(vaultPhotosRoot(session.mountPath));
-  walkAndReseal(vaultFilesRoot(session.mountPath));
+  const startedAt = Date.now();
+  const counts = sealPlaintextVaultTree(vaultTreeRoots(session.mountPath), sealOpts);
 
   session.key = newKey;
   session.meta = {
     ...session.meta,
     version: 2,
     encryption: 'aes-256-gcm-icon-key',
-    ...iconVaultKdfMetaFields(material)
+    ...vaultKdfMetaFields(material)
   };
   fs.writeFileSync(vaultMetaPath(session.mountPath), JSON.stringify(session.meta, null, 2));
-  session.dirty = true;
-  flushDbToUsb(session);
 
   if (session.backupMountPath && isVaultMountPathPresent(session.backupMountPath)) {
     try {
-      walkAndReseal(vaultPhotosRoot(session.backupMountPath));
-      walkAndReseal(vaultFilesRoot(session.backupMountPath));
+      sealPlaintextVaultTree(vaultTreeRoots(session.backupMountPath), sealOpts);
       fs.writeFileSync(
         vaultMetaPath(session.backupMountPath),
         JSON.stringify(session.meta, null, 2)
       );
-      const sealedDb = sealVaultBuffer(exportDb(session.db), newKey);
-      atomicWriteFileSync(vaultDbPath(session.backupMountPath, session.meta), sealedDb);
     } catch (err) {
-      console.warn('[migrateSessionIconVaultToArgon2id] backup mirror failed', err?.message || err);
+      console.warn('[migratePlaintextVaultToEncrypted] backup mirror failed', err?.message || err);
     }
   }
 
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(session, getVaultDbFileName(session.meta));
-    scheduleCloudRelativeSync(session, VAULT_META_FILE);
-  }
-
-  console.log('[migrateSessionIconVaultToArgon2id] upgraded vault icon KDF to Argon2id', {
+  console.log('[migratePlaintextVaultToEncrypted] sealed plaintext vault at rest', {
     singlesId: session.singlesId,
     storageType: session.storageType,
-    vaultId: session.meta?.vaultId
+    vaultId: session.meta?.vaultId,
+    ...counts,
+    ms: Date.now() - startedAt
   });
   return true;
 }
+
 
 /** In-flight rehydrates per session key — parallel requests must not open the vault twice. */
 const rehydrateInFlight = new Map();
@@ -855,11 +667,10 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   const key = await resolveVaultUnlockKey(id, normalizedType, mountPath);
   try {
     await unlockVaultUsbWithKey(id, mountPath, key, {
-      skipBackup: normalizedType === 'onedrive' || !cluster.backupMountPath,
+      skipBackup: normalizedType === 'tutaCloud' || !cluster.backupMountPath,
       backupMountPath: cluster.backupMountPath || null,
       storageType: normalizedType,
-      skipClusterRegister: true,
-      iconName: await readRecordVaultCacheIcon(id, normalizedType)
+      skipClusterRegister: true
     });
   } catch (err) {
     rvCloudWarn('Vault', 'cluster rehydrate unlock failed', {
@@ -871,9 +682,8 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   }
 
   const session = getVaultSession(id, normalizedType);
-  // Registry was read before vault.db, so the copy is at least this version.
   if (session) markVaultSessionClusterState(session, cluster);
-  if (session && normalizedType === 'onedrive') {
+  if (session && normalizedType === 'tutaCloud') {
     session.driveSinglesId = null;
     session.driveFolderId = null;
     session.tutaDrive = true;
@@ -882,11 +692,10 @@ async function rehydrateVaultSessionOnce(singlesId, storageType) {
   return session;
 }
 
-export async function initializeVaultOnUsb(mountPath, iconName) {
-  const material = await createIconVaultKeyMaterial(iconName);
-  return initializeVaultOnUsbWithKey(mountPath, material.key, material);
-}
-
+/**
+ * Create the vault folder (vault.meta.json + photos/ + files/). The notes index itself is
+ * created in Postgres — and seeded with the sample album — on the first unlock.
+ */
 export async function initializeVaultOnUsbWithKey(mountPath, key, kdfMaterial = null) {
   const normalized = path.resolve(mountPath);
   if (fs.existsSync(vaultMetaPath(normalized))) {
@@ -915,49 +724,75 @@ export async function initializeVaultOnUsbWithKey(mountPath, key, kdfMaterial = 
     vaultId: crypto.randomUUID(),
     encryption: plaintextStorage ? 'none' : 'aes-256-gcm-icon-key',
     createdAt: new Date().toISOString(),
-    ...(plaintextStorage ? {} : iconVaultKdfMetaFields(kdfMaterial))
+    ...(plaintextStorage ? {} : vaultKdfMetaFields(kdfMaterial))
   };
   if (!plaintextStorage && !meta.kdfSalt) {
     throw new Error(
-      'Encrypted vault init requires Argon2id kdf material (kdfSalt). Use initializeVaultOnUsb(iconName) or pass createIconVaultKeyMaterial().'
+      'Encrypted vault init requires Argon2id kdf material (kdfSalt). Pass createEnvVaultKeyMaterial().'
     );
   }
   fs.writeFileSync(vaultMetaPath(normalized), JSON.stringify(meta, null, 2));
-  const db = await createFreshDb();
-  fs.writeFileSync(vaultDbPath(normalized), sealVaultBuffer(exportDb(db), key));
-  db.close();
   return meta;
 }
 
-export async function unlockVaultUsb(singlesId, mountPath, iconName, options = {}) {
-  const meta = readVaultMeta(mountPath);
-  const keys = await listIconVaultUnlockKeys(iconName, meta);
-  const key = keys[0]?.key;
-  return unlockVaultUsbWithKey(singlesId, mountPath, key, {
-    ...options,
-    iconName,
-    unlockKdf: keys[0]?.kdf || null
-  });
-}
-
-export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options = {}) {
+/** Wrong server key → VAULT_KEY_MISMATCH (counts toward the unlock guard). */
+function assertKeyOpensVault(mountPath, key) {
+  if (key == null || isPlaintextVaultKey(key)) return;
+  const sample = findSealedVaultSampleFile(vaultFilesRoot(mountPath));
+  if (!sample) return;
   try {
-    return await unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options);
-  } finally {
-    const opened = sessionsByKey.get(
-      vaultSessionKey(singlesId, normalizeVaultStorageType(options?.storageType, 'usb'))
-    );
-    if (opened) opened.allowDirectFlush = false;
+    openVaultBuffer(fs.readFileSync(sample), key);
+  } catch (err) {
+    const keyErr = new Error('Unable to decrypt vault (wrong server key or corrupt vault data)');
+    keyErr.code = VAULT_KEY_MISMATCH;
+    keyErr.cause = err;
+    throw keyErr;
   }
 }
 
-async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}) {
+/**
+ * Make sure the member's notes index for this vault folder is in Postgres.
+ * - index present → use it (vault folder id re-pointed if it changed)
+ * - none → create an empty index (`created: true`, caller seeds sample notes)
+ */
+async function ensureVaultIndexInPostgres({ singlesId, mountPath, meta, key }) {
+  assertKeyOpensVault(mountPath, key);
+  const vaultId = meta?.vaultId ? String(meta.vaultId) : null;
+  const existing = await loadNotesMemberVault(singlesId);
+  if (existing) {
+    if (vaultId && existing.vault_id !== vaultId) {
+      console.warn('[recordVaultUsb] vault folder id changed; keeping the Postgres notes index', {
+        singlesId,
+        previousVaultId: existing.vault_id,
+        vaultId
+      });
+      await setNotesMemberVaultId(singlesId, vaultId);
+    }
+    return { created: false };
+  }
+  await new VaultPgDb(singlesId).tx((tx) => createNotesMemberVault(tx, { vaultId, source: 'seed' }));
+  return { created: true };
+}
+
+/** Encrypted vault: seal stray plaintext files and drop symlinks under files/ so only .enc remains. */
+function sealStrayVaultFiles(session) {
+  if (!session?.key || vaultMetaUsesPlaintextStorage(session.meta)) return;
+  const counts = sealPlaintextVaultTree(
+    [{ dir: vaultPhotosRoot(session.mountPath) }, { dir: vaultFilesRoot(session.mountPath), removeSymlinks: true }],
+    { key: session.key, sealVaultBuffer, atomicWriteFileSync, logPrefix: '[recordVault sealStrayVaultFiles]' }
+  );
+  if (counts.sealed || counts.unlinked) {
+    console.log('[recordVault sealStrayVaultFiles] cleaned vault folder', { singlesId: session.singlesId, ...counts });
+  }
+}
+
+export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options = {}) {
   const targetStorageType = normalizeVaultStorageType(options?.storageType, 'usb');
   ensureVaultLayoutDirs(mountPath);
   let templateApplied = false;
   if (tutaNotesTemplateZipAvailable()) {
     try {
-      const tpl = await applyTutaNotesTemplate(mountPath);
+      const tpl = await applyTutaNotesTemplate(mountPath, {}, { singlesId: Number(singlesId) });
       templateApplied = Boolean(tpl.applied);
     } catch (err) {
       console.warn('[unlockVaultUsbWithKey] template apply failed:', err?.message || err);
@@ -973,14 +808,12 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
       'This USB vault uses the retired 6-digit PIN format. Create a new vault in a different folder.'
     );
   }
-  const vaultRoot = vaultRootOnMount(mountPath);
-  const hasEncryptedDbFile = fs.existsSync(path.join(vaultRoot, VAULT_DB_FILE_ENCRYPTED));
   const metaSaysPlaintext = vaultMetaUsesPlaintextStorage(meta);
-  const hasIconKey = key != null && !isPlaintextVaultKey(key);
-  const treatAsEncryptedVault = !metaSaysPlaintext || hasEncryptedDbFile;
+  const hasKey = key != null && !isPlaintextVaultKey(key);
+  const treatAsEncryptedVault = !metaSaysPlaintext;
 
-  if (treatAsEncryptedVault && !hasIconKey) {
-    throw new Error('Security icon is required to unlock this vault');
+  if (treatAsEncryptedVault && !hasKey) {
+    throw new Error('Vault key is required to unlock this vault');
   }
   if (treatAsEncryptedVault) {
     assertUnlockNotLocked(mountPath, meta);
@@ -990,50 +823,25 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
       ? null
       : assertBackupMountPath(mountPath, options?.backupMountPath, meta?.vaultId || null);
 
-  const unlockKeys = [];
-  if (!metaSaysPlaintext) {
-    if (hasIconKey) unlockKeys.push(key);
-  } else {
-    unlockKeys.push(null);
-    if (hasIconKey && hasEncryptedDbFile) unlockKeys.push(key);
+  const effectiveKey = metaSaysPlaintext ? null : key;
+  let sampleSeedStatus = 'skipped';
+  const db = new VaultPgDb(singlesId);
+  try {
+    await ensureVaultIndexInPostgres({ singlesId: Number(singlesId), mountPath, meta, key: effectiveKey });
+  } catch (err) {
+    if (err?.name === 'RecordVaultUnlockError') throw err;
+    // Only a key that cannot decrypt the vault counts toward the wipe-after-6 guard.
+    if (treatAsEncryptedVault && err?.code === VAULT_KEY_MISMATCH) {
+      recordFailedUnlockAttempt(mountPath, meta);
+    }
+    throw err;
   }
 
-  let db;
-  let effectiveKey = null;
-  let sampleSeedStatus = 'skipped';
   try {
-    const dbCandidates = [];
-    const primaryDb = resolveVaultDbPath(mountPath);
-    dbCandidates.push(primaryDb);
-    const metaForPaths = readVaultMeta(mountPath);
-    for (const name of listVaultDbFileNamesForRead(metaForPaths)) {
-      const abs = path.join(vaultRoot, name);
-      if (!dbCandidates.includes(abs)) dbCandidates.push(abs);
-    }
-    let openErr = null;
-    outer: for (const dbPath of dbCandidates) {
-      if (!fs.existsSync(dbPath)) continue;
-      const enc = fs.readFileSync(dbPath);
-      for (const tryKey of unlockKeys) {
-        try {
-          const plain = openVaultBuffer(enc, tryKey);
-          if (!isSqliteVaultDbBuffer(plain)) continue;
-          db = await openDbFromBuffer(plain);
-          effectiveKey = tryKey;
-          openErr = null;
-          break outer;
-        } catch (err) {
-          openErr = err;
-        }
-      }
-    }
-    if (!db) {
-      throw openErr || new Error('Vault database is missing or unreadable');
-    }
     const allowSeed = !readNewMemberSampleSeededStamp(mountPath);
     sampleSeedStatus = templateApplied
       ? 'template'
-      : ensureRecordVaultNewMemberSampleDb(db, { allowSeed });
+      : await ensureRecordVaultNewMemberSampleDb(db, { allowSeed });
     if (
       sampleSeedStatus === 'inserted' ||
       sampleSeedStatus === 'template' ||
@@ -1043,27 +851,14 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
       stampNewMemberSampleSeeded(mountPath);
     }
   } catch (err) {
-    if (err?.name === 'RecordVaultUnlockError') throw err;
-    if (treatAsEncryptedVault) {
-      recordFailedUnlockAttempt(mountPath, meta);
-    }
-    throw err;
+    console.warn('[unlockVaultUsbWithKey] sample notebook upkeep failed:', err?.message || err);
   }
 
-  let clearedMeta = clearUnlockGuard(mountPath, meta);
-  if (metaSaysPlaintext && effectiveKey != null && !isPlaintextVaultKey(effectiveKey)) {
-    clearedMeta = {
-      ...clearedMeta,
-      version: 2,
-      encryption: 'aes-256-gcm-icon-key'
-    };
-    fs.writeFileSync(vaultMetaPath(mountPath), JSON.stringify(clearedMeta, null, 2));
-  }
+  const clearedMeta = clearUnlockGuard(mountPath, meta);
 
   const existing = getVaultSession(singlesId, targetStorageType);
   if (existing) {
     if (options?.skipClusterRegister) {
-      // Rehydrate must never log the member off cluster-wide.
       dropLocalVaultSession(singlesId, targetStorageType);
     } else {
       await logoffVaultUsb(singlesId, targetStorageType);
@@ -1079,24 +874,7 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
     meta: clearedMeta
   });
   session.storageType = targetStorageType;
-  session.allowDirectFlush = !options?.skipClusterRegister;
   sessionsByKey.set(vaultSessionKey(singlesId, targetStorageType), session);
-  if (sampleSeedStatus !== 'template') {
-    try {
-      await seedRecordVaultNewMemberSampleMedia({
-        mountPath: session.mountPath,
-        key: session.key,
-        meta: session.meta,
-        db: session.db
-      });
-    } catch (err) {
-      console.warn('[recordVault] shared sample media link failed', err?.message || err);
-    }
-  }
-  if (sampleSeedStatus === 'inserted' || sampleSeedStatus === 'upgraded' || sampleSeedStatus === 'template') {
-    markDirty(session);
-    flushDbToUsb(session);
-  }
   if (!options?.skipClusterRegister) {
     const clusterState = await registerVaultClusterUnlock({
       singlesId,
@@ -1107,26 +885,25 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
     });
     if (clusterState) markVaultSessionClusterState(session, clusterState);
   }
-  if (ensureNoteExtraImagesTable(session.db)) {
-    markDirty(session);
-    flushDbToUsb(session);
-  }
-  if (ensureNoteInnerEncryptColumns(session.db)) {
-    markDirty(session);
-    flushDbToUsb(session);
-  }
 
-  const migrateIconName = String(options?.iconName || '').trim();
-  if (
-    migrateIconName &&
-    treatAsEncryptedVault &&
-    !isPlaintextVaultKey(session.key) &&
-    !vaultMetaUsesArgon2idKdf(session.meta)
-  ) {
+  // Plaintext vault + at-rest encrypt enabled → seal files/photos and flip vault.meta.
+  if (vaultMetaUsesPlaintextStorage(session.meta) && isVaultPhotoAndDbEncryptionEnabled()) {
     try {
-      await migrateSessionIconVaultToArgon2id(session, migrateIconName);
+      await migratePlaintextVaultToEncrypted(session, {
+        keyMaterial: options?.encryptKeyMaterial || null,
+        storageType: targetStorageType
+      });
     } catch (migErr) {
-      console.error('[unlockVaultUsbWithKey] Argon2id KDF migrate failed', migErr?.message || migErr);
+      console.error(
+        '[unlockVaultUsbWithKey] plaintext→encrypted migrate failed',
+        migErr?.message || migErr
+      );
+    }
+  } else {
+    try {
+      sealStrayVaultFiles(session);
+    } catch (err) {
+      console.warn('[unlockVaultUsbWithKey] vault folder cleanup failed', err?.message || err);
     }
   }
 
@@ -1135,11 +912,9 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
     syncVaultTreeToBackup(session);
   }
 
-  // Session file counts live on Postgres (website). Bridge standalone no-ops; FE reports instead.
-  // Do not reset on cluster rehydrate, or when the other vault pane is already unlocked.
   const skipSessionCountReset = Boolean(options?.skipClusterRegister);
   if (!skipSessionCountReset) {
-    const otherType = targetStorageType === 'onedrive' ? 'usb' : 'onedrive';
+    const otherType = targetStorageType === 'tutaCloud' ? 'usb' : 'tutaCloud';
     const otherOpen =
       Boolean(getVaultSession(session.singlesId, otherType)) ||
       Boolean(await getVaultClusterUnlock(session.singlesId, otherType));
@@ -1149,7 +924,7 @@ async function unlockVaultUsbWithKeyOnce(singlesId, mountPath, key, options = {}
   }
   let openItemCount = 0;
   if (targetStorageType === 'usb') {
-    openItemCount = countVaultSessionNotebooksAndNotes(session);
+    openItemCount = await countVaultSessionNotebooksAndNotes(session);
     if (openItemCount > 0) {
       await addVaultSessionFileCounts(session.singlesId, { usbDelta: openItemCount });
     }
@@ -1187,60 +962,20 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
 
   if (!storageType) {
     await logoffVaultUsb(id, 'usb', opts);
-    await logoffVaultUsb(id, 'onedrive', opts);
+    await logoffVaultUsb(id, 'tutaCloud', opts);
     return { success: true };
   }
 
   const normalizedType = normalizeVaultStorageType(storageType);
-  let session = getVaultSession(id, normalizedType);
-  if (!session) {
-    // Round-robin: logoff may hit a node that never held the open SQLite session.
-    session = await tryRehydrateVaultSession(id, normalizedType);
-  }
-  if (!session) {
-    if (onProgress) await onProgress({ percent: 100, label: 'Done' });
-    await clearVaultClusterUnlock(id, normalizedType);
-    await flushVaultTransferBytes(id);
-    // Freeze totals for login-gate display even when this node had no local session.
-    await snapshotVaultSessionFileCountsToLast(id);
-    return { success: true };
-  }
-  const dbDirty = Boolean(session.dirty);
+  const session = getVaultSession(id, normalizedType);
   try {
-    if (onProgress) {
-      await onProgress({
-        percent: 2,
-        label:
-          normalizedType === 'onedrive' ? 'Saving cloud vault…' : 'Saving USB vault…'
-      });
-    }
-    if (dbDirty) {
-      if (onProgress && normalizedType !== 'onedrive') {
-        await onProgress({ percent: 25, label: 'Saving USB vault' });
-      }
-      if (canWriteVaultDbNow(session)) {
-        forcePersistVaultDb(session);
-      } else {
-        await commitVaultSessionWithClusterLock(VAULT_PRODUCT, vaultClusterHooks, session);
-      }
-      if (normalizedType === 'usb') {
-        await addVaultSessionFileCounts(id, { usbDelta: 1 });
-      }
-    }
-    if (onProgress && normalizedType === 'usb') {
-      await onProgress({ percent: 70, label: 'Closing USB vault' });
-    }
-    if (session.db) {
-      session.db.close();
-    }
-    if (onProgress && normalizedType !== 'onedrive') {
-      await onProgress({ percent: 90, label: 'Finishing logoff' });
-    }
     if (onProgress) await onProgress({ percent: 100, label: 'Done' });
   } finally {
-    session.locked = true;
-    if (session.key) session.key.fill(0);
-    sessionsByKey.delete(vaultSessionKey(id, normalizedType));
+    if (session) {
+      session.locked = true;
+      if (session.key) session.key.fill(0);
+      sessionsByKey.delete(vaultSessionKey(id, normalizedType));
+    }
     await clearVaultClusterUnlock(id, normalizedType);
     await flushVaultTransferBytes(id);
     // Freeze totals for login-gate display (survives unlock reset / rehydrate).
@@ -1249,41 +984,29 @@ export async function logoffVaultUsb(singlesId, storageType = null, opts = {}) {
   return { success: true };
 }
 
-/** Persist dirty vault DB to disk without closing the session. */
-export async function flushAndAwaitCloudSync(singlesId, storageType = 'onedrive', { onProgress: _onProgress } = {}) {
-  const local = getVaultSession(singlesId, normalizeVaultStorageType(storageType));
-  if (local?.dirty) forcePersistVaultDb(local);
+/** Notes index writes commit to Postgres immediately; nothing to flush. */
+export async function flushAndAwaitCloudSync(_singlesId, _storageType = 'tutaCloud', _opts = {}) {
   return { success: true, synced: false };
 }
 
-/** Drop in-memory vault without persisting local changes (e.g. after restore from zip). */
-export async function discardVaultSessionWithoutCloudSync(singlesId, storageType = 'onedrive') {
+/** Close the vault on every worker without logoff side effects (e.g. after restore from zip). */
+export async function discardVaultSessionWithoutCloudSync(singlesId, storageType = 'tutaCloud') {
   const normalizedType = normalizeVaultStorageType(storageType);
-  let session = getVaultSession(singlesId, normalizedType);
-  if (!session) {
-    session = await tryRehydrateVaultSession(singlesId, normalizedType);
-  }
-  if (!session) {
-    const id = Number(singlesId);
-    await clearVaultClusterUnlock(id, normalizedType);
-    await flushVaultTransferBytes(id);
-    return { success: true };
-  }
   const id = Number(singlesId);
-  session.dirty = false;
-  try {
-    if (session.db) {
-      session.db.close();
-    }
-  } finally {
+  const session = getVaultSession(id, normalizedType);
+  if (session) {
     session.locked = true;
     if (session.key) session.key.fill(0);
     sessionsByKey.delete(vaultSessionKey(id, normalizedType));
-    await clearVaultClusterUnlock(id, normalizedType);
-    await flushVaultTransferBytes(id);
   }
+  await clearVaultClusterUnlock(id, normalizedType);
+  await flushVaultTransferBytes(id);
   return { success: true };
 }
+
+const ATTACHMENT_COLUMNS =
+  'attachment_id, note_id, file_name, file_extension, file_size_bytes, checksum, mime_type, display_order, shared_content_key, created_at';
+const ATTACHMENT_COLUMNS_WITH_PATH = `${ATTACHMENT_COLUMNS}, relative_path`;
 
 function mapAttachmentRow(row) {
   return {
@@ -1299,17 +1022,25 @@ function mapAttachmentRow(row) {
   };
 }
 
-function loadAttachmentsForNote(session, noteId) {
-  return queryAll(
-    session.db,
-    `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, mime_type, display_order,
-            shared_content_key, created_at
-     FROM note_attachments
-     WHERE note_id = ? AND deleted_at IS NULL
-     ORDER BY display_order ASC, attachment_id ASC`,
-    [noteId]
-  ).map(mapAttachmentRow);
+/** Next permanent album photo seq for a note (1-based). */
+
+async function loadAttachmentsForNote(db, noteId) {
+  const rows = await db.all(
+    `SELECT ${ATTACHMENT_COLUMNS_WITH_PATH}
+       FROM ${T.attachments}
+      WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL
+      ORDER BY display_order ASC, attachment_id ASC`,
+    [db.singlesId, noteId]
+  );
+  return rows.map(mapAttachmentRow);
 }
+
+/**
+ * Soft-delete note attachment rows that share byte size + SHA-256 checksum.
+ * Keeps the lowest attachment_id; deletes hard files for the rest.
+ * Also purges orphan byte-identical files under ENV staging / PHOTOALBUMS_FOLDER.
+ * @returns {Promise<{ removedAttachmentIds: number[], kept: number }>}
+ */
 
 function mapExtraImageRow(row) {
   return {
@@ -1323,16 +1054,15 @@ function mapExtraImageRow(row) {
   };
 }
 
-function loadExtraImagesForNote(session, noteId) {
-  if (!vaultTableExists(session.db, 'note_extra_images')) return [];
-  return queryAll(
-    session.db,
+async function loadExtraImagesForNote(db, noteId) {
+  const rows = await db.all(
     `SELECT image_id, note_id, file_name, file_extension, file_size_bytes, display_order, created_at
-     FROM note_extra_images
-     WHERE note_id = ? AND deleted_at IS NULL
-     ORDER BY display_order ASC, image_id ASC`,
-    [noteId]
-  ).map(mapExtraImageRow);
+       FROM ${T.extraImages}
+      WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL
+      ORDER BY display_order ASC, image_id ASC`,
+    [db.singlesId, noteId]
+  );
+  return rows.map(mapExtraImageRow);
 }
 
 function mapNoteRowMetadata(row) {
@@ -1403,74 +1133,85 @@ function mapNoteRow(row, keywords = [], attachments = [], extraImages = []) {
   };
 }
 
-function loadNote(session, noteId, { includeDeleted = false } = {}) {
-  ensureNoteInnerEncryptColumns(session.db);
-  const deletedClause = includeDeleted ? '' : ' AND deleted_at IS NULL';
-  return queryOne(
-    session.db,
+async function loadNote(db, noteId) {
+  return db.one(
     `SELECT note_id, notebook_id, note_name, body_text, display_order, created_at, updated_at,
             inner_encrypt_enabled, inner_pin_salt, inner_unlock_locked_until,
             image_file_name, image_file_extension, image_relative_path, image_checksum, image_file_size_bytes,
             image_top_file_name, image_top_file_extension, image_top_relative_path, image_top_checksum, image_top_file_size_bytes,
             image_bottom_file_name, image_bottom_file_extension, image_bottom_relative_path, image_bottom_checksum, image_bottom_file_size_bytes
-     FROM notes WHERE note_id = ?${deletedClause}`,
-    [noteId]
+       FROM ${T.notes} WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+    [db.singlesId, noteId]
   );
 }
 
-function loadKeywords(session, noteId) {
-  return queryAll(
-    session.db,
-    `SELECT keyword FROM note_keywords WHERE note_id = ? ORDER BY keyword_normalized ASC`,
-    [noteId]
-  ).map((r) => r.keyword);
+async function loadKeywords(db, noteId) {
+  const rows = await db.all(
+    `SELECT keyword FROM ${T.keywords} WHERE singles_id = $1 AND note_id = $2 ORDER BY keyword_normalized ASC`,
+    [db.singlesId, noteId]
+  );
+  return rows.map((r) => r.keyword);
 }
 
-function mapNote(session, noteId) {
-  const row = loadNote(session, noteId);
+async function mapNote(db, noteId) {
+  const row = await loadNote(db, noteId);
   if (!row) return null;
-  return mapNoteRow(row, loadKeywords(session, noteId), loadAttachmentsForNote(session, noteId), loadExtraImagesForNote(session, noteId));
+  const [keywords, attachments, extraImages] = await Promise.all([
+    loadKeywords(db, noteId),
+    loadAttachmentsForNote(db, noteId),
+    loadExtraImagesForNote(db, noteId)
+  ]);
+  return mapNoteRow(row, keywords, attachments, extraImages);
 }
 
-export function vaultGetNote(session, noteId) {
-  return mapNote(session, noteId);
+export async function vaultGetNote(session, noteId) {
+  const row = await loadNote(session.db, noteId);
+  if (row?.body_text && bodyHasInlineDataImage(row.body_text)) {
+    await materializeInlineDataImagesInNoteBody(session, noteId, row.body_text);
+  }
+  return mapNote(session.db, noteId);
 }
 
 /** Notebook/note sidebar tree — metadata only; no body_text, keywords, attachments, or extra_images. */
-export function vaultGetTree(session) {
-  ensureNoteInnerEncryptColumns(session.db);
-  const notebooks = queryAll(
-    session.db,
-    `SELECT notebook_id, notebook_name, display_order, created_at, updated_at
-     FROM notebooks WHERE deleted_at IS NULL
-     ORDER BY display_order ASC, notebook_id ASC`
-  );
-  const notes = queryAll(
-    session.db,
-    `SELECT note_id, notebook_id, note_name, display_order, created_at, updated_at,
-            inner_encrypt_enabled, inner_unlock_locked_until,
-            image_file_name, image_file_extension, image_relative_path, image_file_size_bytes,
-            image_top_file_name, image_top_file_extension, image_top_relative_path, image_top_file_size_bytes,
-            image_bottom_file_name, image_bottom_file_extension, image_bottom_relative_path, image_bottom_file_size_bytes
-     FROM notes WHERE deleted_at IS NULL
-     ORDER BY display_order ASC, note_id ASC`
-  );
+export async function vaultGetTree(session) {
+  const db = session.db;
+  const sid = db.singlesId;
+  const [notebooks, notes, shortcutRows] = await Promise.all([
+    db.all(
+      `SELECT notebook_id, notebook_name, display_order, created_at, updated_at
+         FROM ${T.notebooks} WHERE singles_id = $1 AND deleted_at IS NULL
+        ORDER BY display_order ASC, notebook_id ASC`,
+      [sid]
+    ),
+    db.all(
+      `SELECT note_id, notebook_id, note_name, display_order, created_at, updated_at,
+              inner_encrypt_enabled, inner_unlock_locked_until,
+              image_file_name, image_file_extension, image_relative_path, image_file_size_bytes,
+              image_top_file_name, image_top_file_extension, image_top_relative_path, image_top_file_size_bytes,
+              image_bottom_file_name, image_bottom_file_extension, image_bottom_relative_path, image_bottom_file_size_bytes
+         FROM ${T.notes} WHERE singles_id = $1 AND deleted_at IS NULL
+        ORDER BY display_order ASC, note_id ASC`,
+      [sid]
+    ),
+    db.all(
+      `SELECT s.shortcut_id, s.target_type, s.notebook_id, s.note_id, s.display_order,
+              nb.notebook_name, n.note_name
+         FROM ${T.shortcuts} s
+         JOIN ${T.notebooks} nb
+           ON nb.singles_id = s.singles_id AND nb.notebook_id = s.notebook_id AND nb.deleted_at IS NULL
+         LEFT JOIN ${T.notes} n
+           ON n.singles_id = s.singles_id AND n.note_id = s.note_id AND n.deleted_at IS NULL
+        WHERE s.singles_id = $1 AND (s.target_type = 'notebook' OR n.note_id IS NOT NULL)
+        ORDER BY s.display_order ASC, s.shortcut_id ASC`,
+      [sid]
+    )
+  ]);
   const notesByNotebook = new Map();
   for (const row of notes) {
     const notebookId = Number(row.notebook_id);
     if (!notesByNotebook.has(notebookId)) notesByNotebook.set(notebookId, []);
     notesByNotebook.get(notebookId).push(mapNoteRowMetadata(row));
   }
-  const shortcutRows = queryAll(
-    session.db,
-    `SELECT s.shortcut_id, s.target_type, s.notebook_id, s.note_id, s.display_order,
-            nb.notebook_name, n.note_name
-     FROM shortcuts s
-     JOIN notebooks nb ON nb.notebook_id = s.notebook_id AND nb.deleted_at IS NULL
-     LEFT JOIN notes n ON n.note_id = s.note_id AND n.deleted_at IS NULL
-     WHERE s.target_type = 'notebook' OR n.note_id IS NOT NULL
-     ORDER BY s.display_order ASC, s.shortcut_id ASC`
-  );
   return {
     notebooks: notebooks.map((nb) => ({
       notebook_id: Number(nb.notebook_id),
@@ -1491,28 +1232,40 @@ export function vaultGetTree(session) {
   };
 }
 
-const INNER_ENCRYPT_BODY_PREFIX = '\u2063RVI';
-
 function noteHasInnerPinEncryption(row) {
   if (Number(row?.inner_encrypt_enabled) === 1) return true;
-  return String(row?.body_text || '').startsWith(INNER_ENCRYPT_BODY_PREFIX);
+  return String(row?.body_text || '').startsWith(NOTE_INNER_ENCRYPT_BODY_PREFIX);
 }
 
-export function vaultSearch(session, chain, evaluateChain) {
-  const rows = queryAll(
-    session.db,
-    `SELECT n.note_id, n.notebook_id, n.note_name, n.body_text, n.display_order, n.inner_encrypt_enabled,
-            nb.notebook_name
-     FROM notes n
-     INNER JOIN notebooks nb ON nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
-     WHERE n.deleted_at IS NULL
-     ORDER BY n.notebook_id ASC, n.display_order ASC, n.note_id ASC`
-  );
+export async function vaultSearch(session, chain, evaluateChain) {
+  const db = session.db;
+  const [rows, keywordRows] = await Promise.all([
+    db.all(
+      `SELECT n.note_id, n.notebook_id, n.note_name, n.body_text, n.display_order, n.inner_encrypt_enabled,
+              nb.notebook_name
+         FROM ${T.notes} n
+         JOIN ${T.notebooks} nb
+           ON nb.singles_id = n.singles_id AND nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
+        WHERE n.singles_id = $1 AND n.deleted_at IS NULL
+        ORDER BY n.notebook_id ASC, n.display_order ASC, n.note_id ASC`,
+      [db.singlesId]
+    ),
+    db.all(
+      `SELECT note_id, keyword FROM ${T.keywords} WHERE singles_id = $1 ORDER BY keyword_normalized ASC`,
+      [db.singlesId]
+    )
+  ]);
+  const keywordsByNote = new Map();
+  for (const kw of keywordRows) {
+    const noteId = Number(kw.note_id);
+    if (!keywordsByNote.has(noteId)) keywordsByNote.set(noteId, []);
+    keywordsByNote.get(noteId).push(kw.keyword);
+  }
   const results = [];
   for (const row of rows) {
     // PIN-locked notes must not appear in search (name/body leak).
     if (noteHasInnerPinEncryption(row)) continue;
-    const keywords = loadKeywords(session, row.note_id);
+    const keywords = keywordsByNote.get(Number(row.note_id)) || [];
     const note = { note_name: row.note_name, body_text: row.body_text, keywords };
     if (evaluateChain(chain, (term) => noteMatchesRecordVaultSearchTerm(note, row.notebook_name, term))) {
       results.push({
@@ -1528,78 +1281,75 @@ export function vaultSearch(session, chain, evaluateChain) {
   return results.slice(0, 50);
 }
 
-export function vaultCreateNotebook(session, notebookName) {
-  const orderRow = queryOne(
-    session.db,
-    `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM notebooks WHERE deleted_at IS NULL`
-  );
-  const displayOrder = Number(orderRow?.next_order ?? 0);
-  session.db.run(`INSERT INTO notebooks (notebook_name, display_order) VALUES (?, ?)`, [
-    notebookName,
-    displayOrder
-  ]);
-  const row = queryOne(session.db, `SELECT last_insert_rowid() AS notebook_id`);
-  markDirty(session);
-  flushDbToUsb(session);
-  return queryOne(
-    session.db,
-    `SELECT notebook_id, notebook_name, display_order, created_at, updated_at FROM notebooks WHERE notebook_id = ?`,
-    [row.notebook_id]
+async function loadNotebookRow(db, notebookId) {
+  return db.one(
+    `SELECT notebook_id, notebook_name, display_order, created_at, updated_at
+       FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2`,
+    [db.singlesId, notebookId]
   );
 }
 
-export function vaultUpdateNotebook(session, notebookId, notebookName) {
-  session.db.run(
-    `UPDATE notebooks SET notebook_name = ?, updated_at = datetime('now') WHERE notebook_id = ? AND deleted_at IS NULL`,
-    [notebookName, notebookId]
-  );
-  markDirty(session);
-  flushDbToUsb(session);
-  return queryOne(
-    session.db,
-    `SELECT notebook_id, notebook_name, display_order, created_at, updated_at FROM notebooks WHERE notebook_id = ?`,
-    [notebookId]
-  );
-}
-
-export function vaultDeleteNotebook(session, notebookId) {
-  const noteRows = queryAll(
-    session.db,
-    `SELECT note_id FROM notes WHERE notebook_id = ?`,
-    [notebookId]
-  );
-  for (const note of noteRows) {
-    try {
-      vaultDeleteNote(session, Number(note.note_id), { skipFlush: true });
-    } catch (err) {
-      console.error('[vaultDeleteNotebook] note cleanup', note?.note_id, err?.message || err);
-    }
-  }
-  // Wipe leftover files/{notebookId}/ and photos/{notebookId}/ (orphans + empty dirs).
-  removeNotebookMediaDirs(session, notebookId);
-  session.db.run(`DELETE FROM shortcuts WHERE notebook_id = ?`, [notebookId]);
-  session.db.run(`DELETE FROM notes WHERE notebook_id = ?`, [notebookId]);
-  session.db.run(`DELETE FROM notebooks WHERE notebook_id = ?`, [notebookId]);
-  markDirty(session);
-  flushDbToUsb(session);
-}
-
-export function vaultReorderNotebooks(session, notebookIds) {
-  notebookIds.forEach((id, i) => {
-    session.db.run(
-      `UPDATE notebooks SET display_order = ?, updated_at = datetime('now') WHERE notebook_id = ? AND deleted_at IS NULL`,
-      [i, id]
+export async function vaultCreateNotebook(session, notebookName) {
+  const notebookId = await session.db.tx(async (tx) => {
+    const orderRow = await tx.one(
+      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order
+         FROM ${T.notebooks} WHERE singles_id = $1 AND deleted_at IS NULL`,
+      [tx.singlesId]
     );
+    const id = await tx.nextId('notebooks');
+    await tx.run(
+      `INSERT INTO ${T.notebooks} (singles_id, notebook_id, notebook_name, display_order)
+       VALUES ($1, $2, $3, $4)`,
+      [tx.singlesId, id, notebookName, Number(orderRow?.next_order ?? 0)]
+    );
+    return id;
   });
-  markDirty(session);
-  flushDbToUsb(session);
+  return loadNotebookRow(session.db, notebookId);
 }
 
-async function nextNoteDisplayOrder(session, notebookId) {
-  const row = queryOne(
-    session.db,
-    `SELECT COALESCE(MIN(display_order), 0) - 1 AS next_order FROM notes WHERE notebook_id = ? AND deleted_at IS NULL`,
-    [notebookId]
+export async function vaultUpdateNotebook(session, notebookId, notebookName) {
+  await session.db.run(
+    `UPDATE ${T.notebooks} SET notebook_name = $3, updated_at = NOW()
+      WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+    [session.db.singlesId, notebookId, notebookName]
+  );
+  return loadNotebookRow(session.db, notebookId);
+}
+
+export async function vaultDeleteNotebook(session, notebookId) {
+  await session.db.tx(async (tx) => {
+    const noteRows = await tx.all(
+      `SELECT note_id FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2`,
+      [tx.singlesId, notebookId]
+    );
+    for (const note of noteRows) {
+      await deleteNoteData(session, tx, Number(note.note_id));
+    }
+    // Wipe leftover files/{notebookId}/ and photos/{notebookId}/ (orphans + empty dirs).
+    removeNotebookMediaDirs(session, notebookId);
+    await tx.run(`DELETE FROM ${T.shortcuts} WHERE singles_id = $1 AND notebook_id = $2`, [tx.singlesId, notebookId]);
+    await tx.run(`DELETE FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2`, [tx.singlesId, notebookId]);
+    await tx.run(`DELETE FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2`, [tx.singlesId, notebookId]);
+  });
+}
+
+export async function vaultReorderNotebooks(session, notebookIds) {
+  await session.db.tx(async (tx) => {
+    for (let i = 0; i < notebookIds.length; i += 1) {
+      await tx.run(
+        `UPDATE ${T.notebooks} SET display_order = $3, updated_at = NOW()
+          WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+        [tx.singlesId, notebookIds[i], i]
+      );
+    }
+  });
+}
+
+async function nextNoteDisplayOrder(db, notebookId) {
+  const row = await db.one(
+    `SELECT COALESCE(MIN(display_order), 0) - 1 AS next_order
+       FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+    [db.singlesId, notebookId]
   );
   return Number(row?.next_order ?? -1);
 }
@@ -1609,48 +1359,49 @@ export async function vaultCreateNote(
   notebookId,
   { noteName, bodyText, keywords, imageBuffer, imageExt, innerEncryptEnabled, innerPinSalt }
 ) {
-  const nb = queryOne(
-    session.db,
-    `SELECT notebook_id FROM notebooks WHERE deleted_at IS NULL AND notebook_id = ?`,
-    [notebookId]
-  );
-  if (!nb) throw new Error('Notebook not found');
-
-  const displayOrder = await nextNoteDisplayOrder(session, notebookId);
-  const name = noteName || 'New Note';
-  const body = bodyText ?? DEFAULT_BODY_TEXT;
-  const innerEnabled = innerEncryptEnabled ? 1 : 0;
-  const innerSalt = innerPinSalt ? String(innerPinSalt).trim().slice(0, 512) : null;
-  session.db.run(
-    `INSERT INTO notes (notebook_id, note_name, body_text, display_order, inner_encrypt_enabled, inner_pin_salt)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [notebookId, name, body, displayOrder, innerEnabled, innerSalt]
-  );
-  const noteId = queryOne(session.db, `SELECT last_insert_rowid() AS note_id`).note_id;
-  refreshNoteSearchText(session.db, noteId);
-
-  if (imageBuffer?.length) {
-    const ext = imageExt || 'jpg';
-    const relativePath = photoRelativePath(notebookId, noteId, 'center', ext);
-    writeEncryptedPhoto(session, relativePath, imageBuffer);
-    const checksum = crypto.createHash('sha256').update(imageBuffer).digest('hex');
-    session.db.run(
-      `UPDATE notes SET image_relative_path = ?, image_file_extension = ?, image_file_size_bytes = ?,
-              image_checksum = ?, image_file_name = ?, updated_at = datetime('now')
-       WHERE note_id = ?`,
-      [relativePath, ext, imageBuffer.length, checksum, `note_${noteId}`, noteId]
+  const noteId = await session.db.tx(async (tx) => {
+    const nb = await tx.one(
+      `SELECT notebook_id FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [tx.singlesId, notebookId]
     );
-  }
+    if (!nb) throw new Error('Notebook not found');
 
-  if (keywords) {
-    vaultReplaceKeywords(session, noteId, keywords);
-  } else {
-    refreshNoteSearchText(session.db, noteId);
-  }
+    const displayOrder = await nextNoteDisplayOrder(tx, notebookId);
+    const name = noteName || 'New Note';
+    const body = bodyText ?? DEFAULT_BODY_TEXT;
+    const innerEnabled = innerEncryptEnabled ? 1 : 0;
+    const innerSalt = innerPinSalt ? String(innerPinSalt).trim().slice(0, 512) : null;
+    const id = await tx.nextId('notes');
+    await tx.run(
+      `INSERT INTO ${T.notes} (singles_id, note_id, notebook_id, note_name, body_text, display_order, inner_encrypt_enabled, inner_pin_salt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [tx.singlesId, id, notebookId, name, body, displayOrder, innerEnabled, innerSalt]
+    );
 
-  markDirty(session);
-  flushDbToUsb(session);
-  return mapNote(session, noteId);
+    if (imageBuffer?.length) {
+      const ext = imageExt || 'jpg';
+      const relativePath = photoRelativePath(notebookId, id, 'center', ext);
+      writeEncryptedPhoto(session, relativePath, imageBuffer);
+      const checksum = crypto.createHash('sha256').update(imageBuffer).digest('hex');
+      await tx.run(
+        `UPDATE ${T.notes} SET image_relative_path = $3, image_file_extension = $4, image_file_size_bytes = $5,
+                image_checksum = $6, image_file_name = $7, updated_at = NOW()
+          WHERE singles_id = $1 AND note_id = $2`,
+        [tx.singlesId, id, relativePath, ext, imageBuffer.length, checksum, `note_${id}`]
+      );
+    }
+
+    if (keywords) {
+      await vaultReplaceKeywords(tx, id, keywords);
+    } else {
+      await refreshNoteSearchText(tx, id);
+    }
+    return id;
+  });
+  if (bodyHasInlineDataImage(bodyText ?? '')) {
+    await materializeInlineDataImagesInNoteBody(session, noteId, bodyText);
+  }
+  return mapNote(session.db, noteId);
 }
 
 function slotFields(slot) {
@@ -1681,112 +1432,109 @@ function slotFields(slot) {
   };
 }
 
-export function vaultUpdateNote(session, noteId, patch) {
-  const row = loadNote(session, noteId);
-  if (!row) throw new Error('Note not found');
-  // Leaving TutaNotes always flushes the open note; an identical save must not make
-  // vault.db newer than the backup just taken ("needs backup" prompt on Exit to Mall).
-  if (isUnchangedNoteTextPatch(row, patch)) return mapNote(session, noteId);
+async function clearSlotImageColumns(db, noteId, fields) {
+  await db.run(
+    `UPDATE ${T.notes} SET ${fields.relative} = NULL, ${fields.ext} = NULL, ${fields.size} = NULL,
+            ${fields.checksum} = NULL, ${fields.name} = NULL, updated_at = NOW()
+      WHERE singles_id = $1 AND note_id = $2`,
+    [db.singlesId, noteId]
+  );
+}
 
-  if (patch.notebook_id != null && Number(patch.notebook_id) !== Number(row.notebook_id)) {
-    const targetNb = Number(patch.notebook_id);
-    const nb = queryOne(
-      session.db,
-      `SELECT notebook_id FROM notebooks WHERE notebook_id = ? AND deleted_at IS NULL`,
-      [targetNb]
-    );
-    if (!nb) throw new Error('Target notebook not found');
-    session.db.run(`UPDATE notes SET notebook_id = ?, updated_at = datetime('now') WHERE note_id = ?`, [
-      targetNb,
-      noteId
-    ]);
-  }
+async function updateNoteColumn(db, noteId, column, value) {
+  await db.run(
+    `UPDATE ${T.notes} SET ${column} = $3, updated_at = NOW() WHERE singles_id = $1 AND note_id = $2`,
+    [db.singlesId, noteId, value]
+  );
+}
 
-  if (patch.note_name != null) {
-    session.db.run(`UPDATE notes SET note_name = ?, updated_at = datetime('now') WHERE note_id = ?`, [
-      patch.note_name,
-      noteId
-    ]);
-  }
-  if (patch.body_text != null) {
-    session.db.run(`UPDATE notes SET body_text = ?, updated_at = datetime('now') WHERE note_id = ?`, [
-      patch.body_text,
-      noteId
-    ]);
-  }
-  if (patch.inner_encrypt_enabled != null) {
-    const enabled = patch.inner_encrypt_enabled ? 1 : 0;
-    session.db.run(`UPDATE notes SET inner_encrypt_enabled = ?, updated_at = datetime('now') WHERE note_id = ?`, [
-      enabled,
-      noteId
-    ]);
-  }
-  if (patch.inner_pin_salt !== undefined) {
-    const salt = patch.inner_pin_salt == null ? null : String(patch.inner_pin_salt);
-    session.db.run(`UPDATE notes SET inner_pin_salt = ?, updated_at = datetime('now') WHERE note_id = ?`, [
-      salt,
-      noteId
-    ]);
-  }
-  if (patch.inner_unlock_locked_until !== undefined) {
-    const until =
-      patch.inner_unlock_locked_until == null || patch.inner_unlock_locked_until === ''
-        ? null
-        : String(patch.inner_unlock_locked_until).trim().slice(0, 64);
-    session.db.run(
-      `UPDATE notes SET inner_unlock_locked_until = ?, updated_at = datetime('now') WHERE note_id = ?`,
-      [until, noteId]
-    );
-  }
+export async function vaultUpdateNote(session, noteId, patch) {
+  const existing = await loadNote(session.db, noteId);
+  if (!existing) throw new Error('Note not found');
+  // Leaving TutaNotes always flushes the open note; an identical save must not dirty state.
+  if (isUnchangedNoteTextPatch(existing, patch)) return mapNote(session.db, noteId);
 
-  for (const slot of ['center', 'top', 'bottom']) {
-    const clearKey =
-      slot === 'top' ? 'clear_image_top' : slot === 'bottom' ? 'clear_image_bottom' : 'clear_image';
-    const imageKey = slot === 'top' ? 'image_top' : slot === 'bottom' ? 'image_bottom' : 'image';
-    if (patch[clearKey]) {
-      const fields = slotFields(slot);
-      const rel = row[fields.relative];
-      deleteEncryptedPhoto(session, rel);
-      session.db.run(
-        `UPDATE notes SET ${fields.relative} = NULL, ${fields.ext} = NULL, ${fields.size} = NULL,
-                ${fields.checksum} = NULL, ${fields.name} = NULL, updated_at = datetime('now')
-         WHERE note_id = ?`,
-        [noteId]
+  await session.db.tx(async (tx) => {
+    const row = await loadNote(tx, noteId);
+    if (!row) throw new Error('Note not found');
+
+    if (patch.notebook_id != null && Number(patch.notebook_id) !== Number(row.notebook_id)) {
+      const targetNb = Number(patch.notebook_id);
+      const nb = await tx.one(
+        `SELECT notebook_id FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+        [tx.singlesId, targetNb]
       );
-    } else if (patch[`${imageKey}Parsed`]?.buffer?.length) {
-      const parsed = patch[`${imageKey}Parsed`];
-      const current = loadNote(session, noteId);
-      const fields = slotFields(slot);
-      const ext = parsed.ext || 'jpg';
-      const relativePath = photoRelativePath(current.notebook_id, noteId, slot, ext);
-      deleteEncryptedPhoto(session, current[fields.relative]);
-      writeEncryptedPhoto(session, relativePath, parsed.buffer);
-      const checksum = crypto.createHash('sha256').update(parsed.buffer).digest('hex');
-      session.db.run(
-        `UPDATE notes SET ${fields.relative} = ?, ${fields.ext} = ?, ${fields.size} = ?,
-                ${fields.checksum} = ?, ${fields.name} = ?, updated_at = datetime('now')
-         WHERE note_id = ?`,
-        [
-          relativePath,
-          ext,
-          parsed.buffer.length,
-          checksum,
-          slot === 'center' ? `note_${noteId}` : `note_${noteId}_${slot}`,
-          noteId
-        ]
-      );
+      if (!nb) throw new Error('Target notebook not found');
+      await updateNoteColumn(tx, noteId, 'notebook_id', targetNb);
     }
-  }
 
-  if (patch.keywords != null) {
-    vaultReplaceKeywords(session, noteId, patch.keywords);
-  } else {
-    refreshNoteSearchText(session.db, noteId);
-  }
+    if (patch.note_name != null) {
+      await updateNoteColumn(tx, noteId, 'note_name', patch.note_name);
+    }
+    if (patch.body_text != null) {
+      // Store raw first; materializeInlineDataImagesInNoteBody runs after the tx
+      // (needs vaultAddNoteAttachment / disk writes outside this transaction).
+      await updateNoteColumn(tx, noteId, 'body_text', patch.body_text);
+    }
+    if (patch.inner_encrypt_enabled != null) {
+      await updateNoteColumn(tx, noteId, 'inner_encrypt_enabled', patch.inner_encrypt_enabled ? 1 : 0);
+    }
+    if (patch.inner_pin_salt !== undefined) {
+      const salt = patch.inner_pin_salt == null ? null : String(patch.inner_pin_salt);
+      await updateNoteColumn(tx, noteId, 'inner_pin_salt', salt);
+    }
+    if (patch.inner_unlock_locked_until !== undefined) {
+      const until =
+        patch.inner_unlock_locked_until == null || patch.inner_unlock_locked_until === ''
+          ? null
+          : String(patch.inner_unlock_locked_until).trim().slice(0, 64);
+      await updateNoteColumn(tx, noteId, 'inner_unlock_locked_until', until);
+    }
 
-  markDirty(session);
-  flushDbToUsb(session);
-  return mapNote(session, noteId);
+    for (const slot of ['center', 'top', 'bottom']) {
+      const clearKey =
+        slot === 'top' ? 'clear_image_top' : slot === 'bottom' ? 'clear_image_bottom' : 'clear_image';
+      const imageKey = slot === 'top' ? 'image_top' : slot === 'bottom' ? 'image_bottom' : 'image';
+      if (patch[clearKey]) {
+        const fields = slotFields(slot);
+        deleteEncryptedPhoto(session, row[fields.relative]);
+        await clearSlotImageColumns(tx, noteId, fields);
+      } else if (patch[`${imageKey}Parsed`]?.buffer?.length) {
+        const parsed = patch[`${imageKey}Parsed`];
+        const current = await loadNote(tx, noteId);
+        const fields = slotFields(slot);
+        const ext = parsed.ext || 'jpg';
+        const relativePath = photoRelativePath(current.notebook_id, noteId, slot, ext);
+        deleteEncryptedPhoto(session, current[fields.relative]);
+        writeEncryptedPhoto(session, relativePath, parsed.buffer);
+        const checksum = crypto.createHash('sha256').update(parsed.buffer).digest('hex');
+        await tx.run(
+          `UPDATE ${T.notes} SET ${fields.relative} = $3, ${fields.ext} = $4, ${fields.size} = $5,
+                  ${fields.checksum} = $6, ${fields.name} = $7, updated_at = NOW()
+            WHERE singles_id = $1 AND note_id = $2`,
+          [
+            tx.singlesId,
+            noteId,
+            relativePath,
+            ext,
+            parsed.buffer.length,
+            checksum,
+            slot === 'center' ? `note_${noteId}` : `note_${noteId}_${slot}`
+          ]
+        );
+      }
+    }
+
+    if (patch.keywords != null) {
+      await vaultReplaceKeywords(tx, noteId, patch.keywords);
+    } else {
+      await refreshNoteSearchText(tx, noteId);
+    }
+  });
+  if (patch.body_text != null && bodyHasInlineDataImage(patch.body_text)) {
+    await materializeInlineDataImagesInNoteBody(session, noteId, patch.body_text);
+  }
+  return mapNote(session.db, noteId);
 }
 
 function normalizeVaultImageSlot(slot) {
@@ -1802,15 +1550,10 @@ function readSlotPlainImage(session, row, slot) {
   return readEncryptedPhoto(session, relative);
 }
 
-function writeSlotPlainImage(session, noteId, notebookId, slot, plainBuffer, meta = {}) {
+async function writeSlotPlainImage(session, db, noteId, notebookId, slot, plainBuffer, meta = {}) {
   const fields = slotFields(slot);
   if (!plainBuffer?.length) {
-    session.db.run(
-      `UPDATE notes SET ${fields.relative} = NULL, ${fields.ext} = NULL, ${fields.size} = NULL,
-              ${fields.checksum} = NULL, ${fields.name} = NULL, updated_at = datetime('now')
-       WHERE note_id = ?`,
-      [noteId]
-    );
+    await clearSlotImageColumns(db, noteId, fields);
     return;
   }
 
@@ -1819,15 +1562,15 @@ function writeSlotPlainImage(session, noteId, notebookId, slot, plainBuffer, met
   writeEncryptedPhoto(session, relativePath, plainBuffer);
   const checksum = meta.checksum || crypto.createHash('sha256').update(plainBuffer).digest('hex');
   const name = slot === 'center' ? `note_${noteId}` : `note_${noteId}_${slot}`;
-  session.db.run(
-    `UPDATE notes SET ${fields.relative} = ?, ${fields.ext} = ?, ${fields.size} = ?,
-            ${fields.checksum} = ?, ${fields.name} = ?, updated_at = datetime('now')
-     WHERE note_id = ?`,
-    [relativePath, ext, plainBuffer.length, checksum, name, noteId]
+  await db.run(
+    `UPDATE ${T.notes} SET ${fields.relative} = $3, ${fields.ext} = $4, ${fields.size} = $5,
+            ${fields.checksum} = $6, ${fields.name} = $7, updated_at = NOW()
+      WHERE singles_id = $1 AND note_id = $2`,
+    [db.singlesId, noteId, relativePath, ext, plainBuffer.length, checksum, name]
   );
 }
 
-export function vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSlot) {
+export async function vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSlot) {
   const sourceSlot = normalizeVaultImageSlot(fromSlot);
   const targetSlot = normalizeVaultImageSlot(toSlot);
   const fromId = Number(fromNoteId);
@@ -1836,57 +1579,53 @@ export function vaultMoveNoteImage(session, fromNoteId, fromSlot, toNoteId, toSl
     throw new Error('Invalid note id');
   }
   if (fromId === toId && sourceSlot === targetSlot) {
-    const note = mapNote(session, fromId);
+    const note = await mapNote(session.db, fromId);
     return { fromNote: note, toNote: note };
   }
 
-  const fromRow = loadNote(session, fromId);
-  const toRow = loadNote(session, toId);
-  if (!fromRow || !toRow) throw new Error('Note not found');
+  await session.db.tx(async (tx) => {
+    const fromRow = await loadNote(tx, fromId);
+    const toRow = await loadNote(tx, toId);
+    if (!fromRow || !toRow) throw new Error('Note not found');
 
-  const plainFrom = readSlotPlainImage(session, fromRow, sourceSlot);
-  if (!plainFrom?.length) throw new Error('Source image not found');
+    const plainFrom = readSlotPlainImage(session, fromRow, sourceSlot);
+    if (!plainFrom?.length) throw new Error('Source image not found');
 
-  const fromFields = slotFields(sourceSlot);
-  const toFields = slotFields(targetSlot);
-  const fromMeta = {
-    ext: fromRow[fromFields.ext],
-    checksum: fromRow[fromFields.checksum]
-  };
-  const toMeta = {
-    ext: toRow[toFields.ext],
-    checksum: toRow[toFields.checksum]
-  };
+    const fromFields = slotFields(sourceSlot);
+    const toFields = slotFields(targetSlot);
+    const fromMeta = {
+      ext: fromRow[fromFields.ext],
+      checksum: fromRow[fromFields.checksum]
+    };
+    const toMeta = {
+      ext: toRow[toFields.ext],
+      checksum: toRow[toFields.checksum]
+    };
 
-  const plainTo = readSlotPlainImage(session, toRow, targetSlot);
+    const plainTo = readSlotPlainImage(session, toRow, targetSlot);
 
-  deleteEncryptedPhoto(session, fromRow[fromFields.relative]);
-  if (toRow[toFields.relative] && toRow[toFields.relative] !== fromRow[fromFields.relative]) {
-    deleteEncryptedPhoto(session, toRow[toFields.relative]);
-  }
+    deleteEncryptedPhoto(session, fromRow[fromFields.relative]);
+    if (toRow[toFields.relative] && toRow[toFields.relative] !== fromRow[fromFields.relative]) {
+      deleteEncryptedPhoto(session, toRow[toFields.relative]);
+    }
 
-  writeSlotPlainImage(session, toId, toRow.notebook_id, targetSlot, plainFrom, fromMeta);
+    await writeSlotPlainImage(session, tx, toId, toRow.notebook_id, targetSlot, plainFrom, fromMeta);
 
-  if (plainTo?.length) {
-    writeSlotPlainImage(session, fromId, fromRow.notebook_id, sourceSlot, plainTo, toMeta);
-  } else {
-    session.db.run(
-      `UPDATE notes SET ${fromFields.relative} = NULL, ${fromFields.ext} = NULL, ${fromFields.size} = NULL,
-              ${fromFields.checksum} = NULL, ${fromFields.name} = NULL, updated_at = datetime('now')
-       WHERE note_id = ?`,
-      [fromId]
-    );
-  }
+    if (plainTo?.length) {
+      await writeSlotPlainImage(session, tx, fromId, fromRow.notebook_id, sourceSlot, plainTo, toMeta);
+    } else {
+      await clearSlotImageColumns(tx, fromId, fromFields);
+    }
 
-  refreshNoteSearchText(session.db, fromId);
-  if (toId !== fromId) refreshNoteSearchText(session.db, toId);
-  markDirty(session);
-  flushDbToUsb(session);
-  return { fromNote: mapNote(session, fromId), toNote: mapNote(session, toId) };
+    await refreshNoteSearchText(tx, fromId);
+    if (toId !== fromId) await refreshNoteSearchText(tx, toId);
+  });
+  return { fromNote: await mapNote(session.db, fromId), toNote: await mapNote(session.db, toId) };
 }
 
-function vaultReplaceKeywords(session, noteId, keywords) {
-  session.db.run(`DELETE FROM note_keywords WHERE note_id = ?`, [noteId]);
+/** Inside db.tx(). */
+async function vaultReplaceKeywords(db, noteId, keywords) {
+  await db.run(`DELETE FROM ${T.keywords} WHERE singles_id = $1 AND note_id = $2`, [db.singlesId, noteId]);
   const list = Array.isArray(keywords) ? keywords : [];
   const seen = new Set();
   for (const raw of list) {
@@ -1894,16 +1633,20 @@ function vaultReplaceKeywords(session, noteId, keywords) {
     const normalized = normalizeRecordVaultKeyword(keyword);
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
-    session.db.run(
-      `INSERT INTO note_keywords (note_id, keyword, keyword_normalized) VALUES (?, ?, ?)`,
-      [noteId, keyword, normalized]
+    const keywordId = await db.nextId('keywords');
+    await db.run(
+      `INSERT INTO ${T.keywords} (singles_id, note_keyword_id, note_id, keyword, keyword_normalized)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (singles_id, note_id, keyword_normalized) DO NOTHING`,
+      [db.singlesId, keywordId, noteId, keyword, normalized]
     );
   }
-  refreshNoteSearchText(session.db, noteId);
+  await refreshNoteSearchText(db, noteId);
 }
 
 /**
- * Remove on-disk media for one note: files/{notebookId}/{noteId}/.
+ * Remove on-disk media for one album (note): files/{notebookId}/{noteId}/ (all att_* +
+ * _1000px / _thumbnail siblings). Works under LARGE_CHEAP_STORAGE_FOLDER (TutaDrive).
  */
 function removeNoteMediaDirs(session, notebookId, noteId) {
   const nb = String(notebookId);
@@ -1911,9 +1654,6 @@ function removeNoteMediaDirs(session, notebookId, noteId) {
   writeToMirrorPaths(session, (mountPath) => {
     removeDirRecursive(path.join(vaultFilesRoot(mountPath), nb, nid));
   });
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(session, `${VAULT_FILES_DIR}/${nb}/${nid}`);
-  }
 }
 
 function removeNotebookMediaDirs(session, notebookId) {
@@ -1922,46 +1662,35 @@ function removeNotebookMediaDirs(session, notebookId) {
     removeDirRecursive(path.join(vaultFilesRoot(mountPath), nb));
     removeDirRecursive(path.join(vaultPhotosRoot(mountPath), nb));
   });
-  if (session.storageType === 'onedrive') {
-    scheduleCloudRelativeSync(session, `${VAULT_FILES_DIR}/${nb}`);
-    scheduleCloudRelativeSync(session, `${VAULT_PHOTOS_DIR}/${nb}`);
-  }
 }
 
-export function vaultDeleteNote(session, noteId, { skipFlush = false } = {}) {
-  const row = loadNote(session, noteId, { includeDeleted: true });
-  if (!row) {
-    // Fall back: note may already be soft-deleted but still have disk folders.
-    const anyRow = queryOne(session.db, `SELECT note_id, notebook_id FROM notes WHERE note_id = ?`, [noteId]);
-    if (!anyRow) throw new Error('Note not found');
-    removeNoteMediaDirs(session, anyRow.notebook_id, noteId);
-    hardDeleteNoteDbRows(session, noteId);
-    markDirty(session);
-    if (!skipFlush) flushDbToUsb(session);
-    return;
-  }
+/** Inside db.tx(): delete one note's media files and every row that belongs to it. */
+async function deleteNoteData(session, tx, noteId) {
+  const sid = tx.singlesId;
+  const row = await tx.one(
+    `SELECT notebook_id, image_relative_path, image_top_relative_path, image_bottom_relative_path
+       FROM ${T.notes} WHERE singles_id = $1 AND note_id = $2`,
+    [sid, noteId]
+  );
+  if (!row) return false;
   for (const rel of [row.image_relative_path, row.image_top_relative_path, row.image_bottom_relative_path]) {
     deleteEncryptedPhoto(session, rel);
   }
-  if (vaultTableExists(session.db, 'note_extra_images')) {
-    const extraImageRows = queryAll(
-      session.db,
-      `SELECT relative_path FROM note_extra_images WHERE note_id = ?`,
-      [noteId]
-    );
-    for (const img of extraImageRows) {
-      deleteEncryptedPhoto(session, img.relative_path);
-    }
+  const extraImageRows = await tx.all(
+    `SELECT relative_path FROM ${T.extraImages} WHERE singles_id = $1 AND note_id = $2`,
+    [sid, noteId]
+  );
+  for (const img of extraImageRows) {
+    deleteEncryptedPhoto(session, img.relative_path);
   }
   // Include already soft-deleted rows so orphaned disk files are still removed.
-  const attachmentRows = queryAll(
-    session.db,
-    `SELECT relative_path, shared_content_key, checksum, file_name FROM note_attachments WHERE note_id = ?`,
-    [noteId]
+  const attachmentRows = await tx.all(
+    `SELECT relative_path, shared_content_key, checksum, file_name FROM ${T.attachments}
+      WHERE singles_id = $1 AND note_id = $2`,
+    [sid, noteId]
   );
   for (const att of attachmentRows) {
     if (!att.relative_path) continue;
-    // Shared sample bytes live outside the vault — only remove per-vault copies.
     const sharedKey = resolveRecordVaultSharedContentKey({
       sharedContentKey: att.shared_content_key,
       checksum: att.checksum,
@@ -1971,195 +1700,212 @@ export function vaultDeleteNote(session, noteId, { skipFlush = false } = {}) {
       deleteEncryptedVaultFile(session, att.relative_path);
     }
   }
-  // Nuclear: remove entire note folder under files/ (catches leftovers / orphans).
+  // Nuclear: remove entire album folder (catches any leftover variants / orphans).
   removeNoteMediaDirs(session, row.notebook_id, noteId);
-  hardDeleteNoteDbRows(session, noteId);
-  markDirty(session);
-  if (!skipFlush) flushDbToUsb(session);
+  for (const table of [T.extraImages, T.keywords, T.attachments, T.shortcuts, T.notes]) {
+    await tx.run(`DELETE FROM ${table} WHERE singles_id = $1 AND note_id = $2`, [sid, noteId]);
+  }
+  return true;
 }
 
-function hardDeleteNoteDbRows(session, noteId) {
-  if (vaultTableExists(session.db, 'note_extra_images')) {
-    session.db.run(`DELETE FROM note_extra_images WHERE note_id = ?`, [noteId]);
-  }
-  if (vaultTableExists(session.db, 'note_keywords')) {
-    session.db.run(`DELETE FROM note_keywords WHERE note_id = ?`, [noteId]);
-  }
-  session.db.run(`DELETE FROM note_attachments WHERE note_id = ?`, [noteId]);
-  session.db.run(`DELETE FROM shortcuts WHERE note_id = ?`, [noteId]);
-  session.db.run(`DELETE FROM notes WHERE note_id = ?`, [noteId]);
-}
-
-export function vaultReorderNotes(session, notebookId, noteIds) {
-  noteIds.forEach((id, i) => {
-    session.db.run(
-      `UPDATE notes SET display_order = ?, updated_at = datetime('now')
-       WHERE note_id = ? AND notebook_id = ? AND deleted_at IS NULL`,
-      [i, id, notebookId]
-    );
+export async function vaultDeleteNote(session, noteId) {
+  await session.db.tx(async (tx) => {
+    const note = await loadNote(tx, noteId);
+    if (!note) throw new Error('Note not found');
+    await deleteNoteData(session, tx, noteId);
   });
-  markDirty(session);
-  flushDbToUsb(session);
 }
 
-export function vaultGetNoteImage(session, noteId, slot = 'center') {
-  const row = loadNote(session, noteId);
+export async function vaultReorderNotes(session, notebookId, noteIds) {
+  await session.db.tx(async (tx) => {
+    for (let i = 0; i < noteIds.length; i += 1) {
+      await tx.run(
+        `UPDATE ${T.notes} SET display_order = $4, updated_at = NOW()
+          WHERE singles_id = $1 AND note_id = $2 AND notebook_id = $3 AND deleted_at IS NULL`,
+        [tx.singlesId, noteIds[i], notebookId, i]
+      );
+    }
+  });
+}
+
+function imageContentTypeForExt(extRaw) {
+  const ext = String(extRaw || 'jpg').toLowerCase();
+  return ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+}
+
+export async function vaultGetNoteImage(session, noteId, slot = 'center') {
+  const row = await loadNote(session.db, noteId);
   if (!row) return null;
   const fields = slotFields(slot);
   const relative = row[fields.relative];
   if (!relative) return null;
   const buffer = readEncryptedPhoto(session, relative);
   if (!buffer) return null;
-  const ext = String(row[fields.ext] || 'jpg').toLowerCase();
-  const contentType =
-    ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-  return { buffer, contentType };
+  return { buffer, contentType: imageContentTypeForExt(row[fields.ext]) };
 }
 
 export async function vaultEnsureNotePhotoOnDisk(_session, _noteId, _slot = 'center') {}
 
 export async function vaultEnsureNoteExtraImageOnDisk(_session, _noteId, _imageId) {}
 
-export async function vaultEnsureNoteAttachmentOnDisk(_session, _noteId, _attachmentId) {}
+export async function vaultEnsureNoteAttachmentOnDisk(_session, _noteId, _attachmentId, _opts = {}) {}
 
-export function vaultAddNoteExtraImage(session, noteId, { buffer, ext }) {
-  ensureNoteExtraImagesTable(session.db);
-  const row = loadNote(session, noteId);
-  if (!row) throw new Error('Note not found');
+export async function vaultAddNoteExtraImage(session, noteId, { buffer, ext }) {
   if (!buffer?.length) throw new Error('Image is empty');
+  await session.db.tx(async (tx) => {
+    const row = await loadNote(tx, noteId);
+    if (!row) throw new Error('Note not found');
 
-  const cleanExt = String(ext || 'jpg').replace(/^\./, '').toLowerCase() || 'jpg';
-  const orderRow = queryOne(
-    session.db,
-    `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM note_extra_images WHERE note_id = ?`,
-    [noteId]
-  );
-  const displayOrder = Number(orderRow?.next_order ?? 0);
-  const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
-
-  session.db.run(
-    `INSERT INTO note_extra_images (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, display_order)
-     VALUES (?, ?, ?, '', ?, ?, ?)`,
-    [noteId, `note_${noteId}_extra`, cleanExt, buffer.length, checksum, displayOrder]
-  );
-  const imageId = Number(queryOne(session.db, `SELECT last_insert_rowid() AS image_id`).image_id);
-  const relativePath = extraPhotoRelativePath(row.notebook_id, noteId, imageId, cleanExt);
-  session.db.run(`UPDATE note_extra_images SET relative_path = ? WHERE image_id = ?`, [relativePath, imageId]);
-  writeEncryptedPhoto(session, relativePath, buffer);
-  scheduleFlushDbToUsb(session);
-  return mapNote(session, noteId);
+    const cleanExt = String(ext || 'jpg').replace(/^\./, '').toLowerCase() || 'jpg';
+    const orderRow = await tx.one(
+      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order
+         FROM ${T.extraImages} WHERE singles_id = $1 AND note_id = $2`,
+      [tx.singlesId, noteId]
+    );
+    const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
+    const imageId = await tx.nextId('extraImages');
+    const relativePath = extraPhotoRelativePath(row.notebook_id, noteId, imageId, cleanExt);
+    await tx.run(
+      `INSERT INTO ${T.extraImages}
+         (singles_id, image_id, note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        tx.singlesId,
+        imageId,
+        noteId,
+        `note_${noteId}_extra`,
+        cleanExt,
+        relativePath,
+        buffer.length,
+        checksum,
+        Number(orderRow?.next_order ?? 0)
+      ]
+    );
+    writeEncryptedPhoto(session, relativePath, buffer);
+  });
+  return mapNote(session.db, noteId);
 }
 
-export function vaultDeleteNoteExtraImage(session, noteId, imageId) {
-  const row = queryOne(
-    session.db,
-    `SELECT image_id, relative_path FROM note_extra_images
-     WHERE image_id = ? AND note_id = ? AND deleted_at IS NULL`,
-    [imageId, noteId]
+export async function vaultDeleteNoteExtraImage(session, noteId, imageId) {
+  const db = session.db;
+  const row = await db.one(
+    `SELECT image_id, relative_path FROM ${T.extraImages}
+      WHERE singles_id = $1 AND image_id = $2 AND note_id = $3 AND deleted_at IS NULL`,
+    [db.singlesId, imageId, noteId]
   );
   if (!row) throw new Error('Image not found');
+  await db.run(`UPDATE ${T.extraImages} SET deleted_at = NOW() WHERE singles_id = $1 AND image_id = $2`, [
+    db.singlesId,
+    imageId
+  ]);
   deleteEncryptedPhoto(session, row.relative_path);
-  session.db.run(`UPDATE note_extra_images SET deleted_at = datetime('now') WHERE image_id = ?`, [imageId]);
-  markDirty(session);
-  flushDbToUsb(session);
-  return mapNote(session, noteId);
+  return mapNote(db, noteId);
 }
 
-export function vaultGetNoteExtraImage(session, noteId, imageId) {
-  const row = queryOne(
-    session.db,
-    `SELECT file_extension, relative_path FROM note_extra_images
-     WHERE image_id = ? AND note_id = ? AND deleted_at IS NULL`,
-    [imageId, noteId]
+export async function vaultGetNoteExtraImage(session, noteId, imageId) {
+  const row = await session.db.one(
+    `SELECT file_extension, relative_path FROM ${T.extraImages}
+      WHERE singles_id = $1 AND image_id = $2 AND note_id = $3 AND deleted_at IS NULL`,
+    [session.db.singlesId, imageId, noteId]
   );
   if (!row?.relative_path) return null;
   const buffer = readEncryptedPhoto(session, row.relative_path);
   if (!buffer) return null;
-  const ext = String(row.file_extension || 'jpg').toLowerCase();
-  const contentType =
-    ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-  return { buffer, contentType };
+  return { buffer, contentType: imageContentTypeForExt(row.file_extension) };
 }
 
-export function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType }) {
-  const row = loadNote(session, noteId);
+
+export async function vaultAddNoteAttachment(session, noteId, { buffer, fileName, ext, mimeType }) {
+  const db = session.db;
+  const row = await loadNote(db, noteId);
   if (!row) throw new Error('Note not found');
   if (!buffer?.length) throw new Error('File is empty');
 
   const cleanExt = String(ext || 'bin').replace(/^\./, '').toLowerCase();
-  const safeName = String(fileName || `file.${cleanExt}`)
-    .trim()
-    .slice(0, 240) || `file.${cleanExt}`;
-  const orderRow = queryOne(
-    session.db,
-    `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM note_attachments WHERE note_id = ?`,
-    [noteId]
-  );
-  const displayOrder = Number(orderRow?.next_order ?? 0);
+  const safeName =
+    String(fileName || `file.${cleanExt}`)
+      .trim()
+      .slice(0, 240) || `file.${cleanExt}`;
   const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
   const resolvedMime = mimeType || mimeTypeForRecordVaultExtension(cleanExt);
 
-  session.db.run(
-    `INSERT INTO note_attachments (note_id, file_name, file_extension, relative_path, file_size_bytes, checksum, mime_type, display_order)
-     VALUES (?, ?, ?, '', ?, ?, ?, ?)`,
-    [noteId, safeName, cleanExt, buffer.length, checksum, resolvedMime, displayOrder]
-  );
-  const attachmentId = Number(queryOne(session.db, `SELECT last_insert_rowid() AS attachment_id`).attachment_id);
-  const relativePath = fileRelativePath(row.notebook_id, noteId, attachmentId, cleanExt);
-  session.db.run(`UPDATE note_attachments SET relative_path = ? WHERE attachment_id = ?`, [
-    relativePath,
-    attachmentId
-  ]);
-  writeEncryptedVaultFile(session, relativePath, buffer);
-  refreshNoteSearchText(session.db, noteId);
-  scheduleFlushDbToUsb(session);
+  const attachmentId = await db.tx(async (tx) => {
+    const orderRow = await tx.one(
+      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order
+         FROM ${T.attachments} WHERE singles_id = $1 AND note_id = $2`,
+      [tx.singlesId, noteId]
+    );
+    const id = await tx.nextId('attachments');
+    const relativePath = fileRelativePath(row.notebook_id, noteId, id, cleanExt);
+    await tx.run(
+      `INSERT INTO ${T.attachments}
+         (singles_id, attachment_id, note_id, file_name, file_extension, relative_path, file_size_bytes,
+          checksum, mime_type, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        tx.singlesId,
+        id,
+        noteId,
+        safeName,
+        cleanExt,
+        relativePath,
+        buffer.length,
+        checksum,
+        resolvedMime,
+        Number(orderRow?.next_order ?? 0)
+      ]
+    );
+    writeEncryptedVaultFile(session, relativePath, buffer);
+    await refreshNoteSearchText(tx, noteId);
+    return id;
+  });
+
   return mapAttachmentRow(
-    queryOne(
-      session.db,
-      `SELECT attachment_id, note_id, file_name, file_extension, file_size_bytes, mime_type, display_order,
-              shared_content_key, created_at
-       FROM note_attachments WHERE attachment_id = ?`,
-      [attachmentId]
+    await db.one(
+      `SELECT ${ATTACHMENT_COLUMNS_WITH_PATH} FROM ${T.attachments}
+        WHERE singles_id = $1 AND attachment_id = $2`,
+      [db.singlesId, attachmentId]
     )
   );
 }
 
-export function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
-  const row = queryOne(
-    session.db,
+export async function vaultDeleteNoteAttachment(session, noteId, attachmentId) {
+  const db = session.db;
+  const row = await db.one(
     `SELECT attachment_id, relative_path, shared_content_key, checksum, file_name
-     FROM note_attachments
-     WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
-    [attachmentId, noteId]
+       FROM ${T.attachments}
+      WHERE singles_id = $1 AND attachment_id = $2 AND note_id = $3 AND deleted_at IS NULL`,
+    [db.singlesId, attachmentId, noteId]
   );
   // Idempotent: inline body may reference an attachment whose row is already gone.
   if (!row) {
     return { success: true, attachment_id: Number(attachmentId), already_deleted: true };
   }
+  await db.tx(async (tx) => {
+    await tx.run(
+      `UPDATE ${T.attachments} SET deleted_at = NOW() WHERE singles_id = $1 AND attachment_id = $2`,
+      [tx.singlesId, attachmentId]
+    );
+    await refreshNoteSearchText(tx, noteId);
+  });
   const sharedKey = resolveRecordVaultSharedContentKey({
     sharedContentKey: row.shared_content_key,
     checksum: row.checksum,
     fileName: row.file_name
   });
-  // Shared sample bytes are never deleted — only the per-vault pointer row.
   if (!sharedKey) {
     deleteEncryptedVaultFile(session, row.relative_path);
   }
-  session.db.run(`UPDATE note_attachments SET deleted_at = datetime('now') WHERE attachment_id = ?`, [attachmentId]);
-  refreshNoteSearchText(session.db, noteId);
-  markDirty(session);
-  flushDbToUsb(session);
   return { success: true, attachment_id: Number(attachmentId) };
 }
 
-export function vaultGetNoteAttachment(session, noteId, attachmentId) {
-  const row = queryOne(
-    session.db,
+export async function vaultGetNoteAttachment(session, noteId, attachmentId) {
+  const row = await session.db.one(
     `SELECT attachment_id, note_id, file_name, file_extension, relative_path, mime_type,
             checksum, shared_content_key
-     FROM note_attachments
-     WHERE attachment_id = ? AND note_id = ? AND deleted_at IS NULL`,
-    [attachmentId, noteId]
+       FROM ${T.attachments}
+      WHERE singles_id = $1 AND attachment_id = $2 AND note_id = $3 AND deleted_at IS NULL`,
+    [session.db.singlesId, attachmentId, noteId]
   );
   if (!row) return null;
   const buffer = readVaultAttachmentBuffer(session, row);
@@ -2172,78 +1918,89 @@ export function vaultGetNoteAttachment(session, noteId, attachmentId) {
   };
 }
 
-export function vaultCreateShortcut(session, { targetType, notebookId, noteId }) {
-  const existing =
-    targetType === 'notebook'
-      ? queryOne(
-          session.db,
-          `SELECT s.shortcut_id, s.target_type, s.notebook_id, s.note_id, s.display_order,
-                  nb.notebook_name AS label
-           FROM shortcuts s
-           JOIN notebooks nb ON nb.notebook_id = s.notebook_id
-           WHERE s.target_type = 'notebook' AND s.notebook_id = ? AND nb.deleted_at IS NULL
-           LIMIT 1`,
-          [notebookId]
-        )
-      : queryOne(
-          session.db,
-          `SELECT s.shortcut_id, s.target_type, s.notebook_id, s.note_id, s.display_order,
-                  n.note_name AS label
-           FROM shortcuts s
-           JOIN notes n ON n.note_id = s.note_id
-           WHERE s.target_type = 'note' AND s.notebook_id = ? AND s.note_id = ? AND n.deleted_at IS NULL
-           LIMIT 1`,
-          [notebookId, noteId]
-        );
-  if (existing) {
-    return {
-      shortcut_id: Number(existing.shortcut_id),
-      target_type: existing.target_type,
-      notebook_id: Number(existing.notebook_id),
-      note_id: existing.note_id != null ? Number(existing.note_id) : null,
-      label: existing.label || '',
-      display_order: Number(existing.display_order ?? 0)
-    };
-  }
 
-  const orderRow = queryOne(session.db, `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM shortcuts`);
-  const displayOrder = Number(orderRow?.next_order ?? 0);
-  session.db.run(
-    `INSERT INTO shortcuts (target_type, notebook_id, note_id, display_order) VALUES (?, ?, ?, ?)`,
-    [targetType, notebookId, targetType === 'note' ? noteId : null, displayOrder]
-  );
-  const shortcutId = queryOne(session.db, `SELECT last_insert_rowid() AS shortcut_id`).shortcut_id;
-  markDirty(session);
-  flushDbToUsb(session);
-  const labelRow =
-    targetType === 'notebook'
-      ? queryOne(session.db, `SELECT notebook_name AS label FROM notebooks WHERE notebook_id = ?`, [notebookId])
-      : queryOne(session.db, `SELECT note_name AS label FROM notes WHERE note_id = ?`, [noteId]);
+function mapShortcutRow(row) {
   return {
-    shortcut_id: Number(shortcutId),
-    target_type: targetType,
-    notebook_id: Number(notebookId),
-    note_id: targetType === 'note' ? Number(noteId) : null,
-    label: labelRow?.label || '',
-    display_order: displayOrder
+    shortcut_id: Number(row.shortcut_id),
+    target_type: row.target_type,
+    notebook_id: Number(row.notebook_id),
+    note_id: row.note_id != null ? Number(row.note_id) : null,
+    label: row.label || '',
+    display_order: Number(row.display_order ?? 0)
   };
 }
 
-export function vaultDeleteShortcut(session, shortcutId) {
-  session.db.run(`DELETE FROM shortcuts WHERE shortcut_id = ?`, [shortcutId]);
-  markDirty(session);
-  flushDbToUsb(session);
+export async function vaultCreateShortcut(session, { targetType, notebookId, noteId }) {
+  return session.db.tx(async (tx) => {
+    const sid = tx.singlesId;
+    const existing =
+      targetType === 'notebook'
+        ? await tx.one(
+            `SELECT s.shortcut_id, s.target_type, s.notebook_id, s.note_id, s.display_order,
+                    nb.notebook_name AS label
+               FROM ${T.shortcuts} s
+               JOIN ${T.notebooks} nb ON nb.singles_id = s.singles_id AND nb.notebook_id = s.notebook_id
+              WHERE s.singles_id = $1 AND s.target_type = 'notebook' AND s.notebook_id = $2 AND nb.deleted_at IS NULL
+              LIMIT 1`,
+            [sid, notebookId]
+          )
+        : await tx.one(
+            `SELECT s.shortcut_id, s.target_type, s.notebook_id, s.note_id, s.display_order,
+                    n.note_name AS label
+               FROM ${T.shortcuts} s
+               JOIN ${T.notes} n ON n.singles_id = s.singles_id AND n.note_id = s.note_id
+              WHERE s.singles_id = $1 AND s.target_type = 'note' AND s.notebook_id = $2 AND s.note_id = $3
+                AND n.deleted_at IS NULL
+              LIMIT 1`,
+            [sid, notebookId, noteId]
+          );
+    if (existing) return mapShortcutRow(existing);
+
+    const orderRow = await tx.one(
+      `SELECT COALESCE(MAX(display_order), -1) + 1 AS next_order FROM ${T.shortcuts} WHERE singles_id = $1`,
+      [sid]
+    );
+    const displayOrder = Number(orderRow?.next_order ?? 0);
+    const shortcutId = await tx.nextId('shortcuts');
+    await tx.run(
+      `INSERT INTO ${T.shortcuts} (singles_id, shortcut_id, target_type, notebook_id, note_id, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [sid, shortcutId, targetType, notebookId, targetType === 'note' ? noteId : null, displayOrder]
+    );
+    const labelRow =
+      targetType === 'notebook'
+        ? await tx.one(`SELECT notebook_name AS label FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2`, [
+            sid,
+            notebookId
+          ])
+        : await tx.one(`SELECT note_name AS label FROM ${T.notes} WHERE singles_id = $1 AND note_id = $2`, [sid, noteId]);
+    return mapShortcutRow({
+      shortcut_id: shortcutId,
+      target_type: targetType,
+      notebook_id: notebookId,
+      note_id: targetType === 'note' ? noteId : null,
+      label: labelRow?.label,
+      display_order: displayOrder
+    });
+  });
 }
 
-export function vaultReorderShortcuts(session, shortcutIds) {
-  shortcutIds.forEach((id, i) => {
-    session.db.run(
-      `UPDATE shortcuts SET display_order = ?, updated_at = datetime('now') WHERE shortcut_id = ?`,
-      [i, id]
-    );
+export async function vaultDeleteShortcut(session, shortcutId) {
+  await session.db.run(`DELETE FROM ${T.shortcuts} WHERE singles_id = $1 AND shortcut_id = $2`, [
+    session.db.singlesId,
+    shortcutId
+  ]);
+}
+
+export async function vaultReorderShortcuts(session, shortcutIds) {
+  await session.db.tx(async (tx) => {
+    for (let i = 0; i < shortcutIds.length; i += 1) {
+      await tx.run(
+        `UPDATE ${T.shortcuts} SET display_order = $3, updated_at = NOW() WHERE singles_id = $1 AND shortcut_id = $2`,
+        [tx.singlesId, shortcutIds[i], i]
+      );
+    }
   });
-  markDirty(session);
-  flushDbToUsb(session);
 }
 
 export async function vaultUsbStatus(singlesId, storageType = null) {
@@ -2253,14 +2010,14 @@ export async function vaultUsbStatus(singlesId, storageType = null) {
     session = await tryRehydrateVaultSession(id, storageType);
   } else if (!session) {
     session =
-      (await tryRehydrateVaultSession(id, 'usb')) || (await tryRehydrateVaultSession(id, 'onedrive'));
+      (await tryRehydrateVaultSession(id, 'usb')) || (await tryRehydrateVaultSession(id, 'tutaCloud'));
   }
   return {
     unlocked: Boolean(session),
     storageType: session?.storageType || null,
     mountPath: session?.mountPath || null,
     label:
-      session?.storageType === 'onedrive'
+      session?.storageType === 'tutaCloud'
         ? session?.label || 'TutaDrive'
         : session
           ? path.basename(session.mountPath)
@@ -2278,13 +2035,13 @@ export function listUsbVaultFolderListing(singlesId, { maxDepth = 8 } = {}) {
   return buildVaultFolderListing(session, vaultRootOnMount, { maxDepth });
 }
 
-/** TutaDrive uses the 'onedrive' session slot with a local mount (LEFT_SIDE=TutaDrive). */
+/** TutaDrive uses the 'tutaCloud' session slot with a local mount (LEFT_SIDE=TutaDrive). */
 export function listTutaDriveVaultFolderListing(singlesId, { maxDepth = 8 } = {}) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   return buildVaultFolderListing(session, vaultRootOnMount, { maxDepth });
 }
 
-export function wipeVaultAtMountPath(mountPath, singlesId) {
+export async function wipeVaultAtMountPath(mountPath, singlesId) {
   const match = resolveVolumeRootMountPath(mountPath);
   const normalized = path.resolve(match.mountPath);
   for (const session of listVaultSessions(singlesId)) {
@@ -2297,5 +2054,6 @@ export function wipeVaultAtMountPath(mountPath, singlesId) {
     return { wiped: false };
   }
   removeDirRecursive(root);
+  await deleteNotesMemberVault(singlesId);
   return { wiped: true };
 }

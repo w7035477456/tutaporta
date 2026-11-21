@@ -543,7 +543,7 @@ export async function postAdminClearLockTutaNotes(req, res) {
 
   try {
     const cleared = await clearTutaNotesLock(singlesId);
-    await clearVaultAccessFailStatus(singlesId, 'onedrive');
+    await clearVaultAccessFailStatus(singlesId, 'tutaCloud');
     await clearVaultAccessFailStatus(singlesId, 'usb');
     return res.json({
       success: true,
@@ -571,7 +571,7 @@ export async function postAdminClearLockTutaPhotos(req, res) {
 
   try {
     const cleared = await clearTutaPhotosLock(singlesId);
-    await clearPhotoAlbumsAccessFailStatus(singlesId, 'onedrive');
+    await clearPhotoAlbumsAccessFailStatus(singlesId, 'tutaCloud');
     await clearPhotoAlbumsAccessFailStatus(singlesId, 'usb');
     return res.json({
       success: true,

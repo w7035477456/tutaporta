@@ -5,7 +5,7 @@
 
 import { clusterRedisDel, clusterRedisGetJson, clusterRedisSetJson } from './clusterRedisState.js';
 
-const KEY_PREFIX = 'v1:photo_albums:onedrive:open_progress:';
+const KEY_PREFIX = 'v1:photo_albums:tutaCloud:open_progress:';
 const TTL_SEC = 180;
 
 function progressKey(singlesId) {

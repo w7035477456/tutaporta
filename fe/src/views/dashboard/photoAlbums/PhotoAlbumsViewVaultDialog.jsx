@@ -8,7 +8,7 @@ import PhotoAlbumsTutaCloudVaultTreePanel from './PhotoAlbumsTutaCloudVaultTreeP
 export default function PhotoAlbumsViewVaultDialog({
   open,
   onClose,
-  storageType = 'onedrive',
+  storageType = 'tutaCloud',
   folderName = '',
   tutaDrive = false
 }) {
@@ -43,7 +43,7 @@ export default function PhotoAlbumsViewVaultDialog({
         <ColorTemplate16PopupCenterWide.Body spacing={1.5}>
           <PhotoAlbumsTutaCloudVaultTreePanel
             active={open}
-            storageType={isUsb ? 'usb' : 'onedrive'}
+            storageType={isUsb ? 'usb' : 'tutaCloud'}
             folderName={folderName}
             refreshToken={loadGeneration}
             onLoadingChange={setTreeLoading}
@@ -58,7 +58,7 @@ export default function PhotoAlbumsViewVaultDialog({
 PhotoAlbumsViewVaultDialog.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
-  storageType: PropTypes.oneOf(['tutadrive', 'usb']),
+  storageType: PropTypes.oneOf(['tutaCloud', 'usb']),
   folderName: PropTypes.string,
   tutaDrive: PropTypes.bool
 };

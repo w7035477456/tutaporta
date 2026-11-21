@@ -179,20 +179,9 @@ export function readInitializeSampleVaultBuffer(relativePath, key = null) {
   return openVaultBuffer(plain, key);
 }
 
-function linkFile(targetAbs, linkAbs) {
-  fs.mkdirSync(path.dirname(linkAbs), { recursive: true });
-  if (fs.existsSync(linkAbs)) return true;
-  try {
-    fs.symlinkSync(path.resolve(targetAbs), linkAbs, 'file');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
- * Point vault storage paths at shared cache files via symlinks (plaintext vaults).
- * Encrypted vaults skip links — reads fall back to shared cache in readEncryptedVaultFile.
+ * Write sealed copies of the shared sample media into an encrypted vault. Plaintext vaults
+ * get nothing on disk — reads fall back to the shared cache in readEncryptedVaultFile.
  * `db` is the member's VaultPgDb. `attachmentIdMap` maps manifest ids to the vault ids
  * Restore Sample Album used when a manifest id was taken by another album.
  */
@@ -234,11 +223,8 @@ export async function linkInitializeSampleIntoVault({
       const sharedAbs = cacheFilePath(attachmentId, kind);
       if (!fs.existsSync(sharedAbs)) continue;
 
+      if (usePlainFiles) continue;
       const vaultAbs = vaultFileStoragePath(mountPath, rel, meta);
-      if (usePlainFiles) {
-        linkFile(sharedAbs, vaultAbs);
-        continue;
-      }
 
       if (fs.existsSync(vaultAbs)) continue;
       const plain = fs.readFileSync(sharedAbs);

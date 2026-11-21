@@ -1565,7 +1565,7 @@ export default function RecordVaultWorkspacePane({
   const [ragKeepModelNotice, setRagKeepModelNotice] = useState('');
   const [ragConfiguredModel, setRagConfiguredModel] = useState('');
   const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
-  const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutadrive';
+  const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutacloud';
   const [usbVaultFolderLabel] = useState('USB');
   const [usbBridgeHealthy, setUsbBridgeHealthy] = useState(false);
   const [crossPaneDropActive, setCrossPaneDropActive] = useState(false);
@@ -2345,13 +2345,13 @@ export default function RecordVaultWorkspacePane({
   }, []);
 
   /**
-   * TutaCloud vault.db flush after PIN work. Uses 85→99% while uploading; 100% only when finished.
+   * TutaCloud save after PIN work. Uses 85→99% while uploading; 100% only when finished.
    * Must not block the busy dialog forever — axios has no default timeout and Cloud upload can hang.
    * Notes are already on disk; background upload + logoff still retry.
    */
   const flushTutaCloudAfterInnerPin = useCallback(
     async ({ showErrorOnFail = false, startPercent = 85 } = {}) => {
-      if (paneStorageType !== 'tutadrive') return { ok: true, timedOut: false };
+      if (paneStorageType !== 'tutaCloud') return { ok: true, timedOut: false };
       const floor = Math.max(0, Math.min(98, Math.round(Number(startPercent) || 85)));
       const mapCloudPercent = (p) => {
         const cloud = Math.max(0, Math.min(100, Math.round(Number(p) || 0)));
@@ -2423,7 +2423,7 @@ export default function RecordVaultWorkspacePane({
         return Number.isFinite(idNum) && idNum >= 1 ? `Note ${idNum}` : 'note';
       };
       // TutaCloud: keep 0–85% for local PIN work; Cloud sync owns 85–100%.
-      const localMaxPercent = paneStorageType === 'tutadrive' ? 85 : 100;
+      const localMaxPercent = paneStorageType === 'tutaCloud' ? 85 : 100;
       const progressOpts = { maxPercent: localMaxPercent };
       setInnerEncryptError('');
       setInnerEncryptBusy(true);
@@ -3463,7 +3463,7 @@ export default function RecordVaultWorkspacePane({
 
   const performVaultStorageLogoff = useCallback(async () => {
     setVaultLeavingProgressPercent(1);
-    setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
+    setVaultLeavingProgressLabel(paneStorageType === 'tutaCloud' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
     await vaultApi.logoffRecordVaultStorage({
       onProgress: (progress) => {
         void reportVaultLeavingProgress(progress);
@@ -3499,7 +3499,7 @@ export default function RecordVaultWorkspacePane({
       setBusy(true);
       setVaultLeaving(true);
       setVaultLeavingProgressPercent(1);
-      setVaultLeavingProgressLabel(paneStorageType === 'tutadrive' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
+      setVaultLeavingProgressLabel(paneStorageType === 'tutaCloud' ? 'Saving notes to TutaCloud…' : 'Logging off USB…');
       setError('');
       try {
         await performVaultStorageLogoff();
@@ -3900,7 +3900,7 @@ export default function RecordVaultWorkspacePane({
   }, [flushPendingNoteSave]);
 
   useEffect(() => {
-    if (paneStorageType !== 'tutadrive' || !tutaCloudOffered || !unlocked) return undefined;
+    if (paneStorageType !== 'tutaCloud' || !tutaCloudOffered || !unlocked) return undefined;
     const unregister = registerRecordVaultExitBackupPrompt(offerTutaCloudBackupBeforeExit);
     return () => {
       unregister();
@@ -5079,7 +5079,7 @@ export default function RecordVaultWorkspacePane({
         const payload = {
           kind: billKind || (mime === DRAG_NOTEBOOK ? 'notebook' : 'note'),
           id: Number(id),
-          storageType: paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb',
+          storageType: paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb',
           name,
           notebookId: Number.isFinite(notebookId) ? notebookId : null,
           noteIds: mime === DRAG_NOTE && draggedNoteIds.length > 1 ? draggedNoteIds : undefined
@@ -5223,7 +5223,7 @@ export default function RecordVaultWorkspacePane({
     (event, { targetNotebookId = null } = {}) => {
       const foreign = readCrossPaneDragFromEvent(event);
       if (!foreign) return false;
-      const pane = paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb';
+      const pane = paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb';
       if (foreign.storageType === pane) return false;
       event.preventDefault();
       event.stopPropagation();
@@ -6515,11 +6515,11 @@ export default function RecordVaultWorkspacePane({
         <BusyHourglassOverlay
           open={crossPaneBusy}
           label={
-            crossPaneTransfer?.item?.storageType === 'tutadrive'
+            crossPaneTransfer?.item?.storageType === 'tutaCloud'
               ? paneStorageType === 'usb'
                 ? 'Copying from Cloud to USB'
                 : 'Transferring Cloud item'
-              : paneStorageType === 'tutadrive'
+              : paneStorageType === 'tutaCloud'
                 ? 'Copying from USB to Cloud'
                 : 'Transferring USB item'
           }
@@ -6536,7 +6536,7 @@ export default function RecordVaultWorkspacePane({
         />
         <BusyHourglassOverlay
           open={vaultLeaving}
-          label={paneStorageType === 'tutadrive' ? 'Saving to Cloud' : 'Logging off USB'}
+          label={paneStorageType === 'tutaCloud' ? 'Saving to Cloud' : 'Logging off USB'}
           progressPercent={vaultLeavingProgressPercent}
           progressLabel={vaultLeavingProgressLabel}
           backdropSx={vaultLeavingBackdropSx}
@@ -6564,7 +6564,7 @@ export default function RecordVaultWorkspacePane({
         <RecordVaultCrossPaneTransferDialog
           open={Boolean(crossPaneTransfer) || Boolean(crossPaneDuplicateError)}
           item={crossPaneTransfer?.item || null}
-          targetStorageType={paneStorageType === 'tutadrive' ? 'tutadrive' : 'usb'}
+          targetStorageType={paneStorageType === 'tutaCloud' ? 'tutaCloud' : 'usb'}
           targetNotebookName={crossPaneTransfer?.targetNotebookName || ''}
           busy={crossPaneBusy}
           duplicateError={crossPaneDuplicateError}
@@ -6761,7 +6761,7 @@ export default function RecordVaultWorkspacePane({
           open={tutaCloudBackupOpen}
           onClose={closeTutaCloudBackupDialog}
           folderName={tutaCloudVaultFolderName}
-          tutaDrive={String(paneLabel || '').toLowerCase() === 'tutadrive'}
+          tutaDrive={String(paneLabel || '').toLowerCase() === 'tutacloud'}
           onRestored={() => void handleTutaCloudVaultRestored()}
           requireBackupBeforeClose={tutaCloudBackupRequired}
         />
@@ -6890,7 +6890,7 @@ export default function RecordVaultWorkspacePane({
         />
         <BusyHourglassOverlay
           open={Boolean(unlocked && noteContentLoading && vaultUiReady)}
-          label={paneStorageType === 'tutadrive' ? 'Loading note from TutaCloud' : 'Loading note'}
+          label={paneStorageType === 'tutaCloud' ? 'Loading note from TutaCloud' : 'Loading note'}
           progressPercent={noteLoadProgressPercent}
           progressLabel={noteLoadProgressLabel}
           backdropSx={vaultLeavingBackdropSx}
@@ -7105,7 +7105,7 @@ export default function RecordVaultWorkspacePane({
                   </Box>
                   {!compareMode ? (
                     <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
-                      {paneStorageType === 'tutadrive' && tutaCloudOffered ? (
+                      {paneStorageType === 'tutaCloud' && tutaCloudOffered ? (
                         <Box
                           sx={{
                             ...menuRailButtonCellSx,
@@ -7165,7 +7165,7 @@ export default function RecordVaultWorkspacePane({
                           minWidth: 0,
                           maxWidth: canEnterCompare
                             ? '33%'
-                            : paneStorageType === 'usb' || (paneStorageType === 'tutadrive' && tutaCloudOffered)
+                            : paneStorageType === 'usb' || (paneStorageType === 'tutaCloud' && tutaCloudOffered)
                               ? '50%'
                               : '100%',
                           overflow: 'visible'

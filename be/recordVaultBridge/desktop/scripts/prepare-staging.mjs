@@ -69,7 +69,6 @@ const runtimePackage = {
   type: 'module',
   dependencies: {
     express: '^4.18.2',
-    'sql.js': '^1.14.1',
     archiver: '^8.0.0',
     unzipper: '^0.12.5',
     busboy: '^1.6.0',

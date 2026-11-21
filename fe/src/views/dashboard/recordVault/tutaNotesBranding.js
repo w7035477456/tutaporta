@@ -27,7 +27,7 @@ export const TUTANOTES_USB_STRIP_COLOR = '#6EB5E0';
 export const TUTANOTES_USB_TAB_LABEL_COLOR = '#9B3DBA';
 
 export function tutaNotesStorageStripColor(storageType) {
-  return storageType === 'tutadrive' ? TUTANOTES_TUTACLOUD_STRIP_COLOR : TUTANOTES_USB_STRIP_COLOR;
+  return storageType === 'tutaCloud' ? TUTANOTES_TUTACLOUD_STRIP_COLOR : TUTANOTES_USB_STRIP_COLOR;
 }
 
 /** Expanded workspace header strip — theme daylight (TutaCloud). USB keeps light-blue strip. */

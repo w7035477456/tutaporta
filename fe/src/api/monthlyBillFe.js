@@ -1,7 +1,7 @@
 import api from './axios';
 
 function withStorage(params, storageType) {
-  const st = String(storageType || '').toLowerCase() === 'usb' ? 'usb' : 'onedrive';
+  const st = String(storageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
   return { ...params, storageType: st };
 }
 

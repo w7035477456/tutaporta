@@ -1,7 +1,7 @@
 /**
  * One-time backfill: remove the retired SAMPLE ALBUM tutorial hint labels from every
- * member's TutaPhoto album index in Postgres. Members whose vault.db is not imported yet
- * migrate automatically the next time they unlock TutaPhoto.
+ * member's TutaPhoto album index in Postgres. Unlock also cleans them, so members missed
+ * here are fixed the next time they unlock TutaPhoto.
  *
  * Usage (Mac dev):
  *   node be/scripts/migrateSampleAlbumTutorialLabels.js

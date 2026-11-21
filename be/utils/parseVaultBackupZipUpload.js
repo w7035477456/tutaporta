@@ -27,7 +27,7 @@ function formatUploadHint(contentLength) {
 /**
  * Parse multipart field `backup` into a temp zip file path. Zips over Cloudflare's 100 MB request
  * limit arrive instead as `chunkedUploadId` + `chunkCount` + `totalBytes` fields referencing parts
- * already sent to PUT /api/tutadrive/upload-chunk.
+ * already sent to PUT /api/tutaCloud/upload-chunk.
  */
 export function parseVaultBackupZipUpload(req) {
   const maxZipBytes = backupZipMaxBytes();

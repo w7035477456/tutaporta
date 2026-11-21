@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.paid_record (
     REFERENCES outdateddbsnapshotoct2024.monthly_bill (monthly_bill_id) ON DELETE SET NULL,
   yearly_bill_id bigint NULL
     REFERENCES outdateddbsnapshotoct2024.yearly_bill (yearly_bill_id) ON DELETE SET NULL,
-  storage_backend text NOT NULL DEFAULT 'onedrive'
-    CHECK (storage_backend IN ('onedrive', 'usb')),
+  storage_backend text NOT NULL DEFAULT 'tutaCloud'
+    CHECK (storage_backend IN ('tutaCloud', 'usb')),
   notes_text text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

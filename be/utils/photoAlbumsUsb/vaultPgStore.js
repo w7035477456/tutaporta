@@ -6,12 +6,10 @@
  * under the member's vault folder. Every query goes to Primary (the shared pool) so a write is
  * visible to the next request on any web server.
  *
- * Also converts between Postgres and the legacy SQLite vault.db format: import on first unlock of
- * a pre-Postgres vault, export for backup zips.
+ * Backup zips carry the index as JSON (export / import below); the vault folder holds only
+ * sealed media files and vault.meta.json.
  */
-import initSqlJs from 'sql.js';
 import pool from '../../db/connection.js';
-import { NOTE_EXTRA_IMAGES_MIGRATION_SQL, VAULT_SCHEMA_SQL } from './vaultSchema.js';
 
 const SCHEMA = 'outdateddbsnapshotoct2024';
 
@@ -36,15 +34,6 @@ const ID_COLUMNS = {
   extraImages: 'image_id'
 };
 
-/** Key in PHOTO_ALBUMS_VAULT_TABLES → SQLite table name in a legacy vault.db. */
-const SQLITE_TABLES = {
-  notebooks: 'notebooks',
-  notes: 'notes',
-  keywords: 'note_keywords',
-  shortcuts: 'shortcuts',
-  attachments: 'note_attachments',
-  extraImages: 'note_extra_images'
-};
 
 const TABLE_COLUMNS = {
   notebooks: ['notebook_id', 'notebook_name', 'display_order', 'created_at', 'updated_at', 'deleted_at'],
@@ -108,7 +97,7 @@ const TABLE_COLUMNS = {
   ]
 };
 
-/** NOT NULL columns in Postgres → value used when the SQLite row has NULL. */
+/** NOT NULL columns in Postgres → value used when an imported row has NULL. */
 const NOT_NULL_FALLBACKS = {
   notebook_name: '',
   note_name: '',
@@ -232,53 +221,16 @@ export async function setPhotoAlbumsMemberVaultId(singlesId, vaultId) {
   ]);
 }
 
-/* ─────────────────────────── SQLite vault.db ⇄ Postgres ─────────────────────────── */
+/* ─────────────────────────── Index export / import (backup zips) ─────────────────────────── */
 
-let sqlJsPromise = null;
+export const PHOTOALBUMS_VAULT_INDEX_FORMAT = 'tutaphotoalbums-index';
 
-function getSqlJs() {
-  if (!sqlJsPromise) sqlJsPromise = initSqlJs();
-  return sqlJsPromise;
-}
-
-function sqliteAll(db, sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) rows.push(stmt.getAsObject());
-  stmt.free();
-  return rows;
-}
-
-function sqliteColumns(db, table) {
-  return new Set(sqliteAll(db, `PRAGMA table_info(${table})`).map((row) => String(row.name || '')));
-}
-
-function sqliteTableExists(db, table) {
-  return sqliteAll(db, `SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?`, [table]).length > 0;
-}
-
-/** vault.db stores UTC as 'YYYY-MM-DD HH:MM:SS'. */
-function sqliteTimestampToDate(value) {
-  if (value == null || value === '') return null;
-  const raw = String(value).trim();
-  const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(raw) ? `${raw.replace(' ', 'T')}Z` : raw;
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function dateToSqliteTimestamp(value) {
-  if (value == null) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().replace('T', ' ').slice(0, 19);
-}
-
-function pgValueFromSqlite(column, value) {
+function pgValueFromIndex(column, value) {
   if (TIMESTAMP_COLUMNS.has(column)) {
-    const date = sqliteTimestampToDate(value);
-    if (!date && REQUIRED_TIMESTAMP_COLUMNS.has(column)) return new Date();
-    return date;
+    const date = value == null || value === '' ? null : new Date(value);
+    const valid = date && !Number.isNaN(date.getTime()) ? date : null;
+    if (!valid && REQUIRED_TIMESTAMP_COLUMNS.has(column)) return new Date();
+    return valid;
   }
   if (value == null && Object.prototype.hasOwnProperty.call(NOT_NULL_FALLBACKS, column)) {
     return NOT_NULL_FALLBACKS[column];
@@ -286,84 +238,55 @@ function pgValueFromSqlite(column, value) {
   return value ?? null;
 }
 
+/** The member's album index as a JSON-safe object (rows per table, ids kept). */
+export async function exportPhotoAlbumsMemberVaultIndex(singlesId) {
+  const id = normalizeSinglesId(singlesId);
+  const tables = {};
+  for (const [key, columns] of Object.entries(TABLE_COLUMNS)) {
+    const { rows } = await pool.query(
+      `SELECT ${columns.join(', ')} FROM ${T[key]} WHERE singles_id = $1 ORDER BY ${ID_COLUMNS[key]}`,
+      [id]
+    );
+    tables[key] = rows.map((row) => {
+      const out = {};
+      for (const col of columns) {
+        const value = row[col];
+        out[col] = value instanceof Date ? value.toISOString() : value ?? null;
+      }
+      return out;
+    });
+  }
+  return { format: PHOTOALBUMS_VAULT_INDEX_FORMAT, version: 1, exportedAt: new Date().toISOString(), tables };
+}
+
+export function isPhotoAlbumsVaultIndex(index) {
+  return Boolean(index && index.format === PHOTOALBUMS_VAULT_INDEX_FORMAT && index.tables && typeof index.tables === 'object');
+}
+
 /**
- * Replace the member's album index with the rows of a legacy SQLite vault (sql.js Database).
- * Runs in one transaction; ids are kept so on-disk file paths and page HTML stay valid.
+ * Replace the member's album index with an exported index (one transaction).
+ * Ids are kept so on-disk file paths and note HTML stay valid.
  */
-export async function importSqliteVaultIntoPostgres(singlesId, sqliteDb, { vaultId = null, source = 'import', importedFromPath = null } = {}) {
+export async function importPhotoAlbumsMemberVaultIndex(singlesId, index, { vaultId = null, source = 'restore', importedFromPath = null } = {}) {
+  if (!isPhotoAlbumsVaultIndex(index)) throw new Error('Backup index is missing or not a album index');
   const db = new VaultPgDb(singlesId);
   const counts = {};
   await db.tx(async (tx) => {
     await createPhotoAlbumsMemberVault(tx, { vaultId, source, importedFromPath });
-    for (const [key, sqliteTable] of Object.entries(SQLITE_TABLES)) {
+    for (const [key, allColumns] of Object.entries(TABLE_COLUMNS)) {
       counts[key] = 0;
-      if (!sqliteTableExists(sqliteDb, sqliteTable)) continue;
-      const available = sqliteColumns(sqliteDb, sqliteTable);
-      const columns = TABLE_COLUMNS[key].filter((col) => available.has(col));
-      if (!columns.includes(ID_COLUMNS[key])) continue;
-      const rows = sqliteAll(sqliteDb, `SELECT ${columns.join(', ')} FROM ${sqliteTable}`);
-      const placeholders = columns.map((_, i) => `$${i + 2}`).join(', ');
+      const rows = Array.isArray(index.tables[key]) ? index.tables[key] : [];
       for (const row of rows) {
+        const columns = allColumns.filter((col) => Object.prototype.hasOwnProperty.call(row, col));
+        if (!columns.includes(ID_COLUMNS[key])) continue;
+        const placeholders = columns.map((_, i) => `$${i + 2}`).join(', ');
         await tx.run(
           `INSERT INTO ${T[key]} (singles_id, ${columns.join(', ')}) VALUES ($1, ${placeholders})`,
-          [tx.singlesId, ...columns.map((col) => pgValueFromSqlite(col, row[col]))]
+          [tx.singlesId, ...columns.map((col) => pgValueFromIndex(col, row[col]))]
         );
         counts[key] += 1;
       }
     }
   });
   return counts;
-}
-
-/** sql.js Database from a legacy vault.db buffer, with every column the importer reads. */
-export async function openLegacySqliteVaultBuffer(plainBuffer) {
-  const SQL = await getSqlJs();
-  const db = new SQL.Database(plainBuffer);
-  db.exec(VAULT_SCHEMA_SQL);
-  if (!sqliteTableExists(db, 'note_extra_images')) db.exec(NOTE_EXTRA_IMAGES_MIGRATION_SQL);
-  const noteCols = sqliteColumns(db, 'notes');
-  for (const [col, ddl] of [
-    ['inner_encrypt_enabled', 'INTEGER NOT NULL DEFAULT 0'],
-    ['inner_pin_salt', 'TEXT'],
-    ['inner_unlock_locked_until', 'TEXT']
-  ]) {
-    if (!noteCols.has(col)) db.run(`ALTER TABLE notes ADD COLUMN ${col} ${ddl}`);
-  }
-  const attCols = sqliteColumns(db, 'note_attachments');
-  for (const col of ['album_photo_seq', 'source_taken_at_ms']) {
-    if (!attCols.has(col)) db.run(`ALTER TABLE note_attachments ADD COLUMN ${col} INTEGER`);
-  }
-  return db;
-}
-
-/** The member's album index as a plain SQLite vault.db buffer (backup zips keep the old format). */
-export async function exportPhotoAlbumsMemberVaultToSqliteBuffer(singlesId) {
-  const id = normalizeSinglesId(singlesId);
-  const SQL = await getSqlJs();
-  const sqliteDb = new SQL.Database();
-  try {
-    sqliteDb.exec(VAULT_SCHEMA_SQL);
-    for (const [key, sqliteTable] of Object.entries(SQLITE_TABLES)) {
-      const columns = TABLE_COLUMNS[key];
-      const { rows } = await pool.query(
-        `SELECT ${columns.join(', ')} FROM ${T[key]} WHERE singles_id = $1 ORDER BY ${ID_COLUMNS[key]}`,
-        [id]
-      );
-      const placeholders = columns.map(() => '?').join(', ');
-      for (const row of rows) {
-        sqliteDb.run(
-          `INSERT INTO ${sqliteTable} (${columns.join(', ')}) VALUES (${placeholders})`,
-          columns.map((col) => {
-            const value = row[col];
-            if (TIMESTAMP_COLUMNS.has(col)) return dateToSqliteTimestamp(value);
-            if (typeof value === 'string' && /_bytes$|_ms$/.test(col)) return Number(value);
-            return value ?? null;
-          })
-        );
-      }
-    }
-    return Buffer.from(sqliteDb.export());
-  } finally {
-    sqliteDb.close();
-  }
 }

@@ -20,7 +20,7 @@ function isRetryableChunkError(err) {
 }
 
 /**
- * Send `blob` to PUT /api/tutadrive/upload-chunk in 32 MiB pieces (each retried up to 3 times).
+ * Send `blob` to PUT /api/tutaCloud/upload-chunk in 32 MiB pieces (each retried up to 3 times).
  * `onProgress(loadedBytes, totalBytes)` covers the whole blob.
  */
 export async function uploadBlobInChunks(blob, { onProgress } = {}) {
@@ -32,7 +32,7 @@ export async function uploadBlobInChunks(blob, { onProgress } = {}) {
     const piece = blob.slice(index * CHUNK_BYTES, Math.min(totalBytes, (index + 1) * CHUNK_BYTES));
     for (let attempt = 1; ; attempt += 1) {
       try {
-        await api.put('/api/tutadrive/upload-chunk', piece, {
+        await api.put('/api/tutaCloud/upload-chunk', piece, {
           params: { uploadId: chunkedUploadId, index },
           headers: { 'Content-Type': 'application/octet-stream' },
           maxBodyLength: Infinity,

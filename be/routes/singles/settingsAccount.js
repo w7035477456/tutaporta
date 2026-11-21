@@ -16,8 +16,6 @@ import {
 import { hashPassword } from '../../utils/passwordHash.js';
 import { assertAccountChangeAllowed } from '../../utils/accountChangeCooldown.js';
 import { DUPLICATE_PHONE_ERROR, isDuplicatePhoneAllowed } from '../../utils/duplicatePhonePolicy.js';
-import { hashSecretIconName, normalizeSecretIconName } from '../../utils/secretIconHash.js';
-import { verifySecretIconWithAttemptTracking } from '../../utils/secretIconAttemptTracking.js';
 import { normalizeEmailForDb } from '../../utils/normalizeEmailForDb.js';
 import { recordAuditRegistrationChange } from '../../utils/insertAuditRegistration.js';
 import { invalidateAuthUserCache } from '../../utils/authUserLookupCache.js';
@@ -1334,8 +1332,8 @@ async function findPhoneChangeVerificationForSingles(client, singlesId, kinds) {
 }
 
 /**
- * POST /api/settings/changePhone/submit — body: { iconName, currentPassword, newPhone, confirmPhone, currentEmail }
- * Verifies security icon + password, emails 6-digit code to current account email.
+ * POST /api/settings/changePhone/submit — body: { currentPassword, newPhone, confirmPhone, currentEmail }
+ * Verifies password, emails 6-digit code to current account email.
  */
 export async function submitSettingsChangePhone(req, res) {
   const singlesId = Number(req.auth?.singles_id);
@@ -1343,7 +1341,6 @@ export async function submitSettingsChangePhone(req, res) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const iconName = req.body?.iconName ?? req.body?.icon;
   const plainCurrent = typeof req.body?.currentPassword === 'string' ? req.body.currentPassword.trim() : '';
   const newPhoneRaw = String(req.body?.newPhone ?? '').trim();
   const confirmPhoneRaw = String(req.body?.confirmPhone ?? '').trim();
@@ -1351,13 +1348,6 @@ export async function submitSettingsChangePhone(req, res) {
   const currentEmailNorm = currentEmailRaw.toLowerCase();
   const newPhoneDigits = normalizePhoneDigits(newPhoneRaw);
   const confirmPhoneDigits = normalizePhoneDigits(confirmPhoneRaw);
-  const normalizedIconName = normalizeSecretIconName(iconName);
-  const candidateIconHash = hashSecretIconName(normalizedIconName);
-
-  if (!normalizedIconName || !candidateIconHash) {
-    return res.status(400).json({ error: 'Please choose a valid security icon.' });
-  }
-
   if (!plainCurrent) {
     return res.status(400).json({ error: 'Current password is required.' });
   }
@@ -1394,12 +1384,6 @@ export async function submitSettingsChangePhone(req, res) {
     }
 
     await client.query('BEGIN');
-
-    const iconGate = await verifySecretIconWithAttemptTracking(client, singlesId, candidateIconHash);
-    if (!iconGate.ok) {
-      await client.query('COMMIT');
-      return res.status(iconGate.response.statusCode).json(iconGate.response.body);
-    }
 
     const gate = await verifyCurrentPasswordWithAttemptTracking(client, singlesId, plainCurrent);
     if (!gate.ok) {

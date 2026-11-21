@@ -5,7 +5,6 @@ import { execFileSync } from 'child_process';
 import {
   REQUIRED_VAULT_PATHS,
   VAULT_DIR_NAME,
-  vaultHasDbFile,
   vaultMetaPath,
   vaultRootOnMount
 } from './vaultPaths.js';
@@ -86,15 +85,9 @@ function quickVaultStatus(mountPath) {
     return { hasVault: true, vaultId: meta.vaultId || null, legacyPinVault: true };
   }
   if (Number(meta.version) === 3 || meta.encryption === 'none') {
-    if (!vaultHasDbFile(mountPath)) {
-      return { hasVault: false, partial: true };
-    }
     return { hasVault: true, vaultId: meta.vaultId || null };
   }
   if (Number(meta.version) !== 2) {
-    return { hasVault: false, partial: true };
-  }
-  if (!vaultHasDbFile(mountPath)) {
     return { hasVault: false, partial: true };
   }
   return { hasVault: true, vaultId: meta.vaultId || null };
@@ -113,7 +106,7 @@ function vaultStatusForPath(mountPath) {
       legacyPinVault: Boolean(check.legacyPinVault)
     };
   }
-  // TutaNotes folder present but missing meta/db/photos/files → not a valid vault.
+  // TutaNotes folder present but missing meta/photos/files → not a valid vault.
   if (quick.hasVault || quick.partial || isDirectory(vaultRootOnMount(mountPath))) {
     return { hasVault: false, partial: true };
   }
@@ -141,6 +134,7 @@ function locationEntry(mountPath, label, platform) {
   };
 }
 
+/** The index lives in Postgres; a vault folder is vault.meta.json + photos/ + files/. */
 function verifyVaultStructure(mountPath) {
   const root = vaultRootOnMount(mountPath);
   if (!isDirectory(root)) {
@@ -155,9 +149,6 @@ function verifyVaultStructure(mountPath) {
     } else if (!isDirectory(abs)) {
       return { ok: false, error: `Missing required folder: ${rel}` };
     }
-  }
-  if (!vaultHasDbFile(mountPath)) {
-    return { ok: false, error: 'Missing required file: vault database' };
   }
   const meta = readVaultMeta(mountPath);
   if (!meta?.vaultId) {
@@ -390,7 +381,7 @@ export function scanForRecordVaultUsb() {
   return scanLinuxVolumes();
 }
 
-export function validateVaultOnMount(mountPath) {
+export function validateVaultOnMount(mountPath, options = {}) {
   if (!mountPath || typeof mountPath !== 'string') {
     return { ok: false, error: 'Mount path is required' };
   }
@@ -398,7 +389,7 @@ export function validateVaultOnMount(mountPath) {
   if (!fs.existsSync(normalized)) {
     return { ok: false, error: 'USB path not found' };
   }
-  return verifyVaultStructure(normalized);
+  return verifyVaultStructure(normalized, options);
 }
 
 export { verifyVaultStructure, readVaultMeta };

@@ -331,10 +331,10 @@ export default function MyPhotoAlbums() {
   const [sessionProgressPercent, setSessionProgressPercent] = useState(null);
   const [sessionProgressLabel, setSessionProgressLabel] = useState('');
   const [error, setError] = useState('');
-  /** 'both' = side-by-side login chooser; 'tutadrive' | 'usb' = full-window pane; 'compare' = both workspaces for drag-drop. */
+  /** 'both' = side-by-side login chooser; 'tutaCloud' | 'usb' = full-window pane; 'compare' = both workspaces for drag-drop. */
   const [paneFocus, setPaneFocus] = useState('both');
   /** Which single pane to restore when leaving compare mode. */
-  const [compareReturnFocus, setCompareReturnFocus] = useState('tutadrive');
+  const [compareReturnFocus, setCompareReturnFocus] = useState('tutaCloud');
   /** Shared vault-password gate before Open TutaPhotoAlbums Cloud / USB. */
   const [accessGateOpen, setAccessGateOpen] = useState(false);
   /** Pending open side for Access Gate: `{ storageType, mountPath? }`. */
@@ -342,7 +342,7 @@ export default function MyPhotoAlbums() {
   /** Encrypt Password satisfied this visit — skip re-opening access gate on auto-open retry. */
   const accessUnlockedRef = useRef(false);
   const initialPaneSessionCheckDoneRef = useRef(false);
-  const [accessGateStorageType, setAccessGateStorageType] = useState('tutadrive');
+  const [accessGateStorageType, setAccessGateStorageType] = useState('tutaCloud');
   const [accessGateUsbMountPath, setAccessGateUsbMountPath] = useState('');
   const [tutaCloudProceedOpenToken, setTutaCloudProceedOpenToken] = useState(0);
   const [usbProceedOpenToken, setUsbProceedOpenToken] = useState(0);
@@ -390,7 +390,7 @@ export default function MyPhotoAlbums() {
     // Prior mobile path unlocked vault without FDE — force logoff so desktop asks for password again.
     void (async () => {
       try {
-        if (tutaCloudOffered) await logoffPhotoAlbumsStorage({ storageType: 'tutadrive' });
+        if (tutaCloudOffered) await logoffPhotoAlbumsStorage({ storageType: 'tutaCloud' });
       } catch {
         // ignore
       }
@@ -571,7 +571,7 @@ export default function MyPhotoAlbums() {
   useEffect(() => {
     if (!storageConfigLoaded) return;
     if (tutaCloudOffered && localUsbOffered) return;
-    if (tutaCloudOffered) setPaneFocus('tutadrive');
+    if (tutaCloudOffered) setPaneFocus('tutaCloud');
     else if (localUsbOffered) setPaneFocus('usb');
   }, [localUsbOffered, tutaCloudOffered, storageConfigLoaded]);
 
@@ -603,7 +603,7 @@ export default function MyPhotoAlbums() {
     if (tutaCloudOffered && localUsbOffered) {
       setPaneFocus('both');
     } else {
-      setPaneFocus('tutadrive');
+      setPaneFocus('tutaCloud');
     }
     setError('');
     void (async () => {
@@ -622,10 +622,10 @@ export default function MyPhotoAlbums() {
 
   const selectTutaCloudTab = useCallback(() => {
     setPaneFocus((prev) => {
-      if (prev === 'compare') return 'tutadrive';
+      if (prev === 'compare') return 'tutaCloud';
       // Toggle back to dual login/tips when both storages are offered.
-      if (prev === 'tutadrive' && tutaCloudOffered && localUsbOffered) return 'both';
-      return 'tutadrive';
+      if (prev === 'tutaCloud' && tutaCloudOffered && localUsbOffered) return 'both';
+      return 'tutaCloud';
     });
   }, [localUsbOffered, tutaCloudOffered]);
 
@@ -639,14 +639,14 @@ export default function MyPhotoAlbums() {
 
   const enterCompareMode = useCallback(() => {
     if (!(tutaCloudUnlocked && usbUnlocked && tutaCloudOffered && localUsbOffered)) return;
-    if (paneFocus === 'tutadrive' || paneFocus === 'usb') {
+    if (paneFocus === 'tutaCloud' || paneFocus === 'usb') {
       setCompareReturnFocus(paneFocus);
     }
     setPaneFocus('compare');
   }, [localUsbOffered, tutaCloudOffered, tutaCloudUnlocked, paneFocus, usbUnlocked]);
 
   const returnFromCompareMode = useCallback(() => {
-    setPaneFocus(compareReturnFocus === 'usb' ? 'usb' : 'tutadrive');
+    setPaneFocus(compareReturnFocus === 'usb' ? 'usb' : 'tutaCloud');
   }, [compareReturnFocus]);
 
   const handleTutaCloudSessionEnded = useCallback((message) => {
@@ -658,7 +658,7 @@ export default function MyPhotoAlbums() {
     if (notice) setTutaCloudSessionNotice(notice);
     setPaneFocus((prev) => {
       if (prev === 'compare') return usbUnlocked ? 'usb' : 'both';
-      if (prev === 'tutadrive' && localUsbOffered) return 'both';
+      if (prev === 'tutaCloud' && localUsbOffered) return 'both';
       return prev;
     });
   }, [localUsbOffered, usbUnlocked]);
@@ -670,7 +670,7 @@ export default function MyPhotoAlbums() {
     const notice = String(message || '').trim();
     if (notice) setUsbSessionNotice(notice);
     setPaneFocus((prev) => {
-      if (prev === 'compare') return tutaCloudUnlocked ? 'tutadrive' : 'both';
+      if (prev === 'compare') return tutaCloudUnlocked ? 'tutaCloud' : 'both';
       if (prev === 'usb' && tutaCloudOffered) return 'both';
       return prev;
     });
@@ -708,7 +708,7 @@ export default function MyPhotoAlbums() {
       } catch (err) {
         console.error('[MyPhotoAlbums dual Log off OneDrive] prepare', err?.message || err);
       }
-      await logoffPhotoAlbumsStorage({ storageType: 'tutadrive' });
+      await logoffPhotoAlbumsStorage({ storageType: 'tutaCloud' });
       handleTutaCloudSessionEnded();
     } catch (err) {
       setError(readPhotoAlbumsApiError(err, tutaDriveMode ? 'Log off TutaDrive failed' : 'Log off OneDrive failed'));
@@ -721,8 +721,8 @@ export default function MyPhotoAlbums() {
   // Mobile upload uses a separate sheet and never reaches these handlers.
   const handleTutaCloudOpenClicked = useCallback(() => {
     if (accessUnlockedRef.current) return false;
-    pendingOpenRef.current = { storageType: 'tutadrive' };
-    setAccessGateStorageType('tutadrive');
+    pendingOpenRef.current = { storageType: 'tutaCloud' };
+    setAccessGateStorageType('tutaCloud');
     setAccessGateUsbMountPath('');
     setAccessGateOpen(true);
     return true;
@@ -747,7 +747,7 @@ export default function MyPhotoAlbums() {
     setAccessGateOpen(false);
     const pending = pendingOpenRef.current;
     pendingOpenRef.current = null;
-    if (pending?.storageType === 'tutadrive') {
+    if (pending?.storageType === 'tutaCloud') {
       setTutaCloudProceedOpenToken((n) => n + 1);
     } else if (pending?.storageType === 'usb') {
       setUsbProceedOpenToken((n) => n + 1);
@@ -763,7 +763,7 @@ export default function MyPhotoAlbums() {
   const handleAccessVaultFormatted = useCallback((formattedSide) => {
     if (formattedSide === 'usb') {
       setUsbGateRefreshToken((n) => n + 1);
-    } else if (formattedSide === 'tutadrive') {
+    } else if (formattedSide === 'tutaCloud') {
       setTutaCloudGateRefreshToken((n) => n + 1);
     }
   }, []);
@@ -787,7 +787,7 @@ export default function MyPhotoAlbums() {
   }, []);
 
   const oneDriveVisible =
-    tutaCloudOffered && (showDual || showCompare || paneFocus === 'tutadrive' || !localUsbOffered);
+    tutaCloudOffered && (showDual || showCompare || paneFocus === 'tutaCloud' || !localUsbOffered);
   const usbVisible = localUsbOffered && (showDual || showCompare || paneFocus === 'usb' || !tutaCloudOffered);
   const sideBySideLayout = showDual || showCompare;
 
@@ -799,7 +799,7 @@ export default function MyPhotoAlbums() {
           <GreenButton
             type="button"
             role="tab"
-            aria-selected={paneFocus === 'tutadrive'}
+            aria-selected={paneFocus === 'tutaCloud'}
             title={
               tutaDriveMode
                 ? 'Open or reload TutaPhotoAlbums notes on TutaDrive'
@@ -819,9 +819,9 @@ export default function MyPhotoAlbums() {
       );
     }
     // Expanded Cloud tab, compare mode, or Cloud-only → notebooks workspace.
-    if (tutaCloudUnlocked && (paneFocus === 'tutadrive' || paneFocus === 'compare' || !localUsbOffered)) {
+    if (tutaCloudUnlocked && (paneFocus === 'tutaCloud' || paneFocus === 'compare' || !localUsbOffered)) {
       return (
-        <PhotoAlbumsPaneProvider storageType="tutadrive">
+        <PhotoAlbumsPaneProvider storageType="tutaCloud">
           <PhotoAlbumsWorkspacePane
             unlocked
             compact
@@ -843,7 +843,7 @@ export default function MyPhotoAlbums() {
               <GreenButton
                 type="button"
                 role="tab"
-                aria-selected={paneFocus === 'tutadrive'}
+                aria-selected={paneFocus === 'tutaCloud'}
                 title={
                   tutaDriveMode
                     ? 'Expand TutaPhotos on TutaCloud to the full window'
@@ -964,9 +964,9 @@ export default function MyPhotoAlbums() {
                 <GreenButton
                   type="button"
                   role="tab"
-                  aria-selected={paneFocus === 'tutadrive'}
+                  aria-selected={paneFocus === 'tutaCloud'}
                   title={
-                    paneFocus === 'tutadrive'
+                    paneFocus === 'tutaCloud'
                       ? tutaCloudOffered && localUsbOffered
                         ? `Click again to show ${tutaDriveMode ? 'TutaDrive' : 'OneDrive'} and USB side by side`
                         : tutaDriveMode

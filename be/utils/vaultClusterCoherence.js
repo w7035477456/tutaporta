@@ -1,22 +1,18 @@
 /**
  * Cluster coherence for TutaPhoto (photo_albums) / TutaNotes (record_vault) vaults.
  *
- * Each Node worker keeps the member's SQLite vault open in memory (sql.js). With several
- * PM2 workers and/or web servers behind round-robin, those in-memory copies used to drift:
- * a note created on worker A was "Note not found" on worker B, and whichever worker flushed
- * vault.db last overwrote the others.
+ * The notes / album index lives in Postgres (`notes_*`, `photo_albums_*` tables), so every
+ * worker reads the same rows; only sealed media files sit in the vault folder.
  *
  * Postgres (`outdateddbsnapshotoct2024.vault_cluster_state`) is the single source of truth for:
  *   - unlock registry (mount path, generation, expiry) — replaces the Redis-only registry
- *   - db_version — bumped after every committed vault.db write
+ *   - db_version — bumped after every committed vault write
  *   - a lease lock — serializes vault writes for one member across all workers/servers
  *
  * Per request (see createVaultClusterCoherenceMiddleware):
  *   - read the member's state; drop local sessions that were locked/re-unlocked elsewhere
  *   - write methods take the lease lock first
- *   - reload vault.db from disk when the local copy is older than db_version
- *   - write methods persist vault.db + bump db_version BEFORE the response is sent,
- *     so the next request (any worker) reads the change
+ *   - write methods bump db_version BEFORE the response is sent
  *
  * Every query here (SELECTs included) must hit the Primary, never a read replica: replica
  * lag would hand a worker a stale db_version / unlock state and bring back the stale-copy bug.
@@ -31,7 +27,7 @@ import { isRecordVaultBridgeStandalone } from '../recordVaultBridge/standaloneMo
 export const VAULT_PRODUCT_PHOTO_ALBUMS = 'photo_albums';
 export const VAULT_PRODUCT_RECORD_VAULT = 'record_vault';
 
-const STORAGE_TYPES = ['usb', 'onedrive'];
+const STORAGE_TYPES = ['usb', 'tutaCloud'];
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const UNLOCK_TTL_SEC = 24 * 60 * 60;
@@ -40,7 +36,6 @@ const LOCK_LEASE_SEC = 60;
 const LOCK_HEARTBEAT_MS = 15_000;
 const LOCK_MAX_HOLD_MS = 30 * 60 * 1000;
 const LOCK_WAIT_MAX_MS = 120_000;
-const OLD_DB_CLOSE_DELAY_MS = 60_000;
 
 const STATE_DDL = `
   CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.vault_cluster_state (
@@ -60,7 +55,7 @@ const STATE_DDL = `
     updated_at timestamptz NOT NULL DEFAULT NOW(),
     CONSTRAINT vault_cluster_state_pkey PRIMARY KEY (product, singles_id, storage_type),
     CONSTRAINT vault_cluster_state_product_check CHECK (product IN ('photo_albums', 'record_vault')),
-    CONSTRAINT vault_cluster_state_storage_type_check CHECK (storage_type IN ('usb', 'onedrive'))
+    CONSTRAINT vault_cluster_state_storage_type_check CHECK (storage_type IN ('usb', 'tutaCloud'))
   )
 `;
 
@@ -114,7 +109,10 @@ function normalizeProduct(product) {
 }
 
 function normalizeType(storageType) {
-  return String(storageType || 'usb').trim().toLowerCase() === 'onedrive' ? 'onedrive' : 'usb';
+  const v = String(storageType || 'usb').trim().toLowerCase();
+  if (v === 'tutacloud' || v === 'tutadrive' || v === 'onedrive' || v === 'cloud') return 'tutaCloud';
+  if (String(storageType || '').trim() === 'tutaCloud') return 'tutaCloud';
+  return 'usb';
 }
 
 function normalizeId(singlesId) {
@@ -249,7 +247,7 @@ async function readVaultClusterStates(product, singlesId) {
       WHERE product = $1 AND singles_id = $2`,
     [product, singlesId]
   );
-  const states = { usb: null, onedrive: null };
+  const states = { usb: null, tutaCloud: null };
   const renew = [];
   for (const row of rows) {
     const state = mapStateRow(row);
@@ -376,12 +374,12 @@ async function publishVaultDbVersion(product, singlesId, storageType, token) {
 
 /**
  * Hooks each vaultSession module provides:
- *   readRequestedStorageType(req) → 'usb' | 'onedrive' | null
+ *   readRequestedStorageType(req) → 'usb' | 'tutaCloud' | null
  *   getLocalSession(singlesId, type) → session | null   (unlocked sessions in this process)
  *   dropLocalSession(singlesId, type)                    (forget without saving)
  *   rehydrateSession(singlesId, type) → session | null   (open from disk via registry)
- *   reloadSessionDb(session)                             (re-read vault.db from disk)
- *   persistSessionNow(session)                           (export + write vault.db)
+ *   reloadSessionDb(session)                             (refresh per-session caches; no-op today)
+ *   persistSessionNow(session)                           (flush pending writes; no-op today)
  *
  * Session fields owned here: clusterGeneration, clusterDbVersion, clusterFlushedSinceCommit.
  */
@@ -391,19 +389,6 @@ export function markVaultSessionClusterState(session, { dbVersion, unlockGenerat
   if (Number.isFinite(Number(dbVersion))) session.clusterDbVersion = Number(dbVersion);
   if (Number.isFinite(Number(unlockGeneration))) session.clusterGeneration = Number(unlockGeneration);
   session.clusterFlushedSinceCommit = false;
-}
-
-/** Old sql.js handles stay open briefly so in-flight requests holding them can finish. */
-export function closeVaultDbLater(db) {
-  if (!db) return;
-  const timer = setTimeout(() => {
-    try {
-      db.close();
-    } catch {
-      // already closed
-    }
-  }, OLD_DB_CLOSE_DELAY_MS);
-  timer.unref?.();
 }
 
 async function reloadSessionDbDeduped(hooks, session) {
@@ -454,7 +439,7 @@ async function commitSessionUnderLock(product, hooks, session, token) {
 }
 
 /**
- * Persist a session's pending vault.db change when this process does not already hold the
+ * Commit a session's pending vault change when this process does not already hold the
  * lock (read-triggered repairs, fire-and-forget work after a response). If another worker
  * committed in the meantime, the local change was built on stale data and is discarded.
  */

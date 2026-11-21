@@ -45,12 +45,18 @@ else
 fi
 
 normalize_schema_dump() {
+  # Strip pg_attver: internal Postgres 17.12+ attribute-versioning metadata in
+  # pg_attribute.attoptions. Old pg_dump (e.g. 17.11) emits
+  # ALTER ... SET (pg_attver=N) for those columns; Mac 17.11 rejects SET and
+  # never stores them, so they are not real schema drift — only minor-version noise.
   sed -E \
     -e '/^--/d' \
     -e '/^SET /d' \
     -e '/^SELECT pg_catalog\./d' \
     -e '/^\\restrict/d' \
     -e '/^\\unrestrict/d' \
+    -e '/ALTER COLUMN[[:space:]]+[^[:space:]]+[[:space:]]+SET \(pg_attver=/d' \
+    -e '/ALTER COLUMN[[:space:]]+[^[:space:]]+[[:space:]]+RESET \(pg_attver\)/d' \
     -e 's/[[:space:]]+$//' \
     | awk 'NF { print }'
 }

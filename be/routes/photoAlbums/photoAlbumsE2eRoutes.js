@@ -67,7 +67,7 @@ export async function updatePhotoAlbumsE2eKeys(req, res) {
     }
     const result = await updateVaultKeys(singlesId, {
       ...(req.body || {}),
-      backends: req.body?.backends || ['usb', 'onedrive']
+      backends: req.body?.backends || ['usb', 'tutaCloud']
     });
     return res.json({
       success: true,

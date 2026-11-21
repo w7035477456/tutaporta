@@ -235,7 +235,7 @@ export async function getMonthlyBill(req, res) {
       await client.query('BEGIN');
       const cloneInfo = await ensureMonthCloned(client, singlesId, year, month, storageBackend);
       const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
-      const peer = storageBackend === 'usb' ? 'onedrive' : 'usb';
+      const peer = storageBackend === 'usb' ? 'tutaCloud' : 'usb';
       const { rows: peerCountRows } = await client.query(
         `SELECT COUNT(*)::int AS c
            FROM outdateddbsnapshotoct2024.monthly_bill

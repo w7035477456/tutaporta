@@ -112,7 +112,7 @@ export async function postRecordVaultRagQuery(req, res) {
   }
 
   try {
-    const { notes, skipped, meta: ragCollectMeta } = collectRecordVaultNotesForRag(session, noteIds);
+    const { notes, skipped, meta: ragCollectMeta } = await collectRecordVaultNotesForRag(session, noteIds);
     const keepModelInMemory = req.body?.keepModelInMemory === true;
     const resp = await fetch(`${serviceUrl}/query-notes`, {
       method: 'POST',
@@ -129,7 +129,15 @@ export async function postRecordVaultRagQuery(req, res) {
     if (!resp.ok) {
       const detail = data?.detail || data?.error || resp.statusText || 'RAG query failed';
       const message = Array.isArray(detail)
-        ? detail.map((d) => d?.msg || String(d)).join('; ')
+        ? detail
+            .map((d) => {
+              const loc = Array.isArray(d?.loc)
+                ? d.loc.filter((part) => part !== 'body' && part !== 'query').join('.')
+                : '';
+              const msg = d?.msg || String(d);
+              return loc ? `${loc}: ${msg}` : msg;
+            })
+            .join('; ')
         : String(detail);
       return res.status(resp.status >= 400 && resp.status < 600 ? resp.status : 502).json({
         error: message
@@ -150,7 +158,7 @@ export async function postRecordVaultRagQuery(req, res) {
       pdfDebug: Array.isArray(data.pdf_debug) ? data.pdf_debug : []
     });
   } catch (err) {
-    if (err?.code === 'RAG_NO_NOTES' || err?.code === 'RAG_INNER_LOCKED') {
+    if (err?.code === 'RAG_NO_NOTES' || err?.code === 'RAG_INNER_LOCKED' || err?.code === 'RAG_EMPTY_BODY') {
       return res.status(400).json({ error: err.message, code: err.code });
     }
     if (err?.name === 'TimeoutError' || err?.code === 'ABORT_ERR') {

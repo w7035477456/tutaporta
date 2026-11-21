@@ -165,3 +165,7 @@ if (!globalThis.__vsinglesProcessGuardsInstalled) {
 
 // Start config refresh loop (DB, JWT, Redis, rate limit) every 10 seconds with file-size change detection
 import './config/envConfig.js';
+
+// beall / local TTY: console.error first line → black on red (no-op for PM2 file logs)
+import { installDevErrorHighlight } from './utils/installDevErrorHighlight.js';
+installDevErrorHighlight();

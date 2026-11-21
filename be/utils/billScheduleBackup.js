@@ -5,7 +5,7 @@
  * carries them separately:
  *   bill_schedule.json          rows + paid_record notes + attachment metadata
  *   bill_receipts/{id}/{file}   receipt files (same relative_path as in Postgres)
- * Only the Cloud side (storage_backend 'onedrive') is backed up / restored.
+ * Only the Cloud side (storage_backend 'tutaCloud') is backed up / restored.
  */
 import fs from 'fs';
 import path from 'path';
@@ -16,7 +16,7 @@ import { normalizeBillIcon } from './billIconName.js';
 
 export const BILL_SCHEDULE_BACKUP_FILE = 'bill_schedule.json';
 const BILL_SCHEDULE_BACKUP_VERSION = 1;
-const CLOUD_BACKEND = 'onedrive';
+const CLOUD_BACKEND = 'tutaCloud';
 const BILL_RECEIPTS_PREFIX = 'bill_receipts/';
 
 function safeReceiptRelativePath(raw) {

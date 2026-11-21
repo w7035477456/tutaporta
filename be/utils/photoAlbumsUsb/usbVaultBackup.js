@@ -4,22 +4,18 @@ import path from 'path';
 import { ZipArchive } from 'archiver';
 import { Extract } from 'unzipper';
 import { getVaultSession, logoffVaultUsb } from './vaultSession.js';
+import { vaultRootOnMount, VAULT_DIR_NAME, VAULT_META_FILE } from './vaultPaths.js';
+import { openVaultBuffer, sealVaultBuffer } from './vaultCrypto.js';
+import { exportPhotoAlbumsMemberVaultIndex, importPhotoAlbumsMemberVaultIndex, isPhotoAlbumsVaultIndex } from './vaultPgStore.js';
 import {
-  getVaultDbFileName,
-  vaultRootOnMount,
-  VAULT_DB_FILE_ENCRYPTED,
-  VAULT_DB_FILE_PLAIN,
-  VAULT_DIR_NAME,
-  VAULT_META_FILE
-} from './vaultPaths.js';
-import { sealVaultBuffer } from './vaultCrypto.js';
-import { deletePhotoAlbumsMemberVault, exportPhotoAlbumsMemberVaultToSqliteBuffer } from './vaultPgStore.js';
+  buildVaultIndexBackupEntry,
+  findVaultIndexBackupFile,
+  isVaultIndexBackupFileName,
+  listVaultIndexBackupKeys,
+  readVaultIndexBackupFile,
+  TUTAPHOTOALBUMS_INDEX_BACKUP_FILE
+} from '../vaultIndexBackup.js';
 import { buildMyPhotoAlbumsBackupZipFileName } from '../photoAlbumsBackupZipNames.js';
-
-function isVaultDbFileName(name) {
-  const base = path.basename(String(name || ''));
-  return base === VAULT_DB_FILE_PLAIN || base === VAULT_DB_FILE_ENCRYPTED;
-}
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];
@@ -77,10 +73,11 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
     throw new Error(`Missing ${VAULT_DIR_NAME} folder on USB`);
   }
 
-  // Album index lives in Postgres; the zip carries a vault.db snapshot so restore can re-import it.
-  const vaultDbBuffer = sealVaultBuffer(
-    await exportPhotoAlbumsMemberVaultToSqliteBuffer(singlesId),
-    session.key
+  const indexEntry = buildVaultIndexBackupEntry(
+    await exportPhotoAlbumsMemberVaultIndex(singlesId),
+    session.key,
+    TUTAPHOTOALBUMS_INDEX_BACKUP_FILE,
+    sealVaultBuffer
   );
 
   const zipName = buildMyPhotoAlbumsBackupZipFileName('usb');
@@ -96,10 +93,8 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
     archive.on('error', reject);
     archive.on('end', resolve);
     archive.pipe(res);
-    archive.directory(vaultRoot, archiveRootName, (entry) =>
-      isVaultDbFileName(entry.name) ? false : entry
-    );
-    archive.append(vaultDbBuffer, { name: `${archiveRootName}/${getVaultDbFileName(session.meta)}` });
+    archive.directory(vaultRoot, archiveRootName);
+    archive.append(indexEntry.buffer, { name: indexEntry.name });
     void archive.finalize();
   });
 
@@ -108,7 +103,7 @@ export async function streamUsbVaultBackupZip(singlesId, res) {
 
 /**
  * Restore USB `.recordvault` from a local zip (closes session first so files are not locked).
- * Caller must re-unlock with the security icon afterward.
+ * Caller must re-unlock the vault afterward.
  */
 async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storageType) {
   const session = getVaultSession(singlesId, storageType);
@@ -133,22 +128,41 @@ async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storage
       .promise();
 
     const sourceRoot = resolveUsbVaultRootFromExtractedDir(extractDir);
-    const relFiles = walkLocalFiles(sourceRoot);
+    const relFiles = walkLocalFiles(sourceRoot).filter((rel) => !isVaultIndexBackupFileName(rel, TUTAPHOTOALBUMS_INDEX_BACKUP_FILE));
     if (!relFiles.length) {
       throw new Error('Backup zip is empty');
     }
+    const indexPath = findVaultIndexBackupFile([extractDir, path.dirname(sourceRoot), sourceRoot], TUTAPHOTOALBUMS_INDEX_BACKUP_FILE);
+    if (!indexPath) {
+      throw new Error(
+        'This backup has no album index (it only holds media files), so it cannot be restored. Nothing was changed.'
+      );
+    }
+    let backupMeta = null;
+    try {
+      backupMeta = JSON.parse(fs.readFileSync(path.join(sourceRoot, VAULT_META_FILE), 'utf8'));
+    } catch {
+      backupMeta = null;
+    }
+    const { index } = readVaultIndexBackupFile(
+      indexPath,
+      await listVaultIndexBackupKeys(backupMeta),
+      openVaultBuffer,
+      isPhotoAlbumsVaultIndex
+    );
 
     const vaultRoot = vaultRootOnMount(mountPath);
     removeDirRecursive(vaultRoot);
     fs.mkdirSync(vaultRoot, { recursive: true });
     for (const name of fs.readdirSync(sourceRoot)) {
+      if (isVaultIndexBackupFileName(name, TUTAPHOTOALBUMS_INDEX_BACKUP_FILE)) continue;
       copyEntryRecursive(path.join(sourceRoot, name), path.join(vaultRoot, name));
     }
-
-    // A restored vault.db replaces the Postgres album index on the next unlock.
-    if (relFiles.some((rel) => !rel.includes('/') && isVaultDbFileName(rel))) {
-      await deletePhotoAlbumsMemberVault(singlesId);
-    }
+    const indexCounts = await importPhotoAlbumsMemberVaultIndex(singlesId, index, {
+      vaultId: backupMeta?.vaultId ?? null,
+      source: 'restore',
+      importedFromPath: path.basename(indexPath)
+    });
 
     let restoredBytes = 0;
     for (const rel of relFiles) {
@@ -164,6 +178,7 @@ async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storage
       restoredBytes,
       mountPath,
       label,
+      indexCounts,
       requiresReunlock: true
     };
   } finally {
@@ -176,7 +191,7 @@ export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
   return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'usb');
 }
 
-/** Restore TutaCloud album vault from zip (internal session slot `onedrive`). */
+/** Restore TutaCloud album vault from zip (internal session slot `tutaCloud`). */
 export async function restoreTutaCloudVaultFromZipFile(singlesId, zipFilePath) {
-  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'onedrive');
+  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'tutaCloud');
 }

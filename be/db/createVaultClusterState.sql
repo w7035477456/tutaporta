@@ -17,5 +17,5 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.vault_cluster_state (
   updated_at timestamptz NOT NULL DEFAULT NOW(),
   CONSTRAINT vault_cluster_state_pkey PRIMARY KEY (product, singles_id, storage_type),
   CONSTRAINT vault_cluster_state_product_check CHECK (product IN ('photo_albums', 'record_vault')),
-  CONSTRAINT vault_cluster_state_storage_type_check CHECK (storage_type IN ('usb', 'onedrive'))
+  CONSTRAINT vault_cluster_state_storage_type_check CHECK (storage_type IN ('usb', 'tutaCloud'))
 );

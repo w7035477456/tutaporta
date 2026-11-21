@@ -379,44 +379,55 @@ async function ensureCustomizationSchema() {
 }
 
 async function runCustomizationSchemaDdl() {
+  // Enums live in outdateddbsnapshotoct2024 — always schema-qualify (search_path is "$user", public).
   await pool.query(`
     DO $$
     BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'sound_preference_enum') THEN
-        CREATE TYPE sound_preference_enum AS ENUM ('piano', 'flute', 'rain', 'violin', 'jazz', 'mute', 'spasauna', 'storm', 'harpbirds', 'wavesseagulls');
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE n.nspname = 'outdateddbsnapshotoct2024' AND t.typname = 'sound_preference_enum'
+      ) THEN
+        CREATE TYPE outdateddbsnapshotoct2024.sound_preference_enum AS ENUM (
+          'piano', 'flute', 'rain', 'violin', 'jazz', 'mute', 'spasauna', 'storm', 'harpbirds', 'wavesseagulls'
+        );
       END IF;
     END
     $$;
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'violin'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'violin'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'jazz'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'jazz'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'vocaltrance'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'vocaltrance'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'musictrance'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'musictrance'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'spasauna'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'spasauna'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'storm'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'storm'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'harpbirds'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'harpbirds'
   `);
   await pool.query(`
-    ALTER TYPE sound_preference_enum ADD VALUE IF NOT EXISTS 'wavesseagulls'
+    ALTER TYPE outdateddbsnapshotoct2024.sound_preference_enum ADD VALUE IF NOT EXISTS 'wavesseagulls'
   `);
   await pool.query(`
     DO $$
     BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vsingles_lyric_enum') THEN
-        CREATE TYPE vsingles_lyric_enum AS ENUM ('lyric', 'mute');
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE n.nspname = 'outdateddbsnapshotoct2024' AND t.typname = 'vsingles_lyric_enum'
+      ) THEN
+        CREATE TYPE outdateddbsnapshotoct2024.vsingles_lyric_enum AS ENUM ('lyric', 'mute');
       END IF;
     END
     $$;
@@ -438,8 +449,8 @@ async function runCustomizationSchemaDdl() {
   `);
   await pool.query(`
     ALTER TABLE outdateddbsnapshotoct2024.user_customization
-      ADD COLUMN IF NOT EXISTS sound_preference sound_preference_enum NOT NULL DEFAULT 'piano',
-      ADD COLUMN IF NOT EXISTS vsingles_lyric vsingles_lyric_enum NOT NULL DEFAULT 'lyric',
+      ADD COLUMN IF NOT EXISTS sound_preference outdateddbsnapshotoct2024.sound_preference_enum NOT NULL DEFAULT 'piano',
+      ADD COLUMN IF NOT EXISTS vsingles_lyric outdateddbsnapshotoct2024.vsingles_lyric_enum NOT NULL DEFAULT 'lyric',
       ADD COLUMN IF NOT EXISTS lyric_mute outdateddbsnapshotoct2024.boolean_enum NOT NULL DEFAULT 'false'::outdateddbsnapshotoct2024.boolean_enum,
       ADD COLUMN IF NOT EXISTS lyric_volume smallint NOT NULL DEFAULT 10,
       ADD COLUMN IF NOT EXISTS volume smallint NOT NULL DEFAULT 10,

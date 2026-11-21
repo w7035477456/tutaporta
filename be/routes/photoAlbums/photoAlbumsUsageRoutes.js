@@ -68,7 +68,7 @@ export async function getPhotoAlbumsUsage(req, res) {
         tutaDrive: false,
         tutaDriveStorage: null
       };
-      if (isLeftSideTutaDrive() && (requestedType == null || requestedType === 'onedrive')) {
+      if (isLeftSideTutaDrive() && (requestedType == null || requestedType === 'tutaCloud')) {
         const disk = await loadTutaDriveMemberNotesPhotosSizeForSingles(singlesId);
         if (disk) {
           payload.tutaDrive = true;

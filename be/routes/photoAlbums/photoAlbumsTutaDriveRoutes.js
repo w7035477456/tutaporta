@@ -1,7 +1,7 @@
 /**
  * TutaDrive Cloud for TutaPhotoAlbums — left-panel replacement when LEFT_SIDE=TutaDrive.
  * Vault under ${LARGE_CHEAP_STORAGE_FOLDER}/users/M{member_id}/photoalbums/TutaPhotoAlbums.
- * Reuses the 'onedrive' session slot (workspace pane); no Microsoft sync.
+ * Reuses the 'tutaCloud' session slot (workspace pane); no Microsoft sync.
  */
 
 import fs from 'fs';
@@ -19,7 +19,7 @@ import { PhotoAlbumsUnlockError } from '../../utils/photoAlbumsUsb/unlockGuard.j
 import {
   createEnvVaultKeyMaterial,
   listEnvVaultUnlockKeys
-} from '../../utils/photoAlbumsIconKeys.js';
+} from '../../utils/vaultKeys.js';
 import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
 import { requireVaultAccessSession } from '../../utils/photoAlbumsAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/photoAlbumsUsb/usbScan.js';
@@ -42,7 +42,7 @@ import {
 import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
 import { restoreTutaCloudVaultFromZipFile } from '../../utils/photoAlbumsUsb/usbVaultBackup.js';
 
-const TUTADRIVE_ENV_KEY_TYPE = 'tutadrive';
+const TUTADRIVE_ENV_KEY_TYPE = 'tutaCloud';
 
 function schemaTable(name) {
   const schema = String(getDBSchema() || 'outdateddbsnapshotoct2024').replace(/"/g, '');
@@ -98,7 +98,7 @@ async function resolveMemberContext(singlesId) {
 }
 
 async function dropStaleCloudSessionIfWrongMount(singlesId, albumsMount) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   if (!session?.unlocked || !session.mountPath) return;
   const expected = path.resolve(albumsMount);
   const actual = path.resolve(String(session.mountPath));
@@ -110,17 +110,17 @@ async function dropStaleCloudSessionIfWrongMount(singlesId, albumsMount) {
   console.warn(
     `[tutaDrive/photoAlbums] clearing stale cloud session mount ${actual} (expected ${expected})`
   );
-  await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+  await logoffVaultUsb(singlesId, 'tutaCloud').catch(() => {});
 }
 
 function sessionPayload(singlesId, memberId, albumsMount) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   const expected = path.resolve(albumsMount);
   const actual = session?.mountPath ? path.resolve(String(session.mountPath)) : null;
   const unlocked = Boolean(session?.unlocked && actual === expected);
   return {
     unlocked,
-    storageType: 'onedrive',
+    storageType: 'tutaCloud',
     tutaDrive: true,
     memberId,
     memberFolder: `M${String(memberId).replace(/^M/i, '')}`,
@@ -132,7 +132,7 @@ function sessionPayload(singlesId, memberId, albumsMount) {
 /** Album index is in Postgres, so a vault folder needs only vault.meta.json + layout (no vault.db). */
 function vaultStatusFlags(albumsMount) {
   const hasMeta = fs.existsSync(vaultMetaPath(albumsMount));
-  const check = hasMeta ? validateVaultOnMount(albumsMount, { requireDbFile: false }) : { ok: false };
+  const check = hasMeta ? validateVaultOnMount(albumsMount) : { ok: false };
   return {
     hasVault: Boolean(hasMeta && check.ok),
     needsReformat: Boolean(hasMeta && !check.ok),
@@ -153,7 +153,7 @@ async function resolveTutaDriveUnlockKey(albumsMount) {
 }
 
 function tagSessionAsTutaDrive(singlesId) {
-  const session = getVaultSession(singlesId, 'onedrive');
+  const session = getVaultSession(singlesId, 'tutaCloud');
   if (session) {
     session.driveSinglesId = null;
     session.tutaDrive = true;
@@ -162,7 +162,7 @@ function tagSessionAsTutaDrive(singlesId) {
   return session;
 }
 
-/** GET /api/photoAlbums/tutadrive/status */
+/** GET /api/photoAlbums/tutaCloud/status */
 export async function getPhotoAlbumsTutaDriveStatus(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
@@ -170,7 +170,7 @@ export async function getPhotoAlbumsTutaDriveStatus(req, res) {
     if (!isLeftSideTutaDrive()) {
       return res.json({
         leftSide: getLeftSideMode(),
-        tutadrive: { enabled: false },
+        tutaCloud: { enabled: false },
         session: { unlocked: false }
       });
     }
@@ -179,7 +179,7 @@ export async function getPhotoAlbumsTutaDriveStatus(req, res) {
     const flags = vaultStatusFlags(albumsMount);
     return res.json({
       leftSide: 'TutaDrive',
-      tutadrive: {
+      tutaCloud: {
         enabled: true,
         memberId,
         memberFolder: memberFolder || `M${String(memberId).replace(/^M/i, '')}`,
@@ -199,12 +199,12 @@ export async function getPhotoAlbumsTutaDriveStatus(req, res) {
   }
 }
 
-/** POST /api/photoAlbums/tutadrive/format */
+/** POST /api/photoAlbums/tutaCloud/format */
 export async function formatPhotoAlbumsTutaDrive(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
-    await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+    await logoffVaultUsb(singlesId, 'tutaCloud').catch(() => {});
     const { memberId } = await resolveMemberContext(singlesId);
     await deletePhotoAlbumsMemberVault(singlesId);
     wipeTutaDrivePhotoAlbumsVault(memberId);
@@ -224,7 +224,7 @@ export async function formatPhotoAlbumsTutaDrive(req, res) {
 }
 
 /**
- * POST /api/photoAlbums/tutadrive/reset-album — wipe this member's TutaPhotos on TutaCloud:
+ * POST /api/photoAlbums/tutaCloud/reset-album — wipe this member's TutaPhotos on TutaCloud:
  * vault folder (albums, pages, photos), shared-invite snapshots, and the Postgres rows
  * that point at them. USB vault keys and other members' shares are not touched.
  */
@@ -233,7 +233,7 @@ export async function resetPhotoAlbumsTutaDrive(req, res) {
   if (!singlesId) return;
   try {
     const { memberId } = await resolveMemberContext(singlesId);
-    await logoffVaultUsb(singlesId, 'onedrive').catch(() => {});
+    await logoffVaultUsb(singlesId, 'tutaCloud').catch(() => {});
 
     const client = await pool.connect();
     let inviteIds = [];
@@ -241,14 +241,14 @@ export async function resetPhotoAlbumsTutaDrive(req, res) {
       await client.query('BEGIN');
       const invites = await client.query(
         `DELETE FROM ${schemaTable('photo_albums_invites')}
-          WHERE owner_singles_id = $1 AND storage_type = 'onedrive'
+          WHERE owner_singles_id = $1 AND storage_type = 'tutaCloud'
           RETURNING invite_id`,
         [singlesId]
       );
       inviteIds = invites.rows.map((row) => Number(row.invite_id)).filter((id) => id > 0);
       const vaultKeys = await client.query(
         `DELETE FROM ${schemaTable('photo_albums_vault')}
-          WHERE singles_id = $1 AND storage_backend = 'onedrive'`,
+          WHERE singles_id = $1 AND storage_backend = 'tutaCloud'`,
         [singlesId]
       );
       const hasClusterState = await client.query('SELECT to_regclass($1) IS NOT NULL AS ok', [
@@ -257,7 +257,7 @@ export async function resetPhotoAlbumsTutaDrive(req, res) {
       const clusterState = hasClusterState.rows[0]?.ok
         ? await client.query(
             `DELETE FROM ${schemaTable('vault_cluster_state')}
-              WHERE product = 'photo_albums' AND singles_id = $1 AND storage_type = 'onedrive'`,
+              WHERE product = 'photo_albums' AND singles_id = $1 AND storage_type = 'tutaCloud'`,
             [singlesId]
           )
         : { rowCount: 0 };
@@ -305,7 +305,7 @@ export async function resetPhotoAlbumsTutaDrive(req, res) {
   }
 }
 
-/** POST /api/photoAlbums/tutadrive/init */
+/** POST /api/photoAlbums/tutaCloud/init */
 export async function initPhotoAlbumsTutaDrive(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
@@ -328,7 +328,7 @@ export async function initPhotoAlbumsTutaDrive(req, res) {
   }
 }
 
-/** GET /api/photoAlbums/tutadrive/open-progress — poll 0–100% during TutaDrive open */
+/** GET /api/photoAlbums/tutaCloud/open-progress — poll 0–100% during TutaDrive open */
 export async function getPhotoAlbumsTutaDriveOpenProgress(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
@@ -341,7 +341,7 @@ export async function getPhotoAlbumsTutaDriveOpenProgress(req, res) {
   }
 }
 
-/** POST /api/photoAlbums/tutadrive/unlock */
+/** POST /api/photoAlbums/tutaCloud/unlock */
 export async function unlockPhotoAlbumsTutaDrive(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
@@ -366,7 +366,7 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
     const key = await resolveTutaDriveUnlockKey(albumsMount);
     await setVaultOpenProgress(singlesId, { percent: 78, label: 'Loading sample albums' });
     await unlockVaultUsbWithKey(singlesId, albumsMount, key, {
-      storageType: 'onedrive',
+      storageType: 'tutaCloud',
       skipBackup: true
     });
     tagSessionAsTutaDrive(singlesId);
@@ -400,7 +400,7 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
   }
 }
 
-/** POST /api/photoAlbums/tutadrive/restore-zip — multipart field backup (.zip) onto unlocked TutaCloud vault. */
+/** POST /api/photoAlbums/tutaCloud/restore-zip — multipart field backup (.zip) onto unlocked TutaCloud vault. */
 export async function restorePhotoAlbumsTutaDriveBackupZip(req, res) {
   const singlesId = await requireVaultAccessSession(req, res);
   if (!singlesId) return;
@@ -422,12 +422,12 @@ export async function restorePhotoAlbumsTutaDriveBackupZip(req, res) {
   }
 }
 
-/** POST /api/photoAlbums/tutadrive/logoff */
+/** POST /api/photoAlbums/tutaCloud/logoff */
 export async function logoffPhotoAlbumsTutaDrive(req, res) {
   const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
   try {
-    await logoffVaultUsb(singlesId, 'onedrive');
+    await logoffVaultUsb(singlesId, 'tutaCloud');
     return res.json({ success: true });
   } catch (err) {
     console.error('[logoffPhotoAlbumsTutaDrive]', err?.message || err);

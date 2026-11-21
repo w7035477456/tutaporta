@@ -16,7 +16,7 @@ import {
   requestProfilePhotoNotRealNotice
 } from 'utils/profilePhotoRealCheck';
 
-const RECHECK_PHASES = new Set(['gender', 'alias_secret', 'id_verification']);
+const RECHECK_PHASES = new Set(['gender', 'alias', 'id_verification']);
 
 /**
  * "Please upload real photo" popup. Also rechecks a profile photo set before the

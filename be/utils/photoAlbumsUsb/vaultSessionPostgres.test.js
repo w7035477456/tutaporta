@@ -8,11 +8,14 @@ import sharp from 'sharp';
 
 import { buildPhotoAlbumsSearchChain, evaluatePhotoAlbumsSearchChain } from '../photoAlbumsSearch.js';
 import { loadInitializeSampleManifest } from '../photoAlbumsNewMemberSample/seedPhotoAlbumsNewMemberSample.js';
-import { vaultFilesRoot, vaultRootOnMount, VAULT_DB_FILE_PLAIN } from './vaultPaths.js';
+import { listEnvVaultUnlockKeys } from '../vaultKeys.js';
+import { readVaultMeta } from './usbScan.js';
+import { vaultMetaUsesPlaintextStorage } from '../photoAlbumsIconEncryption.js';
+import { vaultFilesRoot, vaultRootOnMount } from './vaultPaths.js';
 import {
-  PHOTO_ALBUMS_VAULT_TABLES as T,
   deletePhotoAlbumsMemberVault,
-  exportPhotoAlbumsMemberVaultToSqliteBuffer,
+  exportPhotoAlbumsMemberVaultIndex,
+  importPhotoAlbumsMemberVaultIndex,
   loadPhotoAlbumsMemberVault
 } from './vaultPgStore.js';
 import { acquireTestVaultMember } from './vaultPgTestMember.js';
@@ -39,12 +42,24 @@ import {
 let member = null;
 let mountPath = null;
 
+/** The index lives in Postgres: the vault folder holds only vault.meta.json + photos/ + files/. */
+function vaultFolderTopLevel() {
+  return fs.readdirSync(vaultRootOnMount(mountPath)).filter((name) => !name.startsWith('.')).sort();
+}
+
 const liveSampleAttachmentCount = () =>
   loadInitializeSampleManifest().attachments.filter((a) => a.deleted !== true).length;
 
+/** Same key choice as the TutaDrive unlock route: env key once the vault is sealed. */
+async function routeUnlockKey() {
+  const meta = readVaultMeta(mountPath);
+  if (vaultMetaUsesPlaintextStorage(meta)) return null;
+  return (await listEnvVaultUnlockKeys('tutaCloud', meta))[0]?.key ?? null;
+}
+
 async function unlock() {
-  await unlockVaultUsbWithKey(member.singlesId, mountPath, null, { storageType: 'onedrive', skipBackup: true });
-  return getVaultSession(member.singlesId, 'onedrive');
+  await unlockVaultUsbWithKey(member.singlesId, mountPath, await routeUnlockKey(), { storageType: 'tutaCloud', skipBackup: true });
+  return getVaultSession(member.singlesId, 'tutaCloud');
 }
 
 const jpeg = (r) =>
@@ -58,7 +73,7 @@ describe('TutaPhoto vault on Postgres', { concurrency: false }, () => {
 
   after(async () => {
     if (member) {
-      await logoffVaultUsb(member.singlesId, 'onedrive').catch(() => {});
+      await logoffVaultUsb(member.singlesId, 'tutaCloud').catch(() => {});
       await member.release();
     }
     fs.rmSync(mountPath, { recursive: true, force: true });
@@ -67,7 +82,7 @@ describe('TutaPhoto vault on Postgres', { concurrency: false }, () => {
   it('first unlock creates the album index in Postgres and seeds the sample album', async (t) => {
     if (!member) return t.skip('Postgres dev DB not reachable');
     const meta = await initializeVaultOnUsbWithKey(mountPath, null);
-    assert.equal(fs.existsSync(path.join(vaultRootOnMount(mountPath), VAULT_DB_FILE_PLAIN)), false);
+    assert.deepEqual(vaultFolderTopLevel(), ['files', 'photos', 'vault.meta.json']);
 
     const session = await unlock();
     assert.ok(session);
@@ -80,7 +95,7 @@ describe('TutaPhoto vault on Postgres', { concurrency: false }, () => {
 
   it('notebooks, notes, keywords, uploads, search, transfer and delete', async (t) => {
     if (!member) return t.skip('Postgres dev DB not reachable');
-    const session = getVaultSession(member.singlesId, 'onedrive');
+    const session = getVaultSession(member.singlesId, 'tutaCloud');
     const nb = await vaultCreateNotebook(session, 'MY SET');
     const note = await vaultCreateNote(session, nb.notebook_id, {
       noteName: 'MY ALBUM',
@@ -140,37 +155,31 @@ describe('TutaPhoto vault on Postgres', { concurrency: false }, () => {
 
   it('logoff + unlock again (any worker) sees the same rows; no vault.db is written', async (t) => {
     if (!member) return t.skip('Postgres dev DB not reachable');
-    const session = getVaultSession(member.singlesId, 'onedrive');
+    const session = getVaultSession(member.singlesId, 'tutaCloud');
     const nb = await vaultCreateNotebook(session, 'KEEP ME');
-    await logoffVaultUsb(member.singlesId, 'onedrive');
+    await logoffVaultUsb(member.singlesId, 'tutaCloud');
     const reopened = await unlock();
     const names = (await vaultGetTree(reopened)).notebooks.map((n) => n.notebook_name);
     assert.ok(names.includes('KEEP ME'));
-    assert.equal(fs.existsSync(path.join(vaultRootOnMount(mountPath), VAULT_DB_FILE_PLAIN)), false);
+    assert.deepEqual(vaultFolderTopLevel(), ['files', 'photos', 'vault.meta.json']);
     await vaultDeleteNotebook(reopened, nb.notebook_id);
   });
 
-  it('imports a legacy vault.db once on unlock, then renames it', async (t) => {
+  it('backup index export → import restores the photoalbums index (ids kept)', async (t) => {
     if (!member) return t.skip('Postgres dev DB not reachable');
-    const session = getVaultSession(member.singlesId, 'onedrive');
-    await vaultCreateNotebook(session, 'FROM LEGACY FILE');
-    const legacy = await exportPhotoAlbumsMemberVaultToSqliteBuffer(member.singlesId);
-    await logoffVaultUsb(member.singlesId, 'onedrive');
+    const session = getVaultSession(member.singlesId, 'tutaCloud');
+    const nb = await vaultCreateNotebook(session, 'FROM BACKUP');
+    const index = JSON.parse(JSON.stringify(await exportPhotoAlbumsMemberVaultIndex(member.singlesId)));
+    await logoffVaultUsb(member.singlesId, 'tutaCloud');
 
     await deletePhotoAlbumsMemberVault(member.singlesId);
-    const root = vaultRootOnMount(mountPath);
-    fs.writeFileSync(path.join(root, VAULT_DB_FILE_PLAIN), legacy);
+    const counts = await importPhotoAlbumsMemberVaultIndex(member.singlesId, index, { source: 'restore' });
+    assert.equal(counts.notebooks, index.tables.notebooks.length);
 
     const reopened = await unlock();
-    const names = (await vaultGetTree(reopened)).notebooks.map((n) => n.notebook_name);
-    assert.ok(names.includes('FROM LEGACY FILE'));
-    assert.equal((await loadPhotoAlbumsMemberVault(member.singlesId)).source, 'import');
-    assert.equal(fs.existsSync(path.join(root, VAULT_DB_FILE_PLAIN)), false);
-    assert.ok(fs.readdirSync(root).some((name) => /^vault-imported-to-postgres-.*\.db$/.test(name)));
-
-    const rows = await member.db.all(`SELECT COUNT(*)::int AS n FROM ${T.notebooks} WHERE singles_id = $1`, [
-      member.singlesId
-    ]);
-    assert.ok(rows[0].n >= 2);
+    const restored = (await vaultGetTree(reopened)).notebooks.find((n) => n.notebook_name === 'FROM BACKUP');
+    assert.equal(Number(restored?.notebook_id), Number(nb.notebook_id));
+    assert.equal((await loadPhotoAlbumsMemberVault(member.singlesId)).source, 'restore');
+    assert.deepEqual(vaultFolderTopLevel(), ['files', 'photos', 'vault.meta.json']);
   });
 });

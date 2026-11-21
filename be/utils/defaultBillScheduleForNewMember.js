@@ -92,7 +92,7 @@ export const DEFAULT_YEARLY_BILL_ROWS = [
   }
 ];
 
-const BILL_STORAGE_BACKENDS = ['onedrive', 'usb'];
+const BILL_STORAGE_BACKENDS = ['tutaCloud', 'usb'];
 
 function toSinglesId(raw) {
   const id = Math.trunc(Number(raw));

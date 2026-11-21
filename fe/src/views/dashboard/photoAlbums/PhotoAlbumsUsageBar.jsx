@@ -132,7 +132,7 @@ export default function PhotoAlbumsUsageBar({
 }) {
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
   const transfer = usage?.transfer;
-  const isOneDrive = storageType === 'tutadrive';
+  const isOneDrive = storageType === 'tutaCloud';
 
   useEffect(() => {
     return registerPhotoAlbumsDataPlanOpener(() => setDataPlanOpen(true));
@@ -257,7 +257,7 @@ export default function PhotoAlbumsUsageBar({
 
 PhotoAlbumsUsageBar.propTypes = {
   usage: PropTypes.object,
-  storageType: PropTypes.oneOf(['usb', 'onedrive']),
+  storageType: PropTypes.oneOf(['usb', 'tutaCloud']),
   videoTutorialUrl: PropTypes.string,
   onPurchased: PropTypes.func,
   onGetMoreTokens: PropTypes.func,

@@ -11,8 +11,6 @@
     "seed": "node db/seed.js",
     "hash-password": "node scripts/hash-password.js",
     "migrate-password-argon2id": "node scripts/migratePasswordToArgon2id.js",
-    "migrate-icon-vault-kdf": "node scripts/migrateIconVaultKdf.js",
-    "rotate-record-vault-master-key": "node scripts/rotateRecordVaultIconKeysMasterKey.js",
     "verify-login": "node scripts/verify-login-password.js",
     "pm2:start": "pm2 start ecosystem.config.cjs --env production",
     "pm2:stop": "pm2 stop ecosystem.config.cjs",
@@ -51,7 +49,6 @@
     "nodemailer": "^7.0.12",
     "pg": "^8.11.3",
     "sharp": "^0.34.5",
-    "sql.js": "^1.14.1",
     "tesseract.js": "^5.1.1",
     "twilio": "^6.0.2",
     "unzipper": "^0.12.5"

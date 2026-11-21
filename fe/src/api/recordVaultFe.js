@@ -24,7 +24,7 @@ import {
   vaultCloudBackendStorageSlot
 } from 'utils/vaultPaneStorageType';
 
-/** Map pane id (`tutadrive`) → backend session slot header (`onedrive`). */
+/** Map pane id (`tutaCloud`) → backend session slot header (`tutaCloud`). */
 function resolveRecordVaultApiStorageType(storageType) {
   if (storageType == null || String(storageType).trim() === '') return null;
   return isVaultCloudPaneStorageType(storageType) ? vaultCloudBackendStorageSlot() : 'usb';
@@ -147,11 +147,11 @@ export async function snapshotRecordVaultSessionFileCounts() {
 }
 
 /** Per-tab: tree open already counted for this storage type after unlock. */
-const sessionTreeCounted = { usb: false, tutadrive: false };
+const sessionTreeCounted = { usb: false, tutaCloud: false };
 
 export function resetRecordVaultSessionTreeCountFlags() {
   sessionTreeCounted.usb = false;
-  sessionTreeCounted.tutadrive = false;
+  sessionTreeCounted.tutaCloud = false;
 }
 
 function countTreeNotebooksAndNotes(tree) {
@@ -538,7 +538,7 @@ export async function deleteRecordVaultNoteAttachment(noteId, attachmentId, { st
 }
 
 /** Mac only — write attachment to temp and `open` in Word/Excel (or default app). */
-export async function openRecordVaultNoteAttachmentNative(noteId, attachmentId) {
+export async function openRecordVaultNoteAttachmentNative(noteId, attachmentId, { storageType } = {}) {
   const note = Number(noteId);
   const attachment = Number(attachmentId);
   if (!Number.isFinite(note) || note < 1 || !Number.isFinite(attachment) || attachment < 1) {
@@ -573,7 +573,6 @@ export async function fetchRecordVaultUsbStatus() {
   });
   return {
     usbMode: Boolean(data?.usbMode),
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
     session: data?.session || { unlocked: false }
   };
 }
@@ -715,19 +714,6 @@ export async function fetchRecordVaultStorageConfig() {
     oneDrive: tutaCloud,
     localUsb: mapChoice(data?.localUsb),
     backupUsbEnabled: data?.backupUsbEnabled !== false,
-    iconEncryptionRequired: data?.iconEncryptionRequired !== false,
-    iconRetryDelaySeconds: Number(data?.iconRetryDelaySeconds) || 300,
-    cacheTutaCloudIcon: data?.cacheTutaCloudIcon
-      ? String(data.cacheTutaCloudIcon).trim()
-      : data?.cacheOneDriveIcon
-        ? String(data.cacheOneDriveIcon).trim()
-        : '',
-    cacheOneDriveIcon: data?.cacheTutaCloudIcon
-      ? String(data.cacheTutaCloudIcon).trim()
-      : data?.cacheOneDriveIcon
-        ? String(data.cacheOneDriveIcon).trim()
-        : '',
-    cacheUsbIcon: data?.cacheUsbIcon ? String(data.cacheUsbIcon).trim() : '',
     videoTutorialTutanotes: data?.videoTutorialTutanotes ? String(data.videoTutorialTutanotes).trim() : '',
     usbBridgeInstallers: {
       mac: normalizeUsbBridgeInstallerUrl(data?.usbBridgeInstallers?.mac, 'mac'),
@@ -782,7 +768,7 @@ export async function downloadUsbBridgeInstaller(platform = 'mac') {
 }
 
 export async function fetchRecordVaultTutaDriveVaultTree() {
-  const { data } = await api.get('/api/recordVault/tutadrive/vault-tree');
+  const { data } = await api.get('/api/recordVault/tutaCloud/vault-tree');
   return {
     folderName: data?.folderName ? String(data.folderName) : '',
     tree: data?.tree && typeof data.tree === 'object' ? data.tree : null
@@ -808,42 +794,35 @@ function normalizeRecordVaultTutaDriveStatusPayload(data) {
   if (session.unlocked) {
     session.storageType = normalizeVaultPaneStorageType(session.storageType || vaultCloudBackendStorageSlot());
   }
-  const cacheIcon = data?.cacheTutaCloudIcon
-    ? String(data.cacheTutaCloudIcon).trim()
-    : data?.cacheIcon
-      ? String(data.cacheIcon).trim()
-      : '';
   return {
     ...data,
-    enabled: Boolean(data?.tutadrive?.enabled),
-    cacheIcon,
-    cacheTutaCloudIcon: cacheIcon,
+    enabled: Boolean(data?.tutaCloud?.enabled),
     session
   };
 }
 
 export async function fetchRecordVaultTutaDriveStatus() {
-  const { data } = await api.get('/api/recordVault/tutadrive/status');
+  const { data } = await api.get('/api/recordVault/tutaCloud/status');
   return normalizeRecordVaultTutaDriveStatusPayload(data);
 }
 
 export async function unlockRecordVaultTutaDrive() {
-  const { data } = await api.post('/api/recordVault/tutadrive/unlock');
+  const { data } = await api.post('/api/recordVault/tutaCloud/unlock');
   return data;
 }
 
 export async function formatRecordVaultTutaDrive() {
-  const { data } = await api.post('/api/recordVault/tutadrive/format');
+  const { data } = await api.post('/api/recordVault/tutaCloud/format');
   return data;
 }
 
 export async function initRecordVaultTutaDrive() {
-  const { data } = await api.post('/api/recordVault/tutadrive/init');
+  const { data } = await api.post('/api/recordVault/tutaCloud/init');
   return data;
 }
 
 export async function logoffRecordVaultTutaDrive() {
-  const { data } = await api.post('/api/recordVault/tutadrive/logoff');
+  const { data } = await api.post('/api/recordVault/tutaCloud/logoff');
   return data;
 }
 
@@ -852,7 +831,7 @@ export async function syncRecordVaultTutaDrive({ onProgress } = {}) {
   if (typeof onProgress === 'function') {
     onProgress({ percent: 0, label: 'Saving to TutaCloud…' });
   }
-  const { data } = await api.post('/api/recordVault/tutadrive/sync');
+  const { data } = await api.post('/api/recordVault/tutaCloud/sync');
   if (typeof onProgress === 'function') {
     onProgress({ percent: 100, label: 'Done' });
   }
@@ -914,7 +893,7 @@ function triggerBrowserBlobDownload(blob, fileName) {
 /** Zip the TutaCloud vault folder and save to the browser download folder. */
 export async function downloadRecordVaultTutaDriveBackupZip() {
   try {
-    const response = await api.get('/api/recordVault/tutadrive/backup-zip', { responseType: 'blob' });
+    const response = await api.get('/api/recordVault/tutaCloud/backup-zip', { responseType: 'blob' });
     const fileName =
       parseContentDispositionFilename(response.headers?.['content-disposition']) ||
       buildMyNoteBackupZipFileNameClient('cloud');
@@ -932,7 +911,7 @@ export async function restoreRecordVaultTutaDriveBackupZip(file) {
   const formData = new FormData();
   formData.append('backup', file);
   const { formData: body } = await prepareLargeBackupFormData(formData);
-  const { data } = await api.post('/api/recordVault/tutadrive/restore-zip', body, {
+  const { data } = await api.post('/api/recordVault/tutaCloud/restore-zip', body, {
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
     timeout: 0
@@ -970,7 +949,7 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
     }
   }
   const report = makeBackupProgressReporter(onProgress);
-  const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutadrive/backup-zip', report, 'build', 0, 40, {
+  const zipBuf = await downloadBlobWithProgress('/api/recordVault/tutaCloud/backup-zip', report, 'build', 0, 40, {
     estimatedTotalBytes
   });
   report('seal', 40, { totalBytes: zipBuf.length, withZipPassword });
@@ -1008,19 +987,19 @@ export async function createRecordVaultTutaDriveEncryptedBackup(
 }
 
 export async function fetchRecordVaultTutaDriveBackupStatus() {
-  const { data } = await api.get('/api/recordVault/tutadrive/backup/status');
+  const { data } = await api.get('/api/recordVault/tutaCloud/backup/status');
   return data;
 }
 
 /** True when TutaNotes changed since this unlock and since the newest TutaCloud backup. */
 export async function fetchRecordVaultTutaDriveNeedsBackup() {
-  const { data } = await api.get('/api/recordVault/tutadrive/backup/needs-backup');
+  const { data } = await api.get('/api/recordVault/tutaCloud/backup/needs-backup');
   return Boolean(data?.needsBackup);
 }
 
 export async function deleteRecordVaultTutaDriveBackup(fileName) {
   const enc = encodeURIComponent(String(fileName || ''));
-  const { data } = await api.delete(`/api/recordVault/tutadrive/backup/${enc}`);
+  const { data } = await api.delete(`/api/recordVault/tutaCloud/backup/${enc}`);
   return data;
 }
 
@@ -1032,7 +1011,7 @@ export async function downloadRecordVaultTutaDriveStoredBackup(fileName, { targe
   if (!fileName) throw new Error('Backup file name is required');
   try {
     const q = `?fileName=${encodeURIComponent(String(fileName))}`;
-    const response = await api.get(`/api/recordVault/tutadrive/backup${q}`, { responseType: 'blob', timeout: 0 });
+    const response = await api.get(`/api/recordVault/tutaCloud/backup${q}`, { responseType: 'blob', timeout: 0 });
     const resolvedName =
       targetFile?.name || parseContentDispositionFilename(response.headers?.['content-disposition']) || String(fileName);
     if (targetFile) {
@@ -1136,7 +1115,7 @@ async function downloadBlobWithProgress(url, report, stage, fromPct, toPct, { es
 /** Download a stored sealed backup (stage `download`) within [fromPct, toPct]. */
 async function downloadStoredBackupWithProgress(fileName, report, fromPct, toPct) {
   const q = fileName ? `?fileName=${encodeURIComponent(String(fileName))}` : '';
-  return downloadBlobWithProgress(`/api/recordVault/tutadrive/backup${q}`, report, 'download', fromPct, toPct);
+  return downloadBlobWithProgress(`/api/recordVault/tutaCloud/backup${q}`, report, 'download', fromPct, toPct);
 }
 
 /**
@@ -1223,14 +1202,14 @@ export async function uploadRecordVaultTutaDriveStoredBackup(file, replaceFileNa
   const data = replaceFileName
     ? await sendBackupFormWithProgress(
         'put',
-        `/api/recordVault/tutadrive/backup/${encodeURIComponent(String(replaceFileName))}`,
+        `/api/recordVault/tutaCloud/backup/${encodeURIComponent(String(replaceFileName))}`,
         formData,
         sealed.length,
         report,
         15,
         95
       )
-    : await sendBackupFormWithProgress('post', '/api/recordVault/tutadrive/backup', formData, sealed.length, report, 15, 95);
+    : await sendBackupFormWithProgress('post', '/api/recordVault/tutaCloud/backup', formData, sealed.length, report, 15, 95);
   report('saved', 98, { totalBytes: sealed.length, fileName: data?.fileName });
   return data;
 }
@@ -1256,7 +1235,7 @@ export async function restoreRecordVaultTutaDriveEncryptedBackup(file, fileName,
   );
   return sendBackupFormWithProgress(
     'post',
-    '/api/recordVault/tutadrive/restore-zip',
+    '/api/recordVault/tutaCloud/restore-zip',
     formData,
     plainZip.length,
     report,
@@ -1313,7 +1292,7 @@ export async function previewRecordVaultTutaDriveMergeFromStoredBackup(fileName,
   formData.append('backup', new Blob([plainZip], { type: 'application/zip' }), 'TutaNotes-merge.zip');
   return sendBackupFormWithProgress(
     'post',
-    '/api/recordVault/tutadrive/merge/preview',
+    '/api/recordVault/tutaCloud/merge/preview',
     formData,
     plainZip.length,
     report,
@@ -1331,7 +1310,7 @@ export async function fetchRecordVaultTutaDriveBackupNotebookTree(fileName) {
   const formData = new FormData();
   formData.append('backup', new Blob([plainZip], { type: 'application/zip' }), 'TutaNotes-open.zip');
   const { formData: body } = await prepareLargeBackupFormData(formData);
-  const { data } = await api.post('/api/recordVault/tutadrive/backup-tree', body, {
+  const { data } = await api.post('/api/recordVault/tutaCloud/backup-tree', body, {
     maxBodyLength: Infinity,
     maxContentLength: Infinity,
     timeout: 0
@@ -1354,7 +1333,7 @@ export async function fetchRecordVaultTutaDriveBackupNotebookTree(fileName) {
 
 /** Apply merge decisions from a prior preview mergeId. */
 export async function applyRecordVaultTutaDriveMerge(mergeId, decisions) {
-  const { data } = await api.post('/api/recordVault/tutadrive/merge/apply', {
+  const { data } = await api.post('/api/recordVault/tutaCloud/merge/apply', {
     mergeId,
     decisions
   });
@@ -1435,7 +1414,7 @@ async function logoffRecordVaultStorageWithProgress(storageType, onProgress) {
   }, 250);
   try {
     const { data } = isCloud
-      ? await api.post('/api/recordVault/tutadrive/logoff')
+      ? await api.post('/api/recordVault/tutaCloud/logoff')
       : await rvRequest({ method: 'POST', url: '/api/recordVault/usb/logoff', storageType: 'usb' });
     if (typeof onProgress === 'function') {
       onProgress({ percent: 100, label: 'Done' });
@@ -1454,7 +1433,7 @@ export async function logoffRecordVaultStorage({ storageType, onProgress } = {})
     if (typeof onProgress === 'function') {
       data = await logoffRecordVaultStorageWithProgress(VAULT_CLOUD_STORAGE_TYPE, onProgress);
     } else {
-      ({ data } = await api.post('/api/recordVault/tutadrive/logoff'));
+      ({ data } = await api.post('/api/recordVault/tutaCloud/logoff'));
     }
   } else if (normalized === 'usb') {
     if (typeof onProgress === 'function') {
@@ -1569,7 +1548,7 @@ export async function fetchRecordVaultActiveStorageDisplay() {
   try {
     const status = await fetchRecordVaultTutaDriveStatus();
     if (status?.session?.unlocked) {
-      const folder = String(status?.tutadrive?.memberFolder || '').trim();
+      const folder = String(status?.tutaCloud?.memberFolder || '').trim();
       return folder ? `Storage: TutaCloud (${folder})` : 'Storage: TutaCloud';
     }
   } catch {

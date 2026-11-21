@@ -5,7 +5,7 @@
  *   PIN → KEK (Argon2id) → wrap note DEK → seal note body with DEK
  *
  * The PIN, KEK, and plaintext DEK never leave the browser.
- * Storage (USB/OneDrive vault.db) gets only an opaque body blob:
+ * Storage (Postgres index) gets only an opaque body blob:
  *   salt + wrapped DEK + ciphertext — never the PIN.
  *
  * Unlock writes plaintext back and clears the flag; re-encrypt is manual only.

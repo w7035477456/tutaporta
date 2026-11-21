@@ -77,7 +77,6 @@ const PROFILE_COLUMN_CANDIDATES = {
   last_password_change_date: ['last_password_change_date'],
   last_email_change_date: ['last_email_change_date'],
   last_phone_change_date: ['last_phone_change_date'],
-  secret_icon: ['secret_icon'],
   custom_logout_duration: ['custom_logout_duration']
 };
 
@@ -1962,7 +1961,6 @@ export async function getSettingsProfile(req, res) {
       last_password_change_date: formatLastChangeDateForApi(row.last_password_change_date),
       last_email_change_date: formatLastChangeDateForApi(row.last_email_change_date),
       last_phone_change_date: formatLastChangeDateForApi(row.last_phone_change_date),
-      has_secret_icon: Boolean(String(row.secret_icon ?? '').trim()),
       custom_logout_duration: (() => {
         const n = Math.trunc(Number(row.custom_logout_duration));
         return Number.isFinite(n) && n > 0 ? n : 60;
