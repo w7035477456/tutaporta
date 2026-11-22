@@ -187,12 +187,40 @@ function renderPopupResultHtml({
       var ackType = ${JSON.stringify(OAUTH_ACK_TYPE)};
       var bridgePath = '/pages/login/google-oauth-bridge';
       var bridgeOrigin = ${JSON.stringify(bridgeOrigin)};
-      var targetOrigin = window.location.origin;
+      var callbackOrigin = window.location.origin;
+      // Opener is on returnOrigin (e.g. Vite :3001); callback may be on :3000 — always target the FE origin.
+      var openerOrigin = bridgeOrigin || callbackOrigin;
       var statusEl = document.getElementById('status');
       var closed = false;
 
       function setStatus(text) {
         if (statusEl) statusEl.textContent = text;
+      }
+
+      function bridgeUrl() {
+        if (!bridgeOrigin) return '';
+        return (
+          bridgeOrigin.replace(/\\/$/, '') +
+          bridgePath +
+          '#oauth=' +
+          encodeURIComponent(JSON.stringify(payload))
+        );
+      }
+
+      function redirectToBridge() {
+        var dest = bridgeUrl();
+        if (!dest) return;
+        try {
+          window.location.replace(dest);
+        } catch (e) {}
+      }
+
+      // Mac Vite often lands on :3001 while GOOGLE_OAUTH_REDIRECT_URI stays :3000.
+      // Hand off on the FE origin so postMessage / localStorage reach the opener.
+      if (bridgeOrigin && bridgeOrigin !== callbackOrigin) {
+        setStatus('Signed in. Returning…');
+        redirectToBridge();
+        return;
       }
 
       function deliverToMainPage() {
@@ -206,7 +234,7 @@ function renderPopupResultHtml({
         } catch (e) {}
         if (window.opener && !window.opener.closed) {
           try {
-            window.opener.postMessage(payload, targetOrigin);
+            window.opener.postMessage(payload, openerOrigin);
           } catch (e) {}
           if (payload.email) {
             try {
@@ -219,13 +247,6 @@ function renderPopupResultHtml({
             } catch (e) {}
           }
         }
-      }
-
-      function redirectToBridge() {
-        if (!bridgeOrigin) return;
-        try {
-          window.location.replace(bridgeOrigin.replace(/\\/$/, '') + bridgePath);
-        } catch (e) {}
       }
 
       function closePopup() {
@@ -243,7 +264,7 @@ function renderPopupResultHtml({
       }
 
       function onAck(event) {
-        if (event.origin !== targetOrigin) return;
+        if (event.origin !== openerOrigin && event.origin !== callbackOrigin) return;
         if (!event.data || event.data.type !== ackType) return;
         window.removeEventListener('message', onAck);
         clearInterval(retryTimer);

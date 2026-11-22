@@ -15,9 +15,39 @@ function isAllowedOAuthMessageOrigin(origin) {
   if (typeof window === 'undefined') return false;
   if (origin === window.location.origin) return true;
   try {
-    return origin === new URL(getApiBaseUrl()).origin;
+    if (origin === new URL(getApiBaseUrl()).origin) return true;
   } catch {
-    return false;
+    // ignore
+  }
+  // Mac: OAuth redirect_uri is often :3000 while Vite is on :3001 (or another free port).
+  try {
+    const msg = new URL(origin);
+    const here = new URL(window.location.origin);
+    if (msg.hostname === 'localhost' && here.hostname === 'localhost' && msg.protocol === here.protocol) {
+      return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+/** Read `#oauth=<json>` written by the BE callback when redirecting to the FE-origin bridge. */
+export function consumeOAuthResultFromLocationHash() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const hash = String(window.location.hash || '');
+    const prefix = '#oauth=';
+    if (!hash.startsWith(prefix)) return null;
+    const parsed = parseOAuthResultPayload(JSON.parse(decodeURIComponent(hash.slice(prefix.length))));
+    try {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    } catch {
+      // ignore
+    }
+    return parsed;
+  } catch {
+    return null;
   }
 }
 

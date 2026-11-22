@@ -8,9 +8,9 @@ import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Box from '@mui/material/Box';
 
-// assets - top banner for dating pages
+// assets - top banner for dating pages / mall landing header logo
 import { DATING_TOP_BANNER_IMAGE } from 'config/datingTopBanner';
-import bannerTutaDates from 'assets/images/BannerTutaDates.png';
+import bannerTutaMall from 'assets/images/BannerTutaMall.png';
 import { headerBarMinHeightCss } from 'config/headerProfileChipEnv';
 
 // project imports
@@ -123,8 +123,8 @@ function DatingAppBarToolbar({ iconsOnly, adminHeader, showDemoOnlyBanner }) {
       {iconsOnly ? (
         <Box
           component="img"
-          src={bannerTutaDates}
-          alt="TutaDates"
+          src={bannerTutaMall}
+          alt="TutaMall"
           sx={{
             position: 'absolute',
             left: 0,

@@ -1213,6 +1213,8 @@ function ShortcutMenuRow({
   locked = false,
   draggingId,
   dropTargetId,
+  /** True while a notebook/note drag is active (Safari often omits custom MIME from types). */
+  acceptLeftDrag = false,
   onSelect,
   onDragStart,
   onDragEnd,
@@ -1253,7 +1255,7 @@ function ShortcutMenuRow({
           }}
           onDragEnd={onDragEnd}
           onDragOver={(e) => {
-            const fromLeft = isLeftSidebarDragEvent(e);
+            const fromLeft = acceptLeftDrag || isLeftSidebarDragEvent(e);
             if (draggingId != null || fromLeft) {
               e.preventDefault();
               e.dataTransfer.dropEffect = draggingId != null ? 'move' : 'copy';
@@ -1267,7 +1269,8 @@ function ShortcutMenuRow({
             const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
             const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
             if (shortcutRaw) onDrop(e, id);
-            else if (notebookRaw || noteRaw) onDropFromLeft(e);
+            // acceptLeftDrag / activeDragRef cover Safari when getData(custom MIME) is empty
+            else if (notebookRaw || noteRaw || acceptLeftDrag) onDropFromLeft(e);
           }}
           sx={
             isDropTarget
@@ -5474,13 +5477,14 @@ export default function RecordVaultWorkspacePane({
       }
       let notebookRaw = event.dataTransfer.getData(DRAG_NOTEBOOK);
       let noteRaw = event.dataTransfer.getData(DRAG_NOTE);
-      if (!notebookRaw && !noteRaw) {
-        const active = activeDragRef.current;
+      // Prefer live drag state — Safari often leaves getData(custom MIME) empty on drop.
+      const active = activeDragRef.current;
+      if ((!notebookRaw || !noteRaw) && active?.kind) {
         if (active.kind === DRAG_NOTE) {
-          noteRaw = String(active.id ?? '');
-          notebookRaw = String(active.notebookId ?? selectedNotebookId ?? '');
+          if (!noteRaw) noteRaw = String(active.id ?? '');
+          if (!notebookRaw) notebookRaw = String(active.notebookId ?? selectedNotebookId ?? '');
         } else if (active.kind === DRAG_NOTEBOOK) {
-          notebookRaw = String(active.id ?? '');
+          if (!notebookRaw) notebookRaw = String(active.id ?? '');
         }
       }
       if (busy) {
@@ -5566,7 +5570,7 @@ export default function RecordVaultWorkspacePane({
         handleDragEnd();
       }
     },
-    [busy, findNoteRowById, handleDragEnd, notebooks, selectedNotebookId, selectNoteId, shortcuts]
+    [busy, findNoteRowById, handleDragEnd, notebooks, selectedNotebookId, selectNoteId, shortcuts, vaultApi]
   );
 
   const handleShortcutReorderDrop = useCallback(
@@ -8374,7 +8378,10 @@ export default function RecordVaultWorkspacePane({
                               minHeight: compact ? 64 : 100
                             }}
                             onDragOver={(e) => {
-                              const fromLeft = isLeftSidebarDragEvent(e);
+                              const fromLeft =
+                                draggingNotebookId != null ||
+                                draggingNoteId != null ||
+                                isLeftSidebarDragEvent(e);
                               if (fromLeft || draggingShortcutId != null) {
                                 e.preventDefault();
                                 e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
@@ -8386,7 +8393,12 @@ export default function RecordVaultWorkspacePane({
                               const notebookRaw = e.dataTransfer.getData(DRAG_NOTEBOOK);
                               const noteRaw = e.dataTransfer.getData(DRAG_NOTE);
                               const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
-                              if (!shortcutRaw && (notebookRaw || noteRaw || isLeftSidebarDragEvent(e))) {
+                              const fromLeft =
+                                draggingNotebookId != null ||
+                                draggingNoteId != null ||
+                                Boolean(notebookRaw || noteRaw) ||
+                                isLeftSidebarDragEvent(e);
+                              if (!shortcutRaw && fromLeft) {
                                 void handleShortcutDropFromLeft(e);
                               }
                             }}
@@ -8423,10 +8435,25 @@ export default function RecordVaultWorkspacePane({
                             <Box
                               sx={recordVaultMenuListScrollSx}
                               onDragOver={(e) => {
-                                const fromLeft = isLeftSidebarDragEvent(e);
+                                const fromLeft =
+                                  draggingNotebookId != null ||
+                                  draggingNoteId != null ||
+                                  isLeftSidebarDragEvent(e);
                                 if (fromLeft || draggingShortcutId != null) {
                                   e.preventDefault();
                                   e.dataTransfer.dropEffect = fromLeft ? 'copy' : 'move';
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const shortcutRaw = e.dataTransfer.getData(DRAG_SHORTCUT);
+                                const fromLeft =
+                                  draggingNotebookId != null ||
+                                  draggingNoteId != null ||
+                                  isLeftSidebarDragEvent(e);
+                                if (!shortcutRaw && fromLeft) {
+                                  void handleShortcutDropFromLeft(e);
                                 }
                               }}
                             >
@@ -8461,6 +8488,7 @@ export default function RecordVaultWorkspacePane({
                                     locked={shortcutInnerLocked}
                                     draggingId={draggingShortcutId}
                                     dropTargetId={dropTargetShortcutId}
+                                    acceptLeftDrag={draggingNotebookId != null || draggingNoteId != null}
                                     onSelect={() => handleShortcutClick(shortcut)}
                                     onDragStart={(e, shortcutId) => handleDragStart(e, shortcutId, DRAG_SHORTCUT)}
                                     onDragEnd={handleDragEnd}

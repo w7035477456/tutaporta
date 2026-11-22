@@ -184,8 +184,9 @@ export default defineConfig(({ mode }) => {
     server: {
       // this ensures that the browser opens upon server start
       open: true,
-      // this sets a default port to 3000
+      // Always http://localhost:3000 — never hop to :3001/:3002 (breaks Google OAuth redirect_uri).
       port: PORT,
+      strictPort: true,
       host: true,
       proxy: apiProxy,
       // Mac dev: stop Chrome caching stale Vite dep bundles across restarts

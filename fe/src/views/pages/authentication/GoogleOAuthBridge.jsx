@@ -3,8 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import {
+  consumeOAuthResultFromLocationHash,
   consumePendingGoogleOAuthResult,
   GOOGLE_SIGNUP_OAUTH_ACK_TYPE,
+  GOOGLE_SIGNUP_OAUTH_MESSAGE_TYPE,
+  GOOGLE_SIGNUP_OAUTH_RESULT_KEY,
+  GOOGLE_SIGNUP_BROADCAST_CHANNEL,
   persistGoogleSignupEmail,
   persistGoogleSignupToken,
   clearGoogleSignupToken
@@ -16,6 +20,30 @@ export default function GoogleOAuthBridge() {
   const [showCloseHint, setShowCloseHint] = useState(false);
 
   useEffect(() => {
+    // Cross-port Mac handoff: callback (:3000) redirects here (:3001) with #oauth=…
+    const fromHash = consumeOAuthResultFromLocationHash();
+    if (fromHash) {
+      try {
+        localStorage.setItem(GOOGLE_SIGNUP_OAUTH_RESULT_KEY, JSON.stringify(fromHash));
+      } catch {
+        // ignore
+      }
+      try {
+        const channel = new BroadcastChannel(GOOGLE_SIGNUP_BROADCAST_CHANNEL);
+        channel.postMessage(fromHash);
+        channel.close();
+      } catch {
+        // ignore
+      }
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(fromHash, window.location.origin);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     const result = consumePendingGoogleOAuthResult();
     if (result?.email) {
       persistGoogleSignupEmail(result.email);
@@ -28,6 +56,10 @@ export default function GoogleOAuthBridge() {
 
     try {
       if (window.opener && !window.opener.closed) {
+        // Prefer delivering the OAuth result; ack alone is not enough for the login page.
+        if (fromHash?.type === GOOGLE_SIGNUP_OAUTH_MESSAGE_TYPE) {
+          window.opener.postMessage(fromHash, window.location.origin);
+        }
         window.opener.postMessage({ type: GOOGLE_SIGNUP_OAUTH_ACK_TYPE, received: true }, window.location.origin);
         window.opener.focus();
       }
