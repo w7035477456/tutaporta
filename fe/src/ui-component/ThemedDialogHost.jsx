@@ -1,8 +1,29 @@
 import { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
+import { SUCCESS_ON_BLACK_BOX_SX } from 'config/successOnBlackBoxSx';
 import { registerThemedDialogHandler } from 'utils/themedDialog';
+
+function MessageWithSuccessHighlight({ text }) {
+  const str = String(text ?? '');
+  const parts = str.split(/(\bsuccess\b)/i);
+  if (parts.length === 1) return str;
+  return parts.map((part, index) =>
+    /^success$/i.test(part) ? (
+      <Box key={`success-${index}`} component="span" sx={SUCCESS_ON_BLACK_BOX_SX}>
+        {part}
+      </Box>
+    ) : (
+      part
+    )
+  );
+}
+
+MessageWithSuccessHighlight.propTypes = {
+  text: PropTypes.string
+};
 
 /**
  * App-wide host for themedAlert / themedConfirm / themedPrompt
@@ -64,7 +85,7 @@ export default function ThemedDialogHost() {
           <ColorTemplate16PopupCenterWide.Title>{dialog.title}</ColorTemplate16PopupCenterWide.Title>
           <ColorTemplate16PopupCenterWide.Body spacing={1.5} sx={{ textAlign: 'left' }}>
             <ColorTemplate16PopupCenterWide.BodyText sx={{ whiteSpace: 'pre-wrap', fontWeight: 700 }}>
-              {dialog.message}
+              <MessageWithSuccessHighlight text={dialog.message} />
             </ColorTemplate16PopupCenterWide.BodyText>
             {dialog.highlightMessage ? (
               <Box

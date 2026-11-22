@@ -115,9 +115,11 @@ function displayName(name) {
 
 function formatSize(bytes) {
   const n = Number(bytes) || 0;
+  const MiB = 1024 * 1024;
   if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n < MiB) return `${(n / 1024).toFixed(1)} KB`;
+  if (n / MiB > 999) return `${(n / (1024 * MiB)).toFixed(1)} GB`;
+  return `${(n / MiB).toFixed(1)} MB`;
 }
 
 /**

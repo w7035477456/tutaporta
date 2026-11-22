@@ -28,7 +28,8 @@ function formatDataMb(mb) {
   const value = Number(mb) || 0;
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
-  if (abs >= 1024) {
+  // Over 999MB → #.#GB (site-wide TutaMall size rule).
+  if (abs > 999) {
     const gb = abs / 1024;
     return `${sign}${gb.toFixed(1)}GB`;
   }

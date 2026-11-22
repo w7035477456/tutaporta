@@ -1,21 +1,22 @@
+/**
+ * Legacy USB vault zip helpers. TutaCloud backup/restore lives in photoAlbumsTutaDriveBackup.js.
+ */
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { ZipArchive } from 'archiver';
 import { Extract } from 'unzipper';
 import { getVaultSession, logoffVaultUsb } from './vaultSession.js';
 import { vaultRootOnMount, VAULT_DIR_NAME, VAULT_META_FILE } from './vaultPaths.js';
-import { openVaultBuffer, sealVaultBuffer } from './vaultCrypto.js';
-import { exportPhotoAlbumsMemberVaultIndex, importPhotoAlbumsMemberVaultIndex, isPhotoAlbumsVaultIndex } from './vaultPgStore.js';
+import { openVaultBuffer } from './vaultCrypto.js';
+import { importPhotoAlbumsMemberVaultIndex, isPhotoAlbumsVaultIndex } from './vaultPgStore.js';
 import {
-  buildVaultIndexBackupEntry,
   findVaultIndexBackupFile,
   isVaultIndexBackupFileName,
   listVaultIndexBackupKeys,
   readVaultIndexBackupFile,
   TUTAPHOTOALBUMS_INDEX_BACKUP_FILE
 } from '../vaultIndexBackup.js';
-import { buildMyPhotoAlbumsBackupZipFileName } from '../photoAlbumsBackupZipNames.js';
+import { restorePhotoAlbumsTutaDriveVaultFromZipFile } from '../photoAlbumsTutaDriveBackup.js';
 
 function walkLocalFiles(dirPath, basePath = dirPath) {
   if (!fs.existsSync(dirPath)) return [];
@@ -61,56 +62,18 @@ function resolveUsbVaultRootFromExtractedDir(extractDir) {
   throw new Error(`Backup zip must contain a ${VAULT_DIR_NAME} folder with ${VAULT_META_FILE}`);
 }
 
-/** Stream a zip of the unlocked USB `.recordvault` folder to the HTTP response. */
-export async function streamUsbVaultBackupZip(singlesId, res) {
-  const session = getVaultSession(singlesId, 'usb');
-  if (!session?.mountPath) {
-    throw new Error('Record Vault USB not unlocked');
-  }
-
-  const vaultRoot = vaultRootOnMount(session.mountPath);
-  if (!fs.existsSync(vaultRoot)) {
-    throw new Error(`Missing ${VAULT_DIR_NAME} folder on USB`);
-  }
-
-  const indexEntry = buildVaultIndexBackupEntry(
-    await exportPhotoAlbumsMemberVaultIndex(singlesId),
-    session.key,
-    TUTAPHOTOALBUMS_INDEX_BACKUP_FILE,
-    sealVaultBuffer
-  );
-
-  const zipName = buildMyPhotoAlbumsBackupZipFileName('usb');
-  const archiveRootName = VAULT_DIR_NAME;
-
-  res.setHeader('Content-Type', 'application/zip');
-  res.setHeader('Content-Disposition', `attachment; filename="${zipName}"`);
-  // Streamed zip has no stored mtime — date it now so macOS shows a Date Added.
-  res.setHeader('Last-Modified', new Date().toUTCString());
-
-  const archive = new ZipArchive({ zlib: { level: 6 } });
-  await new Promise((resolve, reject) => {
-    archive.on('error', reject);
-    archive.on('end', resolve);
-    archive.pipe(res);
-    archive.directory(vaultRoot, archiveRootName);
-    archive.append(indexEntry.buffer, { name: indexEntry.name });
-    void archive.finalize();
-  });
-
-  return { fileName: zipName, mountPath: session.mountPath };
-}
-
 /**
  * Restore USB `.recordvault` from a local zip (closes session first so files are not locked).
  * Caller must re-unlock the vault afterward.
  */
 async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storageType) {
+  if (storageType === 'tutaCloud') {
+    return restorePhotoAlbumsTutaDriveVaultFromZipFile(singlesId, zipFilePath);
+  }
+
   const session = getVaultSession(singlesId, storageType);
   if (!session?.mountPath) {
-    throw new Error(
-      storageType === 'usb' ? 'Record Vault USB not unlocked' : 'TutaPhotoAlbums TutaCloud vault not unlocked'
-    );
+    throw new Error('Record Vault USB not unlocked');
   }
   const mountPath = session.mountPath;
   const label = path.basename(mountPath);
@@ -128,11 +91,16 @@ async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storage
       .promise();
 
     const sourceRoot = resolveUsbVaultRootFromExtractedDir(extractDir);
-    const relFiles = walkLocalFiles(sourceRoot).filter((rel) => !isVaultIndexBackupFileName(rel, TUTAPHOTOALBUMS_INDEX_BACKUP_FILE));
+    const relFiles = walkLocalFiles(sourceRoot).filter(
+      (rel) => !isVaultIndexBackupFileName(rel, TUTAPHOTOALBUMS_INDEX_BACKUP_FILE)
+    );
     if (!relFiles.length) {
       throw new Error('Backup zip is empty');
     }
-    const indexPath = findVaultIndexBackupFile([extractDir, path.dirname(sourceRoot), sourceRoot], TUTAPHOTOALBUMS_INDEX_BACKUP_FILE);
+    const indexPath = findVaultIndexBackupFile(
+      [extractDir, path.dirname(sourceRoot), sourceRoot],
+      TUTAPHOTOALBUMS_INDEX_BACKUP_FILE
+    );
     if (!indexPath) {
       throw new Error(
         'This backup has no album index (it only holds media files), so it cannot be restored. Nothing was changed.'
@@ -186,12 +154,12 @@ async function restoreVaultFromZipFileForStorage(singlesId, zipFilePath, storage
   }
 }
 
-/** Restore USB `.recordvault` from a local zip (closes session first). */
+/** Restore USB vault from zip (closes session first). */
 export async function restoreUsbVaultFromZipFile(singlesId, zipFilePath) {
   return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'usb');
 }
 
-/** Restore TutaCloud album vault from zip (internal session slot `tutaCloud`). */
+/** Restore TutaCloud album vault from zip — delegates to Notes-style member-layout restore. */
 export async function restoreTutaCloudVaultFromZipFile(singlesId, zipFilePath) {
-  return restoreVaultFromZipFileForStorage(singlesId, zipFilePath, 'tutaCloud');
+  return restorePhotoAlbumsTutaDriveVaultFromZipFile(singlesId, zipFilePath);
 }

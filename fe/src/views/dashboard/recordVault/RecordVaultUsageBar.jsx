@@ -86,7 +86,7 @@ export function LastClickTransferLabel() {
       sx={yellowTextSx}
       title="Data moved between server and browser by your last click"
     >
-      {mb.toFixed(1)} mb
+      {formatUsageDataAmount(mb)}
     </Typography>
   );
 }

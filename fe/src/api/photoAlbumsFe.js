@@ -1,6 +1,7 @@
 import api from './axios';
 import { getApiBaseUrl } from 'config/apiBaseUrl';
 import { prepareLargeBackupFormData } from './chunkedBackupUploadFe';
+import { saveBlobToZipFile } from 'utils/downloadZipFolder';
 import {
   normalizeUsbBridgeInstallerUrl,
   USB_BRIDGE_INSTALLER_API
@@ -8,7 +9,6 @@ import {
 import { rvCloudAxiosError, rvCloudLog } from 'utils/photoAlbumsCloudDebugLog';
 import {
   bridgeFetchBlob,
-  bridgeFetchBlobDownload,
   bridgeRequest,
   bridgeUploadFormData,
   getPhotoAlbumsBridgeBaseUrl,
@@ -1005,45 +1005,6 @@ export async function syncPhotoAlbumsTutaDrive({ onProgress } = {}) {
   return { success: true, synced: false };
 }
 
-function parseContentDispositionFilename(headerValue) {
-  const raw = String(headerValue || '').trim();
-  if (!raw) return '';
-  const utf8Match = raw.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1].replace(/["']/g, ''));
-    } catch {
-      return utf8Match[1].replace(/["']/g, '');
-    }
-  }
-  const plainMatch = raw.match(/filename="?([^";]+)"?/i);
-  return plainMatch?.[1]?.trim() || '';
-}
-
-/** Match BE `buildMyPhotoAlbumsBackupZipFileName` — MyPhotoAlbums_USB_2026-07-11_05-30-00_PM_EDT.zip */
-function buildMyPhotoAlbumsBackupZipFileNameClient(kind = 'usb', date = new Date()) {
-  const y = date.getFullYear();
-  const mo = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  let hours = date.getHours();
-  const tt = hours >= 12 ? 'PM' : 'AM';
-  hours %= 12;
-  if (hours === 0) hours = 12;
-  const hh = String(hours).padStart(2, '0');
-  const mi = String(date.getMinutes()).padStart(2, '0');
-  const ss = String(date.getSeconds()).padStart(2, '0');
-  let tz = 'Local';
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(date);
-    const rawTz = parts.find((part) => part.type === 'timeZoneName')?.value || '';
-    tz = String(rawTz).replace(/[^A-Za-z0-9_+-]/g, '') || 'Local';
-  } catch {
-    // keep Local
-  }
-  const prefix = kind === 'usb' ? 'MyPhotoAlbums_USB' : 'MyPhotoAlbums_TutaCloud';
-  return `${prefix}_${y}-${mo}-${d}_${hh}-${mi}-${ss}_${tt}_${tz}.zip`;
-}
-
 function triggerBrowserBlobDownload(blob, fileName) {
   const name = String(fileName || 'download').trim() || 'download';
   const url = URL.createObjectURL(blob);
@@ -1057,171 +1018,234 @@ function triggerBrowserBlobDownload(blob, fileName) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Poll Redis-backed album backup percent while album zip GET runs. */
-export async function fetchPhotoAlbumsAlbumBackupProgress(storageType = VAULT_CLOUD_STORAGE_TYPE) {
-  const path = '/api/photoAlbums/usb/album-backup-progress';
-  const isUsb = normalizeVaultPaneStorageType(storageType) === 'usb';
-  const config = isUsb
-    ? { headers: { 'X-Record-Vault-Storage': 'usb' } }
-    : { headers: { 'X-Record-Vault-Storage': vaultCloudBackendStorageSlot() } };
-  const { data } = await api.get(path, config);
-  return {
-    percent: Math.max(0, Math.min(100, Math.round(Number(data?.percent) || 0))),
-    label: data?.label ? String(data.label) : '',
-    fileIndex: Math.max(0, Math.round(Number(data?.fileIndex) || 0)),
-    fileTotal: Math.max(0, Math.round(Number(data?.fileTotal) || 0)),
-    bytesDone: Math.max(0, Math.round(Number(data?.bytesDone) || 0))
+function makeBackupProgressReporter(onProgress) {
+  return (stage, percent, details = {}) => {
+    if (typeof onProgress === 'function') onProgress({ stage, percent, ...details });
   };
 }
 
-/** Zip only the currently open album and save to the browser download folder. */
-export async function downloadPhotoAlbumsAlbumBackupZip({
-  storageType = VAULT_CLOUD_STORAGE_TYPE,
-  notebookId,
-  noteId,
-  albumLabel = '',
-  onProgress
-} = {}) {
-  const nb = Number(notebookId);
-  const nid = Number(noteId);
-  if (!Number.isFinite(nb) || nb < 1 || !Number.isFinite(nid) || nid < 1) {
-    throw new Error('Choose an album to back up first');
-  }
-
-  const params = new URLSearchParams();
-  params.set('notebookId', String(nb));
-  params.set('noteId', String(nid));
-  const label = String(albumLabel || '').trim();
-  if (label) params.set('albumLabel', label);
-  const qs = params.toString();
-  const isUsb = normalizeVaultPaneStorageType(storageType) === 'usb';
-  const path = `/api/photoAlbums/usb/album-backup-zip?${qs}`;
-
-  let pollId = null;
-  let stopped = false;
-  if (typeof onProgress === 'function') {
-    onProgress({
-      percent: 1,
-      label: label ? `Backing up only photo album: '${label}' as zip` : 'Starting album backup…',
-      fileIndex: 0,
-      fileTotal: 0,
-      bytesDone: 0
-    });
-    pollId = window.setInterval(() => {
-      if (stopped) return;
-      void fetchPhotoAlbumsAlbumBackupProgress(storageType)
-        .then(onProgress)
-        .catch(() => {
-          // Ignore poll blips; zip GET is the source of truth.
-        });
-    }, 250);
-  }
-
-  try {
-    if (isUsb && isPhotoAlbumsBridgeActive()) {
-      const { blob, fileName: headerName } = await bridgeFetchBlobDownload(path);
-      const fileName = headerName || buildMyPhotoAlbumsBackupZipFileNameClient('usb');
-      triggerBrowserBlobDownload(blob, fileName);
-      if (typeof onProgress === 'function') {
-        onProgress({ percent: 100, label: 'Done', fileIndex: 0, fileTotal: 0, bytesDone: blob?.size ?? 0 });
-      }
-      return { fileName, sizeBytes: blob?.size ?? 0 };
-    }
-    const response = await api.get(path, {
-      responseType: 'blob',
-      headers: {
-        'X-Record-Vault-Storage': isUsb ? 'usb' : vaultCloudBackendStorageSlot()
-      }
-    });
-    const fileName =
-      parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyPhotoAlbumsBackupZipFileNameClient(isUsb ? 'usb' : 'cloud');
-    triggerBrowserBlobDownload(response.data, fileName);
-    const sizeBytes = response.data?.size ?? 0;
-    if (typeof onProgress === 'function') {
-      onProgress({ percent: 100, label: 'Done', fileIndex: 0, fileTotal: 0, bytesDone: sizeBytes });
-    }
-    return { fileName, sizeBytes };
-  } catch (err) {
-    throw await normalizePhotoAlbumsBlobFetchError(err);
-  } finally {
-    stopped = true;
-    if (pollId != null) window.clearInterval(pollId);
-  }
+function transferProgressDetails(startedAt, loaded, total, fromPct, toPct) {
+  const elapsedSec = Math.max((Date.now() - startedAt) / 1000, 0.001);
+  const bytesPerSec = loaded / elapsedSec;
+  const etaSec = total > 0 && bytesPerSec > 0 ? (total - loaded) / bytesPerSec : null;
+  const percent = total > 0 ? fromPct + (Math.min(loaded, total) / total) * (toPct - fromPct) : fromPct;
+  return { percent, details: { loadedBytes: loaded, totalBytes: total, bytesPerSec, etaSec } };
 }
 
-/** Zip the unlocked USB `.recordvault` folder and save to the browser download folder. */
-export async function downloadPhotoAlbumsUsbBackupZip() {
-  try {
-    if (isPhotoAlbumsBridgeActive()) {
-      const { blob, fileName: headerName } = await bridgeFetchBlobDownload('/api/photoAlbums/usb/backup-zip');
-      const fileName = headerName || buildMyPhotoAlbumsBackupZipFileNameClient('usb');
-      triggerBrowserBlobDownload(blob, fileName);
-      return { fileName, sizeBytes: blob?.size ?? 0 };
-    }
-    const response = await api.get('/api/photoAlbums/usb/backup-zip', {
-      responseType: 'blob',
-      headers: { 'X-Record-Vault-Storage': 'usb' }
-    });
-    const fileName =
-      parseContentDispositionFilename(response.headers?.['content-disposition']) ||
-      buildMyPhotoAlbumsBackupZipFileNameClient('usb');
-    triggerBrowserBlobDownload(response.data, fileName);
-    return { fileName, sizeBytes: response.data?.size ?? 0 };
-  } catch (err) {
-    throw await normalizePhotoAlbumsBlobFetchError(err);
+function readFileBytesWithProgress(file, onReadProgress) {
+  if (typeof FileReader === 'undefined' || typeof onReadProgress !== 'function') {
+    return file.arrayBuffer().then((buf) => new Uint8Array(buf));
   }
-}
-
-/** POST multipart restore zip — fetch() so the browser sets multipart boundary (axios defaults break Busboy). */
-async function postPhotoAlbumsRestoreZip(path, file, { extraHeaders = {}, chunkLargeFile = false } = {}) {
-  if (!file) throw new Error('Choose a backup zip file first');
-  let formData = new FormData();
-  formData.append('backup', file, file.name || 'backup.zip');
-  if (chunkLargeFile) {
-    ({ formData } = await prepareLargeBackupFormData(formData));
-  }
-  const base = getApiBaseUrl().replace(/\/$/, '');
-  const url = `${base}${String(path || '').startsWith('/') ? path : `/${path}`}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    body: formData,
-    credentials: 'include',
-    headers: extraHeaders
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) onReadProgress(event.loaded, event.total);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Unable to read the selected zip file'));
+    reader.onload = () => resolve(new Uint8Array(reader.result));
+    reader.readAsArrayBuffer(file);
   });
-  const text = await response.text();
-  let payload = null;
-  if (text) {
-    try {
-      payload = JSON.parse(text);
-    } catch {
-      payload = { error: text.trim() || response.statusText || 'Restore failed' };
-    }
-  }
-  if (!response.ok) {
-    const err = new Error(payload?.error || payload?.message || 'Restore failed');
-    err.response = { data: payload, status: response.status };
-    throw err;
-  }
-  return payload;
 }
 
-/** Upload a MyPhotoAlbums backup zip and restore files to TutaCloud (when server route is enabled). */
+async function readBackupFileWithProgress(file, report, fromPct, toPct) {
+  const startedAt = Date.now();
+  report('read', fromPct, { loadedBytes: 0, totalBytes: file.size });
+  const bytes = await readFileBytesWithProgress(file, (loaded, total) => {
+    const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+    report('read', percent, details);
+  });
+  report('read', toPct, { loadedBytes: bytes.length, totalBytes: bytes.length, done: true });
+  return bytes;
+}
+
+async function downloadBlobWithProgress(url, report, stage, fromPct, toPct, { estimatedTotalBytes = 0 } = {}) {
+  const startedAt = Date.now();
+  let estimate = Number(estimatedTotalBytes) > 0 ? Number(estimatedTotalBytes) : 0;
+  report(stage, fromPct, { loadedBytes: 0, totalBytes: 0, estimatedBytes: estimate });
+  const response = await api.get(url, {
+    responseType: 'blob',
+    timeout: 0,
+    onDownloadProgress: (event) => {
+      if (!estimate) {
+        const headerValue = Number(event?.event?.target?.getResponseHeader?.('X-Estimated-Content-Length'));
+        if (Number.isFinite(headerValue) && headerValue > 0) estimate = headerValue;
+      }
+      const loaded = Number(event?.loaded) || 0;
+      const total = Number(event?.total) || 0;
+      if (total > 0 || !estimate) {
+        const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+        report(stage, percent, details);
+        return;
+      }
+      const { percent, details } = transferProgressDetails(startedAt, loaded, estimate, fromPct, toPct);
+      report(stage, Math.min(percent, toPct - 1), {
+        ...details,
+        totalBytes: 0,
+        estimatedBytes: estimate,
+        etaSec: loaded < estimate ? details.etaSec : null
+      });
+    }
+  });
+  const bytes = new Uint8Array(await response.data.arrayBuffer());
+  report(stage, toPct, { loadedBytes: bytes.length, totalBytes: bytes.length, done: true });
+  return bytes;
+}
+
+async function sendBackupFormWithProgress(method, url, formData, totalBytes, report, fromPct, toPct) {
+  const startedAt = Date.now();
+  let serverStageReported = false;
+  report('send', fromPct, { loadedBytes: 0, totalBytes });
+  const prepared = await prepareLargeBackupFormData(formData, {
+    onProgress: (loaded, total) => {
+      const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+      report('send', percent, details);
+    }
+  });
+  if (prepared.chunked) {
+    serverStageReported = true;
+    report('server', toPct, { totalBytes });
+  }
+  const { data } = await api.request({
+    method,
+    url,
+    data: prepared.formData,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0,
+    onUploadProgress: (event) => {
+      const total = Number(event?.total) || totalBytes;
+      const loaded = Math.min(Number(event?.loaded) || 0, total);
+      const { percent, details } = transferProgressDetails(startedAt, loaded, total, fromPct, toPct);
+      report('send', percent, details);
+      if (loaded >= total && !serverStageReported) {
+        serverStageReported = true;
+        report('server', toPct, { totalBytes: total });
+      }
+    }
+  });
+  return data;
+}
+
+/**
+ * TutaPhotos backup: server streams a vault zip → seal in-browser (TNBAK3 / TNBAK2)
+ * → save only to the folder the member picks (Save As).
+ */
+export async function createPhotoAlbumsTutaDriveEncryptedBackup(
+  note = '',
+  {
+    hint = '',
+    dateStamp = '',
+    password = '',
+    onProgress,
+    estimatedTotalBytes = 0,
+    saveTarget = null,
+    suggestedFileName = ''
+  } = {}
+) {
+  const { photoAlbumsBackupFileNamePreview } = await import('utils/photoAlbumsBackupFileName');
+  const { sealTutaDriveBackupZipWithDek, sealTutaDriveBackupZipWithPassword } = await import(
+    'utils/recordVaultClientVaultCrypto'
+  );
+  const withZipPassword = Boolean(String(password || ''));
+  if (!withZipPassword) {
+    const { isPhotoAlbumsE2eUnlocked } = await import('utils/photoAlbumsClientSession');
+    if (!isPhotoAlbumsE2eUnlocked()) {
+      throw new Error('Unlock with your Encrypt Password first, then Backup again');
+    }
+  }
+  const report = makeBackupProgressReporter(onProgress);
+  const zipBuf = await downloadBlobWithProgress('/api/photoAlbums/tutaCloud/backup-zip', report, 'build', 0, 40, {
+    estimatedTotalBytes
+  });
+  report('seal', 40, { totalBytes: zipBuf.length, withZipPassword });
+  let sealed;
+  if (withZipPassword) {
+    sealed = await sealTutaDriveBackupZipWithPassword(zipBuf, password, { hint, note });
+  } else {
+    const { getPhotoAlbumsE2eDek } = await import('utils/photoAlbumsClientSession');
+    const { vault: vaultKeys } = await fetchPhotoAlbumsE2eKeys();
+    sealed = await sealTutaDriveBackupZipWithDek(zipBuf, getPhotoAlbumsE2eDek(), vaultKeys);
+  }
+  report('seal', 55, { totalBytes: sealed.length, withZipPassword, done: true });
+
+  if (saveTarget?.cancelled) {
+    throw new Error('Backup cancelled — you closed the Save dialog.');
+  }
+
+  const outName =
+    saveTarget?.name ||
+    String(suggestedFileName || '').trim() ||
+    photoAlbumsBackupFileNamePreview(note, dateStamp);
+  const blob = new Blob([sealed], { type: 'application/octet-stream' });
+  report('save', 60, { totalBytes: sealed.length, fileName: outName });
+  if (saveTarget?.file) {
+    await saveBlobToZipFile(saveTarget.file, blob);
+  } else {
+    triggerBrowserBlobDownload(blob, outName);
+  }
+  report('save', 100, { totalBytes: sealed.length, fileName: outName, done: true });
+  return {
+    fileName: outName,
+    sizeBytes: sealed.length,
+    note: String(note || '').trim()
+  };
+}
+
+/** Upload a plain (already decrypted) backup zip and restore files to TutaCloud. */
 export async function restorePhotoAlbumsTutaDriveBackupZip(file) {
-  return postPhotoAlbumsRestoreZip('/api/photoAlbums/tutaCloud/restore-zip', file, { chunkLargeFile: true });
+  if (!file) throw new Error('Choose a backup zip file first');
+  const formData = new FormData();
+  formData.append('backup', file);
+  const { formData: body } = await prepareLargeBackupFormData(formData);
+  const { data } = await api.post('/api/photoAlbums/tutaCloud/restore-zip', body, {
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 0
+  });
+  return data;
 }
 
-/** Upload a MyPhotoAlbums backup zip and restore files onto the unlocked USB vault. */
-export async function restorePhotoAlbumsUsbBackupZip(file) {
-  if (shouldRoutePhotoAlbumsThroughBridge('/api/photoAlbums/usb/restore-zip', 'usb')) {
-    const formData = new FormData();
-    formData.append('backup', file, file.name || 'backup.zip');
-    const { data } = await bridgeUploadFormData('/api/photoAlbums/usb/restore-zip', formData);
-    return data;
+/**
+ * Unseal a local EncryptedTutaPhotosZip / TNBAK sealed zip and restore the vault on the server.
+ * Progress: read (0–40%), decrypt (40–50%), send (50–90%), server (90%).
+ */
+export async function restorePhotoAlbumsTutaDriveEncryptedBackup(file, { onProgress } = {}) {
+  if (!file) throw new Error('Choose a backup zip file first');
+  const report = makeBackupProgressReporter(onProgress);
+  const {
+    getPhotoAlbumsE2eDek,
+    isPhotoAlbumsE2eUnlocked,
+    takePhotoAlbumsBackupDecryptPassword
+  } = await import('utils/photoAlbumsClientSession');
+  const { unsealTutaDriveBackupZipWithDek } = await import('utils/recordVaultClientVaultCrypto');
+  const password = takePhotoAlbumsBackupDecryptPassword();
+  if (!password && !isPhotoAlbumsE2eUnlocked()) {
+    throw new Error('Enter the backup password first, then run Restore again');
   }
-  return postPhotoAlbumsRestoreZip('/api/photoAlbums/usb/restore-zip', file, {
-    extraHeaders: { 'X-Record-Vault-Storage': 'usb' }
+  const dek = getPhotoAlbumsE2eDek();
+  const sealedBytes = await readBackupFileWithProgress(file, report, 0, 40);
+  report('decrypt', 40, { totalBytes: sealedBytes.length, withZipPassword: Boolean(password) });
+  const plainZip = await unsealTutaDriveBackupZipWithDek(sealedBytes, dek, { password });
+  report('decrypt', 50, {
+    totalBytes: plainZip.length,
+    withZipPassword: Boolean(password),
+    done: true
   });
+  const formData = new FormData();
+  formData.append(
+    'backup',
+    new Blob([plainZip], { type: 'application/zip' }),
+    'TutaPhotos-restore.zip'
+  );
+  return sendBackupFormWithProgress(
+    'post',
+    '/api/photoAlbums/tutaCloud/restore-zip',
+    formData,
+    plainZip.length,
+    report,
+    50,
+    90
+  );
 }
 
 /**

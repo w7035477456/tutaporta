@@ -61,7 +61,6 @@ import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_PHOTO_ALBUMS_SIZE } from 'config/busyHourglassEnv';
 import PhotoAlbumsViewVaultDialog from './PhotoAlbumsViewVaultDialog';
 import PhotoAlbumsTutaCloudBackupDialog from './PhotoAlbumsTutaCloudBackupDialog';
-import PhotoAlbumsUsbBackupDialog from './PhotoAlbumsUsbBackupDialog';
 import PhotoAlbumsStorageFilesPanel from './PhotoAlbumsStorageFilesPanel';
 import PhotoAlbumsFilesExplorerPanel from './PhotoAlbumsFilesExplorerPanel';
 import PhotoAlbumsNoteEditor from './PhotoAlbumsNoteEditor';
@@ -1755,7 +1754,6 @@ export default function PhotoAlbumsWorkspacePane({
   const [viewVaultOpen, setViewVaultOpen] = useState(false);
   const [viewVaultStorageType, setViewVaultStorageType] = useState('tutaCloud');
   const [tutaCloudBackupOpen, setTutaCloudBackupOpen] = useState(false);
-  const [usbBackupOpen, setUsbBackupOpen] = useState(false);
   const [tutaCloudVaultFolderName, setTutaCloudVaultFolderName] = useState(TUTACLOUD_VAULT_FOLDER_DEFAULT);
   const isTutaCloudPane = String(paneLabel || '').toLowerCase() === 'tutacloud';
   const [albumFullscreen, setAlbumFullscreen] = useState(false);
@@ -2074,17 +2072,6 @@ export default function PhotoAlbumsWorkspacePane({
     if (!selectedNotebook) return null;
     return (selectedNotebook.notes || []).find((n) => Number(n.note_id) === Number(selectedNoteId)) ?? null;
   }, [selectedNotebook, selectedNoteId]);
-
-  const albumBackupContext = useMemo(() => {
-    if (!selectedNote || !selectedNotebook) return null;
-    const notesInNotebook = selectedNotebook.notes || [];
-    const albumLabel = resolveOpenNoteTitlePlain(selectedNote, notebooks, notesInNotebook);
-    return {
-      notebookId: Number(selectedNote.notebook_id),
-      noteId: Number(selectedNote.note_id),
-      albumLabel
-    };
-  }, [selectedNote, selectedNotebook, notebooks]);
 
   useEffect(() => {
     selectedNotebookIdRef.current = selectedNotebookId;
@@ -3563,10 +3550,6 @@ export default function PhotoAlbumsWorkspacePane({
   }, [onSessionEnded, vaultApi, reportVaultLeavingProgress, paneStorageType]);
 
   const handleTutaCloudVaultRestored = useCallback(async () => {
-    await performVaultStorageLogoff();
-  }, [performVaultStorageLogoff]);
-
-  const handleUsbVaultRestoredOrFormatted = useCallback(async () => {
     await performVaultStorageLogoff();
   }, [performVaultStorageLogoff]);
 
@@ -7514,17 +7497,8 @@ export default function PhotoAlbumsWorkspacePane({
           open={tutaCloudBackupOpen}
           onClose={() => setTutaCloudBackupOpen(false)}
           folderName={tutaCloudVaultFolderName}
-          albumContext={albumBackupContext}
-          onOpenMyPhotoAlbums={() => setTutaCloudBackupOpen(false)}
+          tutaDrive
           onRestored={() => void handleTutaCloudVaultRestored()}
-        />
-        <PhotoAlbumsUsbBackupDialog
-          open={usbBackupOpen}
-          onClose={() => setUsbBackupOpen(false)}
-          folderLabel={usbVaultFolderLabel}
-          albumContext={albumBackupContext}
-          onOpenMyPhotoAlbums={() => setUsbBackupOpen(false)}
-          onRestored={() => handleUsbVaultRestoredOrFormatted()}
         />
         <ColorTemplate16PopupCenterWide
           open={vaultFileTooLargeOpen}
@@ -7740,24 +7714,6 @@ export default function PhotoAlbumsWorkspacePane({
                             hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
                             onClick={() => {
                               setTutaCloudBackupOpen(true);
-                            }}
-                            disabled={busy}
-                            aria-label="Backup/Restore"
-                            title="Backup / Restore"
-                            sx={menuLabelsCompact ? headerCompactChipSx : headerToggleButtonSx}
-                          >
-                            {menuLabelsCompact ? 'BR' : 'Backup/Restore'}
-                          </SliderControlButton>
-                        </Box>
-                      ) : null}
-                      {paneStorageType === 'usb' ? (
-                        <Box sx={{ ...menuRailButtonCellSx, p: 0.35 }}>
-                          <SliderControlButton
-                            type="button"
-                            variant="yellow"
-                            hoverScale={SLIDER_CONTROL_BUTTON_HOVER_SCALE_15}
-                            onClick={() => {
-                              setUsbBackupOpen(true);
                             }}
                             disabled={busy}
                             aria-label="Backup/Restore"

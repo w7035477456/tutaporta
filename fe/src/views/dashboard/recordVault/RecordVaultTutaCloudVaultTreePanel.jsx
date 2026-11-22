@@ -99,9 +99,11 @@ function VaultTreeBranchRail({ isLast }) {
 function formatFileSize(bytes) {
   const value = Number(bytes) || 0;
   if (value <= 0) return '';
+  const MiB = 1024 * 1024;
   if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  if (value < MiB) return `${(value / 1024).toFixed(1)} KB`;
+  if (value / MiB > 999) return `${(value / (1024 * MiB)).toFixed(1)} GB`;
+  return `${(value / MiB).toFixed(1)} MB`;
 }
 
 function VaultTreeNode({ node, depth = 0, isLast = true, ancestorHasNext = [] }) {

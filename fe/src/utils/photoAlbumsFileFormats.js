@@ -502,8 +502,10 @@ export function photoAlbumsUploadFileName(file) {
 export function formatPhotoAlbumsFileSize(bytes) {
   const value = Number(bytes);
   if (!Number.isFinite(value) || value < 0) return '';
-  if (value >= 1024 * 1024 * 1024) return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  const MiB = 1024 * 1024;
+  // Over 999MB → #.# GB (site-wide TutaMall size rule).
+  if (value / MiB > 999) return `${(value / (1024 * MiB)).toFixed(1)} GB`;
+  if (value >= MiB) return `${(value / MiB).toFixed(1)} MB`;
   if (value >= 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
   return `${value} B`;
 }

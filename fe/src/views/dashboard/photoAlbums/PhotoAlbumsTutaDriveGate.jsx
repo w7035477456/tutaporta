@@ -23,8 +23,10 @@ import {
 } from './tutaPhotoAlbumsBranding';
 import {
   tutaPhotoAlbumsPostLoginActionButtonSx,
-  tutaPhotoAlbumsPostLoginButtonRowSx
+  tutaPhotoAlbumsPostLoginButtonRowSx,
+  tutaPhotoAlbumsYellowPostLoginButtonSx
 } from './tutaPhotoAlbumsPostLoginActionButtonSx';
+import PhotoAlbumsTutaCloudBackupDialog from './PhotoAlbumsTutaCloudBackupDialog';
 
 /**
  * Left-panel TutaDrive Cloud gate for TutaPhotoAlbums (LEFT_SIDE=TutaDrive).
@@ -49,6 +51,7 @@ export default function PhotoAlbumsTutaDriveGate({
   const lastFormatRefreshRef = useRef(0);
   const autoOpenAttemptedRef = useRef(false);
   const [autoOpenAwaitingAccess, setAutoOpenAwaitingAccess] = useState(false);
+  const [backupDialogOpen, setBackupDialogOpen] = useState(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -150,6 +153,12 @@ export default function PhotoAlbumsTutaDriveGate({
 
   return (
     <>
+      <PhotoAlbumsTutaCloudBackupDialog
+        open={open && backupDialogOpen}
+        tutaDrive
+        onClose={() => setBackupDialogOpen(false)}
+        onRestored={() => void refreshStatus()}
+      />
       <BusyHourglassOverlay
         open={open && (busy || (autoOpenOnMount && !error && !showLoginChrome && !autoOpenAwaitingAccess))}
         label={busy ? busyLabel : 'Opening TutaDrive Cloud'}
@@ -230,6 +239,15 @@ export default function PhotoAlbumsTutaDriveGate({
               sx={tutaPhotoAlbumsPostLoginActionButtonSx}
             >
               {busy ? 'Opening…' : TUTAPHOTOALBUMS_TUTADRIVE_OPEN_LABEL}
+            </GreenButton>
+            <GreenButton
+              type="button"
+              singleLineLabel={false}
+              disabled={busy}
+              onClick={() => setBackupDialogOpen(true)}
+              sx={{ ...tutaPhotoAlbumsPostLoginActionButtonSx, ...tutaPhotoAlbumsYellowPostLoginButtonSx }}
+            >
+              Backup &amp; Restore Cloud
             </GreenButton>
           </Box>
         </Box>

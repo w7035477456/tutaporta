@@ -292,6 +292,7 @@ import {
 } from './routes/photoAlbums/photoAlbumsE2eRoutes.js';
 import { getPhotoAlbumsStorageConfig, logoffPhotoAlbumsStorage } from './routes/photoAlbums/photoAlbumsStorageRoutes.js';
 import {
+  downloadPhotoAlbumsTutaDriveBackupZip,
   formatPhotoAlbumsTutaDrive,
   getPhotoAlbumsTutaDriveOpenProgress,
   getPhotoAlbumsTutaDriveStatus,
@@ -1690,6 +1691,11 @@ app.post('/api/photoAlbums/tutaCloud/init', ...photoAlbumsVaultAuth, initPhotoAl
 app.post('/api/photoAlbums/tutaCloud/format', ...photoAlbumsVaultAuth, formatPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutaCloud/reset-album', ...photoAlbumsVaultAuth, resetPhotoAlbumsTutaDrive);
 app.post('/api/photoAlbums/tutaCloud/logoff', ...photoAlbumsVaultAuth, logoffPhotoAlbumsTutaDrive);
+app.get(
+  '/api/photoAlbums/tutaCloud/backup-zip',
+  ...photoAlbumsVaultAuth,
+  downloadPhotoAlbumsTutaDriveBackupZip
+);
 app.post(
   '/api/photoAlbums/tutaCloud/restore-zip',
   ...photoAlbumsVaultAuth,

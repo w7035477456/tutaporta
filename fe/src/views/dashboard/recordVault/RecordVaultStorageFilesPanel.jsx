@@ -76,9 +76,11 @@ const treeLabelSx = (isFolder) => ({
 function formatFileSize(bytes) {
   const value = Number(bytes) || 0;
   if (value <= 0) return '';
+  const MiB = 1024 * 1024;
   if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  if (value < MiB) return `${(value / 1024).toFixed(1)} KB`;
+  if (value / MiB > 999) return `${(value / (1024 * MiB)).toFixed(1)} GB`;
+  return `${(value / MiB).toFixed(1)} MB`;
 }
 
 /** Sum all file sizes under a vault tree node (bytes). */
@@ -93,9 +95,10 @@ function sumTreeFileBytes(node) {
   return total;
 }
 
-/** Screenshot format: Total size=435mb */
+/** Screenshot format: Total size=435mb (over 999MB → #.#gb). */
 function formatTotalSizeMb(bytes) {
   const mb = Math.max(0, Math.round((Number(bytes) || 0) / (1024 * 1024)));
+  if (mb > 999) return `Total size=${(mb / 1024).toFixed(1)}gb`;
   return `Total size=${mb}mb`;
 }
 

@@ -1,10 +1,15 @@
+import { USAGE_DATA_GB_THRESHOLD_MB } from 'ui-component/AdminEditableUsageDataAmount';
+
+const MiB = 1024 * 1024;
+
 /** Human-readable byte counts for vault busy overlays (note load, backup, etc.). */
 export function formatVaultTransferBytes(bytes) {
   const n = Math.max(0, Math.floor(Number(bytes) || 0));
   if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 2 : 1)} MB`;
-  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  if (n < MiB) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
+  const mb = n / MiB;
+  if (mb > USAGE_DATA_GB_THRESHOLD_MB) return `${(n / (1024 * MiB)).toFixed(1)} GB`;
+  return `${mb.toFixed(mb < 10 ? 2 : 1)} MB`;
 }
 
 function formatSpeed(bytesPerSec) {

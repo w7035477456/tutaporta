@@ -54,11 +54,7 @@ import {
   initPhotoAlbumsUsbBridge,
   listPhotoAlbumsUsbLocationsLocal,
   logoffPhotoAlbumsUsb,
-  unlockPhotoAlbumsUsbBridge,
-  downloadPhotoAlbumsUsbBackupZip,
-  downloadPhotoAlbumsUsbAlbumBackupZip,
-  getPhotoAlbumsUsbAlbumBackupProgress,
-  restorePhotoAlbumsUsbBackupZip
+  unlockPhotoAlbumsUsbBridge
 } from '../routes/photoAlbums/photoAlbumsUsbRoutes.js';
 import {
   createPhotoAlbumsNote,
@@ -228,10 +224,6 @@ export function startBridgeServer({ port = DEFAULT_PORT } = {}) {
   app.post('/api/photoAlbums/usb/format', formatPhotoAlbumsUsb);
   app.get('/api/photoAlbums/usb/browse', browsePhotoAlbumsUsbPath);
   app.get('/api/photoAlbums/usb/vault-tree', getPhotoAlbumsUsbVaultTree);
-  app.get('/api/photoAlbums/usb/album-backup-progress', getPhotoAlbumsUsbAlbumBackupProgress);
-  app.get('/api/photoAlbums/usb/album-backup-zip', downloadPhotoAlbumsUsbAlbumBackupZip);
-  app.get('/api/photoAlbums/usb/backup-zip', downloadPhotoAlbumsUsbBackupZip);
-  app.post('/api/photoAlbums/usb/restore-zip', restorePhotoAlbumsUsbBackupZip);
 
   app.get('/api/photoAlbums', getPhotoAlbumsTree);
   app.get('/api/photoAlbums/search', searchPhotoAlbumsNotes);

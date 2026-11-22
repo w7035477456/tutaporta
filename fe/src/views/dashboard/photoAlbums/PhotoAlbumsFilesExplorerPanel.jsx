@@ -104,14 +104,16 @@ function entryKey(entry) {
 
 function formatTotalSizeMb(bytes) {
   const mb = Math.max(0, Math.round((Number(bytes) || 0) / (1024 * 1024)));
+  if (mb > 999) return `Total size=${(mb / 1024).toFixed(1)}gb`;
   return `Total size=${mb}mb`;
 }
 
-/** Per-file size for the explorer list (1 decimal under 10 MiB, else whole MiB). */
+/** Per-file size for the explorer list (1 decimal under 10 MiB, else whole MiB; >999MB → #.#gb). */
 function formatEntrySizeMb(bytes) {
   const n = Number(bytes) || 0;
   if (n <= 0) return '';
   const mb = n / (1024 * 1024);
+  if (mb > 999) return `${(mb / 1024).toFixed(1)}gb`;
   if (mb >= 10) return `${Math.round(mb)}mb`;
   return `${mb.toFixed(1)}mb`;
 }

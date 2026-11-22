@@ -23,6 +23,12 @@ import {
 } from 'utils/recordVaultBackupDecryptPrompt';
 import RecordVaultBackupPasswordDialog from './RecordVaultBackupPasswordDialog';
 import { tutaDriveBackupFileNamePreview } from 'utils/recordVaultBackupFileName';
+import { SUCCESS_ON_BLACK_BOX_SX } from 'config/successOnBlackBoxSx';
+import {
+  USAGE_DATA_GB_THRESHOLD_MB,
+  formatUsageDataAmount,
+  formatUsageDataAmountFromBytes
+} from 'ui-component/AdminEditableUsageDataAmount';
 
 const actionRowSx = {
   display: 'flex',
@@ -48,8 +54,7 @@ const formatRedButtonSx = {
 function formatBackupZipSizeLabel(sizeBytes) {
   const bytes = Number(sizeBytes);
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
-  const mb = bytes / (1024 * 1024);
-  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB` : `${mb.toFixed(1)}mb`;
+  return formatUsageDataAmountFromBytes(bytes).replace(/gb$/i, 'GB');
 }
 
 function describeBackupRequestError(err, fallback) {
@@ -96,7 +101,7 @@ const BACKUP_OPERATION_STEPS = {
   }
 };
 
-/** "310mb of 1055mb done" — both sides share one unit (gb once the larger side reaches 10 GiB). */
+/** "384mb of 1.6gb done" — each side uses GB once that value exceeds 999MB. */
 function buildBackupProgressBytesText(progress) {
   if (!progress) return '';
   const reportedTotal = Number(progress.totalBytes) || Number(progress.estimatedBytes) || 0;
@@ -106,12 +111,14 @@ function buildBackupProgressBytesText(progress) {
   if (!loaded && !reportedTotal) return '';
   // An estimated total can undershoot the real zip size — grow it rather than stall at "Y of Y".
   const total = reportedTotal > 0 ? Math.max(reportedTotal, loaded) : 0;
-  const largest = Math.max(loaded, total);
   const MiB = 1024 * 1024;
-  const fmt = (bytes) =>
-    largest >= 10 * 1024 * MiB
-      ? `${(bytes / (1024 * MiB)).toFixed(2)}gb`
-      : `${(bytes / MiB).toFixed(largest >= 100 * MiB ? 0 : 1)}mb`;
+  const fmt = (bytes) => {
+    const mb = bytes / MiB;
+    return formatUsageDataAmount(mb, {
+      precisionMb: mb >= 100 && mb <= USAGE_DATA_GB_THRESHOLD_MB ? 0 : 1,
+      precisionGb: 1
+    });
+  };
   return total > 0 ? `${fmt(loaded)} of ${fmt(total)} done` : `${fmt(loaded)} done`;
 }
 
@@ -429,18 +436,7 @@ export default function RecordVaultTutaCloudBackupDialog({
           {success ? (
             <ColorTemplate16PopupCenterWide.SectionDescription sx={{ textAlign: 'center', fontWeight: 700 }}>
               {backupSaved ? (
-                <Box
-                  component="span"
-                  sx={{
-                    color: '#7CFC00',
-                    WebkitTextFillColor: '#7CFC00',
-                    WebkitTextStroke: '1.5px #000',
-                    paintOrder: 'stroke fill',
-                    fontWeight: 900,
-                    fontStyle: 'normal',
-                    mr: 1
-                  }}
-                >
+                <Box component="span" sx={{ ...SUCCESS_ON_BLACK_BOX_SX, mr: 1 }}>
                   Saved Success
                 </Box>
               ) : null}

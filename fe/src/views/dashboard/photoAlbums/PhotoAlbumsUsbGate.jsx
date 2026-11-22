@@ -9,7 +9,7 @@ import PhotoAlbumsUsbLocationPicker from './PhotoAlbumsUsbLocationPicker';
 import PhotoAlbumsUsbAssignmentDropZone from './PhotoAlbumsUsbAssignmentDropZone';
 import PhotoAlbumsTutaDriveGate from './PhotoAlbumsTutaDriveGate';
 import PhotoAlbumsViewVaultDialog from './PhotoAlbumsViewVaultDialog';
-import PhotoAlbumsUsbBackupDialog from './PhotoAlbumsUsbBackupDialog';
+import PhotoAlbumsTutaCloudBackupDialog from './PhotoAlbumsTutaCloudBackupDialog';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
 import { themedConfirm } from 'utils/themedDialog';
@@ -898,7 +898,7 @@ export default function PhotoAlbumsUsbGate({
             }}
             sx={tutaPhotoAlbumsOrangePostLoginButtonSx}
           >
-            Backup &amp; Restore USB
+            Backup &amp; Restore Cloud
           </GreenButton>
           <GreenButton
             type="button"
@@ -1131,11 +1131,11 @@ export default function PhotoAlbumsUsbGate({
           storageType="usb"
           folderName={selectedPrimary?.label || ''}
         />
-        <PhotoAlbumsUsbBackupDialog
+        <PhotoAlbumsTutaCloudBackupDialog
           open={open && backupDialogOpen}
+          tutaDrive
           onClose={() => setBackupDialogOpen(false)}
-          folderLabel={selectedPrimary?.label || 'USB'}
-          onOpenMyPhotoAlbums={() => {
+          onRestored={() => {
             setBackupDialogOpen(false);
             void openUsbVault('open');
           }}

@@ -100,6 +100,7 @@ function parseArgs(argv) {
     saltEnv: null,
     keyEnv: null,
     fromBackups: [],
+    fromPlainDirs: [],
     keepExtract: false
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -117,6 +118,7 @@ function parseArgs(argv) {
     else if (arg === '--salt-env') { opts.saltEnv = String(next()).trim(); i += 1; }
     else if (arg === '--key-env') { opts.keyEnv = String(next()).trim(); i += 1; }
     else if (arg === '--from-backup') { opts.fromBackups.push(String(next()).trim()); i += 1; }
+    else if (arg === '--from-plain-dir') { opts.fromPlainDirs.push(String(next()).trim()); i += 1; }
     else if (arg === '--keep-extract') opts.keepExtract = true;
     else if (arg === '--help' || arg === '-h') { opts.help = true; }
     else throw new Error(`Unknown argument: ${arg}`);
@@ -288,10 +290,54 @@ async function unsealTnbak2(bytes, password) {
 
 const BACKUP_ENV_SECRETS = ['TEMPKEY_TUTADRIVE', 'TEMPKEY_ONEDRIVE', 'TEMPKEY_USB'];
 
+/** Resolve 32-byte AES key from RECORD_NOTES_ICON_KEYS_MASTER_KEY (base64url or passphrase). */
+function resolveNotesIconMasterKey() {
+  const value = String(process.env.RECORD_NOTES_ICON_KEYS_MASTER_KEY ?? '').trim();
+  if (!value) return null;
+  try {
+    const decoded = Buffer.from(value, 'base64url');
+    if (decoded.length === 32) return decoded;
+  } catch {
+    // passphrase path
+  }
+  return crypto.createHash('sha256').update(value, 'utf8').digest();
+}
+
+/** Decrypt global.record_vault_icon_keys_enc → { iconName: secret }. */
+async function loadIconSecretMap() {
+  const master = resolveNotesIconMasterKey();
+  if (!master) return {};
+  const { rows } = await pool.query(
+    `SELECT record_vault_icon_keys_enc FROM outdateddbsnapshotoct2024.global WHERE id = 1 LIMIT 1`
+  );
+  const blob = String(rows[0]?.record_vault_icon_keys_enc ?? '').trim();
+  if (!blob) return {};
+  const buf = Buffer.from(blob, 'base64');
+  if (buf.length < 12 + 16 + 1) return {};
+  const decipher = crypto.createDecipheriv('aes-256-gcm', master, buf.subarray(0, 12));
+  decipher.setAuthTag(buf.subarray(12, 28));
+  const plain = Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString('utf8');
+  const map = JSON.parse(plain);
+  return map && typeof map === 'object' ? map : {};
+}
+
+let cachedIconSecrets = null;
+async function getIconSecrets() {
+  if (cachedIconSecrets) return cachedIconSecrets;
+  try {
+    cachedIconSecrets = await loadIconSecretMap();
+  } catch (err) {
+    console.warn('[repair] icon key map unavailable:', err?.message || err);
+    cachedIconSecrets = {};
+  }
+  return cachedIconSecrets;
+}
+
 /**
  * Keys a backup's vault files may be sealed with: every env secret the server has used for
  * TutaNotes (before and after work_337) run through the backup's own vault.meta.json KDF,
- * the legacy SHA-256 form of each, and the backup's E2E DEK.
+ * the legacy SHA-256 form of each, every security-icon secret (pre-work_337 unlock path),
+ * and the backup's E2E DEK.
  */
 async function backupCandidateKeys(meta, dek) {
   const out = [];
@@ -304,20 +350,31 @@ async function backupCandidateKeys(meta, dek) {
     out.push({ label, key });
   };
   const salt = meta && vaultMetaUsesArgon2idKdf(meta) ? parseVaultKdfSalt(meta.kdfSalt) : null;
+  const kdfOpts = salt
+    ? {
+        memoryCost: meta.kdfMemory,
+        timeCost: meta.kdfIterations,
+        parallelism: meta.kdfParallelism
+      }
+    : null;
   for (const name of BACKUP_ENV_SECRETS) {
     const secret = String(process.env[name] ?? '').trim();
     if (!secret) continue;
-    if (salt) {
-      add(
-        `${name}+argon2id`,
-        await deriveVaultKeyFromSecretArgon2id(secret, salt, {
-          memoryCost: meta.kdfMemory,
-          timeCost: meta.kdfIterations,
-          parallelism: meta.kdfParallelism
-        })
-      );
-    }
+    if (salt) add(`${name}+argon2id`, await deriveVaultKeyFromSecretArgon2id(secret, salt, kdfOpts));
     add(`${name}+sha256`, deriveVaultKeyFromSecretSha256(secret));
+  }
+  const iconMap = await getIconSecrets();
+  const iconNames = Object.keys(iconMap);
+  if (iconNames.length) {
+    console.log(`[backup] deriving ${iconNames.length} icon vault keys (one-time Argon2id)…`);
+    for (const name of iconNames) {
+      const secret = String(iconMap[name] ?? '').trim();
+      if (!secret) continue;
+      if (salt) {
+        add(`icon:${name}+argon2id`, await deriveVaultKeyFromSecretArgon2id(secret, salt, kdfOpts));
+      }
+      add(`icon:${name}+sha256`, deriveVaultKeyFromSecretSha256(secret));
+    }
   }
   add('backup-E2E-DEK', dek);
   return out;
@@ -388,6 +445,35 @@ async function extractZipBufferSkippingSymlinks(zipBuf, extractDir) {
 }
 
 /**
+ * Index plaintext files under one or more old vault trees (e.g. ~/mac_storage.orig/.../notes)
+ * by sha256. No password — used when an unencrypted copy still exists on disk.
+ */
+function buildPlainDirChecksumIndex(plainDirs, { log }) {
+  const bySha = new Map();
+  for (const dir of plainDirs) {
+    const abs = path.resolve(String(dir).replace(/^~(?=$|\/)/, os.homedir()));
+    if (!fs.existsSync(abs)) {
+      log(`[plain] skip missing ${abs}`);
+      continue;
+    }
+    let n = 0;
+    for (const file of walkFiles(abs)) {
+      const base = path.basename(file);
+      if (base === 'vault.meta.json' || base.endsWith('.json') || base.endsWith('.enc')) continue;
+      const buf = fs.readFileSync(file);
+      if (!buf.length) continue;
+      const sha = sha256(buf);
+      if (!bySha.has(sha)) {
+        bySha.set(sha, () => fs.readFileSync(file));
+        n += 1;
+      }
+    }
+    log(`[plain] ${abs}: ${n} plaintext files indexed`);
+  }
+  return bySha;
+}
+
+/**
  * Decrypt + extract each backup and index every recoverable plaintext by sha256:
  * vault files (opened once or twice with the backup's server key, or plaintext) and
  * data:image payloads still inline in note bodies of the backup's notes index.
@@ -413,7 +499,12 @@ async function buildBackupChecksumIndex(backupPaths, password, { keepExtract, lo
     const metaPath = walkFiles(extractDir).find((p) => path.basename(p) === 'vault.meta.json');
     const meta = metaPath ? JSON.parse(fs.readFileSync(metaPath, 'utf8')) : null;
     const keys = await backupCandidateKeys(meta, dek);
-    log(`[backup] candidate keys: ${keys.map((k) => k.label).join(', ') || '(none)'}`);
+    const keySummary = keys.reduce((acc, k) => {
+      const group = k.label.startsWith('icon:') ? 'icon' : k.label;
+      acc[group] = (acc[group] || 0) + 1;
+      return acc;
+    }, {});
+    log(`[backup] candidate keys: ${keys.length} (${JSON.stringify(keySummary)})`);
 
     const tryOpen = (buf) => {
       const hits = [];
@@ -688,7 +779,7 @@ async function main() {
       'Usage: node be/scripts/repairTutaNotesDoubleSealedAttachments.mjs ' +
         '[--apply] [--singles <id>] [--note <id>] [--member <M...>] [--mount <path>] ' +
         '[--backup-dir <path>] [--salt-env <VAR>] [--key-env <VAR>] [--password-env <VAR>] ' +
-        '[--from-backup <TNBAK2 zip>]... [--keep-extract]'
+        '[--from-backup <TNBAK2 zip>]... [--from-plain-dir <vault notes dir>]... [--keep-extract]'
     );
     return;
   }
@@ -730,15 +821,28 @@ async function main() {
       `${opts.noteId ? ` note=${opts.noteId}` : ''}`
   );
 
+  opts.backupIndex = opts.backupIndex || new Map();
+  if (opts.fromPlainDirs.length) {
+    const plainIndex = buildPlainDirChecksumIndex(opts.fromPlainDirs, {
+      log: (msg) => console.log(msg)
+    });
+    for (const [sha, load] of plainIndex) {
+      if (!opts.backupIndex.has(sha)) opts.backupIndex.set(sha, load);
+    }
+  }
   if (opts.fromBackups.length) {
     const pwd = opts.passwordEnv ? String(process.env[opts.passwordEnv] ?? '') : '';
     if (!pwd) throw new Error('--from-backup needs the Encrypt Password (use --ask-password / --password-env)');
-    opts.backupIndex = await buildBackupChecksumIndex(opts.fromBackups, pwd, {
+    const bakIndex = await buildBackupChecksumIndex(opts.fromBackups, pwd, {
       keepExtract: opts.keepExtract,
       log: (msg) => console.log(msg),
       workDirs: cleanupDirs
     });
+    for (const [sha, load] of bakIndex) {
+      if (!opts.backupIndex.has(sha)) opts.backupIndex.set(sha, load);
+    }
   }
+  if (!opts.backupIndex.size) opts.backupIndex = null;
 
   for (const singlesId of singlesList) {
     let memberId = opts.memberId || (await loadMemberIdForSingles(singlesId));

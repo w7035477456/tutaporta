@@ -44,10 +44,11 @@ export function colorTemplate7PopupInputRootHeightSx(inputHeight = 'bsize') {
 export const COLOR_TEMPLATE7_POPUP_INPUT_WIDTH = '40ch';
 export const COLOR_TEMPLATE7_POPUP_INPUT_BG = '#fff';
 export const COLOR_TEMPLATE7_POPUP_INPUT_TEXT = `var(${ERROR_VAR})`;
-/** Top-right close "X" — red square, black X, black border. */
+/** Top-right close "X" — red square, black X, black border (all TutaMall popups). */
 export const COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE = 1.25;
 export const COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE = 1.5;
-export const COLOR_TEMPLATE7_POPUP_CLOSE_BG = 'var(--theme-error-color)';
+/** Hard red fallback so GreenButton / Minimal palete cannot wash the close X to green. */
+export const COLOR_TEMPLATE7_POPUP_CLOSE_BG = 'var(--theme-error-color, #c62828)';
 export const COLOR_TEMPLATE7_POPUP_CLOSE_TEXT = '#000000';
 export const COLOR_TEMPLATE7_POPUP_CLOSE_BORDER = '2px solid #000000';
 
@@ -475,6 +476,12 @@ export function colorTemplate7PopupFormRowInputStretchSx(overrides = {}, inputHe
 
 /** Compact square — top-right close X (red bg, black X, black border). */
 export function colorTemplate7PopupCloseSx(overrides = {}) {
+  const redClose = {
+    bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
+    color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
+    WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
+    border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`
+  };
   return {
     ...greenButtonSx(),
     fontWeight: 800,
@@ -491,25 +498,30 @@ export function colorTemplate7PopupCloseSx(overrides = {}) {
     justifyContent: 'center',
     cursor: 'pointer',
     m: 0,
-    bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
-    color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-    WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-    border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`,
+    ...redClose,
+    // Beat GreenButton / Minimal `&&&` green so every TutaMall popup close stays red.
+    '&&&': { ...redClose },
+    'html[data-color-palete="minimal"] &&&:not(.Mui-disabled)': { ...redClose },
+    'html[data-color-palete="full"] &&&:not(.Mui-disabled)': { ...redClose },
     '@media (hover: hover)': {
       '&:hover:not(.Mui-disabled)': {
-        bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
-        color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-        WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-        border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`,
+        ...redClose,
+        filter: 'brightness(0.92)',
+        transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE})`
+      },
+      '&&&:hover:not(.Mui-disabled)': {
+        ...redClose,
         filter: 'brightness(0.92)',
         transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE})`
       }
     },
     '&:active:not(.Mui-disabled)': {
-      bgcolor: `${COLOR_TEMPLATE7_POPUP_CLOSE_BG} !important`,
-      color: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-      WebkitTextFillColor: `${COLOR_TEMPLATE7_POPUP_CLOSE_TEXT} !important`,
-      border: `${COLOR_TEMPLATE7_POPUP_CLOSE_BORDER} !important`,
+      ...redClose,
+      filter: 'brightness(0.85)',
+      transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
+    },
+    '&&&:active:not(.Mui-disabled)': {
+      ...redClose,
       filter: 'brightness(0.85)',
       transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
     },

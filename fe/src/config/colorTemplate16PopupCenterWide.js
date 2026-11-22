@@ -32,28 +32,38 @@ export function colorTemplate16PopupVerticalHalfPanelSx(_verticalHalf) {
   return {};
 }
 
-/** Top-right close X — red square, black X, black border. */
+/** Top-right close X — red square, black X, black border (all TutaMall CT16 popups). */
 export function colorTemplate16PopupCloseSx(overrides = {}) {
-  return {
-    bgcolor: 'var(--theme-error-color) !important',
+  const redClose = {
+    bgcolor: 'var(--theme-error-color, #c62828) !important',
     border: '2px solid #000 !important',
     color: '#000 !important',
-    WebkitTextFillColor: '#000 !important',
+    WebkitTextFillColor: '#000 !important'
+  };
+  return {
+    ...redClose,
+    '&&&': { ...redClose },
+    'html[data-color-palete="minimal"] &&&:not(.Mui-disabled)': { ...redClose },
+    'html[data-color-palete="full"] &&&:not(.Mui-disabled)': { ...redClose },
     '@media (hover: hover)': {
       '&:hover:not(.Mui-disabled)': {
-        bgcolor: 'var(--theme-error-color) !important',
-        color: '#000 !important',
-        WebkitTextFillColor: '#000 !important',
-        border: '2px solid #000 !important',
+        ...redClose,
+        filter: 'brightness(0.92)',
+        transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE})`
+      },
+      '&&&:hover:not(.Mui-disabled)': {
+        ...redClose,
         filter: 'brightness(0.92)',
         transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_HOVER_SCALE})`
       }
     },
     '&:active:not(.Mui-disabled)': {
-      bgcolor: 'var(--theme-error-color) !important',
-      color: '#000 !important',
-      WebkitTextFillColor: '#000 !important',
-      border: '2px solid #000 !important',
+      ...redClose,
+      filter: 'brightness(0.85)',
+      transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
+    },
+    '&&&:active:not(.Mui-disabled)': {
+      ...redClose,
       filter: 'brightness(0.85)',
       transform: `scale(${COLOR_TEMPLATE7_POPUP_CLOSE_ACTIVE_SCALE})`
     },

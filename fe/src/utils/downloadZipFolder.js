@@ -14,14 +14,15 @@ export function isSaveZipDialogSupported() {
  * @returns {Promise<{ file: FileSystemFileHandle, name: string } | { cancelled: true } | null>}
  *   null = unsupported / unavailable → caller should fall back to a normal browser download.
  */
-const ZIP_PICKER_ID = 'tutaNotesBackupZip';
+const DEFAULT_ZIP_PICKER_ID = 'tutaNotesBackupZip';
+export const TUTAPHOTOS_ZIP_PICKER_ID = 'tutaPhotosBackupZip';
 const ZIP_PICKER_TYPES = [{ description: 'Zip file', accept: { 'application/zip': ['.zip'] } }];
 
-export async function acquireSaveZipFile(suggestedName) {
+export async function acquireSaveZipFile(suggestedName, { pickerId = DEFAULT_ZIP_PICKER_ID } = {}) {
   if (!isSaveZipDialogSupported()) return null;
   try {
     const file = await window.showSaveFilePicker({
-      id: ZIP_PICKER_ID,
+      id: String(pickerId || DEFAULT_ZIP_PICKER_ID),
       startIn: 'downloads',
       suggestedName: String(suggestedName || 'download.zip'),
       types: ZIP_PICKER_TYPES
@@ -33,14 +34,14 @@ export async function acquireSaveZipFile(suggestedName) {
   }
 }
 
-/** Pick an existing backup zip — Chrome reuses the last folder from the paired Save picker (`ZIP_PICKER_ID`). */
-export async function acquireOpenZipFile() {
+/** Pick an existing backup zip — Chrome reuses the last folder from the paired Save picker. */
+export async function acquireOpenZipFile({ pickerId = DEFAULT_ZIP_PICKER_ID } = {}) {
   if (typeof window === 'undefined' || typeof window.showOpenFilePicker !== 'function') {
     return null;
   }
   try {
     const [handle] = await window.showOpenFilePicker({
-      id: ZIP_PICKER_ID,
+      id: String(pickerId || DEFAULT_ZIP_PICKER_ID),
       startIn: 'documents',
       multiple: false,
       types: ZIP_PICKER_TYPES

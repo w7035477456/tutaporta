@@ -1,34 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
+import PropTypes from 'prop-types';
 import Stack from '@mui/material/Stack';
 import ColorTemplate16PopupCenterWide from 'ui-component/ColorTemplate16PopupCenterWide';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import GreenButton from 'ui-component/GreenButton';
 import { BUSY_HOURGLASS_MODAL_SIZE } from 'config/busyHourglassEnv';
-import { themedConfirm } from 'utils/themedDialog';
-import {
-  downloadPhotoAlbumsAlbumBackupZip,
-  formatPhotoAlbumsTutaDrive,
-  restorePhotoAlbumsTutaDriveBackupZip
-} from 'api/photoAlbumsFe';
-import PhotoAlbumsTutaCloudVaultTreePanel from './PhotoAlbumsTutaCloudVaultTreePanel';
-import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
-import { guestDemoBlockProps } from 'utils/guestDemoLogin';
 import { TUTACLOUD_VAULT_FOLDER_DEFAULT } from 'constants/tutaCloudVaultFolder';
-
-const BACKUP_POPUP_WIDTH = '90vw';
-const BACKUP_POPUP_HEIGHT = '90vh';
-
-const backupPopupShellSx = {
-  width: BACKUP_POPUP_WIDTH,
-  maxWidth: BACKUP_POPUP_WIDTH,
-  height: BACKUP_POPUP_HEIGHT,
-  maxHeight: BACKUP_POPUP_HEIGHT,
-  minHeight: BACKUP_POPUP_HEIGHT,
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden'
-};
+import {
+  createPhotoAlbumsTutaDriveEncryptedBackup,
+  restorePhotoAlbumsTutaDriveEncryptedBackup
+} from 'api/photoAlbumsFe';
+import { tutaPhotoAlbumsPostLoginActionButtonSx } from './tutaPhotoAlbumsPostLoginActionButtonSx';
+import { themedAlert } from 'utils/themedDialog';
+import { acquireOpenZipFile, acquireSaveZipFile, TUTAPHOTOS_ZIP_PICKER_ID } from 'utils/downloadZipFolder';
+import {
+  ensureEncryptPasswordForBackupSeal,
+  prepareBackupDecryptWithPassword
+} from 'utils/photoAlbumsBackupDecryptPrompt';
+import PhotoAlbumsBackupPasswordDialog from './PhotoAlbumsBackupPasswordDialog';
+import { photoAlbumsBackupFileNamePreview } from 'utils/photoAlbumsBackupFileName';
+import { SUCCESS_ON_BLACK_BOX_SX } from 'config/successOnBlackBoxSx';
 
 const actionRowSx = {
   display: 'flex',
@@ -45,109 +37,182 @@ const actionButtonSx = {
   width: { xs: '100%', sm: 'auto' }
 };
 
-const formatWarningBoxSx = {
-  px: 1.5,
-  py: 1.25,
-  borderRadius: 1,
-  border: '2px solid #000',
-  bgcolor: '#000',
-  color: 'var(--theme-yellow-color)',
-  textAlign: 'center',
-  fontWeight: 600,
-  lineHeight: 1.45
-};
-
-const vaultTreeSectionSx = {
-  pt: 1,
-  borderTop: '2px solid rgba(255, 255, 255, 0.2)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 1.5,
-  flex: 1,
-  minHeight: 0
+const formatRedButtonSx = {
+  ...actionButtonSx,
+  bgcolor: 'var(--theme-error-color, #d32f2f) !important',
+  color: '#fff !important'
 };
 
 function formatBackupZipSizeLabel(sizeBytes) {
   const bytes = Number(sizeBytes);
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)}mb`;
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB` : `${mb.toFixed(1)}mb`;
 }
 
-function formatBytesLabel(bytes) {
-  const n = Number(bytes);
-  if (!Number.isFinite(n) || n <= 0) return '';
-  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-  if (n >= 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${n} B`;
+function describeBackupRequestError(err, fallback) {
+  const apiError = err?.response?.data?.error;
+  if (apiError) return apiError;
+  const status = Number(err?.response?.status) || 0;
+  if (status === 413) {
+    return 'Server error 413: upload too large for the gateway limit. Try again or use a smaller vault.';
+  }
+  if (status === 502 || status === 503 || status === 504 || (status >= 520 && status <= 524)) {
+    return (
+      `Server error ${status}: the web server dropped or timed out the request. ` +
+      'Please try again.'
+    );
+  }
+  return err?.message || fallback;
 }
 
-function buildBackupProgressLabel(progress, albumLabel) {
-  const lines = [];
-  const label = String(progress?.label || '').trim();
-  if (label) lines.push(label);
-  else if (albumLabel) {
-    lines.push(`Backing up only photo album: '${albumLabel}' as zip`);
+function formatDurationSec(sec) {
+  const n = Math.max(0, Math.round(Number(sec) || 0));
+  const m = Math.floor(n / 60);
+  const s = n % 60;
+  return m > 0 ? `${m}m ${String(s).padStart(2, '0')}s` : `${s}s`;
+}
+
+const BACKUP_OPERATION_STEPS = {
+  backup: {
+    title: 'Backing up Photo Albums',
+    steps: [
+      ['build', 'Server zipping your photo albums'],
+      ['seal', 'Encrypting the zip in your browser'],
+      ['save', 'Saving to the folder you chose']
+    ]
+  },
+  restoreLocal: {
+    title: 'Restoring Photo Albums',
+    steps: [
+      ['read', 'Reading zip from your computer'],
+      ['decrypt', 'Checking password and decrypting'],
+      ['send', 'Sending vault to the server'],
+      ['server', 'Server unpacking albums into your vault']
+    ],
+    serverWaitText: 'server is unpacking albums into your vault'
   }
-  const fileIndex = Number(progress?.fileIndex) || 0;
-  const fileTotal = Number(progress?.fileTotal) || 0;
-  if (fileTotal > 0) {
-    lines.push(`Files: ${fileIndex} / ${fileTotal}`);
+};
+
+function buildBackupProgressBytesText(progress) {
+  if (!progress) return '';
+  const reportedTotal = Number(progress.totalBytes) || Number(progress.estimatedBytes) || 0;
+  const loaded = progress.stage === 'server' ? reportedTotal : Number(progress.loadedBytes);
+  if (progress.loadedBytes == null && progress.stage !== 'server') return '';
+  if (!Number.isFinite(loaded) || loaded < 0) return '';
+  if (!loaded && !reportedTotal) return '';
+  const total = reportedTotal > 0 ? Math.max(reportedTotal, loaded) : 0;
+  const largest = Math.max(loaded, total);
+  const MiB = 1024 * 1024;
+  const fmt = (bytes) =>
+    largest >= 10 * 1024 * MiB
+      ? `${(bytes / (1024 * MiB)).toFixed(2)}gb`
+      : `${(bytes / MiB).toFixed(largest >= 100 * MiB ? 0 : 1)}mb`;
+  return total > 0 ? `${fmt(loaded)} of ${fmt(total)} done` : `${fmt(loaded)} done`;
+}
+
+function buildBackupProgressLabel(progress, nowMs) {
+  if (!progress) return '';
+  const op = BACKUP_OPERATION_STEPS[progress.operation] || BACKUP_OPERATION_STEPS.backup;
+  const lines = [op.title];
+  const step = op.steps.find(([key]) => key === progress.stage);
+  if (step) lines.push(step[1]);
+  if (progress.stage === 'server' && op.serverWaitText) {
+    lines.push(`(${op.serverWaitText})`);
   }
-  const bytesLabel = formatBytesLabel(progress?.bytesDone);
-  if (bytesLabel) lines.push(`Data: ${bytesLabel}`);
+  if (progress.sourceName) lines.push(`File: ${progress.sourceName}`);
+  if (progress.fileName) lines.push(`Saved as ${progress.fileName}`);
+  if (progress.startedAt && progress.percent >= 99) {
+    lines.push(`Elapsed ${formatDurationSec((nowMs - progress.startedAt) / 1000)}`);
+  }
   return lines.join('\n');
 }
 
-const backupSuccessMessageSx = {
-  mb: 0,
-  textAlign: 'center',
-  color: 'var(--theme-yellow-color) !important',
-  WebkitTextFillColor: 'var(--theme-yellow-color) !important',
-  fontWeight: 700,
-  lineHeight: 1.45,
-  fontStyle: 'normal'
-};
-
-const generalSuccessMessageSx = {
-  mb: 0,
-  textAlign: 'center',
-  color: '#b8f5c3',
-  fontWeight: 700,
-  lineHeight: 1.45
-};
-
+/**
+ * Backup & Restore — encrypted zip on the member's computer only (Save As / Open file).
+ * Cloned from TutaNotes RecordVaultTutaCloudBackupDialog.
+ */
 export default function PhotoAlbumsTutaCloudBackupDialog({
   open,
   onClose,
-  folderName = TUTACLOUD_VAULT_FOLDER_DEFAULT,
-  albumContext = null,
-  onFormatted,
+  folderName: _folderName = TUTACLOUD_VAULT_FOLDER_DEFAULT,
+  tutaDrive = true,
+  onFormatted: _onFormatted,
   onRestored,
-  onOpenMyPhotoAlbums
+  requireBackupBeforeClose = false
 }) {
   const fileInputRef = useRef(null);
   const [busy, setBusy] = useState(false);
-  const [backupProgress, setBackupProgress] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [successTone, setSuccessTone] = useState('');
-  const [treeRefreshToken, setTreeRefreshToken] = useState(0);
-
-  const albumLabel = String(albumContext?.albumLabel || '').trim();
-  const canBackupAlbum =
-    Number(albumContext?.notebookId) > 0 && Number(albumContext?.noteId) > 0;
+  const [backupSaved, setBackupSaved] = useState(false);
+  const [tutaDriveActive] = useState(() => Boolean(tutaDrive));
+  const [passwordDialog, setPasswordDialog] = useState(null);
+  const [backupProgress, setBackupProgress] = useState(null);
+  const [progressNowMs, setProgressNowMs] = useState(() => Date.now());
+  const [requiredBackupDone, setRequiredBackupDone] = useState(false);
+  const [exitReadyOpen, setExitReadyOpen] = useState(false);
+  const backupLocked = requireBackupBeforeClose && !requiredBackupDone;
 
   useEffect(() => {
-    if (!open) return;
-    setTreeRefreshToken((value) => value + 1);
+    if (open) {
+      setRequiredBackupDone(false);
+      setExitReadyOpen(false);
+      setBackupSaved(false);
+      setSuccess('');
+      setError('');
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (!backupProgress) return undefined;
+    setProgressNowMs(Date.now());
+    const timer = setInterval(() => setProgressNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [backupProgress]);
+
+  const startBackupProgress = (operation, sourceName, sourceBytes, extra = {}) => {
+    const base = { operation, sourceName, sourceBytes, startedAt: Date.now(), ...extra };
+    let info = {};
+    let latest = { ...base, stage: '', percent: 0 };
+    setBackupProgress(latest);
+    return {
+      base,
+      update: (event) => {
+        latest = { ...base, ...info, ...event };
+        setBackupProgress(latest);
+      },
+      addInfo: (nextInfo) => {
+        info = { ...info, ...nextInfo };
+        latest = { ...latest, ...nextInfo };
+        setBackupProgress(latest);
+      }
+    };
+  };
+
+  const askBackupPassword = (opts) =>
+    new Promise((resolve) => {
+      setPasswordDialog({
+        mode: 'backup',
+        fileName: '',
+        note: '',
+        hint: '',
+        passwordCheck: null,
+        warning: '',
+        ...opts,
+        resolve
+      });
+    });
+
+  const closePasswordDialog = (value) => {
+    const resolve = passwordDialog?.resolve;
+    setPasswordDialog(null);
+    if (typeof resolve === 'function') resolve(value);
+  };
 
   const resetMessages = () => {
     setError('');
     setSuccess('');
-    setSuccessTone('');
-    setBackupProgress(null);
   };
 
   const handleClose = () => {
@@ -156,202 +221,248 @@ export default function PhotoAlbumsTutaCloudBackupDialog({
     onClose?.();
   };
 
-  const refreshVaultTree = () => {
-    setTreeRefreshToken((value) => value + 1);
+  const handleExitAfterBackup = () => {
+    resetMessages();
+    onClose?.('exit');
+  };
+
+  const announceRestoreSuccessThenRedirect = async (zipFileName, result) => {
+    setBusy(false);
+    setBackupProgress(null);
+    await themedAlert(`Restore zip ${zipFileName} success`, { title: 'Restore complete' });
+    await onRestored?.(result);
   };
 
   const handleBackup = async () => {
-    if (!canBackupAlbum) {
-      setError('Open a photo album first, then click Backup.');
-      return;
+    resetMessages();
+    let backupInput = null;
+    let saveTarget = null;
+
+    if (tutaDriveActive) {
+      backupInput = await askBackupPassword({ mode: 'backup' });
+      if (!backupInput) return;
+      if (!backupInput.password) {
+        try {
+          if (!(await ensureEncryptPasswordForBackupSeal('backup'))) return;
+        } catch (err) {
+          setError(err?.message || 'Unable to unlock Encrypt Password');
+          return;
+        }
+      }
+      saveTarget = await acquireSaveZipFile(
+        photoAlbumsBackupFileNamePreview(backupInput.note, backupInput.dateStamp),
+        { pickerId: TUTAPHOTOS_ZIP_PICKER_ID }
+      );
+      if (saveTarget?.cancelled) return;
     }
 
-    resetMessages();
     setBusy(true);
+    const progress = startBackupProgress(
+      'backup',
+      saveTarget?.name || photoAlbumsBackupFileNamePreview(backupInput?.note, backupInput?.dateStamp),
+      0
+    );
     try {
-      const result = await downloadPhotoAlbumsAlbumBackupZip({
-        storageType: 'tutaCloud',
-        notebookId: albumContext.notebookId,
-        noteId: albumContext.noteId,
-        albumLabel,
-        onProgress: setBackupProgress
+      const result = await createPhotoAlbumsTutaDriveEncryptedBackup(backupInput.note, {
+        hint: backupInput.hint,
+        dateStamp: backupInput.dateStamp,
+        password: backupInput.password,
+        onProgress: progress.update,
+        saveTarget
       });
-      const fileName = result?.fileName || 'MyPhotoAlbums_TutaCloud.zip';
-      const sizeLabel = formatBackupZipSizeLabel(result?.sizeBytes);
-      const sizeText = sizeLabel ? ` (size ${sizeLabel})` : '';
-      setSuccess(
-        `Backup to zip completed for '${albumLabel}'. Your ${fileName}${sizeText} has been downloaded to browser download folder.`
-      );
-      setSuccessTone('backup');
-      refreshVaultTree();
+      const sizeText = formatBackupZipSizeLabel(result?.sizeBytes);
+      progress.update({ stage: 'done', percent: 100, fileName: result?.fileName });
+      const elapsedText = formatDurationSec((Date.now() - progress.base.startedAt) / 1000);
+      setSuccess(`${result?.fileName || 'backup.zip'}${sizeText ? ` (${sizeText})` : ''} in ${elapsedText}.`);
+      setBackupSaved(true);
+      setRequiredBackupDone(true);
+      if (requireBackupBeforeClose) setExitReadyOpen(true);
     } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Backup failed');
+      setError(describeBackupRequestError(err, 'Backup failed'));
     } finally {
       setBusy(false);
       setBackupProgress(null);
     }
   };
 
-  const handleRestoreClick = () => {
-    if (busy) return;
+  const runRestoreWithFile = async (file) => {
+    if (!file) return;
     resetMessages();
+
+    try {
+      const { readTutaDriveBackupHeader, tutaDriveBackupPasswordCheckFromHeader } = await import(
+        'utils/recordVaultClientVaultCrypto'
+      );
+      const head = new Uint8Array(await file.slice(0, 64 * 1024 + 16).arrayBuffer());
+      const parsed = readTutaDriveBackupHeader(head);
+      const header = parsed?.format === 'TNBAK3' ? parsed.header : null;
+      const result = await askBackupPassword({
+        mode: 'restore',
+        fileName: file.name,
+        note: String(header?.note || ''),
+        hint: String(header?.hint || ''),
+        passwordCheck: tutaDriveBackupPasswordCheckFromHeader(header),
+        warning: 'Restore replaces your current vault. Open TutaPhotos again afterward.'
+      });
+      if (!result) return;
+      await prepareBackupDecryptWithPassword(result.password, 'restore');
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Unable to unlock backup password');
+      return;
+    }
+
+    setBusy(true);
+    const progress = startBackupProgress('restoreLocal', file.name, file.size);
+    try {
+      const result = await restorePhotoAlbumsTutaDriveEncryptedBackup(file, { onProgress: progress.update });
+      progress.update({ stage: 'done', percent: 100 });
+      await announceRestoreSuccessThenRedirect(file.name, result);
+    } catch (err) {
+      setError(describeBackupRequestError(err, 'Restore failed'));
+    } finally {
+      setBusy(false);
+      setBackupProgress(null);
+    }
+  };
+
+  const handleRestoreClick = async () => {
+    if (busy || backupLocked) return;
+    const picked = await acquireOpenZipFile({ pickerId: TUTAPHOTOS_ZIP_PICKER_ID });
+    if (picked?.cancelled) return;
+    if (picked?.file) {
+      await runRestoreWithFile(picked.file);
+      return;
+    }
     fileInputRef.current?.click();
   };
 
-  const handleRestoreFile = async (event) => {
+  const handleRestoreFileInput = (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
-
-    resetMessages();
-    setBusy(true);
-    try {
-      const result = await restorePhotoAlbumsTutaDriveBackupZip(file);
-      const count = Number(result?.restoredFiles) || 0;
-      if (result?.merged) {
-        const setName = String(result.notebookName || '').trim();
-        const albumName = String(result.albumName || '').trim();
-        const label =
-          setName && albumName ? `'${setName}' / '${albumName}'` : folderName;
-        setSuccess(
-          `Merged ${count} file${count === 1 ? '' : 's'} from zip into ${label}. Refresh the album list to see the restored album.`
-        );
-      } else {
-        setSuccess(
-          `Restored ${count} file${count === 1 ? '' : 's'} to TutaCloud (${folderName}). Open MyPhotoAlbums again with your Encrypt Password to load the restored notes.`
-        );
-      }
-      setSuccessTone('general');
-      refreshVaultTree();
-      await onRestored?.(result);
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Restore failed');
-    } finally {
-      setBusy(false);
-    }
+    void runRestoreWithFile(file);
   };
-
-  const handleFormat = async () => {
-    if (busy) return;
-    const ok = await themedConfirm(
-      `Format/Clear Entire TutaPhotoAlbums Cloud?\n\nThis deletes the existing TutaCloud MyPhotoAlbums folder and creates a fresh blank vault. Other TutaCloud files are not touched.\n\nBack up first if you want to keep your current albums.`
-    );
-    if (!ok) return;
-
-    resetMessages();
-    setBusy(true);
-    try {
-      await formatPhotoAlbumsTutaDrive();
-      setSuccess(`Formatted ${folderName} on TutaCloud. The folder is now blank and ready for a fresh vault.`);
-      setSuccessTone('general');
-      refreshVaultTree();
-      onFormatted?.();
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Format failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const hourglassLabel = busy && backupProgress ? 'Backing up album' : 'Working on TutaCloud backup';
 
   return (
     <>
       <BusyHourglassOverlay
         open={open && busy}
-        label={hourglassLabel}
+        label={
+          backupProgress
+            ? (BACKUP_OPERATION_STEPS[backupProgress.operation] || BACKUP_OPERATION_STEPS.backup).title
+            : 'Working…'
+        }
+        progressPercent={backupProgress ? backupProgress.percent : null}
+        progressLabel={buildBackupProgressLabel(backupProgress, progressNowMs)}
+        progressDetail={buildBackupProgressBytesText(backupProgress)}
+        yellowPanel={Boolean(backupProgress)}
         fontSize={BUSY_HOURGLASS_MODAL_SIZE}
-        progressPercent={backupProgress?.percent ?? null}
-        progressLabel={buildBackupProgressLabel(backupProgress, albumLabel)}
       />
       <input
         ref={fileInputRef}
         type="file"
-        accept=".zip,application/zip"
+        accept=".zip,application/octet-stream,application/zip"
         hidden
-        onChange={(event) => void handleRestoreFile(event)}
+        onChange={handleRestoreFileInput}
       />
       <ColorTemplate16PopupCenterWide
         open={open}
         onClose={handleClose}
-        closeOnBackdrop={!busy}
-        maxWidth={BACKUP_POPUP_WIDTH}
-        resizable
-        defaultResizeHeight={BACKUP_POPUP_HEIGHT}
-        maxResizeHeight={BACKUP_POPUP_HEIGHT}
-        panelShellSx={backupPopupShellSx}
-        contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}
+        closeOnBackdrop={!busy && !backupLocked}
+        closeButtonDisabled={busy}
+        closeButtonAriaLabel={backupLocked ? 'Close without leaving TutaPhotos' : 'Close popup'}
       >
-        <ColorTemplate16PopupCenterWide.Title>
-          Backup &amp; Restore TutaPhotoAlbums Cloud
-        </ColorTemplate16PopupCenterWide.Title>
-        <ColorTemplate16PopupCenterWide.Body spacing={2} sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <ColorTemplate16PopupCenterWide.Title>Backup &amp; Restore Photo Albums</ColorTemplate16PopupCenterWide.Title>
+        <ColorTemplate16PopupCenterWide.Body spacing={2}>
           <ColorTemplate16PopupCenterWide.SectionDescription sx={{ mb: 0, textAlign: 'center' }}>
-            Backup and download zip saves only the photo album you currently have open
-            {albumLabel ? ` ('${albumLabel}')` : ''} to a zip file in your browser download folder. Upload and Restore
-            from zip merges that album into your cloud vault (album set / album names get _2, _3, … if needed).
+            Backup saves an encrypted zip to a folder you choose. Restore loads a zip you pick from your computer.
+            Your browser remembers the last folder when it supports Save As / Open file dialogs.
           </ColorTemplate16PopupCenterWide.SectionDescription>
 
-          <Box sx={formatWarningBoxSx}>
-            If you do not want to store your data on TutaCloud, before you select &quot;Format/Clear Entire
-            TutaPhotoAlbums Cloud&quot; below, use Backup and download zip first. Once you have done that, you may format
-            to delete your online data. Later, use Upload and Restore from zip to merge a backup zip back into your
-            vault.
-          </Box>
-
+          {backupLocked ? (
+            <ColorTemplate16PopupCenterWide.ErrorBar>
+              Your albums changed since the last backup. Click Backup before leaving, or Skip backup &amp; Exit. X
+              keeps you in TutaPhotos until you back up.
+            </ColorTemplate16PopupCenterWide.ErrorBar>
+          ) : null}
           {error ? <ColorTemplate16PopupCenterWide.ErrorBar>{error}</ColorTemplate16PopupCenterWide.ErrorBar> : null}
+          {success ? (
+            <ColorTemplate16PopupCenterWide.SectionDescription sx={{ textAlign: 'center', fontWeight: 700 }}>
+              {backupSaved ? (
+                <Box component="span" sx={{ ...SUCCESS_ON_BLACK_BOX_SX, mr: 1 }}>
+                  Saved Success
+                </Box>
+              ) : null}
+              {success}
+            </ColorTemplate16PopupCenterWide.SectionDescription>
+          ) : null}
 
           <Stack spacing={1.5}>
             <Box sx={actionRowSx}>
               <GreenButton
                 type="button"
-                disabled={busy || !canBackupAlbum}
+                disabled={busy || backupSaved}
                 onClick={() => void handleBackup()}
                 sx={actionButtonSx}
-                {...guestDemoBlockProps()}
               >
-                Backup and download zip
+                Backup
               </GreenButton>
               <GreenButton
                 type="button"
-                disabled={busy}
-                onClick={() => void handleFormat()}
+                disabled={busy || backupLocked || backupSaved}
+                onClick={() => void handleRestoreClick()}
                 sx={actionButtonSx}
-                {...guestDemoBlockProps()}
               >
-                Format/Clear Entire TutaPhotoAlbums Cloud
+                Restore
               </GreenButton>
-              <GreenButton
-                type="button"
-                disabled={busy}
-                onClick={handleRestoreClick}
-                sx={actionButtonSx}
-                {...guestDemoBlockProps()}
-              >
-                Upload and Restore from zip
-              </GreenButton>
+              {backupLocked ? (
+                <GreenButton type="button" disabled={busy} onClick={handleExitAfterBackup} sx={formatRedButtonSx}>
+                  Skip backup &amp; Exit
+                </GreenButton>
+              ) : null}
             </Box>
           </Stack>
-
-          {success ? (
-            successTone === 'backup' ? (
-              <Box sx={backupSuccessMessageSx}>{success}</Box>
-            ) : (
-              <ColorTemplate16PopupCenterWide.SectionDescription sx={generalSuccessMessageSx}>
-                {success}
-              </ColorTemplate16PopupCenterWide.SectionDescription>
-            )
-          ) : null}
-
-          <Box sx={vaultTreeSectionSx}>
-            <PhotoAlbumsTutaCloudVaultTreePanel
-              active={open}
-              refreshToken={treeRefreshToken}
-              maxHeight="38vh"
-            />
+        </ColorTemplate16PopupCenterWide.Body>
+      </ColorTemplate16PopupCenterWide>
+      <PhotoAlbumsBackupPasswordDialog
+        open={Boolean(passwordDialog)}
+        mode={passwordDialog?.mode || 'backup'}
+        fileName={passwordDialog?.fileName || ''}
+        note={passwordDialog?.note || ''}
+        hint={passwordDialog?.hint || ''}
+        passwordCheck={passwordDialog?.passwordCheck || null}
+        warning={passwordDialog?.warning || ''}
+        onCancel={() => closePasswordDialog(null)}
+        onConfirm={(result) => closePasswordDialog(result)}
+      />
+      <ColorTemplate16PopupCenterWide
+        open={Boolean(open && exitReadyOpen)}
+        onClose={() => setExitReadyOpen(false)}
+        closeOnBackdrop={false}
+        bodyTextAlignLeft={false}
+        centeredLeadLines={0}
+        overlaySx={{ zIndex: 39000 }}
+        closeButtonAriaLabel="Stay in Backup & Restore"
+      >
+        <ColorTemplate16PopupCenterWide.Title>Backup complete</ColorTemplate16PopupCenterWide.Title>
+        <ColorTemplate16PopupCenterWide.Body spacing={2}>
+          <ColorTemplate16PopupCenterWide.BodyText>Zip saved — you can exit now.</ColorTemplate16PopupCenterWide.BodyText>
+          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <GreenButton type="button" onClick={handleExitAfterBackup} sx={actionButtonSx}>
+              Exit
+            </GreenButton>
           </Box>
         </ColorTemplate16PopupCenterWide.Body>
       </ColorTemplate16PopupCenterWide>
     </>
   );
 }
+
+PhotoAlbumsTutaCloudBackupDialog.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  folderName: PropTypes.string,
+  tutaDrive: PropTypes.bool,
+  onFormatted: PropTypes.func,
+  onRestored: PropTypes.func,
+  requireBackupBeforeClose: PropTypes.bool
+};

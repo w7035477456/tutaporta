@@ -41,7 +41,10 @@ import {
   setVaultOpenProgress
 } from '../../utils/photoAlbumsVaultOpenProgress.js';
 import { parseVaultBackupZipUpload } from '../../utils/parseVaultBackupZipUpload.js';
-import { restoreTutaCloudVaultFromZipFile } from '../../utils/photoAlbumsUsb/usbVaultBackup.js';
+import {
+  restorePhotoAlbumsTutaDriveVaultFromZipFile,
+  streamPhotoAlbumsTutaDriveBackupZip
+} from '../../utils/photoAlbumsTutaDriveBackup.js';
 
 const TUTADRIVE_ENV_KEY_TYPE = 'tutaCloud';
 
@@ -404,21 +407,41 @@ export async function unlockPhotoAlbumsTutaDrive(req, res) {
   }
 }
 
-/** POST /api/photoAlbums/tutaCloud/restore-zip — multipart field backup (.zip) onto unlocked TutaCloud vault. */
+/** GET /api/photoAlbums/tutaCloud/backup-zip — plain vault zip for client Encrypt-Password seal. */
+export async function downloadPhotoAlbumsTutaDriveBackupZip(req, res) {
+  const singlesId = requireSinglesId(req, res);
+  if (!singlesId) return;
+  try {
+    if (!isLeftSideTutaDrive()) {
+      return res.status(400).json({ error: 'LEFT_SIDE is not TutaDrive' });
+    }
+    await streamPhotoAlbumsTutaDriveBackupZip(singlesId, res);
+  } catch (err) {
+    console.error('[downloadPhotoAlbumsTutaDriveBackupZip]', err?.message || err);
+    if (!res.headersSent) {
+      return sendRecordVaultError(res, err, 'Unable to build TutaPhotos backup zip', {
+        route: 'downloadPhotoAlbumsTutaDriveBackupZip',
+        singlesId,
+        status: isStoragePermissionError(err) ? 500 : 400
+      });
+    }
+  }
+}
+
+/** POST /api/photoAlbums/tutaCloud/restore-zip — multipart field backup (.zip) into member TutaPhotos vault. */
 export async function restorePhotoAlbumsTutaDriveBackupZip(req, res) {
-  const singlesId = await requireVaultAccessSession(req, res);
+  const singlesId = requireSinglesId(req, res);
   if (!singlesId) return;
 
   let upload = null;
   try {
     upload = await parseVaultBackupZipUpload(req);
-    const result = await restoreTutaCloudVaultFromZipFile(singlesId, upload.zipPath);
+    const result = await restorePhotoAlbumsTutaDriveVaultFromZipFile(singlesId, upload.zipPath);
     return res.json({ success: true, ...result });
   } catch (err) {
     console.error('[restorePhotoAlbumsTutaDriveBackupZip]', err?.message || err);
     const message = err?.message || 'Unable to restore TutaCloud backup zip';
-    const status = /not unlocked/i.test(message) ? 428 : 400;
-    return res.status(status).json({ error: message });
+    return res.status(400).json({ error: message });
   } finally {
     if (upload?.tmpDir) {
       fs.rmSync(upload.tmpDir, { recursive: true, force: true });

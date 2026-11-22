@@ -2,7 +2,8 @@
 # Scan / repair double-sealed TutaNotes vault files under a member notes tree.
 #
 # Default root (override with first positional arg or NOTES_ROOT):
-#   ~/i/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M485668/notes
+#   Mac:    ~/i/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M485668/notes
+#   Ubuntu: ~/i/ubuntu_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M485668/notes
 #
 # Dry-run (default):
 #   scripts/repair-double-sealed-vault-files.sh
@@ -16,16 +17,29 @@
 # inner seal used a different key. Re-try with the member Encrypt Password (hidden prompt):
 #   scripts/repair-double-sealed-vault-files.sh --note 115 --ask-password
 #
-# Still unrecoverable → pull the originals out of an older sealed backup (matched by checksum):
-#   scripts/repair-double-sealed-vault-files.sh --ask-password \
-#     --from-backup ~/code/zipNotes/EncryptedTutaNotesZip_2026_11_17_openshift.zip \
-#     --from-backup ~/code/zipNotes/EncryptedTutaNotesZip_2026_11_15_NewArchitecture.zip
+# Still unrecoverable → pull the originals out of an older sealed backup (matched by checksum).
+# Prefer a plaintext copy of the vault if you still have one (no password needed), e.g.:
+#   scripts/repair-double-sealed-vault-files.sh --apply \
+#     --from-plain-dir ~/mac_storage.orig/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M485668/notes
+# Or older TNBAK2 zips (Nov 15 first, then Nov 20) with --ask-password --from-backup …
 #
 # Reads TEMPKEY_TUTADRIVE from ~/.ssh/be/.env via be/loadEnv.js — never prints secrets.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEFAULT_NOTES="${HOME}/i/mac_storage/tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M485668/notes"
+CHEAP_TAIL="tutamallStorageFolder_largecheapstorage_outdatedOct2021/users/M485668/notes"
+DEFAULT_NOTES=""
+for candidate in \
+  "${HOME}/i/ubuntu_storage/${CHEAP_TAIL}" \
+  "${HOME}/i/mac_storage/${CHEAP_TAIL}" \
+  "${HOME}/ubuntu_storage/${CHEAP_TAIL}" \
+  "${HOME}/mac_storage/${CHEAP_TAIL}"; do
+  if [[ -d "$candidate/TutaNotes" || -f "$candidate/TutaNotes/vault.meta.json" ]]; then
+    DEFAULT_NOTES="$candidate"
+    break
+  fi
+done
+DEFAULT_NOTES="${DEFAULT_NOTES:-${HOME}/i/mac_storage/${CHEAP_TAIL}}"
 
 NOTES_ROOT="${NOTES_ROOT:-}"
 PASS_THROUGH=()
@@ -46,6 +60,11 @@ while [[ $# -gt 0 ]]; do
       shift
       PASS_THROUGH+=("$@")
       break
+      ;;
+    # Flags that take a value — keep the next argv with them (do not treat it as NOTES_ROOT).
+    --singles|--note|--member|--mount|--backup-dir|--password-env|--salt-env|--key-env|--from-backup|--from-plain-dir)
+      PASS_THROUGH+=("$1" "$2")
+      shift 2
       ;;
     -*)
       PASS_THROUGH+=("$1")

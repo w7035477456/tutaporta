@@ -6,6 +6,12 @@ describe('formatVaultTransferBytes', () => {
     expect(formatVaultTransferBytes(2048)).toBe('2.0 KB');
     expect(formatVaultTransferBytes(5 * 1024 * 1024)).toMatch(/MB/);
   });
+
+  it('shows GB with one decimal once size exceeds 999MB', () => {
+    const MiB = 1024 * 1024;
+    expect(formatVaultTransferBytes(999 * MiB)).toMatch(/MB/);
+    expect(formatVaultTransferBytes(1607 * MiB)).toBe('1.6 GB');
+  });
 });
 
 describe('buildVaultTransferProgressLabel', () => {

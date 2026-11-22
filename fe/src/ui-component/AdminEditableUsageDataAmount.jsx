@@ -5,18 +5,28 @@ import { useAuth } from 'contexts/AuthContext';
 import { isImpersonationSession } from 'utils/adminSession';
 import api from 'api/axios';
 
-/** Format MB as mb/gb — GB display is 1 decimal (e.g. 9.8gb, 10.0gb). */
+/** MB amounts above this display as GB (999mb stays mb; 1000mb → ~1.0gb). */
+export const USAGE_DATA_GB_THRESHOLD_MB = 999;
+
+/** Format MB as mb/gb — over 999MB → #.#gb (e.g. 1607mb → 1.6gb). */
 export function formatUsageDataAmount(mb, { precisionGb = 1, precisionMb = 1 } = {}) {
   const value = Number(mb);
   if (!Number.isFinite(value)) return '0mb';
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
-  if (abs >= 1024) {
+  if (abs > USAGE_DATA_GB_THRESHOLD_MB) {
     const gb = abs / 1024;
     return `${sign}${gb.toFixed(precisionGb)}gb`;
   }
   const mbText = abs.toFixed(precisionMb);
   return `${sign}${mbText}mb`;
+}
+
+/** Same >999MB → #.#gb rule, from a byte count. */
+export function formatUsageDataAmountFromBytes(bytes, opts) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n)) return formatUsageDataAmount(0, opts);
+  return formatUsageDataAmount(n / (1024 * 1024), opts);
 }
 
 /** Always gb, 2 decimals, trailing ".00" dropped (5068.8mb → 4.95gb, 10240mb → 10gb). */
