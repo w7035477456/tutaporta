@@ -6,8 +6,11 @@
 export function getApiBaseUrl() {
   const explicit = import.meta.env.VITE_API_BASE_URL;
   if (explicit) return explicit.replace(/\/$/, '');
-  // Dev: same-origin /api via Vite proxy so auth cookies are always sent.
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
+  // Mac Vite: always same-origin /api (proxy → API_PORT) so auth cookies are sent.
+  // Do not rely on import.meta.env.DEV alone — sourcing ~/.ssh/be/.env sets
+  // NODE_ENV=production in the shell, which flips DEV off / PROD on even for `vite`
+  // (MODE stays "development"). Cross-origin calls to :40000 then look like "servers down".
+  if (typeof window !== 'undefined' && (import.meta.env.DEV || import.meta.env.MODE === 'development')) {
     return window.location.origin;
   }
   const port = import.meta.env.API_PORT ?? '40000';

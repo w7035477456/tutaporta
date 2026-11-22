@@ -70,7 +70,15 @@ export function sealPlaintextVaultTree(roots, { key, sealVaultBuffer, atomicWrit
   }
 
   for (const { dir, removeSymlinks = false } of roots) {
-    if (dir && fs.existsSync(dir)) walk(dir, removeSymlinks);
+    if (!dir || !fs.existsSync(dir)) continue;
+    try {
+      // TutaDrive vault photos/ is often a symlink to the member photos/ folder.
+      // Never seal through that link (would encrypt shared non-vault files).
+      if (fs.lstatSync(dir).isSymbolicLink()) continue;
+    } catch {
+      continue;
+    }
+    walk(dir, removeSymlinks);
   }
   return counts;
 }

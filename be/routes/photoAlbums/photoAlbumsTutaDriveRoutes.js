@@ -20,7 +20,8 @@ import {
   createEnvVaultKeyMaterial,
   listEnvVaultUnlockKeys
 } from '../../utils/vaultKeys.js';
-import { isPhotoAlbumsIconEncryptionEnabled } from '../../utils/photoAlbumsIconEncryption.js';
+import { vaultMetaUsesPlaintextStorage } from '../../utils/photoAlbumsIconEncryption.js';
+import { isVaultPhotoAndDbEncryptionEnabled } from '../../utils/photoAlbumsUsb/vaultCrypto.js';
 import { requireVaultAccessSession } from '../../utils/photoAlbumsAccessPassword.js';
 import { readVaultMeta, validateVaultOnMount } from '../../utils/photoAlbumsUsb/usbScan.js';
 import { vaultMetaPath } from '../../utils/photoAlbumsUsb/vaultPaths.js';
@@ -141,13 +142,16 @@ function vaultStatusFlags(albumsMount) {
 }
 
 async function resolveTutaDriveKeyMaterial() {
-  if (!isPhotoAlbumsIconEncryptionEnabled()) return null;
+  // Same gate as seal/open: PHOTOALBUMS_ENCRYPT_PHOTO_AND_DB (not the retired icon flag).
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return null;
   return createEnvVaultKeyMaterial(TUTADRIVE_ENV_KEY_TYPE);
 }
 
 async function resolveTutaDriveUnlockKey(albumsMount) {
-  if (!isPhotoAlbumsIconEncryptionEnabled()) return null;
+  if (!isVaultPhotoAndDbEncryptionEnabled()) return null;
   const meta = readVaultMeta(albumsMount);
+  // Plaintext vaults migrate to encrypted on unlock (fresh Argon2id salt).
+  if (vaultMetaUsesPlaintextStorage(meta)) return null;
   const keys = await listEnvVaultUnlockKeys(TUTADRIVE_ENV_KEY_TYPE, meta);
   return keys[0]?.key ?? null;
 }

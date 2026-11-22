@@ -174,6 +174,15 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     if (isServerDownError(error)) {
+      const config = error.config;
+      // Mac `beall` (`node --watch`) briefly drops the API during a restart; Vite then
+      // answers 502 with X-Tuta-Upstream-Down. One short retry covers that blip so
+      // Encrypt Password → open vault does not flash the false "servers down" popup.
+      if (config && !config.__serverDownRetried) {
+        config.__serverDownRetried = true;
+        await sleepMs(400);
+        return api.request(config);
+      }
       return Promise.reject(markServerDownError(error));
     }
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
