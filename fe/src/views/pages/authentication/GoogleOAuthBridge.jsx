@@ -59,7 +59,7 @@ export default function GoogleOAuthBridge() {
       navTimer = window.setTimeout(() => {
         if (!window.closed) {
           if (result?.action === 'login') {
-            navigate('/main', { replace: true });
+            navigate('/mall', { replace: true });
           } else if (result?.email) {
             navigate('/register', { state: { email: result.email }, replace: true });
           } else {

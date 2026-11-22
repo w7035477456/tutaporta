@@ -191,6 +191,42 @@ export default defineConfig(({ mode }) => {
       // Mac dev: stop Chrome caching stale Vite dep bundles across restarts
       headers: mode === 'development' ? { 'Cache-Control': 'no-store' } : undefined
     },
+    // Pre-bundle TipTap used by TutaPhotos/TutaNotes editors so first open of /myPhotos
+    // does not race Vite dep re-optimize (504 Outdated Optimize Dep → URL bounce).
+    // @tiptap/pm has no "." export — only subpaths; never list bare '@tiptap/pm' here.
+    optimizeDeps: {
+      include: [
+        '@tiptap/core',
+        '@tiptap/pm/state',
+        '@tiptap/pm/view',
+        '@tiptap/pm/model',
+        '@tiptap/pm/transform',
+        '@tiptap/pm/commands',
+        '@tiptap/pm/schema-list',
+        '@tiptap/react',
+        '@tiptap/starter-kit',
+        '@tiptap/extensions',
+        '@tiptap/extension-list',
+        '@tiptap/extension-text-style',
+        '@tiptap/extension-highlight',
+        '@tiptap/extension-subscript',
+        '@tiptap/extension-superscript',
+        '@tiptap/extension-table',
+        '@tiptap/extension-details',
+        '@tiptap/extension-youtube',
+        '@tiptap/extension-mention',
+        '@tiptap/extension-emoji',
+        '@tiptap/extension-code-block-lowlight',
+        '@tiptap/extension-text-align',
+        '@tiptap/extension-typography',
+        '@tiptap/extension-invisible-characters',
+        '@tiptap/extension-file-handler',
+        '@tiptap/extension-mathematics',
+        '@tiptap/extension-image',
+        'tiptap-markdown',
+        'lowlight'
+      ]
+    },
     build: {
       chunkSizeWarningLimit: 1600
     },

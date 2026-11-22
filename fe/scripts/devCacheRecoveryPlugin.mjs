@@ -19,10 +19,21 @@ const INLINE_RECOVERY = String.raw`
 
   var prev = localStorage.getItem(SESSION_KEY);
   var needsPurge = prev !== session;
+  var alreadyOmdv = location.search.indexOf('_omdv=') !== -1;
 
   if (!needsPurge && location.search.indexOf('_omr=') !== -1 && !sessionStorage.getItem(OMR_PURGE)) {
     needsPurge = true;
     sessionStorage.setItem(OMR_PURGE, '1');
+  }
+
+  // Already on a purge reload (_omdv) — sync session keys and stop (no second replace).
+  // Without this, a flaky localStorage write can bounce forever on /myPhotos.
+  if (alreadyOmdv) {
+    try {
+      sessionStorage.setItem(PURGE_FOR, session);
+      localStorage.setItem(SESSION_KEY, session);
+    } catch (e) {}
+    return;
   }
 
   if (!needsPurge) return;
@@ -30,10 +41,8 @@ const INLINE_RECOVERY = String.raw`
 
   sessionStorage.setItem(PURGE_FOR, session);
   localStorage.setItem(SESSION_KEY, session);
-  try {
-    sessionStorage.removeItem('omStaleModuleHardReloadAt');
-    sessionStorage.removeItem('omStaleModuleHardReloadCount');
-  } catch (e) {}
+  // Do NOT clear omStaleModuleHardReloadCount here — hardReloadOnStaleModule needs it
+  // so MAX_AUTO_RELOADS can stop an _omr bounce after a failed TipTap/chunk load.
 
   var url = new URL(location.href);
   url.searchParams.delete('_omr');

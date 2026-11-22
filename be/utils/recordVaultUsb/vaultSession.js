@@ -301,6 +301,22 @@ export function readEncryptedVaultFile(session, relativePath) {
 }
 
 /**
+ * True when the bytes we opened are still a sealed envelope rather than the file itself.
+ *
+ * A healthy `.enc` is `file_size_bytes + 28` and opens once to the plaintext. A double-sealed one
+ * is `file_size_bytes + 56` and opens once to *another sealed blob* of `file_size_bytes + 28`.
+ * Returning those bytes makes the browser render a broken image (served as image/png, no error),
+ * so callers must treat this as "attachment not available" instead of serving ciphertext.
+ *
+ * Deterministic: compares the opened length against the length recorded at upload time.
+ */
+function openedLooksDoubleSealed(opened, row) {
+  const expected = Number(row?.file_size_bytes) || 0;
+  if (!expected || !opened?.length) return false;
+  return opened.length !== expected && opened.length === expected + 28;
+}
+
+/**
  * Resolve attachment bytes: shared_content_key → one global sample file;
  * else vault-encrypted (or plaintext) path under files/.
  */
@@ -308,7 +324,17 @@ export function readVaultAttachmentBuffer(session, row) {
   const shared = readRecordVaultSharedSampleForAttachmentRow(row);
   if (shared?.length) return shared;
   if (!row?.relative_path) return null;
-  return readEncryptedVaultFile(session, row.relative_path);
+  const opened = readEncryptedVaultFile(session, row.relative_path);
+  if (openedLooksDoubleSealed(opened, row)) {
+    console.warn('[recordVault] attachment is double-sealed on disk — not serving ciphertext', {
+      singlesId: session.singlesId,
+      relativePath: row.relative_path,
+      openedLength: opened.length,
+      fileSizeBytes: Number(row.file_size_bytes) || 0
+    });
+    return null;
+  }
+  return opened;
 }
 
 export function deleteEncryptedVaultFile(session, relativePath) {

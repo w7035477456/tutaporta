@@ -2,13 +2,25 @@ const STORAGE_AT = 'omStaleModuleHardReloadAt';
 const STORAGE_COUNT = 'omStaleModuleHardReloadCount';
 const RELOAD_WINDOW_MS = 60000;
 const MAX_AUTO_RELOADS = 2;
+/** Set by hardReloadLikeShiftCmdR — stripped after load. */
 const CACHE_BUST_PARAM = '_omr';
+/** Set by fe/scripts/devCacheRecoveryPlugin.mjs after a Vite-session purge — stripped after load. */
+const DEV_PURGE_PARAM = '_omdv';
 const INSTALL_FLAG = '__omStaleModuleHardReloadInstalled';
 
 /** Must match devCacheRecoveryPlugin.mjs inline bootstrap (omOmrPurge). */
 export const DEV_CACHE_RECOVERY_CLEAR_OMR_FLAG = 'omOmrPurge';
 
 let reloadStarted = false;
+
+function urlHasAutoReloadParam(href = typeof window !== 'undefined' ? window.location.href : '') {
+  try {
+    const url = new URL(href);
+    return url.searchParams.has(CACHE_BUST_PARAM) || url.searchParams.has(DEV_PURGE_PARAM);
+  } catch {
+    return false;
+  }
+}
 
 function errorText(error) {
   if (error == null) return '';
@@ -98,22 +110,35 @@ function markReloadStarted() {
   }
 }
 
-/** Drop retry guard + strip cache-bust query param from the URL bar. */
-export function clearStaleModuleReloadGuard() {
+/**
+ * Drop in-flight reload flag + strip `_omr` / `_omdv` from the URL bar.
+ * @param {{ resetBudget?: boolean }} [options] — when false, keep sessionStorage retry
+ *   count so MAX_AUTO_RELOADS still applies across our own auto hard-reloads.
+ */
+export function clearStaleModuleReloadGuard({ resetBudget = true } = {}) {
   reloadStarted = false;
   if (typeof window === 'undefined') return;
-  try {
-    sessionStorage.removeItem(STORAGE_AT);
-    sessionStorage.removeItem(STORAGE_COUNT);
-  } catch {
-    /* ignore */
+  if (resetBudget) {
+    try {
+      sessionStorage.removeItem(STORAGE_AT);
+      sessionStorage.removeItem(STORAGE_COUNT);
+    } catch {
+      /* ignore */
+    }
   }
   try {
     const url = new URL(window.location.href);
+    let changed = false;
     if (url.searchParams.has(CACHE_BUST_PARAM)) {
       url.searchParams.delete(CACHE_BUST_PARAM);
-      const next = `${url.pathname}${url.search}${url.hash}`;
-      window.history.replaceState(null, '', next);
+      changed = true;
+    }
+    if (url.searchParams.has(DEV_PURGE_PARAM)) {
+      url.searchParams.delete(DEV_PURGE_PARAM);
+      changed = true;
+    }
+    if (changed) {
+      window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
     }
   } catch {
     /* ignore */
@@ -122,12 +147,14 @@ export function clearStaleModuleReloadGuard() {
 
 /**
  * Call once from index.jsx on every full page load.
- * Shift-Cmd-R and normal navigation must reset the auto-reload budget (sessionStorage
- * survives hard refresh, which is why users got stuck until Incognito).
+ * Manual navigation / Shift-Cmd-R (no `_omr`/`_omdv`) reset the auto-reload budget.
+ * Our own auto hard-reloads keep the budget so we stop after MAX_AUTO_RELOADS instead of
+ * bouncing forever between `/myPhotos` and `/myPhotos?_omr=…` / `?_omdv=…`.
  */
 export function bootstrapStaleModuleRecovery() {
   if (typeof window === 'undefined') return;
-  clearStaleModuleReloadGuard();
+  const autoReload = urlHasAutoReloadParam();
+  clearStaleModuleReloadGuard({ resetBudget: !autoReload });
 }
 
 function sleep(ms) {

@@ -83,6 +83,8 @@ root.render(
 
 if (import.meta.env.DEV && typeof sessionStorage !== 'undefined') {
   try {
+    // Allow the next stale `_omr` load to purge once. Bootstrap already stripped
+    // `_omr`/`_omdv` from the bar; clearing this flag must not re-arm a purge loop.
     sessionStorage.removeItem(DEV_CACHE_RECOVERY_CLEAR_OMR_FLAG);
   } catch {
     /* ignore */
