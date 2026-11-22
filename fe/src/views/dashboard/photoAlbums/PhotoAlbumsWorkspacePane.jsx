@@ -5574,8 +5574,15 @@ export default function PhotoAlbumsWorkspacePane({
             clone.style.left = '-10000px';
             clone.style.margin = '0';
             clone.style.transform = 'none';
-            clone.style.width = `${rect.width}px`;
-            clone.style.height = `${rect.height}px`;
+            // menuButtonSx uses width:100%!important — plain inline width loses to that
+            // once the clone is on <body>, so the ghost stretches full viewport.
+            clone.style.setProperty('width', `${rect.width}px`, 'important');
+            clone.style.setProperty('max-width', `${rect.width}px`, 'important');
+            clone.style.setProperty('min-width', `${rect.width}px`, 'important');
+            clone.style.setProperty('height', `${rect.height}px`, 'important');
+            clone.style.setProperty('flex', 'none', 'important');
+            clone.style.setProperty('align-self', 'auto', 'important');
+            clone.style.boxSizing = 'border-box';
             clone.style.pointerEvents = 'none';
             clone.style.opacity = '1';
             document.body.appendChild(clone);
