@@ -135,15 +135,15 @@ export function formatAlbumPageTitleLines(rawTitle, pageIndex, pageCount) {
   };
 }
 
-/** Sidebar album button — line 1 = title, line 2 = dates (blank when none). */
+/** Sidebar album button — title words stack one-per-row; dates only when present (no blank spacer row). */
 export function formatPhotoAlbumsSidebarAlbumLines(rawTitle) {
   const plain = String(rawTitle || '').trim();
   if (!plain) {
-    return { titleLine: '', datesLine: '\u00a0' };
+    return { titleLine: '', datesLine: '' };
   }
   const { name, dates } = parseAlbumTitleNameAndDates(plain);
   return {
     titleLine: name || plain,
-    datesLine: dates || '\u00a0'
+    datesLine: dates || ''
   };
 }

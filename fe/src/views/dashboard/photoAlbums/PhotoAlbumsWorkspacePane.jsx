@@ -976,6 +976,7 @@ function measureLaneFitDeltaPx(laneEl) {
 }
 
 function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
+  const dates = String(datesLine ?? '').replace(/\u00a0/g, ' ').trim();
   return (
     <Box
       component="span"
@@ -991,9 +992,11 @@ function SidebarAlbumTwoLineLabel({ titleLine, datesLine }) {
       }}
     >
       {renderMenuLabelOneWordPerLine(titleLine)}
-      <Box component="span" sx={sidebarAlbumDatesLineSx}>
-        {datesLine}
-      </Box>
+      {dates ? (
+        <Box component="span" sx={sidebarAlbumDatesLineSx}>
+          {dates}
+        </Box>
+      ) : null}
     </Box>
   );
 }
@@ -1705,7 +1708,14 @@ function RenamableDraggableMenuRow({
             onDrop(e, id, dragMime);
           }}
           sx={{
-            ...(!editing && !locked ? menuButtonTwoLineAlbumSx : null),
+            // Extra two-line padding only when a real dates row is under the title.
+            ...(!editing &&
+            !locked &&
+            String(albumLabelLines?.datesLine ?? '')
+              .replace(/\u00a0/g, ' ')
+              .trim()
+              ? menuButtonTwoLineAlbumSx
+              : null),
             ...(isDropTarget
               ? {
                   outline: '2px dashed var(--theme-primary-color)',
