@@ -113,7 +113,12 @@ const DRAG_NOTEBOOK = 'application/x-record-vault-notebook-id';
 const DRAG_NOTE = 'application/x-record-vault-note-id';
 const DRAG_NOTE_IDS = 'application/x-record-vault-note-ids';
 const DRAG_SHORTCUT = 'application/x-record-vault-shortcut-id';
-const DEFAULT_ALBUM_ZOOM = 95;
+/**
+ * Edit-mode album zoom slider default (0–100). Midpoint on the bar.
+ * Layout is sized for this zoom so CSS zoom paints the album at full pane size
+ * (slider 50% → visual 100% of the shell). Not auto-fit-to-flush.
+ */
+const DEFAULT_ALBUM_ZOOM = 50;
 /** Visible theme-primary gutter around the fitted binder/page (auto-zoom). */
 const ALBUM_AUTO_ZOOM_BORDER_PX = 8;
 /** Full Slide — default seconds per album page. User can pick 4, 8, or 12. */
@@ -1101,8 +1106,12 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
     const applyFit = () => {
       const scrollEl = zoomScrollRef.current;
       flushAlbumScrollOrigin(scrollEl);
-      // Size layout as if zoom were 100%, then scale zoom down to fit height + width.
-      const { layoutTarget, binderWidthPx, pageWidthPx } = resolveAlbumViewportLayout(scrollEl, 100);
+      // Size layout for DEFAULT_ALBUM_ZOOM so slider mid (50%) paints at full pane size
+      // (visual 100%). Dragging toward 100% zooms in; toward 0% shrinks.
+      const { layoutTarget, binderWidthPx, pageWidthPx } = resolveAlbumViewportLayout(
+        scrollEl,
+        DEFAULT_ALBUM_ZOOM
+      );
       albumBinderWidthPxRef.current = binderWidthPx;
       setAlbumBinderWidthPx(binderWidthPx);
       const pw = pageWidthPx;
@@ -1149,13 +1158,9 @@ const PhotoAlbumsNoteEditor = forwardRef(function PhotoAlbumsNoteEditor(
       } else {
         ensureAlbumCanvasMinHeight(editor, viewH, { allowShrink: true });
       }
-      const layoutW =
-        albumSpreadCanvasWidth(pw, binderWidthPx) +
-        (albumFullscreen ? 0 : PAGE_RESIZE_HANDLE_WIDTH);
-      // Must match `.rv-editor__body--album` / page height (content + title band).
-      const layoutH = Math.max(viewH, 200);
-      const fitZoom = computeAlbumPageFitZoom(scrollEl, layoutW, layoutH);
-      setAlbumZoom(fitZoom);
+      // Slider defaults to 50%; layout above makes that paint at full pane (visual 100%).
+      // Full screen / Full Slide still use computeAlbumPageFitZoom above.
+      setAlbumZoom(DEFAULT_ALBUM_ZOOM);
       flushAlbumScrollOrigin(scrollEl);
       return pw;
     };

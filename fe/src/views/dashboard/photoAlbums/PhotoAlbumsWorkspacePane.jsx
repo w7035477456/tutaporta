@@ -956,7 +956,7 @@ function horizontalChromePx(el) {
 
 /**
  * Px to add to (positive) or remove from (negative) a swim lane so its widest label — one word
- * per row in each album-set/album button (count badge on the row below), and the Add button — just fits.
+ * per row in each album-set/album button, and the Add button — just fits.
  * null = nothing to measure. Every slot's width changes 1:1 with the lane width (lock / X are fixed).
  */
 function measureLaneFitDeltaPx(laneEl) {
@@ -967,9 +967,8 @@ function measureLaneFitDeltaPx(laneEl) {
     if (!button) return;
     const words = button.querySelectorAll('[data-menu-label-word]');
     const textWidth = words.length ? Math.max(...Array.from(words, measureTextWidthPx)) : measureTextWidthPx(button);
-    const badge = button.querySelector('[data-menu-label-badge]');
-    const badgeWidth = badge ? badge.getBoundingClientRect().width : 0;
-    const needed = Math.max(textWidth, badgeWidth) + horizontalChromePx(button);
+    // Photo count sits under the delete × (outside the label button).
+    const needed = textWidth + horizontalChromePx(button);
     const diff = needed - slot.clientWidth;
     delta = delta == null ? diff : Math.max(delta, diff);
   });
@@ -1139,29 +1138,31 @@ const themeDaynightSurfaceImportantSx = {
   WebkitTextFillColor: `${PHOTO_ALBUMS_THEME_INVERSE_FG} !important`
 };
 
-/** Album label stacked one word per row, photo count badge centered on the row below. */
-const menuRowLabelWithCountSx = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  width: '100%',
-  minWidth: 0,
-  gap: 0.25
-};
-
+/** Photo count under the row delete × (right column). */
 const menuRowCountBadgeSx = {
   flex: '0 0 auto',
-  minWidth: 28,
-  px: 0.45,
-  py: 0.1,
+  minWidth: 22,
+  px: 0.35,
+  py: 0.05,
   ...photoAlbumsThemeDaynightSurfaceSx,
-  fontSize: '0.72rem',
+  fontSize: '0.68rem',
   fontWeight: 800,
-  lineHeight: 1.2,
+  lineHeight: 1.15,
   textAlign: 'center',
   border: PHOTO_ALBUMS_THEME_INVERSE_BORDER_2,
   borderRadius: '4px',
-  boxSizing: 'border-box'
+  boxSizing: 'border-box',
+  userSelect: 'none'
+};
+
+const menuRowDeleteColumnSx = {
+  flex: '0 0 auto',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  gap: 0.25,
+  alignSelf: 'flex-start'
 };
 
 const menuRowEditFieldSx = {
@@ -1232,7 +1233,43 @@ const menuRowCurrentGreenGlobalStyles = {
     }
 };
 
-function MenuRowWithDelete({ onDelete, deleteLabel, disabled, children, onToggleLock, lockTitle, lockDisabled = false, locked = false }) {
+function MenuRowWithDelete({
+  onDelete,
+  deleteLabel,
+  disabled,
+  children,
+  onToggleLock,
+  lockTitle,
+  lockDisabled = false,
+  locked = false,
+  /** Optional media count shown under the delete ×. */
+  sideCount = null
+}) {
+  const deleteColumn =
+    onDelete || sideCount != null ? (
+      <Box sx={menuRowDeleteColumnSx}>
+        {onDelete ? (
+          <ThumbnailDeleteXButton
+            aria-label={deleteLabel}
+            title={deleteLabel}
+            disabled={disabled}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete();
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            sx={menuRowDeleteButtonSx}
+          />
+        ) : null}
+        {sideCount != null ? (
+          <Box component="span" data-menu-label-badge="" sx={menuRowCountBadgeSx} aria-hidden="true">
+            {sideCount}
+          </Box>
+        ) : null}
+      </Box>
+    ) : null;
+
   return (
     <Box
       sx={{
@@ -1265,20 +1302,7 @@ function MenuRowWithDelete({ onDelete, deleteLabel, disabled, children, onToggle
         </Box>
       ) : null}
       <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'visible' }}>{children}</Box>
-      {onDelete ? (
-        <ThumbnailDeleteXButton
-          aria-label={deleteLabel}
-          title={deleteLabel}
-          disabled={disabled}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete();
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          sx={menuRowDeleteButtonSx}
-        />
-      ) : null}
+      {deleteColumn}
     </Box>
   );
 }
@@ -1438,7 +1462,7 @@ function RenamableDraggableMenuRow({
   id,
   label,
   albumLabelLines = null,
-  /** Optional white count badge at the right of the row label (album-set / album totals). */
+  /** Optional media count under the row delete ×. */
   sideCount = null,
   selected,
   selectedBlue = false,
@@ -1554,6 +1578,7 @@ function RenamableDraggableMenuRow({
         onToggleLock={onToggleLock}
         lockTitle={lockTitle}
         locked={locked}
+        sideCount={sideCount}
       >
         <Box data-record-vault-rename-row onMouseDown={(e) => e.stopPropagation()}>
           <TextField
@@ -1589,6 +1614,7 @@ function RenamableDraggableMenuRow({
       onToggleLock={onToggleLock}
       lockTitle={lockTitle}
       locked={locked}
+      sideCount={sideCount}
     >
       <Box id={domId || undefined} data-menu-label-slot="" sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
         <MenuRowButton
@@ -1691,25 +1717,9 @@ function RenamableDraggableMenuRow({
           {locked ? (
             PHOTO_ALBUMS_INNER_LOCKED_LABEL
           ) : albumLabelLines ? (
-            <Box sx={menuRowLabelWithCountSx}>
-              <Box sx={{ width: '100%', minWidth: 0 }}>
-                <SidebarAlbumTwoLineLabel titleLine={albumLabelLines.titleLine} datesLine={albumLabelLines.datesLine} />
-              </Box>
-              {sideCount != null ? (
-                <Box component="span" data-menu-label-badge="" sx={menuRowCountBadgeSx} aria-hidden="true">
-                  {sideCount}
-                </Box>
-              ) : null}
-            </Box>
+            <SidebarAlbumTwoLineLabel titleLine={albumLabelLines.titleLine} datesLine={albumLabelLines.datesLine} />
           ) : (
-            <Box sx={menuRowLabelWithCountSx}>
-              <Box sx={{ width: '100%', minWidth: 0 }}>{renderMenuLabelOneWordPerLine(label)}</Box>
-              {sideCount != null ? (
-                <Box component="span" data-menu-label-badge="" sx={menuRowCountBadgeSx} aria-hidden="true">
-                  {sideCount}
-                </Box>
-              ) : null}
-            </Box>
+            renderMenuLabelOneWordPerLine(label)
           )}
         </MenuRowButton>
       </Box>

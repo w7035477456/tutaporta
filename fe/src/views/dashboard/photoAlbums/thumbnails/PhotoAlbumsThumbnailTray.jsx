@@ -151,10 +151,10 @@ function TrayThumb({ item, noteId, storageType, onRemove, disabled }) {
               width: 18,
               height: 18,
               padding: 0,
-              border: '1px solid #fff',
-              borderRadius: 2,
-              background: '#000',
-              color: '#e53935',
+              border: '2px solid #fff',
+              borderRadius: '50%',
+              background: '#c62828',
+              color: '#fff',
               fontSize: '0.7rem',
               fontWeight: 900,
               lineHeight: 1,
@@ -162,6 +162,7 @@ function TrayThumb({ item, noteId, storageType, onRemove, disabled }) {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.45)',
               zIndex: 3
             }}
           >
@@ -424,15 +425,16 @@ export default function PhotoAlbumsThumbnailTray({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                bgcolor: '#000',
-                color: '#e53935',
-                WebkitTextFillColor: '#e53935',
-                border: '1px solid #fff',
-                borderRadius: '2px',
+                bgcolor: '#c62828',
+                color: '#fff',
+                WebkitTextFillColor: '#fff',
+                border: '2px solid #fff',
+                borderRadius: '50%',
                 fontSize: '0.7rem',
                 fontWeight: 900,
                 lineHeight: 1,
                 boxSizing: 'border-box',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.45)',
                 flexShrink: 0
               }}
             >

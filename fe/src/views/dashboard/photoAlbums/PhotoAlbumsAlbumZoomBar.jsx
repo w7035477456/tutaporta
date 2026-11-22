@@ -20,7 +20,7 @@ export const PHOTO_ALBUMS_ZOOM_STEP = 1;
  * page from 0%–100% (TutaPhotoAlbums only).
  */
 export default function PhotoAlbumsAlbumZoomBar({
-  value = 100,
+  value = 50,
   onChange,
   focusViewActive = false,
   onFocusViewToggle = null,
@@ -30,7 +30,7 @@ export default function PhotoAlbumsAlbumZoomBar({
 }) {
   const zoom = Number.isFinite(value)
     ? Math.min(PHOTO_ALBUMS_ZOOM_MAX, Math.max(PHOTO_ALBUMS_ZOOM_MIN, value))
-    : 100;
+    : 50;
 
   return (
     <Box
