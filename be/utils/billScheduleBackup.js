@@ -13,9 +13,16 @@ import pool, { getDBSchema } from '../db/connection.js';
 import { loadTableColumns } from '../routes/singles/checkrBioReviewDb.js';
 import { billReceiptRelativePath, billReceiptsDirAbs } from './paidRecordStorage.js';
 import { normalizeBillIcon } from './billIconName.js';
+import {
+  legacyBillScheduleTabsWouldCollapse,
+  normalizeBackupTabLabel
+} from './billScheduleBackupTabs.js';
+
+export { legacyBillScheduleTabsWouldCollapse, normalizeBackupTabLabel } from './billScheduleBackupTabs.js';
 
 export const BILL_SCHEDULE_BACKUP_FILE = 'bill_schedule.json';
-const BILL_SCHEDULE_BACKUP_VERSION = 1;
+/** v2 = monthly/yearly rows include tab_label + soft_delete (required for Medford/Rockfield/… tabs). */
+const BILL_SCHEDULE_BACKUP_VERSION = 2;
 const CLOUD_BACKEND = 'tutaCloud';
 const BILL_RECEIPTS_PREFIX = 'bill_receipts/';
 
@@ -25,6 +32,23 @@ function safeReceiptRelativePath(raw) {
     .replace(/^\/+/, '');
   if (!rel.startsWith(BILL_RECEIPTS_PREFIX) || rel.split('/').includes('..')) return null;
   return rel;
+}
+
+/** Prefer zip-root bill_schedule.json; also check next to the vault folder. */
+export function findBillScheduleBackupFile(extractDir, vaultRoot = null) {
+  const candidates = [
+    path.join(extractDir, BILL_SCHEDULE_BACKUP_FILE),
+    vaultRoot ? path.join(path.dirname(vaultRoot), BILL_SCHEDULE_BACKUP_FILE) : null,
+    vaultRoot ? path.join(vaultRoot, BILL_SCHEDULE_BACKUP_FILE) : null
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) return p;
+    } catch {
+      // try next
+    }
+  }
+  return null;
 }
 
 async function attachmentHasChecksumColumn() {
@@ -39,7 +63,7 @@ async function attachmentHasChecksumColumn() {
 export async function exportBillScheduleForBackup(singlesId, notesMount) {
   const { rows: monthly } = await pool.query(
     `SELECT tab_label, soft_delete, bill_year, bill_month, row_index, bill_description, due_day, amount,
-            bill_type, action, paid_record_id, bill_icon
+            bill_type, action, paid_record_id, bill_icon, email_scan_pending
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
       ORDER BY tab_label, bill_year, bill_month, row_index`,
@@ -47,7 +71,7 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
   );
   const { rows: yearly } = await pool.query(
     `SELECT tab_label, soft_delete, bill_year, bill_month, row_index, bill_description, due_month_day, due_year, amount,
-            bill_type, bill_period, bill_source, action, paid_record_id, bill_icon
+            bill_type, bill_period, bill_source, action, paid_record_id, bill_icon, email_scan_pending
        FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2
       ORDER BY tab_label, bill_year, row_index`,
@@ -160,14 +184,23 @@ function normalizeAction(billType, raw) {
  * No-op (returns null) for backups made before bills were included.
  */
 export async function restoreBillScheduleFromBackup(singlesId, extractDir, notesMount) {
-  const jsonPath = path.join(extractDir, BILL_SCHEDULE_BACKUP_FILE);
-  if (!fs.existsSync(jsonPath)) return null;
+  const jsonPath = findBillScheduleBackupFile(extractDir);
+  if (!jsonPath) return null;
 
   const payload = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
   const monthly = Array.isArray(payload?.monthly) ? payload.monthly : [];
   const yearly = Array.isArray(payload?.yearly) ? payload.yearly : [];
   const subscription = Array.isArray(payload?.subscription) ? payload.subscription : [];
   const paidRecords = Array.isArray(payload?.paid_records) ? payload.paid_records : [];
+
+  // Backups made before tab_label was zipped would collapse Medford/Rockfield/… into home1
+  // and hit the unique (tab, year, month, row) key — fail loudly instead of half-restoring.
+  if (legacyBillScheduleTabsWouldCollapse(monthly, yearly)) {
+    throw new Error(
+      'This backup was made before Bill Schedule tabs were included. Make a new Backup/Restore zip from the current app so Medford / Rockfield / Auto tabs are preserved.'
+    );
+  }
+
   const hasChecksum = await attachmentHasChecksumColumn();
 
   const createdReceiptDirs = [];
@@ -322,13 +355,14 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       const { rows: inserted } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
            singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
-           bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon,
+           email_scan_pending
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          RETURNING monthly_bill_id`,
         [
           singlesId,
           CLOUD_BACKEND,
-          String(r?.tab_label ?? 'home1').trim().slice(0, 64) || 'home1',
+          normalizeBackupTabLabel(r?.tab_label),
           r?.soft_delete === true,
           toIntOrNull(r?.bill_year),
           toIntOrNull(r?.bill_month),
@@ -339,7 +373,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           billType,
           normalizeAction(billType, r?.action),
           oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null,
-          normalizeBillIcon(r?.bill_icon)
+          normalizeBillIcon(r?.bill_icon),
+          r?.email_scan_pending === true
         ]
       );
       if (oldPaidId) await linkPaidRecord(oldPaidId, 'monthly', Number(inserted[0].monthly_bill_id));
@@ -358,13 +393,13 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
         `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
            singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
            bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
-           action, paid_record_id, bill_icon
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+           action, paid_record_id, bill_icon, email_scan_pending
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          RETURNING yearly_bill_id`,
         [
           singlesId,
           CLOUD_BACKEND,
-          String(r?.tab_label ?? 'home1').trim().slice(0, 64) || 'home1',
+          normalizeBackupTabLabel(r?.tab_label),
           r?.soft_delete === true,
           toIntOrNull(r?.bill_year),
           toIntOrNull(r?.bill_month),
@@ -378,7 +413,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           billSource,
           normalizeAction(billType, r?.action),
           oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null,
-          normalizeBillIcon(r?.bill_icon)
+          normalizeBillIcon(r?.bill_icon),
+          r?.email_scan_pending === true
         ]
       );
       if (oldPaidId) await linkPaidRecord(oldPaidId, 'yearly', Number(inserted[0].yearly_bill_id));
