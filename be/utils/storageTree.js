@@ -57,13 +57,32 @@ export function formatTreeBytes(bytes) {
   return unit === 0 ? `${value}B` : `${value.toFixed(1)}${units[unit]}`;
 }
 
+/** Admin Tree: notes / photoalbums / tutadates folder sizes as "0.2gb" (1 decimal, GiB). */
+export function formatTreeGb1(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n < 0) return '0.0gb';
+  return `${(n / 1024 ** 3).toFixed(1)}gb`;
+}
+
+/** Folders that get a colored X.Xgb sizeLabel in Admin Tree (both panes). */
+function isSizedTreeFolder(name) {
+  const n = String(name || '').toLowerCase();
+  return n === 'notes' || n === 'photoalbums' || n === 'tutadates';
+}
+
 function byteOrder(a, b) {
   if (a < b) return -1;
   return a > b ? 1 : 0;
 }
 
+/** Strip a trailing `.enc` so `404.jpg.enc` is treated like `404.jpg`. */
+export function storagePlainFileName(name) {
+  const n = String(name || '');
+  return n.toLowerCase().endsWith('.enc') ? n.slice(0, -4) : n;
+}
+
 function fileExt(name) {
-  const ext = path.extname(String(name || '')).slice(1).toLowerCase();
+  const ext = path.extname(storagePlainFileName(name)).slice(1).toLowerCase();
   return ext;
 }
 
@@ -78,6 +97,7 @@ export function storageFileKind(name) {
 /**
  * Content type for serving a storage file to the admin. Text and unknown files (including html/js)
  * are sent as text/plain or octet-stream so nothing renders as a page on our origin.
+ * Vault `.enc` names use the underlying extension (`404.jpg.enc` → image/jpeg).
  */
 export function storageFileContentType(name) {
   const ext = fileExt(name);
@@ -132,7 +152,9 @@ export async function resolveStoragePath(rootKey, relPath) {
 
 /**
  * Folder tree (folders only, with per-folder file count) for one storage root.
- * Node: { name, path, fileCount, children }. `path` is relative to the root ('' for the root).
+ * Node: { name, path, fileCount, bytes, sizeLabel?, children }.
+ * `path` is relative to the root ('' for the root).
+ * `sizeLabel` is set on notes/, photoalbums/, and tutadates/ (e.g. "0.2gb").
  */
 async function buildTree(rootKey) {
   const envVar = STORAGE_ROOT_ENV[rootKey];
@@ -149,7 +171,7 @@ async function buildTree(rootKey) {
   let truncated = false;
 
   async function walk(dir, rel, name) {
-    const node = { name, path: rel, fileCount: 0, children: [] };
+    const node = { name, path: rel, fileCount: 0, bytes: 0, children: [] };
     let entries;
     try {
       entries = await fs.promises.readdir(dir, { withFileTypes: true });
@@ -166,7 +188,11 @@ async function buildTree(rootKey) {
           .catch(() => 0)
       )
     );
-    for (const size of sizes) totalBytes += size;
+    let bytes = 0;
+    for (const size of sizes) {
+      bytes += size;
+      totalBytes += size;
+    }
 
     const subdirs = entries
       .filter((e) => e.isDirectory())
@@ -178,7 +204,14 @@ async function buildTree(rootKey) {
         break;
       }
       folders += 1;
-      node.children.push(await walk(path.join(dir, sub), rel ? `${rel}/${sub}` : sub, sub));
+      const child = await walk(path.join(dir, sub), rel ? `${rel}/${sub}` : sub, sub);
+      node.children.push(child);
+      bytes += Number(child.bytes) || 0;
+    }
+    node.bytes = bytes;
+    // Admin Tree UI: yellow notes / red photoalbums / cyan tutadates (both panes).
+    if (isSizedTreeFolder(name)) {
+      node.sizeLabel = formatTreeGb1(bytes);
     }
     return node;
   }

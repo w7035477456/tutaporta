@@ -1,15 +1,55 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import ColorTemplate9TableData from 'ui-component/ColorTemplate9TableData';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
+import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
 import {
   adminStorageTreeFileUrl,
   fetchAdminStorageTree,
   fetchAdminStorageTreeFileHead,
   fetchAdminStorageTreeFiles
 } from 'api/adminToolsFe';
+
+/** Cycle: original → desc → asc → original. */
+const SIZE_SORT_DIRS = ['original', 'desc', 'asc'];
+
+function nextSizeSortDir(dir) {
+  const i = SIZE_SORT_DIRS.indexOf(dir);
+  return SIZE_SORT_DIRS[(i < 0 ? 0 : i + 1) % SIZE_SORT_DIRS.length];
+}
+
+function childFolderBytes(node, folderName) {
+  const want = String(folderName || '').toLowerCase();
+  const child = (node?.children || []).find((c) => String(c?.name || '').toLowerCase() === want);
+  return child ? Number(child.bytes) || 0 : 0;
+}
+
+/** Reorder siblings that contain `folderName` by that child's bytes (both panes). */
+function sortTreeByFolderSize(tree, folderName, dir) {
+  if (!tree || !folderName || dir === 'original') return tree;
+  const sign = dir === 'asc' ? 1 : -1;
+  const want = String(folderName).toLowerCase();
+  const walk = (node) => {
+    let children = (node.children || []).map(walk);
+    const hasTarget = children.some((c) => (c.children || []).some((gc) => String(gc?.name || '').toLowerCase() === want));
+    if (hasTarget) {
+      children = [...children].sort((a, b) => {
+        const diff = sign * (childFolderBytes(a, want) - childFolderBytes(b, want));
+        if (diff !== 0) return diff;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      });
+    }
+    return { ...node, children };
+  };
+  return walk(tree);
+}
+
+function sizeSortButtonLabel(base, key, sizeSort) {
+  if (sizeSort.key !== key || sizeSort.dir === 'original') return base;
+  return `${base} ${sizeSort.dir === 'asc' ? '↑' : '↓'}`;
+}
 
 /** Folders shallower than this start expanded. */
 const DEFAULT_EXPAND_DEPTH = 3;
@@ -73,17 +113,31 @@ function filePath(folderPath, name) {
   return folderPath ? `${folderPath}/${name}` : name;
 }
 
+function folderSizeColor(name) {
+  const n = String(name || '').toLowerCase();
+  if (n === 'notes') return '#ff0'; // yellow — notes size
+  if (n === 'photoalbums') return '#f44'; // red — photo albums size
+  if (n === 'tutadates') return '#0ff'; // cyan — tutadates (common on FAST / right pane)
+  return null;
+}
+
 function FolderNode({ node, depth, rootKey, expanded, onToggle, filesByPath, onOpenFile, onLoadFiles, isRoot = false, totalLabel = '' }) {
   const isOpen = expanded.has(node.path);
   const hasContent = node.children.length > 0 || node.fileCount > 0;
   const files = filesByPath[node.path];
   const marker = hasContent ? (isOpen ? '▾' : '▸') : ' ';
+  const sizeColor = folderSizeColor(node.name);
   return (
     <>
       <Box sx={{ ...rowSx, pl: `${depth * INDENT_CH}ch` }} onClick={() => onToggle(rootKey, node)}>
         {`${marker} ${isRoot ? '' : '|-- '}${node.name}/`}
         {isRoot && totalLabel ? `  (${totalLabel})` : ''}
         {node.fileCount > 0 ? `  (${node.fileCount} files)` : ''}
+        {node.sizeLabel && sizeColor ? (
+          <Box component="span" sx={{ color: sizeColor, fontWeight: 700 }}>
+            {`  ${node.sizeLabel}`}
+          </Box>
+        ) : null}
       </Box>
       {isOpen ? (
         <>
@@ -132,6 +186,8 @@ const treeNodeShape = PropTypes.shape({
   name: PropTypes.string,
   path: PropTypes.string,
   fileCount: PropTypes.number,
+  bytes: PropTypes.number,
+  sizeLabel: PropTypes.string,
   children: PropTypes.array
 });
 
@@ -245,11 +301,24 @@ const previewPreSx = {
   textAlign: 'left'
 };
 
+function isEncName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .endsWith('.enc');
+}
+
 function FilePreviewPopup({ preview, onClose }) {
   const [textState, setTextState] = useState({ status: 'idle' });
+  const [mediaFailed, setMediaFailed] = useState(false);
   const url = preview ? adminStorageTreeFileUrl(preview.rootKey, preview.path) : '';
   const kind = preview?.file?.kind;
-  const needsBytes = preview && (kind === 'text' || kind === 'other');
+  const encFile = isEncName(preview?.file?.name);
+  const showMedia = !mediaFailed && (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'pdf');
+  const needsBytes = preview && (kind === 'text' || kind === 'other' || mediaFailed);
+
+  useEffect(() => {
+    setMediaFailed(false);
+  }, [preview?.rootKey, preview?.path]);
 
   useEffect(() => {
     if (!needsBytes) return undefined;
@@ -262,7 +331,12 @@ function FilePreviewPopup({ preview, onClose }) {
         if (looksLikeText(bytes)) {
           setTextState({ status: 'text', text: new TextDecoder('utf-8').decode(bytes), truncated });
         } else {
-          setTextState({ status: 'hex', text: hexDump(bytes), truncated: (preview.file.size || 0) > 1024 });
+          setTextState({
+            status: 'hex',
+            text: hexDump(bytes),
+            truncated: (preview.file.size || 0) > 1024,
+            encFailed: encFile && mediaFailed
+          });
         }
       })
       .catch((err) => {
@@ -271,7 +345,7 @@ function FilePreviewPopup({ preview, onClose }) {
     return () => {
       cancelled = true;
     };
-  }, [needsBytes, preview]);
+  }, [needsBytes, preview, encFile, mediaFailed]);
 
   if (!preview) return null;
   const { file } = preview;
@@ -283,15 +357,33 @@ function FilePreviewPopup({ preview, onClose }) {
         <ColorTemplate7PopupLargeDark.BodyText sx={{ fontFamily: 'monospace', fontSize: '0.75rem', wordBreak: 'break-all' }}>
           {preview.path} · {file.sizeLabel}
           {file.modified ? ` · ${new Date(file.modified).toLocaleString()}` : ''}
+          {encFile && showMedia && kind === 'image' ? ' · decrypted preview' : ''}
         </ColorTemplate7PopupLargeDark.BodyText>
-        {kind === 'image' ? (
-          <Box component="img" src={url} alt={file.name} sx={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', alignSelf: 'center' }} />
+        {showMedia && kind === 'image' ? (
+          <Box
+            component="img"
+            src={url}
+            alt={file.name}
+            onError={() => setMediaFailed(true)}
+            sx={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain', alignSelf: 'center' }}
+          />
         ) : null}
-        {kind === 'video' ? (
-          <Box component="video" src={url} controls autoPlay sx={{ maxWidth: '100%', maxHeight: '72vh', alignSelf: 'center', bgcolor: '#000' }} />
+        {showMedia && kind === 'video' ? (
+          <Box
+            component="video"
+            src={url}
+            controls
+            autoPlay
+            onError={() => setMediaFailed(true)}
+            sx={{ maxWidth: '100%', maxHeight: '72vh', alignSelf: 'center', bgcolor: '#000' }}
+          />
         ) : null}
-        {kind === 'audio' ? <Box component="audio" src={url} controls autoPlay sx={{ width: '100%' }} /> : null}
-        {kind === 'pdf' ? <Box component="iframe" src={url} title={file.name} sx={{ width: '100%', height: '72vh', border: 0, bgcolor: '#fff' }} /> : null}
+        {showMedia && kind === 'audio' ? (
+          <Box component="audio" src={url} controls autoPlay onError={() => setMediaFailed(true)} sx={{ width: '100%' }} />
+        ) : null}
+        {showMedia && kind === 'pdf' ? (
+          <Box component="iframe" src={url} title={file.name} sx={{ width: '100%', height: '72vh', border: 0, bgcolor: '#fff' }} />
+        ) : null}
         {needsBytes && textState.status === 'loading' ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
             <CircularProgress />
@@ -301,7 +393,9 @@ function FilePreviewPopup({ preview, onClose }) {
           <>
             {textState.status === 'hex' ? (
               <ColorTemplate7PopupLargeDark.BodyText sx={{ fontSize: '0.75rem' }}>
-                Binary file (possibly encrypted) — first bytes shown as hex.
+                {textState.encFailed
+                  ? 'Could not decrypt this .enc file — first bytes shown as hex.'
+                  : 'Binary file (possibly encrypted) — first bytes shown as hex.'}
               </ColorTemplate7PopupLargeDark.BodyText>
             ) : null}
             <Box component="pre" sx={previewPreSx}>
@@ -342,6 +436,8 @@ export default function AdminToolsTreeTab({ onError }) {
   const [expanded, setExpanded] = useState({ large: new Set(), fast: new Set() });
   const [files, setFiles] = useState({ large: {}, fast: {} });
   const [preview, setPreview] = useState(null);
+  /** { key: 'notes'|'photoalbums'|null, dir: 'original'|'desc'|'asc' } */
+  const [sizeSort, setSizeSort] = useState({ key: null, dir: 'original' });
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -349,6 +445,7 @@ export default function AdminToolsTreeTab({ onError }) {
     try {
       const data = await fetchAdminStorageTree();
       setTrees(data);
+      setSizeSort({ key: null, dir: 'original' });
       setExpanded({
         large: collectDefaultExpanded(data?.largeCheap?.tree, 0, new Set()),
         fast: collectDefaultExpanded(data?.fast?.tree, 0, new Set())
@@ -365,6 +462,30 @@ export default function AdminToolsTreeTab({ onError }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const cycleSizeSort = useCallback((key) => {
+    setSizeSort((prev) => {
+      if (prev.key !== key) return { key, dir: 'desc' };
+      const dir = nextSizeSortDir(prev.dir);
+      return dir === 'original' ? { key: null, dir: 'original' } : { key, dir };
+    });
+  }, []);
+
+  const displayTrees = useMemo(() => {
+    if (!trees) return null;
+    const folderName = sizeSort.key;
+    const dir = sizeSort.dir;
+    if (!folderName || dir === 'original') return trees;
+    const mapPanel = (panel) => {
+      if (!panel?.tree) return panel;
+      return { ...panel, tree: sortTreeByFolderSize(panel.tree, folderName, dir) };
+    };
+    return {
+      ...trees,
+      largeCheap: mapPanel(trees.largeCheap),
+      fast: mapPanel(trees.fast)
+    };
+  }, [trees, sizeSort]);
 
   const loadFiles = useCallback((rootKey, folderPath) => {
     setFiles((prev) => ({ ...prev, [rootKey]: { ...prev[rootKey], [folderPath]: 'loading' } }));
@@ -409,6 +530,12 @@ export default function AdminToolsTreeTab({ onError }) {
         <ColorTemplate9TableData.Button type="button" disabled={busy} onClick={() => void load()}>
           {busy ? 'Loading…' : 'Refresh'}
         </ColorTemplate9TableData.Button>
+        <SelectedButtonTemplate type="button" disabled={busy || !trees} onClick={() => cycleSizeSort('notes')} sizeButtonToLabel>
+          {sizeSortButtonLabel('Sort Notes Size', 'notes', sizeSort)}
+        </SelectedButtonTemplate>
+        <SelectedButtonTemplate type="button" disabled={busy || !trees} onClick={() => cycleSizeSort('photoalbums')} sizeButtonToLabel>
+          {sizeSortButtonLabel('Sort Photos Size', 'photoalbums', sizeSort)}
+        </SelectedButtonTemplate>
         <ColorTemplate9TableData.BodyText sx={{ ...pathLabelSx, opacity: 0.7 }}>
           Click a folder to expand / collapse and list its files. Click a file to preview it.
         </ColorTemplate9TableData.BodyText>
@@ -417,10 +544,10 @@ export default function AdminToolsTreeTab({ onError }) {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
-      ) : trees ? (
+      ) : displayTrees ? (
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 1.5 }}>
-          <TreePanel {...panelProps('large', trees.largeCheap)} />
-          <TreePanel {...panelProps('fast', trees.fast)} />
+          <TreePanel {...panelProps('large', displayTrees.largeCheap)} />
+          <TreePanel {...panelProps('fast', displayTrees.fast)} />
         </Box>
       ) : null}
       <FilePreviewPopup preview={preview} onClose={() => setPreview(null)} />
