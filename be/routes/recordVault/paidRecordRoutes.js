@@ -284,8 +284,8 @@ function parseMultipartFile(req, fieldNames = ['file', 'attachment', 'photo']) {
 }
 
 /**
- * Ensure a monthly_bill / yearly_bill row exists, then ensure paid_record linked.
- * Body: { kind, storageType, monthly_bill_id?, yearly_bill_id?, year, month?, row_index,
+ * Ensure a monthly_bill / yearly_bill / subscription_bill row exists, then ensure paid_record linked.
+ * Body: { kind, storageType, monthly_bill_id?, yearly_bill_id?, subscription_bill_id?, year, month?, row_index,
  *         bill_description?, due_day?, amount?, bill_type?, action? }
  */
 export async function postPaidRecordEnsure(req, res) {
@@ -294,8 +294,8 @@ export async function postPaidRecordEnsure(req, res) {
     const singlesId = requireSinglesId(req);
     const body = req.body || {};
     const kind = String(body.kind || body.schedule_kind || '').trim().toLowerCase();
-    if (kind !== 'monthly' && kind !== 'yearly') {
-      throw httpError(400, 'kind must be monthly or yearly');
+    if (kind !== 'monthly' && kind !== 'yearly' && kind !== 'subscription') {
+      throw httpError(400, 'kind must be monthly, yearly, or subscription');
     }
     const storageBackend = parseBillStorageBackend(
       body.storageType ?? body.storage_backend ?? readBillStorageBackend(req)
@@ -309,11 +309,13 @@ export async function postPaidRecordEnsure(req, res) {
 
     let monthlyBillId = toInt(body.monthly_bill_id);
     let yearlyBillId = toInt(body.yearly_bill_id);
+    let subscriptionBillId = toInt(body.subscription_bill_id);
     let paidRecordId = null;
 
     if (kind === 'monthly') {
       const month = toInt(body.month ?? body.bill_month);
       if (!month || month < 1 || month > 12) throw httpError(400, 'month must be 1–12');
+      subscriptionBillId = null;
 
       if (monthlyBillId && monthlyBillId > 0) {
         const { rows } = await client.query(
@@ -327,13 +329,15 @@ export async function postPaidRecordEnsure(req, res) {
         monthlyBillId = Number(rows[0].monthly_bill_id);
         paidRecordId = rows[0].paid_record_id != null ? Number(rows[0].paid_record_id) : null;
       } else {
+        const tabLabel = String(body.tab_label ?? 'home1').trim().slice(0, 64) || 'home1';
         const { rows: existing } = await client.query(
           `SELECT monthly_bill_id, paid_record_id
              FROM outdateddbsnapshotoct2024.monthly_bill
             WHERE singles_id = $1 AND storage_backend = $2
-              AND bill_year = $3 AND bill_month = $4 AND row_index = $5
+              AND tab_label = $3 AND soft_delete = false
+              AND bill_year = $4 AND bill_month = $5 AND row_index = $6
             LIMIT 1`,
-          [singlesId, storageBackend, year, month, rowIndex]
+          [singlesId, storageBackend, tabLabel, year, month, rowIndex]
         );
         if (existing[0]) {
           monthlyBillId = Number(existing[0].monthly_bill_id);
@@ -343,7 +347,12 @@ export async function postPaidRecordEnsure(req, res) {
           const desc = String(body.bill_description ?? '').slice(0, 500);
           const dueDay = toInt(body.due_day);
           const amount = String(body.amount ?? '').slice(0, 64);
-          const billType = /^auto$/i.test(String(body.bill_type || '')) ? 'Auto' : 'Manual';
+          const rawBillType = String(body.bill_type || '').trim();
+          const billType = /^auto$/i.test(rawBillType)
+            ? 'Auto'
+            : /^paid\s*off$/i.test(rawBillType)
+              ? 'Paid Off'
+              : 'Manual';
           let action = null;
           if (billType === 'Manual') {
             const a = String(body.action ?? '').trim();
@@ -352,13 +361,14 @@ export async function postPaidRecordEnsure(req, res) {
           }
           const { rows: inserted } = await client.query(
             `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
-               singles_id, storage_backend, bill_year, bill_month, row_index,
+               singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
                bill_description, due_day, amount, bill_type, action, paid_record_id
-             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL)
+             ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,$11,NULL)
              RETURNING monthly_bill_id, paid_record_id`,
             [
               singlesId,
               storageBackend,
+              tabLabel,
               year,
               month,
               rowIndex,
@@ -412,8 +422,118 @@ export async function postPaidRecordEnsure(req, res) {
           [monthlyBillId, paidRecordId, singlesId]
         );
       }
+    } else if (kind === 'subscription') {
+      const month = toInt(body.month ?? body.bill_month);
+      if (!month || month < 1 || month > 12) throw httpError(400, 'month must be 1–12');
+      monthlyBillId = null;
+      yearlyBillId = null;
+      if (subscriptionBillId && subscriptionBillId > 0) {
+        const { rows } = await client.query(
+          `SELECT subscription_bill_id, paid_record_id
+             FROM outdateddbsnapshotoct2024.subscription_bill
+            WHERE subscription_bill_id = $1 AND singles_id = $2 AND storage_backend = $3
+            LIMIT 1`,
+          [subscriptionBillId, singlesId, storageBackend]
+        );
+        if (!rows[0]) throw httpError(404, 'subscription_bill row not found');
+        subscriptionBillId = Number(rows[0].subscription_bill_id);
+        paidRecordId = rows[0].paid_record_id != null ? Number(rows[0].paid_record_id) : null;
+      } else {
+        const { rows: existing } = await client.query(
+          `SELECT subscription_bill_id, paid_record_id
+             FROM outdateddbsnapshotoct2024.subscription_bill
+            WHERE singles_id = $1 AND storage_backend = $2
+              AND bill_year = $3 AND bill_month = $4 AND row_index = $5
+            LIMIT 1`,
+          [singlesId, storageBackend, year, month, rowIndex]
+        );
+        if (existing[0]) {
+          subscriptionBillId = Number(existing[0].subscription_bill_id);
+          paidRecordId =
+            existing[0].paid_record_id != null ? Number(existing[0].paid_record_id) : null;
+        } else {
+          const desc = String(body.bill_description ?? '').slice(0, 500);
+          const dueDay = toInt(body.due_day);
+          const amount = String(body.amount ?? '').slice(0, 64);
+          const rawBillType = String(body.bill_type || '').trim();
+          const billType = /^auto$/i.test(rawBillType)
+            ? 'Auto'
+            : /^paid\s*off$/i.test(rawBillType)
+              ? 'Paid Off'
+              : 'Manual';
+          let action = null;
+          if (billType === 'Manual') {
+            const a = String(body.action ?? '').trim();
+            if (/^paid$/i.test(a)) action = 'Paid';
+            else if (/^not\s*paid$/i.test(a)) action = 'Not Paid';
+          }
+          const { rows: inserted } = await client.query(
+            `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
+               singles_id, storage_backend, bill_year, bill_month, row_index,
+               bill_description, due_day, amount, bill_type, action, paid_record_id
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL)
+             RETURNING subscription_bill_id, paid_record_id`,
+            [
+              singlesId,
+              storageBackend,
+              year,
+              month,
+              rowIndex,
+              desc,
+              dueDay && dueDay >= 1 && dueDay <= 31 ? dueDay : null,
+              amount,
+              billType,
+              action
+            ]
+          );
+          subscriptionBillId = Number(inserted[0].subscription_bill_id);
+          paidRecordId = null;
+        }
+      }
+
+      if (paidRecordId && paidRecordId > 0) {
+        const pr = await loadPaidRecordOwned(client, paidRecordId, singlesId);
+        if (!pr) paidRecordId = null;
+      }
+
+      if (!paidRecordId) {
+        const { rows: byBill } = await client.query(
+          `SELECT paid_record_id
+             FROM outdateddbsnapshotoct2024.paid_record
+            WHERE singles_id = $1 AND schedule_kind = 'subscription' AND subscription_bill_id = $2
+            LIMIT 1`,
+          [singlesId, subscriptionBillId]
+        );
+        if (byBill[0]) {
+          paidRecordId = Number(byBill[0].paid_record_id);
+        } else {
+          const { rows: created } = await client.query(
+            `INSERT INTO outdateddbsnapshotoct2024.paid_record (
+               singles_id, schedule_kind, monthly_bill_id, yearly_bill_id, subscription_bill_id,
+               storage_backend, notes_text
+             ) VALUES ($1, 'subscription', NULL, NULL, $2, $3, '')
+             RETURNING paid_record_id`,
+            [singlesId, subscriptionBillId, storageBackend]
+          );
+          paidRecordId = Number(created[0].paid_record_id);
+        }
+        await client.query(
+          `UPDATE outdateddbsnapshotoct2024.subscription_bill
+              SET paid_record_id = $1, updated_at = now()
+            WHERE subscription_bill_id = $2 AND singles_id = $3`,
+          [paidRecordId, subscriptionBillId, singlesId]
+        );
+        await client.query(
+          `UPDATE outdateddbsnapshotoct2024.paid_record
+              SET subscription_bill_id = $1, updated_at = now()
+            WHERE paid_record_id = $2 AND singles_id = $3`,
+          [subscriptionBillId, paidRecordId, singlesId]
+        );
+      }
+
     } else {
       // yearly
+      subscriptionBillId = null;
       if (yearlyBillId && yearlyBillId > 0) {
         const { rows } = await client.query(
           `SELECT yearly_bill_id, paid_record_id
@@ -426,13 +546,15 @@ export async function postPaidRecordEnsure(req, res) {
         yearlyBillId = Number(rows[0].yearly_bill_id);
         paidRecordId = rows[0].paid_record_id != null ? Number(rows[0].paid_record_id) : null;
       } else {
+        const tabLabel = String(body.tab_label ?? 'home1').trim().slice(0, 64) || 'home1';
         const { rows: existing } = await client.query(
           `SELECT yearly_bill_id, paid_record_id
              FROM outdateddbsnapshotoct2024.yearly_bill
             WHERE singles_id = $1 AND storage_backend = $2
-              AND bill_year = $3 AND row_index = $4
+              AND tab_label = $3 AND soft_delete = false
+              AND bill_year = $4 AND row_index = $5
             LIMIT 1`,
-          [singlesId, storageBackend, year, rowIndex]
+          [singlesId, storageBackend, tabLabel, year, rowIndex]
         );
         if (existing[0]) {
           yearlyBillId = Number(existing[0].yearly_bill_id);
@@ -452,13 +574,14 @@ export async function postPaidRecordEnsure(req, res) {
           }
           const { rows: inserted } = await client.query(
             `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
-               singles_id, storage_backend, bill_year, bill_month, row_index,
+               singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
                bill_description, due_month_day, amount, bill_type, action, paid_record_id
-             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL)
+             ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,$11,NULL)
              RETURNING yearly_bill_id, paid_record_id`,
             [
               singlesId,
               storageBackend,
+              tabLabel,
               year,
               billMonth && billMonth >= 1 && billMonth <= 12 ? billMonth : null,
               rowIndex,
@@ -525,6 +648,7 @@ export async function postPaidRecordEnsure(req, res) {
       schedule_kind: kind,
       monthly_bill_id: kind === 'monthly' ? monthlyBillId : null,
       yearly_bill_id: kind === 'yearly' ? yearlyBillId : null,
+      subscription_bill_id: kind === 'subscription' ? subscriptionBillId : null,
       storage_backend: storageBackend,
       notes_text: pr?.notes_text ?? '',
       attachments,
@@ -558,6 +682,7 @@ export async function getPaidRecord(req, res) {
       schedule_kind: pr.schedule_kind,
       monthly_bill_id: pr.monthly_bill_id != null ? Number(pr.monthly_bill_id) : null,
       yearly_bill_id: pr.yearly_bill_id != null ? Number(pr.yearly_bill_id) : null,
+      subscription_bill_id: pr.subscription_bill_id != null ? Number(pr.subscription_bill_id) : null,
       storage_backend: pr.storage_backend,
       notes_text: pr.notes_text ?? '',
       created_at: pr.created_at,

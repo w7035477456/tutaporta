@@ -123,7 +123,7 @@ SELECT
            FROM outdateddbsnapshotoct2024.monthly_bill m
           WHERE m.singles_id = tgt.singles_id
        )
-ON CONFLICT (singles_id, storage_backend, bill_year, bill_month, row_index) DO NOTHING;
+ON CONFLICT (singles_id, storage_backend, tab_label, bill_year, bill_month, row_index) DO NOTHING;
 
 INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
   singles_id,
@@ -158,7 +158,7 @@ SELECT
            FROM outdateddbsnapshotoct2024.yearly_bill y
           WHERE y.singles_id = tgt.singles_id
        )
-ON CONFLICT (singles_id, storage_backend, bill_year, row_index) DO NOTHING;
+ON CONFLICT (singles_id, storage_backend, tab_label, bill_year, row_index) DO NOTHING;
 
 COMMIT;
 

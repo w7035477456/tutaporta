@@ -1,5 +1,5 @@
 /**
- * Bill Schedule (Monthly / Yearly) inside the TutaNotes Cloud backup zip.
+ * Bill Schedule (Monthly / Yearly / Subscription) inside the TutaNotes Cloud backup zip.
  * Bill rows and Bills/Receipts records live in Postgres and their files under
  * notes/bill_receipts/ — both outside the TutaNotes vault folder — so the zip
  * carries them separately:
@@ -38,25 +38,33 @@ async function attachmentHasChecksumColumn() {
  */
 export async function exportBillScheduleForBackup(singlesId, notesMount) {
   const { rows: monthly } = await pool.query(
-    `SELECT bill_year, bill_month, row_index, bill_description, due_day, amount,
+    `SELECT tab_label, soft_delete, bill_year, bill_month, row_index, bill_description, due_day, amount,
             bill_type, action, paid_record_id, bill_icon
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
-      ORDER BY bill_year, bill_month, row_index`,
+      ORDER BY tab_label, bill_year, bill_month, row_index`,
     [singlesId, CLOUD_BACKEND]
   );
   const { rows: yearly } = await pool.query(
-    `SELECT bill_year, bill_month, row_index, bill_description, due_month_day, amount,
-            bill_type, action, paid_record_id, bill_icon
+    `SELECT tab_label, soft_delete, bill_year, bill_month, row_index, bill_description, due_month_day, due_year, amount,
+            bill_type, bill_period, bill_source, action, paid_record_id, bill_icon
        FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2
-      ORDER BY bill_year, row_index`,
+      ORDER BY tab_label, bill_year, row_index`,
+    [singlesId, CLOUD_BACKEND]
+  );
+  const { rows: subscription } = await pool.query(
+    `SELECT bill_year, bill_month, row_index, bill_description, due_day, amount,
+            bill_type, action, paid_record_id, bill_icon
+       FROM outdateddbsnapshotoct2024.subscription_bill
+      WHERE singles_id = $1 AND storage_backend = $2
+      ORDER BY bill_year, bill_month, row_index`,
     [singlesId, CLOUD_BACKEND]
   );
 
   const paidIds = [
     ...new Set(
-      [...monthly, ...yearly]
+      [...monthly, ...yearly, ...subscription]
         .map((r) => Number(r.paid_record_id))
         .filter((id) => Number.isFinite(id) && id > 0)
     )
@@ -116,12 +124,13 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
     exported_at: new Date().toISOString(),
     monthly,
     yearly,
+    subscription,
     paid_records: paidRecords
   };
   return {
     json: `${JSON.stringify(payload, null, 2)}\n`,
     files,
-    rowCount: monthly.length + yearly.length
+    rowCount: monthly.length + yearly.length + subscription.length
   };
 }
 
@@ -131,8 +140,15 @@ function toIntOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function normalizeBillType(raw) {
+  const s = String(raw ?? '').trim();
+  if (/^auto$/i.test(s)) return 'Auto';
+  if (/^paid\s*off$/i.test(s)) return 'Paid Off';
+  return 'Manual';
+}
+
 function normalizeAction(billType, raw) {
-  if (billType === 'Auto') return null;
+  if (billType === 'Auto' || billType === 'Paid Off') return null;
   const s = String(raw ?? '').trim();
   if (/^paid$/i.test(s)) return 'Paid';
   if (/^not\s*paid$/i.test(s)) return 'Not Paid';
@@ -150,6 +166,7 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
   const payload = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
   const monthly = Array.isArray(payload?.monthly) ? payload.monthly : [];
   const yearly = Array.isArray(payload?.yearly) ? payload.yearly : [];
+  const subscription = Array.isArray(payload?.subscription) ? payload.subscription : [];
   const paidRecords = Array.isArray(payload?.paid_records) ? payload.paid_records : [];
   const hasChecksum = await attachmentHasChecksumColumn();
 
@@ -173,12 +190,18 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
             UNION
             SELECT paid_record_id FROM outdateddbsnapshotoct2024.yearly_bill
              WHERE singles_id = $1 AND storage_backend = $2 AND paid_record_id IS NOT NULL
+            UNION
+            SELECT paid_record_id FROM outdateddbsnapshotoct2024.subscription_bill
+             WHERE singles_id = $1 AND storage_backend = $2 AND paid_record_id IS NOT NULL
           )
           AND pr.paid_record_id NOT IN (
             SELECT paid_record_id FROM outdateddbsnapshotoct2024.monthly_bill
              WHERE singles_id = $1 AND storage_backend <> $2 AND paid_record_id IS NOT NULL
             UNION
             SELECT paid_record_id FROM outdateddbsnapshotoct2024.yearly_bill
+             WHERE singles_id = $1 AND storage_backend <> $2 AND paid_record_id IS NOT NULL
+            UNION
+            SELECT paid_record_id FROM outdateddbsnapshotoct2024.subscription_bill
              WHERE singles_id = $1 AND storage_backend <> $2 AND paid_record_id IS NOT NULL
           )`,
       [singlesId, CLOUD_BACKEND]
@@ -191,6 +214,10 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     );
     await client.query(
       `DELETE FROM outdateddbsnapshotoct2024.yearly_bill WHERE singles_id = $1 AND storage_backend = $2`,
+      [singlesId, CLOUD_BACKEND]
+    );
+    await client.query(
+      `DELETE FROM outdateddbsnapshotoct2024.subscription_bill WHERE singles_id = $1 AND storage_backend = $2`,
       [singlesId, CLOUD_BACKEND]
     );
     if (staleIds.length) {
@@ -206,13 +233,15 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     const newIdByOldId = new Map();
     for (const rec of paidRecords) {
       const oldId = toIntOrNull(rec?.paid_record_id);
-      const kind = rec?.schedule_kind === 'yearly' ? 'yearly' : 'monthly';
+      const kindRaw = String(rec?.schedule_kind || '').toLowerCase();
+      const kind =
+        kindRaw === 'yearly' ? 'yearly' : kindRaw === 'subscription' ? 'subscription' : 'monthly';
       if (!oldId) continue;
       const { rows: created } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.paid_record (
-           singles_id, schedule_kind, monthly_bill_id, yearly_bill_id, storage_backend,
+           singles_id, schedule_kind, monthly_bill_id, yearly_bill_id, subscription_bill_id, storage_backend,
            notes_text, created_at, updated_at
-         ) VALUES ($1, $2, NULL, NULL, $3, $4, COALESCE($5::timestamptz, now()), COALESCE($6::timestamptz, now()))
+         ) VALUES ($1, $2, NULL, NULL, NULL, $3, $4, COALESCE($5::timestamptz, now()), COALESCE($6::timestamptz, now()))
          RETURNING paid_record_id`,
         [singlesId, kind, CLOUD_BACKEND, String(rec?.notes_text ?? ''), rec?.created_at ?? null, rec?.updated_at ?? null]
       );
@@ -272,7 +301,12 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     const linkPaidRecord = async (oldPaidId, kind, billId) => {
       const newPaidId = newIdByOldId.get(oldPaidId);
       if (!newPaidId || kindByOldId.get(oldPaidId) !== kind) return null;
-      const column = kind === 'monthly' ? 'monthly_bill_id' : 'yearly_bill_id';
+      const column =
+        kind === 'monthly'
+          ? 'monthly_bill_id'
+          : kind === 'yearly'
+            ? 'yearly_bill_id'
+            : 'subscription_bill_id';
       await client.query(
         `UPDATE outdateddbsnapshotoct2024.paid_record
             SET ${column} = $1
@@ -283,17 +317,19 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     };
 
     for (const r of monthly) {
-      const billType = r?.bill_type === 'Auto' ? 'Auto' : 'Manual';
+      const billType = normalizeBillType(r?.bill_type);
       const oldPaidId = toIntOrNull(r?.paid_record_id);
       const { rows: inserted } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
-           singles_id, storage_backend, bill_year, bill_month, row_index,
+           singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
            bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING monthly_bill_id`,
         [
           singlesId,
           CLOUD_BACKEND,
+          String(r?.tab_label ?? 'home1').trim().slice(0, 64) || 'home1',
+          r?.soft_delete === true,
           toIntOrNull(r?.bill_year),
           toIntOrNull(r?.bill_month),
           toIntOrNull(r?.row_index),
@@ -312,12 +348,51 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     for (const r of yearly) {
       const billType = r?.bill_type === 'Auto' ? 'Auto' : 'Manual';
       const oldPaidId = toIntOrNull(r?.paid_record_id);
+      const billPeriodRaw = String(r?.bill_period ?? '').trim();
+      const billPeriod = ['Monthly', 'BiYearly', 'Quarterly', '2Year'].includes(billPeriodRaw)
+        ? billPeriodRaw
+        : null;
+      const billSourceRaw = String(r?.bill_source ?? '').trim();
+      const billSource = ['Visa', 'Check', 'Other'].includes(billSourceRaw) ? billSourceRaw : null;
       const { rows: inserted } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
-           singles_id, storage_backend, bill_year, bill_month, row_index,
-           bill_description, due_month_day, amount, bill_type, action, paid_record_id, bill_icon
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
+           bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
+           action, paid_record_id, bill_icon
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING yearly_bill_id`,
+        [
+          singlesId,
+          CLOUD_BACKEND,
+          String(r?.tab_label ?? 'home1').trim().slice(0, 64) || 'home1',
+          r?.soft_delete === true,
+          toIntOrNull(r?.bill_year),
+          toIntOrNull(r?.bill_month),
+          toIntOrNull(r?.row_index),
+          String(r?.bill_description ?? '').slice(0, 500),
+          toIntOrNull(r?.due_month_day),
+          billPeriod === '2Year' ? toIntOrNull(r?.due_year) : null,
+          String(r?.amount ?? ''),
+          billType,
+          billPeriod,
+          billSource,
+          normalizeAction(billType, r?.action),
+          oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null,
+          normalizeBillIcon(r?.bill_icon)
+        ]
+      );
+      if (oldPaidId) await linkPaidRecord(oldPaidId, 'yearly', Number(inserted[0].yearly_bill_id));
+    }
+
+    for (const r of subscription) {
+      const billType = normalizeBillType(r?.bill_type);
+      const oldPaidId = toIntOrNull(r?.paid_record_id);
+      const { rows: inserted } = await client.query(
+        `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
+           singles_id, storage_backend, bill_year, bill_month, row_index,
+           bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         RETURNING subscription_bill_id`,
         [
           singlesId,
           CLOUD_BACKEND,
@@ -325,7 +400,7 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           toIntOrNull(r?.bill_month),
           toIntOrNull(r?.row_index),
           String(r?.bill_description ?? '').slice(0, 500),
-          toIntOrNull(r?.due_month_day),
+          toIntOrNull(r?.due_day),
           String(r?.amount ?? ''),
           billType,
           normalizeAction(billType, r?.action),
@@ -333,7 +408,7 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           normalizeBillIcon(r?.bill_icon)
         ]
       );
-      if (oldPaidId) await linkPaidRecord(oldPaidId, 'yearly', Number(inserted[0].yearly_bill_id));
+      if (oldPaidId) await linkPaidRecord(oldPaidId, 'subscription', Number(inserted[0].subscription_bill_id));
     }
 
     await client.query('COMMIT');
@@ -354,6 +429,7 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
   return {
     monthlyRows: monthly.length,
     yearlyRows: yearly.length,
+    subscriptionRows: subscription.length,
     paidRecords: restoredPaidRecords,
     attachments: restoredAttachments
   };

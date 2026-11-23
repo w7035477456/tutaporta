@@ -62,7 +62,10 @@ export default function RecordVaultCrossPaneTransferDialog({
   if (!item) return null;
 
   const isBill =
-    item.kind === 'bill_schedule' || item.kind === 'bill_monthly' || item.kind === 'bill_yearly';
+    item.kind === 'bill_schedule' ||
+    item.kind === 'bill_monthly' ||
+    item.kind === 'bill_yearly' ||
+    item.kind === 'bill_subscription';
   const kindLabel = isBill
     ? 'Bill Schedule'
     : item.kind === 'notebook'
@@ -123,7 +126,14 @@ export default function RecordVaultCrossPaneTransferDialog({
 RecordVaultCrossPaneTransferDialog.propTypes = {
   open: PropTypes.bool,
   item: PropTypes.shape({
-    kind: PropTypes.oneOf(['notebook', 'note', 'bill_schedule', 'bill_monthly', 'bill_yearly']),
+    kind: PropTypes.oneOf([
+      'notebook',
+      'note',
+      'bill_schedule',
+      'bill_monthly',
+      'bill_yearly',
+      'bill_subscription'
+    ]),
     id: PropTypes.number,
     storageType: PropTypes.oneOf(['tutaCloud', 'usb']),
     name: PropTypes.string,

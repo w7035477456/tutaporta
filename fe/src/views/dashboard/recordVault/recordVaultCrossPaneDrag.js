@@ -40,7 +40,12 @@ export function serializeCrossPaneDrag(payload) {
   }
 }
 
-const BILL_KINDS = new Set(['bill_schedule', 'bill_monthly', 'bill_yearly']);
+const BILL_KINDS = new Set([
+  'bill_schedule',
+  'bill_monthly',
+  'bill_yearly',
+  'bill_subscription'
+]);
 
 export function parseCrossPaneDrag(raw) {
   if (!raw) return null;

@@ -57,10 +57,37 @@ The key has a passphrase (`Enter passphrase for key '…xbox2.pem':`). The real 
 
 ```bash
 SSH_KEY_PASSPHRASE=****
-UBUNTU_POSTGRES_PASSWORD=****   # Ubuntu test_user1 — used by scripts/ubuntu-psql.sh (below)
+# Optional override for ubuntu-psql.sh; if unset, script falls back to DB_PASSWORD (below)
+UBUNTU_POSTGRES_PASSWORD=****
 ```
 
 When `SSH_KEY_PASSPHRASE` is set there, `scripts/deploy-ssh-mac.sh` answers the prompt non-interactively via `scripts/deploy-ssh-askpass.sh` (`SSH_ASKPASS_REQUIRE=force`). **Never** paste the values into this rule, any repo file, or command lines — this repo is pushed to GitHub.
+
+## Postgres admin — `test_user1` (never role `postgres`)
+
+For security, **do not use the Postgres role `postgres` as day-to-day admin** on Ubuntu (or Mac). App + migrations use **`test_user1`**.
+
+Mac and Ubuntu BE env files hold the same shape (values outside git; **never** copy secrets into this rule or the repo):
+
+| Env file | Path |
+|----------|------|
+| **Mac** | `~/.ssh/be/.env` |
+| **Ubuntu** | `/home/lawsen0/.ssh/be/.env` |
+
+```bash
+#------ POSTGRES ------
+DB_HOST=127.0.0.1
+DB_PORT=6432                 # PgBouncer (app / BE pooler)
+DB_NAME=outdatedDBOct2021
+DB_USER=test_user1           # DB admin for this project — not role "postgres"
+DB_PASSWORD=****             # test_user1 password (same role on Mac + Ubuntu)
+DB_SCHEMA=outdateddbsnapshotoct2024
+```
+
+| Port | Use |
+|------|-----|
+| **`6432`** | App / BE via PgBouncer (`DB_PORT` in `.env`) |
+| **`50010`** | Direct Postgres Primary — DDL / `scripts/ubuntu-psql.sh` / `isdbsame` |
 
 ## Ubuntu Postgres from the Mac (`scripts/ubuntu-psql.sh`)
 
@@ -73,11 +100,12 @@ echo "SELECT count(*) FROM outdateddbsnapshotoct2024.singles;" | scripts/ubuntu-
 scripts/ubuntu-psql.sh -At -c "SELECT …"                   # extra psql flags pass through
 ```
 
-- Password: **`UBUNTU_POSTGRES_PASSWORD=****`** in the Mac `~/.ssh/be/.env` (same file as the SSH secret above). The script sends it as the first line of the SSH stdin and the remote side reads it into `PGPASSWORD`, so it never appears in argv, `ps`, shell history, or Cursor tool output.
-- Connects as `test_user1` to `outdatedDBOct2021` on `127.0.0.1:50010` via `deploy-ssh-mac.sh`. Overrides: `UBUNTU_PG_HOST`, `UBUNTU_PG_PORT`, `UBUNTU_PG_USER`, `UBUNTU_PG_DB`, `UBUNTU_SSH_HOST`.
+- Password (Mac `~/.ssh/be/.env`), first match wins: **`UBUNTU_POSTGRES_PASSWORD`**, else **`DB_PASSWORD`** (same `test_user1` secret as BE). The script sends it as the first line of the SSH stdin and the remote side reads it into `PGPASSWORD`, so it never appears in argv, `ps`, shell history, or Cursor tool output.
+- Connects as **`test_user1`** to `outdatedDBOct2021` on `127.0.0.1:50010` via `deploy-ssh-mac.sh`. Overrides: `UBUNTU_PG_HOST`, `UBUNTU_PG_PORT`, `UBUNTU_PG_USER`, `UBUNTU_PG_DB`, `UBUNTU_SSH_HOST`.
 - Runs with `ON_ERROR_STOP=1`; exit code is non-zero if any statement fails.
 - Writes / DDL go here (single-box Primary). After DDL, run **`isdbsame`** (`scripts/compare-pg-schema.sh`) and report the result (see `all-in-1UbuntuDevelopment.mdc` §2).
 - **Never** `cat`/`grep`/`sed` the secrets in `~/.ssh/be/.env` (Mac or Ubuntu) yourself, pass `PGPASSWORD=…` on a command line, or print the password — let the script read it.
+- **Never** connect or migrate as role **`postgres`** — use **`test_user1`** only.
 
 ## ⚠ `AuthorizedKeysFile` is non-standard — `~/coredump/` is LIVE auth, not junk
 
@@ -102,4 +130,5 @@ So `/home/lawsen0/coredump/corrupt_logs_2020.log` **is** an `authorized_keys` fi
 - **Never** use agent keys / `githubkey` for this host — IdentitiesOnly + `~/.ssh/xbox2.pem` only.
 - `scp` / `rsync` over SSH must use the **same** port, key, and IdentitiesOnly options (e.g. `scp file xbox2:~/`, `rsync -e 'ssh' … xbox2:…`).
 - Ubuntu Postgres queries / migrations from the Mac → `scripts/ubuntu-psql.sh` (above); don't hand-roll `ssh … psql` with a password.
+- Postgres admin is **`test_user1`** (`DB_USER` / `DB_PASSWORD` in Mac + Ubuntu BE `.env`); **never** use role **`postgres`** for app or DDL.
 - On Ubuntu itself, `f0`/`f2` is a no-op reminder (already on the box) — see `myscript/ubuntu/b`.

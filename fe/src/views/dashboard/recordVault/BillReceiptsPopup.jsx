@@ -102,7 +102,7 @@ export default function BillReceiptsPopup({
   const skipToastTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   /** Bill row this popup's paid_record is linked to (from ensure) — upload/notes responses omit it. */
-  const billLinkRef = useRef({ monthlyBillId: null, yearlyBillId: null });
+  const billLinkRef = useRef({ monthlyBillId: null, yearlyBillId: null, subscriptionBillId: null });
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -130,7 +130,8 @@ export default function BillReceiptsPopup({
       onChanged?.({
         ...data,
         monthlyBillId: data.monthlyBillId || billLinkRef.current.monthlyBillId,
-        yearlyBillId: data.yearlyBillId || billLinkRef.current.yearlyBillId
+        yearlyBillId: data.yearlyBillId || billLinkRef.current.yearlyBillId,
+        subscriptionBillId: data.subscriptionBillId || billLinkRef.current.subscriptionBillId
       });
     },
     [onChanged]
@@ -142,6 +143,7 @@ export default function BillReceiptsPopup({
     if (!data) return;
     if (data.monthlyBillId) billLinkRef.current.monthlyBillId = data.monthlyBillId;
     if (data.yearlyBillId) billLinkRef.current.yearlyBillId = data.yearlyBillId;
+    if (data.subscriptionBillId) billLinkRef.current.subscriptionBillId = data.subscriptionBillId;
     if (data.paidRecordId != null) setPaidRecordId(Number(data.paidRecordId) || null);
     if (data.notesText != null) setNotesText(String(data.notesText || ''));
     if (Array.isArray(data.attachments)) {
@@ -172,7 +174,7 @@ export default function BillReceiptsPopup({
     setAttachments([]);
     setNotesText('');
     setSelectedId(null);
-    billLinkRef.current = { monthlyBillId: null, yearlyBillId: null };
+    billLinkRef.current = { monthlyBillId: null, yearlyBillId: null, subscriptionBillId: null };
     void (async () => {
       try {
         const data = await ensurePaidRecord(ensurePayload, { storageType });

@@ -285,38 +285,61 @@ async function addPendingBillRow(client, { singlesId, storageBackend, cadence, e
   const billType = extract.autopay ? 'Auto' : 'Manual';
 
   if (cadence === 'yearly') {
-    await ensureYearCloned(client, singlesId, year, storageBackend);
+    const { rows: tabRows } = await client.query(
+      `SELECT tab_label
+         FROM outdateddbsnapshotoct2024.yearly_bill
+        WHERE singles_id = $1 AND storage_backend = $2 AND soft_delete = false
+        GROUP BY tab_label
+        ORDER BY MIN(yearly_bill_id) ASC
+        LIMIT 1`,
+      [singlesId, storageBackend]
+    );
+    const tabLabel = String(tabRows[0]?.tab_label || 'home1').trim() || 'home1';
+    await ensureYearCloned(client, singlesId, year, storageBackend, tabLabel);
     const { rows: existing } = await client.query(
       `SELECT bill_description, row_index FROM outdateddbsnapshotoct2024.yearly_bill
-        WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3`,
-      [singlesId, storageBackend, year]
+        WHERE singles_id = $1 AND storage_backend = $2 AND tab_label = $3
+          AND soft_delete = false AND bill_year = $4`,
+      [singlesId, storageBackend, tabLabel, year]
     );
     if (existing.some((r) => descriptionMatches(r.bill_description, key))) return { duplicate: true };
     const nextIndex = existing.reduce((m, r) => Math.max(m, Number(r.row_index) || 0), 0) + 1;
     await client.query(
       `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
-         singles_id, storage_backend, bill_year, bill_month, row_index,
+         singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
          bill_description, due_month_day, amount, bill_type, email_scan_pending
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true)`,
-      [singlesId, storageBackend, year, refMonth, nextIndex, extract.merchant, refDay, amount, billType]
+       ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,true)`,
+      [singlesId, storageBackend, tabLabel, year, refMonth, nextIndex, extract.merchant, refDay, amount, billType]
     );
     return { duplicate: false, kind: 'yearly', year, month: null };
   }
 
-  await ensureMonthCloned(client, singlesId, year, month, storageBackend);
+  // Prefer the earliest active tab (home1 first for legacy); email scan is not tab-scoped in the UI yet.
+  const { rows: tabRows } = await client.query(
+    `SELECT tab_label
+       FROM outdateddbsnapshotoct2024.monthly_bill
+      WHERE singles_id = $1 AND storage_backend = $2 AND soft_delete = false
+      GROUP BY tab_label
+      ORDER BY MIN(monthly_bill_id) ASC
+      LIMIT 1`,
+    [singlesId, storageBackend]
+  );
+  const tabLabel = String(tabRows[0]?.tab_label || 'home1').trim() || 'home1';
+  await ensureMonthCloned(client, singlesId, year, month, storageBackend, tabLabel);
   const { rows: existing } = await client.query(
     `SELECT bill_description, row_index FROM outdateddbsnapshotoct2024.monthly_bill
-      WHERE singles_id = $1 AND storage_backend = $2 AND bill_year = $3 AND bill_month = $4`,
-    [singlesId, storageBackend, year, month]
+      WHERE singles_id = $1 AND storage_backend = $2 AND tab_label = $3
+        AND soft_delete = false AND bill_year = $4 AND bill_month = $5`,
+    [singlesId, storageBackend, tabLabel, year, month]
   );
   if (existing.some((r) => descriptionMatches(r.bill_description, key))) return { duplicate: true };
   const nextIndex = existing.reduce((m, r) => Math.max(m, Number(r.row_index) || 0), 0) + 1;
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
-       singles_id, storage_backend, bill_year, bill_month, row_index,
+       singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type, email_scan_pending
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true)`,
-    [singlesId, storageBackend, year, month, nextIndex, extract.merchant, refDay, amount, billType]
+     ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,true)`,
+    [singlesId, storageBackend, tabLabel, year, month, nextIndex, extract.merchant, refDay, amount, billType]
   );
   return { duplicate: false, kind: 'monthly', year, month };
 }

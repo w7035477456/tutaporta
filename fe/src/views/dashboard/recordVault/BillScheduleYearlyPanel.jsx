@@ -5,9 +5,20 @@ import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import { fetchYearlyBill, saveYearlyBill, transferBillSchedule } from 'api/monthlyBillFe';
+import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
+import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
+import {
+  addYearlyBillTab,
+  fetchYearlyBill,
+  removeYearlyBillTab,
+  renameYearlyBillTab,
+  saveYearlyBill,
+  transferBillSchedule,
+  undeleteYearlyBillTab
+} from 'api/monthlyBillFe';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PropTypes from 'prop-types';
+import { themedChoice, themedConfirm, themedPrompt } from 'utils/themedDialog';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
@@ -20,6 +31,10 @@ import {
   billScheduleApproveBtnSx,
   billScheduleRemoveRowBtnSx
 } from './billScheduleConstants';
+import {
+  BillScheduleDescColumnResizeHandle,
+  useBillScheduleDescColumnWidth
+} from './BillScheduleDescColumnResize';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
   BILL_SCHEDULE_INK,
@@ -29,8 +44,11 @@ import {
   billScheduleNavBtnSx,
   billSchedulePanelRootSx,
   billScheduleSelectSx,
+  billScheduleTabActionBtnSx,
   billScheduleTableSx
 } from './billScheduleTheme';
+
+const DEFAULT_TAB_LABEL = 'home1';
 
 /** Auto-pay fill — white label text on this background. */
 const YELLOW = '#B6A001';
@@ -54,6 +72,10 @@ const MONTH_NAMES = [
   'December'
 ];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const BILL_PERIOD_OPTIONS = ['Monthly', 'BiYearly', 'Quarterly', '2Year'];
+/** Stored value → Period dropdown label. */
+const BILL_PERIOD_LABEL = { Monthly: 'Monthly', BiYearly: 'BiYearly', Quarterly: 'Quarterly', '2Year': '2-year' };
+const BILL_SOURCE_OPTIONS = ['Visa', 'Check', 'Other'];
 const TONE_RANK = { overdue: 4, paid: 3, auto: 2, upcoming: 1, none: 0 };
 
 function blankRow(rowIndex) {
@@ -63,8 +85,11 @@ function blankRow(rowIndex) {
     bill_description: '',
     bill_month: '',
     due_month_day: '',
+    due_year: '',
     amount: '',
     bill_type: 'Manual',
+    bill_period: null,
+    bill_source: null,
     action: null,
     paid_record_id: null,
     bill_icon: null,
@@ -89,33 +114,69 @@ function isPaidAction(action) {
   return /^paid$/i.test(String(action ?? '').trim());
 }
 
+function isMonthlyPeriod(period) {
+  return String(period || '').trim() === 'Monthly';
+}
+
+function is2YearPeriod(period) {
+  return String(period || '').trim() === '2Year';
+}
+
+/** Monthly: day only. 2Year: year + month + day. Else: month + day. */
+function dueDateNeedsMonth(period) {
+  return !isMonthlyPeriod(period);
+}
+
+function dueDateNeedsYear(period) {
+  return is2YearPeriod(period);
+}
+
 function computeStatusLocal(row, year, today = new Date()) {
   if (row.bill_type === 'Auto') return { status: '', status_tone: 'auto' };
   if (isPaidAction(row.action)) return { status: 'PAID', status_tone: 'paid' };
-  const dueMonth = Number(row.bill_month);
   const dueDay = Number(row.due_month_day);
-  if (
-    !Number.isFinite(dueMonth) ||
-    dueMonth < 1 ||
-    dueMonth > 12 ||
-    !Number.isFinite(dueDay) ||
-    dueDay < 1 ||
-    dueDay > 31
-  ) {
-    const described = String(row.bill_description ?? '').trim().length > 0;
+  const described = String(row.bill_description ?? '').trim().length > 0;
+  if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 31) {
     return { status: described ? 'NOT PAID' : '', status_tone: 'none' };
   }
-  const due = new Date(year, dueMonth - 1, dueDay);
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (isMonthlyPeriod(row.bill_period)) {
+    // Day-of-month every month: compare against this month's occurrence in the viewed year.
+    if (year < today.getFullYear()) return { status: 'Over Due', status_tone: 'overdue' };
+    if (year > today.getFullYear()) return { status: 'NOT PAID', status_tone: 'upcoming' };
+    const dim = daysInMonth(year, today.getMonth() + 1);
+    const due = new Date(year, today.getMonth(), Math.min(dueDay, dim));
+    if (todayStart > due) return { status: 'Over Due', status_tone: 'overdue' };
+    return { status: 'NOT PAID', status_tone: 'upcoming' };
+  }
+
+  const dueMonth = Number(row.bill_month);
+  if (!Number.isFinite(dueMonth) || dueMonth < 1 || dueMonth > 12) {
+    return { status: described ? 'NOT PAID' : '', status_tone: 'none' };
+  }
+  const dueYear = is2YearPeriod(row.bill_period)
+    ? Number(row.due_year) || year
+    : year;
+  if (!Number.isFinite(dueYear) || dueYear < 2000) {
+    return { status: described ? 'NOT PAID' : '', status_tone: 'none' };
+  }
+  const due = new Date(dueYear, dueMonth - 1, dueDay);
   if (todayStart > due) return { status: 'Over Due', status_tone: 'overdue' };
   return { status: 'NOT PAID', status_tone: 'upcoming' };
 }
 
 function dueSortKey(row) {
-  const month = Number(row.bill_month);
   const day = Number(row.due_month_day);
-  const m = Number.isFinite(month) && month >= 1 && month <= 12 ? month : 99;
   const d = Number.isFinite(day) && day >= 1 && day <= 31 ? day : 99;
+  if (isMonthlyPeriod(row.bill_period)) return d; // day-only; sort among monthly by day
+  const month = Number(row.bill_month);
+  const m = Number.isFinite(month) && month >= 1 && month <= 12 ? month : 99;
+  if (is2YearPeriod(row.bill_period)) {
+    const y = Number(row.due_year);
+    const yy = Number.isFinite(y) && y >= 2000 ? y : 9999;
+    return yy * 10000 + m * 100 + d;
+  }
   return m * 100 + d;
 }
 
@@ -218,6 +279,9 @@ export default function BillScheduleYearlyPanel({
   const paneStorageType = useRecordVaultPaneStorageType();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
+  const [tabLabel, setTabLabel] = useState(DEFAULT_TAB_LABEL);
+  const [tabs, setTabs] = useState([DEFAULT_TAB_LABEL]);
+  const [deletedTabs, setDeletedTabs] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -232,46 +296,72 @@ export default function BillScheduleYearlyPanel({
   const [iconPickerIndex, setIconPickerIndex] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
+  const [tabBusy, setTabBusy] = useState(false);
+  const {
+    columnStyle: descColumnStyle,
+    startResize: startDescColumnResize,
+    resetWidth: resetDescColumnWidth
+  } = useBillScheduleDescColumnWidth();
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const tabLabelRef = useRef(tabLabel);
+  tabLabelRef.current = tabLabel;
   const storageKey =
     String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
   const peerKey = storageKey === 'usb' ? 'tutaCloud' : 'usb';
   const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
   const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
 
-  const load = useCallback(async (y) => {
-    setLoading(true);
-    setError('');
-    setSavedMsg('');
-    setDirty(false);
-    try {
-      const data = await fetchYearlyBill(y, { storageType: storageKey });
-      setRows(withDerived(data?.rows || [], y));
-      setPeerHasRows(Boolean(data?.peer_has_rows));
-    } catch (err) {
-      setError(
-        err?.response?.data?.error ||
-          (err?.response?.status
-            ? `Yearly bill failed (${err.response.status})`
-            : null) ||
-          err?.message ||
-          'Failed to load yearly bills'
-      );
-      setRows([]);
-      setPeerHasRows(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [storageKey]);
+  const applyTabMeta = (data, preferredTab) => {
+    const nextTabs =
+      Array.isArray(data?.tabs) && data.tabs.length ? data.tabs.map(String) : [DEFAULT_TAB_LABEL];
+    const nextDeleted = Array.isArray(data?.deleted_tabs) ? data.deleted_tabs.map(String) : [];
+    setTabs(nextTabs);
+    setDeletedTabs(nextDeleted);
+    const fromServer = data?.tab_label != null ? String(data.tab_label) : '';
+    const want = preferredTab != null ? String(preferredTab) : fromServer || tabLabelRef.current;
+    const resolved = nextTabs.includes(want) ? want : nextTabs[0];
+    setTabLabel(resolved);
+    return resolved;
+  };
+
+  const load = useCallback(
+    async (y, preferredTab) => {
+      setLoading(true);
+      setError('');
+      setSavedMsg('');
+      setDirty(false);
+      try {
+        const data = await fetchYearlyBill(y, {
+          storageType: storageKey,
+          tabLabel: preferredTab || tabLabelRef.current || DEFAULT_TAB_LABEL
+        });
+        applyTabMeta(data, preferredTab ?? data?.tab_label);
+        setRows(withDerived(data?.rows || [], y));
+        setPeerHasRows(Boolean(data?.peer_has_rows));
+      } catch (err) {
+        setError(
+          err?.response?.data?.error ||
+            (err?.response?.status ? `Yearly bill failed (${err.response.status})` : null) ||
+            err?.message ||
+            'Failed to load yearly bills'
+        );
+        setRows([]);
+        setPeerHasRows(false);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [storageKey]
+  );
 
   useEffect(() => {
-    void load(year);
+    void load(year, tabLabelRef.current);
   }, [year, load]);
 
   useEffect(() => {
     const onReload = () => {
-      void load(year);
+      void load(year, tabLabelRef.current);
     };
     window.addEventListener('record-vault-tree-reload', onReload);
     return () => window.removeEventListener('record-vault-tree-reload', onReload);
@@ -289,12 +379,117 @@ export default function BillScheduleYearlyPanel({
         targetStorageType: storageKey
       });
       notifyRecordVaultTreeReload(null);
-      await load(year);
+      await load(year, tabLabelRef.current);
       setSavedMsg(`Copied Yearly from ${peerLabel}`);
     } catch (err) {
       setError(err?.message || err?.response?.data?.error || 'Copy failed');
     } finally {
       setCopyBusy(false);
+    }
+  };
+
+  const selectTab = async (nextTab) => {
+    if (!nextTab || nextTab === tabLabelRef.current) return;
+    if (dirty) {
+      const ok = await themedConfirm('You have unsaved changes. Discard and switch tabs?', {
+        title: 'Switch tab',
+        okLabel: 'Discard',
+        cancelLabel: 'Cancel'
+      });
+      if (!ok) return;
+    }
+    setTabLabel(nextTab);
+    await load(year, nextTab);
+  };
+
+  const handleAddTab = async () => {
+    if (tabBusy) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      if (dirty) {
+        const saved = await persistSchedule();
+        if (!saved) return;
+      }
+      const data = await addYearlyBillTab(year, { storageType: storageKey });
+      applyTabMeta(data, data?.tab_label);
+      await load(year, data?.tab_label);
+      setSavedMsg(`Added tab ${data?.tab_label || ''}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to add tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
+  const handleRemoveTab = async () => {
+    if (tabBusy || tabs.length <= 1) return;
+    const current = tabLabelRef.current;
+    const ok = await themedConfirm('Are you sure to remove?', {
+      title: 'Remove tab',
+      okLabel: 'Remove',
+      cancelLabel: 'Cancel'
+    });
+    if (!ok) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      const data = await removeYearlyBillTab(current, { storageType: storageKey });
+      applyTabMeta(data, data?.tab_label);
+      await load(year, data?.tab_label);
+      setSavedMsg(`Removed tab ${current}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to remove tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
+  const handleUndeleteTab = async () => {
+    if (tabBusy || !deletedTabs.length) return;
+    const choice = await themedChoice('Restore which tab?', {
+      title: 'Undelete Tabs',
+      choices: deletedTabs.map((t) => ({ value: t, label: t }))
+    });
+    if (!choice) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      const data = await undeleteYearlyBillTab(choice, { storageType: storageKey });
+      applyTabMeta(data, data?.tab_label || choice);
+      await load(year, data?.tab_label || choice);
+      setSavedMsg(`Restored tab ${choice}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to undelete tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
+  const handleRenameTab = async (currentLabel) => {
+    if (tabBusy || !currentLabel) return;
+    const next = await themedPrompt('Rename tab', currentLabel, {
+      title: 'Tab name',
+      okLabel: 'Rename',
+      cancelLabel: 'Cancel'
+    });
+    if (next == null) return;
+    const trimmed = String(next).trim().slice(0, 64);
+    if (!trimmed || trimmed === currentLabel) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      const data = await renameYearlyBillTab(currentLabel, trimmed, {
+        storageType: storageKey,
+        year
+      });
+      applyTabMeta(data, data?.tab_label || trimmed);
+      await load(year, data?.tab_label || trimmed);
+      setSavedMsg(`Renamed to ${data?.tab_label || trimmed}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to rename tab');
+    } finally {
+      setTabBusy(false);
     }
   };
 
@@ -322,21 +517,43 @@ export default function BillScheduleYearlyPanel({
       setSaving(true);
       setError('');
       try {
-        const payload = toSave.map((r, i) => ({
-          row_index: i + 1,
-          yearly_bill_id: r.yearly_bill_id || undefined,
-          bill_description: r.bill_description,
-          bill_month: r.bill_month === '' || r.bill_month == null ? null : Number(r.bill_month),
-          due_month_day:
-            r.due_month_day === '' || r.due_month_day == null ? null : Number(r.due_month_day),
-          amount: normalizeAmountLocal(r.amount),
-          bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
-          action: r.bill_type === 'Auto' ? null : r.action,
-          paid_record_id: r.paid_record_id,
-          bill_icon: r.bill_icon || null,
-          email_scan_pending: r.email_scan_pending === true
-        }));
-        const data = await saveYearlyBill(year, payload, { storageType: storageKey });
+        const payload = toSave.map((r, i) => {
+          const period = BILL_PERIOD_OPTIONS.includes(r.bill_period) ? r.bill_period : null;
+          const monthly = isMonthlyPeriod(period);
+          const twoYear = is2YearPeriod(period);
+          return {
+            row_index: i + 1,
+            yearly_bill_id: r.yearly_bill_id || undefined,
+            bill_description: r.bill_description,
+            // Monthly period: day-only — never persist a month.
+            bill_month: monthly
+              ? null
+              : r.bill_month === '' || r.bill_month == null
+                ? null
+                : Number(r.bill_month),
+            due_month_day:
+              r.due_month_day === '' || r.due_month_day == null ? null : Number(r.due_month_day),
+            // 2Year: year + month + day — clear due_year otherwise.
+            due_year: twoYear
+              ? r.due_year === '' || r.due_year == null
+                ? null
+                : Number(r.due_year)
+              : null,
+            amount: normalizeAmountLocal(r.amount),
+            bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
+            bill_period: period,
+            bill_source: BILL_SOURCE_OPTIONS.includes(r.bill_source) ? r.bill_source : null,
+            action: r.bill_type === 'Auto' ? null : r.action,
+            paid_record_id: r.paid_record_id,
+            bill_icon: r.bill_icon || null,
+            email_scan_pending: r.email_scan_pending === true
+          };
+        });
+        const data = await saveYearlyBill(year, payload, {
+          storageType: storageKey,
+          tabLabel: tabLabelRef.current || DEFAULT_TAB_LABEL
+        });
+        if (data?.tabs) applyTabMeta(data, data?.tab_label || tabLabelRef.current);
         const next = withDerived(data?.rows || [], year);
         setRows(next);
         setSavedMsg('Saved');
@@ -369,6 +586,7 @@ export default function BillScheduleYearlyPanel({
     return {
       kind: 'yearly',
       year,
+      tab_label: tabLabelRef.current || DEFAULT_TAB_LABEL,
       row_index: Number(target.row_index) || 1,
       yearly_bill_id: target.yearly_bill_id || undefined,
       bill_description: target.bill_description,
@@ -442,7 +660,7 @@ export default function BillScheduleYearlyPanel({
       const next = updateRow(index, { action: nextAction });
       if (await persistSchedule(next)) return;
     }
-    await load(year);
+    await load(year, tabLabelRef.current);
   };
 
   const handleAdd = async () => {
@@ -494,23 +712,33 @@ export default function BillScheduleYearlyPanel({
     await persistSchedule(next);
   };
 
-  /** marksByMonth: Map<month, Map<day, tone>> */
+  /** marksByMonth: Map<month, Map<day, tone>> — Monthly marks every month; 2Year only if due_year matches view year. */
   const marksByMonth = useMemo(() => {
     const byMonth = new Map();
     for (let m = 1; m <= 12; m += 1) byMonth.set(m, new Map());
     for (const r of rows) {
-      const m = Number(r.bill_month);
       const day = Number(r.due_month_day);
-      if (!Number.isFinite(m) || m < 1 || m > 12) continue;
       if (!Number.isFinite(day) || day < 1) continue;
       const tone = r.status_tone || 'none';
       if (tone === 'none') continue;
-      const map = byMonth.get(m);
-      const prev = map.get(day);
-      if (!prev || (TONE_RANK[tone] || 0) > (TONE_RANK[prev] || 0)) map.set(day, tone);
+      if (is2YearPeriod(r.bill_period)) {
+        const dy = Number(r.due_year);
+        if (!Number.isFinite(dy) || dy !== year) continue;
+      }
+      const months = isMonthlyPeriod(r.bill_period)
+        ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        : (() => {
+            const m = Number(r.bill_month);
+            return Number.isFinite(m) && m >= 1 && m <= 12 ? [m] : [];
+          })();
+      for (const m of months) {
+        const map = byMonth.get(m);
+        const prev = map.get(day);
+        if (!prev || (TONE_RANK[tone] || 0) > (TONE_RANK[prev] || 0)) map.set(day, tone);
+      }
     }
     return byMonth;
-  }, [rows]);
+  }, [rows, year]);
 
   const inputSx = {
     ...billScheduleInputSx,
@@ -635,16 +863,97 @@ export default function BillScheduleYearlyPanel({
         <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
       ) : null}
 
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1,
+          flexShrink: 0
+        }}
+      >
+        <Box
+          component="button"
+          type="button"
+          disabled={loading || saving || tabBusy}
+          onClick={() => void handleAddTab()}
+          sx={billScheduleTabActionBtnSx}
+        >
+          Add Tab
+        </Box>
+        <Box
+          component="button"
+          type="button"
+          disabled={loading || saving || tabBusy || tabs.length <= 1}
+          onClick={() => void handleRemoveTab()}
+          sx={billScheduleTabActionBtnSx}
+        >
+          Remove Current Tab
+        </Box>
+        <Box
+          component="button"
+          type="button"
+          disabled={loading || saving || tabBusy || deletedTabs.length === 0}
+          onClick={() => void handleUndeleteTab()}
+          sx={billScheduleTabActionBtnSx}
+        >
+          Undelete Tabs
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1,
+          flexShrink: 0
+        }}
+      >
+        {tabs.map((label) => {
+          const selected = label === tabLabel;
+          const TabBtn = selected ? SelectedButtonTemplate : UnSelectedButtonTemplate;
+          return (
+            <TabBtn
+              key={`yearly-tab-${label}`}
+              type="button"
+              {...(selected ? { labelTextBox: false } : null)}
+              transformOrigin="center"
+              disabled={loading || saving || tabBusy}
+              onClick={() => void selectTab(label)}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleRenameTab(label);
+              }}
+              sx={{ minWidth: 88, px: 1.5, py: 0.5 }}
+            >
+              {label}
+            </TabBtn>
+          );
+        })}
+        <Typography sx={{ fontSize: '0.75rem', opacity: 0.65, ml: 0.5 }}>
+          Double-click a tab to rename
+        </Typography>
+      </Box>
+
       <Box component="table" sx={billScheduleTableSx}>
         <thead>
           <tr>
             <th style={{ width: 40 }}>#</th>
             <th style={{ width: 48, textAlign: 'center' }}>Icon</th>
-            <th>Bill Description</th>
-            <th style={{ width: 160 }}>Due Date</th>
+            <th style={{ ...descColumnStyle, position: 'relative' }}>
+              Bill Description
+              <BillScheduleDescColumnResizeHandle
+                onPointerDown={startDescColumnResize}
+                onReset={resetDescColumnWidth}
+              />
+            </th>
+            <th style={{ width: 220 }}>Due Date</th>
             <th style={{ width: 120 }}>Amount</th>
             <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
             <th style={{ width: 110 }}>Type</th>
+            <th style={{ width: 120 }}>Period</th>
+            <th style={{ width: 110 }}>Source</th>
             <th style={{ width: 120 }}>Action</th>
             <th style={{ width: 110 }}>Status</th>
           </tr>
@@ -671,7 +980,7 @@ export default function BillScheduleYearlyPanel({
                     onClick={() => setIconPickerIndex(index)}
                   />
                 </td>
-                <td>
+                <td style={descColumnStyle}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <TextField
                       fullWidth
@@ -707,30 +1016,52 @@ export default function BillScheduleYearlyPanel({
                 </td>
                 <td>
                   <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                    <Select
-                      size="small"
-                      displayEmpty
-                      value={row.bill_month === '' || row.bill_month == null ? '' : Number(row.bill_month)}
-                      onChange={(e) =>
-                        updateRow(index, {
-                          bill_month: e.target.value === '' ? '' : Number(e.target.value)
-                        })
-                      }
-                      sx={{ ...selectSx, minWidth: 72 }}
-                      renderValue={(v) => {
-                        if (v === '' || v == null) return <em style={{ opacity: 0.5 }}>Mon</em>;
-                        return MONTH_SHORT[Number(v) - 1] || v;
-                      }}
-                    >
-                      <MenuItem value="">
-                        <em>Mon</em>
-                      </MenuItem>
-                      {MONTH_SHORT.map((label, i) => (
-                        <MenuItem key={label} value={i + 1}>
-                          {label}
+                    {dueDateNeedsYear(row.bill_period) ? (
+                      <TextField
+                        size="small"
+                        type="number"
+                        inputProps={{ min: 2000, max: 2100, step: 1 }}
+                        value={row.due_year ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === '') {
+                            updateRow(index, { due_year: '' });
+                            return;
+                          }
+                          const n = Math.trunc(Number(v));
+                          if (!Number.isFinite(n)) return;
+                          updateRow(index, { due_year: Math.min(2100, Math.max(2000, n)) });
+                        }}
+                        placeholder="Year"
+                        sx={{ ...inputSx, width: 80 }}
+                      />
+                    ) : null}
+                    {dueDateNeedsMonth(row.bill_period) ? (
+                      <Select
+                        size="small"
+                        displayEmpty
+                        value={row.bill_month === '' || row.bill_month == null ? '' : Number(row.bill_month)}
+                        onChange={(e) =>
+                          updateRow(index, {
+                            bill_month: e.target.value === '' ? '' : Number(e.target.value)
+                          })
+                        }
+                        sx={{ ...selectSx, minWidth: 72 }}
+                        renderValue={(v) => {
+                          if (v === '' || v == null) return <em style={{ opacity: 0.5 }}>Mon</em>;
+                          return MONTH_SHORT[Number(v) - 1] || v;
+                        }}
+                      >
+                        <MenuItem value="">
+                          <em>Mon</em>
                         </MenuItem>
-                      ))}
-                    </Select>
+                        {MONTH_SHORT.map((label, i) => (
+                          <MenuItem key={label} value={i + 1}>
+                            {label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    ) : null}
                     <TextField
                       size="small"
                       type="number"
@@ -794,6 +1125,99 @@ export default function BillScheduleYearlyPanel({
                   >
                     <MenuItem value="Auto">Auto</MenuItem>
                     <MenuItem value="Manual">Manual</MenuItem>
+                  </Select>
+                </td>
+                <td style={{ background: typeActionStatusBg }}>
+                  <Select
+                    fullWidth
+                    size="small"
+                    displayEmpty
+                    value={row.bill_period || ''}
+                    onChange={(e) => {
+                      const nextPeriod = e.target.value || null;
+                      // Monthly → day-only (clear month + due_year).
+                      // 2Year → year+month+day (default due_year to viewed year if empty).
+                      // Else → month+day (clear due_year).
+                      const patch = { bill_period: nextPeriod };
+                      if (isMonthlyPeriod(nextPeriod)) {
+                        patch.bill_month = '';
+                        patch.due_year = '';
+                      } else if (is2YearPeriod(nextPeriod)) {
+                        if (row.due_year === '' || row.due_year == null) patch.due_year = year;
+                      } else {
+                        patch.due_year = '';
+                      }
+                      updateRow(index, patch);
+                    }}
+                    sx={
+                      auto
+                        ? {
+                            ...selectSx,
+                            bgcolor: YELLOW,
+                            color: AUTO_PAY_TEXT,
+                            WebkitTextFillColor: AUTO_PAY_TEXT,
+                            '& .MuiSelect-select': {
+                              color: AUTO_PAY_TEXT,
+                              WebkitTextFillColor: AUTO_PAY_TEXT
+                            },
+                            '& .MuiSelect-icon': { color: AUTO_PAY_TEXT }
+                          }
+                        : paid
+                          ? { ...selectSx, bgcolor: 'transparent' }
+                          : selectSx
+                    }
+                    renderValue={(v) => {
+                      if (!v) return <em style={{ opacity: 0.5 }}>Select</em>;
+                      return BILL_PERIOD_LABEL[v] || v;
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Select</em>
+                    </MenuItem>
+                    {BILL_PERIOD_OPTIONS.map((opt) => (
+                      <MenuItem key={opt} value={opt}>
+                        {BILL_PERIOD_LABEL[opt] || opt}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </td>
+                <td style={{ background: typeActionStatusBg }}>
+                  <Select
+                    fullWidth
+                    size="small"
+                    displayEmpty
+                    value={row.bill_source || ''}
+                    onChange={(e) => updateRow(index, { bill_source: e.target.value || null })}
+                    sx={
+                      auto
+                        ? {
+                            ...selectSx,
+                            bgcolor: YELLOW,
+                            color: AUTO_PAY_TEXT,
+                            WebkitTextFillColor: AUTO_PAY_TEXT,
+                            '& .MuiSelect-select': {
+                              color: AUTO_PAY_TEXT,
+                              WebkitTextFillColor: AUTO_PAY_TEXT
+                            },
+                            '& .MuiSelect-icon': { color: AUTO_PAY_TEXT }
+                          }
+                        : paid
+                          ? { ...selectSx, bgcolor: 'transparent' }
+                          : selectSx
+                    }
+                    renderValue={(v) => {
+                      if (!v) return <em style={{ opacity: 0.5 }}>Select</em>;
+                      return v;
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Select</em>
+                    </MenuItem>
+                    {BILL_SOURCE_OPTIONS.map((opt) => (
+                      <MenuItem key={opt} value={opt}>
+                        {opt}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </td>
                 <td style={{ background: typeActionStatusBg }}>

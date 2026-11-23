@@ -1,0 +1,1054 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import { fetchSubscriptionBill, saveSubscriptionBill, transferBillSchedule } from 'api/monthlyBillFe';
+import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
+import PropTypes from 'prop-types';
+import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
+import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
+import BillColumnButton from './BillColumnButton';
+import BillDueDayInput from './BillDueDayInput';
+import { attachDropToBillRow, billRowDropResultMessage, readBillRowDrop } from './billRowDropAttach';
+import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
+import BillReceiptsPopup from './BillReceiptsPopup';
+import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
+import AutoScanEmailsPopup from './AutoScanEmailsPopup';
+import {
+  BILL_SCHEDULE_PENDING_ROW_STYLE,
+  billScheduleApproveBtnSx,
+  billScheduleRemoveRowBtnSx
+} from './billScheduleConstants';
+import {
+  BillScheduleDescColumnResizeHandle,
+  useBillScheduleDescColumnWidth
+} from './BillScheduleDescColumnResize';
+import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
+import {
+  BILL_SCHEDULE_INK,
+  BILL_SCHEDULE_SURFACE,
+  billScheduleBorderedBoxSx,
+  billScheduleInputSx,
+  billScheduleNavBtnSx,
+  billSchedulePanelRootSx,
+  billScheduleSelectSx,
+  billScheduleTableSx
+} from './billScheduleTheme';
+
+/** Auto-pay fill — white label text on this background. */
+const YELLOW = '#B6A001';
+const GREEN = '#7dcea0';
+const RED = '#e74c3c';
+const AUTO_PAY_TEXT = '#ffffff';
+/** Semi-transparent so the grey reads on both light and dark themes. */
+const PAID_ROW_BG = 'rgba(128, 128, 128, 0.45)';
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December'
+];
+
+const TONE_RANK = { overdue: 4, paid_off: 3, paid: 3, auto: 2, upcoming: 1, none: 0 };
+
+function blankRow(rowIndex) {
+  return {
+    subscription_bill_id: null,
+    row_index: rowIndex,
+    bill_description: '',
+    due_day: '',
+    amount: '',
+    bill_type: 'Manual',
+    action: null,
+    paid_record_id: null,
+    bill_icon: null,
+    has_bill_content: false,
+    status: '',
+    status_tone: 'none'
+  };
+}
+
+function normalizeAmountLocal(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  if (/^varied$/i.test(s)) return 'Varied';
+  const cleaned = s.replace(/[$,\s]/g, '');
+  if (!cleaned) return '';
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return s.slice(0, 64);
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function isPaidAction(action) {
+  return /^paid$/i.test(String(action ?? '').trim());
+}
+
+function isPaidOffType(billType) {
+  return /^paid\s*off$/i.test(String(billType ?? '').trim());
+}
+
+function computeStatusLocal(row, year, month, today = new Date()) {
+  if (row.bill_type === 'Auto') return { status: '', status_tone: 'auto' };
+  if (isPaidOffType(row.bill_type)) return { status: '', status_tone: 'paid_off' };
+  if (isPaidAction(row.action)) return { status: 'PAID', status_tone: 'paid' };
+  const dueDay = Number(row.due_day);
+  if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 31) {
+    const described = String(row.bill_description ?? '').trim().length > 0;
+    return { status: described ? 'NOT PAID' : '', status_tone: 'none' };
+  }
+  const due = new Date(year, month - 1, dueDay);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (todayStart > due) return { status: 'Over Due', status_tone: 'overdue' };
+  return { status: 'NOT PAID', status_tone: 'upcoming' };
+}
+
+function dueSortKey(row) {
+  const day = Number(row.due_day);
+  return Number.isFinite(day) && day >= 1 && day <= 31 ? day : 99;
+}
+
+/** Earliest due day first; rows without a due day last; ties keep their # order. */
+function sortByDueDate(rows) {
+  return [...(rows || [])].sort(
+    (a, b) => dueSortKey(a) - dueSortKey(b) || Number(a.row_index) - Number(b.row_index)
+  );
+}
+
+function withDerived(rows, year, month) {
+  return sortByDueDate(rows).map((r) => ({
+    ...r,
+    ...computeStatusLocal(r, year, month)
+  }));
+}
+
+function cellToneBg(tone) {
+  if (tone === 'auto') return YELLOW;
+  if (tone === 'paid') return GREEN;
+  if (tone === 'overdue') return RED;
+  return 'transparent';
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function firstWeekday(year, month) {
+  return new Date(year, month - 1, 1).getDay();
+}
+
+export default function BillScheduleSubscriptionPanel({
+  storageType: storageTypeProp,
+  videoTutorialUrl = '',
+  onBillScheduleTutorialClick,
+  headerRightAction = null
+}) {
+  const paneStorageType = useRecordVaultPaneStorageType();
+  const now = useMemo(() => new Date(), []);
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [attachingRowIndex, setAttachingRowIndex] = useState(null);
+  const [savedMsg, setSavedMsg] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const [billPopupOpen, setBillPopupOpen] = useState(false);
+  const [billEnsurePayload, setBillEnsurePayload] = useState(null);
+  const [billPopupPayMode, setBillPopupPayMode] = useState(false);
+  /** Row index whose Icon column tray is open, or null. */
+  const [iconPickerIndex, setIconPickerIndex] = useState(null);
+  const [peerHasRows, setPeerHasRows] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const {
+    columnStyle: descColumnStyle,
+    startResize: startDescColumnResize,
+    resetWidth: resetDescColumnWidth
+  } = useBillScheduleDescColumnWidth();
+  const [autoScanOpen, setAutoScanOpen] = useState(false);
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const storageKey =
+    String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
+  const peerKey = storageKey === 'usb' ? 'tutaCloud' : 'usb';
+  const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
+  const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
+
+  const load = useCallback(async (y, m) => {
+    setLoading(true);
+    setError('');
+    setSavedMsg('');
+    setDirty(false);
+    try {
+      const data = await fetchSubscriptionBill(y, m, { storageType: storageKey });
+      setRows(withDerived(data?.rows || [], y, m));
+      setPeerHasRows(Boolean(data?.peer_has_rows));
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to load subscription bills');
+      setRows([]);
+      setPeerHasRows(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    void load(year, month);
+  }, [year, month, load]);
+
+  useEffect(() => {
+    const onReload = () => {
+      void load(year, month);
+    };
+    window.addEventListener('record-vault-tree-reload', onReload);
+    return () => window.removeEventListener('record-vault-tree-reload', onReload);
+  }, [year, month, load]);
+
+  const copyFromPeer = async () => {
+    if (copyBusy) return;
+    setCopyBusy(true);
+    setError('');
+    try {
+      await transferBillSchedule({
+        mode: 'copy',
+        kind: 'bill_subscription',
+        sourceStorageType: peerKey,
+        targetStorageType: storageKey
+      });
+      notifyRecordVaultTreeReload(null);
+      await load(year, month);
+      setSavedMsg(`Copied Subscription from ${peerLabel}`);
+    } catch (err) {
+      setError(err?.message || err?.response?.data?.error || 'Copy failed');
+    } finally {
+      setCopyBusy(false);
+    }
+  };
+
+  const updateRow = (index, patch) => {
+    const next = rowsRef.current.map((r, i) => {
+      if (i !== index) return r;
+      const merged = { ...r, ...patch };
+      if (merged.bill_type === 'Auto' || isPaidOffType(merged.bill_type)) {
+        merged.action = null;
+        merged.paid_record_id = null;
+      }
+      return { ...merged, ...computeStatusLocal(merged, year, month) };
+    });
+    rowsRef.current = next;
+    setRows(next);
+    setSavedMsg('');
+    setDirty(true);
+    return next;
+  };
+
+  /** Persist current (or override) rows; clears dirty/blink on success. Returns saved rows or null. */
+  const persistSchedule = useCallback(
+    async (rowsOverride) => {
+      const toSave = sortByDueDate(Array.isArray(rowsOverride) ? rowsOverride : rowsRef.current);
+      setSaving(true);
+      setError('');
+      try {
+        const payload = toSave.map((r, i) => ({
+          row_index: i + 1,
+          subscription_bill_id: r.subscription_bill_id || undefined,
+          bill_description: r.bill_description,
+          due_day: r.due_day === '' || r.due_day == null ? null : Number(r.due_day),
+          amount: normalizeAmountLocal(r.amount),
+          bill_type: isPaidOffType(r.bill_type)
+            ? 'Paid Off'
+            : r.bill_type === 'Auto'
+              ? 'Auto'
+              : 'Manual',
+          action: r.bill_type === 'Auto' || isPaidOffType(r.bill_type) ? null : r.action,
+          paid_record_id: r.paid_record_id,
+          bill_icon: r.bill_icon || null,
+          email_scan_pending: r.email_scan_pending === true
+        }));
+        const data = await saveSubscriptionBill(year, month, payload, { storageType: storageKey });
+        const next = withDerived(data?.rows || [], year, month);
+        setRows(next);
+        setSavedMsg('Saved');
+        setDirty(false);
+        return next;
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Failed to save');
+        return null;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [year, month, storageKey]
+  );
+
+  /** Saves pending edits first (renumbers rows), then returns the Bills/Receipts ensure payload for the row. */
+  const resolveBillEnsurePayload = async (row) => {
+    let target = row;
+    if (dirty) {
+      // Save renumbers # in due-date order, so locate the row by its sorted position.
+      const current = rowsRef.current.find((r) => Number(r.row_index) === Number(row.row_index)) || row;
+      const savedRowIndex = sortByDueDate(rowsRef.current).indexOf(current) + 1;
+      const saved = await persistSchedule();
+      if (!saved) return null;
+      target =
+        saved.find((r) => Number(r.row_index) === savedRowIndex) ||
+        saved.find((r) => Number(r.subscription_bill_id) === Number(row.subscription_bill_id)) ||
+        row;
+    }
+    return {
+      kind: 'subscription',
+      year,
+      month,
+      row_index: Number(target.row_index) || 1,
+      subscription_bill_id: target.subscription_bill_id || undefined,
+      bill_description: target.bill_description,
+      due_day: target.due_day === '' ? null : target.due_day,
+      amount: target.amount,
+      bill_type: target.bill_type,
+      action: target.action
+    };
+  };
+
+  const openBillForRow = async (row, { payMode = false } = {}) => {
+    const payload = await resolveBillEnsurePayload(row);
+    if (!payload) return;
+    setBillEnsurePayload(payload);
+    setBillPopupPayMode(payMode);
+    setBillPopupOpen(true);
+  };
+
+  /** Drop Mobile Upload photos / computer files on a row's Bill button to attach them without opening the popup. */
+  const dropAttachOnRow = async (row, dataTransfer) => {
+    const dropped = readBillRowDrop(dataTransfer);
+    if (!dropped.mobileUploadNames.length && !dropped.files.length) return;
+    setError('');
+    setSavedMsg('');
+    setAttachingRowIndex(Number(row.row_index));
+    try {
+      const payload = await resolveBillEnsurePayload(row);
+      if (!payload) return;
+      const result = await attachDropToBillRow(payload, storageKey, dropped);
+      if (result.record) handleBillChanged(result.record, payload.row_index);
+      setSavedMsg(billRowDropResultMessage(result, payload.bill_description));
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to attach file to bill');
+    } finally {
+      setAttachingRowIndex(null);
+    }
+  };
+
+  const handleBillChanged = (data, rowIndex = billEnsurePayload?.row_index) => {
+    if (!data?.paidRecordId) return;
+    const next = rowsRef.current.map((r) => {
+      if (
+        (data.subscriptionBillId &&
+          Number(r.subscription_bill_id) === Number(data.subscriptionBillId)) ||
+        Number(r.paid_record_id) === Number(data.paidRecordId) ||
+        (Number(r.row_index) === Number(rowIndex) && !r.subscription_bill_id)
+      ) {
+        return {
+          ...r,
+          paid_record_id: data.paidRecordId,
+          subscription_bill_id: data.subscriptionBillId || r.subscription_bill_id,
+          has_bill_content: Boolean(data.hasBillContent)
+        };
+      }
+      return r;
+    });
+    rowsRef.current = next;
+    setRows(next);
+  };
+
+  /** Close Bills/Receipts; nextAction 'Paid' | 'Not Paid' saves that Action on the popup's row. */
+  const finishBillPopup = async (nextAction) => {
+    const payload = billEnsurePayload;
+    setBillPopupOpen(false);
+    setBillEnsurePayload(null);
+    setBillPopupPayMode(false);
+    const index = payload
+      ? rowsRef.current.findIndex((r) => Number(r.row_index) === Number(payload.row_index))
+      : -1;
+    if (nextAction && index >= 0 && rowsRef.current[index].action !== nextAction) {
+      const next = updateRow(index, { action: nextAction });
+      if (await persistSchedule(next)) return;
+    }
+    await load(year, month);
+  };
+
+  const handleAdd = async () => {
+    const prev = rowsRef.current;
+    const nextIndex = prev.reduce((max, r) => Math.max(max, Number(r.row_index) || 0), 0) + 1;
+    const nextRows = [...prev, blankRow(nextIndex)];
+    setRows(nextRows);
+    setSavedMsg('');
+    await persistSchedule(nextRows);
+  };
+
+  const handlePickBillIcon = async (iconName) => {
+    const index = iconPickerIndex;
+    setIconPickerIndex(null);
+    if (index == null || !rowsRef.current[index]) return;
+    const next = updateRow(index, { bill_icon: iconName || null });
+    await persistSchedule(next);
+  };
+
+  const handleRemoveRow = async (index) => {
+    const prev = rowsRef.current;
+    const removed = prev[index];
+    const renumbered = prev
+      .filter((_, i) => i !== index)
+      .map((r, i) => ({ ...r, row_index: i + 1 }));
+    setRows(withDerived(renumbered, year, month));
+    setSavedMsg('');
+    if (
+      removed &&
+      billPopupOpen &&
+      billEnsurePayload &&
+      (Number(removed.row_index) === Number(billEnsurePayload.row_index) ||
+        (removed.subscription_bill_id &&
+          Number(removed.subscription_bill_id) === Number(billEnsurePayload.subscription_bill_id)))
+    ) {
+      setBillPopupOpen(false);
+      setBillEnsurePayload(null);
+    }
+    await persistSchedule(renumbered);
+  };
+
+  const handleSave = async () => {
+    setSavedMsg('');
+    await persistSchedule();
+  };
+
+  const handleApproveRow = async (index) => {
+    const next = updateRow(index, { email_scan_pending: false });
+    await persistSchedule(next);
+  };
+
+  const handleAutoScanFinished = useCallback(() => {
+    if (dirty) {
+      setSavedMsg('Auto Scan found new bills — click SAVE, then reopen this month to see them.');
+      return;
+    }
+    notifyRecordVaultTreeReload(null);
+  }, [dirty]);
+
+  const calendarMarks = useMemo(() => {
+    const map = new Map();
+    for (const r of rows) {
+      const day = Number(r.due_day);
+      if (!Number.isFinite(day) || day < 1) continue;
+      const tone = r.status_tone || 'none';
+      if (tone === 'none' || tone === 'paid_off') continue;
+      const prev = map.get(day);
+      if (!prev || (TONE_RANK[tone] || 0) > (TONE_RANK[prev] || 0)) map.set(day, tone);
+    }
+    return map;
+  }, [rows]);
+
+  const dim = daysInMonth(year, month);
+  const startWd = firstWeekday(year, month);
+  const today = now;
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+
+  // Allow ~3 years back and ~1 year ahead from today; hide arrows at the ends.
+  const viewMonthIndex = year * 12 + (month - 1);
+  const nowMonthIndex = today.getFullYear() * 12 + today.getMonth();
+  const canGoPrevMonth = viewMonthIndex > nowMonthIndex - 36;
+  const canGoNextMonth = viewMonthIndex < nowMonthIndex + 12;
+
+  const shiftMonth = (delta) => {
+    if (delta < 0 && !canGoPrevMonth) return;
+    if (delta > 0 && !canGoNextMonth) return;
+    let y = year;
+    let m = month + delta;
+    while (m < 1) {
+      m += 12;
+      y -= 1;
+    }
+    while (m > 12) {
+      m -= 12;
+      y += 1;
+    }
+    setYear(y);
+    setMonth(m);
+  };
+
+  const inputSx = {
+    ...billScheduleInputSx,
+    '& .MuiInputBase-input': {
+      ...billScheduleInputSx['& .MuiInputBase-input'],
+      fontFamily: MAIN_FONT_FAMILY
+    }
+  };
+
+  const selectSx = {
+    ...billScheduleSelectSx,
+    '& .MuiSelect-select': {
+      ...billScheduleSelectSx['& .MuiSelect-select'],
+      fontFamily: MAIN_FONT_FAMILY
+    }
+  };
+
+  return (
+    <Box
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'auto',
+        ...billSchedulePanelRootSx,
+        fontFamily: MAIN_FONT_FAMILY,
+        p: 1.5,
+        gap: 1.5
+      }}
+    >
+      <BillScheduleTutorialHeaderBar
+        videoTutorialUrl={videoTutorialUrl}
+        onTutorialClick={onBillScheduleTutorialClick}
+        disabled={loading || saving}
+        rightAction={headerRightAction}
+      />
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75, flexShrink: 0 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>
+          Subscription Bills: {MONTH_NAMES[month - 1]}
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+        <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', opacity: 0.72 }}>
+          ({sideLabel})
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        {canGoPrevMonth ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Previous month"
+            onClick={() => shiftMonth(-1)}
+            sx={billScheduleNavBtnSx}
+          >
+            ‹
+          </Box>
+        ) : (
+          <Box sx={{ width: 36 }} aria-hidden />
+        )}
+        <Typography sx={{ fontWeight: 700, minWidth: 140, textAlign: 'center' }}>
+          {MONTH_NAMES[month - 1]} {year}
+        </Typography>
+        {canGoNextMonth ? (
+          <Box
+            component="button"
+            type="button"
+            aria-label="Next month"
+            onClick={() => shiftMonth(1)}
+            sx={billScheduleNavBtnSx}
+          >
+            ›
+          </Box>
+        ) : (
+          <Box sx={{ width: 36 }} aria-hidden />
+        )}
+      </Box>
+
+      {!loading && rows.length === 0 && peerHasRows ? (
+        <Box
+          sx={{
+            flexShrink: 0,
+            bgcolor: YELLOW,
+            border: `2px solid ${BILL_SCHEDULE_INK}`,
+            borderRadius: 1,
+            p: 1.25,
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 1
+          }}
+        >
+          <Typography sx={{ fontWeight: 700, flex: '1 1 200px' }}>
+            No Subscription rows on {sideLabel} yet. Your Bill Schedule data is on {peerLabel}.
+          </Typography>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            disabled={copyBusy}
+            onClick={() => void copyFromPeer()}
+          >
+            {copyBusy ? 'Copying…' : `Copy Subscription from ${peerLabel}`}
+          </ColorTemplate13DisableGreenButton>
+        </Box>
+      ) : null}
+
+      {error ? (
+        <Typography sx={{ color: RED, fontWeight: 700, flexShrink: 0 }}>{error}</Typography>
+      ) : null}
+      {savedMsg ? (
+        <Typography sx={{ color: '#1b7a3d', fontWeight: 700, flexShrink: 0 }}>{savedMsg}</Typography>
+      ) : null}
+      {loading ? (
+        <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
+      ) : null}
+
+      <Box component="table" sx={billScheduleTableSx}>
+        <thead>
+          <tr>
+            <th style={{ width: 40 }}>#</th>
+            <th style={{ width: 48, textAlign: 'center' }}>Icon</th>
+            <th style={{ ...descColumnStyle, position: 'relative' }}>
+              Bill Description
+              <BillScheduleDescColumnResizeHandle
+                onPointerDown={startDescColumnResize}
+                onReset={resetDescColumnWidth}
+              />
+            </th>
+            <th style={{ width: 88 }}>Due Date</th>
+            <th style={{ width: 120 }}>Amount</th>
+            <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
+            <th style={{ width: 110 }}>Type</th>
+            <th style={{ width: 120 }}>Action</th>
+            <th style={{ width: 110 }}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const auto = row.bill_type === 'Auto';
+            const paidOff = isPaidOffType(row.bill_type);
+            const typeActionStatusBg = auto ? YELLOW : 'transparent';
+            const paid = !auto && !paidOff && row.status_tone === 'paid';
+            const rowGrey = paid || paidOff;
+            const statusBg = auto ? YELLOW : rowGrey ? 'transparent' : cellToneBg(row.status_tone);
+            return (
+              <tr
+                key={`bill-row-${row.row_index}-${index}`}
+                style={{
+                  ...(rowGrey ? { background: PAID_ROW_BG } : null),
+                  ...(row.email_scan_pending ? BILL_SCHEDULE_PENDING_ROW_STYLE : null)
+                }}
+              >
+                <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <BillIconCell
+                    iconName={row.bill_icon}
+                    disabled={loading || saving}
+                    onClick={() => setIconPickerIndex(index)}
+                  />
+                </td>
+                <td style={descColumnStyle}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      value={row.bill_description}
+                      onChange={(e) => updateRow(index, { bill_description: e.target.value })}
+                      placeholder="Bill description"
+                      sx={{ ...inputSx, flex: 1, minWidth: 0 }}
+                    />
+                    {row.email_scan_pending ? (
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="Approve scanned bill"
+                        disabled={loading || saving}
+                        onClick={() => void handleApproveRow(index)}
+                        sx={billScheduleApproveBtnSx}
+                      >
+                        Approve
+                      </Box>
+                    ) : null}
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Remove row"
+                      disabled={loading || saving}
+                      onClick={() => void handleRemoveRow(index)}
+                      sx={billScheduleRemoveRowBtnSx}
+                    >
+                      ×
+                    </Box>
+                  </Box>
+                </td>
+                <td>
+                  <BillDueDayInput
+                    value={row.due_day ?? ''}
+                    year={year}
+                    month={month}
+                    onChange={(day) => updateRow(index, { due_day: day })}
+                    sx={inputSx}
+                  />
+                </td>
+                <td>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={row.amount}
+                    onChange={(e) => updateRow(index, { amount: e.target.value })}
+                    onBlur={() => updateRow(index, { amount: normalizeAmountLocal(row.amount) })}
+                    placeholder="$0.00"
+                    sx={inputSx}
+                  />
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <BillColumnButton
+                    hasContent={Boolean(row.has_bill_content)}
+                    disabled={loading || saving || attachingRowIndex != null}
+                    onClick={() => void openBillForRow(row)}
+                    onDropAttach={(dataTransfer) => void dropAttachOnRow(row, dataTransfer)}
+                  />
+                </td>
+                <td style={{ background: typeActionStatusBg }}>
+                  <Select
+                    fullWidth
+                    size="small"
+                    value={row.bill_type || 'Manual'}
+                    onChange={(e) => updateRow(index, { bill_type: e.target.value })}
+                    sx={{
+                      ...selectSx,
+                      bgcolor: auto
+                        ? YELLOW
+                        : rowGrey
+                          ? 'transparent'
+                          : BILL_SCHEDULE_SURFACE,
+                      ...(auto
+                        ? {
+                            color: AUTO_PAY_TEXT,
+                            WebkitTextFillColor: AUTO_PAY_TEXT,
+                            '& .MuiSelect-select': {
+                              color: AUTO_PAY_TEXT,
+                              WebkitTextFillColor: AUTO_PAY_TEXT
+                            },
+                            '& .MuiSelect-icon': { color: AUTO_PAY_TEXT }
+                          }
+                        : null)
+                    }}
+                  >
+                    <MenuItem value="Auto">Auto</MenuItem>
+                    <MenuItem value="Manual">Manual</MenuItem>
+                    <MenuItem value="Paid Off">Paid Off</MenuItem>
+                  </Select>
+                </td>
+                <td style={{ background: typeActionStatusBg }}>
+                  {auto || paidOff ? null : (
+                    <Select
+                      fullWidth
+                      size="small"
+                      displayEmpty
+                      value={row.action || ''}
+                      onChange={(e) => {
+                        const next = e.target.value || null;
+                        if (next === 'Paid') {
+                          void openBillForRow(rowsRef.current[index], { payMode: true });
+                          return;
+                        }
+                        updateRow(index, { action: next });
+                      }}
+                      sx={paid ? { ...selectSx, bgcolor: 'transparent' } : selectSx}
+                      renderValue={(v) => {
+                        if (!v) return <em style={{ opacity: 0.5 }}>Select</em>;
+                        return v;
+                      }}
+                    >
+                      <MenuItem value="Not Paid">Not Paid</MenuItem>
+                      <MenuItem value="Paid">Paid</MenuItem>
+                    </Select>
+                  )}
+                </td>
+                <td
+                  style={{
+                    background: statusBg,
+                    fontWeight: 800,
+                    textAlign: 'center',
+                    color: row.status_tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK
+                  }}
+                >
+                  {auto || paidOff ? '' : row.status}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexShrink: 0,
+          gap: 1
+        }}
+      >
+        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
+          Add
+        </ColorTemplate13DisableGreenButton>
+        <ColorTemplate13DisableGreenButton type="button" onClick={() => setAutoScanOpen(true)} disabled={loading}>
+          Auto Scan Emails
+        </ColorTemplate13DisableGreenButton>
+        <ColorTemplate13DisableGreenButton
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={loading || saving}
+          sx={
+            dirty && !saving
+              ? { animation: 'blink 1s step-start infinite' }
+              : undefined
+          }
+        >
+          {saving ? 'Saving…' : 'SAVE'}
+        </ColorTemplate13DisableGreenButton>
+      </Box>
+
+      <BillScheduleEmailPrefs />
+
+      <Box
+        sx={{
+          flexShrink: 0,
+          width: '100%',
+          maxWidth: 920,
+          mx: 'auto',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'flex-start' },
+          gap: 2
+        }}
+      >
+        <Box
+          sx={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            maxWidth: { sm: 520 },
+            ...billScheduleBorderedBoxSx,
+            p: 2.5
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              mb: 1.5
+            }}
+          >
+            {canGoPrevMonth ? (
+              <Box
+                component="button"
+                type="button"
+                aria-label="Previous month"
+                onClick={() => shiftMonth(-1)}
+                sx={{ ...billScheduleNavBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+              >
+                ‹
+              </Box>
+            ) : (
+              <Box sx={{ width: 44 }} aria-hidden />
+            )}
+            <Typography sx={{ fontWeight: 800, textAlign: 'center', fontSize: '1.5rem', minWidth: 200 }}>
+              {MONTH_NAMES[month - 1]} {year}
+            </Typography>
+            {canGoNextMonth ? (
+              <Box
+                component="button"
+                type="button"
+                aria-label="Next month"
+                onClick={() => shiftMonth(1)}
+                sx={{ ...billScheduleNavBtnSx, fontSize: '1.75rem', px: 1.25, py: 0.5 }}
+              >
+                ›
+              </Box>
+            ) : (
+              <Box sx={{ width: 44 }} aria-hidden />
+            )}
+          </Box>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              gap: 1,
+              textAlign: 'center'
+            }}
+          >
+            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+              <Typography key={d} sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                {d}
+              </Typography>
+            ))}
+            {Array.from({ length: startWd }).map((_, i) => (
+              <Box key={`pad-${i}`} />
+            ))}
+            {Array.from({ length: dim }).map((_, i) => {
+              const day = i + 1;
+              const tone = calendarMarks.get(day);
+              const isToday = isCurrentMonth && today.getDate() === day;
+              const upcoming = tone === 'upcoming';
+              return (
+                <Box
+                  key={`day-${day}`}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: upcoming ? '50%' : 1,
+                    fontWeight: 700,
+                    fontSize: '1.25rem',
+                    bgcolor: tone && !upcoming ? cellToneBg(tone) : 'transparent',
+                    color:
+                      tone === 'overdue' || tone === 'auto' ? AUTO_PAY_TEXT : BILL_SCHEDULE_INK,
+                    outline: upcoming
+                      ? `3px solid ${BILL_SCHEDULE_INK}`
+                      : isToday
+                        ? `2px solid ${RED}`
+                        : 'none',
+                    outlineOffset: 1
+                  }}
+                >
+                  {day}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        <Box
+          component="aside"
+          aria-label="Calendar legend"
+          sx={{
+            flex: '0 0 auto',
+            alignSelf: { xs: 'stretch', sm: 'flex-start' },
+            ...billScheduleBorderedBoxSx,
+            px: 1.75,
+            py: 1.5,
+            minWidth: { sm: 260 },
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.25
+          }}
+        >
+          {[
+            {
+              key: 'today',
+              label: 'Today Date',
+              sample: 26,
+              sx: {
+                borderRadius: 1,
+                bgcolor: 'transparent',
+                outline: `2px solid ${RED}`,
+                outlineOffset: 0
+              }
+            },
+            {
+              key: 'upcoming',
+              label: 'Manual Pay Note Due yet',
+              sample: 29,
+              sx: {
+                borderRadius: '50%',
+                bgcolor: 'transparent',
+                outline: `3px solid ${BILL_SCHEDULE_INK}`,
+                outlineOffset: 0
+              }
+            },
+            {
+              key: 'auto',
+              label: 'Auto pay',
+              sample: 15,
+              sx: {
+                borderRadius: 1,
+                bgcolor: YELLOW,
+                color: AUTO_PAY_TEXT
+              }
+            },
+            {
+              key: 'paid',
+              label: 'Manual Paid',
+              sample: 1,
+              sx: {
+                borderRadius: 1,
+                bgcolor: GREEN,
+                color: '#000'
+              }
+            },
+            {
+              key: 'overdue',
+              label: 'Manual NotPaid Overdue/Late',
+              sample: 25,
+              sx: {
+                borderRadius: 1,
+                bgcolor: RED,
+                color: '#fff'
+              }
+            }
+          ].map((item) => (
+            <Box
+              key={item.key}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25
+              }}
+            >
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  boxSizing: 'border-box',
+                  ...item.sx
+                }}
+              >
+                {item.sample}
+              </Box>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+                {item.label}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      <BillIconPickerDialog
+        open={iconPickerIndex != null}
+        selectedIcon={iconPickerIndex != null ? rows[iconPickerIndex]?.bill_icon : null}
+        onSelect={(iconName) => void handlePickBillIcon(iconName)}
+        onClose={() => setIconPickerIndex(null)}
+      />
+
+      <AutoScanEmailsPopup
+        open={autoScanOpen}
+        onClose={() => setAutoScanOpen(false)}
+        storageType={storageKey}
+        onScanFinished={handleAutoScanFinished}
+      />
+
+      {billPopupOpen ? (
+        <BillReceiptsPopup
+          open={billPopupOpen}
+          storageType={storageKey}
+          ensurePayload={billEnsurePayload}
+          onClose={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
+          onMarkPaid={() => void finishBillPopup('Paid')}
+          onCancel={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
+          onChanged={handleBillChanged}
+        />
+      ) : null}
+    </Box>
+  );
+}
+
+BillScheduleSubscriptionPanel.propTypes = {
+  storageType: PropTypes.oneOf(['tutaCloud', 'usb']),
+  videoTutorialUrl: PropTypes.string,
+  onBillScheduleTutorialClick: PropTypes.func,
+  headerRightAction: PropTypes.node
+};

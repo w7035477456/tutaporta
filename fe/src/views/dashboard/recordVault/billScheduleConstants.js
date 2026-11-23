@@ -3,17 +3,23 @@
 export const BILL_SCHEDULE_NOTEBOOK_ID = -900001;
 export const BILL_MONTHLY_NOTE_ID = -900003;
 export const BILL_YEARLY_NOTE_ID = -900002;
+export const BILL_SUBSCRIPTION_NOTE_ID = -900004;
+export const BILL_TODO_NOTE_ID = -900005;
 
 export const BILL_SCHEDULE_NOTEBOOK_NAME = 'Bill Schedule';
 export const BILL_MONTHLY_NOTE_NAME = 'Monthly';
 export const BILL_YEARLY_NOTE_NAME = 'Yearly';
+export const BILL_SUBSCRIPTION_NOTE_NAME = 'Subscription';
+export const BILL_TODO_NOTE_NAME = 'ToDo';
 
 export function isBillScheduleSystemId(id) {
   const n = Number(id);
   return (
     n === BILL_SCHEDULE_NOTEBOOK_ID ||
     n === BILL_MONTHLY_NOTE_ID ||
-    n === BILL_YEARLY_NOTE_ID
+    n === BILL_YEARLY_NOTE_ID ||
+    n === BILL_SUBSCRIPTION_NOTE_ID ||
+    n === BILL_TODO_NOTE_ID
   );
 }
 
@@ -29,16 +35,28 @@ export function isBillYearlyNoteId(id) {
   return Number(id) === BILL_YEARLY_NOTE_ID;
 }
 
-/** Cross-pane drag kind for Bill Schedule notebook / Monthly / Yearly. */
+export function isBillSubscriptionNoteId(id) {
+  return Number(id) === BILL_SUBSCRIPTION_NOTE_ID;
+}
+
+export function isBillTodoNoteId(id) {
+  return Number(id) === BILL_TODO_NOTE_ID;
+}
+
+/** Cross-pane drag kind for Bill Schedule notebook / Monthly / Yearly / Subscription. */
 export function billScheduleCrossPaneKind(id) {
   if (isBillScheduleNotebookId(id)) return 'bill_schedule';
   if (isBillMonthlyNoteId(id)) return 'bill_monthly';
   if (isBillYearlyNoteId(id)) return 'bill_yearly';
+  if (isBillSubscriptionNoteId(id)) return 'bill_subscription';
+  // ToDo is local-only for now (no transferable table yet).
   return null;
 }
 
 export function isBillScheduleCrossPaneKind(kind) {
-  return ['bill_schedule', 'bill_monthly', 'bill_yearly'].includes(String(kind || ''));
+  return ['bill_schedule', 'bill_monthly', 'bill_yearly', 'bill_subscription'].includes(
+    String(kind || '')
+  );
 }
 
 /** True for a selectable vault note id or a Bill Schedule system note id. */
@@ -46,7 +64,12 @@ export function isSelectableNoteId(id) {
   const n = Number(id);
   if (!Number.isFinite(n)) return false;
   if (n >= 1) return true;
-  return isBillMonthlyNoteId(n) || isBillYearlyNoteId(n);
+  return (
+    isBillMonthlyNoteId(n) ||
+    isBillYearlyNoteId(n) ||
+    isBillSubscriptionNoteId(n) ||
+    isBillTodoNoteId(n)
+  );
 }
 
 /** Shared red × control at end of Bill Description rows. */
@@ -115,6 +138,26 @@ export function buildBillScheduleNotebook() {
         is_system: true,
         is_bill_schedule: true,
         display_order: 1
+      },
+      {
+        note_id: BILL_SUBSCRIPTION_NOTE_ID,
+        notebook_id: BILL_SCHEDULE_NOTEBOOK_ID,
+        note_name: BILL_SUBSCRIPTION_NOTE_NAME,
+        body_text: '',
+        content_loaded: true,
+        is_system: true,
+        is_bill_schedule: true,
+        display_order: 2
+      },
+      {
+        note_id: BILL_TODO_NOTE_ID,
+        notebook_id: BILL_SCHEDULE_NOTEBOOK_ID,
+        note_name: BILL_TODO_NOTE_NAME,
+        body_text: '',
+        content_loaded: true,
+        is_system: true,
+        is_bill_schedule: true,
+        display_order: 3
       }
     ]
   };

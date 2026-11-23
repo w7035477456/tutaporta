@@ -53,7 +53,8 @@ export async function attachDropToBillRow(ensurePayload, storageType, { mobileUp
     record: {
       ...record,
       monthlyBillId: record?.monthlyBillId || ensured?.monthlyBillId,
-      yearlyBillId: record?.yearlyBillId || ensured?.yearlyBillId
+      yearlyBillId: record?.yearlyBillId || ensured?.yearlyBillId,
+      subscriptionBillId: record?.subscriptionBillId || ensured?.subscriptionBillId
     },
     uploaded,
     skipped,

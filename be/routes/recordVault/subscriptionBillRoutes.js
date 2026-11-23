@@ -1,0 +1,402 @@
+import pool from '../../db/connection.js';
+import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
+import { normalizeBillIcon } from '../../utils/billIconName.js';
+
+function toInt(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
+function sendError(res, error, fallback = 'Subscription bill request failed') {
+  const statusCode = Number(error?.statusCode) || 500;
+  const pgCode = String(error?.code || '');
+  let message = error?.message || fallback;
+  if (pgCode === '42P01') {
+    message =
+      'Database table subscription_bill is missing. On Postgres run: be/db/createSubscriptionBill.sql then be/db/alterPaidRecordSubscription.sql';
+  } else if (pgCode === '42703') {
+    message =
+      'Database schema for subscription_bill is outdated. On Postgres run: be/db/alterPaidRecordSubscription.sql';
+  }
+  if (statusCode >= 500) {
+    console.error('[subscription-bill]', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+      hint: error?.hint
+    });
+  }
+  return res.status(statusCode).json({
+    error: message,
+    ...(pgCode ? { code: pgCode } : {})
+  });
+}
+
+function requireSinglesId(req) {
+  const singlesId = toInt(req.auth?.singles_id);
+  if (!singlesId || singlesId < 1) throw httpError(401, 'Authentication required');
+  return singlesId;
+}
+
+function parseYearMonth(queryOrBody) {
+  const year = toInt(queryOrBody?.year ?? queryOrBody?.bill_year);
+  const month = toInt(queryOrBody?.month ?? queryOrBody?.bill_month);
+  if (!year || year < 2000 || year > 2100) throw httpError(400, 'year must be 2000–2100');
+  if (!month || month < 1 || month > 12) throw httpError(400, 'month must be 1–12');
+  return { year, month };
+}
+
+/** MMYYYY display key matching the design sketch (e.g. 082026). */
+export function billMonthKey(year, month) {
+  return `${String(month).padStart(2, '0')}${year}`;
+}
+
+function normalizeAmount(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  if (/^varied$/i.test(s)) return 'Varied';
+  const cleaned = s.replace(/[$,\s]/g, '');
+  if (!cleaned) return '';
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return s.slice(0, 64);
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function normalizeBillType(raw) {
+  const s = String(raw ?? '').trim();
+  if (/^auto$/i.test(s)) return 'Auto';
+  if (/^paid\s*off$/i.test(s)) return 'Paid Off';
+  return 'Manual';
+}
+
+function normalizeAction(billType, raw) {
+  if (billType === 'Auto' || billType === 'Paid Off') return null;
+  const s = String(raw ?? '').trim();
+  if (!s) return null;
+  if (/^paid$/i.test(s)) return 'Paid';
+  if (/^not\s*paid$/i.test(s)) return 'Not Paid';
+  return null;
+}
+
+function normalizeDueDay(raw) {
+  if (raw == null || raw === '') return null;
+  const n = toInt(raw);
+  if (!n || n < 1 || n > 31) return null;
+  return n;
+}
+
+/** Derive Status for UI (not stored).
+ * auto | paid | overdue | upcoming (future unpaid → black circle) | none
+ */
+export function computeBillStatus(row, year, month, today = new Date()) {
+  const billType = String(row?.bill_type || 'Manual');
+  if (billType === 'Auto') {
+    return { status: '', status_tone: 'auto' };
+  }
+  if (billType === 'Paid Off') {
+    return { status: '', status_tone: 'paid_off' };
+  }
+  const action = row?.action ?? null;
+  if (action === 'Paid') {
+    return { status: 'Paid', status_tone: 'paid' };
+  }
+  const dueDay = toInt(row?.due_day);
+  if (!dueDay) {
+    return { status: '', status_tone: 'none' };
+  }
+  const due = new Date(year, month - 1, dueDay);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const unpaid = action !== 'Paid';
+  if (unpaid && todayStart > due) {
+    return { status: 'Over Due', status_tone: 'overdue' };
+  }
+  if (unpaid && todayStart <= due) {
+    return { status: '', status_tone: 'upcoming' };
+  }
+  return { status: '', status_tone: 'none' };
+}
+
+function mapRow(row, year, month) {
+  const y = year ?? Number(row.bill_year);
+  const m = month ?? Number(row.bill_month);
+  const derived = computeBillStatus(row, y, m);
+  return {
+    subscription_bill_id: Number(row.subscription_bill_id),
+    singles_id: Number(row.singles_id),
+    bill_year: y,
+    bill_month: m,
+    bill_month_key: billMonthKey(y, m),
+    row_index: Number(row.row_index),
+    bill_description: row.bill_description ?? '',
+    due_day: row.due_day != null ? Number(row.due_day) : null,
+    amount: row.amount ?? '',
+    bill_type:
+      row.bill_type === 'Auto' ? 'Auto' : row.bill_type === 'Paid Off' ? 'Paid Off' : 'Manual',
+    action: row.action ?? null,
+    paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
+    bill_icon: row.bill_icon || null,
+    has_bill_content: Boolean(row.has_bill_content),
+    email_scan_pending: Boolean(row.email_scan_pending),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    ...derived
+  };
+}
+
+async function countMonthRows(client, singlesId, year, month, storageBackend) {
+  const { rows } = await client.query(
+    `SELECT COUNT(*)::int AS c
+       FROM outdateddbsnapshotoct2024.subscription_bill
+      WHERE singles_id = $1 AND storage_backend = $2
+        AND bill_year = $3 AND bill_month = $4`,
+    [singlesId, storageBackend, year, month]
+  );
+  return Number(rows[0]?.c) || 0;
+}
+
+async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend) {
+  const { rows } = await client.query(
+    `SELECT bill_year, bill_month
+       FROM outdateddbsnapshotoct2024.subscription_bill
+      WHERE singles_id = $1
+        AND storage_backend = $2
+        AND (bill_year < $3 OR (bill_year = $3 AND bill_month < $4))
+      GROUP BY bill_year, bill_month
+      ORDER BY bill_year DESC, bill_month DESC
+      LIMIT 1`,
+    [singlesId, storageBackend, year, month]
+  );
+  if (!rows[0]) return null;
+  return { year: Number(rows[0].bill_year), month: Number(rows[0].bill_month) };
+}
+
+/**
+ * If target month has no rows, clone template fields from latest prior month
+ * (action + paid_record_id left NULL). Unapproved Auto Scan rows are not cloned.
+ */
+export async function ensureMonthCloned(client, singlesId, year, month, storageBackend) {
+  const existing = await countMonthRows(client, singlesId, year, month, storageBackend);
+  if (existing > 0) return { cloned: false, from: null };
+
+  const prior = await findPriorMonthWithRows(client, singlesId, year, month, storageBackend);
+  if (!prior) return { cloned: false, from: null };
+
+  await client.query(
+    `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
+       singles_id, storage_backend, bill_year, bill_month, row_index,
+       bill_description, due_day, amount, bill_type,
+       action, paid_record_id, bill_icon
+     )
+     SELECT
+       singles_id, storage_backend, $3, $4, row_index,
+       bill_description, due_day, amount, bill_type,
+       NULL, NULL, bill_icon
+       FROM outdateddbsnapshotoct2024.subscription_bill
+      WHERE singles_id = $1 AND storage_backend = $2
+        AND bill_year = $5 AND bill_month = $6
+        AND email_scan_pending = false
+      ORDER BY row_index ASC`,
+    [singlesId, storageBackend, year, month, prior.year, prior.month]
+  );
+  return { cloned: true, from: prior };
+}
+
+async function listMonthRows(client, singlesId, year, month, storageBackend) {
+  const { rows } = await client.query(
+    `SELECT mb.*,
+            (
+              COALESCE(LENGTH(TRIM(pr.notes_text)), 0) > 0
+              OR EXISTS (
+                SELECT 1
+                  FROM outdateddbsnapshotoct2024.paid_record_attachment a
+                 WHERE a.paid_record_id = pr.paid_record_id
+              )
+            ) AS has_bill_content
+       FROM outdateddbsnapshotoct2024.subscription_bill mb
+       LEFT JOIN outdateddbsnapshotoct2024.paid_record pr
+         ON pr.paid_record_id = mb.paid_record_id
+      WHERE mb.singles_id = $1 AND mb.storage_backend = $2
+        AND mb.bill_year = $3 AND mb.bill_month = $4
+      ORDER BY mb.row_index ASC, mb.subscription_bill_id ASC`,
+    [singlesId, storageBackend, year, month]
+  );
+  return rows.map((r) => mapRow(r, year, month));
+}
+
+/** GET /api/subscriptionBill?year=&month=&storageType=onedrive|usb — list (+ clone-on-first-open). */
+export async function getSubscriptionBill(req, res) {
+  try {
+    const singlesId = requireSinglesId(req);
+    const { year, month } = parseYearMonth(req.query);
+    const storageBackend = readBillStorageBackend(req);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const cloneInfo = await ensureMonthCloned(client, singlesId, year, month, storageBackend);
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      const peer = storageBackend === 'usb' ? 'tutaCloud' : 'usb';
+      const { rows: peerCountRows } = await client.query(
+        `SELECT COUNT(*)::int AS c
+           FROM outdateddbsnapshotoct2024.subscription_bill
+          WHERE singles_id = $1 AND storage_backend = $2`,
+        [singlesId, peer]
+      );
+      await client.query('COMMIT');
+      return res.json({
+        bill_year: year,
+        bill_month: month,
+        bill_month_key: billMonthKey(year, month),
+        storage_backend: storageBackend,
+        peer_storage_backend: peer,
+        peer_has_rows: (Number(peerCountRows[0]?.c) || 0) > 0,
+        cloned: cloneInfo.cloned,
+        cloned_from: cloneInfo.from,
+        rows
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/**
+ * PUT /api/subscriptionBill
+ * Body: { year, month, rows: [{ row_index?, bill_description, due_day, amount, bill_type, action, paid_record_id? }] }
+ * Full replace for that month (keeps forever history for other months).
+ */
+export async function putSubscriptionBill(req, res) {
+  try {
+    const singlesId = requireSinglesId(req);
+    const { year, month } = parseYearMonth(req.body || {});
+    const storageBackend = readBillStorageBackend(req);
+    const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
+    if (!incoming) throw httpError(400, 'rows array required');
+    if (incoming.length > 500) throw httpError(400, 'Too many rows (max 500)');
+
+    const normalized = incoming.map((row, i) => {
+      const billType = normalizeBillType(row?.bill_type);
+      const action = normalizeAction(billType, row?.action);
+      const rowIndex = toInt(row?.row_index) || i + 1;
+      if (rowIndex < 1) throw httpError(400, 'row_index must be >= 1');
+      const paidRecordId = toInt(row?.paid_record_id);
+      return {
+        row_index: rowIndex,
+        prior_bill_id: toInt(row?.subscription_bill_id) || null,
+        bill_description: String(row?.bill_description ?? '').slice(0, 500),
+        due_day: normalizeDueDay(row?.due_day),
+        amount: normalizeAmount(row?.amount),
+        bill_type: billType,
+        action,
+        paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null,
+        bill_icon: normalizeBillIcon(row?.bill_icon),
+        email_scan_pending: row?.email_scan_pending === true
+      };
+    });
+
+    // Ensure unique row_index
+    const seen = new Set();
+    for (const r of normalized) {
+      if (seen.has(r.row_index)) throw httpError(400, `Duplicate row_index ${r.row_index}`);
+      seen.add(r.row_index);
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Rows saved without paid_record_id keep their Bills/Receipts link (the DELETE below
+      // would otherwise orphan the paid_record and its attachments).
+      const { rows: priorLinks } = await client.query(
+        `SELECT subscription_bill_id, paid_record_id
+           FROM outdateddbsnapshotoct2024.subscription_bill
+          WHERE singles_id = $1 AND storage_backend = $2
+            AND bill_year = $3 AND bill_month = $4
+            AND paid_record_id IS NOT NULL`,
+        [singlesId, storageBackend, year, month]
+      );
+      const priorPaidByBillId = new Map(
+        priorLinks.map((p) => [Number(p.subscription_bill_id), Number(p.paid_record_id)])
+      );
+      for (const r of normalized) {
+        if (!r.paid_record_id && r.prior_bill_id) {
+          r.paid_record_id = priorPaidByBillId.get(r.prior_bill_id) || null;
+        }
+      }
+      await client.query(
+        `DELETE FROM outdateddbsnapshotoct2024.subscription_bill
+          WHERE singles_id = $1 AND storage_backend = $2
+            AND bill_year = $3 AND bill_month = $4`,
+        [singlesId, storageBackend, year, month]
+      );
+      for (const r of normalized) {
+        const { rows: inserted } = await client.query(
+          `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
+             singles_id, storage_backend, bill_year, bill_month, row_index,
+             bill_description, due_day, amount, bill_type,
+             action, paid_record_id, bill_icon, email_scan_pending
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           RETURNING subscription_bill_id`,
+          [
+            singlesId,
+            storageBackend,
+            year,
+            month,
+            r.row_index,
+            r.bill_description,
+            r.due_day,
+            r.amount,
+            r.bill_type,
+            r.action,
+            r.paid_record_id,
+            r.bill_icon,
+            r.email_scan_pending
+          ]
+        );
+        const newBillId = Number(inserted[0]?.subscription_bill_id);
+        if (r.paid_record_id && newBillId) {
+          await client.query(
+            `UPDATE outdateddbsnapshotoct2024.paid_record
+                SET subscription_bill_id = $1, updated_at = now()
+              WHERE paid_record_id = $2 AND singles_id = $3`,
+            [newBillId, r.paid_record_id, singlesId]
+          );
+        }
+      }
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      await client.query('COMMIT');
+      return res.json({
+        ok: true,
+        bill_year: year,
+        bill_month: month,
+        bill_month_key: billMonthKey(year, month),
+        storage_backend: storageBackend,
+        rows
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+}

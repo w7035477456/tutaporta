@@ -1,6 +1,7 @@
 /**
  * Copy/move Bill Schedule data between Cloud (onedrive) and USB storage sides.
- * Body: { mode: 'copy'|'move', kind: 'bill_schedule'|'bill_monthly'|'bill_yearly',
+ * Body: { mode: 'copy'|'move',
+ *         kind: 'bill_schedule'|'bill_monthly'|'bill_yearly'|'bill_subscription',
  *         sourceStorageType, targetStorageType }
  */
 
@@ -45,14 +46,24 @@ async function countYearly(client, singlesId, storageBackend) {
   return Number(rows[0]?.c) || 0;
 }
 
+async function countSubscription(client, singlesId, storageBackend) {
+  const { rows } = await client.query(
+    `SELECT COUNT(*)::int AS c
+       FROM outdateddbsnapshotoct2024.subscription_bill
+      WHERE singles_id = $1 AND storage_backend = $2`,
+    [singlesId, storageBackend]
+  );
+  return Number(rows[0]?.c) || 0;
+}
+
 async function copyMonthly(client, singlesId, source, target) {
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
-       singles_id, storage_backend, bill_year, bill_month, row_index,
+       singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
      )
      SELECT
-       singles_id, $3, bill_year, bill_month, row_index,
+       singles_id, $3, tab_label, soft_delete, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
@@ -63,13 +74,30 @@ async function copyMonthly(client, singlesId, source, target) {
 async function copyYearly(client, singlesId, source, target) {
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
+       singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
+       bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
+       action, paid_record_id, bill_icon, email_scan_pending
+     )
+     SELECT
+       singles_id, $3, tab_label, soft_delete, bill_year, bill_month, row_index,
+       bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
+       action, paid_record_id, bill_icon, email_scan_pending
+       FROM outdateddbsnapshotoct2024.yearly_bill
+      WHERE singles_id = $1 AND storage_backend = $2`,
+    [singlesId, source, target]
+  );
+}
+
+async function copySubscription(client, singlesId, source, target) {
+  await client.query(
+    `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
-       bill_description, due_month_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
+       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
      )
      SELECT
        singles_id, $3, bill_year, bill_month, row_index,
-       bill_description, due_month_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
-       FROM outdateddbsnapshotoct2024.yearly_bill
+       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
+       FROM outdateddbsnapshotoct2024.subscription_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, source, target]
   );
@@ -91,6 +119,14 @@ async function deleteYearly(client, singlesId, storageBackend) {
   );
 }
 
+async function deleteSubscription(client, singlesId, storageBackend) {
+  await client.query(
+    `DELETE FROM outdateddbsnapshotoct2024.subscription_bill
+      WHERE singles_id = $1 AND storage_backend = $2`,
+    [singlesId, storageBackend]
+  );
+}
+
 function storageSideLabel(backend) {
   return backend === 'usb' ? 'USB' : 'Cloud';
 }
@@ -103,7 +139,9 @@ function emptySourceMessage(kind, source, otherHasData) {
       ? 'Monthly Bill Schedule'
       : kind === 'bill_yearly'
         ? 'Yearly Bill Schedule'
-        : 'Bill Schedule';
+        : kind === 'bill_subscription'
+          ? 'Subscription Bill Schedule'
+          : 'Bill Schedule';
   if (otherHasData) {
     return (
       `No ${what} data on ${srcLabel}. Your rows are on ${otherLabel} — ` +
@@ -122,8 +160,11 @@ export async function transferBillSchedule(req, res) {
       throw httpError(400, 'mode must be copy or move');
     }
     const kind = String(req.body?.kind || '').trim().toLowerCase();
-    if (!['bill_schedule', 'bill_monthly', 'bill_yearly'].includes(kind)) {
-      throw httpError(400, 'kind must be bill_schedule, bill_monthly, or bill_yearly');
+    if (!['bill_schedule', 'bill_monthly', 'bill_yearly', 'bill_subscription'].includes(kind)) {
+      throw httpError(
+        400,
+        'kind must be bill_schedule, bill_monthly, bill_yearly, or bill_subscription'
+      );
     }
     const source = parseBillStorageBackend(req.body?.sourceStorageType);
     const target = parseBillStorageBackend(req.body?.targetStorageType);
@@ -131,6 +172,7 @@ export async function transferBillSchedule(req, res) {
 
     const doMonthly = kind === 'bill_schedule' || kind === 'bill_monthly';
     const doYearly = kind === 'bill_schedule' || kind === 'bill_yearly';
+    const doSubscription = kind === 'bill_schedule' || kind === 'bill_subscription';
 
     const client = await pool.connect();
     try {
@@ -138,13 +180,26 @@ export async function transferBillSchedule(req, res) {
 
       const srcMonthlyBefore = doMonthly ? await countMonthly(client, singlesId, source) : 0;
       const srcYearlyBefore = doYearly ? await countYearly(client, singlesId, source) : 0;
+      const srcSubscriptionBefore = doSubscription
+        ? await countSubscription(client, singlesId, source)
+        : 0;
       const other = source === 'usb' ? 'tutaCloud' : 'usb';
       const otherMonthly = doMonthly ? await countMonthly(client, singlesId, other) : 0;
       const otherYearly = doYearly ? await countYearly(client, singlesId, other) : 0;
+      const otherSubscription = doSubscription
+        ? await countSubscription(client, singlesId, other)
+        : 0;
       const otherHas =
-        (doMonthly && otherMonthly > 0) || (doYearly && otherYearly > 0);
+        (doMonthly && otherMonthly > 0) ||
+        (doYearly && otherYearly > 0) ||
+        (doSubscription && otherSubscription > 0);
 
-      if (kind === 'bill_schedule' && srcMonthlyBefore < 1 && srcYearlyBefore < 1) {
+      if (
+        kind === 'bill_schedule' &&
+        srcMonthlyBefore < 1 &&
+        srcYearlyBefore < 1 &&
+        srcSubscriptionBefore < 1
+      ) {
         throw httpError(400, emptySourceMessage(kind, source, otherHas));
       }
 
@@ -167,6 +222,16 @@ export async function transferBillSchedule(req, res) {
           if (mode === 'move') await deleteYearly(client, singlesId, source);
         } else if (kind === 'bill_yearly') {
           throw httpError(400, emptySourceMessage(kind, source, otherYearly > 0));
+        }
+      }
+
+      if (doSubscription) {
+        if (srcSubscriptionBefore > 0) {
+          await deleteSubscription(client, singlesId, target);
+          await copySubscription(client, singlesId, source, target);
+          if (mode === 'move') await deleteSubscription(client, singlesId, source);
+        } else if (kind === 'bill_subscription') {
+          throw httpError(400, emptySourceMessage(kind, source, otherSubscription > 0));
         }
       }
 

@@ -61,6 +61,7 @@ function mapPaidRecord(data) {
     scheduleKind: data.scheduleKind ?? data.schedule_kind ?? null,
     monthlyBillId: Number(data.monthlyBillId ?? data.monthly_bill_id) || null,
     yearlyBillId: Number(data.yearlyBillId ?? data.yearly_bill_id) || null,
+    subscriptionBillId: Number(data.subscriptionBillId ?? data.subscription_bill_id) || null,
     storageBackend: data.storageBackend ?? data.storage_backend ?? null,
     notesText,
     attachments,

@@ -1,3 +1,8 @@
+import {
+  haystackMatchesRecordVaultSearchQuery,
+  parseRecordVaultSearchQuery
+} from './recordVaultSearchQuery';
+
 const INDEX_KEY = 'recordVaultNoteSearchIndex_v1';
 const MAX_ENTRIES = 500;
 
@@ -38,18 +43,19 @@ export function indexNoteSearchText(noteId, text, title = '') {
 }
 
 export function searchIndexedNotes(query, { noteIds = null, excludeNoteIds = null } = {}) {
-  const q = String(query || '')
-    .trim()
-    .toLowerCase();
-  if (!q) return [];
+  const parsed =
+    query && typeof query === 'object' && (query.q1 != null || Array.isArray(query.terms))
+      ? query
+      : parseRecordVaultSearchQuery(query);
+  if (!parsed?.q1 && !(parsed?.terms && parsed.terms.length)) return [];
   const index = readIndex();
   const out = [];
   for (const [noteId, entry] of Object.entries(index)) {
     const id = Number(noteId);
     if (noteIds && !noteIds.has(id)) continue;
     if (excludeNoteIds && excludeNoteIds.has(id)) continue;
-    const hay = `${entry.title} ${entry.text}`.toLowerCase();
-    if (hay.includes(q)) {
+    const hay = `${entry.title} ${entry.text}`;
+    if (haystackMatchesRecordVaultSearchQuery(hay, parsed)) {
       out.push({ noteId: id, ...entry });
     }
   }

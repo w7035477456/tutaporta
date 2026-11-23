@@ -2,6 +2,8 @@ import pool from '../../db/connection.js';
 import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
 import { normalizeBillIcon } from '../../utils/billIconName.js';
 
+export const DEFAULT_MONTHLY_TAB_LABEL = 'home1';
+
 function toInt(value) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : null;
@@ -22,7 +24,7 @@ function sendError(res, error, fallback = 'Monthly bill request failed') {
       'Database table monthly_bill is missing. On Postgres run: be/db/createMonthlyBill.sql then be/db/alterBillScheduleStorageBackend.sql';
   } else if (pgCode === '42703') {
     message =
-      'Database schema for monthly_bill is outdated. On Postgres run: be/db/alterBillScheduleStorageBackend.sql';
+      'Database schema for monthly_bill is outdated. On Postgres run: be/db/alterMonthlyBillTabs.sql';
   }
   if (statusCode >= 500) {
     console.error('[monthly-bill]', {
@@ -52,6 +54,22 @@ function parseYearMonth(queryOrBody) {
   return { year, month };
 }
 
+/** Normalize tab label; empty → home1. Max 64 chars. */
+export function normalizeTabLabel(raw) {
+  const s = String(raw ?? '').trim().slice(0, 64);
+  return s || DEFAULT_MONTHLY_TAB_LABEL;
+}
+
+/** Next unused homeN among existing labels (case-insensitive). */
+export function nextHomeTabLabel(existingLabels) {
+  const used = new Set(
+    (existingLabels || []).map((l) => String(l || '').trim().toLowerCase()).filter(Boolean)
+  );
+  let n = 1;
+  while (used.has(`home${n}`)) n += 1;
+  return `home${n}`;
+}
+
 /** MMYYYY display key matching the design sketch (e.g. 082026). */
 export function billMonthKey(year, month) {
   return `${String(month).padStart(2, '0')}${year}`;
@@ -71,11 +89,12 @@ function normalizeAmount(raw) {
 function normalizeBillType(raw) {
   const s = String(raw ?? '').trim();
   if (/^auto$/i.test(s)) return 'Auto';
+  if (/^paid\s*off$/i.test(s)) return 'Paid Off';
   return 'Manual';
 }
 
 function normalizeAction(billType, raw) {
-  if (billType === 'Auto') return null;
+  if (billType === 'Auto' || billType === 'Paid Off') return null;
   const s = String(raw ?? '').trim();
   if (!s) return null;
   if (/^paid$/i.test(s)) return 'Paid';
@@ -97,6 +116,9 @@ export function computeBillStatus(row, year, month, today = new Date()) {
   const billType = String(row?.bill_type || 'Manual');
   if (billType === 'Auto') {
     return { status: '', status_tone: 'auto' };
+  }
+  if (billType === 'Paid Off') {
+    return { status: '', status_tone: 'paid_off' };
   }
   const action = row?.action ?? null;
   if (action === 'Paid') {
@@ -125,6 +147,8 @@ function mapRow(row, year, month) {
   return {
     monthly_bill_id: Number(row.monthly_bill_id),
     singles_id: Number(row.singles_id),
+    tab_label: row.tab_label || DEFAULT_MONTHLY_TAB_LABEL,
+    soft_delete: Boolean(row.soft_delete),
     bill_year: y,
     bill_month: m,
     bill_month_key: billMonthKey(y, m),
@@ -132,7 +156,8 @@ function mapRow(row, year, month) {
     bill_description: row.bill_description ?? '',
     due_day: row.due_day != null ? Number(row.due_day) : null,
     amount: row.amount ?? '',
-    bill_type: row.bill_type === 'Auto' ? 'Auto' : 'Manual',
+    bill_type:
+      row.bill_type === 'Auto' ? 'Auto' : row.bill_type === 'Paid Off' ? 'Paid Off' : 'Manual',
     action: row.action ?? null,
     paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
     bill_icon: row.bill_icon || null,
@@ -144,65 +169,112 @@ function mapRow(row, year, month) {
   };
 }
 
-async function countMonthRows(client, singlesId, year, month, storageBackend) {
+async function listTabLabels(client, singlesId, storageBackend, { softDelete }) {
+  const { rows } = await client.query(
+    `SELECT tab_label, MIN(monthly_bill_id) AS first_id
+       FROM outdateddbsnapshotoct2024.monthly_bill
+      WHERE singles_id = $1 AND storage_backend = $2 AND soft_delete = $3
+      GROUP BY tab_label
+      ORDER BY first_id ASC`,
+    [singlesId, storageBackend, softDelete]
+  );
+  return rows.map((r) => String(r.tab_label || '').trim()).filter(Boolean);
+}
+
+async function listAllTabLabels(client, singlesId, storageBackend) {
+  const { rows } = await client.query(
+    `SELECT DISTINCT tab_label
+       FROM outdateddbsnapshotoct2024.monthly_bill
+      WHERE singles_id = $1 AND storage_backend = $2`,
+    [singlesId, storageBackend]
+  );
+  return rows.map((r) => String(r.tab_label || '').trim()).filter(Boolean);
+}
+
+/** Active tabs; if none in DB yet, virtual default home1. */
+async function listActiveTabs(client, singlesId, storageBackend) {
+  const tabs = await listTabLabels(client, singlesId, storageBackend, { softDelete: false });
+  return tabs.length ? tabs : [DEFAULT_MONTHLY_TAB_LABEL];
+}
+
+async function listDeletedTabs(client, singlesId, storageBackend) {
+  return listTabLabels(client, singlesId, storageBackend, { softDelete: true });
+}
+
+async function countMonthRows(client, singlesId, year, month, storageBackend, tabLabel) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
-        AND bill_year = $3 AND bill_month = $4`,
-    [singlesId, storageBackend, year, month]
+        AND tab_label = $3
+        AND soft_delete = false
+        AND bill_year = $4 AND bill_month = $5`,
+    [singlesId, storageBackend, tabLabel, year, month]
   );
   return Number(rows[0]?.c) || 0;
 }
 
-async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend) {
+async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend, tabLabel) {
   const { rows } = await client.query(
     `SELECT bill_year, bill_month
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1
         AND storage_backend = $2
-        AND (bill_year < $3 OR (bill_year = $3 AND bill_month < $4))
+        AND tab_label = $3
+        AND soft_delete = false
+        AND (bill_year < $4 OR (bill_year = $4 AND bill_month < $5))
       GROUP BY bill_year, bill_month
       ORDER BY bill_year DESC, bill_month DESC
       LIMIT 1`,
-    [singlesId, storageBackend, year, month]
+    [singlesId, storageBackend, tabLabel, year, month]
   );
   if (!rows[0]) return null;
   return { year: Number(rows[0].bill_year), month: Number(rows[0].bill_month) };
 }
 
 /**
- * If target month has no rows, clone template fields from latest prior month
+ * If target month has no rows for this tab, clone template fields from latest prior month
  * (action + paid_record_id left NULL). Unapproved Auto Scan rows are not cloned.
  */
-export async function ensureMonthCloned(client, singlesId, year, month, storageBackend) {
-  const existing = await countMonthRows(client, singlesId, year, month, storageBackend);
+export async function ensureMonthCloned(
+  client,
+  singlesId,
+  year,
+  month,
+  storageBackend,
+  tabLabel = DEFAULT_MONTHLY_TAB_LABEL
+) {
+  const label = normalizeTabLabel(tabLabel);
+  const existing = await countMonthRows(client, singlesId, year, month, storageBackend, label);
   if (existing > 0) return { cloned: false, from: null };
 
-  const prior = await findPriorMonthWithRows(client, singlesId, year, month, storageBackend);
+  const prior = await findPriorMonthWithRows(client, singlesId, year, month, storageBackend, label);
   if (!prior) return { cloned: false, from: null };
 
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
-       singles_id, storage_backend, bill_year, bill_month, row_index,
+       singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type,
        action, paid_record_id, bill_icon
      )
      SELECT
-       singles_id, storage_backend, $3, $4, row_index,
+       singles_id, storage_backend, tab_label, false, $4, $5, row_index,
        bill_description, due_day, amount, bill_type,
        NULL, NULL, bill_icon
        FROM outdateddbsnapshotoct2024.monthly_bill
       WHERE singles_id = $1 AND storage_backend = $2
-        AND bill_year = $5 AND bill_month = $6
+        AND tab_label = $3
+        AND soft_delete = false
+        AND bill_year = $6 AND bill_month = $7
         AND email_scan_pending = false
       ORDER BY row_index ASC`,
-    [singlesId, storageBackend, year, month, prior.year, prior.month]
+    [singlesId, storageBackend, label, year, month, prior.year, prior.month]
   );
   return { cloned: true, from: prior };
 }
 
-async function listMonthRows(client, singlesId, year, month, storageBackend) {
+async function listMonthRows(client, singlesId, year, month, storageBackend, tabLabel) {
+  const label = normalizeTabLabel(tabLabel);
   const { rows } = await client.query(
     `SELECT mb.*,
             (
@@ -217,14 +289,32 @@ async function listMonthRows(client, singlesId, year, month, storageBackend) {
        LEFT JOIN outdateddbsnapshotoct2024.paid_record pr
          ON pr.paid_record_id = mb.paid_record_id
       WHERE mb.singles_id = $1 AND mb.storage_backend = $2
-        AND mb.bill_year = $3 AND mb.bill_month = $4
+        AND mb.tab_label = $3
+        AND mb.soft_delete = false
+        AND mb.bill_year = $4 AND mb.bill_month = $5
       ORDER BY mb.row_index ASC, mb.monthly_bill_id ASC`,
-    [singlesId, storageBackend, year, month]
+    [singlesId, storageBackend, label, year, month]
   );
   return rows.map((r) => mapRow(r, year, month));
 }
 
-/** GET /api/monthlyBill?year=&month=&storageType=onedrive|usb — list (+ clone-on-first-open). */
+async function tabsPayload(client, singlesId, storageBackend) {
+  const [tabs, deleted_tabs] = await Promise.all([
+    listActiveTabs(client, singlesId, storageBackend),
+    listDeletedTabs(client, singlesId, storageBackend)
+  ]);
+  return { tabs, deleted_tabs };
+}
+
+/** Resolve requested tab; fall back to first active (or home1). */
+function resolveRequestedTab(requested, activeTabs) {
+  const list = activeTabs?.length ? activeTabs : [DEFAULT_MONTHLY_TAB_LABEL];
+  const want = String(requested ?? '').trim();
+  if (want && list.includes(want)) return want;
+  return list[0];
+}
+
+/** GET /api/monthlyBill?year=&month=&tab_label=&storageType= — list (+ clone-on-first-open). */
 export async function getMonthlyBill(req, res) {
   try {
     const singlesId = requireSinglesId(req);
@@ -233,13 +323,22 @@ export async function getMonthlyBill(req, res) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const cloneInfo = await ensureMonthCloned(client, singlesId, year, month, storageBackend);
-      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      const tabMeta = await tabsPayload(client, singlesId, storageBackend);
+      const tabLabel = resolveRequestedTab(req.query?.tab_label, tabMeta.tabs);
+      const cloneInfo = await ensureMonthCloned(
+        client,
+        singlesId,
+        year,
+        month,
+        storageBackend,
+        tabLabel
+      );
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend, tabLabel);
       const peer = storageBackend === 'usb' ? 'tutaCloud' : 'usb';
       const { rows: peerCountRows } = await client.query(
         `SELECT COUNT(*)::int AS c
            FROM outdateddbsnapshotoct2024.monthly_bill
-          WHERE singles_id = $1 AND storage_backend = $2`,
+          WHERE singles_id = $1 AND storage_backend = $2 AND soft_delete = false`,
         [singlesId, peer]
       );
       await client.query('COMMIT');
@@ -250,6 +349,9 @@ export async function getMonthlyBill(req, res) {
         storage_backend: storageBackend,
         peer_storage_backend: peer,
         peer_has_rows: (Number(peerCountRows[0]?.c) || 0) > 0,
+        tab_label: tabLabel,
+        tabs: tabMeta.tabs,
+        deleted_tabs: tabMeta.deleted_tabs,
         cloned: cloneInfo.cloned,
         cloned_from: cloneInfo.from,
         rows
@@ -271,14 +373,15 @@ export async function getMonthlyBill(req, res) {
 
 /**
  * PUT /api/monthlyBill
- * Body: { year, month, rows: [{ row_index?, bill_description, due_day, amount, bill_type, action, paid_record_id? }] }
- * Full replace for that month (keeps forever history for other months).
+ * Body: { year, month, tab_label, rows: [...] }
+ * Full replace for that tab + month (keeps forever history for other months/tabs).
  */
 export async function putMonthlyBill(req, res) {
   try {
     const singlesId = requireSinglesId(req);
     const { year, month } = parseYearMonth(req.body || {});
     const storageBackend = readBillStorageBackend(req);
+    const tabLabel = normalizeTabLabel(req.body?.tab_label);
     const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
     if (!incoming) throw httpError(400, 'rows array required');
     if (incoming.length > 500) throw httpError(400, 'Too many rows (max 500)');
@@ -303,7 +406,6 @@ export async function putMonthlyBill(req, res) {
       };
     });
 
-    // Ensure unique row_index
     const seen = new Set();
     for (const r of normalized) {
       if (seen.has(r.row_index)) throw httpError(400, `Duplicate row_index ${r.row_index}`);
@@ -313,15 +415,14 @@ export async function putMonthlyBill(req, res) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      // Rows saved without paid_record_id keep their Bills/Receipts link (the DELETE below
-      // would otherwise orphan the paid_record and its attachments).
       const { rows: priorLinks } = await client.query(
         `SELECT monthly_bill_id, paid_record_id
            FROM outdateddbsnapshotoct2024.monthly_bill
           WHERE singles_id = $1 AND storage_backend = $2
-            AND bill_year = $3 AND bill_month = $4
+            AND tab_label = $3 AND soft_delete = false
+            AND bill_year = $4 AND bill_month = $5
             AND paid_record_id IS NOT NULL`,
-        [singlesId, storageBackend, year, month]
+        [singlesId, storageBackend, tabLabel, year, month]
       );
       const priorPaidByBillId = new Map(
         priorLinks.map((p) => [Number(p.monthly_bill_id), Number(p.paid_record_id)])
@@ -334,20 +435,22 @@ export async function putMonthlyBill(req, res) {
       await client.query(
         `DELETE FROM outdateddbsnapshotoct2024.monthly_bill
           WHERE singles_id = $1 AND storage_backend = $2
-            AND bill_year = $3 AND bill_month = $4`,
-        [singlesId, storageBackend, year, month]
+            AND tab_label = $3 AND soft_delete = false
+            AND bill_year = $4 AND bill_month = $5`,
+        [singlesId, storageBackend, tabLabel, year, month]
       );
       for (const r of normalized) {
         const { rows: inserted } = await client.query(
           `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
-             singles_id, storage_backend, bill_year, bill_month, row_index,
+             singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
              action, paid_record_id, bill_icon, email_scan_pending
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+           ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
            RETURNING monthly_bill_id`,
           [
             singlesId,
             storageBackend,
+            tabLabel,
             year,
             month,
             r.row_index,
@@ -371,7 +474,8 @@ export async function putMonthlyBill(req, res) {
           );
         }
       }
-      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend, tabLabel);
+      const tabMeta = await tabsPayload(client, singlesId, storageBackend);
       await client.query('COMMIT');
       return res.json({
         ok: true,
@@ -379,7 +483,225 @@ export async function putMonthlyBill(req, res) {
         bill_month: month,
         bill_month_key: billMonthKey(year, month),
         storage_backend: storageBackend,
+        tab_label: tabLabel,
+        tabs: tabMeta.tabs,
+        deleted_tabs: tabMeta.deleted_tabs,
         rows
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/** POST /api/monthlyBill/tab/add — create next homeN tab (blank anchor row for year/month). */
+export async function postMonthlyBillTabAdd(req, res) {
+  try {
+    const singlesId = requireSinglesId(req);
+    const { year, month } = parseYearMonth(req.body || {});
+    const storageBackend = readBillStorageBackend(req);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let allLabels = await listAllTabLabels(client, singlesId, storageBackend);
+      // Materialize virtual home1 so it remains listed after the first Add Tab.
+      if (allLabels.length === 0) {
+        await client.query(
+          `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
+             singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
+             bill_description, due_day, amount, bill_type, action, paid_record_id
+           ) VALUES ($1,$2,$3,false,$4,$5,1,'',NULL,'','Manual',NULL,NULL)`,
+          [singlesId, storageBackend, DEFAULT_MONTHLY_TAB_LABEL, year, month]
+        );
+        allLabels = [DEFAULT_MONTHLY_TAB_LABEL];
+      }
+      const tabLabel = nextHomeTabLabel(allLabels);
+      await client.query(
+        `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
+           singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
+           bill_description, due_day, amount, bill_type, action, paid_record_id
+         ) VALUES ($1,$2,$3,false,$4,$5,1,'',NULL,'','Manual',NULL,NULL)`,
+        [singlesId, storageBackend, tabLabel, year, month]
+      );
+      const tabMeta = await tabsPayload(client, singlesId, storageBackend);
+      await client.query('COMMIT');
+      return res.json({
+        ok: true,
+        tab_label: tabLabel,
+        tabs: tabMeta.tabs,
+        deleted_tabs: tabMeta.deleted_tabs
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/** POST /api/monthlyBill/tab/remove — soft-delete all rows for tab_label. */
+export async function postMonthlyBillTabRemove(req, res) {
+  try {
+    const singlesId = requireSinglesId(req);
+    const storageBackend = readBillStorageBackend(req);
+    const tabLabel = normalizeTabLabel(req.body?.tab_label);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const active = await listActiveTabs(client, singlesId, storageBackend);
+      if (!active.includes(tabLabel) && tabLabel === DEFAULT_MONTHLY_TAB_LABEL && active.length === 1) {
+        throw httpError(400, 'Cannot remove the only tab');
+      }
+      if (active.length <= 1) throw httpError(400, 'Cannot remove the only tab');
+      if (!active.includes(tabLabel)) throw httpError(404, 'Tab not found');
+
+      const { rowCount } = await client.query(
+        `UPDATE outdateddbsnapshotoct2024.monthly_bill
+            SET soft_delete = true, updated_at = now()
+          WHERE singles_id = $1 AND storage_backend = $2
+            AND tab_label = $3 AND soft_delete = false`,
+        [singlesId, storageBackend, tabLabel]
+      );
+      const tabMeta = await tabsPayload(client, singlesId, storageBackend);
+      await client.query('COMMIT');
+      return res.json({
+        ok: true,
+        removed: tabLabel,
+        rows_updated: Number(rowCount) || 0,
+        tabs: tabMeta.tabs,
+        deleted_tabs: tabMeta.deleted_tabs,
+        tab_label: tabMeta.tabs[0] || DEFAULT_MONTHLY_TAB_LABEL
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/** POST /api/monthlyBill/tab/undelete — restore soft-deleted tab. */
+export async function postMonthlyBillTabUndelete(req, res) {
+  try {
+    const singlesId = requireSinglesId(req);
+    const storageBackend = readBillStorageBackend(req);
+    const tabLabel = normalizeTabLabel(req.body?.tab_label);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const deleted = await listDeletedTabs(client, singlesId, storageBackend);
+      if (!deleted.includes(tabLabel)) throw httpError(404, 'Deleted tab not found');
+      const active = await listActiveTabs(client, singlesId, storageBackend);
+      if (active.includes(tabLabel)) throw httpError(409, 'An active tab already uses that name');
+
+      const { rowCount } = await client.query(
+        `UPDATE outdateddbsnapshotoct2024.monthly_bill
+            SET soft_delete = false, updated_at = now()
+          WHERE singles_id = $1 AND storage_backend = $2
+            AND tab_label = $3 AND soft_delete = true`,
+        [singlesId, storageBackend, tabLabel]
+      );
+      const tabMeta = await tabsPayload(client, singlesId, storageBackend);
+      await client.query('COMMIT');
+      return res.json({
+        ok: true,
+        tab_label: tabLabel,
+        rows_updated: Number(rowCount) || 0,
+        tabs: tabMeta.tabs,
+        deleted_tabs: tabMeta.deleted_tabs
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // ignore
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    return sendError(res, err);
+  }
+}
+
+/** POST /api/monthlyBill/tab/rename — rename tab_label across all months. */
+export async function postMonthlyBillTabRename(req, res) {
+  try {
+    const singlesId = requireSinglesId(req);
+    const storageBackend = readBillStorageBackend(req);
+    const fromLabel = normalizeTabLabel(req.body?.from ?? req.body?.tab_label);
+    const toLabel = normalizeTabLabel(req.body?.to ?? req.body?.new_tab_label);
+    if (fromLabel === toLabel) {
+      return res.json({ ok: true, tab_label: toLabel, renamed: false });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const allLabels = await listAllTabLabels(client, singlesId, storageBackend);
+      const active = await listActiveTabs(client, singlesId, storageBackend);
+
+      // Virtual home1 with no DB rows yet: materialize under the new name.
+      if (!allLabels.includes(fromLabel)) {
+        if (fromLabel !== DEFAULT_MONTHLY_TAB_LABEL || active[0] !== DEFAULT_MONTHLY_TAB_LABEL) {
+          throw httpError(404, 'Tab not found');
+        }
+        if (allLabels.map((l) => l.toLowerCase()).includes(toLabel.toLowerCase())) {
+          throw httpError(409, 'Tab name already exists');
+        }
+        const { year, month } = parseYearMonth(req.body || {});
+        await client.query(
+          `INSERT INTO outdateddbsnapshotoct2024.monthly_bill (
+             singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
+             bill_description, due_day, amount, bill_type, action, paid_record_id
+           ) VALUES ($1,$2,$3,false,$4,$5,1,'',NULL,'','Manual',NULL,NULL)`,
+          [singlesId, storageBackend, toLabel, year, month]
+        );
+      } else {
+        if (!active.includes(fromLabel)) throw httpError(404, 'Tab not found');
+        if (allLabels.map((l) => l.toLowerCase()).includes(toLabel.toLowerCase())) {
+          throw httpError(409, 'Tab name already exists');
+        }
+        await client.query(
+          `UPDATE outdateddbsnapshotoct2024.monthly_bill
+              SET tab_label = $4, updated_at = now()
+            WHERE singles_id = $1 AND storage_backend = $2
+              AND tab_label = $3 AND soft_delete = false`,
+          [singlesId, storageBackend, fromLabel, toLabel]
+        );
+      }
+      const tabMeta = await tabsPayload(client, singlesId, storageBackend);
+      await client.query('COMMIT');
+      return res.json({
+        ok: true,
+        renamed: true,
+        from: fromLabel,
+        tab_label: toLabel,
+        tabs: tabMeta.tabs,
+        deleted_tabs: tabMeta.deleted_tabs
       });
     } catch (err) {
       try {

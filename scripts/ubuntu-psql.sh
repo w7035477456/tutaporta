@@ -6,9 +6,11 @@
 #   echo "SELECT 1;" | scripts/ubuntu-psql.sh
 #   scripts/ubuntu-psql.sh -At -c "SELECT count(*) FROM outdateddbsnapshotoct2024.singles;"
 #
-# Password: UBUNTU_POSTGRES_PASSWORD in ~/.ssh/be/.env (Mac, outside git). It is sent as the first
-# line of the SSH stdin and read into PGPASSWORD remotely, so it never appears in argv / ps on
-# either host. Any other psql flags (-At, -x, --csv, …) are passed through.
+# Password (Mac ~/.ssh/be/.env, outside git), first match wins:
+#   1) UBUNTU_POSTGRES_PASSWORD
+#   2) DB_PASSWORD  (same test_user1 secret as BE .env — Mac and Ubuntu)
+# Sent as the first line of SSH stdin → remote PGPASSWORD (never in argv / ps).
+# Any other psql flags (-At, -x, --csv, …) are passed through.
 #
 # Overrides: UBUNTU_PG_HOST (127.0.0.1), UBUNTU_PG_PORT (50010), UBUNTU_PG_USER (test_user1),
 #            UBUNTU_PG_DB (outdatedDBOct2021), UBUNTU_SSH_HOST (lawsen0@192.168.222.200),
@@ -42,10 +44,22 @@ if [[ "$sql_set" -eq 0 ]]; then
 fi
 
 [[ -r "$SECRETS" ]] || { echo "ubuntu-psql: secrets file not readable: $SECRETS" >&2; exit 2; }
-password="$(sed -n 's/^UBUNTU_POSTGRES_PASSWORD=//p' "$SECRETS" | tail -n 1 | tr -d '\r')"
-password="${password%\"}"; password="${password#\"}"
-password="${password%\'}"; password="${password#\'}"
-[[ -n "$password" ]] || { echo "ubuntu-psql: UBUNTU_POSTGRES_PASSWORD missing in $SECRETS" >&2; exit 2; }
+# Strip optional surrounding quotes from a .env value.
+_strip_env_quotes() {
+  local v="$1"
+  v="${v%\"}"; v="${v#\"}"
+  v="${v%\'}"; v="${v#\'}"
+  printf '%s' "$v"
+}
+password="$(_strip_env_quotes "$(sed -n 's/^UBUNTU_POSTGRES_PASSWORD=//p' "$SECRETS" | tail -n 1 | tr -d '\r')")"
+if [[ -z "$password" ]]; then
+  # Same test_user1 password as BE DB_PASSWORD (Mac + Ubuntu .env); never use role "postgres".
+  password="$(_strip_env_quotes "$(sed -n 's/^DB_PASSWORD=//p' "$SECRETS" | tail -n 1 | tr -d '\r')")"
+fi
+[[ -n "$password" ]] || {
+  echo "ubuntu-psql: need UBUNTU_POSTGRES_PASSWORD or DB_PASSWORD in $SECRETS (user test_user1)" >&2
+  exit 2
+}
 
 remote_flags=""
 for f in ${psql_flags[@]+"${psql_flags[@]}"}; do

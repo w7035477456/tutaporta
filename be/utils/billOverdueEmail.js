@@ -127,7 +127,8 @@ async function loadMonthlyOverdueByUser(client, asOfDate) {
     FROM outdateddbsnapshotoct2024.monthly_bill mb
     INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = mb.singles_id
-    WHERE mb.bill_type = 'Manual'
+    WHERE mb.soft_delete = false
+      AND mb.bill_type = 'Manual'
       AND (mb.action IS DISTINCT FROM 'Paid')
       AND mb.due_day IS NOT NULL
       AND mb.due_day BETWEEN 1 AND 31
@@ -164,7 +165,8 @@ async function loadYearlyOverdueByUser(client, asOfDate) {
     FROM outdateddbsnapshotoct2024.yearly_bill yb
     INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = yb.singles_id
-    WHERE yb.bill_type = 'Manual'
+    WHERE yb.soft_delete = false
+      AND yb.bill_type = 'Manual'
       AND (yb.action IS DISTINCT FROM 'Paid')
       AND yb.bill_month IS NOT NULL
       AND yb.due_month_day IS NOT NULL
@@ -203,7 +205,8 @@ async function loadMonthlyAheadByUser(client, dueDate) {
     FROM outdateddbsnapshotoct2024.monthly_bill mb
     INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = mb.singles_id
-    WHERE mb.bill_type = 'Manual'
+    WHERE mb.soft_delete = false
+      AND mb.bill_type = 'Manual'
       AND (mb.action IS DISTINCT FROM 'Paid')
       AND mb.due_day IS NOT NULL
       AND mb.due_day BETWEEN 1 AND 31
@@ -240,7 +243,8 @@ async function loadYearlyAheadByUser(client, dueDate) {
     FROM outdateddbsnapshotoct2024.yearly_bill yb
     INNER JOIN outdateddbsnapshotoct2024.user_customization uc
       ON uc.singles_id = yb.singles_id
-    WHERE yb.bill_type = 'Manual'
+    WHERE yb.soft_delete = false
+      AND yb.bill_type = 'Manual'
       AND (yb.action IS DISTINCT FROM 'Paid')
       AND yb.bill_month IS NOT NULL
       AND yb.due_month_day IS NOT NULL

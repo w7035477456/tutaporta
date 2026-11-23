@@ -68,6 +68,8 @@ import { waitForVaultTransferThrottleTail } from 'utils/waitForVaultTransferThro
 import RecordVaultNoteEditor from './RecordVaultNoteEditor';
 import BillScheduleMonthlyPanel from './BillScheduleMonthlyPanel';
 import BillScheduleYearlyPanel from './BillScheduleYearlyPanel';
+import BillScheduleSubscriptionPanel from './BillScheduleSubscriptionPanel';
+import BillScheduleTodoPanel from './BillScheduleTodoPanel';
 import BillScheduleInstructionPopup from './BillScheduleInstructionPopup';
 import WorkspaceVideoTutorialPair from 'components/WorkspaceVideoTutorialPair';
 import {
@@ -78,6 +80,8 @@ import {
   isBillScheduleCrossPaneKind,
   isBillScheduleNotebookId,
   isBillScheduleSystemId,
+  isBillSubscriptionNoteId,
+  isBillTodoNoteId,
   isBillYearlyNoteId,
   isSelectableNoteId
 } from './billScheduleConstants';
@@ -135,6 +139,7 @@ import {
   normalizeRecordVaultFontSizePt
 } from './recordVaultNoteFontTokens';
 import { getIndexedNoteText, indexNoteSearchText, removeNoteSearchIndex, searchIndexedNotes } from './recordVaultSearchIndex';
+import { parseRecordVaultSearchQuery } from './recordVaultSearchQuery';
 import {
   buildRecordVaultRecentNoteSlots,
   recordVaultRecentScopeKey,
@@ -1455,7 +1460,7 @@ function RenamableDraggableMenuRow({
             if (!locked) onStartEdit();
           }}
           onDragStart={(e) => {
-            if (disabled) {
+            if (disabled || !onDragStart || !dragMime) {
               e.preventDefault();
               return;
             }
@@ -1934,6 +1939,8 @@ export default function RecordVaultWorkspacePane({
   const isBillScheduleView = isBillScheduleNotebookId(selectedNotebookId);
   const isBillMonthlyView = isBillMonthlyNoteId(selectedNoteId);
   const isBillYearlyView = isBillYearlyNoteId(selectedNoteId);
+  const isBillSubscriptionView = isBillSubscriptionNoteId(selectedNoteId);
+  const isBillTodoView = isBillTodoNoteId(selectedNoteId);
 
   useEffect(() => {
     selectedNotebookIdRef.current = selectedNotebookId;
@@ -2723,7 +2730,14 @@ export default function RecordVaultWorkspacePane({
   const openBillScheduleNote = useCallback(
     (noteId) => {
       const next = Number(noteId);
-      if (!isBillMonthlyNoteId(next) && !isBillYearlyNoteId(next)) return;
+      if (
+        !isBillMonthlyNoteId(next) &&
+        !isBillYearlyNoteId(next) &&
+        !isBillSubscriptionNoteId(next) &&
+        !isBillTodoNoteId(next)
+      ) {
+        return;
+      }
       notebookScopePendingRef.current = true;
       setInnerEncryptUiScope('notebook');
       setNoteContentLoading(false);
@@ -2806,23 +2820,31 @@ export default function RecordVaultWorkspacePane({
   );
 
   const runSearch = useCallback(async () => {
-    const t1 = searchTerm1.trim();
-    if (!t1) {
+    const raw = searchTerm1.trim();
+    if (!raw) {
       setAppliedSearchTerms([]);
       setSearchResults(null);
       setSearchMessage('');
       return;
     }
-    setAppliedSearchTerms([t1]);
+    // `word1 & word2` → AND; `word1 | word2` → OR (see parseRecordVaultSearchQuery).
+    const parsed = parseRecordVaultSearchQuery(raw);
+    if (!parsed.q1) {
+      setAppliedSearchTerms([]);
+      setSearchResults(null);
+      setSearchMessage('');
+      return;
+    }
+    setAppliedSearchTerms(parsed.terms);
     setSearchBusy(true);
     setError('');
     try {
       const results = await vaultApi.searchRecordVaultNotes({
-        q1: t1,
-        q2: '',
-        q3: '',
-        op1: 'and',
-        op2: 'and'
+        q1: parsed.q1,
+        q2: parsed.q2,
+        q3: parsed.q3,
+        op1: parsed.op1,
+        op2: parsed.op2
       });
       const noteById = new Map();
       for (const notebook of notebooks) {
@@ -2880,7 +2902,7 @@ export default function RecordVaultWorkspacePane({
         ids.add(noteId);
         merged.push(row);
       }
-      for (const hit of searchIndexedNotes(t1, { excludeNoteIds: excludeLockedIds })) {
+      for (const hit of searchIndexedNotes(parsed, { excludeNoteIds: excludeLockedIds })) {
         if (ids.has(hit.noteId)) continue;
         const found = noteById.get(hit.noteId);
         if (!found) continue;
@@ -2930,18 +2952,20 @@ export default function RecordVaultWorkspacePane({
    * match scan happens locally and only paints blinking highlights.
    */
   const runNoteSearch = useCallback(() => {
-    const term = noteSearchTerm.trim();
-    setNoteSearchSearched(Boolean(term));
-    if (!term) {
+    const raw = noteSearchTerm.trim();
+    setNoteSearchSearched(Boolean(raw));
+    if (!raw) {
       setNoteSearchTerms([]);
       setNoteSearchHitCount(0);
       setNoteSearchActiveHitIndex(-1);
       noteEditorApiRef.current?.clearNoteSearchHighlight?.();
       return;
     }
-    setNoteSearchTerms([term]);
+    // Same & / | operators as Search All — highlight each term in the open note.
+    const terms = parseRecordVaultSearchQuery(raw).terms;
+    setNoteSearchTerms(terms);
     const apply = () => {
-      const count = noteEditorApiRef.current?.applyNoteSearchHighlight?.([term]) || 0;
+      const count = noteEditorApiRef.current?.applyNoteSearchHighlight?.(terms) || 0;
       setNoteSearchHitCount(count);
       setNoteSearchActiveHitIndex(count > 0 ? 0 : -1);
     };
@@ -3788,7 +3812,12 @@ export default function RecordVaultWorkspacePane({
   const handleContentDragOver = useCallback(
     (event) => {
       // Bill Schedule Monthly/Yearly — file drops belong to Bills/Receipts popup, not vault note attach.
-      if (isBillMonthlyNoteId(selectedNoteId) || isBillYearlyNoteId(selectedNoteId)) {
+      if (
+        isBillMonthlyNoteId(selectedNoteId) ||
+        isBillYearlyNoteId(selectedNoteId) ||
+        isBillSubscriptionNoteId(selectedNoteId) ||
+        isBillTodoNoteId(selectedNoteId)
+      ) {
         return;
       }
       const types = event.dataTransfer?.types ? Array.from(event.dataTransfer.types) : [];
@@ -5070,6 +5099,9 @@ export default function RecordVaultWorkspacePane({
           notebookId = BILL_SCHEDULE_NOTEBOOK_ID;
         } else if (billKind === 'bill_yearly') {
           name = 'Yearly';
+          notebookId = BILL_SCHEDULE_NOTEBOOK_ID;
+        } else if (billKind === 'bill_subscription') {
+          name = 'Subscription';
           notebookId = BILL_SCHEDULE_NOTEBOOK_ID;
         } else if (mime === DRAG_NOTEBOOK) {
           const nb = notebooks.find((row) => Number(row.notebook_id) === Number(id));
@@ -7625,43 +7657,66 @@ export default function RecordVaultWorkspacePane({
                               >
                                 Bill Schedule
                               </Typography>
-                              {(billScheduleNotebook.notes || []).map((note) => (
-                                <Box key={note.note_id} sx={{ width: '100%', flexShrink: 0 }}>
-                                  <RenamableDraggableMenuRow
-                                    id={note.note_id}
-                                    domId={`record-vault-note-${note.note_id}`}
-                                    label={note.note_name}
-                                    buttonTitle={`${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`}
-                                    selected={Number(note.note_id) === Number(selectedNoteId)}
-                                    editing={false}
-                                    editValue=""
-                                    onEditValueChange={() => {}}
-                                    onSelect={() => openBillScheduleNote(note.note_id)}
-                                    onStartEdit={() => {}}
-                                    onCommitEdit={() => {}}
-                                    onCancelEdit={() => {}}
-                                    dragMime={DRAG_NOTE}
-                                    dragNotebookId={BILL_SCHEDULE_NOTEBOOK_ID}
-                                    draggingId={draggingNoteId}
-                                    dropTargetId={dropTargetNoteId}
-                                    acceptForeignDrop={crossPaneDropActive && isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)}
-                                    dragTitle={`Drag ${note.note_name} to the other vault to copy or move`}
-                                    onDragStart={handleDragStart}
-                                    onDragEnd={handleDragEnd}
-                                    onDragOver={() => {}}
-                                    onDrop={(e) => {
-                                      if (
-                                        tryHandleForeignCrossPaneDrop(e, {
-                                          targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
-                                        })
-                                      ) {
-                                        return;
-                                      }
-                                    }}
-                                    disabled={busy || crossPaneBusy}
-                                  />
-                                </Box>
-                              ))}
+                              <Box
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 1fr',
+                                  gap: 0.75,
+                                  width: '100%'
+                                }}
+                              >
+                                {(billScheduleNotebook.notes || []).map((note) => {
+                                  const canCrossPane = Boolean(billScheduleCrossPaneKind(note.note_id));
+                                  return (
+                                    <Box key={note.note_id} sx={{ width: '100%', minWidth: 0, flexShrink: 0 }}>
+                                      <RenamableDraggableMenuRow
+                                        id={note.note_id}
+                                        domId={`record-vault-note-${note.note_id}`}
+                                        label={note.note_name}
+                                        buttonTitle={
+                                          canCrossPane
+                                            ? `${note.note_name} — drag to the other vault (Cloud↔USB) to copy or move`
+                                            : note.note_name
+                                        }
+                                        selected={Number(note.note_id) === Number(selectedNoteId)}
+                                        editing={false}
+                                        editValue=""
+                                        onEditValueChange={() => {}}
+                                        onSelect={() => openBillScheduleNote(note.note_id)}
+                                        onStartEdit={() => {}}
+                                        onCommitEdit={() => {}}
+                                        onCancelEdit={() => {}}
+                                        dragMime={canCrossPane ? DRAG_NOTE : null}
+                                        dragNotebookId={BILL_SCHEDULE_NOTEBOOK_ID}
+                                        draggingId={draggingNoteId}
+                                        dropTargetId={dropTargetNoteId}
+                                        acceptForeignDrop={
+                                          crossPaneDropActive &&
+                                          isBillScheduleCrossPaneKind(getActiveCrossPaneDrag()?.kind)
+                                        }
+                                        dragTitle={
+                                          canCrossPane
+                                            ? `Drag ${note.note_name} to the other vault to copy or move`
+                                            : undefined
+                                        }
+                                        onDragStart={canCrossPane ? handleDragStart : undefined}
+                                        onDragEnd={canCrossPane ? handleDragEnd : undefined}
+                                        onDragOver={() => {}}
+                                        onDrop={(e) => {
+                                          if (
+                                            tryHandleForeignCrossPaneDrop(e, {
+                                              targetNotebookId: BILL_SCHEDULE_NOTEBOOK_ID
+                                            })
+                                          ) {
+                                            return;
+                                          }
+                                        }}
+                                        disabled={busy || crossPaneBusy}
+                                      />
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
                             </Box>
                             <WorkspaceVideoTutorialPair
                               videoTutorialUrl={videoTutorialUrl}
@@ -8057,8 +8112,22 @@ export default function RecordVaultWorkspacePane({
                       // from text selection and drags a huge translucent ghost. Export HTML from
                       // the notebook/note list on the left instead (PhotoAlbums uses the same rule).
                       draggable={false}
-                      onDragOver={isBillMonthlyView || isBillYearlyView ? undefined : handleContentDragOver}
-                      onDrop={isBillMonthlyView || isBillYearlyView ? undefined : handleContentFileDrop}
+                      onDragOver={
+                        isBillMonthlyView ||
+                        isBillYearlyView ||
+                        isBillSubscriptionView ||
+                        isBillTodoView
+                          ? undefined
+                          : handleContentDragOver
+                      }
+                      onDrop={
+                        isBillMonthlyView ||
+                        isBillYearlyView ||
+                        isBillSubscriptionView ||
+                        isBillTodoView
+                          ? undefined
+                          : handleContentFileDrop
+                      }
                       sx={{
                         flex: 1,
                         minWidth: 0,
@@ -8088,6 +8157,25 @@ export default function RecordVaultWorkspacePane({
                           return (
                             <BillScheduleYearlyPanel
                               storageType={paneStorageType}
+                              videoTutorialUrl={videoTutorialUrl}
+                              onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                              headerRightAction={billFocusToggle}
+                            />
+                          );
+                        }
+                        if (isBillSubscriptionView) {
+                          return (
+                            <BillScheduleSubscriptionPanel
+                              storageType={paneStorageType}
+                              videoTutorialUrl={videoTutorialUrl}
+                              onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
+                              headerRightAction={billFocusToggle}
+                            />
+                          );
+                        }
+                        if (isBillTodoView) {
+                          return (
+                            <BillScheduleTodoPanel
                               videoTutorialUrl={videoTutorialUrl}
                               onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
                               headerRightAction={billFocusToggle}

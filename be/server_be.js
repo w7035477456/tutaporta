@@ -575,8 +575,26 @@ import {
   rsvpSpeedDateEvent,
   startSpeedDateEvent
 } from './routes/speedDate/speedDateRoutes.js';
-import { getMonthlyBill, putMonthlyBill } from './routes/recordVault/monthlyBillRoutes.js';
-import { getYearlyBill, putYearlyBill } from './routes/recordVault/yearlyBillRoutes.js';
+import {
+  getMonthlyBill,
+  putMonthlyBill,
+  postMonthlyBillTabAdd,
+  postMonthlyBillTabRemove,
+  postMonthlyBillTabUndelete,
+  postMonthlyBillTabRename
+} from './routes/recordVault/monthlyBillRoutes.js';
+import {
+  getYearlyBill,
+  putYearlyBill,
+  postYearlyBillTabAdd,
+  postYearlyBillTabRemove,
+  postYearlyBillTabUndelete,
+  postYearlyBillTabRename
+} from './routes/recordVault/yearlyBillRoutes.js';
+import {
+  getSubscriptionBill,
+  putSubscriptionBill
+} from './routes/recordVault/subscriptionBillRoutes.js';
 import { transferBillSchedule } from './routes/recordVault/billScheduleTransferRoutes.js';
 import {
   getEmailScanStatus,
@@ -1845,8 +1863,18 @@ app.post('/api/speed-date/pairs/:pairId/interest', requireAuth, postSpeedDateInt
 
 app.get('/api/monthlyBill', requireAuth, getMonthlyBill);
 app.put('/api/monthlyBill', requireAuth, putMonthlyBill);
+app.post('/api/monthlyBill/tab/add', requireAuth, postMonthlyBillTabAdd);
+app.post('/api/monthlyBill/tab/remove', requireAuth, postMonthlyBillTabRemove);
+app.post('/api/monthlyBill/tab/undelete', requireAuth, postMonthlyBillTabUndelete);
+app.post('/api/monthlyBill/tab/rename', requireAuth, postMonthlyBillTabRename);
 app.get('/api/yearlyBill', requireAuth, getYearlyBill);
 app.put('/api/yearlyBill', requireAuth, putYearlyBill);
+app.post('/api/yearlyBill/tab/add', requireAuth, postYearlyBillTabAdd);
+app.post('/api/yearlyBill/tab/remove', requireAuth, postYearlyBillTabRemove);
+app.post('/api/yearlyBill/tab/undelete', requireAuth, postYearlyBillTabUndelete);
+app.post('/api/yearlyBill/tab/rename', requireAuth, postYearlyBillTabRename);
+app.get('/api/subscriptionBill', requireAuth, getSubscriptionBill);
+app.put('/api/subscriptionBill', requireAuth, putSubscriptionBill);
 app.post('/api/billSchedule/transfer', requireAuth, transferBillSchedule);
 app.post('/api/emailScan/inbox', requireAuth, postEmailScanInbox);
 app.get('/api/emailScan/status', requireAuth, getEmailScanStatus);

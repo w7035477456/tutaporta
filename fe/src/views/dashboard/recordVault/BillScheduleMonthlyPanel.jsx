@@ -5,9 +5,20 @@ import Select from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
-import { fetchMonthlyBill, saveMonthlyBill, transferBillSchedule } from 'api/monthlyBillFe';
+import SelectedButtonTemplate from 'ui-component/SelectedButtonTemplate';
+import UnSelectedButtonTemplate from 'ui-component/UnSelectedButtonTemplate';
+import {
+  addMonthlyBillTab,
+  fetchMonthlyBill,
+  removeMonthlyBillTab,
+  renameMonthlyBillTab,
+  saveMonthlyBill,
+  transferBillSchedule,
+  undeleteMonthlyBillTab
+} from 'api/monthlyBillFe';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PropTypes from 'prop-types';
+import { themedChoice, themedConfirm, themedPrompt } from 'utils/themedDialog';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import { notifyRecordVaultTreeReload } from './recordVaultCrossPaneDrag';
 import BillColumnButton from './BillColumnButton';
@@ -22,6 +33,10 @@ import {
   billScheduleApproveBtnSx,
   billScheduleRemoveRowBtnSx
 } from './billScheduleConstants';
+import {
+  BillScheduleDescColumnResizeHandle,
+  useBillScheduleDescColumnWidth
+} from './BillScheduleDescColumnResize';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import {
   BILL_SCHEDULE_INK,
@@ -31,8 +46,11 @@ import {
   billScheduleNavBtnSx,
   billSchedulePanelRootSx,
   billScheduleSelectSx,
+  billScheduleTabActionBtnSx,
   billScheduleTableSx
 } from './billScheduleTheme';
+
+const DEFAULT_TAB_LABEL = 'home1';
 
 /** Auto-pay fill — white label text on this background. */
 const YELLOW = '#B6A001';
@@ -56,7 +74,7 @@ const MONTH_NAMES = [
   'December'
 ];
 
-const TONE_RANK = { overdue: 4, paid: 3, auto: 2, upcoming: 1, none: 0 };
+const TONE_RANK = { overdue: 4, paid_off: 3, paid: 3, auto: 2, upcoming: 1, none: 0 };
 
 function blankRow(rowIndex) {
   return {
@@ -90,8 +108,13 @@ function isPaidAction(action) {
   return /^paid$/i.test(String(action ?? '').trim());
 }
 
+function isPaidOffType(billType) {
+  return /^paid\s*off$/i.test(String(billType ?? '').trim());
+}
+
 function computeStatusLocal(row, year, month, today = new Date()) {
   if (row.bill_type === 'Auto') return { status: '', status_tone: 'auto' };
+  if (isPaidOffType(row.bill_type)) return { status: '', status_tone: 'paid_off' };
   if (isPaidAction(row.action)) return { status: 'PAID', status_tone: 'paid' };
   const dueDay = Number(row.due_day);
   if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 31) {
@@ -148,6 +171,9 @@ export default function BillScheduleMonthlyPanel({
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [tabLabel, setTabLabel] = useState(DEFAULT_TAB_LABEL);
+  const [tabs, setTabs] = useState([DEFAULT_TAB_LABEL]);
+  const [deletedTabs, setDeletedTabs] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -162,40 +188,68 @@ export default function BillScheduleMonthlyPanel({
   const [iconPickerIndex, setIconPickerIndex] = useState(null);
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
+  const {
+    columnStyle: descColumnStyle,
+    startResize: startDescColumnResize,
+    resetWidth: resetDescColumnWidth
+  } = useBillScheduleDescColumnWidth();
   const [autoScanOpen, setAutoScanOpen] = useState(false);
+  const [tabBusy, setTabBusy] = useState(false);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const tabLabelRef = useRef(tabLabel);
+  tabLabelRef.current = tabLabel;
   const storageKey =
     String(storageTypeProp || paneStorageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
   const peerKey = storageKey === 'usb' ? 'tutaCloud' : 'usb';
   const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
   const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
 
-  const load = useCallback(async (y, m) => {
-    setLoading(true);
-    setError('');
-    setSavedMsg('');
-    setDirty(false);
-    try {
-      const data = await fetchMonthlyBill(y, m, { storageType: storageKey });
-      setRows(withDerived(data?.rows || [], y, m));
-      setPeerHasRows(Boolean(data?.peer_has_rows));
-    } catch (err) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to load monthly bills');
-      setRows([]);
-      setPeerHasRows(false);
-    } finally {
-      setLoading(false);
-    }
-  }, [storageKey]);
+  const applyTabMeta = (data, preferredTab) => {
+    const nextTabs =
+      Array.isArray(data?.tabs) && data.tabs.length ? data.tabs.map(String) : [DEFAULT_TAB_LABEL];
+    const nextDeleted = Array.isArray(data?.deleted_tabs) ? data.deleted_tabs.map(String) : [];
+    setTabs(nextTabs);
+    setDeletedTabs(nextDeleted);
+    const fromServer = data?.tab_label != null ? String(data.tab_label) : '';
+    const want = preferredTab != null ? String(preferredTab) : fromServer || tabLabelRef.current;
+    const resolved = nextTabs.includes(want) ? want : nextTabs[0];
+    setTabLabel(resolved);
+    return resolved;
+  };
+
+  const load = useCallback(
+    async (y, m, preferredTab) => {
+      setLoading(true);
+      setError('');
+      setSavedMsg('');
+      setDirty(false);
+      try {
+        const data = await fetchMonthlyBill(y, m, {
+          storageType: storageKey,
+          tabLabel: preferredTab || tabLabelRef.current || DEFAULT_TAB_LABEL
+        });
+        applyTabMeta(data, preferredTab ?? data?.tab_label);
+        setRows(withDerived(data?.rows || [], y, m));
+        setPeerHasRows(Boolean(data?.peer_has_rows));
+      } catch (err) {
+        setError(err?.response?.data?.error || err?.message || 'Failed to load monthly bills');
+        setRows([]);
+        setPeerHasRows(false);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [storageKey]
+  );
 
   useEffect(() => {
-    void load(year, month);
+    void load(year, month, tabLabelRef.current);
   }, [year, month, load]);
 
   useEffect(() => {
     const onReload = () => {
-      void load(year, month);
+      void load(year, month, tabLabelRef.current);
     };
     window.addEventListener('record-vault-tree-reload', onReload);
     return () => window.removeEventListener('record-vault-tree-reload', onReload);
@@ -213,7 +267,7 @@ export default function BillScheduleMonthlyPanel({
         targetStorageType: storageKey
       });
       notifyRecordVaultTreeReload(null);
-      await load(year, month);
+      await load(year, month, tabLabelRef.current);
       setSavedMsg(`Copied Monthly from ${peerLabel}`);
     } catch (err) {
       setError(err?.message || err?.response?.data?.error || 'Copy failed');
@@ -222,11 +276,117 @@ export default function BillScheduleMonthlyPanel({
     }
   };
 
+  const selectTab = async (nextTab) => {
+    if (!nextTab || nextTab === tabLabelRef.current) return;
+    if (dirty) {
+      const ok = await themedConfirm('You have unsaved changes. Discard and switch tabs?', {
+        title: 'Switch tab',
+        okLabel: 'Discard',
+        cancelLabel: 'Cancel'
+      });
+      if (!ok) return;
+    }
+    setTabLabel(nextTab);
+    await load(year, month, nextTab);
+  };
+
+  const handleAddTab = async () => {
+    if (tabBusy) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      if (dirty) {
+        const saved = await persistSchedule();
+        if (!saved) return;
+      }
+      const data = await addMonthlyBillTab(year, month, { storageType: storageKey });
+      applyTabMeta(data, data?.tab_label);
+      await load(year, month, data?.tab_label);
+      setSavedMsg(`Added tab ${data?.tab_label || ''}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to add tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
+  const handleRemoveTab = async () => {
+    if (tabBusy || tabs.length <= 1) return;
+    const current = tabLabelRef.current;
+    const ok = await themedConfirm('Are you sure to remove?', {
+      title: 'Remove tab',
+      okLabel: 'Remove',
+      cancelLabel: 'Cancel'
+    });
+    if (!ok) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      const data = await removeMonthlyBillTab(current, { storageType: storageKey });
+      applyTabMeta(data, data?.tab_label);
+      await load(year, month, data?.tab_label);
+      setSavedMsg(`Removed tab ${current}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to remove tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
+  const handleUndeleteTab = async () => {
+    if (tabBusy || !deletedTabs.length) return;
+    const choice = await themedChoice('Restore which tab?', {
+      title: 'Undelete Tabs',
+      choices: deletedTabs.map((t) => ({ value: t, label: t }))
+    });
+    if (!choice) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      const data = await undeleteMonthlyBillTab(choice, { storageType: storageKey });
+      applyTabMeta(data, data?.tab_label || choice);
+      await load(year, month, data?.tab_label || choice);
+      setSavedMsg(`Restored tab ${choice}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to undelete tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
+  const handleRenameTab = async (currentLabel) => {
+    if (tabBusy || !currentLabel) return;
+    const next = await themedPrompt('Rename tab', currentLabel, {
+      title: 'Tab name',
+      okLabel: 'Rename',
+      cancelLabel: 'Cancel'
+    });
+    if (next == null) return;
+    const trimmed = String(next).trim().slice(0, 64);
+    if (!trimmed || trimmed === currentLabel) return;
+    setTabBusy(true);
+    setError('');
+    try {
+      const data = await renameMonthlyBillTab(currentLabel, trimmed, {
+        storageType: storageKey,
+        year,
+        month
+      });
+      applyTabMeta(data, data?.tab_label || trimmed);
+      await load(year, month, data?.tab_label || trimmed);
+      setSavedMsg(`Renamed to ${data?.tab_label || trimmed}`);
+    } catch (err) {
+      setError(err?.response?.data?.error || err?.message || 'Failed to rename tab');
+    } finally {
+      setTabBusy(false);
+    }
+  };
+
   const updateRow = (index, patch) => {
     const next = rowsRef.current.map((r, i) => {
       if (i !== index) return r;
       const merged = { ...r, ...patch };
-      if (merged.bill_type === 'Auto') {
+      if (merged.bill_type === 'Auto' || isPaidOffType(merged.bill_type)) {
         merged.action = null;
         merged.paid_record_id = null;
       }
@@ -252,13 +412,21 @@ export default function BillScheduleMonthlyPanel({
           bill_description: r.bill_description,
           due_day: r.due_day === '' || r.due_day == null ? null : Number(r.due_day),
           amount: normalizeAmountLocal(r.amount),
-          bill_type: r.bill_type === 'Auto' ? 'Auto' : 'Manual',
-          action: r.bill_type === 'Auto' ? null : r.action,
+          bill_type: isPaidOffType(r.bill_type)
+            ? 'Paid Off'
+            : r.bill_type === 'Auto'
+              ? 'Auto'
+              : 'Manual',
+          action: r.bill_type === 'Auto' || isPaidOffType(r.bill_type) ? null : r.action,
           paid_record_id: r.paid_record_id,
           bill_icon: r.bill_icon || null,
           email_scan_pending: r.email_scan_pending === true
         }));
-        const data = await saveMonthlyBill(year, month, payload, { storageType: storageKey });
+        const data = await saveMonthlyBill(year, month, payload, {
+          storageType: storageKey,
+          tabLabel: tabLabelRef.current || DEFAULT_TAB_LABEL
+        });
+        if (data?.tabs) applyTabMeta(data, data?.tab_label || tabLabelRef.current);
         const next = withDerived(data?.rows || [], year, month);
         setRows(next);
         setSavedMsg('Saved');
@@ -292,6 +460,7 @@ export default function BillScheduleMonthlyPanel({
       kind: 'monthly',
       year,
       month,
+      tab_label: tabLabelRef.current || DEFAULT_TAB_LABEL,
       row_index: Number(target.row_index) || 1,
       monthly_bill_id: target.monthly_bill_id || undefined,
       bill_description: target.bill_description,
@@ -364,7 +533,7 @@ export default function BillScheduleMonthlyPanel({
       const next = updateRow(index, { action: nextAction });
       if (await persistSchedule(next)) return;
     }
-    await load(year, month);
+    await load(year, month, tabLabelRef.current);
   };
 
   const handleAdd = async () => {
@@ -430,7 +599,7 @@ export default function BillScheduleMonthlyPanel({
       const day = Number(r.due_day);
       if (!Number.isFinite(day) || day < 1) continue;
       const tone = r.status_tone || 'none';
-      if (tone === 'none') continue;
+      if (tone === 'none' || tone === 'paid_off') continue;
       const prev = map.get(day);
       if (!prev || (TONE_RANK[tone] || 0) > (TONE_RANK[prev] || 0)) map.set(day, tone);
     }
@@ -579,12 +748,91 @@ export default function BillScheduleMonthlyPanel({
         <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
       ) : null}
 
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1,
+          flexShrink: 0
+        }}
+      >
+        <Box
+          component="button"
+          type="button"
+          disabled={loading || saving || tabBusy}
+          onClick={() => void handleAddTab()}
+          sx={billScheduleTabActionBtnSx}
+        >
+          Add Tab
+        </Box>
+        <Box
+          component="button"
+          type="button"
+          disabled={loading || saving || tabBusy || tabs.length <= 1}
+          onClick={() => void handleRemoveTab()}
+          sx={billScheduleTabActionBtnSx}
+        >
+          Remove Current Tab
+        </Box>
+        <Box
+          component="button"
+          type="button"
+          disabled={loading || saving || tabBusy || deletedTabs.length === 0}
+          onClick={() => void handleUndeleteTab()}
+          sx={billScheduleTabActionBtnSx}
+        >
+          Undelete Tabs
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1,
+          flexShrink: 0
+        }}
+      >
+        {tabs.map((label) => {
+          const selected = label === tabLabel;
+          const TabBtn = selected ? SelectedButtonTemplate : UnSelectedButtonTemplate;
+          return (
+            <TabBtn
+              key={`monthly-tab-${label}`}
+              type="button"
+              {...(selected ? { labelTextBox: false } : null)}
+              transformOrigin="center"
+              disabled={loading || saving || tabBusy}
+              onClick={() => void selectTab(label)}
+              onDoubleClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void handleRenameTab(label);
+              }}
+              sx={{ minWidth: 88, px: 1.5, py: 0.5 }}
+            >
+              {label}
+            </TabBtn>
+          );
+        })}
+        <Typography sx={{ fontSize: '0.75rem', opacity: 0.65, ml: 0.5 }}>
+          Double-click a tab to rename
+        </Typography>
+      </Box>
+
       <Box component="table" sx={billScheduleTableSx}>
         <thead>
           <tr>
             <th style={{ width: 40 }}>#</th>
             <th style={{ width: 48, textAlign: 'center' }}>Icon</th>
-            <th>Bill Description</th>
+            <th style={{ ...descColumnStyle, position: 'relative' }}>
+              Bill Description
+              <BillScheduleDescColumnResizeHandle
+                onPointerDown={startDescColumnResize}
+                onReset={resetDescColumnWidth}
+              />
+            </th>
             <th style={{ width: 88 }}>Due Date</th>
             <th style={{ width: 120 }}>Amount</th>
             <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
@@ -596,14 +844,16 @@ export default function BillScheduleMonthlyPanel({
         <tbody>
           {rows.map((row, index) => {
             const auto = row.bill_type === 'Auto';
+            const paidOff = isPaidOffType(row.bill_type);
             const typeActionStatusBg = auto ? YELLOW : 'transparent';
-            const paid = !auto && row.status_tone === 'paid';
-            const statusBg = auto ? YELLOW : paid ? 'transparent' : cellToneBg(row.status_tone);
+            const paid = !auto && !paidOff && row.status_tone === 'paid';
+            const rowGrey = paid || paidOff;
+            const statusBg = auto ? YELLOW : rowGrey ? 'transparent' : cellToneBg(row.status_tone);
             return (
               <tr
                 key={`bill-row-${row.row_index}-${index}`}
                 style={{
-                  ...(paid ? { background: PAID_ROW_BG } : null),
+                  ...(rowGrey ? { background: PAID_ROW_BG } : null),
                   ...(row.email_scan_pending ? BILL_SCHEDULE_PENDING_ROW_STYLE : null)
                 }}
               >
@@ -615,7 +865,7 @@ export default function BillScheduleMonthlyPanel({
                     onClick={() => setIconPickerIndex(index)}
                   />
                 </td>
-                <td>
+                <td style={descColumnStyle}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <TextField
                       fullWidth
@@ -685,7 +935,11 @@ export default function BillScheduleMonthlyPanel({
                     onChange={(e) => updateRow(index, { bill_type: e.target.value })}
                     sx={{
                       ...selectSx,
-                      bgcolor: auto ? YELLOW : paid ? 'transparent' : BILL_SCHEDULE_SURFACE,
+                      bgcolor: auto
+                        ? YELLOW
+                        : rowGrey
+                          ? 'transparent'
+                          : BILL_SCHEDULE_SURFACE,
                       ...(auto
                         ? {
                             color: AUTO_PAY_TEXT,
@@ -701,10 +955,11 @@ export default function BillScheduleMonthlyPanel({
                   >
                     <MenuItem value="Auto">Auto</MenuItem>
                     <MenuItem value="Manual">Manual</MenuItem>
+                    <MenuItem value="Paid Off">Paid Off</MenuItem>
                   </Select>
                 </td>
                 <td style={{ background: typeActionStatusBg }}>
-                  {auto ? null : (
+                  {auto || paidOff ? null : (
                     <Select
                       fullWidth
                       size="small"
@@ -737,7 +992,7 @@ export default function BillScheduleMonthlyPanel({
                     color: row.status_tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK
                   }}
                 >
-                  {auto ? '' : row.status}
+                  {auto || paidOff ? '' : row.status}
                 </td>
               </tr>
             );

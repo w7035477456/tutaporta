@@ -48,13 +48,18 @@ export async function resetDefaultBillScheduleForMember(client, singlesId, now =
 
   const monthlyResult = await client.query(`DELETE FROM ${Q}.monthly_bill WHERE singles_id = $1`, [id]);
   const yearlyResult = await client.query(`DELETE FROM ${Q}.yearly_bill WHERE singles_id = $1`, [id]);
+  const subscriptionResult = await client.query(
+    `DELETE FROM ${Q}.subscription_bill WHERE singles_id = $1`,
+    [id]
+  );
 
   const seeded = await seedDefaultBillScheduleForNewMember(client, id, now);
 
   return {
     ...seeded,
     monthlyBillsDeleted: Number(monthlyResult.rowCount) || 0,
-    yearlyBillsDeleted: Number(yearlyResult.rowCount) || 0
+    yearlyBillsDeleted: Number(yearlyResult.rowCount) || 0,
+    subscriptionBillsDeleted: Number(subscriptionResult.rowCount) || 0
   };
 }
 
@@ -126,6 +131,7 @@ async function cascadeWipeUserContent(client, singlesId) {
     requestsDeleted: 0,
     monthlyBillsDeleted: 0,
     yearlyBillsDeleted: 0,
+    subscriptionBillsDeleted: 0,
     photoFolderFilesRemoved: 0,
     mobileUploadSessionsDeleted: 0
   };
@@ -178,6 +184,12 @@ async function cascadeWipeUserContent(client, singlesId) {
 
   const yearlyResult = await client.query(`DELETE FROM ${Q}.yearly_bill WHERE singles_id = $1`, [id]);
   summary.yearlyBillsDeleted = Number(yearlyResult.rowCount) || 0;
+
+  const subscriptionResult = await client.query(
+    `DELETE FROM ${Q}.subscription_bill WHERE singles_id = $1`,
+    [id]
+  );
+  summary.subscriptionBillsDeleted = Number(subscriptionResult.rowCount) || 0;
 
   const sessionTable = await client.query(
     `SELECT to_regclass($1) AS rel`,
