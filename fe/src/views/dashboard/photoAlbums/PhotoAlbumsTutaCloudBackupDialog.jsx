@@ -21,6 +21,7 @@ import {
 import PhotoAlbumsBackupPasswordDialog from './PhotoAlbumsBackupPasswordDialog';
 import { photoAlbumsBackupFileNamePreview } from 'utils/photoAlbumsBackupFileName';
 import { SUCCESS_ON_BLACK_BOX_SX } from 'config/successOnBlackBoxSx';
+import { buildBackupProgressBytesText } from 'utils/backupProgressBytesText';
 
 const actionRowSx = {
   display: 'flex',
@@ -93,23 +94,6 @@ const BACKUP_OPERATION_STEPS = {
     serverWaitText: 'server is unpacking albums into your vault'
   }
 };
-
-function buildBackupProgressBytesText(progress) {
-  if (!progress) return '';
-  const reportedTotal = Number(progress.totalBytes) || Number(progress.estimatedBytes) || 0;
-  const loaded = progress.stage === 'server' ? reportedTotal : Number(progress.loadedBytes);
-  if (progress.loadedBytes == null && progress.stage !== 'server') return '';
-  if (!Number.isFinite(loaded) || loaded < 0) return '';
-  if (!loaded && !reportedTotal) return '';
-  const total = reportedTotal > 0 ? Math.max(reportedTotal, loaded) : 0;
-  const largest = Math.max(loaded, total);
-  const MiB = 1024 * 1024;
-  const fmt = (bytes) =>
-    largest >= 10 * 1024 * MiB
-      ? `${(bytes / (1024 * MiB)).toFixed(2)}gb`
-      : `${(bytes / MiB).toFixed(largest >= 100 * MiB ? 0 : 1)}mb`;
-  return total > 0 ? `${fmt(loaded)} of ${fmt(total)} done` : `${fmt(loaded)} done`;
-}
 
 function buildBackupProgressLabel(progress, nowMs) {
   if (!progress) return '';

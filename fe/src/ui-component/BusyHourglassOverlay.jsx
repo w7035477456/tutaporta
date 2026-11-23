@@ -27,7 +27,7 @@ import VaultOverageThrottleNotice from 'ui-component/VaultOverageThrottleNotice'
  * Full-viewport centered spinning hourglass — site-wide busy indicator.
  * Renders via portal so it stays centered over modals and page chrome.
  * Optional progressPercent (0–100) shows "% done" plus an optional status label.
- * Optional progressDetail (e.g. "384mb of 1.6gb done") renders directly under the percent.
+ * Optional progressDetail (e.g. "1.4gb of 1.9gb done\\n1434mb of 1946mb done") renders under the percent.
  * Optional actionLabel + onAction (e.g. Skip OneDrive) for long waits.
  * When TutaNotes / TutaPhotoAlbums data-limit throttle is active, appends a REFILL notice (once —
  * backend progress labels may already include the same line).
@@ -177,7 +177,7 @@ export default function BusyHourglassOverlay({
         </Box>
       ) : null}
       {detailText ? (
-        <Box component="p" sx={{ ...statusParagraphSx, fontWeight: 800, whiteSpace: 'nowrap' }}>
+        <Box component="p" sx={{ ...statusParagraphSx, fontWeight: 800, whiteSpace: 'pre-line' }}>
           {detailText}
         </Box>
       ) : null}

@@ -24,11 +24,8 @@ import {
 import RecordVaultBackupPasswordDialog from './RecordVaultBackupPasswordDialog';
 import { tutaDriveBackupFileNamePreview } from 'utils/recordVaultBackupFileName';
 import { SUCCESS_ON_BLACK_BOX_SX } from 'config/successOnBlackBoxSx';
-import {
-  USAGE_DATA_GB_THRESHOLD_MB,
-  formatUsageDataAmount,
-  formatUsageDataAmountFromBytes
-} from 'ui-component/AdminEditableUsageDataAmount';
+import { formatUsageDataAmountFromBytes } from 'ui-component/AdminEditableUsageDataAmount';
+import { buildBackupProgressBytesText } from 'utils/backupProgressBytesText';
 
 const actionRowSx = {
   display: 'flex',
@@ -100,27 +97,6 @@ const BACKUP_OPERATION_STEPS = {
     serverWaitText: 'server is unpacking notes into your vault'
   }
 };
-
-/** "384mb of 1.6gb done" — each side uses GB once that value exceeds 999MB. */
-function buildBackupProgressBytesText(progress) {
-  if (!progress) return '';
-  const reportedTotal = Number(progress.totalBytes) || Number(progress.estimatedBytes) || 0;
-  const loaded = progress.stage === 'server' ? reportedTotal : Number(progress.loadedBytes);
-  if (progress.loadedBytes == null && progress.stage !== 'server') return '';
-  if (!Number.isFinite(loaded) || loaded < 0) return '';
-  if (!loaded && !reportedTotal) return '';
-  // An estimated total can undershoot the real zip size — grow it rather than stall at "Y of Y".
-  const total = reportedTotal > 0 ? Math.max(reportedTotal, loaded) : 0;
-  const MiB = 1024 * 1024;
-  const fmt = (bytes) => {
-    const mb = bytes / MiB;
-    return formatUsageDataAmount(mb, {
-      precisionMb: mb >= 100 && mb <= USAGE_DATA_GB_THRESHOLD_MB ? 0 : 1,
-      precisionGb: 1
-    });
-  };
-  return total > 0 ? `${fmt(loaded)} of ${fmt(total)} done` : `${fmt(loaded)} done`;
-}
 
 function buildBackupProgressLabel(progress, nowMs) {
   if (!progress) return '';
