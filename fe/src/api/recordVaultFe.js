@@ -445,6 +445,15 @@ export async function deleteRecordVaultNotebook(notebookId, { storageType } = {}
   return data;
 }
 
+export async function undeleteRecordVaultNotebook(notebookId, { storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: `/api/recordVault/notebooks/${notebookId}/undelete`,
+    storageType
+  });
+  return data;
+}
+
 export async function reorderRecordVaultNotebooks(notebookIds, { storageType } = {}) {
   const { data } = await rvRequest({method: 'PUT',
     url: '/api/recordVault/notebooks/reorder',
@@ -521,6 +530,15 @@ export async function moveRecordVaultNote(noteId, notebookId, { storageType } = 
 
 export async function deleteRecordVaultNote(noteId, { storageType } = {}) {
   const { data } = await rvRequest({method: 'DELETE', url: `/api/recordVault/notes/${noteId}`, storageType });
+  return data;
+}
+
+export async function undeleteRecordVaultNote(noteId, { storageType } = {}) {
+  const { data } = await rvRequest({
+    method: 'POST',
+    url: `/api/recordVault/notes/${noteId}/undelete`,
+    storageType
+  });
   return data;
 }
 
@@ -1824,6 +1842,7 @@ export function createRecordVaultPaneApi(storageType) {
     createRecordVaultNotebook: (name) => createRecordVaultNotebook(name, opts),
     updateRecordVaultNotebook: (id, name) => updateRecordVaultNotebook(id, name, opts),
     deleteRecordVaultNotebook: (id) => deleteRecordVaultNotebook(id, opts),
+    undeleteRecordVaultNotebook: (id) => undeleteRecordVaultNotebook(id, opts),
     reorderRecordVaultNotebooks: (ids) => reorderRecordVaultNotebooks(ids, opts),
     reorderRecordVaultNotes: (notebookId, ids) => reorderRecordVaultNotes(notebookId, ids, opts),
     createRecordVaultShortcut: (payload) => createRecordVaultShortcut(payload, opts),
@@ -1832,6 +1851,7 @@ export function createRecordVaultPaneApi(storageType) {
     createRecordVaultNote: (notebookId, payload) => createRecordVaultNote(notebookId, payload, opts),
     updateRecordVaultNote: (noteId, payload) => updateRecordVaultNote(noteId, payload, opts),
     deleteRecordVaultNote: (id) => deleteRecordVaultNote(id, opts),
+    undeleteRecordVaultNote: (id) => undeleteRecordVaultNote(id, opts),
     uploadRecordVaultNoteExtraImage: (noteId, payload) => uploadRecordVaultNoteExtraImage(noteId, payload, opts),
     deleteRecordVaultNoteExtraImage: (noteId, imageId) => deleteRecordVaultNoteExtraImage(noteId, imageId, opts),
     moveRecordVaultNoteImage: (payload) => moveRecordVaultNoteImage(payload, opts),

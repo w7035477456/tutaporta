@@ -1200,6 +1200,14 @@ export async function vaultGetNote(session, noteId) {
 
 /** Notebook/note sidebar tree — metadata only; no body_text, keywords, attachments, or extra_images. */
 export async function vaultGetTree(session) {
+  // Opportunistic: hard-purge this member's soft-deletes past the 48h window (throttled).
+  const now = Date.now();
+  if (!session._softDeletePurgeAt || now - session._softDeletePurgeAt > 15 * 60 * 1000) {
+    session._softDeletePurgeAt = now;
+    void vaultPurgeExpiredSoftDeletes(session).catch((err) => {
+      console.warn('[vaultGetTree] soft-delete purge failed:', err?.message || err);
+    });
+  }
   const db = session.db;
   const sid = db.singlesId;
   const [notebooks, notes, shortcutRows] = await Promise.all([
@@ -1342,21 +1350,79 @@ export async function vaultUpdateNotebook(session, notebookId, notebookName) {
   return loadNotebookRow(session.db, notebookId);
 }
 
+/** Soft-deleted notebooks/notes stay restorable via Undo Delete for this long, then hard-purge. */
+export const RECORD_VAULT_SOFT_DELETE_RETENTION_HOURS = 48;
+export const RECORD_VAULT_SOFT_DELETE_RETENTION_MS =
+  RECORD_VAULT_SOFT_DELETE_RETENTION_HOURS * 60 * 60 * 1000;
+
+export function isRecordVaultSoftDeletePastRetention(deletedAt, nowMs = Date.now()) {
+  if (deletedAt == null || deletedAt === '') return false;
+  const t = new Date(deletedAt).getTime();
+  if (!Number.isFinite(t)) return false;
+  return nowMs - t >= RECORD_VAULT_SOFT_DELETE_RETENTION_MS;
+}
+
+function assertSoftDeleteStillRestorable(deletedAt, label) {
+  if (isRecordVaultSoftDeletePastRetention(deletedAt)) {
+    throw new Error(
+      `${label} was deleted more than ${RECORD_VAULT_SOFT_DELETE_RETENTION_HOURS} hours ago and has been permanently removed`
+    );
+  }
+}
+
+/**
+ * Soft-delete a notebook (and its still-active notes). Media stays on disk so Undo Delete can restore
+ * for RECORD_VAULT_SOFT_DELETE_RETENTION_HOURS, then hard-purge removes rows + files.
+ */
 export async function vaultDeleteNotebook(session, notebookId) {
   await session.db.tx(async (tx) => {
-    const noteRows = await tx.all(
-      `SELECT note_id FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2`,
+    const nb = await tx.one(
+      `SELECT notebook_id FROM ${T.notebooks}
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
       [tx.singlesId, notebookId]
     );
-    for (const note of noteRows) {
-      await deleteNoteData(session, tx, Number(note.note_id));
-    }
-    // Wipe leftover files/{notebookId}/ and photos/{notebookId}/ (orphans + empty dirs).
-    removeNotebookMediaDirs(session, notebookId);
-    await tx.run(`DELETE FROM ${T.shortcuts} WHERE singles_id = $1 AND notebook_id = $2`, [tx.singlesId, notebookId]);
-    await tx.run(`DELETE FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2`, [tx.singlesId, notebookId]);
-    await tx.run(`DELETE FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2`, [tx.singlesId, notebookId]);
+    if (!nb) throw new Error('Notebook not found');
+    await tx.run(
+      `UPDATE ${T.notes} SET deleted_at = NOW(), updated_at = NOW()
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [tx.singlesId, notebookId]
+    );
+    await tx.run(
+      `UPDATE ${T.notebooks} SET deleted_at = NOW(), updated_at = NOW()
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [tx.singlesId, notebookId]
+    );
   });
+}
+
+/** Restore a soft-deleted notebook and all of its soft-deleted notes. Idempotent if already active. */
+export async function vaultUndeleteNotebook(session, notebookId) {
+  await session.db.tx(async (tx) => {
+    const active = await tx.one(
+      `SELECT notebook_id FROM ${T.notebooks}
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NULL`,
+      [tx.singlesId, notebookId]
+    );
+    if (active) return;
+    const nb = await tx.one(
+      `SELECT notebook_id, deleted_at FROM ${T.notebooks}
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NOT NULL`,
+      [tx.singlesId, notebookId]
+    );
+    if (!nb) throw new Error('Notebook not found');
+    assertSoftDeleteStillRestorable(nb.deleted_at, 'Notebook');
+    await tx.run(
+      `UPDATE ${T.notebooks} SET deleted_at = NULL, updated_at = NOW()
+        WHERE singles_id = $1 AND notebook_id = $2`,
+      [tx.singlesId, notebookId]
+    );
+    await tx.run(
+      `UPDATE ${T.notes} SET deleted_at = NULL, updated_at = NOW()
+        WHERE singles_id = $1 AND notebook_id = $2 AND deleted_at IS NOT NULL`,
+      [tx.singlesId, notebookId]
+    );
+  });
+  return loadNotebookRow(session.db, notebookId);
 }
 
 export async function vaultReorderNotebooks(session, notebookIds) {
@@ -1734,12 +1800,116 @@ async function deleteNoteData(session, tx, noteId) {
   return true;
 }
 
+/** Soft-delete a note. Media stays on disk so Undo Delete can restore. */
 export async function vaultDeleteNote(session, noteId) {
   await session.db.tx(async (tx) => {
     const note = await loadNote(tx, noteId);
     if (!note) throw new Error('Note not found');
-    await deleteNoteData(session, tx, noteId);
+    await tx.run(
+      `UPDATE ${T.notes} SET deleted_at = NOW(), updated_at = NOW()
+        WHERE singles_id = $1 AND note_id = $2 AND deleted_at IS NULL`,
+      [tx.singlesId, noteId]
+    );
   });
+}
+
+/** Restore a soft-deleted note (notebook must still be active). Idempotent if already active. */
+export async function vaultUndeleteNote(session, noteId) {
+  await session.db.tx(async (tx) => {
+    const active = await tx.one(
+      `SELECT n.note_id
+         FROM ${T.notes} n
+         JOIN ${T.notebooks} nb
+           ON nb.singles_id = n.singles_id AND nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
+        WHERE n.singles_id = $1 AND n.note_id = $2 AND n.deleted_at IS NULL`,
+      [tx.singlesId, noteId]
+    );
+    if (active) return;
+    const row = await tx.one(
+      `SELECT n.note_id, n.notebook_id, n.deleted_at
+         FROM ${T.notes} n
+         JOIN ${T.notebooks} nb
+           ON nb.singles_id = n.singles_id AND nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
+        WHERE n.singles_id = $1 AND n.note_id = $2 AND n.deleted_at IS NOT NULL`,
+      [tx.singlesId, noteId]
+    );
+    if (!row) throw new Error('Note not found');
+    assertSoftDeleteStillRestorable(row.deleted_at, 'Note');
+    await tx.run(
+      `UPDATE ${T.notes} SET deleted_at = NULL, updated_at = NOW()
+        WHERE singles_id = $1 AND note_id = $2`,
+      [tx.singlesId, noteId]
+    );
+  });
+  return loadNote(session.db, noteId);
+}
+
+/**
+ * Permanently remove soft-deleted notes/notebooks past the 48-hour retention window
+ * for one unlocked vault session (DB rows + on-disk media).
+ */
+export async function vaultPurgeExpiredSoftDeletes(session) {
+  if (!session?.db) return { notes: 0, notebooks: 0 };
+  const cutoffIso = new Date(Date.now() - RECORD_VAULT_SOFT_DELETE_RETENTION_MS).toISOString();
+  let notesPurged = 0;
+  let notebooksPurged = 0;
+
+  // Standalone notes first (parent notebook still live).
+  const expiredNotes = await session.db.all(
+    `SELECT n.note_id
+       FROM ${T.notes} n
+       JOIN ${T.notebooks} nb
+         ON nb.singles_id = n.singles_id AND nb.notebook_id = n.notebook_id AND nb.deleted_at IS NULL
+      WHERE n.singles_id = $1 AND n.deleted_at IS NOT NULL AND n.deleted_at < $2::timestamptz
+      ORDER BY n.note_id ASC`,
+    [session.db.singlesId, cutoffIso]
+  );
+  for (const row of expiredNotes) {
+    const noteId = Number(row.note_id);
+    if (!Number.isFinite(noteId) || noteId < 1) continue;
+    await session.db.tx(async (tx) => {
+      await deleteNoteData(session, tx, noteId);
+    });
+    notesPurged += 1;
+  }
+
+  const expiredNotebooks = await session.db.all(
+    `SELECT notebook_id
+       FROM ${T.notebooks}
+      WHERE singles_id = $1 AND deleted_at IS NOT NULL AND deleted_at < $2::timestamptz
+      ORDER BY notebook_id ASC`,
+    [session.db.singlesId, cutoffIso]
+  );
+  for (const row of expiredNotebooks) {
+    const notebookId = Number(row.notebook_id);
+    if (!Number.isFinite(notebookId) || notebookId < 1) continue;
+    await session.db.tx(async (tx) => {
+      const noteRows = await tx.all(
+        `SELECT note_id FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2`,
+        [tx.singlesId, notebookId]
+      );
+      for (const note of noteRows) {
+        await deleteNoteData(session, tx, Number(note.note_id));
+        notesPurged += 1;
+      }
+      await tx.run(`DELETE FROM ${T.shortcuts} WHERE singles_id = $1 AND notebook_id = $2`, [
+        tx.singlesId,
+        notebookId
+      ]);
+      await tx.run(`DELETE FROM ${T.notes} WHERE singles_id = $1 AND notebook_id = $2`, [
+        tx.singlesId,
+        notebookId
+      ]);
+      await tx.run(`DELETE FROM ${T.notebooks} WHERE singles_id = $1 AND notebook_id = $2`, [
+        tx.singlesId,
+        notebookId
+      ]);
+    });
+    removeNotebookMediaDirs(session, notebookId);
+    notebooksPurged += 1;
+  }
+
+  return { notes: notesPurged, notebooks: notebooksPurged };
 }
 
 export async function vaultReorderNotes(session, notebookId, noteIds) {

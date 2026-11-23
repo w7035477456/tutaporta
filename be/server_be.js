@@ -12,6 +12,7 @@ import { isSignupDownEnabled, rejectWhenSignupDown } from './utils/signupDownCon
 import { isBypassSmsPhoneVerificationEnabled } from './utils/bypassSmsPhoneVerification.js';
 import { startBlockedAsnDailyRefresh } from './utils/blockedAsnRefresh.js';
 import { startBillOverdueEmailDaily } from './utils/billOverdueEmail.js';
+import { startRecordVaultSoftDeletePurge } from './utils/recordVaultSoftDeletePurge.js';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -166,6 +167,8 @@ import {
   createRecordVaultShortcut,
   deleteRecordVaultNotebook,
   deleteRecordVaultNote,
+  undeleteRecordVaultNotebook,
+  undeleteRecordVaultNote,
   deleteRecordVaultShortcut,
   getRecordVaultNote,
   getRecordVaultNoteImage,
@@ -1583,12 +1586,14 @@ app.post('/api/recordVault/notebooks', ...recordVaultVaultAuth, createRecordVaul
 app.put('/api/recordVault/notebooks/reorder', ...recordVaultVaultAuth, reorderRecordVaultNotebooks);
 app.patch('/api/recordVault/notebooks/:notebookId', ...recordVaultVaultAuth, updateRecordVaultNotebook);
 app.delete('/api/recordVault/notebooks/:notebookId', ...recordVaultVaultAuth, deleteRecordVaultNotebook);
+app.post('/api/recordVault/notebooks/:notebookId/undelete', ...recordVaultVaultAuth, undeleteRecordVaultNotebook);
 app.post('/api/recordVault/notebooks/:notebookId/notes', ...recordVaultVaultAuth, createRecordVaultNote);
 app.put('/api/recordVault/notebooks/:notebookId/notes/reorder', ...recordVaultVaultAuth, reorderRecordVaultNotes);
 app.get('/api/recordVault/notes/:noteId', ...recordVaultVaultAuth, getRecordVaultNote);
 app.patch('/api/recordVault/notes/:noteId', ...recordVaultVaultAuth, updateRecordVaultNote);
 app.post('/api/recordVault/notes/move-image', ...recordVaultVaultAuth, moveRecordVaultNoteImage);
 app.delete('/api/recordVault/notes/:noteId', ...recordVaultVaultAuth, deleteRecordVaultNote);
+app.post('/api/recordVault/notes/:noteId/undelete', ...recordVaultVaultAuth, undeleteRecordVaultNote);
 app.get('/api/recordVault/notes/:noteId/image/top', ...recordVaultVaultAuth, getRecordVaultNoteImage);
 app.get('/api/recordVault/notes/:noteId/image/bottom', ...recordVaultVaultAuth, getRecordVaultNoteImage);
 app.get('/api/recordVault/notes/:noteId/image', ...recordVaultVaultAuth, getRecordVaultNoteImage);
@@ -2086,6 +2091,11 @@ httpServer.listen(PORT, () => {
     startBillOverdueEmailDaily();
   } catch (err) {
     console.error('[startup] bill overdue email schedule failed:', err?.message ?? err);
+  }
+  try {
+    startRecordVaultSoftDeletePurge();
+  } catch (err) {
+    console.error('[startup] record vault soft-delete purge schedule failed:', err?.message ?? err);
   }
   try {
     startEmailScanPoller();

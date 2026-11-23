@@ -13,6 +13,8 @@ import {
   vaultCreateShortcut,
   vaultDeleteNotebook,
   vaultDeleteNote,
+  vaultUndeleteNotebook,
+  vaultUndeleteNote,
   vaultDeleteShortcut,
   vaultGetNoteImage,
   vaultGetTree,
@@ -408,8 +410,39 @@ export async function deleteRecordVaultNotebook(req, res) {
     logImpersonatedMutation(req);
     return res.json({ success: true, notebook_id: notebookId, soft_deleted: true });
   } catch (err) {
+    if (err?.message === 'Notebook not found') {
+      return res.status(404).json({ error: err.message });
+    }
     return sendRecordVaultError(res, err, 'Failed to delete notebook', {
       route: 'deleteRecordVaultNotebook',
+      singlesId: req.auth?.singles_id
+    });
+  }
+}
+
+/** POST /api/recordVault/notebooks/:notebookId/undelete */
+export async function undeleteRecordVaultNotebook(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+
+  const notebookId = Number(req.params.notebookId);
+  if (!Number.isFinite(notebookId) || notebookId < 1) {
+    return res.status(400).json({ error: 'Invalid notebook id' });
+  }
+
+  try {
+    const notebook = await vaultUndeleteNotebook(session, notebookId);
+    logImpersonatedMutation(req);
+    return res.json({ success: true, notebook_id: notebookId, notebook, soft_deleted: false });
+  } catch (err) {
+    if (err?.message === 'Notebook not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (String(err?.message || '').includes('permanently removed')) {
+      return res.status(410).json({ error: err.message, code: 'RECORD_VAULT_SOFT_DELETE_EXPIRED' });
+    }
+    return sendRecordVaultError(res, err, 'Failed to undelete notebook', {
+      route: 'undeleteRecordVaultNotebook',
       singlesId: req.auth?.singles_id
     });
   }
@@ -557,6 +590,34 @@ export async function deleteRecordVaultNote(req, res) {
     }
     return sendRecordVaultError(res, err, 'Failed to delete note', {
       route: 'deleteRecordVaultNote',
+      singlesId: req.auth?.singles_id
+    });
+  }
+}
+
+/** POST /api/recordVault/notes/:noteId/undelete */
+export async function undeleteRecordVaultNote(req, res) {
+  const session = await requireVaultSession(req, res);
+  if (!session) return;
+
+  const noteId = Number(req.params.noteId);
+  if (!Number.isFinite(noteId) || noteId < 1) {
+    return res.status(400).json({ error: 'Invalid note id' });
+  }
+
+  try {
+    const note = await vaultUndeleteNote(session, noteId);
+    logImpersonatedMutation(req);
+    return res.json({ success: true, note_id: noteId, note, soft_deleted: false });
+  } catch (err) {
+    if (err?.message === 'Note not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    if (String(err?.message || '').includes('permanently removed')) {
+      return res.status(410).json({ error: err.message, code: 'RECORD_VAULT_SOFT_DELETE_EXPIRED' });
+    }
+    return sendRecordVaultError(res, err, 'Failed to undelete note', {
+      route: 'undeleteRecordVaultNote',
       singlesId: req.auth?.singles_id
     });
   }

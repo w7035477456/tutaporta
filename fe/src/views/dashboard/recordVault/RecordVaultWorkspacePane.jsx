@@ -12,6 +12,7 @@ import SliderControlButton, {
   SLIDER_CONTROL_BUTTON_HOVER_SCALE_50,
   SLIDER_CONTROL_TRUE_YELLOW
 } from 'ui-component/SliderControlButton';
+import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
 import VaultExitToMallToolbarButton from 'components/VaultExitToMallToolbarButton';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { MOBILE_UPLOAD_HOVER_TOOLTIP, mobileUploadHoverTooltipSlotProps } from 'config/mobileUploadHoverTooltip';
@@ -196,6 +197,15 @@ import {
   sortRecordVaultNotes,
   writeStoredRecordVaultNoteSortIndex
 } from './recordVaultNoteSort';
+import {
+  RECORD_VAULT_NOTEBOOK_SORT_DEFAULT_INDEX,
+  loadStoredRecordVaultNotebookSortIndex,
+  nextRecordVaultNotebookSortIndex,
+  recordVaultNotebookSortButtonLabel,
+  recordVaultNotebookSortTitle,
+  sortRecordVaultNotebooks,
+  writeStoredRecordVaultNotebookSortIndex
+} from './recordVaultNotebookSort';
 
 const LAYOUT_LS_KEY = 'recordVaultMenuLayout_v2';
 const NOTE_FONT_STYLE_LS_KEY = 'recordVaultNoteFontStyle_v1';
@@ -457,10 +467,8 @@ const laneAddButtonWrapSx = {
 };
 
 /**
- * Add Note header sort toggle — exactly HALF the Add Note button: 20px tall
- * instead of 40px, 1rem label instead of the inherited 2rem menu font, plain
- * yellow fill so it reads as a chip on the light-blue header row.
- * Cycle: "Create ↓" → "Create ↑" → "Date ↓" → "Date ↑" → "Name ↓" → "Name ↑" → back.
+ * Add Notebook / Add Note header sort toggle — half-height yellow chip on the
+ * light-blue header row. Cycle: Create ↓/↑ → Date ↓/↑ → Name ↓/↑ → back.
  */
 const noteSortHeaderButtonSx = {
   flex: '0 0 auto',
@@ -1543,11 +1551,18 @@ export default function RecordVaultWorkspacePane({
   const [searchParams, setSearchParams] = useSearchParams();
   const paneStorageType = useRecordVaultPaneStorageType();
   const vaultApi = useMemo(() => createRecordVaultPaneApi(paneStorageType), [paneStorageType]);
+  useEffect(() => {
+    setNotebookDeleteUndoStack([]);
+    setNoteDeleteUndoStack([]);
+  }, [paneStorageType]);
   const { user } = useAuth();
   const storedLayout = useMemo(() => loadStoredLayout(), []);
   const [loading, setLoading] = useState(true);
   const [vaultUiReady, setVaultUiReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** LIFO stacks for Undo Delete — last notebook/note × is restored first. */
+  const [notebookDeleteUndoStack, setNotebookDeleteUndoStack] = useState([]);
+  const [noteDeleteUndoStack, setNoteDeleteUndoStack] = useState([]);
   /** When set with busy, shows site BusyHourglassOverlay (e.g. notebook/note delete). */
   const [busyLabel, setBusyLabel] = useState('');
   const [batchUploadProgress] = useState(null);
@@ -1879,7 +1894,8 @@ export default function RecordVaultWorkspacePane({
   const [dropTargetNoteId, setDropTargetNoteId] = useState(null);
   const [draggingShortcutId, setDraggingShortcutId] = useState(null);
   const [dropTargetShortcutId, setDropTargetShortcutId] = useState(null);
-  /** Add Note header button — 6-step order cycle (Create ↓ / ↑, Date ↓ / ↑, Name ↓ / ↑). */
+  /** Add Notebook / Add Note header buttons — 6-step order cycle (Create ↓ / ↑, Date ↓ / ↑, Name ↓ / ↑). */
+  const [notebookSortIndex, setNotebookSortIndex] = useState(() => loadStoredRecordVaultNotebookSortIndex());
   const [noteSortIndex, setNoteSortIndex] = useState(() => loadStoredRecordVaultNoteSortIndex());
   const refreshVaultUsageRef = useRef(() => {});
   const bumpVaultUsageTimerRef = useRef(null);
@@ -1924,7 +1940,14 @@ export default function RecordVaultWorkspacePane({
 
   // Bill Schedule is a separate bottom box (not a notebook row). Keep a stable object for selection/content.
   const billScheduleNotebook = useMemo(() => buildBillScheduleNotebook(), []);
-  const displayNotebooks = notebooks;
+  /** Painted notebook rows; step 0 keeps stored (drag) order, other steps sort for display only. */
+  const displayNotebooks = useMemo(
+    () => sortRecordVaultNotebooks(notebooks, notebookSortIndex),
+    [notebooks, notebookSortIndex]
+  );
+  const notebookSortLabel = recordVaultNotebookSortButtonLabel(notebookSortIndex);
+  const notebookSortHoverTitle = recordVaultNotebookSortTitle(notebookSortIndex);
+  const notebookSortActive = notebookSortIndex !== RECORD_VAULT_NOTEBOOK_SORT_DEFAULT_INDEX;
 
   const selectedNotebook = useMemo(() => {
     if (isBillScheduleNotebookId(selectedNotebookId)) return billScheduleNotebook;
@@ -5495,9 +5518,23 @@ export default function RecordVaultWorkspacePane({
         void handleMoveNoteToNotebook(event, toId);
         return;
       }
+      if (notebookSortActive) {
+        // Sorted view: rows are not in stored order — skip persist reorder.
+        handleDragEnd();
+        return;
+      }
       void handleDropReorder(event, toId, mime, notebooks, 'notebook_id', (ids) => vaultApi.reorderRecordVaultNotebooks(ids));
     },
-    [draggingNoteId, handleDropReorder, handleMoveNoteToNotebook, notebooks, tryHandleForeignCrossPaneDrop, vaultApi]
+    [
+      draggingNoteId,
+      handleDragEnd,
+      handleDropReorder,
+      handleMoveNoteToNotebook,
+      notebookSortActive,
+      notebooks,
+      tryHandleForeignCrossPaneDrop,
+      vaultApi
+    ]
   );
 
   const handleShortcutDropFromLeft = useCallback(
@@ -6150,7 +6187,15 @@ export default function RecordVaultWorkspacePane({
     setCreateItemDialog('note');
   };
 
-  /** Add Note header toggle — one click per order, the 6th wraps back to Create ↓. */
+  /** Add Notebook / Add Note header toggles — one click per order; 6th wraps to Create ↓. */
+  const handleCycleNotebookSort = useCallback(() => {
+    setNotebookSortIndex((current) => {
+      const next = nextRecordVaultNotebookSortIndex(current);
+      writeStoredRecordVaultNotebookSortIndex(next);
+      return next;
+    });
+  }, []);
+
   const handleCycleNoteSort = useCallback(() => {
     setNoteSortIndex((current) => {
       const next = nextRecordVaultNoteSortIndex(current);
@@ -6220,7 +6265,12 @@ export default function RecordVaultWorkspacePane({
     if (isBillScheduleNotebookId(notebookId)) return;
     if (busy || !notebookId) return;
     const label = String(notebookName ?? 'this notebook').trim() || 'this notebook';
-    if (!(await themedConfirm(`Delete "${label}" and all its notes? You can restore within 7 days (undelete coming later).`))) return;
+    if (
+      !(await themedConfirm(
+        `Delete "${label}" and all its notes?\n\nUse Undo Delete to restore within 48 hours. After 48 hours the notebook and its notes are permanently deleted.`
+      ))
+    )
+      return;
     setBusyLabel('Deleting notebook');
     setBusy(true);
     setError('');
@@ -6234,10 +6284,38 @@ export default function RecordVaultWorkspacePane({
     doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.add(id));
     try {
       await vaultApi.deleteRecordVaultNotebook(notebookId);
+      setNotebookDeleteUndoStack((stack) =>
+        [...stack, { notebookId: Number(notebookId), label }].slice(-50)
+      );
+      // Notes soft-deleted with the notebook come back via notebook undo — drop their note-undo entries.
+      setNoteDeleteUndoStack((stack) =>
+        stack.filter((e) => Number(e?.notebookId) !== Number(notebookId))
+      );
       await loadTree({ silent: true });
     } catch (err) {
       doomedNoteIds.forEach((id) => deletedNoteIdsRef.current.delete(id));
       setError(readRecordVaultApiError(err, 'Failed to delete notebook'));
+    } finally {
+      setBusy(false);
+      setBusyLabel('');
+    }
+  };
+
+  const handleUndoDeleteNotebook = async () => {
+    if (busy || !notebookDeleteUndoStack.length) return;
+    const entry = notebookDeleteUndoStack[notebookDeleteUndoStack.length - 1];
+    const notebookId = Number(entry?.notebookId);
+    if (!Number.isFinite(notebookId) || notebookId < 1) return;
+    setBusyLabel('Undoing notebook delete');
+    setBusy(true);
+    setError('');
+    try {
+      await vaultApi.undeleteRecordVaultNotebook(notebookId);
+      setNotebookDeleteUndoStack((stack) => stack.slice(0, -1));
+      await loadTree({ silent: true });
+      setSelectedNotebookId(notebookId);
+    } catch (err) {
+      setError(readRecordVaultApiError(err, 'Failed to undo notebook delete'));
     } finally {
       setBusy(false);
       setBusyLabel('');
@@ -6252,10 +6330,15 @@ export default function RecordVaultWorkspacePane({
       Number(selectedNote?.note_id) === Number(noteId)
         ? selectedNote
         : notebooks.flatMap((nb) => nb.notes || []).find((n) => Number(n.note_id) === Number(noteId));
+    const notebookId = Number(note?.notebook_id || selectedNotebookId);
     const encrypted = noteHasInnerEncryption(note);
     const confirmed = encrypted
-      ? await themedConfirm('Are you sure you want to delete this file (encrypted)?')
-      : await themedConfirm(`Delete "${label}"? You can restore within 7 days (undelete coming later).`);
+      ? await themedConfirm(
+          'Are you sure you want to delete this file (encrypted)?\n\nUse Undo Delete to restore within 48 hours. After 48 hours it is permanently deleted.'
+        )
+      : await themedConfirm(
+          `Delete "${label}"?\n\nUse Undo Delete to restore within 48 hours. After 48 hours the note is permanently deleted.`
+        );
     if (!confirmed) return;
     setBusyLabel('Deleting note');
     setBusy(true);
@@ -6267,12 +6350,16 @@ export default function RecordVaultWorkspacePane({
     deletedNoteIdsRef.current.add(Number(noteId));
     try {
       await vaultApi.deleteRecordVaultNote(noteId);
+      setNoteDeleteUndoStack((stack) =>
+        [...stack, { noteId: Number(noteId), notebookId, label }].slice(-50)
+      );
       removeRecordVaultRecentNote(recentNotesScopeKey, noteId);
       bumpRecentNotes();
       clearInnerUnlockForNote(noteId);
-      const notebookId = Number(selectedNotebookId);
       const remainingNotes = (selectedNotebook?.notes || []).filter((n) => Number(n.note_id) !== Number(noteId));
-      setNotebooks((prev) => prev.map((nb) => (Number(nb.notebook_id) === notebookId ? { ...nb, notes: remainingNotes } : nb)));
+      setNotebooks((prev) =>
+        prev.map((nb) => (Number(nb.notebook_id) === notebookId ? { ...nb, notes: remainingNotes } : nb))
+      );
       setShortcuts((prev) => prev.filter((sc) => !(sc.target_type === 'note' && Number(sc.note_id) === Number(noteId))));
       if (Number(selectedNoteId) === Number(noteId)) {
         const nextNoteId = remainingNotes[0]?.note_id ?? null;
@@ -6282,6 +6369,32 @@ export default function RecordVaultWorkspacePane({
     } catch (err) {
       deletedNoteIdsRef.current.delete(Number(noteId));
       setError(readRecordVaultApiError(err, 'Failed to delete note'));
+    } finally {
+      setBusy(false);
+      setBusyLabel('');
+    }
+  };
+
+  const handleUndoDeleteNote = async () => {
+    if (busy || !noteDeleteUndoStack.length) return;
+    const entry = noteDeleteUndoStack[noteDeleteUndoStack.length - 1];
+    const noteId = Number(entry?.noteId);
+    const notebookId = Number(entry?.notebookId);
+    if (!Number.isFinite(noteId) || noteId < 1) return;
+    setBusyLabel('Undoing note delete');
+    setBusy(true);
+    setError('');
+    try {
+      await vaultApi.undeleteRecordVaultNote(noteId);
+      deletedNoteIdsRef.current.delete(noteId);
+      setNoteDeleteUndoStack((stack) => stack.slice(0, -1));
+      await loadTree({ silent: true });
+      if (Number.isFinite(notebookId) && notebookId > 0) {
+        setSelectedNotebookId(notebookId);
+      }
+      selectNoteId(noteId);
+    } catch (err) {
+      setError(readRecordVaultApiError(err, 'Failed to undo note delete'));
     } finally {
       setBusy(false);
       setBusyLabel('');
@@ -7754,19 +7867,62 @@ export default function RecordVaultWorkspacePane({
                               onDrop={(e) => void handleNotebookLaneFolderDrop(e)}
                               title="Drop a folder of .html notes here to import as a new notebook"
                             >
-                              <Box data-menu-label-slot="" sx={laneAddButtonWrapSx}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'stretch',
+                                  gap: 0.5,
+                                  flexShrink: 0,
+                                  mb: 1,
+                                  overflow: 'visible',
+                                  width: '100%'
+                                }}
+                              >
+                                <Box
+                                  data-menu-label-slot=""
+                                  sx={{ ...laneAddButtonWrapSx, flex: '1 1 auto', width: 'auto', mb: 0, minWidth: 0 }}
+                                >
+                                  <SliderControlButton
+                                    type="button"
+                                    fullWidth
+                                    onClick={handleAddNotebook}
+                                    disabled={busy}
+                                    hoverScale={1.25}
+                                    singleLineLabel
+                                    sx={laneContainedButtonOneLineSx}
+                                  >
+                                    Add Notebook
+                                  </SliderControlButton>
+                                </Box>
                                 <SliderControlButton
                                   type="button"
-                                  fullWidth
-                                  onClick={handleAddNotebook}
+                                  onClick={handleCycleNotebookSort}
                                   disabled={busy}
                                   hoverScale={1.25}
                                   singleLineLabel
-                                  sx={laneContainedButtonOneLineSx}
+                                  aria-label={`Sort notebooks — ${notebookSortHoverTitle}`}
+                                  title={notebookSortHoverTitle}
+                                  sx={noteSortHeaderButtonSx}
                                 >
-                                  Add Notebook
+                                  {notebookSortLabel}
                                 </SliderControlButton>
                               </Box>
+                              {notebookDeleteUndoStack.length > 0 ? (
+                                <Box sx={{ ...laneAddButtonWrapSx, mt: 0.5 }}>
+                                  <ColorTemplate13DisableGreenButton
+                                    type="button"
+                                    activeVariant="primary"
+                                    onClick={() => void handleUndoDeleteNotebook()}
+                                    disabled={busy}
+                                    sx={{ ...laneContainedButtonOneLineSx, width: '100%' }}
+                                  >
+                                    Undo Delete
+                                    {notebookDeleteUndoStack.length > 1
+                                      ? ` (${notebookDeleteUndoStack.length})`
+                                      : ''}
+                                  </ColorTemplate13DisableGreenButton>
+                                </Box>
+                              ) : null}
                               <Box
                                 sx={{
                                   ...recordVaultMenuListScrollSx,
@@ -7845,7 +8001,9 @@ export default function RecordVaultWorkspacePane({
                                             ? 'Drop here to copy or move from the other vault'
                                             : draggingNoteId != null
                                               ? 'Drop note here to move into this notebook'
-                                              : 'Drag to reorder; drag to Finder to export notebook folder + HTML notes'
+                                              : notebookSortActive
+                                                ? 'Sorted view — clear the sort (click until “Create ↓”) to drag-reorder notebooks'
+                                                : 'Drag to reorder; drag to Finder to export notebook folder + HTML notes'
                                         }
                                         onDragStart={handleDragStart}
                                         onDragEnd={handleDragEnd}
@@ -7929,6 +8087,24 @@ export default function RecordVaultWorkspacePane({
                                   {noteSortLabel}
                                 </SliderControlButton>
                               </Box>
+                              {noteDeleteUndoStack.length > 0 &&
+                              selectedNotebookId &&
+                              !isBillScheduleNotebookId(selectedNotebookId) ? (
+                                <Box sx={{ mb: 1, width: '100%' }}>
+                                  <ColorTemplate13DisableGreenButton
+                                    type="button"
+                                    activeVariant="primary"
+                                    onClick={() => void handleUndoDeleteNote()}
+                                    disabled={busy}
+                                    sx={{ ...laneContainedButtonOneLineSx, width: '100%' }}
+                                  >
+                                    Undo Delete
+                                    {noteDeleteUndoStack.length > 1
+                                      ? ` (${noteDeleteUndoStack.length})`
+                                      : ''}
+                                  </ColorTemplate13DisableGreenButton>
+                                </Box>
+                              ) : null}
                               <Box
                                 sx={{
                                   ...recordVaultMenuListScrollSx,
