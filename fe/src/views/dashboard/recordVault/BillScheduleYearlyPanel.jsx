@@ -29,7 +29,10 @@ import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
 import {
   BILL_SCHEDULE_PENDING_ROW_STYLE,
   billScheduleApproveBtnSx,
-  billScheduleRemoveRowBtnSx
+  billScheduleRemoveRowBtnSx,
+  popBillRowDeleteUndo,
+  pushBillRowDeleteUndo,
+  restoreBillRowFromDeleteUndo
 } from './billScheduleConstants';
 import {
   BillScheduleDescColumnResizeHandle,
@@ -297,6 +300,8 @@ export default function BillScheduleYearlyPanel({
   const [peerHasRows, setPeerHasRows] = useState(false);
   const [copyBusy, setCopyBusy] = useState(false);
   const [tabBusy, setTabBusy] = useState(false);
+  /** LIFO stack of removed rows for Undo Delete (last × first). */
+  const [deleteUndoStack, setDeleteUndoStack] = useState([]);
   const {
     columnStyle: descColumnStyle,
     startResize: startDescColumnResize,
@@ -331,6 +336,7 @@ export default function BillScheduleYearlyPanel({
       setError('');
       setSavedMsg('');
       setDirty(false);
+      setDeleteUndoStack([]);
       try {
         const data = await fetchYearlyBill(y, {
           storageType: storageKey,
@@ -683,13 +689,14 @@ export default function BillScheduleYearlyPanel({
   const handleRemoveRow = async (index) => {
     const prev = rowsRef.current;
     const removed = prev[index];
+    if (!removed) return;
+    setDeleteUndoStack((stack) => pushBillRowDeleteUndo(stack, removed, index));
     const renumbered = prev
       .filter((_, i) => i !== index)
       .map((r, i) => ({ ...r, row_index: i + 1 }));
     setRows(withDerived(renumbered, year));
     setSavedMsg('');
     if (
-      removed &&
       billPopupOpen &&
       billEnsurePayload &&
       (Number(removed.row_index) === Number(billEnsurePayload.row_index) ||
@@ -700,6 +707,16 @@ export default function BillScheduleYearlyPanel({
       setBillEnsurePayload(null);
     }
     await persistSchedule(renumbered);
+  };
+
+  const handleUndoDelete = async () => {
+    const { stack, entry } = popBillRowDeleteUndo(deleteUndoStack);
+    if (!entry) return;
+    setDeleteUndoStack(stack);
+    const restored = restoreBillRowFromDeleteUndo(rowsRef.current, entry);
+    setRows(withDerived(restored, year));
+    setSavedMsg('Undid delete');
+    await persistSchedule(restored);
   };
 
   const handleSave = async () => {
@@ -1271,9 +1288,19 @@ export default function BillScheduleYearlyPanel({
           gap: 1
         }}
       >
-        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
-          Add
-        </ColorTemplate13DisableGreenButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
+            Add
+          </ColorTemplate13DisableGreenButton>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            activeVariant="primary"
+            onClick={() => void handleUndoDelete()}
+            disabled={loading || saving || deleteUndoStack.length === 0}
+          >
+            Undo Delete{deleteUndoStack.length > 1 ? ` (${deleteUndoStack.length})` : ''}
+          </ColorTemplate13DisableGreenButton>
+        </Box>
         <Box
           component="aside"
           aria-label="Calendar legend"

@@ -20,7 +20,10 @@ import AutoScanEmailsPopup from './AutoScanEmailsPopup';
 import {
   BILL_SCHEDULE_PENDING_ROW_STYLE,
   billScheduleApproveBtnSx,
-  billScheduleRemoveRowBtnSx
+  billScheduleRemoveRowBtnSx,
+  popBillRowDeleteUndo,
+  pushBillRowDeleteUndo,
+  restoreBillRowFromDeleteUndo
 } from './billScheduleConstants';
 import {
   BillScheduleDescColumnResizeHandle,
@@ -177,6 +180,8 @@ export default function BillScheduleSubscriptionPanel({
     resetWidth: resetDescColumnWidth
   } = useBillScheduleDescColumnWidth();
   const [autoScanOpen, setAutoScanOpen] = useState(false);
+  /** LIFO stack of removed rows for Undo Delete (last × first). */
+  const [deleteUndoStack, setDeleteUndoStack] = useState([]);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
   const storageKey =
@@ -190,6 +195,7 @@ export default function BillScheduleSubscriptionPanel({
     setError('');
     setSavedMsg('');
     setDirty(false);
+    setDeleteUndoStack([]);
     try {
       const data = await fetchSubscriptionBill(y, m, { storageType: storageKey });
       setRows(withDerived(data?.rows || [], y, m));
@@ -406,13 +412,14 @@ export default function BillScheduleSubscriptionPanel({
   const handleRemoveRow = async (index) => {
     const prev = rowsRef.current;
     const removed = prev[index];
+    if (!removed) return;
+    setDeleteUndoStack((stack) => pushBillRowDeleteUndo(stack, removed, index));
     const renumbered = prev
       .filter((_, i) => i !== index)
       .map((r, i) => ({ ...r, row_index: i + 1 }));
     setRows(withDerived(renumbered, year, month));
     setSavedMsg('');
     if (
-      removed &&
       billPopupOpen &&
       billEnsurePayload &&
       (Number(removed.row_index) === Number(billEnsurePayload.row_index) ||
@@ -423,6 +430,16 @@ export default function BillScheduleSubscriptionPanel({
       setBillEnsurePayload(null);
     }
     await persistSchedule(renumbered);
+  };
+
+  const handleUndoDelete = async () => {
+    const { stack, entry } = popBillRowDeleteUndo(deleteUndoStack);
+    if (!entry) return;
+    setDeleteUndoStack(stack);
+    const restored = restoreBillRowFromDeleteUndo(rowsRef.current, entry);
+    setRows(withDerived(restored, year, month));
+    setSavedMsg('Undid delete');
+    await persistSchedule(restored);
   };
 
   const handleSave = async () => {
@@ -786,9 +803,19 @@ export default function BillScheduleSubscriptionPanel({
           gap: 1
         }}
       >
-        <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
-          Add
-        </ColorTemplate13DisableGreenButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
+            Add
+          </ColorTemplate13DisableGreenButton>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            activeVariant="primary"
+            onClick={() => void handleUndoDelete()}
+            disabled={loading || saving || deleteUndoStack.length === 0}
+          >
+            Undo Delete{deleteUndoStack.length > 1 ? ` (${deleteUndoStack.length})` : ''}
+          </ColorTemplate13DisableGreenButton>
+        </Box>
         <ColorTemplate13DisableGreenButton type="button" onClick={() => setAutoScanOpen(true)} disabled={loading}>
           Auto Scan Emails
         </ColorTemplate13DisableGreenButton>

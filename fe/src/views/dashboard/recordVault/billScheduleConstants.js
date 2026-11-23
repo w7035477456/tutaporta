@@ -72,6 +72,42 @@ export function isSelectableNoteId(id) {
   );
 }
 
+/** Max row-delete undos kept in memory (LIFO). */
+export const BILL_SCHEDULE_DELETE_UNDO_MAX = 50;
+
+/** Push a removed bill row onto the undo stack (last delete is undone first). */
+export function pushBillRowDeleteUndo(stack, row, insertIndex) {
+  const prev = Array.isArray(stack) ? stack : [];
+  const next = [
+    ...prev,
+    {
+      row: row && typeof row === 'object' ? { ...row } : row,
+      insertIndex: Math.max(0, Math.trunc(Number(insertIndex)) || 0)
+    }
+  ];
+  return next.length > BILL_SCHEDULE_DELETE_UNDO_MAX
+    ? next.slice(next.length - BILL_SCHEDULE_DELETE_UNDO_MAX)
+    : next;
+}
+
+/** Pop the most recent deleted row. */
+export function popBillRowDeleteUndo(stack) {
+  const prev = Array.isArray(stack) ? stack : [];
+  if (!prev.length) return { stack: prev, entry: null };
+  return { stack: prev.slice(0, -1), entry: prev[prev.length - 1] };
+}
+
+/** Re-insert a deleted row at its prior index and renumber #. */
+export function restoreBillRowFromDeleteUndo(rows, entry) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!entry?.row || typeof entry.row !== 'object') return list;
+  const idx = Math.max(0, Math.min(Number(entry.insertIndex) || 0, list.length));
+  return [...list.slice(0, idx), { ...entry.row }, ...list.slice(idx)].map((r, i) => ({
+    ...r,
+    row_index: i + 1
+  }));
+}
+
 /** Shared red × control at end of Bill Description rows. */
 export const billScheduleRemoveRowBtnSx = {
   width: 24,
