@@ -22,3 +22,14 @@ export const recordVaultYellowScrollbarSx = {
     filter: 'brightness(1.08)'
   }
 };
+
+/** Red thumb on a black track — used on the black Search All / Found strip. */
+export const recordVaultRedScrollbarSx = {
+  ...recordVaultYellowScrollbarSx,
+  scrollbarColor: `#e60000 ${SCROLLBAR_TRACK_BLACK}`,
+  '&::-webkit-scrollbar-thumb': {
+    bgcolor: '#e60000',
+    borderRadius: 7,
+    border: '2px solid #000'
+  }
+};

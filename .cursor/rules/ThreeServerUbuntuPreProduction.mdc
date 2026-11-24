@@ -1,11 +1,11 @@
 ---
-description: Ubuntu pre-production (xbox1 + xbox3 + xbox4, Dell S6000 40 Gb switch) — replaces the All-in-1 xbox2 development box
+description: Ubuntu pre-production (xbox1 + xbox3 + xbox4, Dell S6000 40 Gb switch) — replaces the All-in-1 xbox0 development box
 alwaysApply: true
 ---
 
 # Three-server Ubuntu pre-production (xbox1 + xbox3 + xbox4)
 
-Previously all development ran on one **All-in-1** Ubuntu server, **xbox0 (`192.168.222.200`)** — formerly called xbox2 — HAProxy/Nginx, Postgres Primary, and the web server (FE + BE) on one box, no switch, to keep power usage down (see `all-in-1UbuntuDevelopment.mdc`).
+Previously all development ran on one **All-in-1** Ubuntu server, **xbox0 (`192.168.222.200`)** — formerly called xbox0 — HAProxy/Nginx, Postgres Primary, and the web server (FE + BE) on one box, no switch, to keep power usage down (see `all-in-1UbuntuDevelopment.mdc`).
 
 **Andrew is now transitioning to semi-production-ready, using three Ubuntu servers:**
 

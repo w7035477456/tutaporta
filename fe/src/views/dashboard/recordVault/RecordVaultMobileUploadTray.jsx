@@ -72,7 +72,18 @@ function displayName(name) {
   return stripMobileUploadNamePrefix(name);
 }
 
-function ThumbTile({ entry, thumb, disabled, onRemove, selectable = false, selected = false, onToggleSelect, getDragNames, onDragDone }) {
+function ThumbTile({
+  entry,
+  thumb,
+  disabled,
+  onRemove,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  getDragNames,
+  onDragDone,
+  size = 72
+}) {
   const name = entry.name;
   const video = isVideoContentType(entry.contentType, name);
   return (
@@ -105,8 +116,8 @@ function ThumbTile({ entry, thumb, disabled, onRemove, selectable = false, selec
       sx={{
         position: 'relative',
         flex: '0 0 auto',
-        width: 72,
-        height: 72,
+        width: size,
+        height: size,
         border: selected ? '4px solid #1565c0' : '2px solid #000',
         borderRadius: 0.75,
         bgcolor: '#fff',
@@ -212,7 +223,8 @@ ThumbTile.propTypes = {
   selected: PropTypes.bool,
   onToggleSelect: PropTypes.func,
   getDragNames: PropTypes.func,
-  onDragDone: PropTypes.func
+  onDragDone: PropTypes.func,
+  size: PropTypes.number
 };
 
 /**
@@ -615,6 +627,8 @@ export default function RecordVaultMobileUploadTray({
   layout = 'horizontal',
   /** Horizontal only: sit inside another toolbar (no yellow bar, thumbnails boxed in black). */
   inline = false,
+  /** Inline only: smaller thumbnails / label and a bounded width (header top row, flush right). */
+  dense = false,
   /** Rendered before the title label (e.g. the phone-upload QR code). */
   leading = null,
   plain = false,
@@ -848,8 +862,9 @@ export default function RecordVaultMobileUploadTray({
       }
     : inline
       ? {
-          flex: '1 1 0',
+          flex: dense ? '0 1 auto' : '1 1 0',
           minWidth: 0,
+          ...(dense ? { width: { xs: '100%', md: 'clamp(280px, 30vw, 520px)' }, alignSelf: 'center', gap: 0.5, px: 0.75, py: 0.25 } : null),
           alignSelf: 'stretch',
           display: 'flex',
           alignItems: 'center',
@@ -902,8 +917,16 @@ export default function RecordVaultMobileUploadTray({
               ...recordVaultYellowScrollbarSx,
               ...(inline
                 ? {
-                    overflowX: 'scroll',
-                    alignSelf: 'stretch',
+                    overflowX: dense ? 'auto' : 'scroll',
+                    alignSelf: dense ? 'center' : 'stretch',
+                    ...(dense
+                      ? {
+                          py: 0,
+                          height: 48,
+                          boxSizing: 'border-box',
+                          '&::-webkit-scrollbar': { width: 6, height: 6 }
+                        }
+                      : null),
                     px: 0.75,
                     border: '3px solid #000',
                     borderRadius: 0.5,
@@ -919,7 +942,7 @@ export default function RecordVaultMobileUploadTray({
         <Typography
           sx={{
             fontWeight: 700,
-            fontSize: { xs: '0.75rem', sm: '0.85rem' },
+            fontSize: dense ? '0.7rem' : { xs: '0.75rem', sm: '0.85rem' },
             color: '#555',
             WebkitTextFillColor: '#555'
           }}
@@ -942,6 +965,7 @@ export default function RecordVaultMobileUploadTray({
           onToggleSelect={toggleSelect}
           getDragNames={selectable ? getDragNames : undefined}
           onDragDone={selectable ? clearSelection : undefined}
+          size={dense ? 38 : 72}
         />
       ))}
     </Box>
@@ -1000,7 +1024,7 @@ export default function RecordVaultMobileUploadTray({
               sx={{
                 fontFamily: MAIN_FONT_FAMILY,
                 fontWeight: 800,
-                fontSize: { xs: '0.85rem', sm: '1rem' },
+                fontSize: dense ? '0.75rem' : { xs: '0.85rem', sm: '1rem' },
                 lineHeight: 1.15,
                 color: '#000',
                 WebkitTextFillColor: '#000',
@@ -1070,6 +1094,7 @@ RecordVaultMobileUploadTray.propTypes = {
   onTitleClick: PropTypes.func,
   layout: PropTypes.oneOf(['horizontal', 'grid']),
   inline: PropTypes.bool,
+  dense: PropTypes.bool,
   leading: PropTypes.node,
   plain: PropTypes.bool,
   selectable: PropTypes.bool,

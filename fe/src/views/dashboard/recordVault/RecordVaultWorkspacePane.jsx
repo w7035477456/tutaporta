@@ -111,7 +111,7 @@ import RecordVaultMobileUploadTray, {
 } from './RecordVaultMobileUploadTray';
 import { MOBILE_UPLOAD_PRODUCT_TUTANOTES } from 'constants/mobileUploadProduct';
 import ProfilePhotoUploadQrPanel from 'components/ProfilePhotoUploadQrPanel';
-import { recordVaultYellowScrollbarSx } from './recordVaultYellowScrollbarSx';
+import { recordVaultYellowScrollbarSx, recordVaultRedScrollbarSx } from './recordVaultYellowScrollbarSx';
 import RecordVaultCrossPaneTransferDialog from './RecordVaultCrossPaneTransferDialog';
 import {
   clearActiveCrossPaneDrag,
@@ -168,7 +168,7 @@ import {
   resolveInnerUnlockLockedUntilMs,
   wipeAllPersistedInnerUnlockPins
 } from 'utils/recordVaultNoteInnerUnlockStorage';
-import { TUTANOTES_WORKSPACE_CONTENT_BG, TUTANOTES_WORKSPACE_PANEL_BG, tutaNotesStorageStripColor } from './tutaNotesBranding';
+import { TUTANOTES_WORKSPACE_CONTENT_BG, TUTANOTES_WORKSPACE_PANEL_BG } from './tutaNotesBranding';
 import {
   bodyHtmlHasInlineAttachmentIds,
   cleanRecordVaultNoteBodyHtml,
@@ -6607,14 +6607,13 @@ export default function RecordVaultWorkspacePane({
 
   const menuRailButtonCellSx = {
     flex: '0 0 auto',
-    p: 1,
+    px: 0.75,
+    py: 0.5,
     bgcolor: 'transparent',
     boxSizing: 'border-box',
     display: 'flex',
     alignItems: 'center'
   };
-
-  const paneStripColor = tutaNotesStorageStripColor(paneStorageType);
 
   return (
     <RecordVaultSliderControlButtonProvider fontRem={menuButtonFontRem} followEnvVw={menuButtonFontFollowEnvVw}>
@@ -7106,17 +7105,19 @@ export default function RecordVaultWorkspacePane({
                   overflow: 'visible',
                   borderBottom: '2px solid var(--theme-primary-color)',
                   zIndex: 3,
-                  pt: '2vh',
-                  alignItems: 'stretch',
+                  alignItems: 'center',
                   bgcolor: 'var(--theme-secondary-color)'
                 }}
               >
                 <Box
                   {...guestDemoAllowProps()}
                   sx={{
-                    flex: '0 0 auto',
+                    flex: '0 1 auto',
                     display: 'flex',
-                    flexDirection: 'column',
+                    // Task 1: all menu buttons on a single row (File … AI LLM RAG).
+                    flexDirection: 'row',
+                    flexWrap: { xs: 'wrap', md: 'nowrap' },
+                    alignItems: 'center',
                     bgcolor: 'transparent',
                     // Keep a stable minimum when menus are open (align with notebook sidebar),
                     // but allow the rail to grow so File / Close Menu / Exit never spill into Search.
@@ -7260,7 +7261,16 @@ export default function RecordVaultWorkspacePane({
                     ) : null}
                   </Box>
                   {!compareMode ? (
-                    <Box sx={{ display: 'flex', alignItems: 'stretch', minWidth: 0, overflow: 'visible' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'stretch',
+                        minWidth: 0,
+                        overflow: 'visible',
+                        // Single-row rail: size each cell to its button instead of sharing a column width.
+                        '& > *': { flex: '0 0 auto !important', maxWidth: 'none !important' }
+                      }}
+                    >
                       {paneStorageType === 'tutaCloud' && tutaCloudOffered ? (
                         <Box
                           sx={{
@@ -7452,34 +7462,18 @@ export default function RecordVaultWorkspacePane({
                     </Box>
                   ) : null}
                 </Box>
-                {!compareMode ? (
-                  <RecordVaultSearchBar
-                    searchLabel="Search All"
-                    term1={searchTerm1}
-                    onTerm1Change={setSearchTerm1}
-                    onSubmit={() => void runSearch()}
-                    onClear={handleClearSearch}
-                    searchBusy={searchBusy}
-                    clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
-                    bgcolor="var(--theme-secondary-color)"
-                    sx={{
-                      // Clear of Exit / left chrome — search zone starts after the button rail.
-                      ml: { xs: 0.75, sm: 1 },
-                      pl: { xs: 0.75, sm: 1 },
-                      borderLeft: '2px solid rgba(255,255,255,0.35)',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                ) : null}
+                {/* Task 2: push the (smaller) Mobile Upload tray flush right. */}
+                <Box sx={{ flex: '1 1 0', minWidth: 0 }} aria-hidden />
                 {!compareMode ? (
                   <RecordVaultMobileUploadTray
                     inline
+                    dense
                     leading={
                       unlocked ? (
                         <ProfilePhotoUploadQrPanel
                           variant="qrOnly"
                           purpose="tutanotes"
-                          qrSize={64}
+                          qrSize={44}
                           onPhoneUploadComplete={(fileNameOrId, meta) => void handleMobilePhoneUploadComplete(fileNameOrId, meta)}
                         />
                       ) : null
@@ -7496,166 +7490,187 @@ export default function RecordVaultWorkspacePane({
                     refreshToken={mobileUploadTrayRefreshToken}
                     onError={(msg) => setError(String(msg || ''))}
                   />
-                ) : (
-                  <Box sx={{ flex: 1, minWidth: 0, bgcolor: 'var(--theme-secondary-color)' }} aria-hidden />
-                )}
+                ) : null}
               </Box>
             ) : null}
 
             {!hideWorkspaceChrome && !compareMode ? (
               <Box
-                aria-label="Search results"
                 sx={{
                   flexShrink: 0,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 0.75,
-                  minHeight: 44,
-                  px: 1,
-                  py: 0.75,
-                  overflowX: 'auto',
-                  bgcolor: paneStripColor,
+                  minWidth: 0,
+                  bgcolor: '#000',
                   borderBottom: '2px solid var(--theme-primary-color)'
                 }}
               >
+                <RecordVaultSearchBar
+                  searchLabel="Search All"
+                  term1={searchTerm1}
+                  onTerm1Change={setSearchTerm1}
+                  onSubmit={() => void runSearch()}
+                  onClear={handleClearSearch}
+                  searchBusy={searchBusy}
+                  clearDisabled={busy || (!searchTerm1.trim() && !searchActive)}
+                  bgcolor="#000"
+                  sx={{ flex: '0 0 auto' }}
+                />
                 <Box
+                  aria-label="Search results"
                   sx={{
-                    flexShrink: 0,
-                    display: 'inline-flex',
+                    flex: '1 1 0',
+                    minWidth: 0,
+                    display: 'flex',
                     alignItems: 'center',
-                    border: '3px solid #000',
-                    borderRadius: 0.5,
-                    bgcolor: '#fff !important',
+                    gap: 0.75,
+                    minHeight: 44,
                     px: 1,
-                    py: 0.35,
-                    boxSizing: 'border-box'
+                    py: 0.75,
+                    overflowX: 'auto',
+                    bgcolor: '#000',
+                    ...recordVaultRedScrollbarSx
                   }}
                 >
-                  <Typography
-                    component="span"
-                    sx={{
-                      fontFamily: MAIN_FONT_FAMILY,
-                      fontWeight: 800,
-                      fontSize: { xs: '0.9rem', sm: '1rem' },
-                      lineHeight: 1.2,
-                      color: '#000',
-                      WebkitTextFillColor: '#000'
-                    }}
-                  >
-                    Found:
-                  </Typography>
-                </Box>
-                {searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
                   <Box
                     sx={{
                       flexShrink: 0,
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 0.25,
                       border: '3px solid #000',
-                      borderRadius: 0.75,
-                      bgcolor: '#fff',
-                      px: 0.5,
-                      py: 0.25
+                      borderRadius: 0.5,
+                      bgcolor: '#fff !important',
+                      px: 1,
+                      py: 0.35,
+                      boxSizing: 'border-box'
                     }}
                   >
-                    <Box
-                      component="button"
-                      type="button"
-                      aria-label="Previous document"
-                      title="Previous found note"
-                      onClick={() => goToSearchDoc(-1)}
-                      disabled={currentSearchDocIndex <= 0}
-                      sx={searchNavButtonSx}
-                    >
-                      ◀
-                    </Box>
-                    <Box
-                      component="button"
-                      type="button"
-                      aria-label="Previous match in note"
-                      title="Previous match in this note"
-                      onClick={() => goToSearchHit(-1)}
-                      disabled={searchHitCount <= 0 || activeHitIndex <= 0}
-                      sx={searchNavButtonSx}
-                    >
-                      ▲
-                    </Box>
                     <Typography
                       component="span"
                       sx={{
+                        fontFamily: MAIN_FONT_FAMILY,
                         fontWeight: 800,
-                        fontSize: '0.8rem',
+                        fontSize: { xs: '0.9rem', sm: '1rem' },
+                        lineHeight: 1.2,
                         color: '#000',
-                        WebkitTextFillColor: '#000',
-                        minWidth: 44,
-                        textAlign: 'center',
-                        userSelect: 'none'
+                        WebkitTextFillColor: '#000'
                       }}
                     >
-                      {searchHitCount > 0 ? `${activeHitIndex + 1}/${searchHitCount}` : '0/0'}
+                      Found:
                     </Typography>
-                    <Box
-                      component="button"
-                      type="button"
-                      aria-label="Next match in note"
-                      title="Next match in this note"
-                      onClick={() => goToSearchHit(1)}
-                      disabled={searchHitCount <= 0 || activeHitIndex >= searchHitCount - 1}
-                      sx={searchNavButtonSx}
-                    >
-                      ▼
-                    </Box>
-                    <Box
-                      component="button"
-                      type="button"
-                      aria-label="Next document"
-                      title="Next found note"
-                      onClick={() => goToSearchDoc(1)}
-                      disabled={currentSearchDocIndex >= searchResultTabs.length - 1}
-                      sx={searchNavButtonSx}
-                    >
-                      ▶
-                    </Box>
                   </Box>
-                ) : null}
-                {searchBusy ? (
-                  <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
-                    Searching…
-                  </Typography>
-                ) : searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
-                  searchResultTabs.map((tab) => {
-                    const selected =
-                      Number(tab.notebook_id) === Number(selectedNotebookId) && Number(tab.note_id) === Number(selectedNoteId);
-                    return (
-                      <SliderControlButton
-                        key={`search-tab-${tab.note_id}`}
+                  {searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
+                    <Box
+                      sx={{
+                        flexShrink: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.25,
+                        border: '3px solid #000',
+                        borderRadius: 0.75,
+                        bgcolor: '#fff',
+                        px: 0.5,
+                        py: 0.25
+                      }}
+                    >
+                      <Box
+                        component="button"
                         type="button"
-                        variant="yellow"
-                        disableHoverScale
-                        disableSelectedTranslate
-                        aria-pressed={selected}
-                        onClick={() => handleSearchResultSelect(tab.notebook_id, tab.note_id)}
+                        aria-label="Previous document"
+                        title="Previous found note"
+                        onClick={() => goToSearchDoc(-1)}
+                        disabled={currentSearchDocIndex <= 0}
+                        sx={searchNavButtonSx}
+                      >
+                        ◀
+                      </Box>
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="Previous match in note"
+                        title="Previous match in this note"
+                        onClick={() => goToSearchHit(-1)}
+                        disabled={searchHitCount <= 0 || activeHitIndex <= 0}
+                        sx={searchNavButtonSx}
+                      >
+                        ▲
+                      </Box>
+                      <Typography
+                        component="span"
                         sx={{
-                          flexShrink: 0,
-                          px: 1.25,
-                          py: 0.5,
-                          whiteSpace: 'nowrap',
-                          bgcolor: selected ? `${RECORD_VAULT_SEARCH_HIT_BLUE} !important` : 'var(--theme-yellow-color) !important',
-                          color: selected ? '#ffffff !important' : '#000000 !important',
-                          WebkitTextFillColor: selected ? '#ffffff !important' : '#000000 !important',
-                          border: '4px solid #000000 !important'
+                          fontWeight: 800,
+                          fontSize: '0.8rem',
+                          color: '#000',
+                          WebkitTextFillColor: '#000',
+                          minWidth: 44,
+                          textAlign: 'center',
+                          userSelect: 'none'
                         }}
                       >
-                        {tab.label}
-                      </SliderControlButton>
-                    );
-                  })
-                ) : searchActive && Array.isArray(searchResults) && !searchResultTabs.length ? (
-                  <Typography sx={{ fontWeight: 700, color: '#000', WebkitTextFillColor: '#000', fontSize: '0.9rem', flexShrink: 0 }}>
-                    {searchMessage || 'No notes match your search'}
-                  </Typography>
-                ) : null}
+                        {searchHitCount > 0 ? `${activeHitIndex + 1}/${searchHitCount}` : '0/0'}
+                      </Typography>
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="Next match in note"
+                        title="Next match in this note"
+                        onClick={() => goToSearchHit(1)}
+                        disabled={searchHitCount <= 0 || activeHitIndex >= searchHitCount - 1}
+                        sx={searchNavButtonSx}
+                      >
+                        ▼
+                      </Box>
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label="Next document"
+                        title="Next found note"
+                        onClick={() => goToSearchDoc(1)}
+                        disabled={currentSearchDocIndex >= searchResultTabs.length - 1}
+                        sx={searchNavButtonSx}
+                      >
+                        ▶
+                      </Box>
+                    </Box>
+                  ) : null}
+                  {searchBusy ? (
+                    <Typography sx={{ fontWeight: 700, color: '#fff', WebkitTextFillColor: '#fff', fontSize: '0.9rem', flexShrink: 0 }}>
+                      Searching…
+                    </Typography>
+                  ) : searchActive && Array.isArray(searchResults) && searchResultTabs.length > 0 ? (
+                    searchResultTabs.map((tab) => {
+                      const selected =
+                        Number(tab.notebook_id) === Number(selectedNotebookId) && Number(tab.note_id) === Number(selectedNoteId);
+                      return (
+                        <SliderControlButton
+                          key={`search-tab-${tab.note_id}`}
+                          type="button"
+                          variant="yellow"
+                          disableHoverScale
+                          disableSelectedTranslate
+                          aria-pressed={selected}
+                          onClick={() => handleSearchResultSelect(tab.notebook_id, tab.note_id)}
+                          sx={{
+                            flexShrink: 0,
+                            px: 1.25,
+                            py: 0.5,
+                            whiteSpace: 'nowrap',
+                            bgcolor: selected ? `${RECORD_VAULT_SEARCH_HIT_BLUE} !important` : 'var(--theme-yellow-color) !important',
+                            color: selected ? '#ffffff !important' : '#000000 !important',
+                            WebkitTextFillColor: selected ? '#ffffff !important' : '#000000 !important',
+                            border: '4px solid #000000 !important'
+                          }}
+                        >
+                          {tab.label}
+                        </SliderControlButton>
+                      );
+                    })
+                  ) : searchActive && Array.isArray(searchResults) && !searchResultTabs.length ? (
+                    <Typography sx={{ fontWeight: 700, color: '#fff', WebkitTextFillColor: '#fff', fontSize: '0.9rem', flexShrink: 0 }}>
+                      {searchMessage || 'No notes match your search'}
+                    </Typography>
+                  ) : null}
+                </Box>
               </Box>
             ) : null}
 
@@ -8391,133 +8406,155 @@ export default function RecordVaultWorkspacePane({
                                       data-rv-note-title-row
                                       sx={{
                                         display: 'flex',
-                                        alignItems: 'center',
-                                        flexWrap: 'wrap',
-                                        rowGap: 0.75,
-                                        gap: 1,
+                                        flexDirection: 'column',
+                                        alignItems: 'stretch',
+                                        gap: 0.75,
                                         mx: 1,
                                         mb: 0.5,
                                         px: 1.5,
                                         py: 1,
                                         border: '2px solid #000',
                                         borderRadius: 1,
-                                        bgcolor: '#fff',
+                                        bgcolor: '#000',
                                         flex: '0 0 auto'
                                       }}
                                     >
+                                      {/* Row 1: attach / rotate / in-note search / zoom / focus toggle. */}
                                       <Box
-                                        component="label"
-                                        htmlFor="rv-note-title-input"
                                         sx={{
-                                          fontWeight: 800,
-                                          color: '#000',
-                                          fontSize: '1.15rem',
-                                          flex: '0 0 auto'
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          flexWrap: 'wrap',
+                                          rowGap: 0.75,
+                                          gap: 1
                                         }}
                                       >
-                                        Title:
-                                      </Box>
-                                      {titleHasHighlight ? (
-                                        <Box
-                                          role="textbox"
-                                          tabIndex={0}
-                                          title="Click to edit title"
-                                          onClick={() => {
-                                            setTitleEditing(true);
-                                            setTimeout(() => {
-                                              const el = document.getElementById('rv-note-title-input');
-                                              if (el) {
-                                                el.focus();
-                                                el.select?.();
-                                              }
-                                            }, 0);
-                                          }}
-                                          sx={{
-                                            flex: 1,
-                                            minWidth: 0,
-                                            fontSize: '1.15rem',
-                                            fontWeight: 600,
-                                            color: '#000',
-                                            cursor: 'text',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
-                                          }}
-                                        >
-                                          {renderTitleWithSearchHighlight(openNoteTitlePlain, titleHighlightTerms, titleHighlightClass)}
-                                        </Box>
-                                      ) : (
-                                        <TextField
-                                          id="rv-note-title-input"
-                                          variant="standard"
-                                          fullWidth
-                                          value={openNoteTitlePlain}
-                                          onChange={(e) => handleNoteTitleBoxChange(e.target.value)}
-                                          onFocus={() => {
-                                            noteTitleBoxSnapshotRef.current = String(draftRef.current.openNoteTitlePlain ?? '');
-                                          }}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                              e.preventDefault();
-                                              e.currentTarget.blur();
-                                            } else if (e.key === 'Escape') {
-                                              e.preventDefault();
-                                              setOpenNoteTitlePlain(noteTitleBoxSnapshotRef.current);
-                                              draftRef.current = {
-                                                ...draftRef.current,
-                                                openNoteTitlePlain: noteTitleBoxSnapshotRef.current
-                                              };
-                                              setTitleEditing(false);
-                                              e.currentTarget.blur();
-                                            }
-                                          }}
-                                          onBlur={commitNoteTitleBox}
-                                          placeholder="Untitled note"
-                                          InputProps={{ disableUnderline: true }}
-                                          inputProps={{ 'aria-label': 'Note title', maxLength: 200 }}
-                                          sx={{
-                                            flex: 1,
-                                            minWidth: 0,
-                                            '& .MuiInputBase-input': {
-                                              fontSize: '1.15rem',
-                                              fontWeight: 600,
-                                              color: '#000',
-                                              p: 0
+                                        <RecordVaultNoteAttachButton
+                                          disabled={busy || lockedNow}
+                                          onFiles={async (files) => {
+                                            for (const file of files) {
+                                              await uploadNoteVaultFile(file, null);
                                             }
                                           }}
                                         />
-                                      )}
-                                      <RecordVaultNoteAttachButton
-                                        disabled={busy || lockedNow}
-                                        onFiles={async (files) => {
-                                          for (const file of files) {
-                                            await uploadNoteVaultFile(file, null);
-                                          }
-                                        }}
-                                      />
-                                      <RecordVaultImageRotateButton editor={noteEditor} disabled={lockedNow} />
-                                      <RecordVaultSearchBar
-                                        compact
-                                        searchLabel="Search Here"
-                                        term1={noteSearchTerm}
-                                        onTerm1Change={setNoteSearchTerm}
-                                        onSubmit={runNoteSearch}
-                                        onClear={handleClearNoteSearch}
-                                        clearDisabled={!noteSearchTerm.trim() && noteSearchHitCount === 0}
-                                        hitCount={noteSearchHitCount}
-                                        searched={noteSearchSearched}
-                                        activeHitIndex={noteSearchActiveHitIndex}
-                                        onPrevHit={() => goToNoteSearchHit(-1)}
-                                        onNextHit={() => goToNoteSearchHit(1)}
-                                        sx={{ ml: 0.5 }}
-                                      />
-                                      <RecordVaultNoteContentZoomBar value={noteContentZoom} onChange={setNoteContentZoom} />
-                                      <VaultWorkspaceFocusToggleButton
-                                        active={noteFocusView}
-                                        onToggle={() => setNoteFocusView((v) => !v)}
-                                        // Note-title expand glyph at 2× so it is easy to hit next to the title.
-                                        iconSize={64}
-                                      />
+                                        <RecordVaultImageRotateButton editor={noteEditor} disabled={lockedNow} />
+                                        <RecordVaultSearchBar
+                                          compact
+                                          searchLabel="Search Here"
+                                          term1={noteSearchTerm}
+                                          onTerm1Change={setNoteSearchTerm}
+                                          onSubmit={runNoteSearch}
+                                          onClear={handleClearNoteSearch}
+                                          clearDisabled={!noteSearchTerm.trim() && noteSearchHitCount === 0}
+                                          hitCount={noteSearchHitCount}
+                                          searched={noteSearchSearched}
+                                          activeHitIndex={noteSearchActiveHitIndex}
+                                          onPrevHit={() => goToNoteSearchHit(-1)}
+                                          onNextHit={() => goToNoteSearchHit(1)}
+                                          sx={{ ml: 0.5 }}
+                                        />
+                                        {/* Zoom + expand pinned flush right on row 1. */}
+                                        <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1, flex: '0 0 auto' }}>
+                                          <RecordVaultNoteContentZoomBar value={noteContentZoom} onChange={setNoteContentZoom} />
+                                          <VaultWorkspaceFocusToggleButton
+                                            active={noteFocusView}
+                                            onToggle={() => setNoteFocusView((v) => !v)}
+                                            // Sized to match the Zoom bar / Search Here buttons on the same row.
+                                            iconSize={24}
+                                          />
+                                        </Box>
+                                      </Box>
+                                      {/* Row 2: note title gets the full width so long titles are not truncated. */}
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                                        <Box
+                                          component="label"
+                                          htmlFor="rv-note-title-input"
+                                          sx={{
+                                            fontWeight: 800,
+                                            color: '#fff',
+                                            WebkitTextFillColor: '#fff',
+                                            fontSize: '1.15rem',
+                                            flex: '0 0 auto'
+                                          }}
+                                        >
+                                          Note:
+                                        </Box>
+                                        {titleHasHighlight ? (
+                                          <Box
+                                            role="textbox"
+                                            tabIndex={0}
+                                            title="Click to edit title"
+                                            onClick={() => {
+                                              setTitleEditing(true);
+                                              setTimeout(() => {
+                                                const el = document.getElementById('rv-note-title-input');
+                                                if (el) {
+                                                  el.focus();
+                                                  el.select?.();
+                                                }
+                                              }, 0);
+                                            }}
+                                            sx={{
+                                              flex: 1,
+                                              minWidth: 0,
+                                              fontSize: '1.15rem',
+                                              fontWeight: 600,
+                                              color: '#fff',
+                                              WebkitTextFillColor: '#fff',
+                                              cursor: 'text',
+                                              whiteSpace: 'nowrap',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis'
+                                            }}
+                                          >
+                                            {renderTitleWithSearchHighlight(openNoteTitlePlain, titleHighlightTerms, titleHighlightClass)}
+                                          </Box>
+                                        ) : (
+                                          <TextField
+                                            id="rv-note-title-input"
+                                            variant="standard"
+                                            fullWidth
+                                            value={openNoteTitlePlain}
+                                            onChange={(e) => handleNoteTitleBoxChange(e.target.value)}
+                                            onFocus={() => {
+                                              noteTitleBoxSnapshotRef.current = String(draftRef.current.openNoteTitlePlain ?? '');
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                              } else if (e.key === 'Escape') {
+                                                e.preventDefault();
+                                                setOpenNoteTitlePlain(noteTitleBoxSnapshotRef.current);
+                                                draftRef.current = {
+                                                  ...draftRef.current,
+                                                  openNoteTitlePlain: noteTitleBoxSnapshotRef.current
+                                                };
+                                                setTitleEditing(false);
+                                                e.currentTarget.blur();
+                                              }
+                                            }}
+                                            onBlur={commitNoteTitleBox}
+                                            placeholder="Untitled note"
+                                            InputProps={{ disableUnderline: true }}
+                                            inputProps={{ 'aria-label': 'Note title', maxLength: 200 }}
+                                            sx={{
+                                              flex: 1,
+                                              minWidth: 0,
+                                              '& .MuiInputBase-input': {
+                                                fontSize: '1.15rem',
+                                                fontWeight: 600,
+                                                color: '#fff',
+                                                WebkitTextFillColor: '#fff',
+                                                caretColor: '#fff',
+                                                bgcolor: 'transparent !important',
+                                                '&::placeholder': { color: '#bbb', WebkitTextFillColor: '#bbb', opacity: 1 },
+                                                p: 0
+                                              }
+                                            }}
+                                          />
+                                        )}
+                                      </Box>
                                     </Box>
                                   ) : null
                                 }
