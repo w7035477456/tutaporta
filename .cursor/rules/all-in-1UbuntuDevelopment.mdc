@@ -30,6 +30,12 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 - DB user: **`test_user1`** (superuser on Mac dev)
 - Qualify tables in SQL and migrations: `outdateddbsnapshotoct2024.singles`, etc.
 
+### Schema changes = migration files (required)
+
+- **Every schema change goes in a new file `be/db/migrations/YYYYMMDD_NN_shortName.sql`** (name order = run order; idempotent SQL where possible). Never edit a migration after it has been applied — add a new one.
+- Apply locally with **`dbmigrate`** (`scripts/db-migrate.sh`; `--status` / `--dry-run` change nothing). It records each file in `outdateddbsnapshotoct2024.schema_migrations`, so each runs once per machine.
+- `beall` (Mac) and `scripts/remote-deploy-work2.sh` (Ubuntu deploy, before `febeprod`) run it automatically, so checked-in code brings its schema change with it.
+
 ### Mac ↔ Ubuntu schema parity (required)
 
 1. **Every Mac Postgres schema change must also be applied to Ubuntu Postgres** on `192.168.222.200` (DDL, new tables/columns/indexes/enums/functions, migrations in `be/db/*.sql`, etc.). Either:

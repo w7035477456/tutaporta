@@ -44,6 +44,11 @@ fi
 # shellcheck source=/dev/null
 source "$HOME/b"
 
+# Schema first: apply any new be/db/migrations/*.sql to this host's Postgres before the
+# new build starts. A failed migration stops the deploy (the old build keeps running).
+echo "=== db-migrate (be/db/migrations) ==="
+bash "$REPO/scripts/db-migrate.sh" || { echo "ERROR: db-migrate failed — deploy stopped" >&2; exit 1; }
+
 febeprod
 git branch
 
